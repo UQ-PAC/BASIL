@@ -1,26 +1,30 @@
 grammar Bil;
 
+bil : line+ EOF;
 var : ID ;
 word : LITERAL ;
 assign : var ':=' exp ;
+line : exp ;
 exp : 
-      exp bop exp 
+      exp bop exp
     | '(' exp ')' 
     | uop exp 
+    | assign
     | var
     | word 
-    |exp ' with [' exp ',' ENDIAN ']:' NAT '<-' exp
+    | exp 'with' '[' exp ',' ENDIAN ']:' NAT '<-' exp
+    | CAST ':' NAT '[' exp ']'
 ;
 
 bop : PLUS | MINUS | TIMES | DIVIDE | MODULO | LSL | LSR | ASR | BAND | BOR | BXOR | EQ | LT | LE ;
 uop : NOT ;
 
-ID : [A-z]([A-z] | [0-9])* ;
+ENDIAN : ('el' | 'be');
+ID : ('X'([A-Z]|[a-z]|[0-9])* | 'mem');
 CAST : ('pad' | 'extend' | 'high' | 'low') ;
-NAT : ('32' | '64' | 'u32' | 'u64') ;
+NAT : ('u32' | 'u64' | '32' | '64') ;
 LITERAL : (('0x' [0-9]+) | [0-9]+) ;
-WHITESPACE : ' ' -> skip;
-ENDIAN : ('el' | 'be') ;
+WHITESPACE : ('\n'|' ')+ -> skip;
 PLUS : '+' ;
 MINUS : '-' ;
 TIMES : '*' ;
