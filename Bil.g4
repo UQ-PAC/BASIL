@@ -3,31 +3,36 @@ grammar Bil;
 bil : line+ EOF;
 var : ID ;
 sub : ID ;
-word : LITERAL ;
+word : number ;
 assign : var ':=' exp ;
-line : ADDRESS ADDR_SEP exp WHITESPACE? '\n';
+line : NUMBER ADDR_SEP exp NEWLINE;
 exp : exp bop exp
+    | word 
     | assign
     | '(' exp ')' 
     | uop exp 
     | var
-    | word 
-    | exp 'with' '[' exp ',' ENDIAN ']:' NAT '<-' exp
-    | CAST ':' NAT '[' exp ']'
-    | 'call' SUB 'with return' RET_ADDRESS
-    | 'sub' sub '(' (arg ',')* ')'
+    | exp 'with' '[' exp ',' ENDIAN ']:' nat '<-' exp
+    | CAST ':' nat '[' exp ']'
     ;
 
 bop : PLUS | MINUS | TIMES | DIVIDE | MODULO | LSL | LSR | ASR | BAND | BOR | BXOR | EQ | LT | LE ;
 uop : NOT ;
+number : (NUMBER | NAT32 | NAT64) ;
+nat : (NAT | NAT32 | NAT64) ;
 
-NAT : ('u32' | 'u64' | '32' | '64') ;
+NAT32 : '32' ;
+NAT64 : '64' ;
+NAT : ('u32' | 'u64') ;
 ENDIAN : ('el' | 'be');
-ADDRESS: ([0-9]|[a-f])+ ;
-ADDR_SEP: ':' ;
-LITERAL : (('0x' ([0-9]|[a-f])+) | [0-9]+) ;
-ID : ('X'([A-Z]|[a-z]|[0-9])* | 'mem');
+NUMBER : DECIMAL | HEX ;
 CAST : ('pad' | 'extend' | 'high' | 'low') ;
+ADDR_SEP: ':' ;
+ID : ALPHA (ALPHA | NUMBER)* ;
+fragment DECIMAL : [0-9]+ ;
+fragment HEX : '0x'? ([0-9]|[a-f])+ ;
+fragment ALPHA : ([A-Z]|[a-z])+ ;
+NEWLINE : '\r'? '\n' ;
 WHITESPACE : ' '+ -> skip;
 COMMENT : '//' ~[\r\n]* -> skip;
 PLUS : '+' ;
@@ -46,6 +51,4 @@ NEQ : '<>' ;
 LT : '<' ;
 LE : '<=' ;
 NOT : '~' ;
-SUB_REFERENCE : ('@' ([a-z]|[A-Z])+) | 'LR';
-RET_ADDRESS : '%' ([0-9]|[a-f])+ ;
 

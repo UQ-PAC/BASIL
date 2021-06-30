@@ -1,0 +1,43 @@
+00000515: sub foo(foo_result)
+00000528: foo_result :: out u32 = X0
+
+000001b9:
+000001be: SP := SP - 0x20
+000001c5: mem := mem with [SP + 0xC, el]:u32 <- low:32[X0]
+000001cc: X0 := pad:64[mem[SP + 0xC, el]:u32]
+000001d3: X0 := X0 + 1
+000001da: mem := mem with [SP + 0x1C, el]:u32 <- low:32[X0]
+000001e1: X0 := pad:64[mem[SP + 0x1C, el]:u32]
+000001e8: SP := SP + 0x20
+000001ee: call LR with noreturn
+
+00000516: sub main(main_argc, main_argv, main_result)
+00000529: main_argc :: in u32 = X0
+0000052a: main_argv :: in out u64 = X1
+0000052b: main_result :: out u32 = X0
+
+000001f1:
+000001f6: mem := mem with [SP - 0x10, el]:u64 <- FP
+000001fb: mem := mem with [SP - 8, el]:u64 <- LR
+00000200: SP := SP - 0x10
+00000207: FP := SP
+0000020e: X0 := 0x11000
+00000215: X0 := X0 + 0x14
+0000021c: X1 := 1
+00000223: mem := mem with [X0, el]:u32 <- low:32[X1]
+0000022a: X0 := 0x11000
+00000231: X0 := X0 + 0x14
+00000238: X0 := pad:64[mem[X0, el]:u32]
+0000023e: LR := 0x72C
+00000242: call @foo with return %00000244
+
+00000244:
+00000249: X1 := X0
+00000250: X0 := 0x11000
+00000257: X0 := X0 + 0x18
+0000025e: mem := mem with [X0, el]:u32 <- low:32[X1]
+00000265: X0 := 0
+0000026c: FP := mem[SP, el]:u64
+00000271: LR := mem[SP + 8, el]:u64
+00000276: SP := SP + 0x10
+0000027c: call LR with noreturn

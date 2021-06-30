@@ -1,0 +1,9 @@
+X0 := 0x11000
+X0 := X0 + 0x14                            
+X1 := 1
+mem := mem with [X0, el]:u32 <- low:32[X1] 
+X0 := 0x11000
+X0 := X0 + 0x18                            
+X1 := 2
+mem := mem with [X0, el]:u32 <- low:32[X1]
+X0 := 
