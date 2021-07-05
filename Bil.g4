@@ -1,20 +1,18 @@
 grammar Bil;
 
 bil : block+ EOF;
-block : sub param* (stmt|NEWLINE)* endsub NEWLINE* ; 
+block : sub paramTypes* (stmt|NEWLINE)* endsub NEWLINE* ; 
 
-sub : NUMBER ':' 'sub' ID '(' ID? (',' ID)* ')' NEWLINE;
-endsub : NUMBER ':' 'call LR with noreturn' NEWLINE;
-stmt : (NUMBER ':' (assign|call)? NEWLINE);
-
-
-param : NUMBER ':' ID '::' inout nat '=' var NEWLINE;
+sub : addr ':' 'sub' functionName '(' param? (',' param)* ')' NEWLINE;
+paramTypes : addr ':' param '::' inout nat '=' var NEWLINE;
+stmt : addr ':' (assign|call)? NEWLINE;
+endsub : addr ':' 'call LR with noreturn' NEWLINE;
 
 
 assign : var ':=' exp ;
-call : 'call' '@'? ID 'with' returnaddr ;
+call : 'call' '@'? functionName 'with' returnaddr ;
 exp : exp bop exp
-    | word 
+    | number
     | '(' exp ')' 
     | uop exp 
     | var
@@ -24,11 +22,13 @@ exp : exp bop exp
     ;
 
 var : ID ;
-word : number ;
+functionName : ID ;
+param : ID ;
 bop : PLUS | MINUS | TIMES | DIVIDE | MODULO | LSL | LSR | ASR | BAND | BOR | BXOR | EQ | LT | LE ;
 uop : NOT ;
 inout : 'in out' | 'in' | 'out' ;
-returnaddr : 'noreturn' | 'return' '%' number ;
+returnaddr : 'noreturn' | 'return' '%' addr ;
+addr : (NUMBER | NAT32 | NAT64) ;
 number : (NUMBER | NAT32 | NAT64) ;
 nat : (NAT | NAT32 | NAT64) ;
 
@@ -38,7 +38,6 @@ NAT : ('u32' | 'u64') ;
 ENDIAN : ('el' | 'be');
 NUMBER : HEX | DECIMAL;
 CAST : ('pad' | 'extend' | 'high' | 'low') ;
-ADDR_SEP: ':' ;
 ID : ALPHA (ALPHA | NUMBER | '_')* ;
 DECIMAL : [0-9]+ ;
 HEX : '0x'? ([0-9]|[a-f]|[A-F])+ ;
