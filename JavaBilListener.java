@@ -6,23 +6,22 @@ import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class JavaBilListener implements BilListener {
     private HashMap<String, String> functionStarts;
     private HashMap<String, String> functionEnds;
-    public List<Fact> facts;
+    public Set<Fact> facts;
 
     public JavaBilListener() {
         functionStarts = new HashMap<>();
         functionEnds = new HashMap<>();
-        facts = new ArrayList<>();
+        facts = new HashSet<>();
     }
 
     @Override
     public void enterBil(BilParser.BilContext ctx) {
+
     }
 
     @Override
@@ -32,35 +31,31 @@ public class JavaBilListener implements BilListener {
 
     @Override
     public void enterBlock(BilParser.BlockContext ctx) {
-        functionStarts.put(ctx.sub().ID(0).toString() ,ctx.stmt(0).NUMBER().toString());
-        functionEnds.put(ctx.sub().ID(0).toString() , ctx.endsub().NUMBER().toString());
-
-        List<BilParser.StmtContext> sctxs = ctx.stmt();
+        String fname = ctx.sub().functionName().getText();
+        functionStarts.put(fname, ctx.sub().addr().getText());
+        functionEnds.put(fname, ctx.endsub().addr().getText());
+        List<BilParser.StmtContext> statementCtx = ctx.stmt();
         int i;
-        for (i = 0; i < sctxs.size() - 1; i++) {
-            String i1 = sctxs.get(i).NUMBER().toString();
-
+        for (i = 0; i < statementCtx.size() - 1; i++) {
+            String i1 = statementCtx.get(i).addr().getText();
             String i2;
-            if (sctxs.get(i).call() != null) {
-                String fname = sctxs.get(i).call().ID().toString();
-                i2 = functionStarts.get(fname);
+            if (statementCtx.get(i).call() != null) {
+                String target = statementCtx.get(i).call().functionName().getText();
+                i2 = functionStarts.get(target);
 
-                // Return call
-                String j1 = functionEnds.get(fname);
-                String j2 = sctxs.get(i).call().returnaddr().number().NUMBER().toString();
-                Fact fact = new SuccessorFact(j1, j2);
-                facts.add(fact);
+                /* The successor of the return statement in the target function is the return address */
+                String j1 = functionEnds.get(target);
+                String j2 = statementCtx.get(i).call().returnaddr().addr().getText();
+                facts.add(new SuccessorFact(j1, j2));
             } else {
-                i2 = sctxs.get(i + 1).NUMBER().toString();
+                i2 = statementCtx.get(i + 1).addr().getText();
             }
-            Fact fact = new SuccessorFact(i1, i2);
-            System.out.println(fact);
+            facts.add(new SuccessorFact(i1, i2));
         }
         /* Last statement successor is the return call */
-        String i1 = sctxs.get(i).NUMBER().toString();
-        String i2 = ctx.endsub().NUMBER().toString();
-        Fact fact = new SuccessorFact(i1, i2);
-        facts.add(fact);
+        String i1 = statementCtx.get(i).addr().getText();
+        String i2 = ctx.endsub().addr().getText();
+        facts.add(new SuccessorFact(i1, i2));
     }
 
     @Override
@@ -79,12 +74,32 @@ public class JavaBilListener implements BilListener {
     }
 
     @Override
+    public void enterFunctionName(BilParser.FunctionNameContext ctx) {
+
+    }
+
+    @Override
+    public void exitFunctionName(BilParser.FunctionNameContext ctx) {
+
+    }
+
+    @Override
     public void enterSub(BilParser.SubContext ctx) {
 
     }
 
     @Override
     public void exitSub(BilParser.SubContext ctx) {
+
+    }
+
+    @Override
+    public void enterParamTypes(BilParser.ParamTypesContext ctx) {
+
+    }
+
+    @Override
+    public void exitParamTypes(BilParser.ParamTypesContext ctx) {
 
     }
 
@@ -118,15 +133,6 @@ public class JavaBilListener implements BilListener {
 
     }
 
-    @Override
-    public void enterWord(BilParser.WordContext ctx) {
-
-    }
-
-    @Override
-    public void exitWord(BilParser.WordContext ctx) {
-
-    }
 
     @Override
     public void enterAssign(BilParser.AssignContext ctx) {
@@ -196,6 +202,16 @@ public class JavaBilListener implements BilListener {
 
     @Override
     public void exitReturnaddr(BilParser.ReturnaddrContext ctx) {
+
+    }
+
+    @Override
+    public void enterAddr(BilParser.AddrContext ctx) {
+
+    }
+
+    @Override
+    public void exitAddr(BilParser.AddrContext ctx) {
 
     }
 
