@@ -1,14 +1,13 @@
 package Facts;
 
-public class UopFact {
+public class UopFact extends Fact {
     String pc;
     String lhs;
     ExprType type;
     String expr;
     String op;
 
-    public UopFact(String pc, String lhs, ExprType type, String expr, String op) {
-        this.type = type;
+    public UopFact(String pc, String lhs, String expr, String op) {
         this.expr = expr;
         this.lhs = lhs;
         this.pc = pc;

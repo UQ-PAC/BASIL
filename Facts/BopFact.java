@@ -1,6 +1,6 @@
 package Facts;
 
-public class BopFact {
+public class BopFact extends Fact {
     public ExprType lhsType;
     public ExprType rhsType;
     public String lhs;
@@ -14,6 +14,7 @@ public class BopFact {
         this.rhs1 = rhs1;
         this.rhs2 = rhs2;
         this.op = op;
+        this.pc = pc;
     }
 
     public BopFact(ExprType lhsType, String lhs, ExprType rhs1Type, String rhs1, ExprType rhs2Type, String rhs2) {

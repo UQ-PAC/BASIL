@@ -1,6 +1,5 @@
 
-import Facts.Fact;
-import Facts.SuccessorFact;
+import Facts.*;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.ParseTreeListener;
@@ -65,6 +64,9 @@ public class JavaBilListener implements BilListener {
 
     @Override
     public void enterVar(BilParser.VarContext ctx) {
+        String varName = ctx.getText();
+
+        facts.add(new IsRegFact(varName));
 
     }
 
@@ -115,6 +117,28 @@ public class JavaBilListener implements BilListener {
 
     @Override
     public void enterStmt(BilParser.StmtContext ctx) {
+        String pc = ctx.addr().getText();
+        if (ctx.assign() != null) {
+            BilParser.AssignContext assignCtx = ctx.assign();
+
+            String lhs = assignCtx.var().getText();
+
+            BilParser.ExpContext expCtx = assignCtx.exp();
+            if (expCtx.bop() != null) {
+                String bop = expCtx.bop().getText();
+                String rhs1 = expCtx.exp(0).getText();
+                String rhs2 = expCtx.exp(1).getText();
+                facts.add(new BopFact(pc, lhs, rhs1, rhs2, bop));
+            } else if (expCtx.uop() != null) {
+                String uop = expCtx.uop().getText();
+                String rhs = expCtx.exp(0).getText();
+                facts.add(new UopFact(pc, lhs, rhs, uop));
+            } else if (expCtx.var() != null) {
+                String rhs = expCtx.var().getText();
+                facts.add(new MoveFact(pc, lhs, rhs));
+            }
+        }
+
 
     }
 
@@ -136,7 +160,6 @@ public class JavaBilListener implements BilListener {
 
     @Override
     public void enterAssign(BilParser.AssignContext ctx) {
-
     }
 
     @Override
@@ -167,7 +190,6 @@ public class JavaBilListener implements BilListener {
 
     @Override
     public void enterBop(BilParser.BopContext ctx) {
-
     }
 
     @Override
@@ -216,11 +238,12 @@ public class JavaBilListener implements BilListener {
     }
 
     @Override
-    public void enterNumber(BilParser.NumberContext ctx) {
+    public void enterLiteral(BilParser.LiteralContext ctx) {
+
     }
 
     @Override
-    public void exitNumber(BilParser.NumberContext ctx) {
+    public void exitLiteral(BilParser.LiteralContext ctx) {
 
     }
 

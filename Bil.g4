@@ -12,7 +12,7 @@ endsub : addr ':' 'call LR with noreturn' NEWLINE;
 assign : var ':=' exp ;
 call : 'call' '@'? functionName 'with' returnaddr ;
 exp : exp bop exp
-    | number
+    | literal
     | '(' exp ')' 
     | uop exp 
     | var
@@ -29,7 +29,7 @@ uop : NOT ;
 inout : 'in out' | 'in' | 'out' ;
 returnaddr : 'noreturn' | 'return' '%' addr ;
 addr : (NUMBER | NAT32 | NAT64) ;
-number : (NUMBER | NAT32 | NAT64) ;
+literal : (NUMBER | NAT32 | NAT64) ;
 nat : (NAT | NAT32 | NAT64) ;
 
 NAT32 : '32' ;
