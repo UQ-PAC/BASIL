@@ -1,18 +1,18 @@
 package Facts;
 
 public class ConstFact extends Fact{
-    public String var;
-    public String literal;
+    public String lhs;
+    public String rhs;
     public String pc;
 
-    public ConstFact(String pc, String var, String literal) {
+    public ConstFact(String pc, String lhs, String rhs) {
         this.pc = pc;
-        this.var = var;
-        this.literal = literal;
+        this.lhs = lhs;
+        this.rhs = rhs;
     }
 
     public String toString() {
-        return String.format("const(%s,%s,%s)", pc, var, literal);
+        return String.format("inst(%s, const, %s, %s, none, none )", pc, lhs, rhs);
     }
 
 }
