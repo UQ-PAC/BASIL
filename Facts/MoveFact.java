@@ -12,6 +12,6 @@ public class MoveFact extends Fact{
     }
 
     public String toString() {
-        return String.format("inst(%s, move, %s, %s, none, none", pc, lhs, rhs);
+        return String.format("inst(%s, move, %s, %s, none, none)", pc, lhs, rhs);
     }
 }
