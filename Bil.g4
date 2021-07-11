@@ -1,7 +1,11 @@
 grammar Bil;
 
 bil : block+ EOF;
-block : sub paramTypes* (stmt|NEWLINE)* endsub NEWLINE* ; 
+block : sub 
+        paramTypes*
+        (stmt|NEWLINE)* 
+        endsub
+        NEWLINE* ;
 
 sub : addr ':' 'sub' functionName '(' param? (',' param)* ')' NEWLINE;
 paramTypes : addr ':' param '::' inout nat '=' var NEWLINE;
@@ -40,7 +44,7 @@ NAT : ('u32' | 'u64') ;
 ENDIAN : ('el' | 'be');
 NUMBER : HEX | DECIMAL;
 CAST : ('pad' | 'extend' | 'high' | 'low') ;
-ID : (ALPHA|' ') (ALPHA | NUMBER | '_')* ;
+ID : (ALPHA|'_') (ALPHA | NUMBER | '_')* ;
 DECIMAL : [0-9]+ ;
 HEX : '0x'? ([0-9]|[a-f]|[A-F])+ ;
 ALPHA : ([A-Z]|[a-z])+ ;
