@@ -7,18 +7,20 @@ sub : addr ':' 'sub' functionName '(' param? (',' param)* ')' NEWLINE;
 paramTypes : addr ':' param '::' inout nat '=' var NEWLINE;
 stmt : addr ':' (assign|call)? NEWLINE;
 endsub : addr ':' 'call LR with noreturn' NEWLINE;
+progdecl: addr ':' 'program' NEWLINE;
+
 
 
 assign : var ':=' exp ;
 call : 'call' '@'? functionName 'with' returnaddr ;
-exp : exp bop exp
-    | literal
-    | '(' exp ')' 
-    | uop exp 
-    | var
-    | exp 'with' '[' exp ',' ENDIAN ']:' nat '<-' exp
-    | CAST ':' nat '[' exp ']'
-    | exp '[' exp ',' ENDIAN ']:' nat
+exp : exp bop exp                                       #expBop
+    | literal                                           #expLiteral
+    | '(' exp ')'                                       #expBracket
+    | uop exp                                           #expUop
+    | var                                               #expVar
+    | exp 'with' '[' exp ',' ENDIAN ']:' nat '<-' exp   #expLoad
+    | CAST ':' nat '[' exp ']'                          #expCast
+    | exp '[' exp ',' ENDIAN ']:' nat                   #expStore
     ;
 
 var : ID ;
@@ -38,7 +40,7 @@ NAT : ('u32' | 'u64') ;
 ENDIAN : ('el' | 'be');
 NUMBER : HEX | DECIMAL;
 CAST : ('pad' | 'extend' | 'high' | 'low') ;
-ID : ALPHA (ALPHA | NUMBER | '_')* ;
+ID : (ALPHA|' ') (ALPHA | NUMBER | '_')* ;
 DECIMAL : [0-9]+ ;
 HEX : '0x'? ([0-9]|[a-f]|[A-F])+ ;
 ALPHA : ([A-Z]|[a-z])+ ;
