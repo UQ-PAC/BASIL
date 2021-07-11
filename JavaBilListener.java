@@ -220,6 +220,16 @@ public class JavaBilListener implements BilListener {
     }
 
     @Override
+    public void enterExpExtract(BilParser.ExpExtractContext ctx) {
+
+    }
+
+    @Override
+    public void exitExpExtract(BilParser.ExpExtractContext ctx) {
+
+    }
+
+    @Override
     public void enterExpCast(BilParser.ExpCastContext ctx) {
 
     }
@@ -260,6 +270,26 @@ public class JavaBilListener implements BilListener {
 
     @Override
     public void exitExpBop(BilParser.ExpBopContext ctx) {
+
+    }
+
+    @Override
+    public void enterCjmp(BilParser.CjmpContext ctx) {
+
+    }
+
+    @Override
+    public void exitCjmp(BilParser.CjmpContext ctx) {
+
+    }
+
+    @Override
+    public void enterJmp(BilParser.JmpContext ctx) {
+
+    }
+
+    @Override
+    public void exitJmp(BilParser.JmpContext ctx) {
 
     }
 
