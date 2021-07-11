@@ -11,6 +11,8 @@ public class JavaBilListener implements BilListener {
     private HashMap<String, String> functionStarts;
     private HashMap<String, String> functionEnds;
     public Set<Fact> facts;
+    private String currentPc;
+    private String lhs;
 
     public JavaBilListener() {
         functionStarts = new HashMap<>();
@@ -116,27 +118,22 @@ public class JavaBilListener implements BilListener {
     }
 
     @Override
+    public void enterProgdecl(BilParser.ProgdeclContext ctx) {
+
+    }
+
+    @Override
+    public void exitProgdecl(BilParser.ProgdeclContext ctx) {
+
+    }
+
+    @Override
     public void enterStmt(BilParser.StmtContext ctx) {
-        String pc = ctx.addr().getText();
+        currentPc = ctx.addr().getText();
         if (ctx.assign() != null) {
             BilParser.AssignContext assignCtx = ctx.assign();
+            lhs = assignCtx.var().getText();
 
-            String lhs = assignCtx.var().getText();
-
-            BilParser.ExpContext expCtx = assignCtx.exp();
-            if (expCtx.bop() != null) {
-                String bop = expCtx.bop().getText();
-                String rhs1 = expCtx.exp(0).getText();
-                String rhs2 = expCtx.exp(1).getText();
-                facts.add(new BopFact(pc, lhs, rhs1, rhs2, bop));
-            } else if (expCtx.uop() != null) {
-                String uop = expCtx.uop().getText();
-                String rhs = expCtx.exp(0).getText();
-                facts.add(new UopFact(pc, lhs, rhs, uop));
-            } else if (expCtx.var() != null) {
-                String rhs = expCtx.var().getText();
-                facts.add(new MoveFact(pc, lhs, rhs));
-            }
         }
 
 
@@ -177,14 +174,92 @@ public class JavaBilListener implements BilListener {
 
     }
 
-
     @Override
-    public void enterExp(BilParser.ExpContext ctx) {
+    public void enterExpBracket(BilParser.ExpBracketContext ctx) {
 
     }
 
     @Override
-    public void exitExp(BilParser.ExpContext ctx) {
+    public void exitExpBracket(BilParser.ExpBracketContext ctx) {
+
+    }
+
+    @Override
+    public void enterExpUop(BilParser.ExpUopContext ctx) {
+        String uop = ctx.uop().getText();
+        String rhs = ctx.exp().getText();
+        facts.add(new UopFact(currentPc, lhs, rhs, uop));
+    }
+
+    @Override
+    public void exitExpUop(BilParser.ExpUopContext ctx) {
+
+    }
+
+    @Override
+    public void enterExpVar(BilParser.ExpVarContext ctx) {
+        String rhs = ctx.var().getText();
+        facts.add(new MoveFact(currentPc, lhs, rhs));
+
+    }
+
+    @Override
+    public void exitExpVar(BilParser.ExpVarContext ctx) {
+
+    }
+
+    @Override
+    public void enterExpLiteral(BilParser.ExpLiteralContext ctx) {
+        String rhs = ctx.literal().getText();
+        facts.add(new ConstFact(currentPc, lhs, rhs));
+    }
+
+    @Override
+    public void exitExpLiteral(BilParser.ExpLiteralContext ctx) {
+
+    }
+
+    @Override
+    public void enterExpCast(BilParser.ExpCastContext ctx) {
+
+    }
+
+    @Override
+    public void exitExpCast(BilParser.ExpCastContext ctx) {
+
+    }
+
+    @Override
+    public void enterExpLoad(BilParser.ExpLoadContext ctx) {
+
+    }
+
+    @Override
+    public void exitExpLoad(BilParser.ExpLoadContext ctx) {
+
+    }
+
+    @Override
+    public void enterExpStore(BilParser.ExpStoreContext ctx) {
+
+    }
+
+    @Override
+    public void exitExpStore(BilParser.ExpStoreContext ctx) {
+
+    }
+
+    @Override
+    public void enterExpBop(BilParser.ExpBopContext ctx) {
+        String bop = ctx.bop().getText();
+        String rhs1 = ctx.exp(0).getText();
+        String rhs2 = ctx.exp(1).getText();
+        facts.add(new BopFact(currentPc, lhs, rhs1, rhs2, bop));
+
+    }
+
+    @Override
+    public void exitExpBop(BilParser.ExpBopContext ctx) {
 
     }
 
