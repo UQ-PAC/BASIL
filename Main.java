@@ -11,7 +11,7 @@ import java.io.IOException;
 
 public class Main {
     public static void main(String[] args) throws IOException {
-        BilLexer bilLexer = new BilLexer(CharStreams.fromFileName("samples/cjump.bil"));
+        BilLexer bilLexer = new BilLexer(CharStreams.fromFileName("samples/complex.bil"));
 
         CommonTokenStream tokens = new CommonTokenStream(bilLexer);
         BilParser parser = new BilParser(tokens);
