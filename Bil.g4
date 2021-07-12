@@ -1,10 +1,10 @@
 grammar Bil;
 
-bil : progdecl? block+ EOF;
-block : sub 
-        paramTypes*
-        (stmt)* 
-        endsub ;
+bil : progdecl? function+ EOF;
+function : sub 
+         paramTypes*
+         (stmt)* 
+         endsub ;
 
 /* First line is always this */
 progdecl: addr ':' 'program';
@@ -16,19 +16,20 @@ paramTypes : addr ':' param '::' inout nat '=' var ;
 stmt : addr ':' 
        (assign|call|jmp|cjmp)?
      ;
-/* End of a sub seems to always be this line */
-endsub : addr ':' 'call' functionName 'with' 'noreturn';
+/* Calling with noreturn (probably) means exiting a function */
+endsub : addr ':' 'call' (('@' functionName)|var) 'with' 'noreturn';
+
+call : 'call' (('@' functionName)|var) 'with' returnaddr ;
 
 assign : var ':=' exp ;
-call : 'call' '@'? functionName 'with' returnaddr ;
-exp : exp bop exp                                     #expBop
+exp : exp bop exp                                       #expBop
     | literal                                           #expLiteral
     | '(' exp ')'                                       #expBracket
     | uop exp                                           #expUop
     | var                                               #expVar
-    | exp 'with' '[' exp ',' ENDIAN ']:' nat '<-' exp   #expLoad
+    | exp 'with' '[' exp ',' ENDIAN ']:' nat '<-' exp   #expStore
     | CAST ':' nat '[' exp ']'                          #expCast
-    | exp '[' exp ',' ENDIAN ']:' nat                   #expStore
+    | exp '[' exp ',' ENDIAN ']:' nat                   #expLoad
     | 'extract' ':' nat ':' nat '[' exp ']'             #expExtract
     ;
 cjmp : 'when' var 'goto' '%' addr ;
