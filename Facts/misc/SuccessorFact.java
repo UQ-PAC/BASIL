@@ -1,4 +1,6 @@
-package Facts;
+package Facts.misc;
+
+import Facts.Fact;
 
 public class SuccessorFact extends Fact {
     private String i1;

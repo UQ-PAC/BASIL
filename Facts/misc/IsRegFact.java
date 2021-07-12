@@ -1,6 +1,8 @@
-package Facts;
+package Facts.misc;
 
-public class IsRegFact extends Fact{
+import Facts.Fact;
+
+public class IsRegFact extends Fact {
     String id;
 
     public IsRegFact(String id) {
