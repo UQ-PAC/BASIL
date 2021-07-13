@@ -2,7 +2,7 @@ package Facts.exp;
 
 import Facts.Fact;
 
-public class ExpFact extends Fact {
+public abstract class ExpFact extends Fact {
     static int incrementingId = 0;
     public String id;
 

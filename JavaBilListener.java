@@ -1,7 +1,11 @@
 
 import Facts.*;
 import Facts.exp.*;
-import Facts.inst.AssignFact;
+import Facts.inst.CjmpFact;
+import Facts.inst.JmpFact;
+import Facts.inst.assign.LoadFact;
+import Facts.inst.assign.MoveFact;
+import Facts.inst.assign.StoreFact;
 import Facts.misc.IsRegFact;
 import Facts.misc.SuccessorFact;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -19,12 +23,6 @@ public class JavaBilListener implements BilListener {
     public Set<Fact> facts;
     /** Current program counter */
     private String currentPc;
-    /** Current left hand side */
-    private String currentLhs;
-    /** Current flag */
-    private String currentFlag;
-    /** Current instruction */
-    private String currentInst;
 
 
     public JavaBilListener() {
@@ -173,53 +171,93 @@ public class JavaBilListener implements BilListener {
 
 
     @Override
-    public void enterAssign(BilParser.AssignContext ctx) {
-        String lhs = ctx.var().getText();
-        if (lhs.equals("NF") || lhs.equals("VF") || lhs.equals("ZF") || lhs.equals("CF")) {
-            currentFlag = lhs;
+    public void enterAssign(BilParser.AssignContext assignCtx) {
+        BilParser.ExpContext expCtx = assignCtx.exp();
+        /* Ignore casts */
+        while (expCtx.getClass().equals(BilParser.ExpCastContext.class)) {
+            expCtx = ((BilParser.ExpCastContext) expCtx).exp();
+        }
+
+        if (expCtx.getClass().equals(BilParser.ExpLoadContext.class)) {
+            /* Assignment is a load */
+            BilParser.ExpLoadContext c = (BilParser.ExpLoadContext) expCtx;
+            String lhs = assignCtx.var().getText();
+            String rhs = parseExpression(c.exp(1));
+            facts.add(new LoadFact(currentPc, lhs, rhs));
+        } else if (expCtx.getClass().equals(BilParser.ExpStoreContext.class)) {
+            /* Assignment is a store */
+            BilParser.ExpStoreContext c = (BilParser.ExpStoreContext) expCtx;
+
+            /* LHS of a store is an expression (IMPORTANT) */
+            String lhs = parseExpression(c.exp(1));
+            String rhs = parseExpression(c.exp(2));
+            facts.add(new StoreFact(currentPc, lhs, rhs));
         } else {
-            String rhs = parseExpression(ctx.exp());
-            facts.add(new AssignFact(currentPc, lhs, rhs));
+            /* Assignment is a move */
+            String lhs = assignCtx.var().getText();
+            String rhs = parseExpression(expCtx);
+            facts.add(new MoveFact(currentPc, lhs, rhs));
         }
     }
 
+    /**
+     * Creates and stores a given expression, and all sub-expressions in the facts list.
+     *
+     * @param ectx expression context
+     * @return unique expression identifier
+     */
     private String parseExpression(BilParser.ExpContext ectx) {
         ExpFact expFact = null;
+        while (ectx.getClass().equals(BilParser.ExpCastContext.class)) {
+            /* Ignore all casts */
+            ectx = ((BilParser.ExpCastContext) ectx).exp();
+        }
         if (ectx.getClass().equals(BilParser.ExpBopContext.class)) {
+            /* Binary operation expression */
             BilParser.ExpBopContext ctx = (BilParser.ExpBopContext) ectx;
+
             BilParser.ExpContext left = ctx.exp(0);
             BilParser.ExpContext right = ctx.exp(1);
             String op = ctx.bop().getText();
             expFact = new BopFact(op, parseExpression(left), parseExpression(right));
         } else if (ectx.getClass().equals(BilParser.ExpUopContext.class)) {
+            /* Unary operation expression */
             BilParser.ExpUopContext ctx = (BilParser.ExpUopContext) ectx;
+
             BilParser.ExpContext exp = ctx.exp();
             String op = ctx.uop().getText();
             expFact = new UopFact(op, parseExpression(exp));
         } else if (ectx.getClass().equals(BilParser.ExpVarContext.class)) {
+            /* Variable expression */
             BilParser.ExpVarContext ctx = (BilParser.ExpVarContext) ectx;
+
             expFact = new VarFact(ctx.var().getText());
         } else if (ectx.getClass().equals(BilParser.ExpLiteralContext.class)) {
+            /* Literal expression */
             BilParser.ExpLiteralContext ctx = (BilParser.ExpLiteralContext) ectx;
+
             expFact = new LiteralFact(ctx.literal().getText());
         } else if (ectx.getClass().equals(BilParser.ExpLoadContext.class)) {
+            /* Load expression */
             BilParser.ExpLoadContext ctx = (BilParser.ExpLoadContext) ectx;
+
             String var = ctx.exp(0).getText();
             String address = ctx.exp(1).getText();
-            expFact = new LoadFact(var, address);
         } else if (ectx.getClass().equals(BilParser.ExpStoreContext.class)) {
+            /* Store expression */
             BilParser.ExpStoreContext ctx = (BilParser.ExpStoreContext) ectx;
+
             String var = ctx.exp(0).getText();
             String address = ctx.exp(1).getText();
             String value = ctx.exp(2).getText();
-            expFact = new LoadFact(var, address);
-
         }
         if (expFact == null) {
+            System.out.println("Unhandled expression detected");
             return "";
+        } else {
+            facts.add(expFact);
+            return expFact.id;
         }
-        facts.add(expFact);
-        return expFact.id;
     }
 
     @Override
@@ -329,12 +367,25 @@ public class JavaBilListener implements BilListener {
 
     @Override
     public void exitCjmp(BilParser.CjmpContext ctx) {
-
+        String target = "";
+        String cond = ctx.var().getText();
+        if (ctx.var() != null) {
+            target = ctx.var().getText();
+        } else if (ctx.addr() != null) {
+            target = ctx.addr().getText();
+        }
+        facts.add(new CjmpFact(currentPc, target, cond));
     }
 
     @Override
     public void enterJmp(BilParser.JmpContext ctx) {
-
+        String target = "";
+        if (ctx.var() != null) {
+            target = ctx.var().getText();
+        } else if (ctx.addr() != null) {
+            target = ctx.addr().getText();
+        }
+        facts.add(new JmpFact(currentPc, target));
     }
 
     @Override
