@@ -4,7 +4,7 @@
 Make sure you have ANTLR4 and Java8+ installed.
 
 ## Usage instructoins
-run make to compile the parser.
+run `make` to compile the parser.
 
 To run the parser, use IntelliJ or
 ```
