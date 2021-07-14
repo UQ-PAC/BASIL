@@ -1,6 +1,14 @@
-BIL parser
+### BIL parser
 
-run make to compile
+## Dependencies
+Make sure you have ANTLR4 and Java8+ installed.
 
-run grun Bil bil -gui < file to 
+## Usage instructoins
+run make to compile the parser.
 
+To run the parser, use IntelliJ or
+```
+javac Main.java
+java Main
+
+```
