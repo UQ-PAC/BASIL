@@ -173,25 +173,23 @@ public class JavaBilListener implements BilListener {
     @Override
     public void enterAssign(BilParser.AssignContext assignCtx) {
         BilParser.ExpContext expCtx = assignCtx.exp();
-        /* Ignore casts */
-        while (expCtx.getClass().equals(BilParser.ExpCastContext.class)) {
-            expCtx = ((BilParser.ExpCastContext) expCtx).exp();
-        }
+        expCtx = ignoreUnhandledContexts(expCtx);
 
         if (expCtx.getClass().equals(BilParser.ExpLoadContext.class)) {
             /* Assignment is a load */
             BilParser.ExpLoadContext c = (BilParser.ExpLoadContext) expCtx;
+
             String lhs = assignCtx.var().getText();
-            String rhs = parseExpression(c.exp(1));
-            facts.add(new LoadFact(currentPc, lhs, rhs));
+            MemFact memFact = new MemFact(parseExpression(c.exp(1)));
+            facts.add(new LoadFact(currentPc, lhs, memFact.id));
         } else if (expCtx.getClass().equals(BilParser.ExpStoreContext.class)) {
             /* Assignment is a store */
             BilParser.ExpStoreContext c = (BilParser.ExpStoreContext) expCtx;
 
             /* LHS of a store is an expression (IMPORTANT) */
-            String lhs = parseExpression(c.exp(1));
+            MemFact memFact = new MemFact(parseExpression(c.exp(1)));
             String rhs = parseExpression(c.exp(2));
-            facts.add(new StoreFact(currentPc, lhs, rhs));
+            facts.add(new StoreFact(currentPc, memFact.id, rhs));
         } else {
             /* Assignment is a move */
             String lhs = assignCtx.var().getText();
@@ -201,17 +199,37 @@ public class JavaBilListener implements BilListener {
     }
 
     /**
+     * Skips all unhandled expression contexts.
+     *
+     * @param ectx an expression context
+     * @return expression context that is not unhandled
+     */
+    private BilParser.ExpContext ignoreUnhandledContexts(BilParser.ExpContext ectx) {
+        if (ectx.getClass().equals(BilParser.ExpCastContext.class)) {
+            /* Ignore all casts */
+            ectx = ((BilParser.ExpCastContext) ectx).exp();
+            return ignoreUnhandledContexts(ectx);
+        } else if (ectx.getClass().equals(BilParser.ExpExtractContext.class)) {
+            /* Ignore all extracts */
+            ectx = ((BilParser.ExpExtractContext) ectx).exp();
+            return ignoreUnhandledContexts(ectx);
+        } else {
+            return ectx;
+        }
+    }
+
+    /**
      * Creates and stores a given expression, and all sub-expressions in the facts list.
+     *
+     * NOTE: Memory expressions are handled separately in the assignment context.
      *
      * @param ectx expression context
      * @return unique expression identifier
      */
     private String parseExpression(BilParser.ExpContext ectx) {
         ExpFact expFact = null;
-        while (ectx.getClass().equals(BilParser.ExpCastContext.class)) {
-            /* Ignore all casts */
-            ectx = ((BilParser.ExpCastContext) ectx).exp();
-        }
+        ectx = ignoreUnhandledContexts(ectx);
+
         if (ectx.getClass().equals(BilParser.ExpBopContext.class)) {
             /* Binary operation expression */
             BilParser.ExpBopContext ctx = (BilParser.ExpBopContext) ectx;
@@ -237,22 +255,9 @@ public class JavaBilListener implements BilListener {
             BilParser.ExpLiteralContext ctx = (BilParser.ExpLiteralContext) ectx;
 
             expFact = new LiteralFact(ctx.literal().getText());
-        } else if (ectx.getClass().equals(BilParser.ExpLoadContext.class)) {
-            /* Load expression */
-            BilParser.ExpLoadContext ctx = (BilParser.ExpLoadContext) ectx;
-
-            String var = ctx.exp(0).getText();
-            String address = ctx.exp(1).getText();
-        } else if (ectx.getClass().equals(BilParser.ExpStoreContext.class)) {
-            /* Store expression */
-            BilParser.ExpStoreContext ctx = (BilParser.ExpStoreContext) ectx;
-
-            String var = ctx.exp(0).getText();
-            String address = ctx.exp(1).getText();
-            String value = ctx.exp(2).getText();
         }
         if (expFact == null) {
-            System.out.println("Unhandled expression detected");
+            System.err.println("Unhandled expression detected: " + ectx.getText());
             return "";
         } else {
             facts.add(expFact);
@@ -367,13 +372,8 @@ public class JavaBilListener implements BilListener {
 
     @Override
     public void exitCjmp(BilParser.CjmpContext ctx) {
-        String target = "";
         String cond = ctx.var().getText();
-        if (ctx.var() != null) {
-            target = ctx.var().getText();
-        } else if (ctx.addr() != null) {
-            target = ctx.addr().getText();
-        }
+        String target = ctx.addr().getText();
         facts.add(new CjmpFact(currentPc, target, cond));
     }
 
