@@ -1,4 +1,4 @@
-### BIL parser
+# BIL parser
 
 ## Dependencies
 Make sure you have ANTLR4 and Java8+ installed.
