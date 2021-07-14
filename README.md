@@ -10,5 +10,4 @@ To run the parser, use IntelliJ or
 ```
 javac Main.java
 java Main
-
 ```
