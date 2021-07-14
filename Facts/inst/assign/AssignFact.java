@@ -19,6 +19,9 @@ abstract class AssignFact extends InstFact {
         this.type = type;
     }
 
+    /**
+     * @return inst(pc, type, lhs, rhs)
+     */
     public String toString() {
         return String.format("inst(%s, %s, %s, %s)", super.pc, type, lhs, rhs);
     }

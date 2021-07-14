@@ -1,5 +1,8 @@
 package Facts.inst;
 
+/**
+ * No instruction fact
+ */
 public class NopFact extends InstFact {
 
     public NopFact(String pc) {
@@ -7,6 +10,6 @@ public class NopFact extends InstFact {
     }
 
     public String toString() {
-        return String.format("inst(%s,nop,none,none)", super.pc);
+        return String.format("inst(%s, nop, none, none)", super.pc);
     }
 }

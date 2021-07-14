@@ -1,7 +1,7 @@
 package Facts.inst;
 
 /**
- * Conditional Jump
+ * Conditional Jump fact
  */
 public class CjmpFact extends InstFact {
     String target;
@@ -14,7 +14,7 @@ public class CjmpFact extends InstFact {
     }
 
     public String toString() {
-        return String.format("inst(%s,cjmp,%s,%s)", super.pc, target, condition);
+        return String.format("inst(%s, cjmp, %s, %s)", super.pc, target, condition);
     }
 
 }

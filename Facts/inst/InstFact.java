@@ -3,7 +3,7 @@ package Facts.inst;
 import Facts.Fact;
 
 /**
- * Generic instruction class
+ * Generic instruction fact
  */
 public abstract class InstFact extends Fact {
     protected String pc;

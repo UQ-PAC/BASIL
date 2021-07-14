@@ -1,6 +1,10 @@
 package Facts.exp;
 
+/**
+ * Literal expression (e.g. 4, 5, 10)
+ */
 public class LiteralFact extends ExpFact {
+    /** Value of literal */
     String val;
     public LiteralFact(String val) {
         super();
@@ -8,6 +12,6 @@ public class LiteralFact extends ExpFact {
     }
 
     public String toString() {
-        return String.format("exp(%s,literal,%s,none,none)", super.id, val);
+        return String.format("exp(%s, literal, %s, none, none)", super.id, val);
     }
 }
