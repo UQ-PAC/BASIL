@@ -19,6 +19,6 @@ public class UopFact extends ExpFact {
      * @return exp(id, uop, op, e1, none)
      */
     public String toString() {
-        return String.format("exp(%s, uop, %s, %s, none)", super.id, op, e1);
+        return String.format("%s %s", op, e1);
     }
 }
