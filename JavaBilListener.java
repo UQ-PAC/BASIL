@@ -31,6 +31,7 @@ public class JavaBilListener implements BilListener {
         functionStarts = new HashMap<>();
         functionEnds = new HashMap<>();
         facts = new ArrayList<>();
+        dollarVariables = new HashMap<>();
     }
 
     @Override
@@ -237,17 +238,21 @@ public class JavaBilListener implements BilListener {
             /* Binary operation expression */
             BilParser.ExpBopContext ctx = (BilParser.ExpBopContext) ectx;
 
-            BilParser.ExpContext left = ctx.exp(0);
-            BilParser.ExpContext right = ctx.exp(1);
+            String left = parseExpression(ctx.exp(0));
+            String right = parseExpression(ctx.exp(1));
+            left = dollarVariables.containsKey(left) ? dollarVariables.get(left).toString() : left;
+            right = dollarVariables.containsKey(right) ? dollarVariables.get(right).toString() : right;
             String op = ctx.bop().getText();
-            expFact = new BopFact(op, parseExpression(left), parseExpression(right));
+
+            expFact = new BopFact(op, left, right);
         } else if (ectx.getClass().equals(BilParser.ExpUopContext.class)) {
             /* Unary operation expression */
             BilParser.ExpUopContext ctx = (BilParser.ExpUopContext) ectx;
 
-            BilParser.ExpContext exp = ctx.exp();
+            String exp = parseExpression(ctx.exp());
+            exp = dollarVariables.containsKey(exp) ? dollarVariables.get(exp).toString() : exp;
             String op = ctx.uop().getText();
-            expFact = new UopFact(op, parseExpression(exp));
+            expFact = new UopFact(op, exp);
         } else if (ectx.getClass().equals(BilParser.ExpVarContext.class)) {
             /* Variable expression */
             BilParser.ExpVarContext ctx = (BilParser.ExpVarContext) ectx;
@@ -259,10 +264,12 @@ public class JavaBilListener implements BilListener {
 
             expFact = new LiteralFact(ctx.literal().getText());
         }
+
         if (expFact == null) {
             System.err.println("Unhandled expression detected: " + ectx.getText());
             return "";
         } else {
+            dollarVariables.put(expFact.id, expFact);
             facts.add(expFact);
             return expFact.id;
         }
