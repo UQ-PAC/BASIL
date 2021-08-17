@@ -184,20 +184,27 @@ public class JavaBilListener implements BilListener {
             BilParser.ExpLoadContext c = (BilParser.ExpLoadContext) expCtx;
 
             String lhs = assignCtx.var().getText();
-            MemFact memFact = new MemFact(parseExpression(c.exp(1)));
+            String rhs = parseExpression(c.exp(1));
+            rhs = dollarVariables.containsKey(rhs) ? dollarVariables.get(rhs).toString() : rhs;
+
+            MemFact memFact = new MemFact(rhs);
             facts.add(new LoadFact(currentPc, lhs, memFact.id));
         } else if (expCtx.getClass().equals(BilParser.ExpStoreContext.class)) {
             /* Assignment is a store */
             BilParser.ExpStoreContext c = (BilParser.ExpStoreContext) expCtx;
 
             /* LHS of a store is an expression (IMPORTANT) */
-            MemFact memFact = new MemFact(parseExpression(c.exp(1)));
+            String lhs = parseExpression(c.exp(1));
+            lhs = dollarVariables.containsKey(lhs) ? dollarVariables.get(lhs).toString() : lhs;
+            MemFact memFact = new MemFact(lhs);
             String rhs = parseExpression(c.exp(2));
+            rhs = dollarVariables.containsKey(rhs) ? dollarVariables.get(rhs).toString() : rhs;
             facts.add(new StoreFact(currentPc, memFact.id, rhs));
         } else {
             /* Assignment is a move */
             String lhs = assignCtx.var().getText();
             String rhs = parseExpression(expCtx);
+            rhs = dollarVariables.containsKey(rhs) ? dollarVariables.get(rhs).toString() : rhs;
             facts.add(new MoveFact(currentPc, lhs, rhs));
         }
     }
@@ -270,7 +277,7 @@ public class JavaBilListener implements BilListener {
             return "";
         } else {
             dollarVariables.put(expFact.id, expFact);
-            facts.add(expFact);
+            // facts.add(expFact);
             return expFact.id;
         }
     }
