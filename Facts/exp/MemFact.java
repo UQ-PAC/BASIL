@@ -16,6 +16,6 @@ public class MemFact extends ExpFact {
      * @return exp(id, memExp, exp, none)
      */
     public String toString() {
-        return String.format("exp(%s, memExp, %s, none, none)", super.id, exp);
+        return String.format("mem[%s]", exp);
     }
 }
