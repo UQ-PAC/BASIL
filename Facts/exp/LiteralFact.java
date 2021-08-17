@@ -12,6 +12,6 @@ public class LiteralFact extends ExpFact {
     }
 
     public String toString() {
-        return String.format("exp(%s, literal, %s, none, none)", super.id, val);
+        return String.format("%s", val);
     }
 }

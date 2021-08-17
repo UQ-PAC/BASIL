@@ -14,6 +14,6 @@ public class VarFact extends ExpFact {
      * @return exp(id, var, name, none, none)
      */
     public String toString() {
-        return String.format("exp(%s, var, %s, none, none)", super.id, name);
+        return String.format("%s", name);
     }
 }

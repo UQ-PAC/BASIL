@@ -23,6 +23,8 @@ public class JavaBilListener implements BilListener {
     public List<Fact> facts;
     /** Current program counter */
     private String currentPc;
+    /** Maps dollar variables (produced by expressions) to their corresponding facts, for temporary storage */
+    private HashMap<String, Fact> dollarVariables;
 
 
     public JavaBilListener() {
