@@ -14,7 +14,7 @@ public class CjmpFact extends InstFact {
     }
 
     public String toString() {
-        return String.format("inst(%s, cjmp, %s, %s)", super.pc, target, condition);
+        return String.format("if (%s) {\n    %s\n}", condition, target);
     }
 
 }
