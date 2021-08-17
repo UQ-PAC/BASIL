@@ -31,18 +31,13 @@ public class Main {
         /* End boilerplate */
 
         for (Fact fact : listener.facts) {
-            if (fact instanceof InstFact) {
-                System.out.println(fact);
-            }
-        }
-        for (Fact fact : listener.facts) {
-            if (fact instanceof ExpFact) {
+            if (fact instanceof InstFact || fact instanceof ExpFact) {
                 System.out.println(fact);
             }
         }
     }
 
-    private static Set<Fact> getFacts() {
+    private static List<Fact> getFacts() {
         return listener.facts;
     }
 

@@ -20,7 +20,7 @@ public class JavaBilListener implements BilListener {
     /** Return statements of each function*/
     private HashMap<String, Set<String>> functionEnds;
     /** List of generated Datalog facts */
-    public Set<Fact> facts;
+    public List<Fact> facts;
     /** Current program counter */
     private String currentPc;
 
@@ -28,7 +28,7 @@ public class JavaBilListener implements BilListener {
     public JavaBilListener() {
         functionStarts = new HashMap<>();
         functionEnds = new HashMap<>();
-        facts = new HashSet<>();
+        facts = new ArrayList<>();
     }
 
     @Override
