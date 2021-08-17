@@ -24,12 +24,13 @@ public class Main {
         CommonTokenStream tokens = new CommonTokenStream(bilLexer);
         BilParser parser = new BilParser(tokens);
         parser.setBuildParseTree(true);
-        BilParser.BilContext b = parser.bil();
+        BilParser.BilContext b = parser.bil(); // abstract syntax tree
         listener = new JavaBilListener();
         ParseTreeWalker walker = new ParseTreeWalker();
-        walker.walk(listener, b);
+        walker.walk(listener, b); // walk through the AST b, generating facts via the listener
         /* End boilerplate */
 
+        // print all facts the listener generated
         for (Fact fact : listener.facts) {
             if (fact instanceof InstFact || fact instanceof ExpFact) {
                 System.out.println(fact);
