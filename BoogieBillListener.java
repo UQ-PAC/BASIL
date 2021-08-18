@@ -1,16 +1,26 @@
 import Facts.Fact;
-import Facts.exp.MemFact;
-import Facts.inst.assign.LoadFact;
-import Facts.inst.assign.MoveFact;
-import Facts.inst.assign.StoreFact;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import java.util.*;
 
 /** Notes
- * Right now, we're only indexing one level deep on assignment expressions, but lhs and rhs might be more complex than single variables.
+ * Right now, we're only indexing one level deep on assignment expressions, but lhs and rhs might be more complex than
+ * single variables.
  * In future, we should look at recursively indexing expressions down to the variable or literal level.
+ *
+ * Anything assigned to a hex value of some sort should probably be assigned a bit vector type, as it probably
+ * represents some memory address, on which functions like extract could be used.
+ * These extract functions should be encoded in boogie as native bit-vector slices (no external functions needed).
+ * "v := extract:x:y[z]" ==> "v := z[v.size-x:v.size-y-1];" where v.size = number of bits in v
+ *
+ * Make each pc a label:
+ * "{pc} {stmt (optional)}" ==> "lab{pc}: {stmt};"
+ *
+ * Now we can support gotos:
+ * "goto %{pc}" ==> "goto lab{pc};"
+ *
+ *
  */
 
 public class BoogieBillListener implements BilListener {
@@ -122,7 +132,7 @@ public class BoogieBillListener implements BilListener {
             System.out.printf("mem[%s] := %s;%n", lhsVar.getText(), rhsVar.getText());
         } else {
             /* Assignment is a move */
-            System.out.printf("%s := %s; (class = %s)%n", assignCtx.var().getText(), expCtx.getText(), expCtx.getClass());
+            System.out.printf("%s := %s;%n", assignCtx.var().getText(), expCtx.getText());
             // extract things are ExpExtractContext types
         }
     }
@@ -175,6 +185,13 @@ public class BoogieBillListener implements BilListener {
     @Override
     public void enterExpExtract(BilParser.ExpExtractContext ctx) {
 
+        int firstNat = Integer.parseInt(ctx.nat(0).getText());
+        int secondNat = Integer.parseInt(ctx.nat(1).getText());
+        BilParser.ExpContext exp = ctx.exp();
+
+        // fixme: big warning! this is broken! assumes all bit vectors are 64 bits long
+        // wasn't sure how to get the length of a bit vector: might have to get it from somewhere else in the program and keep track of a variable
+        System.out.printf("%s[%d:%d]", exp.getText(), 64-firstNat, 64-secondNat-1); // fixme: in future, we want to properly translate exp before jamming it in here
     }
 
     @Override
