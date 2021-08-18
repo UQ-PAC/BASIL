@@ -1,8 +1,17 @@
 import Facts.Fact;
+import Facts.exp.MemFact;
+import Facts.inst.assign.LoadFact;
+import Facts.inst.assign.MoveFact;
+import Facts.inst.assign.StoreFact;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import java.util.*;
+
+/** Notes
+ * Right now, we're only indexing one level deep on assignment expressions, but lhs and rhs might be more complex than single variables.
+ * In future, we should look at recursively indexing expressions down to the variable or literal level.
+ */
 
 public class BoogieBillListener implements BilListener {
     /** List of generated Datalog facts */
@@ -64,7 +73,7 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterStmt(BilParser.StmtContext ctx) {
-
+        currentPc = ctx.addr().getText();
     }
 
     @Override
@@ -93,8 +102,29 @@ public class BoogieBillListener implements BilListener {
     }
 
     @Override
-    public void enterAssign(BilParser.AssignContext ctx) {
+    public void enterAssign(BilParser.AssignContext assignCtx) {
+        BilParser.ExpContext expCtx = assignCtx.exp();
+        expCtx = ignoreUnhandledContexts(expCtx);
 
+        if (expCtx.getClass().equals(BilParser.ExpLoadContext.class)) {
+            /* Assignment is a load */
+            BilParser.ExpLoadContext c = (BilParser.ExpLoadContext) expCtx; // 'mem[x0,el]:u32'
+            if (c.exp(2) == null) {
+                return; // no rhs of expression: this is likely a padding instruction on the variable c.exp(1), a.k.a. assignCtx.var()
+            }
+            // fixme: do something here
+        } else if (expCtx.getClass().equals(BilParser.ExpStoreContext.class)) {
+            /* Assignment is a store */
+            BilParser.ExpStoreContext c = (BilParser.ExpStoreContext) expCtx; // 'memwith[X0,el]:u32<-low:32[X1]'
+            BilParser.ExpContext lhsVar = c.exp(1); // 'X0'
+            BilParser.ExpContext rhs = c.exp(2); // 'low:32[X1]'
+            BilParser.ExpContext rhsVar = ((BilParser.ExpCastContext) rhs).exp(); // 'X1'
+            System.out.printf("mem[%s] := %s;%n", lhsVar.getText(), rhsVar.getText());
+        } else {
+            /* Assignment is a move */
+            System.out.printf("%s := %s; (class = %s)%n", assignCtx.var().getText(), expCtx.getText(), expCtx.getClass());
+            // extract things are ExpExtractContext types
+        }
     }
 
     @Override
@@ -330,5 +360,25 @@ public class BoogieBillListener implements BilListener {
     @Override
     public void exitEveryRule(ParserRuleContext parserRuleContext) {
 
+    }
+
+    /**
+     * Skips all unhandled expression contexts.
+     *
+     * @param ectx an expression context
+     * @return expression context that is not unhandled
+     */
+    private BilParser.ExpContext ignoreUnhandledContexts(BilParser.ExpContext ectx) {
+        if (ectx.getClass().equals(BilParser.ExpCastContext.class)) {
+            /* Ignore all casts */
+            ectx = ((BilParser.ExpCastContext) ectx).exp();
+            return ignoreUnhandledContexts(ectx);
+        } else if (ectx.getClass().equals(BilParser.ExpExtractContext.class)) {
+            /* Ignore all extracts */
+            ectx = ((BilParser.ExpExtractContext) ectx).exp();
+            return ignoreUnhandledContexts(ectx);
+        } else {
+            return ectx;
+        }
     }
 }
