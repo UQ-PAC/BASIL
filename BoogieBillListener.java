@@ -28,6 +28,13 @@ import java.util.regex.Pattern;
  * - [x] function calls
  * - [x] filter out stack pointers properly
  * - [ ] functions with params
+ *
+ * CURRENT PROBLEM
+ * function parameters are loaded into memory using the stack pointer's address, so we can't ignore the stack pointer,
+ * or we'll lose information about the value of parameters being passed in. but what are the initial values of the stack
+ * etc. pointers?
+ * as of current, null values are returned by parseExpression to indicate a prohibited variable like SP was in it, and
+ * "skip" is printed instead of the expression/statement.
  */
 
 public class BoogieBillListener implements BilListener {
@@ -73,6 +80,7 @@ public class BoogieBillListener implements BilListener {
     @Override
     public void enterSub(BilParser.SubContext ctx) {
         String functionName = ctx.functionName().getText();
+        System.out.printf("procedure: %s%n", ctx.getText());
         System.out.printf("procedure %s()%n{%n", functionName);
     }
 
