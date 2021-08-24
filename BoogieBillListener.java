@@ -6,6 +6,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import java.util.*;
+import java.util.regex.Pattern;
 
 /** Notes
  * Right now, we're only indexing one level deep on assignment expressions, but lhs and rhs might be more complex than
@@ -27,12 +28,11 @@ import java.util.*;
  */
 
 public class BoogieBillListener implements BilListener {
-    /** Keep track of variables used by the program */
-    Set<String> variableSet = new HashSet<>();
 
     @Override
     public void enterBil(BilParser.BilContext ctx) {
-
+        System.out.println("const registers: [int] int;"); // registers[0] represents the value at X0
+        System.out.println("const memory: [int] int;"); // memory[0x00111] represents the value stored at memory address 0x00111. fixme: for now, only integers can be stored in memory
     }
 
     @Override
@@ -84,6 +84,9 @@ public class BoogieBillListener implements BilListener {
     public void enterStmt(BilParser.StmtContext ctx) {
         String currentPc = ctx.addr().getText();
         System.out.print("label_" + currentPc + ": ");
+        if (ctx.call() == null && ctx.assign() == null && ctx.cjmp() == null && ctx.jmp() == null) {
+            System.out.print("skip");
+        }
     }
 
     @Override
@@ -120,34 +123,28 @@ public class BoogieBillListener implements BilListener {
             /* Assignment is a load */
             BilParser.ExpLoadContext c = (BilParser.ExpLoadContext) expCtx; // 'mem[x0,el]:u32'
             if (c.exp(2) == null) {
+                System.out.print("skip");
                 return; // no rhs of expression: this is likely a padding instruction on the variable c.exp(1), a.k.a. assignCtx.var()
             }
             // fixme; unsure this code will ever run
-            String lhs = assignCtx.var().getText();
+            String lhs = parseExpression(c.exp(1));
             String rhs = parseExpression(c.exp(2));
-            if (!variableSet.contains(lhs)) {
-                System.out.print("var ");
-                variableSet.add(lhs);
-            }
             System.out.printf("%s := mem[%s]", lhs, rhs);
+
         } else if (expCtx.getClass().equals(BilParser.ExpStoreContext.class)) {
             /* Assignment is a store */
             BilParser.ExpStoreContext c = (BilParser.ExpStoreContext) expCtx; // 'memwith[X0,el]:u32<-low:32[X1]'
             String lhs = parseExpression(c.exp(1)); // 'X0'
             String rhs = parseExpression(c.exp(2)); // 'X1', potentially removes casts such as 'low:32[X1]'
-            if (!variableSet.contains(lhs)) {
-                System.out.print("var ");
-                variableSet.add(lhs);
-            }
             System.out.printf("mem[%s] := %s", lhs, rhs);
+
         } else {
             /* Assignment is a move */
             String lhs = assignCtx.var().getText();
-            String rhs = parseExpression(expCtx);
-            if (!variableSet.contains(lhs)) {
-                System.out.print("var ");
-                variableSet.add(lhs);
+            if (lhs.charAt(0) == 'X') {
+                lhs = parseRegister(lhs);
             }
+            String rhs = parseExpression(expCtx);
             System.out.printf("%s := %s", lhs, rhs);
         }
     }
@@ -173,20 +170,34 @@ public class BoogieBillListener implements BilListener {
                 op = "=="; // a little patching here, a little there...
             }
             return String.format("(%s) %s (%s)", left, op, right);
+
         } else if (ectx.getClass().equals(BilParser.ExpUopContext.class)) {
             /* Unary operation expression */
             BilParser.ExpUopContext ctx = (BilParser.ExpUopContext) ectx;
             String exp = parseExpression(ctx.exp());
             String op = ctx.uop().getText();
+
             return String.format("%s (%s)", op, exp);
         } else if (ectx.getClass().equals(BilParser.ExpVarContext.class)) {
             /* Variable expression */
             BilParser.ExpVarContext ctx = (BilParser.ExpVarContext) ectx;
-            return ctx.var().getText();
+            // vars can be flags, registers (X[num]) or "expression bundles" (#[num]) where [num] is some integer
+            String variable = ctx.var().getText();
+            if (variable.charAt(0) == 'X') {
+                // variable is a register, replace with call to register map
+                return parseRegister(variable);
+            } else if (variable.charAt(0) == '#') {
+                // variable is an expression bundle todo
+                return variable;
+            } else {
+                return variable;
+            }
+
         } else if (ectx.getClass().equals(BilParser.ExpLiteralContext.class)) {
             /* Literal expression */
             BilParser.ExpLiteralContext ctx = (BilParser.ExpLiteralContext) ectx;
             return ctx.literal().getText();
+
         } else if (ectx.getClass().equals(BilParser.ExpExtractContext.class)) {
             /* Extraction expression */
             BilParser.ExpExtractContext ctx = (BilParser.ExpExtractContext) ectx;
@@ -196,10 +207,15 @@ public class BoogieBillListener implements BilListener {
             // fixme: big warning! this is broken! assumes all bit vectors are 64 bits long
             // wasn't sure how to get the length of a bit vector: might have to get it from somewhere else in the program and keep track of a variable
             return String.format("%s[%d:%d]", exp, 64-firstNat, 64-secondNat-1); // fixme: in future, we want to properly translate exp before jamming it in here
+
         } else {
             System.err.print("Unhandled expression detected: " + ectx.getText());
             return "";
         }
+    }
+
+    private String parseRegister(String registerID) {
+        return String.format("registers[%d]", Integer.parseInt(registerID.substring(1)));
     }
 
     /**
