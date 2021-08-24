@@ -1,5 +1,7 @@
 import Facts.Fact;
 import Facts.exp.*;
+import Facts.inst.CjmpFact;
+import Facts.inst.JmpFact;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -25,12 +27,8 @@ import java.util.*;
  */
 
 public class BoogieBillListener implements BilListener {
-    /** List of generated Datalog facts */
-    public List<Fact> facts;
-    /** Current program counter */
-    private String currentPc;
-    /** Maps dollar variables (produced by expressions) to their corresponding facts, for temporary storage */
-    private HashMap<String, Fact> dollarVariables;
+    /** Keep track of variables used by the program */
+    Set<String> variableSet = new HashSet<>();
 
     @Override
     public void enterBil(BilParser.BilContext ctx) {
@@ -84,8 +82,8 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterStmt(BilParser.StmtContext ctx) {
-        currentPc = ctx.addr().getText();
-        System.out.print(currentPc + ": ");
+        String currentPc = ctx.addr().getText();
+        System.out.print("label_" + currentPc + ": ");
     }
 
     @Override
@@ -125,18 +123,31 @@ public class BoogieBillListener implements BilListener {
                 return; // no rhs of expression: this is likely a padding instruction on the variable c.exp(1), a.k.a. assignCtx.var()
             }
             // fixme; unsure this code will ever run
+            String lhs = assignCtx.var().getText();
             String rhs = parseExpression(c.exp(2));
-            System.out.printf("%s := mem[%s]", assignCtx.var(), rhs);
+            if (!variableSet.contains(lhs)) {
+                System.out.print("var ");
+                variableSet.add(lhs);
+            }
+            System.out.printf("%s := mem[%s]", lhs, rhs);
         } else if (expCtx.getClass().equals(BilParser.ExpStoreContext.class)) {
             /* Assignment is a store */
             BilParser.ExpStoreContext c = (BilParser.ExpStoreContext) expCtx; // 'memwith[X0,el]:u32<-low:32[X1]'
             String lhs = parseExpression(c.exp(1)); // 'X0'
             String rhs = parseExpression(c.exp(2)); // 'X1', potentially removes casts such as 'low:32[X1]'
+            if (!variableSet.contains(lhs)) {
+                System.out.print("var ");
+                variableSet.add(lhs);
+            }
             System.out.printf("mem[%s] := %s", lhs, rhs);
         } else {
             /* Assignment is a move */
             String lhs = assignCtx.var().getText();
             String rhs = parseExpression(expCtx);
+            if (!variableSet.contains(lhs)) {
+                System.out.print("var ");
+                variableSet.add(lhs);
+            }
             System.out.printf("%s := %s", lhs, rhs);
         }
     }
@@ -158,6 +169,9 @@ public class BoogieBillListener implements BilListener {
             String left = parseExpression(ctx.exp(0));
             String right = parseExpression(ctx.exp(1));
             String op = ctx.bop().getText();
+            if (op.equals("=")) {
+                op = "=="; // a little patching here, a little there...
+            }
             return String.format("(%s) %s (%s)", left, op, right);
         } else if (ectx.getClass().equals(BilParser.ExpUopContext.class)) {
             /* Unary operation expression */
@@ -200,7 +214,6 @@ public class BoogieBillListener implements BilListener {
     private BilParser.ExpContext ignoreUnhandledContexts(BilParser.ExpContext ectx) {
         if (ectx.getClass().equals(BilParser.ExpCastContext.class)) {
             /* Ignore all casts */
-            System.out.print("(Ignored cast)");
             ectx = ((BilParser.ExpCastContext) ectx).exp();
             return ignoreUnhandledContexts(ectx);
         } else {
@@ -310,12 +323,20 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void exitCjmp(BilParser.CjmpContext ctx) {
-
+        String cond = ctx.var().getText();
+        String target = ctx.addr().getText();
+        System.out.printf("if (%s) {goto label_%s}", cond, target);
     }
 
     @Override
     public void enterJmp(BilParser.JmpContext ctx) {
-
+        String target = "";
+        if (ctx.var() != null) {
+            target = ctx.var().getText();
+        } else if (ctx.addr() != null) {
+            target = ctx.addr().getText();
+        }
+        System.out.printf("goto label_%s", target);
     }
 
     @Override
