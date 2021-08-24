@@ -25,15 +25,23 @@ import java.util.regex.Pattern;
  * "goto %{pc}" ==> "goto lab{pc};"
  *
  * todo: test code coverage
- * - function calls
+ * - [x] function calls
+ * - [ ] initialise stack pointers etc.
  */
 
 public class BoogieBillListener implements BilListener {
 
+    // skip all lines referring to stack pointers, function pointers or link registers
+    List<String> prohibitedVars = Arrays.asList("SP", "FP", "LR");
+
     @Override
     public void enterBil(BilParser.BilContext ctx) {
-        System.out.println("const registers: [int] int;"); // registers[0] represents the value at X0
-        System.out.println("const memory: [int] int;"); // memory[0x00111] represents the value stored at memory address 0x00111. fixme: for now, only integers can be stored in memory
+        // registers[0] represents the value at X0
+        System.out.println("const registers: [int] int;");
+        // memory[0x00111] represents the value stored at memory address 0x00111
+        // fixme: for now, only integers can be stored in memory
+        System.out.println("const memory: [int] int;");
+        System.out.println();
     }
 
     @Override
@@ -98,7 +106,7 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterEndsub(BilParser.EndsubContext ctx) {
-        System.out.printf("}%n");
+        System.out.printf("}%n%n");
     }
 
     @Override
@@ -108,7 +116,7 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterCall(BilParser.CallContext ctx) {
-        System.out.printf("entered call: %s", ctx.getText());
+        System.out.printf("call %s(); goto label_%s", ctx.functionName().getText(), ctx.returnaddr().addr().getText());
     }
 
     @Override
@@ -131,6 +139,10 @@ public class BoogieBillListener implements BilListener {
             // fixme; unsure this code will ever run
             String lhs = parseExpression(c.exp(1));
             String rhs = parseExpression(c.exp(2));
+            if (prohibitedVars.contains(lhs) || prohibitedVars.contains(rhs)) {
+                System.out.print("skip");
+                return;
+            }
             System.out.printf("%s := mem[%s]", lhs, rhs);
 
         } else if (expCtx.getClass().equals(BilParser.ExpStoreContext.class)) {
@@ -138,6 +150,10 @@ public class BoogieBillListener implements BilListener {
             BilParser.ExpStoreContext c = (BilParser.ExpStoreContext) expCtx; // 'memwith[X0,el]:u32<-low:32[X1]'
             String lhs = parseExpression(c.exp(1)); // 'X0'
             String rhs = parseExpression(c.exp(2)); // 'X1', potentially removes casts such as 'low:32[X1]'
+            if (prohibitedVars.contains(lhs) || prohibitedVars.contains(rhs)) {
+                System.out.print("skip");
+                return;
+            }
             System.out.printf("mem[%s] := %s", lhs, rhs);
 
         } else {
@@ -147,6 +163,10 @@ public class BoogieBillListener implements BilListener {
                 lhs = parseRegister(lhs);
             }
             String rhs = parseExpression(expCtx);
+            if (prohibitedVars.contains(lhs) || prohibitedVars.contains(rhs)) {
+                System.out.print("skip");
+                return;
+            }
             System.out.printf("%s := %s", lhs, rhs);
         }
     }
