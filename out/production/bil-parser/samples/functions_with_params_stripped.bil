@@ -1,0 +1,42 @@
+00000513: program
+
+0000050a: sub main(main_argc, main_argv, main_result)
+0000051d: main_argc :: in u32 = X0
+0000051e: main_argv :: in out u64 = X1
+0000051f: main_result :: out u32 = X0
+000001b9:
+000001be: mem := mem with [SP - 0x10, el]:u64 <- FP
+000001c3: mem := mem with [SP - 8, el]:u64 <- LR
+000001c8: SP := SP - 0x10
+000001cf: FP := SP
+000001d6: X0 := 0x11000
+000001dd: X0 := X0 + 0x34
+000001e4: X1 := 1
+000001eb: mem := mem with [X0, el]:u32 <- low:32[X1]
+000001f2: X0 := 0x11000
+000001f9: X0 := X0 + 0x34
+00000200: X0 := pad:64[mem[X0, el]:u32]
+00000206: LR := 0x73C
+0000020b: call @plus_one with return %00000358
+00000358:
+0000035d: X1 := X0
+00000364: X0 := 0x11000
+0000036b: X0 := X0 + 0x38
+00000372: mem := mem with [X0, el]:u32 <- low:32[X1]
+00000379: X0 := 0
+00000380: FP := mem[SP, el]:u64
+00000385: LR := mem[SP + 8, el]:u64
+0000038a: SP := SP + 0x10
+00000390: call LR with noreturn
+
+0000050b: sub plus_one(plus_one_result)
+00000520: plus_one_result :: out u32 = X0
+00000209:
+00000211: SP := SP - 0x20
+00000218: mem := mem with [SP + 0xC, el]:u32 <- low:32[X0]
+0000021f: X0 := pad:64[mem[SP + 0xC, el]:u32]
+00000226: X0 := X0 + 1
+0000022d: mem := mem with [SP + 0x1C, el]:u32 <- low:32[X0]
+00000234: X0 := pad:64[mem[SP + 0x1C, el]:u32]
+0000023b: SP := SP + 0x20
+00000241: call LR with noreturn
