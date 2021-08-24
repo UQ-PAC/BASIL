@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
  * "goto %{pc}" ==> "goto lab{pc};"
  *
  * todo: test code coverage
+ * - function calls
  */
 
 public class BoogieBillListener implements BilListener {
@@ -62,7 +63,8 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterSub(BilParser.SubContext ctx) {
-
+        String functionName = ctx.functionName().getText();
+        System.out.printf("procedure %s()%n{%n", functionName);
     }
 
     @Override
@@ -96,7 +98,7 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterEndsub(BilParser.EndsubContext ctx) {
-
+        System.out.printf("}%n");
     }
 
     @Override
@@ -106,7 +108,7 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterCall(BilParser.CallContext ctx) {
-
+        System.out.printf("entered call: %s", ctx.getText());
     }
 
     @Override
