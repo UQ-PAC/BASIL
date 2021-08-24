@@ -35,12 +35,14 @@ import java.util.regex.Pattern;
  * etc. pointers?
  * as of current, null values are returned by parseExpression to indicate a prohibited variable like SP was in it, and
  * "skip" is printed instead of the expression/statement.
+ * i'm going to fix this problem by initialising the stack pointer etc. to a huge number, because its a decrementing
+ * stack. other possible alternatives include modelling the stack and heap differently, though it may be tricky to know
+ * which one "mem with" is referring to, since stack pointers can be stored in registers
+ *
  */
 
 public class BoogieBillListener implements BilListener {
 
-    // skip all lines referring to stack pointers, function pointers or link registers
-    List<String> prohibitedVars = Arrays.asList("SP", "FP", "LR");
 
     @Override
     public void enterBil(BilParser.BilContext ctx) {
@@ -148,10 +150,6 @@ public class BoogieBillListener implements BilListener {
             // fixme; unsure this code will ever run
             String lhs = parseExpression(c.exp(1));
             String rhs = parseExpression(c.exp(2));
-            if (lhs == null || rhs == null) {
-                System.out.print("skip");
-                return;
-            }
             System.out.printf("%s := mem[%s]", lhs, rhs);
 
         } else if (expCtx.getClass().equals(BilParser.ExpStoreContext.class)) {
@@ -159,10 +157,6 @@ public class BoogieBillListener implements BilListener {
             BilParser.ExpStoreContext c = (BilParser.ExpStoreContext) expCtx; // 'memwith[X0,el]:u32<-low:32[X1]'
             String lhs = parseExpression(c.exp(1)); // 'X0'
             String rhs = parseExpression(c.exp(2)); // 'X1', potentially removes casts such as 'low:32[X1]'
-            if (lhs == null || rhs == null) {
-                System.out.print("skip");
-                return;
-            }
             System.out.printf("mem[%s] := %s", lhs, rhs);
 
         } else {
@@ -172,10 +166,6 @@ public class BoogieBillListener implements BilListener {
                 lhs = parseRegister(lhs);
             }
             String rhs = parseExpression(expCtx);
-            if (prohibitedVars.contains(lhs) || rhs == null) {
-                System.out.print("skip");
-                return;
-            }
             System.out.printf("%s := %s", lhs, rhs);
         }
     }
@@ -200,14 +190,14 @@ public class BoogieBillListener implements BilListener {
             if (op.equals("=")) {
                 op = "=="; // a little patching here, a little there...
             }
-            return left == null || right == null ? null : String.format("(%s) %s (%s)", left, op, right);
+            return String.format("(%s) %s (%s)", left, op, right);
 
         } else if (ectx.getClass().equals(BilParser.ExpUopContext.class)) {
             /* Unary operation expression */
             BilParser.ExpUopContext ctx = (BilParser.ExpUopContext) ectx;
             String exp = parseExpression(ctx.exp());
             String op = ctx.uop().getText();
-            return exp == null || op == null ? null : String.format("%s (%s)", op, exp);
+            return String.format("%s (%s)", op, exp);
         } else if (ectx.getClass().equals(BilParser.ExpVarContext.class)) {
             /* Variable expression */
             BilParser.ExpVarContext ctx = (BilParser.ExpVarContext) ectx;
@@ -219,8 +209,6 @@ public class BoogieBillListener implements BilListener {
             } else if (variable.charAt(0) == '#') {
                 // variable is an expression bundle todo
                 return variable;
-            } else if (prohibitedVars.contains(variable)) {
-                return null;
             } else {
                 return variable;
             }
@@ -238,7 +226,7 @@ public class BoogieBillListener implements BilListener {
             String exp = parseExpression(ctx.exp());
             // fixme: big warning! this is broken! assumes all bit vectors are 64 bits long
             // wasn't sure how to get the length of a bit vector: might have to get it from somewhere else in the program and keep track of a variable
-            return exp == null ? null : String.format("%s[%d:%d]", exp, 64-firstNat, 64-secondNat-1); // fixme: in future, we want to properly translate exp before jamming it in here
+            return String.format("%s[%d:%d]", exp, 64-firstNat, 64-secondNat-1); // fixme: in future, we want to properly translate exp before jamming it in here
 
         } else {
             System.err.print("Unhandled expression detected: " + ectx.getText());
