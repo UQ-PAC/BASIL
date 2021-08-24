@@ -1,4 +1,5 @@
 import Facts.Fact;
+import Facts.exp.*;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -20,7 +21,7 @@ import java.util.*;
  * Now we can support gotos:
  * "goto %{pc}" ==> "goto lab{pc};"
  *
- *
+ * todo: test code coverage
  */
 
 public class BoogieBillListener implements BilListener {
@@ -84,11 +85,12 @@ public class BoogieBillListener implements BilListener {
     @Override
     public void enterStmt(BilParser.StmtContext ctx) {
         currentPc = ctx.addr().getText();
+        System.out.print(currentPc + ": ");
     }
 
     @Override
     public void exitStmt(BilParser.StmtContext ctx) {
-
+        System.out.println(";");
     }
 
     @Override
@@ -122,18 +124,87 @@ public class BoogieBillListener implements BilListener {
             if (c.exp(2) == null) {
                 return; // no rhs of expression: this is likely a padding instruction on the variable c.exp(1), a.k.a. assignCtx.var()
             }
-            // fixme: do something here
+            // fixme; unsure this code will ever run
+            String rhs = parseExpression(c.exp(2));
+            System.out.printf("%s := mem[%s]", assignCtx.var(), rhs);
         } else if (expCtx.getClass().equals(BilParser.ExpStoreContext.class)) {
             /* Assignment is a store */
             BilParser.ExpStoreContext c = (BilParser.ExpStoreContext) expCtx; // 'memwith[X0,el]:u32<-low:32[X1]'
-            BilParser.ExpContext lhsVar = c.exp(1); // 'X0'
-            BilParser.ExpContext rhs = c.exp(2); // 'low:32[X1]'
-            BilParser.ExpContext rhsVar = ((BilParser.ExpCastContext) rhs).exp(); // 'X1'
-            System.out.printf("mem[%s] := %s;%n", lhsVar.getText(), rhsVar.getText());
+            String lhs = parseExpression(c.exp(1)); // 'X0'
+            String rhs = parseExpression(c.exp(2)); // 'X1', potentially removes casts such as 'low:32[X1]'
+            System.out.printf("mem[%s] := %s", lhs, rhs);
         } else {
             /* Assignment is a move */
-            System.out.printf("%s := %s;%n", assignCtx.var().getText(), expCtx.getText());
-            // extract things are ExpExtractContext types
+            String lhs = assignCtx.var().getText();
+            String rhs = parseExpression(expCtx);
+            System.out.printf("%s := %s", lhs, rhs);
+        }
+    }
+
+    /**
+     * Creates and stores a given expression, and all sub-expressions in the facts list.
+     *
+     * NOTE: Memory expressions are handled separately in the assignment context.
+     *
+     * @param ectx expression context
+     * @return unique expression identifier
+     */
+    private String parseExpression(BilParser.ExpContext ectx) {
+        ectx = ignoreUnhandledContexts(ectx);
+
+        if (ectx.getClass().equals(BilParser.ExpBopContext.class)) {
+            /* Binary operation expression */
+            BilParser.ExpBopContext ctx = (BilParser.ExpBopContext) ectx;
+            String left = parseExpression(ctx.exp(0));
+            String right = parseExpression(ctx.exp(1));
+            String op = ctx.bop().getText();
+            return String.format("(%s) %s (%s)", left, op, right);
+        } else if (ectx.getClass().equals(BilParser.ExpUopContext.class)) {
+            /* Unary operation expression */
+            BilParser.ExpUopContext ctx = (BilParser.ExpUopContext) ectx;
+            String exp = parseExpression(ctx.exp());
+            String op = ctx.uop().getText();
+            return String.format("%s (%s)", op, exp);
+        } else if (ectx.getClass().equals(BilParser.ExpVarContext.class)) {
+            /* Variable expression */
+            BilParser.ExpVarContext ctx = (BilParser.ExpVarContext) ectx;
+            return ctx.var().getText();
+        } else if (ectx.getClass().equals(BilParser.ExpLiteralContext.class)) {
+            /* Literal expression */
+            BilParser.ExpLiteralContext ctx = (BilParser.ExpLiteralContext) ectx;
+            return ctx.literal().getText();
+        } else if (ectx.getClass().equals(BilParser.ExpExtractContext.class)) {
+            /* Extraction expression */
+            BilParser.ExpExtractContext ctx = (BilParser.ExpExtractContext) ectx;
+            int firstNat = Integer.parseInt(ctx.nat(0).getText());
+            int secondNat = Integer.parseInt(ctx.nat(1).getText());
+            String exp = parseExpression(ctx.exp());
+            // fixme: big warning! this is broken! assumes all bit vectors are 64 bits long
+            // wasn't sure how to get the length of a bit vector: might have to get it from somewhere else in the program and keep track of a variable
+            return String.format("%s[%d:%d]", exp, 64-firstNat, 64-secondNat-1); // fixme: in future, we want to properly translate exp before jamming it in here
+        } else {
+            System.err.print("Unhandled expression detected: " + ectx.getText());
+            return "";
+        }
+    }
+
+    /**
+     * Skips all unhandled expression contexts.
+     *
+     * Unhandled expressions are:
+     * - Casts
+     *
+     * @param ectx an expression context
+     * @return expression context that is not unhandled
+     */
+    private BilParser.ExpContext ignoreUnhandledContexts(BilParser.ExpContext ectx) {
+        if (ectx.getClass().equals(BilParser.ExpCastContext.class)) {
+            /* Ignore all casts */
+            System.out.print("(Ignored cast)");
+            ectx = ((BilParser.ExpCastContext) ectx).exp();
+            return ignoreUnhandledContexts(ectx);
+        } else {
+            return ectx;
         }
     }
 
@@ -185,13 +256,6 @@ public class BoogieBillListener implements BilListener {
     @Override
     public void enterExpExtract(BilParser.ExpExtractContext ctx) {
 
-        int firstNat = Integer.parseInt(ctx.nat(0).getText());
-        int secondNat = Integer.parseInt(ctx.nat(1).getText());
-        BilParser.ExpContext exp = ctx.exp();
-
-        // fixme: big warning! this is broken! assumes all bit vectors are 64 bits long
-        // wasn't sure how to get the length of a bit vector: might have to get it from somewhere else in the program and keep track of a variable
-        System.out.printf("%s[%d:%d]", exp.getText(), 64-firstNat, 64-secondNat-1); // fixme: in future, we want to properly translate exp before jamming it in here
     }
 
     @Override
@@ -377,25 +441,5 @@ public class BoogieBillListener implements BilListener {
     @Override
     public void exitEveryRule(ParserRuleContext parserRuleContext) {
 
-    }
-
-    /**
-     * Skips all unhandled expression contexts.
-     *
-     * @param ectx an expression context
-     * @return expression context that is not unhandled
-     */
-    private BilParser.ExpContext ignoreUnhandledContexts(BilParser.ExpContext ectx) {
-        if (ectx.getClass().equals(BilParser.ExpCastContext.class)) {
-            /* Ignore all casts */
-            ectx = ((BilParser.ExpCastContext) ectx).exp();
-            return ignoreUnhandledContexts(ectx);
-        } else if (ectx.getClass().equals(BilParser.ExpExtractContext.class)) {
-            /* Ignore all extracts */
-            ectx = ((BilParser.ExpExtractContext) ectx).exp();
-            return ignoreUnhandledContexts(ectx);
-        } else {
-            return ectx;
-        }
     }
 }
