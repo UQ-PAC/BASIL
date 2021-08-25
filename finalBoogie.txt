@@ -14,33 +14,35 @@ procedure main()
 {
     skip;
     registers[0] := 0x11000;
-    registers[0] := (registers[0]) + (0x14);
-    registers[1] := 1;
-    mem[registers[0]] := registers[1];
-    registers[0] := 0x11000;
-    registers[0] := (registers[0]) + (0x14);
-    skip;
-    #34 := registers[0];
-    NF := #34[1:0];
-    VF := (registers[0][1:0]) & (~ (#34[1:0]));
-    ZF := (#34) == (0);
-    CF := (registers[0][1:0]) | (~ (((#34[1:0]) | (registers[0][1:0])) & (~ (#34[1:0]))));
-    #36 := ZF;
-    if (#36) {goto label0};
-    goto label1;
-    label0: skip;
-    registers[0] := 0x11000;
-    registers[0] := (registers[0]) + (0x18);
-    registers[1] := 2;
-    mem[registers[0]] := registers[1];
+    registers[0] := (registers[0]) + (0x34);
+    mem[registers[0]] := 0;
     goto label3;
+    // LOOP GUARD
+    label3: skip;
+    registers[0] := 0x11000;
+    registers[0] := (registers[0]) + (0x34);
+    skip;
+    #33 := (0xFFFFFFFFFFFFFFFC) + (registers[0]);
+    NF := #33[1:0];
+    VF := (registers[0][1:0]) & (~ (#33[1:0]));
+    ZF := (#33) == (0);
+    CF := (registers[0][1:0]) | (~ (((#33[1:0]) | (registers[0][1:0])) & (~ (#33[1:0]))));
+    #35 := () <> (0);
+    if (#35) {goto label1};
+    goto label2;
+    // END LOOP GUARD
+    label2: skip;
+    registers[0] := 0;
+    // SHOULD BE RETURN STATEMENT HERE - probably causing the null exception
+    ;
+    // LOOP BODY
     label1: skip;
     registers[0] := 0x11000;
-    registers[0] := (registers[0]) + (0x18);
-    registers[1] := 3;
+    registers[0] := (registers[0]) + (0x34);
+    skip;
+    registers[1] := (registers[0]) + (1);
+    registers[0] := 0x11000;
+    registers[0] := (registers[0]) + (0x34);
     mem[registers[0]] := registers[1];
     goto label3;
-    label3: skip;
-    registers[0] := 0;
-}
-
+    // END LOOP BODY

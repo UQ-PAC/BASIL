@@ -12,35 +12,32 @@ procedure main()
     @param argv: from registers[1]
     @result: to registers[0]
 {
-    label000001bf: skip;
-    label000001c4: registers[0] := 0x11000;
-    label000001cb: registers[0] := (registers[0]) + (0x14);
-    label000001d2: registers[1] := 1;
-    label000001d9: mem[registers[0]] := registers[1];
-    label000001e0: registers[0] := 0x11000;
-    label000001e7: registers[0] := (registers[0]) + (0x14);
-    label000001ee: skip;
-    label000001f4: #34 := registers[0];
-    label000001f8: NF := #34[1:0];
-    label000001fc: VF := (registers[0][1:0]) & (~ (#34[1:0]));
-    label00000200: ZF := (#34) == (0);
-    label00000204: CF := (registers[0][1:0]) | (~ (((#34[1:0]) | (registers[0][1:0])) & (~ (#34[1:0]))));
-    label00000213: #36 := ZF;
-    label0000020d: if (#36) {goto label0000020b};
-    label00000501: goto label00000358;
-    label0000020b: skip;
-    label00000219: registers[0] := 0x11000;
-    label00000220: registers[0] := (registers[0]) + (0x18);
-    label00000227: registers[1] := 2;
-    label0000022e: mem[registers[0]] := registers[1];
-    label00000502: goto label00000230;
-    label00000358: skip;
-    label0000035d: registers[0] := 0x11000;
-    label00000364: registers[0] := (registers[0]) + (0x18);
-    label0000036b: registers[1] := 3;
-    label00000372: mem[registers[0]] := registers[1];
-    label00000378: goto label00000230;
-    label00000230: skip;
-    label00000235: registers[0] := 0;
-}
-
+    label000001b9: skip;
+    label000001be: registers[0] := 0x11000;
+    label000001c5: registers[0] := (registers[0]) + (0x34);
+    label000001cc: mem[registers[0]] := 0;
+    label000001d3: goto label000001d1;
+    label000001d1: skip;
+    label000001d9: registers[0] := 0x11000;
+    label000001e0: registers[0] := (registers[0]) + (0x34);
+    label000001e7: skip;
+    label000001ed: #33 := (0xFFFFFFFFFFFFFFFC) + (registers[0]);
+    label000001f1: NF := #33[1:0];
+    label000001f5: VF := (registers[0][1:0]) & (~ (#33[1:0]));
+    label000001f9: ZF := (#33) == (0);
+    label000001fd: CF := (registers[0][1:0]) | (~ (((#33[1:0]) | (registers[0][1:0])) & (~ (#33[1:0]))));
+    label0000020c: #35 := () <> (0);
+    label00000206: if (#35) {goto label00000204};
+    label000004da: goto label0000023e;
+    label0000023e: skip;
+    label00000243: registers[0] := 0;
+    label00000249: ;
+    label00000204: skip;
+    label00000212: registers[0] := 0x11000;
+    label00000219: registers[0] := (registers[0]) + (0x34);
+    label00000220: skip;
+    label00000227: registers[1] := (registers[0]) + (1);
+    label0000022e: registers[0] := 0x11000;
+    label00000235: registers[0] := (registers[0]) + (0x34);
+    label0000023c: mem[registers[0]] := registers[1];
+    label000004db: goto label000001d1;

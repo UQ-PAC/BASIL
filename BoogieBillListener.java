@@ -60,8 +60,6 @@ public class BoogieBillListener implements BilListener {
     String funcName = "";
     BufferedWriter writer;
 
-    Map<String, Integer> registerValues = new HashMap<>();
-
     public BoogieBillListener(String outputFileName) {
         try {
             writer = new BufferedWriter(new FileWriter(outputFileName, false));
