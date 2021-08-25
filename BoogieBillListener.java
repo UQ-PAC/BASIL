@@ -1,12 +1,10 @@
-import Facts.Fact;
-import Facts.exp.*;
-import Facts.inst.CjmpFact;
-import Facts.inst.JmpFact;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.*;
-import java.util.regex.Pattern;
 
 /** Notes
  * Right now, we're only indexing one level deep on assignment expressions, but lhs and rhs might be more complex than
@@ -47,20 +45,28 @@ public class BoogieBillListener implements BilListener {
     boolean isInFunc = false;
     int expectedParams = 0;
     String funcName = "";
+    BufferedWriter writer;
 
+    public BoogieBillListener() {
+        try {
+            writer = new BufferedWriter(new FileWriter("boogie_out.txt", false));
+        } catch (IOException e) {
+            System.err.println("Error setting up file writer.");
+        }
+    }
 
     @Override
     public void enterBil(BilParser.BilContext ctx) {
         // registers[0] represents the value at X0
-        System.out.println("const registers: [int] int;");
+        writeToFile("const registers: [int] int;\n");
         // memory[0x00111] represents the value stored at memory address 0x00111
         // fixme: for now, only integers can be stored in memory
-        System.out.println("const memory: [int] int;");
-        System.out.println("var SP: int, FP: int, LR: int;");
-        System.out.println("SP = 0;");
-        System.out.println("FP = ?;");
-        System.out.println("LR = ?;");
-        System.out.println();
+        writeToFile("const memory: [int] int;\n");
+        writeToFile("var SP: int, FP: int, LR: int;\n");
+        writeToFile("SP = 0;\n");
+        writeToFile("FP = ?;\n");
+        writeToFile("LR = ?;\n");
+        writeToFile("\n");
     }
 
     @Override
@@ -90,26 +96,13 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterSub(BilParser.SubContext ctx) {
-        // System.out.println(ctx.getText());
+        // writeToFile(ctx.getText() + '\n');
         String functionName = ctx.functionName().getText();
         List<BilParser.ParamContext> params = ctx.param();
         expectedParams = params.size();
-//        BilParser.ParamContext result = null;
-//        for (BilParser.ParamContext param : params) {
-//            if (param.ID().getText().equals(functionName + "_result")) { // fixme: this might cause name-clashing problems: parameters cannot be called "<function name>_result"
-//                result = param;
-//            }
-//        }
-//        StringBuilder builder = new StringBuilder();
-//        if (result != null) {
-//            params.remove(result);
-//            builder.append("    @result_location = ").append(result.getText()).append("\n");
-//        }
-//        for (BilParser.ParamContext param : params) {
-//            builder.append("    ").append(param.getText()).append("\n");
-//        }
-
-        System.out.printf("procedure %s()%n", functionName);
+        // at this point, we just assume that the registers and memory are modified by every function
+        // this can be cleaned up on a second parsing
+        writeToFile(String.format("procedure %s()%n    modifies mem%n    modifies registers%n", functionName));
         isInFunc = true;
         funcName = functionName;
     }
@@ -138,9 +131,9 @@ public class BoogieBillListener implements BilListener {
         if (variable.charAt(0) == 'X') {
             variable = parseRegister(variable); // fixme warning: assumes all registers start with 'X' and no other variable does
         }
-        System.out.printf("    %s %s %s%n", id, inOut, variable);
+        writeToFile(String.format("    %s %s %s%n", id, inOut, variable));
         if (--expectedParams == 0) {
-            System.out.println("{");
+            writeToFile("{\n");
         }
     }
 
@@ -152,23 +145,23 @@ public class BoogieBillListener implements BilListener {
     @Override
     public void enterStmt(BilParser.StmtContext ctx) {
         if (isInFunc) {
-            System.out.print("    ");
+            writeToFile("    ");
         }
         String currentPc = ctx.addr().getText();
-        System.out.print("label_" + currentPc + ": ");
+        writeToFile("label_" + currentPc + ": ");
         if (ctx.call() == null && ctx.assign() == null && ctx.cjmp() == null && ctx.jmp() == null) {
-            System.out.print("skip");
+            writeToFile("skip");
         }
     }
 
     @Override
     public void exitStmt(BilParser.StmtContext ctx) {
-        System.out.println(";");
+        writeToFile(";\n");
     }
 
     @Override
     public void enterEndsub(BilParser.EndsubContext ctx) {
-        System.out.printf("}%n%n");
+        writeToFile(String.format("}%n%n"));
         isInFunc = false;
     }
 
@@ -179,7 +172,7 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterCall(BilParser.CallContext ctx) {
-        System.out.printf("call %s(); goto label_%s", ctx.functionName().getText(), ctx.returnaddr().addr().getText());
+        writeToFile(String.format("call %s(); goto label_%s", ctx.functionName().getText(), ctx.returnaddr().addr().getText()));
     }
 
     @Override
@@ -196,20 +189,20 @@ public class BoogieBillListener implements BilListener {
             /* Assignment is a load */
             BilParser.ExpLoadContext c = (BilParser.ExpLoadContext) expCtx; // 'mem[x0,el]:u32'
             if (c.exp(2) == null) {
-                System.out.print("skip");
+                writeToFile("skip");
                 return; // no rhs of expression: this is likely a padding instruction on the variable c.exp(1), a.k.a. assignCtx.var()
             }
             // fixme; unsure this code will ever run
             String lhs = parseExpression(c.exp(1));
             String rhs = parseExpression(c.exp(2));
-            System.out.printf("%s := mem[%s]", lhs, rhs);
+            writeToFile(String.format("%s := mem[%s]", lhs, rhs));
 
         } else if (expCtx.getClass().equals(BilParser.ExpStoreContext.class)) {
             /* Assignment is a store */
             BilParser.ExpStoreContext c = (BilParser.ExpStoreContext) expCtx; // 'memwith[X0,el]:u32<-low:32[X1]'
             String lhs = parseExpression(c.exp(1)); // 'X0'
             String rhs = parseExpression(c.exp(2)); // 'X1', potentially removes casts such as 'low:32[X1]'
-            System.out.printf("mem[%s] := %s", lhs, rhs);
+            writeToFile(String.format("mem[%s] := %s", lhs, rhs));
 
         } else {
             /* Assignment is a move */
@@ -218,7 +211,7 @@ public class BoogieBillListener implements BilListener {
                 lhs = parseRegister(lhs);
             }
             String rhs = parseExpression(expCtx);
-            System.out.printf("%s := %s", lhs, rhs);
+            writeToFile(String.format("%s := %s", lhs, rhs));
         }
     }
 
@@ -413,7 +406,7 @@ public class BoogieBillListener implements BilListener {
     public void exitCjmp(BilParser.CjmpContext ctx) {
         String cond = ctx.var().getText();
         String target = ctx.addr().getText();
-        System.out.printf("if (%s) {goto label_%s}", cond, target);
+        writeToFile(String.format("if (%s) {goto label_%s}", cond, target));
     }
 
     @Override
@@ -424,7 +417,7 @@ public class BoogieBillListener implements BilListener {
         } else if (ctx.addr() != null) {
             target = ctx.addr().getText();
         }
-        System.out.printf("goto label_%s", target);
+        writeToFile(String.format("goto label_%s", target));
     }
 
     @Override
@@ -550,5 +543,14 @@ public class BoogieBillListener implements BilListener {
     @Override
     public void exitEveryRule(ParserRuleContext parserRuleContext) {
 
+    }
+    
+    private void writeToFile(String text) {
+        try {
+            writer.write(text);
+            writer.flush();
+        } catch (IOException e) {
+            System.err.println("Error writing to file.");
+        }
     }
 }
