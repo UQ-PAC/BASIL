@@ -10,8 +10,14 @@ public class Main {
         BilParser parser = new BilParser(tokens);
         parser.setBuildParseTree(true);
         BilParser.BilContext b = parser.bil(); // abstract syntax tree
-        BoogieBillListener listener = new BoogieBillListener();
+        String outFile = "boogie_out.txt";
+        BoogieBillListener listener = new BoogieBillListener(outFile);
         ParseTreeWalker walker = new ParseTreeWalker();
         walker.walk(listener, b); // walk through the AST b, generating facts via the listener
+
+        // clean the output file from the listener and put the cleaned version in the file called finalBoogieCode
+        String finalBoogieCode = "finalBoogie.txt";
+        BoogieCleaner cleaner = new BoogieCleaner(outFile);
+        cleaner.clean(finalBoogieCode);
     }
 }

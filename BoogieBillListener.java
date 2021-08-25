@@ -47,9 +47,9 @@ public class BoogieBillListener implements BilListener {
     String funcName = "";
     BufferedWriter writer;
 
-    public BoogieBillListener() {
+    public BoogieBillListener(String outputFileName) {
         try {
-            writer = new BufferedWriter(new FileWriter("boogie_out.txt", false));
+            writer = new BufferedWriter(new FileWriter(outputFileName, false));
         } catch (IOException e) {
             System.err.println("Error setting up file writer.");
         }
