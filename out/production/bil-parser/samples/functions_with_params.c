@@ -1,5 +1,5 @@
 int x, y;
-int plus_one();
+int plus_one(int);
 
 int main() {
     x = 1;

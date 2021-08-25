@@ -24,10 +24,10 @@ import java.util.regex.Pattern;
  * Now we can support gotos:
  * "goto %{pc}" ==> "goto lab{pc};"
  *
- * todo: test code coverage
- * - [x] function calls
- * - [x] filter out stack pointers properly
+ * todo:
  * - [ ] functions with params
+ * - [ ] unary operators like ~ probably mean 'bit flip' not 'not'. figure this out and solve
+ *
  *
  * CURRENT PROBLEM
  * function parameters are loaded into memory using the stack pointer's address, so we can't ignore the stack pointer,
@@ -38,10 +38,15 @@ import java.util.regex.Pattern;
  * i'm going to fix this problem by initialising the stack pointer etc. to a huge number, because its a decrementing
  * stack. other possible alternatives include modelling the stack and heap differently, though it may be tricky to know
  * which one "mem with" is referring to, since stack pointers can be stored in registers
- *
+ * Alternatively, initialise it to -1 and the negative memory will always represent the stack.
+ * Also alternatively, we can convert procedures into gotos that are reasoned about in terms of implementation
  */
 
 public class BoogieBillListener implements BilListener {
+
+    boolean isInFunc = false;
+    int expectedParams = 0;
+    String funcName = "";
 
 
     @Override
@@ -51,6 +56,10 @@ public class BoogieBillListener implements BilListener {
         // memory[0x00111] represents the value stored at memory address 0x00111
         // fixme: for now, only integers can be stored in memory
         System.out.println("const memory: [int] int;");
+        System.out.println("var SP: int, FP: int, LR: int;");
+        System.out.println("SP = 0;");
+        System.out.println("FP = ?;");
+        System.out.println("LR = ?;");
         System.out.println();
     }
 
@@ -81,9 +90,28 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterSub(BilParser.SubContext ctx) {
+        // System.out.println(ctx.getText());
         String functionName = ctx.functionName().getText();
-        System.out.printf("procedure: %s%n", ctx.getText());
-        System.out.printf("procedure %s()%n{%n", functionName);
+        List<BilParser.ParamContext> params = ctx.param();
+        expectedParams = params.size();
+//        BilParser.ParamContext result = null;
+//        for (BilParser.ParamContext param : params) {
+//            if (param.ID().getText().equals(functionName + "_result")) { // fixme: this might cause name-clashing problems: parameters cannot be called "<function name>_result"
+//                result = param;
+//            }
+//        }
+//        StringBuilder builder = new StringBuilder();
+//        if (result != null) {
+//            params.remove(result);
+//            builder.append("    @result_location = ").append(result.getText()).append("\n");
+//        }
+//        for (BilParser.ParamContext param : params) {
+//            builder.append("    ").append(param.getText()).append("\n");
+//        }
+
+        System.out.printf("procedure %s()%n", functionName);
+        isInFunc = true;
+        funcName = functionName;
     }
 
     @Override
@@ -93,7 +121,27 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterParamTypes(BilParser.ParamTypesContext ctx) {
-
+        String id = ctx.param().getText();
+        if (id.contains("result")) {
+            id = "@result:";
+        } else {
+            id = id.replace(funcName + "_", "");
+            id = "@param " + id + ":";
+        }
+        String inOut = ctx.inout().getText();
+        if (inOut.equals("out")) {
+            inOut = "to";
+        } else {
+            inOut = "from"; // warning: also includes 'in and out' (i.e. as well as just 'in')
+        }
+        String variable = ctx.var().getText();
+        if (variable.charAt(0) == 'X') {
+            variable = parseRegister(variable); // fixme warning: assumes all registers start with 'X' and no other variable does
+        }
+        System.out.printf("    %s %s %s%n", id, inOut, variable);
+        if (--expectedParams == 0) {
+            System.out.println("{");
+        }
     }
 
     @Override
@@ -103,6 +151,9 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterStmt(BilParser.StmtContext ctx) {
+        if (isInFunc) {
+            System.out.print("    ");
+        }
         String currentPc = ctx.addr().getText();
         System.out.print("label_" + currentPc + ": ");
         if (ctx.call() == null && ctx.assign() == null && ctx.cjmp() == null && ctx.jmp() == null) {
@@ -118,6 +169,7 @@ public class BoogieBillListener implements BilListener {
     @Override
     public void enterEndsub(BilParser.EndsubContext ctx) {
         System.out.printf("}%n%n");
+        isInFunc = false;
     }
 
     @Override
