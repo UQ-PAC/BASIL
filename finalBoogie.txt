@@ -13,42 +13,34 @@ procedure main()
     @result: to registers[0]
 {
     skip;
-    mem[(SP) - (0x10)] := FP;
-    mem[(SP) - (8)] := LR;
-    SP := (SP) - (0x10);
-    FP := SP;
     registers[0] := 0x11000;
-    registers[0] := (registers[0]) + (0x34);
+    registers[0] := (registers[0]) + (0x14);
     registers[1] := 1;
     mem[registers[0]] := registers[1];
     registers[0] := 0x11000;
-    registers[0] := (registers[0]) + (0x34);
+    registers[0] := (registers[0]) + (0x14);
     skip;
-    LR := 0x73C;
-    call plus_one(); goto label00000358;
-    label00000358: skip;
-    registers[1] := registers[0];
+    #34 := registers[0];
+    NF := #34[1:0];
+    VF := (registers[0][1:0]) & (~ (#34[1:0]));
+    ZF := (#34) == (0);
+    CF := (registers[0][1:0]) | (~ (((#34[1:0]) | (registers[0][1:0])) & (~ (#34[1:0]))));
+    #36 := ZF;
+    if (#36) {goto label0};
+    goto label1;
+    label0: skip;
     registers[0] := 0x11000;
-    registers[0] := (registers[0]) + (0x38);
+    registers[0] := (registers[0]) + (0x18);
+    registers[1] := 2;
     mem[registers[0]] := registers[1];
+    goto label3;
+    label1: skip;
+    registers[0] := 0x11000;
+    registers[0] := (registers[0]) + (0x18);
+    registers[1] := 3;
+    mem[registers[0]] := registers[1];
+    goto label3;
+    label3: skip;
     registers[0] := 0;
-    skip;
-    skip;
-    SP := (SP) + (0x10);
-}
-
-procedure plus_one()
-    modifies mem
-    modifies registers
-    @result: to registers[0]
-{
-    skip;
-    SP := (SP) - (0x20);
-    mem[(SP) + (0xC)] := registers[0];
-    skip;
-    registers[0] := (registers[0]) + (1);
-    mem[(SP) + (0x1C)] := registers[0];
-    skip;
-    SP := (SP) + (0x20);
 }
 

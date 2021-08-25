@@ -1,6 +1,8 @@
 import java.io.*;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -8,7 +10,9 @@ public class BoogieCleaner {
 
     String inputFileName;
     String outputFileName;
-    List<String> usedLabels = new ArrayList<>();
+    Map<String, String> usedLabels = new HashMap<>();
+
+    int _nextLabelId = 0; // should only be referenced by getNextLabelId()
 
 
     public BoogieCleaner(String inputFileName, String outputFileName) {
@@ -33,10 +37,10 @@ public class BoogieCleaner {
                         label.append(c);
                         c = line.charAt(++i);
                     }
-                    usedLabels.add(label.toString());
+                    usedLabels.put(label.toString(), "label" + getNextLabelId());
                 }
             }
-            for (String label : usedLabels) {
+            for (String label : usedLabels.keySet()) {
                 System.out.printf("used label: %s%n", label);
             }
         } catch (IOException e) {
@@ -54,10 +58,15 @@ public class BoogieCleaner {
                         i++;
                     }
                     String label = line.substring(start, i);
-                    if (!usedLabels.contains(label)) {
+                    if (!usedLabels.containsKey(label)) {
                         // concatenates the whitespace before the label with the rest of the line, ignoring the ": "
                         // after the label
                         line = line.substring(0, start) + line.substring(i + 1).trim(); // warning: cuts off trailing whitespace
+                    }
+                }
+                for (String usedLabel : usedLabels.keySet()) {
+                    if (line.contains(usedLabel)) {
+                        line = line.replace(usedLabel, usedLabels.get(usedLabel));
                     }
                 }
                 writer.write(line + "\n");
@@ -67,4 +76,10 @@ public class BoogieCleaner {
             System.err.println("Error reading or writing input file.");
         }
     }
+
+    String getNextLabelId() {
+        return String.valueOf(_nextLabelId++);
+    }
 }
+
+

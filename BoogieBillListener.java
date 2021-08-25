@@ -26,7 +26,9 @@ import java.util.*;
  * - [?] functions with params
  * - [ ] unary operators like ~ probably mean 'bit flip' not 'not'. figure this out and solve
  * - [ ] fix cjumps: if bodies are probably executed twice in the current implementation
- *
+ * - [ ] fix sp/fp/lr initialisation
+ * - [ ] loops
+ * - [ ] sort out whatever this is (NF <> VF | ZF <> 0) <> 0
  *
  * CURRENT PROBLEM
  * function parameters are loaded into memory using the stack pointer's address, so we can't ignore the stack pointer,
@@ -39,6 +41,13 @@ import java.util.*;
  * which one "mem with" is referring to, since stack pointers can be stored in registers
  * Alternatively, initialise it to -1 and the negative memory will always represent the stack.
  * Also alternatively, we can convert procedures into gotos that are reasoned about in terms of implementation
+ *
+ * MORE PROBLEMS
+ * registers can contain references to functions!
+ * solution(?): actually dereference the registers while parsing
+ *
+ * they can always fundamentally be dereferenced into their literal definitions.
+ * this dereferencing can also be done for function parameters and such
  */
 
 public class BoogieBillListener implements BilListener {
@@ -47,6 +56,8 @@ public class BoogieBillListener implements BilListener {
     int expectedParams = 0;
     String funcName = "";
     BufferedWriter writer;
+
+
 
     public BoogieBillListener(String outputFileName) {
         try {
@@ -173,7 +184,12 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterCall(BilParser.CallContext ctx) {
-        writeToFile(String.format("call %s(); goto label%s", ctx.functionName().getText(), ctx.returnaddr().addr().getText()));
+        // fixme: bill parser is having trouble understanding when we reach the end of a function call, and sometimes throws a null pointer exception if it doesn't think the end was reached
+        try {
+            writeToFile(String.format("call %s(); goto label%s", ctx.functionName().getText(), ctx.returnaddr().addr().getText()));
+        } catch (NullPointerException e) {
+            System.err.println("ignored null pointer exception");
+        }
     }
 
     @Override
@@ -275,7 +291,7 @@ public class BoogieBillListener implements BilListener {
             return String.format("%s[%d:%d]", exp, 64-firstNat, 64-secondNat-1); // fixme: in future, we want to properly translate exp before jamming it in here
 
         } else {
-            System.err.print("Unhandled expression detected: " + ectx.getText());
+            System.err.println("Unhandled expression detected: " + ectx.getText());
             return "";
         }
     }
