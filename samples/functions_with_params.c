@@ -2,7 +2,7 @@ int x, y;
 int plus_one(int);
 
 int main() {
-    x = 1;
+    int x = 1;
     y = plus_one(x);
 }
 

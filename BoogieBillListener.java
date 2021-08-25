@@ -23,8 +23,9 @@ import java.util.*;
  * "goto %{pc}" ==> "goto lab{pc};"
  *
  * todo:
- * - [ ] functions with params
+ * - [?] functions with params
  * - [ ] unary operators like ~ probably mean 'bit flip' not 'not'. figure this out and solve
+ * - [ ] fix cjumps: if bodies are probably executed twice in the current implementation
  *
  *
  * CURRENT PROBLEM
@@ -148,7 +149,7 @@ public class BoogieBillListener implements BilListener {
             writeToFile("    ");
         }
         String currentPc = ctx.addr().getText();
-        writeToFile("label_" + currentPc + ": ");
+        writeToFile("label" + currentPc + ": ");
         if (ctx.call() == null && ctx.assign() == null && ctx.cjmp() == null && ctx.jmp() == null) {
             writeToFile("skip");
         }
@@ -172,7 +173,7 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterCall(BilParser.CallContext ctx) {
-        writeToFile(String.format("call %s(); goto label_%s", ctx.functionName().getText(), ctx.returnaddr().addr().getText()));
+        writeToFile(String.format("call %s(); goto label%s", ctx.functionName().getText(), ctx.returnaddr().addr().getText()));
     }
 
     @Override
@@ -406,7 +407,7 @@ public class BoogieBillListener implements BilListener {
     public void exitCjmp(BilParser.CjmpContext ctx) {
         String cond = ctx.var().getText();
         String target = ctx.addr().getText();
-        writeToFile(String.format("if (%s) {goto label_%s}", cond, target));
+        writeToFile(String.format("if (%s) {goto label%s}", cond, target));
     }
 
     @Override
@@ -417,7 +418,7 @@ public class BoogieBillListener implements BilListener {
         } else if (ctx.addr() != null) {
             target = ctx.addr().getText();
         }
-        writeToFile(String.format("goto label_%s", target));
+        writeToFile(String.format("goto label%s", target));
     }
 
     @Override

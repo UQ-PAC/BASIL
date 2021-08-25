@@ -1,17 +1,3 @@
-const registers: [int] int;
-const memory: [int] int;
-var SP: int, FP: int, LR: int;
-SP = 0;
-FP = ?;
-LR = ?;
-
-procedure main()
-    modifies mem
-    modifies registers
-    @param argc: from registers[0]
-    @param argv: from registers[1]
-    @result: to registers[0]
-{
     label000001b9: skip;
     label000001be: mem[(SP) - (0x10)] := FP;
     label000001c3: mem[(SP) - (8)] := LR;
@@ -26,7 +12,7 @@ procedure main()
     label00000200: skip;
     label00000206: LR := 0x73C;
     label0000020b: call plus_one(); goto label00000358;
-    label00000358: skip;
+    skip;
     label0000035d: registers[1] := registers[0];
     label00000364: registers[0] := 0x11000;
     label0000036b: registers[0] := (registers[0]) + (0x38);
@@ -35,13 +21,6 @@ procedure main()
     label00000380: skip;
     label00000385: skip;
     label0000038a: SP := (SP) + (0x10);
-}
-
-procedure plus_one()
-    modifies mem
-    modifies registers
-    @result: to registers[0]
-{
     label00000209: skip;
     label00000211: SP := (SP) - (0x20);
     label00000218: mem[(SP) + (0xC)] := registers[0];
@@ -50,5 +29,3 @@ procedure plus_one()
     label0000022d: mem[(SP) + (0x1C)] := registers[0];
     label00000234: skip;
     label0000023b: SP := (SP) + (0x20);
-}
-
