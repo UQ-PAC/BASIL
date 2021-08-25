@@ -43,11 +43,14 @@ import java.util.*;
  * Also alternatively, we can convert procedures into gotos that are reasoned about in terms of implementation
  *
  * MORE PROBLEMS
- * registers can contain references to functions!
- * solution(?): actually dereference the registers while parsing
+ * registers can contain references to functions! function.bil line 53
+ * solution(?): actually dereference the registers while parsing. probably not good due to conditional updates
  *
  * they can always fundamentally be dereferenced into their literal definitions.
  * this dereferencing can also be done for function parameters and such
+ *
+ * problem: how are frame pointers initialised?
+ * solution: always start at the start of main and ignore frame pointers if they're not used
  */
 
 public class BoogieBillListener implements BilListener {
@@ -57,7 +60,7 @@ public class BoogieBillListener implements BilListener {
     String funcName = "";
     BufferedWriter writer;
 
-
+    Map<String, Integer> registerValues = new HashMap<>();
 
     public BoogieBillListener(String outputFileName) {
         try {
