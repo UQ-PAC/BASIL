@@ -28,6 +28,9 @@ public class BoogieTranslator {
         this.lines = lines;
     }
 
+    /**
+     * Starting point for a BIL translation.
+     */
     public void translate() {
         logUsedLabels();
         handleInit();
