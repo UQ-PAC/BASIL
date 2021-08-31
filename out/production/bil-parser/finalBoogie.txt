@@ -17,6 +17,7 @@ procedure main()
     registers[0] := (registers[0]) + (0x34);
     mem[registers[0]] := 0;
     goto label3;
+    // LOOP GUARD
     label3: skip;
     registers[0] := 0x11000;
     registers[0] := (registers[0]) + (0x34);
@@ -29,9 +30,12 @@ procedure main()
     #35 := () <> (0);
     if (#35) {goto label1};
     goto label2;
+    // END LOOP GUARD
     label2: skip;
     registers[0] := 0;
+    // SHOULD BE RETURN STATEMENT HERE - probably causing the null exception
     ;
+    // LOOP BODY
     label1: skip;
     registers[0] := 0x11000;
     registers[0] := (registers[0]) + (0x34);
@@ -41,76 +45,4 @@ procedure main()
     registers[0] := (registers[0]) + (0x34);
     mem[registers[0]] := registers[1];
     goto label3;
-procedure sub_598()
-    modifies mem
-    modifies registers
-    @result: to registers[0]
-{
-    skip;
-    mem[(SP) - (0x10)] := FP;
-    mem[(SP) - (8)] := LR;
-    SP := (SP) - (0x10);
-    FP := SP;
-    LR := 0x5A4;
-    call call_weak_fn(); goto label4;
-    label4: skip;
-    skip;
-    skip;
-    SP := (SP) + (0x10);
-}
-
-procedure sub_610()
-    modifies mem
-    modifies registers
-    @result: to registers[0]
-{
-    skip;
-    FP := 0;
-    LR := 0;
-    registers[5] := registers[0];
-    skip;
-    registers[2] := (SP) + (8);
-    registers[6] := SP;
-    registers[0] := 0x10000;
-    skip;
-    registers[3] := 0x10000;
-    skip;
-    registers[4] := 0x10000;
-    skip;
-    LR := 0x644;
-    call __libc_start_main(); goto label5;
-    label5: skip;
-    LR := 0x648;
-    call abort(); goto label6;
-    label6: skip;
-}
-
-procedure sub_660()
-    modifies mem
-    modifies registers
-    @result: to registers[0]
-{
-    skip;
-    registers[0] := 0x11000;
-    registers[0] := (registers[0]) + (0x30);
-    registers[1] := 0x11000;
-    registers[1] := (registers[1]) + (0x30);
-    #10 := (1) + (~ ((registers[0]) + (registers[1])));
-    NF := #10[1:0];
-    VF := ((registers[1][1:0]) & (~ (registers[0])[1:0])) & (~ ((#10[1:0]) | (~ ((registers[1][1:0]) & (~ ((~ (registers[0])[1:0]) & (#10[1:0])))))));
-    ZF := (#10) == (0);
-    CF := (((registers[1][1:0]) & (~ (registers[0])[1:0])) | (~ (registers[0])[1:0])) & (~ (((#10[1:0]) | (registers[1][1:0])) & (~ (#10[1:0]))));
-    #12 := ZF;
-    if (#12) {goto label9};
-    goto label8;
-    label8: skip;
-    registers[1] := 0x10000;
-    skip;
-    #86 := (registers[1]) == (0);
-    if (#86) {goto label9};
-    goto label10;
-    label9: skip;
-    ;
-    label10: skip;
-}
-
+    // END LOOP BODY

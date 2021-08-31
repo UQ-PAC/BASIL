@@ -29,6 +29,7 @@ import java.util.*;
  * - [ ] fix sp/fp/lr initialisation
  * - [ ] loops
  * - [ ] sort out whatever this is (NF <> VF | ZF <> 0) <> 0
+ * - [ ] dereference parameters in memory allocation statements. i.e. mem[x0] ==> dereference x0
  *
  * CURRENT PROBLEM
  * function parameters are loaded into memory using the stack pointer's address, so we can't ignore the stack pointer,
@@ -55,9 +56,11 @@ import java.util.*;
 
 public class BoogieBillListener implements BilListener {
 
-    boolean isInFunc = false;
+    // represents the number of parameter statements expected to follow this line. useful for identifying parameters
     int expectedParams = 0;
+    // the name of the function currently called, or blank if we are not in any function
     String funcName = "";
+    // writes boogie output
     BufferedWriter writer;
 
     public BoogieBillListener(String outputFileName) {
@@ -116,7 +119,6 @@ public class BoogieBillListener implements BilListener {
         // at this point, we just assume that the registers and memory are modified by every function
         // this can be cleaned up on a second parsing
         writeToFile(String.format("procedure %s()%n    modifies mem%n    modifies registers%n", functionName));
-        isInFunc = true;
         funcName = functionName;
     }
 
@@ -157,7 +159,7 @@ public class BoogieBillListener implements BilListener {
 
     @Override
     public void enterStmt(BilParser.StmtContext ctx) {
-        if (isInFunc) {
+        if (funcName.equals("")) {
             writeToFile("    ");
         }
         String currentPc = ctx.addr().getText();
@@ -175,7 +177,7 @@ public class BoogieBillListener implements BilListener {
     @Override
     public void enterEndsub(BilParser.EndsubContext ctx) {
         writeToFile(String.format("}%n%n"));
-        isInFunc = false;
+        funcName = "";
     }
 
     @Override
