@@ -2,10 +2,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class BoogieTranslator {
 
@@ -14,6 +11,9 @@ public class BoogieTranslator {
     String funcName = "";
     int expectedParams = 0;
     Set<String> usedLabels = new HashSet<>();
+    Map<String, Integer> registerValues = new HashMap<>();
+    // the current index of 'lines' that is being analysed
+    int lineIndex = 0;
 
     public BoogieTranslator(List<ParserRuleContext> lines, String outputFileName) {
         try {
@@ -25,6 +25,14 @@ public class BoogieTranslator {
     }
 
     public void translate() {
+        logUsedLabels();
+        handleInit();
+        for (ParserRuleContext line : lines) {
+            handleLine(line);
+        }
+    }
+
+    private void logUsedLabels() {
         // label analysis
         // find all used labels
         for (ParserRuleContext line : lines) {
@@ -51,47 +59,6 @@ public class BoogieTranslator {
                 usedLabels.add(String.format("%s", target));
             }
         }
-        System.out.println(usedLabels);
-        // begin translation
-        handleInit();
-        for (ParserRuleContext line : lines) {
-            // lines can be statements, functions declarations (subs) functions returns (end subs) or function parameters
-            if (line.getClass() == BilParser.StmtContext.class) {
-                BilParser.StmtContext stmt = (BilParser.StmtContext) line;
-                // visual index for functions
-                if (!funcName.equals("")) {
-                    writeToFile("    ");
-                }
-                // add label if it is used in the program
-                if (usedLabels.contains(stmt.addr().getText())) {
-                    writeToFile("label" + stmt.addr().getText() + ": ");
-                }
-                // statements can be assignments, jumps, conditional jumps or function calls
-                if (stmt.assign() != null) {
-                    handleAssignment(stmt.assign());
-                } else if (stmt.jmp() != null) {
-                    handleJump(stmt.jmp());
-                } else if (stmt.cjmp() != null) {
-                    handleCJump(stmt.cjmp());
-                } else if (stmt.call() != null) {
-                    handleCall(stmt.call());
-                } else {
-                    writeToFile("skip");
-                }
-                // end every statement with this
-                writeToFile(";");
-            } else if (line.getClass() == BilParser.SubContext.class) {
-                handleSub((BilParser.SubContext) line);
-            } else if (line.getClass() == BilParser.EndsubContext.class) {
-                handleEndSub((BilParser.EndsubContext) line);
-            } else if (line.getClass() == BilParser.ParamTypesContext.class) {
-                handleParam((BilParser.ParamTypesContext) line);
-            } else {
-                System.err.printf("Unhandled line: %s%n", line.getText());
-            }
-            // end every line with this
-            writeToFile("\n");
-        }
     }
 
     private void handleInit() {
@@ -105,6 +72,49 @@ public class BoogieTranslator {
         writeToFile("FP = ?;\n");
         writeToFile("LR = ?;\n");
         writeToFile("\n");
+    }
+
+    private void handleLine(ParserRuleContext line) {
+        // lines can be statements, functions declarations (subs) functions returns (end subs) or function parameters
+        if (line.getClass() == BilParser.StmtContext.class) {
+            handleStatement((BilParser.StmtContext) line);
+        } else if (line.getClass() == BilParser.SubContext.class) {
+            handleSub((BilParser.SubContext) line);
+        } else if (line.getClass() == BilParser.EndsubContext.class) {
+            handleEndSub((BilParser.EndsubContext) line);
+        } else if (line.getClass() == BilParser.ParamTypesContext.class) {
+            handleParam((BilParser.ParamTypesContext) line);
+        } else {
+            System.err.printf("Unhandled line: %s%n", line.getText());
+        }
+        // end every line with this
+        writeToFile("\n");
+        lineIndex++;
+    }
+
+    private void handleStatement(BilParser.StmtContext ctx) {
+        // visual index for functions
+        if (!funcName.equals("")) {
+            writeToFile("    ");
+        }
+        // add label if it is used in the program
+        if (usedLabels.contains(ctx.addr().getText())) {
+            writeToFile("label" + ctx.addr().getText() + ": ");
+        }
+        // statements can be assignments, jumps, conditional jumps or function calls
+        if (ctx.assign() != null) {
+            handleAssignment(ctx.assign());
+        } else if (ctx.jmp() != null) {
+            handleJump(ctx.jmp());
+        } else if (ctx.cjmp() != null) {
+            handleCJump(ctx.cjmp());
+        } else if (ctx.call() != null) {
+            handleCall(ctx.call());
+        } else {
+            writeToFile("skip");
+        }
+        // end every statement with this
+        writeToFile(";");
     }
 
     private void handleAssignment(BilParser.AssignContext ctx) {
@@ -134,7 +144,7 @@ public class BoogieTranslator {
         // 'memwith[X0,el]:u32<-low:32[X1]'
         String lhs = parseExpression(ctx.exp(1)); // 'X0'
         String rhs = parseExpression(ctx.exp(2)); // 'X1', potentially removes casts such as 'low:32[X1]'
-        writeToFile(String.format("mem[%s] := %s", lhs, rhs));
+        writeToFile(String.format("mem[%s] := %s", evaluateExpression(ctx.exp(1), lineIndex), rhs)); // fixme
     }
 
     private void handleMove(BilParser.AssignContext ctx) {
@@ -144,6 +154,57 @@ public class BoogieTranslator {
         }
         String rhs = parseExpression(ctx.exp());
         writeToFile(String.format("%s := %s", lhs, rhs));
+    }
+
+    /*
+    We have an expression a + b.
+    Call evaluate expression(a + b).
+    This returns evaluate expression(a) + evaluate expression(b).
+    Evaluate expression(a) attempts to resolve a by searching backwards through the code.
+    It increments back until it finds a non-statement, or an assignment statement with lhs === a.
+    Once it finds this assignment statement, it calls evaluate expression on the rhs of the statement.
+    Global line counters aren't touched, by local decrements/increments are passed to function calls.
+    */
+    // incomplete: only handles addition and subtraction of literals, and only evaluates move assignments
+    // lineNo is the line this expression is on
+    private Integer evaluateExpression(BilParser.ExpContext ectx, int lineNo) {
+        if (ectx.getClass().equals(BilParser.ExpLiteralContext.class)) {
+            return Integer.decode(ectx.getText());
+        } else if (ectx.getClass().equals(BilParser.ExpBopContext.class)) {
+            BilParser.ExpBopContext ctx = (BilParser.ExpBopContext) ectx;
+            Integer lhs = evaluateExpression(ctx.exp(0), lineNo);
+            Integer rhs = evaluateExpression(ctx.exp(1), lineNo);
+            if (lhs != null && rhs != null) {
+                if (ctx.bop().PLUS() != null) {
+                    return lhs + rhs;
+                } else if (ctx.bop().MINUS() != null) {
+                    return lhs - rhs;
+                }
+            }
+        } else if (ectx.getClass().equals(BilParser.ExpVarContext.class)) {
+            String var = ectx.getText();
+            int lineOffset = 0;
+            ParserRuleContext line;
+            while ((line = lines.get(lineNo - (++lineOffset))).getClass().equals(BilParser.StmtContext.class)) {
+                BilParser.StmtContext stmt = (BilParser.StmtContext) line;
+                if (stmt.assign() == null) {
+                    continue; // not an assign statement
+                }
+                BilParser.AssignContext assignment = stmt.assign();
+                if (assignment.exp().getClass().equals(BilParser.ExpLoadContext.class) ||
+                        assignment.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
+                    // we don't evaluate non-move assignments yet. todo
+                    System.err.println("Can't guarantee accuracy of variable substitution as a non-move assignment was encountered");
+                    continue;
+                }
+                if (!assignment.var().getText().equals(var)) {
+                    continue; // this assign statement doesn't update the variable we're evaluating
+                }
+                return evaluateExpression(assignment.exp(), lineNo - lineOffset);
+            } // reached a non-statement
+        }
+        System.err.printf("Failed to evaluate expression: %s%n", ectx.getText());
+        return null;
     }
 
     private void handleJump(BilParser.JmpContext ctx) {
