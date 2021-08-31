@@ -2,6 +2,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class BoogieTranslator {
@@ -10,6 +11,7 @@ public class BoogieTranslator {
     List<ParserRuleContext> lines;
     String funcName = "";
     int expectedParams = 0;
+    List<String> usedLabels = new ArrayList<>();
 
     public BoogieTranslator(List<ParserRuleContext> lines, String outputFileName) {
         try {
@@ -21,10 +23,36 @@ public class BoogieTranslator {
     }
 
     public void translate() {
+        // label analysis
+        // find all used labels
+        for (ParserRuleContext line : lines) {
+            String target = "";
+            // labels are used in jumps, cjumps and calls
+            if (line.getClass() == BilParser.StmtContext.class) {
+                BilParser.StmtContext stmt = (BilParser.StmtContext) line;
+                if (stmt.jmp() != null) {
+                    BilParser.JmpContext jump = stmt.jmp();
+                    if (jump.var() != null) {
+                        target = jump.var().getText();
+                    } else if (jump.addr() != null) {
+                        target = jump.addr().getText();
+                    }
+                } else if (stmt.cjmp() != null) {
+                    BilParser.CjmpContext jump = stmt.cjmp();
+                    target = jump.addr().getText();
+                } else if (stmt.call() != null) {
+                    BilParser.CjmpContext jump = stmt.cjmp(); // todo
+                } else {
+                    continue;
+                }
+                usedLabels.add(String.format("label%s", target));
+            }
+        }
+        System.out.println(usedLabels);
         // begin translation
         handleInit();
         for (ParserRuleContext line : lines) {
-            // lines can be statements, functions calls (subs) functions returns (end subs) or function parameters
+            // lines can be statements, functions declarations (subs) functions returns (end subs) or function parameters
             if (line.getClass() == BilParser.StmtContext.class) {
                 // visual index for functions
                 if (!funcName.equals("")) {

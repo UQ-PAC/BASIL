@@ -8,7 +8,7 @@ LR = ?;
 procedure get_two()
     modifies mem
     modifies registers
-@result: to registers[0]
+    @result: to registers[0]
 {
     skip;
     registers[0] := 2;
@@ -17,9 +17,9 @@ procedure get_two()
 procedure main()
     modifies mem
     modifies registers
-@param argc: from registers[0]
-@param argv: from registers[1]
-@result: to registers[0]
+    @param argc: from registers[0]
+    @param argv: from registers[1]
+    @result: to registers[0]
 {
     skip;
     mem[(SP) - (0x10)] := FP;
