@@ -4,6 +4,23 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 
+/**
+ * todo:
+ * [ ] unary operators like ~ probably mean 'bit flip' not 'not'. figure this out and solve
+ * [ ] remove lines with references to FP when FP isn't utilised throughout the program
+ * [ ] implement loops properly
+ * [ ] sort out whatever this is (NF <> VF | ZF <> 0) <> 0
+ *
+ * [ ] write out rules for wpifrg translation to boogie
+ * [ ] download boogie properly
+ *
+ * theoretical problems:
+ * [ ] registers can store function pointers?
+ * [ ] what to do if we can't just ignore FP
+ * [ ] how to properly deal with SP and LR
+ * [ ] dereferencing of registers when their value has been extracted from mem[]
+ */
+
 public class BoogieTranslator {
 
     // for writing the boogie output
