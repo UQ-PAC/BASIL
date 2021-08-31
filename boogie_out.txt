@@ -22,8 +22,8 @@ procedure main()
     @result: to registers[0]
 {
     skip;
-    mem[null] := FP;
-    mem[null] := LR;
+    mem[(SP) - (0x10)] := FP;
+    mem[(SP) - (8)] := LR;
     SP := (SP) - (0x10);
     FP := SP;
     registers[0] := 0x11000;
