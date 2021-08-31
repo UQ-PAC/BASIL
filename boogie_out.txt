@@ -32,7 +32,7 @@ procedure main()
     mem[registers[0]] := registers[1];
     LR := 0x730;
     call get_two(); goto label0000031b;
-    skip;
+    label0000031b: skip;
     registers[1] := registers[0];
     registers[0] := 0x11000;
     registers[0] := (registers[0]) + (0x38);

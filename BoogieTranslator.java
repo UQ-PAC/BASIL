@@ -3,7 +3,9 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class BoogieTranslator {
 
@@ -11,7 +13,7 @@ public class BoogieTranslator {
     List<ParserRuleContext> lines;
     String funcName = "";
     int expectedParams = 0;
-    List<String> usedLabels = new ArrayList<>();
+    Set<String> usedLabels = new HashSet<>();
 
     public BoogieTranslator(List<ParserRuleContext> lines, String outputFileName) {
         try {
@@ -41,11 +43,12 @@ public class BoogieTranslator {
                     BilParser.CjmpContext jump = stmt.cjmp();
                     target = jump.addr().getText();
                 } else if (stmt.call() != null) {
-                    BilParser.CjmpContext jump = stmt.cjmp(); // todo
+                    BilParser.CallContext jump = stmt.call(); // todo
+                    target = jump.returnaddr().addr().getText();
                 } else {
                     continue;
                 }
-                usedLabels.add(String.format("label%s", target));
+                usedLabels.add(String.format("%s", target));
             }
         }
         System.out.println(usedLabels);
@@ -54,12 +57,16 @@ public class BoogieTranslator {
         for (ParserRuleContext line : lines) {
             // lines can be statements, functions declarations (subs) functions returns (end subs) or function parameters
             if (line.getClass() == BilParser.StmtContext.class) {
+                BilParser.StmtContext stmt = (BilParser.StmtContext) line;
                 // visual index for functions
                 if (!funcName.equals("")) {
                     writeToFile("    ");
                 }
+                // add label if it is used in the program
+                if (usedLabels.contains(stmt.addr().getText())) {
+                    writeToFile("label" + stmt.addr().getText() + ": ");
+                }
                 // statements can be assignments, jumps, conditional jumps or function calls
-                BilParser.StmtContext stmt = (BilParser.StmtContext) line;
                 if (stmt.assign() != null) {
                     handleAssignment(stmt.assign());
                 } else if (stmt.jmp() != null) {
