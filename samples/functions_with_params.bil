@@ -1,131 +1,131 @@
-000004f7: program
-000004e4: sub __cxa_finalize(__cxa_finalize_result)
-000004f8: __cxa_finalize_result :: out u32 = X0
+000004e4: program
+000004d1: sub __cxa_finalize(__cxa_finalize_result)
+000004e5: __cxa_finalize_result :: out u32 = X0
 
-000003be:
-00000442: X16 := 0x11000
-00000449: X17 := mem[X16, el]:u64
-00000450: X16 := X16
-00000456: call X17 with noreturn
+000003ab:
+0000042f: X16 := 0x11000
+00000436: X17 := mem[X16, el]:u64
+0000043d: X16 := X16
+00000443: call X17 with noreturn
 
-000004e5: sub __libc_csu_fini(__libc_csu_fini_result)
-000004f9: __libc_csu_fini_result :: out u32 = X0
+000004d2: sub __libc_csu_fini(__libc_csu_fini_result)
+000004e6: __libc_csu_fini_result :: out u32 = X0
 
-000002da:
-000002de: call LR with noreturn
+000002dc:
+000002e0: call LR with noreturn
 
-000004e6: sub __libc_csu_init(__libc_csu_init_result)
-000004fa: __libc_csu_init_result :: out u32 = X0
+000004d3: sub __libc_csu_init(__libc_csu_init_result)
+000004e7: __libc_csu_init_result :: out u32 = X0
 
-00000228:
-0000022d: mem := mem with [SP - 0x40, el]:u64 <- FP
-00000232: mem := mem with [SP - 0x38, el]:u64 <- LR
-00000237: SP := SP - 0x40
-0000023e: FP := SP
-00000247: X20 := 0x10000
-0000024e: X20 := X20 + 0xDC0
-00000257: X21 := 0x10000
-0000025e: X21 := X21 + 0xDB8
-00000265: X20 := X20 - X21
-0000026c: X22 := X0
-00000275: X23 := X1
-0000027c: X24 := X2
-00000283: X20 := X20 >> 3
-00000289: LR := 0x7A4
-0000028e: call @sub_598 with return %00000290
+0000022a:
+0000022f: mem := mem with [SP - 0x40, el]:u64 <- FP
+00000234: mem := mem with [SP - 0x38, el]:u64 <- LR
+00000239: SP := SP - 0x40
+00000240: FP := SP
+00000249: X20 := 0x10000
+00000250: X20 := X20 + 0xDC0
+00000259: X21 := 0x10000
+00000260: X21 := X21 + 0xDB8
+00000267: X20 := X20 - X21
+0000026e: X22 := X0
+00000277: X23 := X1
+0000027e: X24 := X2
+00000285: X20 := X20 >> 3
+0000028b: LR := 0x79C
+00000290: call @sub_598 with return %00000292
 
-00000290:
-0000029b: #58 := X20 = 0
-00000295: when #58 goto %00000293
-000004e7: goto %000002e1
+00000292:
+0000029d: #58 := X20 = 0
+00000297: when #58 goto %00000295
+000004d4: goto %000002e3
 
-000002e1:
-000002e6: X19 := 0
-000004e8: goto %000002ea
+000002e3:
+000002e8: X19 := 0
+000004d5: goto %000002ec
 
-000002ea:
-000002ef: X3 := mem[X21 + (X19 << 3), el]:u64
-000002f6: X2 := X24
-000002fd: X19 := X19 + 1
-00000304: X1 := X23
-0000030b: X0 := X22
-00000311: LR := 0x7C8
-00000315: call X3 with return %00000318
+000002ec:
+000002f1: X3 := mem[X21 + (X19 << 3), el]:u64
+000002f8: X2 := X24
+000002ff: X19 := X19 + 1
+00000306: X1 := X23
+0000030d: X0 := X22
+00000313: LR := 0x7C0
+00000317: call X3 with return %0000031a
 
-00000318:
-0000031c: #78 := 1 + ~X19 + X20
-00000320: NF := extract:63:63[#78]
-00000324: VF := extract:63:63[X20] & extract:63:63[~X19] &
+0000031a:
+0000031e: #78 := 1 + ~X19 + X20
+00000322: NF := extract:63:63[#78]
+00000326: VF := extract:63:63[X20] & extract:63:63[~X19] &
           ~extract:63:63[#78] | ~extract:63:63[X20] & ~extract:63:63[~X19] &
           extract:63:63[#78]
-00000328: ZF := #78 = 0
-0000032c: CF := extract:63:63[X20] & extract:63:63[~X19] |
+0000032a: ZF := #78 = 0
+0000032e: CF := extract:63:63[X20] & extract:63:63[~X19] |
           extract:63:63[~X19] & ~extract:63:63[#78] | extract:63:63[X20] &
           ~extract:63:63[#78]
-0000033a: #80 := ~ZF <> 0
-00000334: when #80 goto %000002ea
-000004e9: goto %00000293
+0000033c: #80 := ~ZF <> 0
+00000336: when #80 goto %000002ec
+000004d6: goto %00000295
 
-00000293:
-000002a1: X19 := mem[SP + 0x10, el]:u64
-000002a6: X20 := mem[SP + 0x18, el]:u64
-000002ad: X21 := mem[SP + 0x20, el]:u64
-000002b2: X22 := mem[SP + 0x28, el]:u64
-000002b9: X23 := mem[SP + 0x30, el]:u64
-000002be: X24 := mem[SP + 0x38, el]:u64
-000002c5: FP := mem[SP, el]:u64
-000002ca: LR := mem[SP + 8, el]:u64
-000002cf: SP := SP + 0x40
-000002d5: call LR with noreturn
+00000295:
+000002a3: X19 := mem[SP + 0x10, el]:u64
+000002a8: X20 := mem[SP + 0x18, el]:u64
+000002af: X21 := mem[SP + 0x20, el]:u64
+000002b4: X22 := mem[SP + 0x28, el]:u64
+000002bb: X23 := mem[SP + 0x30, el]:u64
+000002c0: X24 := mem[SP + 0x38, el]:u64
+000002c7: FP := mem[SP, el]:u64
+000002cc: LR := mem[SP + 8, el]:u64
+000002d1: SP := SP + 0x40
+000002d7: call LR with noreturn
 
-000004ea: sub __libc_start_main(__libc_start_main_main, __libc_start_main_arg2, __libc_start_main_arg3, __libc_start_main_auxv, __libc_start_main_result)
-000004fb: __libc_start_main_main :: in u64 = X0
-000004fc: __libc_start_main_arg2 :: in u32 = X1
-000004fd: __libc_start_main_arg3 :: in out u64 = X2
-000004fe: __libc_start_main_auxv :: in out u64 = X3
-000004ff: __libc_start_main_result :: out u32 = X0
+000004d7: sub __libc_start_main(__libc_start_main_main, __libc_start_main_arg2, __libc_start_main_arg3, __libc_start_main_auxv, __libc_start_main_result)
+000004e8: __libc_start_main_main :: in u64 = X0
+000004e9: __libc_start_main_arg2 :: in u32 = X1
+000004ea: __libc_start_main_arg3 :: in out u64 = X2
+000004eb: __libc_start_main_auxv :: in out u64 = X3
+000004ec: __libc_start_main_result :: out u32 = X0
 
 00000095:
-0000045d: X16 := 0x11000
-00000464: X17 := mem[X16 + 8, el]:u64
-0000046b: X16 := X16 + 8
-00000471: call X17 with noreturn
+0000044a: X16 := 0x11000
+00000451: X17 := mem[X16 + 8, el]:u64
+00000458: X16 := X16 + 8
+0000045e: call X17 with noreturn
 
-000004eb: sub abort()
+000004d8: sub abort()
 
 
 000000a0:
-00000493: X16 := 0x11000
-0000049a: X17 := mem[X16 + 0x18, el]:u64
-000004a1: X16 := X16 + 0x18
-000004a7: call X17 with noreturn
+00000480: X16 := 0x11000
+00000487: X17 := mem[X16 + 0x18, el]:u64
+0000048e: X16 := X16 + 0x18
+00000494: call X17 with noreturn
 
-000004ec: sub call_weak_fn(call_weak_fn_result)
-00000500: call_weak_fn_result :: out u32 = X0
+000004d9: sub call_weak_fn(call_weak_fn_result)
+000004ed: call_weak_fn_result :: out u32 = X0
 
 000000a4:
 000000a9: X0 := 0x10000
 000000b0: X0 := mem[X0 + 0xFC8, el]:u64
 000000bd: #6 := X0 = 0
 000000b7: when #6 goto %000000b5
-000004ed: goto %00000404
+000004da: goto %000003f1
 
 000000b5:
 000000c2: call LR with noreturn
 
-00000404:
-00000409: goto @__gmon_start__
+000003f1:
+000003f6: goto @__gmon_start__
 
-00000407:
-00000478: X16 := 0x11000
-0000047f: X17 := mem[X16 + 0x10, el]:u64
-00000486: X16 := X16 + 0x10
-0000048c: call X17 with noreturn
+000003f4:
+00000465: X16 := 0x11000
+0000046c: X17 := mem[X16 + 0x10, el]:u64
+00000473: X16 := X16 + 0x10
+00000479: call X17 with noreturn
 
-000004ee: sub main(main_argc, main_argv, main_result)
-00000501: main_argc :: in u32 = X0
-00000502: main_argv :: in out u64 = X1
-00000503: main_result :: out u32 = X0
+000004db: sub main(main_argc, main_argv, main_result)
+000004ee: main_argc :: in u32 = X0
+000004ef: main_argv :: in out u64 = X1
+000004f0: main_result :: out u32 = X0
 
 000001b9:
 000001be: mem := mem with [SP - 0x20, el]:u64 <- FP
@@ -134,53 +134,50 @@
 000001cf: FP := SP
 000001d6: X0 := 1
 000001dd: mem := mem with [SP + 0x1C, el]:u32 <- low:32[X0]
-000001e4: X0 := pad:64[mem[SP + 0x1C, el]:u32]
-000001ea: LR := 0x72C
-000001ef: call @plus_one with return %0000033c
+000001e4: X0 := 2
+000001eb: mem := mem with [SP + 0x18, el]:u32 <- low:32[X0]
+000001f2: X0 := pad:64[mem[SP + 0x1C, el]:u32]
+000001f8: LR := 0x734
+000001fd: call @plus_one with return %0000033e
 
-0000033c:
-00000341: X1 := X0
-00000348: X0 := 0x11000
-0000034f: X0 := X0 + 0x38
-00000356: mem := mem with [X0, el]:u32 <- low:32[X1]
-0000035d: X0 := 0
-00000364: FP := mem[SP, el]:u64
-00000369: LR := mem[SP + 8, el]:u64
-0000036e: SP := SP + 0x20
-00000374: call LR with noreturn
+0000033e:
+00000343: mem := mem with [SP + 0x1C, el]:u32 <- low:32[X0]
+0000034a: X0 := 0
+00000351: FP := mem[SP, el]:u64
+00000356: LR := mem[SP + 8, el]:u64
+0000035b: SP := SP + 0x20
+00000361: call LR with noreturn
 
-000004ef: sub plus_one(plus_one_result)
-00000504: plus_one_result :: out u32 = X0
+000004dc: sub plus_one(plus_one_result)
+000004f1: plus_one_result :: out u32 = X0
 
-000001ed:
-000001f5: SP := SP - 0x20
-000001fc: mem := mem with [SP + 0xC, el]:u32 <- low:32[X0]
-00000203: X0 := pad:64[mem[SP + 0xC, el]:u32]
-0000020a: X0 := X0 + 1
-00000211: mem := mem with [SP + 0x1C, el]:u32 <- low:32[X0]
-00000218: X0 := pad:64[mem[SP + 0x1C, el]:u32]
-0000021f: SP := SP + 0x20
+000001fb:
+00000203: SP := SP - 0x10
+0000020a: mem := mem with [SP + 0xC, el]:u32 <- low:32[X0]
+00000211: X0 := pad:64[mem[SP + 0xC, el]:u32]
+00000218: X0 := X0 + 1
+0000021f: SP := SP + 0x10
 00000225: call LR with noreturn
 
-000004f0: sub sub_598(sub_598_result)
-00000505: sub_598_result :: out u32 = X0
+000004dd: sub sub_598(sub_598_result)
+000004f2: sub_598_result :: out u32 = X0
 
-0000028c:
-000004ae: mem := mem with [SP - 0x10, el]:u64 <- FP
-000004b3: mem := mem with [SP - 8, el]:u64 <- LR
-000004b8: SP := SP - 0x10
-000004bf: FP := SP
-000004c5: LR := 0x5A4
-000004c9: call @call_weak_fn with return %000004cb
+0000028e:
+0000049b: mem := mem with [SP - 0x10, el]:u64 <- FP
+000004a0: mem := mem with [SP - 8, el]:u64 <- LR
+000004a5: SP := SP - 0x10
+000004ac: FP := SP
+000004b2: LR := 0x5A4
+000004b6: call @call_weak_fn with return %000004b8
 
-000004cb:
-000004d0: FP := mem[SP, el]:u64
-000004d5: LR := mem[SP + 8, el]:u64
-000004da: SP := SP + 0x10
-000004e0: call LR with noreturn
+000004b8:
+000004bd: FP := mem[SP, el]:u64
+000004c2: LR := mem[SP + 8, el]:u64
+000004c7: SP := SP + 0x10
+000004cd: call LR with noreturn
 
-000004f1: sub sub_610(sub_610_result)
-00000506: sub_610_result :: out u32 = X0
+000004de: sub sub_610(sub_610_result)
+000004f3: sub_610_result :: out u32 = X0
 
 0000003a:
 0000003f: FP := 0
@@ -200,13 +197,13 @@
 
 00000099:
 0000009d: LR := 0x648
-000000a2: call @abort with return %000004f2
+000000a2: call @abort with return %000004df
 
-000004f2:
-000004f3: call @call_weak_fn with noreturn
+000004df:
+000004e0: call @call_weak_fn with noreturn
 
-000004f4: sub sub_660(sub_660_result)
-00000507: sub_660_result :: out u32 = X0
+000004e1: sub sub_660(sub_660_result)
+000004f4: sub_660_result :: out u32 = X0
 
 000000c7:
 000000cc: X0 := 0x11000
@@ -222,17 +219,17 @@
           ~extract:63:63[#10] | extract:63:63[X1] & ~extract:63:63[#10]
 00000106: #12 := ZF
 00000100: when #12 goto %000000fe
-000004f5: goto %000003e3
+000004e2: goto %000003d0
 
-000003e3:
-000003e8: X1 := 0x10000
-000003ef: X1 := mem[X1 + 0xFB8, el]:u64
-000003fb: #95 := X1 = 0
-000003f5: when #95 goto %000000fe
-000004f6: goto %000003fd
+000003d0:
+000003d5: X1 := 0x10000
+000003dc: X1 := mem[X1 + 0xFB8, el]:u64
+000003e8: #89 := X1 = 0
+000003e2: when #89 goto %000000fe
+000004e3: goto %000003ea
 
 000000fe:
 0000010b: call LR with noreturn
 
-000003fd:
-00000401: call X1 with noreturn
+000003ea:
+000003ee: call X1 with noreturn

@@ -9,7 +9,7 @@ import java.util.List;
 public class Main {
     public static void main(String[] args) throws IOException {
         // generate abstract syntax tree
-        BilLexer bilLexer = new BilLexer(CharStreams.fromFileName("samples/function_stripped.bil"));
+        BilLexer bilLexer = new BilLexer(CharStreams.fromFileName("samples/functions_with_params_stripped.bil"));
         CommonTokenStream tokens = new CommonTokenStream(bilLexer);
         BilParser parser = new BilParser(tokens);
         parser.setBuildParseTree(true);

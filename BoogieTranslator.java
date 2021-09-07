@@ -6,6 +6,8 @@ import java.util.*;
 
 /**
  * todo:
+ * [ ] implement return statements in function calls
+ * [ ] implement proper modifies statements
  * [ ] unary operators like ~ probably mean 'bit flip' not 'not'. figure this out and solve
  * [ ] remove lines with references to FP when FP isn't utilised throughout the program
  * [ ] implement loops properly
@@ -33,8 +35,11 @@ public class BoogieTranslator {
     int expectedParams = 0;
     // line addresses that are used (i.e. jumped to) in the BIL program
     Set<String> usedLabels = new HashSet<>();
+    // {funcName ==> [[params], [returns]]}
+    Map<String, FunctionData> functionData = new HashMap<>();
     // the current index of 'lines' that is being analysed
     int lineIndex = 0;
+    int nameCount = 0;
 
     public BoogieTranslator(List<ParserRuleContext> lines, String outputFileName) {
         try {
@@ -49,11 +54,13 @@ public class BoogieTranslator {
      * Starting point for a BIL translation.
      */
     public void translate() {
-        logUsedLabels();
+        // logUsedLabels();
+        logFunctionData();
+        /*
         handleInit();
         for (ParserRuleContext line : lines) {
             handleLine(line);
-        }
+        }*/
     }
 
     /**
@@ -83,6 +90,63 @@ public class BoogieTranslator {
                     continue;
                 }
                 usedLabels.add(String.format("%s", target));
+            }
+        }
+    }
+
+    /**
+     * Searches through the code and adds all function metadata to the global functionData map.
+     * TODO for wednesday: test this function!
+     */
+    private void logFunctionData() {
+        String funcName = "";
+        FunctionData funcData = new FunctionData();
+        Set<String> assignedVars = new HashSet<>();
+        for (ParserRuleContext line : lines) {
+            if (line.getClass() == BilParser.StmtContext.class && !funcName.equals("")) {
+                // statement inside a function
+                BilParser.StmtContext ctx = (BilParser.StmtContext) line;
+                if (ctx.assign() != null) {
+                    // assignment inside a function
+                    BilParser.AssignContext assignCtx = ctx.assign();
+                    // todo: check if SP is used, on the second round?
+
+                    // find variables which are accessed before they are assigned - these are input parameters.
+                    // these parameters are only accessed via store statements
+                    if (assignCtx.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
+                        boolean isParam = true;
+                        for (String RHSVar : RHSVars(assignCtx)) {
+                            if (!assignedVars.contains(RHSVar)) {
+                                // this variable is accessed before it is assigned
+                                funcData.params.put(RHSVar, generateUniqueName());
+                            }
+                        }
+                    }
+                    assignedVars.add(LHSVar(assignCtx));
+                }
+            } else if (line.getClass() == BilParser.SubContext.class) {
+                // enter sub
+                BilParser.SubContext ctx = (BilParser.SubContext) line;
+                funcName = ctx.functionName().getText();
+
+            } else if (line.getClass() == BilParser.EndsubContext.class) {
+                // exit sub
+                functionData.put(funcName, funcData);
+                funcName = "";
+                funcData = new FunctionData();
+
+            } else if (line.getClass() == BilParser.ParamTypesContext.class) {
+                // param
+                BilParser.ParamTypesContext ctx = (BilParser.ParamTypesContext) line;
+                String id = ctx.param().getText();
+                String variable = ctx.var().getText(); // probably some register
+                if (id.contains("result")) {
+                    // this is the return variable of this function
+                    funcData.result.put(variable, "out");
+                } else {
+                    // this is an input parameter of this function
+                    funcData.params.put(variable, id.replace(funcName + "_", ""));
+                }
             }
         }
     }
@@ -432,6 +496,55 @@ public class BoogieTranslator {
         return String.format("%s[%d:%d]", exp, 64-firstNat, 64-secondNat-1); // fixme: in future, we want to properly translate exp before jamming it in here
     }
 
+    private String LHSVar(BilParser.AssignContext ctx) {
+        if (ctx.exp().getClass().equals(BilParser.ExpLoadContext.class)) {
+            BilParser.ExpLoadContext ctxLoad = (BilParser.ExpLoadContext) ctx.exp();
+            return ctxLoad.exp(1).getText();
+        } else if (ctx.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
+            BilParser.ExpStoreContext ctxStore = (BilParser.ExpStoreContext) ctx.exp();
+            return ctxStore.exp(1).getText();
+        } else {
+            return ctx.var().getText();
+        }
+    }
+
+    private List<String> RHSVars(BilParser.AssignContext ctx) {
+        if (ctx.exp().getClass().equals(BilParser.ExpLoadContext.class)) {
+            BilParser.ExpLoadContext ctxLoad = (BilParser.ExpLoadContext) ctx.exp();
+            if (ctxLoad.exp(2) == null) {
+                return new ArrayList<>(); // RHS of loads (such as pads) may be null
+            }
+            return extractAllVars(ctxLoad.exp(2));
+        } else if (ctx.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
+            BilParser.ExpStoreContext ctxStore = (BilParser.ExpStoreContext) ctx.exp();
+            return extractAllVars(ctxStore.exp(2));
+        } else {
+            return extractAllVars(ctx.exp());
+        }
+    }
+
+    private List<String> extractAllVars(BilParser.ExpContext ctx) {
+        // expressions can be binary operations, unary operations, variables, literals or extractions (i.e. bit slices)
+        ctx = ignoreUnhandledContexts(ctx);
+        List<String> result = new ArrayList<>();
+        if (ctx.getClass().equals(BilParser.ExpBopContext.class)) {
+            BilParser.ExpBopContext _ctx = (BilParser.ExpBopContext) ctx;
+            result.addAll(extractAllVars(_ctx.exp(0)));
+            result.addAll(extractAllVars(_ctx.exp(1)));
+        } else if (ctx.getClass().equals(BilParser.ExpUopContext.class)) {
+            BilParser.ExpUopContext _ctx = (BilParser.ExpUopContext) ctx;
+            result.addAll(extractAllVars(_ctx.exp()));
+        } else if (ctx.getClass().equals(BilParser.ExpVarContext.class)) {
+            BilParser.ExpVarContext _ctx = (BilParser.ExpVarContext) ctx;
+            result.add(_ctx.var().getText());
+        } else if (ctx.getClass().equals(BilParser.ExpExtractContext.class)) {
+            BilParser.ExpExtractContext _ctx = (BilParser.ExpExtractContext) ctx;
+            result.addAll(extractAllVars(_ctx.exp()));
+        }
+        System.err.println("Unhandled expression detected: " + ctx.getText());
+        return result;
+    }
+
     /**
      * Skips all unhandled expression contexts.
      *
@@ -463,4 +576,21 @@ public class BoogieTranslator {
             System.err.println("Error writing to file.");
         }
     }
+
+    private class FunctionData {
+        // map from register id to param name
+        Map<String, String> params;
+        // map from register id to return variable name
+        Map<String, String> result;
+        // true iff SP cannot be removed from the function due to its redundancy (i.e. it has an important use in the function)
+        boolean spUsed = false;
+        // constructor
+        FunctionData() {}
+    }
+
+    private String generateUniqueName() {
+        return "p" + nameCount++;
+    }
 }
+
+
