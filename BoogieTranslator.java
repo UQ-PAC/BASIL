@@ -56,6 +56,11 @@ public class BoogieTranslator {
     public void translate() {
         // logUsedLabels();
         logFunctionData();
+        for (String funcName : functionData.keySet()) {
+            System.out.println(funcName);
+            System.out.println("params: " + functionData.get(funcName).params);
+            System.out.println("return: " + functionData.get(funcName).result);
+        }
         /*
         handleInit();
         for (ParserRuleContext line : lines) {
@@ -114,9 +119,8 @@ public class BoogieTranslator {
                     // find variables which are accessed before they are assigned - these are input parameters.
                     // these parameters are only accessed via store statements
                     if (assignCtx.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
-                        boolean isParam = true;
                         for (String RHSVar : RHSVars(assignCtx)) {
-                            if (!assignedVars.contains(RHSVar)) {
+                            if (!assignedVars.contains(RHSVar) && RHSVar.charAt(0) == 'X') { // warning: assumes all parameter registers start with X
                                 // this variable is accessed before it is assigned
                                 funcData.params.put(RHSVar, generateUniqueName());
                             }
@@ -134,6 +138,7 @@ public class BoogieTranslator {
                 functionData.put(funcName, funcData);
                 funcName = "";
                 funcData = new FunctionData();
+                assignedVars = new HashSet<>();
 
             } else if (line.getClass() == BilParser.ParamTypesContext.class) {
                 // param
@@ -540,8 +545,9 @@ public class BoogieTranslator {
         } else if (ctx.getClass().equals(BilParser.ExpExtractContext.class)) {
             BilParser.ExpExtractContext _ctx = (BilParser.ExpExtractContext) ctx;
             result.addAll(extractAllVars(_ctx.exp()));
+        } else {
+            System.err.println("Unhandled expression detected: " + ctx.getText());
         }
-        System.err.println("Unhandled expression detected: " + ctx.getText());
         return result;
     }
 
@@ -579,9 +585,9 @@ public class BoogieTranslator {
 
     private class FunctionData {
         // map from register id to param name
-        Map<String, String> params;
+        Map<String, String> params = new HashMap<>();
         // map from register id to return variable name
-        Map<String, String> result;
+        Map<String, String> result = new HashMap<>();
         // true iff SP cannot be removed from the function due to its redundancy (i.e. it has an important use in the function)
         boolean spUsed = false;
         // constructor
