@@ -60,6 +60,7 @@ public class BoogieTranslator {
             System.out.println(funcName);
             System.out.println("params: " + functionData.get(funcName).params);
             System.out.println("return: " + functionData.get(funcName).result);
+            System.out.println("stack: " + functionData.get(funcName).stackAliases);
         }
         /*
         handleInit();
@@ -119,10 +120,13 @@ public class BoogieTranslator {
                     // find variables which are accessed before they are assigned - these are input parameters.
                     // these parameters are only accessed via store statements
                     if (assignCtx.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
+                        BilParser.ExpStoreContext storeCtx = (BilParser.ExpStoreContext) assignCtx.exp();
                         for (String RHSVar : RHSVars(assignCtx)) {
                             if (!assignedVars.contains(RHSVar) && RHSVar.charAt(0) == 'X') { // warning: assumes all parameter registers start with X
-                                // this variable is accessed before it is assigned
-                                funcData.params.put(RHSVar, generateUniqueName());
+                                // this register is accessed by a store before it is assigned
+                                String varName = generateUniqueName();
+                                funcData.params.put(RHSVar, varName);
+                                funcData.stackAliases.put(storeCtx.exp(1).getText(), varName);
                             }
                         }
                     }
@@ -584,10 +588,12 @@ public class BoogieTranslator {
     }
 
     private class FunctionData {
-        // map from register id to param name
+        // map from register id to the human-readable parameter variable
         Map<String, String> params = new HashMap<>();
-        // map from register id to return variable name
+        // map from register id to the human-readable output variable
         Map<String, String> result = new HashMap<>();
+        // map from store/load LHSs to the human-readable parameter variable
+        Map<String, String> stackAliases = new HashMap<>();
         // true iff SP cannot be removed from the function due to its redundancy (i.e. it has an important use in the function)
         boolean spUsed = false;
         // constructor
