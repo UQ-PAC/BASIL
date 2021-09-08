@@ -1,14 +1,12 @@
 package Facts.exp;
 
-import Facts.exp.ExpFact;
-
 /**
  * Memory expression e.g. mem[10]
  */
 public class MemFact extends ExpFact {
-    String exp;
-    public MemFact(String exp) {
-        super();
+    public ExpFact exp;
+
+    public MemFact(ExpFact exp) {
         this.exp = exp;
     }
 

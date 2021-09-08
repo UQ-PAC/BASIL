@@ -1,3 +1,14 @@
+import Facts.Fact;
+import Facts.exp.ExpFact;
+import Facts.exp.MemFact;
+import Facts.exp.VarFact;
+import Facts.inst.EnterSubFact;
+import Facts.inst.ExitSubFact;
+import Facts.inst.NopFact;
+import Facts.inst.ParamFact;
+import Facts.inst.assign.LoadFact;
+import Facts.inst.assign.MoveFact;
+import Facts.inst.assign.StoreFact;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -6,10 +17,17 @@ import java.util.List;
 
 public class StatementLoader implements BilListener {
 
-    List<ParserRuleContext> lines;
+    List<Fact> facts;
 
-    public StatementLoader(List<ParserRuleContext> lines) {
-        this.lines = lines;
+    public StatementLoader(List<Fact> lines) {
+        this.facts = lines;
+    }
+
+    private ExpFact parseExpression(BilParser.ExpContext ctx) {
+        if (ctx == null) {
+            return null;
+        }
+        return ;
     }
 
     @Override
@@ -44,7 +62,9 @@ public class StatementLoader implements BilListener {
 
     @Override
     public void enterSub(BilParser.SubContext ctx) {
-        lines.add(ctx);
+        String address = ctx.addr().getText();
+        String funcName = ctx.functionName().getText();
+        facts.add(new EnterSubFact(address, funcName));
     }
 
     @Override
@@ -54,7 +74,15 @@ public class StatementLoader implements BilListener {
 
     @Override
     public void enterParamTypes(BilParser.ParamTypesContext ctx) {
-        lines.add(ctx);
+        String address = ctx.addr().getText();
+        String id = ctx.param().getText(); // human-readable name
+        String variable = ctx.var().getText(); // some register, probably
+        boolean isResult = id.contains("result");
+        if (id.contains("result")) {
+            facts.add(new ParamFact(address, new VarFact("out"), new VarFact(variable), true));
+        } else {
+            facts.add(new ParamFact(address, new VarFact(id), new VarFact(variable), false));
+        }
     }
 
     @Override
@@ -64,7 +92,42 @@ public class StatementLoader implements BilListener {
 
     @Override
     public void enterStmt(BilParser.StmtContext ctx) {
-        lines.add(ctx);
+        String address = ctx.addr().getText();
+        // statements can be assignments, jumps, conditional jumps or function calls
+        if (ctx.assign() != null) {
+            BilParser.AssignContext assignCtx = ctx.assign();
+            if (assignCtx.exp().getClass().equals(BilParser.ExpLoadContext.class)) {
+                BilParser.ExpLoadContext loadCtx = (BilParser.ExpLoadContext) assignCtx.exp();
+                VarFact lhs = new VarFact(loadCtx.exp(1).getText());
+                ExpFact rhs = parseExpression(loadCtx.exp(2));
+                if (rhs != null) { // null check is necessary as rhs may not exist for loads
+                    facts.add(new LoadFact(address, lhs, (MemFact) rhs));
+                }
+            } else if (assignCtx.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
+                BilParser.ExpStoreContext storeCtx = (BilParser.ExpStoreContext) assignCtx.exp();
+                ExpFact lhs = parseExpression(storeCtx.exp(1));
+                ExpFact rhs = parseExpression(storeCtx.exp(2));
+                facts.add(new StoreFact(address, (MemFact) lhs, rhs));
+            } else {
+                VarFact lhs = new VarFact(assignCtx.var().getText());
+                ExpFact rhs = parseExpression(assignCtx.exp());
+                facts.add(new MoveFact(address, lhs, rhs));
+            }
+        } else if (ctx.jmp() != null) {
+
+            handleJump(ctx.jmp());
+        } else if (ctx.cjmp() != null) {
+            handleCJump(ctx.cjmp());
+        } else if (ctx.call() != null) {
+            handleCall(ctx.call());
+        } else {
+            // this statement is empty
+            facts.add(new NopFact(address));
+        }
+
+
+        String address = ctx.
+                String.format("call %s(); goto label%s", ctx.functionName().getText(), ctx.returnaddr().addr().getText())
     }
 
     @Override
@@ -74,7 +137,9 @@ public class StatementLoader implements BilListener {
 
     @Override
     public void enterEndsub(BilParser.EndsubContext ctx) {
-        lines.add(ctx);
+        String address = ctx.addr().getText();
+        String funcName = ctx.functionName().getText();
+        facts.add(new ExitSubFact(address, funcName));
     }
 
     @Override
@@ -84,7 +149,6 @@ public class StatementLoader implements BilListener {
 
     @Override
     public void enterCall(BilParser.CallContext ctx) {
-
     }
 
     @Override

@@ -1,18 +1,19 @@
 package Facts.inst.assign;
 
 import Facts.Fact;
+import Facts.exp.ExpFact;
 import Facts.inst.InstFact;
 
 /**
  * Assignment (e.g. x := exp)
  */
 abstract class AssignFact extends InstFact {
-    String pc;
-    String lhs;
-    String rhs;
-    String type;
+    public String pc;
+    public ExpFact lhs;
+    public ExpFact rhs;
+    public String type;
 
-    AssignFact(String pc, String lhs, String rhs, String type) {
+    AssignFact(String pc, ExpFact lhs, ExpFact rhs, String type) {
         super(pc);
         this.lhs = lhs;
         this.rhs = rhs;

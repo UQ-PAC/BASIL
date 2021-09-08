@@ -31,8 +31,6 @@ public class BoogieTranslator {
     List<ParserRuleContext> lines;
     // the name of the function we are currently in, or "" if we are not in a function
     String funcName = "";
-    // the number of expected ParamType lines remaining after a Sub line is read
-    int expectedParams = 0;
     // line addresses that are used (i.e. jumped to) in the BIL program
     Set<String> usedLabels = new HashSet<>();
     // {funcName ==> [[params], [returns]]}
@@ -54,7 +52,7 @@ public class BoogieTranslator {
      * Starting point for a BIL translation.
      */
     public void translate() {
-        // logUsedLabels();
+        logUsedLabels();
         logFunctionData();
         for (String funcName : functionData.keySet()) {
             System.out.println(funcName);
@@ -62,11 +60,10 @@ public class BoogieTranslator {
             System.out.println("return: " + functionData.get(funcName).result);
             System.out.println("stack: " + functionData.get(funcName).stackAliases);
         }
-        /*
         handleInit();
         for (ParserRuleContext line : lines) {
             handleLine(line);
-        }*/
+        }
     }
 
     /**
@@ -102,7 +99,6 @@ public class BoogieTranslator {
 
     /**
      * Searches through the code and adds all function metadata to the global functionData map.
-     * TODO for wednesday: test this function!
      */
     private void logFunctionData() {
         String funcName = "";
@@ -169,11 +165,7 @@ public class BoogieTranslator {
         writeToFile("const registers: [int] int;\n");
         // memory[0x00111] represents the value stored at memory address 0x00111
         // fixme: for now, only integers can be stored in memory
-        writeToFile("const memory: [int] int;\n");
-        writeToFile("var SP: int, FP: int, LR: int;\n");
-        writeToFile("SP = 0;\n");
-        writeToFile("FP = ?;\n");
-        writeToFile("LR = ?;\n");
+        writeToFile("const mem: [int] int;\n");
         writeToFile("\n");
     }
 
@@ -182,19 +174,18 @@ public class BoogieTranslator {
      * @param line the line to handle.
      */
     private void handleLine(ParserRuleContext line) {
-        // lines can be statements, functions declarations (subs) functions returns (end subs) or function parameters
+        // handled lines are statements, functions declarations (subs) or functions returns (end subs)
+        // we don't handle ParamTypes lines
         if (line.getClass() == BilParser.StmtContext.class) {
             handleStatement((BilParser.StmtContext) line);
         } else if (line.getClass() == BilParser.SubContext.class) {
             handleSub((BilParser.SubContext) line);
         } else if (line.getClass() == BilParser.EndsubContext.class) {
             handleEndSub((BilParser.EndsubContext) line);
-        } else if (line.getClass() == BilParser.ParamTypesContext.class) {
-            handleParam((BilParser.ParamTypesContext) line);
         } else {
             System.err.printf("Unhandled line: %s%n", line.getText());
         }
-        // end every line with this
+        // end every line with a newline
         writeToFile("\n");
         lineIndex++;
     }
@@ -222,9 +213,10 @@ public class BoogieTranslator {
         } else if (ctx.call() != null) {
             handleCall(ctx.call());
         } else {
+            // this statement is empty
             writeToFile("skip");
         }
-        // end every statement with this
+        // end every statement with a semicolon
         writeToFile(";");
     }
 
@@ -392,7 +384,6 @@ public class BoogieTranslator {
     private void handleSub(BilParser.SubContext ctx) {
         String functionName = ctx.functionName().getText();
         List<BilParser.ParamContext> params = ctx.param();
-        expectedParams = params.size();
         // at this point, we just assume that the registers and memory are modified by every function
         // this can be cleaned up on a second parsing
         writeToFile(String.format("procedure %s()%n    modifies mem%n    modifies registers", functionName));
@@ -407,35 +398,6 @@ public class BoogieTranslator {
     private void handleEndSub(BilParser.EndsubContext ctx) {
         writeToFile(String.format("}%n"));
         funcName = "";
-    }
-
-    /**
-     * Handles a paramtypes line.
-     * These are lines which appear after sub lines, that denote the parameters of that sub.
-     * @param ctx the paramtypes to handle.
-     */
-    private void handleParam(BilParser.ParamTypesContext ctx) {
-        String id = ctx.param().getText();
-        if (id.contains("result")) {
-            id = "@result:";
-        } else {
-            id = id.replace(funcName + "_", "");
-            id = "@param " + id + ":";
-        }
-        String inOut = ctx.inout().getText();
-        if (inOut.equals("out")) {
-            inOut = "to";
-        } else {
-            inOut = "from"; // warning: also includes 'in and out' (i.e. as well as just 'in')
-        }
-        String variable = ctx.var().getText();
-        if (variable.charAt(0) == 'X') {
-            variable = parseRegister(variable); // fixme warning: assumes all registers start with 'X' and no other variable does
-        }
-        writeToFile(String.format("    %s %s %s", id, inOut, variable));
-        if (--expectedParams == 0) {
-            writeToFile("\n{");
-        }
     }
 
     /**

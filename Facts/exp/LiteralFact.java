@@ -5,9 +5,9 @@ package Facts.exp;
  */
 public class LiteralFact extends ExpFact {
     /** Value of literal */
-    String val;
+    public String val;
+
     public LiteralFact(String val) {
-        super();
         this.val = val;
     }
 

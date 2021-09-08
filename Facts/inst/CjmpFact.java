@@ -1,13 +1,15 @@
 package Facts.inst;
 
+import Facts.exp.ExpFact;
+
 /**
  * Conditional Jump fact
  */
 public class CjmpFact extends InstFact {
-    String target;
-    String condition;
+    public String target;
+    public ExpFact condition;
 
-    public CjmpFact(String pc, String target, String condition) {
+    public CjmpFact(String pc, String target, ExpFact condition) {
         super(pc);
         this.target = target;
         this.condition = condition;

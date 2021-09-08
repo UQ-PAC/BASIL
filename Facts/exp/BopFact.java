@@ -1,20 +1,18 @@
 package Facts.exp;
 
-import Facts.exp.ExpFact;
 
 /**
  * Binary operation fact
  */
 public class BopFact extends ExpFact {
     /** Operator */
-    String op;
+    public String op;
     /** Expression 1 */
-    String e1;
+    public ExpFact e1;
     /** Expression 2 */
-    String e2;
+    public ExpFact e2;
 
-    public BopFact(String op, String e1, String e2) {
-        super();
+    public BopFact(String op, ExpFact e1, ExpFact e2) {
         this.op = op;
         this.e1 = e1;
         this.e2 = e2;

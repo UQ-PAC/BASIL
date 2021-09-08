@@ -4,9 +4,9 @@ package Facts.exp;
  * Variable fact
  */
 public class VarFact extends ExpFact {
-    String name;
+    public public String name;
+
     public VarFact(String name) {
-        super();
         this.name = name;
     }
 

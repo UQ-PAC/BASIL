@@ -4,7 +4,7 @@ package Facts.inst;
  * Jump
  */
 public class JmpFact extends InstFact {
-    String target;
+    public String target;
 
     public JmpFact(String pc, String target) {
         super(pc);

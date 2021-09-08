@@ -6,7 +6,7 @@ import Facts.Fact;
  * Generic instruction fact
  */
 public abstract class InstFact extends Fact {
-    protected String pc;
+    public String pc;
 
     public InstFact(String pc) {
         this.pc = pc;

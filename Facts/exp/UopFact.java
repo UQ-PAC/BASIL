@@ -1,16 +1,13 @@
 package Facts.exp;
 
-import Facts.exp.ExpFact;
-
 /**
  * Unary operator fact
  */
 public class UopFact extends ExpFact {
-    String op;
-    String e1;
+    public String op;
+    public ExpFact e1;
 
-    public UopFact(String op, String e1) {
-        super();
+    public UopFact(String op, ExpFact e1) {
         this.op = op;
         this.e1 = e1;
     }
