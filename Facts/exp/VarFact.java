@@ -4,7 +4,7 @@ package Facts.exp;
  * Variable fact
  */
 public class VarFact extends ExpFact {
-    public public String name;
+    public String name;
 
     public VarFact(String name) {
         this.name = name;

@@ -1,11 +1,6 @@
 import Facts.Fact;
-import Facts.exp.ExpFact;
-import Facts.exp.MemFact;
-import Facts.exp.VarFact;
-import Facts.inst.EnterSubFact;
-import Facts.inst.ExitSubFact;
-import Facts.inst.NopFact;
-import Facts.inst.ParamFact;
+import Facts.exp.*;
+import Facts.inst.*;
 import Facts.inst.assign.LoadFact;
 import Facts.inst.assign.MoveFact;
 import Facts.inst.assign.StoreFact;
@@ -18,16 +13,83 @@ import java.util.List;
 public class StatementLoader implements BilListener {
 
     List<Fact> facts;
+    String funcName = "";
 
-    public StatementLoader(List<Fact> lines) {
-        this.facts = lines;
+    public StatementLoader(List<Fact> facts) {
+        this.facts = facts;
     }
 
+    // todo handle casts by unwrapping
     private ExpFact parseExpression(BilParser.ExpContext ctx) {
         if (ctx == null) {
             return null;
+        } else if (ctx.getClass().equals(BilParser.ExpBopContext.class)) {
+            return parseBinaryOperation((BilParser.ExpBopContext) ctx);
+        } else if (ctx.getClass().equals(BilParser.ExpUopContext.class)) {
+            return parseUnaryOperation((BilParser.ExpUopContext) ctx);
+        } else if (ctx.getClass().equals(BilParser.ExpVarContext.class)) {
+            return parseVariableExpression((BilParser.ExpVarContext) ctx);
+        } else if (ctx.getClass().equals(BilParser.ExpLiteralContext.class)) {
+            return parseLiteralExpression((BilParser.ExpLiteralContext) ctx);
+        } else if (ctx.getClass().equals(BilParser.ExpExtractContext.class)) {
+            return parseExtractionExpression((BilParser.ExpExtractContext) ctx);
+        } else if (ctx.getClass().equals(BilParser.ExpCastContext.class)) {
+            return parseCastExpression((BilParser.ExpCastContext) ctx);
+        } else if (ctx.getClass().equals(BilParser.ExpLoadContext.class)) {
+            // toReturn == null when this load is not a mem expression, which is currently not expected
+            ExpFact toReturn = parseLoadExpression((BilParser.ExpLoadContext) ctx);
+            if (toReturn != null) {
+                return toReturn;
+            }
         }
-        return ;
+        System.err.println("Unhandled expression detected: " + ctx.getText());
+        return null;
+    }
+
+    private BopFact parseBinaryOperation(BilParser.ExpBopContext ctx) {
+        ExpFact left = parseExpression(ctx.exp(0));
+        ExpFact right = parseExpression(ctx.exp(1));
+        String op = ctx.bop().getText();
+        if (op.equals("=")) {
+            op = "=="; // a little patching here, a little there...
+        }
+        return new BopFact(op, left, right);
+    }
+
+    private UopFact parseUnaryOperation(BilParser.ExpUopContext ctx) {
+        ExpFact exp = parseExpression(ctx.exp());
+        String op = ctx.uop().getText();
+        return new UopFact(op, exp);
+    }
+
+    private VarFact parseVariableExpression(BilParser.ExpVarContext ctx) {
+        return new VarFact(ctx.var().getText());
+    }
+
+    private LiteralFact parseLiteralExpression(BilParser.ExpLiteralContext ctx) {
+        return new LiteralFact(ctx.literal().getText());
+    }
+
+    // fixme: assumes all bit vectors are 64 bits long
+    private ExtractFact parseExtractionExpression(BilParser.ExpExtractContext ctx) {
+        int firstNat = 64 - Integer.parseInt(ctx.nat(0).getText());
+        int secondNat = 63 - Integer.parseInt(ctx.nat(1).getText());
+        // assume extractions only apply to vars
+        VarFact exp = (VarFact) parseExpression(ctx.exp());
+        return new ExtractFact(firstNat, secondNat, exp);
+    }
+
+    private ExpFact parseCastExpression(BilParser.ExpCastContext ctx) {
+        // simply unwrap and throw away casts
+        return parseExpression(ctx.exp());
+    }
+
+    private MemFact parseLoadExpression(BilParser.ExpLoadContext ctx) {
+        if (ctx.exp(0).getText().equals("mem")) {
+            return new MemFact(parseExpression(ctx.exp(1)));
+        } else {
+            return null;
+        }
     }
 
     @Override
@@ -65,6 +127,8 @@ public class StatementLoader implements BilListener {
         String address = ctx.addr().getText();
         String funcName = ctx.functionName().getText();
         facts.add(new EnterSubFact(address, funcName));
+
+        this.funcName = funcName;
     }
 
     @Override
@@ -77,7 +141,6 @@ public class StatementLoader implements BilListener {
         String address = ctx.addr().getText();
         String id = ctx.param().getText(); // human-readable name
         String variable = ctx.var().getText(); // some register, probably
-        boolean isResult = id.contains("result");
         if (id.contains("result")) {
             facts.add(new ParamFact(address, new VarFact("out"), new VarFact(variable), true));
         } else {
@@ -95,8 +158,10 @@ public class StatementLoader implements BilListener {
         String address = ctx.addr().getText();
         // statements can be assignments, jumps, conditional jumps or function calls
         if (ctx.assign() != null) {
+            // statement is assignment; check which type
             BilParser.AssignContext assignCtx = ctx.assign();
             if (assignCtx.exp().getClass().equals(BilParser.ExpLoadContext.class)) {
+                // statement is a load assignment
                 BilParser.ExpLoadContext loadCtx = (BilParser.ExpLoadContext) assignCtx.exp();
                 VarFact lhs = new VarFact(loadCtx.exp(1).getText());
                 ExpFact rhs = parseExpression(loadCtx.exp(2));
@@ -104,30 +169,40 @@ public class StatementLoader implements BilListener {
                     facts.add(new LoadFact(address, lhs, (MemFact) rhs));
                 }
             } else if (assignCtx.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
+                // statement is a store assignment
                 BilParser.ExpStoreContext storeCtx = (BilParser.ExpStoreContext) assignCtx.exp();
-                ExpFact lhs = parseExpression(storeCtx.exp(1));
+                MemFact lhs = new MemFact(parseExpression(storeCtx.exp(1)));
                 ExpFact rhs = parseExpression(storeCtx.exp(2));
-                facts.add(new StoreFact(address, (MemFact) lhs, rhs));
+                facts.add(new StoreFact(address, lhs, rhs));
             } else {
+                // statement is a move assignment
                 VarFact lhs = new VarFact(assignCtx.var().getText());
                 ExpFact rhs = parseExpression(assignCtx.exp());
                 facts.add(new MoveFact(address, lhs, rhs));
             }
         } else if (ctx.jmp() != null) {
-
-            handleJump(ctx.jmp());
+            // statement is a jump
+            String target = "";
+            if (ctx.jmp().var() != null) {
+                target = ctx.jmp().var().getText();
+            } else if (ctx.jmp().addr() != null) {
+                target = ctx.jmp().addr().getText();
+            }
+            facts.add(new JmpFact(address, target));
         } else if (ctx.cjmp() != null) {
-            handleCJump(ctx.cjmp());
+            // statement is a conditional jump
+            VarFact cond = new VarFact(ctx.cjmp().var().getText()); // conditions are always vars
+            String target = ctx.cjmp().addr().getText();
+            facts.add(new CjmpFact(address, target, cond));
         } else if (ctx.call() != null) {
-            handleCall(ctx.call());
+            // statement is a call
+            String funcName = ctx.call().functionName().getText();
+            String returnAddr = ctx.call().returnaddr().addr().getText();
+            facts.add(new CallFact(address, funcName, returnAddr));
         } else {
             // this statement is empty
             facts.add(new NopFact(address));
         }
-
-
-        String address = ctx.
-                String.format("call %s(); goto label%s", ctx.functionName().getText(), ctx.returnaddr().addr().getText())
     }
 
     @Override
@@ -138,8 +213,7 @@ public class StatementLoader implements BilListener {
     @Override
     public void enterEndsub(BilParser.EndsubContext ctx) {
         String address = ctx.addr().getText();
-        String funcName = ctx.functionName().getText();
-        facts.add(new ExitSubFact(address, funcName));
+        facts.add(new ExitSubFact(address, this.funcName));
     }
 
     @Override

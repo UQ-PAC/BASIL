@@ -1,3 +1,4 @@
+import Facts.Fact;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.ParserRuleContext;
@@ -16,14 +17,19 @@ public class Main {
         BilParser.BilContext b = parser.bil(); // abstract syntax tree
 
         // extract all statement objects from the tree
-        List<ParserRuleContext> lines = new ArrayList<>();
-        StatementLoader statementLoader = new StatementLoader(lines);
+        List<Fact> facts = new ArrayList<>();
+        StatementLoader statementLoader = new StatementLoader(facts);
+        ParseTreeWalker walker = new ParseTreeWalker();
+        walker.walk(statementLoader, b);
+        facts.forEach(System.out::println);
+        /*
+
         ParseTreeWalker walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 
         // analyse statements and convert to boogie
         BoogieTranslator translator = new BoogieTranslator(lines, "boogie_out.txt");
-        translator.translate();
+        translator.translate();*/
 
         /*
         // clean the output file from the listener and put the cleaned version in the file called finalBoogieCode
