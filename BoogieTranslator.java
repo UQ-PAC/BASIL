@@ -110,9 +110,18 @@ public class BoogieTranslator {
     /**
      * We want to feed each EnterSubFact with a list of its parameters (i.e. ParamFacts) so that it can include these
      * in its procedure header, and use them for parameter resolving/dereferencing within the function body.
+     * todo: Eventually we might want to replace currentFunc.paramFacts.add() with an currentFunc.addParam().
      */
     private void createFuncParameters() {
-
+        EnterSubFact currentFunc = null;
+        for (InstFact fact : facts) {
+            if (fact instanceof EnterSubFact) {
+                currentFunc = (EnterSubFact) fact;
+            } else if (fact instanceof ParamFact) {
+                assert currentFunc != null; // we assume we won't encounter ParamFacts outside of functions
+                currentFunc.paramFacts.add((ParamFact) fact);
+            }
+        }
     }
 
     /**
