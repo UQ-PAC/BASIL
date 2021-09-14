@@ -108,6 +108,14 @@ public class BoogieTranslator {
     }
 
     /**
+     * We want to feed each EnterSubFact with a list of its parameters (i.e. ParamFacts) so that it can include these
+     * in its procedure header, and use them for parameter resolving/dereferencing within the function body.
+     */
+    private void createFuncParameters() {
+
+    }
+
+    /**
      * Searches through the code and adds all function metadata to the global functionData map.
      */
     private void logFunctionData() {

@@ -12,4 +12,9 @@ public class NopFact extends InstFact {
     public String toString() {
         return (String.format("%sskip;\n", label));
     }
+
+    @Override
+    public boolean equals(Object o) {
+        return super.equals(o);
+    }
 }

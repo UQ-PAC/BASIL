@@ -9,5 +9,4 @@ public abstract class ExpFact extends Fact {
 
     public ExpFact() {
     }
-
 }

@@ -12,4 +12,9 @@ public class LoadFact extends AssignFact {
     public LoadFact(String pc, VarFact lhsExp, MemFact memExp ) {
         super(pc, lhsExp, memExp, "load");
     }
+
+    @Override
+    public boolean equals(Object o) {
+        return super.equals(o);
+    }
 }

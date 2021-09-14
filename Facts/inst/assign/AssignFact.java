@@ -4,6 +4,8 @@ import Facts.Fact;
 import Facts.exp.ExpFact;
 import Facts.inst.InstFact;
 
+import java.util.Objects;
+
 /**
  * Assignment (e.g. x := exp)
  */
@@ -25,5 +27,19 @@ public abstract class AssignFact extends InstFact {
      */
     public String toString() {
         return String.format("%s%s := %s;\n", label, lhs, rhs);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+        AssignFact that = (AssignFact) o;
+        return Objects.equals(pc, that.pc) && Objects.equals(lhs, that.lhs) && Objects.equals(rhs, that.rhs) && Objects.equals(type, that.type);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), pc, lhs, rhs, type);
     }
 }
