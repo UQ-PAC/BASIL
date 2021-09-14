@@ -178,7 +178,7 @@ public class BoogieTranslator {
      * params are in this general list, which is a false assumption at this point in progress
      */
     private void resolveFuncParameters() {
-        EnterSubFact currentFunc = null;
+        EnterSubFact currentFunc;
         Map<MemFact, VarFact> aliasToVarName = new HashMap<>();
         Map<VarFact, VarFact> registertoVarName = new HashMap<>();
         Iterator<InstFact> iter = facts.listIterator();
@@ -212,12 +212,27 @@ public class BoogieTranslator {
                 for (VarFact register : registertoVarName.keySet()) {
                     replaceAllInstancesOfVar(assignFact.rhs, register, registertoVarName.get(register).name);
                 }
+                // replace all mem aliases with their mapped name
                 for (MemFact mem : aliasToVarName.keySet()) {
-                    replaceAllInstancesOfMem(assignFact.rhs, mem, aliasToVarName.get(mem));
+                    replaceAllInstancesOfMem(assignFact, mem, aliasToVarName.get(mem));
                 }
-                // if the lhs contains a mapped register, remove it from the map (only applied to moves and loads)
+                // if the lhs contains a mapped register, remove it from the map as it has been reassigned (only applied to moves and loads)
+                if (assignFact instanceof LoadFact) {
+                    LoadFact loadFact = (LoadFact) assignFact;
+                    registertoVarName.remove((VarFact) loadFact.lhs);
+                }
+                if (assignFact instanceof MoveFact) {
+                    MoveFact moveFact = (MoveFact) assignFact;
+                    registertoVarName.remove((VarFact) moveFact.lhs);
+                }
             } else {
-
+                // for anything but assignments, simply replace references to the mem alias and register as per usual
+                for (VarFact register : registertoVarName.keySet()) {
+                    replaceAllInstancesOfVar(fact, register, registertoVarName.get(register).name);
+                }
+                for (MemFact memFact : aliasToVarName.keySet()) {
+                    replaceAllInstancesOfMem(fact, memFact, aliasToVarName.get(memFact));
+                }
             }
         }
     }
