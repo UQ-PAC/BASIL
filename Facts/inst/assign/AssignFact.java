@@ -7,7 +7,7 @@ import Facts.inst.InstFact;
 /**
  * Assignment (e.g. x := exp)
  */
-abstract class AssignFact extends InstFact {
+public abstract class AssignFact extends InstFact {
     public String pc;
     public ExpFact lhs;
     public ExpFact rhs;
@@ -24,6 +24,6 @@ abstract class AssignFact extends InstFact {
      * @return inst(pc, type, lhs, rhs)
      */
     public String toString() {
-        return String.format("%s: %s := %s;", super.pc, lhs, rhs);
+        return String.format("%s%s := %s;", label, lhs, rhs);
     }
 }

@@ -22,6 +22,6 @@ public class BopFact extends ExpFact {
      * @return exp(pc, bop, op, e1, e2)
      */
     public String toString() {
-        return String.format("%s %s %s", e1, op, e2);
+        return String.format("(%s) %s (%s)", e1, op, e2);
     }
 }

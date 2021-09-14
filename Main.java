@@ -1,7 +1,7 @@
 import Facts.Fact;
+import Facts.inst.InstFact;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
-import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -17,11 +17,12 @@ public class Main {
         BilParser.BilContext b = parser.bil(); // abstract syntax tree
 
         // extract all statement objects from the tree
-        List<Fact> facts = new ArrayList<>();
+        List<InstFact> facts = new ArrayList<>();
         StatementLoader statementLoader = new StatementLoader(facts);
         ParseTreeWalker walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
-        facts.forEach(System.out::println);
+        BoogieTranslator translator = new BoogieTranslator(facts, "boogie_out.txt");
+        translator.translate();
         /*
 
         ParseTreeWalker walker = new ParseTreeWalker();

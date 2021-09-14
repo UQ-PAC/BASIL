@@ -16,7 +16,7 @@ public class CjmpFact extends InstFact {
     }
 
     public String toString() {
-        return String.format("%s: if (%s) goto %s;", super.pc, condition, target);
+        return String.format("%sif (%s) goto %s", label, condition, target);
     }
 
 }

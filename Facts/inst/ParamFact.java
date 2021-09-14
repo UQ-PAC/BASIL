@@ -8,6 +8,7 @@ public class ParamFact extends InstFact {
     public VarFact register;
     public boolean is_result;
 
+
     public ParamFact(String pc, VarFact name, VarFact register, boolean is_result) {
         super(pc);
         this.name = name;
@@ -17,6 +18,6 @@ public class ParamFact extends InstFact {
 
     public String toString() {
         String toFrom = is_result ? "to" : "from";
-        return String.format("%s: param %s, %s %s;", super.pc, name, toFrom, register);
+        return String.format("%sparam %s, %s %s;", label, name, toFrom, register);
     }
 }

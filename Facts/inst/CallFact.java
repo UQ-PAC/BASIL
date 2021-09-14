@@ -12,6 +12,6 @@ public class CallFact extends InstFact {
     }
 
     public String toString() {
-        return String.format("%s: call %s; goto %s;", super.pc, funcName, returnAddr);
+        return String.format("%scall %s; goto %s", label, funcName, returnAddr);
     }
 }

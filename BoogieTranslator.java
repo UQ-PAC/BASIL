@@ -1,3 +1,9 @@
+import Facts.Fact;
+import Facts.inst.*;
+import Facts.inst.assign.AssignFact;
+import Facts.inst.assign.LoadFact;
+import Facts.inst.assign.MoveFact;
+import Facts.inst.assign.StoreFact;
 import org.antlr.v4.runtime.ParserRuleContext;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -28,7 +34,7 @@ public class BoogieTranslator {
     // for writing the boogie output
     BufferedWriter writer;
     // the lines in the BIL file to translate
-    List<ParserRuleContext> lines;
+    List<InstFact> facts;
     // the name of the function we are currently in, or "" if we are not in a function
     String funcName = "";
     // line addresses that are used (i.e. jumped to) in the BIL program
@@ -39,13 +45,13 @@ public class BoogieTranslator {
     int lineIndex = 0;
     int nameCount = 0;
 
-    public BoogieTranslator(List<ParserRuleContext> lines, String outputFileName) {
+    public BoogieTranslator(List<InstFact> facts, String outputFileName) {
         try {
             writer = new BufferedWriter(new FileWriter(outputFileName, false));
         } catch (IOException e) {
             System.err.println("Error setting up file writer.");
         }
-        this.lines = lines;
+        this.facts = facts;
     }
 
     /**
@@ -53,16 +59,16 @@ public class BoogieTranslator {
      */
     public void translate() {
         logUsedLabels();
-        logFunctionData();
-        for (String funcName : functionData.keySet()) {
-            System.out.println(funcName);
-            System.out.println("params: " + functionData.get(funcName).params);
-            System.out.println("return: " + functionData.get(funcName).result);
-            System.out.println("stack: " + functionData.get(funcName).stackAliases);
-        }
+        // logFunctionData();
+//        for (String funcName : functionData.keySet()) {
+//            System.out.println(funcName);
+//            System.out.println("params: " + functionData.get(funcName).params);
+//            System.out.println("return: " + functionData.get(funcName).result);
+//            System.out.println("stack: " + functionData.get(funcName).stackAliases);
+//        }
         handleInit();
-        for (ParserRuleContext line : lines) {
-            handleLine(line);
+        for (InstFact fact : facts) {
+            handleLine(fact);
         }
     }
 
@@ -173,79 +179,63 @@ public class BoogieTranslator {
      * Handles a line of BIL.
      * @param line the line to handle.
      */
-    private void handleLine(ParserRuleContext line) {
+    private void handleLine(InstFact fact) {
         // handled lines are statements, functions declarations (subs) or functions returns (end subs)
         // we don't handle ParamTypes lines
-        if (line.getClass() == BilParser.StmtContext.class) {
-            handleStatement((BilParser.StmtContext) line);
-        } else if (line.getClass() == BilParser.SubContext.class) {
-            handleSub((BilParser.SubContext) line);
-        } else if (line.getClass() == BilParser.EndsubContext.class) {
-            handleEndSub((BilParser.EndsubContext) line);
+        if (fact instanceof AssignFact) {
+            handleAssignment((AssignFact) fact);
+        } else if (fact instanceof CallFact) {
+            handleCall((CallFact) fact);
+        } else if (fact instanceof CjmpFact) {
+            handleCJump((CjmpFact) fact);
+        } else if (fact instanceof EnterSubFact) {
+            handleSub((EnterSubFact) fact);
+        } else if (fact instanceof ExitSubFact) {
+            handleEndSub((ExitSubFact) fact);
+        } else if (fact instanceof JmpFact) {
+            handleJump((JmpFact) fact);
+        } else if (fact instanceof ParamFact) {
+            // todo
+        } else if (fact instanceof NopFact) {
+            handleNop();
         } else {
-            System.err.printf("Unhandled line: %s%n", line.getText());
+            System.err.printf("Unhandled instruction: %s%n", fact);
         }
-        // end every line with a newline
-        writeToFile("\n");
+        // end each instruction with a semicolon and new line
+        writeToFile(";\n");
         lineIndex++;
     }
 
-    /**
-     * Handles a statement, such as an assignment, jump, conditional jump or function call.
-     * @param ctx the statement to handle.
-     */
-    private void handleStatement(BilParser.StmtContext ctx) {
-        // visual index for functions
-        if (!funcName.equals("")) {
-            writeToFile("    ");
-        }
-        // add label if it is used in the program
-        if (usedLabels.contains(ctx.addr().getText())) {
-            writeToFile("label" + ctx.addr().getText() + ": ");
-        }
-        // statements can be assignments, jumps, conditional jumps or function calls
-        if (ctx.assign() != null) {
-            handleAssignment(ctx.assign());
-        } else if (ctx.jmp() != null) {
-            handleJump(ctx.jmp());
-        } else if (ctx.cjmp() != null) {
-            handleCJump(ctx.cjmp());
-        } else if (ctx.call() != null) {
-            handleCall(ctx.call());
-        } else {
-            // this statement is empty
-            writeToFile("skip");
-        }
-        // end every statement with a semicolon
-        writeToFile(";");
+    private void handleNop() {
+        writeToFile("skip");
     }
 
     /**
      * Handles an assignment, such as a load, store or move.
-     * @param ctx the assignment to handle.
      */
-    private void handleAssignment(BilParser.AssignContext ctx) {
+    private void handleAssignment(AssignFact fact) {
         // assignments can be loads, stores or moves
-        if (ctx.exp().getClass().equals(BilParser.ExpLoadContext.class)) {
-            handleLoad((BilParser.ExpLoadContext) ctx.exp());
-        } else if (ctx.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
-            handleStore((BilParser.ExpStoreContext) ctx.exp());
-        } else {
-            handleMove(ctx);
+        if (fact instanceof LoadFact) {
+            handleLoad((LoadFact) fact);
+        } else if (fact instanceof StoreFact) {
+            handleStore((StoreFact) fact);
+        } else if (fact instanceof MoveFact) {
+            handleMove((MoveFact) fact);
         }
     }
 
     /**
      * Handles a load assignment.
      * fixme: Incomplete.
-     * @param ctx the load to handle.
      */
-    private void handleLoad(BilParser.ExpLoadContext ctx) {
-        // 'mem[x0,el]:u32'
-        if (ctx.exp(2) == null) {
-            writeToFile("skip");
-            return; // no rhs of expression: this is likely a padding instruction on the variable c.exp(1), a.k.a. assignCtx.var()
+    private void handleLoad(LoadFact fact) {
+        if (fact.rhs == null) {
+            // no rhs of expression: this is likely a padding instruction
+            handleNop();
+        } else {
+            writeToFile("");
         }
+
         // fixme; unsure this code will ever run
         String lhs = parseExpression(ctx.exp(1));
         String rhs = parseExpression(ctx.exp(2));

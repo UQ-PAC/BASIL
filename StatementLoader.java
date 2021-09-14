@@ -12,10 +12,10 @@ import java.util.List;
 
 public class StatementLoader implements BilListener {
 
-    List<Fact> facts;
+    List<InstFact> facts;
     String funcName = "";
 
-    public StatementLoader(List<Fact> facts) {
+    public StatementLoader(List<InstFact> facts) {
         this.facts = facts;
     }
 

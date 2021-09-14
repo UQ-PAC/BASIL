@@ -1,14 +1,15 @@
 package Facts.inst;
 
 import Facts.Fact;
+import Facts.Label;
 
 /**
  * Generic instruction fact
  */
 public abstract class InstFact extends Fact {
-    public String pc;
+    public Label label;
 
     public InstFact(String pc) {
-        this.pc = pc;
+        label = new Label(pc);
     }
 }
