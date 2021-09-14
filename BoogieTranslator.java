@@ -1,4 +1,4 @@
-import Facts.exp.VarFact;
+import Facts.exp.*;
 import Facts.inst.*;
 import Facts.inst.assign.AssignFact;
 import Facts.inst.assign.LoadFact;
@@ -59,7 +59,7 @@ public class BoogieTranslator {
      */
     public void translate() {
         createLabels();
-        createFuncParameters(); // todo
+        createFuncParameters();
         resolveFuncParameters(); // todo
         printAllFacts(); // todo
 
@@ -126,18 +126,66 @@ public class BoogieTranslator {
         // some parameters aren't encapsulated in instructions. we identify them by finding all registers which are
         // stored before they are assigned. we track the MemFact of this store as an alias for the parameter.
         // not all variables which are accessed before they are assigned are registers. we identify registers using a
-        // rather bold assumption that they all start with 'X'.
+        // rather bold assumption that they all start with 'X'. we assume these stores look like this:
+        // MemFact := VarFact
         List<VarFact> assignedRegisters = new ArrayList<>();
         currentFunc = null;
         for (InstFact fact : facts) {
             if (fact instanceof EnterSubFact) {
                 currentFunc = (EnterSubFact) fact;
                 assignedRegisters = new ArrayList<>();
+            } else if (fact instanceof StoreFact) {
+                // e.g. mem[foo] := var;
+                StoreFact storeFact = (StoreFact) fact;
+                if (storeFact.rhs instanceof VarFact) {
+                    VarFact rhsVar = (VarFact) storeFact.rhs;
+                    if (isRegister(rhsVar) && !assignedRegisters.contains(rhsVar)) {
+                        // this is a register that has been accessed before assigned - it is a parameter
+                        ParamFact param = new ParamFact("", new VarFact(generateUniqueName()), rhsVar, false);
+                        param.alias = (MemFact) storeFact.lhs;
+                        assert currentFunc != null;
+                        currentFunc.paramFacts.add(param);
+                    }
+                }
             } else if (fact instanceof LoadFact) {
+                // e.g. var := mem[foo]
                 LoadFact loadFact = (LoadFact) fact;
-                VarFact variable = (VarFact) loadFact.lhs;
+                VarFact lhsVar = (VarFact) loadFact.lhs;
+                if (isRegister(lhsVar)) {
+                    assignedRegisters.add(lhsVar);
+                }
+            } else if (fact instanceof MoveFact) {
+                // e.g. var := var
+                MoveFact moveFact = (MoveFact) fact;
+                VarFact lhsVar = (VarFact) moveFact.lhs;
+                if (isRegister(lhsVar)) {
+                    assignedRegisters.add(lhsVar);
+                }
             }
         }
+    }
+
+    private boolean isRegister(VarFact varFact) {
+        return varFact.name.charAt(0) == 'X';
+    }
+
+    private List<VarFact> extractVarsFromExp(ExpFact fact) {
+        List<VarFact> vars = new ArrayList<>();
+        if (fact instanceof BopFact) {
+            vars.addAll(extractVarsFromExp(((BopFact) fact).e1));
+            vars.addAll(extractVarsFromExp(((BopFact) fact).e2));
+        } else if (fact instanceof UopFact) {
+            vars.addAll(extractVarsFromExp(((UopFact) fact).e1));
+        } else if (fact instanceof VarFact) {
+            vars.add((VarFact) fact);
+        } else if (fact instanceof ExtractFact) {
+            vars.addAll(extractVarsFromExp(((ExtractFact) fact).variable));
+        }
+        return vars;
+    }
+
+    private void filterNonRegisters(List<VarFact> facts) {
+        facts.removeIf(fact -> fact.name.charAt(0) != 'X');
     }
 
     /**
@@ -443,6 +491,20 @@ public class BoogieTranslator {
      */
     private String parseExpression(BilParser.ExpContext ctx) {
         // expressions can be binary operations, unary operations, variables, literals or extractions (i.e. bit slices)
+        ctx = ignoreUnhandledContexts(ctx);
+        if (ctx.getClass().equals(BilParser.ExpBopContext.class)) {
+            return parseBinaryOperation((BilParser.ExpBopContext) ctx);
+        } else if (ctx.getClass().equals(BilParser.ExpUopContext.class)) {
+            return parseUnaryOperation((BilParser.ExpUopContext) ctx);
+        } else if (ctx.getClass().equals(BilParser.ExpVarContext.class)) {
+            return parseVariableExpression((BilParser.ExpVarContext) ctx);
+        } else if (ctx.getClass().equals(BilParser.ExpLiteralContext.class)) {
+            return parseLiteralExpression((BilParser.ExpLiteralContext) ctx);
+        } else if (ctx.getClass().equals(BilParser.ExpExtractContext.class)) {
+            return parseExtractionExpression((BilParser.ExpExtractContext) ctx);
+        }
+        System.err.println("Unhandled expression detected: " + ctx.getText());
+        return "";// expressions can be binary operations, unary operations, variables, literals or extractions (i.e. bit slices)
         ctx = ignoreUnhandledContexts(ctx);
         if (ctx.getClass().equals(BilParser.ExpBopContext.class)) {
             return parseBinaryOperation((BilParser.ExpBopContext) ctx);

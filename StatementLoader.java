@@ -19,7 +19,6 @@ public class StatementLoader implements BilListener {
         this.facts = facts;
     }
 
-    // todo handle casts by unwrapping
     private ExpFact parseExpression(BilParser.ExpContext ctx) {
         if (ctx == null) {
             return null;
