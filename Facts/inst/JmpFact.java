@@ -12,6 +12,6 @@ public class JmpFact extends InstFact {
     }
 
     public String toString() {
-        return String.format("%sgoto %s;", label, target);
+        return String.format("%sgoto %s;\n", label, target);
     }
 }

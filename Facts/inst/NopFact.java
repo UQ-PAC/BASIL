@@ -10,6 +10,6 @@ public class NopFact extends InstFact {
     }
 
     public String toString() {
-        return (String.format("%sskip", label));
+        return (String.format("%sskip;\n", label));
     }
 }

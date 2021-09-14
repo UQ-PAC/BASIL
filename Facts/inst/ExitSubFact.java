@@ -10,6 +10,6 @@ public class ExitSubFact extends InstFact {
     }
 
     public String toString() {
-        return String.format("%sexit sub %s;", label, funcName);
+        return "}\n\n";
     }
 }

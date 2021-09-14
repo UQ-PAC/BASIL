@@ -17,7 +17,6 @@ public class ParamFact extends InstFact {
     }
 
     public String toString() {
-        String toFrom = is_result ? "to" : "from";
-        return String.format("%sparam %s, %s %s;", label, name, toFrom, register);
+        return "";
     }
 }
