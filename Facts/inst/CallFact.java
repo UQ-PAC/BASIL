@@ -1,11 +1,16 @@
 package Facts.inst;
 
+import Facts.exp.VarFact;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class CallFact extends InstFact {
 
     public String funcName;
     public String returnAddr;
+    public List<VarFact> params = new ArrayList<>();
 
     public CallFact(String pc, String funcName, String returnAddr) {
         super(pc);
@@ -14,7 +19,11 @@ public class CallFact extends InstFact {
     }
 
     public String toString() {
-        return String.format("%scall %s;\ngoto %s;\n", label, funcName, returnAddr);
+        StringBuilder paramsStr = new StringBuilder();
+        for (VarFact param : params) {
+            paramsStr.append(param.name);
+        }
+        return String.format("%scall(%s) %s;\ngoto label%s;\n", label, paramsStr, funcName, returnAddr);
     }
 
     @Override

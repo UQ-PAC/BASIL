@@ -7,8 +7,6 @@ import java.util.Objects;
 public class EnterSubFact extends InstFact {
 
     public String funcName;
-    public List<String> inParams = new ArrayList<>();
-    String outParam;
     public List<ParamFact> paramFacts = new ArrayList<>();
 
     public EnterSubFact(String pc, String funcName) {
@@ -18,6 +16,17 @@ public class EnterSubFact extends InstFact {
 
     public String toString() {
         // todo: add param types
+
+        List<String> inParams = new ArrayList<>();
+        String outParam = null;
+        for (ParamFact fact : paramFacts) {
+            if (fact.is_result) {
+                outParam = fact.name.name;
+            } else {
+                inParams.add(fact.name.name);
+            }
+        }
+
         StringBuilder line = new StringBuilder();
         line.append("procedure ").append(funcName).append("(");
         if (!inParams.isEmpty()) {
@@ -40,11 +49,11 @@ public class EnterSubFact extends InstFact {
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
         EnterSubFact that = (EnterSubFact) o;
-        return Objects.equals(funcName, that.funcName) && Objects.equals(inParams, that.inParams) && Objects.equals(outParam, that.outParam) && Objects.equals(paramFacts, that.paramFacts);
+        return Objects.equals(funcName, that.funcName) && Objects.equals(paramFacts, that.paramFacts);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), funcName, inParams, outParam, paramFacts);
+        return Objects.hash(super.hashCode(), funcName, paramFacts);
     }
 }

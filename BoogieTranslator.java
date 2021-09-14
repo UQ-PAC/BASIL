@@ -179,6 +179,7 @@ public class BoogieTranslator {
      * params are in this general list, which is a false assumption at this point in progress
      */
     private void resolveFuncParameters() {
+        List<EnterSubFact> allFuncs = getAllFuncs();
         EnterSubFact currentFunc;
         Map<MemFact, VarFact> aliasToVarName = new HashMap<>();
         Map<VarFact, VarFact> registertoVarName = new HashMap<>();
@@ -195,6 +196,17 @@ public class BoogieTranslator {
                     }
                     registertoVarName.put(param.register, param.name);
                 }
+            } else if (fact instanceof CallFact) {
+                CallFact callFact = (CallFact) fact;
+                for (EnterSubFact func : allFuncs) {
+                    if (func.funcName.equals(callFact.funcName)) {
+                        for (ParamFact param : func.paramFacts) {
+                            if (!param.is_result) {
+                                callFact.params.add(param.register); // error: changing the name of this variable ended up with this issue. you need to fix replaceallinstancesofvar to look more like replaceallinstancesofmem
+                            }
+                        }
+                    }
+                }
             } else if (fact instanceof AssignFact) {
                 AssignFact assignFact = (AssignFact) fact;
                 // remove any stores where the lhs and rhs map to the same variable (i.e. the initialisation line)
@@ -204,7 +216,8 @@ public class BoogieTranslator {
                     if (storeFact.rhs instanceof VarFact) {
                         VarFact rhs = (VarFact) storeFact.rhs;
                         // check if they map to the same human-readable variable
-                        if (aliasToVarName.get(lhs).equals(registertoVarName.get(rhs))) {
+                        if (aliasToVarName.containsKey(lhs) &&
+                                aliasToVarName.get(lhs).equals(registertoVarName.get(rhs))) {
                             iter.remove();
                         }
                     }
@@ -238,6 +251,16 @@ public class BoogieTranslator {
         }
     }
 
+    private List<EnterSubFact> getAllFuncs() {
+        List<EnterSubFact> funcs = new ArrayList<>();
+        for (InstFact fact : facts) {
+            if (fact instanceof EnterSubFact) {
+                funcs.add((EnterSubFact) fact);
+            }
+        }
+        return funcs;
+    }
+
     // todo
     private void resolveRegisters() {
         Iterator<InstFact> iter = facts.iterator();
@@ -248,7 +271,7 @@ public class BoogieTranslator {
     }
 
     private void printAllFacts() {
-        facts.forEach(System.out::println);
+        facts.forEach(System.out::print);
     }
 
     private void replaceAllInstancesOfVar(Fact fact, VarFact oldVar, String newName) {
