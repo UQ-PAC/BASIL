@@ -1,3 +1,4 @@
+import Facts.exp.VarFact;
 import Facts.inst.*;
 import Facts.inst.assign.AssignFact;
 import Facts.inst.assign.LoadFact;
@@ -122,6 +123,29 @@ public class BoogieTranslator {
                 currentFunc.paramFacts.add((ParamFact) fact);
             }
         }
+        // some parameters aren't encapsulated in instructions. we identify them by finding all registers which are
+        // stored before they are assigned. we track the MemFact of this store as an alias for the parameter.
+        // not all variables which are accessed before they are assigned are registers. we identify registers using a
+        // rather bold assumption that they all start with 'X'.
+        List<VarFact> assignedRegisters = new ArrayList<>();
+        currentFunc = null;
+        for (InstFact fact : facts) {
+            if (fact instanceof EnterSubFact) {
+                currentFunc = (EnterSubFact) fact;
+                assignedRegisters = new ArrayList<>();
+            } else if (fact instanceof LoadFact) {
+                LoadFact loadFact = (LoadFact) fact;
+                VarFact variable = (VarFact) loadFact.lhs;
+            }
+        }
+    }
+
+    /**
+     * We want to replace register references and mem calls to the stack with a human-readable variable for the
+     * parameter.
+     */
+    private void resolveFuncParameters() {
+
     }
 
     /**
