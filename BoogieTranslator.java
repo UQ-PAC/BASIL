@@ -61,8 +61,9 @@ public class BoogieTranslator {
     public void translate() {
         createLabels();
         createFuncParameters();
-        resolveFuncParameters(); // todo
-        printAllFacts(); // todo
+        resolveFuncParameters();
+        resolveRegisters();
+        printAllFacts();
 
         // logFunctionData();
 //        for (String funcName : functionData.keySet()) {
@@ -237,6 +238,19 @@ public class BoogieTranslator {
         }
     }
 
+    // todo
+    private void resolveRegisters() {
+        Iterator<InstFact> iter = facts.iterator();
+        while (iter.hasNext()) {
+            InstFact fact = iter.next();
+            // if we run into a jump, cjump or entersub (or maybe some other thing), then reset
+        }
+    }
+
+    private void printAllFacts() {
+        facts.forEach(System.out::println);
+    }
+
     private void replaceAllInstancesOfVar(Fact fact, VarFact oldVar, String newName) {
         if (fact instanceof BopFact) {
             replaceAllInstancesOfVar(((BopFact) fact).e1, oldVar, newName);
@@ -291,7 +305,7 @@ public class BoogieTranslator {
 
     /**
      * Searches through the code and adds all function metadata to the global functionData map.
-     */
+
     private void logFunctionData() {
         String funcName = "";
         FunctionData funcData = new FunctionData();
@@ -346,12 +360,12 @@ public class BoogieTranslator {
                 }
             }
         }
-    }
+    }*/
 
     /**
      * Represents what to write at the top of the boogie file, when beginning the translation.
      * Will usually include a bunch of variable initialisation, as per usual in boogie.
-     */
+
     private void handleInit() {
         // registers[0] represents the value at X0
         writeToFile("const registers: [int] int;\n");
@@ -363,8 +377,8 @@ public class BoogieTranslator {
 
     /**
      * Handles a line of BIL.
-     * @param line the line to handle.
-     */
+
+
     private void handleLine(InstFact fact) {
         // handled lines are statements, functions declarations (subs) or functions returns (end subs)
         // we don't handle ParamTypes lines
@@ -390,7 +404,7 @@ public class BoogieTranslator {
         // end each instruction with a semicolon and new line
         writeToFile(";\n");
         lineIndex++;
-    }
+    }*/
 
     private void handleNop() {
         writeToFile("skip");
@@ -398,7 +412,7 @@ public class BoogieTranslator {
 
     /**
      * Handles an assignment, such as a load, store or move.
-     */
+
     private void handleAssignment(AssignFact fact) {
         // assignments can be loads, stores or moves
         if (fact instanceof LoadFact) {
@@ -413,7 +427,7 @@ public class BoogieTranslator {
     /**
      * Handles a load assignment.
      * fixme: Incomplete.
-     */
+
     private void handleLoad(LoadFact fact) {
         if (fact.rhs == null) {
             // no rhs of expression: this is likely a padding instruction
@@ -431,7 +445,7 @@ public class BoogieTranslator {
     /**
      * Handles a store assignment.
      * @param ctx the store to handle.
-     */
+
     private void handleStore(BilParser.ExpStoreContext ctx) {
         // 'memwith[X0,el]:u32<-low:32[X1]'
         Integer lhs = evaluateExpression(ctx.exp(1), lineIndex);
@@ -448,7 +462,7 @@ public class BoogieTranslator {
     /**
      * Handles a move assignment.
      * @param ctx the move to handle.
-     */
+
     private void handleMove(BilParser.AssignContext ctx) {
         String lhs = ctx.var().getText();
         if (lhs.charAt(0) == 'X') {
@@ -474,7 +488,7 @@ public class BoogieTranslator {
     assignments. A warning is given if a non-move assignment is discovered while backtracking through the code, as this
     assignment may change the value of a variable we are trying to evaluate, resulting in an incorrect evaluation when
     skipped.
-    */
+
     private Integer evaluateExpression(BilParser.ExpContext ectx, int lineNo) {
         if (ectx.getClass().equals(BilParser.ExpLiteralContext.class)) {
             return Integer.decode(ectx.getText());
@@ -579,9 +593,9 @@ public class BoogieTranslator {
     /**
      * Translates the given expression into boogie.
      * Currently works for binary operations, unary operations, variables, literals and extraction expressions.
-     * @param ctx the expression to translate.
+     *expression to translate.
      * @return the boogie translation of the expression.
-     */
+
     private String parseExpression(BilParser.ExpContext ctx) {
         // expressions can be binary operations, unary operations, variables, literals or extractions (i.e. bit slices)
         ctx = ignoreUnhandledContexts(ctx);
