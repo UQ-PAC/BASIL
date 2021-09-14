@@ -1,3 +1,4 @@
+import Facts.Fact;
 import Facts.exp.*;
 import Facts.inst.*;
 import Facts.inst.assign.AssignFact;
@@ -169,31 +170,108 @@ public class BoogieTranslator {
         return varFact.name.charAt(0) == 'X';
     }
 
-    private List<VarFact> extractVarsFromExp(ExpFact fact) {
-        List<VarFact> vars = new ArrayList<>();
-        if (fact instanceof BopFact) {
-            vars.addAll(extractVarsFromExp(((BopFact) fact).e1));
-            vars.addAll(extractVarsFromExp(((BopFact) fact).e2));
-        } else if (fact instanceof UopFact) {
-            vars.addAll(extractVarsFromExp(((UopFact) fact).e1));
-        } else if (fact instanceof VarFact) {
-            vars.add((VarFact) fact);
-        } else if (fact instanceof ExtractFact) {
-            vars.addAll(extractVarsFromExp(((ExtractFact) fact).variable));
-        }
-        return vars;
-    }
-
-    private void filterNonRegisters(List<VarFact> facts) {
-        facts.removeIf(fact -> fact.name.charAt(0) != 'X');
-    }
-
     /**
      * We want to replace register references and mem calls to the stack with a human-readable variable for the
      * parameter.
+     * This also assumes that memory aliases for param variables are not accessed (loaded) before they are assigned (stored)
+     * fixme: we need to merge input params into the general list of params for this to work. we assume here that all
+     * params are in this general list, which is a false assumption at this point in progress
      */
     private void resolveFuncParameters() {
+        EnterSubFact currentFunc = null;
+        Map<MemFact, VarFact> aliasToVarName = new HashMap<>();
+        Map<VarFact, VarFact> registertoVarName = new HashMap<>();
+        Iterator<InstFact> iter = facts.listIterator();
+        while (iter.hasNext()) {
+            InstFact fact = iter.next();
+            if (fact instanceof EnterSubFact) {
+                currentFunc = (EnterSubFact) fact;
+                aliasToVarName = new HashMap<>();
+                registertoVarName = new HashMap<>();
+                for (ParamFact param : currentFunc.paramFacts) {
+                    if (param.alias != null) {
+                        aliasToVarName.put(param.alias, param.name);
+                    }
+                    registertoVarName.put(param.register, param.name);
+                }
+            } else if (fact instanceof AssignFact) {
+                AssignFact assignFact = (AssignFact) fact;
+                // remove any stores where the lhs and rhs map to the same variable (i.e. the initialisation line)
+                if (assignFact instanceof StoreFact) {
+                    StoreFact storeFact = (StoreFact) fact;
+                    MemFact lhs = (MemFact) storeFact.lhs;
+                    if (storeFact.rhs instanceof VarFact) {
+                        VarFact rhs = (VarFact) storeFact.rhs;
+                        // check if they map to the same human-readable variable
+                        if (aliasToVarName.get(lhs).equals(registertoVarName.get(rhs))) {
+                            iter.remove();
+                        }
+                    }
+                }
+                // replace all mapped rhs registers with their mapped name (applied to all assign types)
+                for (VarFact register : registertoVarName.keySet()) {
+                    replaceAllInstancesOfVar(assignFact.rhs, register, registertoVarName.get(register).name);
+                }
+                for (MemFact mem : aliasToVarName.keySet()) {
+                    replaceAllInstancesOfMem(assignFact.rhs, mem, aliasToVarName.get(mem));
+                }
+                // if the lhs contains a mapped register, remove it from the map (only applied to moves and loads)
+            } else {
 
+            }
+        }
+    }
+
+    private void replaceAllInstancesOfVar(Fact fact, VarFact oldVar, String newName) {
+        if (fact instanceof BopFact) {
+            replaceAllInstancesOfVar(((BopFact) fact).e1, oldVar, newName);
+            replaceAllInstancesOfVar(((BopFact) fact).e2, oldVar, newName);
+        } else if (fact instanceof ExtractFact) {
+            replaceAllInstancesOfVar(((ExtractFact) fact).variable, oldVar, newName);
+        } else if (fact instanceof MemFact) {
+            replaceAllInstancesOfVar(((MemFact) fact).exp, oldVar, newName);
+        } else if (fact instanceof UopFact) {
+            replaceAllInstancesOfVar(((UopFact) fact).e1, oldVar, newName);
+        } else if (fact instanceof VarFact) {
+            if (fact.equals(oldVar)) ((VarFact) fact).name = newName;
+        } else if (fact instanceof AssignFact) {
+            replaceAllInstancesOfVar(((AssignFact) fact).lhs, oldVar, newName);
+            replaceAllInstancesOfVar(((AssignFact) fact).rhs, oldVar, newName);
+        } else if (fact instanceof  CjmpFact) {
+            replaceAllInstancesOfVar(((CjmpFact) fact).condition, oldVar, newName);
+        }
+    }
+
+    private void replaceAllInstancesOfMem(Fact fact, MemFact oldMem, VarFact newVar) {
+        if (fact instanceof BopFact) {
+            if (((BopFact) fact).e1 instanceof MemFact && ((BopFact) fact).e1.equals(oldMem)) {
+                ((BopFact) fact).e1 = newVar;
+            } else {
+                replaceAllInstancesOfMem(((BopFact) fact).e1, oldMem, newVar);
+            }
+            if (((BopFact) fact).e2 instanceof MemFact && ((BopFact) fact).e2.equals(oldMem)) {
+                ((BopFact) fact).e2 = newVar;
+            } else {
+                replaceAllInstancesOfMem(((BopFact) fact).e2, oldMem, newVar);
+            }
+        } else if (fact instanceof UopFact) {
+            if (((UopFact) fact).e1 instanceof MemFact && ((UopFact) fact).e1.equals(oldMem)) {
+                ((UopFact) fact).e1 = newVar;
+            } else {
+                replaceAllInstancesOfMem(((UopFact) fact).e1, oldMem, newVar);
+            }
+        } else if (fact instanceof AssignFact) {
+            if (((AssignFact) fact).lhs instanceof MemFact && ((AssignFact) fact).lhs.equals(oldMem)) {
+                ((AssignFact) fact).lhs = newVar;
+            } else {
+                replaceAllInstancesOfMem(((AssignFact) fact).lhs, oldMem, newVar);
+            }
+            if (((AssignFact) fact).rhs instanceof MemFact && ((AssignFact) fact).rhs.equals(oldMem)) {
+                ((AssignFact) fact).rhs = newVar;
+            } else {
+                replaceAllInstancesOfMem(((AssignFact) fact).rhs, oldMem, newVar);
+            }
+        }
     }
 
     /**
