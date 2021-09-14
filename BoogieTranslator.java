@@ -1,4 +1,3 @@
-import Facts.Fact;
 import Facts.inst.*;
 import Facts.inst.assign.AssignFact;
 import Facts.inst.assign.LoadFact;
@@ -58,7 +57,11 @@ public class BoogieTranslator {
      * Starting point for a BIL translation.
      */
     public void translate() {
-        logUsedLabels();
+        createLabels();
+        createFuncParameters(); // todo
+        resolveFuncParameters(); // todo
+        printAllFacts(); // todo
+
         // logFunctionData();
 //        for (String funcName : functionData.keySet()) {
 //            System.out.println(funcName);
@@ -66,40 +69,41 @@ public class BoogieTranslator {
 //            System.out.println("return: " + functionData.get(funcName).result);
 //            System.out.println("stack: " + functionData.get(funcName).stackAliases);
 //        }
-        handleInit();
-        for (InstFact fact : facts) {
-            handleLine(fact);
-        }
+//        handleInit();
+//        for (InstFact fact : facts) {
+//            handleLine(fact);
+//        }
     }
 
     /**
-     * Searches through the code and adds all used labels to the global usedLabels set
+     * We want to display the labels (i.e. pc's) of all instructions whose labels are referenced elsewhere (for e.g. by
+     * a jump, conditional jump or call).
      */
-    private void logUsedLabels() {
-        for (ParserRuleContext line : lines) {
-            String target = "";
-            // labels are used in jumps, cjumps and calls
-            if (line.getClass() == BilParser.StmtContext.class) {
-                BilParser.StmtContext stmt = (BilParser.StmtContext) line;
-                if (stmt.jmp() != null) {
-                    BilParser.JmpContext jump = stmt.jmp();
-                    // tom included these conditionals and i'm not sure why, but they're staying for now
-                    if (jump.var() != null) {
-                        target = jump.var().getText();
-                    } else if (jump.addr() != null) {
-                        target = jump.addr().getText();
-                    }
-                } else if (stmt.cjmp() != null) {
-                    BilParser.CjmpContext jump = stmt.cjmp();
-                    target = jump.addr().getText();
-                } else if (stmt.call() != null) {
-                    BilParser.CallContext jump = stmt.call(); // todo
-                    target = jump.returnaddr().addr().getText();
-                } else {
-                    continue;
-                }
-                usedLabels.add(String.format("%s", target));
+    private void createLabels() {
+        List<String> usedLabels = new ArrayList<>();
+        for (InstFact fact : facts) {
+            String target = extractTargetLabel(fact);
+            if (target != null) {
+                usedLabels.add(target);
             }
+        }
+        for (InstFact fact : facts) {
+            if (usedLabels.contains(fact.label.pc)) {
+                fact.label.hide = false;
+            }
+        }
+    }
+
+    private String extractTargetLabel(InstFact fact) {
+        // target labels are used in jumps, cjumps and calls
+        if (fact instanceof JmpFact) {
+            return ((JmpFact) fact).target;
+        } else if (fact instanceof CjmpFact) {
+            return ((CjmpFact) fact).target;
+        } else if (fact instanceof CallFact) {
+            return ((CallFact) fact).returnAddr;
+        } else {
+            return null;
         }
     }
 
