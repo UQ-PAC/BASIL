@@ -111,57 +111,65 @@ public class BoogieTranslator {
     }
 
     /**
+     * @return list of [start, end] endpoints for function blocks.
+     * 'Start' is the function header and 'end' is the function return line.
+     */
+    private List<Integer[]> getAllFunctions() {
+        List<Integer[]> functions = new ArrayList<>();
+        for (int i = 0; i < facts.size(); i++) {
+            InstFact fact = facts.get(i);
+            if (fact instanceof EnterSubFact) {
+                Integer[] endPoints = new Integer[2];
+                endPoints[0] = i;
+                functions.add(endPoints);
+            } else if (fact instanceof ExitSubFact) functions.get(functions.size() - 1)[1] = i;
+        }
+        return functions;
+    }
+
+    /**
      * We want to feed each EnterSubFact with a list of its parameters (i.e. ParamFacts) so that it can include these
      * in its procedure header, and use them for parameter resolving/dereferencing within the function body.
-     * todo: Eventually we might want to replace currentFunc.paramFacts.add() with an currentFunc.addParam().
      */
     private void createFuncParameters() {
-        EnterSubFact currentFunc = null;
-        for (InstFact fact : facts) {
-            if (fact instanceof EnterSubFact) {
-                currentFunc = (EnterSubFact) fact;
-            } else if (fact instanceof ParamFact) {
-                assert currentFunc != null; // we assume we won't encounter ParamFacts outside of functions
-                currentFunc.paramFacts.add((ParamFact) fact);
+        for (Integer[] endpoints : getAllFunctions()) {
+            int start = endpoints[0];
+            int end = endpoints[1];
+            EnterSubFact currentFunc = (EnterSubFact) facts.get(start);
+            int i = start + 1;
+            // get all explicitly listed function parameters. we assume they are all listed directly underneath
+            while (i < end) {
+                InstFact param = facts.get(i++);
+                if (!(param instanceof ParamFact)) break;
+                currentFunc.paramFacts.add((ParamFact) param);
             }
-        }
-        // some parameters aren't encapsulated in instructions. we identify them by finding all registers which are
-        // stored before they are assigned. we track the MemFact of this store as an alias for the parameter.
-        // not all variables which are accessed before they are assigned are registers. we identify registers using a
-        // rather bold assumption that they all start with 'X'. we assume these stores look like this:
-        // MemFact := VarFact
-        List<VarFact> assignedRegisters = new ArrayList<>();
-        currentFunc = null;
-        for (InstFact fact : facts) {
-            if (fact instanceof EnterSubFact) {
-                currentFunc = (EnterSubFact) fact;
-                assignedRegisters = new ArrayList<>();
-            } else if (fact instanceof StoreFact) {
-                // e.g. mem[foo] := var;
-                StoreFact storeFact = (StoreFact) fact;
-                if (storeFact.rhs instanceof VarFact) {
+            // get all function parameters which are not explicitly listed (registers which are stored before they are assigned)
+            List<VarFact> assignedRegisters = new ArrayList<>();
+            while (i < end) {
+                InstFact line = facts.get(i++);
+                if (!(line instanceof AssignFact)) continue; // we are only concerned with assignments here
+                if (line instanceof StoreFact) {
+                    // e.g. mem[foo] := var;
+                    StoreFact storeFact = (StoreFact) line;
+                    if (!(storeFact.rhs instanceof VarFact)) continue; // assumption: parameter stores should contain a rhs which is a single variable
                     VarFact rhsVar = (VarFact) storeFact.rhs;
-                    if (isRegister(rhsVar) && !assignedRegisters.contains(rhsVar)) {
-                        // this is a register that has been accessed before assigned - it is a parameter
-                        ParamFact param = new ParamFact("", new VarFact(generateUniqueName()), rhsVar, false);
-                        param.alias = (MemFact) storeFact.lhs;
-                        assert currentFunc != null;
-                        currentFunc.paramFacts.add(param);
-                    }
+                    if (!isRegister(rhsVar) || assignedRegisters.contains(rhsVar)) continue; // variable is not a register, or has been assigned before
+                    // this is a register that has been stored before assigned - it is a parameter
+                    ParamFact param = new ParamFact("", new VarFact(generateUniqueName()), rhsVar, false);
+                    param.alias = (MemFact) storeFact.lhs;
+                    currentFunc.paramFacts.add(param);
+                } else {
+                    VarFact lhsVar = (VarFact) (line instanceof LoadFact ? ((LoadFact) line).lhs : ((MoveFact) line).lhs);
+                    if (isRegister(lhsVar)) assignedRegisters.add(lhsVar);
                 }
-            } else if (fact instanceof LoadFact) {
-                // e.g. var := mem[foo]
-                LoadFact loadFact = (LoadFact) fact;
-                VarFact lhsVar = (VarFact) loadFact.lhs;
-                if (isRegister(lhsVar)) {
-                    assignedRegisters.add(lhsVar);
-                }
-            } else if (fact instanceof MoveFact) {
-                // e.g. var := var
-                MoveFact moveFact = (MoveFact) fact;
-                VarFact lhsVar = (VarFact) moveFact.lhs;
-                if (isRegister(lhsVar)) {
-                    assignedRegisters.add(lhsVar);
+            }
+            // once the parameters for a function have been created, create parameters for any call to this function too
+            for (InstFact fact : facts) {
+                if (!(fact instanceof CallFact)) continue;
+                CallFact call = (CallFact) fact;
+                if (!call.funcName.equals(currentFunc.funcName)) continue;
+                for (ParamFact paramFact : currentFunc.paramFacts) {
+                    if (!paramFact.is_result) call.params.add(paramFact.register);
                 }
             }
         }
@@ -174,78 +182,44 @@ public class BoogieTranslator {
     /**
      * We want to replace register references and mem calls to the stack with a human-readable variable for the
      * parameter.
-     * This also assumes that memory aliases for param variables are not accessed (loaded) before they are assigned (stored)
-     * fixme: we need to merge input params into the general list of params for this to work. we assume here that all
-     * params are in this general list, which is a false assumption at this point in progress
+     * This also assumes that memory aliases for param variables are not accessed (loaded) before they are assigned (stored),
+     * and that each parameter has no more than 1 MemFact alias.
+     *
+     * RELEVANT RULES
+     * 1. All store instructions which contain both the mem (on the left-hand-side) and register (on the right-hand-side) assigned to a parameter are removed.
+     * 2. All references to mems which are assigned to parameters are replaced with references to the human-readable name of that parameter.
      */
     private void resolveFuncParameters() {
-        List<EnterSubFact> allFuncs = getAllFuncs();
-        EnterSubFact currentFunc;
-        Map<MemFact, VarFact> aliasToVarName = new HashMap<>();
-        Map<VarFact, VarFact> registertoVarName = new HashMap<>();
-        Iterator<InstFact> iter = facts.listIterator();
-        while (iter.hasNext()) {
-            InstFact fact = iter.next();
-            if (fact instanceof EnterSubFact) {
-                currentFunc = (EnterSubFact) fact;
-                aliasToVarName = new HashMap<>();
-                registertoVarName = new HashMap<>();
+        // implement rule 1
+        for (Integer[] endpoints : getAllFunctions()) {
+            int start = endpoints[0];
+            int end = endpoints[1];
+            EnterSubFact currentFunc = (EnterSubFact) facts.get(start);
+            List<Integer> forRemoval = new ArrayList<>();
+            for (int i = start; i < end; i++) {
+                InstFact fact = facts.get(i);
+                if (!(fact instanceof StoreFact)) continue;
+                StoreFact storeFact = (StoreFact) fact;
+                if (!(storeFact.rhs instanceof VarFact)) continue; // assume the rhs of the stores we're looking for consist of only a variable
+                MemFact lhs = (MemFact) storeFact.lhs;
+                VarFact rhs = (VarFact) storeFact.rhs;
                 for (ParamFact param : currentFunc.paramFacts) {
-                    if (param.alias != null) {
-                        aliasToVarName.put(param.alias, param.name);
-                    }
-                    registertoVarName.put(param.register, param.name);
-                }
-            } else if (fact instanceof CallFact) {
-                CallFact callFact = (CallFact) fact;
-                for (EnterSubFact func : allFuncs) {
-                    if (func.funcName.equals(callFact.funcName)) {
-                        for (ParamFact param : func.paramFacts) {
-                            if (!param.is_result) {
-                                callFact.params.add(param.register); // error: changing the name of this variable ended up with this issue. you need to fix replaceallinstancesofvar to look more like replaceallinstancesofmem
-                            }
-                        }
+                    if (param.alias == null) continue;
+                    if (param.alias.equals(lhs) && param.register.equals(rhs)) {
+                        forRemoval.add(i);
                     }
                 }
-            } else if (fact instanceof AssignFact) {
-                AssignFact assignFact = (AssignFact) fact;
-                // remove any stores where the lhs and rhs map to the same variable (i.e. the initialisation line)
-                if (assignFact instanceof StoreFact) {
-                    StoreFact storeFact = (StoreFact) fact;
-                    MemFact lhs = (MemFact) storeFact.lhs;
-                    if (storeFact.rhs instanceof VarFact) {
-                        VarFact rhs = (VarFact) storeFact.rhs;
-                        // check if they map to the same human-readable variable
-                        if (aliasToVarName.containsKey(lhs) &&
-                                aliasToVarName.get(lhs).equals(registertoVarName.get(rhs))) {
-                            iter.remove();
-                        }
-                    }
-                }
-                // replace all mapped rhs registers with their mapped name (applied to all assign types)
-                for (VarFact register : registertoVarName.keySet()) {
-                    replaceAllInstancesOfVar(assignFact.rhs, register, registertoVarName.get(register).name);
-                }
-                // replace all mem aliases with their mapped name
-                for (MemFact mem : aliasToVarName.keySet()) {
-                    replaceAllInstancesOfMem(assignFact, mem, aliasToVarName.get(mem));
-                }
-                // if the lhs contains a mapped register, remove it from the map as it has been reassigned (only applied to moves and loads)
-                if (assignFact instanceof LoadFact) {
-                    LoadFact loadFact = (LoadFact) assignFact;
-                    registertoVarName.remove((VarFact) loadFact.lhs);
-                }
-                if (assignFact instanceof MoveFact) {
-                    MoveFact moveFact = (MoveFact) assignFact;
-                    registertoVarName.remove((VarFact) moveFact.lhs);
-                }
-            } else {
-                // for anything but assignments, simply replace references to the mem alias and register as per usual
-                for (VarFact register : registertoVarName.keySet()) {
-                    replaceAllInstancesOfVar(fact, register, registertoVarName.get(register).name);
-                }
-                for (MemFact memFact : aliasToVarName.keySet()) {
-                    replaceAllInstancesOfMem(fact, memFact, aliasToVarName.get(memFact));
+            }
+            forRemoval.forEach(index -> facts.remove((int) index));
+        }
+        // implement rule 2
+        for (Integer[] endpoints : getAllFunctions()) { // we have to call this function again because we just removed some lines from the facts list
+            int start = endpoints[0];
+            int end = endpoints[1];
+            EnterSubFact currentFunc = (EnterSubFact) facts.get(start);
+            for (int i = start; i < end; i++) {
+                for (ParamFact param : currentFunc.paramFacts) {
+                    if (param.alias != null) replaceAllInstancesOfMem(facts.get(i), param.alias, param.name);
                 }
             }
         }
