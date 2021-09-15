@@ -223,16 +223,34 @@ public class BoogieTranslator {
                 }
             }
         }
-    }
+        // finally, resolve output parameters by working from the last place the associated register was assigned
+        for (Integer[] endpoints : getAllFunctions()) { // we have to call this function again because we just removed some lines from the facts list
+            int start = endpoints[0];
+            int end = endpoints[1];
+            EnterSubFact currentFunc = (EnterSubFact) facts.get(start);
+            ParamFact outParam = null;
+            for (ParamFact param : currentFunc.paramFacts) {
+                if (param.is_result) outParam = param;
+            }
+            if (outParam == null) continue; // this function does not have an output
+            // find the last instance of the register being assigned in this function
+            int i;
+            for (i = end; i > start; --i) {
+                InstFact fact = facts.get(i);
+                if (!(fact instanceof AssignFact)) continue;
+                AssignFact assignFact = (AssignFact) fact;
+                if (!(assignFact.lhs instanceof VarFact)) continue;
+                VarFact varFact = (VarFact) assignFact.lhs;
+                if (varFact.equals(outParam.register)) {
+                    // found it
+                    assignFact.lhs = outParam.name;
+                    break;
+                }
+            }
+            for (i = i + 1; i < end; i++) {
 
-    private List<EnterSubFact> getAllFuncs() {
-        List<EnterSubFact> funcs = new ArrayList<>();
-        for (InstFact fact : facts) {
-            if (fact instanceof EnterSubFact) {
-                funcs.add((EnterSubFact) fact);
             }
         }
-        return funcs;
     }
 
     // todo
@@ -246,26 +264,6 @@ public class BoogieTranslator {
 
     private void printAllFacts() {
         facts.forEach(System.out::print);
-    }
-
-    private void replaceAllInstancesOfVar(Fact fact, VarFact oldVar, String newName) {
-        if (fact instanceof BopFact) {
-            replaceAllInstancesOfVar(((BopFact) fact).e1, oldVar, newName);
-            replaceAllInstancesOfVar(((BopFact) fact).e2, oldVar, newName);
-        } else if (fact instanceof ExtractFact) {
-            replaceAllInstancesOfVar(((ExtractFact) fact).variable, oldVar, newName);
-        } else if (fact instanceof MemFact) {
-            replaceAllInstancesOfVar(((MemFact) fact).exp, oldVar, newName);
-        } else if (fact instanceof UopFact) {
-            replaceAllInstancesOfVar(((UopFact) fact).e1, oldVar, newName);
-        } else if (fact instanceof VarFact) {
-            if (fact.equals(oldVar)) ((VarFact) fact).name = newName;
-        } else if (fact instanceof AssignFact) {
-            replaceAllInstancesOfVar(((AssignFact) fact).lhs, oldVar, newName);
-            replaceAllInstancesOfVar(((AssignFact) fact).rhs, oldVar, newName);
-        } else if (fact instanceof  CjmpFact) {
-            replaceAllInstancesOfVar(((CjmpFact) fact).condition, oldVar, newName);
-        }
     }
 
     private void replaceAllInstancesOfMem(Fact fact, MemFact oldMem, VarFact newVar) {
@@ -741,15 +739,6 @@ public class BoogieTranslator {
         return String.format("registers[%d]", Integer.parseInt(registerID.substring(1)));
     }
 
-    private void writeToFile(String text) {
-        try {
-            writer.write(text);
-            writer.flush();
-        } catch (IOException e) {
-            System.err.println("Error writing to file.");
-        }
-    }
-
     private class FunctionData {
         // map from register id to the human-readable parameter variable
         Map<String, String> params = new HashMap<>();
@@ -761,6 +750,15 @@ public class BoogieTranslator {
         boolean spUsed = false;
         // constructor
         FunctionData() {}
+    }
+
+    private void writeToFile(String text) {
+        try {
+            writer.write(text);
+            writer.flush();
+        } catch (IOException e) {
+            System.err.println("Error writing to file.");
+        }
     }
 
     private String generateUniqueName() {
