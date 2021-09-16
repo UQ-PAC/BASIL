@@ -5,7 +5,6 @@ import Facts.inst.assign.AssignFact;
 import Facts.inst.assign.LoadFact;
 import Facts.inst.assign.MoveFact;
 import Facts.inst.assign.StoreFact;
-import org.antlr.v4.runtime.ParserRuleContext;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -61,21 +60,10 @@ public class BoogieTranslator {
     public void translate() {
         createLabels();
         createFuncParameters();
-        resolveFuncParameters();
+        resolveInParams();
+        resolveOutParams();
         resolveRegisters();
         printAllFacts();
-
-        // logFunctionData();
-//        for (String funcName : functionData.keySet()) {
-//            System.out.println(funcName);
-//            System.out.println("params: " + functionData.get(funcName).params);
-//            System.out.println("return: " + functionData.get(funcName).result);
-//            System.out.println("stack: " + functionData.get(funcName).stackAliases);
-//        }
-//        handleInit();
-//        for (InstFact fact : facts) {
-//            handleLine(fact);
-//        }
     }
 
     /**
@@ -189,7 +177,7 @@ public class BoogieTranslator {
      * 1. All store instructions which contain both the mem (on the left-hand-side) and register (on the right-hand-side) assigned to a parameter are removed.
      * 2. All references to mems which are assigned to parameters are replaced with references to the human-readable name of that parameter.
      */
-    private void resolveFuncParameters() {
+    private void resolveInParams() {
         // implement rule 1
         for (Integer[] endpoints : getAllFunctions()) {
             int start = endpoints[0];
@@ -223,8 +211,10 @@ public class BoogieTranslator {
                 }
             }
         }
-        // finally, resolve output parameters by working from the last place the associated register was assigned
-        for (Integer[] endpoints : getAllFunctions()) { // we have to call this function again because we just removed some lines from the facts list
+    }
+
+    private void resolveOutParams() {
+        for (Integer[] endpoints : getAllFunctions()) {
             int start = endpoints[0];
             int end = endpoints[1];
             EnterSubFact currentFunc = (EnterSubFact) facts.get(start);
@@ -233,37 +223,76 @@ public class BoogieTranslator {
                 if (param.is_result) outParam = param;
             }
             if (outParam == null) continue; // this function does not have an output
-            // find the last instance of the register being assigned in this function
             int i;
-            for (i = end; i > start; --i) {
-                InstFact fact = facts.get(i);
-                if (!(fact instanceof AssignFact)) continue;
-                AssignFact assignFact = (AssignFact) fact;
-                if (!(assignFact.lhs instanceof VarFact)) continue;
-                VarFact varFact = (VarFact) assignFact.lhs;
-                if (varFact.equals(outParam.register)) {
-                    // found it
-                    assignFact.lhs = outParam.name;
-                    break;
-                }
-            }
-            for (i = i + 1; i < end; i++) {
-
+            for (i = start; i < end; i++) {
+                replaceAllInstancesOfVar(facts.get(i), outParam.register, outParam.name);
             }
         }
     }
 
     // todo
+
+    /**
+     * Rule:
+     * 1. If we run into a bad instruction, reset all register values.
+     * 2. For registers in non-assignments, change them to their mapped values.
+     * 3. For registers on the rhs of assignments, change them to their mapped values.
+     * 4. For registers on the lhs of assignments, update their mapping to whatever is on the rhs.
+     */
     private void resolveRegisters() {
+        Map<VarFact, String> registerValues = new HashMap<>();
         Iterator<InstFact> iter = facts.iterator();
         while (iter.hasNext()) {
             InstFact fact = iter.next();
-            // if we run into a jump, cjump or entersub (or maybe some other thing), then reset
+            // if we run into a jump, cjump or entersub, exitsub, or call, then reset
+            if (fact instanceof JmpFact ||
+                    fact instanceof CjmpFact ||
+                    fact instanceof EnterSubFact ||
+                    fact instanceof ExitSubFact ||
+                    fact instanceof CallFact) {
+                registerValues = new HashMap<>();
+                continue;
+            }
+
         }
     }
 
     private void printAllFacts() {
         facts.forEach(System.out::print);
+    }
+
+    /**
+     * Note: doesn't work on VarFacts alone, because you need to change the var in the parent fact.
+     * Doesn't apply to function headers or param instructions.
+     */
+    private void replaceAllInstancesOfVar(Fact fact, VarFact oldVar, VarFact newVar) {
+        if (fact instanceof BopFact) {
+            BopFact bopFact = (BopFact) fact;
+            if (!(bopFact.e1 instanceof VarFact)) replaceAllInstancesOfVar(bopFact.e1, oldVar, newVar);
+            else if (bopFact.e1.equals(oldVar)) bopFact.e1 = newVar;
+            if (!(bopFact.e2 instanceof VarFact)) replaceAllInstancesOfVar(bopFact.e2, oldVar, newVar);
+            else if (bopFact.e2.equals(oldVar)) bopFact.e2 = newVar;
+        } else if (fact instanceof ExtractFact) {
+            ExtractFact extractFact = (ExtractFact) fact;
+            if (extractFact.variable.equals(oldVar)) extractFact.variable = newVar;
+        } else if (fact instanceof MemFact) {
+            MemFact memFact = (MemFact) fact;
+            if (!(memFact.exp instanceof VarFact)) replaceAllInstancesOfVar(memFact.exp, oldVar, newVar);
+            else if (memFact.exp.equals(oldVar)) memFact.exp = newVar;
+        } else if (fact instanceof UopFact) {
+            UopFact uopFact = (UopFact) fact;
+            if (!(uopFact.e1 instanceof VarFact)) replaceAllInstancesOfVar(uopFact.e1, oldVar, newVar);
+            else if (uopFact.e1.equals(oldVar)) uopFact.e1 = newVar;
+        } else if (fact instanceof AssignFact) {
+            AssignFact assignFact = (AssignFact) fact;
+            if (!(assignFact.lhs instanceof VarFact)) replaceAllInstancesOfVar(assignFact.lhs, oldVar, newVar);
+            else if (assignFact.lhs.equals(oldVar)) assignFact.lhs = newVar;
+            if (!(assignFact.rhs instanceof VarFact)) replaceAllInstancesOfVar(assignFact.rhs, oldVar, newVar);
+            else if (assignFact.rhs.equals(oldVar)) assignFact.rhs = newVar;
+        } else if (fact instanceof  CjmpFact) {
+            CjmpFact cjmpFact = (CjmpFact) fact;
+            if (cjmpFact.condition.equals(oldVar)) cjmpFact.condition = newVar;
+        }
     }
 
     private void replaceAllInstancesOfMem(Fact fact, MemFact oldMem, VarFact newVar) {

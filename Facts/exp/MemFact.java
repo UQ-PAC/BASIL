@@ -19,6 +19,10 @@ public class MemFact extends ExpFact {
         return String.format("mem[%s]", exp);
     }
 
+    public String toDataString() {
+        return exp.toString();
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
