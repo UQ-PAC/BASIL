@@ -11,6 +11,7 @@ public class CallFact extends InstFact {
     public String funcName;
     public String returnAddr;
     public List<VarFact> params = new ArrayList<>();
+    public boolean showJump = true;
 
     public CallFact(String pc, String funcName, String returnAddr) {
         super(pc);
@@ -22,6 +23,9 @@ public class CallFact extends InstFact {
         StringBuilder paramsStr = new StringBuilder();
         for (VarFact param : params) {
             paramsStr.append(param.name);
+        }
+        if (!showJump) {
+            return String.format("%scall %s(%s);\n", label, funcName, paramsStr);
         }
         return String.format("%scall %s(%s);\ngoto label%s;\n", label, funcName, paramsStr, returnAddr);
     }

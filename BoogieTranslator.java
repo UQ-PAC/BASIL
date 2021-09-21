@@ -53,6 +53,7 @@ public class BoogieTranslator {
      */
     public void translate() {
         createLabels();
+        optimiseLabels();
         createFuncParameters();
         resolveInParams();
         // resolveOutParams();
@@ -68,15 +69,30 @@ public class BoogieTranslator {
         List<String> usedLabels = new ArrayList<>();
         for (InstFact fact : facts) {
             String target = extractTargetLabel(fact);
-            if (target != null) {
-                usedLabels.add(target);
-            }
+            if (target != null) usedLabels.add(target);
         }
-        for (InstFact fact : facts) {
-            if (usedLabels.contains(fact.label.pc)) {
-                fact.label.hide = false;
-            }
+        for (InstFact fact : facts) fact.label.hide = !usedLabels.contains(fact.label.pc);
+    }
+
+    /**
+     * Remove all jumps to lines that directly follow.
+     * Then remove those labels if they are not jumped to again.
+     */
+    private void optimiseLabels() {
+        List<InstFact> toRemove = new ArrayList<>();
+        for (int i = 0; i < facts.size() - 1; i++) {
+            InstFact fact = facts.get(i);
+            String target = extractTargetLabel(fact);
+            if (target == null) continue;
+            InstFact nextFact = facts.get(i + 1);
+            if (nextFact.label.hide || !nextFact.label.pc.equals(target)) continue;
+            // this jump goes to the next line; remove it
+            if (fact instanceof CallFact) ((CallFact) fact).showJump = false;
+            else toRemove.add(fact);
         }
+        toRemove.forEach(fact -> facts.remove(fact));
+        // finally, we need to remove redundant labels again
+        createLabels();
     }
 
     private String extractTargetLabel(InstFact fact) {
@@ -86,10 +102,12 @@ public class BoogieTranslator {
         } else if (fact instanceof CjmpFact) {
             return ((CjmpFact) fact).target;
         } else if (fact instanceof CallFact) {
-            return ((CallFact) fact).returnAddr;
-        } else {
-            return null;
+            CallFact call = (CallFact) fact;
+            if (call.showJump) {
+                return call.returnAddr;
+            }
         }
+        return null;
     }
 
     /**
