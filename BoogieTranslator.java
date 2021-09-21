@@ -59,7 +59,36 @@ public class BoogieTranslator {
         resolveInParams();
         // resolveOutParams();
         resolveRegisters();
+        addVarDeclarations();
         printAllFacts();
+    }
+
+    private void addVarDeclarations() {
+        List<Integer[]> endpoints = getAllFunctions();
+        for (Integer[] endpoint : endpoints) {
+            Set<VarFact> assignedVars = new HashSet<>();
+            int start = endpoint[0];
+            int end = endpoint[1];
+            EnterSubFact func = (EnterSubFact) facts.get(endpoint[0]);
+            // we need not var-declare function parameters
+            func.paramFacts.forEach(param -> assignedVars.add(param.name));
+            for (int i = start + 1; i < end; i++) {
+                InstFact fact = facts.get(i);
+                if (fact instanceof LoadFact) {
+                    LoadFact loadFact = (LoadFact) fact;
+                    if (!assignedVars.contains((VarFact) loadFact.lhs)) {
+                        loadFact.varDeclaration = "var ";
+                        assignedVars.add((VarFact) loadFact.lhs);
+                    }
+                } else if (fact instanceof MoveFact) {
+                    MoveFact moveFact = (MoveFact) fact;
+                    if (!assignedVars.contains((VarFact) moveFact.lhs)) {
+                        moveFact.varDeclaration = "var ";
+                        assignedVars.add((VarFact) moveFact.lhs);
+                    }
+                }
+            }
+        }
     }
 
     /**

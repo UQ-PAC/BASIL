@@ -14,6 +14,7 @@ public abstract class AssignFact extends InstFact {
     public ExpFact lhs;
     public ExpFact rhs;
     public String type;
+    public String varDeclaration = "";
 
     AssignFact(String pc, ExpFact lhs, ExpFact rhs, String type) {
         super(pc);
@@ -26,7 +27,7 @@ public abstract class AssignFact extends InstFact {
      * @return inst(pc, type, lhs, rhs)
      */
     public String toString() {
-        return String.format("%s%s := %s;\n", label, lhs, rhs);
+        return String.format("%s%s%s := %s;\n", label, varDeclaration, lhs, rhs);
     }
 
     @Override
