@@ -1,5 +1,6 @@
 package Facts.inst;
 
+import Facts.Fact;
 import Facts.exp.VarFact;
 
 import java.util.ArrayList;
@@ -32,6 +33,12 @@ public class CallFact extends InstFact {
 
     public List<String> toDatalog() {
         return new ArrayList<>();
+    }
+
+    public List<Fact> toFactList() {
+        List<Fact> factList = new ArrayList<>();
+        factList.add(this);
+        return factList;
     }
 
     @Override

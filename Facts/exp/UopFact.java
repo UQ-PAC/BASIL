@@ -1,5 +1,8 @@
 package Facts.exp;
 
+import Facts.DatalogUtility;
+import Facts.Fact;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -24,9 +27,19 @@ public class UopFact extends ExpFact {
     }
 
     public List<String> toDatalog() {
+        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
         List<String> log = new ArrayList<>(e1.toDatalog());
-        log.add(String.format("$%s\t%s\t%s\t%s\t%s", super.id, "uop", op, e1.id, "none"));
+        super.id = DatalogUtility.id++;
+        log.add(String.format("exp%s\t%s\t%s\texp%s\t%s", super.id, "uop", op, e1.id, "none"));
+        DatalogUtility.recordedFacts.put(this, log);
         return log;
+    }
+
+    public List<Fact> toFactList() {
+        List<Fact> factList = new ArrayList<>();
+        factList.addAll(e1.toFactList());
+        factList.add(this);
+        return factList;
     }
 
     @Override

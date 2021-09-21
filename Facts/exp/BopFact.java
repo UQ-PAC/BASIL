@@ -1,7 +1,12 @@
 package Facts.exp;
 
 
+import Facts.DatalogUtility;
+import Facts.Fact;
+
+import javax.xml.crypto.Data;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -29,11 +34,22 @@ public class BopFact extends ExpFact {
         return String.format("(%s) %s (%s)", e1, op, e2);
     }
 
+    public List<Fact> toFactList() {
+        List<Fact> factList = new ArrayList<>();
+        factList.addAll(e1.toFactList());
+        factList.addAll(e2.toFactList());
+        factList.add(this);
+        return factList;
+    }
+
     public List<String> toDatalog() {
+        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
         List<String> log = new ArrayList<>();
         log.addAll(e1.toDatalog());
         log.addAll(e2.toDatalog());
-        log.add(String.format("$%s\t%s\t%s\t%s\t%s", super.id, "bop", op, e1.id, e2.id));
+        super.id = DatalogUtility.id++;
+        log.add(String.format("exp%s\t%s\t%s\texp%s\texp%s", super.id, "bop", op, e1.id, e2.id));
+        DatalogUtility.recordedFacts.put(this, log);
         return log;
     }
 

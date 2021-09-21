@@ -1,5 +1,6 @@
 package Facts.inst.assign;
 
+import Facts.DatalogUtility;
 import Facts.Fact;
 import Facts.exp.ExpFact;
 import Facts.inst.InstFact;
@@ -33,11 +34,22 @@ public abstract class AssignFact extends InstFact {
     }
 
     public List<String> toDatalog() {
+        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
         List<String> log = new ArrayList<>();
         log.addAll(lhs.toDatalog());
         log.addAll(rhs.toDatalog());
-        log.add(String.format("%s\t%s\t%s\t%s", super.id, type, lhs != null ? lhs.id : "none", rhs != null ? rhs.id : "none"));
+        super.id = DatalogUtility.id++;
+        log.add(String.format("%s\t%s\t%s\t%s", super.id, type, lhs != null ? "exp" + lhs.id : "none", rhs != null ? "exp" + rhs.id : "none"));
+        DatalogUtility.recordedFacts.put(this, log);
         return log;
+    }
+
+    public List<Fact> toFactList() {
+        List<Fact> factList = new ArrayList<>();
+        factList.addAll(lhs.toFactList());
+        factList.addAll(rhs.toFactList());
+        factList.add(this);
+        return factList;
     }
 
     @Override

@@ -1,5 +1,8 @@
 package Facts.inst;
 
+import Facts.DatalogUtility;
+import Facts.Fact;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -20,9 +23,18 @@ public class JmpFact extends InstFact {
     }
 
     public List<String> toDatalog() {
+        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
         List<String> log = new ArrayList<>();
+        super.id = DatalogUtility.id++;
         log.add(String.format("%s\t%s\t%s\t%s", super.id, "jump", target, "none"));
+        DatalogUtility.recordedFacts.put(this, log);
         return log;
+    }
+
+    public List<Fact> toFactList() {
+        List<Fact> factList = new ArrayList<>();
+        factList.add(this);
+        return factList;
     }
 
     @Override

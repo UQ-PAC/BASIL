@@ -1,5 +1,6 @@
 package Facts.inst;
 
+import Facts.Fact;
 import Facts.exp.MemFact;
 import Facts.exp.VarFact;
 
@@ -28,6 +29,12 @@ public class ParamFact extends InstFact {
 
     public List<String> toDatalog() {
         return new ArrayList<>();
+    }
+
+    public List<Fact> toFactList() {
+        List<Fact> factList = new ArrayList<>();
+        factList.add(this);
+        return factList;
     }
 
     @Override

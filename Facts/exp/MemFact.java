@@ -1,5 +1,8 @@
 package Facts.exp;
 
+import Facts.DatalogUtility;
+import Facts.Fact;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -22,13 +25,22 @@ public class MemFact extends ExpFact {
     }
 
     public List<String> toDatalog() {
+        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
+        // for mems, it is sufficient to merely have the internal expression
         List<String> log = new ArrayList<>(exp.toDatalog());
-        log.add(String.format("$%s\t%s\t%s\t%s\t%s", super.id, "mem", exp.id, "none", "none"));
+        DatalogUtility.recordedFacts.put(this, log);
         return log;
     }
 
     public String toDataString() {
         return exp.toString();
+    }
+
+    public List<Fact> toFactList() {
+        List<Fact> factList = new ArrayList<>();
+        factList.addAll(exp.toFactList());
+        factList.add(this);
+        return factList;
     }
 
     @Override

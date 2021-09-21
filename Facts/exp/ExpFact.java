@@ -2,15 +2,15 @@ package Facts.exp;
 
 import Facts.Fact;
 
+import java.util.Arrays;
 import java.util.List;
 
 /**
- * Abstract class of an expressoin fact
+ * Abstract class of an expression fact
  */
 public abstract class ExpFact extends Fact {
 
-    public ExpFact() {
-    }
+    public abstract List<Fact> toFactList();
 
     public abstract List<String> toDatalog();
 }

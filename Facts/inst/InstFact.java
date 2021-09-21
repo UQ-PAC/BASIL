@@ -3,6 +3,7 @@ package Facts.inst;
 import Facts.Fact;
 import Facts.Label;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -18,6 +19,8 @@ public abstract class InstFact extends Fact {
     }
 
     public abstract List<String> toDatalog();
+
+    public abstract List<Fact> toFactList();
 
     @Override
     public boolean equals(Object o) {

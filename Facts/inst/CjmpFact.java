@@ -1,5 +1,7 @@
 package Facts.inst;
 
+import Facts.DatalogUtility;
+import Facts.Fact;
 import Facts.exp.VarFact;
 
 import java.util.ArrayList;
@@ -24,9 +26,19 @@ public class CjmpFact extends InstFact {
     }
 
     public List<String> toDatalog() {
+        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
         List<String> log = new ArrayList<>(condition.toDatalog());
-        log.add(String.format("%s\t%s\t%s\t%s", super.id, "cjump", target, condition.id));
+        super.id = DatalogUtility.id++;
+        log.add(String.format("%s\t%s\t%s\texp%s", super.id, "cjump", target, condition.id));
+        DatalogUtility.recordedFacts.put(this, log);
         return log;
+    }
+
+    public List<Fact> toFactList() {
+        List<Fact> factList = new ArrayList<>();
+        factList.addAll(condition.toFactList());
+        factList.add(this);
+        return factList;
     }
 
     @Override

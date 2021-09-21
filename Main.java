@@ -21,8 +21,16 @@ public class Main {
         StatementLoader statementLoader = new StatementLoader(facts);
         ParseTreeWalker walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
+
+        System.out.println("\n\n-------- DATALOG --------\n");
+        for (InstFact fact : facts) fact.toDatalog().forEach(System.out::println);
+
+        System.out.println("\n\n-------- BOOGIE --------\n");
         BoogieTranslator translator = new BoogieTranslator(facts, "boogie_out.txt");
         translator.translate();
+
+
+
         /*
 
         ParseTreeWalker walker = new ParseTreeWalker();

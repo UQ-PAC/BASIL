@@ -1,6 +1,10 @@
 package Facts.exp;
 
+import Facts.DatalogUtility;
+import Facts.Fact;
+
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -21,9 +25,19 @@ public class ExtractFact extends ExpFact {
     }
 
     public List<String> toDatalog() {
+        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
         List<String> log = new ArrayList<>(variable.toDatalog());
-        log.add(String.format("$%s\t%s\t%s\t%s\t%s", super.id, "extract", firstInt, secondInt, variable.id));
+        super.id = DatalogUtility.id++;
+        log.add(String.format("exp%s\t%s\t%s\t%s\texp%s", super.id, "extract", firstInt, secondInt, variable.id));
+        DatalogUtility.recordedFacts.put(this, log);
         return log;
+    }
+
+    public List<Fact> toFactList() {
+        List<Fact> factList = new ArrayList<>();
+        factList.addAll(variable.toFactList());
+        factList.add(this);
+        return factList;
     }
 
     @Override
