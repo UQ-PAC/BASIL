@@ -30,6 +30,10 @@ public abstract class AssignFact extends InstFact {
         return String.format("%s%s%s := %s;\n", label, varDeclaration, lhs, rhs);
     }
 
+    public String toDatalog() {
+        return String.format("%s\t%s\t%s\t%s", super.id, type, lhs != null ? lhs.id : "none", rhs != null ? rhs.id : "none");
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

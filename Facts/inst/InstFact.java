@@ -2,13 +2,13 @@ package Facts.inst;
 
 import Facts.Fact;
 import Facts.Label;
-
 import java.util.Objects;
 
 /**
  * Generic instruction fact
  */
 public abstract class InstFact extends Fact {
+
     public Label label;
 
     public InstFact(String pc) {

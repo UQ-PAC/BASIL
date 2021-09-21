@@ -18,6 +18,10 @@ public class ExtractFact extends ExpFact {
         return String.format("%s[%d:%d]", variable, firstInt, secondInt);
     }
 
+    public String toDatalog() {
+        return String.format("$%s\t%s\t%s\t%s\t%s", super.id, "extract", firstInt, secondInt, variable.id);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

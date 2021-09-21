@@ -1,6 +1,8 @@
 package Facts;
 public abstract class Fact {
 
+    public int id;
+
     @Override
     public int hashCode() {
         return this.toString().hashCode();

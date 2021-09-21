@@ -17,6 +17,10 @@ public class JmpFact extends InstFact {
         return String.format("%sgoto label%s;\n", label, target);
     }
 
+    public String toDatalog() {
+        return String.format("%s\t%s\t%s\t%s", super.id, "jump", target, "none");
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

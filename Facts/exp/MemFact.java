@@ -19,6 +19,10 @@ public class MemFact extends ExpFact {
         return String.format("mem[%s]", exp);
     }
 
+    public String toDatalog() {
+        return String.format("$%s\t%s\t%s\t%s\t%s", super.id, "mem", exp.id, "none", "none");
+    }
+
     public String toDataString() {
         return exp.toString();
     }

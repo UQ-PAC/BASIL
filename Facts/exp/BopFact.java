@@ -27,6 +27,10 @@ public class BopFact extends ExpFact {
         return String.format("(%s) %s (%s)", e1, op, e2);
     }
 
+    public String toDatalog() {
+        return String.format("$%s\t%s\t%s\t%s\t%s", super.id, "bop", op, e1.id, e2.id);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

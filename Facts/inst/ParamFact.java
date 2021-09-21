@@ -24,6 +24,10 @@ public class ParamFact extends InstFact {
         return "";
     }
 
+    public String toDatalog() {
+        return String.format("%s\t%s\t%s\t%s", super.id, "param", name.id, register.id);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

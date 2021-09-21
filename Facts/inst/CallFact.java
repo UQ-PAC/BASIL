@@ -30,6 +30,10 @@ public class CallFact extends InstFact {
         return String.format("%scall %s(%s);\ngoto label%s;\n", label, funcName, paramsStr, returnAddr);
     }
 
+    public String toDatalog() {
+        return String.format("%s\t%s\t%s\t%s", super.id, "call", funcName, returnAddr);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

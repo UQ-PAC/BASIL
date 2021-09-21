@@ -15,6 +15,10 @@ public class ExitSubFact extends InstFact {
         return "}\n\n";
     }
 
+    public String toDatalog() {
+        return String.format("%s\t%s\t%s\t%s", super.id, "exitfunc", funcName, "none");
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

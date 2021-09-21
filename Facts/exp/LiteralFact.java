@@ -17,6 +17,10 @@ public class LiteralFact extends ExpFact {
         return String.format("%s", val);
     }
 
+    public String toDatalog() {
+        return String.format("$%s\t%s\t%s\t%s\t%s", super.id, "literal", val, "none", "none");
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

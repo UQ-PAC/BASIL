@@ -21,6 +21,10 @@ public class CjmpFact extends InstFact {
         return String.format("%sif (%s) goto label%s;\n", label, condition, target);
     }
 
+    public String toDatalog() {
+        return String.format("%s\t%s\t%s\t%s", super.id, "cjump", target, condition.id);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

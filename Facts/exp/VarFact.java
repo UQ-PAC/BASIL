@@ -19,6 +19,10 @@ public class VarFact extends ExpFact {
         return String.format("%s", name);
     }
 
+    public String toDatalog() {
+        return String.format("$%s\t%s\t%s\t%s\t%s", super.id, "var", name, "none", "none");
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

@@ -21,6 +21,10 @@ public class UopFact extends ExpFact {
         return String.format("%s %s", op, e1);
     }
 
+    public String toDatalog() {
+        return String.format("$%s\t%s\t%s\t%s\t%s", super.id, "uop", op, e1.id, "none");
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

@@ -43,6 +43,10 @@ public class EnterSubFact extends InstFact {
         return String.format("%s%s", label, line);
     }
 
+    public String toDatalog() {
+        return String.format("%s\t%s\t%s\t%s", super.id, "enterfunc", funcName, "none");
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
