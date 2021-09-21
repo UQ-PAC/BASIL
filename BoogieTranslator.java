@@ -257,42 +257,47 @@ public class BoogieTranslator {
         Map<VarFact, InstFact> potentillyRedundantFacts = new HashMap<>();
 
         for (InstFact fact : facts) {
-            if (fact instanceof JmpFact ||
-                    fact instanceof CjmpFact ||
-                    fact instanceof EnterSubFact ||
-                    fact instanceof ExitSubFact ||
-                    fact instanceof CallFact) {
+            if (fact instanceof JmpFact || fact instanceof CjmpFact || fact instanceof EnterSubFact ||
+                    fact instanceof ExitSubFact || fact instanceof CallFact) {
                 for (VarFact register : registerValues.keySet()) {
                     replaceAllInstancesOfVar(fact, register, registerValues.get(register));
                 }
-                // rule 1
+                // bad instruction: clear register mappings
                 registerValues = new HashMap<>();
                 potentillyRedundantFacts = new HashMap<>();
             } else if (fact instanceof LoadFact || fact instanceof MoveFact) {
+                // this instruction might update the value of a register
                 VarFact register = fact instanceof LoadFact ? (VarFact) ((LoadFact) fact).lhs : (VarFact) ((MoveFact) fact).lhs;
                 ExpFact rhs = fact instanceof LoadFact ? ((LoadFact) fact).rhs : ((MoveFact) fact).rhs;
                 if (rhs == null) continue; // skip load assignments with empty rhs
+                // replace the rhs with register mappings as per usual
                 for (VarFact assignedRegister : registerValues.keySet()) {
                     if (!(rhs instanceof VarFact)) replaceAllInstancesOfVar(rhs, assignedRegister, registerValues.get(assignedRegister));
                     else if (rhs.equals(assignedRegister)) rhs = registerValues.get(assignedRegister);
                 }
+                // a register is not assigned here - we have done what we need
                 if (!isRegister(register)) continue;
+                // a register is assigned here: remove the previous assignment (by moving it to redundantFacts)
                 if (potentillyRedundantFacts.containsKey(register)) {
                     redundantFacts.add(potentillyRedundantFacts.get(register));
                     potentillyRedundantFacts.remove(register);
                 }
-                potentillyRedundantFacts.put(register, fact);
+                // if the rhs (after being translated earlier) only contains literals, map this register to that value
                 if (onlyContainsType(rhs, LiteralFact.class)) {
                     registerValues.put(register, rhs);
+                    potentillyRedundantFacts.put(register, fact);
                 } else {
+                    // otherwise, we don't know what this value is, so clear any current mappings
                     registerValues.remove(register);
                 }
             } else {
+                // for any other fact type, substitute the register for its mapped literal as per usual
                 for (VarFact register : registerValues.keySet()) {
                     replaceAllInstancesOfVar(fact, register, registerValues.get(register));
                 }
             }
         }
+        redundantFacts.forEach(fact -> facts.remove(fact));
     }
 
     private void printAllFacts() {
