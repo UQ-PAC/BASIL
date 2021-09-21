@@ -23,7 +23,7 @@ public class CallFact extends InstFact {
         for (VarFact param : params) {
             paramsStr.append(param.name);
         }
-        return String.format("%scall(%s) %s;\ngoto label%s;\n", label, paramsStr, funcName, returnAddr);
+        return String.format("%scall %s(%s);\ngoto label%s;\n", label, funcName, paramsStr, returnAddr);
     }
 
     @Override

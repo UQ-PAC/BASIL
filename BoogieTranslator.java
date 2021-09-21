@@ -55,7 +55,7 @@ public class BoogieTranslator {
         createLabels();
         createFuncParameters();
         resolveInParams();
-        resolveOutParams();
+        // resolveOutParams();
         resolveRegisters();
         printAllFacts();
     }
@@ -224,30 +224,74 @@ public class BoogieTranslator {
         }
     }
 
-    // todo
-
     /**
-     * Rule:
+     * Replace references to registers with references to the literals they represent.
+     *
+     * Rules:
      * 1. If we run into a bad instruction, reset all register values.
      * 2. For registers in non-assignments, change them to their mapped values.
      * 3. For registers on the rhs of assignments, change them to their mapped values.
      * 4. For registers on the lhs of assignments, update their mapping to whatever is on the rhs.
+     * 5. To update, the rhs must only consist of literals, and registers which are mapped to literals.
+     * 6. Redundant facts include assignments of registers which have been fully resolved up until the next assignment.
+     *
+     * Bad instructions include:
+     * - jumps
+     * - conditional jumps
+     * - enter subs
+     * - exit subs
+     * - calls
+     *
+     * If we reach a register assignment:
+     * - Mark the previous assignment (if not wiped) to be removed.
+     * - Mark this assignment for potential removal.
+     * - Replace the rhs as usual.
+     * - Now if the rhs only contains literals, update the value of this register, otherwise wipe it.
      */
     private void resolveRegisters() {
-        Map<VarFact, String> registerValues = new HashMap<>();
-        Iterator<InstFact> iter = facts.iterator();
-        while (iter.hasNext()) {
-            InstFact fact = iter.next();
-            // if we run into a jump, cjump or entersub, exitsub, or call, then reset
+        // these mapped ExpFacts are expected to only contain literals
+        Map<VarFact, ExpFact> registerValues = new HashMap<>();
+        // list of redundant fact objects to remove from the global facts list
+        List<InstFact> redundantFacts = new ArrayList<>();
+        // potentially redundant facts, to be confirmed when a reassignment to the register (map key) is found
+        Map<VarFact, InstFact> potentillyRedundantFacts = new HashMap<>();
+
+        for (InstFact fact : facts) {
             if (fact instanceof JmpFact ||
                     fact instanceof CjmpFact ||
                     fact instanceof EnterSubFact ||
                     fact instanceof ExitSubFact ||
                     fact instanceof CallFact) {
+                for (VarFact register : registerValues.keySet()) {
+                    replaceAllInstancesOfVar(fact, register, registerValues.get(register));
+                }
+                // rule 1
                 registerValues = new HashMap<>();
-                continue;
+                potentillyRedundantFacts = new HashMap<>();
+            } else if (fact instanceof LoadFact || fact instanceof MoveFact) {
+                VarFact register = fact instanceof LoadFact ? (VarFact) ((LoadFact) fact).lhs : (VarFact) ((MoveFact) fact).lhs;
+                ExpFact rhs = fact instanceof LoadFact ? ((LoadFact) fact).rhs : ((MoveFact) fact).rhs;
+                if (rhs == null) continue; // skip load assignments with empty rhs
+                for (VarFact assignedRegister : registerValues.keySet()) {
+                    if (!(rhs instanceof VarFact)) replaceAllInstancesOfVar(rhs, assignedRegister, registerValues.get(assignedRegister));
+                    else if (rhs.equals(assignedRegister)) rhs = registerValues.get(assignedRegister);
+                }
+                if (!isRegister(register)) continue;
+                if (potentillyRedundantFacts.containsKey(register)) {
+                    redundantFacts.add(potentillyRedundantFacts.get(register));
+                    potentillyRedundantFacts.remove(register);
+                }
+                potentillyRedundantFacts.put(register, fact);
+                if (onlyContainsType(rhs, LiteralFact.class)) {
+                    registerValues.put(register, rhs);
+                } else {
+                    registerValues.remove(register);
+                }
+            } else {
+                for (VarFact register : registerValues.keySet()) {
+                    replaceAllInstancesOfVar(fact, register, registerValues.get(register));
+                }
             }
-
         }
     }
 
@@ -256,36 +300,75 @@ public class BoogieTranslator {
     }
 
     /**
-     * Note: doesn't work on VarFacts alone, because you need to change the var in the parent fact.
-     * Doesn't apply to function headers or param instructions.
+     * Checks if all atomic facts in the given expression are of the given type.
+     * Since the only atomic facts that exist are VarFacts and Literals, it only makes sense to call this function with
+     * one of these as the 'type' argument.
+     * Integers such as those used in extract facts do not count as atomic facts and are ignored, as are certain strings
+     * such as cjump target labels.
      */
-    private void replaceAllInstancesOfVar(Fact fact, VarFact oldVar, VarFact newVar) {
+    private boolean onlyContainsType(Fact fact, Class<? extends ExpFact> type) {
         if (fact instanceof BopFact) {
             BopFact bopFact = (BopFact) fact;
-            if (!(bopFact.e1 instanceof VarFact)) replaceAllInstancesOfVar(bopFact.e1, oldVar, newVar);
-            else if (bopFact.e1.equals(oldVar)) bopFact.e1 = newVar;
-            if (!(bopFact.e2 instanceof VarFact)) replaceAllInstancesOfVar(bopFact.e2, oldVar, newVar);
-            else if (bopFact.e2.equals(oldVar)) bopFact.e2 = newVar;
+            return onlyContainsType(bopFact.e1, type) && onlyContainsType(bopFact.e2, type);
         } else if (fact instanceof ExtractFact) {
             ExtractFact extractFact = (ExtractFact) fact;
-            if (extractFact.variable.equals(oldVar)) extractFact.variable = newVar;
+            return onlyContainsType(extractFact.variable, type);
         } else if (fact instanceof MemFact) {
             MemFact memFact = (MemFact) fact;
-            if (!(memFact.exp instanceof VarFact)) replaceAllInstancesOfVar(memFact.exp, oldVar, newVar);
-            else if (memFact.exp.equals(oldVar)) memFact.exp = newVar;
+            return onlyContainsType(memFact.exp, type);
         } else if (fact instanceof UopFact) {
             UopFact uopFact = (UopFact) fact;
-            if (!(uopFact.e1 instanceof VarFact)) replaceAllInstancesOfVar(uopFact.e1, oldVar, newVar);
-            else if (uopFact.e1.equals(oldVar)) uopFact.e1 = newVar;
+            return onlyContainsType(uopFact.e1, type);
         } else if (fact instanceof AssignFact) {
             AssignFact assignFact = (AssignFact) fact;
-            if (!(assignFact.lhs instanceof VarFact)) replaceAllInstancesOfVar(assignFact.lhs, oldVar, newVar);
-            else if (assignFact.lhs.equals(oldVar)) assignFact.lhs = newVar;
-            if (!(assignFact.rhs instanceof VarFact)) replaceAllInstancesOfVar(assignFact.rhs, oldVar, newVar);
-            else if (assignFact.rhs.equals(oldVar)) assignFact.rhs = newVar;
+            return onlyContainsType(assignFact.lhs, type) && onlyContainsType(assignFact.rhs, type);
         } else if (fact instanceof  CjmpFact) {
             CjmpFact cjmpFact = (CjmpFact) fact;
-            if (cjmpFact.condition.equals(oldVar)) cjmpFact.condition = newVar;
+            return onlyContainsType(cjmpFact.condition, type);
+        } else if (fact instanceof LiteralFact) {
+            return type.equals(LiteralFact.class);
+        } else if (fact instanceof VarFact) {
+            return type.equals(VarFact.class);
+        } else {
+            System.err.printf("Unhandled expression in expOnlyContains search: %s\n", fact);
+            return false;
+        }
+    }
+
+    /**
+     * Note: doesn't work on VarFacts alone, because you need to change the var in the parent fact.
+     * Doesn't apply to function headers or param instructions.
+     *
+     * If the newExp is not a variable, then facts that must take variables, such as cjumps and extractions, will not
+     * be modified.
+     */
+    private void replaceAllInstancesOfVar(Fact fact, VarFact oldVar, ExpFact newExp) {
+        if (fact instanceof BopFact) {
+            BopFact bopFact = (BopFact) fact;
+            if (!(bopFact.e1 instanceof VarFact)) replaceAllInstancesOfVar(bopFact.e1, oldVar, newExp);
+            else if (bopFact.e1.equals(oldVar)) bopFact.e1 = newExp;
+            if (!(bopFact.e2 instanceof VarFact)) replaceAllInstancesOfVar(bopFact.e2, oldVar, newExp);
+            else if (bopFact.e2.equals(oldVar)) bopFact.e2 = newExp;
+        } else if (fact instanceof ExtractFact) {
+            ExtractFact extractFact = (ExtractFact) fact;
+            if (extractFact.variable.equals(oldVar) && newExp instanceof VarFact) extractFact.variable = (VarFact) newExp;
+        } else if (fact instanceof MemFact) {
+            MemFact memFact = (MemFact) fact;
+            if (!(memFact.exp instanceof VarFact)) replaceAllInstancesOfVar(memFact.exp, oldVar, newExp);
+            else if (memFact.exp.equals(oldVar)) memFact.exp = newExp;
+        } else if (fact instanceof UopFact) {
+            UopFact uopFact = (UopFact) fact;
+            if (!(uopFact.e1 instanceof VarFact)) replaceAllInstancesOfVar(uopFact.e1, oldVar, newExp);
+            else if (uopFact.e1.equals(oldVar)) uopFact.e1 = newExp;
+        } else if (fact instanceof AssignFact) {
+            AssignFact assignFact = (AssignFact) fact;
+            if (!(assignFact.lhs instanceof VarFact)) replaceAllInstancesOfVar(assignFact.lhs, oldVar, newExp);
+            else if (assignFact.lhs.equals(oldVar)) assignFact.lhs = newExp;
+            if (!(assignFact.rhs instanceof VarFact)) replaceAllInstancesOfVar(assignFact.rhs, oldVar, newExp);
+            else if (assignFact.rhs.equals(oldVar)) assignFact.rhs = newExp;
+        } else if (fact instanceof  CjmpFact) {
+            CjmpFact cjmpFact = (CjmpFact) fact;
+            if (cjmpFact.condition.equals(oldVar) && newExp instanceof VarFact) cjmpFact.condition = (VarFact) newExp;
         }
     }
 
