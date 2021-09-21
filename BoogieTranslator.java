@@ -54,6 +54,7 @@ public class BoogieTranslator {
     public void translate() {
         createLabels();
         optimiseLabels();
+        optimiseSkips();
         createFuncParameters();
         resolveInParams();
         // resolveOutParams();
@@ -93,6 +94,16 @@ public class BoogieTranslator {
         toRemove.forEach(fact -> facts.remove(fact));
         // finally, we need to remove redundant labels again
         createLabels();
+    }
+
+    private void optimiseSkips() {
+        List<InstFact> toRemove = new ArrayList<>();
+        for (InstFact fact : facts) {
+            if (fact instanceof NopFact && fact.label.hide) {
+                toRemove.add(fact);
+            }
+        }
+        toRemove.forEach(fact -> facts.remove(fact));
     }
 
     private String extractTargetLabel(InstFact fact) {
