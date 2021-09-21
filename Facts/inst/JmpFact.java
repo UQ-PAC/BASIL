@@ -1,5 +1,7 @@
 package Facts.inst;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -17,8 +19,10 @@ public class JmpFact extends InstFact {
         return String.format("%sgoto label%s;\n", label, target);
     }
 
-    public String toDatalog() {
-        return String.format("%s\t%s\t%s\t%s", super.id, "jump", target, "none");
+    public List<String> toDatalog() {
+        List<String> log = new ArrayList<>();
+        log.add(String.format("%s\t%s\t%s\t%s", super.id, "jump", target, "none"));
+        return log;
     }
 
     @Override

@@ -1,6 +1,8 @@
 package Facts.exp;
 
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -27,8 +29,12 @@ public class BopFact extends ExpFact {
         return String.format("(%s) %s (%s)", e1, op, e2);
     }
 
-    public String toDatalog() {
-        return String.format("$%s\t%s\t%s\t%s\t%s", super.id, "bop", op, e1.id, e2.id);
+    public List<String> toDatalog() {
+        List<String> log = new ArrayList<>();
+        log.addAll(e1.toDatalog());
+        log.addAll(e2.toDatalog());
+        log.add(String.format("$%s\t%s\t%s\t%s\t%s", super.id, "bop", op, e1.id, e2.id));
+        return log;
     }
 
     @Override

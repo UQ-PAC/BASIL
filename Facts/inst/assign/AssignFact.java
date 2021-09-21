@@ -4,6 +4,8 @@ import Facts.Fact;
 import Facts.exp.ExpFact;
 import Facts.inst.InstFact;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -30,8 +32,12 @@ public abstract class AssignFact extends InstFact {
         return String.format("%s%s%s := %s;\n", label, varDeclaration, lhs, rhs);
     }
 
-    public String toDatalog() {
-        return String.format("%s\t%s\t%s\t%s", super.id, type, lhs != null ? lhs.id : "none", rhs != null ? rhs.id : "none");
+    public List<String> toDatalog() {
+        List<String> log = new ArrayList<>();
+        log.addAll(lhs.toDatalog());
+        log.addAll(rhs.toDatalog());
+        log.add(String.format("%s\t%s\t%s\t%s", super.id, type, lhs != null ? lhs.id : "none", rhs != null ? rhs.id : "none"));
+        return log;
     }
 
     @Override

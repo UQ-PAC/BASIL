@@ -1,5 +1,8 @@
 package Facts.inst;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * No instruction fact
  */
@@ -13,8 +16,10 @@ public class NopFact extends InstFact {
         return (String.format("%sskip;\n", label));
     }
 
-    public String toDatalog() {
-        return String.format("%s\t%s\t%s\t%s", super.id, "skip", "none", "none");
+    public List<String> toDatalog() {
+        List<String> log = new ArrayList<>();
+        log.add(String.format("%s\t%s\t%s\t%s", super.id, "nop", "none", "none"));
+        return log;
     }
 
     @Override

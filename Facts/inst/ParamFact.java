@@ -3,6 +3,8 @@ package Facts.inst;
 import Facts.exp.MemFact;
 import Facts.exp.VarFact;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class ParamFact extends InstFact {
@@ -24,8 +26,8 @@ public class ParamFact extends InstFact {
         return "";
     }
 
-    public String toDatalog() {
-        return String.format("%s\t%s\t%s\t%s", super.id, "param", name.id, register.id);
+    public List<String> toDatalog() {
+        return new ArrayList<>();
     }
 
     @Override

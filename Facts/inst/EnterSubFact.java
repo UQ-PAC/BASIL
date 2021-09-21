@@ -43,8 +43,8 @@ public class EnterSubFact extends InstFact {
         return String.format("%s%s", label, line);
     }
 
-    public String toDatalog() {
-        return String.format("%s\t%s\t%s\t%s", super.id, "enterfunc", funcName, "none");
+    public List<String> toDatalog() {
+        return new ArrayList<>();
     }
 
     @Override

@@ -2,6 +2,8 @@ package Facts.inst;
 
 import Facts.exp.VarFact;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -21,8 +23,10 @@ public class CjmpFact extends InstFact {
         return String.format("%sif (%s) goto label%s;\n", label, condition, target);
     }
 
-    public String toDatalog() {
-        return String.format("%s\t%s\t%s\t%s", super.id, "cjump", target, condition.id);
+    public List<String> toDatalog() {
+        List<String> log = new ArrayList<>(condition.toDatalog());
+        log.add(String.format("%s\t%s\t%s\t%s", super.id, "cjump", target, condition.id));
+        return log;
     }
 
     @Override

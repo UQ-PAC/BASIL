@@ -1,5 +1,7 @@
 package Facts.exp;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -19,8 +21,10 @@ public class VarFact extends ExpFact {
         return String.format("%s", name);
     }
 
-    public String toDatalog() {
-        return String.format("$%s\t%s\t%s\t%s\t%s", super.id, "var", name, "none", "none");
+    public List<String> toDatalog() {
+        List<String> log = new ArrayList<>();
+        log.add(String.format("$%s\t%s\t%s\t%s\t%s", super.id, "var", name, "none", "none"));
+        return log;
     }
 
     @Override

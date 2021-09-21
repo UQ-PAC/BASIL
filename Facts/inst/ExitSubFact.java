@@ -1,5 +1,7 @@
 package Facts.inst;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 public class ExitSubFact extends InstFact {
@@ -15,8 +17,8 @@ public class ExitSubFact extends InstFact {
         return "}\n\n";
     }
 
-    public String toDatalog() {
-        return String.format("%s\t%s\t%s\t%s", super.id, "exitfunc", funcName, "none");
+    public List<String> toDatalog() {
+        return new ArrayList<>();
     }
 
     @Override
