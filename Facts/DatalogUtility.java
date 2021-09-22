@@ -5,28 +5,45 @@ import Facts.inst.*;
 import Facts.inst.assign.LoadFact;
 import Facts.inst.assign.MoveFact;
 import Facts.inst.assign.StoreFact;
+import Facts.misc.SuccessorFact;
 
-import java.sql.Array;
 import java.util.*;
 
 public class DatalogUtility {
     private int expIdCounter = 0;
     private int instIdCounter = 0;
+    private int succIdCounter = 0;
 
     public List<Log> createDatalog(List<InstFact> facts) {
+        facts = new ArrayList<>(facts);
+        // append successor facts
+        List<SuccessorFact> successorFacts = new ArrayList<>();
+        for (int i = 0; i < facts.size(); i++) {
+            InstFact fact = facts.get(i);
+            // incomplete: there might be more successor facts we can extract from other fact instances
+            if (fact instanceof JmpFact) {
+                JmpFact jump = (JmpFact) fact;
+                int factIndexOfTarget = findInstWithPc(jump.target, facts);
+                if (factIndexOfTarget == -1) {
+                    System.err.printf("Could not create succ fact for jump '%s' (fact %d) because no fact containing the target PC was found.", jump, i);
+                    continue;
+                }
+                successorFacts.add(new SuccessorFact(fact, facts.get(factIndexOfTarget)));
+            }
+        }
         // flatten the tree: convert the tree structure into a simple node list with DFS
         Map<Fact, Log> recordedFacts = new HashMap<>();
         List<Fact> factList = new ArrayList<>();
-        for (InstFact fact : facts) {
-            factList.addAll(fact.toFactList());
-        }
-        // remove duplicates
+        for (InstFact fact : facts) factList.addAll(fact.toFactList());
+        factList.addAll(successorFacts);
+        // remove duplicate expression facts
         List<Fact> noDuplicatesFactList = new ArrayList<>();
         for (Fact fact : factList) {
-            if (!noDuplicatesFactList.contains(fact)) {
-                noDuplicatesFactList.add(fact);
-            }
+            if (fact instanceof ExpFact && noDuplicatesFactList.contains(fact)) continue;
+            noDuplicatesFactList.add(fact);
         }
+
+        // note: this only works because two identical instructions are not considered equal if their labels (PCs) are not equal
         // process particular facts in particular ways
         for (Fact fact : noDuplicatesFactList) {
             if (fact instanceof BopFact) {
@@ -143,6 +160,13 @@ public class DatalogUtility {
                         "param",
                         paramFact.name.name,
                         "none"));
+            } else if (fact instanceof SuccessorFact) {
+                // 0 1
+                SuccessorFact successorFact = (SuccessorFact) fact;
+                recordedFacts.put(successorFact, new SuccLog(
+                        recordedFacts.get(successorFact.i1).getIDStr(),
+                        recordedFacts.get(successorFact.i1).getIDStr()
+                ));
             }
         }
         // remove unnecessary facts
@@ -150,19 +174,34 @@ public class DatalogUtility {
         // order by type, then by id
         List<ExpLog> expLogList = new ArrayList<>();
         List<InstLog> instLogList = new ArrayList<>();
+        List<SuccLog> succLogList = new ArrayList<>();
         for (Log log : recordedFacts.values()) {
             if (log instanceof ExpLog) expLogList.add((ExpLog) log);
-            else instLogList.add((InstLog) log);
+            else if (log instanceof InstLog) instLogList.add((InstLog) log);
+            else if (log instanceof SuccLog) succLogList.add((SuccLog) log);
         }
-        expLogList.sort(new LogSorter());
-        instLogList.sort(new LogSorter());
+        SortById sorter = new SortById();
+        expLogList.sort(sorter);
+        instLogList.sort(sorter);
+        succLogList.sort(sorter);
         List<Log> logList = new ArrayList<>();
         logList.addAll(instLogList);
         logList.addAll(expLogList);
+        logList.addAll(succLogList);
         return logList;
     }
 
-    private class LogSorter implements Comparator<Log> {
+    private int findInstWithPc(String pc, List<InstFact> facts) {
+        for (int i = 0; i < facts.size(); i++) {
+            InstFact fact = facts.get(i);
+            if (fact.label.pc.equals(pc)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private class SortById implements Comparator<Log> {
 
         @Override
         public int compare(Log o1, Log o2) {
@@ -221,6 +260,27 @@ public class DatalogUtility {
         @Override
         public String toString() {
             return String.format("%s\t%s\t%s\t%s", super.id, item1, item2, item3);
+        }
+    }
+
+    private class SuccLog extends Log {
+        private final String item1;
+        private final String item2;
+
+        private SuccLog(String item1, String item2) {
+            super.id = succIdCounter++;
+            this.item1 = item1;
+            this.item2 = item2;
+        }
+
+        @Override
+        String getIDStr() {
+            return "" + super.id;
+        }
+
+        @Override
+        public String toString() {
+            return String.format("%s\t%s", item1, item2);
         }
     }
 }
