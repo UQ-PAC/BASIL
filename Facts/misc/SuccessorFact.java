@@ -5,6 +5,7 @@ import Facts.inst.InstFact;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class SuccessorFact extends Fact {
 
@@ -24,5 +25,19 @@ public class SuccessorFact extends Fact {
         List<Fact> factList = new ArrayList<>();
         factList.add(this);
         return factList;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        if (!super.equals(o)) return false;
+        SuccessorFact that = (SuccessorFact) o;
+        return Objects.equals(i1, that.i1) && Objects.equals(i2, that.i2);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), i1, i2);
     }
 }

@@ -20,16 +20,18 @@ public class DatalogUtility {
         List<SuccessorFact> successorFacts = new ArrayList<>();
         for (int i = 0; i < facts.size(); i++) {
             InstFact fact = facts.get(i);
+            int factIndexOfTarget;
             // incomplete: there might be more successor facts we can extract from other fact instances
             if (fact instanceof JmpFact) {
-                JmpFact jump = (JmpFact) fact;
-                int factIndexOfTarget = findInstWithPc(jump.target, facts);
-                if (factIndexOfTarget == -1) {
-                    System.err.printf("Could not create succ fact for jump '%s' (fact %d) because no fact containing the target PC was found.", jump, i);
-                    continue;
-                }
-                successorFacts.add(new SuccessorFact(fact, facts.get(factIndexOfTarget)));
+                factIndexOfTarget = findInstWithPc(((JmpFact) fact).target, facts);
+            } else if (fact instanceof CallFact) {
+                // incomplete: we might also want the start of the called function as a successor to this line
+                factIndexOfTarget = findInstWithPc(((CallFact) fact).returnAddr, facts);
+            } else {
+                continue;
             }
+            if (factIndexOfTarget == -1) System.err.printf("Could not create succ fact for fact %d because no fact containing the target PC was found.", i);
+            else successorFacts.add(new SuccessorFact(fact, facts.get(factIndexOfTarget)));
         }
         // flatten the tree: convert the tree structure into a simple node list with DFS
         Map<Fact, Log> recordedFacts = new HashMap<>();
@@ -165,7 +167,7 @@ public class DatalogUtility {
                 SuccessorFact successorFact = (SuccessorFact) fact;
                 recordedFacts.put(successorFact, new SuccLog(
                         recordedFacts.get(successorFact.i1).getIDStr(),
-                        recordedFacts.get(successorFact.i1).getIDStr()
+                        recordedFacts.get(successorFact.i2).getIDStr()
                 ));
             }
         }

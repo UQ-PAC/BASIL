@@ -23,8 +23,9 @@ public class Main {
         ParseTreeWalker walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 
-        System.out.println("\n\n-------- DATALOG --------\n");
-        new DatalogUtility().createDatalog(facts).forEach(System.out::println);
+//        System.out.println("\n\n-------- DATALOG --------\n");
+//        List<DatalogUtility.Log> logs = new DatalogUtility().createDatalog(facts);
+//        logs.forEach(System.out::println);
 
         System.out.println("\n\n-------- BOOGIE --------\n");
         BoogieTranslator translator = new BoogieTranslator(facts, "boogie_out.txt");

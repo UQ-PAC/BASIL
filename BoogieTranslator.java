@@ -35,8 +35,6 @@ public class BoogieTranslator {
     BufferedWriter writer;
     // the lines in the BIL file to translate
     List<InstFact> facts;
-    // the name of the function we are currently in, or "" if we are not in a function
-    String funcName = "";
     int nameCount = 0;
 
     public BoogieTranslator(List<InstFact> facts, String outputFileName) {
@@ -159,6 +157,7 @@ public class BoogieTranslator {
         for (int i = 0; i < facts.size(); i++) {
             InstFact fact = facts.get(i);
             if (fact instanceof EnterSubFact) {
+                System.out.printf("Enter sub at fact %d: %s", i, fact);
                 Integer[] endPoints = new Integer[2];
                 endPoints[0] = i;
                 functions.add(endPoints);
@@ -231,11 +230,13 @@ public class BoogieTranslator {
      */
     private void resolveInParams() {
         // implement rule 1
+        List<Integer> forRemoval = new ArrayList<>();
         for (Integer[] endpoints : getAllFunctions()) {
+            System.out.println(endpoints[0] + ", " + endpoints[1]);
             int start = endpoints[0];
             int end = endpoints[1];
+            System.out.println(facts.get(start));
             EnterSubFact currentFunc = (EnterSubFact) facts.get(start);
-            List<Integer> forRemoval = new ArrayList<>();
             for (int i = start; i < end; i++) {
                 InstFact fact = facts.get(i);
                 if (!(fact instanceof StoreFact)) continue;
@@ -250,8 +251,17 @@ public class BoogieTranslator {
                     }
                 }
             }
-            forRemoval.forEach(index -> facts.remove((int) index));
         }
+        // how did this ever work? anyway, fix this
+        feivenwuvbnwirubvnwilu // to draw your attention, future james. the problem is the following line. you can't change the list size as you iterate. maybe iterate backwards
+        forRemoval.forEach(index -> facts.remove((int) index));
+
+
+        // this might work ???
+        Collections.reverse(forRemoval);
+        forRemoval.forEach(index -> facts.remove((int) index));
+
+
         // implement rule 2
         for (Integer[] endpoints : getAllFunctions()) { // we have to call this function again because we just removed some lines from the facts list
             int start = endpoints[0];
