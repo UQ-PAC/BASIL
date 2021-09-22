@@ -22,15 +22,6 @@ public class JmpFact extends InstFact {
         return String.format("%sgoto label%s;\n", label, target);
     }
 
-    public List<String> toDatalog() {
-        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
-        List<String> log = new ArrayList<>();
-        super.id = DatalogUtility.id++;
-        log.add(String.format("%s\t%s\t%s\t%s", super.id, "jump", target, "none"));
-        DatalogUtility.recordedFacts.put(this, log);
-        return log;
-    }
-
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.add(this);

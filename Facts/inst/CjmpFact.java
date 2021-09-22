@@ -25,15 +25,6 @@ public class CjmpFact extends InstFact {
         return String.format("%sif (%s) goto label%s;\n", label, condition, target);
     }
 
-    public List<String> toDatalog() {
-        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
-        List<String> log = new ArrayList<>(condition.toDatalog());
-        super.id = DatalogUtility.id++;
-        log.add(String.format("%s\t%s\t%s\texp%s", super.id, "cjump", target, condition.id));
-        DatalogUtility.recordedFacts.put(this, log);
-        return log;
-    }
-
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.addAll(condition.toFactList());

@@ -33,17 +33,6 @@ public abstract class AssignFact extends InstFact {
         return String.format("%s%s%s := %s;\n", label, varDeclaration, lhs, rhs);
     }
 
-    public List<String> toDatalog() {
-        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
-        List<String> log = new ArrayList<>();
-        log.addAll(lhs.toDatalog());
-        log.addAll(rhs.toDatalog());
-        super.id = DatalogUtility.id++;
-        log.add(String.format("%s\t%s\t%s\t%s", super.id, type, lhs != null ? "exp" + lhs.id : "none", rhs != null ? "exp" + rhs.id : "none"));
-        DatalogUtility.recordedFacts.put(this, log);
-        return log;
-    }
-
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.addAll(lhs.toFactList());

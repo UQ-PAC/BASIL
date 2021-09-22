@@ -1,3 +1,4 @@
+import Facts.DatalogUtility;
 import Facts.Fact;
 import Facts.inst.InstFact;
 import org.antlr.v4.runtime.CharStreams;
@@ -23,7 +24,7 @@ public class Main {
         walker.walk(statementLoader, b);
 
         System.out.println("\n\n-------- DATALOG --------\n");
-        for (InstFact fact : facts) fact.toDatalog().forEach(System.out::println);
+        new DatalogUtility().createDatalog(facts).forEach(System.out::println);
 
         System.out.println("\n\n-------- BOOGIE --------\n");
         BoogieTranslator translator = new BoogieTranslator(facts, "boogie_out.txt");

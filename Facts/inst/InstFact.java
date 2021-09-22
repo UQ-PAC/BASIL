@@ -18,8 +18,6 @@ public abstract class InstFact extends Fact {
         label = new Label(pc);
     }
 
-    public abstract List<String> toDatalog();
-
     public abstract List<Fact> toFactList();
 
     @Override

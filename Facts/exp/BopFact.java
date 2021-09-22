@@ -42,17 +42,6 @@ public class BopFact extends ExpFact {
         return factList;
     }
 
-    public List<String> toDatalog() {
-        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
-        List<String> log = new ArrayList<>();
-        log.addAll(e1.toDatalog());
-        log.addAll(e2.toDatalog());
-        super.id = DatalogUtility.id++;
-        log.add(String.format("exp%s\t%s\t%s\texp%s\texp%s", super.id, "bop", op, e1.id, e2.id));
-        DatalogUtility.recordedFacts.put(this, log);
-        return log;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

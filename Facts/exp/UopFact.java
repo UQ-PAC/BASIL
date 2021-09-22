@@ -26,15 +26,6 @@ public class UopFact extends ExpFact {
         return String.format("%s %s", op, e1);
     }
 
-    public List<String> toDatalog() {
-        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
-        List<String> log = new ArrayList<>(e1.toDatalog());
-        super.id = DatalogUtility.id++;
-        log.add(String.format("exp%s\t%s\t%s\texp%s\t%s", super.id, "uop", op, e1.id, "none"));
-        DatalogUtility.recordedFacts.put(this, log);
-        return log;
-    }
-
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.addAll(e1.toFactList());

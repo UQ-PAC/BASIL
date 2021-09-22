@@ -11,6 +11,4 @@ import java.util.List;
 public abstract class ExpFact extends Fact {
 
     public abstract List<Fact> toFactList();
-
-    public abstract List<String> toDatalog();
 }

@@ -45,10 +45,6 @@ public class EnterSubFact extends InstFact {
         return String.format("%s%s", label, line);
     }
 
-    public List<String> toDatalog() {
-        return new ArrayList<>();
-    }
-
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.add(this);

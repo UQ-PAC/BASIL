@@ -19,10 +19,6 @@ public class ExitSubFact extends InstFact {
         return "}\n\n";
     }
 
-    public List<String> toDatalog() {
-        return new ArrayList<>();
-    }
-
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.add(this);

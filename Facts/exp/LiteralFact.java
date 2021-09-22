@@ -22,15 +22,6 @@ public class LiteralFact extends ExpFact {
         return String.format("%s", val);
     }
 
-    public List<String> toDatalog() {
-        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
-        List<String> log = new ArrayList<>();
-        super.id = DatalogUtility.id++;
-        log.add(String.format("exp%s\t%s\t%s\t%s\t%s", super.id, "literal", val, "none", "none"));
-        DatalogUtility.recordedFacts.put(this, log);
-        return log;
-    }
-
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.add(this);

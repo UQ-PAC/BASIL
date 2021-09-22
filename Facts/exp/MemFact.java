@@ -24,14 +24,6 @@ public class MemFact extends ExpFact {
         return String.format("mem[%s]", exp);
     }
 
-    public List<String> toDatalog() {
-        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
-        // for mems, it is sufficient to merely have the internal expression
-        List<String> log = new ArrayList<>(exp.toDatalog());
-        DatalogUtility.recordedFacts.put(this, log);
-        return log;
-    }
-
     public String toDataString() {
         return exp.toString();
     }

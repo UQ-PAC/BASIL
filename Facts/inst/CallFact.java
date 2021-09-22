@@ -31,10 +31,6 @@ public class CallFact extends InstFact {
         return String.format("%scall %s(%s);\ngoto label%s;\n", label, funcName, paramsStr, returnAddr);
     }
 
-    public List<String> toDatalog() {
-        return new ArrayList<>();
-    }
-
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.add(this);

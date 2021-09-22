@@ -24,15 +24,6 @@ public class ExtractFact extends ExpFact {
         return String.format("%s[%d:%d]", variable, firstInt, secondInt);
     }
 
-    public List<String> toDatalog() {
-        if (DatalogUtility.recordedFacts.containsKey(this)) return DatalogUtility.recordedFacts.get(this);
-        List<String> log = new ArrayList<>(variable.toDatalog());
-        super.id = DatalogUtility.id++;
-        log.add(String.format("exp%s\t%s\t%s\t%s\texp%s", super.id, "extract", firstInt, secondInt, variable.id));
-        DatalogUtility.recordedFacts.put(this, log);
-        return log;
-    }
-
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.addAll(variable.toFactList());

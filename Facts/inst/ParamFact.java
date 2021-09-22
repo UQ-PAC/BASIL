@@ -27,10 +27,6 @@ public class ParamFact extends InstFact {
         return "";
     }
 
-    public List<String> toDatalog() {
-        return new ArrayList<>();
-    }
-
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.add(this);
