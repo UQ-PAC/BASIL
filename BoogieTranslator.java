@@ -29,6 +29,16 @@ import java.util.*;
  * [ ] dereferencing of registers when their value has been extracted from mem[]
  */
 
+/**
+ * Welcome to where the magic happens!
+ *
+ * (how it works)
+ *
+ * Many layers involve operations which remove particular instructions from the global list. To do so, it is assumed
+ * that no two instructions will have the same label, and hence, that the list contains no duplicate instructions. That
+ * is:
+ * forall i, j :: 0 <= i < list.size() && 0 <= j < list.size() && i != j ==> !facts.equals(facts.get(i), facts.get(j))
+ */
 public class BoogieTranslator {
 
     // for writing the boogie output
@@ -169,49 +179,102 @@ public class BoogieTranslator {
     /**
      * We want to feed each EnterSubFact with a list of its parameters (i.e. ParamFacts) so that it can include these
      * in its procedure header, and use them for parameter resolving/dereferencing within the function body.
+     * We assume that outParams are always explicitly stated.
      */
     private void createFuncParameters() {
         for (Integer[] endpoints : getAllFunctions()) {
-            int start = endpoints[0];
-            int end = endpoints[1];
-            EnterSubFact currentFunc = (EnterSubFact) facts.get(start);
-            int i = start + 1;
-            // get all explicitly listed function parameters. we assume they are all listed directly underneath
-            while (i < end) {
-                InstFact param = facts.get(i++);
-                if (!(param instanceof ParamFact)) break;
-                currentFunc.paramFacts.add((ParamFact) param);
+            EnterSubFact func = (EnterSubFact) facts.get(endpoints[0]);
+            List<ParamFact> explicitParams = getExplicitParams(endpoints);
+            List<ParamFact> implicitParams = getImplicitParams(endpoints);
+            func.paramFacts = removeDuplicateParamsAndMerge(explicitParams, implicitParams);
+            createCallArguments(func);
+        }
+    }
+
+    /**
+     * Provides function calls with a list of the parameters they will need to provide arguments for.
+     */
+    private void createCallArguments(EnterSubFact func) {
+        for (InstFact fact : facts) {
+            if (!(fact instanceof CallFact)) continue;
+            CallFact call = (CallFact) fact;
+            if (!call.funcName.equals(func.funcName)) continue;
+            for (ParamFact params : func.paramFacts) {
+                if (!params.is_result) call.params.add(params.register);
             }
-            // get all function parameters which are not explicitly listed (registers which are stored before they are assigned)
-            List<VarFact> assignedRegisters = new ArrayList<>();
-            while (i < end) {
-                InstFact line = facts.get(i++);
-                if (!(line instanceof AssignFact)) continue; // we are only concerned with assignments here
-                if (line instanceof StoreFact) {
-                    // e.g. mem[foo] := var;
-                    StoreFact storeFact = (StoreFact) line;
-                    if (!(storeFact.rhs instanceof VarFact)) continue; // assumption: parameter stores should contain a rhs which is a single variable
-                    VarFact rhsVar = (VarFact) storeFact.rhs;
-                    if (!isRegister(rhsVar) || assignedRegisters.contains(rhsVar)) continue; // variable is not a register, or has been assigned before
-                    // this is a register that has been stored before assigned - it is a parameter
-                    ParamFact param = new ParamFact("", new VarFact(generateUniqueName()), rhsVar, false);
-                    param.alias = (MemFact) storeFact.lhs;
-                    currentFunc.paramFacts.add(param);
-                } else {
-                    VarFact lhsVar = (VarFact) (line instanceof LoadFact ? ((LoadFact) line).lhs : ((MoveFact) line).lhs);
-                    if (isRegister(lhsVar)) assignedRegisters.add(lhsVar);
-                }
-            }
-            // once the parameters for a function have been created, create parameters for any call to this function too
-            for (InstFact fact : facts) {
-                if (!(fact instanceof CallFact)) continue;
-                CallFact call = (CallFact) fact;
-                if (!call.funcName.equals(currentFunc.funcName)) continue;
-                for (ParamFact paramFact : currentFunc.paramFacts) {
-                    if (!paramFact.is_result) call.params.add(paramFact.register);
+        }
+    }
+
+    /**
+     * Implicit params found may contain params already listed explicitly. If so, we take the var name of the explicit
+     * param, and the alias of the implicit param.
+     */
+    private List<ParamFact> removeDuplicateParamsAndMerge(List<ParamFact> explicitParams, List<ParamFact> implicitParams) {
+        for (ParamFact explicitParam : explicitParams) {
+            if (explicitParam.is_result) continue; // these can never be caught implicitly, and skipping this means we can simply compare by register
+            Iterator<ParamFact> iter = implicitParams.iterator();
+            while (iter.hasNext()) {
+                ParamFact implicitParam = iter.next();
+                if (explicitParam.register.equals(implicitParam.register)) {
+                    // match found
+                    explicitParam.alias = implicitParam.alias;
+                    iter.remove();
                 }
             }
         }
+        List<ParamFact> params = new ArrayList<>();
+        params.addAll(explicitParams);
+        params.addAll(implicitParams);
+        return params;
+    }
+
+    /**
+     * Returns a list of all the parameters of the given function which are explicitly listed.
+     * Assumes these parameters are sequentially listed, immediately following the EnterSubFact.
+     */
+    private List<ParamFact> getExplicitParams(Integer[] endpoints) {
+        List<ParamFact> params = new ArrayList<>();
+        for (int i = endpoints[0] + 1; i < endpoints[1]; i++) {
+            InstFact param = facts.get(i);
+            if (!(param instanceof ParamFact)) break;
+            params.add((ParamFact) param);
+        }
+        return params;
+    }
+
+    /**
+     * Returns a list of all the parameters of the given function which are not explicitly listed.
+     * These are identified as memory addresses which have registers stored into them before those registers are
+     * assigned within the function.
+     * We assume that these store instructions contain only the register on the rhs.
+     * We also assume that identical memory accesses (e.g. mem[2]) are never written differently (e.g. mem[1+1]), as
+     * this is what we use for identifying and substituting implicit parameters.
+     * We assume that these registers are only accessed once - i.e. by the store instruction - before they are
+     * assigned.
+     */
+    private List<ParamFact> getImplicitParams(Integer[] endpoints) {
+        List<ParamFact> params = new ArrayList<>();
+        Set<VarFact> assignedRegisters = new HashSet<>();
+        for (int i = endpoints[0]; i < endpoints[1]; i++) {
+            InstFact line = facts.get(i);
+            // we are only concerned with assignments here
+            if (!(line instanceof AssignFact)) continue;
+            if (line instanceof StoreFact) {
+                // store facts may represent implicit params. check if the rhs is a register
+                StoreFact storeFact = (StoreFact) line;
+                if (!(storeFact.rhs instanceof VarFact)) continue; // rhs must be a single variable
+                VarFact rhsVar = (VarFact) storeFact.rhs;
+                if (!isRegister(rhsVar) || assignedRegisters.contains(rhsVar)) continue; // variable is not a register, or has been assigned before
+                ParamFact param = new ParamFact("", new VarFact(generateUniqueName()), rhsVar, false);
+                param.alias = (MemFact) storeFact.lhs;
+                params.add(param);
+            } else {
+                // this is a move or a load. if the lhs is a register, add it to the set of assigned registers
+                VarFact lhsVar = (VarFact) (line instanceof LoadFact ? ((LoadFact) line).lhs : ((MoveFact) line).lhs);
+                if (isRegister(lhsVar)) assignedRegisters.add(lhsVar);
+            }
+        }
+        return params;
     }
 
     private boolean isRegister(VarFact varFact) {
@@ -230,7 +293,7 @@ public class BoogieTranslator {
      */
     private void resolveInParams() {
         // implement rule 1
-        List<Integer> forRemoval = new ArrayList<>();
+        Set<InstFact> forRemoval = new HashSet<>();
         for (Integer[] endpoints : getAllFunctions()) {
             System.out.println(endpoints[0] + ", " + endpoints[1]);
             int start = endpoints[0];
@@ -247,20 +310,12 @@ public class BoogieTranslator {
                 for (ParamFact param : currentFunc.paramFacts) {
                     if (param.alias == null) continue;
                     if (param.alias.equals(lhs) && param.register.equals(rhs)) {
-                        forRemoval.add(i);
+                        forRemoval.add(fact);
                     }
                 }
             }
         }
-        // how did this ever work? anyway, fix this
-        feivenwuvbnwirubvnwilu // to draw your attention, future james. the problem is the following line. you can't change the list size as you iterate. maybe iterate backwards
-        forRemoval.forEach(index -> facts.remove((int) index));
-
-
-        // this might work ???
-        Collections.reverse(forRemoval);
-        forRemoval.forEach(index -> facts.remove((int) index));
-
+        facts.removeIf(forRemoval::contains);
 
         // implement rule 2
         for (Integer[] endpoints : getAllFunctions()) { // we have to call this function again because we just removed some lines from the facts list
