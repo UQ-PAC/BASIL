@@ -31,13 +31,12 @@ public class SuccessorFact extends Fact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
         SuccessorFact that = (SuccessorFact) o;
         return Objects.equals(i1, that.i1) && Objects.equals(i2, that.i2);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), i1, i2);
+        return Objects.hash(i1, i2);
     }
 }

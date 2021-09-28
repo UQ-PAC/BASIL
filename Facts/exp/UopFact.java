@@ -37,13 +37,12 @@ public class UopFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
         UopFact uopFact = (UopFact) o;
         return Objects.equals(op, uopFact.op) && Objects.equals(e1, uopFact.e1);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), op, e1);
+        return Objects.hash(op, e1);
     }
 }

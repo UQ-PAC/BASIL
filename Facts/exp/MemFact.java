@@ -39,13 +39,12 @@ public class MemFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
         MemFact memFact = (MemFact) o;
         return Objects.equals(exp, memFact.exp);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), exp);
+        return Objects.hash(exp);
     }
 }

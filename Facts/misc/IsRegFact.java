@@ -19,13 +19,12 @@ public class IsRegFact extends Fact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
         IsRegFact isRegFact = (IsRegFact) o;
         return Objects.equals(id, isRegFact.id);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), id);
+        return Objects.hash(id);
     }
 }

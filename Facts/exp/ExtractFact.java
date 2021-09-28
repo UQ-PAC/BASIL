@@ -35,13 +35,12 @@ public class ExtractFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
         ExtractFact that = (ExtractFact) o;
         return firstInt == that.firstInt && secondInt == that.secondInt && Objects.equals(variable, that.variable);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), firstInt, secondInt, variable);
+        return Objects.hash(firstInt, secondInt, variable);
     }
 }

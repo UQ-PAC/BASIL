@@ -2,8 +2,6 @@ package Facts.inst;
 
 import Facts.Fact;
 import Facts.Label;
-
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -24,13 +22,12 @@ public abstract class InstFact extends Fact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
         InstFact fact = (InstFact) o;
         return Objects.equals(label, fact.label);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), label);
+        return Objects.hash(label);
     }
 }

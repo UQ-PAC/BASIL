@@ -170,7 +170,6 @@ public class BoogieTranslator {
         for (int i = 0; i < facts.size(); i++) {
             InstFact fact = facts.get(i);
             if (fact instanceof EnterSubFact) {
-                System.out.printf("Enter sub at fact %d: %s", i, fact);
                 Integer[] endPoints = new Integer[2];
                 endPoints[0] = i;
                 functions.add(endPoints);
@@ -298,10 +297,8 @@ public class BoogieTranslator {
         // implement rule 1
         Set<InstFact> forRemoval = new HashSet<>();
         for (Integer[] endpoints : getAllFunctions()) {
-            System.out.println(endpoints[0] + ", " + endpoints[1]);
             int start = endpoints[0];
             int end = endpoints[1];
-            System.out.println(facts.get(start));
             EnterSubFact currentFunc = (EnterSubFact) facts.get(start);
             for (int i = start; i < end; i++) {
                 InstFact fact = facts.get(i);
