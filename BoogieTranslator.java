@@ -71,6 +71,9 @@ public class BoogieTranslator {
         printAllFacts();
     }
 
+    /**
+     * Add the "var" keyword to variables which are initially assigned within functions.
+     */
     private void addVarDeclarations() {
         List<Integer[]> endpoints = getAllFunctions();
         for (Integer[] endpoint : endpoints) {

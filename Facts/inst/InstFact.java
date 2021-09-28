@@ -25,8 +25,8 @@ public abstract class InstFact extends Fact {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
-        InstFact instFact = (InstFact) o;
-        return Objects.equals(label, instFact.label);
+        InstFact fact = (InstFact) o;
+        return Objects.equals(label, fact.label);
     }
 
     @Override

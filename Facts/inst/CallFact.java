@@ -43,11 +43,11 @@ public class CallFact extends InstFact {
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
         CallFact callFact = (CallFact) o;
-        return Objects.equals(funcName, callFact.funcName) && Objects.equals(returnAddr, callFact.returnAddr);
+        return showJump == callFact.showJump && Objects.equals(funcName, callFact.funcName) && Objects.equals(returnAddr, callFact.returnAddr) && Objects.equals(params, callFact.params);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), funcName, returnAddr);
+        return Objects.hash(super.hashCode(), funcName, returnAddr, params, showJump);
     }
 }

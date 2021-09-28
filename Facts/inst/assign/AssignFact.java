@@ -47,11 +47,11 @@ public abstract class AssignFact extends InstFact {
         if (o == null || getClass() != o.getClass()) return false;
         if (!super.equals(o)) return false;
         AssignFact that = (AssignFact) o;
-        return Objects.equals(pc, that.pc) && Objects.equals(lhs, that.lhs) && Objects.equals(rhs, that.rhs) && Objects.equals(type, that.type);
+        return Objects.equals(pc, that.pc) && Objects.equals(lhs, that.lhs) && Objects.equals(rhs, that.rhs) && Objects.equals(type, that.type) && Objects.equals(varDeclaration, that.varDeclaration);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(super.hashCode(), pc, lhs, rhs, type);
+        return Objects.hash(super.hashCode(), pc, lhs, rhs, type, varDeclaration);
     }
 }
