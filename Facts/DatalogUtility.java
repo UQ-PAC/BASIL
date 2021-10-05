@@ -6,6 +6,7 @@ import Facts.inst.assign.LoadFact;
 import Facts.inst.assign.MoveFact;
 import Facts.inst.assign.StoreFact;
 import Facts.misc.SuccessorFact;
+import jdk.nashorn.internal.codegen.CompilerConstants;
 
 import java.util.*;
 
@@ -16,28 +17,13 @@ public class DatalogUtility {
 
     public List<Log> createDatalog(List<InstFact> facts) {
         facts = new ArrayList<>(facts);
-        // append successor facts
-        List<SuccessorFact> successorFacts = new ArrayList<>();
-        for (int i = 0; i < facts.size(); i++) {
-            InstFact fact = facts.get(i);
-            int factIndexOfTarget;
-            // incomplete: there might be more successor facts we can extract from other fact instances
-            if (fact instanceof JmpFact) {
-                factIndexOfTarget = findInstWithPc(((JmpFact) fact).target, facts);
-            } else if (fact instanceof CallFact) {
-                // incomplete: we might also want the start of the called function as a successor to this line
-                factIndexOfTarget = findInstWithPc(((CallFact) fact).returnAddr, facts);
-            } else {
-                continue;
-            }
-            if (factIndexOfTarget == -1) System.err.printf("Could not create succ fact for fact %d because no fact containing the target PC was found.", i);
-            else successorFacts.add(new SuccessorFact(fact, facts.get(factIndexOfTarget)));
-        }
-        // flatten the tree: convert the tree structure into a simple node list with DFS
+        // maps facts to their respective logs so they can be referred to by their log ID by other logs
         Map<Fact, Log> recordedFacts = new HashMap<>();
         List<Fact> factList = new ArrayList<>();
+        // flatten the tree: convert the tree structure into a simple node list with DFS
         for (InstFact fact : facts) factList.addAll(fact.toFactList());
-        factList.addAll(successorFacts);
+        // append successor facts
+        factList.addAll(getAllSuccFacts(facts));
         // remove duplicate expression facts
         List<Fact> noDuplicatesFactList = new ArrayList<>();
         for (Fact fact : factList) {
@@ -191,6 +177,63 @@ public class DatalogUtility {
         logList.addAll(expLogList);
         logList.addAll(succLogList);
         return logList;
+    }
+
+    private List<SuccessorFact> getAllSuccFacts(List<InstFact> facts) {
+        // get all instfact -> targetIndex successions
+        // invalid map keys or values are recorded as -1. this usually means we couldn't find a fact corresponding to a target pc
+        Map<Integer, Integer> successions = new HashMap<>();
+        for (int f = 0; f < facts.size(); f++) {
+            InstFact fact = facts.get(f);
+            if (fact instanceof JmpFact) {
+                JmpFact jmpFact = (JmpFact) fact;
+                int targetIndex = findInstWithPc(jmpFact.target, facts);
+                successions.put(f, targetIndex);
+            } else if (fact instanceof CallFact) {
+                CallFact callFact = (CallFact) fact;
+                // need both the call -> startFunction succession and the endFunction -> lineBelowCall succession
+                int enterSubIndex = -1;
+                int exitSubIndex = -1;
+                // find the index of this called function
+                for (int i = 0; i < facts.size(); i++) {
+                    if (!(facts.get(i) instanceof EnterSubFact)) continue;
+                    EnterSubFact enterSubFact = (EnterSubFact) facts.get(i);
+                    if (enterSubFact.funcName.equals(callFact.funcName)) {
+                        // find the index of the called function; record its index and search for its end
+                        enterSubIndex = i;
+                        for (int j = i; j < facts.size(); j++) {
+                            if (facts.get(j) instanceof ExitSubFact) {
+                                // found the end of the function; all done
+                                exitSubIndex = j;
+                                break;
+                            }
+                        }
+                        break;
+                    }
+                }
+                successions.put(f, enterSubIndex); // call -> startFunction succession
+                successions.put(exitSubIndex, findInstWithPc(callFact.returnAddr, facts)); // endFunction -> lineBelowCall succession
+            } else if (fact instanceof CjmpFact) {
+                CjmpFact cjmpFact = (CjmpFact) fact;
+                // need both the ifTrue jump and ifFalse jump
+                // the ifFalse jump will be a jump to the next line
+                successions.put(f, f + 1);
+                // the ifTrue jump will be a jump to the target
+                successions.put(f, findInstWithPc(cjmpFact.target, facts));
+            }
+        }
+
+        List<SuccessorFact> successorFacts = new ArrayList<>();
+        for (Integer k : successions.keySet()) {
+            Integer v = successions.get(k);
+            if (k == -1 || v == -1) {
+                System.err.println("Error recording succession fact.");
+            } else {
+                SuccessorFact succ = new SuccessorFact(facts.get(k), facts.get(v));
+                successorFacts.add(succ);
+            }
+        }
+        return successorFacts;
     }
 
     private int findInstWithPc(String pc, List<InstFact> facts) {
