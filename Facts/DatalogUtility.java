@@ -217,13 +217,13 @@ public class DatalogUtility {
         abstract String getIDStr();
     }
 
-    private class ExpLog extends Log {
+    public class ExpLog extends Log {
         private final String item1;
         private final String item2;
         private final String item3;
         private final String item4;
 
-        private ExpLog(String item1, String item2, String item3, String item4) {
+        public ExpLog(String item1, String item2, String item3, String item4) {
             super.id = expIdCounter++;
             this.item1 = item1;
             this.item2 = item2;
@@ -242,12 +242,12 @@ public class DatalogUtility {
         }
     }
 
-    private class InstLog extends Log {
+    public class InstLog extends Log {
         private final String item1;
         private final String item2;
         private final String item3;
 
-        private InstLog(String item1, String item2, String item3) {
+        public InstLog(String item1, String item2, String item3) {
             super.id = instIdCounter++;
             this.item1 = item1;
             this.item2 = item2;
@@ -265,11 +265,11 @@ public class DatalogUtility {
         }
     }
 
-    private class SuccLog extends Log {
+    public class SuccLog extends Log {
         private final String item1;
         private final String item2;
 
-        private SuccLog(String item1, String item2) {
+        public SuccLog(String item1, String item2) {
             super.id = succIdCounter++;
             this.item1 = item1;
             this.item2 = item2;
