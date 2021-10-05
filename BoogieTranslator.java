@@ -60,6 +60,7 @@ public class BoogieTranslator {
      * Starting point for a BIL translation.
      */
     public void translate() {
+
         createLabels();
         optimiseLabels();
         optimiseSkips();
