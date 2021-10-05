@@ -40,9 +40,15 @@ public class StatementLoader implements BilListener {
             if (toReturn != null) {
                 return toReturn;
             }
+        } else if (ctx.getClass().equals(BilParser.ExpBracketContext.class)) {
+            return parseBracketExpression((BilParser.ExpBracketContext) ctx);
         }
         System.err.println("Unhandled expression detected: " + ctx.getText());
         return null;
+    }
+
+    private ExpFact parseBracketExpression(BilParser.ExpBracketContext ctx) {
+        return parseExpression(ctx.exp());
     }
 
     private BopFact parseBinaryOperation(BilParser.ExpBopContext ctx) {
@@ -195,9 +201,15 @@ public class StatementLoader implements BilListener {
             facts.add(new CjmpFact(address, target, cond));
         } else if (ctx.call() != null) {
             // statement is a call
-            String funcName = ctx.call().functionName().getText();
-            String returnAddr = ctx.call().returnaddr().addr().getText();
-            facts.add(new CallFact(address, funcName, returnAddr));
+            System.out.println(ctx.addr().getText());
+            if (ctx.call().functionName() == null) {
+                // occasionally this occurs with "call LR with no return" lines
+                facts.add(new ExitSubFact(ctx.addr().getText(), this.funcName));
+            } else {
+                String funcName = ctx.call().functionName().getText();
+                String returnAddr = ctx.call().returnaddr().addr().getText();
+                facts.add(new CallFact(address, funcName, returnAddr));
+            }
         } else {
             // this statement is empty
             facts.add(new NopFact(address));

@@ -1,0 +1,5 @@
+
+write code that automatically strips the bil files so they are processable by the boogie translator.
+requires identifying all reachable code from main
+
+create formal rules for the extra security-verification boogie lines

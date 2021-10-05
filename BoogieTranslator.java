@@ -67,8 +67,16 @@ public class BoogieTranslator {
         resolveInParams();
         // resolveOutParams();
         resolveRegisters();
+        resolveMems();
         addVarDeclarations();
         printAllFacts();
+    }
+
+    /**
+     * We'd like to convert mem expressions to variables.
+     */
+    private void resolveMems() {
+
     }
 
     /**
