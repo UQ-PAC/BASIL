@@ -1,5 +1,7 @@
 import BilParsing.BilLexer;
 import BilParsing.BilParser;
+import BilTranslating.BoogieTranslator;
+import BilTranslating.StatementLoader;
 import Facts.DatalogUtility;
 import Facts.inst.InstFact;
 import org.antlr.v4.runtime.CharStreams;
