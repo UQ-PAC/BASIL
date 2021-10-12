@@ -1,5 +1,6 @@
+import BilParsing.BilLexer;
+import BilParsing.BilParser;
 import Facts.DatalogUtility;
-import Facts.Fact;
 import Facts.inst.InstFact;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
