@@ -54,21 +54,5 @@ public class Main {
             BoogieTranslator translator = new BoogieTranslator(facts, "boogie_out.txt");
             translator.translate();
         }
-
-        /*
-
-        ParseTreeWalker walker = new ParseTreeWalker();
-        walker.walk(statementLoader, b);
-
-        // analyse statements and convert to boogie
-        BoogieTranslator translator = new BoogieTranslator(lines, "boogie_out.txt");
-        translator.translate();*/
-
-        /*
-        // clean the output file from the listener and put the cleaned version in the file called finalBoogieCode
-        String finalBoogieCode = "finalBoogie.txt";
-        BoogieCleaner cleaner = new BoogieCleaner(outFile, finalBoogieCode);
-        cleaner.clean();
-        */
     }
 }
