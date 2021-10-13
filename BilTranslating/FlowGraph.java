@@ -5,6 +5,29 @@ import java.util.*;
 import Util.AssumptionViolationException;
 
 // todo: throw exceptions when assumptions aren't met
+// todo: sort out functions which don't explicitly end in return statements
+
+/**
+ * A flow graph is a directed, disconnected graph of blocks, where a block represents an ordered list of facts.
+ * These clusters of connected graphs within the FlowGraph are referred to here as "clusters", and each cluster has a
+ * single access point, which is a special block called a HeadBlock, which was partially named after how I felt creating
+ * this file.
+ *
+ * Each HeadBlock represents one of two clusters:
+ * A function cluster, representing a function/procedure/subroutine.
+ * The global cluster, representing global code. There is only one such cluster.
+ *
+ * Now with C programs compiled to BIL, the starting point for any program is the main function. However,
+ * StatementLoader will add global code before main to initialise global variables and such. Therefore, we assume:
+ * - The starting point for the program is the HeadBlock of the global cluster.
+ * - Global lines only exist in a consecutive sequence starting from the top of a given facts list.
+ *
+ * Using these assumptions, as well as some others listed below (todo), we can define the rules for block and cluster
+ * creation as follows:
+ * todo
+ *
+ * todo assumptions
+ */
 public class FlowGraph {
 
     // a list of all FunctionBlocks in the program
@@ -29,7 +52,8 @@ public class FlowGraph {
      * Blocks ending in call facts have one child - the target of the return goto.
      * Blocks ending in function returns or program terminations have no children.
      * All other blocks have one child - the next line.
-     * Program terminations are identified by analysing the blocks which remain after removing the function clusters.
+     * Although explicit program terminations like exit(0) are currently not handled, we define one program termination
+     * as the last block in the ordered sequence of blocks where all blocks reachable by functions are removed.
      *
      * Assumptions:
      * Any block reachable by a function block cannot reach, nor can be reached from, a block reachable by another
@@ -47,7 +71,7 @@ public class FlowGraph {
         List<Integer> splits = new ArrayList<>(splitsSet);
         splits.sort(Integer::compareTo);
         List<Block> blocks = getBlocks(facts, splits);
-        setChildren(blocks);
+        setChildren(blocks, facts);
         List<FunctionBlock> functionBlocks = new ArrayList<>();
         for (Block block : blocks) {
             if (block instanceof FunctionBlock) {
@@ -107,8 +131,62 @@ public class FlowGraph {
         return blocks;
     }
 
-    private void setChildren(List<Block> blocks) {
+    /**
+     * Add children as follows:
+     * Blocks ending in jumps have one child - the target.
+     * Blocks ending in conditional jumps have two children - the target and the next line.
+     * Blocks ending in call facts have one child - the target of the return goto.
+     * Blocks ending in function returns or program terminations have no children.
+     * All other blocks have one child - the next line, except if that next line is a function header.
+     * Although explicit program terminations like exit(0) are currently not handled, we define one program termination
+     * as the last block in the ordered sequence of blocks where all blocks reachable by functions are removed.
+     *
+     * Assumes that the order of blocks reflects the original order of BIL lines (i.e. facts).
+     *
+     *
+     *
+     * also todo: some function like infinite loops don't necessarily end in return statements, so we need to add them in.
+     */
+    private void setChildren(List<Block> blocks, List<InstFact> facts) {
+        for (int i = 0; i < blocks.size(); i++) {
+            Block block = blocks.get(i);
+            InstFact lastLine = block.lastLine();
+            if (lastLine instanceof JmpFact) {
+                JmpFact jump = (JmpFact) lastLine;
+                int targetIndex = findInstWithPc(jump.target, facts);
+                Block targetBlock = getBlockStartingWith(facts.get(targetIndex), blocks);
+                block.children.add(targetBlock);
+            } else if (lastLine instanceof CjmpFact) {
+                CjmpFact call = (CjmpFact) lastLine;
+                int targetIndex = findInstWithPc(call.target, facts);
+                Block targetBlock = getBlockStartingWith(facts.get(targetIndex), blocks);
+                Block otherChild;
+                try {
+                    otherChild = blocks.get(i + 1);
+                } catch (IndexOutOfBoundsException e) {
+                    throw new AssumptionViolationException("The final block should not end in a conditional jump.");
+                }
+                block.children.add(targetBlock);
+                block.children.add(otherChild);
+            } else if (lastLine instanceof CallFact) {
+                CallFact call = (CallFact) lastLine;
+                int targetIndex = findInstWithPc(call.returnAddr, facts);
+                Block targetBlock = getBlockStartingWith(facts.get(targetIndex), blocks);
+                block.children.add(targetBlock);
+            } else if (lastLine instanceof ExitSubFact) {
+                continue;
+            } else if
+        }
+    }
 
+    private Block getBlockStartingWith(InstFact fact, List<Block> blocks) {
+        for (Block block : blocks) {
+            if (block.firstLine() == fact) {
+                return block;
+            }
+        }
+        throw new AssumptionViolationException(
+                String.format("Failed to build flow graph: Could not find block beginning with target %s", fact));
     }
 
     private int findInstWithPc(String pc, List<InstFact> facts) {
@@ -132,6 +210,14 @@ public class FlowGraph {
         Block(List<InstFact> lines, List<Block> children) {
             this.lines = lines;
             this.children = children;
+        }
+
+        InstFact firstLine() {
+            return lines.get(0);
+        }
+
+        InstFact lastLine() {
+            return lines.get(lines.size() - 1);
         }
     }
 

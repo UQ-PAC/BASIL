@@ -20,6 +20,9 @@ public class StatementLoader implements BilListener {
 
     public StatementLoader(List<InstFact> facts) {
         this.facts = facts;
+        // todo: add pre-function stuff here, like global variable declarations
+        this.facts.add(new CallFact("main_call", "main", "exit"));
+        this.facts.add(new NopFact("exit"));
     }
 
     private ExpFact parseExpression(BilParser.ExpContext ctx) {
