@@ -40,6 +40,10 @@ import java.util.*;
  * that no two instructions will have the same label, and hence, that the list contains no duplicate instructions. That
  * is:
  * forall i, j :: 0 <= i < list.size() && 0 <= j < list.size() && i != j ==> !facts.equals(facts.get(i), facts.get(j))
+ *
+ * assumption: to avoid shared-variable problems when creating the flow graph, we must assume that external lines of bil
+ * are not used by multiple functions - only one function per basic block of external code. otherwise, modifying the
+ * shared line will cause changes in both functions!
  */
 public class BoogieTranslator {
 
