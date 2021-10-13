@@ -4,12 +4,13 @@ import Facts.inst.*;
 import java.util.*;
 import Util.AssumptionViolationException;
 
+// todo: throw exceptions when assumptions aren't met
 public class FlowGraph {
 
     // a list of all FunctionBlocks in the program
-    private List<FunctionBlock> functions;
+    List<FunctionBlock> functions;
     // a non-function block that is first executed upon running the program
-    private Block root;
+    Block root;
 
     FlowGraph(List<FunctionBlock> functions, Block root) {
         this.functions = functions;
