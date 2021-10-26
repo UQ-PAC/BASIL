@@ -24,6 +24,8 @@ import java.util.List;
 
 public class FlowGraphVisualiser extends Application {
 
+    private int edgeId = 0;
+
     public static void main(String[] args) {
         launch(args);
     }
@@ -48,15 +50,18 @@ public class FlowGraphVisualiser extends Application {
 
         FlowGraph flowGraph = FlowGraph.fromFactsList(facts);
         Digraph<String, String> g = new DigraphEdgeList<>();
-        g.insertVertex("a");
-        g.insertVertex("b");
-        g.insertVertex("c");
-        g.insertVertex("d");
-        g.insertVertex("e");
-        g.insertEdge("a", "b", "x");
-        g.insertEdge("b", "c", "y");
-        g.insertEdge("d", "e", "z");
-        g.insertEdge("c", "a", "w");
+        for (FlowGraph.Block cluster : flowGraph.functionBlocks) {
+            for (FlowGraph.Block block : cluster.blocksInCluster()) {
+                g.insertVertex(block.toString());
+            }
+        }
+        for (FlowGraph.Block cluster : flowGraph.functionBlocks) {
+            for (FlowGraph.Block block : cluster.blocksInCluster()) {
+                for (FlowGraph.Block child : block.children) {
+                    g.insertEdge(block.toString(), child.toString(), getEdgeId());
+                }
+            }
+        }
         SmartPlacementStrategy strategy = new SmartCircularSortedPlacementStrategy();
         SmartGraphPanel<String, String> graphView = new SmartGraphPanel<>(g, strategy);
         Scene scene = new Scene(graphView, 1024, 768);
@@ -64,4 +69,10 @@ public class FlowGraphVisualiser extends Application {
         primaryStage.setScene(scene);
         primaryStage.show();
     }
+
+    public String getEdgeId() {
+        return String.valueOf(edgeId++);
+    }
 }
+
+

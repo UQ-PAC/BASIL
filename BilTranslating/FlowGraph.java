@@ -18,9 +18,9 @@ import java.util.*;
 public class FlowGraph {
 
     // the head of all global code; the starting point for the boogie program
-    Block globalBlock;
+    public Block globalBlock;
     // a list of all function heads; represents all functions/procedures in the boogie program
-    List<Block> functionBlocks;
+    public List<Block> functionBlocks;
 
     FlowGraph(List<Block> functionBlocks) {
         this.globalBlock = new Block(new ArrayList<>(), new ArrayList<>());
@@ -173,24 +173,24 @@ public class FlowGraph {
     /**
      * A block is an ordered list of facts.
      */
-    static class Block {
-        List<InstFact> lines;
-        List<Block> children;
+    public static class Block {
+        public List<InstFact> lines;
+        public List<Block> children;
 
         Block(List<InstFact> lines, List<Block> children) {
             this.lines = lines;
             this.children = children;
         }
 
-        InstFact firstLine() {
+        public InstFact firstLine() {
             return lines.get(0);
         }
 
-        InstFact lastLine() {
+        public InstFact lastLine() {
             return lines.get(lines.size() - 1);
         }
 
-        Set<InstFact> linesInCluster() {
+        public Set<InstFact> linesInCluster() {
             Set<InstFact> allLines = new HashSet<>(lines);
             for (Block child : children) {
                 allLines.addAll(child.linesInCluster());
@@ -198,7 +198,7 @@ public class FlowGraph {
             return allLines;
         }
 
-        Set<Block> blocksInCluster() {
+        public Set<Block> blocksInCluster() {
             Set<Block> allBlocks = new HashSet<>();
             allBlocks.add(this);
             for (Block child : children) {
