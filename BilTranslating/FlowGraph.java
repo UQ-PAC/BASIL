@@ -2,7 +2,6 @@ package BilTranslating;
 
 import Facts.inst.*;
 import Util.AssumptionViolationException;
-
 import java.util.*;
 
 public class FlowGraph {
@@ -156,7 +155,7 @@ public class FlowGraph {
     /**
      * A block is an ordered list of facts.
      */
-    class Block implements Iterator<Block> {
+    class Block {
         List<InstFact> lines;
         List<Block> children;
 
@@ -171,6 +170,23 @@ public class FlowGraph {
 
         InstFact lastLine() {
             return lines.get(lines.size() - 1);
+        }
+
+        Set<InstFact> linesInCluster() {
+            Set<InstFact> allLines = new HashSet<>(lines);
+            for (Block child : children) {
+                allLines.addAll(child.linesInCluster());
+            }
+            return allLines;
+        }
+
+        Set<Block> blocksInCluster() {
+            Set<Block> allBlocks = new HashSet<>();
+            allBlocks.add(this);
+            for (Block child : children) {
+                allBlocks.addAll(child.blocksInCluster());
+            }
+            return allBlocks;
         }
 
         /**
@@ -188,18 +204,6 @@ public class FlowGraph {
         @Override
         public int hashCode() {
             return Objects.hash(firstLine());
-        }
-
-        @Override
-        public boolean hasNext() {
-            return false;
-            // todo
-        }
-
-        @Override
-        public Block next() {
-            return null;
-            // todo
         }
     }
 }
