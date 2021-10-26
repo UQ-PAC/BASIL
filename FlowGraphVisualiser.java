@@ -49,21 +49,23 @@ public class FlowGraphVisualiser extends Application {
         walker.walk(statementLoader, b);
 
         FlowGraph flowGraph = FlowGraph.fromFactsList(facts);
-        Digraph<String, String> g = new DigraphEdgeList<>();
+        Digraph<FlowGraph.Block, String> g = new DigraphEdgeList<>();
         for (FlowGraph.Block cluster : flowGraph.functionBlocks) {
             for (FlowGraph.Block block : cluster.blocksInCluster()) {
-                g.insertVertex(block.toString());
+                g.insertVertex(block);
+                System.out.println(block);
             }
         }
         for (FlowGraph.Block cluster : flowGraph.functionBlocks) {
             for (FlowGraph.Block block : cluster.blocksInCluster()) {
                 for (FlowGraph.Block child : block.children) {
-                    g.insertEdge(block.toString(), child.toString(), getEdgeId());
+                    g.insertEdge(block, child, getEdgeId());
                 }
             }
         }
         SmartPlacementStrategy strategy = new SmartCircularSortedPlacementStrategy();
-        SmartGraphPanel<String, String> graphView = new SmartGraphPanel<>(g, strategy);
+        SmartGraphPanel<FlowGraph.Block, String> graphView = new SmartGraphPanel<>(g, strategy);
+        graphView.setAutomaticLayout(false);
         Scene scene = new Scene(graphView, 1024, 768);
         primaryStage.setTitle("Flow Graph Visualisation");
         primaryStage.setScene(scene);

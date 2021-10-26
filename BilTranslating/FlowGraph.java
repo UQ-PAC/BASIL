@@ -229,7 +229,7 @@ public class FlowGraph {
             StringBuilder builder = new StringBuilder();
             builder.append("Block:\n");
             for (InstFact line : lines) {
-                builder.append(line.toString()).append('\n');
+                builder.append(line.toString());
             }
             return builder.toString();
         }
