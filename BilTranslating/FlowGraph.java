@@ -2,7 +2,18 @@ package BilTranslating;
 
 import Facts.inst.*;
 import Util.AssumptionViolationException;
+import com.brunomnsilva.smartgraph.graph.Graph;
+import com.brunomnsilva.smartgraph.graph.GraphEdgeList;
+import com.brunomnsilva.smartgraph.graphview.SmartCircularSortedPlacementStrategy;
+import com.brunomnsilva.smartgraph.graphview.SmartGraphPanel;
+import com.brunomnsilva.smartgraph.graphview.SmartPlacementStrategy;
+import javafx.scene.Scene;
+import javafx.stage.Stage;
+import javafx.stage.StageStyle;
+
 import java.util.*;
+
+
 
 public class FlowGraph {
 
@@ -23,11 +34,16 @@ public class FlowGraph {
      * No code is shared between functions. I.e. if a line belongs to one function cluster, then it will not belong to
      * any other function cluster.
      */
-    public FlowGraph fromFactsList(List<InstFact> facts) {
+    public static FlowGraph fromFactsList(List<InstFact> facts) {
         List<Block> functionBlocks = new ArrayList<>();
         List<Integer> splits = getSplits(facts);
+        splits.forEach(System.out::println);
         for (int i = 0; i < splits.size(); i++) {
             Integer split = splits.get(i);
+            // skip the split at the end of the list
+            if (split == facts.size()) {
+                continue;
+            }
             InstFact fact = facts.get(split);
             if (fact instanceof EnterSubFact) {
                 functionBlocks.add(createBlockFromSplit(split, splits, facts, new ArrayList<>()));
@@ -46,7 +62,7 @@ public class FlowGraph {
      *
      * Requires list of splits to be ordered.
      */
-    private Block createBlockFromSplit(Integer split, List<Integer> splits, List<InstFact> facts,
+    private static Block createBlockFromSplit(Integer split, List<Integer> splits, List<InstFact> facts,
                                               List<Block> existingBlocks) {
         Integer nextSplit = splits.get(splits.indexOf(split) + 1);
         List<InstFact> blockLines = facts.subList(split, nextSplit);
@@ -82,7 +98,7 @@ public class FlowGraph {
      * that creates a function return fact after any lines which immediately precede a function header and do not meet
      * these conditions.
      */
-    private List<Integer> getTargetIndexes(List<InstFact> facts, Integer jumperIndex) {
+    private static List<Integer> getTargetIndexes(List<InstFact> facts, Integer jumperIndex) {
         InstFact jumper = facts.get(jumperIndex);
         List<Integer> targets = new ArrayList<>();
         if (jumper instanceof JmpFact) {
@@ -112,9 +128,10 @@ public class FlowGraph {
      * Any given facts list will also be provided a split at the beginning and end of the program.
      * Splits are identified as any lines which either follow some jump, or are jumped to (conditionally or otherwise).
      */
-    private List<Integer> getSplits(List<InstFact> facts) {
+    private static List<Integer> getSplits(List<InstFact> facts) {
         // splits are represented as the index of the element following the split; i.e. the beginning of a block
-        List<Integer> splits = new ArrayList<>();
+        // we use a set to avoid double-ups
+        Set<Integer> splits = new HashSet<>();
         for (int i = 0; i < facts.size(); i++) {
             InstFact fact = facts.get(i);
             if (fact instanceof JmpFact) {
@@ -140,11 +157,12 @@ public class FlowGraph {
         // ensure there is a split at the start and end of the program
         splits.add(0);
         splits.add(facts.size());
-        splits.sort(Integer::compareTo);
-        return splits;
+        List<Integer> splitsList = new ArrayList<>(splits);
+        splitsList.sort(Integer::compareTo);
+        return splitsList;
     }
 
-    private int findInstWithPc(String pc, List<InstFact> facts) {
+    private static int findInstWithPc(String pc, List<InstFact> facts) {
         for (int i = 0; i < facts.size(); i++) {
             if (facts.get(i).label.pc.equals(pc)) return i;
         }
@@ -155,7 +173,7 @@ public class FlowGraph {
     /**
      * A block is an ordered list of facts.
      */
-    class Block {
+    static class Block {
         List<InstFact> lines;
         List<Block> children;
 
@@ -204,6 +222,16 @@ public class FlowGraph {
         @Override
         public int hashCode() {
             return Objects.hash(firstLine());
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder builder = new StringBuilder();
+            builder.append("Block:\n");
+            for (InstFact line : lines) {
+                builder.append(line.toString()).append('\n');
+            }
+            return builder.toString();
         }
     }
 }
