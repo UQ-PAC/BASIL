@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+// TODO: refactor boogietranslator to take a control flow graph
 public class Main {
     public static void main(String[] args) throws IOException {
         if (args.length == 0) {
