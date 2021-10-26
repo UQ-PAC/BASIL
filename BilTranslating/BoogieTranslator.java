@@ -60,6 +60,7 @@ public class BoogieTranslator {
             System.err.println("Error setting up file writer.");
         }
         this.facts = facts;
+        // todo: add global code to flow graph
     }
 
     /**
