@@ -4,18 +4,23 @@ import Facts.inst.*;
 import Util.AssumptionViolationException;
 import java.util.*;
 
-
-
 public class FlowGraph {
-
     // the head of all global code; the starting point for the boogie program
-    public Block globalBlock;
+    private final Block globalBlock;
     // a list of all function heads; represents all functions/procedures in the boogie program
-    public List<Block> functionBlocks;
+    private final List<Block> functionBlocks;
 
-    FlowGraph(List<Block> functionBlocks) {
+    private FlowGraph(List<Block> functionBlocks) {
         this.globalBlock = new Block(new ArrayList<>(), new ArrayList<>());
         this.functionBlocks = functionBlocks;
+    }
+
+    public Block getGlobalBlock() {
+        return globalBlock;
+    }
+
+    public List<Block> getFunctionBlocks() {
+        return functionBlocks;
     }
 
     /**
@@ -165,12 +170,20 @@ public class FlowGraph {
      * A block is an ordered list of facts.
      */
     public static class Block {
-        public List<InstFact> lines;
-        public List<Block> children;
+        private final List<InstFact> lines;
+        private final List<Block> children;
 
         Block(List<InstFact> lines, List<Block> children) {
             this.lines = lines;
             this.children = children;
+        }
+
+        public List<InstFact> getLines() {
+            return lines;
+        }
+
+        public List<Block> getChildren() {
+            return children;
         }
 
         public InstFact firstLine() {

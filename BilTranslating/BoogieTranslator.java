@@ -50,23 +50,23 @@ public class BoogieTranslator {
     // for writing the boogie output
     BufferedWriter writer;
     // the lines in the BIL file to translate
-    List<InstFact> facts;
+    FlowGraph flowGraph;
     int nameCount = 0;
 
-    public BoogieTranslator(List<InstFact> facts, String outputFileName) {
+    public BoogieTranslator(FlowGraph flowGraph, String outputFileName) {
         try {
             writer = new BufferedWriter(new FileWriter(outputFileName, false));
         } catch (IOException e) {
             System.err.println("Error setting up file writer.");
         }
-        this.facts = facts;
-        // todo: add global code to flow graph
+        this.flowGraph = flowGraph;
     }
 
     /**
      * Starting point for a BIL translation.
      */
     public void translate() {
+        initGlobalBlock();
 
         createLabels();
         optimiseLabels();
@@ -78,6 +78,12 @@ public class BoogieTranslator {
         resolveMems();
         addVarDeclarations();
         printAllFacts();
+    }
+
+    private void initGlobalBlock() {
+        List<InstFact> globalLines = flowGraph.getGlobalBlock().getLines();
+        globalLines.add(new CallFact("start", "main", "exit"));
+        globalLines.add(new NopFact("exit"));
     }
 
     /**
