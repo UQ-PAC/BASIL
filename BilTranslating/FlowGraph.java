@@ -183,19 +183,24 @@ public class FlowGraph {
 
         public Set<InstFact> linesInCluster() {
             Set<InstFact> allLines = new HashSet<>(lines);
-            for (Block child : children) {
-                allLines.addAll(child.linesInCluster());
-            }
+            Set<Block> blocksInCluster = blocksInCluster();
+            blocksInCluster.forEach(block -> allLines.addAll(block.linesInCluster()));
             return allLines;
         }
 
         public Set<Block> blocksInCluster() {
-            Set<Block> allBlocks = new HashSet<>();
-            allBlocks.add(this);
+            Set<Block> cluster = new HashSet<>();
+            recursivelyAddBlocks(cluster);
+            return cluster;
+        }
+
+        private void recursivelyAddBlocks(Set<Block> cluster) {
+            cluster.add(this);
             for (Block child : children) {
-                allBlocks.addAll(child.blocksInCluster());
+                if (!cluster.contains(child)) {
+                    child.recursivelyAddBlocks(cluster);
+                }
             }
-            return allBlocks;
         }
 
         /**
