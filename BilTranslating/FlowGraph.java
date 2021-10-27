@@ -23,13 +23,24 @@ public class FlowGraph {
         return functionBlocks;
     }
 
-    public List<InstFact> getLines() {
-        List<InstFact> lines = new ArrayList<>();
-        List<Block> blocks = new ArrayList<>(functionBlocks);
+    public Set<InstFact> getLines() {
+        Set<InstFact> lines = new HashSet<>();
+        HashSet<Block> blocks = new HashSet<>(functionBlocks);
         blocks.add(globalBlock);
         blocks.forEach(block -> lines.addAll(block.getLines()));
         return lines;
     }
+
+    public void removeLine(InstFact line) {
+        globalBlock.lines.remove(line);
+        functionBlocks.forEach(block -> block.lines.remove(line));
+    }
+
+    public void removeLines(Collection<InstFact> lines) {
+        lines.forEach(this::removeLine);
+    }
+
+
 
     /**
      * Creates a FlowGraph from the given list of facts.
@@ -202,8 +213,8 @@ public class FlowGraph {
      * A block is an ordered list of instruction facts (i.e. lines).
      */
     public static class Block {
-        private final List<InstFact> lines;
-        private final List<Block> children;
+        private List<InstFact> lines;
+        private List<Block> children;
 
         Block(List<InstFact> lines, List<Block> children) {
             this.lines = lines;
@@ -216,6 +227,11 @@ public class FlowGraph {
 
         public List<Block> getChildren() {
             return children;
+        }
+
+        public void setLines(List<InstFact> lines) {
+            // fixme: need to work out constraints and guarantees for the flow graph. what if we remove the first line, or even modify it internally? is using the first line a sensible option for uniquely identifying blocks?
+            this.lines = lines;
         }
 
         public InstFact firstLine() {

@@ -44,6 +44,9 @@ import java.util.*;
  * assumption: to avoid shared-variable problems when creating the flow graph, we must assume that external lines of bil
  * are not used by multiple functions - only one function per basic block of external code. otherwise, modifying the
  * shared line will cause changes in both functions!
+ *
+ * NOTE: if a function adds or moves any lines within the flow graph, it is necessary to call
+ * flowGraph.verifyUniqueLinesProperty() to ensure no duplicate lines were added, as this could lead to problems.
  */
 public class BoogieTranslator {
 
@@ -67,9 +70,8 @@ public class BoogieTranslator {
      */
     public void translate() {
         initGlobalBlock();
-
         createLabels();
-        optimiseLabels();
+
         optimiseSkips();
         createFuncParameters();
         resolveInParams();
@@ -129,35 +131,22 @@ public class BoogieTranslator {
      * a jump, conditional jump or call).
      */
     private void createLabels() {
+        Set<InstFact> lines = flowGraph.getLines();
         List<String> usedLabels = new ArrayList<>();
-        for (InstFact fact : facts) {
-            String target = extractTargetLabel(fact);
+        // get all referred labels within the flow graph
+        for (InstFact line : lines) {
+            String target = extractTargetLabel(line);
             if (target != null) usedLabels.add(target);
         }
-        for (InstFact fact : facts) fact.label.hide = !usedLabels.contains(fact.label.pc);
+        // show all labels which are referred; hide all labels which are not
+        for (InstFact line : lines) {
+            line.label.hide = !usedLabels.contains(line.label.pc);
+        }
     }
 
     /**
-     * Remove all jumps to lines that directly follow.
-     * Then remove those labels if they are not jumped to again.
+     * If a skip is not jumped to, we should remove it.
      */
-    private void optimiseLabels() {
-        List<InstFact> toRemove = new ArrayList<>();
-        for (int i = 0; i < facts.size() - 1; i++) {
-            InstFact fact = facts.get(i);
-            String target = extractTargetLabel(fact);
-            if (target == null) continue;
-            InstFact nextFact = facts.get(i + 1);
-            if (nextFact.label.hide || !nextFact.label.pc.equals(target)) continue;
-            // this jump goes to the next line; remove it
-            if (fact instanceof CallFact) ((CallFact) fact).showJump = false;
-            else toRemove.add(fact);
-        }
-        toRemove.forEach(fact -> facts.remove(fact));
-        // finally, we need to remove redundant labels again
-        createLabels();
-    }
-
     private void optimiseSkips() {
         List<InstFact> toRemove = new ArrayList<>();
         for (InstFact fact : facts) {
