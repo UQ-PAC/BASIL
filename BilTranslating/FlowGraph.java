@@ -23,6 +23,14 @@ public class FlowGraph {
         return functionBlocks;
     }
 
+    public List<InstFact> getLines() {
+        List<InstFact> lines = new ArrayList<>();
+        List<Block> blocks = new ArrayList<>(functionBlocks);
+        blocks.add(globalBlock);
+        blocks.forEach(block -> lines.addAll(block.getLines()));
+        return lines;
+    }
+
     /**
      * Creates a FlowGraph from the given list of facts.
      *
@@ -45,7 +53,31 @@ public class FlowGraph {
                 functionBlocks.add(createBlockFromSplit(split, splits, facts, new ArrayList<>()));
             }
         }
-        return new FlowGraph(functionBlocks);
+        FlowGraph flowGraph = new FlowGraph(functionBlocks);
+        flowGraph.verifyUniqueLinesProperty();
+        return flowGraph;
+    }
+
+    /**
+     * A complete traversal on a flow graph should encounter no line twice.
+     * This ensures:
+     * 1. No blocks overlap (i.e. share lines).
+     * 2. No block exists in multiple locations within the flow graph.
+     */
+    private void verifyUniqueLinesProperty() {
+        List<InstFact> lines = new ArrayList<>();
+        List<Block> blocks = new ArrayList<>(functionBlocks);
+        blocks.add(globalBlock);
+        blocks.forEach(block -> lines.addAll(block.getLines()));
+        Set<InstFact> linesSet = new HashSet<>(lines);
+        if (lines.size() != linesSet.size()) {
+            // find duplicates
+            linesSet.forEach(lines::remove);
+            StringBuilder builder = new StringBuilder();
+            builder.append("Flow graph contains duplicate lines:\n");
+            lines.forEach(builder::append);
+            throw new AssumptionViolationException(builder.toString());
+        }
     }
 
     /**
@@ -167,7 +199,7 @@ public class FlowGraph {
     }
 
     /**
-     * A block is an ordered list of facts.
+     * A block is an ordered list of instruction facts (i.e. lines).
      */
     public static class Block {
         private final List<InstFact> lines;
@@ -194,20 +226,20 @@ public class FlowGraph {
             return lines.get(lines.size() - 1);
         }
 
-        public Set<InstFact> linesInCluster() {
-            Set<InstFact> allLines = new HashSet<>(lines);
-            Set<Block> blocksInCluster = blocksInCluster();
-            blocksInCluster.forEach(block -> allLines.addAll(block.linesInCluster()));
+        public List<InstFact> getLinesInCluster() {
+            List<InstFact> allLines = new ArrayList<>(lines);
+            List<Block> blocksInCluster = getBlocksInCluster();
+            blocksInCluster.forEach(block -> allLines.addAll(block.getLinesInCluster()));
             return allLines;
         }
 
-        public Set<Block> blocksInCluster() {
-            Set<Block> cluster = new HashSet<>();
+        public List<Block> getBlocksInCluster() {
+            List<Block> cluster = new ArrayList<>();
             recursivelyAddBlocks(cluster);
             return cluster;
         }
 
-        private void recursivelyAddBlocks(Set<Block> cluster) {
+        private void recursivelyAddBlocks(List<Block> cluster) {
             cluster.add(this);
             for (Block child : children) {
                 if (!cluster.contains(child)) {
