@@ -1,15 +1,11 @@
 import BilParsing.BilLexer;
 import BilParsing.BilParser;
-import BilTranslating.BoogieTranslator;
-import BilTranslating.FlowGraph;
 import BilTranslating.StatementLoader;
 import Facts.DatalogUtility;
 import Facts.inst.InstFact;
-import javafx.application.Application;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
-
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
