@@ -176,31 +176,62 @@ public class FlowGraph {
             return splitsList;
         }
 
+        /**
+         * Locates the fact in the given list that has the given PC.
+         *
+         * @param pc of the fact to find
+         * @param facts the list of facts to search
+         * @return the fact in the given list that has the given PC.
+         */
         private static int findInstWithPc(String pc, List<InstFact> facts) {
             for (int i = 0; i < facts.size(); i++) {
                 if (facts.get(i).label.pc.equals(pc)) return i;
             }
-            System.err.printf("Error in constructing flow graph: No inst found with pc %s.\n", pc);
-            return -1;
+            throw new AssumptionViolationException(String.format(
+                    "Error in constructing flow graph: No inst found with pc %s.\n", pc
+            ));
         }
 
-        // requires that splits are sorted and that there is a split at the beginning and end of the facts list
+        /**
+         * Creates a list of blocks from each pair of consecutive splits.
+         * For example, for splits = [0, 3, 4, 8] and lines = [a, b, c, d, e, f, g, h], we will get blocks of:
+         * [a, b, c], [d], [e, f, g, h]
+         *
+         * @requires splits and lines are sorted and splits.contains(0) and splits.contains(lines.size())
+         * @param splits a list of indexes to define the boundaries of blocks
+         * @param lines a list of facts from which to extract blocks at the indexes given by splits
+         * @return a list of blocks consisting of sublists of the given facts list, as defined by the given splits list
+         */
         private static List<Block> createBlocksFromSplits(List<Integer> splits, List<InstFact> lines) {
             List<Block> blocks = new ArrayList<>();
             for (int i = 0; i < splits.size() - 1; i++) {
                 List<InstFact> blockLines = lines.subList(splits.get(i), splits.get(i + 1));
-                List<Block> children = new ArrayList<>();
-                Block block = new Block(blockLines, children);
+                // blocks are initially created with no children
+                Block block = new Block(blockLines, new ArrayList<>());
                 blocks.add(block);
             }
             return blocks;
         }
 
+        /**
+         * Sets the children of all blocks in the given list. Think of this like "wiring up" all the blocks in the list
+         * with each other.
+         *
+         * @requires all possible children of blocks within the given list are also contained in the list, and the given
+         * list of facts is ordered
+         * @param blocks the list of blocks to create children for
+         * @param facts the ordered list of facts the given blocks were created from; necessary for finding facts which
+         *              directly follow the last fact in a block, as it may represent a child of this block if the last
+         *              line is, for instance, not a jump
+         */
         private static void setChildren(List<Block> blocks, List<InstFact> facts) {
             for (Block block : blocks) {
+                // the PCs of all facts this block jumps to (for instance, the targets of jumps)
                 List<String> childrenPcs = getChildrenPcs(block, facts);
                 for (String childPc : childrenPcs) {
+                    // tries to find a block in the list with a first line that has the child's PC
                     Block child = findBlockStartingWith(childPc, blocks);
+                    // no such block was found, which means there is no block defined for this jump/cjump etc.
                     if (child == null) {
                         throw new AssumptionViolationException(String.format(
                                 "Error creating flow graph. Could not find a block starting with target pc '%s'.",
@@ -212,6 +243,12 @@ public class FlowGraph {
             }
         }
 
+        /**
+         *
+         * @param block
+         * @param lines
+         * @return
+         */
         private static List<String> getChildrenPcs(Block block, List<InstFact> lines) {
             List<String> childrenPcs = new ArrayList<>();
             InstFact lastLine = block.lastLine();
