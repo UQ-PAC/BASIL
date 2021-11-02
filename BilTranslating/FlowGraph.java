@@ -274,23 +274,6 @@ public class FlowGraph {
             }
         }
 
-        /**
-         * Blocks are equal if their first lines are equal.
-         * Assumes that all InstFacts are distinct, which holds due to unique pc identifiers.
-         */
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            Block block = (Block) o;
-            return firstLine().equals(block.firstLine());
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(firstLine());
-        }
-
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
