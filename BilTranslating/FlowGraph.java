@@ -321,6 +321,10 @@ public class FlowGraph {
 
     /**
      * A block is an ordered list of instruction facts (i.e. lines).
+     * todo: ensure this integrates with the flow graph factory. need to add documentation, and then review:
+     * - set lines
+     * - get all lines in cluster
+     * etc.
      */
     public static class Block {
         private List<InstFact> lines;
