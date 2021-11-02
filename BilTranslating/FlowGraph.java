@@ -54,15 +54,11 @@ public class FlowGraph {
 
     /**
      * Creates a FlowGraph from the given list of facts.
-     *
-     * Assumptions:
-     * No code is shared between functions. I.e. if a line belongs to one function cluster, then it will not belong to
-     * any other function cluster.
+     * Assumes no line is reachable from more than one function header (i.e. EnterSubFact).
      */
     public static FlowGraph fromFactsList(List<InstFact> facts) {
         List<Block> functionBlocks = new ArrayList<>();
         List<Integer> splits = getSplits(facts);
-        splits.forEach(System.out::println);
         for (int i = 0; i < splits.size(); i++) {
             Integer split = splits.get(i);
             // skip the split at the end of the list
