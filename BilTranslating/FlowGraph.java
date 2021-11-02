@@ -62,6 +62,10 @@ public class FlowGraph {
         functionBlocks.forEach(block -> block.lines.remove(line));
     }
 
+    public void enforceConstraints() {
+        enforceDisjointFunctions();
+    }
+
     private void enforceDisjointFunctions() {
         Set<Block> usedBlocks = new HashSet<>();
         for (Block functionBlock : functionBlocks) {
@@ -101,7 +105,12 @@ public class FlowGraph {
     }
 
     /**
-     * Factory for a flow graph.
+     * Factory for a flow graph. It works, at a high level, as follows:
+     * Take a list of facts.
+     * Partition the list into chunks of facts called blocks. These are the nodes in the flow graph.
+     * Go through all the blocks and link them to all the other blocks that they might transition to.
+     * Identify all the function blocks (i.e. blocks with function headers as first lines).
+     * Return a flow graph of these function blocks.
      */
     private static class FlowGraphFactory {
 
@@ -121,7 +130,10 @@ public class FlowGraph {
             // links each block in the list to each other block that may follow this one (e.g. via a jump)
             // essentially creates the edges for this flow graph
             setChildren(blocks, facts);
-            // return a flow graph consisting of the function cluster heads
+            // create a flow graph consisting of the function cluster heads
+            FlowGraph flowGraph = new FlowGraph(getFunctionBlocksFromList(blocks));
+            // ensure the created flow graph maintains the required properties
+            flowGraph.enforceConstraints();
             return new FlowGraph(getFunctionBlocksFromList(blocks));
         }
 
