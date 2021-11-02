@@ -244,27 +244,41 @@ public class FlowGraph {
         }
 
         /**
+         * Finds all PCs of lines that the given block may transition to. Presuming the given block was properly
+         * created, this will solely depend on the last line in the block.
          *
-         * @param block
-         * @param lines
-         * @return
+         * @requires the list of lines contains all PCs which may be jumped to, and the given block was properly
+         * created (e.g. does not contain any jumps halfway through), and the list of lines is ordered
+         * @param block to find the children PCs of
+         * @param lines see #setChildren@facts
+         * @return a list of PCs representing the children of the given block
          */
         private static List<String> getChildrenPcs(Block block, List<InstFact> lines) {
             List<String> childrenPcs = new ArrayList<>();
             InstFact lastLine = block.lastLine();
             if (lastLine instanceof JmpFact) {
+                // for jumps, simply add the target
                 childrenPcs.add(((JmpFact) lastLine).target);
             } else if (lastLine instanceof CjmpFact) {
+                // for conditional jumps, add the target as well as the following line
                 childrenPcs.add(((CjmpFact) lastLine).target);
                 childrenPcs.add(lines.get(lines.indexOf(lastLine) + 1).label.pc);
             } else if (lastLine instanceof CallFact) {
+                // for calls, add the target of the goto portion
                 childrenPcs.add(((CallFact) lastLine).returnAddr);
             } else if (!(lastLine instanceof ExitSubFact)) {
+                // for any other line that is not a function return, simply add the following line
                 childrenPcs.add(lines.get(lines.indexOf(lastLine) + 1).label.pc);
             }
             return childrenPcs;
         }
 
+        /**
+         * Returns all the blocks within the given list that are heads of function clusters.
+         *
+         * @param blocks to search for function blocks
+         * @return all function blocks within the given list
+         */
         private static List<Block> getFunctionBlocksFromList(List<Block> blocks) {
             List<Block> functionBlocks = new ArrayList<>();
             for (Block block : blocks) {
@@ -275,6 +289,14 @@ public class FlowGraph {
             return functionBlocks;
         }
 
+        /**
+         * Searches for a block in the given list that contains a first line with the given PC.
+         * Returns null if none found.
+         *
+         * @param pc the PC to search for
+         * @param blocks the list of blocks to search through
+         * @return the first block with a first line that contains the given pc, or null if none found
+         */
         private static Block findBlockStartingWith(String pc, List<Block> blocks) {
             for (Block block : blocks) {
                 if (block.firstLine().label.pc.equals(pc)) {
