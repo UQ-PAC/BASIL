@@ -57,22 +57,70 @@ public class FlowGraph {
      * Assumes no line is reachable from more than one function header (i.e. EnterSubFact).
      */
     public static FlowGraph fromFactsList(List<InstFact> facts) {
-        List<Block> functionBlocks = new ArrayList<>();
         List<Integer> splits = getSplits(facts);
-        for (int i = 0; i < splits.size(); i++) {
-            Integer split = splits.get(i);
-            // skip the split at the end of the list
-            if (split == facts.size()) {
-                continue;
+        List<Block> availableBlocks = createBlocksFromSplits(splits, facts);
+        List<Block> functionBlocks = getFunctionBlocksFromList(availableBlocks);
+        for (Block functionBlock : functionBlocks) {
+            List<Block> cluster = new ArrayList<>();
+            recursivelyCreateCluster(functionBlock, availableBlocks, cluster);
+            availableBlocks.removeAll(cluster);
+        }
+        return new FlowGraph(functionBlocks);
+    }
+
+    private static void recursivelyCreateCluster(Block block, List<Block> availableBlocks, List<Block> cluster) {
+        cluster.add(block);
+        List<String> childrenPcs = getChildrenPcs(block);
+        for (String childPc : childrenPcs) {
+            Block child = getBlockWithPc(childPc, availableBlocks);
+            if (child.firstLine() instanceof EnterSubFact) {
+                throw new AssumptionViolationException(String.format(
+                        "Error creating flow graph."
+                ));
             }
-            InstFact fact = facts.get(split);
-            if (fact instanceof EnterSubFact) {
-                functionBlocks.add(createBlockFromSplit(split, splits, facts, new ArrayList<>()));
+            if (!cluster.contains(child)) {
+                recursivelyCreateCluster(child, availableBlocks, cluster);
+            }
+            block.children.add(child);
+        }
+    }
+
+    private static List<String> getChildrenPcs(Block parent) {
+
+    }
+
+    private static Block getBlockWithPc(String firstLinePc, List<Block> blocks) {
+        for (Block block : blocks) {
+            if (block.firstLine().label.pc.equals(firstLinePc)) {
+                return block;
             }
         }
-        FlowGraph flowGraph = new FlowGraph(functionBlocks);
-        flowGraph.verifyUniqueLinesProperty();
-        return flowGraph;
+        throw new AssumptionViolationException(String.format(
+                "Error creating flow graph. The line with pc='%s' might be reachable by two different functions.",
+                firstLinePc
+        ));
+    }
+
+    private static List<Block> getFunctionBlocksFromList(List<Block> blocks) {
+        List<Block> functionBlocks = new ArrayList<>();
+        for (Block block : blocks) {
+            if (block.firstLine() instanceof EnterSubFact) {
+                functionBlocks.add(block);
+            }
+        }
+        return functionBlocks;
+    }
+
+    // requires that splits are sorted and that there is a split at the beginning and end of the facts list
+    private static List<Block> createBlocksFromSplits(List<Integer> splits, List<InstFact> lines) {
+        List<Block> blocks = new ArrayList<>();
+        for (int i = 0; i < splits.size() - 1; i++) {
+            List<InstFact> blockLines = lines.subList(splits.get(i), splits.get(i + 1));
+            List<Block> children = new ArrayList<>();
+            Block block = new Block(blockLines, children);
+            blocks.add(block);
+        }
+        return blocks;
     }
 
     /**
@@ -107,8 +155,8 @@ public class FlowGraph {
      *
      * Requires list of splits to be ordered.
      */
-    private static Block createBlockFromSplit(Integer split, List<Integer> splits, List<InstFact> facts,
-                                              List<Block> existingBlocks) {
+    private static Block recursivelyCreateCluster(Integer split, List<Integer> splits, List<InstFact> facts,
+                                                  List<Block> existingBlocks) {
         Integer nextSplit = splits.get(splits.indexOf(split) + 1);
         List<InstFact> blockLines = facts.subList(split, nextSplit);
         Block block = new Block(blockLines, new ArrayList<>());
@@ -125,7 +173,7 @@ public class FlowGraph {
         }
         // now recursively create the rest of the children
         for (Integer childSplit : splitsOfChildren) {
-            Block child = createBlockFromSplit(childSplit, splits, facts, existingBlocks);
+            Block child = recursivelyCreateCluster(childSplit, splits, facts, existingBlocks);
             block.children.add(child);
         }
         return block;
