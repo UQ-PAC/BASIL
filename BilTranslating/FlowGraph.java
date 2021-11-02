@@ -101,46 +101,69 @@ public class FlowGraph {
     }
 
     /**
-     * Factory for a flow graph. Does not enforce any constraints.
+     * Factory for a flow graph.
      */
     private static class FlowGraphFactory {
 
+        /**
+         * Creates a FlowGraph from the given list of facts. Does not enforce any constraints.
+         *
+         * @requires facts are ordered and there are no duplicates
+         * @param facts an ordered list of facts from which to create the flow graph
+         * @return a new flow graph with an empty global block and no constraints
+         */
         private static FlowGraph fromFactsList(List<InstFact> facts) {
+            // an ordered list of indexes of the given facts list, indicating where the list should be split into blocks
             List<Integer> splits = getSplits(facts);
-            List<Block> availableBlocks = createBlocksFromSplits(splits, facts);
-            setChildren(availableBlocks, facts);
-            List<Block> functionBlocks = getFunctionBlocksFromList(availableBlocks);
-            return new FlowGraph(functionBlocks);
+            // an ordered list of blocks, defined by the given given list of splits
+            // essentially creates the nodes for this flow graph
+            List<Block> blocks = createBlocksFromSplits(splits, facts);
+            // links each block in the list to each other block that may follow this one (e.g. via a jump)
+            // essentially creates the edges for this flow graph
+            setChildren(blocks, facts);
+            // return a flow graph consisting of the function cluster heads
+            return new FlowGraph(getFunctionBlocksFromList(blocks));
         }
 
         /**
-         * Returns an ordered list of all fact indexes ('splits') which represent the start of a block.
+         * Returns an ordered list of all fact indexes ('splits') which represent block boundaries.
+         * Splits are defined such that the splits 3 and 6 should define a block consisting of lines facts.get(3),
+         * facts.get(4) and facts.get(5).
          * Any given facts list will also be provided a split at the beginning and end of the program.
-         * Splits are identified as any lines which either follow some jump, or are jumped to (conditionally or otherwise).
+         *
+         * @requires facts are ordered and there are no duplicates
+         * @ensures the returned list of splits are ordered, and there is a split at index 0 and at index facts.size()
+         * @param facts an ordered list of facts from which to create the splits
+         * @return a list of splits indicating where blocks should be defined in the given facts list
          */
         private static List<Integer> getSplits(List<InstFact> facts) {
-            // splits are represented as the index of the element following the split; i.e. the beginning of a block
-            // we use a set to avoid double-ups
+            // we use a set to avoid double-ups, as some lines may be jumped to twice
             Set<Integer> splits = new HashSet<>();
             for (int i = 0; i < facts.size(); i++) {
                 InstFact fact = facts.get(i);
                 if (fact instanceof JmpFact) {
+                    // for jumps, add a split below the jump and above the target line
                     splits.add(i + 1);
                     int targetIndex = findInstWithPc(((JmpFact) fact).target, facts);
                     splits.add(targetIndex);
                 } else if (fact instanceof CjmpFact) {
+                    // for conditional jumps, add a split below the jump and above the target line
                     splits.add(i + 1);
                     int targetIndex = findInstWithPc(((CjmpFact) fact).target, facts);
                     splits.add(targetIndex);
                 } else if (fact instanceof CallFact) {
+                    /* we treat calls here (i.e. call x(); goto y;) like jumps (i.e. to y). this may change in future
+                    updates where we split the "call x()" part from the "goto y" part and make them separate facts */
                     splits.add(i + 1);
                     int targetIndex = findInstWithPc(((CallFact) fact).returnAddr, facts);
                     splits.add(targetIndex);
                 }
                 else if (fact instanceof EnterSubFact) {
+                    // for function headers, add a split before the header
                     splits.add(i);
                 }
                 else if (fact instanceof ExitSubFact) {
+                    // for function returns, add a split after the return
                     splits.add(i + 1);
                 }
             }
@@ -148,6 +171,7 @@ public class FlowGraph {
             splits.add(0);
             splits.add(facts.size());
             List<Integer> splitsList = new ArrayList<>(splits);
+            // ensure the list is sorted
             splitsList.sort(Integer::compareTo);
             return splitsList;
         }
