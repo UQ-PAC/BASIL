@@ -4,6 +4,24 @@ import Facts.inst.*;
 import Util.AssumptionViolationException;
 import java.util.*;
 
+/**
+ * A flow graph is a graphical representation of a bil/boogie program.
+ * Nodes in the graph represent basic blocks, which are defined by jumps, conditional jumps, function headers, function
+ * returns and lines which are jumped to.
+ * Edges in the graph represent 'links' (i.e. conditional jumps, jumps or simply the following line) between blocks.
+ * In this file, a block 'cluster' refers to a complete subgraph of linked blocks, which is disjoint from all other
+ * blocks in the flow graph. An example of a cluster is a function cluster, which represents all blocks within a
+ * self-contained function (or 'procedure' in boogie).
+ * The 'head' of a cluster refers to the root block of that cluster. For example, the first line of a function cluster's
+ * root block will always be an EnterSubFact.
+ * The globalBlock is the head of a cluster which represents all global code and is the presumed starting point for the
+ * boogie program.
+ * Each functionBlock is the head of a function cluster.
+ *
+ * A flow graph self-maintains particular guarantees for user programs:
+ * 1. All lines (i.e. InstFacts) in the flow graph are unique; !line1.equals(line2) for all line1, line2.
+ * 2. Clusters are disjoint; no block reachable by a head block is reachable by any other head block.
+ */
 public class FlowGraph {
     // the head of all global code; the starting point for the boogie program
     private final Block globalBlock;
@@ -23,11 +41,9 @@ public class FlowGraph {
         return functionBlocks;
     }
 
-    public Set<InstFact> getLines() {
-        Set<InstFact> lines = new HashSet<>();
-        HashSet<Block> blocks = new HashSet<>(functionBlocks);
-        blocks.add(globalBlock);
-        blocks.forEach(block -> lines.addAll(block.getLines()));
+    public List<InstFact> getLines() {
+        List<InstFact> lines = new ArrayList<>(globalBlock.getLines());
+        functionBlocks.forEach(block -> lines.addAll(block.getLines()));
         return lines;
     }
 
@@ -35,12 +51,6 @@ public class FlowGraph {
         globalBlock.lines.remove(line);
         functionBlocks.forEach(block -> block.lines.remove(line));
     }
-
-    public void removeLines(Collection<InstFact> lines) {
-        lines.forEach(this::removeLine);
-    }
-
-
 
     /**
      * Creates a FlowGraph from the given list of facts.

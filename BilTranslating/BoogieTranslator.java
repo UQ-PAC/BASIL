@@ -54,7 +54,7 @@ public class BoogieTranslator {
     BufferedWriter writer;
     // the lines in the BIL file to translate
     FlowGraph flowGraph;
-    int nameCount = 0;
+    int uniqueInt = 0;
 
     public BoogieTranslator(FlowGraph flowGraph, String outputFileName) {
         try {
@@ -96,7 +96,8 @@ public class BoogieTranslator {
     }
 
     /**
-     * Add the "var" keyword to variables which are initially assigned within functions.
+     * In boogie, all local variables seem to want to be initialised at the beginning of functions.
+     * Do we want to make all registers local variables?
      */
     private void addVarDeclarations() {
         List<Integer[]> endpoints = getAllFunctions();
@@ -131,7 +132,7 @@ public class BoogieTranslator {
      * a jump, conditional jump or call).
      */
     private void createLabels() {
-        Set<InstFact> lines = flowGraph.getLines();
+        List<InstFact> lines = flowGraph.getLines();
         List<String> usedLabels = new ArrayList<>();
         // get all referred labels within the flow graph
         for (InstFact line : lines) {
@@ -149,12 +150,12 @@ public class BoogieTranslator {
      */
     private void optimiseSkips() {
         List<InstFact> toRemove = new ArrayList<>();
-        for (InstFact fact : facts) {
-            if (fact instanceof NopFact && fact.label.hide) {
-                toRemove.add(fact);
+        for (InstFact line : flowGraph.getLines()) {
+            if (line instanceof NopFact && line.label.hide) {
+                toRemove.add(line);
             }
         }
-        toRemove.forEach(fact -> facts.remove(fact));
+        toRemove.forEach(flowGraph::removeLine);
     }
 
     private String extractTargetLabel(InstFact fact) {
@@ -278,7 +279,7 @@ public class BoogieTranslator {
                 if (!(storeFact.rhs instanceof VarFact)) continue; // rhs must be a single variable
                 VarFact rhsVar = (VarFact) storeFact.rhs;
                 if (!isRegister(rhsVar) || assignedRegisters.contains(rhsVar)) continue; // variable is not a register, or has been assigned before
-                ParamFact param = new ParamFact("", new VarFact(generateUniqueName()), rhsVar, false);
+                ParamFact param = new ParamFact("", new VarFact(uniqueVarName()), rhsVar, false);
                 param.alias = (MemFact) storeFact.lhs;
                 params.add(param);
             } else {
@@ -552,8 +553,16 @@ public class BoogieTranslator {
         }
     }
 
-    private String generateUniqueName() {
-        return "p" + nameCount++;
+    private String uniqueVarName() {
+        return "p" + uniqueNum();
+    }
+
+    private String uniqueLabel() {
+        return "l" + uniqueNum();
+    }
+
+    private int uniqueNum() {
+        return uniqueInt++;
     }
 }
 
