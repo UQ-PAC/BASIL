@@ -33,6 +33,16 @@ public class FlowGraph {
         this.functionBlocks = functionBlocks;
     }
 
+    /**
+     * Creates a FlowGraph from the given list of facts.
+     * Assumes no line is reachable from more than one function header (i.e. EnterSubFact).
+     */
+    public static FlowGraph fromFactsList(List<InstFact> facts) {
+        FlowGraph flowGraph = FlowGraphFactory.fromFactsList(facts);
+        flowGraph.enforceDisjointFunctions();
+        return flowGraph;
+    }
+
     public Block getGlobalBlock() {
         return globalBlock;
     }
@@ -52,75 +62,20 @@ public class FlowGraph {
         functionBlocks.forEach(block -> block.lines.remove(line));
     }
 
-    /**
-     * Creates a FlowGraph from the given list of facts.
-     * Assumes no line is reachable from more than one function header (i.e. EnterSubFact).
-     */
-    public static FlowGraph fromFactsList(List<InstFact> facts) {
-        List<Integer> splits = getSplits(facts);
-        List<Block> availableBlocks = createBlocksFromSplits(splits, facts);
-        List<Block> functionBlocks = getFunctionBlocksFromList(availableBlocks);
+    private void enforceDisjointFunctions() {
+        Set<Block> usedBlocks = new HashSet<>();
         for (Block functionBlock : functionBlocks) {
-            List<Block> cluster = new ArrayList<>();
-            recursivelyCreateCluster(functionBlock, availableBlocks, cluster);
-            availableBlocks.removeAll(cluster);
-        }
-        return new FlowGraph(functionBlocks);
-    }
-
-    private static void recursivelyCreateCluster(Block block, List<Block> availableBlocks, List<Block> cluster) {
-        cluster.add(block);
-        List<String> childrenPcs = getChildrenPcs(block);
-        for (String childPc : childrenPcs) {
-            Block child = getBlockWithPc(childPc, availableBlocks);
-            if (child.firstLine() instanceof EnterSubFact) {
-                throw new AssumptionViolationException(String.format(
-                        "Error creating flow graph."
-                ));
+            List<Block> cluster = functionBlock.getBlocksInCluster();
+            for (Block clusterBlock : cluster) {
+                if (usedBlocks.contains(clusterBlock)) {
+                    throw new AssumptionViolationException(String.format(
+                            "Flow graph error. The following block can be accessed by two different functions:\n%s",
+                            clusterBlock.toString()
+                    ));
+                }
             }
-            if (!cluster.contains(child)) {
-                recursivelyCreateCluster(child, availableBlocks, cluster);
-            }
-            block.children.add(child);
+            usedBlocks.addAll(cluster);
         }
-    }
-
-    private static List<String> getChildrenPcs(Block parent) {
-
-    }
-
-    private static Block getBlockWithPc(String firstLinePc, List<Block> blocks) {
-        for (Block block : blocks) {
-            if (block.firstLine().label.pc.equals(firstLinePc)) {
-                return block;
-            }
-        }
-        throw new AssumptionViolationException(String.format(
-                "Error creating flow graph. The line with pc='%s' might be reachable by two different functions.",
-                firstLinePc
-        ));
-    }
-
-    private static List<Block> getFunctionBlocksFromList(List<Block> blocks) {
-        List<Block> functionBlocks = new ArrayList<>();
-        for (Block block : blocks) {
-            if (block.firstLine() instanceof EnterSubFact) {
-                functionBlocks.add(block);
-            }
-        }
-        return functionBlocks;
-    }
-
-    // requires that splits are sorted and that there is a split at the beginning and end of the facts list
-    private static List<Block> createBlocksFromSplits(List<Integer> splits, List<InstFact> lines) {
-        List<Block> blocks = new ArrayList<>();
-        for (int i = 0; i < splits.size() - 1; i++) {
-            List<InstFact> blockLines = lines.subList(splits.get(i), splits.get(i + 1));
-            List<Block> children = new ArrayList<>();
-            Block block = new Block(blockLines, children);
-            blocks.add(block);
-        }
-        return blocks;
     }
 
     /**
@@ -129,7 +84,7 @@ public class FlowGraph {
      * 1. No blocks overlap (i.e. share lines).
      * 2. No block exists in multiple locations within the flow graph.
      */
-    private void verifyUniqueLinesProperty() {
+    private void enforceUniqueLines() {
         List<InstFact> lines = new ArrayList<>();
         List<Block> blocks = new ArrayList<>(functionBlocks);
         blocks.add(globalBlock);
@@ -146,121 +101,127 @@ public class FlowGraph {
     }
 
     /**
-     * Recursively creates a graph of blocks beginning from the given split.
-     *
-     * Algorithm:
-     * Create a block representing this split.
-     * Recursively create children blocks representing any target splits, if those blocks don't already exist.
-     * Add those children blocks to the created block's list of children.
-     *
-     * Requires list of splits to be ordered.
+     * Factory for a flow graph. Does not enforce any constraints.
      */
-    private static Block recursivelyCreateCluster(Integer split, List<Integer> splits, List<InstFact> facts,
-                                                  List<Block> existingBlocks) {
-        Integer nextSplit = splits.get(splits.indexOf(split) + 1);
-        List<InstFact> blockLines = facts.subList(split, nextSplit);
-        Block block = new Block(blockLines, new ArrayList<>());
-        existingBlocks.add(block);
-        Integer lastLineInBlock = nextSplit - 1;
-        List<Integer> splitsOfChildren = getTargetIndexes(facts, lastLineInBlock);
-        // do not create children blocks that already exist - just add them instead
-        for (Block existingBlock : existingBlocks) {
-            Integer existingBlockSplit = facts.indexOf(existingBlock.firstLine());
-            if (splitsOfChildren.contains(existingBlockSplit)) {
-                block.children.add(existingBlock);
-                splitsOfChildren.remove(existingBlockSplit);
-            }
-        }
-        // now recursively create the rest of the children
-        for (Integer childSplit : splitsOfChildren) {
-            Block child = recursivelyCreateCluster(childSplit, splits, facts, existingBlocks);
-            block.children.add(child);
-        }
-        return block;
-    }
+    private static class FlowGraphFactory {
 
-    /**
-     * Returns a list of the indexes of all lines that may follow this line in a control flow graph.
-     * Hard jumps (jumps, calls) may jump to their targets.
-     * Soft jumps (conditional jumps) may jump to the next line or their targets.
-     * Function returns (ExitSubs) necessarily jump to nowhere.
-     * All other instructions simply jump to the next line.
-     *
-     * It is assumed that in a parsed BIL file, any lines immediately preceding a function header will be either a hard
-     * jump or a function return. In future, if we wanted to avoid this assumption, we could add a check to this code
-     * that creates a function return fact after any lines which immediately precede a function header and do not meet
-     * these conditions.
-     */
-    private static List<Integer> getTargetIndexes(List<InstFact> facts, Integer jumperIndex) {
-        InstFact jumper = facts.get(jumperIndex);
-        List<Integer> targets = new ArrayList<>();
-        if (jumper instanceof JmpFact) {
-            int targetIndex = findInstWithPc(((JmpFact) jumper).target, facts);
-            targets.add(targetIndex);
-        } else if (jumper instanceof CjmpFact) {
-            targets.add(jumperIndex + 1);
-            int targetIndex = findInstWithPc(((CjmpFact) jumper).target, facts);
-            targets.add(targetIndex);
-        } else if (jumper instanceof CallFact) {
-            int targetIndex = findInstWithPc(((CallFact) jumper).returnAddr, facts);
-            targets.add(targetIndex);
-        } else if (!(jumper instanceof ExitSubFact)) {
-            targets.add(jumperIndex + 1);
+        private static FlowGraph fromFactsList(List<InstFact> facts) {
+            List<Integer> splits = getSplits(facts);
+            List<Block> availableBlocks = createBlocksFromSplits(splits, facts);
+            setChildren(availableBlocks, facts);
+            List<Block> functionBlocks = getFunctionBlocksFromList(availableBlocks);
+            return new FlowGraph(functionBlocks);
         }
-        for (Integer target : targets) {
-            if (facts.get(target) instanceof EnterSubFact) {
-                throw new AssumptionViolationException("Assumption not met while creating control flow graph: \n" +
-                        "Found a block with a function block as its child.");
-            }
-        }
-        return targets;
-    }
 
-    /**
-     * Returns an ordered list of all fact indexes ('splits') which represent the start of a block.
-     * Any given facts list will also be provided a split at the beginning and end of the program.
-     * Splits are identified as any lines which either follow some jump, or are jumped to (conditionally or otherwise).
-     */
-    private static List<Integer> getSplits(List<InstFact> facts) {
-        // splits are represented as the index of the element following the split; i.e. the beginning of a block
-        // we use a set to avoid double-ups
-        Set<Integer> splits = new HashSet<>();
-        for (int i = 0; i < facts.size(); i++) {
-            InstFact fact = facts.get(i);
-            if (fact instanceof JmpFact) {
-                splits.add(i + 1);
-                int targetIndex = findInstWithPc(((JmpFact) fact).target, facts);
-                splits.add(targetIndex);
-            } else if (fact instanceof CjmpFact) {
-                splits.add(i + 1);
-                int targetIndex = findInstWithPc(((CjmpFact) fact).target, facts);
-                splits.add(targetIndex);
-            } else if (fact instanceof CallFact) {
-                splits.add(i + 1);
-                int targetIndex = findInstWithPc(((CallFact) fact).returnAddr, facts);
-                splits.add(targetIndex);
+        /**
+         * Returns an ordered list of all fact indexes ('splits') which represent the start of a block.
+         * Any given facts list will also be provided a split at the beginning and end of the program.
+         * Splits are identified as any lines which either follow some jump, or are jumped to (conditionally or otherwise).
+         */
+        private static List<Integer> getSplits(List<InstFact> facts) {
+            // splits are represented as the index of the element following the split; i.e. the beginning of a block
+            // we use a set to avoid double-ups
+            Set<Integer> splits = new HashSet<>();
+            for (int i = 0; i < facts.size(); i++) {
+                InstFact fact = facts.get(i);
+                if (fact instanceof JmpFact) {
+                    splits.add(i + 1);
+                    int targetIndex = findInstWithPc(((JmpFact) fact).target, facts);
+                    splits.add(targetIndex);
+                } else if (fact instanceof CjmpFact) {
+                    splits.add(i + 1);
+                    int targetIndex = findInstWithPc(((CjmpFact) fact).target, facts);
+                    splits.add(targetIndex);
+                } else if (fact instanceof CallFact) {
+                    splits.add(i + 1);
+                    int targetIndex = findInstWithPc(((CallFact) fact).returnAddr, facts);
+                    splits.add(targetIndex);
+                }
+                else if (fact instanceof EnterSubFact) {
+                    splits.add(i);
+                }
+                else if (fact instanceof ExitSubFact) {
+                    splits.add(i + 1);
+                }
             }
-            else if (fact instanceof EnterSubFact) {
-                splits.add(i);
-            }
-            else if (fact instanceof ExitSubFact) {
-                splits.add(i + 1);
-            }
+            // ensure there is a split at the start and end of the program
+            splits.add(0);
+            splits.add(facts.size());
+            List<Integer> splitsList = new ArrayList<>(splits);
+            splitsList.sort(Integer::compareTo);
+            return splitsList;
         }
-        // ensure there is a split at the start and end of the program
-        splits.add(0);
-        splits.add(facts.size());
-        List<Integer> splitsList = new ArrayList<>(splits);
-        splitsList.sort(Integer::compareTo);
-        return splitsList;
-    }
 
-    private static int findInstWithPc(String pc, List<InstFact> facts) {
-        for (int i = 0; i < facts.size(); i++) {
-            if (facts.get(i).label.pc.equals(pc)) return i;
+        private static int findInstWithPc(String pc, List<InstFact> facts) {
+            for (int i = 0; i < facts.size(); i++) {
+                if (facts.get(i).label.pc.equals(pc)) return i;
+            }
+            System.err.printf("Error in constructing flow graph: No inst found with pc %s.\n", pc);
+            return -1;
         }
-        System.err.printf("Error in constructing flow graph: No inst found with pc %s.\n", pc);
-        return -1;
+
+        // requires that splits are sorted and that there is a split at the beginning and end of the facts list
+        private static List<Block> createBlocksFromSplits(List<Integer> splits, List<InstFact> lines) {
+            List<Block> blocks = new ArrayList<>();
+            for (int i = 0; i < splits.size() - 1; i++) {
+                List<InstFact> blockLines = lines.subList(splits.get(i), splits.get(i + 1));
+                List<Block> children = new ArrayList<>();
+                Block block = new Block(blockLines, children);
+                blocks.add(block);
+            }
+            return blocks;
+        }
+
+        private static void setChildren(List<Block> blocks, List<InstFact> facts) {
+            for (Block block : blocks) {
+                List<String> childrenPcs = getChildrenPcs(block, facts);
+                for (String childPc : childrenPcs) {
+                    Block child = findBlockStartingWith(childPc, blocks);
+                    if (child == null) {
+                        throw new AssumptionViolationException(String.format(
+                                "Error creating flow graph. Could not find a block starting with target pc '%s'.",
+                                childPc
+                        ));
+                    }
+                    block.children.add(child);
+                }
+            }
+        }
+
+        private static List<String> getChildrenPcs(Block block, List<InstFact> lines) {
+            List<String> childrenPcs = new ArrayList<>();
+            InstFact lastLine = block.lastLine();
+            if (lastLine instanceof JmpFact) {
+                childrenPcs.add(((JmpFact) lastLine).target);
+            } else if (lastLine instanceof CjmpFact) {
+                childrenPcs.add(((CjmpFact) lastLine).target);
+                childrenPcs.add(lines.get(lines.indexOf(lastLine) + 1).label.pc);
+            } else if (lastLine instanceof CallFact) {
+                childrenPcs.add(((CallFact) lastLine).returnAddr);
+            } else if (!(lastLine instanceof ExitSubFact)) {
+                childrenPcs.add(lines.get(lines.indexOf(lastLine) + 1).label.pc);
+            }
+            return childrenPcs;
+        }
+
+        private static List<Block> getFunctionBlocksFromList(List<Block> blocks) {
+            List<Block> functionBlocks = new ArrayList<>();
+            for (Block block : blocks) {
+                if (block.firstLine() instanceof EnterSubFact) {
+                    functionBlocks.add(block);
+                }
+            }
+            return functionBlocks;
+        }
+
+        private static Block findBlockStartingWith(String pc, List<Block> blocks) {
+            for (Block block : blocks) {
+                if (block.firstLine().label.pc.equals(pc)) {
+                    return block;
+                }
+            }
+            return null;
+        }
     }
 
     /**
