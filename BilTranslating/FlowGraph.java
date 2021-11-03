@@ -21,6 +21,11 @@ import java.util.*;
  * A flow graph self-maintains particular guarantees for user programs:
  * 1. All lines (i.e. InstFacts) in the flow graph are unique; !line1.equals(line2) for all line1, line2.
  * 2. Clusters are disjoint; no block reachable by a head block is reachable by any other head block.
+ *
+ * Example usage:
+ * Delete a line from an unknown location: getBlocks().forEach(block -> block.getLines().remove(line))
+ * Retrieve all blocks within a function: getFunctionBlocks().get(0).getBlocksInCluster()
+ * Insert a line in a particular location: getFunctionBlocks().get(0).getChildren().get(0).getLines().add(4, line)
  */
 public class FlowGraph {
     // the head of all global code; the starting point for the boogie program
@@ -43,29 +48,49 @@ public class FlowGraph {
         return flowGraph;
     }
 
+    /**
+     * @return the global block of this flow graph
+     */
     public Block getGlobalBlock() {
         return globalBlock;
     }
 
+    /**
+     * @return the list of function blocks of this flow graph
+     */
     public List<Block> getFunctionBlocks() {
         return functionBlocks;
     }
 
+    /**
+     * @return all lines of all blocks within this flow graph
+     */
     public List<InstFact> getLines() {
-        List<InstFact> lines = new ArrayList<>(globalBlock.getLinesInCluster());
-        functionBlocks.forEach(block -> lines.addAll(block.getLinesInCluster()));
+        List<InstFact> lines = new ArrayList<>();
+        getBlocks().forEach(block -> lines.addAll(block.getLines()));
         return lines;
     }
 
-    public void removeLine(InstFact line) {
-        globalBlock.lines.remove(line);
-        functionBlocks.forEach(block -> block.lines.remove(line));
+    /**
+     * @return all blocks within this flow graph
+     */
+    public List<Block> getBlocks() {
+        List<Block> blocks = new ArrayList<>(globalBlock.getBlocksInCluster());
+        functionBlocks.forEach(block -> blocks.addAll(block.getBlocksInCluster()));
+        return blocks;
     }
 
+    /**
+     * Enforce guaranteed properties of this flow graph. Exceptions are thrown when these constraints are not met.
+     */
     public void enforceConstraints() {
         enforceDisjointFunctions();
+        enforceUniqueLines();
     }
 
+    /**
+     * No block should be accessible (directly or indirectly) by two different function blocks.
+     */
     private void enforceDisjointFunctions() {
         Set<Block> usedBlocks = new HashSet<>();
         for (Block functionBlock : functionBlocks) {
@@ -432,6 +457,8 @@ public class FlowGraph {
                 }
             }
         }
+
+
 
         @Override
         public String toString() {
