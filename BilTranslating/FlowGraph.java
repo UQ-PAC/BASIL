@@ -34,7 +34,7 @@ public class FlowGraph {
     private final List<Block> functionBlocks;
 
     private FlowGraph(List<Block> functionBlocks) {
-        this.globalBlock = new Block(new ArrayList<>(), new ArrayList<>());
+        this.globalBlock = new Block("global", new ArrayList<>(), new ArrayList<>());
         this.functionBlocks = functionBlocks;
     }
 
@@ -134,6 +134,14 @@ public class FlowGraph {
                     stringBuilder
             ));
         }
+    }
+
+    @Override
+    public String toString() {
+        return "FlowGraph{" +
+                "globalBlock=" + globalBlock +
+                ", functionBlocks=" + functionBlocks +
+                '}';
     }
 
     /**
@@ -250,7 +258,7 @@ public class FlowGraph {
             for (int i = 0; i < splits.size() - 1; i++) {
                 List<InstFact> blockLines = lines.subList(splits.get(i), splits.get(i + 1));
                 // blocks are initially created with no children
-                Block block = new Block(blockLines, new ArrayList<>());
+                Block block = new Block(blockLines.get(0).label.pc, blockLines, new ArrayList<>());
                 blocks.add(block);
             }
             return blocks;
@@ -357,10 +365,10 @@ public class FlowGraph {
      * Blocks have a list of children blocks, which represent directed edges in the flow graph (from block, to child).
      * They are designed to be highly malleable, and therefore do not provide any guarantees about duplicates or other
      * constraints.
-     * Since they are constantly changing, blocks are defined according to their memory addresses (i.e. they do not
-     * override equals) in order to maintain consistent identity.
      */
     public static class Block {
+        // the label of this block
+        private String label;
         // the lines of code this block contains
         private List<InstFact> lines;
         // a list of other blocks this block may transition to
@@ -369,7 +377,8 @@ public class FlowGraph {
         /**
          * Constructor for a block.
          */
-        Block(List<InstFact> lines, List<Block> children) {
+        Block(String label, List<InstFact> lines, List<Block> children) {
+            this.label = label;
             this.lines = lines;
             this.children = children;
         }
@@ -459,19 +468,12 @@ public class FlowGraph {
             }
         }
 
-        public String writeAsFunction() {
-            StringBuilder stringBuilder = new StringBuilder();
-
-
-            return "";
-        }
-
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
-            builder.append("Block:\n");
+            builder.append(label).append(":\n");
             for (InstFact line : lines) {
-                builder.append(line.toString());
+                builder.append("  ").append(line.toString());
             }
             return builder.toString();
         }
