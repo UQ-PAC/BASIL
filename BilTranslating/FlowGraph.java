@@ -2,6 +2,7 @@ package BilTranslating;
 
 import Facts.inst.*;
 import Util.AssumptionViolationException;
+
 import java.util.*;
 
 /**
@@ -34,7 +35,7 @@ public class FlowGraph {
     private final List<Block> functionBlocks;
 
     private FlowGraph(List<Block> functionBlocks) {
-        this.globalBlock = new Block("global", new ArrayList<>(), new ArrayList<>());
+        this.globalBlock = new Block("start", new ArrayList<>(), new ArrayList<>());
         this.functionBlocks = functionBlocks;
     }
 
@@ -138,10 +139,18 @@ public class FlowGraph {
 
     @Override
     public String toString() {
-        return "FlowGraph{" +
-                "globalBlock=" + globalBlock +
-                ", functionBlocks=" + functionBlocks +
-                '}';
+        StringBuilder stringBuilder = new StringBuilder();
+        globalBlock.getBlocksInCluster().forEach(block -> stringBuilder.append(block.toString()));
+        for (Block functionBlock : functionBlocks) {
+            stringBuilder.append("\n");
+            StringBuilder functionBuilder = new StringBuilder();
+            functionBlock.getBlocksInCluster().forEach(block -> functionBuilder.append(block.toString()));
+            String functionStr = functionBuilder.toString();
+            functionStr = functionStr.replaceAll("\n", "\n  ");
+            stringBuilder.append(functionStr).append("}");
+        }
+        return stringBuilder.toString();
+        // functionBlock.getBlocksInCluster().forEach(block -> stringBuilder.append(block.toString())));
     }
 
     /**
@@ -368,7 +377,7 @@ public class FlowGraph {
      */
     public static class Block {
         // the label of this block
-        private String label;
+        private final String label;
         // the lines of code this block contains
         private List<InstFact> lines;
         // a list of other blocks this block may transition to
