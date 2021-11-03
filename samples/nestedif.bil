@@ -1,0 +1,64 @@
+0000052e: sub main(main_argc, main_argv, main_result)
+00000544: main_argc :: in u32 = X0
+00000545: main_argv :: in out u64 = X1
+00000546: main_result :: out u32 = X0
+
+000001b9:
+000001be: SP := SP - 0x10
+000001c5: X0 := 2
+000001cc: mem := mem with [SP + 0xC, el]:u32 <- low:32[X0]
+000001d3: mem := mem with [SP + 8, el]:u32 <- 0
+000001da: X0 := pad:64[mem[SP + 0xC, el]:u32]
+000001e0: #36 := X0
+000001e4: NF := extract:63:63[#36]
+000001e8: VF := extract:63:63[X0] & ~extract:63:63[#36]
+000001ec: ZF := #36 = 0
+000001f0: CF := extract:63:63[X0] | ~extract:63:63[#36] | extract:63:63[X0] &
+          ~extract:63:63[#36]
+000001ff: #38 := ~ZF <> 0
+000001f9: when #38 goto %000001f7
+0000052f: goto %000003a3
+
+000001f7:
+00000205: X0 := pad:64[mem[SP + 0xC, el]:u32]
+0000020b: #42 := 0xFFFFFFFFFFFFFFFF + X0
+0000020f: NF := extract:63:63[#42]
+00000213: VF := extract:63:63[X0] & ~extract:63:63[#42]
+00000217: ZF := #42 = 0
+0000021b: CF := extract:63:63[X0] | ~extract:63:63[#42] | extract:63:63[X0] &
+          ~extract:63:63[#42]
+0000022a: #44 := ~ZF <> 0
+00000224: when #44 goto %00000222
+00000530: goto %0000038f
+
+00000222:
+00000230: X0 := pad:64[mem[SP + 0xC, el]:u32]
+00000236: #48 := 0xFFFFFFFFFFFFFFFE + X0
+0000023a: NF := extract:63:63[#48]
+0000023e: VF := extract:63:63[X0] & ~extract:63:63[#48]
+00000242: ZF := #48 = 0
+00000246: CF := extract:63:63[X0] | ~extract:63:63[#48] | extract:63:63[X0] &
+          ~extract:63:63[#48]
+00000255: #50 := ~ZF <> 0
+0000024f: when #50 goto %0000024d
+00000531: goto %00000381
+
+00000381:
+00000386: X0 := 7
+0000038d: mem := mem with [SP + 8, el]:u32 <- low:32[X0]
+00000532: goto %0000024d
+
+0000038f:
+00000394: X0 := 5
+0000039b: mem := mem with [SP + 8, el]:u32 <- low:32[X0]
+000003a1: goto %0000024d
+
+000003a3:
+000003a8: X0 := 3
+000003af: mem := mem with [SP + 8, el]:u32 <- low:32[X0]
+000003b5: goto %0000024d
+
+0000024d:
+0000025b: X0 := 0
+00000262: SP := SP + 0x10
+00000268: call LR with noreturn

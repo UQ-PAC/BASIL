@@ -191,8 +191,7 @@ public class FlowGraph {
                     int targetIndex = findInstWithPc(((JmpFact) fact).target, facts);
                     splits.add(targetIndex);
                 } else if (fact instanceof CjmpFact) {
-                    // for conditional jumps, add a split below the jump and above the target line
-                    splits.add(i + 1);
+                    // for conditional jumps, add a split above the target line
                     int targetIndex = findInstWithPc(((CjmpFact) fact).target, facts);
                     splits.add(targetIndex);
                 } else if (fact instanceof CallFact) {
@@ -294,7 +293,7 @@ public class FlowGraph {
          * @requires the list of lines contains all PCs which may be jumped to, and the given block was properly
          * created (e.g. does not contain any jumps halfway through), and the list of lines is ordered
          * @param block to find the children PCs of
-         * @param lines see #setChildren@facts
+         * @param lines see {@link #setChildren}
          * @return a list of PCs representing the children of the given block
          */
         private static List<String> getChildrenPcs(Block block, List<InstFact> lines) {
@@ -303,16 +302,18 @@ public class FlowGraph {
             if (lastLine instanceof JmpFact) {
                 // for jumps, simply add the target
                 childrenPcs.add(((JmpFact) lastLine).target);
-            } else if (lastLine instanceof CjmpFact) {
-                // for conditional jumps, add the target as well as the following line
-                childrenPcs.add(((CjmpFact) lastLine).target);
-                childrenPcs.add(lines.get(lines.indexOf(lastLine) + 1).label.pc);
             } else if (lastLine instanceof CallFact) {
                 // for calls, add the target of the goto portion
                 childrenPcs.add(((CallFact) lastLine).returnAddr);
             } else if (!(lastLine instanceof ExitSubFact)) {
                 // for any other line that is not a function return, simply add the following line
                 childrenPcs.add(lines.get(lines.indexOf(lastLine) + 1).label.pc);
+            }
+            // add conditional jumps. these will always be succeeded by a jump or conditional jump
+            for (int i = block.lines.size() - 2; i >= 0; i--) {
+                InstFact line = block.lines.get(i);
+                if (!(line instanceof CjmpFact)) break;
+                childrenPcs.add(((CjmpFact) line).target);
             }
             return childrenPcs;
         }
@@ -458,7 +459,12 @@ public class FlowGraph {
             }
         }
 
+        public String writeAsFunction() {
+            StringBuilder stringBuilder = new StringBuilder();
 
+
+            return "";
+        }
 
         @Override
         public String toString() {
