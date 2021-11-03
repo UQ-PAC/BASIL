@@ -87,6 +87,7 @@ public class FlowGraph {
      * This ensures:
      * 1. No blocks overlap (i.e. share lines).
      * 2. No block exists in multiple locations within the flow graph.
+     * fixme: incomplete, untested
      */
     private void enforceUniqueLines() {
         List<InstFact> lines = new ArrayList<>();
@@ -320,55 +321,103 @@ public class FlowGraph {
     }
 
     /**
-     * A block is an ordered list of instruction facts (i.e. lines).
-     * todo: ensure this integrates with the flow graph factory. need to add documentation, and then review:
-     * - set lines
-     * - get all lines in cluster
-     * etc.
+     * A block is an ordered list of instruction facts (i.e. lines). They represent nodes in the flow graph.
+     * Blocks have a list of children blocks, which represent directed edges in the flow graph (from block, to child).
+     * They are designed to be highly malleable, and therefore do not provide any guarantees about duplicates or other
+     * constraints.
+     * Since they are constantly changing, blocks are defined according to their memory addresses (i.e. they do not
+     * override equals) in order to maintain consistent identity.
      */
     public static class Block {
+        // the lines of code this block contains
         private List<InstFact> lines;
+        // a list of other blocks this block may transition to
         private List<Block> children;
 
+        /**
+         * Constructor for a block.
+         */
         Block(List<InstFact> lines, List<Block> children) {
             this.lines = lines;
             this.children = children;
         }
 
+        /**
+         * The returned list may be mutated in order to update this block.
+         * @return the list object containing lines of code this block contains
+         */
         public List<InstFact> getLines() {
             return lines;
         }
 
+        /**
+         * The returned list may be mutated in order to update this block.
+         * @return the list object containing the children of this block
+         */
         public List<Block> getChildren() {
             return children;
         }
 
+        /**
+         * Sometimes, rather than updating the list returned by getLines(), we may want to re-set the list of lines of
+         * this block entirely.
+         * @param lines to set
+         */
         public void setLines(List<InstFact> lines) {
-            // fixme: need to work out constraints and guarantees for the flow graph. what if we remove the first line, or even modify it internally? is using the first line a sensible option for uniquely identifying blocks?
             this.lines = lines;
         }
 
+        /**
+         * Sometimes, rather than updating the list returned by getChildren(), we may want to re-set the children of
+         * this block entirely.
+         * @param children to set
+         */
+        public void setChildren(List<Block> children) {
+            this.children = children;
+        }
+
+        /**
+         * A convenience method that returns the first line of this block.
+         * @return the first line of this block
+         */
         public InstFact firstLine() {
             return lines.get(0);
         }
 
+        /**
+         * A convenience method that returns the last line of this block.
+         * @return the last line of this block
+         */
         public InstFact lastLine() {
             return lines.get(lines.size() - 1);
         }
 
+        /**
+         * Reads through all lines of all blocks reachable (directly or indirectly) by this block and returns a list of
+         * all these lines.
+         * As such, this list may contain duplicate lines if flow graph properties are not properly constrained.
+         *
+         * @return all of the lines of all blocks reachable by this block - including all lines of this block
+         */
         public List<InstFact> getLinesInCluster() {
             List<InstFact> allLines = new ArrayList<>(lines);
-            List<Block> blocksInCluster = getBlocksInCluster();
-            blocksInCluster.forEach(block -> allLines.addAll(block.getLinesInCluster()));
+            getBlocksInCluster().forEach(block -> allLines.addAll(block.lines));
             return allLines;
         }
 
+        /**
+         * @return a list of all blocks reachable by this block via a depth first search
+         */
         public List<Block> getBlocksInCluster() {
             List<Block> cluster = new ArrayList<>();
             recursivelyAddBlocks(cluster);
             return cluster;
         }
 
+        /**
+         * Helper method for {@link Block#getBlocksInCluster()}.
+         * @param cluster list of blocks which have already been explored
+         */
         private void recursivelyAddBlocks(List<Block> cluster) {
             cluster.add(this);
             for (Block child : children) {
