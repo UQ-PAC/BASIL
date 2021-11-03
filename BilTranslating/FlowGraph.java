@@ -32,11 +32,11 @@ public class FlowGraph {
     // the head of all global code; the starting point for the boogie program
     private final Block globalBlock;
     // a list of all function heads; represents all functions/procedures in the boogie program
-    private final List<Block> functionBlocks;
+    private final List<Function> functions;
 
-    private FlowGraph(List<Block> functionBlocks) {
+    private FlowGraph(List<Function> functions) {
         this.globalBlock = new Block("start", new ArrayList<>(), new ArrayList<>());
-        this.functionBlocks = functionBlocks;
+        this.functions = functions;
     }
 
     /**
@@ -57,10 +57,10 @@ public class FlowGraph {
     }
 
     /**
-     * @return the list of function blocks of this flow graph
+     * @return the list of functions of this flow graph
      */
-    public List<Block> getFunctionBlocks() {
-        return functionBlocks;
+    public List<Function> getFunctions() {
+        return functions;
     }
 
     /**
@@ -77,7 +77,7 @@ public class FlowGraph {
      */
     public List<Block> getBlocks() {
         List<Block> blocks = new ArrayList<>(globalBlock.getBlocksInCluster());
-        functionBlocks.forEach(block -> blocks.addAll(block.getBlocksInCluster()));
+        functions.forEach(function -> blocks.addAll(function.rootBlock.getBlocksInCluster()));
         return blocks;
     }
 
@@ -94,13 +94,13 @@ public class FlowGraph {
      */
     private void enforceDisjointFunctions() {
         Set<Block> usedBlocks = new HashSet<>();
-        for (Block functionBlock : functionBlocks) {
-            List<Block> cluster = functionBlock.getBlocksInCluster();
-            for (Block clusterBlock : cluster) {
-                if (usedBlocks.contains(clusterBlock)) {
+        for (Function function : functions) {
+            List<Block> cluster = function.rootBlock.getBlocksInCluster();
+            for (Block block : cluster) {
+                if (usedBlocks.contains(block)) {
                     throw new AssumptionViolationException(String.format(
                             "Flow graph error. The following block can be accessed by two different functions:\n%s",
-                            clusterBlock.toString()
+                            block.toString()
                     ));
                 }
             }
@@ -139,18 +139,42 @@ public class FlowGraph {
 
     @Override
     public String toString() {
-        StringBuilder stringBuilder = new StringBuilder();
-        globalBlock.getBlocksInCluster().forEach(block -> stringBuilder.append(block.toString()));
-        for (Block functionBlock : functionBlocks) {
-            stringBuilder.append("\n");
-            StringBuilder functionBuilder = new StringBuilder();
-            functionBlock.getBlocksInCluster().forEach(block -> functionBuilder.append(block.toString()));
-            String functionStr = functionBuilder.toString();
-            functionStr = functionStr.replaceAll("\n", "\n  ");
-            stringBuilder.append(functionStr).append("}");
+        StringBuilder builder = new StringBuilder();
+        globalBlock.getBlocksInCluster().forEach(block -> builder.append(block.toString()));
+        functions.forEach(function -> builder.append(function.toString()));
+        return builder.toString();
+    }
+
+    public static class Function {
+        // name of the function
+        private final EnterSubFact header;
+        // the first block in this list must be the first block executed for the function in BIL
+        private final Block rootBlock;
+
+        public Function(EnterSubFact header, Block rootBlock) {
+            this.header = header;
+            this.rootBlock = rootBlock;
         }
-        return stringBuilder.toString();
-        // functionBlock.getBlocksInCluster().forEach(block -> stringBuilder.append(block.toString())));
+
+        public EnterSubFact getHeader() {
+            return header;
+        }
+
+        public Block getRootBlock() {
+            return rootBlock;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder builder = new StringBuilder();
+            builder.append(header);
+            StringBuilder body = new StringBuilder();
+            rootBlock.getBlocksInCluster().forEach(block -> body.append(block.toString()));
+            String bodyStr = body.toString().trim();
+            bodyStr = "  " + bodyStr.replaceAll("\n", "\n  ");
+            builder.append(bodyStr).append("}\n");
+            return builder.toString();
+        }
     }
 
     /**
@@ -179,11 +203,11 @@ public class FlowGraph {
             // links each block in the list to each other block that may follow this one (e.g. via a jump)
             // essentially creates the edges for this flow graph
             setChildren(blocks, facts);
-            // create a flow graph consisting of the function cluster heads
-            FlowGraph flowGraph = new FlowGraph(getFunctionBlocksFromList(blocks));
+            // create a flow graph consisting of the functions formed from these blocks
+            FlowGraph flowGraph = new FlowGraph(convertBlocksToFunctions(blocks));
             // ensure the created flow graph maintains the required properties
             flowGraph.enforceConstraints();
-            return new FlowGraph(getFunctionBlocksFromList(blocks));
+            return flowGraph;
         }
 
         /**
@@ -335,20 +359,17 @@ public class FlowGraph {
             return childrenPcs;
         }
 
-        /**
-         * Returns all the blocks within the given list that are heads of function clusters.
-         *
-         * @param blocks to search for function blocks
-         * @return all function blocks within the given list
-         */
-        private static List<Block> getFunctionBlocksFromList(List<Block> blocks) {
-            List<Block> functionBlocks = new ArrayList<>();
+        private static List<Function> convertBlocksToFunctions(List<Block> blocks) {
+            List<Function> functions = new ArrayList<>();
             for (Block block : blocks) {
-                if (block.firstLine() instanceof EnterSubFact) {
-                    functionBlocks.add(block);
+                InstFact firstLine = block.firstLine();
+                if (firstLine instanceof EnterSubFact) {
+                    Function function = new Function((EnterSubFact) firstLine, block);
+                    functions.add(function);
                 }
             }
-            return functionBlocks;
+            functions.forEach(function -> function.rootBlock.lines.remove(0));
+            return functions;
         }
 
         /**
@@ -486,5 +507,7 @@ public class FlowGraph {
             }
             return builder.toString();
         }
+
+
     }
 }

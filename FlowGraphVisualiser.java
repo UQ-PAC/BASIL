@@ -46,14 +46,14 @@ public class FlowGraphVisualiser extends Application {
 
         FlowGraph flowGraph = FlowGraph.fromFactsList(facts);
         Digraph<FlowGraph.Block, String> g = new DigraphEdgeList<>();
-        for (FlowGraph.Block cluster : flowGraph.getFunctionBlocks()) {
-            for (FlowGraph.Block block : cluster.getBlocksInCluster()) {
+        for (FlowGraph.Function function : flowGraph.getFunctions()) {
+            for (FlowGraph.Block block : function.getRootBlock().getBlocksInCluster()) {
                 g.insertVertex(block);
                 System.out.println(block);
             }
         }
-        for (FlowGraph.Block cluster : flowGraph.getFunctionBlocks()) {
-            for (FlowGraph.Block block : cluster.getBlocksInCluster()) {
+        for (FlowGraph.Function function : flowGraph.getFunctions()) {
+            for (FlowGraph.Block block : function.getRootBlock().getBlocksInCluster()) {
                 for (FlowGraph.Block child : block.getChildren()) {
                     g.insertEdge(block, child, getEdgeId());
                 }
