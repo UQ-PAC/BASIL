@@ -1,5 +1,6 @@
 import BilParsing.BilLexer;
 import BilParsing.BilParser;
+import BilTranslating.FlowGraph;
 import BilTranslating.StatementLoader;
 import Facts.DatalogUtility;
 import Facts.inst.InstFact;
@@ -53,9 +54,9 @@ public class Main {
         }
 
         if (argsList.contains("boogie")) {
-            //FlowGraph flowGraph = FlowGraph.fromFactsList(facts);
-
-
+            FlowGraph flowGraph = FlowGraph.fromFactsList(facts);
+            System.out.println(flowGraph);
+//            FlowGraph flowGraph = FlowGraph.fromFactsList(facts);
 //            BoogieTranslator translator = new BoogieTranslator(facts, "boogie_out.txt");
 //            translator.translate();
         }
