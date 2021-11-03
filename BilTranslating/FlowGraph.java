@@ -52,8 +52,8 @@ public class FlowGraph {
     }
 
     public List<InstFact> getLines() {
-        List<InstFact> lines = new ArrayList<>(globalBlock.getLines());
-        functionBlocks.forEach(block -> lines.addAll(block.getLines()));
+        List<InstFact> lines = new ArrayList<>(globalBlock.getLinesInCluster());
+        functionBlocks.forEach(block -> lines.addAll(block.getLinesInCluster()));
         return lines;
     }
 
@@ -83,25 +83,31 @@ public class FlowGraph {
     }
 
     /**
-     * A complete traversal on a flow graph should encounter no line twice.
-     * This ensures:
-     * 1. No blocks overlap (i.e. share lines).
-     * 2. No block exists in multiple locations within the flow graph.
-     * fixme: incomplete, untested
+     * A complete traversal of a flow graph should encounter no line twice, or no line with the same PC twice.
      */
     private void enforceUniqueLines() {
-        List<InstFact> lines = new ArrayList<>();
-        List<Block> blocks = new ArrayList<>(functionBlocks);
-        blocks.add(globalBlock);
-        blocks.forEach(block -> lines.addAll(block.getLines()));
-        Set<InstFact> linesSet = new HashSet<>(lines);
-        if (lines.size() != linesSet.size()) {
-            // find duplicates
-            linesSet.forEach(lines::remove);
-            StringBuilder builder = new StringBuilder();
-            builder.append("Flow graph contains duplicate lines:\n");
-            lines.forEach(builder::append);
-            throw new AssumptionViolationException(builder.toString());
+        List<InstFact> linesList = getLines();
+        List<String> pcList = new ArrayList<>();
+        linesList.forEach(line -> pcList.add(line.label.pc));
+        Set<InstFact> linesSet = new HashSet<>(linesList);
+        Set<String> pcSet = new HashSet<>(pcList);
+        if (linesSet.size() != linesList.size()) {
+            linesSet.forEach(linesList::remove);
+            StringBuilder stringBuilder = new StringBuilder();
+            linesList.forEach(line -> stringBuilder.append(line.toString()));
+            throw new AssumptionViolationException(String.format(
+                    "Flow graph error. The following lines were found twice throughout the program:\n%s",
+                    stringBuilder
+            ));
+        }
+        if (pcSet.size() != pcList.size()) {
+            pcSet.forEach(pcList::remove);
+            StringBuilder stringBuilder = new StringBuilder();
+            pcList.forEach(stringBuilder::append);
+            throw new AssumptionViolationException(String.format(
+                    "Flow graph error. The following lines were found twice throughout the program:\n%s",
+                    stringBuilder
+            ));
         }
     }
 
