@@ -1,20 +1,15 @@
 package Facts;
 
-import Facts.exp.MemFact;
 import Facts.exp.VarFact;
-import com.sun.istack.internal.Nullable;
 
-public class Parameter {
+public abstract class Parameter {
 
     private VarFact name;
     private final VarFact register;
-    private MemFact alias;
-    private final boolean isResult;
 
-    public Parameter(VarFact name, VarFact register, boolean isResult) {
+    public Parameter(VarFact name, VarFact register) {
         this.name = name;
         this.register = register;
-        this.isResult = isResult;
     }
 
     public VarFact getName() {
@@ -27,19 +22,6 @@ public class Parameter {
 
     public VarFact getRegister() {
         return register;
-    }
-
-    @Nullable
-    public MemFact getAlias() {
-        return alias;
-    }
-
-    public void setAlias(MemFact alias) {
-        this.alias = alias;
-    }
-
-    public boolean isResult() {
-        return isResult;
     }
 
     @Override

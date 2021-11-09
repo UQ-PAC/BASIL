@@ -1,39 +1,60 @@
 package Facts.inst;
 
 import Facts.Fact;
+import Facts.InParameter;
+import Facts.OutParameter;
 import java.util.*;
 
 public class EnterSubFact extends InstFact {
 
-    public String funcName;
-    public List<ParamFact> paramFacts = new ArrayList<>();
+    private String funcName;
+    private List<InParameter> inParams;
+    private OutParameter outParam;
 
     public EnterSubFact(String pc, String funcName) {
         super(pc);
         this.funcName = funcName;
+        inParams = new ArrayList<>();
     }
 
+    public String getFuncName() {
+        return funcName;
+    }
+
+    public void setFuncName(String funcName) {
+        this.funcName = funcName;
+    }
+
+    public List<InParameter> getInParams() {
+        return inParams;
+    }
+
+    public void setInParams(List<InParameter> inParams) {
+        this.inParams = inParams;
+    }
+
+    public OutParameter getOutParam() {
+        return outParam;
+    }
+
+    public void setOutParam(OutParameter outParam) {
+        this.outParam = outParam;
+    }
+
+    @Override
     public String toString() {
         // todo: add param types
 
-        List<String> inParams = new ArrayList<>();
-        String outParam = null;
-        for (ParamFact fact : paramFacts) {
-            if (fact.is_result) {
-                outParam = fact.name.name;
-            } else {
-                inParams.add(fact.name.name);
-            }
-        }
-
         StringBuilder line = new StringBuilder();
         line.append("procedure ").append(funcName).append("(");
+
         if (!inParams.isEmpty()) {
             line.append(inParams.get(0));
             for (int i = 1; i < inParams.size(); i++) {
                 line.append(", ").append(inParams.get(i));
             }
         }
+
         line.append(")");
         if (outParam != null) {
             line.append(" returns (").append(outParam).append(")");
