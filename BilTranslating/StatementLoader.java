@@ -21,6 +21,8 @@ public class StatementLoader implements BilListener {
     List<InstFact> facts;
     // the last function header parsed; needed for assigning parameters
     EnterSubFact currentFunction;
+    // for generating unique labels
+    int pcCount = 0;
 
     public StatementLoader(List<InstFact> facts) {
         this.facts = facts;
@@ -102,6 +104,11 @@ public class StatementLoader implements BilListener {
         } else {
             return null;
         }
+    }
+
+    private String uniquePc() {
+        int pc = pcCount++;
+        return "l" + pc;
     }
 
     @Override
@@ -215,7 +222,8 @@ public class StatementLoader implements BilListener {
             } else {
                 String funcName = ctx.call().functionName().getText();
                 String returnAddr = ctx.call().returnaddr().addr().getText();
-                facts.add(new CallFact(address, funcName, returnAddr));
+                facts.add(new CallFact(address, funcName));
+                facts.add(new JmpFact(uniquePc(), returnAddr));
             }
         } else {
             // this statement is empty
