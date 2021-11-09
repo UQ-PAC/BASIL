@@ -1,7 +1,7 @@
-package Facts.inst.assign;
+package Facts.Inst.Assign;
 
-import Facts.exp.MemFact;
-import Facts.exp.VarFact;
+import Facts.Exp.MemFact;
+import Facts.Exp.VarFact;
 
 /**
  * Load fact

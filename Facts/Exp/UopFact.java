@@ -1,4 +1,4 @@
-package Facts.exp;
+package Facts.Exp;
 
 import Facts.Fact;
 import java.util.ArrayList;
@@ -6,24 +6,27 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Variable fact
+ * Unary operator fact
  */
-public class VarFact extends ExpFact {
-    public String name;
+public class UopFact extends ExpFact {
+    public String op;
+    public ExpFact e1;
 
-    public VarFact(String name) {
-        this.name = name;
+    public UopFact(String op, ExpFact e1) {
+        this.op = op;
+        this.e1 = e1;
     }
 
     /**
-     * @return exp(id, var, name, none, none)
+     * @return exp(id, uop, op, e1, none)
      */
     public String toString() {
-        return String.format("%s", name);
+        return String.format("%s %s", op, e1);
     }
 
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
+        factList.addAll(e1.toFactList());
         factList.add(this);
         return factList;
     }
@@ -32,12 +35,12 @@ public class VarFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        VarFact varFact = (VarFact) o;
-        return Objects.equals(name, varFact.name);
+        UopFact uopFact = (UopFact) o;
+        return Objects.equals(op, uopFact.op) && Objects.equals(e1, uopFact.e1);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(name);
+        return Objects.hash(op, e1);
     }
 }

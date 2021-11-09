@@ -1,4 +1,4 @@
-package Facts.exp;
+package Facts.Exp;
 
 import Facts.Fact;
 import java.util.ArrayList;

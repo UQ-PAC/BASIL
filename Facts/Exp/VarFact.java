@@ -1,4 +1,4 @@
-package Facts.exp;
+package Facts.Exp;
 
 import Facts.Fact;
 import java.util.ArrayList;
@@ -6,29 +6,24 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Memory expression e.g. mem[10]
+ * Variable fact
  */
-public class MemFact extends ExpFact {
-    public ExpFact exp;
+public class VarFact extends ExpFact {
+    public String name;
 
-    public MemFact(ExpFact exp) {
-        this.exp = exp;
+    public VarFact(String name) {
+        this.name = name;
     }
 
     /**
-     * @return exp(id, memExp, exp, none)
+     * @return exp(id, var, name, none, none)
      */
     public String toString() {
-        return String.format("mem[%s]", exp);
-    }
-
-    public String toDataString() {
-        return exp.toString();
+        return String.format("%s", name);
     }
 
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
-        factList.addAll(exp.toFactList());
         factList.add(this);
         return factList;
     }
@@ -37,12 +32,12 @@ public class MemFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        MemFact memFact = (MemFact) o;
-        return Objects.equals(exp, memFact.exp);
+        VarFact varFact = (VarFact) o;
+        return Objects.equals(name, varFact.name);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(exp);
+        return Objects.hash(name);
     }
 }

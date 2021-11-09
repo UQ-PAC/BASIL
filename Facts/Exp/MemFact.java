@@ -1,4 +1,4 @@
-package Facts.exp;
+package Facts.Exp;
 
 import Facts.Fact;
 import java.util.ArrayList;
@@ -6,27 +6,29 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Unary operator fact
+ * Memory expression e.g. mem[10]
  */
-public class UopFact extends ExpFact {
-    public String op;
-    public ExpFact e1;
+public class MemFact extends ExpFact {
+    public ExpFact exp;
 
-    public UopFact(String op, ExpFact e1) {
-        this.op = op;
-        this.e1 = e1;
+    public MemFact(ExpFact exp) {
+        this.exp = exp;
     }
 
     /**
-     * @return exp(id, uop, op, e1, none)
+     * @return exp(id, memExp, exp, none)
      */
     public String toString() {
-        return String.format("%s %s", op, e1);
+        return String.format("mem[%s]", exp);
+    }
+
+    public String toDataString() {
+        return exp.toString();
     }
 
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
-        factList.addAll(e1.toFactList());
+        factList.addAll(exp.toFactList());
         factList.add(this);
         return factList;
     }
@@ -35,12 +37,12 @@ public class UopFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        UopFact uopFact = (UopFact) o;
-        return Objects.equals(op, uopFact.op) && Objects.equals(e1, uopFact.e1);
+        MemFact memFact = (MemFact) o;
+        return Objects.equals(exp, memFact.exp);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(op, e1);
+        return Objects.hash(exp);
     }
 }

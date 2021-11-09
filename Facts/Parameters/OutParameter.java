@@ -1,6 +1,6 @@
-package Facts;
+package Facts.Parameters;
 
-import Facts.exp.VarFact;
+import Facts.Exp.VarFact;
 
 public class OutParameter extends Parameter {
 

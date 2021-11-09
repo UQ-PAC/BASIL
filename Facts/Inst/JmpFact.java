@@ -1,20 +1,22 @@
-package Facts.inst;
+package Facts.Inst;
 
 import Facts.Fact;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * No instruction fact
+ * Jump
  */
-public class NopFact extends InstFact {
+public class JmpFact extends InstFact {
+    public String target;
 
-    public NopFact(String pc) {
+    public JmpFact(String pc, String target) {
         super(pc);
+        this.target = target;
     }
 
     public String toString() {
-        return (String.format("%sskip;", label));
+        return String.format("%sgoto label%s;", label, target);
     }
 
     public List<Fact> toFactList() {

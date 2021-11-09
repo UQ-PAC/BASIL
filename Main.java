@@ -3,7 +3,7 @@ import BilParsing.BilParser;
 import BilTranslating.FlowGraph;
 import BilTranslating.StatementLoader;
 import Facts.DatalogUtility;
-import Facts.inst.InstFact;
+import Facts.Inst.InstFact;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;

@@ -1,7 +1,7 @@
-package Facts.inst.assign;
+package Facts.Inst.Assign;
 
-import Facts.exp.ExpFact;
-import Facts.exp.VarFact;
+import Facts.Exp.ExpFact;
+import Facts.Exp.VarFact;
 
 /**
  * Move fact

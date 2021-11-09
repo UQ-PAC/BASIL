@@ -1,12 +1,12 @@
 package BilTranslating;
 
 import Facts.Fact;
-import Facts.exp.*;
-import Facts.inst.*;
-import Facts.inst.assign.AssignFact;
-import Facts.inst.assign.LoadFact;
-import Facts.inst.assign.MoveFact;
-import Facts.inst.assign.StoreFact;
+import Facts.Exp.*;
+import Facts.Inst.*;
+import Facts.Inst.Assign.AssignFact;
+import Facts.Inst.Assign.LoadFact;
+import Facts.Inst.Assign.MoveFact;
+import Facts.Inst.Assign.StoreFact;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;

@@ -1,4 +1,4 @@
-package Facts.misc;
+package Facts.Misc;
 
 import Facts.Fact;
 

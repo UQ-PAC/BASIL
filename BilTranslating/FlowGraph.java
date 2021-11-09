@@ -1,6 +1,6 @@
 package BilTranslating;
 
-import Facts.inst.*;
+import Facts.Inst.*;
 import Util.AssumptionViolationException;
 
 import java.util.*;

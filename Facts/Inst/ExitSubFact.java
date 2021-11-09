@@ -1,4 +1,4 @@
-package Facts.inst;
+package Facts.Inst;
 
 import Facts.Fact;
 import java.util.Collections;

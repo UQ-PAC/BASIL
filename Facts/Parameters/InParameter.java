@@ -1,7 +1,7 @@
-package Facts;
+package Facts.Parameters;
 
-import Facts.exp.MemFact;
-import Facts.exp.VarFact;
+import Facts.Exp.MemFact;
+import Facts.Exp.VarFact;
 import com.sun.istack.internal.Nullable;
 
 public class InParameter extends Parameter {

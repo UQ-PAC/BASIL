@@ -1,11 +1,11 @@
 package Facts;
 
-import Facts.exp.*;
-import Facts.inst.*;
-import Facts.inst.assign.LoadFact;
-import Facts.inst.assign.MoveFact;
-import Facts.inst.assign.StoreFact;
-import Facts.misc.SuccessorFact;
+import Facts.Exp.*;
+import Facts.Inst.*;
+import Facts.Inst.Assign.LoadFact;
+import Facts.Inst.Assign.MoveFact;
+import Facts.Inst.Assign.StoreFact;
+import Facts.Misc.SuccessorFact;
 
 import java.util.*;
 

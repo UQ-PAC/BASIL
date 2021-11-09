@@ -1,8 +1,8 @@
-package Facts.inst.assign;
+package Facts.Inst.Assign;
 
 import Facts.Fact;
-import Facts.exp.ExpFact;
-import Facts.inst.InstFact;
+import Facts.Exp.ExpFact;
+import Facts.Inst.InstFact;
 import java.util.ArrayList;
 import java.util.List;
 

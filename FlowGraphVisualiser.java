@@ -2,7 +2,7 @@ import BilParsing.BilLexer;
 import BilParsing.BilParser;
 import BilTranslating.FlowGraph;
 import BilTranslating.StatementLoader;
-import Facts.inst.InstFact;
+import Facts.Inst.InstFact;
 import com.brunomnsilva.smartgraph.graph.Digraph;
 import com.brunomnsilva.smartgraph.graph.DigraphEdgeList;
 import com.brunomnsilva.smartgraph.graphview.SmartCircularSortedPlacementStrategy;
@@ -30,7 +30,7 @@ public class FlowGraphVisualiser extends Application {
     public void start(Stage primaryStage) {
         BilLexer bilLexer;
         try {
-            bilLexer = new BilLexer(CharStreams.fromFileName("samples/loops_stripped.bil"));
+            bilLexer = new BilLexer(CharStreams.fromFileName("Samples/loops_stripped.bil"));
         } catch (IOException e) {
             System.err.println("File not found.");
             throw new AssertionError();
