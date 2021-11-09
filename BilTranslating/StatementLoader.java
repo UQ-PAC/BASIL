@@ -210,7 +210,7 @@ public class StatementLoader implements BilListener {
             System.out.println(ctx.addr().getText());
             if (ctx.call().functionName() == null) {
                 // occasionally this occurs with "call LR with no return" lines
-                facts.add(new ExitSubFact(ctx.addr().getText(), this.currentFunction));
+                facts.add(new ExitSubFact(ctx.addr().getText()));
             } else {
                 String funcName = ctx.call().functionName().getText();
                 String returnAddr = ctx.call().returnaddr().addr().getText();
@@ -230,7 +230,7 @@ public class StatementLoader implements BilListener {
     @Override
     public void enterEndsub(BilParser.EndsubContext ctx) {
         String address = ctx.addr().getText();
-        facts.add(new ExitSubFact(address, this.currentFunction));
+        facts.add(new ExitSubFact(address));
     }
 
     @Override

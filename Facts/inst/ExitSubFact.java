@@ -6,11 +6,8 @@ import java.util.List;
 
 public class ExitSubFact extends InstFact {
 
-    public EnterSubFact function;
-
-    public ExitSubFact(String pc, EnterSubFact function) {
+    public ExitSubFact(String pc) {
         super(pc);
-        this.function = function;
     }
 
     public String toString() {
