@@ -9,8 +9,6 @@ import Facts.Inst.Assign.MoveFact;
 import Facts.Inst.Assign.StoreFact;
 import Facts.Label;
 import Facts.Parameters.InParameter;
-import jdk.nashorn.internal.codegen.CompilerConstants;
-
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
