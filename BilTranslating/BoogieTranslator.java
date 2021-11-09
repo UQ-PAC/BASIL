@@ -99,7 +99,7 @@ public class BoogieTranslator {
         List<String> usedLabels = new ArrayList<>();
         // get all referred labels within the flow graph
         for (InstFact line : lines) {
-            String target = extractTargetLabel(line);
+            String target = getJumpTarget(line);
             if (target != null) {
                 usedLabels.add(target);
             }
@@ -113,6 +113,29 @@ public class BoogieTranslator {
                 label.hide();
             }
         }
+    }
+
+    private String getJumpTarget(InstFact fact) {
+        // target labels are used in jumps and cjumps
+        if (fact instanceof JmpFact) {
+            return ((JmpFact) fact).getTarget();
+        } else if (fact instanceof CjmpFact) {
+            return ((CjmpFact) fact).getTarget();
+        }
+        return null;
+    }
+
+    /**
+     * If a skip is not jumped to, we should remove it.
+     */
+    private void optimiseSkips() {
+        List<InstFact> toRemove = new ArrayList<>();
+        for (InstFact line : flowGraph.getLines()) {
+            if (line instanceof NopFact && line.label.hide) {
+                toRemove.add(line);
+            }
+        }
+        toRemove.forEach(flowGraph::removeLine);
     }
 
     /**
@@ -156,33 +179,9 @@ public class BoogieTranslator {
 
 
 
-    /**
-     * If a skip is not jumped to, we should remove it.
-     */
-    private void optimiseSkips() {
-        List<InstFact> toRemove = new ArrayList<>();
-        for (InstFact line : flowGraph.getLines()) {
-            if (line instanceof NopFact && line.label.hide) {
-                toRemove.add(line);
-            }
-        }
-        toRemove.forEach(flowGraph::removeLine);
-    }
 
-    private String extractTargetLabel(InstFact fact) {
-        // target labels are used in jumps, cjumps and calls
-        if (fact instanceof JmpFact) {
-            return ((JmpFact) fact).target;
-        } else if (fact instanceof CjmpFact) {
-            return ((CjmpFact) fact).target;
-        } else if (fact instanceof CallFact) {
-            CallFact call = (CallFact) fact;
-            if (call.showJump) {
-                return call.returnAddr;
-            }
-        }
-        return null;
-    }
+
+
 
     /**
      * @return list of [start, end] endpoints for function blocks.
