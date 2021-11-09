@@ -24,7 +24,6 @@ import java.util.*;
  * 2. Clusters are disjoint; no block reachable by a head block is reachable by any other head block.
  *
  * Example usage:
- * Delete a line from an unknown location: getBlocks().forEach(block -> block.getLines().remove(line))
  * Retrieve all blocks within a function: getFunctionBlocks().get(0).getBlocksInCluster()
  * Insert a line in a particular location: getFunctionBlocks().get(0).getChildren().get(0).getLines().add(4, line)
  */
@@ -81,6 +80,10 @@ public class FlowGraph {
         return blocks;
     }
 
+    public void removeLine(InstFact line) {
+        getBlocks().forEach(block -> block.getLines().remove(line));
+    }
+
     /**
      * Enforce guaranteed properties of this flow graph. Exceptions are thrown when these constraints are not met.
      */
@@ -114,7 +117,7 @@ public class FlowGraph {
     private void enforceUniqueLines() {
         List<InstFact> linesList = getLines();
         List<String> pcList = new ArrayList<>();
-        linesList.forEach(line -> pcList.add(line.label.pc));
+        linesList.forEach(line -> pcList.add(line.getLabel().getPc()));
         Set<InstFact> linesSet = new HashSet<>(linesList);
         Set<String> pcSet = new HashSet<>(pcList);
         if (linesSet.size() != linesList.size()) {
@@ -226,11 +229,11 @@ public class FlowGraph {
                 if (fact instanceof JmpFact) {
                     // for jumps, add a split below the jump and above the target line
                     splits.add(i + 1);
-                    int targetIndex = findInstWithPc(((JmpFact) fact).target, facts);
+                    int targetIndex = findInstWithPc(((JmpFact) fact).getTarget(), facts);
                     splits.add(targetIndex);
                 } else if (fact instanceof CjmpFact) {
                     // for conditional jumps, add a split above the target line
-                    int targetIndex = findInstWithPc(((CjmpFact) fact).target, facts);
+                    int targetIndex = findInstWithPc(((CjmpFact) fact).getTarget(), facts);
                     splits.add(targetIndex);
                 } else if (fact instanceof EnterSubFact) {
                     // for function headers, add a split before the header
@@ -259,7 +262,7 @@ public class FlowGraph {
          */
         private static int findInstWithPc(String pc, List<InstFact> facts) {
             for (int i = 0; i < facts.size(); i++) {
-                if (facts.get(i).label.pc.equals(pc)) return i;
+                if (facts.get(i).getLabel().getPc().equals(pc)) return i;
             }
             throw new AssumptionViolationException(String.format(
                     "Error in constructing flow graph: No inst found with pc %s.\n", pc
@@ -282,7 +285,7 @@ public class FlowGraph {
                 // need to convert the sublist view to a real arraylist to avoid ConcurrentModificationException
                 List<InstFact> blockLines = new ArrayList<>(lines.subList(splits.get(i), splits.get(i + 1)));
                 // blocks are initially created with no children
-                Block block = new Block(blockLines.get(0).label.pc, blockLines, new ArrayList<>());
+                Block block = new Block(blockLines.get(0).getLabel().getPc(), blockLines, new ArrayList<>());
                 blocks.add(block);
             }
             return blocks;
@@ -333,16 +336,16 @@ public class FlowGraph {
             InstFact lastLine = block.lastLine();
             if (lastLine instanceof JmpFact) {
                 // for jumps, simply add the target
-                childrenPcs.add(((JmpFact) lastLine).target);
+                childrenPcs.add(((JmpFact) lastLine).getTarget());
             } else if (!(lastLine instanceof ExitSubFact)) {
                 // for any other line that is not a function return, simply add the following line
-                childrenPcs.add(lines.get(lines.indexOf(lastLine) + 1).label.pc);
+                childrenPcs.add(lines.get(lines.indexOf(lastLine) + 1).getLabel().getPc());
             }
             // add conditional jumps. these will always be succeeded by a jump or conditional jump
             for (int i = block.lines.size() - 2; i >= 0; i--) {
                 InstFact line = block.lines.get(i);
                 if (!(line instanceof CjmpFact)) break;
-                childrenPcs.add(((CjmpFact) line).target);
+                childrenPcs.add(((CjmpFact) line).getTarget());
             }
             return childrenPcs;
         }
@@ -370,7 +373,7 @@ public class FlowGraph {
          */
         private static Block findBlockStartingWith(String pc, List<Block> blocks) {
             for (Block block : blocks) {
-                if (block.firstLine().label.pc.equals(pc)) {
+                if (block.firstLine().getLabel().getPc().equals(pc)) {
                     return block;
                 }
             }

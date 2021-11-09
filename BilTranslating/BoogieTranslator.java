@@ -96,7 +96,7 @@ public class BoogieTranslator {
      */
     private void createLabels() {
         List<InstFact> lines = flowGraph.getLines();
-        List<String> usedLabels = new ArrayList<>();
+        Set<String> usedLabels = new HashSet<>();
         // get all referred labels within the flow graph
         for (InstFact line : lines) {
             String target = getJumpTarget(line);
@@ -127,15 +127,15 @@ public class BoogieTranslator {
 
     /**
      * If a skip is not jumped to, we should remove it.
+     * Depends on:
+     * - {@link #createLabels()}
      */
     private void optimiseSkips() {
-        List<InstFact> toRemove = new ArrayList<>();
         for (InstFact line : flowGraph.getLines()) {
-            if (line instanceof NopFact && line.label.hide) {
-                toRemove.add(line);
+            if (line instanceof NopFact && !line.getLabel().isVisible()) {
+                flowGraph.removeLine(line);
             }
         }
-        toRemove.forEach(flowGraph::removeLine);
     }
 
     /**

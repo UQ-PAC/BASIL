@@ -17,6 +17,10 @@ public class Label {
         this.pc = pc;
     }
 
+    public boolean isVisible() {
+        return visible;
+    }
+
     public void show() {
         visible = true;
     }
