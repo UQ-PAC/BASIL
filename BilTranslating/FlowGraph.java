@@ -500,9 +500,7 @@ public class FlowGraph {
         public String toString() {
             StringBuilder builder = new StringBuilder();
             builder.append(label).append(":\n");
-            for (InstFact line : lines) {
-                builder.append("  ").append(line).append("\n");
-            }
+            lines.forEach(line -> builder.append("  ").append(line).append("\n"));
             return builder.toString();
         }
     }
