@@ -232,14 +232,7 @@ public class FlowGraph {
                     // for conditional jumps, add a split above the target line
                     int targetIndex = findInstWithPc(((CjmpFact) fact).target, facts);
                     splits.add(targetIndex);
-                } else if (fact instanceof CallFact) {
-                    /* we treat calls here (i.e. call x(); goto y;) like jumps (i.e. to y). this may change in future
-                    updates where we split the "call x()" part from the "goto y" part and make them separate facts */
-                    splits.add(i + 1);
-                    int targetIndex = findInstWithPc(((CallFact) fact).returnAddr, facts);
-                    splits.add(targetIndex);
-                }
-                else if (fact instanceof EnterSubFact) {
+                } else if (fact instanceof EnterSubFact) {
                     // for function headers, add a split before the header
                     splits.add(i);
                 }
@@ -341,9 +334,6 @@ public class FlowGraph {
             if (lastLine instanceof JmpFact) {
                 // for jumps, simply add the target
                 childrenPcs.add(((JmpFact) lastLine).target);
-            } else if (lastLine instanceof CallFact) {
-                // for calls, add the target of the goto portion
-                childrenPcs.add(((CallFact) lastLine).returnAddr);
             } else if (!(lastLine instanceof ExitSubFact)) {
                 // for any other line that is not a function return, simply add the following line
                 childrenPcs.add(lines.get(lines.indexOf(lastLine) + 1).label.pc);
