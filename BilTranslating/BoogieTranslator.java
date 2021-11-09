@@ -214,7 +214,7 @@ public class BoogieTranslator {
             CallFact call = (CallFact) fact;
             if (!call.funcName.equals(func.funcName)) continue;
             for (ParamFact params : func.paramFacts) {
-                if (!params.is_result) call.params.add(params.register);
+                if (!params.is_result) call.args.add(params.register);
             }
         }
     }
