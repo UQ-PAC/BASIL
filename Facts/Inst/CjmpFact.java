@@ -9,8 +9,9 @@ import java.util.List;
  * Conditional Jump fact
  */
 public class CjmpFact extends InstFact {
-    public String target;
-    public VarFact condition;
+
+    private String target;
+    private VarFact condition;
 
     public CjmpFact(String pc, String target, VarFact condition) {
         super(pc);
@@ -18,14 +19,30 @@ public class CjmpFact extends InstFact {
         this.condition = condition;
     }
 
-    public String toString() {
-        return String.format("%sif (%s) goto label%s;", label, condition, target);
+    public String getTarget() {
+        return target;
+    }
+
+    public void setTarget(String target) {
+        this.target = target;
+    }
+
+    public VarFact getCondition() {
+        return condition;
+    }
+
+    public void setCondition(VarFact condition) {
+        this.condition = condition;
     }
 
     public List<Fact> toFactList() {
-        List<Fact> factList = new ArrayList<>();
-        factList.addAll(condition.toFactList());
+        List<Fact> factList = new ArrayList<>(condition.toFactList());
         factList.add(this);
         return factList;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%sif (%s) goto label%s;", getLabel(), condition, target);
     }
 }

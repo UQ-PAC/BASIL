@@ -9,10 +9,18 @@ import java.util.List;
  */
 public abstract class InstFact extends Fact {
 
-    public Label label;
+    private Label label;
 
     public InstFact(String pc) {
         label = new Label(pc);
+    }
+
+    public Label getLabel() {
+        return label;
+    }
+
+    public void setLabel(Label label) {
+        this.label = label;
     }
 
     public abstract List<Fact> toFactList();

@@ -10,11 +10,12 @@ public class ExitSubFact extends InstFact {
         super(pc);
     }
 
-    public String toString() {
-        return "return;";
-    }
-
     public List<Fact> toFactList() {
         return Collections.singletonList(this);
+    }
+
+    @Override
+    public String toString() {
+        return "return;";
     }
 }

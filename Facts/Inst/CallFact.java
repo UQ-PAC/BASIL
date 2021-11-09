@@ -8,21 +8,38 @@ import java.util.List;
 
 public class CallFact extends InstFact {
 
-    public String funcName;
-    public List<VarFact> args = new ArrayList<>();
+    private String funcName;
+    private List<VarFact> args = new ArrayList<>();
 
     public CallFact(String pc, String funcName) {
         super(pc);
         this.funcName = funcName;
     }
 
-    public String toString() {
-        StringBuilder argsStr = new StringBuilder();
-        args.forEach(arg -> argsStr.append(arg.name));
-        return String.format("%scall %s(%s);", label, funcName, argsStr);
+    public String getFuncName() {
+        return funcName;
+    }
+
+    public void setFuncName(String funcName) {
+        this.funcName = funcName;
+    }
+
+    public List<VarFact> getArgs() {
+        return args;
+    }
+
+    public void setArgs(List<VarFact> args) {
+        this.args = args;
     }
 
     public List<Fact> toFactList() {
         return Collections.singletonList(this);
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder argsStr = new StringBuilder();
+        args.forEach(arg -> argsStr.append(arg.name));
+        return String.format("%scall %s(%s);", getLabel(), funcName, argsStr);
     }
 }

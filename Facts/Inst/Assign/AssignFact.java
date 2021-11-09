@@ -10,24 +10,39 @@ import java.util.List;
  * Assignment (e.g. x := exp)
  */
 public abstract class AssignFact extends InstFact {
-    public String pc;
-    public ExpFact lhs;
-    public ExpFact rhs;
-    public String type;
-    public String varDeclaration = "";
 
-    AssignFact(String pc, ExpFact lhs, ExpFact rhs, String type) {
+    private ExpFact lhs;
+    private ExpFact rhs;
+    private String varDeclaration = "";
+
+    AssignFact(String pc, ExpFact lhs, ExpFact rhs) {
         super(pc);
         this.lhs = lhs;
         this.rhs = rhs;
-        this.type = type;
     }
 
-    /**
-     * @return inst(pc, type, lhs, rhs)
-     */
-    public String toString() {
-        return String.format("%s%s%s := %s;", label, varDeclaration, lhs, rhs);
+    public ExpFact getLhs() {
+        return lhs;
+    }
+
+    public void setLhs(ExpFact lhs) {
+        this.lhs = lhs;
+    }
+
+    public ExpFact getRhs() {
+        return rhs;
+    }
+
+    public void setRhs(ExpFact rhs) {
+        this.rhs = rhs;
+    }
+
+    public String getVarDeclaration() {
+        return varDeclaration;
+    }
+
+    public void setVarDeclaration(String varDeclaration) {
+        this.varDeclaration = varDeclaration;
     }
 
     public List<Fact> toFactList() {
@@ -36,5 +51,10 @@ public abstract class AssignFact extends InstFact {
         factList.addAll(rhs.toFactList());
         factList.add(this);
         return factList;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s%s%s := %s;", getLabel(), varDeclaration, lhs, rhs);
     }
 }

@@ -64,6 +64,6 @@ public class EnterSubFact extends InstFact {
             line.append(" returns (").append(outParam).append(")");
         }
         line.append(" {");
-        return String.format("%s%s", label, line);
+        return String.format("%s%s", getLabel(), line);
     }
 }
