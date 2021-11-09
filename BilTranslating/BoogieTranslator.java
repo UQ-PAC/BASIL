@@ -8,6 +8,8 @@ import Facts.Inst.Assign.LoadFact;
 import Facts.Inst.Assign.MoveFact;
 import Facts.Inst.Assign.StoreFact;
 import Facts.Label;
+import Facts.Parameters.InParameter;
+import jdk.nashorn.internal.codegen.CompilerConstants;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -74,9 +76,9 @@ public class BoogieTranslator {
     public void translate() {
         initGlobalBlock();
         createLabels();
-
         optimiseSkips();
-        createFuncParameters();
+        identifyImplicitParams();
+
         resolveInParams();
         // resolveOutParams();
         resolveRegisters();
@@ -95,7 +97,7 @@ public class BoogieTranslator {
      * a jump or conditional jump).
      */
     private void createLabels() {
-        List<InstFact> lines = flowGraph.getLines();
+        List<InstFact> lines = flowGraph.getViewOfLines();
         Set<String> usedLabels = new HashSet<>();
         // get all referred labels within the flow graph
         for (InstFact line : lines) {
@@ -131,10 +133,58 @@ public class BoogieTranslator {
      * - {@link #createLabels()}
      */
     private void optimiseSkips() {
-        for (InstFact line : flowGraph.getLines()) {
+        for (InstFact line : flowGraph.getViewOfLines()) {
             if (line instanceof NopFact && !line.getLabel().isVisible()) {
                 flowGraph.removeLine(line);
             }
+        }
+    }
+
+    /**
+     * Many parameters are implicit in BIL, represented not as statements but as a particular pattern of loading
+     * registers which have not been previously assigned within the function to memory addresses based on the SP, at the
+     * beginning of the function. This method identifies this pattern and adds any parameters found to the function's
+     * parameter list.
+     * It is assumed that out-parameters are always explicitly stated in BIL, and therefore StatementLoader would have
+     * added them already.
+     * It is assumed that the first block (i.e. root block) of any function will contain all loadings of parameters.
+     *
+     * We assume that these store instructions contain only the register on the rhs.
+     * We also assume that identical memory accesses (e.g. mem[2]) are never written differently (e.g. mem[1+1]), as
+     * this is what we use for identifying and substituting implicit parameters.
+     * We assume that these registers are only accessed once - i.e. by the store instruction - before they are
+     * assigned.
+     */
+    private void identifyImplicitParams() {
+        for (FlowGraph.Function function : flowGraph.getFunctions()) {
+            EnterSubFact functionFact = function.getHeader();
+            List<InParameter> params = functionFact.getInParams();
+            FlowGraph.Block rootBlock = function.getRootBlock();
+            Set<VarFact> assignedRegisters = new HashSet<>();
+            for (InstFact line : rootBlock.getLines()) {
+                if (line instanceof StoreFact) {
+                    // store facts may represent implicit params. check conditions
+                    StoreFact storeFact = (StoreFact) line;
+                    if (!(storeFact.getRhs() instanceof VarFact)) {
+                        continue; // rhs must be a single variable
+                    }
+                    VarFact rhsVar = (VarFact) storeFact.getRhs();
+                    if (!isRegister(rhsVar) || assignedRegisters.contains(rhsVar)) {
+                        continue; // rhs must be an unassigned register
+                    }
+                    InParameter param = new InParameter(new VarFact(uniqueVarName()), rhsVar);
+                    param.setAlias((MemFact) storeFact.getLhs());
+                    params.add(param);
+                } else if (line instanceof LoadFact || line instanceof MoveFact) {
+                    // if the lhs is a register, add it to the set of assigned registers
+                    VarFact lhsVar = (VarFact) ((AssignFact) line).getLhs();
+                    if (isRegister(lhsVar)) {
+                        assignedRegisters.add(lhsVar);
+                    }
+                }
+            }
+            removeDuplicateParamsAndMerge(params);
+            createCallArguments(functionFact);
         }
     }
 
@@ -201,108 +251,53 @@ public class BoogieTranslator {
     }
 
     /**
-     * We want to feed each EnterSubFact with a list of its parameters (i.e. ParamFacts) so that it can include these
-     * in its procedure header, and use them for parameter resolving/dereferencing within the function body.
-     * We assume that outParams are always explicitly stated.
-     */
-    private void createFuncParameters() {
-        for (Integer[] endpoints : getAllFunctions()) {
-            EnterSubFact func = (EnterSubFact) facts.get(endpoints[0]);
-            List<ParamFact> explicitParams = getExplicitParams(endpoints);
-            List<ParamFact> implicitParams = getImplicitParams(endpoints);
-            func.paramFacts = removeDuplicateParamsAndMerge(explicitParams, implicitParams);
-            createCallArguments(func);
-        }
-    }
-
-    /**
      * Provides function calls with a list of the parameters they will need to provide arguments for.
      */
     private void createCallArguments(EnterSubFact func) {
-        for (InstFact fact : facts) {
-            if (!(fact instanceof CallFact)) continue;
-            CallFact call = (CallFact) fact;
-            if (!call.funcName.equals(func.funcName)) continue;
-            for (ParamFact params : func.paramFacts) {
-                if (!params.is_result) call.args.add(params.register);
+        for (CallFact call : getCallsToFunction(func)) {
+            func.getInParams().forEach(param -> call.getArgs().add(param.getRegister()));
+        }
+    }
+
+    private List<CallFact> getCallsToFunction(EnterSubFact function) {
+        List<CallFact> calls = new ArrayList<>();
+        for (InstFact line : flowGraph.getViewOfLines()) {
+            if (line instanceof CallFact) {
+                CallFact call = (CallFact) line;
+                if (call.getFuncName().equals(function.getFuncName())) {
+                    calls.add(call);
+                }
             }
         }
+        return calls;
     }
 
     /**
      * Implicit params found may contain params already listed explicitly. If so, we take the var name of the explicit
      * param, and the alias of the implicit param.
      */
-    private List<ParamFact> removeDuplicateParamsAndMerge(List<ParamFact> explicitParams, List<ParamFact> implicitParams) {
-        for (ParamFact explicitParam : explicitParams) {
-            if (explicitParam.is_result) continue; // these can never be caught implicitly, and skipping this means we can simply compare by register
-            Iterator<ParamFact> iter = implicitParams.iterator();
-            while (iter.hasNext()) {
-                ParamFact implicitParam = iter.next();
-                if (explicitParam.register.equals(implicitParam.register)) {
-                    // match found
-                    explicitParam.alias = implicitParam.alias;
+    private void removeDuplicateParamsAndMerge(List<InParameter> params) {
+        Iterator<InParameter> iter = params.iterator();
+        while (iter.hasNext()) {
+            InParameter param = iter.next();
+            for (InParameter otherParam : params) {
+                if (param != otherParam && param.getRegister().equals(otherParam.getRegister())) {
+                    // duplicate found
+                    if (param.getAlias() == null) {
+                        // null alias => this is the explicit param
+                        otherParam.setName(param.getName());
+                    } else {
+                        // non-null alias => this is the implicit param
+                        otherParam.setAlias(param.getAlias());
+                    }
                     iter.remove();
                 }
             }
         }
-        List<ParamFact> params = new ArrayList<>();
-        params.addAll(explicitParams);
-        params.addAll(implicitParams);
-        return params;
-    }
-
-    /**
-     * Returns a list of all the parameters of the given function which are explicitly listed.
-     * Assumes these parameters are sequentially listed, immediately following the EnterSubFact.
-     */
-    private List<ParamFact> getExplicitParams(Integer[] endpoints) {
-        List<ParamFact> params = new ArrayList<>();
-        for (int i = endpoints[0] + 1; i < endpoints[1]; i++) {
-            InstFact param = facts.get(i);
-            if (!(param instanceof ParamFact)) break;
-            params.add((ParamFact) param);
-        }
-        return params;
-    }
-
-    /**
-     * Returns a list of all the parameters of the given function which are not explicitly listed.
-     * These are identified as memory addresses which have registers stored into them before those registers are
-     * assigned within the function.
-     * We assume that these store instructions contain only the register on the rhs.
-     * We also assume that identical memory accesses (e.g. mem[2]) are never written differently (e.g. mem[1+1]), as
-     * this is what we use for identifying and substituting implicit parameters.
-     * We assume that these registers are only accessed once - i.e. by the store instruction - before they are
-     * assigned.
-     */
-    private List<ParamFact> getImplicitParams(Integer[] endpoints) {
-        List<ParamFact> params = new ArrayList<>();
-        Set<VarFact> assignedRegisters = new HashSet<>();
-        for (int i = endpoints[0]; i < endpoints[1]; i++) {
-            InstFact line = facts.get(i);
-            // we are only concerned with assignments here
-            if (!(line instanceof AssignFact)) continue;
-            if (line instanceof StoreFact) {
-                // store facts may represent implicit params. check if the rhs is a register
-                StoreFact storeFact = (StoreFact) line;
-                if (!(storeFact.rhs instanceof VarFact)) continue; // rhs must be a single variable
-                VarFact rhsVar = (VarFact) storeFact.rhs;
-                if (!isRegister(rhsVar) || assignedRegisters.contains(rhsVar)) continue; // variable is not a register, or has been assigned before
-                ParamFact param = new ParamFact("", new VarFact(uniqueVarName()), rhsVar, false);
-                param.alias = (MemFact) storeFact.lhs;
-                params.add(param);
-            } else {
-                // this is a move or a load. if the lhs is a register, add it to the set of assigned registers
-                VarFact lhsVar = (VarFact) (line instanceof LoadFact ? ((LoadFact) line).lhs : ((MoveFact) line).lhs);
-                if (isRegister(lhsVar)) assignedRegisters.add(lhsVar);
-            }
-        }
-        return params;
     }
 
     private boolean isRegister(VarFact varFact) {
-        return varFact.name.charAt(0) == 'X';
+        return varFact.getName().charAt(0) == 'X';
     }
 
     /**
