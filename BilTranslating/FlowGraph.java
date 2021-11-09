@@ -289,7 +289,8 @@ public class FlowGraph {
         private static List<Block> createBlocksFromSplits(List<Integer> splits, List<InstFact> lines) {
             List<Block> blocks = new ArrayList<>();
             for (int i = 0; i < splits.size() - 1; i++) {
-                List<InstFact> blockLines = lines.subList(splits.get(i), splits.get(i + 1));
+                // need to convert the sublist view to a real arraylist to avoid ConcurrentModificationException
+                List<InstFact> blockLines = new ArrayList<>(lines.subList(splits.get(i), splits.get(i + 1)));
                 // blocks are initially created with no children
                 Block block = new Block(blockLines.get(0).label.pc, blockLines, new ArrayList<>());
                 blocks.add(block);
@@ -507,7 +508,5 @@ public class FlowGraph {
             }
             return builder.toString();
         }
-
-
     }
 }
