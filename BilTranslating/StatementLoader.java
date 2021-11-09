@@ -15,8 +15,10 @@ import java.util.List;
 
 public class StatementLoader implements BilListener {
 
+    // list of facts to output
     List<InstFact> facts;
-    String funcName = "";
+    // the last function header parsed; needed for assigning parameters
+    EnterSubFact currentFunction;
 
     public StatementLoader(List<InstFact> facts) {
         this.facts = facts;
@@ -133,10 +135,11 @@ public class StatementLoader implements BilListener {
     @Override
     public void enterSub(BilParser.SubContext ctx) {
         String address = ctx.addr().getText();
-        String funcName = ctx.functionName().getText();
-        facts.add(new EnterSubFact(address, funcName));
+        String name = ctx.functionName().getText();
+        EnterSubFact function = new EnterSubFact(address, name);
+        facts.add(function);
 
-        this.funcName = funcName;
+        this.currentFunction = function;
     }
 
     @Override
@@ -207,7 +210,7 @@ public class StatementLoader implements BilListener {
             System.out.println(ctx.addr().getText());
             if (ctx.call().functionName() == null) {
                 // occasionally this occurs with "call LR with no return" lines
-                facts.add(new ExitSubFact(ctx.addr().getText(), this.funcName));
+                facts.add(new ExitSubFact(ctx.addr().getText(), this.currentFunction));
             } else {
                 String funcName = ctx.call().functionName().getText();
                 String returnAddr = ctx.call().returnaddr().addr().getText();
@@ -227,7 +230,7 @@ public class StatementLoader implements BilListener {
     @Override
     public void enterEndsub(BilParser.EndsubContext ctx) {
         String address = ctx.addr().getText();
-        facts.add(new ExitSubFact(address, this.funcName));
+        facts.add(new ExitSubFact(address, this.currentFunction));
     }
 
     @Override
