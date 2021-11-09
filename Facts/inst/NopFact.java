@@ -16,7 +16,7 @@ public class NopFact extends InstFact {
     }
 
     public String toString() {
-        return (String.format("%sskip;\n", label));
+        return (String.format("%sskip;", label));
     }
 
     public List<Fact> toFactList() {

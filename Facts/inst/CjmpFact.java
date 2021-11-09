@@ -22,7 +22,7 @@ public class CjmpFact extends InstFact {
     }
 
     public String toString() {
-        return String.format("%sif (%s) goto label%s;\n", label, condition, target);
+        return String.format("%sif (%s) goto label%s;", label, condition, target);
     }
 
     public List<Fact> toFactList() {

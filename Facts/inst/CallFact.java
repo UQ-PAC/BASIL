@@ -26,7 +26,7 @@ public class CallFact extends InstFact {
             paramsStr.append(param.name);
         }
         if (!showJump) {
-            return String.format("%scall %s(%s);\n", label, funcName, paramsStr);
+            return String.format("%scall %s(%s);", label, funcName, paramsStr);
         }
         return String.format("%scall %s(%s);\ngoto label%s;\n", label, funcName, paramsStr, returnAddr);
     }

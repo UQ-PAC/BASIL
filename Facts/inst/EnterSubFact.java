@@ -41,7 +41,7 @@ public class EnterSubFact extends InstFact {
         if (outParam != null) {
             line.append(" returns (").append(outParam).append(")");
         }
-        line.append(" {\n");
+        line.append(" {");
         return String.format("%s%s", label, line);
     }
 

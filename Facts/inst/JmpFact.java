@@ -19,7 +19,7 @@ public class JmpFact extends InstFact {
     }
 
     public String toString() {
-        return String.format("%sgoto label%s;\n", label, target);
+        return String.format("%sgoto label%s;", label, target);
     }
 
     public List<Fact> toFactList() {

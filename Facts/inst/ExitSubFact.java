@@ -16,7 +16,7 @@ public class ExitSubFact extends InstFact {
     }
 
     public String toString() {
-        return "return;\n";
+        return "return;";
     }
 
     public List<Fact> toFactList() {

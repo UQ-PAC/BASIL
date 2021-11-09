@@ -170,7 +170,7 @@ public class FlowGraph {
             builder.append(header);
             StringBuilder body = new StringBuilder();
             rootBlock.getBlocksInCluster().forEach(block -> body.append(block.toString()));
-            String bodyStr = body.toString().trim();
+            String bodyStr = body.toString();
             bodyStr = "  " + bodyStr.replaceAll("\n", "\n  ");
             builder.append(bodyStr).append("}\n");
             return builder.toString();
