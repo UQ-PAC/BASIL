@@ -6,10 +6,10 @@ import Facts.Inst.Assign.LoadFact;
 import Facts.Inst.Assign.MoveFact;
 import Facts.Inst.Assign.StoreFact;
 import Facts.Misc.SuccessorFact;
-
 import java.util.*;
 
 public class DatalogUtility {
+
     private int expIdCounter = 0;
     private int instIdCounter = 0;
     private int succIdCounter = 0;
@@ -38,43 +38,43 @@ public class DatalogUtility {
                 BopFact bopFact = (BopFact) fact;
                 recordedFacts.put(bopFact, new ExpLog(
                         "bop",
-                        bopFact.op,
-                        recordedFacts.get(bopFact.e1).getIDStr(),
-                        recordedFacts.get(bopFact.e2).getIDStr()));
+                        bopFact.getOperator(),
+                        recordedFacts.get(bopFact.getFirstExp()).getIDStr(),
+                        recordedFacts.get(bopFact.getSecondExp()).getIDStr()));
             } else if (fact instanceof ExtractFact) {
                 // exp2 extract 1 2 exp1
                 ExtractFact extractFact = (ExtractFact) fact;
                 recordedFacts.put(extractFact, new ExpLog(
                         "extract",
-                        Integer.toString(extractFact.firstInt),
-                        Integer.toString(extractFact.secondInt),
-                        recordedFacts.get(extractFact.variable).getIDStr()));
+                        Integer.toString(extractFact.getFirstInt()),
+                        Integer.toString(extractFact.getSecondInt()),
+                        recordedFacts.get(extractFact.getVariable()).getIDStr()));
             } else if (fact instanceof LiteralFact) {
                 // exp2 literal 1 none none
                 LiteralFact literalFact = (LiteralFact) fact;
                 recordedFacts.put(literalFact, new ExpLog(
                         "literal",
-                        literalFact.val,
+                        literalFact.getVal(),
                         "none",
                         "none"));
             } else if (fact instanceof MemFact) {
                 // ignore mem facts - link this mem to the log of its exp
                 MemFact memFact = (MemFact) fact;
-                recordedFacts.put(memFact, recordedFacts.get(memFact.exp));
+                recordedFacts.put(memFact, recordedFacts.get(memFact.getExp()));
             } else if (fact instanceof UopFact) {
                 // exp2 uop ~ exp1 none
                 UopFact uopFact = (UopFact) fact;
                 recordedFacts.put(uopFact, new ExpLog(
                         "uop",
-                        uopFact.op,
-                        recordedFacts.get(uopFact.e1).getIDStr(),
+                        uopFact.getOperator(),
+                        recordedFacts.get(uopFact.getExp()).getIDStr(),
                         "none"));
             } else if (fact instanceof VarFact) {
                 // exp2 var X0 none none
                 VarFact varFact = (VarFact) fact;
                 recordedFacts.put(varFact, new ExpLog(
                         "var",
-                        varFact.name,
+                        varFact.getName(),
                         "none",
                         "none"));
             } else if (fact instanceof LoadFact) {
@@ -82,56 +82,56 @@ public class DatalogUtility {
                 LoadFact loadFact = (LoadFact) fact;
                 recordedFacts.put(loadFact, new InstLog(
                         "load",
-                        recordedFacts.get(loadFact.lhs).getIDStr(),
-                        loadFact.rhs == null ? "none" : recordedFacts.get(loadFact.rhs).getIDStr()));
+                        recordedFacts.get(loadFact.getLhs()).getIDStr(),
+                        loadFact.getRhs() == null ? "none" : recordedFacts.get(loadFact.getRhs()).getIDStr()));
             } else if (fact instanceof MoveFact) {
                 // 2 move exp1 exp0
                 MoveFact moveFact = (MoveFact) fact;
                 recordedFacts.put(moveFact, new InstLog(
                         "move",
-                        recordedFacts.get(moveFact.lhs).getIDStr(),
-                        recordedFacts.get(moveFact.rhs).getIDStr()));
+                        recordedFacts.get(moveFact.getLhs()).getIDStr(),
+                        recordedFacts.get(moveFact.getRhs()).getIDStr()));
             } else if (fact instanceof StoreFact) {
                 // 2 store exp1 exp0
                 StoreFact storeFact = (StoreFact) fact;
                 recordedFacts.put(storeFact, new InstLog(
                         "store",
-                        recordedFacts.get(storeFact.lhs).getIDStr(),
-                        recordedFacts.get(storeFact.rhs).getIDStr()));
+                        recordedFacts.get(storeFact.getLhs()).getIDStr(),
+                        recordedFacts.get(storeFact.getRhs()).getIDStr()));
             } else if (fact instanceof CallFact) {
                 // 2 call functionName none
                 CallFact callFact = (CallFact) fact;
                 recordedFacts.put(callFact, new InstLog(
                         "call",
-                        callFact.funcName,
+                        callFact.getFuncName(),
                         "none"));
             } else if (fact instanceof CjmpFact) {
                 // 2 cjmp exp1 target
                 CjmpFact cjmpFact = (CjmpFact) fact;
                 recordedFacts.put(cjmpFact, new InstLog(
                         "cjmp",
-                        recordedFacts.get(cjmpFact.condition).getIDStr(),
-                        cjmpFact.target));
+                        recordedFacts.get(cjmpFact.getCondition()).getIDStr(),
+                        cjmpFact.getTarget()));
             } else if (fact instanceof EnterSubFact) {
                 // 2 enterSub function none
                 EnterSubFact enterSubFact = (EnterSubFact) fact;
                 recordedFacts.put(enterSubFact, new InstLog(
                         "enterSub",
-                        enterSubFact.funcName,
+                        enterSubFact.getFuncName(),
                         "none"));
             } else if (fact instanceof ExitSubFact) {
                 // 2 exitFunc function none
                 ExitSubFact exitSubFact = (ExitSubFact) fact;
                 recordedFacts.put(exitSubFact, new InstLog(
                         "exitSub",
-                        exitSubFact.funcName,
+                        "none",
                         "none"));
             } else if (fact instanceof JmpFact) {
                 // 2 jump target none
                 JmpFact jmpFact = (JmpFact) fact;
                 recordedFacts.put(jmpFact, new InstLog(
                         "jump",
-                        jmpFact.target,
+                        jmpFact.getTarget(),
                         "none"));
             } else if (fact instanceof NopFact) {
                 // 2 nop none none
@@ -139,13 +139,6 @@ public class DatalogUtility {
                 recordedFacts.put(nopFact, new InstLog(
                         "nop",
                         "none",
-                        "none"));
-            } else if (fact instanceof ParamFact) {
-                // 2 param name none
-                ParamFact paramFact = (ParamFact) fact;
-                recordedFacts.put(paramFact, new InstLog(
-                        "param",
-                        paramFact.name.name,
                         "none"));
             } else if (fact instanceof SuccessorFact) {
                 // 0 1
@@ -186,7 +179,7 @@ public class DatalogUtility {
             InstFact fact = facts.get(f);
             if (fact instanceof JmpFact) {
                 JmpFact jmpFact = (JmpFact) fact;
-                int targetIndex = findInstWithPc(jmpFact.target, facts);
+                int targetIndex = findInstWithPc(jmpFact.getTarget(), facts);
                 successions.put(f, targetIndex);
             } else if (fact instanceof CallFact) {
                 CallFact callFact = (CallFact) fact;
@@ -197,7 +190,7 @@ public class DatalogUtility {
                 for (int i = 0; i < facts.size(); i++) {
                     if (!(facts.get(i) instanceof EnterSubFact)) continue;
                     EnterSubFact enterSubFact = (EnterSubFact) facts.get(i);
-                    if (enterSubFact.funcName.equals(callFact.funcName)) {
+                    if (enterSubFact.getFuncName().equals(callFact.getFuncName())) {
                         // find the index of the called function; record its index and search for its end
                         enterSubIndex = i;
                         for (int j = i; j < facts.size(); j++) {
@@ -211,14 +204,14 @@ public class DatalogUtility {
                     }
                 }
                 successions.put(f, enterSubIndex); // call -> startFunction succession
-                successions.put(exitSubIndex, findInstWithPc(callFact.returnAddr, facts)); // endFunction -> lineBelowCall succession
+                // todo: endFunction -> lineBelowCall succession - there are many places where the function may return. this may be better done with a flow graph?
             } else if (fact instanceof CjmpFact) {
                 CjmpFact cjmpFact = (CjmpFact) fact;
                 // need both the ifTrue jump and ifFalse jump
                 // the ifFalse jump will be a jump to the next line
                 successions.put(f, f + 1);
                 // the ifTrue jump will be a jump to the target
-                successions.put(f, findInstWithPc(cjmpFact.target, facts));
+                successions.put(f, findInstWithPc(cjmpFact.getTarget(), facts));
             }
         }
 
@@ -238,7 +231,7 @@ public class DatalogUtility {
     private int findInstWithPc(String pc, List<InstFact> facts) {
         for (int i = 0; i < facts.size(); i++) {
             InstFact fact = facts.get(i);
-            if (fact.label.pc.equals(pc)) {
+            if (fact.getLabel().getPc().equals(pc)) {
                 return i;
             }
         }

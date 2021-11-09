@@ -1,31 +1,32 @@
 package Facts;
 
-import java.util.Objects;
-
 public class Label {
 
-    public String pc;
-    public boolean hide = true;
+    private String pc;
+    private boolean visible = false;
 
     public Label(String pc) {
         this.pc = pc;
     }
 
+    public String getPc() {
+        return pc;
+    }
+
+    public void setPc(String pc) {
+        this.pc = pc;
+    }
+
+    public void show() {
+        visible = true;
+    }
+
+    public void hide() {
+        visible = false;
+    }
+
     @Override
     public String toString() {
-        return hide ? "" : String.format("label%s: ", pc);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Label label = (Label) o;
-        return hide == label.hide && Objects.equals(pc, label.pc);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(pc, hide);
+        return visible ? String.format("label%s: ", pc) : "";
     }
 }
