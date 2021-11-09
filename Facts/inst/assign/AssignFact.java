@@ -1,10 +1,8 @@
 package Facts.inst.assign;
 
-import Facts.DatalogUtility;
 import Facts.Fact;
 import Facts.exp.ExpFact;
 import Facts.inst.InstFact;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;

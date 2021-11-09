@@ -168,12 +168,9 @@ public class FlowGraph {
         public String toString() {
             StringBuilder builder = new StringBuilder();
             builder.append(header).append("\n");
-            StringBuilder body = new StringBuilder();
-            rootBlock.getBlocksInCluster().forEach(block -> body.append(block.toString()));
-            String bodyStr = body.toString().trim();
-            bodyStr = "  " + bodyStr.replaceAll("\n", "\n  ");
-            builder.append(bodyStr).append("\n}\n");
-            return builder.toString();
+            rootBlock.getBlocksInCluster().forEach(builder::append);
+            builder.append("}");
+            return builder.toString().replaceAll("\n", "\n  ") + "\n";
         }
     }
 
@@ -504,7 +501,7 @@ public class FlowGraph {
             StringBuilder builder = new StringBuilder();
             builder.append(label).append(":\n");
             for (InstFact line : lines) {
-                builder.append("  ").append(line.toString()).append("\n");
+                builder.append("  ").append(line).append("\n");
             }
             return builder.toString();
         }
