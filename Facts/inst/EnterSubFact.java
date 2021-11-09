@@ -1,10 +1,7 @@
 package Facts.inst;
 
 import Facts.Fact;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public class EnterSubFact extends InstFact {
 
@@ -46,9 +43,7 @@ public class EnterSubFact extends InstFact {
     }
 
     public List<Fact> toFactList() {
-        List<Fact> factList = new ArrayList<>();
-        factList.add(this);
-        return factList;
+        return Collections.singletonList(this);
     }
 
     @Override
