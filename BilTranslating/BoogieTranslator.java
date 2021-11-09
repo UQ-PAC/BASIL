@@ -7,6 +7,8 @@ import Facts.Inst.Assign.AssignFact;
 import Facts.Inst.Assign.LoadFact;
 import Facts.Inst.Assign.MoveFact;
 import Facts.Inst.Assign.StoreFact;
+import Facts.Label;
+
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -51,10 +53,11 @@ import java.util.*;
 public class BoogieTranslator {
 
     // for writing the boogie output
-    BufferedWriter writer;
+    private BufferedWriter writer;
     // the lines in the BIL file to translate
-    FlowGraph flowGraph;
-    int uniqueInt = 0;
+    private final FlowGraph flowGraph;
+    // for generating unique variable names and labels
+    private int uniqueInt = 0;
 
     public BoogieTranslator(FlowGraph flowGraph, String outputFileName) {
         try {
@@ -84,8 +87,32 @@ public class BoogieTranslator {
 
     private void initGlobalBlock() {
         List<InstFact> globalLines = flowGraph.getGlobalBlock().getLines();
-        globalLines.add(new CallFact("start", "main", "exit"));
-        globalLines.add(new NopFact("exit"));
+        globalLines.add(new CallFact("start", "main"));
+    }
+
+    /**
+     * We want to display the labels (i.e. pc's) of all instructions whose labels are referenced elsewhere (for e.g. by
+     * a jump or conditional jump).
+     */
+    private void createLabels() {
+        List<InstFact> lines = flowGraph.getLines();
+        List<String> usedLabels = new ArrayList<>();
+        // get all referred labels within the flow graph
+        for (InstFact line : lines) {
+            String target = extractTargetLabel(line);
+            if (target != null) {
+                usedLabels.add(target);
+            }
+        }
+        // show all labels which are referred; hide all labels which are not
+        for (InstFact line : lines) {
+            Label label = line.getLabel();
+            if (usedLabels.contains(label.getPc())) {
+                label.show();
+            } else {
+                label.hide();
+            }
+        }
     }
 
     /**
@@ -127,23 +154,7 @@ public class BoogieTranslator {
         }
     }
 
-    /**
-     * We want to display the labels (i.e. pc's) of all instructions whose labels are referenced elsewhere (for e.g. by
-     * a jump, conditional jump or call).
-     */
-    private void createLabels() {
-        List<InstFact> lines = flowGraph.getLines();
-        List<String> usedLabels = new ArrayList<>();
-        // get all referred labels within the flow graph
-        for (InstFact line : lines) {
-            String target = extractTargetLabel(line);
-            if (target != null) usedLabels.add(target);
-        }
-        // show all labels which are referred; hide all labels which are not
-        for (InstFact line : lines) {
-            line.label.hide = !usedLabels.contains(line.label.pc);
-        }
-    }
+
 
     /**
      * If a skip is not jumped to, we should remove it.
