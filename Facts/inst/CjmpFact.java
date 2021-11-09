@@ -31,18 +31,4 @@ public class CjmpFact extends InstFact {
         factList.add(this);
         return factList;
     }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        CjmpFact cjmpFact = (CjmpFact) o;
-        return Objects.equals(target, cjmpFact.target) && Objects.equals(condition, cjmpFact.condition);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), target, condition);
-    }
 }

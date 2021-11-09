@@ -10,15 +10,5 @@ public class MoveFact extends AssignFact {
     public MoveFact(String pc, VarFact lhsExp, ExpFact rhsExp) {
         super(pc, lhsExp, rhsExp, "move");
     }
-
-    @Override
-    public boolean equals(Object o) {
-        return super.equals(o);
-    }
-
-    @Override
-    public int hashCode() {
-        return super.hashCode();
-    }
 }
 

@@ -24,18 +24,4 @@ public class ExitSubFact extends InstFact {
         factList.add(this);
         return factList;
     }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        ExitSubFact that = (ExitSubFact) o;
-        return Objects.equals(funcName, that.funcName);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), funcName);
-    }
 }

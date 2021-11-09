@@ -36,18 +36,4 @@ public class CallFact extends InstFact {
         factList.add(this);
         return factList;
     }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        CallFact callFact = (CallFact) o;
-        return showJump == callFact.showJump && Objects.equals(funcName, callFact.funcName) && Objects.equals(returnAddr, callFact.returnAddr) && Objects.equals(params, callFact.params);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), funcName, returnAddr, params, showJump);
-    }
 }

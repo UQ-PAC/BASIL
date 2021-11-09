@@ -32,18 +32,4 @@ public class ParamFact extends InstFact {
         factList.add(this);
         return factList;
     }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        ParamFact paramFact = (ParamFact) o;
-        return is_result == paramFact.is_result && Objects.equals(name, paramFact.name) && Objects.equals(register, paramFact.register) && Objects.equals(alias, paramFact.alias);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), name, register, alias, is_result);
-    }
 }

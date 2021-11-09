@@ -41,6 +41,10 @@ public class EnterSubFact extends InstFact {
         this.outParam = outParam;
     }
 
+    public List<Fact> toFactList() {
+        return Collections.singletonList(this);
+    }
+
     @Override
     public String toString() {
         // todo: add param types
@@ -61,23 +65,5 @@ public class EnterSubFact extends InstFact {
         }
         line.append(" {");
         return String.format("%s%s", label, line);
-    }
-
-    public List<Fact> toFactList() {
-        return Collections.singletonList(this);
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        if (!super.equals(o)) return false;
-        EnterSubFact that = (EnterSubFact) o;
-        return Objects.equals(funcName, that.funcName) && Objects.equals(paramFacts, that.paramFacts);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(super.hashCode(), funcName, paramFacts);
     }
 }

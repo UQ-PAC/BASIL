@@ -11,14 +11,4 @@ public class StoreFact extends AssignFact {
     public StoreFact(String pc, MemFact memExp, ExpFact rhsExp) {
         super(pc, memExp, rhsExp, "store");
     }
-
-    @Override
-    public boolean equals(Object o) {
-        return super.equals(o);
-    }
-
-    @Override
-    public int hashCode() {
-        return super.hashCode();
-    }
 }

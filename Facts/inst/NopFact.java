@@ -24,14 +24,4 @@ public class NopFact extends InstFact {
         factList.add(this);
         return factList;
     }
-
-    @Override
-    public boolean equals(Object o) {
-        return super.equals(o);
-    }
-
-    @Override
-    public int hashCode() {
-        return super.hashCode();
-    }
 }
