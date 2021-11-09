@@ -9,32 +9,55 @@ import java.util.Objects;
  * Binary operation fact
  */
 public class BopFact extends ExpFact {
-    /** Operator */
-    public String op;
-    /** Expression 1 */
-    public ExpFact e1;
-    /** Expression 2 */
-    public ExpFact e2;
 
-    public BopFact(String op, ExpFact e1, ExpFact e2) {
-        this.op = op;
-        this.e1 = e1;
-        this.e2 = e2;
+    /** Operator */
+    private String operator;
+    /** Expression 1 */
+    private ExpFact firstExp;
+    /** Expression 2 */
+    private ExpFact secondExp;
+
+    public BopFact(String operator, ExpFact firstExp, ExpFact secondExp) {
+        this.operator = operator;
+        this.firstExp = firstExp;
+        this.secondExp = secondExp;
     }
 
-    /**
-     * @return exp(pc, bop, op, e1, e2)
-     */
-    public String toString() {
-        return String.format("(%s) %s (%s)", e1, op, e2);
+    public String getOperator() {
+        return operator;
+    }
+
+    public void setOperator(String operator) {
+        this.operator = operator;
+    }
+
+    public ExpFact getFirstExp() {
+        return firstExp;
+    }
+
+    public void setFirstExp(ExpFact firstExp) {
+        this.firstExp = firstExp;
+    }
+
+    public ExpFact getSecondExp() {
+        return secondExp;
+    }
+
+    public void setSecondExp(ExpFact secondExp) {
+        this.secondExp = secondExp;
     }
 
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
-        factList.addAll(e1.toFactList());
-        factList.addAll(e2.toFactList());
+        factList.addAll(firstExp.toFactList());
+        factList.addAll(secondExp.toFactList());
         factList.add(this);
         return factList;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("(%s) %s (%s)", firstExp, operator, secondExp);
     }
 
     @Override
@@ -42,11 +65,11 @@ public class BopFact extends ExpFact {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         BopFact bopFact = (BopFact) o;
-        return Objects.equals(op, bopFact.op) && Objects.equals(e1, bopFact.e1) && Objects.equals(e2, bopFact.e2);
+        return Objects.equals(operator, bopFact.operator) && Objects.equals(firstExp, bopFact.firstExp) && Objects.equals(secondExp, bopFact.secondExp);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(op, e1, e2);
+        return Objects.hash(operator, firstExp, secondExp);
     }
 }

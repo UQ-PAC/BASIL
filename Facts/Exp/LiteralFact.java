@@ -10,20 +10,29 @@ import java.util.Objects;
  */
 public class LiteralFact extends ExpFact {
     /** Value of literal */
-    public String val;
+    private String val;
 
     public LiteralFact(String val) {
         this.val = val;
     }
 
-    public String toString() {
-        return String.format("%s", val);
+    public String getVal() {
+        return val;
+    }
+
+    public void setVal(String val) {
+        this.val = val;
     }
 
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.add(this);
         return factList;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s", val);
     }
 
     @Override

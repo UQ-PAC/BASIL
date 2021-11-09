@@ -9,17 +9,19 @@ import java.util.Objects;
  * Memory expression e.g. mem[10]
  */
 public class MemFact extends ExpFact {
-    public ExpFact exp;
+
+    private ExpFact exp;
 
     public MemFact(ExpFact exp) {
         this.exp = exp;
     }
 
-    /**
-     * @return exp(id, memExp, exp, none)
-     */
-    public String toString() {
-        return String.format("mem[%s]", exp);
+    public ExpFact getExp() {
+        return exp;
+    }
+
+    public void setExp(ExpFact exp) {
+        this.exp = exp;
     }
 
     public String toDataString() {
@@ -27,10 +29,14 @@ public class MemFact extends ExpFact {
     }
 
     public List<Fact> toFactList() {
-        List<Fact> factList = new ArrayList<>();
-        factList.addAll(exp.toFactList());
+        List<Fact> factList = new ArrayList<>(exp.toFactList());
         factList.add(this);
         return factList;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("mem[%s]", exp);
     }
 
     @Override

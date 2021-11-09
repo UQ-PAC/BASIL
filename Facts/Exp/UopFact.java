@@ -9,26 +9,41 @@ import java.util.Objects;
  * Unary operator fact
  */
 public class UopFact extends ExpFact {
-    public String op;
-    public ExpFact e1;
 
-    public UopFact(String op, ExpFact e1) {
-        this.op = op;
-        this.e1 = e1;
+    private String operator;
+    private ExpFact exp;
+
+    public UopFact(String operator, ExpFact exp) {
+        this.operator = operator;
+        this.exp = exp;
     }
 
-    /**
-     * @return exp(id, uop, op, e1, none)
-     */
-    public String toString() {
-        return String.format("%s %s", op, e1);
+    public String getOperator() {
+        return operator;
+    }
+
+    public void setOperator(String operator) {
+        this.operator = operator;
+    }
+
+    public ExpFact getExp() {
+        return exp;
+    }
+
+    public void setExp(ExpFact exp) {
+        this.exp = exp;
     }
 
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
-        factList.addAll(e1.toFactList());
+        factList.addAll(exp.toFactList());
         factList.add(this);
         return factList;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s %s", operator, exp);
     }
 
     @Override
@@ -36,11 +51,11 @@ public class UopFact extends ExpFact {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         UopFact uopFact = (UopFact) o;
-        return Objects.equals(op, uopFact.op) && Objects.equals(e1, uopFact.e1);
+        return Objects.equals(operator, uopFact.operator) && Objects.equals(exp, uopFact.exp);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(op, e1);
+        return Objects.hash(operator, exp);
     }
 }

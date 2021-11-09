@@ -21,6 +21,6 @@ public class NopFact extends InstFact {
 
     @Override
     public String toString() {
-        return (String.format("%sskip;", label));
+        return (String.format("%sskip;", getLabel()));
     }
 }

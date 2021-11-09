@@ -7,9 +7,9 @@ import java.util.Objects;
 
 public class ExtractFact extends ExpFact {
 
-    public int firstInt;
-    public int secondInt;
-    public VarFact variable;
+    private int firstInt;
+    private int secondInt;
+    private VarFact variable;
 
     public ExtractFact(int firstInt, int secondInt, VarFact variable) {
         this.firstInt = firstInt;
@@ -17,15 +17,39 @@ public class ExtractFact extends ExpFact {
         this.variable = variable;
     }
 
-    public String toString() {
-        return String.format("%s[%d:%d]", variable, firstInt, secondInt);
+    public int getFirstInt() {
+        return firstInt;
+    }
+
+    public void setFirstInt(int firstInt) {
+        this.firstInt = firstInt;
+    }
+
+    public int getSecondInt() {
+        return secondInt;
+    }
+
+    public void setSecondInt(int secondInt) {
+        this.secondInt = secondInt;
+    }
+
+    public VarFact getVariable() {
+        return variable;
+    }
+
+    public void setVariable(VarFact variable) {
+        this.variable = variable;
     }
 
     public List<Fact> toFactList() {
-        List<Fact> factList = new ArrayList<>();
-        factList.addAll(variable.toFactList());
+        List<Fact> factList = new ArrayList<>(variable.toFactList());
         factList.add(this);
         return factList;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s[%d:%d]", variable, firstInt, secondInt);
     }
 
     @Override

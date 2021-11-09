@@ -9,23 +9,30 @@ import java.util.Objects;
  * Variable fact
  */
 public class VarFact extends ExpFact {
-    public String name;
+
+    private String name;
 
     public VarFact(String name) {
         this.name = name;
     }
 
-    /**
-     * @return exp(id, var, name, none, none)
-     */
-    public String toString() {
-        return String.format("%s", name);
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.add(this);
         return factList;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s", name);
     }
 
     @Override
