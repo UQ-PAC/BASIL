@@ -3,7 +3,6 @@ package Facts.inst;
 import Facts.Fact;
 import Facts.Label;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Generic instruction fact

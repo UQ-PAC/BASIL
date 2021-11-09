@@ -1,10 +1,8 @@
 package Facts.inst;
 
 import Facts.Fact;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 public class ExitSubFact extends InstFact {
 

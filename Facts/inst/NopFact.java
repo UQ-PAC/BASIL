@@ -1,8 +1,6 @@
 package Facts.inst;
 
-import Facts.DatalogUtility;
 import Facts.Fact;
-
 import java.util.ArrayList;
 import java.util.List;
 

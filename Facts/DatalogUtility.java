@@ -6,7 +6,6 @@ import Facts.inst.assign.LoadFact;
 import Facts.inst.assign.MoveFact;
 import Facts.inst.assign.StoreFact;
 import Facts.misc.SuccessorFact;
-import jdk.nashorn.internal.codegen.CompilerConstants;
 
 import java.util.*;
 

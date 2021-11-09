@@ -1,12 +1,7 @@
 package Facts.exp;
 
-
-import Facts.DatalogUtility;
 import Facts.Fact;
-
-import javax.xml.crypto.Data;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 

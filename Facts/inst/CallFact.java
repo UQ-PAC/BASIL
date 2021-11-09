@@ -2,10 +2,8 @@ package Facts.inst;
 
 import Facts.Fact;
 import Facts.exp.VarFact;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 public class CallFact extends InstFact {
 

@@ -1,12 +1,9 @@
 package Facts.inst;
 
-import Facts.DatalogUtility;
 import Facts.Fact;
 import Facts.exp.VarFact;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Conditional Jump fact

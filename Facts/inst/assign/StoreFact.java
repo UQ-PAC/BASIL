@@ -2,7 +2,6 @@ package Facts.inst.assign;
 
 import Facts.exp.ExpFact;
 import Facts.exp.MemFact;
-import Facts.inst.InstFact;
 
 /**
  * Store fact

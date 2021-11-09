@@ -3,10 +3,8 @@ package Facts.inst;
 import Facts.Fact;
 import Facts.exp.MemFact;
 import Facts.exp.VarFact;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 public class ParamFact extends InstFact {
 

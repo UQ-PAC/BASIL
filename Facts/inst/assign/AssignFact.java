@@ -5,7 +5,6 @@ import Facts.exp.ExpFact;
 import Facts.inst.InstFact;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 
 /**
  * Assignment (e.g. x := exp)
