@@ -2,6 +2,8 @@ package BilTranslating;
 
 import BilParsing.BilListener;
 import BilParsing.BilParser;
+import Facts.InParameter;
+import Facts.OutParameter;
 import Facts.exp.*;
 import Facts.inst.*;
 import Facts.inst.assign.LoadFact;
@@ -149,13 +151,12 @@ public class StatementLoader implements BilListener {
 
     @Override
     public void enterParamTypes(BilParser.ParamTypesContext ctx) {
-        String address = ctx.addr().getText();
         String id = ctx.param().getText(); // human-readable name
         String variable = ctx.var().getText(); // some register, probably
         if (id.contains("result")) {
-            facts.add(new ParamFact(address, new VarFact("out"), new VarFact(variable), true));
+            currentFunction.setOutParam(new OutParameter(new VarFact("out"), new VarFact(variable)));
         } else {
-            facts.add(new ParamFact(address, new VarFact(id), new VarFact(variable), false));
+            currentFunction.getInParams().add(new InParameter(new VarFact(id), new VarFact(variable)));
         }
     }
 

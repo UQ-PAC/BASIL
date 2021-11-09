@@ -8,7 +8,7 @@ public class InParameter extends Parameter {
 
     private MemFact alias;
 
-    InParameter(VarFact name, VarFact register) {
+    public InParameter(VarFact name, VarFact register) {
         super(name, register);
     }
 
