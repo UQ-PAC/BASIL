@@ -190,6 +190,58 @@ public class BoogieTranslator {
     }
 
     /**
+     * We want to replace mem expressions which represent parameters, like mem[SP + 1], with the human-readable names
+     * of those parameters.
+     * We do this by first removing the initialising store fact "mem[SP + 1] := X0", then replacing all instances of
+     * "mem[SP + 1]" with the variable name.
+     * Depends on:
+     * - {@link #identifyImplicitParams()}
+     * Assumes:
+     * - Registers on the RHS of the initialising store fact are reassigned before they are used again.
+     * - No parameter is initialised twice (i.e. there is no more than one initialising store fact per mem exp).
+     * - Equivalent mem expressions are never written differently, e.g. mem[SP + 1] is never written as mem[SP + 0 + 1].
+     * - SP is equivalent at every line of code in the function, except the beginning and end.
+     * - All InParameters at this point have been assigned aliases.
+     * - All parameter initialisations occur in the first block of the function.
+     * - ...plus many other assumptions.
+     */
+    private void resolveInParams() {
+        for (FlowGraph.Function function : flowGraph.getFunctions()) {
+            // ensure all InParameters have been assigned aliases
+            for (InParameter param : function.getHeader().getInParams()) {
+                if (param.getAlias() == null) {
+                    throw new AssumptionViolationException(String.format(
+                            "Parameter %s of function %s, with assigned register %s, was not provided with a " +
+                                    "MemFact alias before resolving InParameters.",
+                            param.getName(), function.getHeader().getFuncName(), param.getRegister()
+                    ));
+                }
+            }
+            // remove all parameter initialisations from the first block
+            List<InstFact> forRemoval = new ArrayList<>();
+            List<InstFact> firstLines = function.getRootBlock().getLines();
+            for (InstFact line : firstLines) {
+                if (!(line instanceof StoreFact)) continue;
+                StoreFact store = (StoreFact) line;
+                if (!(store.getRhs() instanceof VarFact)) continue; // assume the rhs of the stores we're looking for consist of only a variable
+                MemFact lhs = (MemFact) store.getLhs();
+                VarFact rhs = (VarFact) store.getRhs();
+                for (InParameter param : function.getHeader().getInParams()) {
+                    if (param.getAlias().equals(lhs) && param.getRegister().equals(rhs)) {
+                        forRemoval.add(line);
+                    }
+                }
+            }
+            forRemoval.forEach(firstLines::remove);
+            // replace all instances of the alias with the human readable parameter name
+            function.getHeader().getInParams().forEach(param ->
+                    function.getRootBlock().getLinesInCluster().forEach(line ->
+                            replaceAllMatchingChildren(line, param.getAlias(), param.getName())));
+            // ok i just did this for fun but come on, 9 function calls in a single line? :o
+        }
+    }
+
+    /**
      * We'd like to convert mem expressions to variables.
      */
     private void resolveMems() {
@@ -227,12 +279,6 @@ public class BoogieTranslator {
             }
         }
     }
-
-
-
-
-
-
 
     /**
      * @return list of [start, end] endpoints for function blocks.
@@ -299,90 +345,6 @@ public class BoogieTranslator {
 
     private boolean isRegister(VarFact varFact) {
         return varFact.getName().charAt(0) == 'X';
-    }
-
-    /**
-     * We want to replace mem expressions which represent parameters, like mem[SP + 1], with the human-readable names
-     * of those parameters.
-     * We do this by first removing the initialising store fact "mem[SP + 1] := X0", then replacing all instances of
-     * "mem[SP + 1]" with the variable name.
-     * Depends on:
-     * - {@link #identifyImplicitParams()}
-     * Assumes:
-     * - Registers on the RHS of the initialising store fact are reassigned before they are used again.
-     * - No parameter is initialised twice (i.e. there is no more than one initialising store fact per mem exp).
-     * - Equivalent mem expressions are never written differently, e.g. mem[SP + 1] is never written as mem[SP + 0 + 1].
-     * - SP is equivalent at every line of code in the function, except the beginning and end.
-     * - All InParameters at this point have been assigned aliases.
-     * - All parameter initialisations occur in the first block of the function.
-     * - ...plus many other assumptions.
-     */
-    private void resolveInParams() {
-        for (FlowGraph.Function function : flowGraph.getFunctions()) {
-            // ensure all InParameters have been assigned aliases
-            for (InParameter param : function.getHeader().getInParams()) {
-                if (param.getAlias() == null) {
-                    throw new AssumptionViolationException(String.format(
-                            "Parameter %s of function %s, with assigned register %s, was not provided with a " +
-                                    "MemFact alias before resolving InParameters.",
-                            param.getName(), function.getHeader().getFuncName(), param.getRegister()
-                    ));
-                }
-            }
-            // remove all parameter initialisations from the first block
-            List<InstFact> forRemoval = new ArrayList<>();
-            List<InstFact> firstLines = function.getRootBlock().getLines();
-            for (InstFact line : firstLines) {
-                if (!(line instanceof StoreFact)) continue;
-                StoreFact store = (StoreFact) line;
-                if (!(store.getRhs() instanceof VarFact)) continue; // assume the rhs of the stores we're looking for consist of only a variable
-                MemFact lhs = (MemFact) store.getLhs();
-                VarFact rhs = (VarFact) store.getRhs();
-                for (InParameter param : function.getHeader().getInParams()) {
-                    if (param.getAlias().equals(lhs) && param.getRegister().equals(rhs)) {
-                        forRemoval.add(line);
-                    }
-                }
-            }
-            forRemoval.forEach(firstLines::remove);
-            // replace all instances of the alias with the human readable parameter name
-
-        }
-
-        // implement rule 1
-        Set<InstFact> forRemoval = new HashSet<>();
-        for (Integer[] endpoints : getAllFunctions()) {
-            int start = endpoints[0];
-            int end = endpoints[1];
-            EnterSubFact currentFunc = (EnterSubFact) facts.get(start);
-            for (int i = start; i < end; i++) {
-                InstFact fact = facts.get(i);
-                if (!(fact instanceof StoreFact)) continue;
-                StoreFact storeFact = (StoreFact) fact;
-                if (!(storeFact.rhs instanceof VarFact)) continue; // assume the rhs of the stores we're looking for consist of only a variable
-                MemFact lhs = (MemFact) storeFact.lhs;
-                VarFact rhs = (VarFact) storeFact.rhs;
-                for (ParamFact param : currentFunc.paramFacts) {
-                    if (param.alias == null) continue;
-                    if (param.alias.equals(lhs) && param.register.equals(rhs)) {
-                        forRemoval.add(fact);
-                    }
-                }
-            }
-        }
-        facts.removeIf(forRemoval::contains);
-
-        // implement rule 2
-        for (Integer[] endpoints : getAllFunctions()) { // we have to call this function again because we just removed some lines from the facts list
-            int start = endpoints[0];
-            int end = endpoints[1];
-            EnterSubFact currentFunc = (EnterSubFact) facts.get(start);
-            for (int i = start; i < end; i++) {
-                for (ParamFact param : currentFunc.paramFacts) {
-                    if (param.alias != null) replaceAllInstancesOfMem(facts.get(i), param.alias, param.name);
-                }
-            }
-        }
     }
 
     private void resolveOutParams() {
@@ -559,47 +521,8 @@ public class BoogieTranslator {
     // works because getChildren returns ExpFacts and ExpFacts override equals(), unlike InstFacts which are inherently
     // unique
     private void replaceAllMatchingChildren(Fact parent, ExpFact oldExp, ExpFact newExp) {
-        List<ExpFact> children = parent.getChildren();
-        for (ExpFact child : children) {
-            if (child.equals(oldExp)) {
-
-            }
-        }
-    }
-
-    /**
-     * Recursively replaces all instances of the oldMem in the given fact with the newVar.
-     */
-    private void replaceAllInstancesOfMem(Fact fact, MemFact oldMem, VarFact newVar) {
-        if (fact instanceof BopFact) {
-            if (((BopFact) fact).getFirstExp() instanceof MemFact && ((BopFact) fact).getFirstExp().equals(oldMem)) {
-                ((BopFact) fact).setFirstExp(newVar);
-            } else {
-                replaceAllInstancesOfMem(((BopFact) fact).e1, oldMem, newVar);
-            }
-            if (((BopFact) fact).e2 instanceof MemFact && ((BopFact) fact).e2.equals(oldMem)) {
-                ((BopFact) fact).e2 = newVar;
-            } else {
-                replaceAllInstancesOfMem(((BopFact) fact).e2, oldMem, newVar);
-            }
-        } else if (fact instanceof UopFact) {
-            if (((UopFact) fact).e1 instanceof MemFact && ((UopFact) fact).e1.equals(oldMem)) {
-                ((UopFact) fact).e1 = newVar;
-            } else {
-                replaceAllInstancesOfMem(((UopFact) fact).e1, oldMem, newVar);
-            }
-        } else if (fact instanceof AssignFact) {
-            if (((AssignFact) fact).lhs instanceof MemFact && ((AssignFact) fact).lhs.equals(oldMem)) {
-                ((AssignFact) fact).lhs = newVar;
-            } else {
-                replaceAllInstancesOfMem(((AssignFact) fact).lhs, oldMem, newVar);
-            }
-            if (((AssignFact) fact).rhs instanceof MemFact && ((AssignFact) fact).rhs.equals(oldMem)) {
-                ((AssignFact) fact).rhs = newVar;
-            } else {
-                replaceAllInstancesOfMem(((AssignFact) fact).rhs, oldMem, newVar);
-            }
-        }
+        parent.getChildren().forEach(child -> replaceAllMatchingChildren(child, oldExp, newExp));
+        parent.replace(oldExp, newExp);
     }
 
     private void writeToFile(String text) {
