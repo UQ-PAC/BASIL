@@ -10,11 +10,9 @@ import Facts.Inst.Assign.StoreFact;
 import Facts.Label;
 import Facts.Parameters.InParameter;
 import Util.AssumptionViolationException;
-
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.sql.ParameterMetaData;
 import java.util.*;
 
 /**
@@ -52,6 +50,15 @@ import java.util.*;
  *
  * NOTE: if a function adds or moves any lines within the flow graph, it is necessary to call
  * flowGraph.verifyUniqueLinesProperty() to ensure no duplicate lines were added, as this could lead to problems.
+ *
+ * NOTES:
+ * Sometimes its ok to modify a list returned by a get method like Block.getLines(), and sometimes its not like
+ * Block.getLinesInCluster(). Should this ever be ok and how do you differentiate between these cases for user
+ * programmers.
+ * Exps override equals and Insts don't. This is because we want identical looking lines to still be considered
+ * distinct, but we do want to check if Exps look the same in methods like Fact.replace and methods in this file that
+ * make use of that.
+ *
  */
 public class BoogieTranslator {
 
