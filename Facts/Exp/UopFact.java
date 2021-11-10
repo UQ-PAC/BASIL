@@ -2,6 +2,7 @@ package Facts.Exp;
 
 import Facts.Fact;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -35,8 +36,7 @@ public class UopFact extends ExpFact {
     }
 
     public List<Fact> toFactList() {
-        List<Fact> factList = new ArrayList<>();
-        factList.addAll(exp.toFactList());
+        List<Fact> factList = new ArrayList<>(exp.toFactList());
         factList.add(this);
         return factList;
     }
@@ -57,5 +57,10 @@ public class UopFact extends ExpFact {
     @Override
     public int hashCode() {
         return Objects.hash(operator, exp);
+    }
+
+    @Override
+    public List<Fact> getChildren() {
+        return Collections.singletonList(exp);
     }
 }

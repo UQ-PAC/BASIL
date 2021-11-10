@@ -39,7 +39,12 @@ public class CallFact extends InstFact {
     @Override
     public String toString() {
         StringBuilder argsStr = new StringBuilder();
-        args.forEach(arg -> argsStr.append(arg.name));
+        args.forEach(arg -> argsStr.append(arg.getName()));
         return String.format("%scall %s(%s);", getLabel(), funcName, argsStr);
+    }
+
+    @Override
+    public List<Fact> getChildren() {
+        return new ArrayList<>(args);
     }
 }

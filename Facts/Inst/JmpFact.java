@@ -34,4 +34,9 @@ public class JmpFact extends InstFact {
     public String toString() {
         return String.format("%sgoto label%s;", getLabel(), target);
     }
+
+    @Override
+    public List<Fact> getChildren() {
+        return new ArrayList<>();
+    }
 }

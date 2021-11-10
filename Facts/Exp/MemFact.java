@@ -2,6 +2,7 @@ package Facts.Exp;
 
 import Facts.Fact;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -50,5 +51,10 @@ public class MemFact extends ExpFact {
     @Override
     public int hashCode() {
         return Objects.hash(exp);
+    }
+
+    @Override
+    public List<Fact> getChildren() {
+        return Collections.singletonList(exp);
     }
 }

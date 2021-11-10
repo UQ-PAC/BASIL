@@ -23,4 +23,9 @@ public class NopFact extends InstFact {
     public String toString() {
         return (String.format("%sskip;", getLabel()));
     }
+
+    @Override
+    public List<Fact> getChildren() {
+        return new ArrayList<>();
+    }
 }

@@ -4,6 +4,7 @@ import Facts.Fact;
 import Facts.Exp.ExpFact;
 import Facts.Inst.InstFact;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -56,5 +57,10 @@ public abstract class AssignFact extends InstFact {
     @Override
     public String toString() {
         return String.format("%s%s%s := %s;", getLabel(), varDeclaration, lhs, rhs);
+    }
+
+    @Override
+    public List<Fact> getChildren() {
+        return Arrays.asList(lhs, rhs);
     }
 }

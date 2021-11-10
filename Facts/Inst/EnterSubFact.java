@@ -66,4 +66,9 @@ public class EnterSubFact extends InstFact {
         line.append(" {");
         return String.format("%s%s", getLabel(), line);
     }
+
+    @Override
+    public List<Fact> getChildren() {
+        return new ArrayList<>();
+    }
 }

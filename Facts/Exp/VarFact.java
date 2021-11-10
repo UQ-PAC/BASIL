@@ -47,4 +47,9 @@ public class VarFact extends ExpFact {
     public int hashCode() {
         return Objects.hash(name);
     }
+
+    @Override
+    public List<Fact> getChildren() {
+        return new ArrayList<>();
+    }
 }

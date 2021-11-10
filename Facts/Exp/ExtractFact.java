@@ -2,6 +2,7 @@ package Facts.Exp;
 
 import Facts.Fact;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -63,5 +64,10 @@ public class ExtractFact extends ExpFact {
     @Override
     public int hashCode() {
         return Objects.hash(firstInt, secondInt, variable);
+    }
+
+    @Override
+    public List<Fact> getChildren() {
+        return Collections.singletonList(variable);
     }
 }

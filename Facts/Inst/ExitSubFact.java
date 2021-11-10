@@ -1,6 +1,8 @@
 package Facts.Inst;
 
 import Facts.Fact;
+
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
@@ -17,5 +19,10 @@ public class ExitSubFact extends InstFact {
     @Override
     public String toString() {
         return "return;";
+    }
+
+    @Override
+    public List<Fact> getChildren() {
+        return new ArrayList<>();
     }
 }

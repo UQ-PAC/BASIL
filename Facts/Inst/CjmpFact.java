@@ -3,6 +3,7 @@ package Facts.Inst;
 import Facts.Fact;
 import Facts.Exp.VarFact;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -44,5 +45,10 @@ public class CjmpFact extends InstFact {
     @Override
     public String toString() {
         return String.format("%sif (%s) goto label%s;", getLabel(), condition, target);
+    }
+
+    @Override
+    public List<Fact> getChildren() {
+        return Collections.singletonList(condition);
     }
 }

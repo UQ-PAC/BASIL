@@ -2,6 +2,7 @@ package Facts.Exp;
 
 import Facts.Fact;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -71,5 +72,10 @@ public class BopFact extends ExpFact {
     @Override
     public int hashCode() {
         return Objects.hash(operator, firstExp, secondExp);
+    }
+
+    @Override
+    public List<Fact> getChildren() {
+        return Arrays.asList(firstExp, secondExp);
     }
 }

@@ -1,2 +1,8 @@
 package Facts;
-public abstract class Fact {}
+
+import java.util.List;
+
+public abstract class Fact {
+
+    public abstract List<Fact> getChildren();
+}

@@ -8,6 +8,6 @@ import Facts.Exp.VarFact;
  */
 public class LoadFact extends AssignFact {
     public LoadFact(String pc, VarFact lhsExp, MemFact memExp ) {
-        super(pc, lhsExp, memExp, "load");
+        super(pc, lhsExp, memExp);
     }
 }

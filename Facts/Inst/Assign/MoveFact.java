@@ -8,7 +8,7 @@ import Facts.Exp.VarFact;
  */
 public class MoveFact extends AssignFact {
     public MoveFact(String pc, VarFact lhsExp, ExpFact rhsExp) {
-        super(pc, lhsExp, rhsExp, "move");
+        super(pc, lhsExp, rhsExp);
     }
 }
 
