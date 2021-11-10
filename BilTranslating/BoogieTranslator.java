@@ -79,8 +79,8 @@ public class BoogieTranslator {
         createLabels();
         optimiseSkips();
         identifyImplicitParams();
-
         resolveInParams();
+
         // resolveOutParams();
         resolveRegisters();
         resolveMems();
@@ -186,6 +186,39 @@ public class BoogieTranslator {
             }
             removeDuplicateParamsAndMerge(params);
             createCallArguments(functionFact);
+        }
+    }
+
+    /**
+     * Implicit params found may contain params already listed explicitly. If so, we take the var name of the explicit
+     * param, and the alias of the implicit param.
+     */
+    private void removeDuplicateParamsAndMerge(List<InParameter> params) {
+        Iterator<InParameter> iter = params.iterator();
+        while (iter.hasNext()) {
+            InParameter param = iter.next();
+            for (InParameter otherParam : params) {
+                if (param != otherParam && param.getRegister().equals(otherParam.getRegister())) {
+                    // duplicate found
+                    if (param.getAlias() == null) {
+                        // null alias => this is the explicit param
+                        otherParam.setName(param.getName());
+                    } else {
+                        // non-null alias => this is the implicit param
+                        otherParam.setAlias(param.getAlias());
+                    }
+                    iter.remove();
+                }
+            }
+        }
+    }
+
+    /**
+     * Provides function calls with a list of the parameters they will need to provide arguments for.
+     */
+    private void createCallArguments(EnterSubFact func) {
+        for (CallFact call : getCallsToFunction(func)) {
+            func.getInParams().forEach(param -> call.getArgs().add(param.getRegister()));
         }
     }
 
@@ -297,15 +330,6 @@ public class BoogieTranslator {
         return functions;
     }
 
-    /**
-     * Provides function calls with a list of the parameters they will need to provide arguments for.
-     */
-    private void createCallArguments(EnterSubFact func) {
-        for (CallFact call : getCallsToFunction(func)) {
-            func.getInParams().forEach(param -> call.getArgs().add(param.getRegister()));
-        }
-    }
-
     private List<CallFact> getCallsToFunction(EnterSubFact function) {
         List<CallFact> calls = new ArrayList<>();
         for (InstFact line : flowGraph.getViewOfLines()) {
@@ -317,30 +341,6 @@ public class BoogieTranslator {
             }
         }
         return calls;
-    }
-
-    /**
-     * Implicit params found may contain params already listed explicitly. If so, we take the var name of the explicit
-     * param, and the alias of the implicit param.
-     */
-    private void removeDuplicateParamsAndMerge(List<InParameter> params) {
-        Iterator<InParameter> iter = params.iterator();
-        while (iter.hasNext()) {
-            InParameter param = iter.next();
-            for (InParameter otherParam : params) {
-                if (param != otherParam && param.getRegister().equals(otherParam.getRegister())) {
-                    // duplicate found
-                    if (param.getAlias() == null) {
-                        // null alias => this is the explicit param
-                        otherParam.setName(param.getName());
-                    } else {
-                        // non-null alias => this is the implicit param
-                        otherParam.setAlias(param.getAlias());
-                    }
-                    iter.remove();
-                }
-            }
-        }
     }
 
     private boolean isRegister(VarFact varFact) {
