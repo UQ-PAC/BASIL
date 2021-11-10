@@ -60,7 +60,7 @@ public class UopFact extends ExpFact {
     }
 
     @Override
-    public List<Fact> getChildren() {
+    public List<ExpFact> getChildren() {
         return Collections.singletonList(exp);
     }
 }

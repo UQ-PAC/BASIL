@@ -49,7 +49,7 @@ public class LiteralFact extends ExpFact {
     }
 
     @Override
-    public List<Fact> getChildren() {
+    public List<ExpFact> getChildren() {
         return new ArrayList<>();
     }
 }

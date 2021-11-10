@@ -1,5 +1,6 @@
 package Facts.Inst;
 
+import Facts.Exp.ExpFact;
 import Facts.Fact;
 import Facts.Exp.VarFact;
 import java.util.ArrayList;
@@ -44,7 +45,7 @@ public class CallFact extends InstFact {
     }
 
     @Override
-    public List<Fact> getChildren() {
+    public List<ExpFact> getChildren() {
         return new ArrayList<>(args);
     }
 }

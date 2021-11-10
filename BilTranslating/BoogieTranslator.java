@@ -555,7 +555,8 @@ public class BoogieTranslator {
         }
     }
 
-    //
+    // recursively replaces all children of this fact which match the given fact, with the other given fact
+    private void replaceAll
 
     /**
      * Recursively replaces all instances of the oldMem in the given fact with the newVar.

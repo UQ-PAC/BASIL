@@ -75,7 +75,7 @@ public class BopFact extends ExpFact {
     }
 
     @Override
-    public List<Fact> getChildren() {
+    public List<ExpFact> getChildren() {
         return Arrays.asList(firstExp, secondExp);
     }
 }

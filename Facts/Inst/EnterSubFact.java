@@ -1,5 +1,6 @@
 package Facts.Inst;
 
+import Facts.Exp.ExpFact;
 import Facts.Fact;
 import Facts.Parameters.InParameter;
 import Facts.Parameters.OutParameter;
@@ -68,7 +69,7 @@ public class EnterSubFact extends InstFact {
     }
 
     @Override
-    public List<Fact> getChildren() {
+    public List<ExpFact> getChildren() {
         return new ArrayList<>();
     }
 }

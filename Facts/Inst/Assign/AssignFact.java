@@ -60,7 +60,7 @@ public abstract class AssignFact extends InstFact {
     }
 
     @Override
-    public List<Fact> getChildren() {
+    public List<ExpFact> getChildren() {
         return Arrays.asList(lhs, rhs);
     }
 }
