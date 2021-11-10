@@ -70,4 +70,11 @@ public class ExtractFact extends ExpFact {
     public List<ExpFact> getChildren() {
         return Collections.singletonList(variable);
     }
+
+    @Override
+    public void replace(ExpFact oldExp, ExpFact newExp) {
+        if (variable.equals(oldExp)) {
+            variable = (VarFact) newExp;
+        }
+    }
 }

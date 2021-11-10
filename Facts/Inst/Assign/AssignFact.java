@@ -63,4 +63,14 @@ public abstract class AssignFact extends InstFact {
     public List<ExpFact> getChildren() {
         return Arrays.asList(lhs, rhs);
     }
+
+    @Override
+    public void replace(ExpFact oldExp, ExpFact newExp) {
+        if (lhs.equals(oldExp)) {
+            lhs = newExp;
+        }
+        if (rhs.equals(oldExp)) {
+            rhs = newExp;
+        }
+    }
 }

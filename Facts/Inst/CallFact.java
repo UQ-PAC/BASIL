@@ -48,4 +48,13 @@ public class CallFact extends InstFact {
     public List<ExpFact> getChildren() {
         return new ArrayList<>(args);
     }
+
+    @Override
+    public void replace(ExpFact oldExp, ExpFact newExp) {
+        for (int i = 0; i < args.size(); i++) {
+            if (args.get(i).equals(oldExp)) {
+                args.set(i, (VarFact) newExp);
+            }
+        }
+    }
 }

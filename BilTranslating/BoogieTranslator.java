@@ -556,7 +556,16 @@ public class BoogieTranslator {
     }
 
     // recursively replaces all children of this fact which match the given fact, with the other given fact
-    private void replaceAll
+    // works because getChildren returns ExpFacts and ExpFacts override equals(), unlike InstFacts which are inherently
+    // unique
+    private void replaceAllMatchingChildren(Fact parent, ExpFact oldExp, ExpFact newExp) {
+        List<ExpFact> children = parent.getChildren();
+        for (ExpFact child : children) {
+            if (child.equals(oldExp)) {
+
+            }
+        }
+    }
 
     /**
      * Recursively replaces all instances of the oldMem in the given fact with the newVar.

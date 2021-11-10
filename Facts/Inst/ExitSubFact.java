@@ -26,4 +26,7 @@ public class ExitSubFact extends InstFact {
     public List<ExpFact> getChildren() {
         return new ArrayList<>();
     }
+
+    @Override
+    public void replace(ExpFact oldExp, ExpFact newExp) {}
 }

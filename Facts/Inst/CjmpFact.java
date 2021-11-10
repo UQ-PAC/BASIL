@@ -52,4 +52,11 @@ public class CjmpFact extends InstFact {
     public List<ExpFact> getChildren() {
         return Collections.singletonList(condition);
     }
+
+    @Override
+    public void replace(ExpFact oldExp, ExpFact newExp) {
+        if (condition.equals(oldExp)) {
+            condition = (VarFact) newExp;
+        }
+    }
 }

@@ -29,4 +29,7 @@ public class NopFact extends InstFact {
     public List<ExpFact> getChildren() {
         return new ArrayList<>();
     }
+
+    @Override
+    public void replace(ExpFact oldExp, ExpFact newExp) {}
 }

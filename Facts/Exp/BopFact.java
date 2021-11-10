@@ -78,4 +78,14 @@ public class BopFact extends ExpFact {
     public List<ExpFact> getChildren() {
         return Arrays.asList(firstExp, secondExp);
     }
+
+    @Override
+    public void replace(ExpFact oldExp, ExpFact newExp) {
+        if (firstExp.equals(oldExp)) {
+            firstExp = newExp;
+        }
+        if (secondExp.equals(oldExp)) {
+            secondExp = newExp;
+        }
+    }
 }

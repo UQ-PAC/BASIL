@@ -63,4 +63,11 @@ public class UopFact extends ExpFact {
     public List<ExpFact> getChildren() {
         return Collections.singletonList(exp);
     }
+
+    @Override
+    public void replace(ExpFact oldExp, ExpFact newExp) {
+        if (exp.equals(oldExp)) {
+            exp = newExp;
+        }
+    }
 }
