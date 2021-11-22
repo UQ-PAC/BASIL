@@ -88,9 +88,8 @@ public class BoogieTranslator {
         optimiseSkips();
         identifyImplicitParams();
         resolveInParams();
-
-        // resolveOutParams();
-        resolveRegisters();
+        resolveOutParams();
+        // resolveRegisters();
         addVarDeclarations();
         printAllFacts();
     }
@@ -339,6 +338,71 @@ public class BoogieTranslator {
         }
     }
 
+    private void resolveVars() {
+        for (FlowGraph.Function function : flowGraph.getFunctions()) {
+            for (FlowGraph.Block block : function.getRootBlock().getBlocksInCluster()) {
+                constantPropagation(block.getLines());
+            }
+        }
+    }
+
+    /**
+     * Performs constant propagation on a list of facts. Modifies the list it is given.
+     *
+     * Algorithm:
+     * For each line, from top to bottom:
+     * If the line is an assignment with a pending-removal variable on the lhs, remove the pending-removal line.
+     * Then, with the exception of the LHS of assignments, replace any instances of variables with their mapped values, if
+     * such a mapping exists.
+     * Then, if the result is an assignment with no variables on the RHS, compute the value of the RHS, assign it to
+     * the values map and add the line for pending-removal.
+     */
+    private void constantPropagation(List<InstFact> lines) {
+        // these mapped ExpFacts are expected to only contain literals
+        Map<VarFact, LiteralFact> values = new HashMap<>();
+        // assignments that will be removed if the lhs variable is re-assigned later
+        Map<VarFact, AssignFact> pendingRemoval = new HashMap<>();
+        // list of lines that will be removed once the loop exits
+        List<AssignFact> toRemove = new ArrayList<>();
+        for (InstFact line : lines) {
+            // if this is an assignment, remove any assignments that pending removal, that contain this lhs
+            if (line instanceof AssignFact) {
+                AssignFact assignment = (AssignFact) line;
+                if (assignment.getLhs() instanceof VarFact) {
+                    VarFact variable = (VarFact) assignment.getLhs();
+                    if (pendingRemoval.containsKey(variable)) {
+                        toRemove.add(pendingRemoval.get(variable));
+                        pendingRemoval.remove(variable);
+                    }
+                }
+            }
+            // with the exception of the lhs of assignments, replace any instances of variables with their mapped values
+            // note that we don't make an exception for store assignments because their lhs is always a memFact, not var
+            if (line instanceof LoadFact || line instanceof MoveFact) {
+                AssignFact assignment = (AssignFact) line;
+                for (VarFact variable : values.keySet()) {
+                    // since we can't call replaceAllMatchingChildren on the whole line, we have to perform it on the rhs manually
+                    replaceAllMatchingChildren(assignment.getRhs(), variable, values.get(variable));
+                    if (assignment.getRhs().equals(variable)) {
+                        assignment.replace(variable, values.get(variable));
+                    }
+                }
+                /* if the result has no variables on the rhs, compute the value of the rhs, assign it to
+                the values map and add the line for pending-removal */
+                if (onlyContainsType(line, LiteralFact.class)) {
+
+                }
+            } else {
+                values.forEach((variable, literal) -> replaceAllMatchingChildren(line, variable, literal)); // fixme: warning: this may cause some cast exceptions as some facts may expect a var, but get a literal instead
+            }
+
+        }
+    }
+
+    private <T> T computeLiteral(ExpFact expression) {
+        // todo
+    }
+
     /**
      * Replace references to registers with references to the literals they represent.
      *
@@ -427,32 +491,15 @@ public class BoogieTranslator {
      * such as cjump target labels.
      */
     private boolean onlyContainsType(Fact fact, Class<? extends ExpFact> type) {
-        if (fact instanceof BopFact) {
-            BopFact bopFact = (BopFact) fact;
-            return onlyContainsType(bopFact.e1, type) && onlyContainsType(bopFact.e2, type);
-        } else if (fact instanceof ExtractFact) {
-            ExtractFact extractFact = (ExtractFact) fact;
-            return onlyContainsType(extractFact.variable, type);
-        } else if (fact instanceof MemFact) {
-            MemFact memFact = (MemFact) fact;
-            return onlyContainsType(memFact.exp, type);
-        } else if (fact instanceof UopFact) {
-            UopFact uopFact = (UopFact) fact;
-            return onlyContainsType(uopFact.e1, type);
-        } else if (fact instanceof AssignFact) {
-            AssignFact assignFact = (AssignFact) fact;
-            return onlyContainsType(assignFact.lhs, type) && onlyContainsType(assignFact.rhs, type);
-        } else if (fact instanceof  CjmpFact) {
-            CjmpFact cjmpFact = (CjmpFact) fact;
-            return onlyContainsType(cjmpFact.condition, type);
-        } else if (fact instanceof LiteralFact) {
-            return type.equals(LiteralFact.class);
-        } else if (fact instanceof VarFact) {
-            return type.equals(VarFact.class);
-        } else {
-            System.err.printf("Unhandled expression in expOnlyContains search: %s\n", fact);
-            return false;
+        if (type == LiteralFact.class || type == VarFact.class) {
+            return type.isAssignableFrom(fact.getClass());
         }
+        for (ExpFact child : fact.getChildren()) {
+            if (!onlyContainsType(child, type)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
