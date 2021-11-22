@@ -89,9 +89,9 @@ public class BoogieTranslator {
         identifyImplicitParams();
         resolveInParams();
         resolveOutParams();
-        // resolveRegisters();
+        resolveVars();
         addVarDeclarations();
-        printAllFacts();
+        writeToFile();
     }
 
     private void initGlobalBlock() {
@@ -406,86 +406,6 @@ public class BoogieTranslator {
     }
 
     /**
-     * Replace references to registers with references to the literals they represent.
-     *
-     * Rules:
-     * 1. If we run into a bad instruction, reset all register values.
-     * 2. For registers in non-assignments, change them to their mapped values.
-     * 3. For registers on the rhs of assignments, change them to their mapped values.
-     * 4. For registers on the lhs of assignments, update their mapping to whatever is on the rhs.
-     * 5. To update, the rhs must only consist of literals, and registers which are mapped to literals.
-     * 6. Redundant facts include assignments of registers which have been fully resolved up until the next assignment.
-     *
-     * Bad instructions include:
-     * - jumps
-     * - conditional jumps
-     * - enter subs
-     * - exit subs
-     * - calls
-     *
-     * If we reach a register assignment:
-     * - Mark the previous assignment (if not wiped) to be removed.
-     * - Mark this assignment for potential removal.
-     * - Replace the rhs as usual.
-     * - Now if the rhs only contains literals, update the value of this register, otherwise wipe it.
-     */
-    private void resolveRegisters() {
-        // these mapped ExpFacts are expected to only contain literals
-        Map<VarFact, ExpFact> registerValues = new HashMap<>();
-        // list of redundant fact objects to remove from the global facts list
-        List<InstFact> redundantFacts = new ArrayList<>();
-        // potentially redundant facts, to be confirmed when a reassignment to the register (map key) is found
-        Map<VarFact, InstFact> potentillyRedundantFacts = new HashMap<>();
-
-        for (InstFact fact : facts) {
-            if (fact instanceof JmpFact || fact instanceof CjmpFact || fact instanceof EnterSubFact ||
-                    fact instanceof ExitSubFact || fact instanceof CallFact) {
-                for (VarFact register : registerValues.keySet()) {
-                    replaceAllInstancesOfVar(fact, register, registerValues.get(register));
-                }
-                // bad instruction: clear register mappings
-                registerValues = new HashMap<>();
-                potentillyRedundantFacts = new HashMap<>();
-            } else if (fact instanceof LoadFact || fact instanceof MoveFact) {
-                // this instruction might update the value of a register
-                VarFact register = fact instanceof LoadFact ? (VarFact) ((LoadFact) fact).lhs : (VarFact) ((MoveFact) fact).lhs;
-                ExpFact rhs = fact instanceof LoadFact ? ((LoadFact) fact).rhs : ((MoveFact) fact).rhs;
-                if (rhs == null) continue; // skip load assignments with empty rhs
-                // replace the rhs with register mappings as per usual
-                for (VarFact assignedRegister : registerValues.keySet()) {
-                    if (!(rhs instanceof VarFact)) replaceAllInstancesOfVar(rhs, assignedRegister, registerValues.get(assignedRegister));
-                    else if (rhs.equals(assignedRegister)) rhs = registerValues.get(assignedRegister);
-                }
-                // a register is not assigned here - we have done what we need
-                if (!isRegister(register)) continue;
-                // a register is assigned here: remove the previous assignment (by moving it to redundantFacts)
-                if (potentillyRedundantFacts.containsKey(register)) {
-                    redundantFacts.add(potentillyRedundantFacts.get(register));
-                    potentillyRedundantFacts.remove(register);
-                }
-                // if the rhs (after being translated earlier) only contains literals, map this register to that value
-                if (onlyContainsType(rhs, LiteralFact.class)) {
-                    registerValues.put(register, rhs);
-                    potentillyRedundantFacts.put(register, fact);
-                } else {
-                    // otherwise, we don't know what this value is, so clear any current mappings
-                    registerValues.remove(register);
-                }
-            } else {
-                // for any other fact type, substitute the register for its mapped literal as per usual
-                for (VarFact register : registerValues.keySet()) {
-                    replaceAllInstancesOfVar(fact, register, registerValues.get(register));
-                }
-            }
-        }
-        redundantFacts.forEach(fact -> facts.remove(fact));
-    }
-
-    private void printAllFacts() {
-        facts.forEach(System.out::print);
-    }
-
-    /**
      * Checks if all atomic facts in the given expression are of the given type.
      * Since the only atomic facts that exist are VarFacts and Literals, it only makes sense to call this function with
      * one of these as the 'type' argument.
@@ -504,43 +424,6 @@ public class BoogieTranslator {
         return true;
     }
 
-    /**
-     * Note: doesn't work on VarFacts alone, because you need to change the var in the parent fact.
-     * Doesn't apply to function headers or param instructions.
-     *
-     * If the newExp is not a variable, then facts that must take variables, such as cjumps and extractions, will not
-     * be modified.
-     */
-    private void replaceAllInstancesOfVar(Fact fact, VarFact oldVar, ExpFact newExp) {
-        if (fact instanceof BopFact) {
-            BopFact bopFact = (BopFact) fact;
-            if (!(bopFact.e1 instanceof VarFact)) replaceAllInstancesOfVar(bopFact.e1, oldVar, newExp);
-            else if (bopFact.e1.equals(oldVar)) bopFact.e1 = newExp;
-            if (!(bopFact.e2 instanceof VarFact)) replaceAllInstancesOfVar(bopFact.e2, oldVar, newExp);
-            else if (bopFact.e2.equals(oldVar)) bopFact.e2 = newExp;
-        } else if (fact instanceof ExtractFact) {
-            ExtractFact extractFact = (ExtractFact) fact;
-            if (extractFact.variable.equals(oldVar) && newExp instanceof VarFact) extractFact.variable = (VarFact) newExp;
-        } else if (fact instanceof MemFact) {
-            MemFact memFact = (MemFact) fact;
-            if (!(memFact.exp instanceof VarFact)) replaceAllInstancesOfVar(memFact.exp, oldVar, newExp);
-            else if (memFact.exp.equals(oldVar)) memFact.exp = newExp;
-        } else if (fact instanceof UopFact) {
-            UopFact uopFact = (UopFact) fact;
-            if (!(uopFact.e1 instanceof VarFact)) replaceAllInstancesOfVar(uopFact.e1, oldVar, newExp);
-            else if (uopFact.e1.equals(oldVar)) uopFact.e1 = newExp;
-        } else if (fact instanceof AssignFact) {
-            AssignFact assignFact = (AssignFact) fact;
-            if (!(assignFact.lhs instanceof VarFact)) replaceAllInstancesOfVar(assignFact.lhs, oldVar, newExp);
-            else if (assignFact.lhs.equals(oldVar)) assignFact.lhs = newExp;
-            if (!(assignFact.rhs instanceof VarFact)) replaceAllInstancesOfVar(assignFact.rhs, oldVar, newExp);
-            else if (assignFact.rhs.equals(oldVar)) assignFact.rhs = newExp;
-        } else if (fact instanceof  CjmpFact) {
-            CjmpFact cjmpFact = (CjmpFact) fact;
-            if (cjmpFact.condition.equals(oldVar) && newExp instanceof VarFact) cjmpFact.condition = (VarFact) newExp;
-        }
-    }
-
     // recursively replaces all children of this fact which match the given fact, with the other given fact
     // works because getChildren returns ExpFacts and ExpFacts override equals(), unlike InstFacts which are inherently
     // unique
@@ -549,9 +432,9 @@ public class BoogieTranslator {
         parent.replace(oldExp, newExp);
     }
 
-    private void writeToFile(String text) {
+    private void writeToFile() {
         try {
-            writer.write(text);
+            writer.write(flowGraph.toString());
             writer.flush();
         } catch (IOException e) {
             System.err.println("Error writing to file.");
