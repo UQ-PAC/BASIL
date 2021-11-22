@@ -14,7 +14,6 @@ public abstract class AssignFact extends InstFact {
 
     private ExpFact lhs;
     private ExpFact rhs;
-    private String varDeclaration = "";
 
     AssignFact(String pc, ExpFact lhs, ExpFact rhs) {
         super(pc);
@@ -38,14 +37,6 @@ public abstract class AssignFact extends InstFact {
         this.rhs = rhs;
     }
 
-    public String getVarDeclaration() {
-        return varDeclaration;
-    }
-
-    public void setVarDeclaration(String varDeclaration) {
-        this.varDeclaration = varDeclaration;
-    }
-
     public List<Fact> toFactList() {
         List<Fact> factList = new ArrayList<>();
         factList.addAll(lhs.toFactList());
@@ -56,7 +47,7 @@ public abstract class AssignFact extends InstFact {
 
     @Override
     public String toString() {
-        return String.format("%s%s%s := %s;", getLabel(), varDeclaration, lhs, rhs);
+        return String.format("%s%s := %s;", getLabel(), lhs, rhs);
     }
 
     @Override

@@ -9,6 +9,7 @@ import Facts.Inst.Assign.MoveFact;
 import Facts.Inst.Assign.StoreFact;
 import Facts.Label;
 import Facts.Parameters.InParameter;
+import Facts.Parameters.OutParameter;
 import Util.AssumptionViolationException;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
@@ -90,7 +91,6 @@ public class BoogieTranslator {
 
         // resolveOutParams();
         resolveRegisters();
-        resolveMems();
         addVarDeclarations();
         printAllFacts();
     }
@@ -281,60 +281,32 @@ public class BoogieTranslator {
         }
     }
 
-    /**
-     * We'd like to convert mem expressions to variables.
-     */
-    private void resolveMems() {
-
+    private Set<VarFact> getLocalVarsInFunction(FlowGraph.Function function) {
+        Set<VarFact> vars = new HashSet<>();
+        for (InstFact line : function.getRootBlock().getLinesInCluster()) {
+            if (line instanceof LoadFact || line instanceof MoveFact) {
+                VarFact lhs = (VarFact) ((AssignFact) line).getLhs();
+                vars.add(lhs);
+            }
+        }
+        return vars;
     }
 
     /**
      * In boogie, all local variables seem to want to be initialised at the beginning of functions.
      * Do we want to make all registers local variables?
+     * This should be done before memFacts are replaced by global variables, or the global variables will have var
+     * initialisations.
+     * Depends on:
+     * - resolveRegisters()
      */
     private void addVarDeclarations() {
-        List<Integer[]> endpoints = getAllFunctions();
-        for (Integer[] endpoint : endpoints) {
-            Set<VarFact> assignedVars = new HashSet<>();
-            int start = endpoint[0];
-            int end = endpoint[1];
-            EnterSubFact func = (EnterSubFact) facts.get(endpoint[0]);
-            // we need not var-declare function parameters
-            func.paramFacts.forEach(param -> assignedVars.add(param.name));
-            for (int i = start + 1; i < end; i++) {
-                InstFact fact = facts.get(i);
-                if (fact instanceof LoadFact) {
-                    LoadFact loadFact = (LoadFact) fact;
-                    if (!assignedVars.contains((VarFact) loadFact.lhs)) {
-                        loadFact.varDeclaration = "var ";
-                        assignedVars.add((VarFact) loadFact.lhs);
-                    }
-                } else if (fact instanceof MoveFact) {
-                    MoveFact moveFact = (MoveFact) fact;
-                    if (!assignedVars.contains((VarFact) moveFact.lhs)) {
-                        moveFact.varDeclaration = "var ";
-                        assignedVars.add((VarFact) moveFact.lhs);
-                    }
-                }
+        for (FlowGraph.Function function : flowGraph.getFunctions()) {
+            List<InstFact> firstLines = function.getRootBlock().getLines();
+            for (VarFact localVar : getLocalVarsInFunction(function)) {
+                firstLines.add(0, new InitFact(localVar, uniqueLabel()));
             }
         }
-    }
-
-    /**
-     * @return list of [start, end] endpoints for function blocks.
-     * 'Start' is the function header and 'end' is the function return line.
-     */
-    private List<Integer[]> getAllFunctions() {
-        List<Integer[]> functions = new ArrayList<>();
-        for (int i = 0; i < facts.size(); i++) {
-            InstFact fact = facts.get(i);
-            if (fact instanceof EnterSubFact) {
-                Integer[] endPoints = new Integer[2];
-                endPoints[0] = i;
-                functions.add(endPoints);
-            } else if (fact instanceof ExitSubFact) functions.get(functions.size() - 1)[1] = i;
-        }
-        return functions;
     }
 
     private List<CallFact> getCallsToFunction(EnterSubFact function) {
@@ -354,20 +326,16 @@ public class BoogieTranslator {
         return varFact.getName().charAt(0) == 'X';
     }
 
+    /**
+     * Resolves outParams by crudely replacing all references to their associated register with their human-readable
+     * name.
+     */
     private void resolveOutParams() {
-        for (Integer[] endpoints : getAllFunctions()) {
-            int start = endpoints[0];
-            int end = endpoints[1];
-            EnterSubFact currentFunc = (EnterSubFact) facts.get(start);
-            ParamFact outParam = null;
-            for (ParamFact param : currentFunc.paramFacts) {
-                if (param.is_result) outParam = param;
-            }
-            if (outParam == null) continue; // this function does not have an output
-            int i;
-            for (i = start; i < end; i++) {
-                replaceAllInstancesOfVar(facts.get(i), outParam.register, outParam.name);
-            }
+        for (FlowGraph.Function function : flowGraph.getFunctions()) {
+            OutParameter outParam = function.getHeader().getOutParam();
+            if (outParam == null) continue;
+            function.getRootBlock().getLinesInCluster().forEach(line ->
+                    replaceAllMatchingChildren(line, outParam.getRegister(), outParam.getName()));
         }
     }
 
