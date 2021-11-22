@@ -365,20 +365,10 @@ public class BoogieTranslator {
         // list of lines that will be removed once the loop exits
         List<AssignFact> toRemove = new ArrayList<>();
         for (InstFact line : lines) {
-            // if this is an assignment, remove any assignments that pending removal, that contain this lhs
-            if (line instanceof AssignFact) {
-                AssignFact assignment = (AssignFact) line;
-                if (assignment.getLhs() instanceof VarFact) {
-                    VarFact variable = (VarFact) assignment.getLhs();
-                    if (pendingRemoval.containsKey(variable)) {
-                        toRemove.add(pendingRemoval.get(variable));
-                        pendingRemoval.remove(variable);
-                    }
-                }
-            }
             // with the exception of the lhs of assignments, replace any instances of variables with their mapped values
             // note that we don't make an exception for store assignments because their lhs is always a memFact, not var
             if (line instanceof LoadFact || line instanceof MoveFact) {
+                // if this is an assignment, remove any assignments that pending removal, that contain this lhs
                 AssignFact assignment = (AssignFact) line;
                 for (VarFact variable : values.keySet()) {
                     // since we can't call replaceAllMatchingChildren on the whole line, we have to perform it on the rhs manually
@@ -387,20 +377,32 @@ public class BoogieTranslator {
                         assignment.replace(variable, values.get(variable));
                     }
                 }
-                /* if the result has no variables on the rhs, compute the value of the rhs, assign it to
-                the values map and add the line for pending-removal */
-                if (onlyContainsType(line, LiteralFact.class)) {
-
+                if (assignment.getLhs() instanceof VarFact) {
+                    VarFact variable = (VarFact) assignment.getLhs();
+                    if (pendingRemoval.containsKey(variable)) {
+                        toRemove.add(pendingRemoval.get(variable));
+                        pendingRemoval.remove(variable);
+                    }
+                    /* if the result has no variables on the rhs, compute the value of the rhs, assign it to
+                    the values map and add the line for pending-removal */
+                    ExpFact rhs = assignment.getRhs();
+                    if (onlyContainsType(rhs, LiteralFact.class)) {
+                        String computed = computeLiteral(rhs);
+                        LiteralFact newLiteral = new LiteralFact(computed);
+                        values.put(variable, newLiteral);
+                        pendingRemoval.put(variable, assignment);
+                    }
                 }
             } else {
                 values.forEach((variable, literal) -> replaceAllMatchingChildren(line, variable, literal)); // fixme: warning: this may cause some cast exceptions as some facts may expect a var, but get a literal instead
             }
-
         }
+        toRemove.forEach(lines::remove);
     }
 
-    private <T> T computeLiteral(ExpFact expression) {
+    private String computeLiteral(ExpFact exp) {
         // todo
+        return exp.toString();
     }
 
     /**
