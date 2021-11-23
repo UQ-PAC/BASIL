@@ -34,9 +34,9 @@
 000001f1: LR := 0x730
 000001f6: call @get_two with return %0000031b
 0000031b:
+00000320: X1 := X0
 // 000001f5: call @__libc_csu_fini with return %000011f1
 000011f1:
-00000320: X1 := X0
 00000327: X0 := 0x11000
 0000032e: X0 := X0 + 0x38
 00000335: mem := mem with [X0, el]:u32 <- low:32[X1]

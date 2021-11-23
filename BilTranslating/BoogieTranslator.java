@@ -34,6 +34,8 @@ import java.util.*;
  * ExpFacts override equals and InstFacts don't.
  */
 
+// TODO fix calls to use return vals properly
+
 public class BoogieTranslator {
 
     // for writing the boogie output

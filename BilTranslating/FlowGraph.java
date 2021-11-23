@@ -2,6 +2,9 @@ package BilTranslating;
 
 import Facts.Exp.VarFact;
 import Facts.Inst.*;
+import Facts.Inst.Assign.AssignFact;
+import Facts.Inst.Assign.MoveFact;
+import Facts.Inst.Assign.StoreFact;
 import Util.AssumptionViolationException;
 import java.util.*;
 
@@ -207,6 +210,7 @@ public class FlowGraph {
          * @return a new flow graph with an empty global block and no constraints
          */
         private static FlowGraph fromFactsList(List<InstFact> facts) {
+            facts = setFunctionsWithReturns(facts);
             // an ordered list of indexes of the given facts list, indicating where the list should be split into blocks
             List<Integer> splits = getSplits(facts);
             // an ordered list of blocks, defined by the given given list of splits
@@ -221,6 +225,28 @@ public class FlowGraph {
             // ensure the created flow graph maintains the required properties
             flowGraph.enforceConstraints();
             return flowGraph;
+        }
+
+        // TODO can this be moved to StatementLoader?
+        private static List<InstFact> setFunctionsWithReturns (List<InstFact> facts) {
+            System.out.println(facts);
+
+            for (int i = 0; i < facts.size(); i++) {
+                if (!(facts.get(i) instanceof CallFact) || !(facts.get(i + 1) instanceof JmpFact) || !(facts.get(i + 3) instanceof MoveFact)) continue;
+
+                CallFact call = (CallFact) facts.get(i);
+                JmpFact cjmp = (JmpFact) facts.get(i + 1);
+                AssignFact assign = (MoveFact) facts.get(i + 3);
+
+                if (cjmp.getTarget().equals(facts.get(i + 1).getLabel().getPc())) throw new AssumptionViolationException("Expected jump to next line");
+
+                call.setLHS(assign.getLhs());
+                facts.remove(i + 1);
+                facts.remove(i + 2);
+                facts.remove(i + 3);
+            }
+
+            return facts;
         }
 
         private static Block findFunction(List<Block> blocks, String functionName) {
