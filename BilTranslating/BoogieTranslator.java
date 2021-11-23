@@ -85,7 +85,7 @@ public class BoogieTranslator {
      * Starting point for a BIL translation.
      */
     public void translate() {
-        reachableFunctions();
+        // reachableFunctions();
         createLabels();
         optimiseSkips();
         identifyImplicitParams();

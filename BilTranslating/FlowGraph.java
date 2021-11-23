@@ -210,6 +210,7 @@ public class FlowGraph {
             // an ordered list of blocks, defined by the given given list of splits
             // essentially creates the nodes for this flow graph
             List<Block> blocks = createBlocksFromSplits(splits, facts);
+            blocks = stripBlocks(blocks);
             // links each block in the list to each other block that may follow this one (e.g. via a jump)
             // essentially creates the edges for this flow graph
             setChildren(blocks, facts);
@@ -218,6 +219,40 @@ public class FlowGraph {
             // ensure the created flow graph maintains the required properties
             flowGraph.enforceConstraints();
             return flowGraph;
+        }
+
+        private static Block findFunction(List<Block> blocks, String functionName) {
+            return blocks.stream().filter(b -> b.firstLine() instanceof EnterSubFact && ((EnterSubFact) b.firstLine()).getFuncName().equals(functionName)).findFirst().get();
+        }
+
+        private static List<Block> stripBlocks (List<Block> blocks) {
+            List<Block> reachableBlocks = new LinkedList<>();
+            LinkedList<Block> queue = new LinkedList<>();
+
+            Block mainBlock = blocks.stream().filter(block -> block.getLines().get(0) instanceof EnterSubFact && ((EnterSubFact) block.getLines().get(0)).getFuncName().equals("main")).findFirst().get();
+            queue.add(mainBlock);
+
+            while (!queue.isEmpty()) {
+                Block block = queue.poll();
+                if (reachableBlocks.contains(block)) continue;
+
+                reachableBlocks.add(block);
+
+                block.getLines().forEach(fact -> {
+                    // TODO rewrite using match
+                    if (fact instanceof JmpFact) {
+                        String targetPC = ((JmpFact) fact).getTarget();
+                        queue.add(findBlockStartingWith(targetPC, blocks));
+                    } else if (fact instanceof CjmpFact) {
+                        String targetPC = ((CjmpFact) fact).getTarget();
+                        queue.add(findBlockStartingWith(targetPC, blocks));
+                    } else if (fact instanceof CallFact) {
+                        queue.add(findFunction(blocks, ((CallFact) fact).getFuncName()));
+                    }
+                });
+            }
+
+            return reachableBlocks;
         }
 
         /**
