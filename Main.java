@@ -15,7 +15,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-// TODO: refactor boogietranslator to take a control flow graph
+
 public class Main {
     public static void main(String[] args) throws IOException {
         if (args.length == 0) {
@@ -56,12 +56,8 @@ public class Main {
 
         if (argsList.contains("boogie")) {
             FlowGraph flowGraph = FlowGraph.fromFactsList(facts);
-            //System.out.println(flowGraph);
             BoogieTranslator translator = new BoogieTranslator(flowGraph, "boogie_out.txt");
             translator.translate();
-//            FlowGraph flowGraph = FlowGraph.fromFactsList(facts);
-//            BoogieTranslator translator = new BoogieTranslator(facts, "boogie_out.txt");
-//            translator.translate();
         }
     }
 }
