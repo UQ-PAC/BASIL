@@ -11,11 +11,14 @@ public class EnterSubFact extends InstFact {
     private String funcName;
     private List<InParameter> inParams;
     private OutParameter outParam;
+    private List<String> modifies; // TODO type
 
     public EnterSubFact(String pc, String funcName) {
         super(pc);
         this.funcName = funcName;
         inParams = new ArrayList<>();
+        this.modifies = new LinkedList<>();
+        modifies.add("mem");
     }
 
     public String getFuncName() {
@@ -48,22 +51,31 @@ public class EnterSubFact extends InstFact {
 
     @Override
     public String toString() {
-        // todo: add param types
-
-        StringBuilder line = new StringBuilder();
-        line.append("procedure ").append(funcName).append("(");
+        StringBuilder decl = new StringBuilder();
+        decl.append(funcName).append("(");
 
         if (!inParams.isEmpty()) {
-            line.append(inParams.get(0));
+            decl.append(inParams.get(0));
             for (int i = 1; i < inParams.size(); i++) {
-                line.append(", ").append(inParams.get(i));
+                decl.append(", ").append(inParams.get(i));
             }
         }
 
-        line.append(")");
+        decl.append(")");
         if (outParam != null) {
-            line.append(" returns (").append(outParam).append(")");
+            decl.append(" returns (").append(outParam).append(")");
         }
+
+        StringBuilder line = new StringBuilder();
+        line.append("procedure ").append(decl);
+
+        if (modifies.size() > 0) {
+            line.append(";\n").append("modifies ");
+            modifies.forEach(mod -> line.append(mod + " "));
+
+            line.append(";\nimplementation ").append(decl);
+        }
+
         line.append(" {");
         return String.format("%s%s", getLabel(), line);
     }
