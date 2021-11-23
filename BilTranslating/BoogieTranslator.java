@@ -441,7 +441,6 @@ public class BoogieTranslator {
             queue.addAll(block.getChildren());
 
             block.getLines().forEach(line -> {
-                System.out.println(line);
                 if (line instanceof CallFact) {
                     CallFact call = (CallFact) line;
 
