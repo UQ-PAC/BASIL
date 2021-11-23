@@ -31,7 +31,7 @@ public class FlowGraph {
     // the head of all global code; the starting point for the boogie program
     private final Block globalBlock;
     // a list of all function heads; represents all functions/procedures in the boogie program
-    private final List<Function> functions;
+    private List<Function> functions;
 
     private FlowGraph(List<Function> functions) {
         this.globalBlock = new Block("start", new ArrayList<>(), new ArrayList<>());
@@ -46,6 +46,10 @@ public class FlowGraph {
         FlowGraph flowGraph = FlowGraphFactory.fromFactsList(facts);
         flowGraph.enforceDisjointFunctions();
         return flowGraph;
+    }
+
+    public void setFunctions(List<Function> functions) {
+        this.functions = functions;
     }
 
     /**

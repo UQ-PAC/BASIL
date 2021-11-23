@@ -1,5 +1,7 @@
 package BilTranslating;
 
+import BilTranslating.FlowGraph.Block;
+import BilTranslating.FlowGraph.Function;
 import Facts.Fact;
 import Facts.Exp.*;
 import Facts.Inst.*;
@@ -91,6 +93,7 @@ public class BoogieTranslator {
         resolveOutParams();
         resolveVars();
         addVarDeclarations();
+        reachableFunctions();
         writeToFile();
     }
 
@@ -419,6 +422,62 @@ public class BoogieTranslator {
             }
         }
         return true;
+    }
+
+    private List<Function> findAllChildFunctions(Function func) {
+        List<Function> functions = new LinkedList<>();
+        Set<Block> visitedBlocks = new HashSet<>();
+        Set<String> visitedFunctions = new HashSet<>();
+        LinkedList<Block> queue = new LinkedList<>();
+        queue.add(func.getRootBlock());
+
+        //System.out.println(flowGraph.getFunctions().size());
+
+        while (!queue.isEmpty()) {
+            Block block = queue.poll();
+            if (visitedBlocks.contains(block)) continue;
+            visitedBlocks.add(block);
+
+            queue.addAll(block.getChildren());
+
+            block.getLines().forEach(line -> {
+                System.out.println(line);
+                if (line instanceof CallFact) {
+                    CallFact call = (CallFact) line;
+
+                    if (!visitedFunctions.contains(call.getFuncName())) {
+                        // Call should not fail
+                        functions.add(flowGraph.getFunctions().stream().filter(f -> Objects.equals(
+                                f.getHeader().getFuncName(), call.getFuncName())).findFirst().get());
+                        visitedFunctions.add(call.getFuncName());
+                    }
+                }
+            });
+        }
+
+        return functions;
+    }
+
+    /*
+     * Find all functions reachable from main
+     */
+    private void reachableFunctions() {
+        Function mainFunc = flowGraph.getFunctions().stream().filter(f -> f.getHeader().getFuncName().equals("main")).findFirst().get();
+
+        List<Function> functions = new LinkedList<>();
+        LinkedList<Function> queue = new LinkedList<>();
+
+        queue.add(mainFunc);
+
+        while (!queue.isEmpty()) {
+            Function func = queue.poll();
+            if (functions.contains(func)) continue; // slow
+
+            functions.add(func);
+            queue.addAll(findAllChildFunctions(func));
+        }
+
+        flowGraph.setFunctions(functions);
     }
 
     // recursively replaces all children of this fact which match the given fact, with the other given fact

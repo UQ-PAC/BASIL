@@ -1,2 +1,5 @@
 out/
 password.txt
+boogie_out.txt
+.idea/
+*.iml
