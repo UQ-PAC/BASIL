@@ -1,34 +1,71 @@
 start:
   call main(X0X1);
 procedure main(main_argc, main_argv) returns (out) {
-  000004a7:
+  0000052e:
     var VF;
+    var #50;
     var out;
     var SP;
     var ZF;
+    var #38;
     var NF;
+    var #48;
     var #36;
-    var #34;
+    var #44;
     var CF;
+    var #42;
     SP := (SP) - (0x10);
-    mem[(SP) + (0xC)] := 5;
+    mem[(SP) + (0xC)] := 2;
+    mem[(SP) + (8)] := 0;
     out := mem[(SP) + (0xC)];
-    #34 := (0xFFFFFFFFFFFFFFFB) + (5);
-    NF := #34[1:0];
-    VF := (5[1:0]) & (~ #34[1:0]);
-    ZF := (#34) == (0);
-    CF := (5[1:0]) | (~ ((#34[1:0]) | (5[1:0])) & (~ #34[1:0]));
-    #36 := ~ (ZF) <> (0);
-    if (#36) goto label000001f0;
-    goto label00000322;
-  00000322:
-    label00000322: skip;
-    out := 6;
-    mem[(SP) + (0xC)] := 6;
-    goto label000001f0;
-  000001f0:
-    label000001f0: skip;
+    #36 := 2;
+    NF := 2[1:0];
+    VF := (2[1:0]) & (~ 2[1:0]);
+    ZF := (2) == (0);
+    CF := (2[1:0]) | (~ ((2[1:0]) | (2[1:0])) & (~ 2[1:0]));
+    #38 := ~ (ZF) <> (0);
+    if (#38) goto label000001f7;
+    goto label000003a3;
+  000003a3:
+    label000003a3: skip;
+    out := 3;
+    mem[(SP) + (8)] := 3;
+    goto label0000024d;
+  0000024d:
+    label0000024d: skip;
     out := 0;
     SP := (SP) + (0x10);
     return;
+  000001f7:
+    label000001f7: skip;
+    out := mem[(SP) + (0xC)];
+    #42 := (0xFFFFFFFFFFFFFFFF) + (out);
+    NF := #42[1:0];
+    VF := (out[1:0]) & (~ #42[1:0]);
+    ZF := (#42) == (0);
+    CF := (out[1:0]) | (~ ((#42[1:0]) | (out[1:0])) & (~ #42[1:0]));
+    #44 := ~ (ZF) <> (0);
+    if (#44) goto label00000222;
+    goto label0000038f;
+  0000038f:
+    label0000038f: skip;
+    out := 5;
+    mem[(SP) + (8)] := 5;
+    goto label0000024d;
+  00000222:
+    label00000222: skip;
+    out := mem[(SP) + (0xC)];
+    #48 := (0xFFFFFFFFFFFFFFFE) + (out);
+    NF := #48[1:0];
+    VF := (out[1:0]) & (~ #48[1:0]);
+    ZF := (#48) == (0);
+    CF := (out[1:0]) | (~ ((#48[1:0]) | (out[1:0])) & (~ #48[1:0]));
+    #50 := ~ (ZF) <> (0);
+    if (#50) goto label0000024d;
+    goto label00000381;
+  00000381:
+    label00000381: skip;
+    out := 7;
+    mem[(SP) + (8)] := 7;
+    goto label0000024d;
   }
