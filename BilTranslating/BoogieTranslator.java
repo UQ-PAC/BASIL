@@ -421,5 +421,3 @@ public class BoogieTranslator {
         return uniqueInt++;
     }
 }
-
-
