@@ -85,7 +85,7 @@ public class BoogieTranslator {
      * Starting point for a BIL translation.
      */
     public void translate() {
-        initGlobalBlock();
+        reachableFunctions();
         createLabels();
         optimiseSkips();
         identifyImplicitParams();
@@ -93,13 +93,7 @@ public class BoogieTranslator {
         resolveOutParams();
         resolveVars();
         addVarDeclarations();
-        reachableFunctions();
         writeToFile();
-    }
-
-    private void initGlobalBlock() {
-        List<InstFact> globalLines = flowGraph.getGlobalBlock().getLines();
-        globalLines.add(new CallFact("start", "main"));
     }
 
     /**
@@ -144,7 +138,7 @@ public class BoogieTranslator {
      */
     private void optimiseSkips() {
         for (InstFact line : flowGraph.getViewOfLines()) {
-            if (line instanceof NopFact && !line.getLabel().isVisible()) {
+            if (line instanceof NopFact) {
                 flowGraph.removeLine(line);
             }
         }
@@ -285,7 +279,12 @@ public class BoogieTranslator {
         for (InstFact line : function.getRootBlock().getLinesInCluster()) {
             if (line instanceof LoadFact || line instanceof MoveFact) {
                 VarFact lhs = (VarFact) ((AssignFact) line).getLhs();
-                vars.add(lhs);
+
+                // TODO slow
+                if (flowGraph.getGlobalInits().stream().noneMatch(init -> init.getVariable().getName().equals(lhs.getName()))
+                        && function.getHeader().getInParams().stream().noneMatch(inParam -> inParam.getName().equals(lhs.getName())) // TODO check if this is needed
+                && !function.getHeader().getOutParam().getName().getName().equals(lhs.getName()))
+                    vars.add(lhs);
             }
         }
         return vars;
@@ -301,9 +300,8 @@ public class BoogieTranslator {
      */
     private void addVarDeclarations() {
         for (FlowGraph.Function function : flowGraph.getFunctions()) {
-            List<InstFact> firstLines = function.getRootBlock().getLines();
             for (VarFact localVar : getLocalVarsInFunction(function)) {
-                firstLines.add(0, new InitFact(localVar, uniqueLabel()));
+                function.addInitFact(new InitFact(localVar, uniqueLabel()));
             }
         }
     }

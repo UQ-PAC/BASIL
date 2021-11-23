@@ -12,6 +12,7 @@ public abstract class Parameter {
         this.register = register;
     }
 
+    // TODO get name returns a string everywhere else (rename this function)
     public VarFact getName() {
         return name;
     }
@@ -26,6 +27,6 @@ public abstract class Parameter {
 
     @Override
     public String toString() {
-        return name.toString();
+        return name.toString() + ": int";
     }
 }

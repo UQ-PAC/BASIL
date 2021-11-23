@@ -34,7 +34,7 @@
 000001f1: LR := 0x730
 000001f6: call @get_two with return %0000031b
 0000031b:
-000001f5: call @__libc_csu_fini with return %000011f1
+// 000001f5: call @__libc_csu_fini with return %000011f1
 000011f1:
 00000320: X1 := X0
 00000327: X0 := 0x11000

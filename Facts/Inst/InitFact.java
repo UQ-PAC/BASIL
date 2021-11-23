@@ -8,12 +8,20 @@ import java.util.Collections;
 import java.util.List;
 
 public class InitFact extends InstFact {
-
     private VarFact variable;
+    private String type;
 
+    // TODO: create a none label and use that here
     public InitFact(VarFact variable, String label) {
         super(label);
         this.variable = variable;
+        this.type = "int";
+    }
+
+    public InitFact(VarFact variable, String label, String type) {
+        super(label);
+        this.variable = variable;
+        this.type = type;
     }
 
     public VarFact getVariable() {
@@ -43,6 +51,6 @@ public class InitFact extends InstFact {
 
     @Override
     public String toString() {
-        return String.format("var %s;", variable);
+        return String.format("var %s: %s;", variable, type);
     }
 }

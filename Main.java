@@ -57,7 +57,7 @@ public class Main {
         if (argsList.contains("boogie")) {
             FlowGraph flowGraph = FlowGraph.fromFactsList(facts);
             //System.out.println(flowGraph);
-            BoogieTranslator translator = new BoogieTranslator(flowGraph, "boogie_out.txt");
+            BoogieTranslator translator = new BoogieTranslator(flowGraph, "boogie_out.bpl");
             translator.translate();
 //            FlowGraph flowGraph = FlowGraph.fromFactsList(facts);
 //            BoogieTranslator translator = new BoogieTranslator(facts, "boogie_out.txt");

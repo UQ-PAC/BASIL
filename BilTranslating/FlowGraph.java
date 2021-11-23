@@ -1,5 +1,6 @@
 package BilTranslating;
 
+import Facts.Exp.VarFact;
 import Facts.Inst.*;
 import Util.AssumptionViolationException;
 
@@ -28,14 +29,14 @@ import java.util.*;
  * Insert a line in a particular location: getFunctionBlocks().get(0).getChildren().get(0).getLines().add(4, line)
  */
 public class FlowGraph {
-    // the head of all global code; the starting point for the boogie program
-    private final Block globalBlock;
     // a list of all function heads; represents all functions/procedures in the boogie program
     private List<Function> functions;
+    private List<InitFact> globalInits;
 
     private FlowGraph(List<Function> functions) {
-        this.globalBlock = new Block("start", new ArrayList<>(), new ArrayList<>());
         this.functions = functions;
+        globalInits = new LinkedList<>();
+        globalInits.add(new InitFact(new VarFact("mem"), "mem", "[int] int")); // TODO label.none
     }
 
     /**
@@ -48,15 +49,12 @@ public class FlowGraph {
         return flowGraph;
     }
 
-    public void setFunctions(List<Function> functions) {
-        this.functions = functions;
+    public List<InitFact> getGlobalInits() {
+        return globalInits;
     }
 
-    /**
-     * @return the global block of this flow graph
-     */
-    public Block getGlobalBlock() {
-        return globalBlock;
+    public void setFunctions(List<Function> functions) {
+        this.functions = functions;
     }
 
     /**
@@ -79,7 +77,7 @@ public class FlowGraph {
      * @return all blocks within this flow graph
      */
     public List<Block> getBlocks() {
-        List<Block> blocks = new ArrayList<>(globalBlock.getBlocksInCluster());
+        List<Block> blocks = new ArrayList<>();
         functions.forEach(function -> blocks.addAll(function.rootBlock.getBlocksInCluster()));
         return blocks;
     }
@@ -147,7 +145,7 @@ public class FlowGraph {
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder();
-        globalBlock.getBlocksInCluster().forEach(block -> builder.append(block.toString()));
+        globalInits.forEach(init -> builder.append(init).append("\n"));
         functions.forEach(function -> builder.append(function.toString()));
         return builder.toString();
     }
@@ -158,9 +156,12 @@ public class FlowGraph {
         // the first block in this list must be the first block executed for the function in BIL
         private final Block rootBlock;
 
+        private List<InitFact> initFacts;
+
         public Function(EnterSubFact header, Block rootBlock) {
             this.header = header;
             this.rootBlock = rootBlock;
+            this.initFacts = new LinkedList<>();
         }
 
         public EnterSubFact getHeader() {
@@ -171,10 +172,15 @@ public class FlowGraph {
             return rootBlock;
         }
 
+        public void addInitFact(InitFact initFact) {
+            initFacts.add(initFact);
+        }
+
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
             builder.append(header).append("\n");
+            initFacts.forEach(fact -> builder.append(fact).append("\n"));
             rootBlock.getBlocksInCluster().forEach(builder::append);
             builder.append("}");
             return builder.toString().replaceAll("\n", "\n  ") + "\n";
@@ -493,10 +499,11 @@ public class FlowGraph {
             }
         }
 
+        // TODO blocks cant start with a number
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
-            builder.append(label).append(":\n");
+            builder.append("label").append(label).append(":\n");
             lines.forEach(line -> builder.append("  ").append(line).append("\n"));
             return builder.toString();
         }
