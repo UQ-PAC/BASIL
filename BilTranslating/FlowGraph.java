@@ -2,7 +2,6 @@ package BilTranslating;
 
 import Facts.Inst.*;
 import Util.AssumptionViolationException;
-
 import java.util.*;
 
 /**
@@ -26,6 +25,9 @@ import java.util.*;
  * Example usage:
  * Retrieve all blocks within a function: getFunctionBlocks().get(0).getBlocksInCluster()
  * Insert a line in a particular location: getFunctionBlocks().get(0).getChildren().get(0).getLines().add(4, line)
+ *
+ * todo:
+ * [ ] make block.getLines() return an immutable list, because we want to practice good java
  */
 public class FlowGraph {
     // the head of all global code; the starting point for the boogie program
