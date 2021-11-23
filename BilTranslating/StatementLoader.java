@@ -88,8 +88,7 @@ public class StatementLoader implements BilListener {
     private ExtractFact parseExtractionExpression(BilParser.ExpExtractContext ctx) {
         int firstNat = 64 - Integer.parseInt(ctx.nat(0).getText());
         int secondNat = 63 - Integer.parseInt(ctx.nat(1).getText());
-        // assume extractions only apply to vars
-        VarFact exp = (VarFact) parseExpression(ctx.exp());
+        ExpFact exp = parseExpression(ctx.exp());
         return new ExtractFact(firstNat, secondNat, exp);
     }
 

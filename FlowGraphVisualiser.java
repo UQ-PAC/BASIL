@@ -30,7 +30,7 @@ public class FlowGraphVisualiser extends Application {
     public void start(Stage primaryStage) {
         BilLexer bilLexer;
         try {
-            bilLexer = new BilLexer(CharStreams.fromFileName("Samples/loops_stripped.bil"));
+            bilLexer = new BilLexer(CharStreams.fromFileName("Samples/ThatCompile/loops/loops_stripped.bil"));
         } catch (IOException e) {
             System.err.println("File not found.");
             throw new AssertionError();

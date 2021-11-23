@@ -12,57 +12,28 @@ import Facts.Inst.Assign.StoreFact;
 import Facts.Label;
 import Facts.Parameters.InParameter;
 import Facts.Parameters.OutParameter;
-import Util.AssumptionViolationException;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 
-/**
+/*
  * todo:
- * [ ] implement return statements in function calls
- * [ ] implement proper modifies statements
  * [ ] unary operators like ~ probably mean 'bit flip' not 'not'. figure this out and solve
- * [ ] remove lines with references to FP when FP isn't utilised throughout the program
- * [ ] implement loops properly
- * [ ] sort out whatever this is (NF <> VF | ZF <> 0) <> 0
- *
+ * [ ] fix call arguments
+ * [ ] parse this operator: <>
  * [ ] write out rules for wpifrg translation to boogie
- * [ ] download boogie properly
- *
- * theoretical problems:
  * [ ] registers can store function pointers?
- * [ ] what to do if we can't just ignore FP
- * [ ] how to properly deal with SP and LR
+ * [ ] #37 probably isn't a valid variable name
  * [ ] dereferencing of registers when their value has been extracted from mem[]
- */
-
-/**
- * Welcome to where the magic happens!
- *
- * (how it works)
- *
- * Many layers involve operations which remove particular instructions from the global list. To do so, it is assumed
- * that no two instructions will have the same label, and hence, that the list contains no duplicate instructions. That
- * is:
- * forall i, j :: 0 <= i < list.size() && 0 <= j < list.size() && i != j ==> !facts.equals(facts.get(i), facts.get(j))
- *
- * assumption: to avoid shared-variable problems when creating the flow graph, we must assume that external lines of bil
- * are not used by multiple functions - only one function per basic block of external code. otherwise, modifying the
- * shared line will cause changes in both functions!
- *
- * NOTE: if a function adds or moves any lines within the flow graph, it is necessary to call
- * flowGraph.verifyUniqueLinesProperty() to ensure no duplicate lines were added, as this could lead to problems.
  *
  * NOTES:
  * Sometimes its ok to modify a list returned by a get method like Block.getLines(), and sometimes its not like
- * Block.getLinesInCluster(). Should this ever be ok and how do you differentiate between these cases for user
- * programmers.
- * Exps override equals and Insts don't. This is because we want identical looking lines to still be considered
- * distinct, but we do want to check if Exps look the same in methods like Fact.replace and methods in this file that
- * make use of that.
- *
+ * Block.getLinesInCluster(). This will be fixed soon.
+ * Use flowGraph.enforceConstraints() to ensure any function you write does not break the flow graph's properties.
+ * ExpFacts override equals and InstFacts don't.
  */
+
 public class BoogieTranslator {
 
     // for writing the boogie output
@@ -506,5 +477,3 @@ public class BoogieTranslator {
         return uniqueInt++;
     }
 }
-
-
