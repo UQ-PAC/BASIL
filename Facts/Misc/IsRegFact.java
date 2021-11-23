@@ -1,7 +1,9 @@
 package Facts.Misc;
 
+import Facts.Exp.ExpFact;
 import Facts.Fact;
 
+import java.util.List;
 import java.util.Objects;
 
 public class IsRegFact extends Fact {
@@ -26,5 +28,15 @@ public class IsRegFact extends Fact {
     @Override
     public int hashCode() {
         return Objects.hash(id);
+    }
+
+    @Override
+    public List<ExpFact> getChildren() {
+        return null;
+    }
+
+    @Override
+    public void replace(ExpFact oldExp, ExpFact newExp) {
+
     }
 }

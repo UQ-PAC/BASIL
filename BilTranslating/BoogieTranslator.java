@@ -240,20 +240,16 @@ public class BoogieTranslator {
      * - No parameter is initialised twice (i.e. there is no more than one initialising store fact per mem exp).
      * - Equivalent mem expressions are never written differently, e.g. mem[SP + 1] is never written as mem[SP + 0 + 1].
      * - SP is equivalent at every line of code in the function, except the beginning and end.
-     * - All InParameters at this point have been assigned aliases.
      * - All parameter initialisations occur in the first block of the function.
      * - ...plus many other assumptions.
      */
     private void resolveInParams() {
         for (FlowGraph.Function function : flowGraph.getFunctions()) {
-            // ensure all InParameters have been assigned aliases
+            // get all InParameters that have been assigned aliases
+            List<InParameter> paramsWithAliases = new ArrayList<>();
             for (InParameter param : function.getHeader().getInParams()) {
-                if (param.getAlias() == null) {
-                    throw new AssumptionViolationException(String.format(
-                            "Parameter %s of function %s, with assigned register %s, was not provided with a " +
-                                    "MemFact alias before resolving InParameters.",
-                            param.getName(), function.getHeader().getFuncName(), param.getRegister()
-                    ));
+                if (param.getAlias() != null) {
+                    paramsWithAliases.add(param);
                 }
             }
             // remove all parameter initialisations from the first block
@@ -265,7 +261,7 @@ public class BoogieTranslator {
                 if (!(store.getRhs() instanceof VarFact)) continue; // assume the rhs of the stores we're looking for consist of only a variable
                 MemFact lhs = (MemFact) store.getLhs();
                 VarFact rhs = (VarFact) store.getRhs();
-                for (InParameter param : function.getHeader().getInParams()) {
+                for (InParameter param : paramsWithAliases) {
                     if (param.getAlias().equals(lhs) && param.getRegister().equals(rhs)) {
                         forRemoval.add(line);
                     }
@@ -273,10 +269,11 @@ public class BoogieTranslator {
             }
             forRemoval.forEach(firstLines::remove);
             // replace all instances of the alias with the human readable parameter name
-            function.getHeader().getInParams().forEach(param ->
-                    function.getRootBlock().getLinesInCluster().forEach(line ->
-                            replaceAllMatchingChildren(line, param.getAlias(), param.getName())));
-            // ok i just did this for fun but come on, 9 function calls in a single line? :o
+            for (InParameter param : paramsWithAliases) {
+                for (InstFact line : function.getRootBlock().getLinesInCluster()) {
+                    replaceAllMatchingChildren(line, param.getAlias(), param.getName());
+                }
+            }
         }
     }
 

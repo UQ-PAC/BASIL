@@ -1,5 +1,6 @@
 package Facts.Misc;
 
+import Facts.Exp.ExpFact;
 import Facts.Fact;
 import Facts.Inst.InstFact;
 
@@ -38,5 +39,15 @@ public class SuccessorFact extends Fact {
     @Override
     public int hashCode() {
         return Objects.hash(i1, i2);
+    }
+
+    @Override
+    public List<ExpFact> getChildren() {
+        return null; // todo
+    }
+
+    @Override
+    public void replace(ExpFact oldExp, ExpFact newExp) {
+        // todo
     }
 }

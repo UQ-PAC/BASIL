@@ -10,9 +10,9 @@ public class ExtractFact extends ExpFact {
 
     private int firstInt;
     private int secondInt;
-    private VarFact variable;
+    private ExpFact variable;
 
-    public ExtractFact(int firstInt, int secondInt, VarFact variable) {
+    public ExtractFact(int firstInt, int secondInt, ExpFact variable) {
         this.firstInt = firstInt;
         this.secondInt = secondInt;
         this.variable = variable;
@@ -34,11 +34,11 @@ public class ExtractFact extends ExpFact {
         this.secondInt = secondInt;
     }
 
-    public VarFact getVariable() {
+    public ExpFact getVariable() {
         return variable;
     }
 
-    public void setVariable(VarFact variable) {
+    public void setVariable(ExpFact variable) {
         this.variable = variable;
     }
 
@@ -74,7 +74,7 @@ public class ExtractFact extends ExpFact {
     @Override
     public void replace(ExpFact oldExp, ExpFact newExp) {
         if (variable.equals(oldExp)) {
-            variable = (VarFact) newExp;
+            variable = newExp;
         }
     }
 }

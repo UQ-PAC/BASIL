@@ -43,6 +43,6 @@ public class InitFact extends InstFact {
 
     @Override
     public String toString() {
-        return String.format("var %s", variable);
+        return String.format("var %s;", variable);
     }
 }
