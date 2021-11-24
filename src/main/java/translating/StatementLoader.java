@@ -1,7 +1,5 @@
 package BilTranslating;
 
-import BilParsing.BilListener;
-import BilParsing.BilParser;
 import Facts.Parameters.InParameter;
 import Facts.Parameters.OutParameter;
 import Facts.Exp.*;
@@ -13,6 +11,7 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
 import java.util.List;
+import BilParser.*;
 
 
 public class StatementLoader implements BilListener {

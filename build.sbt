@@ -1,15 +1,22 @@
+import scala.sys.process.Process
+
 val scala3Version = "3.0.0"
 
 lazy val root = project
   .in(file("."))
+  .enablePlugins(Antlr4Plugin)
   .settings(
     name := "wptool-boogie",
     version := "0.0.1",
 
     scalaVersion := scala3Version,
+    Antlr4 / antlr4Version := "4.9.3",
+
+    mainClass in (Compile, run) := Some("Main"), // TODO deprecated
 
     libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
-    libraryDependencies += "org.antlr" % "antlr4-runtime" % "4.9.3"
+    libraryDependencies += "org.antlr" % "antlr4-runtime" % "4.9.3",
+
   )
 
 
@@ -24,3 +31,5 @@ libraryDependencies ++= {
   Seq("base", "controls", "fxml", "graphics", "media", "swing", "web")
     .map(m => "org.openjfx" % s"javafx-$m" % "15.0.1" classifier osName)
 }
+
+

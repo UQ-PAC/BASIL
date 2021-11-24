@@ -1,5 +1,3 @@
-import BilParsing.BilLexer;
-import BilParsing.BilParser;
 import BilTranslating.FlowGraph;
 import BilTranslating.StatementLoader;
 import Facts.Inst.InstFact;
@@ -17,6 +15,7 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import BilParser.*;
 
 public class FlowGraphVisualiser extends Application {
 

@@ -1,5 +1,9 @@
 grammar Bil;
 
+@header {
+  package BilParser;
+}
+
 bil : progdecl? function+ EOF;
 function : sub 
          paramTypes*

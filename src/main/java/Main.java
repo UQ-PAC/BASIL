@@ -1,5 +1,3 @@
-import BilParsing.BilLexer;
-import BilParsing.BilParser;
 import BilTranslating.BoogieTranslator;
 import BilTranslating.FlowGraph;
 import BilTranslating.StatementLoader;
@@ -14,6 +12,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import BilParser.*;
 
 
 public class Main {
