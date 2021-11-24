@@ -19,7 +19,7 @@ public class LiteralFact extends ExpFact {
     private String parseHex (String val) {
         if (val.length() < 3 || !val.substring(0, 2).equals("0x")) return val;
 
-        return Integer.toString(Integer.parseInt(val.substring(2), 16));
+        return Long.toString(Long.parseUnsignedLong(val.substring(2), 16));
     }
 
     public String getVal() {
