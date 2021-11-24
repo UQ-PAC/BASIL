@@ -1,8 +1,8 @@
-package Facts.Misc;
+package facts.misc;
 
-import Facts.Exp.ExpFact;
-import Facts.Fact;
-import Facts.Inst.InstFact;
+import facts.exp.ExpFact;
+import facts.Fact;
+import facts.inst.InstFact;
 
 import java.util.ArrayList;
 import java.util.List;

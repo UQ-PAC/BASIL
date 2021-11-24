@@ -1,10 +1,9 @@
-package BilTranslating;
+package translating;
 
-import Facts.Exp.VarFact;
-import Facts.Inst.*;
-import Facts.Inst.Assign.AssignFact;
-import Facts.Inst.Assign.MoveFact;
-import Facts.Inst.Assign.StoreFact;
+import facts.exp.VarFact;
+import facts.inst.*;
+import facts.inst.Assign.AssignFact;
+import facts.inst.Assign.MoveFact;
 import Util.AssumptionViolationException;
 import java.util.*;
 
@@ -45,7 +44,7 @@ public class FlowGraph {
     }
 
     /**
-     * Creates a FlowGraph from the given list of facts.
+     * Creates a translating.FlowGraph from the given list of facts.
      * Assumes no line is reachable from more than one function header (i.e. EnterSubFact).
      */
     public static FlowGraph fromFactsList(List<InstFact> facts) {
@@ -203,7 +202,7 @@ public class FlowGraph {
     private static class FlowGraphFactory {
 
         /**
-         * Creates a FlowGraph from the given list of facts. Does not enforce any constraints.
+         * Creates a translating.FlowGraph from the given list of facts. Does not enforce any constraints.
          *
          * @requires facts are ordered and there are no duplicates
          * @param facts an ordered list of facts from which to create the flow graph
@@ -227,7 +226,7 @@ public class FlowGraph {
             return flowGraph;
         }
 
-        // TODO can this be moved to StatementLoader?
+        // TODO can this be moved to translating.StatementLoader?
         private static List<InstFact> setFunctionsWithReturns (List<InstFact> facts) {
             System.out.println(facts);
 
@@ -344,7 +343,7 @@ public class FlowGraph {
                 if (facts.get(i).getLabel().getPc().equals(pc)) return i;
             }
             throw new AssumptionViolationException(String.format(
-                    "Error in constructing flow graph: No inst found with pc %s.\n", pc
+                    "Error in constructing flow graph: No facts.inst found with pc %s.\n", pc
             ));
         }
 

@@ -1,6 +1,6 @@
-package Facts;
+package facts;
 
-import Facts.Exp.ExpFact;
+import facts.exp.ExpFact;
 import java.util.List;
 
 public abstract class Fact {

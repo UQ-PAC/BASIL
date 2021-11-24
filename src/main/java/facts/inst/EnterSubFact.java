@@ -1,9 +1,9 @@
-package Facts.Inst;
+package facts.inst;
 
-import Facts.Exp.ExpFact;
-import Facts.Fact;
-import Facts.Parameters.InParameter;
-import Facts.Parameters.OutParameter;
+import facts.exp.ExpFact;
+import facts.Fact;
+import facts.parameters.InParameter;
+import facts.parameters.OutParameter;
 import java.util.*;
 
 public class EnterSubFact extends InstFact {

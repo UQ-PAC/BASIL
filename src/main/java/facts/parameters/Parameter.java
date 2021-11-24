@@ -1,6 +1,6 @@
-package Facts.Parameters;
+package facts.parameters;
 
-import Facts.Exp.VarFact;
+import facts.exp.VarFact;
 
 public abstract class Parameter {
 

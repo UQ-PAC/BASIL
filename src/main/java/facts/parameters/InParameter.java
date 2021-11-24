@@ -1,7 +1,7 @@
-package Facts.Parameters;
+package facts.parameters;
 
-import Facts.Exp.MemFact;
-import Facts.Exp.VarFact;
+import facts.exp.MemFact;
+import facts.exp.VarFact;
 
 public class InParameter extends Parameter {
 

@@ -1,4 +1,4 @@
-package Facts;
+package facts;
 
 public class Label {
 

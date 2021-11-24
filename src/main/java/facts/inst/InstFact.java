@@ -1,7 +1,7 @@
-package Facts.Inst;
+package facts.inst;
 
-import Facts.Fact;
-import Facts.Label;
+import facts.Fact;
+import facts.Label;
 import java.util.List;
 
 /**

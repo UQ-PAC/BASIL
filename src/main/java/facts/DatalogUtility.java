@@ -1,11 +1,17 @@
-package Facts;
+package facts;
 
-import Facts.Exp.*;
-import Facts.Inst.*;
-import Facts.Inst.Assign.LoadFact;
-import Facts.Inst.Assign.MoveFact;
-import Facts.Inst.Assign.StoreFact;
-import Facts.Misc.SuccessorFact;
+import facts.exp.*;
+import facts.inst.*;
+import facts.inst.Assign.LoadFact;
+import facts.inst.Assign.MoveFact;
+import facts.inst.Assign.StoreFact;
+import facts.misc.SuccessorFact;
+import facts.exp.BopFact;
+import facts.exp.ExpFact;
+import facts.exp.LiteralFact;
+import facts.exp.MemFact;
+import facts.exp.UopFact;
+import facts.exp.VarFact;
 import java.util.*;
 
 public class DatalogUtility {
@@ -58,7 +64,7 @@ public class DatalogUtility {
                         "none",
                         "none"));
             } else if (fact instanceof MemFact) {
-                // ignore mem facts - link this mem to the log of its exp
+                // ignore mem facts - link this mem to the log of its facts.exp
                 MemFact memFact = (MemFact) fact;
                 recordedFacts.put(memFact, recordedFacts.get(memFact.getExp()));
             } else if (fact instanceof UopFact) {
@@ -273,7 +279,7 @@ public class DatalogUtility {
 
         @Override
         public String toString() {
-            return String.format("exp%s\t%s\t%s\t%s\t%s", super.id, item1, item2, item3, item4);
+            return String.format("facts.exp%s\t%s\t%s\t%s\t%s", super.id, item1, item2, item3, item4);
         }
     }
 

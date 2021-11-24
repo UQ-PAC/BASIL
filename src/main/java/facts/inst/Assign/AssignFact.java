@@ -1,14 +1,14 @@
-package Facts.Inst.Assign;
+package facts.inst.Assign;
 
-import Facts.Fact;
-import Facts.Exp.ExpFact;
-import Facts.Inst.InstFact;
+import facts.Fact;
+import facts.exp.ExpFact;
+import facts.inst.InstFact;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 /**
- * Assignment (e.g. x := exp)
+ * Assignment (e.g. x := facts.exp)
  */
 public abstract class AssignFact extends InstFact {
 

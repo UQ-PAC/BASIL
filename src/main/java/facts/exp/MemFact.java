@@ -1,6 +1,6 @@
-package Facts.Exp;
+package facts.exp;
 
-import Facts.Fact;
+import facts.Fact;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

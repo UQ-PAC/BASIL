@@ -1,7 +1,7 @@
-package Facts.Misc;
+package facts.misc;
 
-import Facts.Exp.ExpFact;
-import Facts.Fact;
+import facts.exp.ExpFact;
+import facts.Fact;
 
 import java.util.List;
 import java.util.Objects;

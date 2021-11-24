@@ -12,7 +12,7 @@ lazy val root = project
     scalaVersion := scala3Version,
     Antlr4 / antlr4Version := "4.9.3",
 
-    mainClass in (Compile, run) := Some("Main"), // TODO deprecated
+    Compile / run / mainClass := Some("main"),
 
     libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
     libraryDependencies += "org.antlr" % "antlr4-runtime" % "4.9.3",

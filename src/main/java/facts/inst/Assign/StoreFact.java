@@ -1,7 +1,7 @@
-package Facts.Inst.Assign;
+package facts.inst.Assign;
 
-import Facts.Exp.ExpFact;
-import Facts.Exp.MemFact;
+import facts.exp.ExpFact;
+import facts.exp.MemFact;
 
 /**
  * Store fact

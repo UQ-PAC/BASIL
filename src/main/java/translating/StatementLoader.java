@@ -1,12 +1,13 @@
-package BilTranslating;
+package translating;
 
-import Facts.Parameters.InParameter;
-import Facts.Parameters.OutParameter;
-import Facts.Exp.*;
-import Facts.Inst.*;
-import Facts.Inst.Assign.LoadFact;
-import Facts.Inst.Assign.MoveFact;
-import Facts.Inst.Assign.StoreFact;
+import facts.ExtractFact;
+import facts.parameters.InParameter;
+import facts.parameters.OutParameter;
+import facts.exp.*;
+import facts.inst.*;
+import facts.inst.Assign.LoadFact;
+import facts.inst.Assign.MoveFact;
+import facts.inst.Assign.StoreFact;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -18,7 +19,7 @@ public class StatementLoader implements BilListener {
 
     // list of facts to output
     List<InstFact> facts;
-    // the last function header parsed; needed for assigning parameters
+    // the last function header parsed; needed for assigning facts.parameters
     EnterSubFact currentFunction;
     // for generating unique labels
     int pcCount = 0;

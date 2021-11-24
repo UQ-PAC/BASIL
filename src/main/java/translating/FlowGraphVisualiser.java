@@ -1,6 +1,6 @@
-import BilTranslating.FlowGraph;
-import BilTranslating.StatementLoader;
-import Facts.Inst.InstFact;
+package translating;
+
+import facts.inst.InstFact;
 import com.brunomnsilva.smartgraph.graph.Digraph;
 import com.brunomnsilva.smartgraph.graph.DigraphEdgeList;
 import com.brunomnsilva.smartgraph.graphview.SmartCircularSortedPlacementStrategy;
