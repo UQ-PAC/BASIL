@@ -32,13 +32,34 @@ Expression facts do override the equals method, as it is desirable to detect ide
 
 All flow graphs are fundamentally made of blocks. These blocks represent ‘basic blocks’ in Boogie, where each block consists of some label, and a list of lines (in our case, facts). Blocks are nodes in the flow graph structure, and as such, they link to other ‘children’ blocks by storing them in a list. In this way, a block can return all the blocks it can recursively reach by conducting a depth-first search on its children.  
 A block begins with any line that is: the first line in the BIL file, a function header, a line that is jumped to by another line or a line that directly follows the last line of a block (except if this following line is a function header). A block ends with any line that is: the last line in the BIL file, a function return statement, a jump instruction or any line where the following line is a function header.  
-One must be careful when attempting to modify the list of lines within a block. For instance, modifying the list returned by the method getAllLines() will successfully modify the block, but modifying the list returned by the method getAllLinesInCluster(), which returns a combined list of all lines of all blocks reachable by this block, will not succeed, as the returned list is not the one stored by the block. This is probably poor design and will be changed in future, but heed this warning.
+One must be careful when attempting to modify the list of lines within a block. For instance, modifying the list returned by the method getLines() will successfully modify the block, but modifying the list returned by the method getLinesInCluster(), which returns a combined list of all lines of all blocks reachable by this block, will not succeed, as the returned list is not the one stored by the block. This is probably poor design and will be changed in future, but heed this warning.  
+Example Block.toString() output:
+```
+my_block:
+    X0 := 0;
+    X0 := X0 + 1;
+    X1 := X0;
+```
 
 #### Function
 
 As far as I understand, all BIL code runs within a function, starting with main. As such, it is useful to model the BIL code as a flow graph which contains a collection of functions, where each function contains a collection of blocks. More details about these relationships is under “Flow Graph”, but for now, you should just know that functions contain two variables.  
 First, they contain the header fact of the function they represent. This is an instruction fact that contains the name of the function, a list of parameters and other useful metadata about the function itself.  
-Second, they contain the ‘root block’ of the function. This is the first block that is executed when the function is called (essentially, the lines just below the function header). The root block can provide access to any block within the function by conducting a depth-first-search on its children.
+Second, they contain the ‘root block’ of the function. This is the first block that is executed when the function is called (essentially, the lines just below the function header). The root block can provide access to any block within the function by conducting a depth-first-search on its children.  
+Example Function.toString() output:
+```
+procedure my_func(param1, param2) {
+    my_block:
+        X0 := 0;
+        X0 := X0 + 1;
+        X1 := X0;
+    a_second_block:
+        X1 := X1 + 1;
+    another_block:
+        if (X1 == 2) goto a_second_block;
+        return;
+}
+```
 
 #### Flow Graph
 
@@ -56,6 +77,8 @@ Suppose we have just lifted our assembly into a fresh new BIL file. To translate
 3. Convert the list of facts into a flow graph.
 4. Perform analysis and modification on the flow graph to create verifiable Boogie code.
 5. Write the flow graph to a file.
+
+![image](https://user-images.githubusercontent.com/64625414/143155979-74622034-0373-4623-884f-0fe0f16d4ee6.png)
 
 ### Preprocessing
 
@@ -115,7 +138,7 @@ Create labels. When we created our list of facts through StatementLoader, each i
 
 #### optimiseSkips()
 
-Sometimes BIL will output an empty instruction (i.e. a blank line). The facts that StatementLoader converts these to are called NopFacts (“no operation” facts) or ‘skips’. After creating our labels with the previous layer, some skips will have labels and some won’t. The skips that do will need to be kept in the flow graph, because they might be jumped to by other facts. The skips that don’t are useless, and are removed by this layer.
+Sometimes BIL will output an empty instruction (i.e. a blank line). The facts that StatementLoader converts these to are called NopFacts (“no operation” facts) or ‘skips’. After creating our labels with the previous layer, some skips will have visible labels and some won’t. The skips that do will need to be kept in the flow graph, because they might be jumped to by other facts. The skips that don’t are useless, and are removed by this layer.
 
 #### identifyImplicitParams()
 
@@ -127,7 +150,7 @@ After all parameters (implicit and explicit) have been created in the previous l
 
 #### resolveOutParams()
 
-We refer to the parameters which functions accept as input as ‘in-parameters’, and any returned variable as the ‘out-parameter’. This layer does a similar thing to what the previous layer did with in-parameters, except with out-parameters instead. In other words, we’re replacing all references to the register being used to carry the return value, with the human-readable parameter name.
+We refer to the parameters that are passed in as input as ‘in-parameters’, and any returned variable as the ‘out-parameter’. This layer does a similar thing to what the previous layer did with in-parameters, except with out-parameters instead. In other words, we’re replacing all references to the register being used to carry the return value, with the human-readable parameter name.
 
 #### resolveVars()
 
@@ -164,7 +187,13 @@ Facts override the toString() method such that they can be printed as syntactica
 
 ## Tips for Programmers
 
-todo
+Some objects returned by the flow graph, such as lists of lines and blocks, may not be member variables. In other words, they may have been freshly made by the called getter, so modifying them will have no effect on the flow graph. However, others indeed may be member variables. This should change soon, but be aware of exactly what objects you're modifying when trying to modify the flow graph.
+
+Recall that instruction facts override equals and expression facts don't. Hence, instructionFact1.equals(instructionFact2) is always false.
+
+Types for children of facts are fairly strict, and although we intend to loosen them soon, bear in mind we might get a lot of cast exceptions before that happens.
+
+We want flow graphs to maintain particular properties or guarantees. Use FlowGraph.enforceConstraints() to ensure these guarantees are met. This is particularly useful after editing a flow graph.
 
 ## Tasks for the Summer
 
