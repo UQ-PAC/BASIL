@@ -295,19 +295,23 @@ public class FlowGraph {
          * @return a list of splits indicating where blocks should be defined in the given facts list
          */
         private static List<Integer> getSplits(List<InstFact> facts) {
+            System.out.println("\n\n\n");
+            facts.forEach(System.out::println);
+            System.out.println("\n\n\n");
             // we use a set to avoid double-ups, as some lines may be jumped to twice
             Set<Integer> splits = new HashSet<>();
             for (int i = 0; i < facts.size(); i++) {
                 InstFact fact = facts.get(i);
                 if (fact instanceof JmpFact) {
+                    System.out.println(fact);
                     // for jumps, add a split below the jump and above the target line
                     splits.add(i + 1);
                     int targetIndex = findInstWithPc(((JmpFact) fact).getTarget(), facts);
-                    splits.add(targetIndex);
+                    if (targetIndex != -1) splits.add(targetIndex);
                 } else if (fact instanceof CjmpFact) {
                     // for conditional jumps, add a split above the target line
                     int targetIndex = findInstWithPc(((CjmpFact) fact).getTarget(), facts);
-                    splits.add(targetIndex);
+                    if (targetIndex != -1) splits.add(targetIndex);
                 } else if (fact instanceof EnterSubFact) {
                     // for function headers, add a split before the header
                     splits.add(i);
@@ -334,6 +338,8 @@ public class FlowGraph {
          * @return the fact in the given list that has the given PC.
          */
         private static int findInstWithPc(String pc, List<InstFact> facts) {
+            if (pc.substring(0, 2).equals("__")) return -1; // TODO when jumping to a function e.g. goto @__gmon_start__
+
             for (int i = 0; i < facts.size(); i++) {
                 if (facts.get(i).getLabel().getPc().equals(pc)) return i;
             }
