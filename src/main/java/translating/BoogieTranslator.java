@@ -317,6 +317,7 @@ public class BoogieTranslator {
         }
     }
 
+    // TODO this could be replaced with a more sophisticated value analysis (e.g. to handle the case where we can resolve the value from multiple variables)
     /**
      * Performs constant propagation on a list of facts. Modifies the list it is given.
      *
