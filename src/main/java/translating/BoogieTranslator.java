@@ -388,6 +388,8 @@ public class BoogieTranslator {
         if (type == LiteralFact.class || type == VarFact.class) {
             return type.isAssignableFrom(fact.getClass());
         }
+
+        // TODO i think this code is unnecassary as fact.getChildren will always be an empty list
         for (ExpFact child : fact.getChildren()) {
             if (!onlyContainsType(child, type)) {
                 return false;
