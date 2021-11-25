@@ -1,6 +1,6 @@
 package translating;
 
-import facts.inst.InstFact;
+import facts.stmt.Stmt;
 import com.brunomnsilva.smartgraph.graph.Digraph;
 import com.brunomnsilva.smartgraph.graph.DigraphEdgeList;
 import com.brunomnsilva.smartgraph.graphview.SmartCircularSortedPlacementStrategy;
@@ -38,7 +38,7 @@ public class FlowGraphVisualiser extends Application {
         BilParser parser = new BilParser(tokens);
         parser.setBuildParseTree(true);
         BilParser.BilContext b = parser.bil();
-        List<InstFact> facts = new ArrayList<>();
+        List<Stmt> facts = new ArrayList<>();
         StatementLoader statementLoader = new StatementLoader(facts);
         ParseTreeWalker walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);

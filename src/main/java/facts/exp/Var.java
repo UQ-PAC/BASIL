@@ -8,11 +8,11 @@ import java.util.Objects;
 /**
  * Variable fact
  */
-public class VarFact extends ExpFact {
+public class Var extends Expr {
 
     private String name;
 
-    public VarFact(String name) {
+    public Var(String name) {
         this.name = name;
     }
 
@@ -39,8 +39,8 @@ public class VarFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        VarFact varFact = (VarFact) o;
-        return Objects.equals(name, varFact.name);
+        Var var = (Var) o;
+        return Objects.equals(name, var.name);
     }
 
     @Override
@@ -49,10 +49,10 @@ public class VarFact extends ExpFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return new ArrayList<>();
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {}
+    public void replace(Expr oldExp, Expr newExp) {}
 }

@@ -6,13 +6,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
-public class ExtractFact extends ExpFact {
+public class Extract extends Expr {
 
     private int firstInt;
     private int secondInt;
-    private ExpFact variable;
+    private Expr variable;
 
-    public ExtractFact(int firstInt, int secondInt, ExpFact variable) {
+    public Extract(int firstInt, int secondInt, Expr variable) {
         this.firstInt = firstInt;
         this.secondInt = secondInt;
         this.variable = variable;
@@ -34,11 +34,11 @@ public class ExtractFact extends ExpFact {
         this.secondInt = secondInt;
     }
 
-    public ExpFact getVariable() {
+    public Expr getVariable() {
         return variable;
     }
 
-    public void setVariable(ExpFact variable) {
+    public void setVariable(Expr variable) {
         this.variable = variable;
     }
 
@@ -57,7 +57,7 @@ public class ExtractFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        ExtractFact that = (ExtractFact) o;
+        Extract that = (Extract) o;
         return firstInt == that.firstInt && secondInt == that.secondInt && Objects.equals(variable, that.variable);
     }
 
@@ -67,12 +67,12 @@ public class ExtractFact extends ExpFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return Collections.singletonList(variable);
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {
+    public void replace(Expr oldExp, Expr newExp) {
         if (variable.equals(oldExp)) {
             variable = newExp;
         }

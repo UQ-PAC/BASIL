@@ -1,3 +1,4 @@
+import facts.stmt.Stmt
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTreeWalker
@@ -8,9 +9,7 @@ import java.io.IOException
 import java.util.ArrayList
 import java.util.Arrays
 import java.util.List
-import facts.inst.InstFact
 import translating.{BoogieTranslator, FlowGraph, StatementLoader}
-import BilParser.*
 
 @main def main(fileName: String, outputType: String) = {
         // generate abstract syntax tree
@@ -21,7 +20,7 @@ import BilParser.*
         val b = parser.bil(); // abstract syntax tree
 
         // extract all statement objects from the tree
-        val facts = new ArrayList[InstFact]();
+        val facts = new ArrayList[Stmt]();
         val statementLoader = new StatementLoader(facts);
         val walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);

@@ -1,6 +1,6 @@
-package facts.inst;
+package facts.stmt;
 
-import facts.exp.ExpFact;
+import facts.exp.Expr;
 import facts.Fact;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,7 +8,7 @@ import java.util.List;
 /**
  * Jump
  */
-public class JmpFact extends InstFact {
+public class JmpFact extends Stmt {
 
     private String target;
 
@@ -37,10 +37,10 @@ public class JmpFact extends InstFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return new ArrayList<>();
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {}
+    public void replace(Expr oldExp, Expr newExp) {}
 }

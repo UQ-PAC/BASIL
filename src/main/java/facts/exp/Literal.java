@@ -8,11 +8,11 @@ import java.util.Objects;
 /**
  * Literal expression (e.g. 4, 5, 10)
  */
-public class LiteralFact extends ExpFact {
+public class Literal extends Expr {
     /** Value of literal */
     private String val;
 
-    public LiteralFact(String val) {
+    public Literal(String val) {
         this.val = parseHex(val);
     }
 
@@ -45,7 +45,7 @@ public class LiteralFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        LiteralFact that = (LiteralFact) o;
+        Literal that = (Literal) o;
         return Objects.equals(val, that.val);
     }
 
@@ -55,10 +55,10 @@ public class LiteralFact extends ExpFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return new ArrayList<>();
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {}
+    public void replace(Expr oldExp, Expr newExp) {}
 }

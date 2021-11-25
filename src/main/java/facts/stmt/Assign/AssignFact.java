@@ -1,8 +1,8 @@
-package facts.inst.Assign;
+package facts.stmt.Assign;
 
 import facts.Fact;
-import facts.exp.ExpFact;
-import facts.inst.InstFact;
+import facts.exp.Expr;
+import facts.stmt.Stmt;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -10,30 +10,30 @@ import java.util.List;
 /**
  * Assignment (e.g. x := facts.exp)
  */
-public abstract class AssignFact extends InstFact {
+public abstract class AssignFact extends Stmt {
 
-    private ExpFact lhs;
-    private ExpFact rhs;
+    private Expr lhs;
+    private Expr rhs;
 
-    AssignFact(String pc, ExpFact lhs, ExpFact rhs) {
+    AssignFact(String pc, Expr lhs, Expr rhs) {
         super(pc);
         this.lhs = lhs;
         this.rhs = rhs;
     }
 
-    public ExpFact getLhs() {
+    public Expr getLhs() {
         return lhs;
     }
 
-    public void setLhs(ExpFact lhs) {
+    public void setLhs(Expr lhs) {
         this.lhs = lhs;
     }
 
-    public ExpFact getRhs() {
+    public Expr getRhs() {
         return rhs;
     }
 
-    public void setRhs(ExpFact rhs) {
+    public void setRhs(Expr rhs) {
         this.rhs = rhs;
     }
 
@@ -51,12 +51,12 @@ public abstract class AssignFact extends InstFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return Arrays.asList(lhs, rhs);
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {
+    public void replace(Expr oldExp, Expr newExp) {
         if (lhs.equals(oldExp)) {
             lhs = newExp;
         }

@@ -9,16 +9,16 @@ import java.util.Objects;
 /**
  * Binary operation fact
  */
-public class BopFact extends ExpFact {
+public class BinOp extends Expr {
 
     /** Operator */
     private String operator;
     /** Expression 1 */
-    private ExpFact firstExp;
+    private Expr firstExp;
     /** Expression 2 */
-    private ExpFact secondExp;
+    private Expr secondExp;
 
-    public BopFact(String operator, ExpFact firstExp, ExpFact secondExp) {
+    public BinOp(String operator, Expr firstExp, Expr secondExp) {
         this.operator = operator;
         this.firstExp = firstExp;
         this.secondExp = secondExp;
@@ -32,19 +32,19 @@ public class BopFact extends ExpFact {
         this.operator = operator;
     }
 
-    public ExpFact getFirstExp() {
+    public Expr getFirstExp() {
         return firstExp;
     }
 
-    public void setFirstExp(ExpFact firstExp) {
+    public void setFirstExp(Expr firstExp) {
         this.firstExp = firstExp;
     }
 
-    public ExpFact getSecondExp() {
+    public Expr getSecondExp() {
         return secondExp;
     }
 
-    public void setSecondExp(ExpFact secondExp) {
+    public void setSecondExp(Expr secondExp) {
         this.secondExp = secondExp;
     }
 
@@ -65,8 +65,8 @@ public class BopFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        BopFact bopFact = (BopFact) o;
-        return Objects.equals(operator, bopFact.operator) && Objects.equals(firstExp, bopFact.firstExp) && Objects.equals(secondExp, bopFact.secondExp);
+        BinOp binOp = (BinOp) o;
+        return Objects.equals(operator, binOp.operator) && Objects.equals(firstExp, binOp.firstExp) && Objects.equals(secondExp, binOp.secondExp);
     }
 
     @Override
@@ -75,12 +75,12 @@ public class BopFact extends ExpFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return Arrays.asList(firstExp, secondExp);
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {
+    public void replace(Expr oldExp, Expr newExp) {
         if (firstExp.equals(oldExp)) {
             firstExp = newExp;
         }

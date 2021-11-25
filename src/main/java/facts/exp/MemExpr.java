@@ -9,19 +9,19 @@ import java.util.Objects;
 /**
  * Memory expression e.g. mem[10]
  */
-public class MemFact extends ExpFact {
+public class MemExpr extends Expr {
 
-    private ExpFact exp;
+    private Expr exp;
 
-    public MemFact(ExpFact exp) {
+    public MemExpr(Expr exp) {
         this.exp = exp;
     }
 
-    public ExpFact getExp() {
+    public Expr getExp() {
         return exp;
     }
 
-    public void setExp(ExpFact exp) {
+    public void setExp(Expr exp) {
         this.exp = exp;
     }
 
@@ -44,8 +44,8 @@ public class MemFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        MemFact memFact = (MemFact) o;
-        return Objects.equals(exp, memFact.exp);
+        MemExpr memExpr = (MemExpr) o;
+        return Objects.equals(exp, memExpr.exp);
     }
 
     @Override
@@ -54,12 +54,12 @@ public class MemFact extends ExpFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return Collections.singletonList(exp);
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {
+    public void replace(Expr oldExp, Expr newExp) {
         if (exp.equals(oldExp)) {
             exp = newExp;
         }

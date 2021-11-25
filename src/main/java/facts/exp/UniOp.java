@@ -9,12 +9,12 @@ import java.util.Objects;
 /**
  * Unary operator fact
  */
-public class UopFact extends ExpFact {
+public class UniOp extends Expr {
 
     private String operator;
-    private ExpFact exp;
+    private Expr exp;
 
-    public UopFact(String operator, ExpFact exp) {
+    public UniOp(String operator, Expr exp) {
         this.operator = operator;
         this.exp = exp;
     }
@@ -27,11 +27,11 @@ public class UopFact extends ExpFact {
         this.operator = operator;
     }
 
-    public ExpFact getExp() {
+    public Expr getExp() {
         return exp;
     }
 
-    public void setExp(ExpFact exp) {
+    public void setExp(Expr exp) {
         this.exp = exp;
     }
 
@@ -50,8 +50,8 @@ public class UopFact extends ExpFact {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        UopFact uopFact = (UopFact) o;
-        return Objects.equals(operator, uopFact.operator) && Objects.equals(exp, uopFact.exp);
+        UniOp uniOp = (UniOp) o;
+        return Objects.equals(operator, uniOp.operator) && Objects.equals(exp, uniOp.exp);
     }
 
     @Override
@@ -60,12 +60,12 @@ public class UopFact extends ExpFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return Collections.singletonList(exp);
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {
+    public void replace(Expr oldExp, Expr newExp) {
         if (exp.equals(oldExp)) {
             exp = newExp;
         }

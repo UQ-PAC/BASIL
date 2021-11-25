@@ -1,19 +1,19 @@
-package facts.inst;
+package facts.stmt;
 
-import facts.exp.ExpFact;
+import facts.exp.Expr;
 import facts.Fact;
 import facts.parameters.InParameter;
 import facts.parameters.OutParameter;
 import java.util.*;
 
-public class EnterSubFact extends InstFact {
+public class EnterSub extends Stmt {
 
     private String funcName;
     private List<InParameter> inParams;
     private OutParameter outParam;
     private List<String> modifies; // TODO type
 
-    public EnterSubFact(String pc, String funcName) {
+    public EnterSub(String pc, String funcName) {
         super(pc);
         this.funcName = funcName;
         inParams = new ArrayList<>();
@@ -81,10 +81,10 @@ public class EnterSubFact extends InstFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return new ArrayList<>();
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {}
+    public void replace(Expr oldExp, Expr newExp) {}
 }

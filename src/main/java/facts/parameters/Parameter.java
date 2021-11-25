@@ -1,27 +1,27 @@
 package facts.parameters;
 
-import facts.exp.VarFact;
+import facts.exp.Var;
 
 public abstract class Parameter {
 
-    private VarFact name;
-    private final VarFact register;
+    private Var name;
+    private final Var register;
 
-    public Parameter(VarFact name, VarFact register) {
+    public Parameter(Var name, Var register) {
         this.name = name;
         this.register = register;
     }
 
     // TODO get name returns a string everywhere else (rename this function)
-    public VarFact getName() {
+    public Var getName() {
         return name;
     }
 
-    public void setName(VarFact name) {
+    public void setName(Var name) {
         this.name = name;
     }
 
-    public VarFact getRegister() {
+    public Var getRegister() {
         return register;
     }
 

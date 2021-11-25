@@ -1,10 +1,10 @@
 package facts.parameters;
 
-import facts.exp.VarFact;
+import facts.exp.Var;
 
 public class OutParameter extends Parameter {
 
-    public OutParameter(VarFact name, VarFact register) {
+    public OutParameter(Var name, Var register) {
         super(name, register);
     }
 }

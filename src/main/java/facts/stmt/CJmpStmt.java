@@ -1,8 +1,8 @@
-package facts.inst;
+package facts.stmt;
 
-import facts.exp.ExpFact;
+import facts.exp.Expr;
 import facts.Fact;
-import facts.exp.VarFact;
+import facts.exp.Var;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -10,12 +10,12 @@ import java.util.List;
 /**
  * Conditional Jump fact
  */
-public class CjmpFact extends InstFact {
+public class CJmpStmt extends Stmt {
 
     private String target;
-    private VarFact condition;
+    private Expr condition; // TODO changed this to ExpFact but should check this
 
-    public CjmpFact(String pc, String target, VarFact condition) {
+    public CJmpStmt(String pc, String target, Var condition) {
         super(pc);
         this.target = target;
         this.condition = condition;
@@ -29,11 +29,11 @@ public class CjmpFact extends InstFact {
         this.target = target;
     }
 
-    public VarFact getCondition() {
+    public Expr getCondition() {
         return condition;
     }
 
-    public void setCondition(VarFact condition) {
+    public void setCondition(Expr condition) {
         this.condition = condition;
     }
 
@@ -49,14 +49,14 @@ public class CjmpFact extends InstFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return Collections.singletonList(condition);
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {
+    public void replace(Expr oldExp, Expr newExp) {
         if (condition.equals(oldExp)) {
-            condition = (VarFact) newExp;
+            condition = newExp;
         }
     }
 }
