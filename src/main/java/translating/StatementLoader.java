@@ -214,15 +214,19 @@ public class StatementLoader implements BilListener {
             facts.add(new CjmpFact(address, target, cond));
         } else if (ctx.call() != null) {
             // statement is a call
-            System.out.println(ctx.addr().getText());
             if (ctx.call().functionName() == null) {
                 // occasionally this occurs with "call LR with no return" lines
                 facts.add(new ExitSubFact(ctx.addr().getText()));
             } else {
                 String funcName = ctx.call().functionName().getText();
-                String returnAddr = ctx.call().returnaddr().addr().getText();
+                String returnAddr = null;
+                if (ctx.call().returnaddr().addr() != null) {
+                    returnAddr = ctx.call().returnaddr().addr().getText();
+                }
                 facts.add(new CallFact(address, funcName));
-                facts.add(new JmpFact(uniquePc(), returnAddr));
+
+                // handle the case of no return
+                if (returnAddr != null) facts.add(new JmpFact(uniquePc(), returnAddr));
             }
         } else {
             // this statement is empty
@@ -232,17 +236,6 @@ public class StatementLoader implements BilListener {
 
     @Override
     public void exitStmt(BilParser.StmtContext ctx) {
-
-    }
-
-    @Override
-    public void enterEndsub(BilParser.EndsubContext ctx) {
-        String address = ctx.addr().getText();
-        facts.add(new ExitSubFact(address));
-    }
-
-    @Override
-    public void exitEndsub(BilParser.EndsubContext ctx) {
 
     }
 
