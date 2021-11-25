@@ -13,8 +13,22 @@ import java.util
 import java.util.{ArrayList, HashMap, HashSet, LinkedList, List, Map, Objects, Set}
 import scala.collection.mutable
 
-class BoogieTranslator (flowGraph: FlowGraph) {
+class BoogieTranslator (flowGraph: FlowGraph, outputFileName: String) {
   private var uniqueInt = 0;
+
+  /**
+   * Starting point for a BIL translation.
+   */
+  def translate() = {
+    createLabels()
+    optimiseSkips()
+    identifyImplicitParams()
+    resolveInParams()
+    resolveOutParams()
+    resolveVars()
+    addVarDeclarations()
+    writeToFile()
+  }
 
   private def createLabels(): Unit = {
     val lines = flowGraph.getViewOfLines
@@ -22,13 +36,13 @@ class BoogieTranslator (flowGraph: FlowGraph) {
 
     // get all referred labels within the flow graph
     lines.forEach(line => {
-      val target: String = getJumpTarget(line)
+      val target = getJumpTarget(line)
       if (target != null) usedLabels.add(target)
     })
 
     // show all labels which are referred; hide all labels which are not
     lines.forEach(line => {
-      val label: Label = line.getLabel
+      val label = line.getLabel
       if (usedLabels.contains(label.getPc)) label.show()
       else label.hide()
     })
@@ -282,7 +296,10 @@ class BoogieTranslator (flowGraph: FlowGraph) {
           }
         }
       }
-      else values.forEach((variable: VarFact, literal: LiteralFact) => replaceAllMatchingChildren(line, variable, literal)) // fixme: warning: this may cause some cast exceptions as some facts may expect a var, but get a literal instead
+      else {
+        // fixme: warning: this may cause some cast exceptions as some facts may expect a var, but get a literal instead
+        values.forEach((variable: VarFact, literal: LiteralFact) => replaceAllMatchingChildren(line, variable, literal))
+      }
     })
     toRemove.forEach(lines.remove)
   }
@@ -314,7 +331,7 @@ class BoogieTranslator (flowGraph: FlowGraph) {
     parent.replace(oldExp, newExp)
   }
 
-  private def writeToFile(outputFileName: String): Unit = {
+  private def writeToFile(): Unit = {
     try {
       val writer = new BufferedWriter(new FileWriter(outputFileName, false))
       writer.write(flowGraph.toString)

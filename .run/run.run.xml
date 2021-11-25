@@ -5,7 +5,7 @@
     <option name="selectedOptions">
       <list />
     </option>
-    <option name="tasks" value="&quot;run samples/that_compile/loops/loops.bil boogie&quot;" />
+    <option name="tasks" value="&quot;run samples/that_compile/function/function.bil boogie&quot;" />
     <option name="useSbtShell" value="true" />
     <option name="vmparams" value="-Xms512M -Xmx1024M -Xss1M -XX:+CMSClassUnloadingEnabled" />
     <option name="workingDir" value="$PROJECT_DIR$" />
