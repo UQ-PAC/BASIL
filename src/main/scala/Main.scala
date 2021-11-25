@@ -10,6 +10,7 @@ import java.util.ArrayList
 import java.util.Arrays
 import java.util.List
 import translating.{BoogieTranslator, FlowGraph, StatementLoader}
+import BilParser.*
 
 @main def main(fileName: String, outputType: String) = {
         // generate abstract syntax tree

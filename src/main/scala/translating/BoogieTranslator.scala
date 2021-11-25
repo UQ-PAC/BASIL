@@ -13,12 +13,12 @@ import java.util
 import java.util.{ArrayList, HashMap, HashSet, LinkedList, List, Map, Objects, Set}
 import scala.collection.mutable
 
-class BoogieTranslator (flowGraph: FlowGraph, outputFileName: String) {
+// TODO rewrite this file to make the flowGraph immutable (this should make whats happening a bit more transparent)
+class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   private var uniqueInt = 0;
 
-  /**
-   * Starting point for a BIL translation.
-   */
+  /** Starting point for a BIL translation.
+    */
   def translate() = {
     createLabels()
     optimiseSkips()
@@ -55,70 +55,67 @@ class BoogieTranslator (flowGraph: FlowGraph, outputFileName: String) {
     else null
   }
 
-
-  /**
-   * If a skip is not jumped to, we should remove it.
-   * Depends on:
-   * - {@link #createLabels ( )}
-   */
+  /** If a skip is not jumped to, we should remove it. Depends on:
+    *   - {@link #createLabels ( )}
+    */
   private def optimiseSkips(): Unit = {
     flowGraph.getViewOfLines.forEach(line => {
       if (line.isInstanceOf[SkipStmt]) flowGraph.removeLine(line)
     })
   }
 
-
-  /**
-   * Many facts.parameters are implicit in BIL, represented not as statements but as a particular pattern of loading
-   * registers which have not been previously assigned within the function to memory addresses based on the SP, at the
-   * beginning of the function. This method identifies this pattern and adds any facts.parameters found to the function's
-   * parameter list.
-   * It is assumed that out-facts.parameters are always explicitly stated in BIL, and therefore translating.StatementLoader would have
-   * added them already.
-   * It is assumed that the first block (i.e. root block) of any function will contain all loadings of facts.parameters.
-   *
-   * We assume that these store instructions contain only the register on the rhs.
-   * We also assume that identical memory accesses (e.g. mem[2]) are never written differently (e.g. mem[1+1]), as
-   * this is what we use for identifying and substituting implicit facts.parameters.
-   * We assume that these registers are only accessed once - i.e. by the store instruction - before they are
-   * assigned.
-   */
+  /** Many facts.parameters are implicit in BIL, represented not as statements but as a particular pattern of loading
+    * registers which have not been previously assigned within the function to memory addresses based on the SP, at the
+    * beginning of the function. This method identifies this pattern and adds any facts.parameters found to the
+    * function's parameter list. It is assumed that out-facts.parameters are always explicitly stated in BIL, and
+    * therefore translating.StatementLoader would have added them already. It is assumed that the first block (i.e. root
+    * block) of any function will contain all loadings of facts.parameters.
+    *
+    * We assume that these store instructions contain only the register on the rhs. We also assume that identical memory
+    * accesses (e.g. mem[2]) are never written differently (e.g. mem[1+1]), as this is what we use for identifying and
+    * substituting implicit facts.parameters. We assume that these registers are only accessed once - i.e. by the store
+    * instruction - before they are assigned.
+    */
   private def identifyImplicitParams(): Unit = {
-    flowGraph.getFunctions.forEach(function => {
-      val functionFact = function.getHeader
-      val params = functionFact.getInParams
-      val rootBlock = function.getRootBlock
-      val assignedRegisters = new mutable.HashSet[Var]
+    flowGraph.getFunctions
+      .forEach(function => {
+        val functionFact = function.getHeader
+        val params = functionFact.getInParams
+        val rootBlock = function.getRootBlock
+        val assignedRegisters = new mutable.HashSet[Var]
 
-      rootBlock.getLines.forEach(line => {
-        if (line.isInstanceOf[StoreFact]) { // store facts may represent implicit params. check conditions
-          // TODO rewrite as match
-          val storeFact = line.asInstanceOf[StoreFact]
-          if (!storeFact.getRhs.isInstanceOf[Var]) return // rhs must be a single variable
+        rootBlock.getLines.forEach(line => {
+          if (line.isInstanceOf[StoreFact]) { // store facts may represent implicit params. check conditions
+            // TODO rewrite as match
+            val storeFact = line.asInstanceOf[StoreFact]
+            if (!storeFact.getRhs.isInstanceOf[Var])
+              return // rhs must be a single variable
 
-          val rhsVar = storeFact.getRhs.asInstanceOf[Var]
-          if (!isRegister(rhsVar) || assignedRegisters.contains(rhsVar)) return // rhs must be an unassigned register
-          val param = new InParameter(new Var(uniqueVarName), rhsVar)
-          param.setAlias(storeFact.getLhs.asInstanceOf[MemExpr])
-          params.add(param)
-        }
-        else if (line.isInstanceOf[LoadFact] || line.isInstanceOf[MoveFact]) { // if the lhs is a register, add it to the set of assigned registers
-          val lhsVar = line.asInstanceOf[AssignFact].getLhs.asInstanceOf[Var]
-          if (isRegister(lhsVar)) assignedRegisters.add(lhsVar)
-        }
+            val rhsVar = storeFact.getRhs.asInstanceOf[Var]
+            if (!isRegister(rhsVar) || assignedRegisters.contains(rhsVar))
+              return // rhs must be an unassigned register
+
+            val param = new InParameter(new Var(uniqueVarName), rhsVar)
+            param.setAlias(storeFact.getLhs.asInstanceOf[MemExpr])
+            params.add(param)
+          } else if (line.isInstanceOf[LoadFact] || line.isInstanceOf[MoveFact]) {
+            // if the lhs is a register, add it to the set of assigned registers
+            val lhsVar = line.asInstanceOf[AssignFact].getLhs.asInstanceOf[Var]
+            if (isRegister(lhsVar)) assignedRegisters.add(lhsVar)
+          }
+        })
+
+        removeDuplicateParamsAndMerge(params)
+        createCallArguments(functionFact)
       })
-
-      removeDuplicateParamsAndMerge(params)
-      createCallArguments(functionFact)
-    })
   }
 
-
-  /**
-   * Implicit params found may contain params already listed explicitly. If so, we take the var name of the explicit
-   * param, and the alias of the implicit param.
-   */
-  private def removeDuplicateParamsAndMerge(params: util.List[InParameter]): Unit = {
+  /** Implicit params found may contain params already listed explicitly. If so, we take the var name of the explicit
+    * param, and the alias of the implicit param.
+    */
+  private def removeDuplicateParamsAndMerge(
+      params: util.List[InParameter]
+  ): Unit = {
     val iter = params.iterator
     while (iter.hasNext) {
       val param = iter.next
@@ -126,8 +123,7 @@ class BoogieTranslator (flowGraph: FlowGraph, outputFileName: String) {
         if ((param ne otherParam) && param.getRegister == otherParam.getRegister) { // duplicate found
           if (param.getAlias == null) { // null alias => this is the explicit param
             otherParam.setName(param.getName)
-          }
-          else { // non-null alias => this is the implicit param
+          } else { // non-null alias => this is the implicit param
             otherParam.setAlias(param.getAlias)
           }
           iter.remove()
@@ -136,28 +132,25 @@ class BoogieTranslator (flowGraph: FlowGraph, outputFileName: String) {
     }
   }
 
-
-  /**
-   * Provides function calls with a list of the facts.parameters they will need to provide arguments for.
-   */
+  /** Provides function calls with a list of the facts.parameters they will need to provide arguments for.
+    */
   private def createCallArguments(func: EnterSub): Unit =
-    getCallsToFunction(func).forEach(call => func.getInParams.forEach((param: InParameter) => call.getArgs.add(param.getRegister)))
+    getCallsToFunction(func).forEach(call =>
+      func.getInParams.forEach((param: InParameter) => call.getArgs.add(param.getRegister))
+    )
 
-  /**
-   * We want to replace mem expressions which represent facts.parameters, like mem[SP + 1], with the human-readable names
-   * of those facts.parameters.
-   * We do this by first removing the initialising store fact "mem[SP + 1] := X0", then replacing all instances of
-   * "mem[SP + 1]" with the variable name.
-   * Depends on:
-   * - {@link #identifyImplicitParams ( )}
-   * Assumes:
-   * - Registers on the RHS of the initialising store fact are reassigned before they are used again.
-   * - No parameter is initialised twice (i.e. there is no more than one initialising store fact per mem facts.exp).
-   * - Equivalent mem expressions are never written differently, e.g. mem[SP + 1] is never written as mem[SP + 0 + 1].
-   * - SP is equivalent at every line of code in the function, except the beginning and end.
-   * - All parameter initialisations occur in the first block of the function.
-   * - ...plus many other assumptions.
-   */
+  /** We want to replace mem expressions which represent facts.parameters, like mem[SP + 1], with the human-readable
+    * names of those facts.parameters. We do this by first removing the initialising store fact "mem[SP + 1] := X0",
+    * then replacing all instances of "mem[SP + 1]" with the variable name. Depends on:
+    *   - {@link #identifyImplicitParams ( )} Assumes:
+    *   - Registers on the RHS of the initialising store fact are reassigned before they are used again.
+    *   - No parameter is initialised twice (i.e. there is no more than one initialising store fact per mem facts.exp).
+    *   - Equivalent mem expressions are never written differently, e.g. mem[SP + 1] is never written as mem[SP + 0 +
+    *     1].
+    *   - SP is equivalent at every line of code in the function, except the beginning and end.
+    *   - All parameter initialisations occur in the first block of the function.
+    *   - ...plus many other assumptions.
+    */
   private def resolveInParams(): Unit = {
     flowGraph.getFunctions.forEach(function => {
       // get all InParameters that have been assigned aliases
@@ -171,21 +164,26 @@ class BoogieTranslator (flowGraph: FlowGraph, outputFileName: String) {
       firstLines.forEach(line => {
         if (!((line.isInstanceOf[StoreFact]))) return
         val store: StoreFact = line.asInstanceOf[StoreFact]
-        if (!((store.getRhs.isInstanceOf[Var]))) return // assume the rhs of the stores we're looking for consist of only a variable
+        if (!((store.getRhs.isInstanceOf[Var])))
+          return // assume the rhs of the stores we're looking for consist of only a variable
         val lhs: MemExpr = store.getLhs.asInstanceOf[MemExpr]
         val rhs: Var = store.getRhs.asInstanceOf[Var]
-        paramsWithAliases.forEach(param => if (param.getAlias == lhs && param.getRegister == rhs) forRemoval.add(line))
+        paramsWithAliases.forEach(param =>
+          if (param.getAlias == lhs && param.getRegister == rhs)
+            forRemoval.add(line)
+        )
       })
 
       forRemoval.forEach(firstLines.remove)
 
       // replace all instances of the alias with the human readable parameter name
-      paramsWithAliases.forEach(param => function.getRootBlock.getLinesInCluster.forEach(line =>
+      paramsWithAliases.forEach(param =>
+        function.getRootBlock.getLinesInCluster.forEach(line =>
           replaceAllMatchingChildren(line, param.getAlias, param.getName)
-      ))
+        )
+      )
     })
   }
-
 
   private def getLocalVarsInFunction(function: FlowGraph.Function) = {
     val vars = new mutable.HashSet[Var]
@@ -193,9 +191,12 @@ class BoogieTranslator (flowGraph: FlowGraph, outputFileName: String) {
       if (line.isInstanceOf[LoadFact] || line.isInstanceOf[MoveFact]) {
         val lhs = line.asInstanceOf[AssignFact].getLhs.asInstanceOf[Var]
         // TODO slow
-        if (flowGraph.getGlobalInits.stream.noneMatch((init: InitStmt) => init.getVariable.getName == lhs.getName)
-          && function.getHeader.getInParams.stream.noneMatch((inParam: InParameter) => inParam.getName.getName == lhs.getName) // TODO check if this is needed
-          && !(function.getHeader.getOutParam.getName.getName == lhs.getName))  {
+        if (
+          flowGraph.getGlobalInits.stream.noneMatch(init => init.getVariable.getName == lhs.getName)
+          && function.getHeader.getInParams.stream
+            .noneMatch((inParam) => inParam.getName.getName == lhs.getName) // TODO check if this is needed
+          && !(function.getHeader.getOutParam.getName.getName == lhs.getName)
+        ) {
           vars.add(lhs)
         }
       }
@@ -203,14 +204,11 @@ class BoogieTranslator (flowGraph: FlowGraph, outputFileName: String) {
     vars.toList
   }
 
-  /**
-   * In boogie, all local variables seem to want to be initialised at the beginning of functions.
-   * Do we want to make all registers local variables?
-   * This should be done before memFacts are replaced by global variables, or the global variables will have var
-   * initialisations.
-   * Depends on:
-   * - resolveRegisters()
-   */
+  /** In boogie, all local variables seem to want to be initialised at the beginning of functions. Do we want to make
+    * all registers local variables? This should be done before memFacts are replaced by global variables, or the global
+    * variables will have var initialisations. Depends on:
+    *   - resolveRegisters()
+    */
   private def addVarDeclarations(): Unit = {
     flowGraph.getFunctions.forEach(function =>
       for (localVar <- getLocalVarsInFunction(function)) {
@@ -233,89 +231,103 @@ class BoogieTranslator (flowGraph: FlowGraph, outputFileName: String) {
     return calls
   }
 
-  private def isRegister(varFact: Var): Boolean = varFact.getName.charAt(0) == 'X'
+  private def isRegister(varFact: Var): Boolean =
+    varFact.getName.charAt(0) == 'X'
 
-  /**
-   * Resolves outParams by crudely replacing all references to their associated register with their human-readable
-   * name.
-   */
+  /** Resolves outParams by crudely replacing all references to their associated register with their human-readable
+    * name.
+    */
   private def resolveOutParams(): Unit =
     flowGraph.getFunctions.forEach(function =>
       val outParam: OutParameter = function.getHeader.getOutParam
       // TODO check will not be necassary if outparam is a scala class
-      if (outParam != null) function.getRootBlock.getLinesInCluster.forEach((line: Stmt) => replaceAllMatchingChildren(line, outParam.getRegister, outParam.getName))
+      if (outParam != null)
+        function.getRootBlock.getLinesInCluster.forEach((line: Stmt) =>
+          replaceAllMatchingChildren(
+            line,
+            outParam.getRegister,
+            outParam.getName
+          )
+        )
     )
 
   private def resolveVars(): Unit =
     flowGraph.getFunctions.forEach(function =>
-      function.getRootBlock.getBlocksInCluster.forEach(block =>
-        constantPropagation(block.getLines)
-    ))
+      function.getRootBlock.getBlocksInCluster.forEach(block => constantPropagation(block.getLines))
+    )
 
   // TODO this could be replaced with a more sophisticated value analysis (e.g. to handle the case where we can resolve the value from multiple variables)
-  /**
-   * Performs constant propagation on a list of facts. Modifies the list it is given.
-   *
-   * Algorithm:
-   * For each line, from top to bottom:
-   * If the line is an assignment with a pending-removal variable on the lhs, remove the pending-removal line.
-   * Then, with the exception of the LHS of assignments, replace any instances of variables with their mapped values, if
-   * such a mapping exists.
-   * Then, if the result is an assignment with no variables on the RHS, compute the value of the RHS, assign it to
-   * the values map and add the line for pending-removal.
-   */
+  /** Performs constant propagation on a list of facts. Modifies the list it is given.
+    *
+    * Algorithm: For each line, from top to bottom: If the line is an assignment with a pending-removal variable on the
+    * lhs, remove the pending-removal line. Then, with the exception of the LHS of assignments, replace any instances of
+    * variables with their mapped values, if such a mapping exists. Then, if the result is an assignment with no
+    * variables on the RHS, compute the value of the RHS, assign it to the values map and add the line for
+    * pending-removal.
+    */
   private def constantPropagation(lines: List[Stmt]): Unit = { // these mapped ExpFacts are expected to only contain literals
     val values: Map[Var, Literal] = new HashMap[Var, Literal]
     // assignments that will be removed if the lhs variable is re-assigned later
     val pendingRemoval: Map[Var, AssignFact] = new HashMap[Var, AssignFact]
     // list of lines that will be removed once the loop exits
     val toRemove: List[AssignFact] = new ArrayList[AssignFact]
-    lines.forEach(line => { // with the exception of the lhs of assignments, replace any instances of variables with their mapped values
-      // note that we don't make an exception for store assignments because their lhs is always a memFact, not var
-      if (line.isInstanceOf[LoadFact] || line.isInstanceOf[MoveFact]) { // if this is an assignment, remove any assignments that pending removal, that contain this lhs
-        val assignment: AssignFact = line.asInstanceOf[AssignFact]
+    lines.forEach(
+      line =>
+        { // with the exception of the lhs of assignments, replace any instances of variables with their mapped values
+          // note that we don't make an exception for store assignments because their lhs is always a memFact, not var
+          if (line.isInstanceOf[LoadFact] || line.isInstanceOf[MoveFact]) { // if this is an assignment, remove any assignments that pending removal, that contain this lhs
+            val assignment: AssignFact = line.asInstanceOf[AssignFact]
 
-        values.keySet.forEach(variable => { // since we can't call replaceAllMatchingChildren on the whole line, we have to perform it on the rhs manually
-          replaceAllMatchingChildren(assignment.getRhs, variable, values.get(variable))
-          if (assignment.getRhs == variable) assignment.replace(variable, values.get(variable))
-        })
+            values.keySet.forEach(
+              variable =>
+                { // since we can't call replaceAllMatchingChildren on the whole line, we have to perform it on the rhs manually
+                  replaceAllMatchingChildren(
+                    assignment.getRhs,
+                    variable,
+                    values.get(variable)
+                  )
+                  if (assignment.getRhs == variable)
+                    assignment.replace(variable, values.get(variable))
+                }
+            )
 
-        if (assignment.getLhs.isInstanceOf[Var]) {
-          val variable: Var = assignment.getLhs.asInstanceOf[Var]
-          if (pendingRemoval.containsKey(variable)) {
-            toRemove.add(pendingRemoval.get(variable))
-            pendingRemoval.remove(variable)
-          }
-          /* if the result has no variables on the rhs, compute the value of the rhs, assign it to
-                              the values map and add the line for pending-removal */ val rhs: Expr = assignment.getRhs
-          if (onlyContainsType(rhs, classOf[Literal])) {
-            val computed: String = computeLiteral(rhs)
-            val newLiteral: Literal = new Literal(computed)
-            values.put(variable, newLiteral)
-            pendingRemoval.put(variable, assignment)
+            if (assignment.getLhs.isInstanceOf[Var]) {
+              val variable: Var = assignment.getLhs.asInstanceOf[Var]
+              if (pendingRemoval.containsKey(variable)) {
+                toRemove.add(pendingRemoval.get(variable))
+                pendingRemoval.remove(variable)
+              }
+              /* if the result has no variables on the rhs, compute the value of the rhs, assign it to
+                              the values map and add the line for pending-removal */
+              val rhs: Expr = assignment.getRhs
+              if (onlyContainsType(rhs, classOf[Literal])) {
+                val computed = computeLiteral(rhs)
+                val newLiteral: Literal = new Literal(computed)
+                values.put(variable, newLiteral)
+                pendingRemoval.put(variable, assignment)
+              }
+            }
+          } else {
+            values.forEach((variable: Var, literal: Literal) => replaceAllMatchingChildren(line, variable, literal))
           }
         }
-      }
-      else {
-        // fixme: warning: this may cause some cast exceptions as some facts may expect a var, but get a literal instead
-        values.forEach((variable: Var, literal: Literal) => replaceAllMatchingChildren(line, variable, literal))
-      }
-    })
+    )
     toRemove.forEach(lines.remove)
   }
 
   // TODO
-  private def computeLiteral(exp: Expr): String =  exp.toString
+  private def computeLiteral(exp: Expr): String = exp.toString
 
   // TODO rewrite (i think with a match this whole logic could be quite simple)
-  /**
-   * Checks if all atomic facts in the given expression are of the given type.
-   * Since the only atomic facts that exist are VarFacts and Literals, it only makes sense to call this function with
-   * one of these as the 'type' argument.
-   * Integers such as those used in extract facts do not count as atomic facts and are ignored, as are certain strings
-   * such as cjump target labels.
-   */
-  private def onlyContainsType(fact: Fact, `type`: Class[_ <: Expr]): Boolean = {
+  /** Checks if all atomic facts in the given expression are of the given type. Since the only atomic facts that exist
+    * are VarFacts and Literals, it only makes sense to call this function with one of these as the 'type' argument.
+    * Integers such as those used in extract facts do not count as atomic facts and are ignored, as are certain strings
+    * such as cjump target labels.
+    */
+  private def onlyContainsType(
+      fact: Fact,
+      `type`: Class[_ <: Expr]
+  ): Boolean = {
     if ((`type` eq classOf[Literal]) || (`type` eq classOf[Var])) {
       `type`.isAssignableFrom(fact.getClass)
     }

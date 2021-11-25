@@ -41,6 +41,7 @@ public class FlowGraph {
         this.functions = functions;
         globalInits = new LinkedList<>();
         globalInits.add(new InitStmt(new Var("mem"), "mem", "[int] int")); // TODO label.none
+        globalInits.add(new InitStmt(new Var("SP"), "SP", "int")); // TODO label.none
     }
 
     /**
