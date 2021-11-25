@@ -228,8 +228,6 @@ public class FlowGraph {
 
         // TODO can this be moved to translating.StatementLoader?
         private static List<InstFact> setFunctionsWithReturns (List<InstFact> facts) {
-            System.out.println(facts);
-
             for (int i = 0; i < facts.size(); i++) {
                 if (!(facts.get(i) instanceof CallFact) || !(facts.get(i + 1) instanceof JmpFact) || !(facts.get(i + 3) instanceof MoveFact)) continue;
 
@@ -294,15 +292,11 @@ public class FlowGraph {
          * @return a list of splits indicating where blocks should be defined in the given facts list
          */
         private static List<Integer> getSplits(List<InstFact> facts) {
-            System.out.println("\n\n\n");
-            facts.forEach(System.out::println);
-            System.out.println("\n\n\n");
             // we use a set to avoid double-ups, as some lines may be jumped to twice
             Set<Integer> splits = new HashSet<>();
             for (int i = 0; i < facts.size(); i++) {
                 InstFact fact = facts.get(i);
                 if (fact instanceof JmpFact) {
-                    System.out.println(fact);
                     // for jumps, add a split below the jump and above the target line
                     splits.add(i + 1);
                     int targetIndex = findInstWithPc(((JmpFact) fact).getTarget(), facts);

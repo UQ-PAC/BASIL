@@ -48,7 +48,6 @@ public class FlowGraphVisualiser extends Application {
         for (FlowGraph.Function function : flowGraph.getFunctions()) {
             for (FlowGraph.Block block : function.getRootBlock().getBlocksInCluster()) {
                 g.insertVertex(block);
-                System.out.println(block);
             }
         }
         for (FlowGraph.Function function : flowGraph.getFunctions()) {
