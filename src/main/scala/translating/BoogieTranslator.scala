@@ -48,11 +48,11 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     })
   }
 
-  // TODO rewrite to use match
-  private def getJumpTarget(fact: Stmt): String = { // target labels are used in jumps and cjumps
-    if (fact.isInstanceOf[JmpFact]) fact.asInstanceOf[JmpFact].getTarget
-    else if (fact.isInstanceOf[CJmpStmt]) fact.asInstanceOf[CJmpStmt].getTarget
-    else null
+  // target labels are used in jumps and cjumps
+  private def getJumpTarget(fact: Stmt): String = fact match {
+    case jmpFact: JmpFact => jmpFact.getTarget
+    case cjmpStmt: CJmpStmt => cjmpStmt.getTarget
+    case _ => null
   }
 
   /** If a skip is not jumped to, we should remove it. Depends on:
@@ -85,23 +85,22 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
         val assignedRegisters = new mutable.HashSet[Var]
 
         rootBlock.getLines.forEach(line => {
-          if (line.isInstanceOf[StoreFact]) { // store facts may represent implicit params. check conditions
-            // TODO rewrite as match
-            val storeFact = line.asInstanceOf[StoreFact]
-            if (!storeFact.getRhs.isInstanceOf[Var])
-              return // rhs must be a single variable
+          line match {
+            // TODO once the stmts are case classes this can be simplified
+            case storeFact: StoreFact =>
+              if (!storeFact.getRhs.isInstanceOf[Var])
+                return // rhs must be a single variable
 
-            val rhsVar = storeFact.getRhs.asInstanceOf[Var]
-            if (!isRegister(rhsVar) || assignedRegisters.contains(rhsVar))
-              return // rhs must be an unassigned register
+              val rhsVar = storeFact.getRhs.asInstanceOf[Var]
+              if (!isRegister(rhsVar) || assignedRegisters.contains(rhsVar))
+                return // rhs must be an unassigned register
 
-            val param = new InParameter(new Var(uniqueVarName), rhsVar)
-            param.setAlias(storeFact.getLhs.asInstanceOf[MemExpr])
-            params.add(param)
-          } else if (line.isInstanceOf[LoadFact] || line.isInstanceOf[MoveFact]) {
-            // if the lhs is a register, add it to the set of assigned registers
-            val lhsVar = line.asInstanceOf[AssignFact].getLhs.asInstanceOf[Var]
-            if (isRegister(lhsVar)) assignedRegisters.add(lhsVar)
+              val param = new InParameter(new Var(uniqueVarName), rhsVar)
+              param.setAlias(storeFact.getLhs.asInstanceOf[MemExpr])
+              params.add(param)
+            case assignFact: AssignFact =>
+              val lhsVar = assignFact.getLhs.asInstanceOf[Var]
+              if (isRegister(lhsVar)) assignedRegisters.add(lhsVar)
           }
         })
 
@@ -266,51 +265,47 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     * pending-removal.
     */
   private def constantPropagation(lines: List[Stmt]): Unit = { // these mapped ExpFacts are expected to only contain literals
-    val values: Map[Var, Literal] = new HashMap[Var, Literal]
+    val values = new HashMap[Var, Literal]
     // assignments that will be removed if the lhs variable is re-assigned later
-    val pendingRemoval: Map[Var, AssignFact] = new HashMap[Var, AssignFact]
+    val pendingRemoval = new HashMap[Var, AssignFact]
     // list of lines that will be removed once the loop exits
-    val toRemove: List[AssignFact] = new ArrayList[AssignFact]
-    lines.forEach(
-      line =>
-        { // with the exception of the lhs of assignments, replace any instances of variables with their mapped values
-          // note that we don't make an exception for store assignments because their lhs is always a memFact, not var
-          if (line.isInstanceOf[LoadFact] || line.isInstanceOf[MoveFact]) { // if this is an assignment, remove any assignments that pending removal, that contain this lhs
-            val assignment: AssignFact = line.asInstanceOf[AssignFact]
-
-            values.keySet.forEach(
-              variable =>
-                { // since we can't call replaceAllMatchingChildren on the whole line, we have to perform it on the rhs manually
-                  replaceAllMatchingChildren(
-                    assignment.getRhs,
-                    variable,
-                    values.get(variable)
-                  )
-                  if (assignment.getRhs == variable)
-                    assignment.replace(variable, values.get(variable))
-                }
+    val toRemove = new ArrayList[AssignFact]
+    lines.forEach(line => {
+        // with the exception of the lhs of assignments, replace any instances of variables with their mapped values
+        // note that we don't make an exception for store assignments because their lhs is always a memFact, not var
+        line match {
+          case assignment: AssignFact => {
+            // if this is an assignment, remove any assignments that pending removal, that contain this lhs
+            values.keySet.forEach(variable => {
+                // since we can't call replaceAllMatchingChildren on the whole line, we have to perform it on the rhs manually
+                replaceAllMatchingChildren(assignment.getRhs, variable, values.get(variable))
+                if (assignment.getRhs == variable) assignment.replace(variable, values.get(variable))
+              }
             )
 
+            // TODO shouldnt the LHS always be a Var
             if (assignment.getLhs.isInstanceOf[Var]) {
               val variable: Var = assignment.getLhs.asInstanceOf[Var]
               if (pendingRemoval.containsKey(variable)) {
                 toRemove.add(pendingRemoval.get(variable))
                 pendingRemoval.remove(variable)
               }
+
               /* if the result has no variables on the rhs, compute the value of the rhs, assign it to
                               the values map and add the line for pending-removal */
-              val rhs: Expr = assignment.getRhs
-              if (onlyContainsType(rhs, classOf[Literal])) {
-                val computed = computeLiteral(rhs)
-                val newLiteral: Literal = new Literal(computed)
-                values.put(variable, newLiteral)
-                pendingRemoval.put(variable, assignment)
+              assignment.getRhs match {
+                case lit: Literal =>
+                  val computed = computeLiteral(lit)
+                  val newLiteral: Literal = new Literal(computed) // TODO are these two lines necassary
+                  values.put(variable, newLiteral)
+                  pendingRemoval.put(variable, assignment)
+                case _ => // skip
               }
             }
-          } else {
-            values.forEach((variable: Var, literal: Literal) => replaceAllMatchingChildren(line, variable, literal))
           }
+          case _ => values.forEach((variable: Var, literal: Literal) => replaceAllMatchingChildren(line, variable, literal))
         }
+      }
     )
     toRemove.forEach(lines.remove)
   }
@@ -324,10 +319,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     * Integers such as those used in extract facts do not count as atomic facts and are ignored, as are certain strings
     * such as cjump target labels.
     */
-  private def onlyContainsType(
-      fact: Fact,
-      `type`: Class[_ <: Expr]
-  ): Boolean = {
+  private def onlyContainsType(fact: Fact, `type`: Class[_ <: Expr]): Boolean = {
     if ((`type` eq classOf[Literal]) || (`type` eq classOf[Var])) {
       `type`.isAssignableFrom(fact.getClass)
     }
@@ -349,8 +341,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
       writer.write(flowGraph.toString)
       writer.flush()
     } catch {
-      case e: IOException =>
-        System.err.println("Error writing to file.")
+      case _: IOException => System.err.println("Error writing to file.")
     }
   }
 
