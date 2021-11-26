@@ -12,7 +12,7 @@ import java.io.{BufferedWriter, FileWriter, IOException}
 import java.util
 import java.util.{ArrayList, HashMap, HashSet, LinkedList, List, Map, Objects, Set}
 import scala.collection.mutable
-import collection.JavaConverters._
+import collection.JavaConverters.*
 
 // TODO rewrite this file to make the flowGraph immutable (this should make whats happening a bit more transparent)
 class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
@@ -298,12 +298,13 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     toRemove.forEach(lines.remove)
   }
 
-  // TODO
   private def computeLiteral(exp: Expr): String = exp.toString
 
   // recursively replaces all children of this fact which match the given fact, with the other given fact
   // works because getChildren returns ExpFacts and ExpFacts override equals(), unlike InstFacts which are inherently
   // unique
+  // TODO this operators on stmts and expr
+  // TODO move this to the classes (i.e. to stmt and expr)
   private def replaceAllMatchingChildren(parent: Fact, oldExp: Expr, newExp: Expr): Unit = {
     parent.getChildren.forEach((child: Expr) => replaceAllMatchingChildren(child, oldExp, newExp))
     parent.replace(oldExp, newExp)

@@ -18,14 +18,14 @@ import BilParser.*;
 public class StatementLoader implements BilListener {
 
     // list of facts to output
-    List<Stmt> facts;
+    List<Stmt> stmts;
     // the last function header parsed; needed for assigning facts.parameters
     EnterSub currentFunction;
     // for generating unique labels
     int pcCount = 0;
 
-    public StatementLoader(List<Stmt> facts) {
-        this.facts = facts;
+    public StatementLoader(List<Stmt> stmts) {
+        this.stmts = stmts;
     }
 
     private Expr parseExpression(BilParser.ExpContext ctx) {
@@ -145,7 +145,7 @@ public class StatementLoader implements BilListener {
         String address = ctx.addr().getText();
         String name = ctx.functionName().getText();
         EnterSub function = new EnterSub(address, name);
-        facts.add(function);
+        stmts.add(function);
 
         this.currentFunction = function;
     }
@@ -184,19 +184,19 @@ public class StatementLoader implements BilListener {
                 Var lhs = new Var(loadCtx.exp(1).getText());
                 Expr rhs = parseExpression(loadCtx.exp(2));
                 if (rhs != null) { // null check is necessary as rhs may not exist for loads
-                    facts.add(new Load(address, lhs, (MemExpr) rhs));
+                    stmts.add(new Load(address, lhs, (MemExpr) rhs));
                 }
             } else if (assignCtx.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
                 // statement is a store assignment
                 BilParser.ExpStoreContext storeCtx = (BilParser.ExpStoreContext) assignCtx.exp();
                 MemExpr lhs = new MemExpr(parseExpression(storeCtx.exp(1)));
                 Expr rhs = parseExpression(storeCtx.exp(2));
-                facts.add(new Store(address, lhs, rhs));
+                stmts.add(new Store(address, lhs, rhs));
             } else {
                 // statement is a move assignment
                 Var lhs = new Var(assignCtx.var().getText());
                 Expr rhs = parseExpression(assignCtx.exp());
-                facts.add(new Move(address, lhs, rhs));
+                stmts.add(new Move(address, lhs, rhs));
             }
         } else if (ctx.jmp() != null) {
             // statement is a jump
@@ -206,31 +206,31 @@ public class StatementLoader implements BilListener {
             } else if (ctx.jmp().addr() != null) {
                 target = ctx.jmp().addr().getText();
             }
-            facts.add(new JmpStmt(address, target));
+            stmts.add(new JmpStmt(address, target));
         } else if (ctx.cjmp() != null) {
             // statement is a conditional jump
             Var cond = new Var(ctx.cjmp().var().getText()); // conditions are always vars
             String target = ctx.cjmp().addr().getText();
-            facts.add(new CJmpStmt(address, target, cond));
+            stmts.add(new CJmpStmt(address, target, cond));
         } else if (ctx.call() != null) {
             // statement is a call
             if (ctx.call().functionName() == null) {
                 // occasionally this occurs with "call LR with no return" lines
-                facts.add(new ExitSub(ctx.addr().getText()));
+                stmts.add(new ExitSub(ctx.addr().getText()));
             } else {
                 String funcName = ctx.call().functionName().getText();
                 String returnAddr = null;
                 if (ctx.call().returnaddr().addr() != null) {
                     returnAddr = ctx.call().returnaddr().addr().getText();
                 }
-                facts.add(new CallStmt(address, funcName));
+                stmts.add(new CallStmt(address, funcName));
 
                 // handle the case of no return
-                if (returnAddr != null) facts.add(new JmpStmt(uniquePc(), returnAddr));
+                if (returnAddr != null) stmts.add(new JmpStmt(uniquePc(), returnAddr));
             }
         } else {
             // this statement is empty
-            facts.add(new SkipStmt(address));
+            stmts.add(new SkipStmt(address));
         }
     }
 

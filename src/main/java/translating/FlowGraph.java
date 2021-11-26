@@ -45,11 +45,11 @@ public class FlowGraph {
     }
 
     /**
-     * Creates a translating.FlowGraph from the given list of facts.
+     * Creates a translating.FlowGraph from the given list of stmts.
      * Assumes no line is reachable from more than one function header (i.e. EnterSubFact).
      */
-    public static FlowGraph fromFactsList(List<Stmt> facts) {
-        FlowGraph flowGraph = FlowGraphFactory.fromFactsList(facts);
+    public static FlowGraph fromStmts(List<Stmt> stmts) {
+        FlowGraph flowGraph = FlowGraphFactory.fromStmts(stmts);
         flowGraph.enforceDisjointFunctions();
         return flowGraph;
     }
@@ -211,7 +211,7 @@ public class FlowGraph {
          * @param facts an ordered list of facts from which to create the flow graph
          * @return a new flow graph with an empty global block and no constraints
          */
-        private static FlowGraph fromFactsList(List<Stmt> facts) {
+        private static FlowGraph fromStmts(List<Stmt> facts) {
             facts = setFunctionsWithReturns(facts);
             // an ordered list of indexes of the given facts list, indicating where the list should be split into blocks
             List<Integer> splits = getSplits(facts);

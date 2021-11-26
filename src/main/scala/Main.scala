@@ -21,13 +21,13 @@ import BilParser.*
         val b = parser.bil(); // abstract syntax tree
 
         // extract all statement objects from the tree
-        val facts = new ArrayList[Stmt]();
-        val statementLoader = new StatementLoader(facts);
+        val stmts = new ArrayList[Stmt]();
+        val statementLoader = new StatementLoader(stmts);
         val walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 
         if (outputType.equals("boogie")) {
-            val flowGraph = FlowGraph.fromFactsList(facts);
+            val flowGraph = FlowGraph.fromStmts(stmts);
             val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl");
             translator.translate();
         } else {

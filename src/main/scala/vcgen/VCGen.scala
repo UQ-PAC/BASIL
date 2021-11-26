@@ -1,7 +1,8 @@
 package vcgen
 
 import facts.exp.{Expr, Literal}
-import facts.stmt.{Assert, Stmt}
+import facts.stmt.Assign.Assign
+import facts.stmt.{Assert, CJmpStmt, Stmt}
 import translating.FlowGraph
 
 import collection.JavaConverters.*
@@ -22,7 +23,12 @@ object VCGen {
    * @return
    */
   def genVC (stmt: Stmt): Expr = stmt match {
+    case cjmpStmt: CJmpStmt => computeGamma(cjmpStmt.getCondition)
+    case assign: Assign => ??? // TODO do the different assignments need to be different
+    case _: Assert => ???  // There should not be an assert here
     case _ => ???
   }
+
+  def computeGamma(expr: Expr) = ???
 
 }

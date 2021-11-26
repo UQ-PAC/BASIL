@@ -3,7 +3,6 @@ package facts.parameters;
 import facts.exp.Var;
 
 public abstract class Parameter {
-
     private Var name;
     private final Var register;
 
