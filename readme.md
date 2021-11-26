@@ -207,3 +207,7 @@ todo
  - Use bitvectors (so we can have element-wise operators e.g. for the loops sample)
  - Fix jumps (need to properly handle jumps to functions, calls with no return)
 
+
+ - Replace nulls with option where possible
+ - Move over to scala collections
+

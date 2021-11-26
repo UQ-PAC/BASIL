@@ -10,12 +10,12 @@ import java.util.List;
 /**
  * Assignment (e.g. x := facts.exp)
  */
-public abstract class AssignFact extends Stmt {
+public abstract class Assign extends Stmt {
 
     private Expr lhs;
     private Expr rhs;
 
-    AssignFact(String pc, Expr lhs, Expr rhs) {
+    Assign(String pc, Expr lhs, Expr rhs) {
         super(pc);
         this.lhs = lhs;
         this.rhs = rhs;

@@ -8,11 +8,11 @@ import java.util.List;
 /**
  * Jump
  */
-public class JmpFact extends Stmt {
+public class JmpStmt extends Stmt {
 
     private String target;
 
-    public JmpFact(String pc, String target) {
+    public JmpStmt(String pc, String target) {
         super(pc);
         this.target = target;
     }

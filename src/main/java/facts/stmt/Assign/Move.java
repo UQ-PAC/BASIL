@@ -6,8 +6,8 @@ import facts.exp.Var;
 /**
  * Move fact
  */
-public class MoveFact extends AssignFact {
-    public MoveFact(String pc, Var lhsExp, Expr rhsExp) {
+public class Move extends Assign {
+    public Move(String pc, Var lhsExp, Expr rhsExp) {
         super(pc, lhsExp, rhsExp);
     }
 }

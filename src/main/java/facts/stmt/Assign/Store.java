@@ -6,8 +6,8 @@ import facts.exp.MemExpr;
 /**
  * Store fact
  */
-public class StoreFact extends AssignFact {
-    public StoreFact(String pc, MemExpr memExp, Expr rhsExp) {
+public class Store extends Assign {
+    public Store(String pc, MemExpr memExp, Expr rhsExp) {
         super(pc, memExp, rhsExp);
     }
 }

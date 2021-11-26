@@ -1,7 +1,7 @@
 package translating
 
 import facts.exp.{Expr, Literal, MemExpr, Var}
-import facts.stmt.Assign.{AssignFact, LoadFact, MoveFact, StoreFact}
+import facts.stmt.Assign.{Assign, Load, Move, Store}
 import facts.stmt.*
 import facts.parameters.{InParameter, OutParameter}
 import facts.{Fact, Label}
@@ -12,6 +12,7 @@ import java.io.{BufferedWriter, FileWriter, IOException}
 import java.util
 import java.util.{ArrayList, HashMap, HashSet, LinkedList, List, Map, Objects, Set}
 import scala.collection.mutable
+import collection.JavaConverters._
 
 // TODO rewrite this file to make the flowGraph immutable (this should make whats happening a bit more transparent)
 class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
@@ -50,7 +51,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
 
   // target labels are used in jumps and cjumps
   private def getJumpTarget(fact: Stmt): String = fact match {
-    case jmpFact: JmpFact => jmpFact.getTarget
+    case jmpStmt: JmpStmt => jmpStmt.getTarget
     case cjmpStmt: CJmpStmt => cjmpStmt.getTarget
     case _ => null
   }
@@ -77,35 +78,29 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     * instruction - before they are assigned.
     */
   private def identifyImplicitParams(): Unit = {
-    flowGraph.getFunctions
-      .forEach(function => {
-        val functionFact = function.getHeader
-        val params = functionFact.getInParams
+    flowGraph.getFunctions.forEach(function => {
+        val params = function.getHeader.getInParams
         val rootBlock = function.getRootBlock
         val assignedRegisters = new mutable.HashSet[Var]
 
-        rootBlock.getLines.forEach(line => {
-          line match {
-            // TODO once the stmts are case classes this can be simplified
-            case storeFact: StoreFact =>
-              if (!storeFact.getRhs.isInstanceOf[Var])
-                return // rhs must be a single variable
-
-              val rhsVar = storeFact.getRhs.asInstanceOf[Var]
-              if (!isRegister(rhsVar) || assignedRegisters.contains(rhsVar))
-                return // rhs must be an unassigned register
-
+      // TODO could neaten this further with case classes by combiling the nested matches
+        rootBlock.getLines.forEach(line => {line match {
+          case store: Store => store.getRhs match {
+            case rhsVar: Var if (isRegister(rhsVar) && assignedRegisters.contains(rhsVar)) =>
               val param = new InParameter(new Var(uniqueVarName), rhsVar)
-              param.setAlias(storeFact.getLhs.asInstanceOf[MemExpr])
+              param.setAlias(store.getLhs.asInstanceOf[MemExpr])
               params.add(param)
-            case assignFact: AssignFact =>
-              val lhsVar = assignFact.getLhs.asInstanceOf[Var]
-              if (isRegister(lhsVar)) assignedRegisters.add(lhsVar)
+            case _ =>
           }
-        })
+          case assign: Assign => assign.getLhs match {
+            case lhsVar: Var if (isRegister(lhsVar)) => assignedRegisters.add(lhsVar)
+            case _: Var =>
+          }
+          case _ =>
+        }})
 
         removeDuplicateParamsAndMerge(params)
-        createCallArguments(functionFact)
+        createCallArguments(function.getHeader)
       })
   }
 
@@ -160,18 +155,18 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
       val forRemoval: List[Stmt] = new ArrayList[Stmt]
       val firstLines: List[Stmt] = function.getRootBlock.getLines
 
-      firstLines.forEach(line => {
-        if (!((line.isInstanceOf[StoreFact]))) return
-        val store: StoreFact = line.asInstanceOf[StoreFact]
-        if (!((store.getRhs.isInstanceOf[Var])))
-          return // assume the rhs of the stores we're looking for consist of only a variable
-        val lhs: MemExpr = store.getLhs.asInstanceOf[MemExpr]
-        val rhs: Var = store.getRhs.asInstanceOf[Var]
-        paramsWithAliases.forEach(param =>
-          if (param.getAlias == lhs && param.getRegister == rhs)
-            forRemoval.add(line)
-        )
-      })
+      firstLines.forEach(line => {line match {
+        case store: Store => (store.getRhs, store.getLhs) match {
+          case (rhs: Var, lhs: MemExpr) =>
+            paramsWithAliases.forEach(param =>
+              if (param.getAlias == lhs && param.getRegister == rhs)
+                forRemoval.add(line)
+            )
+          case (_: Var, _) => ???
+          case _ =>
+        }
+        case _ =>
+      }})
 
       forRemoval.forEach(firstLines.remove)
 
@@ -187,13 +182,12 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   private def getLocalVarsInFunction(function: FlowGraph.Function) = {
     val vars = new mutable.HashSet[Var]
     function.getRootBlock.getLinesInCluster.forEach(line => {
-      if (line.isInstanceOf[LoadFact] || line.isInstanceOf[MoveFact]) {
-        val lhs = line.asInstanceOf[AssignFact].getLhs.asInstanceOf[Var]
+      if (line.isInstanceOf[Load] || line.isInstanceOf[Move]) {
+        val lhs = line.asInstanceOf[Assign].getLhs.asInstanceOf[Var]
         // TODO slow
         if (
           flowGraph.getGlobalInits.stream.noneMatch(init => init.getVariable.getName == lhs.getName)
-          && function.getHeader.getInParams.stream
-            .noneMatch((inParam) => inParam.getName.getName == lhs.getName) // TODO check if this is needed
+          && function.getHeader.getInParams.stream.noneMatch((inParam) => inParam.getName.getName == lhs.getName) // TODO check if this is needed
           && !(function.getHeader.getOutParam.getName.getName == lhs.getName)
         ) {
           vars.add(lhs)
@@ -211,27 +205,21 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   private def addVarDeclarations(): Unit = {
     flowGraph.getFunctions.forEach(function =>
       for (localVar <- getLocalVarsInFunction(function)) {
+        // TODO i think this could be replaced by a none label as well
         function.addInitFact(new InitStmt(localVar, uniqueLabel))
       }
     )
   }
 
+  // TODO not sure if we need this (could we rewrite createCallAgument)
   private def getCallsToFunction(function: EnterSub): List[CallStmt] = {
-    val calls: List[CallStmt] = new ArrayList[CallStmt]
-
-    // TOOD rewrite with match
-    flowGraph.getViewOfLines.forEach(line =>
-      if (line.isInstanceOf[CallStmt]) {
-        val call: CallStmt = line.asInstanceOf[CallStmt]
-        if (call.getFuncName == function.getFuncName) calls.add(call)
-      }
-    )
-
-    return calls
+    flowGraph.getViewOfLines.asScala.filter(line => line match {
+      case callStmt: CallStmt if (callStmt.getFuncName == function.getFuncName) => true
+      case _ => false
+    }).asJava.asInstanceOf[List[CallStmt]]
   }
 
-  private def isRegister(varFact: Var): Boolean =
-    varFact.getName.charAt(0) == 'X'
+  private def isRegister(varFact: Var): Boolean = varFact.getName.charAt(0) == 'X'
 
   /** Resolves outParams by crudely replacing all references to their associated register with their human-readable
     * name.
@@ -255,7 +243,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
       function.getRootBlock.getBlocksInCluster.forEach(block => constantPropagation(block.getLines))
     )
 
-  // TODO this could be replaced with a more sophisticated value analysis (e.g. to handle the case where we can resolve the value from multiple variables)
+  // TODO this should be changed to use a fixed-point algorithm (to make it more accurate)
   /** Performs constant propagation on a list of facts. Modifies the list it is given.
     *
     * Algorithm: For each line, from top to bottom: If the line is an assignment with a pending-removal variable on the
@@ -267,14 +255,14 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   private def constantPropagation(lines: List[Stmt]): Unit = { // these mapped ExpFacts are expected to only contain literals
     val values = new HashMap[Var, Literal]
     // assignments that will be removed if the lhs variable is re-assigned later
-    val pendingRemoval = new HashMap[Var, AssignFact]
+    val pendingRemoval = new HashMap[Var, Assign]
     // list of lines that will be removed once the loop exits
-    val toRemove = new ArrayList[AssignFact]
+    val toRemove = new ArrayList[Assign]
     lines.forEach(line => {
         // with the exception of the lhs of assignments, replace any instances of variables with their mapped values
         // note that we don't make an exception for store assignments because their lhs is always a memFact, not var
         line match {
-          case assignment: AssignFact => {
+          case assignment: Assign => {
             // if this is an assignment, remove any assignments that pending removal, that contain this lhs
             values.keySet.forEach(variable => {
                 // since we can't call replaceAllMatchingChildren on the whole line, we have to perform it on the rhs manually
@@ -312,20 +300,6 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
 
   // TODO
   private def computeLiteral(exp: Expr): String = exp.toString
-
-  // TODO rewrite (i think with a match this whole logic could be quite simple)
-  /** Checks if all atomic facts in the given expression are of the given type. Since the only atomic facts that exist
-    * are VarFacts and Literals, it only makes sense to call this function with one of these as the 'type' argument.
-    * Integers such as those used in extract facts do not count as atomic facts and are ignored, as are certain strings
-    * such as cjump target labels.
-    */
-  private def onlyContainsType(fact: Fact, `type`: Class[_ <: Expr]): Boolean = {
-    if ((`type` eq classOf[Literal]) || (`type` eq classOf[Var])) {
-      `type`.isAssignableFrom(fact.getClass)
-    }
-
-    true
-  }
 
   // recursively replaces all children of this fact which match the given fact, with the other given fact
   // works because getChildren returns ExpFacts and ExpFacts override equals(), unlike InstFacts which are inherently

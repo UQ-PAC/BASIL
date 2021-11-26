@@ -5,9 +5,9 @@ import facts.parameters.InParameter;
 import facts.parameters.OutParameter;
 import facts.exp.*;
 import facts.stmt.*;
-import facts.stmt.Assign.LoadFact;
-import facts.stmt.Assign.MoveFact;
-import facts.stmt.Assign.StoreFact;
+import facts.stmt.Assign.Load;
+import facts.stmt.Assign.Move;
+import facts.stmt.Assign.Store;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -184,19 +184,19 @@ public class StatementLoader implements BilListener {
                 Var lhs = new Var(loadCtx.exp(1).getText());
                 Expr rhs = parseExpression(loadCtx.exp(2));
                 if (rhs != null) { // null check is necessary as rhs may not exist for loads
-                    facts.add(new LoadFact(address, lhs, (MemExpr) rhs));
+                    facts.add(new Load(address, lhs, (MemExpr) rhs));
                 }
             } else if (assignCtx.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
                 // statement is a store assignment
                 BilParser.ExpStoreContext storeCtx = (BilParser.ExpStoreContext) assignCtx.exp();
                 MemExpr lhs = new MemExpr(parseExpression(storeCtx.exp(1)));
                 Expr rhs = parseExpression(storeCtx.exp(2));
-                facts.add(new StoreFact(address, lhs, rhs));
+                facts.add(new Store(address, lhs, rhs));
             } else {
                 // statement is a move assignment
                 Var lhs = new Var(assignCtx.var().getText());
                 Expr rhs = parseExpression(assignCtx.exp());
-                facts.add(new MoveFact(address, lhs, rhs));
+                facts.add(new Move(address, lhs, rhs));
             }
         } else if (ctx.jmp() != null) {
             // statement is a jump
@@ -206,7 +206,7 @@ public class StatementLoader implements BilListener {
             } else if (ctx.jmp().addr() != null) {
                 target = ctx.jmp().addr().getText();
             }
-            facts.add(new JmpFact(address, target));
+            facts.add(new JmpStmt(address, target));
         } else if (ctx.cjmp() != null) {
             // statement is a conditional jump
             Var cond = new Var(ctx.cjmp().var().getText()); // conditions are always vars
@@ -226,7 +226,7 @@ public class StatementLoader implements BilListener {
                 facts.add(new CallStmt(address, funcName));
 
                 // handle the case of no return
-                if (returnAddr != null) facts.add(new JmpFact(uniquePc(), returnAddr));
+                if (returnAddr != null) facts.add(new JmpStmt(uniquePc(), returnAddr));
             }
         } else {
             // this statement is empty

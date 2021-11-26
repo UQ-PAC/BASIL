@@ -2,8 +2,8 @@ package translating;
 
 import facts.exp.Var;
 import facts.stmt.*;
-import facts.stmt.Assign.AssignFact;
-import facts.stmt.Assign.MoveFact;
+import facts.stmt.Assign.Assign;
+import facts.stmt.Assign.Move;
 import Util.AssumptionViolationException;
 import java.util.*;
 
@@ -158,6 +158,8 @@ public class FlowGraph {
     public static class Function {
         // name of the function
         private final EnterSub header;
+        // TODO I think it would be easier if we stored a list of blocks instead
+        // TODO atm you basically have to do dfs each time
         // the first block in this list must be the first block executed for the function in BIL
         private final Block rootBlock;
 
@@ -230,11 +232,11 @@ public class FlowGraph {
         // TODO can this be moved to translating.StatementLoader?
         private static List<Stmt> setFunctionsWithReturns (List<Stmt> facts) {
             for (int i = 0; i < facts.size(); i++) {
-                if (!(facts.get(i) instanceof CallStmt) || !(facts.get(i + 1) instanceof JmpFact) || !(facts.get(i + 3) instanceof MoveFact)) continue;
+                if (!(facts.get(i) instanceof CallStmt) || !(facts.get(i + 1) instanceof JmpStmt) || !(facts.get(i + 3) instanceof Move)) continue;
 
                 CallStmt call = (CallStmt) facts.get(i);
-                JmpFact cjmp = (JmpFact) facts.get(i + 1);
-                AssignFact assign = (MoveFact) facts.get(i + 3);
+                JmpStmt cjmp = (JmpStmt) facts.get(i + 1);
+                Assign assign = (Move) facts.get(i + 3);
 
                 if (cjmp.getTarget().equals(facts.get(i + 1).getLabel().getPc())) throw new AssumptionViolationException("Expected jump to next line");
 
@@ -266,8 +268,8 @@ public class FlowGraph {
 
                 block.getLines().forEach(fact -> {
                     // TODO rewrite using match
-                    if (fact instanceof JmpFact) {
-                        String targetPC = ((JmpFact) fact).getTarget();
+                    if (fact instanceof JmpStmt) {
+                        String targetPC = ((JmpStmt) fact).getTarget();
                         queue.add(findBlockStartingWith(targetPC, blocks));
                     } else if (fact instanceof CJmpStmt) {
                         String targetPC = ((CJmpStmt) fact).getTarget();
@@ -297,10 +299,10 @@ public class FlowGraph {
             Set<Integer> splits = new HashSet<>();
             for (int i = 0; i < facts.size(); i++) {
                 Stmt fact = facts.get(i);
-                if (fact instanceof JmpFact) {
+                if (fact instanceof JmpStmt) {
                     // for jumps, add a split below the jump and above the target line
                     splits.add(i + 1);
-                    int targetIndex = findInstWithPc(((JmpFact) fact).getTarget(), facts);
+                    int targetIndex = findInstWithPc(((JmpStmt) fact).getTarget(), facts);
                     if (targetIndex != -1) splits.add(targetIndex);
                 } else if (fact instanceof CJmpStmt) {
                     // for conditional jumps, add a split above the target line
@@ -375,7 +377,10 @@ public class FlowGraph {
          *              directly follow the last fact in a block, as it may represent a child of this block if the last
          *              line is, for instance, not a jump
          */
-        private static void setChildren(List<Block> blocks, List<Stmt> facts) {
+        private static List<List<Block>> setChildren(List<Block> blocks, List<Stmt> facts) {
+            // TODO return a list of collections of blocks (where each collection is the blocks for a function)
+            // One way to do this would be
+
             for (Block block : blocks) {
                 // the PCs of all facts this block jumps to (for instance, the targets of jumps)
                 List<String> childrenPcs = getChildrenPcs(block, facts);
@@ -392,6 +397,8 @@ public class FlowGraph {
                     block.children.add(child);
                 }
             }
+
+            return new LinkedList<>();
         }
 
         /**
@@ -407,9 +414,9 @@ public class FlowGraph {
         private static List<String> getChildrenPcs(Block block, List<Stmt> lines) {
             List<String> childrenPcs = new ArrayList<>();
             Stmt lastLine = block.lastLine();
-            if (lastLine instanceof JmpFact) {
+            if (lastLine instanceof JmpStmt) {
                 // for jumps, simply add the target
-                childrenPcs.add(((JmpFact) lastLine).getTarget());
+                childrenPcs.add(((JmpStmt) lastLine).getTarget());
             } else if (!(lastLine instanceof ExitSub)) {
                 // for any other line that is not a function return, simply add the following line
                 childrenPcs.add(lines.get(lines.indexOf(lastLine) + 1).getLabel().getPc());
@@ -466,6 +473,7 @@ public class FlowGraph {
         // the lines of code this block contains
         private List<Stmt> lines;
         // a list of other blocks this block may transition to
+        // TODO im not sure if we actually need to store the children
         private List<Block> children;
 
         /**
