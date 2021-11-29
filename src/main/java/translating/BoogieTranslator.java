@@ -122,7 +122,7 @@ public class BoogieTranslator {
      * registers which have not been previously assigned within the function to memory addresses based on the SP, at the
      * beginning of the function. This method identifies this pattern and adds any parameters found to the function's
      * parameter list.
-     * It is assumed that out-parameters are always explicitly stated in BIL, and therefore translating.StatementLoader would have
+     * It is assumed that out-parameters are always explicitly stated in BIL, and therefore StatementLoader would have
      * added them already.
      * It is assumed that the first block (i.e. root block) of any function will contain all loadings of parameters.
      *
