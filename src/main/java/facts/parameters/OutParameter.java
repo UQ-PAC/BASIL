@@ -1,5 +1,4 @@
 package facts.parameters;
-
 import facts.exp.Var;
 
 public class OutParameter extends Parameter {

@@ -1,7 +1,7 @@
 package facts.stmt.Assign;
 
-import facts.exp.MemExpr;
 import facts.exp.Var;
+import facts.exp.MemExpr;
 
 /**
  * Load fact

@@ -1,11 +1,9 @@
 package facts.stmt;
 
-import facts.exp.Expr;
 import facts.exp.Var;
-import facts.Fact;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import facts.exp.Expr;
 
 public class InitStmt extends Stmt {
     private Var variable;
@@ -42,11 +40,6 @@ public class InitStmt extends Stmt {
         if (variable.equals(oldExp)) {
             variable = (Var) newExp;
         }
-    }
-
-    @Override
-    public List<Fact> toFactList() {
-        return Arrays.asList(this, variable);
     }
 
     @Override

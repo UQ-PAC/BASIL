@@ -1,7 +1,7 @@
 package facts.parameters;
 
-import facts.exp.MemExpr;
 import facts.exp.Var;
+import facts.exp.MemExpr;
 
 public class InParameter extends Parameter {
 

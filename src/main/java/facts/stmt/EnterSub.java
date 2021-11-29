@@ -1,8 +1,7 @@
 package facts.stmt;
 
-import facts.exp.Expr;
-import facts.Fact;
 import facts.parameters.InParameter;
+import facts.exp.Expr;
 import facts.parameters.OutParameter;
 import java.util.*;
 
@@ -21,20 +20,8 @@ public class EnterSub extends Stmt {
         modifies.add("mem");
     }
 
-    public String getFuncName() {
-        return funcName;
-    }
-
-    public void setFuncName(String funcName) {
-        this.funcName = funcName;
-    }
-
     public List<InParameter> getInParams() {
         return inParams;
-    }
-
-    public void setInParams(List<InParameter> inParams) {
-        this.inParams = inParams;
     }
 
     public OutParameter getOutParam() {
@@ -45,8 +32,8 @@ public class EnterSub extends Stmt {
         this.outParam = outParam;
     }
 
-    public List<Fact> toFactList() {
-        return Collections.singletonList(this);
+    public String getFuncName() {
+        return funcName;
     }
 
     @Override

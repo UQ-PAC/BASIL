@@ -1,9 +1,7 @@
 package facts.stmt.Assign;
 
-import facts.Fact;
 import facts.exp.Expr;
 import facts.stmt.Stmt;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
@@ -35,14 +33,6 @@ public abstract class Assign extends Stmt {
 
     public void setRhs(Expr rhs) {
         this.rhs = rhs;
-    }
-
-    public List<Fact> toFactList() {
-        List<Fact> factList = new ArrayList<>();
-        factList.addAll(lhs.toFactList());
-        factList.addAll(rhs.toFactList());
-        factList.add(this);
-        return factList;
     }
 
     @Override

@@ -1,9 +1,8 @@
 package facts.stmt;
 
-import facts.exp.Expr;
-import facts.Fact;
 import java.util.ArrayList;
 import java.util.List;
+import facts.exp.Expr;
 
 /**
  * Jump
@@ -23,12 +22,6 @@ public class JmpStmt extends Stmt {
 
     public void setTarget(String target) {
         this.target = target;
-    }
-
-    public List<Fact> toFactList() {
-        List<Fact> factList = new ArrayList<>();
-        factList.add(this);
-        return factList;
     }
 
     @Override

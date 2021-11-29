@@ -1,6 +1,5 @@
 package translating;
 
-import facts.exp.Extract;
 import facts.parameters.InParameter;
 import facts.parameters.OutParameter;
 import facts.exp.*;

@@ -23,5 +23,4 @@ public abstract class Stmt extends Fact {
         this.label = label;
     }
 
-    public abstract List<Fact> toFactList();
 }

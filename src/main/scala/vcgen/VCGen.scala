@@ -1,6 +1,6 @@
 package vcgen
 
-import facts.exp.{Expr, Literal}
+import facts.exp.{Expr, Literal, Var}
 import facts.stmt.Assign.Assign
 import facts.stmt.{Assert, CJmpStmt, Stmt}
 import translating.FlowGraph
@@ -30,5 +30,4 @@ object VCGen {
   }
 
   def computeGamma(expr: Expr) = ???
-
 }

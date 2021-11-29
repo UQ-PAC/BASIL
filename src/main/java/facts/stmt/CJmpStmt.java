@@ -1,11 +1,9 @@
 package facts.stmt;
 
-import facts.exp.Expr;
-import facts.Fact;
-import facts.exp.Var;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import facts.exp.Expr;
+import facts.exp.Var;
 
 /**
  * Conditional Jump fact
@@ -25,22 +23,8 @@ public class CJmpStmt extends Stmt {
         return target;
     }
 
-    public void setTarget(String target) {
-        this.target = target;
-    }
-
     public Expr getCondition() {
         return condition;
-    }
-
-    public void setCondition(Expr condition) {
-        this.condition = condition;
-    }
-
-    public List<Fact> toFactList() {
-        List<Fact> factList = new ArrayList<>(condition.toFactList());
-        factList.add(this);
-        return factList;
     }
 
     @Override

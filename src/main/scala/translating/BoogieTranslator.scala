@@ -107,9 +107,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   /** Implicit params found may contain params already listed explicitly. If so, we take the var name of the explicit
     * param, and the alias of the implicit param.
     */
-  private def removeDuplicateParamsAndMerge(
-      params: util.List[InParameter]
-  ): Unit = {
+  private def removeDuplicateParamsAndMerge(params: util.List[InParameter]): Unit = {
     val iter = params.iterator
     while (iter.hasNext) {
       val param = iter.next
@@ -148,8 +146,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   private def resolveInParams(): Unit = {
     flowGraph.getFunctions.forEach(function => {
       // get all InParameters that have been assigned aliases
-      val paramsWithAliases: List[InParameter] = new ArrayList[InParameter]
-      function.getHeader.getInParams.forEach(param => if (param.getAlias != null) paramsWithAliases.add(param))
+      val paramsWithAliases = function.getHeader.getInParams.asScala.filter(param => param.getAlias != null)
 
       // remove all parameter initialisations from the first block
       val forRemoval: List[Stmt] = new ArrayList[Stmt]
@@ -158,11 +155,11 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
       firstLines.forEach(line => {line match {
         case store: Store => (store.getRhs, store.getLhs) match {
           case (rhs: Var, lhs: MemExpr) =>
-            paramsWithAliases.forEach(param =>
+            for (param <- paramsWithAliases) {
               if (param.getAlias == lhs && param.getRegister == rhs)
                 forRemoval.add(line)
-            )
-          case (_: Var, _) => ???
+            }
+          case (_: Var, _) => ??? // We may need to handle this later
           case _ =>
         }
         case _ =>
@@ -171,11 +168,11 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
       forRemoval.forEach(firstLines.remove)
 
       // replace all instances of the alias with the human readable parameter name
-      paramsWithAliases.forEach(param =>
+      for (param <- paramsWithAliases) {
         function.getRootBlock.getLinesInCluster.forEach(line =>
           replaceAllMatchingChildren(line, param.getAlias, param.getName)
         )
-      )
+      }
     })
   }
 
@@ -305,7 +302,12 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   // unique
   // TODO this operators on stmts and expr
   // TODO move this to the classes (i.e. to stmt and expr)
-  private def replaceAllMatchingChildren(parent: Fact, oldExp: Expr, newExp: Expr): Unit = {
+  private def replaceAllMatchingChildren(parent: Stmt, oldExp: Expr, newExp: Expr): Unit = {
+    parent.getChildren.forEach((child: Expr) => replaceAllMatchingChildren(child, oldExp, newExp))
+    parent.replace(oldExp, newExp)
+  }
+
+  private def replaceAllMatchingChildren(parent: Expr, oldExp: Expr, newExp: Expr): Unit = {
     parent.getChildren.forEach((child: Expr) => replaceAllMatchingChildren(child, oldExp, newExp))
     parent.replace(oldExp, newExp)
   }

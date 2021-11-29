@@ -1,6 +1,6 @@
 package facts.parameters;
-
 import facts.exp.Var;
+import facts.exp.MemExpr;
 
 public abstract class Parameter {
     private Var name;
