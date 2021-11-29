@@ -1,0 +1,47 @@
+000004dc: program
+000004c3: sub __cxa_finalize(__cxa_finalize_result)
+000004dd: __cxa_finalize_result :: out u32 = X0
+
+0000039d:
+0000042f: X16 := X16
+00000435: call X17 with noreturn
+
+000004c4: sub __libc_csu_fini(__libc_csu_fini_result)
+000004de: __libc_csu_fini_result :: out u32 = X0
+
+000002b9:
+000002bd: call LR with noreturn
+
+000004cd: sub get_two(get_two_result)
+000004e6: get_two_result :: out u32 = X0
+000001f4:
+000001fc: X0 := 2
+00000202: call LR with noreturn
+
+000004ce: sub main(main_argc, main_argv, main_result)
+000004e7: main_argc :: in u32 = X0
+000004e8: main_argv :: in out u64 = X1
+000004e9: main_result :: out u32 = X0
+000001b9:
+000001be: mem := mem with [SP - 0x10, el]:u64 <- FP
+000001c3: mem := mem with [SP - 8, el]:u64 <- LR
+000001c8: SP := SP - 0x10
+000001cf: FP := SP
+000001d6: X0 := 0x11000
+000001dd: X0 := X0 + 0x34
+000001e4: X1 := 1
+000001eb: mem := mem with [X0, el]:u32 <- low:32[X1]
+000001f1: LR := 0x730
+000001f6: call @get_two with return %0000031b
+0000031b:
+00000320: X1 := X0
+// 000001f5: call @__libc_csu_fini with return %000011f1
+000011f1:
+00000327: X0 := 0x11000
+0000032e: X0 := X0 + 0x38
+00000335: mem := mem with [X0, el]:u32 <- low:32[X1]
+0000033c: X0 := 0
+00000343: FP := mem[SP, el]:u64
+00000348: LR := mem[SP + 8, el]:u64
+0000034d: SP := SP + 0x10
+00000353: call LR with noreturn

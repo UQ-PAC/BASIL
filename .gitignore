@@ -1,2 +1,14 @@
 out/
 password.txt
+boogie_out.txt
+boogie_out.bpl
+.idea/
+*.iml
+.ccls-cache/
+target/
+.metals/
+.idea/
+gen/
+.bsp/
+.bloop/
+metals.sbt

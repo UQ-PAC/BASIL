@@ -189,8 +189,18 @@ Facts override the toString() method such that they can be printed as syntactica
 
 Some objects returned by the flow graph, such as lists of lines and blocks, may not be member variables. In other words, they may have been freshly made by the called getter, so modifying them will have no effect on the flow graph. However, others indeed may be member variables. This should change soon, but be aware of exactly what objects you're modifying when trying to modify the flow graph.
 
-Recall that instruction facts override equals and expression facts don't. Hence, instructionFact1.equals(instructionFact2) is always false.
+Recall that expression facts override equals and instruction facts don't. Hence, instructionFact1.equals(instructionFact2) is always false.
 
 Types for children of facts are fairly strict, and although we intend to loosen them soon, bear in mind we might get a lot of cast exceptions before that happens.
 
 We want flow graphs to maintain particular properties or guarantees. Use FlowGraph.enforceConstraints() to ensure these guarantees are met. This is particularly useful after editing a flow graph.
+
+## Tasks for the Summer
+
+ - Value analysis 
+ - Points to/alias analysis
+ - Reading globals from the symbol table and global offset table
+ - Using the call graph
+ - Generate the verification conditions
+ - Use bitvectors (so we can have element-wise operators e.g. for the loops sample)
+ - Fix jumps (need to properly handle jumps to functions, calls with no return)
