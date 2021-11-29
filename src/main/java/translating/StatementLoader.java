@@ -19,7 +19,7 @@ public class StatementLoader implements BilListener {
 
     // list of facts to output
     List<InstFact> facts;
-    // the last function header parsed; needed for assigning facts.parameters
+    // the last function header parsed; needed for assigning parameters
     EnterSubFact currentFunction;
     // for generating unique labels
     int pcCount = 0;
