@@ -12,4 +12,6 @@ class Var(var name: String) extends Expr {
   override def replace(oldExp: Expr, newExp: Expr) = {}
 
   override def vars: List[Var] = List(this)
+  
+  def toGamma = Var("Gamma_" + name)
 }

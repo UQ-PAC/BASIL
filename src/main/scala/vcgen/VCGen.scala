@@ -1,6 +1,6 @@
 package vcgen
 
-import facts.exp.{Expr, Literal, Var}
+import facts.exp.{BinOp, Bool, Expr, Literal, Var, conjunct}
 import facts.stmt.Assign.Assign
 import facts.stmt.{Assert, CJmpStmt, Stmt}
 import translating.FlowGraph
@@ -8,7 +8,7 @@ import translating.FlowGraph
 import collection.JavaConverters.*
 
 object VCGen {
-  def genVCs (flowGraph: FlowGraph): List[Stmt] = {
+  def genVCs(flowGraph: FlowGraph): List[Stmt] = {
     flowGraph.setFunctions(flowGraph.getFunctions.asScala.map(func => {
       func
     }).asJava)
@@ -19,15 +19,16 @@ object VCGen {
 
   /**
    * Generate the VC for a given statement
+   *
    * @param stmt
    * @return
    */
-  def genVC (stmt: Stmt): Expr = stmt match {
-    case cjmpStmt: CJmpStmt => computeGamma(cjmpStmt.getCondition)
+  def genVC(stmt: Stmt, state: State): Expr = stmt match {
+    case cjmpStmt: CJmpStmt => computeGamma(cjmpStmt.getCondition, state)
     case assign: Assign => ??? // TODO do the different assignments need to be different
-    case _: Assert => ???  // There should not be an assert here
+    case _: Assert => ??? // There should not be an assert here
     case _ => ???
   }
 
-  def computeGamma(expr: Expr) = ???
+  def computeGamma(expr: Expr, state: State) = Bool.True // expr.vars.map(v => BinOp("&&", v.toGamma, state.getL(v))).conjunct
 }

@@ -17,6 +17,8 @@ lazy val root = project
     libraryDependencies += "com.novocode" % "junit-interface" % "0.11" % "test",
     libraryDependencies += "org.antlr" % "antlr4-runtime" % "4.9.3",
 
+    Antlr4 / antlr4PackageName := Some("BilParser")
+
   )
 
 

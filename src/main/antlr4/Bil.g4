@@ -1,9 +1,5 @@
 grammar Bil;
 
-@header {
-  package BilParser;
-}
-
 // TODO this assumes functions are declared contiguously. If this is not the case we are in trouble
 // TODO if this turns out to be the case it might be easier to parse in blocks (where a block is terminated by white space)
 bil : progdecl function+ EOF;
