@@ -1,6 +1,10 @@
 package BilTranslating;
 
+import Facts.Exp.VarFact;
 import Facts.Inst.*;
+import Facts.Inst.Assign.AssignFact;
+import Facts.Inst.Assign.MoveFact;
+import Facts.Inst.Assign.StoreFact;
 import Util.AssumptionViolationException;
 import java.util.*;
 
@@ -30,14 +34,14 @@ import java.util.*;
  * [ ] make block.getLines() return an immutable list, because we want to practice good java
  */
 public class FlowGraph {
-    // the head of all global code; the starting point for the boogie program
-    private final Block globalBlock;
     // a list of all function heads; represents all functions/procedures in the boogie program
-    private final List<Function> functions;
+    private List<Function> functions;
+    private List<InitFact> globalInits;
 
     private FlowGraph(List<Function> functions) {
-        this.globalBlock = new Block("start", new ArrayList<>(), new ArrayList<>());
         this.functions = functions;
+        globalInits = new LinkedList<>();
+        globalInits.add(new InitFact(new VarFact("mem"), "mem", "[int] int")); // TODO label.none
     }
 
     /**
@@ -50,11 +54,12 @@ public class FlowGraph {
         return flowGraph;
     }
 
-    /**
-     * @return the global block of this flow graph
-     */
-    public Block getGlobalBlock() {
-        return globalBlock;
+    public List<InitFact> getGlobalInits() {
+        return globalInits;
+    }
+
+    public void setFunctions(List<Function> functions) {
+        this.functions = functions;
     }
 
     /**
@@ -77,7 +82,7 @@ public class FlowGraph {
      * @return all blocks within this flow graph
      */
     public List<Block> getBlocks() {
-        List<Block> blocks = new ArrayList<>(globalBlock.getBlocksInCluster());
+        List<Block> blocks = new ArrayList<>();
         functions.forEach(function -> blocks.addAll(function.rootBlock.getBlocksInCluster()));
         return blocks;
     }
@@ -145,7 +150,7 @@ public class FlowGraph {
     @Override
     public String toString() {
         StringBuilder builder = new StringBuilder();
-        globalBlock.getBlocksInCluster().forEach(block -> builder.append(block.toString()));
+        globalInits.forEach(init -> builder.append(init).append("\n"));
         functions.forEach(function -> builder.append(function.toString()));
         return builder.toString();
     }
@@ -156,9 +161,12 @@ public class FlowGraph {
         // the first block in this list must be the first block executed for the function in BIL
         private final Block rootBlock;
 
+        private List<InitFact> initFacts;
+
         public Function(EnterSubFact header, Block rootBlock) {
             this.header = header;
             this.rootBlock = rootBlock;
+            this.initFacts = new LinkedList<>();
         }
 
         public EnterSubFact getHeader() {
@@ -169,10 +177,15 @@ public class FlowGraph {
             return rootBlock;
         }
 
+        public void addInitFact(InitFact initFact) {
+            initFacts.add(initFact);
+        }
+
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
             builder.append(header).append("\n");
+            initFacts.forEach(fact -> builder.append(fact).append("\n"));
             rootBlock.getBlocksInCluster().forEach(builder::append);
             builder.append("}");
             return builder.toString().replaceAll("\n", "\n  ") + "\n";
@@ -197,11 +210,13 @@ public class FlowGraph {
          * @return a new flow graph with an empty global block and no constraints
          */
         private static FlowGraph fromFactsList(List<InstFact> facts) {
+            facts = setFunctionsWithReturns(facts);
             // an ordered list of indexes of the given facts list, indicating where the list should be split into blocks
             List<Integer> splits = getSplits(facts);
             // an ordered list of blocks, defined by the given given list of splits
             // essentially creates the nodes for this flow graph
             List<Block> blocks = createBlocksFromSplits(splits, facts);
+            blocks = stripBlocks(blocks);
             // links each block in the list to each other block that may follow this one (e.g. via a jump)
             // essentially creates the edges for this flow graph
             setChildren(blocks, facts);
@@ -210,6 +225,62 @@ public class FlowGraph {
             // ensure the created flow graph maintains the required properties
             flowGraph.enforceConstraints();
             return flowGraph;
+        }
+
+        // TODO can this be moved to StatementLoader?
+        private static List<InstFact> setFunctionsWithReturns (List<InstFact> facts) {
+            System.out.println(facts);
+
+            for (int i = 0; i < facts.size(); i++) {
+                if (!(facts.get(i) instanceof CallFact) || !(facts.get(i + 1) instanceof JmpFact) || !(facts.get(i + 3) instanceof MoveFact)) continue;
+
+                CallFact call = (CallFact) facts.get(i);
+                JmpFact cjmp = (JmpFact) facts.get(i + 1);
+                AssignFact assign = (MoveFact) facts.get(i + 3);
+
+                if (cjmp.getTarget().equals(facts.get(i + 1).getLabel().getPc())) throw new AssumptionViolationException("Expected jump to next line");
+
+                call.setLHS(assign.getLhs());
+                facts.remove(i + 1);
+                facts.remove(i + 2);
+                facts.remove(i + 3);
+            }
+
+            return facts;
+        }
+
+        private static Block findFunction(List<Block> blocks, String functionName) {
+            return blocks.stream().filter(b -> b.firstLine() instanceof EnterSubFact && ((EnterSubFact) b.firstLine()).getFuncName().equals(functionName)).findFirst().get();
+        }
+
+        private static List<Block> stripBlocks (List<Block> blocks) {
+            List<Block> reachableBlocks = new LinkedList<>();
+            LinkedList<Block> queue = new LinkedList<>();
+
+            Block mainBlock = blocks.stream().filter(block -> block.getLines().get(0) instanceof EnterSubFact && ((EnterSubFact) block.getLines().get(0)).getFuncName().equals("main")).findFirst().get();
+            queue.add(mainBlock);
+
+            while (!queue.isEmpty()) {
+                Block block = queue.poll();
+                if (reachableBlocks.contains(block)) continue;
+
+                reachableBlocks.add(block);
+
+                block.getLines().forEach(fact -> {
+                    // TODO rewrite using match
+                    if (fact instanceof JmpFact) {
+                        String targetPC = ((JmpFact) fact).getTarget();
+                        queue.add(findBlockStartingWith(targetPC, blocks));
+                    } else if (fact instanceof CjmpFact) {
+                        String targetPC = ((CjmpFact) fact).getTarget();
+                        queue.add(findBlockStartingWith(targetPC, blocks));
+                    } else if (fact instanceof CallFact) {
+                        queue.add(findFunction(blocks, ((CallFact) fact).getFuncName()));
+                    }
+                });
+            }
+
+            return reachableBlocks;
         }
 
         /**
@@ -491,10 +562,11 @@ public class FlowGraph {
             }
         }
 
+        // TODO blocks cant start with a number
         @Override
         public String toString() {
             StringBuilder builder = new StringBuilder();
-            builder.append(label).append(":\n");
+            builder.append("label").append(label).append(":\n");
             lines.forEach(line -> builder.append("  ").append(line).append("\n"));
             return builder.toString();
         }

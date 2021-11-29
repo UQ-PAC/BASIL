@@ -2,7 +2,6 @@ package Facts.Parameters;
 
 import Facts.Exp.MemFact;
 import Facts.Exp.VarFact;
-import com.sun.istack.internal.Nullable;
 
 public class InParameter extends Parameter {
 
@@ -12,7 +11,6 @@ public class InParameter extends Parameter {
         super(name, register);
     }
 
-    @Nullable
     public MemFact getAlias() {
         return alias;
     }

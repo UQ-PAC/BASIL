@@ -1,5 +1,7 @@
 package BilTranslating;
 
+import BilTranslating.FlowGraph.Block;
+import BilTranslating.FlowGraph.Function;
 import Facts.Fact;
 import Facts.Exp.*;
 import Facts.Inst.*;
@@ -32,6 +34,8 @@ import java.util.*;
  * ExpFacts override equals and InstFacts don't.
  */
 
+// TODO fix calls to use return vals properly
+
 public class BoogieTranslator {
 
     // for writing the boogie output
@@ -54,7 +58,7 @@ public class BoogieTranslator {
      * Starting point for a BIL translation.
      */
     public void translate() {
-        initGlobalBlock();
+        // reachableFunctions();
         createLabels();
         optimiseSkips();
         identifyImplicitParams();
@@ -63,11 +67,6 @@ public class BoogieTranslator {
         resolveVars();
         addVarDeclarations();
         writeToFile();
-    }
-
-    private void initGlobalBlock() {
-        List<InstFact> globalLines = flowGraph.getGlobalBlock().getLines();
-        globalLines.add(new CallFact("start", "main"));
     }
 
     /**
@@ -112,7 +111,7 @@ public class BoogieTranslator {
      */
     private void optimiseSkips() {
         for (InstFact line : flowGraph.getViewOfLines()) {
-            if (line instanceof NopFact && !line.getLabel().isVisible()) {
+            if (line instanceof NopFact) {
                 flowGraph.removeLine(line);
             }
         }
@@ -253,7 +252,12 @@ public class BoogieTranslator {
         for (InstFact line : function.getRootBlock().getLinesInCluster()) {
             if (line instanceof LoadFact || line instanceof MoveFact) {
                 VarFact lhs = (VarFact) ((AssignFact) line).getLhs();
-                vars.add(lhs);
+
+                // TODO slow
+                if (flowGraph.getGlobalInits().stream().noneMatch(init -> init.getVariable().getName().equals(lhs.getName()))
+                        && function.getHeader().getInParams().stream().noneMatch(inParam -> inParam.getName().equals(lhs.getName())) // TODO check if this is needed
+                && !function.getHeader().getOutParam().getName().getName().equals(lhs.getName()))
+                    vars.add(lhs);
             }
         }
         return vars;
@@ -269,9 +273,8 @@ public class BoogieTranslator {
      */
     private void addVarDeclarations() {
         for (FlowGraph.Function function : flowGraph.getFunctions()) {
-            List<InstFact> firstLines = function.getRootBlock().getLines();
             for (VarFact localVar : getLocalVarsInFunction(function)) {
-                firstLines.add(0, new InitFact(localVar, uniqueLabel()));
+                function.addInitFact(new InitFact(localVar, uniqueLabel()));
             }
         }
     }
@@ -390,6 +393,61 @@ public class BoogieTranslator {
             }
         }
         return true;
+    }
+
+    private List<Function> findAllChildFunctions(Function func) {
+        List<Function> functions = new LinkedList<>();
+        Set<Block> visitedBlocks = new HashSet<>();
+        Set<String> visitedFunctions = new HashSet<>();
+        LinkedList<Block> queue = new LinkedList<>();
+        queue.add(func.getRootBlock());
+
+        //System.out.println(flowGraph.getFunctions().size());
+
+        while (!queue.isEmpty()) {
+            Block block = queue.poll();
+            if (visitedBlocks.contains(block)) continue;
+            visitedBlocks.add(block);
+
+            queue.addAll(block.getChildren());
+
+            block.getLines().forEach(line -> {
+                if (line instanceof CallFact) {
+                    CallFact call = (CallFact) line;
+
+                    if (!visitedFunctions.contains(call.getFuncName())) {
+                        // Call should not fail
+                        functions.add(flowGraph.getFunctions().stream().filter(f -> Objects.equals(
+                                f.getHeader().getFuncName(), call.getFuncName())).findFirst().get());
+                        visitedFunctions.add(call.getFuncName());
+                    }
+                }
+            });
+        }
+
+        return functions;
+    }
+
+    /*
+     * Find all functions reachable from main
+     */
+    private void reachableFunctions() {
+        Function mainFunc = flowGraph.getFunctions().stream().filter(f -> f.getHeader().getFuncName().equals("main")).findFirst().get();
+
+        List<Function> functions = new LinkedList<>();
+        LinkedList<Function> queue = new LinkedList<>();
+
+        queue.add(mainFunc);
+
+        while (!queue.isEmpty()) {
+            Function func = queue.poll();
+            if (functions.contains(func)) continue; // slow
+
+            functions.add(func);
+            queue.addAll(findAllChildFunctions(func));
+        }
+
+        flowGraph.setFunctions(functions);
     }
 
     // recursively replaces all children of this fact which match the given fact, with the other given fact
