@@ -194,7 +194,3 @@ Recall that instruction facts override equals and expression facts don't. Hence,
 Types for children of facts are fairly strict, and although we intend to loosen them soon, bear in mind we might get a lot of cast exceptions before that happens.
 
 We want flow graphs to maintain particular properties or guarantees. Use FlowGraph.enforceConstraints() to ensure these guarantees are met. This is particularly useful after editing a flow graph.
-
-## Tasks for the Summer
-
-todo
