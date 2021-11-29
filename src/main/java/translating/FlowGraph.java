@@ -45,7 +45,7 @@ public class FlowGraph {
     }
 
     /**
-     * Creates a translating.FlowGraph from the given list of stmts.
+     * Creates a FlowGraph from the given list of facts.
      * Assumes no line is reachable from more than one function header (i.e. EnterSubFact).
      */
     public static FlowGraph fromStmts(List<Stmt> stmts) {
@@ -205,7 +205,7 @@ public class FlowGraph {
     private static class FlowGraphFactory {
 
         /**
-         * Creates a translating.FlowGraph from the given list of facts. Does not enforce any constraints.
+         * Creates a FlowGraph from the given list of facts. Does not enforce any constraints.
          *
          * @requires facts are ordered and there are no duplicates
          * @param facts an ordered list of facts from which to create the flow graph
@@ -229,8 +229,8 @@ public class FlowGraph {
             return flowGraph;
         }
 
-        // TODO can this be moved to translating.StatementLoader?
-        private static List<Stmt> setFunctionsWithReturns (List<Stmt> facts) {
+        // TODO can this be moved to StatementLoader?
+        private static List<InstFact> setFunctionsWithReturns (List<InstFact> facts) {
             for (int i = 0; i < facts.size(); i++) {
                 if (!(facts.get(i) instanceof CallStmt) || !(facts.get(i + 1) instanceof JmpStmt) || !(facts.get(i + 3) instanceof Move)) continue;
 
@@ -340,7 +340,7 @@ public class FlowGraph {
                 if (facts.get(i).getLabel().getPc().equals(pc)) return i;
             }
             throw new AssumptionViolationException(String.format(
-                    "Error in constructing flow graph: No facts.inst found with pc %s.\n", pc
+                    "Error in constructing flow graph: No inst found with pc %s.\n", pc
             ));
         }
 

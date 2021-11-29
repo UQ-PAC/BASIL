@@ -197,8 +197,6 @@ We want flow graphs to maintain particular properties or guarantees. Use FlowGra
 
 ## Tasks for the Summer
 
-todo
-
  - Value analysis 
  - Points to/alias analysis
  - Reading globals from the symbol table and global offset table
@@ -207,8 +205,6 @@ todo
  - Use bitvectors (so we can have element-wise operators e.g. for the loops sample). This would be pretty self contained I hope
  - On a related note, add a proper type system
  - Fix jumps (need to properly handle jumps to functions, calls with no return)
-
-
  - Replace nulls with option where possible
  - Move over to scala collections
 

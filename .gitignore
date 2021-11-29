@@ -12,3 +12,4 @@ gen/
 .bsp/
 .bloop/
 metals.sbt
+.run/

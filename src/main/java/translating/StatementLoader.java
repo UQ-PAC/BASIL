@@ -17,9 +17,9 @@ import BilParser.*;
 public class StatementLoader implements BilListener {
 
     // list of facts to output
-    List<Stmt> stmts;
-    // the last function header parsed; needed for assigning facts.parameters
-    EnterSub currentFunction;
+    List<InstFact> facts;
+    // the last function header parsed; needed for assigning parameters
+    EnterSubFact currentFunction;
     // for generating unique labels
     int pcCount = 0;
 
