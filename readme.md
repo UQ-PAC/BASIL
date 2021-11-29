@@ -204,4 +204,3 @@ todo
  - Reading globals from the symbol table and global offset table
  - Using the call graph
  - Generate the verification conditions
-
