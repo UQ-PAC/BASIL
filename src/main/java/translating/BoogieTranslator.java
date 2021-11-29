@@ -118,17 +118,17 @@ public class BoogieTranslator {
     }
 
     /**
-     * Many facts.parameters are implicit in BIL, represented not as statements but as a particular pattern of loading
+     * Many parameters are implicit in BIL, represented not as statements but as a particular pattern of loading
      * registers which have not been previously assigned within the function to memory addresses based on the SP, at the
-     * beginning of the function. This method identifies this pattern and adds any facts.parameters found to the function's
+     * beginning of the function. This method identifies this pattern and adds any parameters found to the function's
      * parameter list.
-     * It is assumed that out-facts.parameters are always explicitly stated in BIL, and therefore translating.StatementLoader would have
+     * It is assumed that out-parameters are always explicitly stated in BIL, and therefore translating.StatementLoader would have
      * added them already.
-     * It is assumed that the first block (i.e. root block) of any function will contain all loadings of facts.parameters.
+     * It is assumed that the first block (i.e. root block) of any function will contain all loadings of parameters.
      *
      * We assume that these store instructions contain only the register on the rhs.
      * We also assume that identical memory accesses (e.g. mem[2]) are never written differently (e.g. mem[1+1]), as
-     * this is what we use for identifying and substituting implicit facts.parameters.
+     * this is what we use for identifying and substituting implicit parameters.
      * We assume that these registers are only accessed once - i.e. by the store instruction - before they are
      * assigned.
      */
@@ -190,7 +190,7 @@ public class BoogieTranslator {
     }
 
     /**
-     * Provides function calls with a list of the facts.parameters they will need to provide arguments for.
+     * Provides function calls with a list of the parameters they will need to provide arguments for.
      */
     private void createCallArguments(EnterSubFact func) {
         for (CallFact call : getCallsToFunction(func)) {
@@ -199,15 +199,15 @@ public class BoogieTranslator {
     }
 
     /**
-     * We want to replace mem expressions which represent facts.parameters, like mem[SP + 1], with the human-readable names
-     * of those facts.parameters.
+     * We want to replace mem expressions which represent parameters, like mem[SP + 1], with the human-readable names
+     * of those parameters.
      * We do this by first removing the initialising store fact "mem[SP + 1] := X0", then replacing all instances of
      * "mem[SP + 1]" with the variable name.
      * Depends on:
      * - {@link #identifyImplicitParams()}
      * Assumes:
      * - Registers on the RHS of the initialising store fact are reassigned before they are used again.
-     * - No parameter is initialised twice (i.e. there is no more than one initialising store fact per mem facts.exp).
+     * - No parameter is initialised twice (i.e. there is no more than one initialising store fact per mem exp).
      * - Equivalent mem expressions are never written differently, e.g. mem[SP + 1] is never written as mem[SP + 0 + 1].
      * - SP is equivalent at every line of code in the function, except the beginning and end.
      * - All parameter initialisations occur in the first block of the function.
