@@ -230,7 +230,7 @@ public class FlowGraph {
         }
 
         // TODO can this be moved to StatementLoader?
-        private static List<InstFact> setFunctionsWithReturns (List<InstFact> facts) {
+        private static List<Stmt> setFunctionsWithReturns (List<Stmt> facts) {
             for (int i = 0; i < facts.size(); i++) {
                 if (!(facts.get(i) instanceof CallStmt) || !(facts.get(i + 1) instanceof JmpStmt) || !(facts.get(i + 3) instanceof Move)) continue;
 
