@@ -526,6 +526,10 @@ public class FlowGraph {
         public void setChildren(List<Block> children) {
             this.children = children;
         }
+        
+        public void removeLine(Stmt line) {
+            lines.remove(line);
+        }
 
         /**
          * A convenience method that returns the first line of this block.

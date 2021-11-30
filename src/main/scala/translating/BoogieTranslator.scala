@@ -149,9 +149,9 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
 
       // remove all parameter initialisations from the first block
       val forRemoval: List[Stmt] = new ArrayList[Stmt]
-      val firstLines: List[Stmt] = function.getBlocks.get(0).getLines
+      val rootBlock: FlowGraph.Block = function.getBlocks.get(0)
 
-      firstLines.forEach(line => {line match {
+      rootBlock.getLines.forEach(line => {line match {
         case store: Store => (store.getRhs, store.getLhs) match {
           case (rhs: Var, lhs: MemExpr) =>
             for (param <- paramsWithAliases) {
@@ -164,7 +164,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
         case _ =>
       }})
 
-      forRemoval.forEach(firstLines.remove)
+      forRemoval.forEach(rootBlock.removeLine)
 
       // replace all instances of the alias with the human readable parameter name
       for (param <- paramsWithAliases) {
@@ -237,7 +237,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
 
   private def resolveVars(): Unit =
     flowGraph.getFunctions.forEach(function =>
-      function.getBlocks.forEach(block => constantPropagation(block.getLines))
+      function.getBlocks.forEach(block => constantPropagation(block))
     )
 
   // TODO this should be changed to use a fixed-point algorithm (to make it more accurate)
@@ -249,7 +249,8 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     * variables on the RHS, compute the value of the RHS, assign it to the values map and add the line for
     * pending-removal.
     */
-  private def constantPropagation(lines: List[Stmt]): Unit = { // these mapped ExpFacts are expected to only contain literals
+  private def constantPropagation(block: FlowGraph.Block): Unit = { // these mapped ExpFacts are expected to only contain literals
+    val lines: List[Stmt] = block.getLines
     val values = new HashMap[Var, Literal]
     // assignments that will be removed if the lhs variable is re-assigned later
     val pendingRemoval = new HashMap[Var, Assign]
@@ -291,7 +292,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
         }
       }
     )
-    toRemove.forEach(lines.remove)
+    toRemove.forEach(block.removeLine)
   }
 
   private def computeLiteral(exp: Expr): String = exp.toString
