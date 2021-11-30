@@ -11,6 +11,7 @@ lazy val root = project
 
     scalaVersion := scala3Version,
     Antlr4 / antlr4Version := "4.9.3",
+    Antlr4 / antlr4GenVisitor := true,
 
     Compile / run / mainClass := Some("main"),
 

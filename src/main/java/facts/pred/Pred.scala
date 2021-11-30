@@ -1,4 +1,4 @@
-package facts.Pred
+package facts.pred
 
 trait Pred {}
 

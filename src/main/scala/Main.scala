@@ -12,6 +12,9 @@ import java.util.List
 import translating.{BoogieTranslator, FlowGraph, StatementLoader}
 import BilParser.*
 
+import scala.collection.mutable.ArrayBuffer
+import collection.JavaConverters.*
+
 @main def main(fileName: String, outputType: String) = {
         // generate abstract syntax tree
         val bilLexer = new BilLexer(CharStreams.fromFileName(fileName));
@@ -21,13 +24,13 @@ import BilParser.*
         val b = parser.bil(); // abstract syntax tree
 
         // extract all statement objects from the tree
-        val stmts = new ArrayList[Stmt]();
+        val stmts = new ArrayBuffer[Stmt]();
         val statementLoader = new StatementLoader(stmts);
         val walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 
         if (outputType.equals("boogie")) {
-            val flowGraph = FlowGraph.fromStmts(stmts);
+            val flowGraph = FlowGraph.fromStmts(stmts.asJava);
             val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl");
             translator.translate();
         } else {

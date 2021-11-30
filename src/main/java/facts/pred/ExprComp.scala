@@ -1,4 +1,4 @@
-package facts.Pred
+package facts.pred
 
 import facts.exp.Expr
 

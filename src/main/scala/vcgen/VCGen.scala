@@ -1,11 +1,12 @@
 package vcgen
 
-import facts.exp.{BinOp, Expr, Literal, Var, conjunct}
+import facts.exp.{BinOp, Expr, Literal, Var}
 import facts.stmt.Assign.Assign
 import facts.stmt.{Assert, CJmpStmt, Stmt}
 import translating.FlowGraph
 
 import collection.JavaConverters.*
+import facts.pred.{Bool, Pred}
 
 object VCGen {
   def genVCs(flowGraph: FlowGraph): List[Stmt] = {
@@ -23,7 +24,7 @@ object VCGen {
    * @param stmt
    * @return
    */
-  def genVC(stmt: Stmt, state: State): Expr = stmt match {
+  def genVC(stmt: Stmt, state: State): Pred = stmt match {
     case cjmpStmt: CJmpStmt => computeGamma(cjmpStmt.getCondition, state)
     case assign: Assign => ??? // TODO do the different assignments need to be different
     case _: Assert => ??? // There should not be an assert here

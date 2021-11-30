@@ -16,6 +16,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import BilParser.*;
+import scala.collection.JavaConverters;
+import scala.collection.mutable.ArrayBuffer;
 
 public class FlowGraphVisualiser extends Application {
 
@@ -38,12 +40,12 @@ public class FlowGraphVisualiser extends Application {
         BilParser parser = new BilParser(tokens);
         parser.setBuildParseTree(true);
         BilParser.BilContext b = parser.bil();
-        List<Stmt> facts = new ArrayList<>();
+        ArrayBuffer<Stmt> facts = new ArrayBuffer<>();
         StatementLoader statementLoader = new StatementLoader(facts);
         ParseTreeWalker walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 
-        FlowGraph flowGraph = FlowGraph.fromStmts(facts);
+        FlowGraph flowGraph = FlowGraph.fromStmts(JavaConverters.bufferAsJavaList(facts));
         Digraph<FlowGraph.Block, String> g = new DigraphEdgeList<>();
         for (FlowGraph.Function function : flowGraph.getFunctions()) {
             for (FlowGraph.Block block : function.getRootBlock().getBlocksInCluster()) {

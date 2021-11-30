@@ -2,6 +2,7 @@ package vcgen
 
 import facts.exp.{Expr, Var}
 import translating.FlowGraph.Function
+import facts.pred.Bool
 
 // TODO overlap between this and the flow graph
 // e.g. globals are currently also stored in the flow graph

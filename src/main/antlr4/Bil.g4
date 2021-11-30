@@ -46,6 +46,10 @@ literal : NUMBER ;
 nat : (NAT | NUMBER) ;
 addr : NUMBER ;
 
+TRUE: 'True' ;
+FALSE: 'False' ;
+HIGH : 'HIGH' ;
+LOW : 'LOW' ;
 CAST : ('pad' | 'extend' | 'high' | 'low') ;
 NAT : ('u32' | 'u64') ;
 ENDIAN : ('el' | 'be');
@@ -57,6 +61,13 @@ ALPHA : ([A-Z]|[a-z])+ ;
 NEWLINE : '\r'? '\n' -> skip;
 WHITESPACE : ' '+ -> skip;
 COMMENT : '//' ~[\r\n]* -> skip;
+AND : '&&' ;
+OR : '||' ;
+NEQ_PRED : '!=' ;
+EQ_PRED : '==' ;
+GT: '>' ;
+GE: '>=' ;
+MAPSTO : '->' ;
 PLUS : '+' ;
 MINUS : '-' ;
 TIMES : '*' ;
@@ -81,33 +92,25 @@ NOT : '~' ;
 
 progSpec: (lpreds | gammas)* ;
 
-// TODO we probably want the notion of binary and int expressions (i.e. predicates are binary, expr in bil are int)
+lpreds : 'L:' lpred (',' lpred)* ;
+lpred :  (var MAPSTO pred);
+gammas : 'Gamma:' gamma (',' gamma)* ;
+gamma :  (var MAPSTO (LOW | HIGH));
+
 pred : pred predBop pred  # predBinOp
     | '(' pred ')'        # predBracket
     | uop pred            # predUniOp
     // TODO i dont think this is right
     | exp expComp exp     # predExprComp
-    | predLiteral         # predLiteral
+    | predLit             # predLiteral
+    | GAMMA_ID            # gammaVar
     ;
 
-predLiteral : TRUE | FALSE ;
+GAMMA_ID : 'Gamma_'ID ;
+primeVar : (ID | GAMMA_ID)'\''; // TODO
+predLit : TRUE | FALSE ;
 
-lpreds : 'L:' pred (',' pred)* ;
-gammas : 'Gamma:' gamma (',' gamma)* ;
-gamma:  (ID MAPSTO (LOW | HIGH));
 
 predBop : AND | OR | NEQ_PRED | EQ_PRED ;
 expComp : NEQ_PRED | EQ_PRED | GE | GT | LE | LT ;
 
-AND : '&&' ;
-OR : '||' ;
-NEQ_PRED : '!=' ;
-EQ_PRED : '==' ;
-
-TRUE: 'True' ;
-FALSE: 'False' ;
-
-HIGH : 'HIGH' ;
-LOW : 'LOW' ;
-
-MAPSTO : '->' ;
