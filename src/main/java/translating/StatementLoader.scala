@@ -152,8 +152,6 @@ class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
     case (v: Var, null, _: TerminalNode) => gammaMappings.put(v, High)
   }
   
-  // override def exitPredId(ctx: BilParser.PredIdContext): Unit = preds.put(ctx, new pred.Var(ctx.getText))
-
   private def uniquePc () =
     pcCount += 1
     "l" + pcCount
