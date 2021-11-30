@@ -203,7 +203,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     flowGraph.getFunctions.forEach(function =>
       for (localVar <- getLocalVarsInFunction(function)) {
         // TODO i think this could be replaced by a none label as well
-        function.addInitFact(new InitStmt(localVar, uniqueLabel))
+        function.addInitStmt(new InitStmt(localVar, uniqueLabel))
       }
     )
   }
