@@ -7,7 +7,6 @@ boogie_out.bpl
 .ccls-cache/
 target/
 .metals/
-.idea/
 gen/
 .bsp/
 .bloop/

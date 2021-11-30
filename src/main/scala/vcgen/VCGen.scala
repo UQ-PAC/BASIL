@@ -13,7 +13,7 @@ object VCGen {
     flowGraph.setFunctions(flowGraph.getFunctions.asScala.map(func => {
       func
     }).asJava)
-    flowGraph.getViewOfLines.asScala.flatMap(line =>
+    flowGraph.getLines.asScala.flatMap(line =>
       List(line, Assert("-1", Literal("0")))
     ).toList
   }

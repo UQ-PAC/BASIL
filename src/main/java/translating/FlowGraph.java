@@ -16,21 +16,14 @@ import java.util.*;
  * blocks in the flow graph. An example of a cluster is a function cluster, which represents all blocks within a
  * self-contained function (or 'procedure' in boogie).
  * The 'head' of a cluster refers to the root block of that cluster. For example, the first line of a function cluster's
- * root block will always be an EnterSubFact.
+ * root block will always be an EnterSub.
  * The globalBlock is the head of a cluster which represents all global code and is the presumed starting point for the
  * boogie program.
  * Each functionBlock is the head of a function cluster.
  *
  * A flow graph self-maintains particular guarantees for user programs:
- * 1. All lines (i.e. InstFacts) in the flow graph are unique; !line1.equals(line2) for all line1, line2.
+ * 1. All lines (i.e. statements) in the flow graph are unique; !line1.equals(line2) for all line1, line2.
  * 2. Clusters are disjoint; no block reachable by a head block is reachable by any other head block.
- *
- * Example usage:
- * Retrieve all blocks within a function: getFunctionBlocks().get(0).getBlocksInCluster()
- * Insert a line in a particular location: getFunctionBlocks().get(0).getChildren().get(0).getLines().add(4, line)
- *
- * todo:
- * [ ] make block.getLines() return an immutable list, because we want to practice good java
  */
 public class FlowGraph {
     // a list of all function heads; represents all functions/procedures in the boogie program
@@ -45,8 +38,8 @@ public class FlowGraph {
     }
 
     /**
-     * Creates a FlowGraph from the given list of facts.
-     * Assumes no line is reachable from more than one function header (i.e. EnterSubFact).
+     * Creates a FlowGraph from the given list of statements.
+     * Assumes no line is reachable from more than one function header (i.e. EnterSub).
      */
     public static FlowGraph fromStmts(List<Stmt> stmts) {
         FlowGraph flowGraph = FlowGraphFactory.fromStmts(stmts);
@@ -56,6 +49,10 @@ public class FlowGraph {
 
     public List<InitStmt> getGlobalInits() {
         return globalInits;
+    }
+
+    public void setGlobalInits(List<InitStmt> inits) {
+        this.globalInits = inits;
     }
 
     public void setFunctions(List<Function> functions) {
@@ -72,7 +69,7 @@ public class FlowGraph {
     /**
      * @return all lines of all blocks within this flow graph
      */
-    public List<Stmt> getViewOfLines() {
+    public List<Stmt> getLines() {
         List<Stmt> lines = new ArrayList<>();
         getBlocks().forEach(block -> lines.addAll(block.getLines()));
         return lines;
@@ -83,7 +80,7 @@ public class FlowGraph {
      */
     public List<Block> getBlocks() {
         List<Block> blocks = new ArrayList<>();
-        functions.forEach(function -> blocks.addAll(function.rootBlock.getBlocksInCluster()));
+        functions.forEach(function -> blocks.addAll(function.getBlocks()));
         return blocks;
     }
 
@@ -105,7 +102,7 @@ public class FlowGraph {
     private void enforceDisjointFunctions() {
         Set<Block> usedBlocks = new HashSet<>();
         for (Function function : functions) {
-            List<Block> cluster = function.rootBlock.getBlocksInCluster();
+            List<Block> cluster = function.getBlocks();
             for (Block block : cluster) {
                 if (usedBlocks.contains(block)) {
                     throw new AssumptionViolationException(String.format(
@@ -122,7 +119,7 @@ public class FlowGraph {
      * A complete traversal of a flow graph should encounter no line twice, or no line with the same PC twice.
      */
     private void enforceUniqueLines() {
-        List<Stmt> linesList = getViewOfLines();
+        List<Stmt> linesList = getLines();
         List<String> pcList = new ArrayList<>();
         linesList.forEach(line -> pcList.add(line.getLabel().getPc()));
         Set<Stmt> linesSet = new HashSet<>(linesList);
@@ -158,16 +155,14 @@ public class FlowGraph {
     public static class Function {
         // name of the function
         private final EnterSub header;
-        // TODO I think it would be easier if we stored a list of blocks instead
-        // TODO atm you basically have to do dfs each time
         // the first block in this list must be the first block executed for the function in BIL
-        private final Block rootBlock;
-
+        private final List<Block> blocks;
+        // variable initialisations to be at the top of this function
         private List<InitStmt> initStmts;
 
-        public Function(EnterSub header, Block rootBlock) {
+        public Function(EnterSub header, List<Block> blocks) {
             this.header = header;
-            this.rootBlock = rootBlock;
+            this.blocks = blocks;
             this.initStmts = new LinkedList<>();
         }
 
@@ -175,11 +170,17 @@ public class FlowGraph {
             return header;
         }
 
-        public Block getRootBlock() {
-            return rootBlock;
+        public List<Block> getBlocks() {
+            return blocks;
+        }
+        
+        public List<Stmt> getLines() {
+            List<Stmt> lines = new ArrayList<>();
+            blocks.forEach(block -> lines.addAll(block.getLines()));
+            return lines;
         }
 
-        public void addInitFact(InitStmt initStmt) {
+        public void addInitStmt(InitStmt initStmt) {
             initStmts.add(initStmt);
         }
 
@@ -187,8 +188,8 @@ public class FlowGraph {
         public String toString() {
             StringBuilder builder = new StringBuilder();
             builder.append(header).append("\n");
-            initStmts.forEach(fact -> builder.append(fact).append("\n"));
-            rootBlock.getBlocksInCluster().forEach(builder::append);
+            initStmts.forEach(stmt -> builder.append(stmt).append("\n"));
+            blocks.forEach(builder::append);
             builder.append("}");
             return builder.toString().replaceAll("\n", "\n  ") + "\n";
         }
@@ -196,8 +197,8 @@ public class FlowGraph {
 
     /**
      * Factory for a flow graph. It works, at a high level, as follows:
-     * Take a list of facts.
-     * Partition the list into chunks of facts called blocks. These are the nodes in the flow graph.
+     * Take a list of statements.
+     * Partition the list into chunks of statements called blocks. These are the nodes in the flow graph.
      * Go through all the blocks and link them to all the other blocks that they might transition to.
      * Identify all the function blocks (i.e. blocks with function headers as first lines).
      * Return a flow graph of these function blocks.
@@ -205,23 +206,23 @@ public class FlowGraph {
     private static class FlowGraphFactory {
 
         /**
-         * Creates a FlowGraph from the given list of facts. Does not enforce any constraints.
+         * Creates a FlowGraph from the given list of statements. Does not enforce any constraints.
          *
-         * @requires facts are ordered and there are no duplicates
-         * @param facts an ordered list of facts from which to create the flow graph
+         * @requires statements are ordered and there are no duplicates
+         * @param stmts an ordered list of statements from which to create the flow graph
          * @return a new flow graph with an empty global block and no constraints
          */
-        private static FlowGraph fromStmts(List<Stmt> facts) {
-            facts = setFunctionsWithReturns(facts);
-            // an ordered list of indexes of the given facts list, indicating where the list should be split into blocks
-            List<Integer> splits = getSplits(facts);
+        private static FlowGraph fromStmts(List<Stmt> stmts) {
+            stmts = setFunctionsWithReturns(stmts);
+            // an ordered list of indexes of the given statements list, indicating where the list should be split into blocks
+            List<Integer> splits = getSplits(stmts);
             // an ordered list of blocks, defined by the given given list of splits
             // essentially creates the nodes for this flow graph
-            List<Block> blocks = createBlocksFromSplits(splits, facts);
+            List<Block> blocks = createBlocksFromSplits(splits, stmts);
             blocks = stripBlocks(blocks);
             // links each block in the list to each other block that may follow this one (e.g. via a jump)
             // essentially creates the edges for this flow graph
-            setChildren(blocks, facts);
+            setChildren(blocks, stmts);
             // create a flow graph consisting of the functions formed from these blocks
             FlowGraph flowGraph = new FlowGraph(convertBlocksToFunctions(blocks));
             // ensure the created flow graph maintains the required properties
@@ -230,23 +231,22 @@ public class FlowGraph {
         }
 
         // TODO can this be moved to StatementLoader?
-        private static List<Stmt> setFunctionsWithReturns (List<Stmt> facts) {
-            for (int i = 0; i < facts.size(); i++) {
-                if (!(facts.get(i) instanceof CallStmt) || !(facts.get(i + 1) instanceof JmpStmt) || !(facts.get(i + 3) instanceof Move)) continue;
+        private static List<Stmt> setFunctionsWithReturns (List<Stmt> stmts) {
+            for (int i = 0; i < stmts.size(); i++) {
+                if (!(stmts.get(i) instanceof CallStmt) || !(stmts.get(i + 1) instanceof JmpStmt) || !(stmts.get(i + 3) instanceof Move)) continue;
+                CallStmt call = (CallStmt) stmts.get(i);
+                JmpStmt cjmp = (JmpStmt) stmts.get(i + 1);
+                Assign assign = (Move) stmts.get(i + 3);
 
-                CallStmt call = (CallStmt) facts.get(i);
-                JmpStmt cjmp = (JmpStmt) facts.get(i + 1);
-                Assign assign = (Move) facts.get(i + 3);
-
-                if (cjmp.getTarget().equals(facts.get(i + 1).getLabel().getPc())) throw new AssumptionViolationException("Expected jump to next line");
+                if (cjmp.getTarget().equals(stmts.get(i + 1).getLabel().getPc())) throw new AssumptionViolationException("Expected jump to next line");
 
                 call.setLHS(assign.getLhs());
-                facts.remove(i + 1);
-                facts.remove(i + 2);
-                facts.remove(i + 3);
+                stmts.remove(i + 1);
+                stmts.remove(i + 2);
+                stmts.remove(i + 3);
             }
 
-            return facts;
+            return stmts;
         }
 
         private static Block findFunction(List<Block> blocks, String functionName) {
@@ -266,16 +266,16 @@ public class FlowGraph {
 
                 reachableBlocks.add(block);
 
-                block.getLines().forEach(fact -> {
+                block.getLines().forEach(stmt -> {
                     // TODO rewrite using match
-                    if (fact instanceof JmpStmt) {
-                        String targetPC = ((JmpStmt) fact).getTarget();
+                    if (stmt instanceof JmpStmt) {
+                        String targetPC = ((JmpStmt) stmt).getTarget();
                         queue.add(findBlockStartingWith(targetPC, blocks));
-                    } else if (fact instanceof CJmpStmt) {
-                        String targetPC = ((CJmpStmt) fact).getTarget();
+                    } else if (stmt instanceof CJmpStmt) {
+                        String targetPC = ((CJmpStmt) stmt).getTarget();
                         queue.add(findBlockStartingWith(targetPC, blocks));
-                    } else if (fact instanceof CallStmt) {
-                        queue.add(findFunction(blocks, ((CallStmt) fact).getFuncName()));
+                    } else if (stmt instanceof CallStmt) {
+                        queue.add(findFunction(blocks, ((CallStmt) stmt).getFuncName()));
                     }
                 });
             }
@@ -284,42 +284,42 @@ public class FlowGraph {
         }
 
         /**
-         * Returns an ordered list of all fact indexes ('splits') which represent block boundaries.
-         * Splits are defined such that the splits 3 and 6 should define a block consisting of lines facts.get(3),
-         * facts.get(4) and facts.get(5).
-         * Any given facts list will also be provided a split at the beginning and end of the program.
+         * Returns an ordered list of all statement indexes ('splits') which represent block boundaries.
+         * Splits are defined such that the splits 3 and 6 should define a block consisting of lines stmts.get(3),
+         * stmts.get(4) and stmts.get(5).
+         * Any given statements list will also be provided a split at the beginning and end of the program.
          *
-         * @requires facts are ordered and there are no duplicates
-         * @ensures the returned list of splits are ordered, and there is a split at index 0 and at index facts.size()
-         * @param facts an ordered list of facts from which to create the splits
-         * @return a list of splits indicating where blocks should be defined in the given facts list
+         * @requires statements are ordered and there are no duplicates
+         * @ensures the returned list of splits are ordered, and there is a split at index 0 and at index stmts.size()
+         * @param stmts an ordered list of statements from which to create the splits
+         * @return a list of splits indicating where blocks should be defined in the given statements list
          */
-        private static List<Integer> getSplits(List<Stmt> facts) {
+        private static List<Integer> getSplits(List<Stmt> stmts) {
             // we use a set to avoid double-ups, as some lines may be jumped to twice
             Set<Integer> splits = new HashSet<>();
-            for (int i = 0; i < facts.size(); i++) {
-                Stmt fact = facts.get(i);
-                if (fact instanceof JmpStmt) {
+            for (int i = 0; i < stmts.size(); i++) {
+                Stmt stmt = stmts.get(i);
+                if (stmt instanceof JmpStmt) {
                     // for jumps, add a split below the jump and above the target line
                     splits.add(i + 1);
-                    int targetIndex = findInstWithPc(((JmpStmt) fact).getTarget(), facts);
+                    int targetIndex = findInstWithPc(((JmpStmt) stmt).getTarget(), stmts);
                     if (targetIndex != -1) splits.add(targetIndex);
-                } else if (fact instanceof CJmpStmt) {
+                } else if (stmt instanceof CJmpStmt) {
                     // for conditional jumps, add a split above the target line
-                    int targetIndex = findInstWithPc(((CJmpStmt) fact).getTarget(), facts);
+                    int targetIndex = findInstWithPc(((CJmpStmt) stmt).getTarget(), stmts);
                     if (targetIndex != -1) splits.add(targetIndex);
-                } else if (fact instanceof EnterSub) {
+                } else if (stmt instanceof EnterSub) {
                     // for function headers, add a split before the header
                     splits.add(i);
                 }
-                else if (fact instanceof ExitSub) {
+                else if (stmt instanceof ExitSub) {
                     // for function returns, add a split after the return
                     splits.add(i + 1);
                 }
             }
             // ensure there is a split at the start and end of the program
             splits.add(0);
-            splits.add(facts.size());
+            splits.add(stmts.size());
             List<Integer> splitsList = new ArrayList<>(splits);
             // ensure the list is sorted
             splitsList.sort(Integer::compareTo);
@@ -327,17 +327,17 @@ public class FlowGraph {
         }
 
         /**
-         * Locates the fact in the given list that has the given PC.
+         * Locates the statement in the given list that has the given PC.
          *
-         * @param pc of the fact to find
-         * @param facts the list of facts to search
-         * @return the fact in the given list that has the given PC.
+         * @param pc of the statement to find
+         * @param stmts the list of statements to search
+         * @return the statement in the given list that has the given PC.
          */
-        private static int findInstWithPc(String pc, List<Stmt> facts) {
+        private static int findInstWithPc(String pc, List<Stmt> stmts) {
             if (pc.substring(0, 2).equals("__")) return -1; // TODO when jumping to a function e.g. goto @__gmon_start__
 
-            for (int i = 0; i < facts.size(); i++) {
-                if (facts.get(i).getLabel().getPc().equals(pc)) return i;
+            for (int i = 0; i < stmts.size(); i++) {
+                if (stmts.get(i).getLabel().getPc().equals(pc)) return i;
             }
             throw new AssumptionViolationException(String.format(
                     "Error in constructing flow graph: No inst found with pc %s.\n", pc
@@ -351,8 +351,8 @@ public class FlowGraph {
          *
          * @requires splits and lines are sorted and splits.contains(0) and splits.contains(lines.size())
          * @param splits a list of indexes to define the boundaries of blocks
-         * @param lines a list of facts from which to extract blocks at the indexes given by splits
-         * @return a list of blocks consisting of sublists of the given facts list, as defined by the given splits list
+         * @param lines a list of statements from which to extract blocks at the indexes given by splits
+         * @return a list of blocks consisting of sublists of the given statements list, as defined by the given splits list
          */
         private static List<Block> createBlocksFromSplits(List<Integer> splits, List<Stmt> lines) {
             List<Block> blocks = new ArrayList<>();
@@ -371,19 +371,19 @@ public class FlowGraph {
          * with each other.
          *
          * @requires all possible children of blocks within the given list are also contained in the list, and the given
-         * list of facts is ordered
+         * list of statements is ordered
          * @param blocks the list of blocks to create children for
-         * @param facts the ordered list of facts the given blocks were created from; necessary for finding facts which
-         *              directly follow the last fact in a block, as it may represent a child of this block if the last
+         * @param stmts the ordered list of statements the given blocks were created from; necessary for finding statements which
+         *              directly follow the last statement in a block, as it may represent a child of this block if the last
          *              line is, for instance, not a jump
          */
-        private static List<List<Block>> setChildren(List<Block> blocks, List<Stmt> facts) {
+        private static List<List<Block>> setChildren(List<Block> blocks, List<Stmt> stmts) {
             // TODO return a list of collections of blocks (where each collection is the blocks for a function)
             // One way to do this would be
 
             for (Block block : blocks) {
-                // the PCs of all facts this block jumps to (for instance, the targets of jumps)
-                List<String> childrenPcs = getChildrenPcs(block, facts);
+                // the PCs of all statements this block jumps to (for instance, the targets of jumps)
+                List<String> childrenPcs = getChildrenPcs(block, stmts);
                 for (String childPc : childrenPcs) {
                     // tries to find a block in the list with a first line that has the child's PC
                     Block child = findBlockStartingWith(childPc, blocks);
@@ -435,12 +435,23 @@ public class FlowGraph {
             for (Block block : blocks) {
                 Stmt firstLine = block.firstLine();
                 if (firstLine instanceof EnterSub) {
-                    Function function = new Function((EnterSub) firstLine, block);
+                    List<Block> blocksInFunction = new ArrayList<>();
+                    dfsOnBlock(blocksInFunction, block);
+                    Function function = new Function((EnterSub) firstLine, blocksInFunction);
                     functions.add(function);
                 }
             }
-            functions.forEach(function -> function.rootBlock.lines.remove(0));
+            functions.forEach(function -> function.getBlocks().get(0).lines.remove(0));
             return functions;
+        }
+        
+        private static void dfsOnBlock(List<Block> blocks, Block next) {
+            blocks.add(next);
+            for (Block child : next.getChildren()) {
+                if (!blocks.contains(child)) {
+                    dfsOnBlock(blocks, child);
+                }
+            }
         }
 
         /**
@@ -462,7 +473,7 @@ public class FlowGraph {
     }
 
     /**
-     * A block is an ordered list of instruction facts (i.e. lines). They represent nodes in the flow graph.
+     * A block is an ordered list of instruction statements (i.e. lines). They represent nodes in the flow graph.
      * Blocks have a list of children blocks, which represent directed edges in the flow graph (from block, to child).
      * They are designed to be highly malleable, and therefore do not provide any guarantees about duplicates or other
      * constraints.
@@ -486,7 +497,6 @@ public class FlowGraph {
         }
 
         /**
-         * The returned list may be mutated in order to update this block.
          * @return the list object containing lines of code this block contains
          */
         public List<Stmt> getLines() {
@@ -494,16 +504,7 @@ public class FlowGraph {
         }
 
         /**
-         * The returned list may be mutated in order to update this block.
-         * @return the list object containing the children of this block
-         */
-        public List<Block> getChildren() {
-            return children;
-        }
-
-        /**
-         * Sometimes, rather than updating the list returned by getLines(), we may want to re-set the list of lines of
-         * this block entirely.
+         * Sets the lines contained in this block.
          * @param lines to set
          */
         public void setLines(List<Stmt> lines) {
@@ -511,12 +512,22 @@ public class FlowGraph {
         }
 
         /**
-         * Sometimes, rather than updating the list returned by getChildren(), we may want to re-set the children of
-         * this block entirely.
+         * @return the list object containing the children of this block
+         */
+        public List<Block> getChildren() {
+            return children;
+        }
+
+        /**
+         * Sets the children of this block.
          * @param children to set
          */
         public void setChildren(List<Block> children) {
             this.children = children;
+        }
+        
+        public void removeLine(Stmt line) {
+            lines.remove(line);
         }
 
         /**
@@ -533,41 +544,6 @@ public class FlowGraph {
          */
         public Stmt lastLine() {
             return lines.get(lines.size() - 1);
-        }
-
-        /**
-         * Reads through all lines of all blocks reachable (directly or indirectly) by this block and returns a list of
-         * all these lines.
-         * As such, this list may contain duplicate lines if flow graph properties are not properly constrained.
-         *
-         * @return all of the lines of all blocks reachable by this block - including all lines of this block
-         */
-        public List<Stmt> getLinesInCluster() {
-            List<Stmt> allLines = new ArrayList<>(lines);
-            getBlocksInCluster().forEach(block -> allLines.addAll(block.lines));
-            return allLines;
-        }
-
-        /**
-         * @return a list of all blocks reachable by this block via a depth first search
-         */
-        public List<Block> getBlocksInCluster() {
-            List<Block> cluster = new ArrayList<>();
-            recursivelyAddBlocks(cluster);
-            return cluster;
-        }
-
-        /**
-         * Helper method for {@link Block#getBlocksInCluster()}.
-         * @param cluster list of blocks which have already been explored
-         */
-        private void recursivelyAddBlocks(List<Block> cluster) {
-            cluster.add(this);
-            for (Block child : children) {
-                if (!cluster.contains(child)) {
-                    child.recursivelyAddBlocks(cluster);
-                }
-            }
         }
 
         // TODO blocks cant start with a number

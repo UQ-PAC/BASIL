@@ -48,12 +48,12 @@ public class FlowGraphVisualiser extends Application {
         FlowGraph flowGraph = FlowGraph.fromStmts(JavaConverters.bufferAsJavaList(facts));
         Digraph<FlowGraph.Block, String> g = new DigraphEdgeList<>();
         for (FlowGraph.Function function : flowGraph.getFunctions()) {
-            for (FlowGraph.Block block : function.getRootBlock().getBlocksInCluster()) {
+            for (FlowGraph.Block block : function.getBlocks()) {
                 g.insertVertex(block);
             }
         }
         for (FlowGraph.Function function : flowGraph.getFunctions()) {
-            for (FlowGraph.Block block : function.getRootBlock().getBlocksInCluster()) {
+            for (FlowGraph.Block block : function.getBlocks()) {
                 for (FlowGraph.Block child : block.getChildren()) {
                     g.insertEdge(block, child, getEdgeId());
                 }
