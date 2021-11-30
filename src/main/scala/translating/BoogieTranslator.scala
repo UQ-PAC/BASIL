@@ -6,7 +6,6 @@ import facts.stmt.*
 import facts.parameters.{InParameter, OutParameter}
 import facts.{Fact, Label}
 import translating.FlowGraph
-
 import scala.collection.mutable.HashSet
 import java.io.{BufferedWriter, FileWriter, IOException}
 import java.util
@@ -80,7 +79,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   private def identifyImplicitParams(): Unit = {
     flowGraph.getFunctions.forEach(function => {
         val params = function.getHeader.getInParams
-        val rootBlock = function.getRootBlock
+        val rootBlock = function.getBlocks.get(0)
         val assignedRegisters = new mutable.HashSet[Var]
 
       // TODO could neaten this further with case classes by combiling the nested matches
@@ -150,7 +149,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
 
       // remove all parameter initialisations from the first block
       val forRemoval: List[Stmt] = new ArrayList[Stmt]
-      val firstLines: List[Stmt] = function.getRootBlock.getLines
+      val firstLines: List[Stmt] = function.getBlocks.get(0).getLines
 
       firstLines.forEach(line => {line match {
         case store: Store => (store.getRhs, store.getLhs) match {
@@ -169,16 +168,17 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
 
       // replace all instances of the alias with the human readable parameter name
       for (param <- paramsWithAliases) {
-        function.getRootBlock.getLinesInCluster.forEach(line =>
+        function.getLines.forEach(line =>
           replaceAllMatchingChildren(line, param.getAlias, param.getName)
         )
       }
     })
   }
 
+  // todo: this seems to produce a list with duplicates
   private def getLocalVarsInFunction(function: FlowGraph.Function) = {
     val vars = new mutable.HashSet[Var]
-    function.getRootBlock.getLinesInCluster.forEach(line => {
+    function.getLines.forEach(line => {
       if (line.isInstanceOf[Load] || line.isInstanceOf[Move]) {
         val lhs = line.asInstanceOf[Assign].getLhs.asInstanceOf[Var]
         // TODO slow
@@ -226,7 +226,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
       val outParam: OutParameter = function.getHeader.getOutParam
       // TODO check will not be necassary if outparam is a scala class
       if (outParam != null)
-        function.getRootBlock.getLinesInCluster.forEach((line: Stmt) =>
+        function.getLines.forEach((line: Stmt) =>
           replaceAllMatchingChildren(
             line,
             outParam.getRegister,
@@ -237,7 +237,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
 
   private def resolveVars(): Unit =
     flowGraph.getFunctions.forEach(function =>
-      function.getRootBlock.getBlocksInCluster.forEach(block => constantPropagation(block.getLines))
+      function.getBlocks.forEach(block => constantPropagation(block.getLines))
     )
 
   // TODO this should be changed to use a fixed-point algorithm (to make it more accurate)
@@ -268,7 +268,6 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
               }
             )
 
-            // TODO shouldnt the LHS always be a Var
             if (assignment.getLhs.isInstanceOf[Var]) {
               val variable: Var = assignment.getLhs.asInstanceOf[Var]
               if (pendingRemoval.containsKey(variable)) {

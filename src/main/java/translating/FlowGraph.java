@@ -24,10 +24,6 @@ import java.util.*;
  * A flow graph self-maintains particular guarantees for user programs:
  * 1. All lines (i.e. statements) in the flow graph are unique; !line1.equals(line2) for all line1, line2.
  * 2. Clusters are disjoint; no block reachable by a head block is reachable by any other head block.
- *
- * Example usage:
- * Retrieve all blocks within a function: getFunctionBlocks().get(0).getBlocksInCluster()
- * Insert a line in a particular location: getFunctionBlocks().get(0).getChildren().get(0).getLines().add(4, line)
  */
 public class FlowGraph {
     // a list of all function heads; represents all functions/procedures in the boogie program
@@ -84,7 +80,7 @@ public class FlowGraph {
      */
     public List<Block> getBlocks() {
         List<Block> blocks = new ArrayList<>();
-        functions.forEach(function -> blocks.addAll(function.rootBlock.getBlocksInCluster()));
+        functions.forEach(function -> blocks.addAll(function.getBlocks()));
         return blocks;
     }
 
@@ -106,7 +102,7 @@ public class FlowGraph {
     private void enforceDisjointFunctions() {
         Set<Block> usedBlocks = new HashSet<>();
         for (Function function : functions) {
-            List<Block> cluster = function.rootBlock.getBlocksInCluster();
+            List<Block> cluster = function.getBlocks();
             for (Block block : cluster) {
                 if (usedBlocks.contains(block)) {
                     throw new AssumptionViolationException(String.format(
@@ -159,16 +155,14 @@ public class FlowGraph {
     public static class Function {
         // name of the function
         private final EnterSub header;
-        // TODO I think it would be easier if we stored a list of blocks instead
-        // TODO atm you basically have to do dfs each time
         // the first block in this list must be the first block executed for the function in BIL
-        private final Block rootBlock;
-
+        private final List<Block> blocks;
+        // variable initialisations to be at the top of this function
         private List<InitStmt> initStmts;
 
-        public Function(EnterSub header, Block rootBlock) {
+        public Function(EnterSub header, List<Block> blocks) {
             this.header = header;
-            this.rootBlock = rootBlock;
+            this.blocks = blocks;
             this.initStmts = new LinkedList<>();
         }
 
@@ -176,8 +170,14 @@ public class FlowGraph {
             return header;
         }
 
-        public Block getRootBlock() {
-            return rootBlock;
+        public List<Block> getBlocks() {
+            return blocks;
+        }
+        
+        public List<Stmt> getLines() {
+            List<Stmt> lines = new ArrayList<>();
+            blocks.forEach(block -> lines.addAll(block.getLines()));
+            return lines;
         }
 
         public void addInitStmt(InitStmt initStmt) {
@@ -189,7 +189,7 @@ public class FlowGraph {
             StringBuilder builder = new StringBuilder();
             builder.append(header).append("\n");
             initStmts.forEach(stmt -> builder.append(stmt).append("\n"));
-            rootBlock.getBlocksInCluster().forEach(builder::append);
+            blocks.forEach(builder::append);
             builder.append("}");
             return builder.toString().replaceAll("\n", "\n  ") + "\n";
         }
@@ -436,12 +436,23 @@ public class FlowGraph {
             for (Block block : blocks) {
                 Stmt firstLine = block.firstLine();
                 if (firstLine instanceof EnterSub) {
-                    Function function = new Function((EnterSub) firstLine, block);
+                    List<Block> blocksInFunction = new ArrayList<>();
+                    dfsOnBlock(blocksInFunction, block);
+                    Function function = new Function((EnterSub) firstLine, blocksInFunction);
                     functions.add(function);
                 }
             }
-            functions.forEach(function -> function.rootBlock.lines.remove(0));
+            functions.forEach(function -> function.getBlocks().get(0).lines.remove(0));
             return functions;
+        }
+        
+        private static void dfsOnBlock(List<Block> blocks, Block next) {
+            blocks.add(next);
+            for (Block child : next.getChildren()) {
+                if (!blocks.contains(child)) {
+                    dfsOnBlock(blocks, child);
+                }
+            }
         }
 
         /**
@@ -487,7 +498,6 @@ public class FlowGraph {
         }
 
         /**
-         * The returned list may be mutated in order to update this block.
          * @return the list object containing lines of code this block contains
          */
         public List<Stmt> getLines() {
@@ -495,16 +505,7 @@ public class FlowGraph {
         }
 
         /**
-         * The returned list may be mutated in order to update this block.
-         * @return the list object containing the children of this block
-         */
-        public List<Block> getChildren() {
-            return children;
-        }
-
-        /**
-         * Sometimes, rather than updating the list returned by getLines(), we may want to re-set the list of lines of
-         * this block entirely.
+         * Sets the lines contained in this block.
          * @param lines to set
          */
         public void setLines(List<Stmt> lines) {
@@ -512,8 +513,14 @@ public class FlowGraph {
         }
 
         /**
-         * Sometimes, rather than updating the list returned by getChildren(), we may want to re-set the children of
-         * this block entirely.
+         * @return the list object containing the children of this block
+         */
+        public List<Block> getChildren() {
+            return children;
+        }
+
+        /**
+         * Sets the children of this block.
          * @param children to set
          */
         public void setChildren(List<Block> children) {
@@ -534,41 +541,6 @@ public class FlowGraph {
          */
         public Stmt lastLine() {
             return lines.get(lines.size() - 1);
-        }
-
-        /**
-         * Reads through all lines of all blocks reachable (directly or indirectly) by this block and returns a list of
-         * all these lines.
-         * As such, this list may contain duplicate lines if flow graph properties are not properly constrained.
-         *
-         * @return all of the lines of all blocks reachable by this block - including all lines of this block
-         */
-        public List<Stmt> getLinesInCluster() {
-            List<Stmt> allLines = new ArrayList<>(lines);
-            getBlocksInCluster().forEach(block -> allLines.addAll(block.lines));
-            return allLines;
-        }
-
-        /**
-         * @return a list of all blocks reachable by this block via a depth first search
-         */
-        public List<Block> getBlocksInCluster() {
-            List<Block> cluster = new ArrayList<>();
-            recursivelyAddBlocks(cluster);
-            return cluster;
-        }
-
-        /**
-         * Helper method for {@link Block#getBlocksInCluster()}.
-         * @param cluster list of blocks which have already been explored
-         */
-        private void recursivelyAddBlocks(List<Block> cluster) {
-            cluster.add(this);
-            for (Block child : children) {
-                if (!cluster.contains(child)) {
-                    child.recursivelyAddBlocks(cluster);
-                }
-            }
         }
 
         // TODO blocks cant start with a number
