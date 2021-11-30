@@ -1,6 +1,6 @@
 package vcgen
 
-import facts.exp.{BinOp, Bool, Expr, Literal, Var, conjunct}
+import facts.exp.{BinOp, Expr, Literal, Var, conjunct}
 import facts.stmt.Assign.Assign
 import facts.stmt.{Assert, CJmpStmt, Stmt}
 import translating.FlowGraph

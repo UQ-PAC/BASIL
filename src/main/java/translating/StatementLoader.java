@@ -1,5 +1,16 @@
 package translating;
 
+import BilParser.BilParser.ExpCompContext;
+import BilParser.BilParser.GammaContext;
+import BilParser.BilParser.GammasContext;
+import BilParser.BilParser.LpredsContext;
+import BilParser.BilParser.PredBinOpContext;
+import BilParser.BilParser.PredBopContext;
+import BilParser.BilParser.PredBracketContext;
+import BilParser.BilParser.PredContext;
+import BilParser.BilParser.PredExprCompContext;
+import BilParser.BilParser.PredUniOpContext;
+import BilParser.BilParser.ProgSpecContext;
 import facts.parameters.InParameter;
 import facts.parameters.OutParameter;
 import facts.exp.*;
@@ -17,9 +28,9 @@ import BilParser.*;
 public class StatementLoader implements BilListener {
 
     // list of facts to output
-    List<InstFact> facts;
+    List<Stmt> stmts;
     // the last function header parsed; needed for assigning parameters
-    EnterSubFact currentFunction;
+    EnterSub currentFunction;
     // for generating unique labels
     int pcCount = 0;
 
@@ -464,6 +475,106 @@ public class StatementLoader implements BilListener {
 
     @Override
     public void exitAddr(BilParser.AddrContext ctx) {
+
+    }
+
+    @Override
+    public void enterProgSpec(ProgSpecContext ctx) {
+
+    }
+
+    @Override
+    public void exitProgSpec(ProgSpecContext ctx) {
+
+    }
+
+    @Override
+    public void enterPredUniOp(PredUniOpContext ctx) {
+
+    }
+
+    @Override
+    public void exitPredUniOp(PredUniOpContext ctx) {
+
+    }
+
+    @Override
+    public void enterPredExprComp(PredExprCompContext ctx) {
+
+    }
+
+    @Override
+    public void exitPredExprComp(PredExprCompContext ctx) {
+
+    }
+
+    @Override
+    public void enterPredBinOp(PredBinOpContext ctx) {
+
+    }
+
+    @Override
+    public void exitPredBinOp(PredBinOpContext ctx) {
+
+    }
+
+    @Override
+    public void enterPredBracket(PredBracketContext ctx) {
+
+    }
+
+    @Override
+    public void exitPredBracket(PredBracketContext ctx) {
+
+    }
+
+    @Override
+    public void enterLpreds(LpredsContext ctx) {
+
+    }
+
+    @Override
+    public void exitLpreds(LpredsContext ctx) {
+
+    }
+
+    @Override
+    public void enterGammas(GammasContext ctx) {
+
+    }
+
+    @Override
+    public void exitGammas(GammasContext ctx) {
+
+    }
+
+    @Override
+    public void enterGamma(GammaContext ctx) {
+
+    }
+
+    @Override
+    public void exitGamma(GammaContext ctx) {
+
+    }
+
+    @Override
+    public void enterPredBop(PredBopContext ctx) {
+
+    }
+
+    @Override
+    public void exitPredBop(PredBopContext ctx) {
+
+    }
+
+    @Override
+    public void enterExpComp(ExpCompContext ctx) {
+
+    }
+
+    @Override
+    public void exitExpComp(ExpCompContext ctx) {
 
     }
 

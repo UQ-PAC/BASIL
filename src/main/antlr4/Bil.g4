@@ -2,7 +2,7 @@ grammar Bil;
 
 // TODO this assumes functions are declared contiguously. If this is not the case we are in trouble
 // TODO if this turns out to be the case it might be easier to parse in blocks (where a block is terminated by white space)
-bil : progdecl function+ EOF;
+bil : progSpec progdecl function+ EOF;
 function : sub 
          paramTypes*
          (stmt)*
@@ -22,15 +22,15 @@ stmt : addr ':'
 call : 'call' (('@' functionName)|var) 'with' (returnaddr | 'noreturn') ;
 
 assign : var ':=' exp ;
-exp : exp bop exp                                       #expBop
-    | literal                                           #expLiteral
-    | '(' exp ')'                                       #expBracket
-    | uop exp                                           #expUop
-    | var                                               #expVar
-    | exp 'with' '[' exp ',' ENDIAN ']:' nat '<-' exp   #expStore
-    | CAST ':' nat '[' exp ']'                          #expCast
-    | exp '[' exp ',' ENDIAN ']:' nat                   #expLoad
-    | 'extract' ':' nat ':' nat '[' exp ']'             #expExtract
+exp : exp bop exp                                       # expBop
+    | literal                                           # expLiteral
+    | '(' exp ')'                                       # expBracket
+    | uop exp                                           # expUop
+    | var                                               # expVar
+    | exp 'with' '[' exp ',' ENDIAN ']:' nat '<-' exp   # expStore
+    | CAST ':' nat '[' exp ']'                          # expCast
+    | exp '[' exp ',' ENDIAN ']:' nat                   # expLoad
+    | 'extract' ':' nat ':' nat '[' exp ']'             # expExtract
     ;
 cjmp : 'when' var 'goto' '%' addr ;
 jmp : 'goto' (('%' addr)|('@' var));
@@ -74,3 +74,40 @@ LT : '<' ;
 LE : '<=' ;
 NOT : '~' ;
 
+
+/**
+  The grammar which follows this is used to specify the program, and is not bil code.
+*/
+
+progSpec: (lpreds | gammas)* ;
+
+// TODO we probably want the notion of binary and int expressions (i.e. predicates are binary, expr in bil are int)
+pred : pred predBop pred  # predBinOp
+    | '(' pred ')'        # predBracket
+    | uop pred            # predUniOp
+    // TODO i dont think this is right
+    | exp expComp exp     # predExprComp
+    | predLiteral         # predLiteral
+    ;
+
+predLiteral : TRUE | FALSE ;
+
+lpreds : 'L:' pred (',' pred)* ;
+gammas : 'Gamma:' gamma (',' gamma)* ;
+gamma:  (ID MAPSTO (LOW | HIGH));
+
+predBop : AND | OR | NEQ_PRED | EQ_PRED ;
+expComp : NEQ_PRED | EQ_PRED | GE | GT | LE | LT ;
+
+AND : '&&' ;
+OR : '||' ;
+NEQ_PRED : '!=' ;
+EQ_PRED : '==' ;
+
+TRUE: 'True' ;
+FALSE: 'False' ;
+
+HIGH : 'HIGH' ;
+LOW : 'LOW' ;
+
+MAPSTO : '->' ;

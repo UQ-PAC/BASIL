@@ -6,7 +6,7 @@ import java.util.Objects
 /** Binary operation fact
   */
 case class BinOp(
-    var operator: String,
+    operator: String,
     var firstExp: Expr,
     var secondExp: Expr
 ) extends Expr {

@@ -1,6 +1,6 @@
 package vcgen
 
-import facts.exp.{Bool, Expr, Var}
+import facts.exp.{Expr, Var}
 import translating.FlowGraph.Function
 
 // TODO overlap between this and the flow graph

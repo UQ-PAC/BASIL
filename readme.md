@@ -208,3 +208,8 @@ We want flow graphs to maintain particular properties or guarantees. Use FlowGra
  - Replace nulls with option where possible
  - Move over to scala collections
 
+## Setting up SBT
+
+The project uses the scala build tool (SBT) to build the project. For the most part this should *just work*, and there are intellij run files (located in the .run folder) which automatically compile and run the project.
+However, there are some issues when it comes to using the project in intellij. In particular, it is necassary to go into `target/scala-3.0.0/src_managed` and unmark `main` as a sources root folder. It may also be necassary
+to go into a java file and manually enabling `Highlight: All Problems` using the tick in the top right.
