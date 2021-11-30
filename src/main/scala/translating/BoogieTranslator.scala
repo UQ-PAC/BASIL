@@ -6,7 +6,6 @@ import facts.stmt.*
 import facts.parameters.{InParameter, OutParameter}
 import facts.{Fact, Label}
 import translating.FlowGraph
-
 import scala.collection.mutable.HashSet
 import java.io.{BufferedWriter, FileWriter, IOException}
 import java.util
@@ -32,7 +31,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   }
 
   private def createLabels(): Unit = {
-    val lines = flowGraph.getViewOfLines
+    val lines = flowGraph.getLines
     val usedLabels = new mutable.HashSet[String]
 
     // get all referred labels within the flow graph
@@ -60,7 +59,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     *   - {@link #createLabels ( )}
     */
   private def optimiseSkips(): Unit = {
-    flowGraph.getViewOfLines.forEach(line => {
+    flowGraph.getLines.forEach(line => {
       if (line.isInstanceOf[SkipStmt]) flowGraph.removeLine(line)
     })
   }
@@ -80,7 +79,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   private def identifyImplicitParams(): Unit = {
     flowGraph.getFunctions.forEach(function => {
         val params = function.getHeader.getInParams
-        val rootBlock = function.getRootBlock
+        val rootBlock = function.getBlocks.get(0)
         val assignedRegisters = new mutable.HashSet[Var]
 
       // TODO could neaten this further with case classes by combiling the nested matches
@@ -127,7 +126,10 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   /** Provides function calls with a list of the facts.parameters they will need to provide arguments for.
     */
   private def createCallArguments(func: EnterSub): Unit =
-    getCallsToFunction(func).forEach(call =>
+    flowGraph.getLines.asScala.filter(line => line match {
+      case callStmt: CallStmt if (callStmt.getFuncName == func.getFuncName) => true
+      case _ => false
+    }).asJava.asInstanceOf[List[CallStmt]].forEach(call =>
       func.getInParams.forEach((param: InParameter) => call.getArgs.add(param.getRegister))
     )
 
@@ -150,9 +152,9 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
 
       // remove all parameter initialisations from the first block
       val forRemoval: List[Stmt] = new ArrayList[Stmt]
-      val firstLines: List[Stmt] = function.getRootBlock.getLines
+      val rootBlock: FlowGraph.Block = function.getBlocks.get(0)
 
-      firstLines.forEach(line => {line match {
+      rootBlock.getLines.forEach(line => {line match {
         case store: Store => (store.getRhs, store.getLhs) match {
           case (rhs: Var, lhs: MemExpr) =>
             for (param <- paramsWithAliases) {
@@ -165,20 +167,21 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
         case _ =>
       }})
 
-      forRemoval.forEach(firstLines.remove)
+      forRemoval.forEach(rootBlock.removeLine)
 
       // replace all instances of the alias with the human readable parameter name
       for (param <- paramsWithAliases) {
-        function.getRootBlock.getLinesInCluster.forEach(line =>
+        function.getLines.forEach(line =>
           replaceAllMatchingChildren(line, param.getAlias, param.getName)
         )
       }
     })
   }
 
+  // todo: this seems to produce a list with duplicates
   private def getLocalVarsInFunction(function: FlowGraph.Function) = {
     val vars = new mutable.HashSet[Var]
-    function.getRootBlock.getLinesInCluster.forEach(line => {
+    function.getLines.forEach(line => {
       if (line.isInstanceOf[Load] || line.isInstanceOf[Move]) {
         val lhs = line.asInstanceOf[Assign].getLhs.asInstanceOf[Var]
         // TODO slow
@@ -208,14 +211,6 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     )
   }
 
-  // TODO not sure if we need this (could we rewrite createCallAgument)
-  private def getCallsToFunction(function: EnterSub): List[CallStmt] = {
-    flowGraph.getViewOfLines.asScala.filter(line => line match {
-      case callStmt: CallStmt if (callStmt.getFuncName == function.getFuncName) => true
-      case _ => false
-    }).asJava.asInstanceOf[List[CallStmt]]
-  }
-
   private def isRegister(varFact: Var): Boolean = varFact.getName.charAt(0) == 'X'
 
   /** Resolves outParams by crudely replacing all references to their associated register with their human-readable
@@ -226,7 +221,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
       val outParam: OutParameter = function.getHeader.getOutParam
       // TODO check will not be necassary if outparam is a scala class
       if (outParam != null)
-        function.getRootBlock.getLinesInCluster.forEach((line: Stmt) =>
+        function.getLines.forEach((line: Stmt) =>
           replaceAllMatchingChildren(
             line,
             outParam.getRegister,
@@ -237,7 +232,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
 
   private def resolveVars(): Unit =
     flowGraph.getFunctions.forEach(function =>
-      function.getRootBlock.getBlocksInCluster.forEach(block => constantPropagation(block.getLines))
+      function.getBlocks.forEach(block => constantPropagation(block))
     )
 
   // TODO this should be changed to use a fixed-point algorithm (to make it more accurate)
@@ -249,7 +244,8 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     * variables on the RHS, compute the value of the RHS, assign it to the values map and add the line for
     * pending-removal.
     */
-  private def constantPropagation(lines: List[Stmt]): Unit = { // these mapped ExpFacts are expected to only contain literals
+  private def constantPropagation(block: FlowGraph.Block): Unit = { // these mapped ExpFacts are expected to only contain literals
+    val lines: List[Stmt] = block.getLines
     val values = new HashMap[Var, Literal]
     // assignments that will be removed if the lhs variable is re-assigned later
     val pendingRemoval = new HashMap[Var, Assign]
@@ -268,7 +264,6 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
               }
             )
 
-            // TODO shouldnt the LHS always be a Var
             if (assignment.getLhs.isInstanceOf[Var]) {
               val variable: Var = assignment.getLhs.asInstanceOf[Var]
               if (pendingRemoval.containsKey(variable)) {
@@ -292,7 +287,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
         }
       }
     )
-    toRemove.forEach(lines.remove)
+    toRemove.forEach(block.removeLine)
   }
 
   private def computeLiteral(exp: Expr): String = exp.toString
