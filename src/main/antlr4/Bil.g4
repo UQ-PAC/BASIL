@@ -1,14 +1,12 @@
 grammar Bil;
 
-@header {
-  package BilParser;
-}
-
-bil : progdecl? function+ EOF;
+// TODO this assumes functions are declared contiguously. If this is not the case we are in trouble
+// TODO if this turns out to be the case it might be easier to parse in blocks (where a block is terminated by white space)
+bil : progdecl function+ EOF;
 function : sub 
          paramTypes*
-         (stmt)* 
-         endsub ;
+         (stmt)*
+         ;
 
 /* First line is always this */
 progdecl: addr ':' 'program';
@@ -20,10 +18,8 @@ paramTypes : addr ':' param '::' inout nat '=' var ;
 stmt : addr ':' 
        (assign|call|jmp|cjmp)?
      ;
-/* Calling with noreturn (probably) means exiting a function */
-endsub : addr ':' 'call' (('@' functionName)|var) 'with' 'noreturn';
 
-call : 'call' (('@' functionName)|var) 'with' returnaddr ;
+call : 'call' (('@' functionName)|var) 'with' (returnaddr | 'noreturn') ;
 
 assign : var ':=' exp ;
 exp : exp bop exp                                       #expBop

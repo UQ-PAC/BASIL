@@ -1,13 +1,12 @@
 package translating;
 
-import facts.exp.ExtractFact;
 import facts.parameters.InParameter;
 import facts.parameters.OutParameter;
 import facts.exp.*;
-import facts.inst.*;
-import facts.inst.Assign.LoadFact;
-import facts.inst.Assign.MoveFact;
-import facts.inst.Assign.StoreFact;
+import facts.stmt.*;
+import facts.stmt.Assign.Load;
+import facts.stmt.Assign.Move;
+import facts.stmt.Assign.Store;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.ErrorNode;
 import org.antlr.v4.runtime.tree.TerminalNode;
@@ -24,11 +23,11 @@ public class StatementLoader implements BilListener {
     // for generating unique labels
     int pcCount = 0;
 
-    public StatementLoader(List<InstFact> facts) {
-        this.facts = facts;
+    public StatementLoader(List<Stmt> stmts) {
+        this.stmts = stmts;
     }
 
-    private ExpFact parseExpression(BilParser.ExpContext ctx) {
+    private Expr parseExpression(BilParser.ExpContext ctx) {
         if (ctx == null) {
             return null;
         } else if (ctx.getClass().equals(BilParser.ExpBopContext.class)) {
@@ -45,7 +44,7 @@ public class StatementLoader implements BilListener {
             return parseCastExpression((BilParser.ExpCastContext) ctx);
         } else if (ctx.getClass().equals(BilParser.ExpLoadContext.class)) {
             // toReturn == null when this load is not a mem expression, which is currently not expected
-            ExpFact toReturn = parseLoadExpression((BilParser.ExpLoadContext) ctx);
+            Expr toReturn = parseLoadExpression((BilParser.ExpLoadContext) ctx);
             if (toReturn != null) {
                 return toReturn;
             }
@@ -56,50 +55,50 @@ public class StatementLoader implements BilListener {
         return null;
     }
 
-    private ExpFact parseBracketExpression(BilParser.ExpBracketContext ctx) {
+    private Expr parseBracketExpression(BilParser.ExpBracketContext ctx) {
         return parseExpression(ctx.exp());
     }
 
-    private BopFact parseBinaryOperation(BilParser.ExpBopContext ctx) {
-        ExpFact left = parseExpression(ctx.exp(0));
-        ExpFact right = parseExpression(ctx.exp(1));
+    private BinOp parseBinaryOperation(BilParser.ExpBopContext ctx) {
+        Expr left = parseExpression(ctx.exp(0));
+        Expr right = parseExpression(ctx.exp(1));
         String op = ctx.bop().getText();
         if (op.equals("=")) {
             op = "=="; // a little patching here, a little there...
         }
-        return new BopFact(op, left, right);
+        return new BinOp(op, left, right);
     }
 
-    private UopFact parseUnaryOperation(BilParser.ExpUopContext ctx) {
-        ExpFact exp = parseExpression(ctx.exp());
+    private UniOp parseUnaryOperation(BilParser.ExpUopContext ctx) {
+        Expr exp = parseExpression(ctx.exp());
         String op = ctx.uop().getText();
-        return new UopFact(op, exp);
+        return new UniOp(op, exp);
     }
 
-    private VarFact parseVariableExpression(BilParser.ExpVarContext ctx) {
-        return new VarFact(ctx.var().getText());
+    private Var parseVariableExpression(BilParser.ExpVarContext ctx) {
+        return new Var(ctx.var().getText());
     }
 
-    private LiteralFact parseLiteralExpression(BilParser.ExpLiteralContext ctx) {
-        return new LiteralFact(ctx.literal().getText());
+    private Literal parseLiteralExpression(BilParser.ExpLiteralContext ctx) {
+        return new Literal(ctx.literal().getText());
     }
 
     // fixme: assumes all bit vectors are 64 bits long
-    private ExtractFact parseExtractionExpression(BilParser.ExpExtractContext ctx) {
+    private Extract parseExtractionExpression(BilParser.ExpExtractContext ctx) {
         int firstNat = 64 - Integer.parseInt(ctx.nat(0).getText());
         int secondNat = 63 - Integer.parseInt(ctx.nat(1).getText());
-        ExpFact exp = parseExpression(ctx.exp());
-        return new ExtractFact(firstNat, secondNat, exp);
+        Expr exp = parseExpression(ctx.exp());
+        return new Extract(firstNat, secondNat, exp);
     }
 
-    private ExpFact parseCastExpression(BilParser.ExpCastContext ctx) {
+    private Expr parseCastExpression(BilParser.ExpCastContext ctx) {
         // simply unwrap and throw away casts
         return parseExpression(ctx.exp());
     }
 
-    private MemFact parseLoadExpression(BilParser.ExpLoadContext ctx) {
+    private MemExpr parseLoadExpression(BilParser.ExpLoadContext ctx) {
         if (ctx.exp(0).getText().equals("mem")) {
-            return new MemFact(parseExpression(ctx.exp(1)));
+            return new MemExpr(parseExpression(ctx.exp(1)));
         } else {
             return null;
         }
@@ -144,8 +143,8 @@ public class StatementLoader implements BilListener {
     public void enterSub(BilParser.SubContext ctx) {
         String address = ctx.addr().getText();
         String name = ctx.functionName().getText();
-        EnterSubFact function = new EnterSubFact(address, name);
-        facts.add(function);
+        EnterSub function = new EnterSub(address, name);
+        stmts.add(function);
 
         this.currentFunction = function;
     }
@@ -160,9 +159,9 @@ public class StatementLoader implements BilListener {
         String id = ctx.param().getText(); // human-readable name
         String variable = ctx.var().getText(); // some register, probably
         if (id.contains("result")) {
-            currentFunction.setOutParam(new OutParameter(new VarFact("out"), new VarFact(variable)));
+            currentFunction.setOutParam(new OutParameter(new Var("out"), new Var(variable)));
         } else {
-            currentFunction.getInParams().add(new InParameter(new VarFact(id), new VarFact(variable)));
+            currentFunction.getInParams().add(new InParameter(new Var(id), new Var(variable)));
         }
     }
 
@@ -181,22 +180,22 @@ public class StatementLoader implements BilListener {
             if (assignCtx.exp().getClass().equals(BilParser.ExpLoadContext.class)) {
                 // statement is a load assignment
                 BilParser.ExpLoadContext loadCtx = (BilParser.ExpLoadContext) assignCtx.exp();
-                VarFact lhs = new VarFact(loadCtx.exp(1).getText());
-                ExpFact rhs = parseExpression(loadCtx.exp(2));
+                Var lhs = new Var(loadCtx.exp(1).getText());
+                Expr rhs = parseExpression(loadCtx.exp(2));
                 if (rhs != null) { // null check is necessary as rhs may not exist for loads
-                    facts.add(new LoadFact(address, lhs, (MemFact) rhs));
+                    stmts.add(new Load(address, lhs, (MemExpr) rhs));
                 }
             } else if (assignCtx.exp().getClass().equals(BilParser.ExpStoreContext.class)) {
                 // statement is a store assignment
                 BilParser.ExpStoreContext storeCtx = (BilParser.ExpStoreContext) assignCtx.exp();
-                MemFact lhs = new MemFact(parseExpression(storeCtx.exp(1)));
-                ExpFact rhs = parseExpression(storeCtx.exp(2));
-                facts.add(new StoreFact(address, lhs, rhs));
+                MemExpr lhs = new MemExpr(parseExpression(storeCtx.exp(1)));
+                Expr rhs = parseExpression(storeCtx.exp(2));
+                stmts.add(new Store(address, lhs, rhs));
             } else {
                 // statement is a move assignment
-                VarFact lhs = new VarFact(assignCtx.var().getText());
-                ExpFact rhs = parseExpression(assignCtx.exp());
-                facts.add(new MoveFact(address, lhs, rhs));
+                Var lhs = new Var(assignCtx.var().getText());
+                Expr rhs = parseExpression(assignCtx.exp());
+                stmts.add(new Move(address, lhs, rhs));
             }
         } else if (ctx.jmp() != null) {
             // statement is a jump
@@ -206,43 +205,36 @@ public class StatementLoader implements BilListener {
             } else if (ctx.jmp().addr() != null) {
                 target = ctx.jmp().addr().getText();
             }
-            facts.add(new JmpFact(address, target));
+            stmts.add(new JmpStmt(address, target));
         } else if (ctx.cjmp() != null) {
             // statement is a conditional jump
-            VarFact cond = new VarFact(ctx.cjmp().var().getText()); // conditions are always vars
+            Var cond = new Var(ctx.cjmp().var().getText()); // conditions are always vars
             String target = ctx.cjmp().addr().getText();
-            facts.add(new CjmpFact(address, target, cond));
+            stmts.add(new CJmpStmt(address, target, cond));
         } else if (ctx.call() != null) {
             // statement is a call
-            System.out.println(ctx.addr().getText());
             if (ctx.call().functionName() == null) {
                 // occasionally this occurs with "call LR with no return" lines
-                facts.add(new ExitSubFact(ctx.addr().getText()));
+                stmts.add(new ExitSub(ctx.addr().getText()));
             } else {
                 String funcName = ctx.call().functionName().getText();
-                String returnAddr = ctx.call().returnaddr().addr().getText();
-                facts.add(new CallFact(address, funcName));
-                facts.add(new JmpFact(uniquePc(), returnAddr));
+                String returnAddr = null;
+                if (ctx.call().returnaddr().addr() != null) {
+                    returnAddr = ctx.call().returnaddr().addr().getText();
+                }
+                stmts.add(new CallStmt(address, funcName));
+
+                // handle the case of no return
+                if (returnAddr != null) stmts.add(new JmpStmt(uniquePc(), returnAddr));
             }
         } else {
             // this statement is empty
-            facts.add(new NopFact(address));
+            stmts.add(new SkipStmt(address));
         }
     }
 
     @Override
     public void exitStmt(BilParser.StmtContext ctx) {
-
-    }
-
-    @Override
-    public void enterEndsub(BilParser.EndsubContext ctx) {
-        String address = ctx.addr().getText();
-        facts.add(new ExitSubFact(address));
-    }
-
-    @Override
-    public void exitEndsub(BilParser.EndsubContext ctx) {
 
     }
 

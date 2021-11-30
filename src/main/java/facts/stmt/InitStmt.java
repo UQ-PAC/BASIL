@@ -1,52 +1,45 @@
-package facts.inst;
+package facts.stmt;
 
-import facts.exp.ExpFact;
-import facts.exp.VarFact;
-import facts.Fact;
-import java.util.Arrays;
+import facts.exp.Var;
 import java.util.Collections;
 import java.util.List;
+import facts.exp.Expr;
 
-public class InitFact extends InstFact {
-    private VarFact variable;
+public class InitStmt extends Stmt {
+    private Var variable;
     private String type;
 
     // TODO: create a none label and use that here
-    public InitFact(VarFact variable, String label) {
+    public InitStmt(Var variable, String label) {
         super(label);
         this.variable = variable;
         this.type = "int";
     }
 
-    public InitFact(VarFact variable, String label, String type) {
+    public InitStmt(Var variable, String label, String type) {
         super(label);
         this.variable = variable;
         this.type = type;
     }
 
-    public VarFact getVariable() {
+    public Var getVariable() {
         return variable;
     }
 
-    public void setVariable(VarFact variable) {
+    public void setVariable(Var variable) {
         this.variable = variable;
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return Collections.singletonList(variable);
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {
+    public void replace(Expr oldExp, Expr newExp) {
         if (variable.equals(oldExp)) {
-            variable = (VarFact) newExp;
+            variable = (Var) newExp;
         }
-    }
-
-    @Override
-    public List<Fact> toFactList() {
-        return Arrays.asList(this, variable);
     }
 
     @Override

@@ -202,5 +202,9 @@ We want flow graphs to maintain particular properties or guarantees. Use FlowGra
  - Reading globals from the symbol table and global offset table
  - Using the call graph
  - Generate the verification conditions
- - Use bitvectors (so we can have element-wise operators e.g. for the loops sample)
+ - Use bitvectors (so we can have element-wise operators e.g. for the loops sample). This would be pretty self contained I hope
+ - On a related note, add a proper type system
  - Fix jumps (need to properly handle jumps to functions, calls with no return)
+ - Replace nulls with option where possible
+ - Move over to scala collections
+

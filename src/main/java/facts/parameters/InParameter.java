@@ -1,21 +1,21 @@
 package facts.parameters;
 
-import facts.exp.MemFact;
-import facts.exp.VarFact;
+import facts.exp.Var;
+import facts.exp.MemExpr;
 
 public class InParameter extends Parameter {
 
-    private MemFact alias;
+    private MemExpr alias;
 
-    public InParameter(VarFact name, VarFact register) {
+    public InParameter(Var name, Var register) {
         super(name, register);
     }
 
-    public MemFact getAlias() {
+    public MemExpr getAlias() {
         return alias;
     }
 
-    public void setAlias(MemFact alias) {
+    public void setAlias(MemExpr alias) {
         this.alias = alias;
     }
 }

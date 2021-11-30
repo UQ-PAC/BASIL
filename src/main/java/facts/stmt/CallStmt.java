@@ -1,25 +1,23 @@
-package facts.inst;
+package facts.stmt;
 
-import facts.exp.ExpFact;
-import facts.Fact;
-import facts.exp.VarFact;
+import facts.exp.Var;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import facts.exp.Expr;
 
-public class CallFact extends InstFact {
+public class CallStmt extends Stmt {
 
     private String funcName;
-    private List<VarFact> args = new ArrayList<>();
-    private ExpFact lhs;
+    private List<Var> args = new ArrayList<>();
+    private Expr lhs;
 
-    public CallFact(String pc, String funcName) {
+    public CallStmt(String pc, String funcName) {
         super(pc);
         this.funcName = funcName;
         this.lhs = null;
     }
 
-    public void setLHS (ExpFact lhs) {
+    public void setLHS (Expr lhs) {
         this.lhs = lhs;
     }
 
@@ -31,16 +29,12 @@ public class CallFact extends InstFact {
         this.funcName = funcName;
     }
 
-    public List<VarFact> getArgs() {
+    public List<Var> getArgs() {
         return args;
     }
 
-    public void setArgs(List<VarFact> args) {
+    public void setArgs(List<Var> args) {
         this.args = args;
-    }
-
-    public List<Fact> toFactList() {
-        return Collections.singletonList(this);
     }
 
     @Override
@@ -51,15 +45,15 @@ public class CallFact extends InstFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return new ArrayList<>(args);
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {
+    public void replace(Expr oldExp, Expr newExp) {
         for (int i = 0; i < args.size(); i++) {
             if (args.get(i).equals(oldExp)) {
-                args.set(i, (VarFact) newExp);
+                args.set(i, (Var) newExp);
             }
         }
     }

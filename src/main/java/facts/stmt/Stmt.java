@@ -1,4 +1,4 @@
-package facts.inst;
+package facts.stmt;
 
 import facts.Fact;
 import facts.Label;
@@ -7,11 +7,11 @@ import java.util.List;
 /**
  * Generic instruction fact
  */
-public abstract class InstFact extends Fact {
+public abstract class Stmt extends Fact {
 
     private Label label;
 
-    public InstFact(String pc) {
+    public Stmt(String pc) {
         label = new Label(pc);
     }
 
@@ -23,5 +23,4 @@ public abstract class InstFact extends Fact {
         this.label = label;
     }
 
-    public abstract List<Fact> toFactList();
 }

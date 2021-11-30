@@ -1,6 +1,6 @@
 package translating;
 
-import facts.inst.InstFact;
+import facts.stmt.Stmt;
 import com.brunomnsilva.smartgraph.graph.Digraph;
 import com.brunomnsilva.smartgraph.graph.DigraphEdgeList;
 import com.brunomnsilva.smartgraph.graphview.SmartCircularSortedPlacementStrategy;
@@ -29,7 +29,7 @@ public class FlowGraphVisualiser extends Application {
     public void start(Stage primaryStage) {
         BilLexer bilLexer;
         try {
-            bilLexer = new BilLexer(CharStreams.fromFileName("Samples/ThatCompile/loops/loops_stripped.bil"));
+            bilLexer = new BilLexer(CharStreams.fromFileName("samples/that_compile/loops/loops_stripped.bil"));
         } catch (IOException e) {
             System.err.println("File not found.");
             throw new AssertionError();
@@ -38,12 +38,12 @@ public class FlowGraphVisualiser extends Application {
         BilParser parser = new BilParser(tokens);
         parser.setBuildParseTree(true);
         BilParser.BilContext b = parser.bil();
-        List<InstFact> facts = new ArrayList<>();
+        List<Stmt> facts = new ArrayList<>();
         StatementLoader statementLoader = new StatementLoader(facts);
         ParseTreeWalker walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 
-        FlowGraph flowGraph = FlowGraph.fromFactsList(facts);
+        FlowGraph flowGraph = FlowGraph.fromStmts(facts);
         Digraph<FlowGraph.Block, String> g = new DigraphEdgeList<>();
         for (FlowGraph.Function function : flowGraph.getFunctions()) {
             for (FlowGraph.Block block : function.getRootBlock().getBlocksInCluster()) {

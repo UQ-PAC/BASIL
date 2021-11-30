@@ -1,19 +1,18 @@
-package facts.inst;
+package facts.stmt;
 
-import facts.exp.ExpFact;
-import facts.Fact;
 import facts.parameters.InParameter;
+import facts.exp.Expr;
 import facts.parameters.OutParameter;
 import java.util.*;
 
-public class EnterSubFact extends InstFact {
+public class EnterSub extends Stmt {
 
     private String funcName;
     private List<InParameter> inParams;
     private OutParameter outParam;
     private List<String> modifies; // TODO type
 
-    public EnterSubFact(String pc, String funcName) {
+    public EnterSub(String pc, String funcName) {
         super(pc);
         this.funcName = funcName;
         inParams = new ArrayList<>();
@@ -21,20 +20,8 @@ public class EnterSubFact extends InstFact {
         modifies.add("mem");
     }
 
-    public String getFuncName() {
-        return funcName;
-    }
-
-    public void setFuncName(String funcName) {
-        this.funcName = funcName;
-    }
-
     public List<InParameter> getInParams() {
         return inParams;
-    }
-
-    public void setInParams(List<InParameter> inParams) {
-        this.inParams = inParams;
     }
 
     public OutParameter getOutParam() {
@@ -45,8 +32,8 @@ public class EnterSubFact extends InstFact {
         this.outParam = outParam;
     }
 
-    public List<Fact> toFactList() {
-        return Collections.singletonList(this);
+    public String getFuncName() {
+        return funcName;
     }
 
     @Override
@@ -81,10 +68,10 @@ public class EnterSubFact extends InstFact {
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return new ArrayList<>();
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {}
+    public void replace(Expr oldExp, Expr newExp) {}
 }

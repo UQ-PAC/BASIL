@@ -1,18 +1,17 @@
-package facts.inst;
+package facts.stmt;
 
-import facts.exp.ExpFact;
-import facts.Fact;
 import java.util.ArrayList;
 import java.util.List;
+import facts.exp.Expr;
 
 /**
  * Jump
  */
-public class JmpFact extends InstFact {
+public class JmpStmt extends Stmt {
 
     private String target;
 
-    public JmpFact(String pc, String target) {
+    public JmpStmt(String pc, String target) {
         super(pc);
         this.target = target;
     }
@@ -25,22 +24,16 @@ public class JmpFact extends InstFact {
         this.target = target;
     }
 
-    public List<Fact> toFactList() {
-        List<Fact> factList = new ArrayList<>();
-        factList.add(this);
-        return factList;
-    }
-
     @Override
     public String toString() {
         return String.format("%sgoto label%s;", getLabel(), target);
     }
 
     @Override
-    public List<ExpFact> getChildren() {
+    public List<Expr> getChildren() {
         return new ArrayList<>();
     }
 
     @Override
-    public void replace(ExpFact oldExp, ExpFact newExp) {}
+    public void replace(Expr oldExp, Expr newExp) {}
 }
