@@ -31,7 +31,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   }
 
   private def createLabels(): Unit = {
-    val lines = flowGraph.getViewOfLines
+    val lines = flowGraph.getLines
     val usedLabels = new mutable.HashSet[String]
 
     // get all referred labels within the flow graph
@@ -59,7 +59,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     *   - {@link #createLabels ( )}
     */
   private def optimiseSkips(): Unit = {
-    flowGraph.getViewOfLines.forEach(line => {
+    flowGraph.getLines.forEach(line => {
       if (line.isInstanceOf[SkipStmt]) flowGraph.removeLine(line)
     })
   }
@@ -126,7 +126,10 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   /** Provides function calls with a list of the facts.parameters they will need to provide arguments for.
     */
   private def createCallArguments(func: EnterSub): Unit =
-    getCallsToFunction(func).forEach(call =>
+    flowGraph.getLines.asScala.filter(line => line match {
+      case callStmt: CallStmt if (callStmt.getFuncName == func.getFuncName) => true
+      case _ => false
+    }).asJava.asInstanceOf[List[CallStmt]].forEach(call =>
       func.getInParams.forEach((param: InParameter) => call.getArgs.add(param.getRegister))
     )
 
@@ -206,14 +209,6 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
         function.addInitStmt(new InitStmt(localVar, uniqueLabel))
       }
     )
-  }
-
-  // TODO not sure if we need this (could we rewrite createCallAgument)
-  private def getCallsToFunction(function: EnterSub): List[CallStmt] = {
-    flowGraph.getViewOfLines.asScala.filter(line => line match {
-      case callStmt: CallStmt if (callStmt.getFuncName == function.getFuncName) => true
-      case _ => false
-    }).asJava.asInstanceOf[List[CallStmt]]
   }
 
   private def isRegister(varFact: Var): Boolean = varFact.getName.charAt(0) == 'X'

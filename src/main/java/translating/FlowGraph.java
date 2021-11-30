@@ -69,7 +69,7 @@ public class FlowGraph {
     /**
      * @return all lines of all blocks within this flow graph
      */
-    public List<Stmt> getViewOfLines() {
+    public List<Stmt> getLines() {
         List<Stmt> lines = new ArrayList<>();
         getBlocks().forEach(block -> lines.addAll(block.getLines()));
         return lines;
@@ -119,7 +119,7 @@ public class FlowGraph {
      * A complete traversal of a flow graph should encounter no line twice, or no line with the same PC twice.
      */
     private void enforceUniqueLines() {
-        List<Stmt> linesList = getViewOfLines();
+        List<Stmt> linesList = getLines();
         List<String> pcList = new ArrayList<>();
         linesList.forEach(line -> pcList.add(line.getLabel().getPc()));
         Set<Stmt> linesSet = new HashSet<>(linesList);
