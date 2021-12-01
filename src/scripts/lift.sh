@@ -8,8 +8,7 @@ echo Lifting "$1"...
 echo Compiling to a.out...
 aarch64-linux-gnu-gcc -fno-plt -fno-pic "$1"
 echo Lifting to "$2"...
-sudo docker run binaryanalysisplatform/bap:latest bap a.out -d > "$2"
-echo Deleting a.out
-rm a.out
+bap a.out -d > "$2"
+
 echo Done
 
