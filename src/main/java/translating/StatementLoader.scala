@@ -22,12 +22,10 @@ import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}
 import FlowGraph.Function
 import facts.pred
-
 import java.util
 import BilParser.*
 import facts.pred.{Bool, ExprComp, High, Low, Pred, Security}
 import vcgen.State
-
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
