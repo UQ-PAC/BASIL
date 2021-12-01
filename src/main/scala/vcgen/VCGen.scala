@@ -1,12 +1,12 @@
 package vcgen
 
-import facts.exp.{BinOp, Expr, Literal, Var}
+import astnodes.exp.{BinOp, Expr, Literal, Var}
 import facts.stmt.Assign.Assign
 import facts.stmt.{Assert, CJmpStmt, Stmt}
 import translating.FlowGraph
 
 import collection.JavaConverters.*
-import facts.pred.{Bool, Pred}
+import astnodes.pred.{Bool, Pred}
 
 object VCGen {
   def genVCs(flowGraph: FlowGraph): List[Stmt] = {

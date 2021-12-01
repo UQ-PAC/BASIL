@@ -1,6 +1,6 @@
 package facts.stmt;
 
-import facts.exp.Expr;
+import astnodes.exp.Expr;
 import java.util.ArrayList;
 import java.util.List;
 

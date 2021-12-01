@@ -1,6 +1,6 @@
 package facts;
 
-import facts.exp.Expr;
+import astnodes.exp.Expr;
 import java.util.List;
 
 // TODO remove this (any reference to fact can really be a reference to stmt or exp)

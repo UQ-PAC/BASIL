@@ -1,4 +1,4 @@
-package facts.pred
+package astnodes.pred
 
 sealed trait Security extends Ordered[Security] {
   def compare(that: Security): Int =

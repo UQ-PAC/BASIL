@@ -2,8 +2,8 @@ package facts.stmt;
 
 import java.util.Collections;
 import java.util.List;
-import facts.exp.Expr;
-import facts.exp.Var;
+import astnodes.exp.Expr;
+import astnodes.exp.Var;
 
 /**
  * Conditional Jump fact

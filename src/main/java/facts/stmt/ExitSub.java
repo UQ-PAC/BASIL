@@ -1,7 +1,7 @@
 package facts.stmt;
 
 import java.util.ArrayList;
-import facts.exp.Expr;
+import astnodes.exp.Expr;
 import java.util.List;
 
 public class ExitSub extends Stmt {

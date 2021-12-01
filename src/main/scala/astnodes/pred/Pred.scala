@@ -1,6 +1,10 @@
-package facts.pred
+package astnodes.pred
 
-trait Pred {}
+import astnodes.exp.Var
+
+trait Pred {
+  def vars: List[Var]
+}
 
 /** Define custom methods for List[Expr]
   */

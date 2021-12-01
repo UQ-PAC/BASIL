@@ -1,10 +1,10 @@
 package translating;
 
-import facts.exp.Var;
+import astnodes.exp.Var;
 import facts.stmt.*;
 import facts.stmt.Assign.Assign;
-import facts.stmt.Assign.Move;
-import Util.AssumptionViolationException;
+import facts.stmt.Assign.RegisterAssign;
+import util.AssumptionViolationException;
 import java.util.*;
 
 /**
@@ -233,10 +233,10 @@ public class FlowGraph {
         // TODO can this be moved to StatementLoader?
         private static List<Stmt> setFunctionsWithReturns (List<Stmt> stmts) {
             for (int i = 0; i < stmts.size(); i++) {
-                if (!(stmts.get(i) instanceof CallStmt) || !(stmts.get(i + 1) instanceof JmpStmt) || !(stmts.get(i + 3) instanceof Move)) continue;
+                if (!(stmts.get(i) instanceof CallStmt) || !(stmts.get(i + 1) instanceof JmpStmt) || !(stmts.get(i + 3) instanceof RegisterAssign)) continue;
                 CallStmt call = (CallStmt) stmts.get(i);
                 JmpStmt cjmp = (JmpStmt) stmts.get(i + 1);
-                Assign assign = (Move) stmts.get(i + 3);
+                Assign assign = (RegisterAssign) stmts.get(i + 3);
 
                 if (cjmp.getTarget().equals(stmts.get(i + 1).getLabel().getPc())) throw new AssumptionViolationException("Expected jump to next line");
 
@@ -494,6 +494,10 @@ public class FlowGraph {
             this.label = label;
             this.lines = lines;
             this.children = children;
+        }
+
+        public String getLabel() {
+            return label;
         }
 
         /**

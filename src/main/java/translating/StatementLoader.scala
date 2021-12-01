@@ -13,20 +13,18 @@ import BilParser.BilParser.PredUniOpContext
 import BilParser.BilParser.ProgSpecContext
 import facts.parameters.InParameter
 import facts.parameters.OutParameter
-import facts.exp.*
+import astnodes.exp.*
 import facts.stmt.*
-import facts.stmt.Assign.Load
-import facts.stmt.Assign.Move
-import facts.stmt.Assign.Store
+import facts.stmt.Assign.{RegisterAssign, MemAssign}
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}
 import FlowGraph.Function
-import facts.pred
+import astnodes.pred
 
-import java.util
 import BilParser.*
-import facts.pred.{Bool, ExprComp, High, Low, Pred, Security}
+import astnodes.pred.{Bool, ExprComp, High, Low, Pred, Security}
 import vcgen.State
+import util.AssumptionViolationException
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -80,23 +78,36 @@ class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
 // statements can be assignments, jumps, conditional jumps or function calls
     if (ctx.assign != null) { // statement is assignment; check which type
       val assignCtx = ctx.assign
+      val LHS = getExpr(assignCtx.`var`)
+      val RHS = getExpr(assignCtx.exp)
+
+      stmts += ((LHS, RHS) match {
+        case (v: Var, m: MemStore) =>
+          if (v.name == "mem") new MemAssign(address, new MemLoad(m.loc), m.expr)
+          else throw new AssumptionViolationException("expected mem for memstore")
+        case (v: Var, _) => new RegisterAssign(address, v, RHS)
+        case _ => throw new AssumptionViolationException("Unexpected expression")
+      })
+
+      /*
       if (assignCtx.exp.getClass == classOf[BilParser.ExpLoadContext]) { // statement is a load assignment
         val loadCtx = assignCtx.exp.asInstanceOf[BilParser.ExpLoadContext]
-        val lhs = new Var(loadCtx.exp(1).getText)
-        val rhs = getExpr(loadCtx.exp(2))
+        val lhs = new Var(loadCtx.exp(0).getText)
+        val rhs = getExpr(loadCtx.exp(1))
         if (rhs != null) { // null check is necessary as rhs may not exist for loads
           stmts += new Load(address, lhs, rhs.asInstanceOf[MemExpr])
         }
       } else if (assignCtx.exp.getClass == classOf[BilParser.ExpStoreContext]) { // statement is a store assignment
         val storeCtx = assignCtx.exp.asInstanceOf[BilParser.ExpStoreContext]
-        val lhs = new MemExpr(getExpr(storeCtx.exp(1)))
-        val rhs = getExpr(storeCtx.exp(2))
+        val lhs = new MemExpr(getExpr(storeCtx.exp(0)))
+        val rhs = getExpr(storeCtx.exp(1))
         stmts += new Store(address, lhs, rhs)
       } else { // statement is a move assignment
         val lhs = new Var(assignCtx.`var`.getText)
         val rhs = getExpr(assignCtx.exp)
         stmts += new Move(address, lhs, rhs)
       }
+      */
     } else if (ctx.jmp != null) { // statement is a jump
       var target = ""
       if (ctx.jmp.`var` != null) target = ctx.jmp.`var`.getText
@@ -135,11 +146,16 @@ class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
     exprs.put(ctx, new Extract(firstNat, secondNat, exp))
   }
   override def exitExpCast(ctx: BilParser.ExpCastContext): Unit = exprs.put(ctx, getExpr(ctx.exp)) // simply unwrap and throw away casts
-  override def exitExpLoad(ctx: BilParser.ExpLoadContext): Unit = if (ctx.exp(0).getText == "mem") exprs.put(ctx, new MemExpr(getExpr(ctx.exp(1))))
+  override def exitExpLoad(ctx: BilParser.ExpLoadContext): Unit =
+    if (ctx.exp(0).getText == "mem") exprs.put(ctx, new MemLoad(getExpr(ctx.exp(1))))
+    else throw new AssumptionViolationException("Found load on variable other than mem")
+  override def exitExpStore(ctx: BilParser.ExpStoreContext): Unit =
+    if (ctx.exp(0).getText == "mem") exprs.put(ctx, new MemStore(getExpr(ctx.exp(1)), getExpr(ctx.exp(2))))
+    else throw new AssumptionViolationException("Found store on variable other than mem")
 
 
-  override def exitPredBinOp(ctx: PredBinOpContext): Unit = preds.put(ctx, new pred.BinOp(ctx.predBop.getText, getPred(ctx.pred(0)), getPred(ctx.pred(1))))
-  override def exitPredUniOp(ctx: PredUniOpContext): Unit = preds.put(ctx, new pred.UniOp(ctx.uop.getText, getPred(ctx.pred)))
+  override def exitPredBinOp(ctx: PredBinOpContext): Unit = preds.put(ctx, new astnodes.pred.BinOp(ctx.predBop.getText, getPred(ctx.pred(0)), getPred(ctx.pred(1))))
+  override def exitPredUniOp(ctx: PredUniOpContext): Unit = preds.put(ctx, new astnodes.pred.UniOp(ctx.uop.getText, getPred(ctx.pred)))
   override def exitPredBracket(ctx: PredBracketContext): Unit = preds.put(ctx, getPred(ctx.pred))
   override def exitPredExprComp(ctx: PredExprCompContext): Unit = preds.put(ctx, new ExprComp(ctx.expComp.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
   override def exitPredLiteral(ctx: BilParser.PredLiteralContext): Unit = preds.put(ctx, ctx.getText match {
