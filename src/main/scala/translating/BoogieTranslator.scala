@@ -1,7 +1,7 @@
 package translating
 
-import facts.exp.{Expr, Literal, MemExpr, Var}
-import facts.stmt.Assign.{Assign, Load, Move, Store}
+import astnodes.exp.{Expr, Literal, MemLoad, Var}
+import facts.stmt.Assign.{Assign, RegisterAssign, MemAssign}
 import facts.stmt.*
 import facts.parameters.{InParameter, OutParameter}
 import facts.{Fact, Label}
@@ -27,6 +27,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     resolveOutParams()
     resolveVars()
     addVarDeclarations()
+    // TODO vcgen happens here
     writeToFile()
   }
 
@@ -84,10 +85,10 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
 
       // TODO could neaten this further with case classes by combiling the nested matches
         rootBlock.getLines.forEach(line => {line match {
-          case store: Store => store.getRhs match {
+          case store: MemAssign => store.getRhs match {
             case rhsVar: Var if (isRegister(rhsVar) && assignedRegisters.contains(rhsVar)) =>
               val param = new InParameter(new Var(uniqueVarName), rhsVar)
-              param.setAlias(store.getLhs.asInstanceOf[MemExpr])
+              param.setAlias(store.getLhs.asInstanceOf[MemLoad])
               params.add(param)
             case _ =>
           }
@@ -155,8 +156,8 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
       val rootBlock: FlowGraph.Block = function.getBlocks.get(0)
 
       rootBlock.getLines.forEach(line => {line match {
-        case store: Store => (store.getRhs, store.getLhs) match {
-          case (rhs: Var, lhs: MemExpr) =>
+        case store: MemAssign => (store.getRhs, store.getLhs) match {
+          case (rhs: Var, lhs: MemLoad) =>
             for (param <- paramsWithAliases) {
               if (param.getAlias == lhs && param.getRegister == rhs)
                 forRemoval.add(line)
@@ -182,7 +183,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   private def getLocalVarsInFunction(function: FlowGraph.Function) = {
     val vars = new mutable.HashSet[Var]
     function.getLines.forEach(line => {
-      if (line.isInstanceOf[Load] || line.isInstanceOf[Move]) {
+      if (line.isInstanceOf[RegisterAssign]) {
         val lhs = line.asInstanceOf[Assign].getLhs.asInstanceOf[Var]
         // TODO slow
         if (
@@ -251,42 +252,39 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     val pendingRemoval = new HashMap[Var, Assign]
     // list of lines that will be removed once the loop exits
     val toRemove = new ArrayList[Assign]
-    lines.forEach(line => {
-        // with the exception of the lhs of assignments, replace any instances of variables with their mapped values
-        // note that we don't make an exception for store assignments because their lhs is always a memFact, not var
-        line match {
-          case assignment: Assign => {
-            // if this is an assignment, remove any assignments that pending removal, that contain this lhs
-            values.keySet.forEach(variable => {
-                // since we can't call replaceAllMatchingChildren on the whole line, we have to perform it on the rhs manually
-                replaceAllMatchingChildren(assignment.getRhs, variable, values.get(variable))
-                if (assignment.getRhs == variable) assignment.replace(variable, values.get(variable))
-              }
-            )
+    lines.forEach {
+      // with the exception of the lhs of assignments, replace any instances of variables with their mapped values
+      // note that we don't make an exception for store assignments because their lhs is always a memFact, not var
+      case assignment: Assign => {
+        // if this is an assignment, remove any assignments that pending removal, that contain this lhs
+        values.keySet.forEach(variable => {
+          // since we can't call replaceAllMatchingChildren on the whole line, we have to perform it on the rhs manually
+          replaceAllMatchingChildren(assignment.getRhs, variable, values.get(variable))
+          if (assignment.getRhs == variable) assignment.replace(variable, values.get(variable))
+        }
+        )
 
-            if (assignment.getLhs.isInstanceOf[Var]) {
-              val variable: Var = assignment.getLhs.asInstanceOf[Var]
-              if (pendingRemoval.containsKey(variable)) {
-                toRemove.add(pendingRemoval.get(variable))
-                pendingRemoval.remove(variable)
-              }
-
-              /* if the result has no variables on the rhs, compute the value of the rhs, assign it to
-                              the values map and add the line for pending-removal */
-              assignment.getRhs match {
-                case lit: Literal =>
-                  val computed = computeLiteral(lit)
-                  val newLiteral: Literal = new Literal(computed) // TODO are these two lines necassary
-                  values.put(variable, newLiteral)
-                  pendingRemoval.put(variable, assignment)
-                case _ => // skip
-              }
-            }
+        if (assignment.getLhs.isInstanceOf[Var]) {
+          val variable: Var = assignment.getLhs.asInstanceOf[Var]
+          if (pendingRemoval.containsKey(variable)) {
+            toRemove.add(pendingRemoval.get(variable))
+            pendingRemoval.remove(variable)
           }
-          case _ => values.forEach((variable: Var, literal: Literal) => replaceAllMatchingChildren(line, variable, literal))
+
+          /* if the result has no variables on the rhs, compute the value of the rhs, assign it to
+                          the values map and add the line for pending-removal */
+          assignment.getRhs match {
+            case lit: Literal =>
+              val computed = computeLiteral(lit)
+              val newLiteral: Literal = new Literal(computed) // TODO are these two lines necassary
+              values.put(variable, newLiteral)
+              pendingRemoval.put(variable, assignment)
+            case _ => // skip
+          }
         }
       }
-    )
+      case line => values.forEach((variable: Var, literal: Literal) => replaceAllMatchingChildren(line, variable, literal))
+    }
     toRemove.forEach(block.removeLine)
   }
 

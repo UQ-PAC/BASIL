@@ -1,9 +1,9 @@
 package facts.stmt;
 
-import facts.exp.Var;
+import astnodes.exp.Var;
 import java.util.Collections;
 import java.util.List;
-import facts.exp.Expr;
+import astnodes.exp.Expr;
 
 public class InitStmt extends Stmt {
     private Var variable;

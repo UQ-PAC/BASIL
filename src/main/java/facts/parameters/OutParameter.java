@@ -1,5 +1,5 @@
 package facts.parameters;
-import facts.exp.Var;
+import astnodes.exp.Var;
 
 public class OutParameter extends Parameter {
 
