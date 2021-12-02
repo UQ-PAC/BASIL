@@ -12,16 +12,18 @@ class Worklist(analyses: Set[LatticeElement], controlFlow: FlowGraph) {
     private var map: HashMap[Stmt, Set[LatticeElement]] = ???;
     private var worklist: Iterator[Stmt] = ???;
     private var lastPoint: Stmt = ???; // first point?
-    
-    def work = {
+
+    def Worklist(analyses: Set[LatticeElement], controlFlow: FlowGraph) = {
         initLastMapping(analyses);
         worklist = topoSort(controlFlow);
-
+    }
+    
+    def work = {
         while (worklist.hasNext) {
-            pointUpdate; 
+            pointUpdate;
         }
     }
-
+    
     def overallState: HashMap[Stmt, Set[LatticeElement]] = {
         return this.map;
     }
@@ -46,14 +48,12 @@ class Worklist(analyses: Set[LatticeElement], controlFlow: FlowGraph) {
     }
 
     /**
-     *
-     */ 
+     * Handles a single update of the next program point.
+     */
     private def pointUpdate = {
         var nextPoint: Stmt = this.worklist.next;
-
+        
         this.map = this.map + (nextPoint -> this.map.getOrElse(this.lastPoint, Set[LatticeElement]()).map((a: LatticeElement) => a.transferAndCheck(nextPoint)));
-
-        // check that monotonicity is maintained using compare();
 
         this.lastPoint = nextPoint;
     }
