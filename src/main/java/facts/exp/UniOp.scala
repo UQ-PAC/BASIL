@@ -12,4 +12,15 @@ class UniOp(var operator: String, var exp: Expr) extends Expr {
   override def replace(oldExp: Expr, newExp: Expr) = if (exp == oldExp) exp = newExp
 
   override def vars: List[Var] = exp.vars
+
+  object Operator extends Enumeration {
+    type Operator = Value
+    val UnaryNegation: Operator = Value("!")
+    val BitwiseComplement: Operator = Value("~") // todo
+
+    def fromBil(bilStr: String): Value = bilStr match {
+      case "-" => UnaryNegation
+      case "~" => BitwiseComplement
+    }
+  }
 }
