@@ -6,14 +6,14 @@ import scala.jdk.CollectionConverters.IteratorHasAsScala;
 
 import facts.stmt.Stmt;
 import translating.FlowGraph;
-import analysis.LatticeElement;
+import analysis.AnalysisPoint;
 
-class Worklist(analyses: Set[LatticeElement], controlFlow: FlowGraph) {
-    private var map: HashMap[Stmt, Set[LatticeElement]] = ???;
+class Worklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
+    private var map: HashMap[Stmt, Set[AnalysisPoint[_]]] = ???;
     private var worklist: Iterator[Stmt] = ???;
-    private var lastPoint: Stmt = ???; // first point?
+    private var lastPoint: Stmt = ???; // what is the -1'th stmt in a program and how do we make this work
 
-    def Worklist(analyses: Set[LatticeElement], controlFlow: FlowGraph) = {
+    def Worklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) = {
         initLastMapping(analyses);
         worklist = topoSort(controlFlow);
     }
@@ -24,12 +24,12 @@ class Worklist(analyses: Set[LatticeElement], controlFlow: FlowGraph) {
         }
     }
     
-    def overallState: HashMap[Stmt, Set[LatticeElement]] = {
+    def overallState: HashMap[Stmt, Set[AnalysisPoint[_]]] = {
         return this.map;
     }
 
-    def pointState(stmt: Stmt): Set[LatticeElement] = {
-        return this.map.getOrElse(stmt, Set[LatticeElement]());
+    def pointState(stmt: Stmt): Set[AnalysisPoint[_]] = {
+        return this.map.getOrElse(stmt, Set[AnalysisPoint[_]]());
     }
 
     /**
@@ -43,8 +43,8 @@ class Worklist(analyses: Set[LatticeElement], controlFlow: FlowGraph) {
      * Sets the most recent control-flow point of the analysis to be the "nothing" state for every lattice.
      * Should only be called at the start of the analysis so we have a base map to work off.
      */
-    private def initLastMapping(analyses: Set[LatticeElement]) = {
-        this.map = this.map + (this.lastPoint -> analyses.map((a: LatticeElement) => a.createLowest()));
+    private def initLastMapping(analyses: Set[AnalysisPoint[_]]) = {
+        this.map = this.map + (this.lastPoint -> analyses.map((a: AnalysisPoint[_]) => a.createLowest()));
     }
 
     /**
@@ -53,7 +53,7 @@ class Worklist(analyses: Set[LatticeElement], controlFlow: FlowGraph) {
     private def pointUpdate = {
         var nextPoint: Stmt = this.worklist.next;
         
-        this.map = this.map + (nextPoint -> this.map.getOrElse(this.lastPoint, Set[LatticeElement]()).map((a: LatticeElement) => a.transferAndCheck(nextPoint)));
+        this.map = this.map + (nextPoint -> this.map.getOrElse(this.lastPoint, Set[AnalysisPoint[_]]()).map((a: AnalysisPoint[_]) => a.transferAndCheck(nextPoint)));
 
         this.lastPoint = nextPoint;
     }

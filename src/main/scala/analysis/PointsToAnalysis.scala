@@ -3,14 +3,10 @@ package analysis
 import scala.math.signum;
 import scala.collection.mutable.HashMap;
 import facts.stmt.Stmt;
-import analysis.LatticeElement;
+import analysis.AnalysisPoint;
 
-class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends LatticeElement {
-    private var currentState: HashMap[Int, Set[Int]] = ???;
-
-    private def PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) = {
-        this.currentState = pointsToGraph;
-    }
+class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends AnalysisPoint[PointsToAnalysis] {
+    private var currentState: HashMap[Int, Set[Int]] = pointsToGraph;
 
     private def countEdges: Int = {
         var count: Int = 0;
@@ -20,15 +16,15 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends LatticeEle
         return count;
     }
 
-    override def compare(other: LatticeElement): Int = {
-        return (this.countEdges - other.asInstanceOf[PointsToAnalysis].countEdges).sign;
+    override def compare(other: PointsToAnalysis): Int = {
+        return (this.countEdges - other.countEdges.sign);
     }
 
-    override def union(other: LatticeElement): LatticeElement = {
+    override def union(other: PointsToAnalysis): PointsToAnalysis = {
         var combined: HashMap[Int, Set[Int]] = new HashMap[Int, Set[Int]]();
 
         this.currentState.foreach(cEdge => {
-            other.asInstanceOf[PointsToAnalysis].currentState.foreach(oEdge => {
+            other.currentState.foreach(oEdge => {
                 if (cEdge._1 == oEdge._1) {
                     combined = combined + (cEdge._1 -> cEdge._2.union(oEdge._2))
                 }
@@ -38,11 +34,11 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends LatticeEle
         return new PointsToAnalysis(combined);
     }
 
-    override def intersection(other: LatticeElement): LatticeElement = {
+    override def intersection(other: PointsToAnalysis): PointsToAnalysis = {
         var intersected: HashMap[Int, Set[Int]] = new HashMap[Int, Set[Int]]();
 
         currentState.foreach(cEdge => {
-            other.asInstanceOf[PointsToAnalysis].currentState.foreach(oEdge => {
+            other.currentState.foreach(oEdge => {
                 if (cEdge._1 == oEdge._1) {
                     intersected = intersected + (cEdge._1 -> cEdge._2.intersect(oEdge._2))
                 }
@@ -52,7 +48,7 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends LatticeEle
         return new PointsToAnalysis(intersected);
     }
 
-    override def transfer(stmt: Stmt): LatticeElement = {
+    override def transfer(stmt: Stmt): PointsToAnalysis = {
         /**
          * pretend this applies a bunch of rules and gives us a fancy output
          * stuff like "if stmt.type = assignation, output = (currentstate remove LHS) union (LHS -> RHS)
@@ -61,7 +57,7 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends LatticeEle
         return this;
     }
 
-    override def createLowest(): LatticeElement = {
+    override def createLowest(): PointsToAnalysis = {
         var a = new HashMap[Int, Set[Int]];
         return new PointsToAnalysis(a);
     }
