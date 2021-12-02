@@ -1,5 +1,8 @@
 package analysis
 
+import facts.stmt.Stmt;
+import util.LatticeViolationException;
+
 trait LatticeElement {
     /**
      * An ordering relation on the lattice so we can check that a transfer doesn't lose precision.
@@ -33,7 +36,20 @@ trait LatticeElement {
     /**
      * For now, just a placeholder that gives the simple name of the class. Useful for exception handling.
      */
-    def toString(): String = {
+    override def toString(): String = {
         return this.getClass.getSimpleName;
+    }
+
+    /**
+     * Fancy method that uses our transfer and compare methods to guarantee that we maintain monotonicity.
+     */
+    def transferAndCheck(stmt: Stmt): LatticeElement = {
+        var newState: LatticeElement = transfer(stmt);
+
+        if (compare(newState) > 0) {
+            throw new LatticeViolationException(toString); 
+        }
+
+        return newState;
     }
 }
