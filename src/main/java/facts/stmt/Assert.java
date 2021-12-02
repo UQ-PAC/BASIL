@@ -1,14 +1,15 @@
 package facts.stmt;
 
 import astnodes.exp.Expr;
+import astnodes.pred.Pred;
 import java.util.List;
 
 public class Assert extends Stmt {
-    private Expr expr;
+    private Pred pred;
     
-    public Assert(String pc, Expr expr) {
+    public Assert(String pc, Pred pred) {
         super(pc);
-        this.expr = expr;
+        this.pred = pred;
     }
 
     @Override

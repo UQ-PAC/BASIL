@@ -1,5 +1,0 @@
-package analysis
-
-trait LatticeElement {
-
-}

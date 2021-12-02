@@ -41,8 +41,8 @@ case class FunctionState (
                            private val L: Map[Var, Pred],
                            private val gamma: Map[Var, Security],
 ) {
-  def getL(v: Var) = L.getOrElse(v, Bool.True)
-  def getGamma(v: Var) = gamma.getOrElse(v, High)
+  def getL(v: Var): Pred = L.getOrElse(v, Bool.True)
+  def getGamma(v: Var): Security = gamma.getOrElse(v, High)
 }
 
 case object FunctionState {
@@ -52,16 +52,14 @@ case object FunctionState {
     }
 
     val controls = vars.map(v => (v,
-      controlledBy.filter{
-        case (c, controlled) => controlled.contains(v)
-      }.map{
-        case (c, _) => c
+      controlledBy.collect{
+        case (c, controlled) if (controlled.contains(v)) => c
       }.toSet
     )).toMap
 
-    val blocks = function.getBlocks.asScala.map(b => new Block(b))
+    val blocks = function.getBlocks.asScala.map(b => new Block(b)).toList
 
-    new FunctionState(controls, blocks.toList, vars, L, gamma)
+    new FunctionState(controls, blocks, vars, L, gamma)
   }
 }
 
