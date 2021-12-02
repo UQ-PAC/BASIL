@@ -1,5 +1,7 @@
 package facts.exp
 
+import jdk.javadoc.doclet.DocletEnvironment.ModuleMode
+
 import java.util
 import java.util.Objects
 
@@ -20,4 +22,47 @@ case class BinOp(
   }
 
   override def vars = firstExp.vars ++ secondExp.vars
+
+  object Operator extends Enumeration {
+    type Operator = Value
+    // arithmetic operators
+    val Addition: Operator = Value("+")
+    val Subtraction: Operator = Value("-")
+    val Multiplication: Operator = Value("*")
+    val Division: Operator = Value("/")
+    val Modulo: Operator = Value("%")
+    val BitwiseAnd: Operator = Value("&") // todo
+    val BitwiseOr: Operator = Value("|") // todo
+    val BitwiseXor: Operator = Value("xor") // todo
+    val LogicalShiftLeft: Operator = Value("<<") // todo
+    val LogicalShiftRight: Operator = Value(">>") // todo
+    val ArithmeticShiftRight: Operator = Value(">>>") // todo
+    // logical operators
+    val Equality: Operator = Value("==")
+    val NonEquality: Operator = Value("!=")
+    val LessThan: Operator = Value("<")
+    val LessThanOrEqual: Operator = Value("<=")
+
+    def fromBil(bilStr: String): Value = bilStr match {
+      // note at the moment we do not distinguish between signed and unsigned
+      // arithmetic operators
+      case "+" => Addition
+      case "-" => Subtraction
+      case "*" => Multiplication
+      case "/" => Division
+      case "%" => Modulo
+      case "&" => BitwiseAnd
+      case "|" => BitwiseOr
+      case "xor" => BitwiseXor
+      case "<<" => LogicalShiftLeft
+      case ">>" => LogicalShiftRight
+      case ">>>" => ArithmeticShiftRight
+      // logical operators
+      case "=" => Equality
+      case "<>" => NonEquality
+      case "<" => LessThan
+      case "<=" => LessThanOrEqual
+    }
+  }
 }
+  
