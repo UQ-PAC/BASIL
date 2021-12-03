@@ -52,9 +52,17 @@ class Worklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
      */
     private def pointUpdate = {
         var nextPoint: Stmt = this.worklist.next;
+        var saveState: Set[AnalysisPoint[_]] = this.map.getOrElse(nextPoint, Set[AnalysisPoint[_]]());
         
+        // get what's at lastpoint or empty set, then for every analysis at lastpoint, create nextpoint set as transfers over nextpoint
+        // lastpoint should be "empty analysis" from init, or a created state; nextpoint is getting overwritten with transfers from lastpoint
         this.map = this.map + (nextPoint -> this.map.getOrElse(this.lastPoint, Set[AnalysisPoint[_]]()).map((a: AnalysisPoint[_]) => a.transferAndCheck(nextPoint)));
 
+        if (this.map.getOrElse(nextPoint, Set[AnalysisPoint[_]]()) != saveState) {
+            this.worklist.concat(Iterator[Stmt](nextPoint, this.lastPoint));
+        }
+        
+        // if something changed, add lastpoint and nextpoint back to worklist
         this.lastPoint = nextPoint;
     }
 }
