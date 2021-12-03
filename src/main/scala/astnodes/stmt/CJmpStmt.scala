@@ -7,14 +7,14 @@ import astnodes.exp.Var
 
 /** Conditional Jump fact
   */
-class CJmpStmt(
+case class CJmpStmt(
     override val pc: String,
-    var target: String,
-    var condition: Expr // TODO changed this to ExpFact but should check this
+    val trueTarget: String,
+    val falseTaget: String,
+    var condition: Expr,
 ) extends Stmt(pc) {
-  def getTarget = target
   def getCondition = condition
-  override def toString = String.format("%sif (%s) goto label%s;", getLabel, condition, target)
+  override def toString = f"${pc}if ($condition) goto label$trueTarget; goto label$falseTaget;"
   override def getChildren = Collections.singletonList(condition)
   override def replace(oldExp: Expr, newExp: Expr) = if (condition == oldExp) condition = newExp
 }

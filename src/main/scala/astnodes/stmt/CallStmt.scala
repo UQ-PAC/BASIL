@@ -5,12 +5,10 @@ import java.util
 import astnodes.exp.Expr
 import scala.jdk.CollectionConverters.*
 
-class CallStmt(private val p: String, var funcName: String) extends Stmt(p) {
-  private var args: util.List[Var] = new util.ArrayList[Var]
+case class CallStmt(override val pc: String, val funcName: String) extends Stmt(pc) {
+  private var args: util.List[Var] = new util.ArrayList[Var] // TODO change to Option[List[Var]]
   private var lhs: Option[Expr] = None
   def setLHS(lhs: Expr) = this.lhs = Some(lhs)
-  def getFuncName = funcName
-  def setFuncName(funcName: String) = this.funcName = funcName
   def getArgs = args
   def setArgs(args: util.List[Var]) = this.args = args
   override def toString = {

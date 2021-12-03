@@ -58,8 +58,8 @@ case class FunctionState (
 ) {
   def getGamma(v: Var): Security = gamma.getOrElse(v, High)
 
-  def children(label: String) = labelToChildren.get(label)
-  def children(block: Block) = labelToChildren.get(block.label)
+  def children(label: String): Option[Set[String]] = labelToChildren.get(label)
+  def children(block: Block): Option[Set[String]] = labelToChildren.get(block.label)
   
   def parents(label: String): List[String] = labelToChildren.collect{
     case (l, ls) if ls.contains(label) => l

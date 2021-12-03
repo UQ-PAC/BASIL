@@ -55,8 +55,8 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
 
   // target labels are used in jumps and cjumps
   private def getJumpTarget(fact: Stmt): String = fact match {
-    case jmpStmt: JmpStmt => jmpStmt.getTarget
-    case cjmpStmt: CJmpStmt => cjmpStmt.getTarget
+    case jmpStmt: JmpStmt => jmpStmt.target
+    case cjmpStmt: CJmpStmt => cjmpStmt.trueTarget // TODO and falseTarget
     case _ => null
   }
 
@@ -132,7 +132,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     */
   private def createCallArguments(func: EnterSub): Unit =
     flowGraph.getLines.asScala.filter(line => line match {
-      case callStmt: CallStmt if (callStmt.getFuncName == func.getFuncName) => true
+      case callStmt: CallStmt if (callStmt.funcName == func.getFuncName) => true
       case _ => false
     }).asJava.asInstanceOf[List[CallStmt]].forEach(call =>
       func.getInParams.forEach((param: InParameter) => call.getArgs.add(param.getRegister))
@@ -191,7 +191,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
         val lhs = line.asInstanceOf[Assign].getLhs.asInstanceOf[Var]
         // TODO slow
         if (
-          flowGraph.getGlobalInits.stream.noneMatch(init => init.getVariable.getName == lhs.getName)
+          flowGraph.getGlobalInits.stream.noneMatch(init => init.variable.getName == lhs.getName)
           && function.getHeader.getInParams.stream.noneMatch((inParam) => inParam.getName.getName == lhs.getName) // TODO check if this is needed
           && !(function.getHeader.getOutParam.get.getName.getName == lhs.getName)
         ) {

@@ -114,7 +114,7 @@ class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
     } else if (ctx.cjmp != null) { // statement is a conditional jump
       val cond = new Var(ctx.cjmp.`var`.getText) // conditions are always vars
       val target = ctx.cjmp.addr.getText
-      stmts += new CJmpStmt(address, target, cond)
+      stmts += new CJmpStmt(address, target, "TODO", cond) // TODO set up false GOTO
     } else if (ctx.call != null) { // statement is a call
       if (ctx.call.functionName == null) { // occasionally this occurs with "call LR with no return" lines
         stmts += new ExitSub(ctx.addr.getText)

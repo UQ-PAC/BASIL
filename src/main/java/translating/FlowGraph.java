@@ -239,7 +239,7 @@ public class FlowGraph {
                 JmpStmt cjmp = (JmpStmt) stmts.get(i + 1);
                 Assign assign = (RegisterAssign) stmts.get(i + 3);
 
-                if (cjmp.getTarget().equals(stmts.get(i + 1).getLabel().getPc())) throw new AssumptionViolationException("Expected jump to next line");
+                if (cjmp.target().equals(stmts.get(i + 1).getLabel().getPc())) throw new AssumptionViolationException("Expected jump to next line");
 
                 call.setLHS(assign.getLhs());
                 stmts.remove(i + 1);
@@ -270,13 +270,14 @@ public class FlowGraph {
                 block.getLines().forEach(stmt -> {
                     // TODO rewrite using match
                     if (stmt instanceof JmpStmt) {
-                        String targetPC = ((JmpStmt) stmt).getTarget();
+                        String targetPC = ((JmpStmt) stmt).target();
                         queue.add(findBlockStartingWith(targetPC, blocks));
                     } else if (stmt instanceof CJmpStmt) {
-                        String targetPC = ((CJmpStmt) stmt).getTarget();
-                        queue.add(findBlockStartingWith(targetPC, blocks));
+                        CJmpStmt cjmp = ((CJmpStmt) stmt);
+                        queue.add(findBlockStartingWith(cjmp.trueTarget(), blocks));
+                        queue.add(findBlockStartingWith(cjmp.falseTaget(), blocks));
                     } else if (stmt instanceof CallStmt) {
-                        queue.add(findFunction(blocks, ((CallStmt) stmt).getFuncName()));
+                        queue.add(findFunction(blocks, ((CallStmt) stmt).funcName()));
                     }
                 });
             }
@@ -284,6 +285,7 @@ public class FlowGraph {
             return reachableBlocks;
         }
 
+        // TODO could this be done in the parser as it seems that bil is already split into basic blocks
         /**
          * Returns an ordered list of all statement indexes ('splits') which represent block boundaries.
          * Splits are defined such that the splits 3 and 6 should define a block consisting of lines stmts.get(3),
@@ -303,11 +305,14 @@ public class FlowGraph {
                 if (stmt instanceof JmpStmt) {
                     // for jumps, add a split below the jump and above the target line
                     splits.add(i + 1);
-                    int targetIndex = findInstWithPc(((JmpStmt) stmt).getTarget(), stmts);
+                    int targetIndex = findInstWithPc(((JmpStmt) stmt).target(), stmts);
                     if (targetIndex != -1) splits.add(targetIndex);
                 } else if (stmt instanceof CJmpStmt) {
                     // for conditional jumps, add a split above the target line
-                    int targetIndex = findInstWithPc(((CJmpStmt) stmt).getTarget(), stmts);
+                    int targetIndex = findInstWithPc(((CJmpStmt) stmt).falseTaget(), stmts);
+                    if (targetIndex != -1) splits.add(targetIndex);
+
+                    targetIndex = findInstWithPc(((CJmpStmt) stmt).trueTarget(), stmts);
                     if (targetIndex != -1) splits.add(targetIndex);
                 } else if (stmt instanceof EnterSub) {
                     // for function headers, add a split before the header
@@ -417,7 +422,7 @@ public class FlowGraph {
             Stmt lastLine = block.lastLine();
             if (lastLine instanceof JmpStmt) {
                 // for jumps, simply add the target
-                childrenPcs.add(((JmpStmt) lastLine).getTarget());
+                childrenPcs.add(((JmpStmt) lastLine).target());
             } else if (!(lastLine instanceof ExitSub)) {
                 // for any other line that is not a function return, simply add the following line
                 childrenPcs.add(lines.get(lines.indexOf(lastLine) + 1).getLabel().getPc());
@@ -426,7 +431,7 @@ public class FlowGraph {
             for (int i = block.lines.size() - 2; i >= 0; i--) {
                 Stmt line = block.lines.get(i);
                 if (!(line instanceof CJmpStmt)) break;
-                childrenPcs.add(((CJmpStmt) line).getTarget());
+                childrenPcs.add(((CJmpStmt) line).trueTarget()); // TODO and false target
             }
             return childrenPcs;
         }
