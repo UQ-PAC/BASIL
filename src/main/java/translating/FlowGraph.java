@@ -33,7 +33,8 @@ public class FlowGraph {
     private FlowGraph(List<Function> functions) {
         this.functions = functions;
         globalInits = new LinkedList<>();
-        globalInits.add(new InitStmt(new Var("mem"), "mem", "[int] int")); // TODO label.none
+        globalInits.add(new InitStmt(new Var("heap"), "heap", "[int] int")); // TODO label.none
+        globalInits.add(new InitStmt(new Var("stack"), "stack", "[int] int")); // TODO label.none
         globalInits.add(new InitStmt(new Var("SP"), "SP", "int")); // TODO label.none
     }
 
@@ -213,7 +214,7 @@ public class FlowGraph {
          * @return a new flow graph with an empty global block and no constraints
          */
         private static FlowGraph fromStmts(List<Stmt> stmts) {
-            stmts = setFunctionsWithReturns(stmts);
+            // stmts = setFunctionsWithReturns(stmts);
             // an ordered list of indexes of the given statements list, indicating where the list should be split into blocks
             List<Integer> splits = getSplits(stmts);
             // an ordered list of blocks, defined by the given given list of splits
@@ -430,6 +431,7 @@ public class FlowGraph {
             return childrenPcs;
         }
 
+        // TODO this and the stripping could happen at the same time I think
         private static List<Function> convertBlocksToFunctions(List<Block> blocks) {
             List<Function> functions = new ArrayList<>();
             for (Block block : blocks) {
@@ -522,14 +524,6 @@ public class FlowGraph {
             return children;
         }
 
-        /**
-         * Sets the children of this block.
-         * @param children to set
-         */
-        public void setChildren(List<Block> children) {
-            this.children = children;
-        }
-        
         public void removeLine(Stmt line) {
             lines.remove(line);
         }

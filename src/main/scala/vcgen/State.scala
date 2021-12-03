@@ -1,12 +1,13 @@
 package vcgen
 
-import astnodes.exp.{Expr, Var}
+import astnodes.exp.{Expr, MemLoad, Var}
 import translating.FlowGraph.{Block, Function}
 import astnodes.pred.{Bool, High, Pred, Security}
 import facts.Label
 import facts.stmt.Stmt
 import translating.FlowGraph
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.ListHasAsScala
 
@@ -21,45 +22,57 @@ import scala.jdk.CollectionConverters.ListHasAsScala
 case class State(
     functions: List[FunctionState],
     rely: Pred,
-    guar: Pred
-) {
+    guar: Pred,
+    controls: Map[Var, Set[Var]],
+    private val L: Map[Var, Pred],
+    private val gamma: Map[Var, Security],
+                ) {
+  /*
   def apply(flowGraph: FlowGraph, lPreds: Map[Var, Pred], gamma: Map[Var, Security]): State = {
-    // TODO
-    // Generate flow graph
-    // Find control variables
-
-    new State(List(), rely, guar)
-  }
-
-}
-
-
-case class FunctionState (
-                           controls: Map[Var, Set[Var]],
-                           blocks: List[Block],
-                           vars: List[Var], // TODO do we use this?
-                           private val L: Map[Var, Pred],
-                           private val gamma: Map[Var, Security],
-) {
-  def getL(v: Var): Pred = L.getOrElse(v, Bool.True)
-  def getGamma(v: Var): Security = gamma.getOrElse(v, High)
-}
-
-case object FunctionState {
-  def apply(function: FlowGraph.Function, L: Map[Var, Pred], gamma: Map[Var, Security], vars: List[Var]): FunctionState = {
     val controlledBy = L.map{
       case (v, p) => (v, p.vars)
     }
-
+  
     val controls = vars.map(v => (v,
       controlledBy.collect{
         case (c, controlled) if (controlled.contains(v)) => c
       }.toSet
     )).toMap
 
-    val blocks = function.getBlocks.asScala.map(b => new Block(b)).toList
+    new State(List(), rely, guar, new mutable.HashMap[](), new mutable.HashMap[Var, Pred](), new mutable.HashMap[Var, Security]())
+  }
+  */
 
-    new FunctionState(controls, blocks, vars, L, gamma)
+
+
+  def getL(v: Var): Pred = L.getOrElse(v, Bool.True)
+  def getGamma(v: Var): Security = gamma.getOrElse(v, High)
+}
+
+// TODO L, controls only need to be defined on state as they are only needed for globals
+// TODO gamma needs to be defined for each function and the global state
+case class FunctionState (
+  private val labelToBlock: Map[String, Block],
+  private val labelToChildren: Map[String, Set[String]],
+  private val gamma: Map[Var, Security],
+) {
+  def getGamma(v: Var): Security = gamma.getOrElse(v, High)
+
+  def children(label: String) = labelToChildren.get(label)
+  def children(block: Block) = labelToChildren.get(block.label)
+  
+  def parents(label: String): List[String] = labelToChildren.collect{
+    case (l, ls) if ls.contains(label) => l
+  }.toList
+  def parents(block: Block): List[String] = parents(block.label)
+}
+
+case object FunctionState {
+  def apply(function: FlowGraph.Function, gamma: Map[Var, Security]): FunctionState = {
+    val blocks = function.getBlocks.asScala.map(b => (b.getLabel, new Block(b))).toMap
+    
+
+    new FunctionState(blocks, Map.empty, gamma)
   }
 }
 
