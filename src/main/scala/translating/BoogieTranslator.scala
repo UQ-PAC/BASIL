@@ -1,10 +1,10 @@
 package translating
 
 import astnodes.exp.{Expr, Literal, MemLoad, Var}
-import facts.stmt.Assign.{Assign, MemAssign, RegisterAssign}
-import facts.stmt.*
-import facts.parameters.{InParameter, OutParameter}
-import facts.{Fact, Label}
+import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
+import astnodes.stmt.*
+import astnodes.parameters.{InParameter, OutParameter}
+import astnodes.{Label}
 import translating.FlowGraph
 
 import scala.collection.mutable.HashSet
@@ -193,7 +193,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
         if (
           flowGraph.getGlobalInits.stream.noneMatch(init => init.getVariable.getName == lhs.getName)
           && function.getHeader.getInParams.stream.noneMatch((inParam) => inParam.getName.getName == lhs.getName) // TODO check if this is needed
-          && !(function.getHeader.getOutParam.getName.getName == lhs.getName)
+          && !(function.getHeader.getOutParam.get.getName.getName == lhs.getName)
         ) {
           vars.add(lhs)
         }
@@ -223,7 +223,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     */
   private def resolveOutParams(): Unit =
     flowGraph.getFunctions.forEach(function =>
-      val outParam: OutParameter = function.getHeader.getOutParam
+      val outParam: OutParameter = function.getHeader.getOutParam.get
       // TODO check will not be necassary if outparam is a scala class
       if (outParam != null)
         function.getLines.forEach((line: Stmt) =>
@@ -312,21 +312,22 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
   /**
     * Where possible resolves global variables in the heap to their variable name
     */
+  /*
   private def replaceGlobalVars (symbolTable: mutable.Map[Literal, Var]): Unit = {
     flowGraph.getFunctions.forEach(func => {
       func.getBlocks.forEach(block => {
         block.setLines(block.getLines.stream.map {
               // TODO fix when we can match on m as well
               // TODO this wont work until we have working constant proportation
-          case MemAssign(pc, m, e) if (!m.onStack && m.exp.isInstanceOf[Literal]) =>
-            println("Applying transform")
-            RegisterAssign(pc, symbolTable.getOrElse(m.exp.asInstanceOf[Literal], throw new AssumptionViolationException("Expected to find global variable in symbol table")), e)
+          case MemAssign(pc, MemLoad(l : Literal), e) if (!m.onStack) =>
+            RegisterAssign(pc, symbolTable.getOrElse(l, throw new AssumptionViolationException("Expected to find global variable in symbol table")), e)
           case x => x
         }.collect(Collectors.toList))
       })
     })
 
   }
+  */
 
   private def writeToFile(): Unit = {
     try {

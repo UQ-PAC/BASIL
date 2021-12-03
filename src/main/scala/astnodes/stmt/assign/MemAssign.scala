@@ -1,4 +1,4 @@
-package facts.stmt.Assign
+package astnodes.stmt.assign
 
 import astnodes.exp.{BinOp, Var, Expr, MemLoad}
 

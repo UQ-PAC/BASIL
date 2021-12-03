@@ -1,9 +1,9 @@
 package translating;
 
 import astnodes.exp.Var;
-import facts.stmt.*;
-import facts.stmt.Assign.Assign;
-import facts.stmt.Assign.RegisterAssign;
+import astnodes.stmt.*;
+import astnodes.stmt.assign.Assign;
+import astnodes.stmt.assign.RegisterAssign;
 import util.AssumptionViolationException;
 import java.util.*;
 

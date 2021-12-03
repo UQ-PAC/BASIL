@@ -1,4 +1,4 @@
-import facts.stmt.Stmt
+import astnodes.stmt.Stmt
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTreeWalker

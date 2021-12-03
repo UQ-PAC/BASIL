@@ -1,5 +1,5 @@
 import BilParser.{BilLexer, BilParser}
-import facts.stmt.Stmt
+import astnodes.stmt.Stmt
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.junit.Assert.*

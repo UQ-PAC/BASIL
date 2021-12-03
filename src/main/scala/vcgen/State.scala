@@ -3,8 +3,8 @@ package vcgen
 import astnodes.exp.{Expr, MemLoad, Var}
 import translating.FlowGraph.{Block, Function}
 import astnodes.pred.{Bool, High, Pred, Security}
-import facts.Label
-import facts.stmt.Stmt
+import astnodes.Label
+import astnodes.stmt.Stmt
 import translating.FlowGraph
 
 import scala.collection.mutable

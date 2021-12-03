@@ -1,13 +1,13 @@
-package facts.stmt.Assign
+package astnodes.stmt.assign
 
 import astnodes.exp.Expr
-import facts.stmt.Stmt
+import astnodes.stmt.Stmt
 import java.util
 
 // TODO not happy with setup for STMT -> Assign -> MemAssign/RegisterAssign
 /** Assignment (e.g. x := facts.exp)
   */
-abstract class Assign (val pc: String, var lhs: Expr, var rhs: Expr) extends Stmt(pc) {
+abstract class Assign (override val pc: String, var lhs: Expr, var rhs: Expr) extends Stmt(pc) {
   def getLhs = lhs
   def getRhs = rhs
 

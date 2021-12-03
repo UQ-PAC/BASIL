@@ -1,6 +1,6 @@
 package analysis
 
-import facts.stmt.Stmt
+import astnodes.stmt.Stmt
 
 trait Analysis {
   def transfer(stmt: Stmt, elem: LatticeElement): LatticeElement;

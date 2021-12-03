@@ -1,8 +1,8 @@
-package facts.stmt.Assign
+package astnodes.stmt.assign
 
 import astnodes.exp.Expr
 import astnodes.exp.Var
-import facts.stmt.Stmt
+import astnodes.stmt.Stmt
 
 // TODO check if we need override pc
 /** Load fact

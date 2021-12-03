@@ -1,8 +1,8 @@
 package vcgen
 
 import astnodes.exp.{Expr, Literal, Var}
-import facts.stmt.Assign.{Assign, MemAssign, RegisterAssign}
-import facts.stmt.{Assert, CJmpStmt, Stmt}
+import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
+import astnodes.stmt.{Assert, CJmpStmt, Stmt}
 import translating.FlowGraph
 
 import collection.JavaConverters.*
