@@ -22,13 +22,16 @@ class EnterSub(override val pc: String, var funcName: String) extends Stmt(pc) {
 
   override def toString = {
     val in = inParams.asScala.mkString(", ")
-    val out = if (outParam != None) f"returns ($outParam)"
+    val out = if (outParam != None) f" returns (${outParam.get})" else ""
+
+    val decl = funcName + "(" + in + ")" + out
 
     // TODO
     val modifiesStr =
-      if (modifies.size > 0) ""
+      if (modifies.size > 0) "\n modifies " + modifies.asScala.mkString(" ") //+ ";\nimplementation " + decl
+      else ""
 
-    ""
+    "procedure " + decl + modifiesStr + "; {"
   }
 
   override def getChildren = new ArrayList[Expr]

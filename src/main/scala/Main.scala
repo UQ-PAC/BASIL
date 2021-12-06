@@ -35,7 +35,7 @@ import collection.JavaConverters.*
         symsParser.setBuildParseTree(true)
         val symsListener = new SymbolTableListener()
         walker.walk(symsListener, symsParser.syms)
-        print(symsListener.symbolTable)
+        println(symsListener.symbolTable)
 
         if (outputType.equals("boogie")) {
             val flowGraph = FlowGraph.fromStmts(stmts.asJava);

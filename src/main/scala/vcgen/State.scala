@@ -13,12 +13,6 @@ import scala.jdk.CollectionConverters.ListHasAsScala
 
 // TODO eventually change to use a state object for everything (at the moment the flow graph
 // is sort of the state I guess)
-
-// TODO alternatively, does it make more sense to store the state per function
-// OR to have a state for the whole program and for each function
-
-// TODO overlap between this and the flow graph
-// e.g. globals are currently also stored in the flow graph
 case class State(
     functions: List[FunctionState],
     rely: Pred,
@@ -26,12 +20,14 @@ case class State(
     controls: Map[Var, Set[Var]],
     private val L: Map[Var, Pred],
     private val gamma: Map[Var, Security],
-                ) {
-  /*
+) {
   def apply(flowGraph: FlowGraph, lPreds: Map[Var, Pred], gamma: Map[Var, Security]): State = {
     val controlledBy = L.map{
       case (v, p) => (v, p.vars)
     }
+
+    // TODO alternatively could use the GOT
+    val vars = flowGraph.getFunctions.asScala.flatMap(func => func.getInitStmts.asScala.map(init => init.variable)).toSet
   
     val controls = vars.map(v => (v,
       controlledBy.collect{
@@ -39,9 +35,8 @@ case class State(
       }.toSet
     )).toMap
 
-    new State(List(), rely, guar, new mutable.HashMap[](), new mutable.HashMap[Var, Pred](), new mutable.HashMap[Var, Security]())
+    new State(List(), rely, guar, controls, lPreds, gamma)
   }
-  */
 
 
 

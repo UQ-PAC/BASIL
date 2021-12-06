@@ -4,16 +4,17 @@ import astnodes.exp.{Expr, Literal, MemLoad, Var}
 import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
 import astnodes.stmt.*
 import astnodes.parameters.{InParameter, OutParameter}
-import astnodes.{Label}
+import astnodes.Label
 import translating.FlowGraph
 
 import scala.collection.mutable.HashSet
 import java.io.{BufferedWriter, FileWriter, IOException}
+import scala.collection.immutable
 // import java.util
 import java.util.stream.Collectors
 import java.util.{ArrayList, HashMap, HashSet, LinkedList, List, Map, Objects, Set}
 import scala.collection.mutable
-import collection.JavaConverters.*
+import scala.jdk.CollectionConverters.*
 import util.AssumptionViolationException
 
 // TODO rewrite this file to make the flowGraph immutable (this should make whats happening a bit more transparent)
