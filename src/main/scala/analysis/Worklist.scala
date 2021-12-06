@@ -5,6 +5,8 @@ import scala.collection.mutable.Set;
 import scala.collection.mutable.Stack;
 import scala.jdk.CollectionConverters.IteratorHasAsScala;
 import scala.jdk.CollectionConverters.ListHasAsScala;
+import scala.jdk.CollectionConverters.ListHasAsScala;
+import scala.jdk.CollectionConverters.SeqHasAsJava;
 import java.util.MissingResourceException;
 
 import astnodes.stmt.Stmt;
@@ -110,26 +112,45 @@ class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
         var nodeStack: Stack[Block] = new Stack[Block]();
         var visited: List[Block] = List[Block]();
         var output: Iterator[Block] = Iterator[Block]();
+        var rmChildren: Map[Block, List[Block]] = Map[Block, List[Block]]();
 
         nodeStack.addOne(controlFlow.getBlocks.get(0));
 
         while (!nodeStack.isEmpty) {
-            var vertex = nodeStack.pop;
+            var vertex: Block = nodeStack.pop;
+
+            if (!visited.contains(vertex)) {
+                visited.concat(List(vertex));
+            }
             
             vertex.getChildren.asScala.foreach(c => {
                 if (visited.contains(c)) {
                     // note that this portion of the code will change significantly once FlowGraph is refactored.
                     // The basic approach is there, though.
                     vertex.children.remove(c);
+
+                    // remove children so that we don't have cycles, but remember to keep them around so we can return
+                    // the graph to it's original state further down
+                    if (rmChildren.contains(vertex)) {
+                        rmChildren.get(vertex).concat(List(c));
+                    } else {
+                        rmChildren.concat(HashMap[Block, List[Block]](vertex -> List(c)));
+                    }
                 } else {
                     nodeStack.addOne(c);
                 }
             });
 
+            // add blocks to the beginning of an iterator as we finish all their children
             if (vertex.getChildren.isEmpty) {
                 output = Iterator(vertex) ++ output;
             }
         }
+
+        rmChildren.keys.foreach(k => {
+            // scala thinks we need getOrElse here despite the fact we're literally iterating over known keys
+            k.children = rmChildren.getOrElse(k, List()).asJava;
+        });
 
         output;
     }
