@@ -1,20 +1,24 @@
 package translating
 
 import astnodes.exp.{Expr, Literal, MemLoad, Var}
-import facts.stmt.Assign.{Assign, RegisterAssign, MemAssign}
-import facts.stmt.*
-import facts.parameters.{InParameter, OutParameter}
-import facts.{Fact, Label}
+import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
+import astnodes.stmt.*
+import astnodes.parameters.{InParameter, OutParameter}
+import astnodes.Label
 import translating.FlowGraph
+
 import scala.collection.mutable.HashSet
 import java.io.{BufferedWriter, FileWriter, IOException}
-import java.util
+import scala.collection.immutable
+// import java.util
+import java.util.stream.Collectors
 import java.util.{ArrayList, HashMap, HashSet, LinkedList, List, Map, Objects, Set}
 import scala.collection.mutable
-import collection.JavaConverters.*
+import scala.jdk.CollectionConverters.*
+import util.AssumptionViolationException
 
 // TODO rewrite this file to make the flowGraph immutable (this should make whats happening a bit more transparent)
-class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
+class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable: mutable.Map[Literal, Var]) {
   private var uniqueInt = 0;
 
   /** Starting point for a BIL translation.
@@ -27,6 +31,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     resolveOutParams()
     resolveVars()
     addVarDeclarations()
+    // TODO could turn this on later:  replaceGlobalVars(symbolTable)
     // TODO vcgen happens here
     writeToFile()
   }
@@ -51,8 +56,8 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
 
   // target labels are used in jumps and cjumps
   private def getJumpTarget(fact: Stmt): String = fact match {
-    case jmpStmt: JmpStmt => jmpStmt.getTarget
-    case cjmpStmt: CJmpStmt => cjmpStmt.getTarget
+    case jmpStmt: JmpStmt => jmpStmt.target
+    case cjmpStmt: CJmpStmt => cjmpStmt.trueTarget // TODO and falseTarget
     case _ => null
   }
 
@@ -107,7 +112,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   /** Implicit params found may contain params already listed explicitly. If so, we take the var name of the explicit
     * param, and the alias of the implicit param.
     */
-  private def removeDuplicateParamsAndMerge(params: util.List[InParameter]): Unit = {
+  private def removeDuplicateParamsAndMerge(params: List[InParameter]): Unit = {
     val iter = params.iterator
     while (iter.hasNext) {
       val param = iter.next
@@ -128,7 +133,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     */
   private def createCallArguments(func: EnterSub): Unit =
     flowGraph.getLines.asScala.filter(line => line match {
-      case callStmt: CallStmt if (callStmt.getFuncName == func.getFuncName) => true
+      case callStmt: CallStmt if (callStmt.funcName == func.getFuncName) => true
       case _ => false
     }).asJava.asInstanceOf[List[CallStmt]].forEach(call =>
       func.getInParams.forEach((param: InParameter) => call.getArgs.add(param.getRegister))
@@ -187,9 +192,9 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
         val lhs = line.asInstanceOf[Assign].getLhs.asInstanceOf[Var]
         // TODO slow
         if (
-          flowGraph.getGlobalInits.stream.noneMatch(init => init.getVariable.getName == lhs.getName)
+          flowGraph.getGlobalInits.stream.noneMatch(init => init.variable.getName == lhs.getName)
           && function.getHeader.getInParams.stream.noneMatch((inParam) => inParam.getName.getName == lhs.getName) // TODO check if this is needed
-          && !(function.getHeader.getOutParam.getName.getName == lhs.getName)
+          && !(function.getHeader.getOutParam.get.getName.getName == lhs.getName)
         ) {
           vars.add(lhs)
         }
@@ -219,7 +224,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     */
   private def resolveOutParams(): Unit =
     flowGraph.getFunctions.forEach(function =>
-      val outParam: OutParameter = function.getHeader.getOutParam
+      val outParam: OutParameter = function.getHeader.getOutParam.get
       // TODO check will not be necassary if outparam is a scala class
       if (outParam != null)
         function.getLines.forEach((line: Stmt) =>
@@ -304,6 +309,26 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
     parent.getChildren.forEach((child: Expr) => replaceAllMatchingChildren(child, oldExp, newExp))
     parent.replace(oldExp, newExp)
   }
+
+  /**
+    * Where possible resolves global variables in the heap to their variable name
+    */
+  /*
+  private def replaceGlobalVars (symbolTable: mutable.Map[Literal, Var]): Unit = {
+    flowGraph.getFunctions.forEach(func => {
+      func.getBlocks.forEach(block => {
+        block.setLines(block.getLines.stream.map {
+              // TODO fix when we can match on m as well
+              // TODO this wont work until we have working constant proportation
+          case MemAssign(pc, MemLoad(l : Literal), e) if (!m.onStack) =>
+            RegisterAssign(pc, symbolTable.getOrElse(l, throw new AssumptionViolationException("Expected to find global variable in symbol table")), e)
+          case x => x
+        }.collect(Collectors.toList))
+      })
+    })
+
+  }
+  */
 
   private def writeToFile(): Unit = {
     try {

@@ -5,6 +5,7 @@ grammar Bil;
 bil : progSpec progdecl function+ EOF;
 function : sub 
          paramTypes*
+         gammas?
          (stmt)*
          ;
 

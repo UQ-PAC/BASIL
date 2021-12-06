@@ -12,3 +12,4 @@ gen/
 .bloop/
 metals.sbt
 .run/
+*.out
