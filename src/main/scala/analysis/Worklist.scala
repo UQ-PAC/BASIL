@@ -7,8 +7,7 @@ import scala.jdk.CollectionConverters.IteratorHasAsScala;
 import scala.jdk.CollectionConverters.ListHasAsScala;
 import java.util.MissingResourceException;
 
-import facts.stmt.Stmt;
-import facts.stmt.EnterSub;
+import astnodes.stmt.Stmt;
 import translating.FlowGraph;
 import translating.FlowGraph.Block;
 import analysis.AnalysisPoint;
@@ -56,7 +55,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
      * to queue on update, if they weren't already there.
      */
     def analyseSingleBlock(block: Block) = {
-        block.getLines().asScala.foreach(l => {
+        block.getLines.asScala.foreach(l => {
             analyseSinglePoint(l);
         });
         

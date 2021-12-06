@@ -2,7 +2,7 @@ package analysis
 
 import scala.math.signum;
 import scala.collection.mutable.HashMap;
-import facts.stmt.Stmt;
+import astnodes.stmt.Stmt;
 import analysis.AnalysisPoint;
 
 class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends AnalysisPoint[PointsToAnalysis] {
@@ -26,7 +26,7 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends AnalysisPo
         this.currentState.foreach(cEdge => {
             other.currentState.foreach(oEdge => {
                 if (cEdge._1 == oEdge._1) {
-                    combined = combined + (cEdge._1 -> cEdge._2.union(oEdge._2))
+                    combined.concat(HashMap(cEdge._1 -> cEdge._2.union(oEdge._2)));
                 }
             })
         });
@@ -40,7 +40,7 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends AnalysisPo
         currentState.foreach(cEdge => {
             other.currentState.foreach(oEdge => {
                 if (cEdge._1 == oEdge._1) {
-                    intersected = intersected + (cEdge._1 -> cEdge._2.intersect(oEdge._2))
+                    intersected.concat(HashMap(cEdge._1 -> cEdge._2.intersect(oEdge._2)));
                 }
             })
         });

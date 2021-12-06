@@ -1,6 +1,6 @@
 package analysis
 
-import facts.stmt.Stmt;
+import astnodes.stmt.Stmt;
 import util.LatticeViolationException;
 
 trait AnalysisPoint[A <: AnalysisPoint[A]] {
