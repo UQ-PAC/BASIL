@@ -1,4 +1,4 @@
-package facts;
+package astnodes;
 
 public class Label {
 

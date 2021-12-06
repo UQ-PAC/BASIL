@@ -2,6 +2,7 @@ package astnodes.exp
 
 import java.util
 import java.util.Objects
+import astnodes.pred
 
 /** Variable fact
   */
@@ -13,5 +14,5 @@ class Var(var name: String) extends Expr {
 
   override def vars: List[Var] = List(this)
   
-  def toGamma = Var("Gamma_" + name)
+  def toGamma = pred.Var(name, true, false)
 }

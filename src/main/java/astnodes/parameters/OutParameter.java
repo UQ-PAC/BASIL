@@ -1,4 +1,4 @@
-package facts.parameters;
+package astnodes.parameters;
 import astnodes.exp.Var;
 
 public class OutParameter extends Parameter {

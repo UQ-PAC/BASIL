@@ -1,14 +1,17 @@
 import BilParser.{BilLexer, BilParser}
-import facts.stmt.Stmt
+import astnodes.stmt.Stmt
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.junit.Assert.*
 import org.junit.Test
 import translating.{BoogieTranslator, FlowGraph, StatementLoader}
+
 import collection.JavaConverters.*
 import java.io.FileNotFoundException
 import scala.collection.mutable.ArrayBuffer
 import jdk.nashorn.internal.objects.NativeError.printStackTrace
+
+import scala.collection.mutable
 
 class FunctionalTests:
 
@@ -28,7 +31,7 @@ class FunctionalTests:
     walker.walk(statementLoader, b)
     // translate
     val flowGraph = FlowGraph.fromStmts(stmts.asJava)
-    val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl")
+    val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", new mutable.HashMap())
     translator.translate()
 
   @Test def cjump(): Unit =
