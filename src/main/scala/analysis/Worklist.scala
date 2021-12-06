@@ -2,67 +2,127 @@ package analysis
 
 import scala.collection.mutable.HashMap;
 import scala.collection.mutable.Set;
+import scala.collection.mutable.ListBuffer;
 import scala.jdk.CollectionConverters.IteratorHasAsScala;
+import scala.jdk.CollectionConverters.ListHasAsScala;
+import java.util.MissingResourceException;
 
 import facts.stmt.Stmt;
+import facts.stmt.EnterSub;
 import translating.FlowGraph;
+import translating.FlowGraph.Block;
 import analysis.AnalysisPoint;
+import java.util.Stack
 
-class Worklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
-    private var map: HashMap[Stmt, Set[AnalysisPoint[_]]] = ???;
-    private var worklist: Iterator[Stmt] = ???;
-    private var lastPoint: Stmt = ???; // what is the -1'th stmt in a program and how do we make this work
+class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
+    var workListQueue: Iterator[Block] = ???;
+    var prevState: Set[AnalysisPoint[_]] = createAnalysisEmpty;
 
-    def Worklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) = {
-        initLastMapping(analyses);
-        worklist = topoSort(controlFlow);
+    var analysedStmtInfo: HashMap[Stmt, Set[AnalysisPoint[_]]] = ???;
+    var blockFinalStates: HashMap[Block, Set[AnalysisPoint[_]]] = HashMap();
+
+    def createAnalysisEmpty: Set[AnalysisPoint[_]] = {
+        analyses.map(a => a.createLowest);
     }
-    
-    def work = {
-        while (worklist.hasNext) {
-            pointUpdate;
+
+    def getAllStates: HashMap[Stmt, Set[AnalysisPoint[_]]] = {
+        analysedStmtInfo;
+    }
+
+    def getOneState(stmt: Stmt): Set[AnalysisPoint[_]] = {
+        analysedStmtInfo.getOrElse(stmt, createAnalysisEmpty);
+    }
+
+    /**
+     * Sets up the flowgraph into a couple different structures for convenient information, then analyses
+     * the blocks according to a queue.
+     */
+    def workOnBlocks = {
+        var acyclic = ???; // Remove back-edge of all cycles in cfg - depth-first search
+        workListQueue = topologicalSort(controlFlow); // topo sort acyclic, save as iterator - depth-first search 2
+
+        while (workListQueue.hasNext) {
+            var nextBlock: Block = workListQueue.next;
+            prevState = ???; // union of all *acyclic* block's parent's final states. If any parent is somehow un-analysed, throw an exception because this shouldn't happen.
+
+            analyseSingleBlock(nextBlock);
         }
     }
-    
-    def overallState: HashMap[Stmt, Set[AnalysisPoint[_]]] = {
-        return this.map;
-    }
-
-    def pointState(stmt: Stmt): Set[AnalysisPoint[_]] = {
-        return this.map.getOrElse(stmt, Set[AnalysisPoint[_]]());
-    }
 
     /**
-     * Implements a cycle-handling topological sort so we can analyse control flow in an intelligent way.
+     * Analyses a block (full of statements) by analysing the statements in getLines().
+     * 
+     * Updates the blockFinalStates map with the prevState at the end of the lines, and adds all block children
+     * to queue on update, if they weren't already there.
      */
-    private def topoSort(controlFlow: FlowGraph): Iterator[Stmt] = {
-        return controlFlow.getLines.iterator.asScala;
-    }
-
-    /**
-     * Sets the most recent control-flow point of the analysis to be the "nothing" state for every lattice.
-     * Should only be called at the start of the analysis so we have a base map to work off.
-     */
-    private def initLastMapping(analyses: Set[AnalysisPoint[_]]) = {
-        this.map = this.map + (this.lastPoint -> analyses.map((a: AnalysisPoint[_]) => a.createLowest()));
-    }
-
-    /**
-     * Handles a single update of the next program point.
-     */
-    private def pointUpdate = {
-        var nextPoint: Stmt = this.worklist.next;
-        var saveState: Set[AnalysisPoint[_]] = this.map.getOrElse(nextPoint, Set[AnalysisPoint[_]]());
+    def analyseSingleBlock(block: Block) = {
+        block.getLines().asScala.foreach(l => {
+            analyseSinglePoint(l);
+        });
         
-        // get what's at lastpoint or empty set, then for every analysis at lastpoint, create nextpoint set as transfers over nextpoint
-        // lastpoint should be "empty analysis" from init, or a created state; nextpoint is getting overwritten with transfers from lastpoint
-        this.map = this.map + (nextPoint -> this.map.getOrElse(this.lastPoint, Set[AnalysisPoint[_]]()).map((a: AnalysisPoint[_]) => a.transferAndCheck(nextPoint)));
-
-        if (this.map.getOrElse(nextPoint, Set[AnalysisPoint[_]]()) != saveState) {
-            this.worklist.concat(Iterator[Stmt](nextPoint, this.lastPoint));
+        var currentFinalBlockState = blockFinalStates.getOrElse(block, null);
+        if (currentFinalBlockState != null) {
+            if (currentFinalBlockState != prevState) {
+                blockFinalStates.remove(block);
+                blockFinalStates.concat(HashMap(block -> prevState));
+                
+                if (!workListQueue.contains(block)) {
+                    workListQueue ++ Iterator(block.getChildren.asScala);
+                }
+            }
+        } else {
+            blockFinalStates.concat(HashMap(block -> prevState));
         }
-        
-        // if something changed, add lastpoint and nextpoint back to worklist
-        this.lastPoint = nextPoint;
     }
+
+    /**
+     * Analyses a single statement, from the known previous state.
+     * 
+     * Saves the new "prevState" and updates the analysedStmtInfo map.
+     */
+    def analyseSinglePoint(stmt: Stmt) = {
+        var newAnalysedPoint: Set[AnalysisPoint[_]] = Set[AnalysisPoint[_]]();
+
+        prevState.foreach(p => {
+            newAnalysedPoint.add(p.transfer(stmt));
+        });
+
+        // if anything already exists for this stmt, replace it.
+        if (analysedStmtInfo.getOrElse(stmt, null) != null) {
+            analysedStmtInfo.remove(stmt);
+        }
+        analysedStmtInfo.concat(HashMap(stmt -> newAnalysedPoint));
+
+        prevState = newAnalysedPoint;
+    }
+
+    /**
+     * Takes a FlowGraph (w/r/t code "blocks") and returns a copy of it, having removed every back-edge
+     * by iterative depth-first-search.
+     */
+    def decycleFlowGraph(controlFlow: FlowGraph): FlowGraph = {
+        var nodeStack: Stack[Block] = new Stack[Block]();
+        var discovered: ListBuffer[Block] = new ListBuffer[Block]();
+
+        // add first node to S
+
+        while (!nodeStack.isEmpty) {
+            var vertex = nodeStack.pop;
+            discovered += vertex;
+            
+            // for every edge from V
+            // if the edge leads to discovered, remove it
+            // otherwise, add it to nodeStack.
+        }
+
+        controlFlow;
+    }
+
+    def topologicalSort(controlFlow: FlowGraph): Iterator[Block] = {
+        controlFlow.getBlocks.iterator.asScala;
+    }
+}
+
+class FunctionWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
+
 }

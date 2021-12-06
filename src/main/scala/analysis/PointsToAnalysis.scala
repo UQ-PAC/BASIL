@@ -57,8 +57,7 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends AnalysisPo
         return this;
     }
 
-    override def createLowest(): PointsToAnalysis = {
-        var a = new HashMap[Int, Set[Int]];
-        return new PointsToAnalysis(a);
+    override def createLowest: PointsToAnalysis = {
+        return new PointsToAnalysis(new HashMap[Int, Set[Int]]);
     }
 }

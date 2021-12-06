@@ -47,13 +47,13 @@ trait AnalysisPoint[A <: AnalysisPoint[A]] {
      * Creates an AnalysisPoint in the same type of analysis as this one, but with currentState as whatever
      * we're using for low/false. 
      */
-    def createLowest(): A;
+    def createLowest: A;
 
     /**
      * Basic placeholder that gives the simple name of the class, which useful for exception handling. Feel
      * free to override this with more specific state information on a per-analysis basis.
      */
-    override def toString(): String = {
+    override def toString: String = {
         return this.getClass.getSimpleName;
     }
 
@@ -74,9 +74,9 @@ trait AnalysisPoint[A <: AnalysisPoint[A]] {
     }
 
     /**
-     * so we can access the current state
+     * So we can access the current state.
      */
-    def getState(): Any = {
+    def getState: Any = {
         return currentState;
     }
 }
