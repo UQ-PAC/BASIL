@@ -39,7 +39,7 @@ trait AnalysisPoint[A <: AnalysisPoint[A]] {
     
     /**
      * An intersection or meet of two lattice elements. Should contain all the information that appears in
-     * both states
+     * both states.
      */
     def intersection(other: A): A;
 

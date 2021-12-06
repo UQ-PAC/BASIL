@@ -2,7 +2,7 @@ package analysis
 
 import scala.collection.mutable.HashMap;
 import scala.collection.mutable.Set;
-import scala.collection.mutable.ListBuffer;
+import scala.collection.mutable.Stack;
 import scala.jdk.CollectionConverters.IteratorHasAsScala;
 import scala.jdk.CollectionConverters.ListHasAsScala;
 import java.util.MissingResourceException;
@@ -11,7 +11,6 @@ import astnodes.stmt.Stmt;
 import translating.FlowGraph;
 import translating.FlowGraph.Block;
 import analysis.AnalysisPoint;
-import java.util.Stack
 
 class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
     var workListQueue: Iterator[Block] = ???;
@@ -35,14 +34,20 @@ class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
     /**
      * Sets up the flowgraph into a couple different structures for convenient information, then analyses
      * the blocks according to a queue.
+     * 
+     * N.B: Because of the way worklist algorithms work, any blocks that depend on a loop will be re-computed
+     * every time the loop is computed until that loop is stable (i.e. further iterations make no changes).
+     * Ideally, we could analyse the loop on it's own and ignore the children until we know it is stable.
+     * 
+     * For small programs, this is negligible, but the worst-case is having a large, branching structure with many
+     * blocks that all depend on a loop; forcing us to re-analyse every block until that loop stablises.
      */
     def workOnBlocks = {
-        var acyclic = ???; // Remove back-edge of all cycles in cfg - depth-first search
-        workListQueue = topologicalSort(controlFlow); // topo sort acyclic, save as iterator - depth-first search 2
+        workListQueue = topologicalSort(controlFlow); // topo sort with rm back-edges, save as iterator - depth-first search
 
         while (workListQueue.hasNext) {
             var nextBlock: Block = workListQueue.next;
-            prevState = ???; // union of all *acyclic* block's parent's final states. If any parent is somehow un-analysed, throw an exception because this shouldn't happen.
+            prevState = ???; // union of all parent's final states; unknown final states are considered as "no information" and add nothing to the union
 
             analyseSingleBlock(nextBlock);
         }
@@ -96,29 +101,37 @@ class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
     }
 
     /**
-     * Takes a FlowGraph (w/r/t code "blocks") and returns a copy of it, having removed every back-edge
-     * by iterative depth-first-search.
+     * Takes a FlowGraph (w/r/t code "blocks") and returns a copy of it, sorted ideally for analysis.
+     * 
+     * Do a depth-first search, removing back-edges as we see them. Once every node's children have been finished,
+     * append it to the output list. If this list is FILO, we have a topological sort.
      */
-    def decycleFlowGraph(controlFlow: FlowGraph): FlowGraph = {
+    def topologicalSort(controlFlow: FlowGraph): Iterator[Block] = {
         var nodeStack: Stack[Block] = new Stack[Block]();
-        var discovered: ListBuffer[Block] = new ListBuffer[Block]();
+        var visited: List[Block] = List[Block]();
+        var output: Iterator[Block] = Iterator[Block]();
 
-        // add first node to S
+        nodeStack.addOne(controlFlow.getBlocks.get(0));
 
         while (!nodeStack.isEmpty) {
             var vertex = nodeStack.pop;
-            discovered += vertex;
             
-            // for every edge from V
-            // if the edge leads to discovered, remove it
-            // otherwise, add it to nodeStack.
+            vertex.getChildren.asScala.foreach(c => {
+                if (visited.contains(c)) {
+                    // note that this portion of the code will change significantly once FlowGraph is refactored.
+                    // The basic approach is there, though.
+                    vertex.children.remove(c);
+                } else {
+                    nodeStack.addOne(c);
+                }
+            });
+
+            if (vertex.getChildren.isEmpty) {
+                output = Iterator(vertex) ++ output;
+            }
         }
 
-        controlFlow;
-    }
-
-    def topologicalSort(controlFlow: FlowGraph): Iterator[Block] = {
-        controlFlow.getBlocks.iterator.asScala;
+        output;
     }
 }
 
