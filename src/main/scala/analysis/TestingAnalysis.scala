@@ -7,11 +7,11 @@ import astnodes.stmt.*;
  * Dummy "testing analysis" - keeps track of all the statements that it's seen so far, as a list.
  * Prints a line if it sees a call statement.
  */
-class TestingAnalysis(state: List[Stmt]) extends AnalysisPoint {
-    private var currentState: List[Stmt] = state;
+class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
+    private var currentState: Set[Stmt] = state;
 
     def this() = {
-        this(List[Stmt]());
+        this(Set());
     }
 
     override def compare(other: AnalysisPoint): Int = {
@@ -23,7 +23,7 @@ class TestingAnalysis(state: List[Stmt]) extends AnalysisPoint {
     override def union(other: AnalysisPoint): AnalysisPoint = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
-        new TestingAnalysis(currentState ++ otherAsThis.currentState);
+        new TestingAnalysis(currentState.union(otherAsThis.currentState));
     }
 
     override def intersection(other: AnalysisPoint): AnalysisPoint = {
@@ -33,14 +33,14 @@ class TestingAnalysis(state: List[Stmt]) extends AnalysisPoint {
     }
 
     override def transfer(stmt: Stmt): AnalysisPoint = {
-        var newState: List[Stmt] = List();
+        var newState: Set[Stmt] = Set();
         stmt match {
             case callStmt: CallStmt => {
                 println(callStmt.toString);
-                newState = currentState ++ List(callStmt);
+                newState = currentState ++ Set(callStmt);
             }
             case _ => {
-                newState = currentState ++ List(stmt);
+                newState = currentState ++ Set(stmt);
             };
         }
 
@@ -48,6 +48,6 @@ class TestingAnalysis(state: List[Stmt]) extends AnalysisPoint {
     }
 
     override def createLowest: AnalysisPoint = {
-        new TestingAnalysis(List());
+        new TestingAnalysis(Set());
     }
 }

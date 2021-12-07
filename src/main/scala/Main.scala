@@ -13,12 +13,9 @@ import java.util.Arrays
 import java.util.List
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import BilParser.*
-<<<<<<< HEAD
 import analysis.*;
-=======
 import astnodes.pred.Bool
 import vcgen.{State, VCGen}
->>>>>>> e56c565fcdf7d09da5771fc7176f3bfe557da544
 
 import collection.immutable
 import scala.collection.mutable.ArrayBuffer
@@ -49,23 +46,20 @@ import collection.JavaConverters.*
         */
 
         if (outputType.equals("boogie")) {
-<<<<<<< HEAD
-            val flowGraph = FlowGraph.fromStmts(stmts.asJava);
-
-            val testingWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
-            testingWorklist.workOnBlocks;
-
-            // val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
-            // translator.translate();
-=======
           val flowGraph = FlowGraph.fromStmts(stmts.asJava)
+
+          var testWorklist: BlockWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
+          testWorklist.workOnBlocks;
+          println(testWorklist.getAllStates);
+
+          /*
           val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
           val updatedFlowGraph = translator.translate();
 
           val state = State(updatedFlowGraph, Bool.True, Bool.False, Map.empty, Map.empty)
           val vc = VCGen.genVCs(state)
           writeToFile(vc)
->>>>>>> e56c565fcdf7d09da5771fc7176f3bfe557da544
+          */
         } else {
           println("Output failed")
         }

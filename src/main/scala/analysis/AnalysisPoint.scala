@@ -6,15 +6,6 @@ import util.AnalysisTypeException;
 
 trait AnalysisPoint {
     /**
-     * The "state" of the analysis at a known point. The point isn't stored here, rather, Worklist keeps a
-     * mapping of (point: Stmt -> state: AnalysisPoint) that we can query.
-     * 
-     * This state should be a mapping or enum or something that represents the actual lattice with the
-     * information we know at this point. See PointsToAnalysis for an example.
-     */
-    private var currentState: Any = ???;
-
-    /**
      * An ordering relation on the currentState of an analysis point so we can check any given transfer
      * for loss of precision.
      * 
@@ -96,12 +87,5 @@ trait AnalysisPoint {
         } else {
             throw new AnalysisTypeException(this.getClass.toString + " : " + other.getClass.toString);
         }
-    }
-
-    /**
-     * So we can access the current state.
-     */
-    def getState: Any = {
-        currentState;
     }
 }

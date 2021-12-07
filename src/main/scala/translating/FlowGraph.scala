@@ -81,7 +81,7 @@ object FlowGraph {
       */
     def fromStmts(stmts: List[Stmt]) = {
       val stmts1 = mergeCjmp(stmts.asScala.toList)
-      val stmts2 = setFunctionsWithReturns(stmts1.asJava);
+      val stmts2 = setFunctionsWithReturns(stmts1).asJava;
       // an ordered list of indexes of the given statements list, indicating where the list should be split into blocks
       val splits = getSplits(stmts2)
       // an ordered list of blocks, defined by the given given list of splits
@@ -98,8 +98,28 @@ object FlowGraph {
       flowGraph
     }
 
-    private def setFunctionsWithReturns(stmts: List[Stmt]): List[Stmt] = {
-      for (i <- 0 until stmts.size) {
+    private def setFunctionsWithReturns(stmts: immutable.List[Stmt]): immutable.List[Stmt] = {
+      var i = 0 // TODO work out a way to not use this
+
+      // TODO ideally could collect (returning a partial funciton instead of some/none)
+      (stmts.sliding(4, 1).flatMap{
+        case x if (x.size < 4) => Some(x(0)) // TODO this isnt doing what i want
+        case (call: CallStmt) :: (jmp: JmpStmt) :: _ :: (assign: RegisterAssign) :: Nil =>
+          call.setLHS(assign.getLhs)
+          i = 3
+          Some(call)
+        case _ if (i > 0) =>
+          i -= 1
+          None
+        case stmt :: rest => Some(stmt)
+        case Nil => None
+      } ++ stmts.takeRight(3)).toList  // Make sure to get the last 3 lines
+
+
+      /*
+      for (i <- 0 to (stmts.size - 3)) {
+        println(i)
+        println(stmts.size)
         if (stmts.get(i).isInstanceOf[CallStmt]
             && stmts.get(i + 1).isInstanceOf[JmpStmt]
             && stmts.get(i + 3).isInstanceOf[RegisterAssign]
@@ -116,7 +136,9 @@ object FlowGraph {
             stmts.remove(i + 3)
         }
       }
+
       stmts
+      */
     }
     private def findFunction(blocks: List[FlowGraph.Block], functionName: String) = blocks.stream
       .filter((b: FlowGraph.Block) => b.firstLine.isInstanceOf[EnterSub] && b.firstLine.asInstanceOf[EnterSub].getFuncName == functionName)
@@ -203,7 +225,7 @@ object FlowGraph {
     private def findInstWithPc(pc: String, stmts: List[Stmt]): Int = {
       if (pc.substring(0, 2) == "__") return -1 // TODO when jumping to a function e.g. goto @__gmon_start__
       for (i <- 0 until stmts.size) { if (stmts.get(i).getLabel.getPc == pc) return i }
-      throw new AssumptionViolationException(f"Error in constructing flow graph: No inst found with pc $pc.\n")
+      throw new AssumptionViolationException(s"Error in constructing flow graph: No inst found with pc $pc.\n")
     }
 
     /** Creates a list of blocks from each pair of consecutive splits. For example, for splits = [0, 3, 4, 8]
@@ -250,7 +272,7 @@ object FlowGraph {
           val child = findBlockStartingWith(childPc, blocks)
           // no such block was found, which means there is no block defined for this jump/cjump etc.
           if (child == null)
-            throw new AssumptionViolationException(f"Error creating flow graph. Could not find a block starting with target pc '$childPc'.")
+            throw new AssumptionViolationException(s"Error creating flow graph. Could not find a block starting with target pc '$childPc'.")
           block.children.add(child)
         }
       }
@@ -448,13 +470,13 @@ class FlowGraph (var functions: List[FlowGraph.Function]) {
       linesSet.forEach(linesList.remove)
       val stringBuilder = new StringBuilder
       linesList.forEach((line: Stmt) => stringBuilder.append(line.toString))
-      throw new AssumptionViolationException(f"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder")
+      throw new AssumptionViolationException(s"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder")
     }
     if (pcSet.size != pcList.size) {
       pcSet.forEach(pcList.remove)
       val stringBuilder = new StringBuilder
       pcList.forEach(stringBuilder.append)
-      throw new AssumptionViolationException(f"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder")
+      throw new AssumptionViolationException(s"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder")
     }
   }
   override def toString = {

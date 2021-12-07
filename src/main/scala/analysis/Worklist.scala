@@ -3,6 +3,7 @@ package analysis;
 import scala.collection.mutable.HashMap;
 import scala.collection.mutable.Set;
 import scala.collection.mutable.Stack;
+import scala.collection.mutable.ArrayDeque;
 import scala.jdk.CollectionConverters.IteratorHasAsScala;
 import scala.jdk.CollectionConverters.ListHasAsScala;
 import scala.jdk.CollectionConverters.ListHasAsScala;
@@ -15,10 +16,10 @@ import translating.FlowGraph.Block;
 import analysis.AnalysisPoint;
 
 class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
-    var workListQueue: Iterator[Block] = ???;
+    var workListQueue: ArrayDeque[Block] = ArrayDeque();
     var prevState: Set[AnalysisPoint] = createAnalysisEmpty;
 
-    var analysedStmtInfo: HashMap[Stmt, Set[AnalysisPoint]] = ???;
+    var analysedStmtInfo: HashMap[Stmt, Set[AnalysisPoint]] = HashMap();
     var blockFinalStates: HashMap[Block, Set[AnalysisPoint]] = HashMap();
 
     def createAnalysisEmpty: Set[AnalysisPoint] = {
@@ -47,8 +48,8 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
     def workOnBlocks = {
         workListQueue = topologicalSort(controlFlow); // topo sort with rm back-edges, save as iterator - depth-first search
 
-        while (workListQueue.hasNext) {
-            var nextBlock: Block = workListQueue.next;
+        while (!workListQueue.isEmpty) {
+            var nextBlock: Block = workListQueue.removeHead();
 
             // clear prevState
             prevState = createAnalysisEmpty;
@@ -105,6 +106,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * to queue on update, if they weren't already there.
      */
     def analyseSingleBlock(block: Block) = {
+        println("analysing block: " + block.toString);
         block.getLines.asScala.foreach(l => {
             analyseSinglePoint(l);
         });
@@ -118,26 +120,32 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
                 
                 // if queue doesn't contain child, add child, *and* if queue doesn't contain this, add this
                 if (!workListQueue.contains(block)) {
-                    workListQueue ++ Iterator(block);
+                    workListQueue.append(block);
                 }
 
                 block.getChildren.asScala.foreach(c => {
                     if (!workListQueue.contains(c)) {
-                        workListQueue ++ Iterator(c);
+                        workListQueue.append(c);
                     }
                 });
             }
         } else {
+            println("1")
             blockFinalStates.concat(HashMap(block -> prevState));
+            println("2")
+
+            println(workListQueue.toString);
 
             // if queue doesn't contain child, add child, *and* if queue doesn't contain this, add this
             if (!workListQueue.contains(block)) {
-                workListQueue ++ Iterator(block);
+                println("3")
+                workListQueue.append(block);
             }
+            println("4");
             
             block.getChildren.asScala.foreach(c => {
                 if (!workListQueue.contains(c)) {
-                    workListQueue ++ Iterator(c);
+                    workListQueue.append(c);
                 }
             });
         }
@@ -149,6 +157,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * Saves the new "prevState" and updates the analysedStmtInfo map.
      */
     def analyseSinglePoint(stmt: Stmt) = {
+        println("analysing stmt: " + stmt.toString);
         var newAnalysedPoint: Set[AnalysisPoint] = Set[AnalysisPoint]();
 
         prevState.foreach(p => {
@@ -171,10 +180,10 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * append that node to the *start* of the output iterator.
      * Output list is now a topologically ordered representation of the graph. Tada!
      */
-    def topologicalSort(controlFlow: FlowGraph): Iterator[Block] = {
+    def topologicalSort(controlFlow: FlowGraph): ArrayDeque[Block] = {
         var nodeStack: Stack[Block] = new Stack[Block]();
         var visited: List[Block] = List[Block]();
-        var output: Iterator[Block] = Iterator[Block]();
+        var output: ArrayDeque[Block] = ArrayDeque[Block]();
         var rmChildren: Map[Block, List[Block]] = Map[Block, List[Block]]();
 
         nodeStack.addOne(controlFlow.getBlocks.get(0));
@@ -206,7 +215,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
 
             // add blocks to the beginning of an iterator as we finish all their children
             if (vertex.getChildren.isEmpty) {
-                output = Iterator(vertex) ++ output;
+                output.prepend(vertex);
             }
         }
 

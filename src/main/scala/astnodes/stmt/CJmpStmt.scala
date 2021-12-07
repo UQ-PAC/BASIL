@@ -14,8 +14,8 @@ case class CJmpStmt(
                      var condition: Expr,
 ) extends Stmt(pc) {
   def getCondition = condition
-  override def toString = f"if ($condition) goto label$trueTarget else goto label$falseTarget;"
-  override def toBoogieString: String = f"if (${condition.toBoogieString}) { goto label$trueTarget; } goto label$falseTarget;"
+  override def toString = s"if ($condition) goto label$trueTarget else goto label$falseTarget;"
+  override def toBoogieString: String = s"if (${condition.toBoogieString}) { goto label$trueTarget; } goto label$falseTarget;"
   override def getChildren = Collections.singletonList(condition)
   override def replace(oldExp: Expr, newExp: Expr) = if (condition == oldExp) condition = newExp
 }
