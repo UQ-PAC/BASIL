@@ -182,8 +182,14 @@ class ConstantPropagation(functions: List[FlowGraph.Function]) {
    * TODO
    */
   private def calculateVarConstraint(state: util.HashMap[Var, Expr], assignment: Assign): Unit = {
-    var lhs : Expr = assignment.getLhs
+    var lhs : Var = assignment.getLhs.asInstanceOf[Var]
     var rhs : Expr = assignment.getRhs
+
+    if (state.containsKey(lhs)) {
+      state.replace(lhs, rhs)
+    } else {
+      state.put(lhs, rhs)
+    }
   }
 
   /**
@@ -194,6 +200,10 @@ class ConstantPropagation(functions: List[FlowGraph.Function]) {
   private def constantPropagation(states: HashMap[FlowGraph.Block, util.HashMap[Var, Expr]],
                                   blocks: List[FlowGraph.Block])
   : Unit = {
-
+    states.keySet().forEach(block => {
+      states.get(block).keySet().forEach(variable => {
+        states.keySet()
+      })
+    })
   }
 }
