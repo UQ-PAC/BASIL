@@ -1,4 +1,4 @@
-package analysis
+package analysis;
 
 import scala.math.signum;
 import scala.collection.mutable.HashMap;
@@ -18,7 +18,7 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends AnalysisPo
 
     override def compare(other: AnalysisPoint): Int = {
         var otherAsThis: PointsToAnalysis = typeCheck(other);
-        return (this.countEdges - otherAsThis.countEdges.sign);
+        return (this.countEdges - otherAsThis.countEdges).sign;
     }
 
     override def union(other: AnalysisPoint): AnalysisPoint = {

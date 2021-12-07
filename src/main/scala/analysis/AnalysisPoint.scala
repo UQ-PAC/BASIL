@@ -55,7 +55,7 @@ trait AnalysisPoint {
      * free to override this with more specific state information on a per-analysis basis.
      */
     override def toString: String = {
-        return this.getClass.getSimpleName;
+        this.getClass.getSimpleName;
     }
 
     /**
@@ -71,7 +71,7 @@ trait AnalysisPoint {
             throw new LatticeViolationException(toString); 
         }
 
-        return newState;
+        newState;
     }
 
     /**
@@ -88,11 +88,11 @@ trait AnalysisPoint {
      * but this causes errors elsewhere in the worklist function where we need to operate on sets of 
      * analyses and guarantee they have the same type.
      * 
-     * Also, this has to work with match statements somehow...
+     * Also, this should work with match statements somehow...
      */
     final def typeCheck(other: AnalysisPoint): this.type = {
         if (this.getClass == other.getClass) {
-            return other.asInstanceOf[this.type]
+            return other.asInstanceOf[this.type];
         } else {
             throw new AnalysisTypeException(this.getClass.toString + " : " + other.getClass.toString);
         }
@@ -102,6 +102,6 @@ trait AnalysisPoint {
      * So we can access the current state.
      */
     def getState: Any = {
-        return currentState;
+        currentState;
     }
 }
