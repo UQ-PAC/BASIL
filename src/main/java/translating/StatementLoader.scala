@@ -138,8 +138,10 @@ class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
   override def exitExpLiteral(ctx: BilParser.ExpLiteralContext): Unit = exprs.put(ctx, new Literal(ctx.literal.getText))
   override def exitExpExtract(ctx: BilParser.ExpExtractContext): Unit = {
     // fixme: assumes all bit vectors are 64 bits long
-    val firstNat = 64 - ctx.nat(0).getText.toInt
-    val secondNat = 63 - ctx.nat(1).getText.toInt
+    // TODO: val firstNat = 64 - ctx.nat(0).getText.toInt
+    // TODO: val secondNat = 63 - ctx.nat(1).getText.toInt
+    val firstNat = ctx.nat(1).getText.toInt
+    val secondNat = ctx.nat(1).getText.toInt
     val exp = getExpr(ctx.exp)
     exprs.put(ctx, new Extract(firstNat, secondNat, exp))
   }
