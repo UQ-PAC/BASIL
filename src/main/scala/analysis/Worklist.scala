@@ -49,10 +49,51 @@ class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
 
         while (workListQueue.hasNext) {
             var nextBlock: Block = workListQueue.next;
-            prevState = ???; // union of all parent's final states; unknown final states are considered as "no information" and add nothing to the union
 
+            // clear prevState
+            prevState = createAnalysisEmpty;
+
+            // for each parent
+            findParents(nextBlock).foreach(parent => {
+                // if the block hasn't been analysed, getOrElse becomes useful and gives us an empty set.
+                // empty set means the next loop gets skipped and we go straight to the next parent.
+                var parentFinalState: Set[AnalysisPoint[_]] = blockFinalStates.getOrElse(parent, Set());
+
+                // for each analysis of the parent
+                parentFinalState.foreach(parentAnalysisPoint => {
+                    var analysisFound: Boolean = false;
+                    
+                    // if an analysis of that type is in prevState, update it with the union of the two
+                    prevState.foreach(prevAnalysisPoint => {
+                        if (prevAnalysisPoint.getClass == parentAnalysisPoint.getClass) {
+                            prevState.remove(prevAnalysisPoint);
+                            prevState.add(prevAnalysisPoint.union(parentAnalysisPoint)); // need typecasting here
+                            analysisFound = false;
+                        }
+                    });
+                    
+                    // otherwise, add it to prevState
+                    if (!analysisFound) {
+                        prevState.add(parentAnalysisPoint);
+                    }
+                });
+            });
+
+            // prevState is now the union of all parent's analyses.
             analyseSingleBlock(nextBlock);
         }
+    }
+
+    def findParents(block: Block) = {
+        var output: Set[Block] = Set();
+
+        controlFlow.getBlocks.asScala.foreach(b => {
+            if (b.getChildren.asScala.contains(block)) {
+                output.add(b);
+            }
+        });
+
+        output;
     }
 
     /**
@@ -67,17 +108,36 @@ class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
         });
         
         var currentFinalBlockState = blockFinalStates.getOrElse(block, null);
+
         if (currentFinalBlockState != null) {
             if (currentFinalBlockState != prevState) {
                 blockFinalStates.remove(block);
                 blockFinalStates.concat(HashMap(block -> prevState));
                 
+                // if queue doesn't contain child, add child, *and* if queue doesn't contain this, add this
                 if (!workListQueue.contains(block)) {
-                    workListQueue ++ Iterator(block.getChildren.asScala);
+                    workListQueue ++ Iterator(block);
                 }
+
+                block.getChildren.asScala.foreach(c => {
+                    if (!workListQueue.contains(c)) {
+                        workListQueue ++ Iterator(c);
+                    }
+                });
             }
         } else {
             blockFinalStates.concat(HashMap(block -> prevState));
+
+            // if queue doesn't contain child, add child, *and* if queue doesn't contain this, add this
+            if (!workListQueue.contains(block)) {
+                workListQueue ++ Iterator(block);
+            }
+            
+            block.getChildren.asScala.foreach(c => {
+                if (!workListQueue.contains(c)) {
+                    workListQueue ++ Iterator(c);
+                }
+            });
         }
     }
 
@@ -105,8 +165,9 @@ class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
     /**
      * Takes a FlowGraph (w/r/t code "blocks") and returns a copy of it, sorted ideally for analysis.
      * 
-     * Do a depth-first search, removing back-edges as we see them. Once every node's children have been finished,
-     * append it to the output list. If this list is FILO, we have a topological sort.
+     * Do a depth-first search, removing back-edges as we see them. Once every child of a node has been finished,
+     * append that node to the *start* of the output iterator.
+     * Output list is now a topologically ordered representation of the graph. Tada!
      */
     def topologicalSort(controlFlow: FlowGraph): Iterator[Block] = {
         var nodeStack: Stack[Block] = new Stack[Block]();
@@ -151,7 +212,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
             // scala thinks we need getOrElse here despite the fact we're literally iterating over known keys
             k.children = rmChildren.getOrElse(k, List()).asJava;
         });
-
+        
         output;
     }
 }
