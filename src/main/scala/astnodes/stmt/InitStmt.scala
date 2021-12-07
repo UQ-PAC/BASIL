@@ -19,7 +19,7 @@ class InitStmt(var variable: Var, label: String, val varType: String = "bv64") e
       if (varType == "bv64") "bool"
       else if (varType == "[bv64] bv64") "[bv64] bool"
       else if (varType == "[bv64] bool") "[bv64] bool" // TODO  rm
-      else throw new AssumptionViolationException(f"Unhandled type $varType")
+      else throw new AssumptionViolationException(s"Unhandled type $varType")
     };"
 
 }
