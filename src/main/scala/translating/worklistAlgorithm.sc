@@ -10,6 +10,7 @@ import java.util.{HashMap, LinkedList, List}
 import scala.util.control.Breaks
 
 //TODO: all of these functions use object methods I don't know if will remain once moved to scala
+//TODO: needs a top & bottom lattice object
 class ConstantPropagation(functions: List[FlowGraph.Function]) {
 
   /**
@@ -23,6 +24,11 @@ class ConstantPropagation(functions: List[FlowGraph.Function]) {
     })
   }
 
+  /**
+   * Uses the propagation worklist algorithm to calculate variable constraints on each block.
+   * @param blocks
+   * @return
+   */
   private def propagationWorklistAlgorithm(blocks: util.List[FlowGraph.Block]):
   util.HashMap[FlowGraph.Block, util.HashMap[Var, Expr]] = {
     // the most straightforward way I can think of storing the blocks abstract states is
@@ -82,10 +88,33 @@ class ConstantPropagation(functions: List[FlowGraph.Function]) {
   /**
    * Performs a join operation and updates node. Returns true if there were no differences
    * between the child and parent node, else false.
+   * - for each var in pred node block
+   *    - if node contains var
+   *        - if expr equal
+   *            - don't change node state
+   *        - else
+   *            - assign top
+   *    - else add var to node state
    */
-  private def joinFunction(blockAbstractState: util.HashMap[FlowGraph.Block, util.HashMap[Var, Expr]], node: FlowGraph.Block, predecessorNode: FlowGraph.Block) = {
+  private def joinFunction(blockAbstractState: util.HashMap[FlowGraph.Block,
+    util.HashMap[Var, Expr]], node: FlowGraph.Block, predecessorNode: FlowGraph.Block) = {
+    var conflict: Boolean = false;
 
-    true
+    val predState = blockAbstractState.get(predecessorNode)
+    val currState = blockAbstractState.get(node)
+
+    predState.keySet().forEach(variable => {
+      if (currState.containsKey(variable)) {
+        if (!currState.get(variable).equals(predState.get(variable))) {
+          currState.remove(variable)
+          conflict = true
+        }
+      } else {
+        currState.put(variable, predState.get(variable))
+      }
+    })
+
+    conflict
   }
 
   /**
@@ -106,20 +135,19 @@ class ConstantPropagation(functions: List[FlowGraph.Function]) {
         if (!exists.contains(variable)) exists.add(variable)
       })
     })
+
     // perform the meet operator for constant propagation
     var allStatesAgree = true
     exists.forEach(variable => {
-      var expFactToCompare = null
+      var expFactToCompare: Expr = null
       val loop = new Breaks
       loop.breakable{
         predecessors.forEach(block => {
           if (blockAbstractState.get(block).containsKey(variable)) if (expFactToCompare != null) if (!(expFactToCompare == blockAbstractState.get(block).get(variable))) {
             allStatesAgree = false
             break
-
           }
-          // TODO: this line is throwing an error for some reason
-//          else expFactToCompare: Expr = blockAbstractState.get(block).get(variable)
+          else expFactToCompare = blockAbstractState.get(block).get(variable)
         })
       }
       if (allStatesAgree) newAbstractState.put(variable, expFactToCompare)
@@ -130,18 +158,20 @@ class ConstantPropagation(functions: List[FlowGraph.Function]) {
 
   /**
    * Updates the abstract state of the block.
+   * - for each line in the block
+   *    - if statement is an Assign
+   *        - if state contains variable
+   *            - new entry = var, calculateVarConstraint
+   *            - add entry to state
+   *        - else
+   *            - add var, expr to state
    */
   private def transferFunction(block: FlowGraph.Block, state: util.HashMap[Var, Expr]): Unit = {
     block.getLines.forEach(line => {
       if (line.isInstanceOf[Assign]) {
         val assignment = line.asInstanceOf[Assign]
         val variable = assignment.getLhs.asInstanceOf[Var]
-        if (state.containsKey(variable)) {
-          return
-          // TODO: add a clone method to instruction facts so variables can be calculated
-          //  without modifying any of the lines just yet (need to wait until the
-          //  worklist algorithm has finished running) or something similar
-        }
+        calculateVarConstraint(state, assignment)
       }
     })
   }
@@ -151,7 +181,10 @@ class ConstantPropagation(functions: List[FlowGraph.Function]) {
    * expression and updates/adds the variable to the map.
    * TODO
    */
-  private def calculateVarConstraints(state: util.HashMap[Var, Expr], assignment: Assign): Unit = {}
+  private def calculateVarConstraint(state: util.HashMap[Var, Expr], assignment: Assign): Unit = {
+    var lhs : Expr = assignment.getLhs
+    var rhs : Expr = assignment.getRhs
+  }
 
   /**
    * Performs constant propagation on the lines and updates the variables.
