@@ -44,7 +44,7 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
             };
         }
 
-        new TestingAnalysis(newState);
+        new TestingAnalysis(newrun State);
     }
 
     override def createLowest: AnalysisPoint = {
