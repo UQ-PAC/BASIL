@@ -14,22 +14,22 @@ import translating.FlowGraph;
 import translating.FlowGraph.Block;
 import analysis.AnalysisPoint;
 
-class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
+class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
     var workListQueue: Iterator[Block] = ???;
-    var prevState: Set[AnalysisPoint[_]] = createAnalysisEmpty;
+    var prevState: Set[AnalysisPoint] = createAnalysisEmpty;
 
-    var analysedStmtInfo: HashMap[Stmt, Set[AnalysisPoint[_]]] = ???;
-    var blockFinalStates: HashMap[Block, Set[AnalysisPoint[_]]] = HashMap();
+    var analysedStmtInfo: HashMap[Stmt, Set[AnalysisPoint]] = ???;
+    var blockFinalStates: HashMap[Block, Set[AnalysisPoint]] = HashMap();
 
-    def createAnalysisEmpty: Set[AnalysisPoint[_]] = {
+    def createAnalysisEmpty: Set[AnalysisPoint] = {
         analyses.map(a => a.createLowest);
     }
 
-    def getAllStates: HashMap[Stmt, Set[AnalysisPoint[_]]] = {
+    def getAllStates: HashMap[Stmt, Set[AnalysisPoint]] = {
         analysedStmtInfo;
     }
 
-    def getOneState(stmt: Stmt): Set[AnalysisPoint[_]] = {
+    def getOneState(stmt: Stmt): Set[AnalysisPoint] = {
         analysedStmtInfo.getOrElse(stmt, createAnalysisEmpty);
     }
 
@@ -57,17 +57,19 @@ class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
             findParents(nextBlock).foreach(parent => {
                 // if the block hasn't been analysed, getOrElse becomes useful and gives us an empty set.
                 // empty set means the next loop gets skipped and we go straight to the next parent.
-                var parentFinalState: Set[AnalysisPoint[_]] = blockFinalStates.getOrElse(parent, Set());
+                var parentFinalState: Set[AnalysisPoint] = blockFinalStates.getOrElse(parent, Set());
 
                 // for each analysis of the parent
                 parentFinalState.foreach(parentAnalysisPoint => {
                     var analysisFound: Boolean = false;
+
+                    // parentAnalysisPoint: AnalysisPoint[ValueAnalysis] = ValueAnalysis(foo);
                     
                     // if an analysis of that type is in prevState, update it with the union of the two
-                    prevState.foreach(prevAnalysisPoint => {
-                        if (prevAnalysisPoint.getClass == parentAnalysisPoint.getClass) {
+                    prevState.foreach({
+                        case prevAnalysisPoint: parentAnalysisPoint.type => {
                             prevState.remove(prevAnalysisPoint);
-                            prevState.add(prevAnalysisPoint.union(parentAnalysisPoint)); // need typecasting here
+                            prevState.add(prevAnalysisPoint.union(parentAnalysisPoint));
                             analysisFound = false;
                         }
                     });
@@ -147,7 +149,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
      * Saves the new "prevState" and updates the analysedStmtInfo map.
      */
     def analyseSinglePoint(stmt: Stmt) = {
-        var newAnalysedPoint: Set[AnalysisPoint[_]] = Set[AnalysisPoint[_]]();
+        var newAnalysedPoint: Set[AnalysisPoint] = Set[AnalysisPoint]();
 
         prevState.foreach(p => {
             newAnalysedPoint.add(p.transfer(stmt));
@@ -217,6 +219,6 @@ class BlockWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
     }
 }
 
-class FunctionWorklist(analyses: Set[AnalysisPoint[_]], controlFlow: FlowGraph) {
+class FunctionWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
 
 }

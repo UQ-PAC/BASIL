@@ -2,8 +2,9 @@ package analysis
 
 import astnodes.stmt.Stmt;
 import util.LatticeViolationException;
+import util.AnalysisTypeException;
 
-trait AnalysisPoint[A <: AnalysisPoint[A]] {
+trait AnalysisPoint {
     /**
      * The "state" of the analysis at a known point. The point isn't stored here, rather, Worklist keeps a
      * mapping of (point: Stmt -> state: AnalysisPoint) that we can query.
@@ -20,7 +21,7 @@ trait AnalysisPoint[A <: AnalysisPoint[A]] {
      * Returns 1 iff this < other, 0 iff this == other, and -1 iff this > other - so a return value of 1
      * indicates precision has been lost.
      */
-    def compare(other: A): Int;
+    def compare(other: AnalysisPoint): Int;
 
     /**
      * A general transfer function on the lattice. Gives us a new AnalysisPoint, which is the result of
@@ -29,25 +30,25 @@ trait AnalysisPoint[A <: AnalysisPoint[A]] {
      * Note that this function should be able to handle all the different transfer functions by if/else'ing
      * every type of statement the analysis needs to handle.
      */
-    def transfer(stmt: Stmt): A;
+    def transfer(stmt: Stmt): AnalysisPoint;
 
     /**
      * A union or join of two lattice states. Should contain all the information from the first state
      * as well as all the information from the second state - even if this introduces uncertainty.
      */
-    def union(other: A): A;
+    def union(other: AnalysisPoint): AnalysisPoint;
     
     /**
      * An intersection or meet of two lattice elements. Should contain all the information that appears in
      * both states.
      */
-    def intersection(other: A): A;
+    def intersection(other: AnalysisPoint): AnalysisPoint;
 
     /**
      * Creates an AnalysisPoint in the same type of analysis as this one, but with currentState as whatever
      * we're using for low/false. 
      */
-    def createLowest: A;
+    def createLowest: AnalysisPoint;
 
     /**
      * Basic placeholder that gives the simple name of the class, which useful for exception handling. Feel
@@ -63,14 +64,31 @@ trait AnalysisPoint[A <: AnalysisPoint[A]] {
      * Please don't override this unless it's absolutely necessary - write all the analysis-specific stuff in
      * transfer(), compare(), and toString()!
      */
-    def transferAndCheck(stmt: Stmt): A = {
-        var newState: A = transfer(stmt);
+    def transferAndCheck(stmt: Stmt): AnalysisPoint = {
+        var newState: AnalysisPoint = transfer(stmt);
 
         if (compare(newState) > 0) {
             throw new LatticeViolationException(toString); 
         }
 
         return newState;
+    }
+
+    /**
+     * Another fancy, please-don't-override method that casts "other" to an instance of "this". Please use 
+     * this in your transfer, union, intersection, compare, etc. functions though.
+     * 
+     * You might think it would be easier to use scala's subclass comparison thingy where you have
+     * ExampleAnalysis(foo) extends AnalysisPoint[ExampleAnalysis]
+     * but this causes errors elsewhere in the worklist function where we need to operate on sets of 
+     * analyses and guarantee they have the same type.
+     */
+    def typeCheck(other: AnalysisPoint): this.type = {
+        if (this.getClass == other.getClass) {
+            return other.asInstanceOf[this.type]
+        } else {
+            throw new AnalysisTypeException(this.getClass.toString + " : " + other.getClass.toString);
+        }
     }
 
     /**
