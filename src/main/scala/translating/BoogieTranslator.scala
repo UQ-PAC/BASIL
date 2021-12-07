@@ -118,16 +118,17 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     val iter = params.iterator
     while (iter.hasNext) {
       val param = iter.next
-      params.forEach(otherParam => {
-        if ((param ne otherParam) && param.getRegister == otherParam.getRegister) { // duplicate found
-          if (param.getAlias == null) { // null alias => this is the explicit param
-            otherParam.setName(param.getName)
-          } else { // non-null alias => this is the implicit param
-            otherParam.setAlias(param.getAlias)
-          }
-          iter.remove()
-        }
+
+      val otherparams = params.asScala.filter(otherParam => {
+        (param != otherParam) && param.getRegister == otherParam.getRegister
       })
+      
+      otherparams.foreach{
+        case x if (x.getAlias == null) => x.setName(param.getName)  // null alias => this is the explicit param
+        case x => x.setAlias(param.getAlias)  // non-null alias => this is the implicit param
+      }
+      
+      if (otherparams.nonEmpty) iter.remove()
     }
   }
 
