@@ -3,6 +3,8 @@ import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 
+import scala.collection.mutable.Set;
+
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.IOException
@@ -11,6 +13,7 @@ import java.util.Arrays
 import java.util.List
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import BilParser.*
+import analysis.*;
 
 import scala.collection.mutable.ArrayBuffer
 import collection.JavaConverters.*
@@ -29,6 +32,7 @@ import collection.JavaConverters.*
         val walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 
+        /*
         val symsLexer = new SymsLexer(CharStreams.fromFileName(elfFileName))
         val symsTokens = new CommonTokenStream(symsLexer)
         val symsParser = new SymsParser(symsTokens)
@@ -36,11 +40,16 @@ import collection.JavaConverters.*
         val symsListener = new SymbolTableListener()
         walker.walk(symsListener, symsParser.syms)
         println(symsListener.symbolTable)
+        */
 
         if (outputType.equals("boogie")) {
             val flowGraph = FlowGraph.fromStmts(stmts.asJava);
-            val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
-            translator.translate();
+
+            val testingWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
+            testingWorklist.workOnBlocks;
+
+            // val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
+            // translator.translate();
         } else {
           println("Output failed")
         }

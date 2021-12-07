@@ -97,21 +97,22 @@ object FlowGraph {
       flowGraph
     }
 
-    private def setFunctionsWithReturns(stmts: List[Stmt]) = {
+    private def setFunctionsWithReturns(stmts: List[Stmt]): List[Stmt] = {
       for (i <- 0 until stmts.size) {
         if (stmts.get(i).isInstanceOf[CallStmt]
-          && stmts.get(i + 1).isInstanceOf[JmpStmt]
-          && stmts.get(i + 3).isInstanceOf[RegisterAssign]
+            && stmts.get(i + 1).isInstanceOf[JmpStmt]
+            && stmts.get(i + 3).isInstanceOf[RegisterAssign]
         ) {
-          val call = stmts.get(i).asInstanceOf[CallStmt]
-          val cjmp = stmts.get(i + 1).asInstanceOf[JmpStmt]
-          val assign = stmts.get(i + 3).asInstanceOf[RegisterAssign]
-          if (cjmp.target == stmts.get(i + 1).getLabel.getPc)
-            throw new AssumptionViolationException("Expected jump to next line")
-          call.setLHS(assign.getLhs)
-          stmts.remove(i + 1)
-          stmts.remove(i + 2)
-          stmts.remove(i + 3)
+            val call = stmts.get(i).asInstanceOf[CallStmt]
+            val cjmp = stmts.get(i + 1).asInstanceOf[JmpStmt]
+            val assign = stmts.get(i + 3).asInstanceOf[RegisterAssign]
+            if (cjmp.target == stmts.get(i + 1).getLabel.getPc) {
+                throw new AssumptionViolationException("Expected jump to next line")
+            }
+            call.setLHS(assign.getLhs)
+            stmts.remove(i + 1)
+            stmts.remove(i + 2)
+            stmts.remove(i + 3)
         }
       }
       stmts

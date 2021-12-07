@@ -1,4 +1,4 @@
-package analysis
+package analysis;
 
 import scala.collection.mutable.HashMap;
 import scala.collection.mutable.Set;

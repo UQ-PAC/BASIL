@@ -10,6 +10,10 @@ import astnodes.stmt.*;
 class TestingAnalysis(state: List[Stmt]) extends AnalysisPoint {
     private var currentState: List[Stmt] = state;
 
+    def this() = {
+        this(List[Stmt]());
+    }
+
     override def compare(other: AnalysisPoint): Int = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
