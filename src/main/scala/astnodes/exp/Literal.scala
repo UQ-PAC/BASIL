@@ -5,7 +5,7 @@ import java.util.Objects
 
 /** Literal expression (e.g. 4, 5, 10)
   */
-class Literal(var value: String) extends Expr {
+case class Literal(var value: String) extends Expr {
   this.value = parseHex(value)
 
   /** Value of literal */

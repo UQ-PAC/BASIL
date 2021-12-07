@@ -9,21 +9,13 @@ import collection.JavaConverters.*
 import astnodes.pred.{Bool, Pred, BinOp, conjunct}
 
 object VCGen {
-  def genVCs(flowGraph: FlowGraph, state: State): List[Stmt] = {
-
-    /*
-    flowGraph.setFunctions(
-      flowGraph.getFunctions.asScala.map(func => func.getBlocks.asScala.map(
-        // func.copy(blocks = blocks.map(....)
-        block => block.getLines.asScala.flatMap(line => None
-        // TODO genVC(line, fState, state)
-      ))).asJava
-    )
-    */
-
-    List.empty;
-
-    // flowGraph.getLines.asScala.flatMap(line => List(line, Assert("-1", genVC(line, state)))).toList
+  def genVCs(state: State): State = {
+    // TODO there is a better way to do this deep copy (i assume)
+    state.copy(functions = state.functions.map(f =>
+      f.copy(labelToBlock = f.labelToBlock.map {
+        case (pc, b) => (pc, b.copy(lines = b.lines.flatMap(line => List(Assert("TODO", genVC(line, f, state)), line))))
+      })
+    ))
   }
 
   /** Generate the VC for a given statement
@@ -45,7 +37,7 @@ object VCGen {
     // TODO ^ my current thinking is that we specify using the original vars, use the GOT/symbol table to generate a corresponding specification
     // on the memory
     case _: Assert => ??? // There should not be an assert here
-    case _         => ???
+    case _         => Bool.True // TODO
   }
 
   // def computeGamma(expr: Expr) = expr.vars.map(v => v.toGamma).asInstanceOf[List[Pred]].conjunct

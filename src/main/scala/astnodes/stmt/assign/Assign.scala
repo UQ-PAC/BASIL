@@ -12,6 +12,7 @@ abstract class Assign (override val pc: String, var lhs: Expr, var rhs: Expr) ex
   def getRhs = rhs
 
   override def toString = String.format("%s%s := %s;", getLabel, lhs, rhs)
+  override def toBoogieString: String = f"$getLabel$lhs := ${rhs.toBoogieString};"
   override def getChildren = util.Arrays.asList(lhs, rhs)
   override def replace(oldExp: Expr, newExp: Expr) = {
     if (lhs == oldExp) lhs = newExp

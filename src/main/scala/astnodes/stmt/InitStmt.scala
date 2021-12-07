@@ -5,7 +5,7 @@ import java.util.Collections
 import java.util
 import astnodes.exp.Expr
 
-
+// TODO is this class necassary 
 class InitStmt(var variable: Var, label: String, val varType: String = "int") extends Stmt(label) { 
   override def getChildren: util.List[Expr]  =  Collections.singletonList(variable)
   override def replace(oldExp: Expr, newExp: Expr)  =  if (variable == oldExp)  variable = newExp.asInstanceOf[Var]

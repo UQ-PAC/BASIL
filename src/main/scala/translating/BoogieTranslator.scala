@@ -23,7 +23,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
 
   /** Starting point for a BIL translation.
     */
-  def translate() = {
+  def translate(): FlowGraph = {
     createLabels()
     optimiseSkips()
     identifyImplicitParams()
@@ -33,7 +33,9 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     addVarDeclarations()
     // TODO could turn this on later:  replaceGlobalVars(symbolTable)
     // TODO vcgen happens here
-    writeToFile()
+    // writeToFile()
+
+    flowGraph;
   }
 
   private def createLabels(): Unit = {
@@ -212,7 +214,9 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     flowGraph.getFunctions.forEach(function =>
       for (localVar <- getLocalVarsInFunction(function)) {
         // TODO i think this could be replaced by a none label as well
-        function.addInitStmt(new InitStmt(localVar, uniqueLabel))
+        // TODO rework how this works to instead store a list of vars
+        println((function.getInitStmts, function.getInitStmts.asScala.filter(x => x.variable == localVar), localVar))
+        if (!function.getInitStmts.asScala.exists(x => x.variable == localVar)) function.addInitStmt(new InitStmt(localVar, uniqueLabel))
       }
     )
   }

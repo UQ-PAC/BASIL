@@ -11,7 +11,10 @@ import java.util.Arrays
 import java.util.List
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import BilParser.*
+import astnodes.pred.Bool
+import vcgen.{State, VCGen}
 
+import collection.immutable
 import scala.collection.mutable.ArrayBuffer
 import collection.JavaConverters.*
 
@@ -38,10 +41,26 @@ import collection.JavaConverters.*
         println(symsListener.symbolTable)
 
         if (outputType.equals("boogie")) {
-            val flowGraph = FlowGraph.fromStmts(stmts.asJava);
-            val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
-            translator.translate();
+          val flowGraph = FlowGraph.fromStmts(stmts.asJava);
+          val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
+          val updatedFlowGraph = translator.translate();
+
+          val state = State(updatedFlowGraph, Bool.True, Bool.False, Map.empty, Map.empty)
+          val vc = VCGen.genVCs(state)
+          writeToFile(vc)
         } else {
           println("Output failed")
         }
     }
+
+// TODO copy pasted
+def writeToFile(state: State): Unit = {
+  val outputFileName = "boogie_out.bpl"
+  try {
+    val writer = new BufferedWriter(new FileWriter(outputFileName, false))
+    writer.write(state.toString)
+    writer.flush()
+  } catch {
+    case _: IOException => System.err.println("Error writing to file.")
+  }
+}

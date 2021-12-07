@@ -4,6 +4,7 @@ import astnodes.exp.Var
 
 trait Pred {
   def vars: List[Var]
+  def toBoogieString = toString
 }
 
 /** Define custom methods for List[Expr]
