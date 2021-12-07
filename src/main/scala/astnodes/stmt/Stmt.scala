@@ -15,4 +15,6 @@ abstract class Stmt(val pc: String) {
 
   def getChildren: util.List[Expr]
   def replace(oldExpr: Expr, newExpr: Expr): Unit
+  
+  def toBoogieString = toString
 }
