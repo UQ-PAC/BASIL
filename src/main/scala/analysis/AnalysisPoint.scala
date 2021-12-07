@@ -61,10 +61,10 @@ trait AnalysisPoint {
     /**
      * Fancy method that uses the transfer and compare methods to guarantee that we maintain monotonicity.
      * 
-     * Please don't override this unless it's absolutely necessary - write all the analysis-specific stuff in
-     * transfer(), compare(), and toString()!
+     * This shouldn't need to be overridden - write all the analysis-specific stuff in
+     * transfer(), compare(), union(), intersection(), createLowest, and toString()!
      */
-    def transferAndCheck(stmt: Stmt): AnalysisPoint = {
+    final def transferAndCheck(stmt: Stmt): AnalysisPoint = {
         var newState: AnalysisPoint = transfer(stmt);
 
         if (compare(newState) > 0) {
@@ -79,11 +79,18 @@ trait AnalysisPoint {
      * this in your transfer, union, intersection, compare, etc. functions though.
      * 
      * You might think it would be easier to use scala's subclass comparison thingy where you have
+     *
+     * AnalysisPoint[A <: AnalysisPoint[A]] {
+     *     def transfer(stmt: Stmt): A;
+     * }
      * ExampleAnalysis(foo) extends AnalysisPoint[ExampleAnalysis]
+     * 
      * but this causes errors elsewhere in the worklist function where we need to operate on sets of 
      * analyses and guarantee they have the same type.
+     * 
+     * Also, this has to work with match statements somehow...
      */
-    def typeCheck(other: AnalysisPoint): this.type = {
+    final def typeCheck(other: AnalysisPoint): this.type = {
         if (this.getClass == other.getClass) {
             return other.asInstanceOf[this.type]
         } else {

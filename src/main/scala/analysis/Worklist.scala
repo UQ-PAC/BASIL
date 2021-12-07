@@ -70,7 +70,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
                         case prevAnalysisPoint: parentAnalysisPoint.type => {
                             prevState.remove(prevAnalysisPoint);
                             prevState.add(prevAnalysisPoint.union(parentAnalysisPoint));
-                            analysisFound = false;
+                            analysisFound = true;
                         }
                     });
                     
