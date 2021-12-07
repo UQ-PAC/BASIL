@@ -3,17 +3,18 @@ package astnodes.stmt
 import astnodes.parameters.InParameter
 import astnodes.exp.Expr
 import astnodes.parameters.OutParameter
-import scala.jdk.CollectionConverters.*
 
+import scala.jdk.CollectionConverters.*
 import java.util
 import java.util.*
+import scala.collection.immutable
 
 // TODO scalaify
 class EnterSub(override val pc: String, var funcName: String) extends Stmt(pc) {
   private var inParams: List[InParameter] = new util.ArrayList[InParameter]()
   private var outParam: Option[OutParameter] = None
   private var modifies: List[String] = new util.LinkedList[String]() // TODO type
-  modifies.add("mem")
+  modifies.addAll(immutable.List("heap", "stack", "Gamma_heap", "Gamma_stack").asJava)
 
   def getInParams = inParams
   def getOutParam = outParam
@@ -28,7 +29,7 @@ class EnterSub(override val pc: String, var funcName: String) extends Stmt(pc) {
 
     // TODO
     val modifiesStr =
-      if (modifies.size > 0) "\n modifies " + modifies.asScala.mkString(" ") //+ ";\nimplementation " + decl
+      if (modifies.size > 0) "\n modifies " + modifies.asScala.mkString(", ") //+ ";\nimplementation " + decl
       else ""
 
     "procedure " + decl + modifiesStr + "; {"

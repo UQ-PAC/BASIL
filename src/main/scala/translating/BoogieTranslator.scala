@@ -29,7 +29,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     identifyImplicitParams()
     resolveInParams()
     resolveOutParams()
-    resolveVars()
+    // TODO this doesnt work: resolveVars()
     addVarDeclarations()
     // TODO could turn this on later:  replaceGlobalVars(symbolTable)
     // TODO vcgen happens here
@@ -194,9 +194,9 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
         val lhs = line.asInstanceOf[Assign].getLhs.asInstanceOf[Var]
         // TODO slow
         if (
-          flowGraph.getGlobalInits.stream.noneMatch(init => init.variable.getName == lhs.getName)
-          && function.getHeader.getInParams.stream.noneMatch((inParam) => inParam.getName.getName == lhs.getName) // TODO check if this is needed
-          && !(function.getHeader.getOutParam.get.getName.getName == lhs.getName)
+          flowGraph.getGlobalInits.stream.noneMatch(init => init.variable.name == lhs.name)
+          && function.getHeader.getInParams.stream.noneMatch((inParam) => inParam.getName.name == lhs.name) // TODO check if this is needed
+          && !(function.getHeader.getOutParam.get.getName.name == lhs.name)
         ) {
           vars.add(lhs)
         }
@@ -221,7 +221,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     )
   }
 
-  private def isRegister(varFact: Var): Boolean = varFact.getName.charAt(0) == 'X'
+  private def isRegister(varFact: Var): Boolean = varFact.name.charAt(0) == 'X'
 
   /** Resolves outParams by crudely replacing all references to their associated register with their human-readable
     * name.

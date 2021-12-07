@@ -6,7 +6,7 @@ import astnodes.stmt.{Assert, CJmpStmt, Stmt}
 import translating.FlowGraph
 
 import collection.JavaConverters.*
-import astnodes.pred.{Bool, Pred, BinOp, conjunct}
+import astnodes.pred.{Bool, Pred, BinOp, conjunct, BinOperator}
 
 object VCGen {
   def genVCs(state: State): State = {
@@ -29,7 +29,7 @@ object VCGen {
     case assign: MemAssign =>
       assign.memExp.onStack match {
         case true  => Bool.True // TODO aren't these thread local
-        case false => BinOp("=>", assign.memExp.toL, computeGamma(assign.rhsExp))
+        case false => BinOp(BinOperator.Implication, assign.memExp.toL, computeGamma(assign.rhsExp))
         // Use the GOT/ST to get the exact variable being referenced, except if it uses pointer arithmetic etc etc
         // would be interesting to see if making the substitution actually made a meaningful difference
       }

@@ -7,8 +7,7 @@ import astnodes.pred
 /** Variable fact
   */
 case class Var(name: String) extends Expr {
-  def getName = name
-  override def toString = String.format("%s", name)
+  override def toString = name
   override def getChildren = new util.ArrayList[Expr]
   override def replace(oldExp: Expr, newExp: Expr) = {}
 

@@ -76,8 +76,8 @@ case object BinOperator extends Enumeration {
     case BitwiseAnd => "bv64and"
     case BitwiseOr => "bv64or"
     case BitwiseXor => "bv64xor"
-    case Equality => "bvcomp"
+    case Equality => "bv64comp"
     // TODO !!!!!!!!!!! case NonEquality => ??? // TODO need to do this as !(a = b) i think
-    case NonEquality => "bvcomp"
+    case NonEquality => "bv64comp"
   }
 }

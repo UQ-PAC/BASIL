@@ -42,6 +42,7 @@ object FlowGraph {
 
   class Function(val header: EnterSub, val blocks: List[FlowGraph.Block]) {
     private val initStmts = new LinkedList[InitStmt]
+
     // variable initialisations to be at the top of this function
     def getHeader = header
     def getBlocks = blocks
@@ -204,8 +205,8 @@ object FlowGraph {
       throw new AssumptionViolationException(f"Error in constructing flow graph: No inst found with pc $pc.\n")
     }
 
-    /** Creates a list of blocks from each pair of consecutive splits. For example, for splits = [0, 3, 4, 8] and lines
-      * = [a, b, c, d, e, f, g, h], we will get blocks of: [a, b, c], [d], [e, f, g, h]
+    /** Creates a list of blocks from each pair of consecutive splits. For example, for splits = [0, 3, 4, 8]
+      * and lines = [a, b, c, d, e, f, g, h], we will get blocks of: [a, b, c], [d], [e, f, g, h]
       *
       * @requires
       *   splits and lines are sorted and splits.contains(0) and splits.contains(lines.size())
@@ -374,9 +375,11 @@ object FlowGraph {
 
 class FlowGraph (var functions: List[FlowGraph.Function]) {
   private var globalInits: List[InitStmt] = new LinkedList[InitStmt].asInstanceOf[List[InitStmt]]
-  globalInits.add(new InitStmt(new Var("heap"), "heap", "[int] int")) // TODO label.none
-  globalInits.add(new InitStmt(new Var("stack"), "stack", "[int] int"))
-  globalInits.add(new InitStmt(new Var("SP"), "SP", "int"))
+  globalInits.add(new InitStmt(new Var("heap"), "heap", "[bv64] bv64")) // TODO label.none
+  globalInits.add(new InitStmt(new Var("stack"), "stack", "[bv64] bv64"))
+  globalInits.add(new InitStmt(new Var("L_heap"), "heap", "[bv64] bool")) // TODO This isnt great
+  globalInits.add(new InitStmt(new Var("L_stack"), "stack", "[bv64] bool"))
+  globalInits.add(new InitStmt(new Var("SP"), "SP"))
 
   def getGlobalInits = globalInits
   def setGlobalInits(inits: List[InitStmt]) = this.globalInits = inits
