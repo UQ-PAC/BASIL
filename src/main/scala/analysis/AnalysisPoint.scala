@@ -9,10 +9,17 @@ trait AnalysisPoint {
      * An ordering relation on the currentState of an analysis point so we can check any given transfer
      * for loss of precision.
      * 
-     * Returns 1 iff this < other, 0 iff this == other, and -1 iff this > other - so a return value of 1
+     * Returns 1 iff this < other, 0 iff this ≡ other, and -1 iff this > other - so a return value of 1
      * indicates precision has been lost.
      */
     def compare(other: AnalysisPoint): Int;
+
+    /**
+     * Defines equality on two analysis points. Not the same as compare == 0; compare defines an ordering relation
+     * where two elements might be on the same level of the lattice, whereas equals is simply asking if the two
+     * analyses have exactly the same state.
+     */
+    def equals(other: AnalysisPoint): Boolean;
 
     /**
      * A general transfer function on the lattice. Gives us a new AnalysisPoint, which is the result of

@@ -16,9 +16,14 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends AnalysisPo
         return count;
     }
 
+    override def equals(other: AnalysisPoint): Boolean = {
+        var otherAsThis: PointsToAnalysis = typeCheck(other);
+        this.currentState.equals(otherAsThis.currentState);
+    }
+
     override def compare(other: AnalysisPoint): Int = {
         var otherAsThis: PointsToAnalysis = typeCheck(other);
-        return (this.countEdges - otherAsThis.countEdges).sign;
+        (this.countEdges - otherAsThis.countEdges).sign;
     }
 
     override def union(other: AnalysisPoint): AnalysisPoint = {
@@ -33,7 +38,7 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends AnalysisPo
             })
         });
 
-        return new PointsToAnalysis(combined);
+        new PointsToAnalysis(combined);
     }
 
     override def intersection(other: AnalysisPoint): AnalysisPoint = {
@@ -48,7 +53,7 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends AnalysisPo
             })
         });
 
-        return new PointsToAnalysis(intersected);
+        new PointsToAnalysis(intersected);
     }
 
     override def transfer(stmt: Stmt): AnalysisPoint = {
@@ -57,10 +62,10 @@ class PointsToAnalysis(pointsToGraph: HashMap[Int, Set[Int]]) extends AnalysisPo
          * stuff like "if stmt.type = assignation, output = (currentstate remove LHS) union (LHS -> RHS)
          */
 
-        return this;
+        this;
     }
 
     override def createLowest: AnalysisPoint = {
-        return new PointsToAnalysis(new HashMap[Int, Set[Int]]);
+        new PointsToAnalysis(new HashMap[Int, Set[Int]]);
     }
 }

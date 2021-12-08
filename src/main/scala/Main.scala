@@ -35,7 +35,6 @@ import collection.JavaConverters.*
         val walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 
-        /*
         val symsLexer = new SymsLexer(CharStreams.fromFileName(elfFileName))
         val symsTokens = new CommonTokenStream(symsLexer)
         val symsParser = new SymsParser(symsTokens)
@@ -43,25 +42,25 @@ import collection.JavaConverters.*
         val symsListener = new SymbolTableListener()
         walker.walk(symsListener, symsParser.syms)
         println(symsListener.symbolTable)
-        */
 
         if (outputType.equals("boogie")) {
-          val flowGraph = FlowGraph.fromStmts(stmts.asJava)
+            val flowGraph = FlowGraph.fromStmts(stmts.asJava)
 
-          var testWorklist: BlockWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
-          testWorklist.workOnBlocks;
-          println(testWorklist.getAllStates);
+            /**
+             * These two lines create a worklist and tell it to do it's work. Comment them out if you're testing
+             * an analysis.
+            var testWorklist: BlockWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
+            testWorklist.workOnBlocks;
+            */
+            
+            val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
+            val updatedFlowGraph = translator.translate();
 
-          /*
-          val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
-          val updatedFlowGraph = translator.translate();
-
-          val state = State(updatedFlowGraph, Bool.True, Bool.False, Map.empty, Map.empty)
-          val vc = VCGen.genVCs(state)
-          writeToFile(vc)
-          */
+            val state = State(updatedFlowGraph, Bool.True, Bool.False, Map.empty, Map.empty)
+            val vc = VCGen.genVCs(state)
+            writeToFile(vc)
         } else {
-          println("Output failed")
+            println("Output failed")
         }
     }
 

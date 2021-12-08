@@ -1,6 +1,6 @@
 package analysis;
 
-import scala.collection.mutable.HashMap;
+import scala.collection.mutable.Map;
 import scala.collection.mutable.Set;
 import scala.collection.mutable.Stack;
 import scala.collection.mutable.ArrayDeque;
@@ -10,7 +10,7 @@ import scala.jdk.CollectionConverters.ListHasAsScala;
 import scala.jdk.CollectionConverters.SeqHasAsJava;
 import java.util.MissingResourceException;
 
-import astnodes.stmt.Stmt;
+import astnodes.stmt.*;
 import translating.FlowGraph;
 import translating.FlowGraph.Block;
 import analysis.AnalysisPoint;
@@ -19,14 +19,14 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
     var workListQueue: ArrayDeque[Block] = ArrayDeque();
     var prevState: Set[AnalysisPoint] = createAnalysisEmpty;
 
-    var analysedStmtInfo: HashMap[Stmt, Set[AnalysisPoint]] = HashMap();
-    var blockFinalStates: HashMap[Block, Set[AnalysisPoint]] = HashMap();
+    var analysedStmtInfo: Map[Stmt, Set[AnalysisPoint]] = Map();
+    var blockFinalStates: Map[Block, Set[AnalysisPoint]] = Map();
 
     def createAnalysisEmpty: Set[AnalysisPoint] = {
         analyses.map(a => a.createLowest);
     }
 
-    def getAllStates: HashMap[Stmt, Set[AnalysisPoint]] = {
+    def getAllStates: Map[Stmt, Set[AnalysisPoint]] = {
         analysedStmtInfo;
     }
 
@@ -47,6 +47,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      */
     def workOnBlocks = {
         workListQueue = topologicalSort(controlFlow); // topo sort with rm back-edges, save as iterator - depth-first search
+        var break: Int = 0;
 
         while (!workListQueue.isEmpty) {
             var nextBlock: Block = workListQueue.removeHead();
@@ -73,6 +74,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
                             prevState.add(prevAnalysisPoint.union(parentAnalysisPoint));
                             analysisFound = true;
                         }
+                        case _ => {}
                     });
                     
                     // otherwise, add it to prevState
@@ -114,9 +116,9 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
         var currentFinalBlockState = blockFinalStates.getOrElse(block, null);
 
         if (currentFinalBlockState != null) {
-            if (currentFinalBlockState != prevState) {
+            if (!(currentFinalBlockState.toString == prevState.toString)) { // TODO: fix this
                 blockFinalStates.remove(block);
-                blockFinalStates.concat(HashMap(block -> prevState));
+                blockFinalStates.update(block, prevState);
                 
                 // if queue doesn't contain child, add child, *and* if queue doesn't contain this, add this
                 if (!workListQueue.contains(block)) {
@@ -130,22 +132,16 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
                 });
             }
         } else {
-            println("1")
-            blockFinalStates.concat(HashMap(block -> prevState));
-            println("2")
-
-            println(workListQueue.toString);
+            blockFinalStates.update(block, prevState);
 
             // if queue doesn't contain child, add child, *and* if queue doesn't contain this, add this
             if (!workListQueue.contains(block)) {
-                println("3")
-                workListQueue.append(block);
+                workListQueue = workListQueue.append(block);
             }
-            println("4");
             
             block.getChildren.asScala.foreach(c => {
                 if (!workListQueue.contains(c)) {
-                    workListQueue.append(c);
+                    workListQueue = workListQueue.append(c);
                 }
             });
         }
@@ -168,7 +164,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
         if (analysedStmtInfo.getOrElse(stmt, null) != null) {
             analysedStmtInfo.remove(stmt);
         }
-        analysedStmtInfo.concat(HashMap(stmt -> newAnalysedPoint));
+        analysedStmtInfo.update(stmt, newAnalysedPoint);
 
         prevState = newAnalysedPoint;
     }
@@ -186,32 +182,42 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
         var output: ArrayDeque[Block] = ArrayDeque[Block]();
         var rmChildren: Map[Block, List[Block]] = Map[Block, List[Block]]();
 
-        nodeStack.addOne(controlFlow.getBlocks.get(0));
+        println(controlFlow.getLines)
+
+        println(controlFlow.getBlocks.asScala.map(_.firstLine))
+
+        println(controlFlow.getLines.asScala.find((line: Stmt) =>
+            line.isInstanceOf[EnterSub]
+        ));
+
+        // add "main" block, which is not always controlFlow.getBlocks.get(0).
+        nodeStack.addOne(controlFlow.getBlocks.asScala.find((block: Block) =>
+            block.isMain;
+        ).get);
 
         while (!nodeStack.isEmpty) {
             var vertex: Block = nodeStack.pop;
 
             if (!visited.contains(vertex)) {
-                visited.concat(List(vertex));
+                visited = visited ++ List(vertex);
             }
             
+
             vertex.getChildren.asScala.foreach(c => {
                 if (visited.contains(c)) {
-                    // note that this portion of the code will change significantly once FlowGraph is refactored.
-                    // The basic approach is there, though.
-                    vertex.children.remove(c);
-
-                    // remove children so that we don't have cycles, but remember to keep them around so we can return
-                    // the graph to it's original state further down
                     if (rmChildren.contains(vertex)) {
-                        rmChildren.get(vertex).concat(List(c));
+                        rmChildren.update(vertex, (rmChildren.getOrElse(vertex, null) ++ List(c)));
                     } else {
-                        rmChildren.concat(HashMap[Block, List[Block]](vertex -> List(c)));
+                        rmChildren.update(vertex, List(c));
                     }
                 } else {
                     nodeStack.addOne(c);
                 }
             });
+
+            rmChildren.getOrElse(vertex, List()).foreach(c => {
+                vertex.children.remove(c);
+            })
 
             // add blocks to the beginning of an iterator as we finish all their children
             if (vertex.getChildren.isEmpty) {

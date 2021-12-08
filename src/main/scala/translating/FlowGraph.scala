@@ -369,6 +369,15 @@ object FlowGraph {
       */
     def setLines(lines: List[Stmt]) = this.lines = lines
 
+    def isMain = {
+        var answer: Boolean = false;
+        if (this.lines.get(0).isInstanceOf[EnterSub]) {
+            answer = (this.lines.get(0).asInstanceOf[EnterSub].getFuncName == "main");
+        }
+        
+        answer;
+    }
+
     /** @return
       *   the list object containing the children of this block
       */

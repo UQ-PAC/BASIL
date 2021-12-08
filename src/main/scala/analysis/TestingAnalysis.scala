@@ -14,6 +14,15 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
         this(Set());
     }
 
+    override def equals(other: AnalysisPoint): Boolean = {
+        var otherAsThis: TestingAnalysis = typeCheck(other);
+
+        println(this.toString);
+        println(otherAsThis.toString);
+        println(this.toString == otherAsThis.toString);
+        this.toString == otherAsThis.toString;
+    }
+
     override def compare(other: AnalysisPoint): Int = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
@@ -37,17 +46,29 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
         stmt match {
             case callStmt: CallStmt => {
                 println(callStmt.toString);
-                newState = currentState ++ Set(callStmt);
+                if (!currentState.contains(stmt)) {
+                    newState = currentState ++ Set(stmt);
+                } else {
+                    newState = currentState;
+                }
             }
             case _ => {
-                newState = currentState ++ Set(stmt);
+                if (!currentState.contains(stmt)) {
+                    newState = currentState ++ Set(stmt);
+                } else {
+                    newState = currentState;
+                }
             };
         }
 
-        new TestingAnalysis(newrun State);
+        new TestingAnalysis(newState);
     }
 
     override def createLowest: AnalysisPoint = {
         new TestingAnalysis(Set());
+    }
+
+    override def toString: String = {
+        "TestingAnalysis: " + this.currentState;
     }
 }
