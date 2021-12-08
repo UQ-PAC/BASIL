@@ -3,6 +3,8 @@ import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 
+import scala.collection.mutable.Set;
+
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.IOException
@@ -11,6 +13,7 @@ import java.util.Arrays
 import java.util.List
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import BilParser.*
+import analysis.*;
 import astnodes.pred.Bool
 import vcgen.{State, VCGen}
 
@@ -41,15 +44,23 @@ import collection.JavaConverters.*
         println(symsListener.symbolTable)
 
         if (outputType.equals("boogie")) {
-          val flowGraph = FlowGraph.fromStmts(stmts.asJava)
-          val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
-          val updatedFlowGraph = translator.translate();
+            val flowGraph = FlowGraph.fromStmts(stmts.asJava)
 
-          val state = State(updatedFlowGraph, Bool.True, Bool.False, Map.empty, Map.empty)
-          val vc = VCGen.genVCs(state)
-          writeToFile(vc)
+            /**
+             * These two lines create a worklist and tell it to do it's work. Comment them out if you're testing
+             * an analysis.
+            var testWorklist: BlockWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
+            testWorklist.workOnBlocks;
+            */
+            
+            val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
+            val updatedFlowGraph = translator.translate();
+
+            val state = State(updatedFlowGraph, Bool.True, Bool.False, Map.empty, Map.empty)
+            val vc = VCGen.genVCs(state)
+            writeToFile(vc)
         } else {
-          println("Output failed")
+            println("Output failed")
         }
     }
 
