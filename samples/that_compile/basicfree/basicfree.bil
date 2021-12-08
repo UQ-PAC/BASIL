@@ -1,4 +1,4 @@
-000004f6: program
+00000000: program
 000004e2: sub __cxa_finalize(__cxa_finalize_result)
 000004f7: __cxa_finalize_result :: out u32 = X0
 

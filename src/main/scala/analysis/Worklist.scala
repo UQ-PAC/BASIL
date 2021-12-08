@@ -13,6 +13,7 @@ import java.util.MissingResourceException;
 import astnodes.stmt.*;
 import translating.FlowGraph;
 import translating.FlowGraph.Block;
+import translating.FlowGraph.Function;
 import analysis.AnalysisPoint;
 
 class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
@@ -182,18 +183,10 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
         var output: ArrayDeque[Block] = ArrayDeque[Block]();
         var rmChildren: Map[Block, List[Block]] = Map[Block, List[Block]]();
 
-        println(controlFlow.getLines)
-
-        println(controlFlow.getBlocks.asScala.map(_.firstLine))
-
-        println(controlFlow.getLines.asScala.find((line: Stmt) =>
-            line.isInstanceOf[EnterSub]
-        ));
-
         // add "main" block, which is not always controlFlow.getBlocks.get(0).
-        nodeStack.addOne(controlFlow.getBlocks.asScala.find((block: Block) =>
-            block.isMain;
-        ).get);
+        nodeStack.addOne(controlFlow.getFunctions.asScala.toList.find((func: Function) =>
+            func.getHeader.getFuncName == "main";
+        ).get.getBlocks.asScala.head);
 
         while (!nodeStack.isEmpty) {
             var vertex: Block = nodeStack.pop;

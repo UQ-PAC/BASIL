@@ -41,17 +41,12 @@ import collection.JavaConverters.*
         symsParser.setBuildParseTree(true)
         val symsListener = new SymbolTableListener()
         walker.walk(symsListener, symsParser.syms)
-        println(symsListener.symbolTable)
 
         if (outputType.equals("boogie")) {
             val flowGraph = FlowGraph.fromStmts(stmts.asJava)
 
-            /**
-             * These two lines create a worklist and tell it to do it's work. Comment them out if you're testing
-             * an analysis.
             var testWorklist: BlockWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
             testWorklist.workOnBlocks;
-            */
             
             val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
             val updatedFlowGraph = translator.translate();
