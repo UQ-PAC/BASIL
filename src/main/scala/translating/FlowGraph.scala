@@ -95,25 +95,33 @@ object FlowGraph {
       val flowGraph = new FlowGraph(convertBlocksToFunctions(blocks))
       // ensure the created flow graph maintains the required properties
       flowGraph.enforceConstraints()
+
       flowGraph
     }
 
     private def setFunctionsWithReturns(stmts: immutable.List[Stmt]): immutable.List[Stmt] = {
+      println("HERE")
+
       var i = 0 // TODO work out a way to not use this
 
       // TODO ideally could collect (returning a partial funciton instead of some/none)
-      (stmts.sliding(4, 1).flatMap{
-        case x if (x.size < 4) => Some(x(0)) // TODO this isnt doing what i want
-        case (call: CallStmt) :: (jmp: JmpStmt) :: _ :: (assign: RegisterAssign) :: Nil =>
+      (stmts.sliding(3, 1).flatMap{
+        case (call: CallStmt) :: _ :: (assign: RegisterAssign) :: Nil =>
+          println(s"setting return for $call")
           call.setLHS(assign.getLhs)
-          i = 3
+          i = 2
           Some(call)
-        case _ if (i > 0) =>
+        case x :: rest if (i == 2) =>
+          println(x)
+          i -= 1
+          // x.getLabel.show
+          Some(x)
+        case _ if (i == 1) =>
           i -= 1
           None
         case stmt :: rest => Some(stmt)
         case Nil => None
-      } ++ stmts.takeRight(3)).toList  // Make sure to get the last 3 lines
+      } ++ stmts.takeRight(2)).toList  // Make sure to get the last 3 lines
 
 
       /*
@@ -146,10 +154,10 @@ object FlowGraph {
     private def stripBlocks(blocks: immutable.List[FlowGraph.Block]): immutable.List[FlowGraph.Block] = {
       val reachableBlocks = new ArrayBuffer[FlowGraph.Block]
       val queue = new LinkedList[FlowGraph.Block]
-      val mainBlock = blocks.find((block: FlowGraph.Block) =>
-          block.getLines.get(0).isInstanceOf[EnterSub]
-          && block.getLines.get(0).asInstanceOf[EnterSub].getFuncName == "main"
-        ).get
+      val mainBlock = blocks.find(_.getLines.get(0) match {
+        case enterSub: EnterSub => enterSub.getFuncName == "main"
+        case _ => false
+      }).get
 
       queue.add(mainBlock)
       while ({ !queue.isEmpty }) {
@@ -163,7 +171,9 @@ object FlowGraph {
             case cjmp: CJmpStmt =>
               queue.add(findBlockStartingWith(cjmp.trueTarget, blocks.asJava))
               queue.add(findBlockStartingWith(cjmp.falseTarget, blocks.asJava))
-            case call: CallStmt => queue.add(findFunction(blocks.asJava, call.funcName))
+            case call: CallStmt =>
+              queue.add(findFunction(blocks.asJava, call.funcName))
+              if (call.returnTarget != None) queue.add(findBlockStartingWith(call.returnTarget.get, blocks.asJava))
             case _ =>
           })
         }
@@ -188,20 +198,21 @@ object FlowGraph {
     private def getSplits(stmts: List[Stmt]) = { // we use a set to avoid double-ups, as some lines may be jumped to twice
       val splits = new HashSet[Integer]
       for (i <- 0 until stmts.size) {
-        val stmt = stmts.get(i)
-        if (stmt.isInstanceOf[JmpStmt]) { // for jumps, add a split below the jump and above the target line
-          splits.add(i + 1)
-          val targetIndex = findInstWithPc(stmt.asInstanceOf[JmpStmt].target, stmts)
-          if (targetIndex != -1) splits.add(targetIndex)
-        } else if (stmt.isInstanceOf[CJmpStmt]) { // for conditional jumps, add a split above the target line
-          var targetIndex = findInstWithPc(stmt.asInstanceOf[CJmpStmt].falseTarget, stmts)
-          if (targetIndex != -1) splits.add(targetIndex)
-          targetIndex = findInstWithPc(stmt.asInstanceOf[CJmpStmt].trueTarget, stmts)
-          if (targetIndex != -1) splits.add(targetIndex)
-        } else if (stmt.isInstanceOf[EnterSub]) { // for function headers, add a split before the header
-          splits.add(i)
-        } else if (stmt.isInstanceOf[ExitSub]) { // for function returns, add a split after the return
-          splits.add(i + 1)
+        stmts.get(i) match {
+          case jmpStmt: JmpStmt =>
+            splits.add(i + 1)
+            val targetIndex = findInstWithPc(jmpStmt.target, stmts)
+            if (targetIndex != -1) splits.add(targetIndex)
+          case jmpStmt: CJmpStmt =>
+            splits.add(i + 1) // TODO check if we need this
+            val trueTargetIndex = findInstWithPc(jmpStmt.trueTarget, stmts)
+            if (trueTargetIndex != -1) splits.add(trueTargetIndex)
+            val falseTargetIndex = findInstWithPc(jmpStmt.falseTarget, stmts)
+            if (falseTargetIndex != -1) splits.add(falseTargetIndex)
+          case _: CallStmt => splits.add(i + 1)
+          case _: EnterSub => splits.add(i)
+          case _: ExitSub => splits.add(i + 1)
+          case x => x
         }
       }
 
@@ -295,6 +306,7 @@ object FlowGraph {
         case jmp: JmpStmt => immutable.List(jmp.target)
         case cjmp: CJmpStmt => immutable.List(cjmp.trueTarget, cjmp.falseTarget)
         // TODO case exitSub: ExitSub => immutable.List(lines.get(lines.indexOf(exitSub) + 1).getLabel.getPc)
+        case callStmt: CallStmt => callStmt.returnTarget.toList
         case _: ExitSub => immutable.List()
       }
     }
@@ -397,11 +409,11 @@ object FlowGraph {
 
 class FlowGraph (var functions: List[FlowGraph.Function]) {
   private var globalInits: List[InitStmt] = new LinkedList[InitStmt].asInstanceOf[List[InitStmt]]
-  globalInits.add(new InitStmt(new Var("heap"), "heap", "[bv64] bv64")) // TODO label.none
-  globalInits.add(new InitStmt(new Var("stack"), "stack", "[bv64] bv64"))
-  globalInits.add(new InitStmt(new Var("L_heap"), "heap", "[bv64] bool")) // TODO This isnt great
-  globalInits.add(new InitStmt(new Var("L_stack"), "stack", "[bv64] bool"))
-  globalInits.add(new InitStmt(new Var("SP"), "SP"))
+  globalInits.add(new InitStmt(Var("heap", -1), "heap", "[bv32] bv32")) // TODO label.none
+  globalInits.add(new InitStmt(Var("stack", -1), "stack", "[bv32] bv32"))
+  globalInits.add(new InitStmt(Var("L_heap", -1), "heap", "[bv32] bool")) // TODO This isnt great
+  globalInits.add(new InitStmt(Var("L_stack", -1), "stack", "[bv32] bool"))
+  globalInits.add(new InitStmt(Var("SP", -1 ), "SP"))
 
   def getGlobalInits = globalInits
   def setGlobalInits(inits: List[InitStmt]) = this.globalInits = inits

@@ -14,7 +14,7 @@ progdecl: addr ':' 'program';
 /* Beginning of sub */
 sub : addr ':' 'sub' functionName '(' param? (',' param)* ')';
 /* Listing the parameter types */
-paramTypes : addr ':' param '::' inout nat '=' var ;
+paramTypes : addr ':' param '::' inout nat '=' var ;  // param: name from C, var: register
 /* Statement */
 stmt : addr ':' 
        (assign|call|jmp|cjmp)?

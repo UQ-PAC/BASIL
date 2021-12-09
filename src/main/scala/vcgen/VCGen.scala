@@ -13,7 +13,7 @@ object VCGen {
     // TODO there is a better way to do this deep copy (i assume)
     state.copy(functions = state.functions.map(f =>
       f.copy(labelToBlock = f.labelToBlock.map {
-        case (pc, b) => (pc, b.copy(lines = b.lines.flatMap(line => List(Assert("TODO", genVC(line, f, state)), line))))
+        case (pc, b) => (pc, b.copy(lines = b.lines.flatMap(line => List(line, Assert("TODO", genVC(line, f, state))))))
       })
     ))
   }
@@ -28,8 +28,10 @@ object VCGen {
     case assign: RegisterAssign => Bool.True // will need to add rely/guar later
     case assign: MemAssign =>
       assign.memExp.onStack match {
-        case true  => Bool.True // TODO aren't these thread local
-        case false => BinOp(BinOperator.Implication, assign.memExp.toL, computeGamma(assign.rhsExp))
+        case true  => Bool.True // these are thread local
+        case false =>
+          // TODO need to be careful bc these could be global or thead local (if they are in the GOT)
+          BinOp(BinOperator.Implication, assign.memExp.toL, computeGamma(assign.rhsExp))
         // Use the GOT/ST to get the exact variable being referenced, except if it uses pointer arithmetic etc etc
         // would be interesting to see if making the substitution actually made a meaningful difference
       }

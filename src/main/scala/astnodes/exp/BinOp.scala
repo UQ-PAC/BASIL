@@ -1,8 +1,9 @@
 package astnodes.exp
 
-import jdk.javadoc.doclet.DocletEnvironment.ModuleMode
-import java.util
-import java.util.Objects
+import util.{AssumptionViolationException}
+
+import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
 
 /** Binary operation fact
   */
@@ -13,8 +14,8 @@ case class BinOp(
 ) extends Expr {
   def this(operatorStr: String, firstExp: Expr, secondExp: Expr) = this(BinOperator.fromBil(operatorStr), firstExp, secondExp)
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
-  override def toBoogieString = s"${BinOperator.toBoogie(operator)}(${firstExp.toBoogieString}, ${secondExp.toBoogieString})"
-  override def getChildren = util.Arrays.asList(firstExp, secondExp)
+  override def toBoogieString = s"${BinOperator.toBoogie(operator, size)}(${firstExp.toBoogieString}, ${secondExp.toBoogieString})"
+  override def getChildren = ArrayBuffer(firstExp, secondExp).asJava
 
   // TODO update so the member vars can be vals
   override def replace(oldExp: Expr, newExp: Expr) = {
@@ -23,6 +24,15 @@ case class BinOp(
   }
 
   override def vars = firstExp.vars ++ secondExp.vars
+
+  // Finish resolveTypes and then remove thsi
+  override def size = (firstExp.size, secondExp.size) match {
+    case (a: Some[Int], b: Some[int]) if (a == b) => a
+    case (a: Some[Int], b: Some[int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop should have the same size $firstExp: ${firstExp.size}, $secondExp: ${secondExp.size}")
+    case (x: Some[Int], None) => x
+    case (None, x: Some[Int]) => x
+    case (None, None) => None
+  }
 }
 
 // TODO look at scala 3 enums
@@ -67,17 +77,20 @@ case object BinOperator extends Enumeration {
     case "<=" => LessThanOrEqual
   }
 
-  def toBoogie(value: Value): String = value match {
-    case Addition => "bv64add"
-    case Subtraction => "bv64sub"
-    case Multiplication => "bv64mul"
-    case Division => "bv64udiv"
-    case Modulo => "bv64mod"
-    case BitwiseAnd => "bv64and"
-    case BitwiseOr => "bv64or"
-    case BitwiseXor => "bv64xor"
-    case Equality => "bv64comp"
+  // TODO getOrElse ??
+  def toBoogie(value: Value, size: Option[Int]): String =
+    val size1 = size.getOrElse(64)
+    value match {
+    case Addition => s"bv${size1}add"
+    case Subtraction => s"bv${size1}sub"
+    case Multiplication => s"bv${size1}mul"
+    case Division => s"bv${size1}udiv"
+    case Modulo => s"bv${size1}mod"
+    case BitwiseAnd => s"bv${size1}and"
+    case BitwiseOr => s"bv${size1}or"
+    case BitwiseXor => s"bv${size1}xor"
+    case Equality => s"bv${size1}comp"
     // TODO !!!!!!!!!!! case NonEquality => ??? // TODO need to do this as !(a = b) i think
-    case NonEquality => "bv64comp"
+    case NonEquality => s"bv${size1}comp"
   }
 }

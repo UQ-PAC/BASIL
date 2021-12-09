@@ -4,7 +4,7 @@ import astnodes.exp.{Expr, MemLoad, Var}
 import translating.FlowGraph.{Block, Function}
 import astnodes.pred.{Bool, High, Pred, Security}
 import astnodes.Label
-import astnodes.stmt.{CJmpStmt, EnterSub, ExitSub, InitStmt, JmpStmt, Stmt}
+import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, InitStmt, JmpStmt, Stmt}
 import translating.FlowGraph
 import util.Boogie.generateBVHeader
 
@@ -84,6 +84,7 @@ case object FunctionState {
     val labelToChildren = function.getBlocks.asScala.map(b => (b.label, b.lastLine match {
       case cjmp: CJmpStmt => Set(cjmp.trueTarget, cjmp.falseTarget)
       case jmp: JmpStmt => Set(jmp.target)
+      case call: CallStmt => call.returnTarget.toSet
       case _: ExitSub => Set()
     })).toMap
 

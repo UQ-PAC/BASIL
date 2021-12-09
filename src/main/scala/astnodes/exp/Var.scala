@@ -6,7 +6,8 @@ import astnodes.pred
 
 /** Variable fact
   */
-case class Var(name: String) extends Expr {
+case class Var(name: String, override val size: Option[Int]) extends Expr {
+
   override def toString = name
   override def getChildren = new util.ArrayList[Expr]
   override def replace(oldExp: Expr, newExp: Expr) = {}
@@ -14,4 +15,9 @@ case class Var(name: String) extends Expr {
   override def vars: List[Var] = List(this)
   
   def toGamma = pred.Var(name, true)
+}
+
+case object Var {
+  def apply(name: String, size: Int) = new Var(name, Some(size))
+
 }

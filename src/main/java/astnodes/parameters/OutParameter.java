@@ -11,6 +11,6 @@ public class OutParameter extends Parameter {
 
     @Override
     public String toString() {
-        return String.format("%s: bv64, Gamma_%s: bool", getName(), getName());
+        return String.format("%s: bv%d, Gamma_%s: bool", getName(), getName().size().get(), getName());
     }
 }

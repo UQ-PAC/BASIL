@@ -10,7 +10,9 @@ trait Expr {
   // TODO can we remove these
   def getChildren: util.List[Expr]
   def replace(oldExpr: Expr, newExpr: Expr): Unit
-  
+
   def toBoogieString = toString
+  
+  def size: Option[Int]
 }
 

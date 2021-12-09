@@ -48,6 +48,7 @@ class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
 
   val lPreds = new mutable.HashMap[Var, Pred]
   val gammaMappings = new mutable.HashMap[Var, Security]
+  val varSizes = mutable.Map[String, Int]().withDefaultValue(32) // TODO is this reasonable?
 
 
   // the last function header parsed; needed for assigning parameters
@@ -65,10 +66,20 @@ class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
     this.currentFunction = function
   }
   override def exitParamTypes(ctx: BilParser.ParamTypesContext): Unit = {
+    // TODO this seems quite fickle
     val id = ctx.param.getText // human-readable name
     val variable = ctx.`var`.getText // some register, probably
-    if (id.contains("result")) currentFunction.setOutParam(new OutParameter(new Var("out"), new Var(variable)))
-    else currentFunction.getInParams.add(new InParameter(new Var(id), new Var(variable)))
+
+    val size = ctx.nat.getText match {
+      case "u32" => 32
+      case "u64" => 64
+    }
+
+    // TODO it would be good to instead use in/out but what is in out
+    if (id.contains("result")) currentFunction.setOutParam(new OutParameter(Var(variable, size), Var(variable, size)))
+    else currentFunction.getInParams.add(new InParameter(Var(id, size), Var(variable, size)))
+
+    varSizes.put(variable, size)
   }
 
   override def exitStmt(ctx: BilParser.StmtContext): Unit = {
@@ -112,7 +123,7 @@ class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
       else if (ctx.jmp.addr != null) target = ctx.jmp.addr.getText
       stmts += new JmpStmt(address, target)
     } else if (ctx.cjmp != null) { // statement is a conditional jump
-      val cond = new Var(ctx.cjmp.`var`.getText) // conditions are always vars
+      val cond = Var(ctx.cjmp.`var`.getText, varSizes(ctx.cjmp.`var`.getText)) // conditions are always vars
       val target = ctx.cjmp.addr.getText
       stmts += new CJmpStmt(address, target, "TODO", cond) // TODO set up false GOTO
     } else if (ctx.call != null) { // statement is a call
@@ -120,10 +131,7 @@ class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
         stmts += new ExitSub(ctx.addr.getText)
       } else {
         val funcName = ctx.call.functionName.getText
-        stmts += new CallStmt(address, funcName)
-
-        // handle the case of no return
-        if (ctx.call.returnaddr.addr != null) stmts += new JmpStmt(uniquePc(), ctx.call.returnaddr.addr.getText)
+        stmts += new CallStmt(address, funcName, Option(ctx.call.returnaddr.addr).map(_.getText))
       }
     } else { // this statement is empty
       stmts += new SkipStmt(address)
@@ -133,19 +141,28 @@ class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
   override def exitExpBracket(ctx: BilParser.ExpBracketContext): Unit = exprs.put(ctx, getExpr(ctx.exp))
   override def exitExpUop(ctx: BilParser.ExpUopContext): Unit = exprs.put(ctx, new UniOp(ctx.uop.getText, getExpr(ctx.exp)))
   override def exitExpBop(ctx: BilParser.ExpBopContext): Unit = exprs.put(ctx, new BinOp(ctx.bop.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
-  override def exitVar(ctx: BilParser.VarContext): Unit = exprs.put(ctx, new Var(ctx.getText))
+  override def exitVar(ctx: BilParser.VarContext): Unit = exprs.put(ctx, Var(ctx.getText, varSizes(ctx.getText)))
   override def exitExpVar(ctx: BilParser.ExpVarContext): Unit = exprs.put(ctx, exprs.get(ctx.`var`))
   override def exitExpLiteral(ctx: BilParser.ExpLiteralContext): Unit = exprs.put(ctx, new Literal(ctx.literal.getText))
   override def exitExpExtract(ctx: BilParser.ExpExtractContext): Unit = {
     // fixme: assumes all bit vectors are 64 bits long
     // TODO: val firstNat = 64 - ctx.nat(0).getText.toInt
     // TODO: val secondNat = 63 - ctx.nat(1).getText.toInt
-    val firstNat = ctx.nat(1).getText.toInt
+    val firstNat = ctx.nat(0).getText.toInt
     val secondNat = ctx.nat(1).getText.toInt
     val exp = getExpr(ctx.exp)
     exprs.put(ctx, new Extract(firstNat, secondNat, exp))
   }
-  override def exitExpCast(ctx: BilParser.ExpCastContext): Unit = exprs.put(ctx, getExpr(ctx.exp)) // simply unwrap and throw away casts
+
+  // Currently doesnt handle high/low. these could be converted to extracts
+  override def exitExpCast(ctx: BilParser.ExpCastContext): Unit = ctx.CAST().getText match {
+    case "pad" => exprs.put(ctx, Pad(getExpr(ctx.exp), ctx.nat.getText.toInt))
+    case "extend" => exprs.put(ctx, Extend(getExpr(ctx.exp), ctx.nat.getText.toInt))
+    // case "low" => exprs.put(ctx, Extract(ctx.nat.getText.toInt, 0, getExpr(ctx.exp)))
+    // case "high" => exprs.put(ctx, Extract(65, ctx.nat.getText.toInt, getExpr(ctx.exp))) // TODO assumes bv size is 64
+    case "low" | "high" => exprs.put(ctx, getExpr(ctx.exp))
+  }
+
   override def exitExpLoad(ctx: BilParser.ExpLoadContext): Unit =
     if (ctx.exp(0).getText == "mem") exprs.put(ctx, new MemLoad(getExpr(ctx.exp(1))))
     else throw new AssumptionViolationException("Found load on variable other than mem")

@@ -17,8 +17,8 @@ class InitStmt(var variable: Var, label: String, val varType: String = "bv64") e
   override def toBoogieString: String = f"var $variable: $varType; " +
     f"var Gamma_$variable: ${
       if (varType == "bv64") "bool"
-      else if (varType == "[bv64] bv64") "[bv64] bool"
-      else if (varType == "[bv64] bool") "[bv64] bool" // TODO  rm
+      else if (varType == "[bv32] bv32") "[bv32] bool"
+      else if (varType == "[bv32] bool") "[bv32] bool" // TODO  rm
       else throw new AssumptionViolationException(s"Unhandled type $varType")
     };"
 

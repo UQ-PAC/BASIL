@@ -1,6 +1,6 @@
 package translating
 
-import astnodes.exp.{Expr, Literal, MemLoad, Var}
+import astnodes.exp.{BinOp, Expr, Literal, MemLoad, Var}
 import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
 import astnodes.stmt.*
 import astnodes.parameters.{InParameter, OutParameter}
@@ -31,8 +31,8 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     resolveOutParams()
     // TODO this doesnt work: resolveVars()
     addVarDeclarations()
+    resolveTypes()
     // TODO could turn this on later:  replaceGlobalVars(symbolTable)
-    // TODO vcgen happens here
     // writeToFile()
 
     flowGraph;
@@ -94,7 +94,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
         rootBlock.getLines.forEach(line => {line match {
           case store: MemAssign => store.getRhs match {
             case rhsVar: Var if (isRegister(rhsVar) && assignedRegisters.contains(rhsVar)) =>
-              val param = new InParameter(new Var(uniqueVarName), rhsVar)
+              val param = new InParameter(new Var(uniqueVarName, rhsVar.size), rhsVar)
               param.setAlias(store.getLhs.asInstanceOf[MemLoad])
               params.add(param)
             case _ =>
@@ -228,10 +228,14 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     * name.
     */
   private def resolveOutParams(): Unit =
+    // TODO not sure if this actually helps with readability
+
     flowGraph.getFunctions.forEach(function =>
-      val outParam: OutParameter = function.getHeader.getOutParam.get
+      val outParamOp = function.getHeader.getOutParam
       // TODO check will not be necassary if outparam is a scala class
-      if (outParam != null)
+      if (outParamOp.isDefined)
+        val outParam = outParamOp.get
+
         function.getLines.forEach((line: Stmt) =>
           replaceAllMatchingChildren(
             line,
@@ -334,6 +338,34 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
 
   }
   */
+
+  private def resolveTypes(): Unit = {
+    flowGraph.getFunctions.forEach(f => f.getBlocks.forEach(b =>
+      b.setLines(b.getLines.asScala.map(resolveTypes).asJava)
+    ))
+  }
+
+  private def resolveTypes(stmt: Stmt): Stmt = stmt match {
+    case assign: RegisterAssign => assign.copy(expr = resolveTypes(assign.expr, assign.lhsExp.size.get))
+    case x => x
+  }
+
+  // TODO improve this!!
+  private def resolveTypes(expr: Expr, size: Int): Expr = expr match {
+    case binOp: BinOp => {
+      val binOp1 = binOp.copy(firstExp = resolveTypes(binOp.firstExp, size), secondExp = resolveTypes(binOp.secondExp, size))
+      (binOp1.firstExp.size, binOp1.secondExp.size) match {
+        case (a: Some[Int], b: Some[Int]) if (a == b) => binOp1
+        case (a: Some[Int], b: Some[Int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop should have the same size ${binOp1.firstExp}: ${a}, ${binOp1.secondExp}: ${b}")
+        case (x: Some[Int], None) => binOp1.copy(secondExp = resolveTypes(binOp1.secondExp, x.get))
+        case (None, x: Some[Int]) => binOp1.copy(firstExp = resolveTypes(binOp1.firstExp, x.get))
+        case (None, None) => binOp1
+      }
+    }
+    // case binOp: BinOp => binOp.copy(firstExp = resolveTypes(binOp.firstExp, size), secondExp = resolveTypes(binOp.secondExp, size))
+    case lit: Literal if (lit.size == None) => lit.copy(size = Some(size))
+    case _ => expr
+  }
 
   private def writeToFile(): Unit = {
     try {

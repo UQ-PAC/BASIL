@@ -9,7 +9,8 @@ import astnodes.pred.conjunct
 /** Memory expression e.g. mem[10]
   */
 case class MemLoad(var exp: Expr) extends Expr {
-  override def toString = String.format("%s[%s]", if (this.onStack) "stack" else "heap", exp)
+  override def toString = s"${if (this.onStack) "stack" else "heap"}[$exp]"
+  override def toBoogieString = s"${if (this.onStack) "stack" else "heap"}[${exp.toBoogieString}]"
   override def getChildren = Collections.singletonList(exp)
   override def replace(oldExp: Expr, newExp: Expr) = if (exp == oldExp) exp = newExp
 
@@ -25,4 +26,5 @@ case class MemLoad(var exp: Expr) extends Expr {
 
   // TODO need to rework memload .....
   def toL = new pred.MemLoad(false, true, exp)
+  override def size = Some(64)
 }
