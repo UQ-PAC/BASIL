@@ -26,5 +26,5 @@ case class MemLoad(var exp: Expr) extends Expr {
 
   // TODO need to rework memload .....
   def toL = new pred.MemLoad(false, true, exp)
-  override def size = Some(64)
+  override def size = Some(32)
 }

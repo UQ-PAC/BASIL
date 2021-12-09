@@ -48,7 +48,12 @@ class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
 
   val lPreds = new mutable.HashMap[Var, Pred]
   val gammaMappings = new mutable.HashMap[Var, Security]
-  val varSizes = mutable.Map[String, Int]().withDefaultValue(32) // TODO is this reasonable?
+
+  // TODO is this correct?
+  val varSizes = mutable.Map[String, Int]().withDefault(x =>
+    if (x.charAt(0) == '#') 64
+    else 32
+  )
 
 
   // the last function header parsed; needed for assigning parameters

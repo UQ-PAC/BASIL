@@ -14,6 +14,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 import java.io.IOException;
 import BilParser.*;
+import scala.Int;
 import scala.collection.JavaConverters;
 import scala.collection.mutable.ArrayBuffer;
 
@@ -43,7 +44,8 @@ public class FlowGraphVisualiser extends Application {
         ParseTreeWalker walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 
-        FlowGraph flowGraph = FlowGraph.fromStmts(JavaConverters.bufferAsJavaList(facts));
+        /*
+        FlowGraph flowGraph = FlowGraph.fromStmts(JavaConverters.bufferAsJavaList(facts), statementLoader.varSizes().toMap(String, Int));
         Digraph<FlowGraph.Block, String> g = new DigraphEdgeList<>();
         for (FlowGraph.Function function : flowGraph.getFunctions()) {
             for (FlowGraph.Block block : function.getBlocks()) {
@@ -64,6 +66,7 @@ public class FlowGraphVisualiser extends Application {
         primaryStage.setTitle("Flow Graph Visualisation");
         primaryStage.setScene(scene);
         primaryStage.show();
+         */
     }
 
     public String getEdgeId() {

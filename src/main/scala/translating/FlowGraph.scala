@@ -34,8 +34,8 @@ object FlowGraph {
   /** Creates a FlowGraph from the given list of statements. Assumes no line is reachable from more than one function
     * header (i.e. EnterSub).
     */
-  def fromStmts(stmts: List[Stmt]) = {
-    val flowGraph = FlowGraphFactory.fromStmts(stmts)
+  def fromStmts(stmts: List[Stmt], types: immutable.Map[String, Int]) = {
+    val flowGraph = FlowGraphFactory.fromStmts(stmts, types)
     flowGraph.enforceDisjointFunctions()
     flowGraph
   }
@@ -79,7 +79,7 @@ object FlowGraph {
       * @return
       *   a new flow graph with an empty global block and no constraints
       */
-    def fromStmts(stmts: List[Stmt]) = {
+    def fromStmts(stmts: List[Stmt], types: immutable.Map[String, Int]) = {
       val stmts1 = mergeCjmp(stmts.asScala.toList)
       val stmts2 = setFunctionsWithReturns(stmts1).asJava;
       // an ordered list of indexes of the given statements list, indicating where the list should be split into blocks
@@ -92,7 +92,7 @@ object FlowGraph {
       // essentially creates the edges for this flow graph
       setChildren(blocks, stmts2)
       // create a flow graph consisting of the functions formed from these blocks
-      val flowGraph = new FlowGraph(convertBlocksToFunctions(blocks))
+      val flowGraph = new FlowGraph(convertBlocksToFunctions(blocks), types)
       // ensure the created flow graph maintains the required properties
       flowGraph.enforceConstraints()
 
@@ -407,13 +407,13 @@ object FlowGraph {
   }
 }
 
-class FlowGraph (var functions: List[FlowGraph.Function]) {
+class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.Map[String, Int]) {
   private var globalInits: List[InitStmt] = new LinkedList[InitStmt].asInstanceOf[List[InitStmt]]
   globalInits.add(new InitStmt(Var("heap", -1), "heap", "[bv32] bv32")) // TODO label.none
   globalInits.add(new InitStmt(Var("stack", -1), "stack", "[bv32] bv32"))
   globalInits.add(new InitStmt(Var("L_heap", -1), "heap", "[bv32] bool")) // TODO This isnt great
   globalInits.add(new InitStmt(Var("L_stack", -1), "stack", "[bv32] bool"))
-  globalInits.add(new InitStmt(Var("SP", -1 ), "SP"))
+  globalInits.add(new InitStmt(Var("SP", -1 ), "SP", "bv32"))
 
   def getGlobalInits = globalInits
   def setGlobalInits(inits: List[InitStmt]) = this.globalInits = inits

@@ -6,8 +6,6 @@ import astnodes.exp.Expr
 import scala.jdk.CollectionConverters.*
 
 case class CallStmt(override val pc: String, funcName: String, returnTarget: Option[String]) extends Stmt(pc) {
-  println(s"call stmt funcname: $funcName")
-
   private var args: util.List[Var] = new util.ArrayList[Var]
   private var lhs: Option[Var] = None
   def setLHS(lhs: Var) = this.lhs = Some(lhs)

@@ -1,6 +1,6 @@
 package translating
 
-import astnodes.exp.{BinOp, Expr, Literal, MemLoad, Var}
+import astnodes.exp.{BinOp, Concat, Expr, Literal, MemLoad, Var}
 import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
 import astnodes.stmt.*
 import astnodes.parameters.{InParameter, OutParameter}
@@ -30,7 +30,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     resolveInParams()
     resolveOutParams()
     // TODO this doesnt work: resolveVars()
-    addVarDeclarations()
+    addVarDeclarations(flowGraph.types)
     resolveTypes()
     // TODO could turn this on later:  replaceGlobalVars(symbolTable)
     // writeToFile()
@@ -211,13 +211,12 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     * variables will have var initialisations. Depends on:
     *   - resolveRegisters()
     */
-  private def addVarDeclarations(): Unit = {
+  private def addVarDeclarations(types: immutable.Map[String, Int]): Unit = {
     flowGraph.getFunctions.forEach(function =>
       for (localVar <- getLocalVarsInFunction(function)) {
         // TODO i think this could be replaced by a none label as well
         // TODO rework how this works to instead store a list of vars
-        println((function.getInitStmts, function.getInitStmts.asScala.filter(x => x.variable == localVar), localVar))
-        if (!function.getInitStmts.asScala.exists(x => x.variable == localVar)) function.addInitStmt(new InitStmt(localVar, uniqueLabel))
+        if (!function.getInitStmts.asScala.exists(x => x.variable == localVar)) function.addInitStmt(new InitStmt(localVar, uniqueLabel, s"bv${types(localVar.name)}"))
       }
     )
   }
@@ -351,6 +350,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
   }
 
   // TODO improve this!!
+  // TODO use proper type checking
   private def resolveTypes(expr: Expr, size: Int): Expr = expr match {
     case binOp: BinOp => {
       val binOp1 = binOp.copy(firstExp = resolveTypes(binOp.firstExp, size), secondExp = resolveTypes(binOp.secondExp, size))

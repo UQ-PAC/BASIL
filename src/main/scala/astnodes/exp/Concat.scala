@@ -17,13 +17,20 @@ case class Concat (left: Expr, right: Expr) extends Expr{
 }
 
 case object Extend {
-  def apply(expr: Expr, size: Int) = Concat(expr, Literal("0", Some(size - expr.size.get)))
+  def apply(expr: Expr, size: Int) =
+    if (size - expr.size.get > 0) Concat(expr, Literal("0", Some(size - expr.size.get)))
+    else expr
 
 }
 
 case object Pad {
   def apply(expr: Expr, size: Int) =
-    // println(s"$expr:${expr.size.get} $size")
-    Concat(Literal("0", Some(size - expr.size.get)), expr)
+    println(s"$expr $size ${expr.size} ${size - expr.size.get}")
+    println(
+      if (size - expr.size.get > 0) Concat(Literal("0", Some(size - expr.size.get)), expr)
+      else expr
+    )
+    if (size - expr.size.get > 0) Concat(Literal("0", Some(size - expr.size.get)), expr)
+    else expr
 
 }

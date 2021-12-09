@@ -30,7 +30,8 @@ class FunctionalTests:
     val walker = new ParseTreeWalker()
     walker.walk(statementLoader, b)
     // translate
-    val flowGraph = FlowGraph.fromStmts(stmts.asJava)
+    // TODO default value
+    val flowGraph = FlowGraph.fromStmts(stmts.asJava, statementLoader.varSizes.toMap)
     val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", new mutable.HashMap())
     translator.translate()
 

@@ -41,7 +41,12 @@ import collection.JavaConverters.*
         println(symsListener.symbolTable)
 
         if (outputType.equals("boogie")) {
-          val flowGraph = FlowGraph.fromStmts(stmts.asJava)
+
+          // TODO duplicated code for default value
+          val flowGraph = FlowGraph.fromStmts(stmts.asJava, statementLoader.varSizes.toMap.withDefault(x =>
+            if (x.charAt(0) == '#') 64
+            else 32
+          ))
           val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
           val updatedFlowGraph = translator.translate();
 
