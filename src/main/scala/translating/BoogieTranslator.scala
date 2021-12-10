@@ -216,7 +216,6 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
       for (localVar <- getLocalVarsInFunction(function)) {
         // TODO i think this could be replaced by a none label as well
         // TODO rework how this works to instead store a list of vars
-        println((function.getInitStmts, function.getInitStmts.asScala.filter(x => x.variable == localVar), localVar))
         if (!function.getInitStmts.asScala.exists(x => x.variable == localVar)) function.addInitStmt(new InitStmt(localVar, uniqueLabel))
       }
     )

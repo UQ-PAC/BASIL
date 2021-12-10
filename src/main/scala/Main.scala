@@ -47,6 +47,7 @@ import collection.JavaConverters.*
 
             var testWorklist: BlockWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
             testWorklist.workOnBlocks;
+            println(testWorklist.getAllStates);
             
             val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
             val updatedFlowGraph = translator.translate();

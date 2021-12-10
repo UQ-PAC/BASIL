@@ -16,10 +16,6 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
 
     override def equals(other: AnalysisPoint): Boolean = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
-
-        println(this.toString);
-        println(otherAsThis.toString);
-        println(this.toString == otherAsThis.toString);
         this.toString == otherAsThis.toString;
     }
 

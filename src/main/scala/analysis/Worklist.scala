@@ -48,6 +48,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      */
     def workOnBlocks = {
         workListQueue = topologicalSort(controlFlow); // topo sort with rm back-edges, save as iterator - depth-first search
+        println("breakpoint")
         var break: Int = 0;
 
         while (!workListQueue.isEmpty) {
@@ -109,7 +110,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * to queue on update, if they weren't already there.
      */
     def analyseSingleBlock(block: Block) = {
-        println("analysing block: " + block.toString);
+        /*println("analysing block: " + block.toString);*/
         block.getLines.asScala.foreach(l => {
             analyseSinglePoint(l);
         });
@@ -154,7 +155,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * Saves the new "prevState" and updates the analysedStmtInfo map.
      */
     def analyseSinglePoint(stmt: Stmt) = {
-        println("analysing stmt: " + stmt.toString);
+        /*println("analysing stmt: " + stmt.toString);*/
         var newAnalysedPoint: Set[AnalysisPoint] = Set[AnalysisPoint]();
 
         prevState.foreach(p => {
@@ -177,53 +178,70 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * append that node to the *start* of the output iterator.
      * Output list is now a topologically ordered representation of the graph. Tada!
      */
+
+    // use scope as a pass-by-reference facsimile because I cba passing through and returning from the recursive method
+    var rmChildren: Map[Block, List[Block]] = null;
+    var dfsPath: List[Block] = null;
+    var sorted: ArrayDeque[Block] = null;
+    
     def topologicalSort(controlFlow: FlowGraph): ArrayDeque[Block] = {
-        var nodeStack: Stack[Block] = new Stack[Block]();
-        var visited: List[Block] = List[Block]();
-        var output: ArrayDeque[Block] = ArrayDeque[Block]();
-        var rmChildren: Map[Block, List[Block]] = Map[Block, List[Block]]();
+        // initialise our references to stuff
+        sorted = ArrayDeque[Block]();
+        rmChildren = Map[Block, List[Block]]();
+        dfsPath = List[Block]();
 
-        // add "main" block, which is not always controlFlow.getBlocks.get(0).
-        nodeStack.addOne(controlFlow.getFunctions.asScala.toList.find((func: Function) =>
-            func.getHeader.getFuncName == "main";
-        ).get.getBlocks.asScala.head);
+        // recursive DFS from main node
+        var output = dfsHelper(
+            controlFlow.getFunctions.asScala.toList.find((func: Function) => {
+                func.getHeader.getFuncName == "main";
+            }).get.getBlocks.asScala.head
+        );
 
-        while (!nodeStack.isEmpty) {
-            var vertex: Block = nodeStack.pop;
-
-            if (!visited.contains(vertex)) {
-                visited = visited ++ List(vertex);
-            }
-            
-
-            vertex.getChildren.asScala.foreach(c => {
-                if (visited.contains(c)) {
-                    if (rmChildren.contains(vertex)) {
-                        rmChildren.update(vertex, (rmChildren.getOrElse(vertex, null) ++ List(c)));
-                    } else {
-                        rmChildren.update(vertex, List(c));
-                    }
-                } else {
-                    nodeStack.addOne(c);
-                }
-            });
-
-            rmChildren.getOrElse(vertex, List()).foreach(c => {
-                vertex.children.remove(c);
+        // add back all the cycles we removed
+        rmChildren.keys.foreach(key => {
+            rmChildren.getOrElse(key, List[Block]()).foreach(rmdChild => {
+                key.children.add(rmdChild);
             })
-
-            // add blocks to the beginning of an iterator as we finish all their children
-            if (vertex.getChildren.isEmpty) {
-                output.prepend(vertex);
-            }
-        }
-
-        rmChildren.keys.foreach(k => {
-            // scala thinks we need getOrElse here despite the fact we're literally iterating over known keys
-            k.children = rmChildren.getOrElse(k, List()).asJava;
         });
         
+        // clear cause no-one should ever use again
+        rmChildren = null;
+        dfsPath = null;
+        sorted = null
+
         output;
+    }
+
+    def dfsHelper(node: Block): ArrayDeque[Block] = {
+        dfsPath ++ List(node);
+
+        node.getChildren.asScala.foreach(child => {
+            if (dfsPath.contains(child)) {
+                // if backedge, add to our rmChildren list
+
+                if (rmChildren.contains(node)) {
+                    rmChildren.update(node, (rmChildren.getOrElse(node, null) ++ List(child)));
+                } else {
+                    rmChildren.update(node, List(child));
+                }
+            } else {
+                // or not on path, so recurse
+
+                dfsHelper(child);
+            }
+        });
+
+        // remove rmChildren
+        rmChildren.getOrElse(node, List()).foreach(cycle => {
+            node.children.remove(cycle);
+        })
+
+        dfsPath = dfsPath.filter(_ != node);
+
+        if (!sorted.contains(node)) {
+            sorted.prepend(node);
+        }
+        sorted;
     }
 }
 
