@@ -42,6 +42,7 @@ object FlowGraph {
 
   class Function(val header: EnterSub, val blocks: List[FlowGraph.Block]) {
     private val initStmts = new LinkedList[InitStmt]
+
     // variable initialisations to be at the top of this function
     def getHeader = header
     def getBlocks = blocks
@@ -80,7 +81,7 @@ object FlowGraph {
       */
     def fromStmts(stmts: List[Stmt]) = {
       val stmts1 = mergeCjmp(stmts.asScala.toList)
-      val stmts2 = setFunctionsWithReturns(stmts1.asJava);
+      val stmts2 = setFunctionsWithReturns(stmts1).asJava;
       // an ordered list of indexes of the given statements list, indicating where the list should be split into blocks
       val splits = getSplits(stmts2)
       // an ordered list of blocks, defined by the given given list of splits
@@ -97,24 +98,47 @@ object FlowGraph {
       flowGraph
     }
 
-    private def setFunctionsWithReturns(stmts: List[Stmt]) = {
-      for (i <- 0 until stmts.size) {
-        if (stmts.get(i).isInstanceOf[CallStmt]
-          && stmts.get(i + 1).isInstanceOf[JmpStmt]
-          && stmts.get(i + 3).isInstanceOf[RegisterAssign]
-        ) {
-          val call = stmts.get(i).asInstanceOf[CallStmt]
-          val cjmp = stmts.get(i + 1).asInstanceOf[JmpStmt]
-          val assign = stmts.get(i + 3).asInstanceOf[RegisterAssign]
-          if (cjmp.target == stmts.get(i + 1).getLabel.getPc)
-            throw new AssumptionViolationException("Expected jump to next line")
+    private def setFunctionsWithReturns(stmts: immutable.List[Stmt]): immutable.List[Stmt] = {
+      var i = 0 // TODO work out a way to not use this
+
+      // TODO ideally could collect (returning a partial funciton instead of some/none)
+      (stmts.sliding(4, 1).flatMap{
+        case x if (x.size < 4) => Some(x(0)) // TODO this isnt doing what i want
+        case (call: CallStmt) :: (jmp: JmpStmt) :: _ :: (assign: RegisterAssign) :: Nil =>
           call.setLHS(assign.getLhs)
-          stmts.remove(i + 1)
-          stmts.remove(i + 2)
-          stmts.remove(i + 3)
+          i = 3
+          Some(call)
+        case _ if (i > 0) =>
+          i -= 1
+          None
+        case stmt :: rest => Some(stmt)
+        case Nil => None
+      } ++ stmts.takeRight(3)).toList  // Make sure to get the last 3 lines
+
+
+      /*
+      for (i <- 0 to (stmts.size - 3)) {
+        println(i)
+        println(stmts.size)
+        if (stmts.get(i).isInstanceOf[CallStmt]
+            && stmts.get(i + 1).isInstanceOf[JmpStmt]
+            && stmts.get(i + 3).isInstanceOf[RegisterAssign]
+        ) {
+            val call = stmts.get(i).asInstanceOf[CallStmt]
+            val cjmp = stmts.get(i + 1).asInstanceOf[JmpStmt]
+            val assign = stmts.get(i + 3).asInstanceOf[RegisterAssign]
+            if (cjmp.target == stmts.get(i + 1).getLabel.getPc) {
+                throw new AssumptionViolationException("Expected jump to next line")
+            }
+            call.setLHS(assign.getLhs)
+            stmts.remove(i + 1)
+            stmts.remove(i + 2)
+            stmts.remove(i + 3)
         }
       }
+
       stmts
+      */
     }
     private def findFunction(blocks: List[FlowGraph.Block], functionName: String) = blocks.stream
       .filter((b: FlowGraph.Block) => b.firstLine.isInstanceOf[EnterSub] && b.firstLine.asInstanceOf[EnterSub].getFuncName == functionName)
@@ -201,11 +225,11 @@ object FlowGraph {
     private def findInstWithPc(pc: String, stmts: List[Stmt]): Int = {
       if (pc.substring(0, 2) == "__") return -1 // TODO when jumping to a function e.g. goto @__gmon_start__
       for (i <- 0 until stmts.size) { if (stmts.get(i).getLabel.getPc == pc) return i }
-      throw new AssumptionViolationException(f"Error in constructing flow graph: No inst found with pc $pc.\n")
+      throw new AssumptionViolationException(s"Error in constructing flow graph: No inst found with pc $pc.\n")
     }
 
-    /** Creates a list of blocks from each pair of consecutive splits. For example, for splits = [0, 3, 4, 8] and lines
-      * = [a, b, c, d, e, f, g, h], we will get blocks of: [a, b, c], [d], [e, f, g, h]
+    /** Creates a list of blocks from each pair of consecutive splits. For example, for splits = [0, 3, 4, 8]
+      * and lines = [a, b, c, d, e, f, g, h], we will get blocks of: [a, b, c], [d], [e, f, g, h]
       *
       * @requires
       *   splits and lines are sorted and splits.contains(0) and splits.contains(lines.size())
@@ -248,7 +272,7 @@ object FlowGraph {
           val child = findBlockStartingWith(childPc, blocks)
           // no such block was found, which means there is no block defined for this jump/cjump etc.
           if (child == null)
-            throw new AssumptionViolationException(f"Error creating flow graph. Could not find a block starting with target pc '$childPc'.")
+            throw new AssumptionViolationException(s"Error creating flow graph. Could not find a block starting with target pc '$childPc'.")
           block.children.add(child)
         }
       }
@@ -374,9 +398,11 @@ object FlowGraph {
 
 class FlowGraph (var functions: List[FlowGraph.Function]) {
   private var globalInits: List[InitStmt] = new LinkedList[InitStmt].asInstanceOf[List[InitStmt]]
-  globalInits.add(new InitStmt(new Var("heap"), "heap", "[int] int")) // TODO label.none
-  globalInits.add(new InitStmt(new Var("stack"), "stack", "[int] int"))
-  globalInits.add(new InitStmt(new Var("SP"), "SP", "int"))
+  globalInits.add(new InitStmt(new Var("heap"), "heap", "[bv64] bv64")) // TODO label.none
+  globalInits.add(new InitStmt(new Var("stack"), "stack", "[bv64] bv64"))
+  globalInits.add(new InitStmt(new Var("L_heap"), "heap", "[bv64] bool")) // TODO This isnt great
+  globalInits.add(new InitStmt(new Var("L_stack"), "stack", "[bv64] bool"))
+  globalInits.add(new InitStmt(new Var("SP"), "SP"))
 
   def getGlobalInits = globalInits
   def setGlobalInits(inits: List[InitStmt]) = this.globalInits = inits
@@ -444,13 +470,13 @@ class FlowGraph (var functions: List[FlowGraph.Function]) {
       linesSet.forEach(linesList.remove)
       val stringBuilder = new StringBuilder
       linesList.forEach((line: Stmt) => stringBuilder.append(line.toString))
-      throw new AssumptionViolationException(f"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder")
+      throw new AssumptionViolationException(s"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder")
     }
     if (pcSet.size != pcList.size) {
       pcSet.forEach(pcList.remove)
       val stringBuilder = new StringBuilder
       pcList.forEach(stringBuilder.append)
-      throw new AssumptionViolationException(f"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder")
+      throw new AssumptionViolationException(s"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder")
     }
   }
   override def toString = {

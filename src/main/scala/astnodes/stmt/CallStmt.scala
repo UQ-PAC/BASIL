@@ -12,13 +12,13 @@ case class CallStmt(override val pc: String, val funcName: String) extends Stmt(
   def getArgs = args
   def setArgs(args: util.List[Var]) = this.args = args
   override def toString = {
-    val argsStr = args.asScala.map(arg => arg.getName).mkString(", ")
+    val argsStr = args.asScala.map(arg => arg.name).mkString(", ")
     val lhsStr = lhs match {
-      case Some(x) => f"x := "
+      case Some(x) => s"x := "
       case None => ""
     }
 
-    f"call $getLabel$lhsStr ${lhs.getOrElse("")} ($argsStr);"
+    s"call $getLabel$lhsStr ${lhs.getOrElse("")} ($argsStr);"
   }
 
   override def getChildren = new util.ArrayList[Expr](args)

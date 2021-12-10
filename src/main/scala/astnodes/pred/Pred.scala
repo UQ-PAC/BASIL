@@ -4,6 +4,7 @@ import astnodes.exp.Var
 
 trait Pred {
   def vars: List[Var]
+  def toBoogieString = toString
 }
 
 /** Define custom methods for List[Expr]
@@ -11,7 +12,7 @@ trait Pred {
 extension (preds: List[Pred]) {
   def conjunct: Pred = preds match {
     case pred :: Nil => pred
-    case pred :: rest => BinOp("&&", pred, rest.conjunct)
+    case pred :: rest => BinOp(BinOperator.Conjuction, pred, rest.conjunct)
     case Nil => Bool.True
   }
 }

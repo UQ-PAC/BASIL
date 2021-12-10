@@ -25,6 +25,6 @@ public abstract class Parameter {
 
     @Override
     public String toString() {
-        return name.toString() + ": int";
+        return name.toString() + ": bv64";
     }
 }
