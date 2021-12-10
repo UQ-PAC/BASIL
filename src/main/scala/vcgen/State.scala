@@ -4,10 +4,11 @@ import astnodes.exp.{Expr, MemLoad, Var}
 import translating.FlowGraph.{Block, Function}
 import astnodes.pred.{Bool, High, Pred, Security}
 import astnodes.Label
-import astnodes.stmt.Stmt
+import astnodes.stmt.{CJmpStmt, EnterSub, ExitSub, InitStmt, JmpStmt, Stmt}
 import translating.FlowGraph
+import util.Boogie.generateBVHeader
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.ListHasAsScala
 
@@ -18,36 +19,47 @@ case class State(
     rely: Pred,
     guar: Pred,
     controls: Map[Var, Set[Var]],
+    globalInits: List[InitStmt],
     private val L: Map[Var, Pred],
     private val gamma: Map[Var, Security],
 ) {
-  def apply(flowGraph: FlowGraph, lPreds: Map[Var, Pred], gamma: Map[Var, Security]): State = {
-    val controlledBy = L.map{
+  def getL(v: Var): Pred = L.getOrElse(v, Bool.True)
+  def getGamma(v: Var): Security = gamma.getOrElse(v, High)
+
+  override def toString: String = generateBVHeader(1) + generateBVHeader(32) + generateBVHeader(64)
+    + globalInits.map(_.toBoogieString).mkString("\n") + functions.mkString("")
+
+}
+
+case object State {
+  def apply(flowGraph: FlowGraph, rely: Pred, guar: Pred, lPreds: Map[Var, Pred], gamma: Map[Var, Security]): State = {
+    val controlledBy = lPreds.map{
       case (v, p) => (v, p.vars)
     }
 
     // TODO alternatively could use the GOT
+    // TODO could globalInits be used??
     val vars = flowGraph.getFunctions.asScala.flatMap(func => func.getInitStmts.asScala.map(init => init.variable)).toSet
-  
+
     val controls = vars.map(v => (v,
       controlledBy.collect{
         case (c, controlled) if (controlled.contains(v)) => c
       }.toSet
-    )).toMap
+    )).toMap[Var, Set[Var]]
 
-    new State(List(), rely, guar, controls, lPreds, gamma)
+    // TODO gamma for each function
+    val functions = flowGraph.functions.asScala.map(f => FunctionState(f, Map.empty)).toList
+
+    State(functions, rely, guar, controls, flowGraph.getGlobalInits.asScala.toList, lPreds, gamma)
   }
-
-
-
-  def getL(v: Var): Pred = L.getOrElse(v, Bool.True)
-  def getGamma(v: Var): Security = gamma.getOrElse(v, High)
 }
 
 // TODO L, controls only need to be defined on state as they are only needed for globals
 // TODO gamma needs to be defined for each function and the global state
 case class FunctionState (
-  private val labelToBlock: Map[String, Block],
+                           labelToBlock: Map[String, Block],
+                           initStmts: List[InitStmt],
+                           header: EnterSub,
   private val labelToChildren: Map[String, Set[String]],
   private val gamma: Map[Var, Security],
 ) {
@@ -60,14 +72,22 @@ case class FunctionState (
     case (l, ls) if ls.contains(label) => l
   }.toList
   def parents(block: Block): List[String] = parents(block.label)
+
+
+  // TOOD could sbst("    \n", "            \n")
+  override def toString: String = header.toString + "\n" + initStmts.map(_.toBoogieString).mkString("\n") + labelToBlock.values.mkString("") + "}"
 }
 
 case object FunctionState {
   def apply(function: FlowGraph.Function, gamma: Map[Var, Security]): FunctionState = {
     val blocks = function.getBlocks.asScala.map(b => (b.getLabel, new Block(b))).toMap
-    
+    val labelToChildren = function.getBlocks.asScala.map(b => (b.label, b.lastLine match {
+      case cjmp: CJmpStmt => Set(cjmp.trueTarget, cjmp.falseTarget)
+      case jmp: JmpStmt => Set(jmp.target)
+      case _: ExitSub => Set()
+    })).toMap
 
-    new FunctionState(blocks, Map.empty, gamma)
+    new FunctionState(blocks, function.getInitStmts.asScala.toList, function.getHeader, labelToChildren, gamma)
   }
 }
 
@@ -76,4 +96,6 @@ case class Block (
   lines: List[Stmt],
 ) {
   def this(block: FlowGraph.Block) = this(block.getLabel, block.getLines.asScala.toList)
+
+  override def toString: String = "\nlabel" + label + ":\n    " + lines.map(l => l.toBoogieString).mkString("\n    ")
 }

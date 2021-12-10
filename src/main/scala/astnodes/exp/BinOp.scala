@@ -13,6 +13,7 @@ case class BinOp(
 ) extends Expr {
   def this(operatorStr: String, firstExp: Expr, secondExp: Expr) = this(BinOperator.fromBil(operatorStr), firstExp, secondExp)
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
+  override def toBoogieString = s"${BinOperator.toBoogie(operator)}(${firstExp.toBoogieString}, ${secondExp.toBoogieString})"
   override def getChildren = util.Arrays.asList(firstExp, secondExp)
 
   // TODO update so the member vars can be vals
@@ -24,7 +25,8 @@ case class BinOp(
   override def vars = firstExp.vars ++ secondExp.vars
 }
 
-object BinOperator extends Enumeration {
+// TODO look at scala 3 enums
+case object BinOperator extends Enumeration {
   type Operator = Value
   // arithmetic operators
   val Addition: Operator = Value("+")
@@ -63,5 +65,19 @@ object BinOperator extends Enumeration {
     case "<>" => NonEquality
     case "<" => LessThan
     case "<=" => LessThanOrEqual
+  }
+
+  def toBoogie(value: Value): String = value match {
+    case Addition => "bv64add"
+    case Subtraction => "bv64sub"
+    case Multiplication => "bv64mul"
+    case Division => "bv64udiv"
+    case Modulo => "bv64mod"
+    case BitwiseAnd => "bv64and"
+    case BitwiseOr => "bv64or"
+    case BitwiseXor => "bv64xor"
+    case Equality => "bv64comp"
+    // TODO !!!!!!!!!!! case NonEquality => ??? // TODO need to do this as !(a = b) i think
+    case NonEquality => "bv64comp"
   }
 }

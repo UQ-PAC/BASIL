@@ -23,17 +23,19 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
 
   /** Starting point for a BIL translation.
     */
-  def translate() = {
+  def translate(): FlowGraph = {
     createLabels()
     optimiseSkips()
     identifyImplicitParams()
     resolveInParams()
     resolveOutParams()
-    resolveVars()
+    // TODO this doesnt work: resolveVars()
     addVarDeclarations()
     // TODO could turn this on later:  replaceGlobalVars(symbolTable)
     // TODO vcgen happens here
-    writeToFile()
+    // writeToFile()
+
+    flowGraph;
   }
 
   private def createLabels(): Unit = {
@@ -116,16 +118,17 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     val iter = params.iterator
     while (iter.hasNext) {
       val param = iter.next
-      params.forEach(otherParam => {
-        if ((param ne otherParam) && param.getRegister == otherParam.getRegister) { // duplicate found
-          if (param.getAlias == null) { // null alias => this is the explicit param
-            otherParam.setName(param.getName)
-          } else { // non-null alias => this is the implicit param
-            otherParam.setAlias(param.getAlias)
-          }
-          iter.remove()
-        }
+
+      val otherparams = params.asScala.filter(otherParam => {
+        (param != otherParam) && param.getRegister == otherParam.getRegister
       })
+      
+      otherparams.foreach{
+        case x if (x.getAlias == null) => x.setName(param.getName)  // null alias => this is the explicit param
+        case x => x.setAlias(param.getAlias)  // non-null alias => this is the implicit param
+      }
+      
+      if (otherparams.nonEmpty) iter.remove()
     }
   }
 
@@ -192,9 +195,9 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
         val lhs = line.asInstanceOf[Assign].getLhs.asInstanceOf[Var]
         // TODO slow
         if (
-          flowGraph.getGlobalInits.stream.noneMatch(init => init.variable.getName == lhs.getName)
-          && function.getHeader.getInParams.stream.noneMatch((inParam) => inParam.getName.getName == lhs.getName) // TODO check if this is needed
-          && !(function.getHeader.getOutParam.get.getName.getName == lhs.getName)
+          flowGraph.getGlobalInits.stream.noneMatch(init => init.variable.name == lhs.name)
+          && function.getHeader.getInParams.stream.noneMatch((inParam) => inParam.getName.name == lhs.name) // TODO check if this is needed
+          && !(function.getHeader.getOutParam.get.getName.name == lhs.name)
         ) {
           vars.add(lhs)
         }
@@ -212,12 +215,13 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     flowGraph.getFunctions.forEach(function =>
       for (localVar <- getLocalVarsInFunction(function)) {
         // TODO i think this could be replaced by a none label as well
-        function.addInitStmt(new InitStmt(localVar, uniqueLabel))
+        // TODO rework how this works to instead store a list of vars
+        if (!function.getInitStmts.asScala.exists(x => x.variable == localVar)) function.addInitStmt(new InitStmt(localVar, uniqueLabel))
       }
     )
   }
 
-  private def isRegister(varFact: Var): Boolean = varFact.getName.charAt(0) == 'X'
+  private def isRegister(varFact: Var): Boolean = varFact.name.charAt(0) == 'X'
 
   /** Resolves outParams by crudely replacing all references to their associated register with their human-readable
     * name.

@@ -3,6 +3,8 @@ import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 
+import scala.collection.mutable.Set;
+
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.IOException
@@ -11,7 +13,11 @@ import java.util.Arrays
 import java.util.List
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import BilParser.*
+import analysis.*;
+import astnodes.pred.Bool
+import vcgen.{State, VCGen}
 
+import collection.immutable
 import scala.collection.mutable.ArrayBuffer
 import collection.JavaConverters.*
 
@@ -35,13 +41,32 @@ import collection.JavaConverters.*
         symsParser.setBuildParseTree(true)
         val symsListener = new SymbolTableListener()
         walker.walk(symsListener, symsParser.syms)
-        println(symsListener.symbolTable)
 
         if (outputType.equals("boogie")) {
-            val flowGraph = FlowGraph.fromStmts(stmts.asJava);
+            val flowGraph = FlowGraph.fromStmts(stmts.asJava)
+
+            var worklist: BlockWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
+            worklist.workOnBlocks;
+            
             val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
-            translator.translate();
+            val updatedFlowGraph = translator.translate();
+
+            val state = State(updatedFlowGraph, Bool.True, Bool.False, Map.empty, Map.empty)
+            val vc = VCGen.genVCs(state)
+            writeToFile(vc)
         } else {
-          println("Output failed")
+            println("Output failed")
         }
     }
+
+// TODO copy pasted
+def writeToFile(state: State): Unit = {
+  val outputFileName = "boogie_out.bpl"
+  try {
+    val writer = new BufferedWriter(new FileWriter(outputFileName, false))
+    writer.write(state.toString)
+    writer.flush()
+  } catch {
+    case _: IOException => System.err.println("Error writing to file.")
+  }
+}
