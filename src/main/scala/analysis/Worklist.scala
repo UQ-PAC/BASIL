@@ -48,7 +48,6 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      */
     def workOnBlocks = {
         workListQueue = topologicalSort(controlFlow); // topo sort with rm back-edges, save as iterator - depth-first search
-        println("breakpoint")
         var break: Int = 0;
 
         while (!workListQueue.isEmpty) {
@@ -63,23 +62,20 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
                 // empty set means the next loop gets skipped and we go straight to the next parent.
                 var parentFinalState: Set[AnalysisPoint] = blockFinalStates.getOrElse(parent, Set());
 
-                // for each analysis of the parent
+                // for every parent final state
                 parentFinalState.foreach(parentAnalysisPoint => {
                     var analysisFound: Boolean = false;
 
-                    // parentAnalysisPoint: AnalysisPoint[ValueAnalysis] = ValueAnalysis(foo);
-                    
-                    // if an analysis of that type is in prevState, update it with the union of the two
-                    prevState.foreach({
-                        case prevAnalysisPoint: parentAnalysisPoint.type => {
+                    // for every current final state
+                    prevState.foreach(prevAnalysisPoint => {
+                        if (prevAnalysisPoint.getClass == parentAnalysisPoint.getClass) {
                             prevState.remove(prevAnalysisPoint);
                             prevState.add(prevAnalysisPoint.union(parentAnalysisPoint));
                             analysisFound = true;
                         }
-                        case _ => {}
                     });
                     
-                    // otherwise, add it to prevState
+                    // if there's no matches, then add it
                     if (!analysisFound) {
                         prevState.add(parentAnalysisPoint);
                     }
@@ -110,7 +106,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * to queue on update, if they weren't already there.
      */
     def analyseSingleBlock(block: Block) = {
-        /*println("analysing block: " + block.toString);*/
+        println("analysing block: " + block.toString);
         block.getLines.asScala.foreach(l => {
             analyseSinglePoint(l);
         });
@@ -155,7 +151,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * Saves the new "prevState" and updates the analysedStmtInfo map.
      */
     def analyseSinglePoint(stmt: Stmt) = {
-        /*println("analysing stmt: " + stmt.toString);*/
+        println("analysing stmt: " + stmt.toString);
         var newAnalysedPoint: Set[AnalysisPoint] = Set[AnalysisPoint]();
 
         prevState.foreach(p => {
@@ -213,7 +209,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
     }
 
     def dfsHelper(node: Block): ArrayDeque[Block] = {
-        dfsPath ++ List(node);
+        dfsPath = dfsPath ++ List(node);
 
         node.getChildren.asScala.foreach(child => {
             if (dfsPath.contains(child)) {
