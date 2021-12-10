@@ -14,16 +14,16 @@ import javax.swing.SpringLayout.Constraints
 import scala.util.control.Breaks
 import scala.collection.mutable.ArrayBuffer
 
-class ConstantPropagation[functions: util.List[FlowGraph.Function]] {
+class ConstantPropagation(functions: util.List[FlowGraph.Function], flowgraph: FlowGraph) {
 
   /**
    * Performs constant propagation on all functions given
    */
   def foldVariables(): Unit = {
     functions.forEach(function => {
-      val blockStates =
+      val stmtConstrainst =
         propagationWorklistAlgorithm(function.getBlocks, function.getLines)
-      constantPropagation(blockStates, function.getLines)
+      constantPropagation(stmtConstrainst, function.getLines, function.getBlocks)
     })
   }
 
@@ -42,8 +42,7 @@ class ConstantPropagation[functions: util.List[FlowGraph.Function]] {
    */
   private def propagationWorklistAlgorithm(blocks: util.List[FlowGraph.Block], lines: List[Stmt]):
   util.HashMap[String, ArrayBuffer[String]] = {
-    var constraints : util.HashMap[String, ArrayBuffer[String]] = new util.HashMap[String,
-      ArrayBuffer[String]]()
+    val constraints = new util.HashMap[String, ArrayBuffer[String]]()
     val predecessorMap = findBlockPredecessors(blocks.get(0))
     val worklist = new util.LinkedList[FlowGraph.Block]
     worklist.add(blocks.get(0))
@@ -65,14 +64,15 @@ class ConstantPropagation[functions: util.List[FlowGraph.Function]] {
       var predecessor : Stmt = next.firstLine.asInstanceOf[Stmt]
       while (i < next.getLines.size) {
         // join then transfer
-        joinFunction(constraints, next.getLines(i).asInstanceOf[Stmt], predecessor, lines)
-        transferFunction(predecessor, next.getLines(i).asInstanceOf[Stmt], constraints, lines)
+        val blockLines : Array[Stmt] = next.getLines.asInstanceOf[Array[Stmt]]
+        joinFunction(constraints, blockLines(i), predecessor, lines)
+        transferFunction(predecessor, blockLines(i).asInstanceOf[Stmt], constraints, lines)
         i+=1
       }
 
-      next.getChildren.foreach(child => {
-        if (!joinFunction(constraints, next.lastLine.asInstanceOf[Stmt], predecessorMap.get(next)
-          .get(0), lines))
+      next.getChildren.forEach(child => {
+        if (!joinFunction(constraints, next.lastLine.asInstanceOf[Stmt], 
+          child.firstLine.asInstanceOf[Stmt], lines))
           worklist.add(child)
       })
     }
@@ -88,11 +88,11 @@ class ConstantPropagation[functions: util.List[FlowGraph.Function]] {
    * @param predecessors       list of all predecessors of the node.
    */
   private def meetFunction(constraints : util.HashMap[String, ArrayBuffer[String]], node: Stmt,
-                           predecessors: List[Stmt]): Unit = {
+                           predecessors: ArrayBuffer[Stmt]): Unit = {
     // TODO: top & bottom lattice elements??
 
     val predPcs = ArrayBuffer[String]()
-    predecessors.forEach(stmt => {
+    predecessors.foreach(stmt => {
       val pc = stmt.getLabel.getPc
       if (!predPcs.contains(pc)) {
         predPcs+=pc
@@ -102,7 +102,7 @@ class ConstantPropagation[functions: util.List[FlowGraph.Function]] {
     val nodeConst = ArrayBuffer[String]()
     var contains : Boolean = true
     predPcs.foreach(pc => {
-      predecessors.forEach(stmt => {
+      predecessors.foreach(stmt => {
         if (!constraints.get(stmt.getLabel.getPc).contains(pc)) {
           contains = false
           break()
@@ -130,7 +130,7 @@ class ConstantPropagation[functions: util.List[FlowGraph.Function]] {
    */
   private def joinFunction(constraints: util.HashMap[String, ArrayBuffer[String]], node: Stmt,
                            predecessors: Stmt, lines: List[Stmt]): Boolean = {
-    var nodeList : util.LinkedList[String] = new util.LinkedList[String]()
+    val nodeList = new ArrayBuffer[String]()
     val predNum = predecessors.getLabel.getPc
     val nodeNum = node.getLabel.getPc
 
@@ -184,7 +184,7 @@ class ConstantPropagation[functions: util.List[FlowGraph.Function]] {
       childStmtDeps.foreach(constPC => {
         val constStmt = findInstFromPc(lines, constPC)
         if (predVar.equals(constStmt.getLhs)) {
-          constraints.get(childStmt.getLabel.getPc).remove(constPC)
+          constraints.get(childStmt.getLabel.getPc)-=constPC
           constraints.get(childStmt.getLabel.getPc)+=predStmt.getLabel.getPc
           break()
         } else {
@@ -201,35 +201,63 @@ class ConstantPropagation[functions: util.List[FlowGraph.Function]] {
    * @param blocks
    */
   private def constantPropagation(constraints: util.HashMap[String, ArrayBuffer[String]],
-                                  lines: List[Stmt])
+                                  lines: List[Stmt], blocks: List[FlowGraph.Block])
   : Unit = {
     // assignments that will be removed if the lhs variable is re-assigned later
-    var pendingRemoval : util.LinkedList[String] = new util.LinkedList[String]()
+    val pendingRemoval = new ArrayBuffer[Assign]()
     // list of lines that will be removed once the loop exits
-    val toRemove : util.LinkedList[String] = new util.LinkedList[String]()
+    val toRemove = new ArrayBuffer[Assign]()
+    // iterate over all lines in the function
     lines.forEach(line => {
       val lineNum = line.getLabel.getPc
+      // if the constraint map contains the pc, then for each constraint pc find the instruction 
+      // and replace the line with the instruction rhs
       if (constraints.containsKey(lineNum)) {
-        constraints.get(lineNum).forEach(constPc => {
+        constraints.get(lineNum).foreach(constPc => {
           val constraint = findInstFromPc(lines, constPc)
           replaceAllMatchingChildren(line.asInstanceOf[Assign].getRhs, constraint.getLhs,
             constraint.getRhs)
         })
-
-        line.asInstanceOf[Assign].getRhs match {
-          case lit: Literal =>
-            val computed = computeLiteral(lit)
-            val newLiteral: Literal = new Literal(computed) // TODO are these two lines necassary
-            pendingRemoval+=lineNum
-          case _ => // skip
+  
+        // if the line is an instance of an assignment
+        if (line.isInstanceOf[Assign]) {
+          // for each instruct in pending removal, if the instruct lhs var matches the current 
+          // assign var, remove the old stmt from pending and place in remove
+          pendingRemoval.foreach(pending => {
+            if (pending.getLhs.equals(line.asInstanceOf[Assign].getLhs)) {
+              pendingRemoval-=pending
+              toRemove+=pending
+              pendingRemoval+=line.asInstanceOf[Assign]
+            }
+          })
+          
+          // if rhs contains only literals, then compute the rhs
+          line.asInstanceOf[Assign].getRhs match {
+            case lit: Literal =>
+              val computed = computeLiteral(lit)
+              val newLiteral: Literal = new Literal(computed) // TODO are these two lines necassary
+              pendingRemoval+=line.asInstanceOf[Assign]
+            case _ => // skip
+          }
         }
       }
     })
+      
+    // remove all
+    toRemove.foreach(flowgraph.removeLine)
   }
 
   // TODO
   private def computeLiteral(exp: Expr): String = exp.toString
 
+  /**
+   * Iterates over all lines in the function until it finds the statement/instruction with the
+   * matching pc
+   *
+   * @param lines
+   * @param pc
+   * @return
+   */
   private def findInstFromPc(lines: List[Stmt], pc: String): Assign = {
     var inst : Stmt = null
     lines.forEach(line => {

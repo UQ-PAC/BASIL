@@ -236,10 +236,9 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
         )
     )
 
-  private def resolveVars(): Unit =
-    flowGraph.getFunctions.forEach(function =>
-      function.getBlocks.forEach(block => constantPropagation(block))
-    )
+  private def resolveVars(): Unit = {
+    val CP = new ConstantPropagation(flowGraph.getFunctions, flowGraph)
+  }
 
   // TODO this should be changed to use a fixed-point algorithm (to make it more accurate)
   /** Performs constant propagation on a list of facts. Modifies the list it is given.
