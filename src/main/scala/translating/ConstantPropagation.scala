@@ -14,13 +14,15 @@ import javax.swing.SpringLayout.Constraints
 import scala.util.control.Breaks
 import scala.collection.mutable.ArrayBuffer
 
-class ConstantPropagation(functions: util.List[FlowGraph.Function], flowgraph: FlowGraph) {
+class ConstantPropagation(flowgraph: FlowGraph) {
+  
+  // TODO: should be able to give boolean for equivalences
 
   /**
    * Performs constant propagation on all functions given
    */
   def foldVariables(): Unit = {
-    functions.forEach(function => {
+    flowgraph.getFunctions.forEach(function => {
       val stmtConstrainst =
         propagationWorklistAlgorithm(function.getBlocks, function.getLines)
       constantPropagation(stmtConstrainst, function.getLines, function.getBlocks)
@@ -52,26 +54,33 @@ class ConstantPropagation(functions: util.List[FlowGraph.Function], flowgraph: F
       val next = worklist.poll
 
       // perform meet on all predecessor statements if next has more than one
-      if (predecessorMap.get(next).size > 0) {
-        val predStmts = ArrayBuffer[Stmt]()
-        predecessorMap.get(next).forEach(block => {
-          predStmts+=block.lastLine.asInstanceOf[Stmt]
-        })
-        meetFunction(constraints, next.firstLine.asInstanceOf[Stmt], predStmts)
+      if (predecessorMap.containsKey(next)) {
+        if (predecessorMap.get(next).size > 0) {
+          val predStmts = ArrayBuffer[Stmt]()
+          predecessorMap.get(next).forEach(block => {
+            predStmts+=block.lastLine.asInstanceOf[Stmt]
+          })
+          meetFunction(constraints, next.firstLine.asInstanceOf[Stmt], predStmts)
+        }
       }
 
-      var i : Int = 0
+      var i : Int = 1
       var predecessor : Stmt = next.firstLine.asInstanceOf[Stmt]
+      val tempBlockLines = next.getLines.asInstanceOf[ArrayList[Stmt]]
+      val blockLines = new ArrayBuffer[Stmt]()
+      tempBlockLines.forEach(line => {
+        blockLines+= line
+      })
       while (i < next.getLines.size) {
         // join then transfer
-        val blockLines : Array[Stmt] = next.getLines.asInstanceOf[Array[Stmt]]
         joinFunction(constraints, blockLines(i), predecessor, lines)
         transferFunction(predecessor, blockLines(i).asInstanceOf[Stmt], constraints, lines)
+        predecessor = blockLines(i)
         i+=1
       }
 
       next.getChildren.forEach(child => {
-        if (!joinFunction(constraints, next.lastLine.asInstanceOf[Stmt], 
+        if (joinFunction(constraints, next.lastLine.asInstanceOf[Stmt], 
           child.firstLine.asInstanceOf[Stmt], lines))
           worklist.add(child)
       })
@@ -130,34 +139,45 @@ class ConstantPropagation(functions: util.List[FlowGraph.Function], flowgraph: F
    */
   private def joinFunction(constraints: util.HashMap[String, ArrayBuffer[String]], node: Stmt,
                            predecessors: Stmt, lines: List[Stmt]): Boolean = {
-    val nodeList = new ArrayBuffer[String]()
     val predNum = predecessors.getLabel.getPc
     val nodeNum = node.getLabel.getPc
+    
+    var conflicts : Boolean = false
+    val predStmts = constraints.get(predNum)
+    val childStmts = constraints.get(nodeNum)
+    if (predStmts != null) {      // if map contains parent statement
+      if (childStmts != null) {       // if map contains child statement
+        predStmts.foreach(predDep => {
+          val predDepInst = findInstFromPc(lines, predDep)
+          var contains : Boolean = false
+          childStmts.foreach(nodeDep => {
+            val nodeDepInst = findInstFromPc(lines, nodeDep)
+            if (predDepInst.getLhs.equals(nodeDepInst.getLhs) && !predDepInst.getRhs.equals
+            (nodeDepInst.getRhs)) {
+              // TODO: add to the list as a top lattice element??
+              constraints.get(nodeNum)-=predDep
+              conflicts = true
+              contains = true
+            } else if (nodeDep.equals(predDep)) {
+              contains = true
+            }
+          })
+          if (!contains) {
+            constraints.get(nodeNum)+=predDep
+          }
+        })
+      } else {
+        constraints.put(node.getLabel.getPc, new ArrayBuffer[String]())
+        predStmts.foreach(predDep => {
+          constraints.get(nodeNum)+=predDep
+        })
+      }
+    } else {
+      constraints.put(predNum, new ArrayBuffer[String]())
+      constraints.put(nodeNum, new ArrayBuffer[String]())
+    }
 
-    // for all dependencies, must find the var they point to, and compare the vars they have in
-    // common
-    // for all pcs in predecessor
-        // for all pcs in node
-            // get stmt from pred
-            // get stmt from node
-            // if pred var == node var
-                // add to node list
-
-    constraints.get(predNum).foreach(predDep => {
-      val predDepInst = findInstFromPc(lines, predDep)
-      constraints.get(nodeNum).foreach(nodeDep => {
-        val nodeDepInst = findInstFromPc(lines, nodeDep)
-        if (predDepInst.getLhs.equals(nodeDepInst.getLhs) && predDepInst.getRhs.equals
-        (nodeDepInst.getRhs)) {
-          nodeList+=nodeNum
-        } else if (predDepInst.getLhs.equals(nodeDepInst.getLhs) && !predDepInst.getRhs.equals
-        (nodeDepInst.getRhs)) {
-          // TODO: add to the list as a top lattice element??
-        }
-      })
-    })
-
-    true
+    conflicts
   }
 
   /**
@@ -174,24 +194,32 @@ class ConstantPropagation(functions: util.List[FlowGraph.Function], flowgraph: F
     ArrayBuffer[String]], lines: List[Stmt])
   : Unit = {
     val childStmtDeps = constraints.get(childStmt.getLabel.getPc)
+    val predStmtDeps = constraints.get(predStmt.getLabel.getPc)
 
-    // eval parent stmt
-    // if rhs
+    // TODO: handle case where line is new Assign
     var replaceConstNum : String = null
+    
     if (predStmt.isInstanceOf[Assign]) {
       val predAssign = predStmt.asInstanceOf[Assign]
       val predVar = predAssign.getLhs
+      var contains : Boolean = false
       childStmtDeps.foreach(constPC => {
         val constStmt = findInstFromPc(lines, constPC)
+        if (predStmt.getLabel.getPc.equals(constPC)) {
+          contains = true
+          break()
+        }
         if (predVar.equals(constStmt.getLhs)) {
           constraints.get(childStmt.getLabel.getPc)-=constPC
           constraints.get(childStmt.getLabel.getPc)+=predStmt.getLabel.getPc
-          break()
-        } else {
-          constraints.get(childStmt.getLabel.getPc)+=predStmt.getLabel.getPc
+          contains = true
           break()
         }
       })
+      
+      if (!contains) {
+        constraints.get(childStmt.getLabel.getPc)+=predStmt.getLabel.getPc
+      }
     }
   }
 

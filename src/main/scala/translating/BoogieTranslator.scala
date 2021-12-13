@@ -30,6 +30,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     resolveInParams()
     resolveOutParams()
     // TODO this doesnt work: resolveVars()
+    resolveVars()
     addVarDeclarations()
     // TODO could turn this on later:  replaceGlobalVars(symbolTable)
     // TODO vcgen happens here
@@ -241,7 +242,8 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     )
 
   private def resolveVars(): Unit = {
-    val CP = new ConstantPropagation(flowGraph.getFunctions, flowGraph)
+    val CP = new ConstantPropagation(flowGraph)
+    CP.foldVariables()
   }
 
   // TODO this should be changed to use a fixed-point algorithm (to make it more accurate)
