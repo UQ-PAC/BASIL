@@ -22,11 +22,14 @@ class ConstantPropagation(flowgraph: FlowGraph) {
    * Performs constant propagation on all functions given
    */
   def foldVariables(): Unit = {
+//    System.out.println("here in Const prop")
     flowgraph.getFunctions.forEach(function => {
       val stmtConstrainst =
         propagationWorklistAlgorithm(function.getBlocks, function.getLines)
+//      System.out.println("almost")
       constantPropagation(stmtConstrainst, function.getLines, function.getBlocks)
     })
+//    System.out.println("leaving Const prop")
   }
 
   /**
@@ -51,6 +54,7 @@ class ConstantPropagation(flowgraph: FlowGraph) {
     while ( {
       worklist.size > 0
     }) {
+//      System.out.println("in wl")
       val next = worklist.poll
 
       // perform meet on all predecessor statements if next has more than one
@@ -64,6 +68,8 @@ class ConstantPropagation(flowgraph: FlowGraph) {
         }
       }
 
+//      System.out.println("in wl2")
+
       var i : Int = 1
       var predecessor : Stmt = next.firstLine.asInstanceOf[Stmt]
       val tempBlockLines = next.getLines.asInstanceOf[ArrayList[Stmt]]
@@ -71,13 +77,19 @@ class ConstantPropagation(flowgraph: FlowGraph) {
       tempBlockLines.forEach(line => {
         blockLines+= line
       })
+
+//      System.out.println("in wl2.5")
       while (i < next.getLines.size) {
         // join then transfer
         joinFunction(constraints, blockLines(i), predecessor, lines)
+//        System.out.println("in wl2.5.1")
         transferFunction(predecessor, blockLines(i).asInstanceOf[Stmt], constraints, lines)
+//        System.out.println("in wl2.5.2")
         predecessor = blockLines(i)
         i+=1
       }
+
+//      System.out.println("in wl3")
 
       next.getChildren.forEach(child => {
         if (joinFunction(constraints, next.lastLine.asInstanceOf[Stmt], 
@@ -85,6 +97,8 @@ class ConstantPropagation(flowgraph: FlowGraph) {
           worklist.add(child)
       })
     }
+    
+//    System.out.println("finished worklist")
     return constraints
   }
 
@@ -203,24 +217,27 @@ class ConstantPropagation(flowgraph: FlowGraph) {
       val predAssign = predStmt.asInstanceOf[Assign]
       val predVar = predAssign.getLhs
       var contains : Boolean = false
-      childStmtDeps.foreach(constPC => {
+      val loop = new Breaks
+      loop.breakable { childStmtDeps.foreach(constPC => {
         val constStmt = findInstFromPc(lines, constPC)
         if (predStmt.getLabel.getPc.equals(constPC)) {
           contains = true
-          break()
+//          System.out.println("hello there")
+          loop.break
         }
         if (predVar.equals(constStmt.getLhs)) {
           constraints.get(childStmt.getLabel.getPc)-=constPC
           constraints.get(childStmt.getLabel.getPc)+=predStmt.getLabel.getPc
           contains = true
-          break()
+//          System.out.println("gk")
+          loop.break
         }
       })
       
       if (!contains) {
         constraints.get(childStmt.getLabel.getPc)+=predStmt.getLabel.getPc
       }
-    }
+    }}
   }
 
   /**
@@ -236,17 +253,28 @@ class ConstantPropagation(flowgraph: FlowGraph) {
     // list of lines that will be removed once the loop exits
     val toRemove = new ArrayBuffer[Assign]()
     // iterate over all lines in the function
+//    System.out.println("in cp")
     lines.forEach(line => {
+//      System.out.println("cp2")
       val lineNum = line.getLabel.getPc
       // if the constraint map contains the pc, then for each constraint pc find the instruction 
       // and replace the line with the instruction rhs
-      if (constraints.containsKey(lineNum)) {
+      if (constraints.containsKey(lineNum) && line.isInstanceOf[Assign]) {
         constraints.get(lineNum).foreach(constPc => {
           val constraint = findInstFromPc(lines, constPc)
+//          System.out.println("cp2.1")
+//          System.out.println(line.asInstanceOf[Assign].getRhs)
+//          System.out.println(constraint)
+//          System.out.println(constraint.getLhs)
+//          System.out.println(constraint.getRhs)
           replaceAllMatchingChildren(line.asInstanceOf[Assign].getRhs, constraint.getLhs,
             constraint.getRhs)
+          if (line.asInstanceOf[Assign].getRhs == constraint.getLhs) line.asInstanceOf[Assign].replace(line.asInstanceOf[Assign].getRhs,
+            constraint.getRhs)
+//          System.out.println("cp2.2")
         })
-  
+
+//        System.out.println("cp3")
         // if the line is an instance of an assignment
         if (line.isInstanceOf[Assign]) {
           // for each instruct in pending removal, if the instruct lhs var matches the current 
@@ -268,11 +296,15 @@ class ConstantPropagation(flowgraph: FlowGraph) {
             case _ => // skip
           }
         }
+//        System.out.println("cp4")
       }
     })
-      
+
+//    System.out.println("cp5")
     // remove all
     toRemove.foreach(flowgraph.removeLine)
+
+//    System.out.println("out cp")
   }
 
   // TODO
