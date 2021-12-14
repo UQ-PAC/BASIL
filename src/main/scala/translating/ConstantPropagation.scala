@@ -2,7 +2,7 @@ package translating
 
 import astnodes.exp.{Expr, Literal, Var}
 import astnodes.stmt.Stmt
-import astnodes.stmt.assign.Assign
+import astnodes.stmt.assign.*
 import translating.FlowGraph
 import vcgen.Block
 
@@ -24,13 +24,62 @@ class ConstantPropagation(flowgraph: FlowGraph) {
   def foldVariables(): Unit = {
 //    System.out.println("here in Const prop")
     flowgraph.getFunctions.forEach(function => {
+      System.out.println("Before constant propagation")
+      debugPrinter(function)
+//      System.out.println("All mem assign statements")
+//      debugFindMemAssigns(function)
+//      System.out.println("All reg assign statements")
+//      debugFindRegAssigns(function)
       val stmtConstrainst =
         propagationWorklistAlgorithm(function.getBlocks, function.getLines)
-//      System.out.println("almost")
+      System.out.println("Constraints:")
+      debugMapPrint(stmtConstrainst)
       constantPropagation(stmtConstrainst, function.getLines, function.getBlocks)
+      System.out.println("After constant propagation")
+      debugPrinter(function)
+//      System.out.println("All assign statements")
+//      debugFindAssigns(function)
     })
 //    System.out.println("leaving Const prop")
   }
+  
+  private def debugPrinter(function: FlowGraph.Function): Unit = {
+    function.getLines.forEach(line => {
+      System.out.println(line.getLabel.getPc + " " + line)
+    })
+  }
+  
+  private def debugFindMemAssigns(function: FlowGraph.Function): Unit = {
+    function.getLines.forEach(line => {
+      if (line.isInstanceOf[MemAssign]) System.out.println(line)
+    })
+  }
+
+  private def debugFindRegAssigns(function: FlowGraph.Function): Unit = {
+    function.getLines.forEach(line => {
+      if (line.isInstanceOf[RegisterAssign]) System.out.println(line)
+    })
+  }
+  
+  private def debugMapPrint(map : util.HashMap[String, ArrayBuffer[String]]): Unit = {
+    map.keySet().forEach(pc => {
+      System.out.println("Line:")
+      System.out.println(pc)
+      System.out.println("Dependent lines:")
+      map.get(pc).foreach(const => {
+        System.out.println(const)
+      })
+    })
+  }
+  
+  /*
+  TO TEST:
+  - constraint map stores correct constraints
+  - join joins properly
+  - meet meets properly
+  - transfer transfers properly
+  - constant prop removes & computes
+   */
 
   /**
    * Uses the propagation worklist algorithm to calculate variable constraints on each block.
@@ -260,6 +309,10 @@ class ConstantPropagation(flowgraph: FlowGraph) {
       // if the constraint map contains the pc, then for each constraint pc find the instruction 
       // and replace the line with the instruction rhs
       if (constraints.containsKey(lineNum) && line.isInstanceOf[Assign]) {
+//        constraints.get(lineNum).foreach(constPc => {
+//          val constraint = findInstFromPc(lines, constPc)
+//          
+//        })
         constraints.get(lineNum).foreach(constPc => {
           val constraint = findInstFromPc(lines, constPc)
 //          System.out.println("cp2.1")
@@ -267,6 +320,8 @@ class ConstantPropagation(flowgraph: FlowGraph) {
 //          System.out.println(constraint)
 //          System.out.println(constraint.getLhs)
 //          System.out.println(constraint.getRhs)
+          replaceAllMatchingChildren(line.asInstanceOf[Assign].getLhs, constraint.getLhs,
+            constraint.getRhs)
           replaceAllMatchingChildren(line.asInstanceOf[Assign].getRhs, constraint.getLhs,
             constraint.getRhs)
           if (line.asInstanceOf[Assign].getRhs == constraint.getLhs) line.asInstanceOf[Assign].replace(line.asInstanceOf[Assign].getRhs,
@@ -364,3 +419,7 @@ class ConstantPropagation(flowgraph: FlowGraph) {
     predecessorMap
   }
 }
+
+object TopElement {}
+
+object BottomElement {}
