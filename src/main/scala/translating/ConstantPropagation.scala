@@ -1,6 +1,6 @@
 package translating
 
-import astnodes.exp.{Expr, Literal, Var}
+import astnodes.exp.{BinOp, Expr, Literal, Var}
 import astnodes.stmt.Stmt
 import astnodes.stmt.assign.*
 import translating.FlowGraph
@@ -311,47 +311,46 @@ class ConstantPropagation(flowgraph: FlowGraph) {
       if (constraints.containsKey(lineNum) && line.isInstanceOf[Assign]) {
 //        constraints.get(lineNum).foreach(constPc => {
 //          val constraint = findInstFromPc(lines, constPc)
-//          
+//
 //        })
+        System.out.println("Next line:")
+        System.out.println(line)
         constraints.get(lineNum).foreach(constPc => {
           val constraint = findInstFromPc(lines, constPc)
-//          System.out.println("cp2.1")
-//          System.out.println(line.asInstanceOf[Assign].getRhs)
-//          System.out.println(constraint)
-//          System.out.println(constraint.getLhs)
-//          System.out.println(constraint.getRhs)
           replaceAllMatchingChildren(line.asInstanceOf[Assign].getLhs, constraint.getLhs,
             constraint.getRhs)
           replaceAllMatchingChildren(line.asInstanceOf[Assign].getRhs, constraint.getLhs,
             constraint.getRhs)
           if (line.asInstanceOf[Assign].getRhs == constraint.getLhs) line.asInstanceOf[Assign].replace(line.asInstanceOf[Assign].getRhs,
             constraint.getRhs)
+          System.out.println(line)
 //          System.out.println("cp2.2")
         })
 
-//        System.out.println("cp3")
-        // if the line is an instance of an assignment
-        if (line.isInstanceOf[Assign]) {
-          // for each instruct in pending removal, if the instruct lhs var matches the current 
-          // assign var, remove the old stmt from pending and place in remove
-          pendingRemoval.foreach(pending => {
-            if (pending.getLhs.equals(line.asInstanceOf[Assign].getLhs)) {
-              pendingRemoval-=pending
-              toRemove+=pending
-              pendingRemoval+=line.asInstanceOf[Assign]
-            }
-          })
-          
-          // if rhs contains only literals, then compute the rhs
-          line.asInstanceOf[Assign].getRhs match {
-            case lit: Literal =>
-              val computed = computeLiteral(lit)
-              val newLiteral: Literal = new Literal(computed) // TODO are these two lines necassary
-              pendingRemoval+=line.asInstanceOf[Assign]
-            case _ => // skip
+        // for every new assign add it to pending if new lhs??
+        var contains : Boolean = false
+        val loop = new Breaks
+        loop.breakable(pendingRemoval.foreach(pending => {
+          if (pending.getLhs.equals(line.asInstanceOf[Assign].getLhs)) {
+            pendingRemoval -= pending
+            toRemove += pending
+            pendingRemoval += line.asInstanceOf[Assign]
+            contains = true
+            loop.break()
           }
+        }))
+        if (!contains) {
+          pendingRemoval+=line.asInstanceOf[Assign]
         }
-//        System.out.println("cp4")
+        
+        System.out.println("Pending:")
+        pendingRemoval.foreach(pending => {
+          System.out.println(pending)
+        })
+        System.out.println("To remove:")
+        toRemove.foreach(remove => {
+          System.out.println(remove)
+        })
       }
     })
 
@@ -363,7 +362,43 @@ class ConstantPropagation(flowgraph: FlowGraph) {
   }
 
   // TODO
-  private def computeLiteral(exp: Expr): String = exp.toString
+  private def computeLiteral(exp: Expr): String = {
+    var result : String = null
+    
+    if (exp.getChildren.size() > 0) {
+      val treeStruct = new ArrayBuffer[String]()
+      val queue = new util.LinkedList[Expr]()
+      treeStruct+=exp.asInstanceOf[BinOp].getOp()
+      queue.add(exp)
+
+      // create binary tree struct
+      while (queue.size() > 0) {
+        val next = queue.poll()
+
+        if (next.getChildren.size() > 0) {
+          treeStruct+=next.asInstanceOf[BinOp].getOp()
+          next.getChildren.forEach(child => {
+            queue.add(child)
+          })
+        } else {
+          treeStruct+=next.toString
+        }
+      }
+
+      // compute the expression
+      
+      
+//      try {   // i dont think this should be here
+//        val number = next.toString.toInt
+//      } catch {
+//        case ex: NumberFormatException =>
+//      }
+    } else {        // expr is a literal
+      result = exp.toString
+    }
+    
+    result
+  }
 
   /**
    * Iterates over all lines in the function until it finds the statement/instruction with the

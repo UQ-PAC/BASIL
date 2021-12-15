@@ -12,6 +12,10 @@ case class BinOp(
     var secondExp: Expr
 ) extends Expr {
   def this(operatorStr: String, firstExp: Expr, secondExp: Expr) = this(BinOperator.fromBil(operatorStr), firstExp, secondExp)
+  def getOp(): String = {
+    return operator.toString
+  }
+  
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
   override def toBoogieString = s"${BinOperator.toBoogie(operator)}(${firstExp.toBoogieString}, ${secondExp.toBoogieString})"
   override def getChildren = util.Arrays.asList(firstExp, secondExp)
