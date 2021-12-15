@@ -16,6 +16,71 @@ case class BinOp(
     return operator.toString
   }
   
+  // TODO: this can be simplified a lot, but atm it seems to work allg
+  def compute(): Double = {
+    if (firstExp.isInstanceOf[Literal] && secondExp.isInstanceOf[Literal]) {
+      val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
+      val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
+      return performArithmetic(firstOperand, secondOperand, operator.toString)
+    } else if (firstExp.isInstanceOf[Literal] && secondExp.isInstanceOf[BinOp]) {
+      val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
+      val secondOperand = secondExp.asInstanceOf[BinOp].compute()
+      return performArithmetic(firstOperand, secondOperand, operator.toString)
+    } else if (firstExp.isInstanceOf[BinOp] && secondExp.isInstanceOf[Literal]) {
+      val firstOperand = firstExp.asInstanceOf[BinOp].compute()
+      val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
+      return performArithmetic(firstOperand, secondOperand, operator.toString)
+    } else {
+      val firstOperand = firstExp.asInstanceOf[BinOp].compute()
+      val secondOperand = secondExp.asInstanceOf[BinOp].compute()
+      return performArithmetic(firstOperand, secondOperand, operator.toString)
+    }
+  }
+  
+  def canCompute(): Boolean = {
+    if (firstExp.isInstanceOf[Literal]) {
+      try {
+        val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
+      } catch {
+        case ex: NumberFormatException => return false
+      }
+    } else if (firstExp.isInstanceOf[Var]) {
+      return false
+    } else if (!firstExp.asInstanceOf[BinOp].canCompute()) {
+      return false
+    }
+    
+    if (secondExp.isInstanceOf[Literal]) {
+      try {
+        val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
+      } catch {
+        case ex: NumberFormatException => return false
+      }
+    } else if (secondExp.isInstanceOf[Var]) {
+      return false
+    }else if (!secondExp.asInstanceOf[BinOp].canCompute()) {
+      return false
+    }
+    
+    return true
+  }
+  
+  /**
+    * Helper method for compute()
+   */
+  private def performArithmetic(firstOperand : Double, secondOperand : Double, operator : String)
+    : Double = {
+    var result : Double = 0.0
+    operator match {
+      case "+" => result = firstOperand + secondOperand
+      case "-" => result = firstOperand - secondOperand
+      case "*" => result = firstOperand * secondOperand
+      case "/" => result = firstOperand / secondOperand
+      case "%" => result = firstOperand % secondOperand
+    }
+    return result
+  }
+  
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
   override def toBoogieString = s"${BinOperator.toBoogie(operator)}(${firstExp.toBoogieString}, ${secondExp.toBoogieString})"
   override def getChildren = util.Arrays.asList(firstExp, secondExp)
