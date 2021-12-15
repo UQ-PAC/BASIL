@@ -3,6 +3,8 @@ import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 
+import scala.collection.mutable.Set;
+
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.IOException
@@ -11,6 +13,7 @@ import java.util.Arrays
 import java.util.List
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import BilParser.*
+import analysis.*;
 import astnodes.pred.Bool
 import vcgen.{State, VCGen}
 
@@ -42,9 +45,12 @@ import scala.language.postfixOps
         walker.walk(symsListener, symsParser.syms)
 
         if (outputType.equals("boogie")) {
-
           // TODO duplicated code for default value
           val flowGraph = FlowGraph.fromStmts(stmts.asJava, statementLoader.varSizes.toMap)
+
+          var worklist: BlockWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
+          worklist.workOnBlocks;
+
           val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl");
           val updatedFlowGraph = translator.translate();
 
@@ -57,7 +63,7 @@ import scala.language.postfixOps
           // "boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process("grep --color=always '.*errors.*\\|$'", None, "GREP_COLORS" -> "'1;33")  !
           "boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" !
         } else {
-          println("Output failed")
+            println("Output failed")
         }
     }
 

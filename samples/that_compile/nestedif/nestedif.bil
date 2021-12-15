@@ -1,3 +1,4 @@
+00000520: program
 0000052e: sub main(main_argc, main_argv, main_result)
 00000544: main_argc :: in u32 = X0
 00000545: main_argv :: in out u64 = X1

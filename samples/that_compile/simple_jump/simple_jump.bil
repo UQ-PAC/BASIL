@@ -1,5 +1,4 @@
 00000000: program
-
 000004a7: sub main(main_argc, main_argv, main_result)
 000004bb: main_argc :: in u32 = X0
 000004bc: main_argv :: in out u64 = X1
