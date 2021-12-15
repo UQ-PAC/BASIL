@@ -10,7 +10,7 @@ case class Concat (left: Expr, right: Expr) extends Expr{
     case (Some(x), Some(y)) => Some(x + y)
   }
 
-  override def vars: List[Var] = left.vars ++ right.vars
+  override def vars = left.vars ++ right.vars
   override def replace(oldExpr: Expr, newExpr: Expr): Unit = {} // TODO
   override def getChildren: util.List[Expr] = ArrayBuffer(left, right).asJava
 
@@ -25,11 +25,7 @@ case object Extend {
 
 case object Pad {
   def apply(expr: Expr, size: Int) =
-    println(s"$expr $size ${expr.size} ${size - expr.size.get}")
-    println(
-      if (size - expr.size.get > 0) Concat(Literal("0", Some(size - expr.size.get)), expr)
-      else expr
-    )
+    println(expr)
     if (size - expr.size.get > 0) Concat(Literal("0", Some(size - expr.size.get)), expr)
     else expr
 

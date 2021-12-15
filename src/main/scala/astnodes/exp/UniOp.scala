@@ -13,7 +13,7 @@ case class UniOp(var operator: UniOperator.Value, var exp: Expr) extends Expr {
   override def getChildren = Collections.singletonList(exp)
   override def replace(oldExp: Expr, newExp: Expr) = if (exp == oldExp) exp = newExp
 
-  override def vars: List[Var] = exp.vars
+  override def vars = exp.vars
 
   override def size = exp.size
 
@@ -29,11 +29,14 @@ case object UniOperator extends Enumeration {
     case "~" => BitwiseComplement
   }
 
-  def toBoogie(value: Value, size: Option[Int]): String =
+  def toBoogie(value: Value, size: Option[Int]): String = {
     val size1 = size.getOrElse(64) // TODO
     value match {
-    // TODO !!!!!
-    case UnaryNegation => s"bv${size1}not" // TODO this is unarynecation right?
-    case BitwiseComplement => s"bv${size1}neg"
+      // TODO !!!!!
+      case UnaryNegation => s"bv${size1}not" // TODO this is unarynecation right?
+      case BitwiseComplement => s"bv${size1}neg"
+    }
   }
+
+  def changesSize(op: Value): Boolean = false
 }

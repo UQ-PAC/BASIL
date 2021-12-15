@@ -5,7 +5,7 @@ grammar Bil;
 bil : progSpec progdecl function+ EOF;
 function : sub 
          paramTypes*
-         gammas?
+         progSpec
          (stmt)*
          ;
 
@@ -29,16 +29,19 @@ exp : exp bop exp                                       # expBop
     | uop exp                                           # expUop
     | var                                               # expVar
     | exp 'with' '[' exp ',' ENDIAN ']:' nat '<-' exp   # expStore
+    | exp 'with' '[' exp ']' '<-' exp                   # expStore8 // sizes can be ommited if storing a single byte
     | CAST ':' nat '[' exp ']'                          # expCast
+    // TODO maybe merge these instead??
     | exp '[' exp ',' ENDIAN ']:' nat                   # expLoad
+    | exp '[' exp ']'                                   # expLoad8
     | 'extract' ':' nat ':' nat '[' exp ']'             # expExtract
     ;
 cjmp : 'when' var 'goto' '%' addr ;
 jmp : 'goto' (('%' addr)|('@' var));
 
 var : ID ;
-functionName : ID ;
-param : ID ;
+functionName : ID | '.'ID ;
+param : ID | '\\.'ID ;
 bop : PLUS | MINUS | TIMES | DIVIDE | MODULO | LSL | LSR | ASR | BAND | BOR | BXOR | EQ | NEQ | LT | LE ;
 uop : NOT ;
 inout : 'in out' | 'in' | 'out' ;
@@ -47,8 +50,8 @@ literal : NUMBER ;
 nat : (NAT | NUMBER) ;
 addr : NUMBER ;
 
-TRUE: 'True' ;
-FALSE: 'False' ;
+TRUE: 'TRUE' ;
+FALSE: 'FALSE' ;
 HIGH : 'HIGH' ;
 LOW : 'LOW' ;
 CAST : ('pad' | 'extend' | 'high' | 'low') ;
@@ -98,7 +101,8 @@ lpred :  (var MAPSTO pred);
 gammas : 'Gamma:' gamma (',' gamma)* ;
 gamma :  (var MAPSTO (LOW | HIGH));
 
-pred : pred predBop pred  # predBinOp
+pred :
+    pred predBop pred  # predBinOp
     | '(' pred ')'        # predBracket
     | uop pred            # predUniOp
     // TODO i dont think this is right

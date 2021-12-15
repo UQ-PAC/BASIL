@@ -13,6 +13,20 @@ import jdk.nashorn.internal.objects.NativeError.printStackTrace
 
 import scala.collection.mutable
 
+/**
+  * TODO: write tests
+  *   - tests for typing
+  *   - tests for correctness
+  *   - tests for bv to mem conversions
+  *   - tests for bv (e.g. for extract 0[0:8] == 0bv8)
+  *   - test axioms (for the moment just for bool <-> bv1)
+  */
+
+
+/** Idea for how to do tests
+  *   write a helper method which takes a function end expected errors (maybe line numbers and number of errors???)
+  */
+
 class FunctionalTests:
 
   val samplesThatCompileLocation: String = "samples/that_compile/"
@@ -32,7 +46,7 @@ class FunctionalTests:
     // translate
     // TODO default value
     val flowGraph = FlowGraph.fromStmts(stmts.asJava, statementLoader.varSizes.toMap)
-    val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", new mutable.HashMap())
+    val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl")
     translator.translate()
 
   @Test def cjump(): Unit =

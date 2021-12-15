@@ -1,15 +1,15 @@
 00000290: program
-// 00000278: sub .plt(\.plt_result)
-// 00000291: \.plt_result :: out u32 = R0
+00000278: sub .plt(\.plt_result)
+00000291: \.plt_result :: out u32 = R0
 
-// 000001f7:
-// 000001f9: mem := mem with [R31 - 0x10, el]:u64 <- R16
-// 000001fb: mem := mem with [R31 - 8, el]:u64 <- R30
-// 000001fd: R31 := R31 - 0x10
-// 00000201: R16 := 0x10000
-// 00000205: R17 := mem[R16 + 0xFF8, el]:u64
-// 00000209: R16 := R16 + 0xFF8
-// 0000020d: call R17 with noreturn
+000001f7:
+000001f9: mem := mem with [R31 - 0x10, el]:u64 <- R16
+000001fb: mem := mem with [R31 - 8, el]:u64 <- R30
+000001fd: R31 := R31 - 0x10
+00000201: R16 := 0x10000
+00000205: R17 := mem[R16 + 0xFF8, el]:u64
+00000209: R16 := R16 + 0xFF8
+0000020d: call R17 with noreturn
 
 00000279: sub __cxa_finalize(__cxa_finalize_result)
 00000292: __cxa_finalize_result :: out u32 = R0

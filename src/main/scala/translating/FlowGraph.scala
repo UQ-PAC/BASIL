@@ -42,6 +42,10 @@ object FlowGraph {
 
   class Function(val header: EnterSub, val blocks: List[FlowGraph.Block]) {
     private val initStmts = new LinkedList[InitStmt]
+    initStmts.add(new InitStmt(Var("ZF", -1 ), "ZF", "bv1"))
+    initStmts.add(new InitStmt(Var("CF", -1 ), "CF", "bv1"))
+    initStmts.add(new InitStmt(Var("NF", -1 ), "NF", "bv1"))
+    initStmts.add(new InitStmt(Var("VF", -1 ), "VF", "bv1"))
 
     // variable initialisations to be at the top of this function
     def getHeader = header
@@ -100,21 +104,16 @@ object FlowGraph {
     }
 
     private def setFunctionsWithReturns(stmts: immutable.List[Stmt]): immutable.List[Stmt] = {
-      println("HERE")
-
       var i = 0 // TODO work out a way to not use this
 
       // TODO ideally could collect (returning a partial funciton instead of some/none)
       (stmts.sliding(3, 1).flatMap{
         case (call: CallStmt) :: _ :: (assign: RegisterAssign) :: Nil =>
-          println(s"setting return for $call")
           call.setLHS(assign.getLhs)
           i = 2
           Some(call)
         case x :: rest if (i == 2) =>
-          println(x)
           i -= 1
-          // x.getLabel.show
           Some(x)
         case _ if (i == 1) =>
           i -= 1
@@ -122,30 +121,6 @@ object FlowGraph {
         case stmt :: rest => Some(stmt)
         case Nil => None
       } ++ stmts.takeRight(2)).toList  // Make sure to get the last 3 lines
-
-
-      /*
-      for (i <- 0 to (stmts.size - 3)) {
-        println(i)
-        println(stmts.size)
-        if (stmts.get(i).isInstanceOf[CallStmt]
-          && stmts.get(i + 1).isInstanceOf[JmpStmt]
-          && stmts.get(i + 3).isInstanceOf[RegisterAssign]
-        ) {
-          val call = stmts.get(i).asInstanceOf[CallStmt]
-          val cjmp = stmts.get(i + 1).asInstanceOf[JmpStmt]
-          val assign = stmts.get(i + 3).asInstanceOf[RegisterAssign]
-          if (cjmp.target == stmts.get(i + 1).getLabel.getPc)
-            throw new AssumptionViolationException("Expected jump to next line")
-          call.setLHS(assign.getLhs)
-          stmts.remove(i + 1)
-          stmts.remove(i + 2)
-          stmts.remove(i + 3)
-        }
-      }
-
-      stmts
-      */
     }
     private def findFunction(blocks: List[FlowGraph.Block], functionName: String) = blocks.stream
       .filter((b: FlowGraph.Block) => b.firstLine.isInstanceOf[EnterSub] && b.firstLine.asInstanceOf[EnterSub].getFuncName == functionName)
@@ -408,12 +383,14 @@ object FlowGraph {
 }
 
 class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.Map[String, Int]) {
+  // TODO this isnt great
   private var globalInits: List[InitStmt] = new LinkedList[InitStmt].asInstanceOf[List[InitStmt]]
-  globalInits.add(new InitStmt(Var("heap", -1), "heap", "[bv32] bv32")) // TODO label.none
-  globalInits.add(new InitStmt(Var("stack", -1), "stack", "[bv32] bv32"))
-  globalInits.add(new InitStmt(Var("L_heap", -1), "heap", "[bv32] bool")) // TODO This isnt great
-  globalInits.add(new InitStmt(Var("L_stack", -1), "stack", "[bv32] bool"))
-  globalInits.add(new InitStmt(Var("SP", -1 ), "SP", "bv32"))
+  globalInits.add(new InitStmt(Var("heap", -1), "heap", "[bv64] bv8")) // TODO label.none
+  globalInits.add(new InitStmt(Var("stack", -1), "stack", "[bv64] bv8"))
+  globalInits.add(new InitStmt(Var("L_heap", -1), "heap", "[bv64] bool", true)) // TODO This isnt great
+  globalInits.add(new InitStmt(Var("L_stack", -1), "stack", "[bv64] bool", true))
+  globalInits.add(new InitStmt(Var("SP", -1 ), "SP", "bv64"))
+  globalInits.add(new InitStmt(Var("R31", -1 ), "R31", "bv64"))
 
   def getGlobalInits = globalInits
   def setGlobalInits(inits: List[InitStmt]) = this.globalInits = inits

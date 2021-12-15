@@ -19,5 +19,5 @@ case class Literal(var value: String, override val size: Option[Int] = None) ext
 
   override def vars: List[Var] = List()
 
-  override def toBoogieString: String = value + s"bv${if (size.isDefined) size.get else 32}"
+  override def toBoogieString: String = value + s"bv${if (size.isDefined) size.get else 64}"
 }

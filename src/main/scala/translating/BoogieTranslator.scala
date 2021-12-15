@@ -1,6 +1,6 @@
 package translating
 
-import astnodes.exp.{BinOp, Concat, Expr, Literal, MemLoad, Var}
+import astnodes.exp.{BinOp, BinOperator, Concat, Expr, Literal, MemLoad, MemStore, UniOp, UniOperator, Var}
 import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
 import astnodes.stmt.*
 import astnodes.parameters.{InParameter, OutParameter}
@@ -18,7 +18,7 @@ import scala.jdk.CollectionConverters.*
 import util.AssumptionViolationException
 
 // TODO rewrite this file to make the flowGraph immutable (this should make whats happening a bit more transparent)
-class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable: mutable.Map[Literal, Var]) {
+class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
   private var uniqueInt = 0;
 
   /** Starting point for a BIL translation.
@@ -31,7 +31,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     resolveOutParams()
     // TODO this doesnt work: resolveVars()
     addVarDeclarations(flowGraph.types)
-    resolveTypes()
+    inferConstantTypes()
     // TODO could turn this on later:  replaceGlobalVars(symbolTable)
     // writeToFile()
 
@@ -198,6 +198,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
           flowGraph.getGlobalInits.stream.noneMatch(init => init.variable.name == lhs.name)
           && function.getHeader.getInParams.stream.noneMatch((inParam) => inParam.getName.name == lhs.name) // TODO check if this is needed
           && !(function.getHeader.getOutParam.get.getName.name == lhs.name)
+          && function.getInitStmts.stream.noneMatch(init => init.variable.name == lhs.name)
         ) {
           vars.add(lhs)
         }
@@ -338,33 +339,53 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
   }
   */
 
-  private def resolveTypes(): Unit = {
+  /**
+    * Infers the bv sizes for constants
+    */
+  private def inferConstantTypes(): Unit = {
     flowGraph.getFunctions.forEach(f => f.getBlocks.forEach(b =>
-      b.setLines(b.getLines.asScala.map(resolveTypes).asJava)
+      b.setLines(b.getLines.asScala.map(inferConstantTypes).asJava)
     ))
   }
 
-  private def resolveTypes(stmt: Stmt): Stmt = stmt match {
-    case assign: RegisterAssign => assign.copy(expr = resolveTypes(assign.expr, assign.lhsExp.size.get))
+  private def inferConstantTypes(stmt: Stmt): Stmt = stmt match {
+    case assign: RegisterAssign => assign.copy(expr = inferConstantTypes(assign.expr, assign.lhsExp.size))
     case x => x
   }
 
   // TODO improve this!!
   // TODO use proper type checking
-  private def resolveTypes(expr: Expr, size: Int): Expr = expr match {
+  private def inferConstantTypes(expr: Expr, size: Option[Int]): Expr = expr match {
     case binOp: BinOp => {
-      val binOp1 = binOp.copy(firstExp = resolveTypes(binOp.firstExp, size), secondExp = resolveTypes(binOp.secondExp, size))
+      val inputSize = if (BinOperator.changesSize(binOp.operator)) None else size
+      val binOp1 = binOp.copy(firstExp = inferConstantTypes(binOp.firstExp, inputSize), secondExp = inferConstantTypes(binOp.secondExp, inputSize))
       (binOp1.firstExp.size, binOp1.secondExp.size) match {
         case (a: Some[Int], b: Some[Int]) if (a == b) => binOp1
-        case (a: Some[Int], b: Some[Int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop should have the same size ${binOp1.firstExp}: ${a}, ${binOp1.secondExp}: ${b}")
-        case (x: Some[Int], None) => binOp1.copy(secondExp = resolveTypes(binOp1.secondExp, x.get))
-        case (None, x: Some[Int]) => binOp1.copy(firstExp = resolveTypes(binOp1.firstExp, x.get))
+        case (a: Some[Int], b: Some[Int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop ($binOp) should have the same size (${binOp1.firstExp}: ${a}, ${binOp1.secondExp}: ${b})")
+        case (x: Some[Int], None) => binOp1.copy(secondExp = inferConstantTypes(binOp1.secondExp, x))
+        case (None, x: Some[Int]) => binOp1.copy(firstExp = inferConstantTypes(binOp1.firstExp, x))
         case (None, None) => binOp1
       }
     }
-    // case binOp: BinOp => binOp.copy(firstExp = resolveTypes(binOp.firstExp, size), secondExp = resolveTypes(binOp.secondExp, size))
-    case lit: Literal if (lit.size == None) => lit.copy(size = Some(size))
+    case uniOp: UniOp =>
+      val inputSize = if (UniOperator.changesSize(uniOp.operator)) None else size
+      uniOp.copy(exp = inferConstantTypes(uniOp.exp, inputSize))
+    case lit: Literal if (lit.size == None) => lit.copy(size = size)
     case _ => expr
+  }
+
+  // TODO this is a temporary rudimentary analysis that should be replaced with a static analysis method later
+  // TODO implement this
+  private def regionAnalysis(): Unit = flowGraph.getFunctions.forEach(f => f.getBlocks.forEach(b =>
+      b.setLines(b.getLines.asScala.map(regionAnalysis).asJava)
+    ))
+
+  // private def isOnStack()
+
+  private def regionAnalysis(stmt: Stmt): Stmt = stmt match {
+    // case MemLoad(BinOp(_, v: Var, _), _) if (v.name == "SP") => stmt
+    case _: MemAssign => stmt
+    case x => x
   }
 
   private def writeToFile(): Unit = {
