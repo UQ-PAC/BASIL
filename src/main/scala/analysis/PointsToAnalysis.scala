@@ -140,7 +140,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                 // only defined "library" functions in the worklist make it to here.
                 if (functionCall.funcName == "malloc") {
                     // X0 -> new heap allocation
-                    currentState.update(Var("X0"), Set(Literal("alloc")));
+                    currentState.update(Var("X0", None), Set(Literal("alloc")));
                 }
             }
             case _ => {
@@ -155,7 +155,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
         var hasKnownPointer: Boolean = false;
 
         expr.getChildren.asScala.foreach(c => {
-            if (c == Var("SP") || c == Var("FP") || c == Var("LR")) {
+            if (c == Var("SP", None) || c == Var("FP", None) || c == Var("LR", None)) {
                 hasKnownPointer = true;
             } else {
                 hasKnownPointer = knownPointer(c);

@@ -86,7 +86,7 @@ trait AnalysisPoint {
      * but this causes errors elsewhere in the worklist function where we need to operate on sets of 
      * analyses and guarantee they have the same type.
      * 
-     * Also, this should work with match statements somehow...
+     * Also, this should work with match statements, but it doesn't. Go figure.
      */
     final def typeCheck(other: AnalysisPoint): this.type = {
         if (this.getClass == other.getClass) {

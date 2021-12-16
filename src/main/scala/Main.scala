@@ -51,7 +51,7 @@ import scala.language.postfixOps
             worklist.analyseFromMain;
             println(worklist.getAllStates);
             
-            val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
+            val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl");
             val updatedFlowGraph = translator.translate();
 
           val state = State(updatedFlowGraph, Bool.True, Bool.False, symsListener.symbolTable.toMap, statementLoader.lPreds.toMap, statementLoader.gammaMappings.toMap)

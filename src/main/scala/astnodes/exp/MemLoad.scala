@@ -27,13 +27,8 @@ case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Expr {
   /** Assumes: anything on the stack is represented as SP + val (where val is an int etc)
     */
   def onStack = exp match {
-<<<<<<< HEAD
-    // TODO improve once everything is immutable
-    case BinOp(_, v: Var, _) => v.name == "SP"
-=======
     case v: Var => v.name == "R31"
     case BinOp(_, v: Var, _) => v.name == "R31"
->>>>>>> 8dc2e6ed607444f1c25f7b0b36ea251216459046
     case _ => false
   }
 

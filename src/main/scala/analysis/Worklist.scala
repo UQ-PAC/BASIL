@@ -16,7 +16,7 @@ import translating.FlowGraph.Function;
 import analysis.AnalysisPoint;
 
 class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
-    private final val debug: Boolean = true;
+    private final val debug: Boolean = false;
 
     // functions that we abstract away and don't traverse. If we encounter a call to any of these, it's 
     // passed through to the analyses as a call instruction so they can decide what to do with it
