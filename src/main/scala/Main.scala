@@ -45,7 +45,7 @@ import collection.JavaConverters.*
         if (outputType.equals("boogie")) {
             val flowGraph = FlowGraph.fromStmts(stmts.asJava)
 
-            var worklist: BlockWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
+            var worklist: InlineWorklist = InlineWorklist(Set(PointsToAnalysis()), flowGraph);
             worklist.analyseFromMain;
             println(worklist.getAllStates);
             

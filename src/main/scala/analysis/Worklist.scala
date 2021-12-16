@@ -6,7 +6,6 @@ import scala.collection.mutable.Stack; // hence, mutability in everything is goo
 import scala.collection.mutable.ArrayDeque;
 import scala.jdk.CollectionConverters.IteratorHasAsScala;
 import scala.jdk.CollectionConverters.ListHasAsScala;
-import scala.jdk.CollectionConverters.ListHasAsScala;
 import scala.jdk.CollectionConverters.SeqHasAsJava;
 import java.util.MissingResourceException;
 
@@ -17,7 +16,13 @@ import translating.FlowGraph.Function;
 import analysis.AnalysisPoint;
 import java.lang.invoke.CallSite
 
-class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
+class InlineWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
+    private final val debug: Boolean = false;
+
+    // functions that we abstract away and don't traverse. If we encounter a call to any of these, it's 
+    // treated like any other instruction, so the transfer functions can define what they do with it
+    val libraryFunctions: Set[String] = Set("malloc");
+
     var currentWorkListQueue: ArrayDeque[Block] = ArrayDeque(); // queue of blocks to work on, for the current function.
 
     var previousStmtAnalysisState: Set[AnalysisPoint] = null; // previous state on a per stmt basis.
@@ -63,7 +68,9 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * blocks that all depend on a loop; forcing us to re-analyse every block until that loop stablises.
      */
     def workOnFunction(functionName: String): Unit = {
-        println("analysing function: " + functionName);
+        if (debug) {
+            println("analysing function: " + functionName);
+        }
 
         currentWorkListQueue = topologicalSortFromFunction(controlFlow, functionName);
 
@@ -127,7 +134,9 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * to queue on update, if they weren't already there.
      */
     def workOnBlock(blockToWorkOn: Block, currentFunctionAnalysedInfo: Map[Stmt, Set[AnalysisPoint]]): Unit = {
-        println("analysing block: " + blockToWorkOn.toString);
+        if (debug) {
+            println("analysing block: " + blockToWorkOn.toString);
+        }
 
         blockToWorkOn.getLines.asScala.foreach(blockStmtLine => {
             workOnStmt(blockStmtLine, currentFunctionAnalysedInfo);
@@ -173,9 +182,9 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * Saves the new "prevState" and updates the analysedStmtInfo map.
      */
     def workOnStmt(singleStmt: Stmt, functionAnalysedInfo: Map[Stmt, Set[AnalysisPoint]]): Unit = {
-        println("analysing stmt: " + singleStmt.toString);
-        println(previousStmtAnalysisState);
-        print("\n\n");
+        if (debug) {
+            println("analysing stmt: " + singleStmt.toString);
+        }
 
         var newAnalysedPoint: Set[AnalysisPoint] = Set[AnalysisPoint]();
 
@@ -185,7 +194,22 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
                 // effectively just inlines every function at every time it's called
                 var inProgressWorkListQueue: ArrayDeque[Block] = currentWorkListQueue;
 
-                workOnFunction(functionCallStmt.funcName);
+                if (!libraryFunctions.contains(functionCallStmt.funcName)) {
+                    workOnFunction(functionCallStmt.funcName);
+                } else {
+                    // treat it like a normal statement and let the analyses
+                    // define how they deal with it
+                    previousStmtAnalysisState.foreach(p => {
+                        newAnalysedPoint.add(p.transfer(singleStmt));
+                    });
+
+                    if (functionAnalysedInfo.getOrElse(singleStmt, null) != null) {
+                        functionAnalysedInfo.remove(singleStmt);
+                    }
+                    functionAnalysedInfo.update(singleStmt, newAnalysedPoint);
+
+                    previousStmtAnalysisState = newAnalysedPoint;
+                }
 
                 currentWorkListQueue = inProgressWorkListQueue;
             }

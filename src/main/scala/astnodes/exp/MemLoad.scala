@@ -5,6 +5,7 @@ import java.util
 import java.util.Objects
 import astnodes.pred
 import astnodes.pred.conjunct
+import astnodes.exp.Var;
 
 /** Memory expression e.g. mem[10]
   */
@@ -18,8 +19,9 @@ case class MemLoad(var exp: Expr) extends Expr {
   /** Assumes: anything on the stack is represented as SP + val (where val is an int etc)
     */
   def onStack = exp match {
-    // TODO imporve once everything is immutable
+    // TODO improve once everything is immutable
     case BinOp(_, v: Var, _) => v.name == "SP"
+    case single: Var => single.name == "SP"
     case _ => false
   }
 
