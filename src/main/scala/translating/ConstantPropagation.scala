@@ -283,6 +283,7 @@ class ConstantPropagation(flowgraph: FlowGraph) {
     // list of lines that will be removed once the loop exits
     val toRemove = new ArrayBuffer[Assign]()
     // iterate over all lines in the function
+    // TODO: remove from pending if accessed??
     function.getLines.forEach(line => {
 //      System.out.println("here6")
       val lineNum = line.getLabel.getPc
@@ -290,7 +291,15 @@ class ConstantPropagation(flowgraph: FlowGraph) {
       // and replace the line with the instruction rhs
       if (constraints.containsKey(lineNum) && line.isInstanceOf[Assign]) {
         constraints.get(lineNum).foreach(constPc => {
+          // if line is different after replacement, remove constraint from pending
           val constraint = findInstFromPc(function.getLines, constPc)
+//          if (line.asInstanceOf[Assign].getRhs.contains(constraint.getLhs) && (line
+//            .asInstanceOf[Assign].getLhs != constraint.getLhs)) {
+//            System.out.println("found")
+//            if (pendingRemoval.contains(constraint)) {
+//              pendingRemoval-=constraint
+//            }
+//          }
           replaceAllMatchingChildren(line.asInstanceOf[Assign].getLhs, constraint.getLhs,
             constraint.getRhs)
           replaceAllMatchingChildren(line.asInstanceOf[Assign].getRhs, constraint.getLhs,
@@ -300,14 +309,33 @@ class ConstantPropagation(flowgraph: FlowGraph) {
         })
 //        System.out.println("here7")
 
+        if (line.isInstanceOf[Assign] && line.asInstanceOf[Assign].getRhs.isInstanceOf[BinOp]) {
+          //        System.out.println("here8.2")
+          if (line.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].canCompute()) {
+            //          System.out.println("here8.3")
+            val newRhs = line.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].compute()
+            //          System.out.println("here8.3.1")
+            val newRhsAsStr = newRhs.toString()
+            val newRhsExp = new Literal(newRhsAsStr)
+            line.asInstanceOf[Assign].replace(line.asInstanceOf[Assign].getRhs, newRhsExp)
+            //          System.out.println("here8.4")
+          }
+        }
+
+        // TODO: where the revision is needed
         var contains : Boolean = false
         val loop = new Breaks
         loop.breakable(pendingRemoval.foreach(pending => {
-          if (pending.getLhs.equals(line.asInstanceOf[Assign].getLhs)) {
-            pendingRemoval -= pending
-            toRemove += pending
-            pendingRemoval += line.asInstanceOf[Assign]
+          if (pending.getLhs.equals(line.asInstanceOf[Assign].getLhs) && pending.getRhs.equals
+          (line.asInstanceOf[Assign].getRhs)) {
+            toRemove += line.asInstanceOf[Assign]
             contains = true
+            loop.break()
+          } else if (pending.getLhs.equals(line.asInstanceOf[Assign].getLhs) && !pending.getRhs
+            .equals(line.asInstanceOf[Assign].getRhs)) {
+            pendingRemoval-=pending
+            pendingRemoval+=line.asInstanceOf[Assign]
+            contains=true
             loop.break()
           }
         }))
@@ -321,22 +349,22 @@ class ConstantPropagation(flowgraph: FlowGraph) {
     // remove all
     toRemove.foreach(flowgraph.removeLine)
     
-    function.getLines.forEach(line => {
-//      System.out.println("here8.1")
-//      System.out.println(line.getLabel.getPc + " " + line)
-      if (line.isInstanceOf[Assign] && line.asInstanceOf[Assign].getRhs.isInstanceOf[BinOp]) {
-//        System.out.println("here8.2")
-        if (line.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].canCompute()) {
-//          System.out.println("here8.3")
-          val newRhs = line.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].compute()
-//          System.out.println("here8.3.1")
-          val newRhsAsStr = newRhs.toString()
-          val newRhsExp = new Literal(newRhsAsStr)
-          line.asInstanceOf[Assign].replace(line.asInstanceOf[Assign].getRhs, newRhsExp)
-//          System.out.println("here8.4")
-        }
-      }
-    })
+//    function.getLines.forEach(line => {
+////      System.out.println("here8.1")
+////      System.out.println(line.getLabel.getPc + " " + line)
+//      if (line.isInstanceOf[Assign] && line.asInstanceOf[Assign].getRhs.isInstanceOf[BinOp]) {
+////        System.out.println("here8.2")
+//        if (line.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].canCompute()) {
+////          System.out.println("here8.3")
+//          val newRhs = line.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].compute()
+////          System.out.println("here8.3.1")
+//          val newRhsAsStr = newRhs.toString()
+//          val newRhsExp = new Literal(newRhsAsStr)
+//          line.asInstanceOf[Assign].replace(line.asInstanceOf[Assign].getRhs, newRhsExp)
+////          System.out.println("here8.4")
+//        }
+//      }
+//    })
 
 //    System.out.println("here9")
   }
