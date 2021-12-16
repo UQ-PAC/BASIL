@@ -39,8 +39,7 @@ public class FlowGraphVisualiser extends Application {
         BilParser parser = new BilParser(tokens);
         parser.setBuildParseTree(true);
         BilParser.BilContext b = parser.bil();
-        ArrayBuffer<Stmt> facts = new ArrayBuffer<>();
-        StatementLoader statementLoader = new StatementLoader(facts);
+        StatementLoader statementLoader = new StatementLoader();
         ParseTreeWalker walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 

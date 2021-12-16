@@ -5,7 +5,7 @@ grammar Bil;
 bil : progSpec progdecl function+ EOF;
 function : sub 
          paramTypes*
-         progSpec
+         // progSpec // TODO only gamma
          (stmt)*
          ;
 
@@ -42,7 +42,7 @@ jmp : 'goto' (('%' addr)|('@' var));
 var : ID ;
 functionName : ID | '.'ID ;
 param : ID | '\\.'ID ;
-bop : PLUS | MINUS | TIMES | DIVIDE | MODULO | LSL | LSR | ASR | BAND | BOR | BXOR | EQ | NEQ | LT | LE ;
+bop : PLUS | MINUS | TIMES | DIVIDE | MODULO | LSL | LSR | ASR | BAND | BOR | BXOR | EQ | NEQ | LT | LE | UNKNOWN_OP ;
 uop : NOT ;
 inout : 'in out' | 'in' | 'out' ;
 returnaddr : 'noreturn' | 'return' '%' addr ;
@@ -88,6 +88,7 @@ NEQ : '<>' ;
 LT : '<' ;
 LE : '<=' ;
 NOT : '~' ;
+UNKNOWN_OP : '~>>' ;
 
 
 /**
@@ -98,7 +99,7 @@ progSpec: (lpreds | gammas)* ;
 
 lpreds : 'L:' lpred (',' lpred)* ;
 lpred :  (var MAPSTO pred);
-gammas : 'Gamma:' gamma (',' gamma)* ;
+gammas : 'GAMMA:' gamma (',' gamma)* ;
 gamma :  (var MAPSTO (LOW | HIGH));
 
 pred :

@@ -27,9 +27,9 @@ import util.AssumptionViolationException
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-// list of facts to output
-// TODO also shouldnt need this
-class StatementLoader(var stmts: ArrayBuffer[Stmt]) extends BilBaseListener {
+// TODO create a statementloaderstate class
+class StatementLoader() extends BilBaseListener {
+  val stmts = ArrayBuffer[Stmt]()
   private val exprs = ParseTreeProperty[Expr]
   private def getExpr(node: ParseTree) =
     if (node == null) throw new NullPointerException("Null expression")

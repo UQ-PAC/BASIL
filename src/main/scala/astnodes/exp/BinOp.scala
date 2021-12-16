@@ -58,6 +58,7 @@ case object BinOperator extends Enumeration {
   val NonEquality: Operator = Value("!=")
   val LessThan: Operator = Value("<")
   val LessThanOrEqual: Operator = Value("<=")
+  val UnknownOperator: Operator = Value("???") // currently just ~>>
 
   def fromBil(bilStr: String): Value = bilStr match {
     // note at the moment we do not distinguish between signed and unsigned
@@ -78,6 +79,7 @@ case object BinOperator extends Enumeration {
     case "<>" => NonEquality
     case "<" => LessThan
     case "<=" => LessThanOrEqual
+    case "~>>" => UnknownOperator
   }
 
   // TODO getOrElse ??

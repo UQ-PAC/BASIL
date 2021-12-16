@@ -25,7 +25,6 @@ case object Extend {
 
 case object Pad {
   def apply(expr: Expr, size: Int) =
-    println(expr)
     if (size - expr.size.get > 0) Concat(Literal("0", Some(size - expr.size.get)), expr)
     else expr
 

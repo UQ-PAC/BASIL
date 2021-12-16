@@ -32,8 +32,7 @@ import scala.language.postfixOps
         val b = parser.bil(); // abstract syntax tree
 
         // extract all statement objects from the tree
-        val stmts = new ArrayBuffer[Stmt]();
-        val statementLoader = new StatementLoader(stmts);
+        val statementLoader = new StatementLoader();
         val walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 
@@ -46,22 +45,22 @@ import scala.language.postfixOps
 
         if (outputType.equals("boogie")) {
           // TODO duplicated code for default value
-          val flowGraph = FlowGraph.fromStmts(stmts.asJava, statementLoader.varSizes.toMap)
+          val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
           var worklist: BlockWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
-          worklist.workOnBlocks;
+          // worklist.workOnBlocks;
 
           val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl");
           val updatedFlowGraph = translator.translate();
 
-          val state = State(updatedFlowGraph, Bool.True, Bool.False, symsListener.symbolTable.toMap, statementLoader.lPreds.toMap, Map.empty)
+          val state = State(updatedFlowGraph, Bool.True, Bool.False, symsListener.symbolTable.toMap, statementLoader.lPreds.toMap, statementLoader.gammaMappings.toMap)
           val vc = VCGen.genVCs(state)
           writeToFile(vc)
 
           // println("boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process(Seq("grep", "--color=always", ".*errors.*\\|$"), None, "GREP_COLORS" -> "'1;33"))
           // ("boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process(Seq("GREP_COLORS='1;32'", "grep", "--color=always", ".*errors.*\\|$"), None, "GREP_COLORS" -> "'1;32")) !
           // "boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process("grep --color=always '.*errors.*\\|$'", None, "GREP_COLORS" -> "'1;33")  !
-          "boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" !
+          "boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| "grep --color=always '.*parse errors.*\\|$'" !
         } else {
             println("Output failed")
         }
