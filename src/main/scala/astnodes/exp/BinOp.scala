@@ -44,7 +44,7 @@ case class BinOp(
       } catch {
         case ex: NumberFormatException => return false
       }
-    } else if (firstExp.isInstanceOf[Var]) {
+    } else if (firstExp.isInstanceOf[Var] || firstExp.isInstanceOf[Extract]) {
       return false
     } else if (!firstExp.asInstanceOf[BinOp].canCompute()) {
       return false
@@ -56,9 +56,9 @@ case class BinOp(
       } catch {
         case ex: NumberFormatException => return false
       }
-    } else if (secondExp.isInstanceOf[Var]) {
+    } else if (secondExp.isInstanceOf[Var] || secondExp.isInstanceOf[Extract]) {
       return false
-    }else if (!secondExp.asInstanceOf[BinOp].canCompute()) {
+    } else if (!secondExp.asInstanceOf[BinOp].canCompute()) {
       return false
     }
     
@@ -77,6 +77,7 @@ case class BinOp(
       case "*" => result = firstOperand * secondOperand
       case "/" => result = firstOperand / secondOperand
       case "%" => result = firstOperand % secondOperand
+      case _ => 
     }
     return result
   }

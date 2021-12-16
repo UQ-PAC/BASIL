@@ -23,40 +23,51 @@ class ConstantPropagation(flowgraph: FlowGraph) {
    */
   def foldVariables(): Unit = {
     flowgraph.getFunctions.forEach(function => {
+      System.out.println("Before CP:")
+      debugPrinter(function)
+//      function.getBlocks.forEach(block => {
+//        System.out.println(block)
+//      })
       val stmtConstrainst =
         propagationWorklistAlgorithm(function.getBlocks, function.getLines)
+//      System.out.println("here5")
       constantPropagation(stmtConstrainst, function, function.getBlocks)
+      System.out.println("After CP:")
+      debugPrinter(function)
+//      function.getBlocks.forEach(block => {
+//        System.out.println(block)
+//      })
     })
   }
   
-//  private def debugPrinter(function: FlowGraph.Function): Unit = {
-//    function.getLines.forEach(line => {
-//      System.out.println(line.getLabel.getPc + " " + line)
-//    })
-//  }
-//  
-//  private def debugFindMemAssigns(function: FlowGraph.Function): Unit = {
-//    function.getLines.forEach(line => {
-//      if (line.isInstanceOf[MemAssign]) System.out.println(line)
-//    })
-//  }
-//
-//  private def debugFindRegAssigns(function: FlowGraph.Function): Unit = {
-//    function.getLines.forEach(line => {
-//      if (line.isInstanceOf[RegisterAssign]) System.out.println(line)
-//    })
-//  }
-//  
-//  private def debugMapPrint(map : util.HashMap[String, ArrayBuffer[String]]): Unit = {
-//    map.keySet().forEach(pc => {
-//      System.out.println("Line:")
-//      System.out.println(pc)
-//      System.out.println("Dependent lines:")
-//      map.get(pc).foreach(const => {
-//        System.out.println(const)
-//      })
-//    })
-//  }
+  private def debugPrinter(function: FlowGraph.Function): Unit = {
+    function.getLines.forEach(line => {
+      System.out.println(line.getLabel.getPc + " " + line)
+    })
+  }
+
+  private def debugFindMemAssigns(function: FlowGraph.Function): Unit = {
+    function.getLines.forEach(line => {
+      if (line.isInstanceOf[MemAssign]) System.out.println(line)
+    })
+  }
+
+  private def debugFindRegAssigns(function: FlowGraph.Function): Unit = {
+    function.getLines.forEach(line => {
+      if (line.isInstanceOf[RegisterAssign]) System.out.println(line)
+    })
+  }
+
+  private def debugMapPrint(map : util.HashMap[String, ArrayBuffer[String]]): Unit = {
+    map.keySet().forEach(pc => {
+      System.out.println("Line:")
+      System.out.println(pc)
+      System.out.println("Dependent lines:")
+      map.get(pc).foreach(const => {
+        System.out.println(const)
+      })
+    })
+  }
   
   /**
    * Uses the propagation worklist algorithm to calculate variable constraints on each block.
@@ -80,6 +91,7 @@ class ConstantPropagation(flowgraph: FlowGraph) {
     while ( {
       worklist.size > 0
     }) {
+//      System.out.println("here1")
       val next = worklist.poll
 
       // perform meet on all predecessor statements if next has more than one
@@ -93,6 +105,7 @@ class ConstantPropagation(flowgraph: FlowGraph) {
         }
       }
 
+//      System.out.println("here2")
       var i : Int = 1
       var predecessor : Stmt = next.firstLine.asInstanceOf[Stmt]
       val tempBlockLines = next.getLines.asInstanceOf[ArrayList[Stmt]]
@@ -101,6 +114,7 @@ class ConstantPropagation(flowgraph: FlowGraph) {
         blockLines+= line
       })
 
+//      System.out.println("here3")
       while (i < next.getLines.size) {
         // join then transfer
         joinFunction(constraints, blockLines(i), predecessor, lines)
@@ -109,6 +123,7 @@ class ConstantPropagation(flowgraph: FlowGraph) {
         i+=1
       }
 
+//      System.out.println("here4")
       next.getChildren.forEach(child => {
         if (joinFunction(constraints, next.lastLine.asInstanceOf[Stmt], 
           child.firstLine.asInstanceOf[Stmt], lines))
@@ -269,6 +284,7 @@ class ConstantPropagation(flowgraph: FlowGraph) {
     val toRemove = new ArrayBuffer[Assign]()
     // iterate over all lines in the function
     function.getLines.forEach(line => {
+//      System.out.println("here6")
       val lineNum = line.getLabel.getPc
       // if the constraint map contains the pc, then for each constraint pc find the instruction 
       // and replace the line with the instruction rhs
@@ -282,6 +298,7 @@ class ConstantPropagation(flowgraph: FlowGraph) {
           if (line.asInstanceOf[Assign].getRhs == constraint.getLhs) line.asInstanceOf[Assign].replace(line.asInstanceOf[Assign].getRhs,
             constraint.getRhs)
         })
+//        System.out.println("here7")
 
         var contains : Boolean = false
         val loop = new Breaks
@@ -299,20 +316,29 @@ class ConstantPropagation(flowgraph: FlowGraph) {
         }
       }
     })
+//    System.out.println("here8")
     
     // remove all
     toRemove.foreach(flowgraph.removeLine)
     
     function.getLines.forEach(line => {
+//      System.out.println("here8.1")
+//      System.out.println(line.getLabel.getPc + " " + line)
       if (line.isInstanceOf[Assign] && line.asInstanceOf[Assign].getRhs.isInstanceOf[BinOp]) {
+//        System.out.println("here8.2")
         if (line.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].canCompute()) {
+//          System.out.println("here8.3")
           val newRhs = line.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].compute()
+//          System.out.println("here8.3.1")
           val newRhsAsStr = newRhs.toString()
           val newRhsExp = new Literal(newRhsAsStr)
           line.asInstanceOf[Assign].replace(line.asInstanceOf[Assign].getRhs, newRhsExp)
+//          System.out.println("here8.4")
         }
       }
     })
+
+//    System.out.println("here9")
   }
 
   /**
