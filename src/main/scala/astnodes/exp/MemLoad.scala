@@ -21,7 +21,6 @@ case class MemLoad(var exp: Expr) extends Expr {
   def onStack = exp match {
     // TODO improve once everything is immutable
     case BinOp(_, v: Var, _) => v.name == "SP"
-    case single: Var => single.name == "SP"
     case _ => false
   }
 
