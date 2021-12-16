@@ -1,8 +1,9 @@
 package astnodes.exp
 
-import jdk.javadoc.doclet.DocletEnvironment.ModuleMode
-import java.util
-import java.util.Objects
+import util.{AssumptionViolationException}
+
+import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
 
 /** Binary operation fact
   */
@@ -13,8 +14,9 @@ case class BinOp(
 ) extends Expr {
   def this(operatorStr: String, firstExp: Expr, secondExp: Expr) = this(BinOperator.fromBil(operatorStr), firstExp, secondExp)
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
-  override def toBoogieString = s"${BinOperator.toBoogie(operator)}(${firstExp.toBoogieString}, ${secondExp.toBoogieString})"
-  override def getChildren = util.Arrays.asList(firstExp, secondExp)
+  override def toBoogieString = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
+  //s"${BinOperator.toBoogie(operator, size)}(${firstExp.toBoogieString}, ${secondExp.toBoogieString})"
+  override def getChildren = ArrayBuffer(firstExp, secondExp).asJava
 
   // TODO update so the member vars can be vals
   override def replace(oldExp: Expr, newExp: Expr) = {
@@ -23,6 +25,17 @@ case class BinOp(
   }
 
   override def vars = firstExp.vars ++ secondExp.vars
+
+  // Finish resolveTypes and then remove thsi
+  override def size = BinOperator.size(operator, inputSize)
+
+  def inputSize = (firstExp.size, secondExp.size) match {
+    case (a: Some[Int], b: Some[int]) if (a == b) => a
+    case (a: Some[Int], b: Some[int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop should have the same size $firstExp: ${firstExp.size}, $secondExp: ${secondExp.size}")
+    case (x: Some[Int], None) => x
+    case (None, x: Some[Int]) => x
+    case (None, None) => None
+  }
 }
 
 // TODO look at scala 3 enums
@@ -45,6 +58,7 @@ case object BinOperator extends Enumeration {
   val NonEquality: Operator = Value("!=")
   val LessThan: Operator = Value("<")
   val LessThanOrEqual: Operator = Value("<=")
+  val UnknownOperator: Operator = Value("???") // currently just ~>>
 
   def fromBil(bilStr: String): Value = bilStr match {
     // note at the moment we do not distinguish between signed and unsigned
@@ -65,19 +79,33 @@ case object BinOperator extends Enumeration {
     case "<>" => NonEquality
     case "<" => LessThan
     case "<=" => LessThanOrEqual
+    case "~>>" => UnknownOperator
   }
 
-  def toBoogie(value: Value): String = value match {
-    case Addition => "bv64add"
-    case Subtraction => "bv64sub"
-    case Multiplication => "bv64mul"
-    case Division => "bv64udiv"
-    case Modulo => "bv64mod"
-    case BitwiseAnd => "bv64and"
-    case BitwiseOr => "bv64or"
-    case BitwiseXor => "bv64xor"
-    case Equality => "bv64comp"
-    // TODO !!!!!!!!!!! case NonEquality => ??? // TODO need to do this as !(a = b) i think
-    case NonEquality => "bv64comp"
+  // TODO getOrElse ??
+  def toBoogie(value: Value, size: Option[Int]): List[String] = {
+    val size1 = size.getOrElse(64)
+    value match {
+      case Addition => List(s"bv${size1}add")
+      case Subtraction => List(s"bv${size1}sub")
+      case Multiplication => List(s"bv${size1}mul")
+      case Division => List(s"bv${size1}udiv")
+      case Modulo => List(s"bv${size1}mod")
+      case BitwiseAnd => List(s"bv${size1}and")
+      case BitwiseOr => List(s"bv${size1}or")
+      case BitwiseXor => List(s"bv${size1}xor")
+      case Equality => List(s"bv${size1}comp", "booltobv1")
+      case NonEquality => List(s"bv${size1}comp", "!", "booltobv1")
+    }
+  }
+  
+  def changesSize(value: Value) = value match {
+    case Equality | NonEquality => true
+    case _ => false
+  }
+
+  def size(value: Value, size: Option[Int]): Option[Int] = value match {
+    case Equality | NonEquality => Some(1)
+    case _ => size
   }
 }

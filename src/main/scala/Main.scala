@@ -17,9 +17,11 @@ import analysis.*;
 import astnodes.pred.Bool
 import vcgen.{State, VCGen}
 
-import collection.immutable
+import collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
 import collection.JavaConverters.*
+import sys.process.*
+import scala.language.postfixOps
 
 @main def main(fileName: String, elfFileName: String, outputType: String) = {
         // generate abstract syntax tree
@@ -30,8 +32,7 @@ import collection.JavaConverters.*
         val b = parser.bil(); // abstract syntax tree
 
         // extract all statement objects from the tree
-        val stmts = new ArrayBuffer[Stmt]();
-        val statementLoader = new StatementLoader(stmts);
+        val statementLoader = new StatementLoader();
         val walker = new ParseTreeWalker();
         walker.walk(statementLoader, b);
 
@@ -43,7 +44,8 @@ import collection.JavaConverters.*
         walker.walk(symsListener, symsParser.syms)
 
         if (outputType.equals("boogie")) {
-            val flowGraph = FlowGraph.fromStmts(stmts.asJava)
+          // TODO duplicated code for default value
+          val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
             var worklist: InlineWorklist = InlineWorklist(PointsToAnalysis(), flowGraph);
             worklist.analyseFromMain;
@@ -52,9 +54,14 @@ import collection.JavaConverters.*
             val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
             val updatedFlowGraph = translator.translate();
 
-            val state = State(updatedFlowGraph, Bool.True, Bool.False, Map.empty, Map.empty)
-            val vc = VCGen.genVCs(state)
-            writeToFile(vc)
+          val state = State(updatedFlowGraph, Bool.True, Bool.False, symsListener.symbolTable.toMap, statementLoader.lPreds.toMap, statementLoader.gammaMappings.toMap)
+          val vc = VCGen.genVCs(state)
+          writeToFile(vc)
+
+          // println("boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process(Seq("grep", "--color=always", ".*errors.*\\|$"), None, "GREP_COLORS" -> "'1;33"))
+          // ("boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process(Seq("GREP_COLORS='1;32'", "grep", "--color=always", ".*errors.*\\|$"), None, "GREP_COLORS" -> "'1;32")) !
+          // "boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process("grep --color=always '.*errors.*\\|$'", None, "GREP_COLORS" -> "'1;33")  !
+          "boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| "grep --color=always '.*parse errors.*\\|$'" !
         } else {
             println("Output failed")
         }

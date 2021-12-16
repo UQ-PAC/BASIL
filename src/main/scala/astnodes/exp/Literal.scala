@@ -5,7 +5,7 @@ import java.util.Objects
 
 /** Literal expression (e.g. 4, 5, 10)
   */
-case class Literal(var value: String) extends Expr {
+case class Literal(var value: String, override val size: Option[Int] = None) extends Expr {
   this.value = parseHex(value)
 
   /** Value of literal */
@@ -20,5 +20,5 @@ case class Literal(var value: String) extends Expr {
 
   override def vars: List[Var] = List()
 
-  override def toBoogieString: String = value + "bv64"
+  override def toBoogieString: String = value + s"bv${if (size.isDefined) size.get else 64}"
 }

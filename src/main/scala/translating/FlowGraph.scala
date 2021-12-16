@@ -34,14 +34,18 @@ object FlowGraph {
   /** Creates a FlowGraph from the given list of statements. Assumes no line is reachable from more than one function
     * header (i.e. EnterSub).
     */
-  def fromStmts(stmts: List[Stmt]) = {
-    val flowGraph = FlowGraphFactory.fromStmts(stmts)
+  def fromStmts(stmts: List[Stmt], types: immutable.Map[String, Int]) = {
+    val flowGraph = FlowGraphFactory.fromStmts(stmts, types)
     flowGraph.enforceDisjointFunctions()
     flowGraph
   }
 
   class Function(val header: EnterSub, val blocks: List[FlowGraph.Block]) {
     private val initStmts = new LinkedList[InitStmt]
+    initStmts.add(new InitStmt(Var("ZF", -1 ), "ZF", "bv1"))
+    initStmts.add(new InitStmt(Var("CF", -1 ), "CF", "bv1"))
+    initStmts.add(new InitStmt(Var("NF", -1 ), "NF", "bv1"))
+    initStmts.add(new InitStmt(Var("VF", -1 ), "VF", "bv1"))
 
     // variable initialisations to be at the top of this function
     def getHeader = header
@@ -79,7 +83,7 @@ object FlowGraph {
       * @return
       *   a new flow graph with an empty global block and no constraints
       */
-    def fromStmts(stmts: List[Stmt]) = {
+    def fromStmts(stmts: List[Stmt], types: immutable.Map[String, Int]) = {
       val stmts1 = mergeCjmp(stmts.asScala.toList)
       val stmts2 = setFunctionsWithReturns(stmts1).asJava;
       // an ordered list of indexes of the given statements list, indicating where the list should be split into blocks
@@ -92,9 +96,10 @@ object FlowGraph {
       // essentially creates the edges for this flow graph
       setChildren(blocks, stmts2)
       // create a flow graph consisting of the functions formed from these blocks
-      val flowGraph = new FlowGraph(convertBlocksToFunctions(blocks))
+      val flowGraph = new FlowGraph(convertBlocksToFunctions(blocks), types)
       // ensure the created flow graph maintains the required properties
       flowGraph.enforceConstraints()
+
       flowGraph
     }
 
@@ -102,18 +107,21 @@ object FlowGraph {
       var i = 0 // TODO work out a way to not use this
 
       // TODO ideally could collect (returning a partial funciton instead of some/none)
-      (stmts.sliding(4, 1).flatMap{
-        case x if (x.size < 4) => Some(x(0)) // TODO this isnt doing what i want
-        case (call: CallStmt) :: (jmp: JmpStmt) :: _ :: (assign: RegisterAssign) :: Nil =>
+      (stmts.sliding(3, 1).flatMap{
+        case (call: CallStmt) :: _ :: (assign: RegisterAssign) :: Nil =>
           call.setLHS(assign.getLhs)
-          i = 3
+          i = 2
           Some(call)
-        case _ if (i > 0) =>
+        case x :: rest if (i == 2) =>
+          i -= 1
+          Some(x)
+        case _ if (i == 1) =>
           i -= 1
           None
         case stmt :: rest => Some(stmt)
         case Nil => None
-      } ++ stmts.takeRight(3)).toList  // Make sure to get the last 3 lines
+      } ++ stmts.takeRight(2)).toList  // Make sure to get the last 3 lines
+        // TODO check 2 or 3
 
 
       /*
@@ -147,10 +155,10 @@ object FlowGraph {
     private def stripBlocks(blocks: immutable.List[FlowGraph.Block]): immutable.List[FlowGraph.Block] = {
       val reachableBlocks = new ArrayBuffer[FlowGraph.Block]
       val queue = new LinkedList[FlowGraph.Block]
-      val mainBlock = blocks.find((block: FlowGraph.Block) =>
-          block.getLines.get(0).isInstanceOf[EnterSub]
-          && block.getLines.get(0).asInstanceOf[EnterSub].getFuncName == "main"
-        ).get
+      val mainBlock = blocks.find(_.getLines.get(0) match {
+        case enterSub: EnterSub => enterSub.getFuncName == "main"
+        case _ => false
+      }).get
 
       queue.add(mainBlock)
       while ({ !queue.isEmpty }) {
@@ -164,7 +172,9 @@ object FlowGraph {
             case cjmp: CJmpStmt =>
               queue.add(findBlockStartingWith(cjmp.trueTarget, blocks.asJava))
               queue.add(findBlockStartingWith(cjmp.falseTarget, blocks.asJava))
-            case call: CallStmt => queue.add(findFunction(blocks.asJava, call.funcName))
+            case call: CallStmt =>
+              queue.add(findFunction(blocks.asJava, call.funcName))
+              if (call.returnTarget != None) queue.add(findBlockStartingWith(call.returnTarget.get, blocks.asJava))
             case _ =>
           })
         }
@@ -189,20 +199,21 @@ object FlowGraph {
     private def getSplits(stmts: List[Stmt]) = { // we use a set to avoid double-ups, as some lines may be jumped to twice
       val splits = new HashSet[Integer]
       for (i <- 0 until stmts.size) {
-        val stmt = stmts.get(i)
-        if (stmt.isInstanceOf[JmpStmt]) { // for jumps, add a split below the jump and above the target line
-          splits.add(i + 1)
-          val targetIndex = findInstWithPc(stmt.asInstanceOf[JmpStmt].target, stmts)
-          if (targetIndex != -1) splits.add(targetIndex)
-        } else if (stmt.isInstanceOf[CJmpStmt]) { // for conditional jumps, add a split above the target line
-          var targetIndex = findInstWithPc(stmt.asInstanceOf[CJmpStmt].falseTarget, stmts)
-          if (targetIndex != -1) splits.add(targetIndex)
-          targetIndex = findInstWithPc(stmt.asInstanceOf[CJmpStmt].trueTarget, stmts)
-          if (targetIndex != -1) splits.add(targetIndex)
-        } else if (stmt.isInstanceOf[EnterSub]) { // for function headers, add a split before the header
-          splits.add(i)
-        } else if (stmt.isInstanceOf[ExitSub]) { // for function returns, add a split after the return
-          splits.add(i + 1)
+        stmts.get(i) match {
+          case jmpStmt: JmpStmt =>
+            splits.add(i + 1)
+            val targetIndex = findInstWithPc(jmpStmt.target, stmts)
+            if (targetIndex != -1) splits.add(targetIndex)
+          case jmpStmt: CJmpStmt =>
+            splits.add(i + 1) // TODO check if we need this
+            val trueTargetIndex = findInstWithPc(jmpStmt.trueTarget, stmts)
+            if (trueTargetIndex != -1) splits.add(trueTargetIndex)
+            val falseTargetIndex = findInstWithPc(jmpStmt.falseTarget, stmts)
+            if (falseTargetIndex != -1) splits.add(falseTargetIndex)
+          case _: CallStmt => splits.add(i + 1)
+          case _: EnterSub => splits.add(i)
+          case _: ExitSub => splits.add(i + 1)
+          case x => x
         }
       }
 
@@ -296,6 +307,7 @@ object FlowGraph {
         case jmp: JmpStmt => immutable.List(jmp.target)
         case cjmp: CJmpStmt => immutable.List(cjmp.trueTarget, cjmp.falseTarget)
         // TODO case exitSub: ExitSub => immutable.List(lines.get(lines.indexOf(exitSub) + 1).getLabel.getPc)
+        case callStmt: CallStmt => callStmt.returnTarget.toList
         case _: ExitSub => immutable.List()
       }
     }
@@ -396,13 +408,15 @@ object FlowGraph {
   }
 }
 
-class FlowGraph (var functions: List[FlowGraph.Function]) {
+class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.Map[String, Int]) {
+  // TODO this isnt great
   private var globalInits: List[InitStmt] = new LinkedList[InitStmt].asInstanceOf[List[InitStmt]]
-  globalInits.add(new InitStmt(new Var("heap"), "heap", "[bv64] bv64")) // TODO label.none
-  globalInits.add(new InitStmt(new Var("stack"), "stack", "[bv64] bv64"))
-  globalInits.add(new InitStmt(new Var("L_heap"), "heap", "[bv64] bool")) // TODO This isnt great
-  globalInits.add(new InitStmt(new Var("L_stack"), "stack", "[bv64] bool"))
-  globalInits.add(new InitStmt(new Var("SP"), "SP"))
+  globalInits.add(new InitStmt(Var("heap", -1), "heap", "[bv64] bv8")) // TODO label.none
+  globalInits.add(new InitStmt(Var("stack", -1), "stack", "[bv64] bv8"))
+  globalInits.add(new InitStmt(Var("L_heap", -1), "heap", "[bv64] bool", true)) // TODO This isnt great
+  globalInits.add(new InitStmt(Var("L_stack", -1), "stack", "[bv64] bool", true))
+  globalInits.add(new InitStmt(Var("SP", -1 ), "SP", "bv64"))
+  globalInits.add(new InitStmt(Var("R31", -1 ), "R31", "bv64"))
 
   def getGlobalInits = globalInits
   def setGlobalInits(inits: List[InitStmt]) = this.globalInits = inits

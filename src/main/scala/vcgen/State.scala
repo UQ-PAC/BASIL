@@ -1,12 +1,14 @@
 package vcgen
 
-import astnodes.exp.{Expr, MemLoad, Var}
+import astnodes.exp.{Expr, Literal, MemLoad, Var}
 import translating.FlowGraph.{Block, Function}
 import astnodes.pred.{Bool, High, Pred, Security}
+import astnodes.pred
 import astnodes.Label
-import astnodes.stmt.{CJmpStmt, EnterSub, ExitSub, InitStmt, JmpStmt, Stmt}
+import astnodes.stmt.assign.{GammaUpdate, RegisterAssign}
+import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, InitStmt, JmpStmt, Stmt}
 import translating.FlowGraph
-import util.Boogie.generateBVHeader
+import util.Boogie.{generateBVHeader, generateBVToBoolHeader}
 
 import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
@@ -15,24 +17,28 @@ import scala.jdk.CollectionConverters.ListHasAsScala
 // TODO eventually change to use a state object for everything (at the moment the flow graph
 // is sort of the state I guess)
 case class State(
-    functions: List[FunctionState],
-    rely: Pred,
-    guar: Pred,
-    controls: Map[Var, Set[Var]],
-    globalInits: List[InitStmt],
-    private val L: Map[Var, Pred],
-    private val gamma: Map[Var, Security],
+                  functions: List[FunctionState],
+                  rely: Pred,
+                  guar: Pred,
+                  controls: Map[Var, Set[Var]],
+                  globalInits: List[InitStmt],
+                  symbolTable: Map[String, Literal],
+                  private val L: Map[Var, Pred],
+                  private val gamma0: Map[Var, Security],
 ) {
   def getL(v: Var): Pred = L.getOrElse(v, Bool.True)
-  def getGamma(v: Var): Security = gamma.getOrElse(v, High)
+  def getGamma(v: Var): Security = gamma0.getOrElse(v, High)
 
-  override def toString: String = generateBVHeader(1) + generateBVHeader(32) + generateBVHeader(64)
-    + globalInits.map(_.toBoogieString).mkString("\n") + functions.mkString("")
+  override def toString: String = generateBVToBoolHeader + generateBVHeader(1) + generateBVHeader(32) + generateBVHeader(64)
+    + globalInits.map(_.toBoogieString).mkString("\n") + "\n"
+    // TODO this assumes everything is a global variable
+    + L.map((v, p) => s"axiom L_heap[${symbolTable(v.name).toBoogieString}] == $p;").mkString("\n") + "\n\n"
+    + functions.mkString("")
 
 }
 
 case object State {
-  def apply(flowGraph: FlowGraph, rely: Pred, guar: Pred, lPreds: Map[Var, Pred], gamma: Map[Var, Security]): State = {
+  def apply(flowGraph: FlowGraph, rely: Pred, guar: Pred, symbolTable: Map[String, Literal], lPreds: Map[Var, Pred], gamma: Map[Var, Security]): State = {
     val controlledBy = lPreds.map{
       case (v, p) => (v, p.vars)
     }
@@ -47,10 +53,19 @@ case object State {
       }.toSet
     )).toMap[Var, Set[Var]]
 
-    // TODO gamma for each function
-    val functions = flowGraph.functions.asScala.map(f => FunctionState(f, Map.empty)).toList
+    val functions = flowGraph.functions.asScala.map(FunctionState.apply).toList.map{
+      case x if (x.header.funcName == "main") => {
+        // Update the first block to contain the gamma assignments
+        // TODO there is probably a more sensible way to do this
+        val (pc, block) = x.labelToBlock.head
+        val newBlock = block.copy(lines = block.lines.prependedAll(gamma.map{case (v, s) => GammaUpdate(pred.MemLoad(gamma = true, L = false, symbolTable(v.name)), s.toBool)}))
+        val newMap = x.labelToBlock.updated(pc, newBlock)
+        x.copy(labelToBlock = newMap)
+      }
+      case x => x
+    }
 
-    State(functions, rely, guar, controls, flowGraph.getGlobalInits.asScala.toList, lPreds, gamma)
+    State(functions, rely, guar, controls, flowGraph.getGlobalInits.asScala.toList, symbolTable, lPreds, gamma)
   }
 }
 
@@ -61,9 +76,7 @@ case class FunctionState (
                            initStmts: List[InitStmt],
                            header: EnterSub,
   private val labelToChildren: Map[String, Set[String]],
-  private val gamma: Map[Var, Security],
 ) {
-  def getGamma(v: Var): Security = gamma.getOrElse(v, High)
 
   def children(label: String): Option[Set[String]] = labelToChildren.get(label)
   def children(block: Block): Option[Set[String]] = labelToChildren.get(block.label)
@@ -75,19 +88,23 @@ case class FunctionState (
 
 
   // TOOD could sbst("    \n", "            \n")
-  override def toString: String = header.toString + "\n" + initStmts.map(_.toBoogieString).mkString("\n") + labelToBlock.values.mkString("") + "}"
+  override def toString: String = header.toString + "\n"
+    + initStmts.map(_.toBoogieString).mkString("\n")
+    + labelToBlock.values.mkString("") + "\n}"
+
 }
 
 case object FunctionState {
-  def apply(function: FlowGraph.Function, gamma: Map[Var, Security]): FunctionState = {
+  def apply(function: FlowGraph.Function): FunctionState = {
     val blocks = function.getBlocks.asScala.map(b => (b.getLabel, new Block(b))).toMap
     val labelToChildren = function.getBlocks.asScala.map(b => (b.label, b.lastLine match {
       case cjmp: CJmpStmt => Set(cjmp.trueTarget, cjmp.falseTarget)
       case jmp: JmpStmt => Set(jmp.target)
+      case call: CallStmt => call.returnTarget.toSet
       case _: ExitSub => Set()
     })).toMap
 
-    new FunctionState(blocks, function.getInitStmts.asScala.toList, function.getHeader, labelToChildren, gamma)
+    new FunctionState(blocks, function.getInitStmts.asScala.toList, function.getHeader, labelToChildren)
   }
 }
 

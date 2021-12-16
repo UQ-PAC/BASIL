@@ -8,5 +8,9 @@ case class Extract(firstInt: Int, secondInt: Int, var variable: Expr) extends Ex
   override def toString = String.format("%s[%d:%d]", variable, firstInt, secondInt)
   override def getChildren = Collections.singletonList(variable)
   override def replace(oldExp: Expr, newExp: Expr) = if (variable == oldExp) variable = newExp
-  override def vars: List[Var] = variable.vars
+  override def vars = variable.vars
+
+  override def size = Some(firstInt - secondInt + 1)  // + 1 as extracts are inclusive (e.g. 0:31 has 32 bits)
+
+  override def toBoogieString: String = s"${variable.toBoogieString}[${firstInt + 1}:$secondInt]"
 }

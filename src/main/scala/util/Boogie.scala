@@ -43,6 +43,14 @@ object Boogie {
       |function {:bvbuiltin "bvsge"} bv${size}sge(bv${size},bv${size}) returns(bool);
       |
       |function {:bvbuiltin "bvcomp"} bv${size}comp(bv${size},bv${size}) returns(bool);
-      |// TODO could maybe define not equals
+      |
+      |""".stripMargin
+
+  def generateBVToBoolHeader = """
+      |function booltobv1(bool) returns (bv1);
+      |axiom booltobv1(true) == 1bv1 && booltobv1(false) == 0bv1;
+      |
+      |function bv1tobool(bv1) returns (bool);
+      |axiom bv1tobool(1bv1) == true && bv1tobool(0bv1) == false;
       |""".stripMargin
 }
