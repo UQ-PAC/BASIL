@@ -1,14 +1,13 @@
+package util
+
 import BilParser.{BilLexer, BilParser, SymsLexer, SymsParser}
-import analysis.BlockWorklist
 import astnodes.pred.Bool
-import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
+import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import vcgen.{State, VCGen}
 
 import java.io.{BufferedWriter, FileWriter, IOException}
-import scala.collection.mutable.Set
-import scala.jdk.CollectionConverters._
 
 object RunUtils {
 
@@ -38,7 +37,15 @@ object RunUtils {
     // var worklist: BlockWorklist = BlockWorklist(Set(TestingAnal), flowGraph);
     // worklist.workOnBlocks;
 
-    val state = State(flowGraph, Bool.True, Bool.False, symsListener.symbolTable.toMap, statementLoader.varSizes.toMap, statementLoader.lPreds.toMap, statementLoader.gammaMappings.toMap)
+    val state = State(
+      flowGraph,
+      Bool.True,
+      Bool.False,
+      symsListener.symbolTable.toMap,
+      statementLoader.varSizes.toMap,
+      statementLoader.lPreds.toMap,
+      statementLoader.gammaMappings.toMap
+    )
 
     val updatedState = BoogieTranslator.translate(state)
 
