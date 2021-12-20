@@ -12,26 +12,29 @@ import vcgen.{FunctionState, State}
 import scala.collection.mutable.HashSet
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.collection.{immutable, mutable}
-// import java.util
 import scala.collection.mutable
 import util.AssumptionViolationException
 import scala.jdk.CollectionConverters._
 
-// TODO rewrite this file to make the flowGraph immutable (this should make whats happening a bit more transparent)
-object BoogieTranslator {
-  // private var uniqueInt = 0;
 
-  /** Starting point for a BIL translation.
-    */
+/** Methods to perform the translation from BIL to the IR.
+ */
+object BoogieTranslator {
+  /** Peforms the BIL to IR translation
+   */
   def translate(state: State): State = inferConstantTypes(addVarDeclarations(resolveOutParams(resolveInParams(identifyImplicitParams(optimiseSkips(createLabels(state)))))))
 
+  /** Update all lines by applying the given function */
   private def updateAllLines(state: State, fn: Stmt => Stmt): State = updateAllLines(state, PartialFunction.fromFunction(fn))
+
+  /** Update all lines by applying the given partial function */
   private def updateAllLines(state: State, fn: PartialFunction[Stmt, Stmt]): State = updateAllFunctions(state, f => f.copy(labelToBlock = f.labelToBlock.map {
     case (pc, block) => (pc, block.copy(lines = block.lines.collect(fn)))
   }))
 
   private def updateAllFunctions(state: State, fn: FunctionState => FunctionState): State = state.copy(functions = state.functions.map(fn))
 
+  /** Hides labels which are not needed */
   private def createLabels(state: State): State = {
     val usedLabels = state.functions.flatMap(f => f.labelToBlock.flatMap {
       case (_, block) => block.lines.collect {
@@ -49,8 +52,8 @@ object BoogieTranslator {
     })
   }
 
-  /** If a skip is not jumped to, we should remove it. Depends on:
-    *   - {@link #createLabels ( )}
+  /** If a skip is not jumped to, we should remove it. Depends on createLabels
+    *   
     */
   private def optimiseSkips(state: State): State = {
     updateAllLines(state, {
@@ -120,7 +123,6 @@ object BoogieTranslator {
     })
   }
 
-  // TODO update to make stuff imutable
   /** Provides function calls with a list of the parameters they will need to provide arguments for.
     */
   private def createCallArguments(state: State, func: EnterSub): Unit =
@@ -150,11 +152,11 @@ object BoogieTranslator {
       // remove all parameter initialisations from the first block
       val rootBlock = function.rootBlock.copy(lines = function.rootBlock.lines.filter{
         case store: MemAssign => (store.rhs, store.lhs) match {
-          case (rhs: Register, lhs: MemLoad) => paramsWithAliases.exists(param => param.getAlias == lhs && param.getRegister == rhs)
+          case (rhs: Register, lhs: MemLoad) => !paramsWithAliases.exists(param => param.getAlias == lhs && param.getRegister == rhs)
           case (_: Register, _) => ??? // We may need to handle this later
-          case _ => false
+          case _ => true
         }
-        case _ => false
+        case _ => true
       })
 
       // replace all instances of the alias with the human readable parameter name
@@ -166,14 +168,8 @@ object BoogieTranslator {
 
       function.copy(labelToBlock = function.labelToBlock.updated(function.rootBlockLabel, rootBlock))
     })
-
-    state.functions.foreach(function => {
-    })
-
-    state
   }
 
-  // todo: this seems to produce a list with duplicates
   private def getLocalVarsInFunction(state: State, function: FunctionState) = {
     val vars = new mutable.HashSet[Register]
     function.labelToBlock.foreach{
@@ -265,22 +261,6 @@ object BoogieTranslator {
     case lit: Literal if (lit.size == None) => lit.copy(size = size)
     case _ => expr
   }
-
-  // TODO this is a temporary rudimentary analysis that should be replaced with a static analysis method later
-  // TODO implement this
-  /*
-  private def regionAnalysis(): Unit = flowGraph.getFunctions.forEach(f => f.getBlocks.forEach(b =>
-      b.setLines(b.getLines.asScala.map(regionAnalysis).asJava)
-    ))
-
-  // private def isOnStack()
-
-  private def regionAnalysis(stmt: Stmt): Stmt = stmt match {
-    // case MemLoad(BinOp(_, v: Var, _), _) if (v.name == "SP") => stmt
-    case _: MemAssign => stmt
-    case x => x
-  }
-  */
 
   private def uniqueVarName: String = return "p" + "TODO"
   private def uniqueLabel: String = return "l" + "TODO"
