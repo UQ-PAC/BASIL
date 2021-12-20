@@ -2,6 +2,7 @@ package astnodes.stmt
 
 import astnodes.parameters.InParameter
 import astnodes.exp.Expr
+import astnodes.exp.`var`.Var
 import astnodes.parameters.OutParameter
 
 import scala.jdk.CollectionConverters.*
@@ -21,6 +22,7 @@ class EnterSub(override val pc: String, var funcName: String) extends Stmt(pc) {
   def getInParams = inParams
   def getOutParam = outParam
   def setOutParam(outParam: OutParameter) = this.outParam = Some(outParam)
+  def setInParams(newInParms: List[InParameter]) = inParams = newInParms
   def getFuncName = funcName
 
   override def toString = {
@@ -37,6 +39,5 @@ class EnterSub(override val pc: String, var funcName: String) extends Stmt(pc) {
     "procedure " + decl + modifiesStr + "; {"
   }
 
-  override def getChildren = new ArrayList[Expr]
-  override def replace(oldExp: Expr, newExp: Expr) = {}
+  override def subst(v: Var, w: Var): Stmt = this
 }

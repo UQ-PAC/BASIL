@@ -1,7 +1,9 @@
 package astnodes.exp
+import astnodes.exp.`var`.Var
+
 import java.util
 import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 case class Concat (left: Expr, right: Expr) extends Expr{
   override def toBoogieString: String = s"${left.toBoogieString} ++ ${right.toBoogieString}"
@@ -11,9 +13,7 @@ case class Concat (left: Expr, right: Expr) extends Expr{
   }
 
   override def vars = left.vars ++ right.vars
-  override def replace(oldExpr: Expr, newExpr: Expr): Unit = {} // TODO
-  override def getChildren: util.List[Expr] = ArrayBuffer(left, right).asJava
-
+  override def subst(v: Var, w: Var): Expr = this.copy(left = left.subst(v,w), right = right.subst(v,w))
 }
 
 case object Extend {

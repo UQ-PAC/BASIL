@@ -3,7 +3,7 @@ package astnodes.stmt
 import java.util.Collections
 import java.util
 import astnodes.exp.Expr
-import astnodes.exp.Var
+import astnodes.exp.`var`.{Register, Var}
 
 /** Conditional Jump fact
   */
@@ -16,6 +16,6 @@ case class CJmpStmt(
   def getCondition = condition
   override def toString = s"if ($condition) goto label$trueTarget else goto label$falseTarget;"
   override def toBoogieString: String = s"if (bv1tobool(${condition.toBoogieString})) { goto label$trueTarget; } goto label$falseTarget;"
-  override def getChildren = Collections.singletonList(condition)
-  override def replace(oldExp: Expr, newExp: Expr) = if (condition == oldExp) condition = newExp
+
+  override def subst(v: Var, w: Var): Stmt = this.copy(condition = condition.subst(v,w))
 }

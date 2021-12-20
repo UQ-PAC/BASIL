@@ -1,18 +1,17 @@
 package astnodes.stmt
 
-import astnodes.exp.Var
 import java.util
 import astnodes.exp.Expr
+import astnodes.exp.`var`.{Register, Var}
+
 import scala.jdk.CollectionConverters.*
 
-case class CallStmt(override val pc: String, funcName: String, returnTarget: Option[String]) extends Stmt(pc) {
-  private var args: util.List[Var] = new util.ArrayList[Var]
-  private var lhs: Option[Var] = None
-  def setLHS(lhs: Var) = this.lhs = Some(lhs)
-  def getArgs = args
-  def setArgs(args: util.List[Var]) = this.args = args
+// TODO remove var for lhs
+case class CallStmt(override val pc: String, funcName: String, returnTarget: Option[String], args: List[Register], var lhs: Option[Register]) extends Stmt(pc) {
+  def setLHS(reg: Register) = lhs = Some(reg)
+
   override def toString = {
-    val argsStr = args.asScala.map(arg => arg.name).mkString(", ")
+    val argsStr = args.map(arg => arg.name).mkString(", ")
     val lhsStr = lhs match {
       case Some(x) => s"$x, ${x.toGamma} := "
       case None => ""
@@ -25,8 +24,8 @@ case class CallStmt(override val pc: String, funcName: String, returnTarget: Opt
     s"call $getLabel$lhsStr $funcName ($argsStr); $targetStr"
   }
 
-  override def getChildren = new util.ArrayList[Expr](args)
-  override def replace(oldExp: Expr, newExp: Expr) = for (i <- 0 until args.size) {
-    if (args.get(i) == oldExp) args.set(i, newExp.asInstanceOf[Var])
-  }
+  override def subst(v: Var, w: Var): Stmt = this.copy(args = args.map(r => r.subst(v,w) match {
+      case x: Register => x
+      case _ => ???
+    }))
 }

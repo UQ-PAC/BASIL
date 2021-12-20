@@ -1,3 +1,4 @@
+L: z -> TRUE
 00000270: program
 00000258: sub .plt(\.plt_result)
 00000271: \.plt_result :: out u32 = R0
@@ -219,26 +220,26 @@
 00000118: #27 := pad:64[mem[R0, el]:u32]
 0000011a: R0 := 0
 0000011c: R0 := R0 & 0xFFFFFFFF00000000 | pad:64[#27]
-00000120: mem := mem with [R31 + 0xC, el]:u32 <- low:32[extract:31:0[R0]]
-00000124: mem := mem with [R31 + 0xC, el]:u32 <- 0
+00000120: mem := mem with [R31 + 0xC, el]:u32 <- low:32[extract:31:0[R0]]  // x = secret
+00000124: mem := mem with [R31 + 0xC, el]:u32 <- 0  // x = 0
 00000128: R0 := 0x11000
 0000012c: R0 := R0 + 0x34
 00000130: #30 := pad:64[mem[R31 + 0xC, el]:u32]
 00000132: R1 := 0
 00000134: R1 := R1 & 0xFFFFFFFF00000000 | pad:64[#30]
-00000138: mem := mem with [R0, el]:u32 <- low:32[extract:31:0[R1]]
+00000138: mem := mem with [R0, el]:u32 <- low:32[extract:31:0[R1]]  // z = x
 0000013c: R0 := 0x11000
 00000140: R0 := R0 + 0x38
 00000144: #32 := pad:64[mem[R0, el]:u32]
 00000146: R0 := 0
 00000148: R0 := R0 & 0xFFFFFFFF00000000 | pad:64[#32]
-0000014c: mem := mem with [R31 + 0xC, el]:u32 <- low:32[extract:31:0[R0]]
+0000014c: mem := mem with [R31 + 0xC, el]:u32 <- low:32[extract:31:0[R0]]  // x = secret
 00000150: R0 := 0x11000
 00000154: R0 := R0 + 0x34
 00000158: #34 := pad:64[mem[R31 + 0xC, el]:u32]
 0000015a: R1 := 0
 0000015c: R1 := R1 & 0xFFFFFFFF00000000 | pad:64[#34]
-00000160: mem := mem with [R0, el]:u32 <- low:32[extract:31:0[R1]]
+00000160: mem := mem with [R0, el]:u32 <- low:32[extract:31:0[R1]]  // unsafe: z = x
 00000164: R0 := 0
 00000166: R0 := R0 & 0xFFFFFFFF00000000
 0000016a: R31 := R31 + 0x10
