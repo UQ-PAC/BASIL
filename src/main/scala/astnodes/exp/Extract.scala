@@ -6,6 +6,8 @@ import java.util.Collections
 import java.util
 import java.util.Objects
 
+/** Extracts the bits from firstInt to secondInt (inclusive) from variable.
+ */ 
 case class Extract(firstInt: Int, secondInt: Int, variable: Expr) extends Expr {
   override def toString = String.format("%s[%d:%d]", variable, firstInt, secondInt)
   override def vars = variable.vars

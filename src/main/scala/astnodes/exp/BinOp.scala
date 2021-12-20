@@ -6,8 +6,8 @@ import util.AssumptionViolationException
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
-/** Binary operation fact
-  */
+/** Binary operation of two expressions
+ */
 case class BinOp(
     operator: BinOperator.Value,
     firstExp: Expr,

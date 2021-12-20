@@ -6,7 +6,7 @@ import astnodes.pred
 import java.util
 import java.util.Objects
 
-/** Variable fact
+/** A register
   */
 case class Register(name: String, override val size: Option[Int]) extends Var {
   override def toString = name

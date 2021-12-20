@@ -17,8 +17,13 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.ListHasAsScala
 import astnodes.pred.Var
 
-// TODO eventually change to use a state object for everything (at the moment the flow graph
-// is sort of the state I guess)
+/** The program State
+ *
+ *  Stores all the information currently known about the state of the program
+ *
+ *  @param controls the control variables for any given variable
+ *  @param symbolTable a mapping from variable id to its location in memory (from the symbol table)
+ */
 case class State(
                   functions: List[FunctionState],
                   rely: Pred,
@@ -51,13 +56,13 @@ case class State(
 }
 
 case object State {
+  /** Generate a State object from a flow graph */
   def apply(flowGraph: FlowGraph, rely: Pred, guar: Pred, symbolTable: Map[String, Literal], bvSizes: Map[String, Int], lPreds: Map[Register, Pred], gamma: Map[Register, Security]): State = {
     val controlledBy = lPreds.map{
       case (v, p) => (v, p.vars)
     }
 
     // TODO alternatively could use the GOT
-    // TODO could globalInits be used??
     val vars = flowGraph.getFunctions.asScala.flatMap(func => func.getInitStmts.asScala.map(init => init.variable)).toSet
 
     val controls = vars.map(v => (v,
@@ -69,7 +74,6 @@ case object State {
     val functions = flowGraph.functions.asScala.map(FunctionState.apply).toList.map{
       case x if (x.header.funcName == "main") => {
         // Update the first block to contain the gamma assignments
-        // TODO there is probably a more sensible way to do this
         val (pc, block) = (x.rootBlockLabel, x.rootBlock)
         val newBlock = block.copy(lines = block.lines.prependedAll(gamma.map{case (v, s) => GammaUpdate(pred.MemLoad(gamma = true, L = false, symbolTable(v.name)), s.toBool)}))
         val newMap = x.labelToBlock.updated(pc, newBlock)
@@ -82,6 +86,14 @@ case object State {
   }
 }
 
+/** The state of a function
+ *
+ *  Functions are stored as a collection of basic blocks, connected by jumps
+ *
+ *  @param labelToBlock a mapping from a blocks label to the block itself
+ *  @param rootBlockLabel the label of the root block
+ *  @param labelToChildren a mapping from a blocks label to its children
+ */
 case class FunctionState (
   labelToBlock: Map[String, Block],
   initStmts: List[InitStmt],
@@ -99,8 +111,6 @@ case class FunctionState (
   }.toList
   def parents(block: Block): List[String] = parents(block.label)
 
-
-  // TOOD could sbst("    \n", "            \n")
   override def toString: String = header.toString + "\n"
     + initStmts.map(_.toBoogieString).mkString("\n")
     + labelToBlock.values.mkString("") + "\n}"
@@ -108,6 +118,7 @@ case class FunctionState (
 }
 
 case object FunctionState {
+  /** Generate a FunctionState from a FlowGraph.Function */
   def apply(function: FlowGraph.Function): FunctionState = {
     val blocks = function.getBlocks.asScala.map(b => (b.getLabel, new Block(b))).toMap
     val labelToChildren = function.getBlocks.asScala.map(b => (b.label, b.lastLine match {
@@ -121,6 +132,8 @@ case object FunctionState {
   }
 }
 
+/** A basic block
+ */
 case class Block (
   label: String,
   lines: List[Stmt],

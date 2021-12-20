@@ -5,8 +5,8 @@ import astnodes.pred
 
 import java.util.Collections
 
-/** Memory expression e.g. mem[10]
-  */
+/** A load from memory at location exp
+ */
 case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
 
   override def toString = s"${if (this.onStack) "stack" else "heap"}[$exp]"
@@ -22,9 +22,12 @@ case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
 
   /** Assumes: anything on the stack is represented as SP + val (where val is an int etc)
     */
-  def onStack = exp match {
+  def onStack = onStackMatch(exp)
+
+  def onStackMatch(expr: Expr): Boolean = expr match {
     case v: Register              => v.name == "R31"
-    case BinOp(_, v: Register, _) => v.name == "R31"
+    case BinOp(_, e1: Expr, e2: Expr) => onStackMatch(e1) || onStackMatch(e2)
+    case UniOp(_, e1: Expr) => onStackMatch(e1)
     case _                   => false
   }
 
