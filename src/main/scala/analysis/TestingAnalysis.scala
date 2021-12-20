@@ -41,7 +41,6 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
         var newState: Set[Stmt] = Set();
         stmt match {
             case callStmt: CallStmt => {
-                println(callStmt.toString);
                 if (!currentState.contains(stmt)) {
                     newState = currentState ++ Set(stmt);
                 } else {

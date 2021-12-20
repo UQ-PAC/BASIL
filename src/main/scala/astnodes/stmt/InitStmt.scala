@@ -1,15 +1,17 @@
 package astnodes.stmt
 
-import astnodes.exp.Var
-
 import util.AssumptionViolationException
+
 import java.util.{Collections, List}
 import astnodes.exp.Expr
+import astnodes.exp.`var`.{Register, Var}
 
 // TODO is this class necassary 
-class InitStmt(var variable: Var, label: String, val varType: String, val const: Boolean = false) extends Stmt(label) {
-  override def getChildren: List[Expr]  =  Collections.singletonList(variable)
-  override def replace(oldExp: Expr, newExp: Expr)  =  if (variable == oldExp)  variable = newExp.asInstanceOf[Var]
+case class InitStmt(variable: Register, label: String, val varType: String, val const: Boolean = false) extends Stmt(label) {
+  override def subst(v: Var, w: Var): Stmt = variable.subst(v,w) match {
+    case res: Register => this.copy(variable = res)
+    case _ => ???
+  }
   override def toString  =  String.format("%s %s: %s;", if (const) "const" else "var", variable, varType)
 
   // TODO not 100% happy with this

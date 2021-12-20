@@ -1,25 +1,25 @@
 package astnodes.parameters;
-import astnodes.exp.Var;
+import astnodes.exp.var.Register;
 
 public abstract class Parameter {
-    private Var name;
-    private final Var register;
+    private Register name;
+    private final Register register;
 
-    public Parameter(Var name, Var register) {
+    public Parameter(Register name, Register register) {
         this.name = name;
         this.register = register;
     }
 
     // TODO get name returns a string everywhere else (rename this function)
-    public Var getName() {
+    public Register getName() {
         return name;
     }
 
-    public void setName(Var name) {
+    public void setName(Register name) {
         this.name = name;
     }
 
-    public Var getRegister() {
+    public Register getRegister() {
         return register;
     }
 

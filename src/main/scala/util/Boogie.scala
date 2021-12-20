@@ -42,7 +42,8 @@ object Boogie {
       |function {:bvbuiltin "bvsgt"} bv${size}sgt(bv${size},bv${size}) returns(bool);
       |function {:bvbuiltin "bvsge"} bv${size}sge(bv${size},bv${size}) returns(bool);
       |
-      |function {:bvbuiltin "bvcomp"} bv${size}comp(bv${size},bv${size}) returns(bool);
+      |function bv${size}eq(x: bv${size}, y: bv${size}) returns(bool) { x == y }
+      |function bv${size}neq(x: bv${size}, y: bv${size}) returns(bool) { x != y }
       |
       |""".stripMargin
 

@@ -15,15 +15,17 @@ import astnodes.parameters.InParameter
 import astnodes.parameters.OutParameter
 import astnodes.exp.*
 import astnodes.stmt.*
-import astnodes.stmt.assign.{RegisterAssign, MemAssign}
+import astnodes.stmt.assign.{MemAssign, RegisterAssign}
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}
 import FlowGraph.Function
 import astnodes.pred
 import BilParser.*
+import astnodes.exp.`var`.{MemLoad, Register}
 import astnodes.pred.{Bool, ExprComp, High, Low, Pred, Security}
 import vcgen.State
 import util.AssumptionViolationException
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -46,8 +48,8 @@ class StatementLoader() extends BilBaseListener {
     else
       throw new Exception("Unparsed param " + node.getText + " (" + node.getClass + ")")
 
-  val lPreds = new mutable.HashMap[Var, Pred]
-  val gammaMappings = new mutable.HashMap[Var, Security]
+  val lPreds = new mutable.HashMap[Register, Pred]
+  val gammaMappings = new mutable.HashMap[Register, Security]
 
 
   val varSizes = mutable.Map[String, Int]()
@@ -65,13 +67,14 @@ class StatementLoader() extends BilBaseListener {
   private def setVarSize(name: String, rhs: Expr) = {
     if (!varSizes.contains(name)) {
       if (name.charAt(0) == 'R') varSizes(name) = 64
-      else varSizes(name) = rhs.size.get
+      else if (name.charAt(0) == '#') varSizes(name) = rhs.size.get
+      else if (name == "NF" || name == "ZF" || name == "CF" || name == "VF") varSizes(name) = 1
+      else ???
     }
   }
 
 
   // the last function header parsed; needed for assigning parameters
-  // TODO we shouldnt need this
   private var currentFunction: EnterSub = null
 
   // for generating unique labels
@@ -91,15 +94,14 @@ class StatementLoader() extends BilBaseListener {
     this.currentFunction = function
   }
   override def exitParamTypes(ctx: BilParser.ParamTypesContext): Unit = {
-    // TODO this seems quite fickle
     val id = ctx.param.getText // human-readable name
     val variable = ctx.`var`.getText // some register, probably
 
     val size = 64
 
     // TODO it would be good to instead use in/out but what is in out
-    if (id.contains("result")) currentFunction.setOutParam(new OutParameter(Var(variable, size), Var(variable, size)))
-    else currentFunction.getInParams.add(new InParameter(Var(id, size), Var(variable, size)))
+    if (id.contains("result")) currentFunction.setOutParam(new OutParameter(Register(variable, size), Register(variable, size)))
+    else currentFunction.getInParams.add(new InParameter(Register(id, size), Register(variable, size)))
   }
 
   override def exitStmt(ctx: BilParser.StmtContext): Unit = {
@@ -111,10 +113,10 @@ class StatementLoader() extends BilBaseListener {
       val RHS = getExpr(assignCtx.exp)
 
       stmts += ((LHS, RHS) match {
-        case (v: Var, m: MemStore) =>
+        case (v: Register, m: MemStore) =>
           if (v.name == "mem") new MemAssign(address, new MemLoad(m.loc, m.size), m.expr)
           else throw new AssumptionViolationException("expected mem for memstore")
-        case (v: Var, _) => {
+        case (v: Register, _) => {
           setVarSize(v.name, RHS)
           new RegisterAssign(address, v.copy(size = Some(varSizes(v.name))), RHS)
         }
@@ -146,7 +148,7 @@ class StatementLoader() extends BilBaseListener {
       else if (ctx.jmp.addr != null) target = ctx.jmp.addr.getText
       stmts += new JmpStmt(address, target)
     } else if (ctx.cjmp != null) { // statement is a conditional jump
-      val cond = Var(ctx.cjmp.`var`.getText, varSizes(ctx.cjmp.`var`.getText)) // conditions are always vars
+      val cond = Register(ctx.cjmp.`var`.getText, varSizes(ctx.cjmp.`var`.getText)) // conditions are always vars
       val target = ctx.cjmp.addr.getText
       stmts += new CJmpStmt(address, target, "TODO", cond) // TODO set up false GOTO
     } else if (ctx.call != null) { // statement is a call
@@ -154,7 +156,7 @@ class StatementLoader() extends BilBaseListener {
         stmts += new ExitSub(ctx.addr.getText)
       } else {
         val funcName = ctx.call.functionName.getText
-        stmts += new CallStmt(address, funcName, Option(ctx.call.returnaddr.addr).map(_.getText))
+        stmts += new CallStmt(address, funcName, Option(ctx.call.returnaddr.addr).map(_.getText), List(), None)
       }
     } else { // this statement is empty
       stmts += new SkipStmt(address)
@@ -164,9 +166,9 @@ class StatementLoader() extends BilBaseListener {
   override def exitExpBracket(ctx: BilParser.ExpBracketContext): Unit = exprs.put(ctx, getExpr(ctx.exp))
   override def exitExpUop(ctx: BilParser.ExpUopContext): Unit = exprs.put(ctx, new UniOp(ctx.uop.getText, getExpr(ctx.exp)))
   override def exitExpBop(ctx: BilParser.ExpBopContext): Unit = exprs.put(ctx, new BinOp(ctx.bop.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
-  override def exitVar(ctx: BilParser.VarContext): Unit = exprs.put(ctx, new Var(ctx.getText, varSizes.get(ctx.getText)))
+  override def exitVar(ctx: BilParser.VarContext): Unit = exprs.put(ctx, new Register(ctx.getText, varSizes.get(ctx.getText)))
   override def exitExpVar(ctx: BilParser.ExpVarContext): Unit = exprs.put(ctx, exprs.get(ctx.`var`))
-  override def exitExpLiteral(ctx: BilParser.ExpLiteralContext): Unit = exprs.put(ctx, new Literal(ctx.literal.getText))
+  override def exitExpLiteral(ctx: BilParser.ExpLiteralContext): Unit = exprs.put(ctx, Literal(ctx.literal.getText))
   override def exitExpExtract(ctx: BilParser.ExpExtractContext): Unit = {
     // fixme: assumes all bit vectors are 64 bits long
     // TODO: val firstNat = 64 - ctx.nat(0).getText.toInt
@@ -211,12 +213,12 @@ class StatementLoader() extends BilBaseListener {
   })
 
   override def exitGamma(ctx: GammaContext): Unit = (getExpr(ctx.`var`), ctx.LOW, ctx.HIGH) match {
-    case (v: Var, _: TerminalNode, null) => gammaMappings.put(v, Low)
-    case (v: Var, null, _: TerminalNode) => gammaMappings.put(v, High)
+    case (v: Register, _: TerminalNode, null) => gammaMappings.put(v, Low)
+    case (v: Register, null, _: TerminalNode) => gammaMappings.put(v, High)
   }
 
   override def exitLpred(ctx: BilParser.LpredContext): Unit = (getExpr(ctx.`var`), getPred(ctx.pred)) match {
-    case (v: Var, p: Pred) => lPreds.put(v, p)
+    case (v: Register, p: Pred) => lPreds.put(v, p)
   }
   
   private def uniquePc () =

@@ -1,10 +1,12 @@
 package astnodes.stmt.assign
 
-import astnodes.exp.{BinOp, BinOperator, Expr, Extract, Literal, MemLoad, Var}
+import astnodes.exp.`var`.{MemLoad, Var}
+import astnodes.exp.{BinOp, BinOperator, Expr, Extract, Literal}
+import astnodes.stmt.Stmt
 
 /** Store fact
   */
-case class MemAssign(override val pc: String, val memExp: MemLoad, val rhsExp: Expr) extends Assign (pc, memExp, rhsExp)  {
+case class MemAssign(override val pc: String, override val lhs: MemLoad, override val rhs: Expr) extends Assign (pc, lhs, rhs) with Stmt(pc)  {
 
   // TODO this tostring method is bad as well
   // need to really sort out a good way to handle the differnet ways memload is presented
@@ -13,9 +15,8 @@ case class MemAssign(override val pc: String, val memExp: MemLoad, val rhsExp: E
 
   override def toBoogieString: String =
     (0 to lhs.size.get/8 - 1).map(n => {
-      val newMemExp = BinOp(BinOperator.Addition, memExp.exp, Literal(n.toString))
-      s"${lhsToString(newMemExp)} := ${Extract(8 * (n + 1) - 1, 8 * n, rhsExp).toBoogieString}"
+      val newMemExp = BinOp(BinOperator.Addition, lhs.exp, Literal(n.toString))
+      s"${lhsToString(newMemExp)} := ${Extract(8 * (n + 1) - 1, 8 * n, rhs).toBoogieString}"
     }).mkString("; ") + s";     // $pc"
-
 
 }

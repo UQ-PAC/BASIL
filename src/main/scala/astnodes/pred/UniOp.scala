@@ -1,5 +1,6 @@
 package astnodes.pred
-import astnodes.exp.Var
+
+import astnodes.exp.`var`.Register
 
 case class UniOp(op: String, pred: Pred) extends Pred {
   override def vars = pred.vars

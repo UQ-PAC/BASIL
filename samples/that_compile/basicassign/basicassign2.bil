@@ -1,9 +1,9 @@
+L: secret -> FALSE, z -> TRUE
 00000260: program
 0000025c: sub main(main_argc, main_argv, main_result)
 00000270: main_argc :: in u32 = R0
 00000271: main_argv :: in out u64 = R1
 00000272: main_result :: out u32 = R0
-L: secret -> FALSE, z -> TRUE
 
 0000010a:
 0000010c: R31 := R31 - 0x10
