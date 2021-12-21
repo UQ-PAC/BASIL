@@ -30,7 +30,7 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     resolveInParams()
     resolveOutParams()
     // TODO this doesnt work: resolveVars()
-    resolveVars()
+//    resolveVars()
     addVarDeclarations()
     // TODO could turn this on later:  replaceGlobalVars(symbolTable)
     // TODO vcgen happens here

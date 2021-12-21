@@ -3,8 +3,7 @@ import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 
-import scala.collection.mutable.Set;
-
+import scala.collection.mutable.Set
 import java.io.BufferedWriter
 import java.io.FileWriter
 import java.io.IOException
@@ -13,11 +12,12 @@ import java.util.Arrays
 import java.util.List
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import BilParser.*
-import analysis.*;
+import analysis.*
 import astnodes.pred.Bool
 import vcgen.{State, VCGen}
+import astnodes.exp.*
 
-import collection.immutable
+import collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
 import collection.JavaConverters.*
 
@@ -45,7 +45,10 @@ import collection.JavaConverters.*
         if (outputType.equals("boogie")) {
             val flowGraph = FlowGraph.fromStmts(stmts.asJava)
 
-            var worklist: BlockWorklist = BlockWorklist(Set(TestingAnalysis()), flowGraph);
+            val toRemove : immutable.Set[String] = immutable.Set()
+            val pending : immutable.Set[String] = immutable.Set()
+            var worklist: BlockWorklist = BlockWorklist(Set(ConstantPropagationAnalysis(new 
+                mutable.HashMap[Var, String](), toRemove, pending)), flowGraph);
             worklist.analyseFromMain;
             println(worklist.getAllStates);
             
