@@ -35,4 +35,5 @@ libraryDependencies ++= {
     .map(m => "org.openjfx" % s"javafx-$m" % "15.0.1" classifier osName)
 }
 
-
+libraryDependencies += "org.scalactic" %% "scalactic" % "3.2.10"
+libraryDependencies += "org.scalatest" %% "scalatest" % "3.2.10" % "test"

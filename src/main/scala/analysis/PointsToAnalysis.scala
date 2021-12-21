@@ -7,6 +7,7 @@ import scala.jdk.CollectionConverters.ListHasAsScala;
 import analysis.AnalysisPoint;
 import astnodes.stmt.*;
 import astnodes.stmt.assign.*;
+import astnodes.exp.`var`.*;
 import astnodes.exp.*;
 import util.SegmentationViolationException;
 
@@ -74,10 +75,10 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
             case assignStmt: Assign => {
                 var locationValue: Set[Expr] = null;
 
-                (assignStmt.getRhs) match {
-                    case assignFromVar: Var => {
+                (assignStmt.rhs) match {
+                    case assignFromRegister: Register => {
                         // () := foo ~ LHS points to everything that (foo) points to i.e. *foo
-                        locationValue = currentState.getOrElse(assignFromVar, Set(Literal(null)));
+                        locationValue = currentState.getOrElse(assignFromRegister, Set(Literal(null)));
                     }
                     case assignFromMem: MemLoad => {
                         // () := mem[foo] ~ LHS points to everything that is pointed to by memory pointed to by foo i.e. **foo
@@ -110,10 +111,10 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                     return PointsToAnalysis(currentState);
                 }
 
-                (assignStmt.getLhs) match {
-                    case assignToVar: Var => {
+                (assignStmt.lhs) match {
+                    case assignToRegister: Register => {
                         // foo := () ~ basic assignment
-                        currentState.update(assignToVar, locationValue);
+                        currentState.update(assignToRegister, locationValue);
                     }
                     case assignToMem: MemLoad => {
                         // mem[foo] := () ~ everything that foo points to could point to RHS.
@@ -132,7 +133,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                         }
                     }
                     case _ => {
-                        println(assignStmt.getLhs);
+                        println(assignStmt.lhs);
                     }
                 }
             }
@@ -140,7 +141,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                 // only defined "library" functions in the worklist make it to here.
                 if (functionCall.funcName == "malloc") {
                     // X0 -> new heap allocation
-                    currentState.update(Var("X0"), Set(Literal("alloc")));
+                    currentState.update(Register("X0", None), Set(Literal("alloc")));
                 }
             }
             case _ => {
@@ -154,8 +155,8 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
     def knownPointer(expr: Expr): Boolean = {
         var hasKnownPointer: Boolean = false;
 
-        expr.getChildren.asScala.foreach(c => {
-            if (c == Var("SP") || c == Var("FP") || c == Var("LR")) {
+        expr.vars.foreach(c => {
+            if (c == Register("SP", None) || c == Register("FP", None) || c == Register("LR", None)) {
                 hasKnownPointer = true;
             } else {
                 hasKnownPointer = knownPointer(c);

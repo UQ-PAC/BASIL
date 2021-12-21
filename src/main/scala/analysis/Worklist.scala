@@ -16,16 +16,18 @@ import translating.FlowGraph.Function;
 import analysis.AnalysisPoint;
 
 class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
-    private final val debug: Boolean = true;
+    private final val debug: Boolean = false;
+
+    private val directionForwards: Boolean = analysis.isForwards;
 
     // functions that we abstract away and don't traverse. If we encounter a call to any of these, it's 
-    // passed through to the analyses as a call instruction so they can decide what to do with it
+    // passed through to the analyses as a call instruction so they can decide what to do with it.
     val libraryFunctions: Set[String] = Set("malloc");
 
+    var currentCallString: List[String] = List();
+
     var currentWorkListQueue: ArrayDeque[Block] = ArrayDeque(); // queue of blocks to work on, for the current function.
-
     var previousStmtAnalysisState: AnalysisPoint = null; // previous state on a per stmt basis.
-
     var finalAnalysedStmtInfo: Map[Stmt, AnalysisPoint] = Map(); // "output" info as the end result of the analysis
     var allBlockFinalAnalysisStates: Map[Block, AnalysisPoint] = Map(); // final states of all analysed blocks
 
@@ -66,8 +68,10 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
         if (debug) {
             println("analysing function: " + functionName);
         }
-
+        
+        currentCallString = currentCallString ++ List(functionName);
         currentWorkListQueue = topologicalSortFromFunction(controlFlow, functionName);
+        if !directionForwards then currentWorkListQueue = currentWorkListQueue.reverse;
 
         if (previousStmtAnalysisState == null) {
             previousStmtAnalysisState = analysis.createLowest;
@@ -79,16 +83,24 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
         while(!currentWorkListQueue.isEmpty) {
             var nextBlockToAnalyse: Block = currentWorkListQueue.removeHead();
             
-            // for blocks *with* parents (i.e. not function start blocks) we take the previous state to be the union
+            // for blocks *with* parents (i.e. not function start blocks) we take the previous state to be the combine
             // of all parents' final states.
-            if (!findBlockParents(nextBlockToAnalyse).isEmpty) {
-                previousStmtAnalysisState = analysis.createLowest;
+            if (directionForwards) {
+                if (!findBlockParents(nextBlockToAnalyse).isEmpty) {
+                    previousStmtAnalysisState = analysis.createLowest;
 
-                findBlockParents(nextBlockToAnalyse).foreach(nextBlockToAnalyseParent => {
-                    var nextBlockToAnalyseParentFinalState: AnalysisPoint = allBlockFinalAnalysisStates.getOrElse(nextBlockToAnalyseParent, analysis.createLowest);
+                    findBlockParents(nextBlockToAnalyse).foreach(nextBlockToAnalyseParent => {
+                        previousStmtAnalysisState = previousStmtAnalysisState.combine(allBlockFinalAnalysisStates.getOrElse(nextBlockToAnalyseParent, analysis.createLowest));
+                    });
+                }
+            } else {
+                if (!nextBlockToAnalyse.getChildren.isEmpty) {
+                    previousStmtAnalysisState = analysis.createLowest;
 
-                    previousStmtAnalysisState = previousStmtAnalysisState.union(nextBlockToAnalyseParentFinalState);
-                });
+                    nextBlockToAnalyse.getChildren.asScala.foreach(nextBlockToAnalyseChild => {
+                        previousStmtAnalysisState = previousStmtAnalysisState.combine(allBlockFinalAnalysisStates.getOrElse(nextBlockToAnalyseChild, analysis.createLowest));
+                    });
+                }
             }
 
             workOnBlock(nextBlockToAnalyse, currentFunctionAnalysedInfo);
@@ -101,6 +113,7 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
 
         // Once the entire function has been analysed to stability, save and/or update the info in the "output" map.
         saveNewAnalysisInfo(currentFunctionAnalysedInfo);
+        currentCallString = currentCallString.filter(elem => {elem != functionName});
     }
 
     /**
@@ -114,14 +127,16 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
             println("analysing block: " + blockToWorkOn.toString);
         }
 
-        blockToWorkOn.getLines.asScala.foreach(blockStmtLine => {
+        var blockLines = blockToWorkOn.getLines.asScala;
+        if !directionForwards then blockLines = blockLines.reverse;
+        blockLines.foreach(blockStmtLine => {
             workOnStmt(blockStmtLine, currentFunctionAnalysedInfo);
         });
         
         var currentFinalBlockState = allBlockFinalAnalysisStates.getOrElse(blockToWorkOn, null);
 
         if (currentFinalBlockState != null) {
-            if (!(currentFinalBlockState.toString == previousStmtAnalysisState.toString)) { // TODO: fix this to be not string comparison
+            if (!currentFinalBlockState.equals(previousStmtAnalysisState.toString)) {
                 allBlockFinalAnalysisStates.remove(blockToWorkOn);
                 allBlockFinalAnalysisStates.update(blockToWorkOn, previousStmtAnalysisState);
                 
@@ -161,31 +176,38 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
         if (debug) {
             println("analysing stmt: " + singleStmt.toString);
         }
-
+        
         singleStmt match {
             case functionCallStmt: CallStmt => {
                 // if we have a function call, pause the current analysis and analyse the given function
                 // effectively just inlines every function at every time it's called
                 var inProgressWorkListQueue: ArrayDeque[Block] = currentWorkListQueue;
 
-                if (!libraryFunctions.contains(functionCallStmt.funcName)) {
-                    workOnFunction(functionCallStmt.funcName);
-                } else {
-                    // treat it like a normal statement and let the analyses define how they deal with it
-                    previousStmtAnalysisState = previousStmtAnalysisState.transfer(singleStmt);
-                
-                    // if anything already exists for this stmt, replace it.
-                    if (functionAnalysedInfo.getOrElse(singleStmt, null) != null) {
-                        functionAnalysedInfo.remove(singleStmt);
-                    }
+                if (!currentCallString.contains(functionCallStmt.funcName)) {
+                    if (!libraryFunctions.contains(functionCallStmt.funcName)) {
+                        workOnFunction(functionCallStmt.funcName);
+                    } else {
+                        // treat it like a normal statement and let the analyses define how they deal with it
+                        previousStmtAnalysisState = previousStmtAnalysisState.transferAndCheck(singleStmt);
+                    
+                        // if anything already exists for this stmt, replace it.
+                        if (functionAnalysedInfo.getOrElse(singleStmt, null) != null) {
+                            functionAnalysedInfo.remove(singleStmt);
+                        }
 
-                    functionAnalysedInfo.update(singleStmt, previousStmtAnalysisState);
+                        functionAnalysedInfo.update(singleStmt, previousStmtAnalysisState);
+                    }
+                } else {
+                    // recursive or mutually recursive function call. for now, just silently drop these.
+                    // One idea for how to deal with these is to pass them to the transfer function,
+                    // and they can define how to deal with it as a call statement to non-library function,
+                    // given any statement that matches these criteria will be recursive.
                 }
 
                 currentWorkListQueue = inProgressWorkListQueue;
             }
             case _ => {
-                previousStmtAnalysisState = previousStmtAnalysisState.transfer(singleStmt);
+                previousStmtAnalysisState = previousStmtAnalysisState.transferAndCheck(singleStmt);
 
                 // if anything already exists for this stmt, replace it.
                 if (functionAnalysedInfo.getOrElse(singleStmt, null) != null) {
@@ -273,7 +295,7 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
 
     def saveNewAnalysisInfo(functionAnalysedInfo: Map[Stmt, AnalysisPoint]) = {
         functionAnalysedInfo.keys.foreach(currentFunctionAnalysisPoint => {
-            finalAnalysedStmtInfo.update(currentFunctionAnalysisPoint, finalAnalysedStmtInfo.getOrElse(currentFunctionAnalysisPoint, analysis.createLowest).union(functionAnalysedInfo.getOrElse(currentFunctionAnalysisPoint, analysis.createLowest)));
+            finalAnalysedStmtInfo.update(currentFunctionAnalysisPoint, finalAnalysedStmtInfo.getOrElse(currentFunctionAnalysisPoint, analysis.createLowest).combine(functionAnalysedInfo.getOrElse(currentFunctionAnalysisPoint, analysis.createLowest)));
         });
     }
 }

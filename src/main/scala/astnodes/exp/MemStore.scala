@@ -1,4 +1,6 @@
 package astnodes.exp
+import astnodes.exp.`var`.{Register, Var}
+
 import java.util
 import java.util.Collections
 
@@ -7,8 +9,7 @@ import java.util.Collections
   * @param loc
   * @param expr
   */
-case class MemStore(loc: Expr, expr: Expr) extends Expr {
-  override def vars: List[Var] = ??? // loc.vars ++ expr.vars
-  override def getChildren: util.List[Expr] = ??? // Collections.singletonList(expr) // TODO
-  override def replace(oldExp: Expr, newExp: Expr): Unit = ???
+case class MemStore(loc: Expr, expr: Expr, override val size: Some[Int]) extends Expr {
+  override def vars: List[Register] = ???
+  override def subst(v: Var, w: Var): Expr = ???
 }
