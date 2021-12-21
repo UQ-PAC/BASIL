@@ -54,6 +54,8 @@ class StatementLoader() extends BilBaseListener {
 
   val varSizes = mutable.Map[String, Int]()
 
+  var rely: Option[Pred] = None
+
   /*
   private def getVarSize(name: String, rhs: Option[Expr]): Int = {
     if (!varSizes.contains(name)) {
@@ -220,6 +222,8 @@ class StatementLoader() extends BilBaseListener {
   override def exitLpred(ctx: BilParser.LpredContext): Unit = (getExpr(ctx.`var`), getPred(ctx.pred)) match {
     case (v: Register, p: Pred) => lPreds.put(v, p)
   }
+
+  override def exitRely(ctx: BilParser.RelyContext): Unit = rely = Some(getPred(ctx.pred))
   
   private def uniquePc () =
     pcCount += 1

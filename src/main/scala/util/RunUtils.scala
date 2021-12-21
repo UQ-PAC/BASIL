@@ -8,6 +8,7 @@ import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableLis
 import vcgen.{State, VCGen}
 
 import java.io.{BufferedWriter, FileWriter, IOException}
+import scala.jdk.CollectionConverters._
 
 object RunUtils {
 
@@ -39,7 +40,7 @@ object RunUtils {
 
     val state = State(
       flowGraph,
-      Bool.True,
+      statementLoader.rely.getOrElse(Bool.True), // TODO check default
       Bool.False,
       symsListener.symbolTable.toMap,
       statementLoader.varSizes.toMap,
