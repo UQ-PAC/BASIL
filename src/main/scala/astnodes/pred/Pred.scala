@@ -1,10 +1,6 @@
 package astnodes.pred
 
-<<<<<<< HEAD
 import astnodes.exp.`var`.{MemLoad, Register, Var}
-=======
-import astnodes.exp.{Var, MemLoad}
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 
 trait Pred {
   def vars: List[Var | MemLoad]  // TODO

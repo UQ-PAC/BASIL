@@ -42,17 +42,10 @@ object FlowGraph {
 
   class Function(val header: EnterSub, val blocks: List[FlowGraph.Block]) {
     private val initStmts = new LinkedList[InitStmt]
-<<<<<<< HEAD
     initStmts.add(new InitStmt(Register("ZF", -1 ), "ZF", "bv1"))
     initStmts.add(new InitStmt(Register("CF", -1 ), "CF", "bv1"))
     initStmts.add(new InitStmt(Register("NF", -1 ), "NF", "bv1"))
     initStmts.add(new InitStmt(Register("VF", -1 ), "VF", "bv1"))
-=======
-    initStmts.add(new InitStmt(Var("ZF", -1 ), "ZF", "bv1"))
-    initStmts.add(new InitStmt(Var("CF", -1 ), "CF", "bv1"))
-    initStmts.add(new InitStmt(Var("NF", -1 ), "NF", "bv1"))
-    initStmts.add(new InitStmt(Var("VF", -1 ), "VF", "bv1"))
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 
     // variable initialisations to be at the top of this function
     def getHeader = header
@@ -116,11 +109,7 @@ object FlowGraph {
       // TODO ideally could collect (returning a partial funciton instead of some/none)
       (stmts.sliding(3, 1).flatMap{
         case (call: CallStmt) :: _ :: (assign: RegisterAssign) :: Nil =>
-<<<<<<< HEAD
           call.setLHS(assign.lhs)
-=======
-          call.setLHS(assign.getLhs)
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
           i = 2
           Some(call)
         case x :: rest if (i == 2) =>
@@ -422,21 +411,12 @@ object FlowGraph {
 class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.Map[String, Int]) {
   // TODO this isnt great
   private var globalInits: List[InitStmt] = new LinkedList[InitStmt].asInstanceOf[List[InitStmt]]
-<<<<<<< HEAD
   globalInits.add(new InitStmt(Register("heap", -1), "heap", "[bv64] bv8")) // TODO label.none
   globalInits.add(new InitStmt(Register("stack", -1), "stack", "[bv64] bv8"))
   globalInits.add(new InitStmt(Register("L_heap", -1), "heap", "[bv64] bool", true)) // TODO This isnt great
   globalInits.add(new InitStmt(Register("L_stack", -1), "stack", "[bv64] bool", true))
   globalInits.add(new InitStmt(Register("SP", -1 ), "SP", "bv64"))
   globalInits.add(new InitStmt(Register("R31", -1 ), "R31", "bv64"))
-=======
-  globalInits.add(new InitStmt(Var("heap", -1), "heap", "[bv64] bv8")) // TODO label.none
-  globalInits.add(new InitStmt(Var("stack", -1), "stack", "[bv64] bv8"))
-  globalInits.add(new InitStmt(Var("L_heap", -1), "heap", "[bv64] bool", true)) // TODO This isnt great
-  globalInits.add(new InitStmt(Var("L_stack", -1), "stack", "[bv64] bool", true))
-  globalInits.add(new InitStmt(Var("SP", -1 ), "SP", "bv64"))
-  globalInits.add(new InitStmt(Var("R31", -1 ), "R31", "bv64"))
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 
   def getGlobalInits = globalInits
   def setGlobalInits(inits: List[InitStmt]) = this.globalInits = inits

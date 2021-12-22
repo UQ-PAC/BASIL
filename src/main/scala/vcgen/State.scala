@@ -1,27 +1,16 @@
 package vcgen
 
-<<<<<<< HEAD
 import astnodes.exp.{Expr, Literal}
 import translating.FlowGraph.{Block, Function}
 import astnodes.pred.{BinOp, BinOperator, Bool, ExprComp, High, Pred, Security, ITE}
 import astnodes.pred
 import astnodes.Label
 import astnodes.exp.`var`.Register
-=======
-import astnodes.exp.{Expr, Literal, MemLoad, Var}
-import translating.FlowGraph.{Block, Function}
-import astnodes.pred.{Bool, High, Pred, Security}
-import astnodes.pred
-import astnodes.Label
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 import astnodes.stmt.assign.{GammaUpdate, RegisterAssign}
 import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, InitStmt, JmpStmt, Stmt}
 import translating.FlowGraph
 import util.Boogie.{generateBVHeader, generateBVToBoolHeader}
-<<<<<<< HEAD
 import astnodes.pred.conjunct
-=======
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 
 import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
@@ -39,7 +28,6 @@ case class State(
                   functions: List[FunctionState],
                   rely: Pred,
                   guar: Pred,
-<<<<<<< HEAD
                   controls: Map[Register, Set[Register]],
                   globalInits: List[InitStmt],
                   symbolTable: Map[String, Literal],
@@ -57,37 +45,19 @@ case class State(
         ITE(ExprComp("==", Register("pos", 64), symbolTable(v.name)), p, prev)
       }.toBoogieString + " }"
     }
-=======
-                  controls: Map[Var, Set[Var]],
-                  globalInits: List[InitStmt],
-                  symbolTable: Map[String, Literal],
-                  private val L: Map[Var, Pred],
-                  private val gamma0: Map[Var, Security],
-) {
-  def getL(v: Var): Pred = L.getOrElse(v, Bool.True)
-  def getGamma(v: Var): Security = gamma0.getOrElse(v, High)
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 
   override def toString: String = generateBVToBoolHeader + generateBVHeader(1) + generateBVHeader(32) + generateBVHeader(64)
     + globalInits.map(_.toBoogieString).mkString("\n") + "\n"
     // TODO this assumes everything is a global variable
-<<<<<<< HEAD
     // + L.map((v, p) => s"axiom L_heap[${symbolTable(v.name).toBoogieString}] == $p;").mkString("\n") + "\n\n"
     + "function L(pos: bv64, heap: [bv64] bv8) returns (bool)" + lBodyStr + "\n\n"
-=======
-    + L.map((v, p) => s"axiom L_heap[${symbolTable(v.name).toBoogieString}] == $p;").mkString("\n") + "\n\n"
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
     + functions.mkString("")
 
 }
 
 case object State {
-<<<<<<< HEAD
   /** Generate a State object from a flow graph */
   def apply(flowGraph: FlowGraph, rely: Pred, guar: Pred, symbolTable: Map[String, Literal], bvSizes: Map[String, Int], lPreds: Map[Register, Pred], gamma: Map[Register, Security]): State = {
-=======
-  def apply(flowGraph: FlowGraph, rely: Pred, guar: Pred, symbolTable: Map[String, Literal], lPreds: Map[Var, Pred], gamma: Map[Var, Security]): State = {
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
     val controlledBy = lPreds.map{
       case (v, p) => (v, p.vars)
     }
@@ -99,21 +69,12 @@ case object State {
       controlledBy.collect{
         case (c, controlled) if (controlled.contains(v)) => c
       }.toSet
-<<<<<<< HEAD
     )).toMap[Register, Set[Register]]
-=======
-    )).toMap[Var, Set[Var]]
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 
     val functions = flowGraph.functions.asScala.map(FunctionState.apply).toList.map{
       case x if (x.header.funcName == "main") => {
         // Update the first block to contain the gamma assignments
-<<<<<<< HEAD
         val (pc, block) = (x.rootBlockLabel, x.rootBlock)
-=======
-        // TODO there is probably a more sensible way to do this
-        val (pc, block) = x.labelToBlock.head
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
         val newBlock = block.copy(lines = block.lines.prependedAll(gamma.map{case (v, s) => GammaUpdate(pred.MemLoad(gamma = true, L = false, symbolTable(v.name)), s.toBool)}))
         val newMap = x.labelToBlock.updated(pc, newBlock)
         x.copy(labelToBlock = newMap)
@@ -121,11 +82,7 @@ case object State {
       case x => x
     }
 
-<<<<<<< HEAD
     State(functions, rely, guar, controls, flowGraph.getGlobalInits.asScala.toList, symbolTable, bvSizes, lPreds, gamma)
-=======
-    State(functions, rely, guar, controls, flowGraph.getGlobalInits.asScala.toList, symbolTable, lPreds, gamma)
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
   }
 }
 
@@ -144,10 +101,7 @@ case class FunctionState (
   val rootBlockLabel: String,
   private val labelToChildren: Map[String, Set[String]],
 ) {
-<<<<<<< HEAD
   def rootBlock = labelToBlock(rootBlockLabel)
-=======
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 
   def children(label: String): Option[Set[String]] = labelToChildren.get(label)
   def children(block: Block): Option[Set[String]] = labelToChildren.get(block.label)
@@ -161,21 +115,10 @@ case class FunctionState (
     + initStmts.map(_.toBoogieString).mkString("\n")
     + labelToBlock.values.mkString("") + "\n}"
 
-<<<<<<< HEAD
 }
 
 case object FunctionState {
   /** Generate a FunctionState from a FlowGraph.Function */
-=======
-  // TOOD could sbst("    \n", "            \n")
-  override def toString: String = header.toString + "\n"
-    + initStmts.map(_.toBoogieString).mkString("\n")
-    + labelToBlock.values.mkString("") + "\n}"
-
-}
-
-case object FunctionState {
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
   def apply(function: FlowGraph.Function): FunctionState = {
     val blocks = function.getBlocks.asScala.map(b => (b.getLabel, new Block(b))).toMap
     val labelToChildren = function.getBlocks.asScala.map(b => (b.label, b.lastLine match {
@@ -185,11 +128,7 @@ case object FunctionState {
       case _: ExitSub => Set()
     })).toMap
 
-<<<<<<< HEAD
     new FunctionState(blocks, function.getInitStmts.asScala.toList, function.getHeader, function.getBlocks.get(0).label, labelToChildren)
-=======
-    new FunctionState(blocks, function.getInitStmts.asScala.toList, function.getHeader, labelToChildren)
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
   }
 }
 

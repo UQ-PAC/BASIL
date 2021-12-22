@@ -16,11 +16,6 @@ case class CJmpStmt(
   def getCondition = condition
   override def toString = s"if ($condition) goto label$trueTarget else goto label$falseTarget;"
   override def toBoogieString: String = s"if (bv1tobool(${condition.toBoogieString})) { goto label$trueTarget; } goto label$falseTarget;"
-<<<<<<< HEAD
 
   override def subst(v: Var, w: Var): Stmt = this.copy(condition = condition.subst(v,w))
-=======
-  override def getChildren = Collections.singletonList(condition)
-  override def replace(oldExp: Expr, newExp: Expr) = if (condition == oldExp) condition = newExp
->>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 }
