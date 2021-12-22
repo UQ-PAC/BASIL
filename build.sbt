@@ -35,4 +35,3 @@ libraryDependencies ++= {
     .map(m => "org.openjfx" % s"javafx-$m" % "15.0.1" classifier osName)
 }
 
-

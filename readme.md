@@ -185,16 +185,6 @@ In Boogie, all local variables need to be initialised at the start of the functi
 
 Facts override the toString() method such that they can be printed as syntactically-valid Boogie lines of code. Similarly, Blocks can be printed as syntactically-valid Boogie basic blocks, consisting of their label, followed by the toString() output of each of their Facts. Functions are similar in relation to Blocks, and FlowGraphs are similar in relation to Functions. Hence, converting the flow graph to valid Boogie syntax to be written to a file is as simple as using the FlowGraph.toString() method.
 
-## Tips for Programmers
-
-Some objects returned by the flow graph, such as lists of lines and blocks, may not be member variables. In other words, they may have been freshly made by the called getter, so modifying them will have no effect on the flow graph. However, others indeed may be member variables. This should change soon, but be aware of exactly what objects you're modifying when trying to modify the flow graph.
-
-Recall that expression facts override equals and instruction facts don't. Hence, instructionFact1.equals(instructionFact2) is always false.
-
-Types for children of facts are fairly strict, and although we intend to loosen them soon, bear in mind we might get a lot of cast exceptions before that happens.
-
-We want flow graphs to maintain particular properties or guarantees. Use FlowGraph.enforceConstraints() to ensure these guarantees are met. This is particularly useful after editing a flow graph.
-
 ## Tasks for the Summer
 
  - Value analysis 
@@ -202,15 +192,15 @@ We want flow graphs to maintain particular properties or guarantees. Use FlowGra
  - Reading globals from the symbol table and global offset table
  - Using the call graph
  - Generate the verification conditions
- - Use bitvectors (so we can have element-wise operators e.g. for the loops sample). This would be pretty self contained I hope
- - On a related note, add a proper type system
  - Fix jumps (need to properly handle jumps to functions, calls with no return)
  - Replace nulls with option where possible
  - Move over to scala collections
  - Better handling toStrings (there is a lot of overlap between pred/exp and between toString/toBoogieString)
+ - The bitvector types are quite basic (e.g. literals are always 32bits)
 
 ## Setting up SBT
 
 The project uses the scala build tool (SBT) to build the project. For the most part this should *just work*, and there are intellij run files (located in the .run folder) which automatically compile and run the project.
 However, there are some issues when it comes to using the project in intellij. In particular, it is necassary to go into `target/scala-3.0.0/src_managed` and unmark `main` as a sources root folder. It may also be necassary
 to go into a java file and manually enabling `Highlight: All Problems` using the tick in the top right.
+Alternatively, these issues do not appear when using the metals LSP (for example when using neovim or vscode).

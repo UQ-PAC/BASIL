@@ -1,11 +1,10 @@
 package analysis;
 
-import scala.collection.mutable.Map;   // functional programming is silly when computers are machines with memory (state).
-import scala.collection.mutable.Set;   // why have state if you're not going to use it?
-import scala.collection.mutable.Stack; // hence, mutability in everything is good
+import scala.collection.mutable.Map;
+import scala.collection.mutable.Set;
+import scala.collection.mutable.Stack;
 import scala.collection.mutable.ArrayDeque;
 import scala.jdk.CollectionConverters.IteratorHasAsScala;
-import scala.jdk.CollectionConverters.ListHasAsScala;
 import scala.jdk.CollectionConverters.ListHasAsScala;
 import scala.jdk.CollectionConverters.SeqHasAsJava;
 import java.util.MissingResourceException;
@@ -15,15 +14,22 @@ import translating.FlowGraph;
 import translating.FlowGraph.Block;
 import translating.FlowGraph.Function;
 import analysis.AnalysisPoint;
-import java.lang.invoke.CallSite
 
-class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
+class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
+    private final val debug: Boolean = false;
+
+    private val directionForwards: Boolean = analysis.isForwards;
+
+    // functions that we abstract away and don't traverse. If we encounter a call to any of these, it's 
+    // passed through to the analyses as a call instruction so they can decide what to do with it.
+    val libraryFunctions: Set[String] = Set("malloc");
+
+    var currentCallString: List[String] = List();
+
     var currentWorkListQueue: ArrayDeque[Block] = ArrayDeque(); // queue of blocks to work on, for the current function.
-
-    var previousStmtAnalysisState: Set[AnalysisPoint] = null; // previous state on a per stmt basis.
-
-    var finalAnalysedStmtInfo: Map[Stmt, Set[AnalysisPoint]] = Map(); // "output" info as the end result of the analysis
-    var allBlockFinalAnalysisStates: Map[Block, Set[AnalysisPoint]] = Map(); // final states of all analysed blocks
+    var previousStmtAnalysisState: AnalysisPoint = null; // previous state on a per stmt basis.
+    var finalAnalysedStmtInfo: Map[Stmt, AnalysisPoint] = Map(); // "output" info as the end result of the analysis
+    var allBlockFinalAnalysisStates: Map[Block, AnalysisPoint] = Map(); // final states of all analysed blocks
 
     // clears out everything except analysedStmtInfo
     def finish = {
@@ -32,11 +38,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
         allBlockFinalAnalysisStates = null;
     }
 
-    def createAnalysisEmpty: Set[AnalysisPoint] = {
-        analyses.map(analysis => analysis.createLowest);
-    }
-
-    def getAllStates: Map[Stmt, Set[AnalysisPoint]] = {
+    def getAllStates: Map[Stmt, AnalysisPoint] = {
         finalAnalysedStmtInfo;
     }
     
@@ -59,8 +61,8 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
         })
     }
 
-    def getOneState(stmt: Stmt): Set[AnalysisPoint] = {
-        finalAnalysedStmtInfo.getOrElse(stmt, createAnalysisEmpty);
+    def getOneState(stmt: Stmt): AnalysisPoint = {
+        finalAnalysedStmtInfo.getOrElse(stmt, analysis.createLowest);
     }
 
     /**
@@ -82,58 +84,42 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * blocks that all depend on a loop; forcing us to re-analyse every block until that loop stablises.
      */
     def workOnFunction(functionName: String): Unit = {
-        println("analysing function: " + functionName);
-
+        if (debug) {
+            println("analysing function: " + functionName);
+        }
+        
+        currentCallString = currentCallString ++ List(functionName);
         currentWorkListQueue = topologicalSortFromFunction(controlFlow, functionName);
+        if !directionForwards then currentWorkListQueue = currentWorkListQueue.reverse;
 
         if (previousStmtAnalysisState == null) {
-            previousStmtAnalysisState = createAnalysisEmpty;
+            previousStmtAnalysisState = analysis.createLowest;
         }
 
         var functionStartAnalysisState = previousStmtAnalysisState;
-        var currentFunctionAnalysedInfo: Map[Stmt, Set[AnalysisPoint]] = Map();
+        var currentFunctionAnalysedInfo: Map[Stmt, AnalysisPoint] = Map();
         
         while(!currentWorkListQueue.isEmpty) {
-            println("wl still not empty")
             var nextBlockToAnalyse: Block = currentWorkListQueue.removeHead();
             
-            // for blocks *with* parents (i.e. not function start blocks) we take the previous state to be the union
+            // for blocks *with* parents (i.e. not function start blocks) we take the previous state to be the combine
             // of all parents' final states.
-            if (!findBlockParents(nextBlockToAnalyse).isEmpty) {
-                println("has parents")
-                previousStmtAnalysisState = createAnalysisEmpty;
+            if (directionForwards) {
+                if (!findBlockParents(nextBlockToAnalyse).isEmpty) {
+                    previousStmtAnalysisState = analysis.createLowest;
 
-                findBlockParents(nextBlockToAnalyse).foreach(nextBlockToAnalyseParent => {
-                    println("next parent")
-                    var nextBlockToAnalyseParentFinalState: Set[AnalysisPoint] = allBlockFinalAnalysisStates.getOrElse(nextBlockToAnalyseParent, Set());
-
-                    // for every parent final state
-                    nextBlockToAnalyseParentFinalState.foreach(nextBlockToAnalyseParentPoint => {
-                        println("next parent analysis point")
-                        var analysisFound: Boolean = false;
-
-                        // for every current final state
-                        previousStmtAnalysisState.foreach(previousStmtAnalysisPoint => {
-                            println("next prev stmt analysis point")
-                            if (previousStmtAnalysisPoint.getClass == nextBlockToAnalyseParentPoint.getClass) {
-                                println("found analysis point")
-
-                                previousStmtAnalysisState.remove(previousStmtAnalysisPoint);
-                                previousStmtAnalysisState.add(previousStmtAnalysisPoint.union(nextBlockToAnalyseParentPoint));
-                                analysisFound = true;
-
-                            }
-                        });
-                        
-                        // if there's no matches, then add it
-                        if (!analysisFound) {
-                            println("analysis was not found")
-                            previousStmtAnalysisState.add(nextBlockToAnalyseParentPoint);
-                        }
-
-                        println("finished analysing")
+                    findBlockParents(nextBlockToAnalyse).foreach(nextBlockToAnalyseParent => {
+                        previousStmtAnalysisState = previousStmtAnalysisState.combine(allBlockFinalAnalysisStates.getOrElse(nextBlockToAnalyseParent, analysis.createLowest));
                     });
-                });
+                }
+            } else {
+                if (!nextBlockToAnalyse.getChildren.isEmpty) {
+                    previousStmtAnalysisState = analysis.createLowest;
+
+                    nextBlockToAnalyse.getChildren.asScala.foreach(nextBlockToAnalyseChild => {
+                        previousStmtAnalysisState = previousStmtAnalysisState.combine(allBlockFinalAnalysisStates.getOrElse(nextBlockToAnalyseChild, analysis.createLowest));
+                    });
+                }
             }
 
             workOnBlock(nextBlockToAnalyse, currentFunctionAnalysedInfo);
@@ -146,6 +132,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
 
         // Once the entire function has been analysed to stability, save and/or update the info in the "output" map.
         saveNewAnalysisInfo(currentFunctionAnalysedInfo);
+        currentCallString = currentCallString.filter(elem => {elem != functionName});
     }
 
     /**
@@ -154,10 +141,14 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * Updates the blockFinalStates map with the prevState at the end of the lines, and adds all block children
      * to queue on update, if they weren't already there.
      */
-    def workOnBlock(blockToWorkOn: Block, currentFunctionAnalysedInfo: Map[Stmt, Set[AnalysisPoint]]): Unit = {
-        println("analysing block: " + blockToWorkOn.toString);
+    def workOnBlock(blockToWorkOn: Block, currentFunctionAnalysedInfo: Map[Stmt, AnalysisPoint]): Unit = {
+        if (debug) {
+            println("analysing block: " + blockToWorkOn.toString);
+        }
 
-        blockToWorkOn.getLines.asScala.foreach(blockStmtLine => {
+        var blockLines = blockToWorkOn.getLines.asScala;
+        if !directionForwards then blockLines = blockLines.reverse;
+        blockLines.foreach(blockStmtLine => {
             workOnStmt(blockStmtLine, currentFunctionAnalysedInfo);
         });
         
@@ -166,7 +157,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
         println("in work on block")
 
         if (currentFinalBlockState != null) {
-            if (!(currentFinalBlockState.toString == previousStmtAnalysisState.toString)) { // TODO: fix this to be not string comparison
+            if (!currentFinalBlockState.equals(previousStmtAnalysisState.toString)) {
                 allBlockFinalAnalysisStates.remove(blockToWorkOn);
                 allBlockFinalAnalysisStates.update(blockToWorkOn, previousStmtAnalysisState);
                 
@@ -204,36 +195,49 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      * 
      * Saves the new "prevState" and updates the analysedStmtInfo map.
      */
-    def workOnStmt(singleStmt: Stmt, functionAnalysedInfo: Map[Stmt, Set[AnalysisPoint]]): Unit = {
-        println("analysing stmt: " + singleStmt.toString);
-//        println(previousStmtAnalysisState);
-        print("\n\n");
-
-        var newAnalysedPoint: Set[AnalysisPoint] = Set[AnalysisPoint]();
-
+    def workOnStmt(singleStmt: Stmt, functionAnalysedInfo: Map[Stmt, AnalysisPoint]): Unit = {
+        if (debug) {
+            println("analysing stmt: " + singleStmt.toString);
+        }
+        
         singleStmt match {
             case functionCallStmt: CallStmt => {
                 // if we have a function call, pause the current analysis and analyse the given function
                 // effectively just inlines every function at every time it's called
                 var inProgressWorkListQueue: ArrayDeque[Block] = currentWorkListQueue;
 
-                workOnFunction(functionCallStmt.funcName);
+                if (!currentCallString.contains(functionCallStmt.funcName)) {
+                    if (!libraryFunctions.contains(functionCallStmt.funcName)) {
+                        workOnFunction(functionCallStmt.funcName);
+                    } else {
+                        // treat it like a normal statement and let the analyses define how they deal with it
+                        previousStmtAnalysisState = previousStmtAnalysisState.transferAndCheck(singleStmt);
+                    
+                        // if anything already exists for this stmt, replace it.
+                        if (functionAnalysedInfo.getOrElse(singleStmt, null) != null) {
+                            functionAnalysedInfo.remove(singleStmt);
+                        }
+
+                        functionAnalysedInfo.update(singleStmt, previousStmtAnalysisState);
+                    }
+                } else {
+                    // recursive or mutually recursive function call. for now, just silently drop these.
+                    // One idea for how to deal with these is to pass them to the transfer function,
+                    // and they can define how to deal with it as a call statement to non-library function,
+                    // given any statement that matches these criteria will be recursive.
+                }
 
                 currentWorkListQueue = inProgressWorkListQueue;
             }
             case _ => {
-                previousStmtAnalysisState.foreach(p => {
-                    newAnalysedPoint.add(p.transfer(singleStmt));
-                });
-                println("in workOnStmt")
+                previousStmtAnalysisState = previousStmtAnalysisState.transferAndCheck(singleStmt);
 
                 // if anything already exists for this stmt, replace it.
                 if (functionAnalysedInfo.getOrElse(singleStmt, null) != null) {
                     functionAnalysedInfo.remove(singleStmt);
                 }
-                functionAnalysedInfo.update(singleStmt, newAnalysedPoint);
 
-                previousStmtAnalysisState = newAnalysedPoint;
+                functionAnalysedInfo.update(singleStmt, previousStmtAnalysisState);
             }
         }
     }
@@ -312,41 +316,9 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
         output;
     }
 
-    def saveNewAnalysisInfo(functionAnalysedInfo: Map[Stmt, Set[AnalysisPoint]]) = {
-        functionAnalysedInfo.keys.foreach(updStmt => { // for every key in new analysis map
-            var curStmtVal: Set[AnalysisPoint] = finalAnalysedStmtInfo.getOrElse(updStmt, Set());
-
-            if (curStmtVal.isEmpty) {
-                finalAnalysedStmtInfo.update(updStmt, functionAnalysedInfo.getOrElse(updStmt, Set())); // if empty, add the new analysis
-            } else {
-                var newStmtVal: Set[AnalysisPoint] = Set();
-
-                // for every updated stmt
-                functionAnalysedInfo.getOrElse(updStmt, Set()).foreach(updAnalysis => {
-                    var analysisFound: Boolean = false;
-
-                    // for every old stmt
-                    curStmtVal.foreach(curAnalysis => {
-                        if (curAnalysis.getClass == updAnalysis.getClass) {
-                            // if they match classes then take union
-                            newStmtVal.add(curAnalysis.union(updAnalysis));
-                            analysisFound = true;
-                        }
-                    });
-
-                    if (!analysisFound) {
-                        // otherwise just add the new one
-                        newStmtVal.add(updAnalysis);
-                    }
-                });
-
-                finalAnalysedStmtInfo.remove(updStmt);
-                finalAnalysedStmtInfo.update(updStmt, newStmtVal);
-            }
+    def saveNewAnalysisInfo(functionAnalysedInfo: Map[Stmt, AnalysisPoint]) = {
+        functionAnalysedInfo.keys.foreach(currentFunctionAnalysisPoint => {
+            finalAnalysedStmtInfo.update(currentFunctionAnalysisPoint, finalAnalysedStmtInfo.getOrElse(currentFunctionAnalysisPoint, analysis.createLowest).combine(functionAnalysedInfo.getOrElse(currentFunctionAnalysisPoint, analysis.createLowest)));
         });
     }
-}
-
-class FunctionWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
-
 }

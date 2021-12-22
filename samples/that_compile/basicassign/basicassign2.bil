@@ -1,0 +1,30 @@
+00000260: program
+0000025c: sub main(main_argc, main_argv, main_result)
+00000270: main_argc :: in u32 = R0
+00000271: main_argv :: in out u64 = R1
+00000272: main_result :: out u32 = R0
+L: secret -> FALSE, z -> TRUE
+
+0000010a:
+0000010c: R31 := R31 - 0x10
+00000110: R0 := 0x11000
+00000114: R0 := R0 + 0x40
+00000118: R0 := mem[R0, el]:u64
+0000011c: mem := mem with [R31 + 8, el]:u64 <- R0  // x = secret
+00000120: mem := mem with [R31 + 8, el]:u64 <- 0  // x = 0
+00000124: R0 := 0x11000
+00000128: R0 := R0 + 0x38
+0000012c: R1 := mem[R31 + 8, el]:u64
+00000130: mem := mem with [R0, el]:u64 <- R1
+00000134: R0 := 0x11000
+00000138: R0 := R0 + 0x40
+0000013c: R0 := mem[R0, el]:u64
+00000140: mem := mem with [R31 + 8, el]:u64 <- R0  // x = secret
+00000144: R0 := 0x11000
+00000148: R0 := R0 + 0x38
+0000014c: R1 := mem[R31 + 8, el]:u64
+00000150: mem := mem with [R0, el]:u64 <- R1  // z = x
+00000154: R0 := 0
+00000156: R0 := R0 & 0xFFFFFFFF00000000d
+0000015a: R31 := R31 + 0x10
+0000015e: call R30 with noreturn

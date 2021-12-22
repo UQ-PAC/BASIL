@@ -1,0 +1,48 @@
+00000290: program
+
+0000028c: sub main(main_argc, main_argv, main_result)
+000002a0: main_argc :: in u32 = R0
+000002a1: main_argv :: in out u64 = R1
+000002a2: main_result :: out u32 = R0
+Gamma: secret -> HIGH
+L: x -> FALSE, secret -> FALSE, z -> TRUE
+
+0000010a:
+0000010c: R0 := 0x11000
+00000110: R0 := R0 + 0x3C  // y
+00000114: #27 := pad:64[mem[R0, el]:u32]   // TODO 64 bit here
+00000116: R1 := 0
+00000118: R1 := R1 & 0xFFFFFFFF00000000 | pad:64[#27]  // TODO 32 bit here
+0000011c: R0 := 0x11000
+00000120: R0 := R0 + 0x34  // x
+00000124: mem := mem with [R0, el]:u32 <- low:32[extract:31:0[R1]] // x = secret
+00000128: R0 := 0x11000
+0000012c: R0 := R0 + 0x34
+00000130: mem := mem with [R0, el]:u32 <- 0 // x = 0
+00000134: R0 := 0x11000
+00000138: R0 := R0 + 0x34
+0000013c: #30 := pad:64[mem[R0, el]:u32]
+0000013e: R1 := 0
+00000140: R1 := R1 & 0xFFFFFFFF00000000 | pad:64[#30]
+00000144: R0 := 0x11000
+00000148: R0 := R0 + 0x38
+0000014c: mem := mem with [R0, el]:u32 <- low:32[extract:31:0[R1]] // z = x
+00000150: R0 := 0x11000
+00000154: R0 := R0 + 0x3C
+00000158: #32 := pad:64[mem[R0, el]:u32]
+0000015a: R1 := 0
+0000015c: R1 := R1 & 0xFFFFFFFF00000000 | pad:64[#32]
+00000160: R0 := 0x11000
+00000164: R0 := R0 + 0x34
+00000168: mem := mem with [R0, el]:u32 <- low:32[extract:31:0[R1]]
+0000016c: R0 := 0x11000
+00000170: R0 := R0 + 0x34
+00000174: #34 := pad:64[mem[R0, el]:u32]
+00000176: R1 := 0
+00000178: R1 := R1 & 0xFFFFFFFF00000000 | pad:64[#34]
+0000017c: R0 := 0x11000
+00000180: R0 := R0 + 0x38
+00000184: mem := mem with [R0, el]:u32 <- low:32[extract:31:0[R1]]
+00000188: R0 := 0
+0000018a: R0 := R0 & 0xFFFFFFFF00000000
+0000018e: call R30 with noreturn

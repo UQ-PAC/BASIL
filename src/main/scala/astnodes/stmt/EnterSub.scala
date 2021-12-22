@@ -2,6 +2,7 @@ package astnodes.stmt
 
 import astnodes.parameters.InParameter
 import astnodes.exp.Expr
+import astnodes.exp.`var`.Var
 import astnodes.parameters.OutParameter
 
 import scala.jdk.CollectionConverters.*
@@ -10,15 +11,18 @@ import java.util.*
 import scala.collection.immutable
 
 // TODO scalaify
+// TODO rewrite statment loader to remove getters
 class EnterSub(override val pc: String, var funcName: String) extends Stmt(pc) {
   private var inParams: List[InParameter] = new util.ArrayList[InParameter]()
   private var outParam: Option[OutParameter] = None
   private var modifies: List[String] = new util.LinkedList[String]() // TODO type
-  modifies.addAll(immutable.List("heap", "stack", "Gamma_heap", "Gamma_stack").asJava)
+  // TODO dont like this
+  modifies.addAll(immutable.List("heap", "stack", "Gamma_heap", "Gamma_stack", "SP", "R31", "Gamma_SP", "Gamma_R31").asJava)
 
   def getInParams = inParams
   def getOutParam = outParam
   def setOutParam(outParam: OutParameter) = this.outParam = Some(outParam)
+  def setInParams(newInParms: List[InParameter]) = inParams = newInParms
   def getFuncName = funcName
 
   override def toString = {
@@ -35,6 +39,5 @@ class EnterSub(override val pc: String, var funcName: String) extends Stmt(pc) {
     "procedure " + decl + modifiesStr + "; {"
   }
 
-  override def getChildren = new ArrayList[Expr]
-  override def replace(oldExp: Expr, newExp: Expr) = {}
+  override def subst(v: Var, w: Var): Stmt = this
 }
