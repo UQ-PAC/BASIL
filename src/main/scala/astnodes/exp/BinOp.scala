@@ -1,28 +1,24 @@
 package astnodes.exp
 
-import util.{AssumptionViolationException}
+import astnodes.exp.`var`.Var
+import util.AssumptionViolationException
 
 import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
-/** Binary operation fact
-  */
+/** Binary operation of two expressions
+ */
 case class BinOp(
     operator: BinOperator.Value,
-    var firstExp: Expr,
-    var secondExp: Expr
+    firstExp: Expr,
+    secondExp: Expr
 ) extends Expr {
   def this(operatorStr: String, firstExp: Expr, secondExp: Expr) = this(BinOperator.fromBil(operatorStr), firstExp, secondExp)
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
   override def toBoogieString = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
   //s"${BinOperator.toBoogie(operator, size)}(${firstExp.toBoogieString}, ${secondExp.toBoogieString})"
-  override def getChildren = ArrayBuffer(firstExp, secondExp).asJava
 
-  // TODO update so the member vars can be vals
-  override def replace(oldExp: Expr, newExp: Expr) = {
-    if (firstExp == oldExp) firstExp = newExp
-    if (secondExp == oldExp) secondExp = newExp
-  }
+  override def subst(v: Var, w: Var): Expr = this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
 
   override def vars = firstExp.vars ++ secondExp.vars
 
@@ -47,12 +43,12 @@ case object BinOperator extends Enumeration {
   val Multiplication: Operator = Value("*")
   val Division: Operator = Value("/")
   val Modulo: Operator = Value("%")
-  val BitwiseAnd: Operator = Value("&") // todo
-  val BitwiseOr: Operator = Value("|") // todo
-  val BitwiseXor: Operator = Value("xor") // todo
-  val LogicalShiftLeft: Operator = Value("<<") // todo
-  val LogicalShiftRight: Operator = Value(">>") // todo
-  val ArithmeticShiftRight: Operator = Value(">>>") // todo
+  val BitwiseAnd: Operator = Value("&")
+  val BitwiseOr: Operator = Value("|")
+  val BitwiseXor: Operator = Value("xor")
+  val LogicalShiftLeft: Operator = Value("<<")
+  val LogicalShiftRight: Operator = Value(">>")
+  val ArithmeticShiftRight: Operator = Value(">>>")
   // logical operators
   val Equality: Operator = Value("==")
   val NonEquality: Operator = Value("!=")
@@ -82,9 +78,8 @@ case object BinOperator extends Enumeration {
     case "~>>" => UnknownOperator
   }
 
-  // TODO getOrElse ??
   def toBoogie(value: Value, size: Option[Int]): List[String] = {
-    val size1 = size.getOrElse(64)
+    val size1 = size.get
     value match {
       case Addition => List(s"bv${size1}add")
       case Subtraction => List(s"bv${size1}sub")
@@ -94,8 +89,11 @@ case object BinOperator extends Enumeration {
       case BitwiseAnd => List(s"bv${size1}and")
       case BitwiseOr => List(s"bv${size1}or")
       case BitwiseXor => List(s"bv${size1}xor")
-      case Equality => List(s"bv${size1}comp", "booltobv1")
-      case NonEquality => List(s"bv${size1}comp", "!", "booltobv1")
+      case LogicalShiftLeft => List(s"bv${size1}shl")
+      case LogicalShiftRight => List(s"bv${size1}lshr")
+      case ArithmeticShiftRight => List(s"bv${size1}ashr")
+      case Equality => List(s"bv${size1}eq", "booltobv1")
+      case NonEquality => List(s"bv${size1}neq", "booltobv1")
     }
   }
   

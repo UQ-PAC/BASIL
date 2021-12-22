@@ -1,17 +1,18 @@
 package astnodes.exp
 
+import astnodes.exp.`var`.Var
+
 import java.util.Collections
 import java.util
 import java.util.Objects
 
 /** Unary operator fact
   */
-case class UniOp(var operator: UniOperator.Value, var exp: Expr) extends Expr {
+case class UniOp(var operator: UniOperator.Value, val exp: Expr) extends Expr {
   def this(operatorStr: String, exp: Expr) = this(UniOperator.fromBil(operatorStr), exp)
   override def toString = String.format("%s %s", operator, exp)
   override def toBoogieString: String = s"${UniOperator.toBoogie(operator, size)}(${exp.toBoogieString})"
-  override def getChildren = Collections.singletonList(exp)
-  override def replace(oldExp: Expr, newExp: Expr) = if (exp == oldExp) exp = newExp
+  override def subst(v: Var, w: Var): Expr = this.copy(exp = exp.subst(v, w))
 
   override def vars = exp.vars
 

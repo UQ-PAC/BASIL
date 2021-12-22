@@ -1,13 +1,13 @@
 package astnodes.parameters;
 
-import astnodes.exp.Var;
-import astnodes.exp.MemLoad;
+import astnodes.exp.var.Register;
+import astnodes.exp.var.MemLoad;
 
 public class InParameter extends Parameter {
 
     private MemLoad alias;
 
-    public InParameter(Var name, Var register) {
+    public InParameter(Register name, Register register) {
         super(name, register);
     }
 
