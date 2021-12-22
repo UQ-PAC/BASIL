@@ -5,7 +5,6 @@ grammar Bil;
 bil : progSpec progdecl function+ EOF;
 function : sub 
          paramTypes*
-         // progSpec // TODO only gamma
          (stmt)*
          ;
 
@@ -35,9 +34,12 @@ exp : exp bop exp                                       # expBop
     | exp '[' exp ',' ENDIAN ']:' nat                   # expLoad
     | exp '[' exp ']'                                   # expLoad8
     | 'extract' ':' nat ':' nat '[' exp ']'             # expExtract
+	| functionName'(' argList ')'						# expFunctionCall
     ;
 cjmp : 'when' var 'goto' '%' addr ;
 jmp : 'goto' (('%' addr)|('@' var));
+
+argList : exp (',' exp)* ;
 
 var : ID ;
 functionName : ID | '.'ID ;
@@ -95,12 +97,15 @@ UNKNOWN_OP : '~>>' ;
   The grammar which follows this is used to specify the program, and is not bil code.
 */
 
-progSpec: (lpreds | gammas)* ;
+progSpec: (lpreds | gammas | lattice | rely)* ;
 
 lpreds : 'L:' lpred (',' lpred)* ;
 lpred :  (var MAPSTO pred);
 gammas : 'GAMMA:' gamma (',' gamma)* ;
 gamma :  (var MAPSTO (LOW | HIGH));
+lattice : 'Lattice:' lattice_elem (',' lattice_elem)* ;
+lattice_elem : ID '<:' 'ID'* ;
+rely: 'Rely:' pred ; 
 
 pred :
     pred predBop pred  # predBinOp

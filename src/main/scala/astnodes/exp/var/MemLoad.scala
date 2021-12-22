@@ -15,7 +15,7 @@ case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
   def toBoogieString(exp: Expr) = s"${if (this.onStack) "stack" else "heap"}[${exp.toBoogieString}]"
   override def toBoogieString: String =
     (0 to size.get / 8 - 1)
-      .map(n => s"${toBoogieString(BinOp(BinOperator.Addition, exp, Literal(n.toString)))}")
+      .map(n => s"${toBoogieString(BinOp(BinOperator.Addition, exp, Literal(n.toString, Some(64))))}")
       .mkString(" ++ ")
 
   override def vars = List(this) // TOOD also exp.vars????
