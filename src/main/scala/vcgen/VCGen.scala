@@ -3,7 +3,7 @@ package vcgen
 import astnodes.exp.`var`.{MemLoad, Register}
 import astnodes.exp.{Expr, Literal}
 import astnodes.stmt.assign.{Assign, GammaUpdate, MemAssign, RegisterAssign}
-import astnodes.stmt.{Assert, CJmpStmt, Stmt}
+import astnodes.stmt.{Assert, CJmpStmt, Stmt, MethodCall}
 import translating.FlowGraph
 
 import collection.JavaConverters.*
@@ -14,7 +14,7 @@ object VCGen {
   def genVCs(state: State): State = {
     state.copy(functions = state.functions.map(f =>
       f.copy(labelToBlock = f.labelToBlock.map {
-        case (pc, b) => (pc, b.copy(lines = b.lines.flatMap(line => List(Assert("TODO", genVC(line, f, state)), line) ++ genGammaUpdate(line, state))))
+        case (pc, b) => (pc, b.copy(lines = b.lines.flatMap(line => List(rely, Assert("TODO", genVC(line, f, state)), line) ++ genGammaUpdate(line, state))))
       })
     ))
   }
@@ -52,5 +52,7 @@ object VCGen {
     // case assign: RegisterAssign => Some(GammaUpdate(assign.lhs.toGamma, computeGamma(assign.rhs, state)))
     case _ => None
   }
+
+  def rely = MethodCall("-1", "rely")
 }
 

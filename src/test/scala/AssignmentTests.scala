@@ -13,22 +13,27 @@ import org.scalatest.funsuite.AnyFunSuite
 class AssignmentTests extends AnyFunSuite {
   test("basicassign") {
     val result = TestUtils.processBoogieFile("basicassign/basicassign")
-    assert(result.failures == List(261))
+    assert(result.failures == List(236, 300))
+  }
+
+  test("basicassign_rely") {
+    val result = TestUtils.processBoogieFile("basicassign/basicassign_rely", Some("basicassign/basicassign.elf"))
+    assert(result.failures == List(300))
   }
 
   test("basicassign1") {
     val result = TestUtils.processBoogieFile("basicassign/basicassign1")
-    assert(result.failures == List(234))
+    assert(result.failures == List(264))
   }
 
   test("basicassign2") {
     val result = TestUtils.processBoogieFile("basicassign/basicassign2")
-    assert(result.failures == List(206))
+    assert(result.failures == List(228))
   }
 
   test("basicassign3") {
     val result = TestUtils.processBoogieFile("basicassign/basicassign3")
-    assert(result.failures == List(234))
+    assert(result.failures == List(264))
   }
 
   test("basicassign_gamma0") {

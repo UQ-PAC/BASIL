@@ -34,9 +34,12 @@ exp : exp bop exp                                       # expBop
     | exp '[' exp ',' ENDIAN ']:' nat                   # expLoad
     | exp '[' exp ']'                                   # expLoad8
     | 'extract' ':' nat ':' nat '[' exp ']'             # expExtract
+	| functionName'(' argList ')'						# expFunctionCall
     ;
 cjmp : 'when' var 'goto' '%' addr ;
 jmp : 'goto' (('%' addr)|('@' var));
+
+argList : exp (',' exp)* ;
 
 var : ID ;
 functionName : ID | '.'ID ;
@@ -102,7 +105,7 @@ gammas : 'GAMMA:' gamma (',' gamma)* ;
 gamma :  (var MAPSTO (LOW | HIGH));
 lattice : 'Lattice:' lattice_elem (',' lattice_elem)* ;
 lattice_elem : ID '<:' 'ID'* ;
-rely: pred ; 
+rely: 'Rely:' pred ; 
 
 pred :
     pred predBop pred  # predBinOp

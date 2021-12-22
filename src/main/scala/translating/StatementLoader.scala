@@ -28,6 +28,7 @@ import util.AssumptionViolationException
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
 
 // TODO create a statementloaderstate class
 class StatementLoader() extends BilBaseListener {
@@ -203,6 +204,7 @@ class StatementLoader() extends BilBaseListener {
   override def exitExpStore8(ctx: BilParser.ExpStore8Context): Unit =
     if (ctx.exp(0).getText == "mem") exprs.put(ctx, MemStore(getExpr(ctx.exp(1)), getExpr(ctx.exp(2)), Some(8)))
     else throw new AssumptionViolationException("Found store on variable other than mem")
+  override def exitExpFunctionCall(ctx: BilParser.ExpFunctionCallContext): Unit = exprs.put(ctx, new FunctionCall("old", ctx.argList.exp.asScala.map(a => getExpr(a)).toList))
 
 
   override def exitPredBinOp(ctx: PredBinOpContext): Unit = preds.put(ctx, new astnodes.pred.BinOp(ctx.predBop.getText, getPred(ctx.pred(0)), getPred(ctx.pred(1))))
