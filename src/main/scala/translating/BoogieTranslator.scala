@@ -1,6 +1,10 @@
 package translating
 
+<<<<<<< HEAD
 import astnodes.exp.{BinOp, BinOperator, Concat, Expr, Literal, MemStore, UniOp, UniOperator}
+=======
+import astnodes.exp.{BinOp, BinOperator, Concat, Expr, Literal, MemLoad, MemStore, UniOp, UniOperator, Var}
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
 import astnodes.stmt.*
 import astnodes.parameters.{InParameter, OutParameter}
@@ -16,6 +20,7 @@ import scala.collection.mutable
 import util.AssumptionViolationException
 import scala.jdk.CollectionConverters._
 
+<<<<<<< HEAD
 
 /** Methods to perform the translation from BIL to the IR.
  */
@@ -23,6 +28,28 @@ object BoogieTranslator {
   /** Peforms the BIL to IR translation
    */
   def translate(state: State): State = inferConstantTypes(addVarDeclarations(resolveOutParams(resolveInParams(identifyImplicitParams(optimiseSkips(createLabels(state)))))))
+=======
+// TODO rewrite this file to make the flowGraph immutable (this should make whats happening a bit more transparent)
+class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String) {
+  private var uniqueInt = 0;
+
+  /** Starting point for a BIL translation.
+    */
+  def translate(): FlowGraph = {
+    createLabels()
+    optimiseSkips()
+    identifyImplicitParams()
+    resolveInParams()
+    resolveOutParams()
+    // TODO this doesnt work: resolveVars()
+    addVarDeclarations(flowGraph.types)
+    inferConstantTypes()
+    // TODO could turn this on later:  replaceGlobalVars(symbolTable)
+    // writeToFile()
+
+    flowGraph;
+  }
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 
   /** Update all lines by applying the given function */
   private def updateAllLines(state: State, fn: Stmt => Stmt): State = updateAllLines(state, PartialFunction.fromFunction(fn))
@@ -80,12 +107,27 @@ object BoogieTranslator {
       val assignedRegisters = new mutable.HashSet[Register]
 
       // TODO could neaten this further with case classes by combiling the nested matches
+<<<<<<< HEAD
       rootBlock.lines.foreach {
         case store: MemAssign => store.rhs match {
           case rhsVar: Register if (isRegister(rhsVar) && assignedRegisters.contains(rhsVar)) =>
             val param = new InParameter(new Register(uniqueVarName, rhsVar.size), rhsVar)
             param.setAlias(store.lhs.asInstanceOf[MemLoad])
             params.add(param)
+=======
+        rootBlock.getLines.forEach(line => {line match {
+          case store: MemAssign => store.getRhs match {
+            case rhsVar: Var if (isRegister(rhsVar) && assignedRegisters.contains(rhsVar)) =>
+              val param = new InParameter(new Var(uniqueVarName, rhsVar.size), rhsVar)
+              param.setAlias(store.getLhs.asInstanceOf[MemLoad])
+              params.add(param)
+            case _ =>
+          }
+          case assign: Assign => assign.getLhs match {
+            case lhsVar: Var if (isRegister(lhsVar)) => assignedRegisters.add(lhsVar)
+            case _: Var =>
+          }
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
           case _ =>
         }
         case assign: Assign => assign.lhs match {
@@ -170,6 +212,7 @@ object BoogieTranslator {
     })
   }
 
+<<<<<<< HEAD
   private def getLocalVarsInFunction(state: State, function: FunctionState) = {
     val vars = new mutable.HashSet[Register]
     function.labelToBlock.foreach{
@@ -184,6 +227,23 @@ object BoogieTranslator {
             vars.add(lhs)
           }
         case _ =>
+=======
+  // todo: this seems to produce a list with duplicates
+  private def getLocalVarsInFunction(function: FlowGraph.Function) = {
+    val vars = new mutable.HashSet[Var]
+    function.getLines.forEach(line => {
+      if (line.isInstanceOf[RegisterAssign]) {
+        val lhs = line.asInstanceOf[Assign].getLhs.asInstanceOf[Var]
+        // TODO slow
+        if (
+          flowGraph.getGlobalInits.stream.noneMatch(init => init.variable.name == lhs.name)
+          && function.getHeader.getInParams.stream.noneMatch((inParam) => inParam.getName.name == lhs.name) // TODO check if this is needed
+          && !(function.getHeader.getOutParam.get.getName.name == lhs.name)
+          && function.getInitStmts.stream.noneMatch(init => init.variable.name == lhs.name)
+        ) {
+          vars.add(lhs)
+        }
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
       }
     }
 
@@ -195,6 +255,7 @@ object BoogieTranslator {
     * variables will have var initialisations. Depends on:
     *   - resolveRegisters()
     */
+<<<<<<< HEAD
   private def addVarDeclarations(state: State): State = {
     state.copy(functions = state.functions.map(function => {
       val initStmts = function.initStmts.toBuffer
@@ -202,6 +263,14 @@ object BoogieTranslator {
         // TODO i think this could be replaced by a none label as well
         // TODO rework how this works to instead store a list of vars
         if (!function.initStmts.exists(x => x.variable == localVar)) initStmts += new InitStmt(localVar, uniqueLabel, s"bv${state.bvSizes(localVar.name)}")
+=======
+  private def addVarDeclarations(types: immutable.Map[String, Int]): Unit = {
+    flowGraph.getFunctions.forEach(function =>
+      for (localVar <- getLocalVarsInFunction(function)) {
+        // TODO i think this could be replaced by a none label as well
+        // TODO rework how this works to instead store a list of vars
+        if (!function.getInitStmts.asScala.exists(x => x.variable == localVar)) function.addInitStmt(new InitStmt(localVar, uniqueLabel, s"bv${types(localVar.name)}"))
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
       }
 
       function.copy(initStmts = initStmts.toList)
@@ -213,8 +282,61 @@ object BoogieTranslator {
   /** Resolves outParams by crudely replacing all references to their associated register with their human-readable
     * name.
     */
+<<<<<<< HEAD
   private def resolveOutParams(state: State): State = {
     // TODO not sure if this actually helps with readability
+=======
+  private def resolveOutParams(): Unit =
+    // TODO not sure if this actually helps with readability
+
+    flowGraph.getFunctions.forEach(function =>
+      val outParamOp = function.getHeader.getOutParam
+      // TODO check will not be necassary if outparam is a scala class
+      if (outParamOp.isDefined)
+        val outParam = outParamOp.get
+
+        function.getLines.forEach((line: Stmt) =>
+          replaceAllMatchingChildren(
+            line,
+            outParam.getRegister,
+            outParam.getName
+          )
+        )
+    )
+
+  private def resolveVars(): Unit =
+    flowGraph.getFunctions.forEach(function =>
+      function.getBlocks.forEach(block => constantPropagation(block))
+    )
+
+  // TODO this should be changed to use a fixed-point algorithm (to make it more accurate)
+  /** Performs constant propagation on a list of facts. Modifies the list it is given.
+    *
+    * Algorithm: For each line, from top to bottom: If the line is an assignment with a pending-removal variable on the
+    * lhs, remove the pending-removal line. Then, with the exception of the LHS of assignments, replace any instances of
+    * variables with their mapped values, if such a mapping exists. Then, if the result is an assignment with no
+    * variables on the RHS, compute the value of the RHS, assign it to the values map and add the line for
+    * pending-removal.
+    */
+  private def constantPropagation(block: FlowGraph.Block): Unit = { // these mapped ExpFacts are expected to only contain literals
+    val lines: List[Stmt] = block.getLines
+    val values = new HashMap[Var, Literal]
+    // assignments that will be removed if the lhs variable is re-assigned later
+    val pendingRemoval = new HashMap[Var, Assign]
+    // list of lines that will be removed once the loop exits
+    val toRemove = new ArrayList[Assign]
+    lines.forEach {
+      // with the exception of the lhs of assignments, replace any instances of variables with their mapped values
+      // note that we don't make an exception for store assignments because their lhs is always a memFact, not var
+      case assignment: Assign => {
+        // if this is an assignment, remove any assignments that pending removal, that contain this lhs
+        values.keySet.forEach(variable => {
+          // since we can't call replaceAllMatchingChildren on the whole line, we have to perform it on the rhs manually
+          replaceAllMatchingChildren(assignment.getRhs, variable, values.get(variable))
+          if (assignment.getRhs == variable) assignment.replace(variable, values.get(variable))
+        }
+        )
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 
     for (function <- state.functions) {
       val outParamOp = function.header.getOutParam
@@ -240,6 +362,71 @@ object BoogieTranslator {
     case assign: RegisterAssign => assign.copy(rhs = inferConstantTypes(assign.rhs, assign.lhs.size))
     case x => x
   }
+<<<<<<< HEAD
+=======
+  */
+
+  /**
+    * Infers the bv sizes for constants
+    */
+  private def inferConstantTypes(): Unit = {
+    flowGraph.getFunctions.forEach(f => f.getBlocks.forEach(b =>
+      b.setLines(b.getLines.asScala.map(inferConstantTypes).asJava)
+    ))
+  }
+
+  private def inferConstantTypes(stmt: Stmt): Stmt = stmt match {
+    case assign: RegisterAssign => assign.copy(expr = inferConstantTypes(assign.expr, assign.lhsExp.size))
+    case x => x
+  }
+
+  // TODO improve this!!
+  // TODO use proper type checking
+  private def inferConstantTypes(expr: Expr, size: Option[Int]): Expr = expr match {
+    case binOp: BinOp => {
+      val inputSize = if (BinOperator.changesSize(binOp.operator)) None else size
+      val binOp1 = binOp.copy(firstExp = inferConstantTypes(binOp.firstExp, inputSize), secondExp = inferConstantTypes(binOp.secondExp, inputSize))
+      (binOp1.firstExp.size, binOp1.secondExp.size) match {
+        case (a: Some[Int], b: Some[Int]) if (a == b) => binOp1
+        case (a: Some[Int], b: Some[Int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop ($binOp) should have the same size (${binOp1.firstExp}: ${a}, ${binOp1.secondExp}: ${b})")
+        case (x: Some[Int], None) => binOp1.copy(secondExp = inferConstantTypes(binOp1.secondExp, x))
+        case (None, x: Some[Int]) => binOp1.copy(firstExp = inferConstantTypes(binOp1.firstExp, x))
+        case (None, None) => binOp1
+      }
+    }
+    case uniOp: UniOp =>
+      val inputSize = if (UniOperator.changesSize(uniOp.operator)) None else size
+      uniOp.copy(exp = inferConstantTypes(uniOp.exp, inputSize))
+    case lit: Literal if (lit.size == None) => lit.copy(size = size)
+    case _ => expr
+  }
+
+  // TODO this is a temporary rudimentary analysis that should be replaced with a static analysis method later
+  // TODO implement this
+  private def regionAnalysis(): Unit = flowGraph.getFunctions.forEach(f => f.getBlocks.forEach(b =>
+      b.setLines(b.getLines.asScala.map(regionAnalysis).asJava)
+    ))
+
+  // private def isOnStack()
+
+  private def regionAnalysis(stmt: Stmt): Stmt = stmt match {
+    // case MemLoad(BinOp(_, v: Var, _), _) if (v.name == "SP") => stmt
+    case _: MemAssign => stmt
+    case x => x
+  }
+
+  private def writeToFile(): Unit = {
+    try {
+      val writer = new BufferedWriter(new FileWriter(outputFileName, false))
+      writer.write(flowGraph.toString)
+      writer.flush()
+    } catch {
+      case _: IOException => System.err.println("Error writing to file.")
+    }
+  }
+
+  private def uniqueVarName: String = return "p" + uniqueNum
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 
   // TODO improve this!!
   // TODO use proper type checking

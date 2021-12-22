@@ -196,6 +196,7 @@ Facts override the toString() method such that they can be printed as syntactica
  - Replace nulls with option where possible
  - Move over to scala collections
  - Better handling toStrings (there is a lot of overlap between pred/exp and between toString/toBoogieString)
+ - The bitvector types are quite basic (e.g. literals are always 32bits)
 
 ## Setting up SBT
 

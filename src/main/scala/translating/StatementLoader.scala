@@ -75,6 +75,26 @@ class StatementLoader() extends BilBaseListener {
   }
 
 
+  val varSizes = mutable.Map[String, Int]()
+
+  /*
+  private def getVarSize(name: String, rhs: Option[Expr]): Int = {
+    if (!varSizes.contains(name)) {
+      if (rhs.isEmpty) throw new AssumptionViolationException("")
+      if (name.charAt(0) == 'R') varSizes(name) = 64
+      else varSizes(name) = rhs.get.size.get
+    }
+    varSizes(name)
+  }
+  */
+  private def setVarSize(name: String, rhs: Expr) = {
+    if (!varSizes.contains(name)) {
+      if (name.charAt(0) == 'R') varSizes(name) = 64
+      else varSizes(name) = rhs.size.get
+    }
+  }
+
+
   // the last function header parsed; needed for assigning parameters
   private var currentFunction: EnterSub = null
 
@@ -95,14 +115,20 @@ class StatementLoader() extends BilBaseListener {
     this.currentFunction = function
   }
   override def exitParamTypes(ctx: BilParser.ParamTypesContext): Unit = {
+    // TODO this seems quite fickle
     val id = ctx.param.getText // human-readable name
     val variable = ctx.`var`.getText // some register, probably
 
     val size = 64
 
     // TODO it would be good to instead use in/out but what is in out
+<<<<<<< HEAD:src/main/scala/translating/StatementLoader.scala
     if (id.contains("result")) currentFunction.setOutParam(new OutParameter(Register(variable, size), Register(variable, size)))
     else currentFunction.getInParams.add(new InParameter(Register(id, size), Register(variable, size)))
+=======
+    if (id.contains("result")) currentFunction.setOutParam(new OutParameter(Var(variable, size), Var(variable, size)))
+    else currentFunction.getInParams.add(new InParameter(Var(id, size), Var(variable, size)))
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65:src/main/scala/translating/StatementLoader.scala
   }
 
   override def exitStmt(ctx: BilParser.StmtContext): Unit = {
@@ -114,10 +140,17 @@ class StatementLoader() extends BilBaseListener {
       val RHS = getExpr(assignCtx.exp)
 
       stmts += ((LHS, RHS) match {
+<<<<<<< HEAD:src/main/scala/translating/StatementLoader.scala
         case (v: Register, m: MemStore) =>
           if (v.name == "mem") new MemAssign(address, new MemLoad(m.loc, m.size), m.expr)
           else throw new AssumptionViolationException("expected mem for memstore")
         case (v: Register, _) => {
+=======
+        case (v: Var, m: MemStore) =>
+          if (v.name == "mem") new MemAssign(address, new MemLoad(m.loc, m.size), m.expr)
+          else throw new AssumptionViolationException("expected mem for memstore")
+        case (v: Var, _) => {
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65:src/main/scala/translating/StatementLoader.scala
           setVarSize(v.name, RHS)
           new RegisterAssign(address, v.copy(size = Some(varSizes(v.name))), RHS)
         }
@@ -149,7 +182,11 @@ class StatementLoader() extends BilBaseListener {
       else if (ctx.jmp.addr != null) target = ctx.jmp.addr.getText
       stmts += new JmpStmt(address, target)
     } else if (ctx.cjmp != null) { // statement is a conditional jump
+<<<<<<< HEAD:src/main/scala/translating/StatementLoader.scala
       val cond = Register(ctx.cjmp.`var`.getText, varSizes(ctx.cjmp.`var`.getText)) // conditions are always vars
+=======
+      val cond = Var(ctx.cjmp.`var`.getText, varSizes(ctx.cjmp.`var`.getText)) // conditions are always vars
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65:src/main/scala/translating/StatementLoader.scala
       val target = ctx.cjmp.addr.getText
       stmts += new CJmpStmt(address, target, "TODO", cond) // TODO set up false GOTO
     } else if (ctx.call != null) { // statement is a call
@@ -157,7 +194,11 @@ class StatementLoader() extends BilBaseListener {
         stmts += new ExitSub(ctx.addr.getText)
       } else {
         val funcName = ctx.call.functionName.getText
+<<<<<<< HEAD:src/main/scala/translating/StatementLoader.scala
         stmts += new CallStmt(address, funcName, Option(ctx.call.returnaddr.addr).map(_.getText), List(), None)
+=======
+        stmts += new CallStmt(address, funcName, Option(ctx.call.returnaddr.addr).map(_.getText))
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65:src/main/scala/translating/StatementLoader.scala
       }
     } else { // this statement is empty
       stmts += new SkipStmt(address)
@@ -167,7 +208,11 @@ class StatementLoader() extends BilBaseListener {
   override def exitExpBracket(ctx: BilParser.ExpBracketContext): Unit = exprs.put(ctx, getExpr(ctx.exp))
   override def exitExpUop(ctx: BilParser.ExpUopContext): Unit = exprs.put(ctx, new UniOp(ctx.uop.getText, getExpr(ctx.exp)))
   override def exitExpBop(ctx: BilParser.ExpBopContext): Unit = exprs.put(ctx, new BinOp(ctx.bop.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
+<<<<<<< HEAD:src/main/scala/translating/StatementLoader.scala
   override def exitVar(ctx: BilParser.VarContext): Unit = exprs.put(ctx, new Register(ctx.getText, varSizes.get(ctx.getText)))
+=======
+  override def exitVar(ctx: BilParser.VarContext): Unit = exprs.put(ctx, new Var(ctx.getText, varSizes.get(ctx.getText)))
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65:src/main/scala/translating/StatementLoader.scala
   override def exitExpVar(ctx: BilParser.ExpVarContext): Unit = exprs.put(ctx, exprs.get(ctx.`var`))
   override def exitExpLiteral(ctx: BilParser.ExpLiteralContext): Unit = exprs.put(ctx, Literal(ctx.literal.getText))
   override def exitExpExtract(ctx: BilParser.ExpExtractContext): Unit = {
@@ -220,6 +265,10 @@ class StatementLoader() extends BilBaseListener {
 
   override def exitLpred(ctx: BilParser.LpredContext): Unit = (getExpr(ctx.`var`), getPred(ctx.pred)) match {
     case (v: Register, p: Pred) => lPreds.put(v, p)
+  }
+
+  override def exitLpred(ctx: BilParser.LpredContext): Unit = (getExpr(ctx.`var`), getPred(ctx.pred)) match {
+    case (v: Var, p: Pred) => lPreds.put(v, p)
   }
   
   private def uniquePc () =

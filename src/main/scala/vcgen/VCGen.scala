@@ -1,7 +1,11 @@
 package vcgen
 
+<<<<<<< HEAD
 import astnodes.exp.`var`.{MemLoad, Register}
 import astnodes.exp.{Expr, Literal}
+=======
+import astnodes.exp.{Expr, Literal, MemLoad, Var}
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
 import astnodes.stmt.assign.{Assign, GammaUpdate, MemAssign, RegisterAssign}
 import astnodes.stmt.{Assert, CJmpStmt, Stmt}
 import translating.FlowGraph
@@ -14,7 +18,11 @@ object VCGen {
   def genVCs(state: State): State = {
     state.copy(functions = state.functions.map(f =>
       f.copy(labelToBlock = f.labelToBlock.map {
+<<<<<<< HEAD
         case (pc, b) => (pc, b.copy(lines = b.lines.flatMap(line => List(Assert("TODO", genVC(line, f, state)), line) ++ genGammaUpdate(line, state))))
+=======
+        case (pc, b) => (pc, b.copy(lines = b.lines.flatMap(line => List(line, Assert("TODO", genVC(line, f, state))) ++ genGammaUpdate(line))))
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
       })
     ))
   }
@@ -26,11 +34,19 @@ object VCGen {
     case assign: RegisterAssign => Bool.True // will need to add rely/guar later
     // TODO for each part
     case assign: MemAssign =>
+<<<<<<< HEAD
       assign.lhs.onStack match {
         case true  => Bool.True // these are thread local
         case false =>
           // TODO need to be careful bc these could be global or thead local (if they are in the GOT)
           BinOp(BinOperator.Implication, assign.lhs.toL, computeGamma(assign.rhs, state))
+=======
+      assign.memExp.onStack match {
+        case true  => Bool.True // these are thread local
+        case false =>
+          // TODO need to be careful bc these could be global or thead local (if they are in the GOT)
+          BinOp(BinOperator.Implication, assign.memExp.toL, computeGamma(assign.rhsExp))
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
         // Use the GOT/ST to get the exact variable being referenced, except if it uses pointer arithmetic etc etc
         // would be interesting to see if making the substitution actually made a meaningful difference
       }
@@ -38,6 +54,7 @@ object VCGen {
     case _         => Bool.True // TODO
   }
 
+<<<<<<< HEAD
   /** Compute the gamma value for an expression
    */
   def computeGamma(expr: Expr, state: State) = expr.vars.map{
@@ -50,6 +67,18 @@ object VCGen {
   def genGammaUpdate(stmt: Stmt, state: State): Option[Stmt] = stmt match {
     case assign: Assign => Some(GammaUpdate(assign.lhs.toGamma, computeGamma(assign.rhs, state)))
     // case assign: RegisterAssign => Some(GammaUpdate(assign.lhs.toGamma, computeGamma(assign.rhs, state)))
+=======
+  // def computeGamma(expr: Expr) = expr.vars.map(v => v.toGamma).asInstanceOf[List[Pred]].conjunct
+  def computeGamma(expr: Expr) = expr.vars.map{
+    case v: Var => v.toGamma
+    case l: MemLoad => l.toGamma
+  }.conjunct
+    // Bool.True // expr.vars.map(v => BinOp("&&", v.toGamma, state.getL(v))).conjunct
+
+  def genGammaUpdate(stmt: Stmt): Option[Stmt] = stmt match {
+    case assign: MemAssign => Some(GammaUpdate(assign.memExp.toGamma, computeGamma(assign.rhs)))
+    case assign: RegisterAssign => Some(GammaUpdate(assign.lhsExp.toGamma, computeGamma(assign.rhs)))
+>>>>>>> 157a6a8eaa3d618e175e798e48b4b3cd70632d65
     case _ => None
   }
 }
