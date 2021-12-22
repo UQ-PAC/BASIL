@@ -48,16 +48,23 @@ import collection.JavaConverters.*
             val toRemove : immutable.Set[String] = immutable.Set()
             val pending : immutable.Set[String] = immutable.Set()
             var worklist: BlockWorklist = BlockWorklist(Set(ConstantPropagationAnalysis(new 
-                mutable.HashMap[Var, String](), toRemove, pending)), flowGraph);
+                mutable.HashMap[Expr, String](), toRemove, pending)), flowGraph);
+            worklist.printAllLinesWithLabels;
             worklist.analyseFromMain;
-            println(worklist.getAllStates);
+            System.out.println("left worklist")
+//            println(worklist.getAllStates);
+            worklist.printAllStates
             
-            val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener.symbolTable);
+            val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", symsListener
+              .symbolTable, worklist.finalAnalysedStmtInfo);
             val updatedFlowGraph = translator.translate();
+            System.out.println("left translator")
 
             val state = State(updatedFlowGraph, Bool.True, Bool.False, Map.empty, Map.empty)
             val vc = VCGen.genVCs(state)
+            System.out.println("left vcgen")
             writeToFile(vc)
+            System.out.println("wrote to file")
         } else {
             println("Output failed")
         }

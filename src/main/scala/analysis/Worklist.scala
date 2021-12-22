@@ -39,6 +39,25 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
     def getAllStates: Map[Stmt, Set[AnalysisPoint]] = {
         finalAnalysedStmtInfo;
     }
+    
+    def printAllLinesWithLabels: Unit = {
+        controlFlow.getLines.forEach(line => {
+            System.out.println(line.getLabel.getPc + " " + line)
+        })
+    }
+    
+    def printAllStates: Unit = {
+        finalAnalysedStmtInfo.foreach(point => {
+            System.out.println(point._1)
+            point._2.foreach(analyses => {
+                if (analyses.isInstanceOf[ConstantPropagationAnalysis]) {
+                    analyses.asInstanceOf[ConstantPropagationAnalysis].state.foreach(varConstraint => {
+                        System.out.println(varConstraint._1.toString + " : " + varConstraint._2)
+                    })
+                }
+            })
+        })
+    }
 
     def getOneState(stmt: Stmt): Set[AnalysisPoint] = {
         finalAnalysedStmtInfo.getOrElse(stmt, createAnalysisEmpty);
@@ -75,23 +94,29 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
         var currentFunctionAnalysedInfo: Map[Stmt, Set[AnalysisPoint]] = Map();
         
         while(!currentWorkListQueue.isEmpty) {
+            println("wl still not empty")
             var nextBlockToAnalyse: Block = currentWorkListQueue.removeHead();
             
             // for blocks *with* parents (i.e. not function start blocks) we take the previous state to be the union
             // of all parents' final states.
             if (!findBlockParents(nextBlockToAnalyse).isEmpty) {
+                println("has parents")
                 previousStmtAnalysisState = createAnalysisEmpty;
 
                 findBlockParents(nextBlockToAnalyse).foreach(nextBlockToAnalyseParent => {
+                    println("next parent")
                     var nextBlockToAnalyseParentFinalState: Set[AnalysisPoint] = allBlockFinalAnalysisStates.getOrElse(nextBlockToAnalyseParent, Set());
 
                     // for every parent final state
                     nextBlockToAnalyseParentFinalState.foreach(nextBlockToAnalyseParentPoint => {
+                        println("next parent analysis point")
                         var analysisFound: Boolean = false;
 
                         // for every current final state
                         previousStmtAnalysisState.foreach(previousStmtAnalysisPoint => {
+                            println("next prev stmt analysis point")
                             if (previousStmtAnalysisPoint.getClass == nextBlockToAnalyseParentPoint.getClass) {
+                                println("found analysis point")
 
                                 previousStmtAnalysisState.remove(previousStmtAnalysisPoint);
                                 previousStmtAnalysisState.add(previousStmtAnalysisPoint.union(nextBlockToAnalyseParentPoint));
@@ -102,8 +127,11 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
                         
                         // if there's no matches, then add it
                         if (!analysisFound) {
+                            println("analysis was not found")
                             previousStmtAnalysisState.add(nextBlockToAnalyseParentPoint);
                         }
+
+                        println("finished analysing")
                     });
                 });
             }
@@ -134,6 +162,8 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
         });
         
         var currentFinalBlockState = allBlockFinalAnalysisStates.getOrElse(blockToWorkOn, null);
+        
+        println("in work on block")
 
         if (currentFinalBlockState != null) {
             if (!(currentFinalBlockState.toString == previousStmtAnalysisState.toString)) { // TODO: fix this to be not string comparison
@@ -165,6 +195,8 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
                 }
             });
         }
+
+        println("out work on block")
     }
 
     /**
@@ -174,7 +206,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
      */
     def workOnStmt(singleStmt: Stmt, functionAnalysedInfo: Map[Stmt, Set[AnalysisPoint]]): Unit = {
         println("analysing stmt: " + singleStmt.toString);
-        println(previousStmtAnalysisState);
+//        println(previousStmtAnalysisState);
         print("\n\n");
 
         var newAnalysedPoint: Set[AnalysisPoint] = Set[AnalysisPoint]();
@@ -193,6 +225,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
                 previousStmtAnalysisState.foreach(p => {
                     newAnalysedPoint.add(p.transfer(singleStmt));
                 });
+                println("in workOnStmt")
 
                 // if anything already exists for this stmt, replace it.
                 if (functionAnalysedInfo.getOrElse(singleStmt, null) != null) {

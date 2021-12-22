@@ -1,5 +1,6 @@
 package translating
 
+import analysis.*
 import astnodes.exp.{Expr, Literal, MemLoad, Var}
 import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
 import astnodes.stmt.*
@@ -7,10 +8,9 @@ import astnodes.parameters.{InParameter, OutParameter}
 import astnodes.Label
 import translating.FlowGraph
 
-import scala.collection.mutable.HashSet
+import scala.collection.mutable.{HashSet, Map, Set}
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.collection.immutable
-// import java.util
 import java.util.stream.Collectors
 import java.util.{ArrayList, HashMap, HashSet, LinkedList, List, Map, Objects, Set}
 import scala.collection.mutable
@@ -18,7 +18,8 @@ import scala.jdk.CollectionConverters.*
 import util.AssumptionViolationException
 
 // TODO rewrite this file to make the flowGraph immutable (this should make whats happening a bit more transparent)
-class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable: mutable.Map[Literal, Var]) {
+class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable: mutable
+.Map[Literal, Var], analysisStmtInfo: mutable.Map[Stmt, scala.collection.mutable.Set[AnalysisPoint]]) {
   private var uniqueInt = 0;
 
   /** Starting point for a BIL translation.
@@ -29,14 +30,45 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     identifyImplicitParams()
     resolveInParams()
     resolveOutParams()
-    // TODO this doesnt work: resolveVars()
-//    resolveVars()
     addVarDeclarations()
     // TODO could turn this on later:  replaceGlobalVars(symbolTable)
     // TODO vcgen happens here
     // writeToFile()
+    // TODO this doesnt work: resolveVars()
+    resolveVars()
+    printAllLines()
 
     flowGraph;
+  }
+  
+  private def printAllLines(): Unit = {
+    flowGraph.getLines.forEach(line => {
+      line match {
+        case memAssign : MemAssign => {
+          System.out.println("MemAssign: " + line)
+        } case regAssign : RegisterAssign => {
+          System.out.println("RegisterAssign: " + line)
+        } case assert : Assert => {
+          System.out.println("Assert: " + line)
+        } case callStmt : CallStmt => {
+          System.out.println("CallStmt: " + line)
+        } case cJumpStmt : CJmpStmt => {
+          System.out.println("CJumpStmt: " + line)
+        } case enterSub : EnterSub => {
+          System.out.println("EnterSub: " + line)
+        } case exitSub : ExitSub => {
+          System.out.println("ExitSub: " + line)
+        } case initStmt : InitStmt => {
+          System.out.println("InitStmt: " + line)
+        } case jmpStmt : JmpStmt => {
+          System.out.println("MemAssign: " + line)
+        } case skipStmt : SkipStmt => {
+          System.out.println("MemAssign: " + line)
+        } case _ => {
+          System.out.println("Other: " + line)
+        }
+      }
+    })
   }
 
   private def createLabels(): Unit = {
@@ -242,8 +274,28 @@ class BoogieTranslator(flowGraph: FlowGraph, outputFileName: String, symbolTable
     )
 
   private def resolveVars(): Unit = {
-    val CP = new ConstantPropagation(flowGraph)
-    CP.foldVariables()
+//    val CPStmtAnalysis = getCPAnalysis()
+//    var prevStmtState : ConstantPropagationAnalysis = null
+//
+//    flowGraph.getLines.forEach(stmt => {
+//      prevStmtState.state.foreach(constraint => {
+//        if (stmt.isInstanceOf[])
+//      })
+//    })
+  }
+  
+  private def getCPAnalysis(): mutable.Map[Stmt, ConstantPropagationAnalysis] = {
+    val CPMap = new mutable.HashMap[Stmt, ConstantPropagationAnalysis]()
+    
+    analysisStmtInfo.foreach(entry => {
+      entry._2.foreach(analysisPoint => {
+        if (analysisPoint.isInstanceOf[ConstantPropagationAnalysis]) {
+          CPMap.put(entry._1, analysisPoint.asInstanceOf[ConstantPropagationAnalysis])
+        }
+      })
+    })
+    
+    CPMap
   }
 
   // TODO this should be changed to use a fixed-point algorithm (to make it more accurate)

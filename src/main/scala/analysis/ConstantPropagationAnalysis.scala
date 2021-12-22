@@ -9,10 +9,10 @@ import scala.collection.mutable.HashMap
 import scala.util.control.Breaks
 
 // TODO: does not have to take this map?
-class ConstantPropagationAnalysis(constraints: HashMap[Var, String], toRemove: Set[String],
+class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: Set[String],
                                   pendingRemoval: Set[String]) extends AnalysisPoint {
 
-  val state : HashMap[Var, String] = constraints
+  val state : HashMap[Expr, String] = constraints
   val stmtsToRemove : Set[String] = toRemove
   val stmtsPendingRemoval : Set[String] = pendingRemoval
   
@@ -22,15 +22,23 @@ class ConstantPropagationAnalysis(constraints: HashMap[Var, String], toRemove: S
     * @param stmt
     */
   override def transfer(stmt: Stmt): AnalysisPoint = {
-    
-    val newState : HashMap[Var, String] = state.clone()
+    System.out.println("in transfer")
+    val newState : HashMap[Expr, String] = state.clone()
     
     stmt match {
-      case assignStmt : Assign => {
-        newState.update(new Var(assignStmt.getLhs.asInstanceOf[Var].toString), assignStmt.getLabel
-          .getPc)
-      } case _ => {}
+      case memAssignStmt : MemAssign => {
+        System.out.println("in mem assign")
+        newState.update(memAssignStmt.getLhs.asInstanceOf[MemLoad], memAssignStmt.getLabel.getPc)
+      } case regAssignStmt : RegisterAssign => {
+        System.out.println("in reg assign")
+        newState.update(regAssignStmt.getLhs.asInstanceOf[Var], regAssignStmt.getLabel.getPc)
+      }
+      case _ => {
+        System.out.println("elsewhere")
+      }
     }
+
+    System.out.println("out transfer")
     
     new ConstantPropagationAnalysis(newState, toRemove, pendingRemoval)
   }
@@ -46,6 +54,7 @@ class ConstantPropagationAnalysis(constraints: HashMap[Var, String], toRemove: S
   }
 
   private def countEdges: Int = {
+//    System.out.println("in countEdges")
     var count: Int = 0;
     state.values.foreach(expr => {
       if (expr != null) count += 1;
@@ -54,7 +63,8 @@ class ConstantPropagationAnalysis(constraints: HashMap[Var, String], toRemove: S
   }
 
   override def createLowest: AnalysisPoint = {
-    new ConstantPropagationAnalysis(new HashMap[Var, String], Set(), Set())
+//    System.out.println("in createLowest")
+    new ConstantPropagationAnalysis(new HashMap[Expr, String], Set(), Set())
   }
 
   override def equals(other: AnalysisPoint): Boolean = {
@@ -76,9 +86,10 @@ class ConstantPropagationAnalysis(constraints: HashMap[Var, String], toRemove: S
     * @return
     */
   override def intersection(other: AnalysisPoint): AnalysisPoint = {
+//    System.out.println("in intersection")
     val otherAsThis : ConstantPropagationAnalysis = typeCheck(other)
     
-    val newState = new HashMap[Var, String]()
+    val newState = new HashMap[Expr, String]()
     val newRemove : Set[String] = Set()
     val newPending : Set[String] = Set()
     
@@ -101,9 +112,10 @@ class ConstantPropagationAnalysis(constraints: HashMap[Var, String], toRemove: S
     * @return
     */
   override def union(other: AnalysisPoint): AnalysisPoint = {
+    System.out.println("in union")
     val otherAsThis : ConstantPropagationAnalysis = typeCheck(other)
 
-    val newState = new HashMap[Var, String]()
+    val newState = new HashMap[Expr, String]()
     val newRemove : Set[String] = Set()
     val newPending : Set[String] = Set()
     
@@ -111,17 +123,26 @@ class ConstantPropagationAnalysis(constraints: HashMap[Var, String], toRemove: S
 
     var contains : Boolean = false
     state.foreach(entry => {
+      println(entry)
       if (otherAsThis.state.contains(entry._1)) {
+        println(otherAsThis.state.get(entry._1))
+        println("in")
         contains = true
-        
-        if (entry._2 == null && otherAsThis.state.get(entry._1) == null) {
-          newState.put(entry._1, null)
+
+        if (entry._2 == null) {
+          newState.put(entry._1, otherAsThis.state.getOrElse(entry._1, null))
+        } else if (otherAsThis.state.get(entry._1) == null) {
+          newState.put(entry._1, entry._2)
         } else if (entry._2.equals(otherAsThis.state.get(entry._1))) {
+          println("in 2")
           newState.put(entry._1, entry._2)
         } else if (!entry._2.equals(otherAsThis.state.get(entry._1))) {
+          println("in 3")
           newState.put(entry._1, null)
         }
       }
+
+      println("left")
       
       if (!contains) {
         newState.put(entry._1, entry._2)
@@ -129,11 +150,13 @@ class ConstantPropagationAnalysis(constraints: HashMap[Var, String], toRemove: S
     })
 
     otherAsThis.state.foreach(entry => {
+      println("for each other constraint")
       if (!newState.contains(entry._1) && !state.contains(entry._1)) {
         newState.put(entry._1, entry._2)
       }
     })
 
+    println("out union")
     new ConstantPropagationAnalysis(newState, newRemove, newPending)
   }
 }

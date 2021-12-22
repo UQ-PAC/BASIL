@@ -31,8 +31,8 @@ class FunctionalTests:
     walker.walk(statementLoader, b)
     // translate
     val flowGraph = FlowGraph.fromStmts(stmts.asJava)
-    val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", new mutable.HashMap())
-    translator.translate()
+//    val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl", new mutable.HashMap())
+//    translator.translate()
 
   @Test def cjump(): Unit =
     try {
