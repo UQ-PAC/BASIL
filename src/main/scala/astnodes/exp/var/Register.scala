@@ -1,7 +1,7 @@
-package astnodes.exp.`var`;
+package astnodes.exp.`var`
 
-import astnodes.exp.{Expr, `var`};
-import astnodes.pred;
+import astnodes.exp.{Expr, `var`}
+import astnodes.pred
 
 import java.util
 import java.util.Objects

@@ -1,7 +1,7 @@
 package astnodes.parameters;
 
-import astnodes.exp.var.MemLoad;
 import astnodes.exp.var.Register;
+import astnodes.exp.var.MemLoad;
 
 public class InParameter extends Parameter {
 

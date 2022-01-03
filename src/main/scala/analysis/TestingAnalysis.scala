@@ -2,7 +2,6 @@ package analysis;
 
 import analysis.AnalysisPoint;
 import astnodes.stmt.*;
-import astnodes.stmt.assign.*;
 
 /**
  * Dummy "testing analysis" - keeps track of all the statements that it's seen so far, as a list.
@@ -17,7 +16,7 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
 
     override def equals(other: AnalysisPoint): Boolean = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
-        currentState.equals(otherAsThis.currentState);
+        this.toString == otherAsThis.toString;
     }
 
     override def compare(other: AnalysisPoint): Int = {
@@ -29,18 +28,25 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
     override def union(other: AnalysisPoint): AnalysisPoint = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
-        TestingAnalysis(currentState.union(otherAsThis.currentState));
+        new TestingAnalysis(currentState.union(otherAsThis.currentState));
     }
 
     override def intersection(other: AnalysisPoint): AnalysisPoint = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
-        TestingAnalysis(currentState.intersect(otherAsThis.currentState));
+        new TestingAnalysis(currentState.intersect(otherAsThis.currentState));
     }
 
     override def transfer(stmt: Stmt): AnalysisPoint = {
         var newState: Set[Stmt] = Set();
         stmt match {
+            case callStmt: CallStmt => {
+                if (!currentState.contains(stmt)) {
+                    newState = currentState ++ Set(stmt);
+                } else {
+                    newState = currentState;
+                }
+            }
             case _ => {
                 if (!currentState.contains(stmt)) {
                     newState = currentState ++ Set(stmt);
@@ -50,11 +56,11 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
             };
         }
 
-        TestingAnalysis(newState);
+        new TestingAnalysis(newState);
     }
 
     override def createLowest: AnalysisPoint = {
-        TestingAnalysis(Set());
+        new TestingAnalysis(Set());
     }
 
     override def toString: String = {

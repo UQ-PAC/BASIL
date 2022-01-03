@@ -3,7 +3,7 @@ package astnodes.pred
 import astnodes.exp.`var`.{MemLoad, Register, Var}
 
 trait Pred {
-  def vars: List[Var | MemLoad]  // TODO
+  def vars: List[Var]
   def toBoogieString = toString
 }
 

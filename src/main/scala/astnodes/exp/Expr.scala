@@ -1,6 +1,6 @@
 package astnodes.exp
 
-import astnodes.exp.`var`.{MemLoad, Register, Var}
+import astnodes.exp.'var'.Var
 
 import java.util
 
@@ -22,8 +22,8 @@ trait Expr {
   def size: Option[Int]
   
   def contains(expr: Expr): Boolean = {
-    if (getChildren.size() > 0) {
-      getChildren.forEach(child => {
+    if (vars.size > 0) {
+      vars.foreach(child => {
         return child.contains(expr)
       })
     } else {

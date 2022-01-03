@@ -2,22 +2,25 @@ package translating
 
 import analysis.*
 import astnodes.exp.{Expr, Literal, MemLoad, Var}
+import astnodes.exp.{BinOp, BinOperator, Concat, Expr, Literal, MemStore, UniOp, UniOperator}
 import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
 import astnodes.stmt.*
 import astnodes.parameters.{InParameter, OutParameter}
 import astnodes.Label
 import astnodes.exp.`var`.*;
+import astnodes.exp.`var`.{MemLoad, Register, Var}
 import translating.FlowGraph
 import vcgen.{FunctionState, State}
 
 import scala.collection.mutable.{HashSet, Map, Set}
 import java.io.{BufferedWriter, FileWriter, IOException}
+import scala.collection.{immutable, mutable}
 import scala.collection.immutable
 import java.util.stream.Collectors
 import java.util.{ArrayList, HashMap, HashSet, LinkedList, List, Map, Objects, Set}
 import scala.collection.mutable
-import scala.jdk.CollectionConverters.*
 import util.AssumptionViolationException
+import scala.jdk.CollectionConverters._
 
 
 /** Methods to perform the translation from BIL to the IR.
@@ -263,6 +266,43 @@ object BoogieTranslator {
 
     state
   }
+
+  private def computeLiteral(exp: Expr): String = exp.toString
+
+  // recursively replaces all children of this fact which match the given fact, with the other given fact
+  // works because getChildren returns ExpFacts and ExpFacts override equals(), unlike InstFacts which are inherently
+  // unique
+  // TODO this operators on stmts and expr
+  // TODO move this to the classes (i.e. to stmt and expr)
+  private def replaceAllMatchingChildren(parent: Stmt, oldExp: Expr, newExp: Expr): Unit = {
+    parent.getChildren.forEach((child: Expr) => replaceAllMatchingChildren(child, oldExp, newExp))
+    parent.replace(oldExp, newExp)
+  }
+
+  private def replaceAllMatchingChildren(parent: Expr, oldExp: Expr, newExp: Expr): Unit = {
+    parent.getChildren.forEach((child: Expr) => replaceAllMatchingChildren(child, oldExp, newExp))
+    parent.replace(oldExp, newExp)
+  }
+
+  /**
+    * Where possible resolves global variables in the heap to their variable name
+    */
+  /*
+  private def replaceGlobalVars (symbolTable: mutable.Map[Literal, Var]): Unit = {
+    flowGraph.getFunctions.forEach(func => {
+      func.getBlocks.forEach(block => {
+        block.setLines(block.getLines.stream.map {
+              // TODO fix when we can match on m as well
+              // TODO this wont work until we have working constant proportation
+          case MemAssign(pc, MemLoad(l : Literal), e) if (!m.onStack) =>
+            RegisterAssign(pc, symbolTable.getOrElse(l, throw new AssumptionViolationException("Expected to find global variable in symbol table")), e)
+          case x => x
+        }.collect(Collectors.toList))
+      })
+    })
+
+  }
+  */
 
   /**
     * Infers the bv sizes for constants

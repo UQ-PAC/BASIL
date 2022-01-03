@@ -1,7 +1,7 @@
-package astnodes.exp.`var`;
+package astnodes.exp.`var`
 
-import astnodes.pred;
-import astnodes.exp.*;
+import astnodes.exp.*
+import astnodes.pred
 
 import java.util.Collections
 

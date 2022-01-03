@@ -21,7 +21,6 @@ import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, Termi
 import FlowGraph.Function
 import astnodes.pred
 import BilParser.*
-import astnodes.*;
 import astnodes.exp.`var`.{MemLoad, Register}
 import astnodes.pred.{Bool, ExprComp, High, Low, Pred, Security}
 import vcgen.State
@@ -95,7 +94,6 @@ class StatementLoader() extends BilBaseListener {
     this.currentFunction = function
   }
   override def exitParamTypes(ctx: BilParser.ParamTypesContext): Unit = {
-    // TODO this seems quite fickle
     val id = ctx.param.getText // human-readable name
     val variable = ctx.`var`.getText // some register, probably
 
