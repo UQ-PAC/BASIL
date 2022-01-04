@@ -42,6 +42,7 @@ object FlowGraph {
 
   class Function(val header: EnterSub, val blocks: List[FlowGraph.Block]) {
     private val initStmts = new LinkedList[InitStmt]
+    // TODO should automatically generate these
     initStmts.add(new InitStmt(Register("ZF", -1 ), "ZF", "bv1"))
     initStmts.add(new InitStmt(Register("CF", -1 ), "CF", "bv1"))
     initStmts.add(new InitStmt(Register("NF", -1 ), "NF", "bv1"))

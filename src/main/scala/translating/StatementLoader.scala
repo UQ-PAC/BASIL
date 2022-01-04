@@ -70,8 +70,11 @@ class StatementLoader() extends BilBaseListener {
   private def setVarSize(name: String, rhs: Expr) = {
     if (!varSizes.contains(name)) {
       if (name.charAt(0) == 'R') varSizes(name) = 64
-      else if (name.charAt(0) == '#') varSizes(name) = rhs.size.get
+      else if (name.charAt(0) == '#') 
+        println((name, rhs, rhs.size.get))
+        varSizes(name) = rhs.size.get
       else if (name == "NF" || name == "ZF" || name == "CF" || name == "VF") varSizes(name) = 1
+      else if (name == "SP" || name == "FP" || name == "LR") varSizes(name) = 64
       else ???
     }
   }
@@ -100,10 +103,10 @@ class StatementLoader() extends BilBaseListener {
     val id = ctx.param.getText // human-readable name
     val variable = ctx.`var`.getText // some register, probably
 
-    val size = 64
+    val size = typeToSize(ctx.nat.getText)
 
     // TODO it would be good to instead use in/out but what is in out
-    if (id.contains("result")) currentFunction.setOutParam(new OutParameter(Register(variable, size), Register(variable, size)))
+    if (id.contains("result")) currentFunction.setOutParam(new OutParameter(Register(id, size), Register(variable, 64)))
     else currentFunction.getInParams.add(new InParameter(Register(id, size), Register(variable, size)))
   }
 
@@ -156,7 +159,7 @@ class StatementLoader() extends BilBaseListener {
       stmts += new CJmpStmt(address, target, "TODO", cond) // TODO set up false GOTO
     } else if (ctx.call != null) { // statement is a call
       if (ctx.call.functionName == null) { // occasionally this occurs with "call LR with no return" lines
-        stmts += new ExitSub(ctx.addr.getText)
+        stmts += new ExitSub(ctx.addr.getText, None)
       } else {
         val funcName = ctx.call.functionName.getText
         stmts += new CallStmt(address, funcName, Option(ctx.call.returnaddr.addr).map(_.getText), List(), None)

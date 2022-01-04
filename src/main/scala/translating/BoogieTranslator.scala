@@ -15,6 +15,7 @@ import scala.collection.{immutable, mutable}
 import scala.collection.mutable
 import util.AssumptionViolationException
 import scala.jdk.CollectionConverters._
+import astnodes.exp.Extract
 
 
 /** Methods to perform the translation from BIL to the IR.
@@ -22,7 +23,7 @@ import scala.jdk.CollectionConverters._
 object BoogieTranslator {
   /** Peforms the BIL to IR translation
    */
-  def translate(state: State): State = inferConstantTypes(addVarDeclarations(resolveOutParams(resolveInParams(identifyImplicitParams(optimiseSkips(createLabels(state)))))))
+  def translate(state: State): State = inferConstantTypes(addVarDeclarations(addAssignBeforeReturn(identifyImplicitParams(optimiseSkips(createLabels(state))))))
 
   /** Update all lines by applying the given function */
   private def updateAllLines(state: State, fn: Stmt => Stmt): State = updateAllLines(state, PartialFunction.fromFunction(fn))
@@ -183,6 +184,7 @@ object BoogieTranslator {
           ) {
             vars.add(lhs)
           }
+        case CallStmt(_, _, _, _, Some(x)) => vars.add(x)
         case _ =>
       }
     }
@@ -208,6 +210,7 @@ object BoogieTranslator {
     }))
   }
 
+  // TODO this is wrong, so identifyImplicitParams is wrong..
   private def isRegister(varFact: Register): Boolean = varFact.name.charAt(0) == 'X'
 
   /** Resolves outParams by crudely replacing all references to their associated register with their human-readable
@@ -230,6 +233,17 @@ object BoogieTranslator {
 
     state
   }
+
+  private def addAssignBeforeReturn(state: State): State = state.copy(functions = state.functions.map(f => 
+    f.copy(labelToBlock = f.header.getOutParam match {
+      case Some(outParam) => f.labelToBlock.map{
+        case (l, b) => (l, b.copy(lines = b.lines.flatMap{
+          case c: ExitSub => List(RegisterAssign("generatedline", outParam.getName, Extract(outParam.getName.size.get - 1, 0, outParam.getRegister)), c)
+          case x => List(x)
+        }))
+      }
+      case None => f.labelToBlock
+  })))
 
   /**
     * Infers the bv sizes for constants
