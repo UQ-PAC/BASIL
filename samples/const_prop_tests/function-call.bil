@@ -1,0 +1,34 @@
+00000516: program
+00000511: sub func(func_result)
+00000528: func_result :: out u32 = X0
+
+0000020a:
+00000212: SP := SP - 0x10
+00000219: X0 := 7
+00000220: mem := mem with [SP + 0xC, el]:u32 <- low:32[X0]
+00000229: SP := SP + 0x10
+0000022f: call LR with noreturn
+
+00000512: sub main(main_argc, main_argv, main_result)
+00000529: main_argc :: in u32 = X0
+0000052a: main_argv :: in out u64 = X1
+0000052b: main_result :: out u32 = X0
+
+000001cf:
+000001d4: mem := mem with [SP - 0x20, el]:u64 <- FP
+000001d9: mem := mem with [SP - 0x18, el]:u64 <- LR
+000001de: SP := SP - 0x20
+000001e5: FP := SP
+000001ec: mem := mem with [SP + 0x18, el]:u32 <- 0
+000001f3: X0 := pad:64[mem[SP + 0x18, el]:u32]
+000001fa: X0 := X0 + 1
+00000201: mem := mem with [SP + 0x1C, el]:u32 <- low:32[X0]
+00000207: LR := 0x738
+0000020c: call @func with return %0000035e
+
+0000035e:
+00000363: X0 := 0
+0000036a: FP := mem[SP, el]:u64
+0000036f: LR := mem[SP + 8, el]:u64
+00000374: SP := SP + 0x20
+0000037a: call LR with noreturn

@@ -1,12 +1,14 @@
 package analysis
 
-import astnodes.exp.*
-import astnodes.stmt.*
-import astnodes.stmt.assign.*
+import java.util.List
 
 //import scala.collection.mutable
 import scala.collection.mutable.HashMap
 import scala.util.control.Breaks
+import scala.astnodes.exp.*
+import scala.astnodes.stmt.*
+import scala.astnodes.stmt.assign.*
+import scala.translating.FlowGraph
 
 // TODO: does not have to take this map?
 class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: Set[String],
@@ -15,6 +17,29 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
   val state : HashMap[Expr, String] = constraints
   val stmtsToRemove : Set[String] = toRemove
   val stmtsPendingRemoval : Set[String] = pendingRemoval
+
+  def resolveVar(stmt: Stmt, flowgraph: Flowgraph): Unit = {
+    if (stmtsToRemove.contains(stmt.getLabel.getPc)) {
+      flowgraph.removeLine(stmt)
+    } else {
+      state.foreach(entry => {
+        if (stmt.isInstanceOf[Assign]) {
+          val newExpr = findInstFromPc(flowgraph.getLines, entry._2).getRhs
+          stmt.replace(entry._1, newExpr)
+        }
+      })
+    }
+  }
+
+  private def findInstFromPc(lines: List[Stmt], pc: String): Assign = {
+    var inst : Stmt = null
+    lines.forEach(line => {
+      if (line.getLabel.getPc.equals(pc)) {
+        inst = line
+      }
+    })
+    inst.asInstanceOf[Assign]
+  }
   
   /**
     * Handle each type of statement.

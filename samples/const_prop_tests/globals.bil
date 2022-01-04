@@ -1,0 +1,33 @@
+00000549: program
+00000545: sub main(main_argc, main_argv, main_result)
+0000055b: main_argc :: in u32 = X0
+0000055c: main_argv :: in out u64 = X1
+0000055d: main_result :: out u32 = X0
+
+000001cf:
+000001d4: SP := SP - 0x10
+000001db: X0 := 0x11000
+000001e2: X0 := X0 + 0x18
+000001e9: X0 := pad:64[mem[X0, el]:u32]
+000001f0: X1 := X0 + 2
+000001f7: X0 := 0x11000
+000001fe: X0 := X0 + 0x18
+00000205: mem := mem with [X0, el]:u32 <- low:32[X1]
+0000020c: X0 := 0x11000
+00000213: X0 := X0 + 0x10
+0000021a: X0 := pad:64[mem[X0, el]:u32]
+00000221: X1 := X0 + 1
+00000228: X0 := 0x11000
+0000022f: X0 := X0 + 0x10
+00000236: mem := mem with [X0, el]:u32 <- low:32[X1]
+0000023d: X0 := 0x11000
+00000244: X0 := X0 + 0x18
+0000024b: X1 := pad:64[mem[X0, el]:u32]
+00000252: X0 := 0x11000
+00000259: X0 := X0 + 0x10
+00000260: X0 := pad:64[mem[X0, el]:u32]
+00000267: X0 := X1 + X0
+0000026e: mem := mem with [SP + 0xC, el]:u32 <- low:32[X0]
+00000275: X0 := 0
+0000027c: SP := SP + 0x10
+00000282: call LR with noreturn

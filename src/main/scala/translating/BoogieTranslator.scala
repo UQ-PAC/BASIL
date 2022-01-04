@@ -30,6 +30,9 @@ object BoogieTranslator {
    */
   def translate(state: State): State = inferConstantTypes(addVarDeclarations(resolveOutParams(resolveInParams(identifyImplicitParams(optimiseSkips(createLabels(state)))))))
 
+  /**
+   * delete later
+   */
   private def printAllLines(): Unit = {
     flowGraph.getLines.forEach(line => {
       line match {

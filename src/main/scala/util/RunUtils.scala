@@ -1,14 +1,11 @@
 package util
 
-import BilParser.{BilLexer, BilParser, SymsLexer, SymsParser}
-import astnodes.pred.Bool
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
-import vcgen.{State, VCGen}
 
 import java.io.{BufferedWriter, FileWriter, IOException}
 import collection.JavaConverters.*
+import scala.collection.immutable.HashMap
 
 object RunUtils {
 
@@ -49,6 +46,11 @@ object RunUtils {
     )
 
     val updatedState = BoogieTranslator.translate(state)
+    val worklist = InlineWorklist(new ConstantPropagationAnalysis(new HashMap[Expr, String](),
+      Set(), Set()))
+    worklist.printAllLinesWithLabels
+    worklist.analyseFromMain
+    worklist.printAllLinesWithLabels
 
     VCGen.genVCs(updatedState)
   }

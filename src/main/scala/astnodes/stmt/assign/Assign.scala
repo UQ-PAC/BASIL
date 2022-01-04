@@ -16,4 +16,11 @@ trait Assign (override val pc: String, val lhs: Var, val rhs: Expr) extends Stmt
     case lhsRes: MemLoad => MemAssign(pc, lhsRes, rhs.subst(v,w))
     case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs = rhs.subst(v,w))
   }
+
+  def getLhs: Var = lhs
+  def getRhs: Expr = rhs
+
+  def replace(oldExpr: Expr, newExpr: Expr): Unit = {
+    rhs.subst(oldExpr, newExpr)
+  }
 }

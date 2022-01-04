@@ -20,7 +20,6 @@ import astnodes.exp.*
 
 import collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
-import collection.JavaConverters.*
 import sys.process.*
 import scala.language.postfixOps
 

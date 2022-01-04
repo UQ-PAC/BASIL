@@ -70,6 +70,11 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
      */
     def analyseFromMain = {
         workOnFunction("main");
+        if (analysis.isInstanceOf[ConstantPropagationAnalysis]) {
+            finalAnalysedStmtInfo.foreach(entry => {
+                entry._2.resolveVars(entry._1, controlFlow)
+            })
+        }
         finish;
     }
 
