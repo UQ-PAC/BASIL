@@ -70,7 +70,6 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
 
     override def transfer(stmt: Stmt): AnalysisPoint = {
         var newAnalysedMap: Map[Expr, Set[Expr]] = currentState;
-        println(stmt);
         stmt match {
             case assignStmt: Assign => {
                 var locationValue: Set[Expr] = null;

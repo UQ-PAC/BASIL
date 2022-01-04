@@ -51,7 +51,7 @@ object RunUtils {
 
     val updatedState = BoogieTranslator.translate(state)
 
-    var worklist: InlineWorklist = InlineWorklist(TestingAnalysis(), flowGraph);
+    var worklist: InlineWorklist = InlineWorklist(PointsToAnalysis(), flowGraph);
     worklist.analyseFromMain;
     println(worklist.getAllStates)
 
