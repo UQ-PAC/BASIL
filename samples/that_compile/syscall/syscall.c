@@ -2,5 +2,5 @@
 
 int main(int argc, char **argv) {
     int x = fork();
-    x += 1;
+    return x;
 }
