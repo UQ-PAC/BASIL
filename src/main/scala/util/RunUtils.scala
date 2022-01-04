@@ -6,10 +6,11 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import vcgen.{State, VCGen}
+
 import analysis.*;
 
 import java.io.{BufferedWriter, FileWriter, IOException}
-import scala.jdk.CollectionConverters.BufferHasAsJava;
+import scala.jdk.CollectionConverters._
 
 object RunUtils {
 
@@ -41,7 +42,7 @@ object RunUtils {
 
     val state = State(
       flowGraph,
-      Bool.True,
+      statementLoader.rely.getOrElse(Bool.True), // TODO check default
       Bool.False,
       symsListener.symbolTable.toMap,
       statementLoader.varSizes.toMap,
@@ -53,7 +54,6 @@ object RunUtils {
 
     var worklist: InlineWorklist = InlineWorklist(PointsToAnalysis(), flowGraph);
     worklist.analyseFromMain;
-    println(worklist.getAllStates)
 
     VCGen.genVCs(updatedState)
   }

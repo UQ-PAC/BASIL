@@ -2,10 +2,11 @@ package vcgen
 
 import astnodes.exp.{Expr, Literal}
 import translating.FlowGraph.{Block, Function}
-import astnodes.pred.{BinOp, BinOperator, Bool, ExprComp, High, Pred, Security, ITE}
+import astnodes.pred.{BinOp, BinOperator, Bool, ExprComp, High, Pred, Security, ITE, Forall}
 import astnodes.pred
+import astnodes.exp
 import astnodes.Label
-import astnodes.exp.`var`.Register
+import astnodes.exp.`var`.{Register, MemLoad}
 import astnodes.stmt.assign.{GammaUpdate, RegisterAssign}
 import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, InitStmt, JmpStmt, Stmt}
 import translating.FlowGraph
@@ -16,6 +17,7 @@ import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.ListHasAsScala
 import astnodes.pred.Var
+import astnodes.pred.MemLoad
 
 /** The program State
  *
@@ -46,11 +48,19 @@ case class State(
       }.toBoogieString + " }"
     }
 
+  //TODO handle size of memload
+  /** Returns the complete rely (including automatically generated conditions) */
+  private def getCompleteRely: List[Pred] = List(rely.vars.collect{case v: Register => v}.foldLeft(rely)((p, v) => p.substExpr(v, exp.`var`.MemLoad(symbolTable(v.name), Some(8)))), Forall("i: bv64", "((heap[i] == old(heap[i])) ==> (Gamma_heap[i] == old(Gamma_heap[i])))")) // TODO
+
+  // TODO modifies
+  private def relyStr = "procedure rely(); modifies " + "heap, Gamma_heap" + ";\n ensures " + getCompleteRely.mkString(";\n ensures ") + ";"
+
   override def toString: String = generateBVToBoolHeader + generateBVHeader(1) + generateBVHeader(32) + generateBVHeader(64)
     + globalInits.map(_.toBoogieString).mkString("\n") + "\n"
     // TODO this assumes everything is a global variable
     // + L.map((v, p) => s"axiom L_heap[${symbolTable(v.name).toBoogieString}] == $p;").mkString("\n") + "\n\n"
     + "function L(pos: bv64, heap: [bv64] bv8) returns (bool)" + lBodyStr + "\n\n"
+    + relyStr + "\n\n"
     + functions.mkString("")
 
 }

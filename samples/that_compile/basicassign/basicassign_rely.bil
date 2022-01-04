@@ -1,4 +1,5 @@
 L: x -> FALSE, secret -> FALSE, z -> TRUE
+Rely: x == old(x)
 00000290: program
 00000278: sub .plt(\.plt_result)
 00000291: \.plt_result :: out u32 = R0

@@ -4,7 +4,6 @@ import astnodes.exp.`var`.{Register, Var}
 import java.util
 import java.util.Collections
 
-// TODO check if this is needed
 /**
   * This is only used by the parser
   * @param loc

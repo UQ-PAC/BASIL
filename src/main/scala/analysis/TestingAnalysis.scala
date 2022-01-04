@@ -41,6 +41,13 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
     override def transfer(stmt: Stmt): AnalysisPoint = {
         var newState: Set[Stmt] = Set();
         stmt match {
+            case callStmt: CallStmt => {
+                if (!currentState.contains(stmt)) {
+                    newState = currentState ++ Set(stmt);
+                } else {
+                    newState = currentState;
+                }
+            }
             case _ => {
                 if (!currentState.contains(stmt)) {
                     newState = currentState ++ Set(stmt);

@@ -5,7 +5,7 @@ import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
 import astnodes.stmt.*
 import astnodes.parameters.{InParameter, OutParameter}
 import astnodes.Label
-import astnodes.exp.`var`.*;
+import astnodes.exp.`var`.{MemLoad, Register, Var}
 import translating.FlowGraph
 import vcgen.{FunctionState, State}
 
@@ -241,8 +241,7 @@ object BoogieTranslator {
     case x => x
   }
 
-  // TODO improve this!!
-  // TODO use proper type checking
+  // TODO improve this and perform proper type checking
   private def inferConstantTypes(expr: Expr, size: Option[Int]): Expr = expr match {
     case binOp: BinOp => {
       val inputSize = if (BinOperator.changesSize(binOp.operator)) None else size

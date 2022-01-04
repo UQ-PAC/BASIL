@@ -36,6 +36,8 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
         currentWorkListQueue = null;
         previousStmtAnalysisState = null;
         allBlockFinalAnalysisStates = null;
+        
+        if (debug) println(getAllStates);
     }
 
     def getAllStates: Map[Stmt, AnalysisPoint] = {

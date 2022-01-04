@@ -21,7 +21,6 @@ import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, Termi
 import FlowGraph.Function
 import astnodes.pred
 import BilParser.*
-import astnodes.*;
 import astnodes.exp.`var`.{MemLoad, Register}
 import astnodes.pred.{Bool, ExprComp, High, Low, Pred, Security}
 import vcgen.State
@@ -29,6 +28,7 @@ import util.AssumptionViolationException
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
 
 // TODO create a statementloaderstate class
 class StatementLoader() extends BilBaseListener {
@@ -54,6 +54,8 @@ class StatementLoader() extends BilBaseListener {
 
 
   val varSizes = mutable.Map[String, Int]()
+
+  var rely: Option[Pred] = None
 
   /*
   private def getVarSize(name: String, rhs: Option[Expr]): Int = {
@@ -95,7 +97,6 @@ class StatementLoader() extends BilBaseListener {
     this.currentFunction = function
   }
   override def exitParamTypes(ctx: BilParser.ParamTypesContext): Unit = {
-    // TODO this seems quite fickle
     val id = ctx.param.getText // human-readable name
     val variable = ctx.`var`.getText // some register, probably
 
@@ -203,6 +204,7 @@ class StatementLoader() extends BilBaseListener {
   override def exitExpStore8(ctx: BilParser.ExpStore8Context): Unit =
     if (ctx.exp(0).getText == "mem") exprs.put(ctx, MemStore(getExpr(ctx.exp(1)), getExpr(ctx.exp(2)), Some(8)))
     else throw new AssumptionViolationException("Found store on variable other than mem")
+  override def exitExpFunctionCall(ctx: BilParser.ExpFunctionCallContext): Unit = exprs.put(ctx, new FunctionCall("old", ctx.argList.exp.asScala.map(a => getExpr(a)).toList))
 
 
   override def exitPredBinOp(ctx: PredBinOpContext): Unit = preds.put(ctx, new astnodes.pred.BinOp(ctx.predBop.getText, getPred(ctx.pred(0)), getPred(ctx.pred(1))))
@@ -222,6 +224,8 @@ class StatementLoader() extends BilBaseListener {
   override def exitLpred(ctx: BilParser.LpredContext): Unit = (getExpr(ctx.`var`), getPred(ctx.pred)) match {
     case (v: Register, p: Pred) => lPreds.put(v, p)
   }
+
+  override def exitRely(ctx: BilParser.RelyContext): Unit = rely = Some(getPred(ctx.pred))
   
   private def uniquePc () =
     pcCount += 1
