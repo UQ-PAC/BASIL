@@ -4,6 +4,7 @@ import astnodes.exp.`var`.{MemLoad, Register, Var}
 
 trait Pred {
   def vars: List[Var]
+  def substExpr(v: Var, w: Var): Pred
   def toBoogieString = toString
 }
 

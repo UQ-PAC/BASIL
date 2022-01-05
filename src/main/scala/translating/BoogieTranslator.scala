@@ -317,8 +317,7 @@ object BoogieTranslator {
     case x => x
   }
 
-  // TODO improve this!!
-  // TODO use proper type checking
+  // TODO improve this and perform proper type checking
   private def inferConstantTypes(expr: Expr, size: Option[Int]): Expr = expr match {
     case binOp: BinOp => {
       val inputSize = if (BinOperator.changesSize(binOp.operator)) None else size

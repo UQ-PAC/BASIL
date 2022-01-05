@@ -10,7 +10,7 @@ class JumpTests extends AnyFunSuite {
 
   test("ifglobal") {
     val result = TestUtils.processBoogieFile("if/ifglobal")
-    assert(result.failures == List(191))
+    assert(result.failures == List(207))
   }
 
   test("ifglobal_safe") {

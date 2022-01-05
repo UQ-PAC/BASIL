@@ -4,13 +4,7 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 
 import java.io.{BufferedWriter, FileWriter, IOException}
-import collection.JavaConverters.*
-import scala.collection.immutable.HashMap
-import vcgen.*
-import util.RunUtils
-import translating.*
-import analysis.*
-import astnodes.exp.Expr
+import scala.jdk.CollectionConverters._
 
 object RunUtils {
 
@@ -42,7 +36,7 @@ object RunUtils {
 
     val state = State(
       flowGraph,
-      Bool.True,
+      statementLoader.rely.getOrElse(Bool.True), // TODO check default
       Bool.False,
       symsListener.symbolTable.toMap,
       statementLoader.varSizes.toMap,
