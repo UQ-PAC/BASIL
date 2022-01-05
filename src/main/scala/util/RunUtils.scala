@@ -6,6 +6,11 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import java.io.{BufferedWriter, FileWriter, IOException}
 import collection.JavaConverters.*
 import scala.collection.immutable.HashMap
+import vcgen.*
+import util.RunUtils
+import translating.*
+import analysis.*
+import astnodes.exp.Expr
 
 object RunUtils {
 
@@ -46,8 +51,8 @@ object RunUtils {
     )
 
     val updatedState = BoogieTranslator.translate(state)
-    val worklist = InlineWorklist(new ConstantPropagationAnalysis(new HashMap[Expr, String](),
-      Set(), Set()))
+    val worklist = InlineWorklist(new ConstantPropagationAnalysis(new collection.mutable.HashMap[Expr, String](),
+      Set(), Set()), flowGraph)
     worklist.printAllLinesWithLabels
     worklist.analyseFromMain
     worklist.printAllLinesWithLabels

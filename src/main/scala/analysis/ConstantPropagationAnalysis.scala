@@ -5,10 +5,11 @@ import java.util.List
 //import scala.collection.mutable
 import scala.collection.mutable.HashMap
 import scala.util.control.Breaks
-import scala.astnodes.exp.*
-import scala.astnodes.stmt.*
-import scala.astnodes.stmt.assign.*
-import scala.translating.FlowGraph
+import astnodes.exp.*
+import astnodes.exp.'var'.*
+import astnodes.stmt.*
+import astnodes.stmt.assign.*
+import translating.FlowGraph
 
 // TODO: does not have to take this map?
 class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: Set[String],
@@ -18,14 +19,14 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
   val stmtsToRemove : Set[String] = toRemove
   val stmtsPendingRemoval : Set[String] = pendingRemoval
 
-  def resolveVar(stmt: Stmt, flowgraph: Flowgraph): Unit = {
+  def resolveVar(stmt: Stmt, flowgraph: translating.FlowGraph): Unit = {
     if (stmtsToRemove.contains(stmt.getLabel.getPc)) {
       flowgraph.removeLine(stmt)
     } else {
       state.foreach(entry => {
         if (stmt.isInstanceOf[Assign]) {
           val newExpr = findInstFromPc(flowgraph.getLines, entry._2).getRhs
-          stmt.replace(entry._1, newExpr)
+          // stmt.replace(entry._1, newExpr)
         }
       })
     }

@@ -1,6 +1,6 @@
 package astnodes.exp
 
-import astnodes.exp.'var'.Var
+import astnodes.exp.var.Var
 
 import java.util
 

@@ -116,7 +116,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                         // foo := () ~ basic assignment
                         currentState.update(assignToRegister, locationValue);
                     }
-                    case assignToMem: MemLoad => {
+                    case assignToMem: astnodes.exp.`var`.MemLoad => {
                         // mem[foo] := () ~ everything that foo points to could point to RHS.
                         // special exception: if foo can only point to one thing, then mem[foo] can only point to RHS.
                         var memLoadPotentialValues = currentState.getOrElse(assignToMem.exp, Set());

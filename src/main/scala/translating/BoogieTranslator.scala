@@ -33,35 +33,35 @@ object BoogieTranslator {
   /**
    * delete later
    */
-  private def printAllLines(): Unit = {
-    flowGraph.getLines.forEach(line => {
-      line match {
-        case memAssign : MemAssign => {
-          System.out.println("MemAssign: " + line)
-        } case regAssign : RegisterAssign => {
-          System.out.println("RegisterAssign: " + line)
-        } case assert : Assert => {
-          System.out.println("Assert: " + line)
-        } case callStmt : CallStmt => {
-          System.out.println("CallStmt: " + line)
-        } case cJumpStmt : CJmpStmt => {
-          System.out.println("CJumpStmt: " + line)
-        } case enterSub : EnterSub => {
-          System.out.println("EnterSub: " + line)
-        } case exitSub : ExitSub => {
-          System.out.println("ExitSub: " + line)
-        } case initStmt : InitStmt => {
-          System.out.println("InitStmt: " + line)
-        } case jmpStmt : JmpStmt => {
-          System.out.println("MemAssign: " + line)
-        } case skipStmt : SkipStmt => {
-          System.out.println("MemAssign: " + line)
-        } case _ => {
-          System.out.println("Other: " + line)
-        }
-      }
-    })
-  }
+  // private def printAllLines(): Unit = {
+  //   flowGraph.getLines.forEach(line => {
+  //     line match {
+  //       case memAssign : MemAssign => {
+  //         System.out.println("MemAssign: " + line)
+  //       } case regAssign : RegisterAssign => {
+  //         System.out.println("RegisterAssign: " + line)
+  //       } case assert : Assert => {
+  //         System.out.println("Assert: " + line)
+  //       } case callStmt : CallStmt => {
+  //         System.out.println("CallStmt: " + line)
+  //       } case cJumpStmt : CJmpStmt => {
+  //         System.out.println("CJumpStmt: " + line)
+  //       } case enterSub : EnterSub => {
+  //         System.out.println("EnterSub: " + line)
+  //       } case exitSub : ExitSub => {
+  //         System.out.println("ExitSub: " + line)
+  //       } case initStmt : InitStmt => {
+  //         System.out.println("InitStmt: " + line)
+  //       } case jmpStmt : JmpStmt => {
+  //         System.out.println("MemAssign: " + line)
+  //       } case skipStmt : SkipStmt => {
+  //         System.out.println("MemAssign: " + line)
+  //       } case _ => {
+  //         System.out.println("Other: " + line)
+  //       }
+  //     }
+  //   })
+  // }
 
   /** Update all lines by applying the given function */
   private def updateAllLines(state: State, fn: Stmt => Stmt): State = updateAllLines(state, PartialFunction.fromFunction(fn))
@@ -277,15 +277,15 @@ object BoogieTranslator {
   // unique
   // TODO this operators on stmts and expr
   // TODO move this to the classes (i.e. to stmt and expr)
-  private def replaceAllMatchingChildren(parent: Stmt, oldExp: Expr, newExp: Expr): Unit = {
-    parent.getChildren.forEach((child: Expr) => replaceAllMatchingChildren(child, oldExp, newExp))
-    parent.replace(oldExp, newExp)
-  }
+  // private def replaceAllMatchingChildren(parent: Stmt, oldExp: Expr, newExp: Expr): Unit = {
+  //   parent.getChildren.forEach((child: Expr) => replaceAllMatchingChildren(child, oldExp, newExp))
+  //   parent.replace(oldExp, newExp)
+  // }
 
-  private def replaceAllMatchingChildren(parent: Expr, oldExp: Expr, newExp: Expr): Unit = {
-    parent.getChildren.forEach((child: Expr) => replaceAllMatchingChildren(child, oldExp, newExp))
-    parent.replace(oldExp, newExp)
-  }
+  // private def replaceAllMatchingChildren(parent: Expr, oldExp: Expr, newExp: Expr): Unit = {
+  //   parent.getChildren.forEach((child: Expr) => replaceAllMatchingChildren(child, oldExp, newExp))
+  //   parent.replace(oldExp, newExp)
+  // }
 
   /**
     * Where possible resolves global variables in the heap to their variable name
