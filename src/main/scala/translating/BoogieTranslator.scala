@@ -86,7 +86,7 @@ object BoogieTranslator {
           case rhsVar: Register if (isRegister(rhsVar) && assignedRegisters.contains(rhsVar)) =>
             val param = new InParameter(new Register(uniqueVarName, rhsVar.size), rhsVar)
             param.setAlias(store.lhs.asInstanceOf[MemLoad])
-            params.add(param)
+            params += param
           case _ =>
         }
         case assign: Assign => assign.lhs match {
@@ -96,7 +96,7 @@ object BoogieTranslator {
         case _ =>
       }
 
-      function.header.setInParams(removeDuplicateParamsAndMerge(params.asScala.toList).asJava)
+      function.header.setInParams(removeDuplicateParamsAndMerge(params.toList).toBuffer)
       createCallArguments(state, function.header)
     })
 
@@ -128,8 +128,8 @@ object BoogieTranslator {
     */
   private def createCallArguments(state: State, func: EnterSub): Unit =
     updateAllLines(state, {
-      case callStmt: CallStmt if (callStmt.funcName == func.getFuncName) => {
-        callStmt.copy(args = func.getInParams.asScala.map(_.getRegister).toList)
+      case callStmt: CallStmt if (callStmt.funcName == func.funcName) => {
+        callStmt.copy(args = func.getInParams.map(_.getRegister).toList)
       }
     })
 
@@ -148,7 +148,7 @@ object BoogieTranslator {
   private def resolveInParams(state: State): State = {
     updateAllFunctions(state, function => {
       // get all InParameters that have been assigned aliases
-      val paramsWithAliases = function.header.getInParams.asScala.filter(param => param.getAlias != null)
+      val paramsWithAliases = function.header.getInParams.filter(param => param.getAlias != null)
 
       // remove all parameter initialisations from the first block
       val rootBlock = function.rootBlock.copy(lines = function.rootBlock.lines.filter{
@@ -178,7 +178,7 @@ object BoogieTranslator {
         case RegisterAssign(_, lhs, _) =>
           if (
             !state.globalInits.exists(init => init.variable.name == lhs.name)
-              && function.header.getInParams.stream.noneMatch((inParam) => inParam.getName.name == lhs.name) // TODO check if this is needed
+              && function.header.getInParams.filter((inParam) => inParam.getName.name == lhs.name).isEmpty // TODO check if this is needed (otherwise change to short circuting operation)
               && !(function.header.getOutParam.get.getName.name == lhs.name)
               && !function.initStmts.exists(init => init.variable.name == lhs.name)
           ) {

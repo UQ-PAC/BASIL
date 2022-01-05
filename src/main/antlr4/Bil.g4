@@ -4,6 +4,7 @@ grammar Bil;
 // TODO if this turns out to be the case it might be easier to parse in blocks (where a block is terminated by white space)
 bil : progSpec progdecl function+ EOF;
 function : sub 
+		 funcSpec
          paramTypes*
          (stmt)*
          ;
@@ -11,9 +12,14 @@ function : sub
 /* First line is always this */
 progdecl: addr ':' 'program';
 /* Beginning of sub */
-sub : addr ':' 'sub' functionName '(' param? (',' param)* ')';
+sub : addr ':' 'sub' functionName '(' param? (',' param)* ')'  ;
 /* Listing the parameter types */
 paramTypes : addr ':' param '::' inout nat '=' var ;  // param: name from C, var: register
+
+funcSpec : ( ensuresSpec | requiresSpec )* ;
+ensuresSpec : 'ENSURES:' pred ;
+requiresSpec : 'RELIES:' pred ;
+
 /* Statement */
 stmt : addr ':' 
        (assign|call|jmp|cjmp)?

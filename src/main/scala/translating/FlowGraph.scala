@@ -150,14 +150,14 @@ object FlowGraph {
       */
     }
     private def findFunction(blocks: List[FlowGraph.Block], functionName: String) = blocks.stream
-      .filter((b: FlowGraph.Block) => b.firstLine.isInstanceOf[EnterSub] && b.firstLine.asInstanceOf[EnterSub].getFuncName == functionName)
+      .filter((b: FlowGraph.Block) => b.firstLine.isInstanceOf[EnterSub] && b.firstLine.asInstanceOf[EnterSub].funcName == functionName)
       .findFirst.get
 
     private def stripBlocks(blocks: immutable.List[FlowGraph.Block]): immutable.List[FlowGraph.Block] = {
       val reachableBlocks = new ArrayBuffer[FlowGraph.Block]
       val queue = new LinkedList[FlowGraph.Block]
       val mainBlock = blocks.find(_.getLines.get(0) match {
-        case enterSub: EnterSub => enterSub.getFuncName == "main"
+        case enterSub: EnterSub => enterSub.funcName == "main"
         case _ => false
       }).get
 
