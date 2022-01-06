@@ -1,43 +1,43 @@
 0000050f: program
 00000500: sub main(main_argc, main_argv, main_result)
-00000519: main_argc :: in u32 = X0
-0000051a: main_argv :: in out u64 = X1
-0000051b: main_result :: out u32 = X0
+00000519: main_argc :: in u32 = R0
+0000051a: main_argv :: in out u64 = R1
+0000051b: main_result :: out u32 = R0
 
 000001b9:
 000001be: mem := mem with [SP - 0x20, el]:u64 <- FP
 000001c3: mem := mem with [SP - 0x18, el]:u64 <- LR
 000001c8: SP := SP - 0x20
 000001cf: FP := SP
-000001d6: X0 := 4
+000001d6: R0 := 4
 000001dc: LR := 0x774
 000001e1: call @malloc with return %000001e3
 
 000001e3:
-000001e8: mem := mem with [SP + 0x10, el]:u64 <- X0
-000001ef: X0 := SP + 0x10
-000001f6: mem := mem with [SP + 0x18, el]:u64 <- X0
-000001fd: X0 := mem[SP + 0x10, el]:u64
-00000204: mem := mem with [SP + 0x18, el]:u64 <- X0
-0000020b: X0 := mem[SP + 0x10, el]:u64
-00000212: X1 := X0
-00000219: X0 := mem[SP + 0x18, el]:u64
+000001e8: mem := mem with [SP + 0x10, el]:u64 <- R0
+000001ef: R0 := SP + 0x10
+000001f6: mem := mem with [SP + 0x18, el]:u64 <- R0
+000001fd: R0 := mem[SP + 0x10, el]:u64
+00000204: mem := mem with [SP + 0x18, el]:u64 <- R0
+0000020b: R0 := mem[SP + 0x10, el]:u64
+00000212: R1 := R0
+00000219: R0 := mem[SP + 0x18, el]:u64
 00000220: mem := mem with [X0, el]:u32 <- low:32[X1]
-00000227: X0 := mem[SP + 0x18, el]:u64
-0000022e: X0 := pad:64[mem[X0, el]:u32]
-00000235: X0 := extend:64[extract:31:0[X0]]
-0000023c: mem := mem with [SP + 0x10, el]:u64 <- X0
+00000227: R0 := mem[SP + 0x18, el]:u64
+0000022e: R0 := pad:64[mem[X0, el]:u32]
+00000235: R0 := extend:64[extract:31:0[X0]]
+0000023c: mem := mem with [SP + 0x10, el]:u64 <- R0
 00000245: FP := mem[SP, el]:u64
 0000024a: LR := mem[SP + 8, el]:u64
 0000024f: SP := SP + 0x20
 00000255: call LR with noreturn
 
 00000501: sub malloc(malloc_size, malloc_result)
-0000051c: malloc_size :: in u64 = X0
-0000051d: malloc_result :: out u64 = X0
+0000051c: malloc_size :: in u64 = R0
+0000051d: malloc_result :: out u64 = R0
 
 000001df:
-00000454: X16 := 0x11000
-0000045b: X17 := mem[X16 + 8, el]:u64
-00000462: X16 := X16 + 8
-00000468: call X17 with noreturn
+00000454: R16 := 0x11000
+0000045b: R17 := mem[X16 + 8, el]:u64
+00000462: R16 := R16 + 8
+00000468: call R17 with noreturn

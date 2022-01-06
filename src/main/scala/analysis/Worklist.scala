@@ -16,7 +16,7 @@ import translating.FlowGraph.Function;
 import analysis.AnalysisPoint;
 
 class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
-    private final val debug: Boolean = false;
+    private final val debug: Boolean = true;
 
     private val directionForwards: Boolean = analysis.isForwards;
 

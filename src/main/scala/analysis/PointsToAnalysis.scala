@@ -77,7 +77,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                 (assignStmt.rhs) match {
                     case assignFromRegister: Register => {
                         // () := foo ~ LHS points to everything that (foo) points to i.e. *foo
-                        locationValue = currentState.getOrElse(assignFromRegister, Set(Literal(null)));
+                         locationValue = currentState.getOrElse(assignFromRegister, Set(Literal(null)));
                     }
                     case assignFromMem: MemLoad => {
                         // () := mem[foo] ~ LHS points to everything that is pointed to by memory pointed to by foo i.e. **foo
@@ -95,14 +95,14 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                     }
                     case assignFromExtract: Extract => {
                         // () := X0[x:y] ~ idk if we need to consider this
-                        //println(assignStmt);
+                        ;
                     }
                     case assignFromLiteral: Literal => {
-                        // () := 1 ~ LHS points to Literal(null);
+                        // () := 1 ~ LHS points to Literal(null) as constant pointers are disregarded
                         locationValue = Set(Literal(null));
                     }
                     case _ => {
-                        //println(assignStmt);
+                        ;
                     }
                 }
 
@@ -127,7 +127,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                         } else if (memLoadPotentialValues.size == 1) {
                             currentState.update(memLoadPotentialValues.head, locationValue);
                         } else {
-                            // if it's a known "constant pointer" - contains SP or FP - then we're fine, otherwise error
+                            // if it's a known "constant pointer" - contains SP, FP, or LR - then we're fine, otherwise error
                             currentState.update(assignToMem, locationValue);
                         }
                     }
@@ -139,8 +139,8 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
             case functionCall: CallStmt => {
                 // only defined "library" functions in the worklist make it to here.
                 if (functionCall.funcName == "malloc") {
-                    // X0 -> new heap allocation
-                    currentState.update(Register("X0", None), Set(Literal("alloc")));
+                    // R0 -> new heap allocation (assuming malloc clobbers R0 with its return value)
+                    currentState.update(Register("R0", 64), Set(Literal("alloc")));
                 }
             }
             case _ => {
@@ -153,12 +153,10 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
 
     def knownPointer(expr: Expr): Boolean = {
         var hasKnownPointer: Boolean = false;
-
+        
         expr.vars.foreach(c => {
             if (c == Register("SP", None) || c == Register("FP", None) || c == Register("LR", None)) {
                 hasKnownPointer = true;
-            } else {
-                hasKnownPointer = knownPointer(c);
             }
 
             if (hasKnownPointer) {
@@ -177,3 +175,11 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
         "PointsToAnalysis: " + currentState.toString;
     }
 }
+
+object OldFunctionPointer extends Literal(null, Option(64)) {}
+
+object OldLinkRegister extends Literal(null, Option(64)) {}
+
+object StackPointer extends Literal(null, Option(64)) {}
+
+object NonPointerValue extends Literal(null, Option(64)) {}
