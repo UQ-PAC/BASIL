@@ -45,11 +45,9 @@ object BoogieTranslator {
     })
 
     updateAllLines(state, stmt => {
-      // TODO make label immutable
-      if (usedLabels.contains(stmt.getLabel.getPc)) stmt.getLabel.show()
-      else stmt.getLabel.hide()
-
-      stmt
+      // TODO do we need to explicitly hide in the else branch
+      if (usedLabels.contains(stmt.label.pc)) stmt.copy(stmt.label.copy(visible = true))
+      else stmt
     })
   }
 

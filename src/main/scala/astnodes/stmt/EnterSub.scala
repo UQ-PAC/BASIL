@@ -9,12 +9,13 @@ import scala.collection.immutable
 import astnodes.pred.Pred
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Buffer
+import astnodes.Label
 
 // TODO scalaify
 // TODO rewrite statment loader to remove getters
 // TODO remove the need for this, and instead create directly place this logic in function state
 //      as we know the BIL output I think this would be fine
-case class EnterSub(override val pc: String, funcName: String, var requires: List[Pred], var ensures: List[Pred]) extends Stmt(pc) {
+case class EnterSub(val pc: String, funcName: String, var requires: List[Pred], var ensures: List[Pred]) extends Stmt(Label(pc)) {
   private var inParams: Buffer[InParameter] = new ArrayBuffer[InParameter]()
   private var outParam: Option[OutParameter] = None
   private var modifies: Buffer[String] = new ArrayBuffer[String]() // TODO type

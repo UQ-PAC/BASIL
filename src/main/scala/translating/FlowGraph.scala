@@ -136,7 +136,7 @@ object FlowGraph {
             val call = stmts.get(i).asInstanceOf[CallStmt]
             val cjmp = stmts.get(i + 1).asInstanceOf[JmpStmt]
             val assign = stmts.get(i + 3).asInstanceOf[RegisterAssign]
-            if (cjmp.target == stmts.get(i + 1).getLabel.getPc) {
+            if (cjmp.target == stmts.get(i + 1).label.pc) {
                 throw new AssumptionViolationException("Expected jump to next line")
             }
             call.setLHS(assign.getLhs)
@@ -236,7 +236,7 @@ object FlowGraph {
       */
     private def findInstWithPc(pc: String, stmts: List[Stmt]): Int = {
       if (pc.substring(0, 2) == "__") return -1 // TODO when jumping to a function e.g. goto @__gmon_start__
-      for (i <- 0 until stmts.size) { if (stmts.get(i).getLabel.getPc == pc) return i }
+      for (i <- 0 until stmts.size) { if (stmts.get(i).label.pc == pc) return i }
       throw new AssumptionViolationException(s"Error in constructing flow graph: No inst found with pc $pc.\n")
     }
 
@@ -258,7 +258,7 @@ object FlowGraph {
         val blockLines = new ArrayList[Stmt](lines.subList(splits.get(i), splits.get(i + 1)))
 // blocks are initially created with no children
         val block =
-          new FlowGraph.Block(blockLines.get(0).getLabel.getPc, blockLines, new ArrayList[FlowGraph.Block])
+          new FlowGraph.Block(blockLines.get(0).label.pc, blockLines, new ArrayList[FlowGraph.Block])
         blocks.add(block)
       }
       blocks
@@ -307,7 +307,7 @@ object FlowGraph {
       block.lastLine match {
         case jmp: JmpStmt => immutable.List(jmp.target)
         case cjmp: CJmpStmt => immutable.List(cjmp.trueTarget, cjmp.falseTarget)
-        // TODO case exitSub: ExitSub => immutable.List(lines.get(lines.indexOf(exitSub) + 1).getLabel.getPc)
+        // TODO case exitSub: ExitSub => immutable.List(lines.get(lines.indexOf(exitSub) + 1).getLabel.pc)
         case callStmt: CallStmt => callStmt.returnTarget.toList
         case _: ExitSub => immutable.List()
       }
@@ -343,7 +343,7 @@ object FlowGraph {
       *   the first block with a first line that contains the given pc, or null if none found
       */
     private def findBlockStartingWith(pc: String, blocks: List[FlowGraph.Block]): FlowGraph.Block = {
-      for (block <- blocks.asScala) { if (block.firstLine.getLabel.getPc == pc) return block }
+      for (block <- blocks.asScala) { if (block.firstLine.label.pc == pc) return block }
       null
     }
 
@@ -478,7 +478,7 @@ class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.M
   private def enforceUniqueLines() = {
     val linesList = getLines
     val pcList = new ArrayList[String]
-    linesList.forEach((line: Stmt) => pcList.add(line.getLabel.getPc))
+    linesList.forEach((line: Stmt) => pcList.add(line.label.pc))
     val linesSet = new HashSet[Stmt](linesList)
     val pcSet = new HashSet[String](pcList)
     if (linesSet.size != linesList.size) {

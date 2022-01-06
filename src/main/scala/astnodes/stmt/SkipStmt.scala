@@ -2,12 +2,11 @@ package astnodes.stmt
 
 import astnodes.exp.Expr
 import astnodes.exp.`var`.Var
-
-import java.util
+import astnodes.Label
 
 /** No instruction fact
   */
-class SkipStmt(override val pc: String) extends Stmt(pc) {
-  override def toString = String.format("%sskip;", getLabel)
+case class SkipStmt(val pc: String) extends Stmt(Label(pc)) {
+  override def toString = String.format("%sskip;", label)
   override def subst(v: Var, w: Var): Stmt = this
 }
