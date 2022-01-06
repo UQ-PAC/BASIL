@@ -40,14 +40,14 @@ class FunctionalTests:
     val b = parser.bil()
     // extract all statement objects from the tree
     val stmts = new ArrayBuffer[Stmt]()
-    val statementLoader = new StatementLoader(stmts)
-    val walker = new ParseTreeWalker()
-    walker.walk(statementLoader, b)
+    // val statementLoader = new StatementLoader(stmts)
+    // val walker = new ParseTreeWalker()
+    // walker.walk(statementLoader, b)
     // translate
     // TODO default value
-    val flowGraph = FlowGraph.fromStmts(stmts.asJava, statementLoader.varSizes.toMap)
-    val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl")
-    translator.translate()
+    // val flowGraph = FlowGraph.fromStmts(stmts.asJava, statementLoader.varSizes.toMap)
+    // val translator = new BoogieTranslator(flowGraph, "boogie_out.bpl")
+    // translator.translate()
 
   @Test def cjump(): Unit =
     try {

@@ -80,7 +80,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                         // () := foo ~ LHS points to everything that (foo) points to i.e. *foo
                         locationValue = currentState.getOrElse(assignFromRegister, Set(Literal(null)));
                     }
-                    case assignFromMem: MemLoad => {
+                    case assignFromMem: `var`.MemLoad => {
                         // () := mem[foo] ~ LHS points to everything that is pointed to by memory pointed to by foo i.e. **foo
                         currentState.getOrElse(assignFromMem.exp, Set()).foreach(single => {
                             if (locationValue == null) {

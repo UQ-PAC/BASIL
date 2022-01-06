@@ -20,7 +20,7 @@ trait Assign (override val pc: String, val lhs: Var, val rhs: Expr) extends Stmt
   def getLhs: Var = lhs
   def getRhs: Expr = rhs
 
-  def replace(oldExpr: Expr, newExpr: Expr): Unit = {
-    rhs.subst(oldExpr, newExpr)
-  }
+  // def replace(oldExpr: Expr, newExpr: Expr): Unit = {
+  //   rhs.subst(oldExpr, newExpr)
+  // }
 }

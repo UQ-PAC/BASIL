@@ -1,6 +1,6 @@
 package astnodes.exp.`var`
 
-import astnodes.exp.*
+import astnodes.exp.{Expr, BinOp, UniOp, Literal, BinOperator}
 import astnodes.pred
 
 import java.util.Collections

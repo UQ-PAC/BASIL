@@ -16,7 +16,7 @@ import translating.FlowGraph.Function;
 import analysis.AnalysisPoint;
 
 class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
-    private final val debug: Boolean = false;
+    private final val debug: Boolean = true;
 
     private val directionForwards: Boolean = analysis.isForwards;
 
@@ -159,10 +159,15 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
         
         var currentFinalBlockState = allBlockFinalAnalysisStates.getOrElse(blockToWorkOn, null);
         
-        println("in work on block")
+        // println("in work on block")
 
         if (currentFinalBlockState != null) {
-            if (!currentFinalBlockState.equals(previousStmtAnalysisState.toString)) {
+            if (!currentFinalBlockState.equals(previousStmtAnalysisState)) {
+                println("Final block states different")
+                println("previous:")
+                println(currentFinalBlockState)
+                println("updated:")
+                println(previousStmtAnalysisState)
                 allBlockFinalAnalysisStates.remove(blockToWorkOn);
                 allBlockFinalAnalysisStates.update(blockToWorkOn, previousStmtAnalysisState);
                 
@@ -192,7 +197,7 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
             });
         }
 
-        println("out work on block")
+        // println("out work on block")
     }
 
     /**

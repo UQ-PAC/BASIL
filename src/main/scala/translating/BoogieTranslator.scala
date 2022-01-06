@@ -1,23 +1,17 @@
 package translating
 
-import analysis.*
-import astnodes.exp.{Expr, Literal, MemLoad, Var}
 import astnodes.exp.{BinOp, BinOperator, Concat, Expr, Literal, MemStore, UniOp, UniOperator}
 import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
 import astnodes.stmt.*
 import astnodes.parameters.{InParameter, OutParameter}
 import astnodes.Label
-import astnodes.exp.`var`.*;
 import astnodes.exp.`var`.{MemLoad, Register, Var}
 import translating.FlowGraph
 import vcgen.{FunctionState, State}
 
-import scala.collection.mutable.{HashSet, Map, Set}
+import scala.collection.mutable.HashSet
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.collection.{immutable, mutable}
-import scala.collection.immutable
-import java.util.stream.Collectors
-import java.util.{ArrayList, HashMap, HashSet, LinkedList, List, Map, Objects, Set}
 import scala.collection.mutable
 import util.AssumptionViolationException
 import scala.jdk.CollectionConverters._
@@ -146,7 +140,7 @@ object BoogieTranslator {
   /** Implicit params found may contain params already listed explicitly. If so, we take the var name of the explicit
     * param, and the alias of the implicit param.
     */
-  private def removeDuplicateParamsAndMerge(params: List[InParameter]): List[InParameter] = {
+  private def removeDuplicateParamsAndMerge(params: scala.collection.immutable.List[InParameter]): List[InParameter] = {
     // TODO this has side effects
     params.filter(param => {
       val otherparams = params.filter(otherParam => {

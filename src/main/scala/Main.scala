@@ -24,6 +24,7 @@ import sys.process.*
 import scala.language.postfixOps
 
 @main def main(fileName: String, elfFileName: String, outputType: String = "") = {
+  println("in main")
   val state = RunUtils.generateVCs(fileName, elfFileName)
   RunUtils.writeToFile(state)
 

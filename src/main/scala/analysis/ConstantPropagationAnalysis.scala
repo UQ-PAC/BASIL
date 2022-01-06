@@ -5,8 +5,8 @@ import java.util.List
 //import scala.collection.mutable
 import scala.collection.mutable.HashMap
 import scala.util.control.Breaks
-import astnodes.exp.*
-import astnodes.exp.'var'.*
+import astnodes.exp.{Expr, Literal, MemStore, BinOp, UniOp, Extract}
+import astnodes.exp.`var`.{MemLoad, Var}
 import astnodes.stmt.*
 import astnodes.stmt.assign.*
 import translating.FlowGraph
@@ -23,12 +23,15 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     if (stmtsToRemove.contains(stmt.getLabel.getPc)) {
       flowgraph.removeLine(stmt)
     } else {
+      if (state.size > 0) { 
+      println("map has element")
       state.foreach(entry => {
-        if (stmt.isInstanceOf[Assign]) {
+        println(entry)
+        if (stmt.isInstanceOf[Assign] && entry._2 != null) {
           val newExpr = findInstFromPc(flowgraph.getLines, entry._2).getRhs
-          // stmt.replace(entry._1, newExpr)
+          // stmt.asInstanceOf[Assign].getRhs.replace(entry._2.asInstanceOf[Var], newExpr)
         }
-      })
+      }) }
     }
   }
 
@@ -48,23 +51,23 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     * @param stmt
     */
   override def transfer(stmt: Stmt): AnalysisPoint = {
-    System.out.println("in transfer")
+    // System.out.println("in transfer")
     val newState : HashMap[Expr, String] = state.clone()
     
     stmt match {
       case memAssignStmt : MemAssign => {
-        System.out.println("in mem assign")
+        // System.out.println("in mem assign")
         newState.update(memAssignStmt.getLhs.asInstanceOf[MemLoad], memAssignStmt.getLabel.getPc)
       } case regAssignStmt : RegisterAssign => {
-        System.out.println("in reg assign")
+        // System.out.println("in reg assign")
         newState.update(regAssignStmt.getLhs.asInstanceOf[Var], regAssignStmt.getLabel.getPc)
       }
       case _ => {
-        System.out.println("elsewhere")
+        // System.out.println("elsewhere")
       }
     }
 
-    System.out.println("out transfer")
+    // System.out.println("out transfer")
     
     new ConstantPropagationAnalysis(newState, toRemove, pendingRemoval)
   }
@@ -138,7 +141,7 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     * @return
     */
   override def union(other: AnalysisPoint): AnalysisPoint = {
-    System.out.println("in union")
+    // System.out.println("in union")
     val otherAsThis : ConstantPropagationAnalysis = typeCheck(other)
 
     val newState = new HashMap[Expr, String]()
@@ -149,10 +152,10 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
 
     var contains : Boolean = false
     state.foreach(entry => {
-      println(entry)
+      // println(entry)
       if (otherAsThis.state.contains(entry._1)) {
-        println(otherAsThis.state.get(entry._1))
-        println("in")
+        // println(otherAsThis.state.get(entry._1))
+        // println("in")
         contains = true
 
         if (entry._2 == null) {
@@ -160,15 +163,15 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
         } else if (otherAsThis.state.get(entry._1) == null) {
           newState.put(entry._1, entry._2)
         } else if (entry._2.equals(otherAsThis.state.get(entry._1))) {
-          println("in 2")
+          // println("in 2")
           newState.put(entry._1, entry._2)
         } else if (!entry._2.equals(otherAsThis.state.get(entry._1))) {
-          println("in 3")
+          // println("in 3")
           newState.put(entry._1, null)
         }
       }
 
-      println("left")
+      // println("left")
       
       if (!contains) {
         newState.put(entry._1, entry._2)
@@ -176,13 +179,26 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     })
 
     otherAsThis.state.foreach(entry => {
-      println("for each other constraint")
+      // println("for each other constraint")
       if (!newState.contains(entry._1) && !state.contains(entry._1)) {
         newState.put(entry._1, entry._2)
       }
     })
 
-    println("out union")
+    // println("out union")
     new ConstantPropagationAnalysis(newState, newRemove, newPending)
   }
+
+  // override def toString: String = {
+  //   val sb = new StringBuilder()
+
+  //   state.foreach(entry => {
+  //     sb ++= entry._1.toString
+  //     sb ++= " "
+  //     sb ++= entry._2
+  //     sb += '\n'
+  //   })
+
+  //   sb.toString
+  // }
 }
