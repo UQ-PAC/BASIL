@@ -123,32 +123,9 @@ object FlowGraph {
         case Nil => None
       } ++ stmts.takeRight(2)).toList  // Make sure to get the last 3 lines
         // TODO check 2 or 3
-
-
-      /*
-      for (i <- 0 to (stmts.size - 3)) {
-        println(i)
-        println(stmts.size)
-        if (stmts.get(i).isInstanceOf[CallStmt]
-            && stmts.get(i + 1).isInstanceOf[JmpStmt]
-            && stmts.get(i + 3).isInstanceOf[RegisterAssign]
-        ) {
-            val call = stmts.get(i).asInstanceOf[CallStmt]
-            val cjmp = stmts.get(i + 1).asInstanceOf[JmpStmt]
-            val assign = stmts.get(i + 3).asInstanceOf[RegisterAssign]
-            if (cjmp.target == stmts.get(i + 1).label.pc) {
-                throw new AssumptionViolationException("Expected jump to next line")
-            }
-            call.setLHS(assign.getLhs)
-            stmts.remove(i + 1)
-            stmts.remove(i + 2)
-            stmts.remove(i + 3)
-        }
-      }
-
-      stmts
-      */
     }
+
+
     private def findFunction(blocks: List[FlowGraph.Block], functionName: String) = blocks.stream
       .filter((b: FlowGraph.Block) => b.firstLine.isInstanceOf[EnterSub] && b.firstLine.asInstanceOf[EnterSub].funcName == functionName)
       .findFirst.get
@@ -174,7 +151,7 @@ object FlowGraph {
               queue.add(findBlockStartingWith(cjmp.trueTarget, blocks.asJava))
               queue.add(findBlockStartingWith(cjmp.falseTarget, blocks.asJava))
             case call: CallStmt =>
-              queue.add(findFunction(blocks.asJava, call.funcName))
+              if (!call.libraryFunction) queue.add(findFunction(blocks.asJava, call.funcName))
               if (call.returnTarget != None) queue.add(findBlockStartingWith(call.returnTarget.get, blocks.asJava))
             case _ =>
           })

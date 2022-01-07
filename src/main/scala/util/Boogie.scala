@@ -56,12 +56,14 @@ object Boogie {
       |""".stripMargin
 
   def generateFunctionHeader = """
-      |type empty;
       |
-      |function malloc(size: bv64) returns (bv64);
-      |axiom forall i: ((bv64 :: 0 <= i && i < (size / 4)) => heap[malloc(size) + i] == empty)
+      | procedure malloc(size: bv64) returns (addr: bv64);
+      | ensures forall i: ((bv64 :: 0 <= i && i < (size / 4)) => old(heap_free[addr + i]) == true); 
+      | ensures forall i: ((bv64 :: 0 <= i && i < (size / 4)) => heap_free[addr + i] == false); 
+      | ensures heap_sizes[addr] == size/4;
       |
-      |function free() returns (bv64);
-      |axiom forall i: ((bv64 :: 0 <= i && i < (size / 4)) => heap[malloc(size) + i] == empty)
+      | procedure free(addr: bv64) returns ();
+      | ensures forall i: ((bv64 :: 0 <= i && i < (heap_sizes[addr] / 4)) => heap_free[addr + i] == true); 
+      |
       |""".stripMargin
 }
