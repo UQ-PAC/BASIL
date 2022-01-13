@@ -32,6 +32,13 @@ To run the test suite run
 
 This runs a collection of the samples, checking that the correct number of errors are produced and that these occur on the corect line numbers. 
 
+### Manually executing boogie files
+
+It can be helpful to manually run boogie files. For example, to make manual edits to the generated boogie file (`boogie_out.bpl`) for debugging purposes or to run one of the sample output files. To do this run
+
+`boogie boogie.bpl`
+
+where `boogie.bpl` is the name of the boogie file.
 
 
 ### Notes about SBT
