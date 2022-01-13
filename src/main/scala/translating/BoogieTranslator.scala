@@ -99,8 +99,6 @@ object BoogieTranslator {
         case _ =>
       }
 
-      println((function.header.funcName, params))
-
       function.header.setInParams(removeDuplicateParamsAndMerge(params.toList).toBuffer)
       createCallArguments(state, function.header)
     })
