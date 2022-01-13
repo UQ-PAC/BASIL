@@ -12,15 +12,25 @@ import java.util
 trait Assign (override val pc: String, val lhs: Var, val rhs: Expr) extends Stmt {
   override def toString = String.format("%s%s := %s;", getLabel, lhs, rhs)
 
-  override def subst(v: Var, w: Var): Stmt = lhs.subst(v,w) match {
+  override def subst(v: Expr, w: Expr): Stmt = lhs.subst(v,w) match {
     case lhsRes: MemLoad => MemAssign(pc, lhsRes, rhs.subst(v,w))
-    case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs = rhs.subst(v,w))
+    case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs = rhs.subst(v,w)),
   }
 
   def getLhs: Var = lhs
   def getRhs: Expr = rhs
 
-  // def replace(oldExpr: Expr, newExpr: Expr): Unit = {
-  //   rhs.subst(oldExpr, newExpr)
-  // }
+  def replace(oldExpr: Expr, newExpr: Expr): Assign = {
+    var updatedRhs : Expr = null
+    if (rhs.equals(oldExpr)) {
+      updatedRhs = newExpr
+    } else {
+      updatedRhs = rhs.subst(oldExpr, newExpr)
+    }
+    // println(s"Substed RHS: $updatedRhs")
+    lhs match {
+      case lhsRes: MemLoad => MemAssign(pc, lhsRes, updatedRhs)
+      case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs = updatedRhs)
+    }
+  }
 }

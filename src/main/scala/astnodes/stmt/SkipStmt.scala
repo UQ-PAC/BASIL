@@ -9,5 +9,5 @@ import java.util
   */
 class SkipStmt(override val pc: String) extends Stmt(pc) {
   override def toString = String.format("%sskip;", getLabel)
-  override def subst(v: Var, w: Var): Stmt = this
+  override def subst(v: Expr, w: Expr): Stmt = this
 }

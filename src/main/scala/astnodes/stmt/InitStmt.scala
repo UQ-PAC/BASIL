@@ -8,7 +8,7 @@ import astnodes.exp.`var`.{Register, Var}
 
 // TODO is this class necassary 
 case class InitStmt(variable: Register, label: String, val varType: String, val const: Boolean = false) extends Stmt(label) {
-  override def subst(v: Var, w: Var): Stmt = variable.subst(v,w) match {
+  override def subst(v: Expr, w: Expr): Stmt = variable.subst(v,w) match {
     case res: Register => this.copy(variable = res)
     case _ => ???
   }

@@ -8,5 +8,5 @@ import astnodes.exp.`var`.Var
 class ExitSub(override val pc: String) extends Stmt(pc) {
   override def toString = "return;"
 
-  override def subst(v: Var, w: Var): Stmt = this
+  override def subst(v: Expr, w: Expr): Stmt = this
 }

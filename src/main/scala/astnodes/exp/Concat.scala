@@ -16,7 +16,7 @@ case class Concat (left: Expr, right: Expr) extends Expr{
   }
 
   override def vars = left.vars ++ right.vars
-  override def subst(v: Var, w: Var): Expr = this.copy(left = left.subst(v,w), right = right.subst(v,w))
+  override def subst(v: Expr, w: Expr): Expr = this.copy(left = left.subst(v,w), right = right.subst(v,w))
 }
 
 /**

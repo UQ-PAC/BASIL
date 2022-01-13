@@ -10,28 +10,54 @@ import astnodes.exp.`var`.{MemLoad, Var}
 import astnodes.stmt.*
 import astnodes.stmt.assign.*
 import translating.FlowGraph
+import translating.FlowGraph.Block
 
 // TODO: does not have to take this map?
 class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: Set[String],
-                                  pendingRemoval: Set[String]) extends AnalysisPoint {
+                                  previous : astnodes.stmt.Stmt, flowgraph : FlowGraph) extends AnalysisPoint {
 
   val state : HashMap[Expr, String] = constraints
   val stmtsToRemove : Set[String] = toRemove
-  val stmtsPendingRemoval : Set[String] = pendingRemoval
+  val previousStmt : Stmt = previous
 
-  def resolveVar(stmt: Stmt, flowgraph: translating.FlowGraph): Unit = {
+  def resolveVar(stmt: Stmt): Unit = {
     if (stmtsToRemove.contains(stmt.getLabel.getPc)) {
       flowgraph.removeLine(stmt)
     } else {
       if (state.size > 0) { 
-      println("map has element")
+      // println("map has element")
+      // println(s"Statement: $stmt")
+      var newStmt = stmt
       state.foreach(entry => {
-        println(entry)
-        if (stmt.isInstanceOf[Assign] && entry._2 != null) {
-          val newExpr = findInstFromPc(flowgraph.getLines, entry._2).getRhs
-          // stmt.asInstanceOf[Assign].getRhs.replace(entry._2.asInstanceOf[Var], newExpr)
+        // println(entry)
+        // stmt match {
+        //   case reg : RegisterAssign => println(s"RegAssign\n$reg")
+        //   case mem : MemAssign => println(s"MemAssign\n$mem")
+        //   case gamma : GammaUpdate => println(s"GammaUpdate\n$gamma")
+        //   case _ => println("Other")
+        // }
+        if (newStmt.isInstanceOf[Assign] && entry._2 != null) {
+          val newExpr = findInstFromPc(flowgraph.getLines, entry._2)
+          // println(s"New expr: $newExpr")
+          newStmt = newStmt.asInstanceOf[Assign].replace(entry._1, newExpr.getRhs)
+          // println(s"New stmt: $newStmt")
+          if (newStmt.asInstanceOf[Assign].getRhs.isInstanceOf[BinOp]) {
+            val newStmtRhs = newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].simplify()
+            // println(s"New RHS: $newStmtRhs")
+            newStmt = newStmt.asInstanceOf[Assign].replace(newStmt.asInstanceOf[Assign].getRhs, newStmtRhs)
+            // println(s"New stmt: $newStmt")
+            // if (newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].canCompute()) {
+            //   val newVal = newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].compute()
+            //   val newLit = new Literal(newVal.toString)
+            //   newStmt = newStmt.asInstanceOf[Assign].replace(newStmt.asInstanceOf[Assign].getRhs, newLit)
+            // }
+          } else if (newStmt.asInstanceOf[Assign].getRhs.isInstanceOf[UniOp]) {
+
+          }
         }
-      }) }
+      })
+      flowgraph.replaceLine(newStmt, stmt)
+      }
     }
   }
 
@@ -54,12 +80,19 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     // System.out.println("in transfer")
     val newState : HashMap[Expr, String] = state.clone()
     
-    stmt match {
-      case memAssignStmt : MemAssign => {
-        // System.out.println("in mem assign")
-        newState.update(memAssignStmt.getLhs.asInstanceOf[MemLoad], memAssignStmt.getLabel.getPc)
-      } case regAssignStmt : RegisterAssign => {
+    previousStmt match {
+      // case memAssignStmt : MemAssign => {
+      //   // System.out.println("in mem assign")
+      //   newState.update(memAssignStmt.getLhs.asInstanceOf[MemLoad], memAssignStmt.getLabel.getPc)
+      case regAssignStmt : RegisterAssign => {
         // System.out.println("in reg assign")
+        val oldStmPc = newState.getOrElse(regAssignStmt.getLhs, null)
+        if (oldStmPc != null) {
+          val oldStmt = findInstFromPc(flowgraph.getLines, oldStmPc)
+          if (oldStmt.getRhs.equals(regAssignStmt.getRhs)) {
+            toRemove+oldStmPc
+          }
+        }
         newState.update(regAssignStmt.getLhs.asInstanceOf[Var], regAssignStmt.getLabel.getPc)
       }
       case _ => {
@@ -69,7 +102,7 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
 
     // System.out.println("out transfer")
     
-    new ConstantPropagationAnalysis(newState, toRemove, pendingRemoval)
+    new ConstantPropagationAnalysis(newState, toRemove, stmt, flowgraph)
   }
 
   /**
@@ -93,14 +126,14 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
 
   override def createLowest: AnalysisPoint = {
 //    System.out.println("in createLowest")
-    new ConstantPropagationAnalysis(new HashMap[Expr, String], Set(), Set())
+    new ConstantPropagationAnalysis(new HashMap[Expr, String], Set(), null, flowgraph)
   }
 
   override def equals(other: AnalysisPoint): Boolean = {
     var otherAsThis: ConstantPropagationAnalysis = typeCheck(other);
     
     if (!state.equals(otherAsThis.state) || !stmtsToRemove.equals(otherAsThis
-      .stmtsToRemove) || !stmtsPendingRemoval.equals(otherAsThis.stmtsPendingRemoval)) {
+      .stmtsToRemove)) {
       return false
     }
     
@@ -132,7 +165,7 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
       }
     })
     
-    new ConstantPropagationAnalysis(newState, newRemove, newPending)
+    new ConstantPropagationAnalysis(newState, newRemove, null, flowgraph)
   }
 
   /**
@@ -186,19 +219,6 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     })
 
     // println("out union")
-    new ConstantPropagationAnalysis(newState, newRemove, newPending)
+    new ConstantPropagationAnalysis(newState, newRemove, null, flowgraph)
   }
-
-  // override def toString: String = {
-  //   val sb = new StringBuilder()
-
-  //   state.foreach(entry => {
-  //     sb ++= entry._1.toString
-  //     sb ++= " "
-  //     sb ++= entry._2
-  //     sb += '\n'
-  //   })
-
-  //   sb.toString
-  // }
 }

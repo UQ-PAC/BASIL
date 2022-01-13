@@ -24,7 +24,7 @@ case class CallStmt(override val pc: String, funcName: String, returnTarget: Opt
     s"call $getLabel$lhsStr $funcName ($argsStr); $targetStr"
   }
 
-  override def subst(v: Var, w: Var): Stmt = this.copy(args = args.map(r => r.subst(v,w) match {
+  override def subst(v: Expr, w: Expr): Stmt = this.copy(args = args.map(r => r.subst(v,w) match {
       case x: Register => x
       case _ => ???
     }))

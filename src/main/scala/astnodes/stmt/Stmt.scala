@@ -14,7 +14,7 @@ trait Stmt(val pc: String) {
   def getLabel = label
   def setLabel(label: Label) = this.label = label
 
-  def subst(v: Var, w: Var): Stmt
+  def subst(v: Expr, w: Expr): Stmt
   
   def toBoogieString = toString
 }

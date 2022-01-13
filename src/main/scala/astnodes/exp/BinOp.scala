@@ -17,6 +17,24 @@ case class BinOp(
   def getOp(): String = {
     return operator.toString
   }
+
+  def simplify(): Expr = {
+    if (this.canCompute()) {
+      val newVal = this.compute()
+      return new Literal(newVal.toString)
+    }
+
+    var newLhs : Expr = firstExp
+    var newRhs : Expr = secondExp
+    if (firstExp.isInstanceOf[BinOp]) { 
+      newLhs = firstExp.asInstanceOf[BinOp].simplify()
+    }
+    if (secondExp.isInstanceOf[BinOp]) {
+      newRhs = secondExp.asInstanceOf[BinOp].simplify()
+    }
+
+    this.copy(firstExp = newLhs, secondExp = newRhs)
+  }
   
   // TODO: this can be simplified a lot, but atm it seems to work allg
   def compute(): Double = {
@@ -46,7 +64,7 @@ case class BinOp(
       } catch {
         case ex: NumberFormatException => return false
       }
-    } else if (firstExp.isInstanceOf[Var] || firstExp.isInstanceOf[Extract]) {
+    } else if (!firstExp.isInstanceOf[BinOp]) {
       return false
     } else if (!firstExp.asInstanceOf[BinOp].canCompute()) {
       return false
@@ -58,7 +76,7 @@ case class BinOp(
       } catch {
         case ex: NumberFormatException => return false
       }
-    } else if (secondExp.isInstanceOf[Var] || secondExp.isInstanceOf[Extract]) {
+    } else if (!secondExp.isInstanceOf[BinOp]) {
       return false
     } else if (!secondExp.asInstanceOf[BinOp].canCompute()) {
       return false
@@ -79,6 +97,8 @@ case class BinOp(
       case "*" => result = firstOperand * secondOperand
       case "/" => result = firstOperand / secondOperand
       case "%" => result = firstOperand % secondOperand
+      case "&" => result = firstOperand.asInstanceOf[Int] & secondOperand.asInstanceOf[Int]
+      case "|" => result = firstOperand.asInstanceOf[Int] | secondOperand.asInstanceOf[Int]
       case _ => 
     }
     return result
@@ -87,7 +107,7 @@ case class BinOp(
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
   override def toBoogieString = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
 
-  override def subst(v: Var, w: Var): Expr = this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
+  override def subst(v: Expr, w: Expr): Expr = this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
 
   override def vars = firstExp.vars ++ secondExp.vars
 

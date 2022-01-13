@@ -39,5 +39,5 @@ class EnterSub(override val pc: String, var funcName: String) extends Stmt(pc) {
     "procedure " + decl + modifiesStr + "; {"
   }
 
-  override def subst(v: Var, w: Var): Stmt = this
+  override def subst(v: Expr, w: Expr): Stmt = this
 }

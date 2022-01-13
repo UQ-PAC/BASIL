@@ -11,5 +11,5 @@ import java.util.Collections
   */
 case class MemStore(loc: Expr, expr: Expr, override val size: Some[Int]) extends Expr {
   override def vars: List[Register] = ???
-  override def subst(v: Var, w: Var): Expr = ???
+  override def subst(v: Expr, w: Expr): Expr = ???
 }

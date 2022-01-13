@@ -16,7 +16,7 @@ import translating.FlowGraph.Function;
 import analysis.AnalysisPoint;
 
 class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
-    private final val debug: Boolean = true;
+    private final val debug: Boolean = false;
 
     private val directionForwards: Boolean = analysis.isForwards;
 
@@ -48,18 +48,16 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
         })
     }
     
-    // def printAllStates: Unit = {
-    //     finalAnalysedStmtInfo.foreach(point => {
-    //         System.out.println(point._1)
-    //         point._2.asScala.foreach(analyses => {
-    //             if (analyses.isInstanceOf[ConstantPropagationAnalysis]) {
-    //                 analyses.asInstanceOf[ConstantPropagationAnalysis].state.foreach(varConstraint => {
-    //                     System.out.println(varConstraint._1.toString + " : " + varConstraint._2)
-    //                 })
-    //             }
-    //         })
-    //     })
-    // }
+    def printAllStates: Unit = {
+        finalAnalysedStmtInfo.foreach(point => {
+            println("Line:")
+            System.out.println(point._1)
+            println("Dependencies:")
+            point._2.asInstanceOf[ConstantPropagationAnalysis].state.foreach(varConstraint => {
+                System.out.println(varConstraint._1.toString + " : " + varConstraint._2)
+            })
+        })
+    }
 
     def getOneState(stmt: Stmt): AnalysisPoint = {
         finalAnalysedStmtInfo.getOrElse(stmt, analysis.createLowest);
@@ -72,7 +70,7 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
         workOnFunction("main");
         if (analysis.isInstanceOf[ConstantPropagationAnalysis]) {
             finalAnalysedStmtInfo.foreach(entry => {
-                entry._2.asInstanceOf[ConstantPropagationAnalysis].resolveVar(entry._1, controlFlow)
+                entry._2.asInstanceOf[ConstantPropagationAnalysis].resolveVar(entry._1)
             })
         }
         finish;
@@ -163,11 +161,11 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
 
         if (currentFinalBlockState != null) {
             if (!currentFinalBlockState.equals(previousStmtAnalysisState)) {
-                println("Final block states different")
-                println("previous:")
-                println(currentFinalBlockState)
-                println("updated:")
-                println(previousStmtAnalysisState)
+                // println("Final block states different")
+                // println("previous:")
+                // println(currentFinalBlockState)
+                // println("updated:")
+                // println(previousStmtAnalysisState)
                 allBlockFinalAnalysisStates.remove(blockToWorkOn);
                 allBlockFinalAnalysisStates.update(blockToWorkOn, previousStmtAnalysisState);
                 

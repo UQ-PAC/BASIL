@@ -14,5 +14,5 @@ case class GammaUpdate (val lhs: Var | MemLoad, pred: Pred) extends Stmt("NA") {
   override def toBoogieString: String = s"${lhs.toBoogieString} := ${pred.toBoogieString};"
 
   // TODO
-  override def subst(v: `var`.Var, w: `var`.Var): Stmt = this
+  override def subst(v: Expr, w: Expr): Stmt = this
 }

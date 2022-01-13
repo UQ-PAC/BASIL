@@ -11,7 +11,7 @@ trait Expr {
   def vars: List[Var] 
 
   /* Substitute a given variable for another variable */
-  def subst(v: Var, w: Var): Expr
+  def subst(v: Expr, w: Expr): Expr
   def toBoogieString = toString
 
   /* 
@@ -19,20 +19,6 @@ trait Expr {
    *
    * Note: for binary operators in some cases the input and output sizes will not match.
    */
-  def size: Option[Int]
-  
-  // def contains(expr: Expr): Boolean = {
-  //   if (vars.size > 0) {
-  //     vars.foreach(child => {
-  //       return child.contains(expr)
-  //     })
-  //   } else {
-  //     if (expr == this) {
-  //       return true
-  //     }
-  //   }
-    
-  //   return false
-  // }
+  def size: Option[Int] 
 }
 

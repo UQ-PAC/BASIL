@@ -7,7 +7,7 @@ import astnodes.pred.Pred
 import java.util
 
 class Assert(pc: String, var pred: Pred) extends Stmt(pc) {
-  override def subst(v: Var, w: Var): Stmt = ???
+  override def subst(v: Expr, w: Expr): Stmt = ???
 
   // TODO is there a way to merge these two methods
   override def toString: String = s"assert $pred;"

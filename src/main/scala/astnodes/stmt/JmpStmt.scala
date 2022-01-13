@@ -8,5 +8,5 @@ import astnodes.exp.`var`.Var
   */
 class JmpStmt(override val pc: String, val target: String) extends Stmt(pc) {
   override def toString = String.format("%sgoto label%s;", getLabel, target)
-  override def subst(v: Var, w: Var): Stmt = this
+  override def subst(v: Expr, w: Expr): Stmt = this
 }
