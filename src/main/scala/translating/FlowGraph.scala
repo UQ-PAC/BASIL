@@ -390,6 +390,8 @@ class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.M
   // TODO this isnt great
   private var globalInits: List[InitStmt] = new LinkedList[InitStmt].asInstanceOf[List[InitStmt]]
   globalInits.add(new InitStmt(Register("heap", -1), "heap", "[bv64] bv8")) // TODO label.none
+  globalInits.add(new InitStmt(Register("heap_free", -1 ), "heap_free", "[bv64] bool"))
+  globalInits.add(new InitStmt(Register("heap_sizes", -1 ), "heap_size", "[bv64] bv64"))
   globalInits.add(new InitStmt(Register("stack", -1), "stack", "[bv64] bv8"))
   globalInits.add(new InitStmt(Register("L_heap", -1), "heap", "[bv64] bool", true)) // TODO This isnt great
   globalInits.add(new InitStmt(Register("L_stack", -1), "stack", "[bv64] bool", true))

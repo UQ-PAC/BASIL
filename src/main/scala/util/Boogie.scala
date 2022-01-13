@@ -55,15 +55,16 @@ object Boogie {
       |axiom bv1tobool(1bv1) == true && bv1tobool(0bv1) == false;
       |""".stripMargin
 
-  def generateFunctionHeader = """
+  def generateLibraryFuncHeader = """
+      |// TODO signed or unsigned div
+      |procedure malloc(size: bv64) returns (addr: bv64, Gamma_addr: bool);
+      |ensures (forall i: bv64 :: ((bv64ule(0bv64, i) && bv64ult(i, bv64udiv(size, 4bv64))) ==> old(heap_free[bv64add(addr, i)]) == true)); 
+      |ensures (forall i: bv64 :: ((bv64ule(0bv64, i) && bv64ult(i, bv64udiv(size, 4bv64))) ==> heap_free[bv64add(addr, i)] == false)); 
+      |ensures heap_sizes[addr] == bv64udiv(size, 4bv64);
+      |ensures Gamma_addr == false;
       |
-      | procedure malloc(size: bv64) returns (addr: bv64);
-      | ensures forall i: ((bv64 :: 0 <= i && i < (size / 4)) => old(heap_free[addr + i]) == true); 
-      | ensures forall i: ((bv64 :: 0 <= i && i < (size / 4)) => heap_free[addr + i] == false); 
-      | ensures heap_sizes[addr] == size/4;
-      |
-      | procedure free(addr: bv64) returns ();
-      | ensures forall i: ((bv64 :: 0 <= i && i < (heap_sizes[addr] / 4)) => heap_free[addr + i] == true); 
+      |procedure free_(addr: bv64) returns ();
+      |ensures (forall i: bv64 :: (bv64ule(0bv64, i) && bv64ult(i, bv64udiv(heap_sizes[addr], 4bv64))) ==> heap_free[bv64add(addr, i)] == true); 
       |
       |""".stripMargin
 }

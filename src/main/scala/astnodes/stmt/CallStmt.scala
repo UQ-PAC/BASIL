@@ -20,9 +20,11 @@ case class CallStmt(val pc: String, funcName: String, returnTarget: Option[Strin
       case Some(x) => s"goto label$x;"
       case None => ""
     }
+    val name = 
+      if (libraryFunction) CallStmt.libraryFunctions(funcName).mappedName.getOrElse(funcName)
+      else funcName
 
-    if (libraryFunction) s"$label$lhsStr $funcName ($argsStr); $targetStr"
-    else s"call $label$lhsStr $funcName ($argsStr); $targetStr"
+    s"call $label$lhsStr $name ($argsStr); $targetStr"
   }
 
   override def subst(v: Var, w: Var): Stmt = this.copy(args = args.map(r => r.subst(v,w) match {
@@ -31,6 +33,16 @@ case class CallStmt(val pc: String, funcName: String, returnTarget: Option[Strin
     }))
 
 
-  private val libraryFunctions = HashSet("malloc", "realloc", "free")
-  def libraryFunction = libraryFunctions.contains(funcName)
+  def libraryFunction = CallStmt.libraryFunctions.contains(funcName)
 }
+
+case object CallStmt {
+  val libraryFunctions = List(
+      "malloc" -> LibraryFunction(Some(Register("R0", 64)), List(Register("R0", 64))), 
+      "realloc" -> LibraryFunction(Some(Register("R0", 64)), List()), 
+      "free" -> LibraryFunction(None, List(Register("R0", 64)), Some("free_"))
+    ).toMap
+}
+
+case class LibraryFunction(lhs: Option[Register], args: List[Register], mappedName: Option[String] = None)
+
