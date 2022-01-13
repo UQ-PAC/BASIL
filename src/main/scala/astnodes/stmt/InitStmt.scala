@@ -21,6 +21,7 @@ case class InitStmt(variable: Register, pc: String, val varType: String, val con
     f"${if (const) "const" else "var"} Gamma_$variable: ${
       if (varType.startsWith("bv")) "bool"
       else if (varType == "[bv64] bv8") "[bv64] bool"
+      else if (varType == "[bv64] bv64") "[bv64] bool"
       else if (varType == "[bv64] bool") "[bv64] bool" // TODO remove
       else throw new AssumptionViolationException(s"Unhandled type $varType")
     };"

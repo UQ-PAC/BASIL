@@ -16,6 +16,8 @@ import scala.collection.mutable
 import util.AssumptionViolationException
 import scala.jdk.CollectionConverters._
 import astnodes.exp.Extract
+import vcgen.Block
+import java.util.Base64
 
 
 /** Methods to perform the translation from BIL to the IR.
@@ -23,17 +25,20 @@ import astnodes.exp.Extract
 object BoogieTranslator {
   /** Peforms the BIL to IR translation
    */
-  def translate(state: State): State = inferConstantTypes(addVarDeclarations(addAssignBeforeReturn(identifyImplicitParams(optimiseSkips(createLabels(state))))))
+  // def translate(state: State): State = inferConstantTypes(addVarDeclarations(optimiseSkips(addAssignBeforeReturn(identifyImplicitParams(addOutParam(addInParams(createLabels(state))))))))
+  def translate(state: State): State = inferConstantTypes(addVarDeclarations(optimiseSkips(addAssignBeforeReturn(addOutParam(addInParams(identifyImplicitParams(createLabels(state))))))))
 
   /** Update all lines by applying the given function */
   private def updateAllLines(state: State, fn: Stmt => Stmt): State = updateAllLines(state, PartialFunction.fromFunction(fn))
 
   /** Update all lines by applying the given partial function */
-  private def updateAllLines(state: State, fn: PartialFunction[Stmt, Stmt]): State = updateAllFunctions(state, f => f.copy(labelToBlock = f.labelToBlock.map {
-    case (pc, block) => (pc, block.copy(lines = block.lines.collect(fn)))
-  }))
+  private def updateAllLines(state: State, fn: PartialFunction[Stmt, Stmt]): State = updateAllBlocks(state, block => block.copy(lines = block.lines.collect(fn)))
 
   private def updateAllFunctions(state: State, fn: FunctionState => FunctionState): State = state.copy(functions = state.functions.map(fn))
+
+  private def updateAllBlocks(state: State, fn: Block => Block): State = updateAllFunctions(state, f => f.copy(labelToBlock = f.labelToBlock.map {
+    case (pc, block) => (pc, fn(block))
+  }))
 
   /** Hides labels which are not needed */
   private def createLabels(state: State): State = {
@@ -131,7 +136,32 @@ object BoogieTranslator {
       }
     })
 
-  /** We want to replace mem expressions which represent facts.parameters, like mem[SP + 1], with the human-readable
+
+  private def addInParams(state: State): State = updateAllBlocks(state, block => block.lines(block.lines.size - 1) match {
+    case call: CallStmt if (call.libraryFunction) =>
+      block.copy(lines = block.lines.updated(block.lines.size - 1, 
+        call.copy(args = CallStmt.libraryFunctions(call.funcName).args)))
+    case call: CallStmt => 
+      // TODO 
+      block.copy(lines = block.lines.updated(block.lines.size - 1, 
+        call.copy(args = state.functionFromCall(call).header.getInParams.map(p => p.getName).toList)))
+    case _ => block
+  })
+
+  private def addOutParam(state: State): State = updateAllLines(state, stmt => stmt match {
+    case call: CallStmt if (call.libraryFunction) => 
+      call.copy(lhs = CallStmt.libraryFunctions(call.funcName).lhs)
+    case call: CallStmt => state.functionFromCall(call).header.getOutParam match {
+      case Some(x) => 
+        call.copy(lhs = Some(x.getName)) 
+        call
+      case None => call
+    }
+    case _ => stmt
+  })
+
+  // TODO is this necassary / when is this used (I'm not sure it matches the arm calling convetion)
+  /** We want to replace mem expressions which represent parameters, like mem[SP + 1], with the human-readable
     * names of those facts.parameters. We do this by first removing the initialising store fact "mem[SP + 1] := X0",
     * then replacing all instances of "mem[SP + 1]" with the variable name. Depends on:
     *   - {@link #identifyImplicitParams ( )} Assumes:
@@ -201,7 +231,13 @@ object BoogieTranslator {
       for (localVar <- getLocalVarsInFunction(state, function)) {
         // TODO i think this could be replaced by a none label as well
         // TODO rework how this works to instead store a list of vars
-        if (!function.initStmts.exists(x => x.variable == localVar)) initStmts += new InitStmt(localVar, uniqueLabel, s"bv${state.bvSizes(localVar.name)}")
+        if (!function.initStmts.exists(x => x.variable == localVar)) {
+          val size = {
+            if (!state.bvSizes.contains(localVar.name) && localVar.name.endsWith("_result")) 64
+            else state.bvSizes(localVar.name)
+          }
+          initStmts += new InitStmt(localVar, uniqueLabel, s"bv$size")
+        }
       }
 
       function.copy(initStmts = initStmts.toList)

@@ -4,7 +4,7 @@ import org.scalatest.funsuite.AnyFunSuite
 class FunctionTests extends AnyFunSuite {
   test("function") {
     val result = TestUtils.processBoogieFile("function/function")
-    assert(result.failures == List(230))
+    assert(result.failures == List(237))
   }
 
   test("function_ensures") {
