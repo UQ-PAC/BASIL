@@ -3,10 +3,9 @@ package astnodes.stmt
 import astnodes.exp.Expr
 import astnodes.exp.`var`.Var
 import astnodes.pred.Pred
+import astnodes.Label
 
-import java.util
-
-class Assert(pc: String, var pred: Pred) extends Stmt(pc) {
+case class Assert(pc: String, var pred: Pred) extends Stmt(Label(pc)) {
   override def subst(v: Var, w: Var): Stmt = ???
 
   // TODO is there a way to merge these two methods

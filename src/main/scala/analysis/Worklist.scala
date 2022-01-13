@@ -15,6 +15,34 @@ import translating.FlowGraph.Block;
 import translating.FlowGraph.Function;
 import analysis.AnalysisPoint;
 
+abstract class Worklist(controlFlow: FlowGraph) {
+    var currentWorkListQueue: ArrayDeque[Block] = ArrayDeque();
+}
+
+class SingleWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) extends Worklist(controlFlow) {
+
+}
+
+trait TraverseBackwards extends Worklist {
+    
+}
+
+trait CallStrings extends Worklist {
+    
+}
+
+trait PathPruning extends Worklist {
+
+}
+
+trait Debug extends Worklist {
+
+}
+
+trait PassThroughLibrary(library: Set[String]) extends Worklist {
+
+}
+
 class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
     private final val debug: Boolean = true;
 
@@ -257,7 +285,7 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
 
         node.getChildren.asScala.foreach(child => {
             if (dfsPath.contains(child)) {
-                // if backedge, add to our rmChildren list. we can't remove them yet cause ConcurrentModificationException
+                // if backedge, add to our rmChildren list. we can't remove them yet cause ConcurrentModificationException.
 
                 if (rmChildren.contains(node)) {
                     rmChildren.update(node, (rmChildren.getOrElse(node, null) ++ List(child)));

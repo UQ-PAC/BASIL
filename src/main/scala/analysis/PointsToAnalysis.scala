@@ -10,11 +10,16 @@ import astnodes.stmt.assign.*;
 import astnodes.exp.`var`.*;
 import astnodes.exp.*;
 import util.SegmentationViolationException;
+import util.AssumptionViolationException
 
 class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoint {
     // i.e. map of Expr[X0] -> Expr[SP + 10]
     // "not a pointer" value is Literal(null)
     private var currentState: Map[Expr, Set[Expr]] = pointsToGraph;
+
+    private var stackOffset: Int = 0;
+
+    var functionName: String = "";
 
     def this() = {
         this(Map());
@@ -38,7 +43,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
         (this.countEdges - otherAsThis.countEdges).sign;
     }
 
-    override def union(other: AnalysisPoint): AnalysisPoint = {
+    override def join(other: AnalysisPoint): AnalysisPoint = {
         var otherAsThis: PointsToAnalysis = typeCheck(other);
         var combined: Map[Expr, Set[Expr]] = Map[Expr, Set[Expr]]();
 
@@ -53,7 +58,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
         PointsToAnalysis(combined);
     }
 
-    override def intersection(other: AnalysisPoint): AnalysisPoint = {
+    override def meet(other: AnalysisPoint): AnalysisPoint = {
         var otherAsThis: PointsToAnalysis = typeCheck(other);
         var intersected: Map[Expr, Set[Expr]] = Map[Expr, Set[Expr]]();
 
@@ -77,7 +82,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                 (assignStmt.rhs) match {
                     case assignFromRegister: Register => {
                         // () := foo ~ LHS points to everything that (foo) points to i.e. *foo
-                         locationValue = currentState.getOrElse(assignFromRegister, Set(Literal(null)));
+                        locationValue = currentState.getOrElse(assignFromRegister, Set(Literal(null)));
                     }
                     case assignFromMem: MemLoad => {
                         // () := mem[foo] ~ LHS points to everything that is pointed to by memory pointed to by foo i.e. **foo
@@ -143,8 +148,17 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                     currentState.update(Register("R0", 64), Set(Literal("alloc")));
                 }
             }
-            case _ => {
+            case returnStmt: ExitSub => {
+                // function returns i.e. "call LR with noreturn"
+                // test that LR & FP point to the correct thing?
                 ;
+            }
+            case skipStmt: SkipStmt => {
+                // explicitly do nothing for these statements
+                ;
+            }
+            case _ => {
+                println(stmt.getClass.getSimpleName);
             }
         }
 
@@ -176,10 +190,17 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
     }
 }
 
-object OldFunctionPointer extends Literal(null, Option(64)) {}
+object NonPointerValue extends Literal(null, Option(64)) {
+    // Represents constant integer values like 0x20.
+}
 
-object OldLinkRegister extends Literal(null, Option(64)) {}
+class FunctionStackPointer(val functionName: String, val offset: Long) extends Literal("SP", Option(64)) {
+    // Represents this function's SP, s.t. StackPointer(32) is SP + 32, or SP + 0x20.
+    // Used to track stack accesses on a per-function basis, so multiple calls to the same function are considered
+    // to have the same base offset regardless of what truly happens at runtime.
+}
 
-object StackPointer extends Literal(null, Option(64)) {}
-
-object NonPointerValue extends Literal(null, Option(64)) {}
+class ReturnFramePointer(val functionName: String, val offset: Long) extends Literal("FP", Option(64)) {
+    // Represents this function's FP.
+    // On return (call to true LR), the analysis checks that the FP points to this value.
+}

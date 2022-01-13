@@ -15,6 +15,7 @@ import scala.collection.{immutable, mutable}
 import scala.collection.mutable
 import util.AssumptionViolationException
 import scala.jdk.CollectionConverters._
+import astnodes.exp.Extract
 
 
 /** Methods to perform the translation from BIL to the IR.
@@ -22,7 +23,7 @@ import scala.jdk.CollectionConverters._
 object BoogieTranslator {
   /** Peforms the BIL to IR translation
    */
-  def translate(state: State): State = inferConstantTypes(addVarDeclarations(resolveOutParams(resolveInParams(identifyImplicitParams(optimiseSkips(createLabels(state)))))))
+  def translate(state: State): State = inferConstantTypes(addVarDeclarations(addAssignBeforeReturn(identifyImplicitParams(optimiseSkips(createLabels(state))))))
 
   /** Update all lines by applying the given function */
   private def updateAllLines(state: State, fn: Stmt => Stmt): State = updateAllLines(state, PartialFunction.fromFunction(fn))
@@ -44,11 +45,9 @@ object BoogieTranslator {
     })
 
     updateAllLines(state, stmt => {
-      // TODO make label immutable
-      if (usedLabels.contains(stmt.getLabel.getPc)) stmt.getLabel.show()
-      else stmt.getLabel.hide()
-
-      stmt
+      // TODO do we need to explicitly hide in the else branch
+      if (usedLabels.contains(stmt.label.pc)) stmt.copy(stmt.label.copy(visible = true))
+      else stmt
     })
   }
 
@@ -85,7 +84,7 @@ object BoogieTranslator {
           case rhsVar: Register if (isRegister(rhsVar) && assignedRegisters.contains(rhsVar)) =>
             val param = new InParameter(new Register(uniqueVarName, rhsVar.size), rhsVar)
             param.setAlias(store.lhs.asInstanceOf[MemLoad])
-            params.add(param)
+            params += param
           case _ =>
         }
         case assign: Assign => assign.lhs match {
@@ -95,7 +94,7 @@ object BoogieTranslator {
         case _ =>
       }
 
-      function.header.setInParams(removeDuplicateParamsAndMerge(params.asScala.toList).asJava)
+      function.header.setInParams(removeDuplicateParamsAndMerge(params.toList).toBuffer)
       createCallArguments(state, function.header)
     })
 
@@ -127,8 +126,8 @@ object BoogieTranslator {
     */
   private def createCallArguments(state: State, func: EnterSub): Unit =
     updateAllLines(state, {
-      case callStmt: CallStmt if (callStmt.funcName == func.getFuncName) => {
-        callStmt.copy(args = func.getInParams.asScala.map(_.getRegister).toList)
+      case callStmt: CallStmt if (callStmt.funcName == func.funcName) => {
+        callStmt.copy(args = func.getInParams.map(_.getRegister).toList)
       }
     })
 
@@ -147,7 +146,7 @@ object BoogieTranslator {
   private def resolveInParams(state: State): State = {
     updateAllFunctions(state, function => {
       // get all InParameters that have been assigned aliases
-      val paramsWithAliases = function.header.getInParams.asScala.filter(param => param.getAlias != null)
+      val paramsWithAliases = function.header.getInParams.filter(param => param.getAlias != null)
 
       // remove all parameter initialisations from the first block
       val rootBlock = function.rootBlock.copy(lines = function.rootBlock.lines.filter{
@@ -177,12 +176,13 @@ object BoogieTranslator {
         case RegisterAssign(_, lhs, _) =>
           if (
             !state.globalInits.exists(init => init.variable.name == lhs.name)
-              && function.header.getInParams.stream.noneMatch((inParam) => inParam.getName.name == lhs.name) // TODO check if this is needed
+              && function.header.getInParams.filter((inParam) => inParam.getName.name == lhs.name).isEmpty // TODO check if this is needed (otherwise change to short circuting operation)
               && !(function.header.getOutParam.get.getName.name == lhs.name)
               && !function.initStmts.exists(init => init.variable.name == lhs.name)
           ) {
             vars.add(lhs)
           }
+        case CallStmt(_, _, _, _, Some(x)) => vars.add(x)
         case _ =>
       }
     }
@@ -208,6 +208,7 @@ object BoogieTranslator {
     }))
   }
 
+  // TODO this is wrong, so identifyImplicitParams is wrong..
   private def isRegister(varFact: Register): Boolean = varFact.name.charAt(0) == 'X'
 
   /** Resolves outParams by crudely replacing all references to their associated register with their human-readable
@@ -230,6 +231,17 @@ object BoogieTranslator {
 
     state
   }
+
+  private def addAssignBeforeReturn(state: State): State = state.copy(functions = state.functions.map(f => 
+    f.copy(labelToBlock = f.header.getOutParam match {
+      case Some(outParam) => f.labelToBlock.map{
+        case (l, b) => (l, b.copy(lines = b.lines.flatMap{
+          case c: ExitSub => List(RegisterAssign("generatedline", outParam.getName, Extract(outParam.getName.size.get - 1, 0, outParam.getRegister)), c)
+          case x => List(x)
+        }))
+      }
+      case None => f.labelToBlock
+  })))
 
   /**
     * Infers the bv sizes for constants

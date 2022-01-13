@@ -3,11 +3,10 @@ package astnodes.stmt
 import java.util
 import astnodes.exp.Expr
 import astnodes.exp.`var`.{Register, Var}
-
-import scala.jdk.CollectionConverters.*
+import astnodes.Label
 
 // TODO remove var for lhs
-case class CallStmt(override val pc: String, funcName: String, returnTarget: Option[String], args: List[Register], var lhs: Option[Register]) extends Stmt(pc) {
+case class CallStmt(val pc: String, funcName: String, returnTarget: Option[String], args: List[Register], var lhs: Option[Register]) extends Stmt(Label(pc)) {
   def setLHS(reg: Register) = lhs = Some(reg)
 
   override def toString = {
@@ -21,7 +20,7 @@ case class CallStmt(override val pc: String, funcName: String, returnTarget: Opt
       case None => ""
     }
 
-    s"call $getLabel$lhsStr $funcName ($argsStr); $targetStr"
+    s"call $label$lhsStr $funcName ($argsStr); $targetStr"
   }
 
   override def subst(v: Var, w: Var): Stmt = this.copy(args = args.map(r => r.subst(v,w) match {

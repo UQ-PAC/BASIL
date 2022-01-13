@@ -39,14 +39,13 @@ trait AnalysisPoint {
      * A union or join of two lattice states. Should contain all the information from the first state
      * as well as all the information from the second state - even if this introduces uncertainty.
      */
-    
-    def union(other: AnalysisPoint): AnalysisPoint;
+    def join(other: AnalysisPoint): AnalysisPoint;
     
     /**
      * An intersection or meet of two lattice states. Should contain all the information that appears in
      * both states.
      */
-    def intersection(other: AnalysisPoint): AnalysisPoint;
+    def meet(other: AnalysisPoint): AnalysisPoint;
 
     /**
      * Creates an AnalysisPoint in the same type of analysis as this one, but with currentState as whatever
@@ -88,12 +87,12 @@ trait AnalysisPoint {
      * This function gets used by the worklist to combine parents' states as well as overlapping functions' states.
      */
     def combine(other: AnalysisPoint): AnalysisPoint = {
-        union(other);
+        join(other);
     }
 
     /**
-     * Another fancy, please-don't-override method that casts "other" to an instance of "this". Please use 
-     * this in your transfer, union, intersection, compare, etc. functions though.
+     * Another fancy, method that casts "other" to an instance of "this". Please use  this in your transfer, union,
+     * intersection, compare, etc. functions to typecast AnalysisPoints to the correct (matching) type.
      * 
      * You might think it would be easier to use scala's subclass comparison thingy where you have
      *
@@ -102,7 +101,7 @@ trait AnalysisPoint {
      * }
      * ExampleAnalysis(foo) extends AnalysisPoint[ExampleAnalysis]
      * 
-     * but this causes errors elsewhere in the worklist function where we need to operate on sets of 
+     * but this causes errors elsewhere in the worklist where we need to operate on sets of 
      * analyses and guarantee they have the same type.
      * 
      * Also, this should work with match statements, but it doesn't. Go figure.

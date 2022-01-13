@@ -3,10 +3,11 @@ package astnodes.stmt.assign
 import astnodes.exp.`var`.{MemLoad, Var}
 import astnodes.exp.{BinOp, BinOperator, Expr, Extract, Literal}
 import astnodes.stmt.Stmt
+import astnodes.Label
 
 /** Store fact
   */
-case class MemAssign(override val pc: String, override val lhs: MemLoad, override val rhs: Expr) extends Assign (pc, lhs, rhs) with Stmt(pc)  {
+case class MemAssign(val pc: String, override val lhs: MemLoad, override val rhs: Expr) extends Assign (pc, lhs, rhs) with Stmt(Label(pc))  {
 
   // TODO this tostring method is bad as well
   // need to really sort out a good way to handle the differnet ways memload is presented
@@ -20,3 +21,4 @@ case class MemAssign(override val pc: String, override val lhs: MemLoad, overrid
     }).mkString("; ") + s";     // $pc"
 
 }
+

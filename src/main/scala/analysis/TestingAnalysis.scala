@@ -26,13 +26,13 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
         (this.currentState.size - otherAsThis.currentState.size).sign;
     }
 
-    override def union(other: AnalysisPoint): AnalysisPoint = {
+    override def join(other: AnalysisPoint): AnalysisPoint = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
         TestingAnalysis(currentState.union(otherAsThis.currentState));
     }
 
-    override def intersection(other: AnalysisPoint): AnalysisPoint = {
+    override def meet(other: AnalysisPoint): AnalysisPoint = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
         TestingAnalysis(currentState.intersect(otherAsThis.currentState));

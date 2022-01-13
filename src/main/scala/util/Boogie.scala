@@ -54,4 +54,14 @@ object Boogie {
       |function bv1tobool(bv1) returns (bool);
       |axiom bv1tobool(1bv1) == true && bv1tobool(0bv1) == false;
       |""".stripMargin
+
+  def generateFunctionHeader = """
+      |type empty;
+      |
+      |function malloc(size: bv64) returns (bv64);
+      |axiom forall i: ((bv64 :: 0 <= i && i < (size / 4)) => heap[malloc(size) + i] == empty)
+      |
+      |function free() returns (bv64);
+      |axiom forall i: ((bv64 :: 0 <= i && i < (size / 4)) => heap[malloc(size) + i] == empty)
+      |""".stripMargin
 }

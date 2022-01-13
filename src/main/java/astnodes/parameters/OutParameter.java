@@ -3,8 +3,8 @@ import astnodes.exp.var.Register;
 
 public class OutParameter extends Parameter {
 
-    public OutParameter(Register name, Register register) {
-        super(name, register);
+    public OutParameter(Register outputName, Register register) {
+        super(outputName, register);
     }
     
     // TODO hack
