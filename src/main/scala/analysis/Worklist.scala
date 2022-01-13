@@ -189,7 +189,7 @@ class BlockWorklist(analyses: Set[AnalysisPoint], controlFlow: FlowGraph) {
         // recursive DFS from main node
         var output = dfsHelper(
             controlFlow.getFunctions.asScala.toList.find((func: Function) => {
-                func.getHeader.getFuncName == "main";
+                func.getHeader.funcName == "main";
             }).get.getBlocks.asScala.head
         );
 

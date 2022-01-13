@@ -15,6 +15,9 @@ import scala.collection.{immutable, mutable}
 import scala.collection.mutable
 import util.AssumptionViolationException
 import scala.jdk.CollectionConverters._
+import astnodes.exp.Extract
+import vcgen.Block
+import java.util.Base64
 
 
 /** Methods to perform the translation from BIL to the IR.
@@ -22,17 +25,20 @@ import scala.jdk.CollectionConverters._
 object BoogieTranslator {
   /** Peforms the BIL to IR translation
    */
-  def translate(state: State): State = inferConstantTypes(addVarDeclarations(resolveOutParams(resolveInParams(identifyImplicitParams(optimiseSkips(createLabels(state)))))))
+  // def translate(state: State): State = inferConstantTypes(addVarDeclarations(optimiseSkips(addAssignBeforeReturn(identifyImplicitParams(addOutParam(addInParams(createLabels(state))))))))
+  def translate(state: State): State = inferConstantTypes(addVarDeclarations(optimiseSkips(addAssignBeforeReturn(addOutParam(addInParams(identifyImplicitParams(createLabels(state))))))))
 
   /** Update all lines by applying the given function */
   private def updateAllLines(state: State, fn: Stmt => Stmt): State = updateAllLines(state, PartialFunction.fromFunction(fn))
 
   /** Update all lines by applying the given partial function */
-  private def updateAllLines(state: State, fn: PartialFunction[Stmt, Stmt]): State = updateAllFunctions(state, f => f.copy(labelToBlock = f.labelToBlock.map {
-    case (pc, block) => (pc, block.copy(lines = block.lines.collect(fn)))
-  }))
+  private def updateAllLines(state: State, fn: PartialFunction[Stmt, Stmt]): State = updateAllBlocks(state, block => block.copy(lines = block.lines.collect(fn)))
 
   private def updateAllFunctions(state: State, fn: FunctionState => FunctionState): State = state.copy(functions = state.functions.map(fn))
+
+  private def updateAllBlocks(state: State, fn: Block => Block): State = updateAllFunctions(state, f => f.copy(labelToBlock = f.labelToBlock.map {
+    case (pc, block) => (pc, fn(block))
+  }))
 
   /** Hides labels which are not needed */
   private def createLabels(state: State): State = {
@@ -44,11 +50,9 @@ object BoogieTranslator {
     })
 
     updateAllLines(state, stmt => {
-      // TODO make label immutable
-      if (usedLabels.contains(stmt.getLabel.getPc)) stmt.getLabel.show()
-      else stmt.getLabel.hide()
-
-      stmt
+      // TODO do we need to explicitly hide in the else branch
+      if (usedLabels.contains(stmt.label.pc)) stmt.copy(stmt.label.copy(visible = true))
+      else stmt
     })
   }
 
@@ -85,7 +89,7 @@ object BoogieTranslator {
           case rhsVar: Register if (isRegister(rhsVar) && assignedRegisters.contains(rhsVar)) =>
             val param = new InParameter(new Register(uniqueVarName, rhsVar.size), rhsVar)
             param.setAlias(store.lhs.asInstanceOf[MemLoad])
-            params.add(param)
+            params += param
           case _ =>
         }
         case assign: Assign => assign.lhs match {
@@ -95,7 +99,7 @@ object BoogieTranslator {
         case _ =>
       }
 
-      function.header.setInParams(removeDuplicateParamsAndMerge(params.asScala.toList).asJava)
+      function.header.setInParams(removeDuplicateParamsAndMerge(params.toList).toBuffer)
       createCallArguments(state, function.header)
     })
 
@@ -127,12 +131,37 @@ object BoogieTranslator {
     */
   private def createCallArguments(state: State, func: EnterSub): Unit =
     updateAllLines(state, {
-      case callStmt: CallStmt if (callStmt.funcName == func.getFuncName) => {
-        callStmt.copy(args = func.getInParams.asScala.map(_.getRegister).toList)
+      case callStmt: CallStmt if (callStmt.funcName == func.funcName) => {
+        callStmt.copy(args = func.getInParams.map(_.getRegister).toList)
       }
     })
 
-  /** We want to replace mem expressions which represent facts.parameters, like mem[SP + 1], with the human-readable
+
+  private def addInParams(state: State): State = updateAllBlocks(state, block => block.lines(block.lines.size - 1) match {
+    case call: CallStmt if (call.libraryFunction) =>
+      block.copy(lines = block.lines.updated(block.lines.size - 1, 
+        call.copy(args = CallStmt.libraryFunctions(call.funcName).args)))
+    case call: CallStmt => 
+      // TODO 
+      block.copy(lines = block.lines.updated(block.lines.size - 1, 
+        call.copy(args = state.functionFromCall(call).header.getInParams.map(p => p.getName).toList)))
+    case _ => block
+  })
+
+  private def addOutParam(state: State): State = updateAllLines(state, stmt => stmt match {
+    case call: CallStmt if (call.libraryFunction) => 
+      call.copy(lhs = CallStmt.libraryFunctions(call.funcName).lhs)
+    case call: CallStmt => state.functionFromCall(call).header.getOutParam match {
+      case Some(x) => 
+        call.copy(lhs = Some(x.getName)) 
+        call
+      case None => call
+    }
+    case _ => stmt
+  })
+
+  // TODO is this necassary / when is this used (I'm not sure it matches the arm calling convetion)
+  /** We want to replace mem expressions which represent parameters, like mem[SP + 1], with the human-readable
     * names of those facts.parameters. We do this by first removing the initialising store fact "mem[SP + 1] := X0",
     * then replacing all instances of "mem[SP + 1]" with the variable name. Depends on:
     *   - {@link #identifyImplicitParams ( )} Assumes:
@@ -147,7 +176,7 @@ object BoogieTranslator {
   private def resolveInParams(state: State): State = {
     updateAllFunctions(state, function => {
       // get all InParameters that have been assigned aliases
-      val paramsWithAliases = function.header.getInParams.asScala.filter(param => param.getAlias != null)
+      val paramsWithAliases = function.header.getInParams.filter(param => param.getAlias != null)
 
       // remove all parameter initialisations from the first block
       val rootBlock = function.rootBlock.copy(lines = function.rootBlock.lines.filter{
@@ -177,12 +206,13 @@ object BoogieTranslator {
         case RegisterAssign(_, lhs, _) =>
           if (
             !state.globalInits.exists(init => init.variable.name == lhs.name)
-              && function.header.getInParams.stream.noneMatch((inParam) => inParam.getName.name == lhs.name) // TODO check if this is needed
+              && function.header.getInParams.filter((inParam) => inParam.getName.name == lhs.name).isEmpty // TODO check if this is needed (otherwise change to short circuting operation)
               && !(function.header.getOutParam.get.getName.name == lhs.name)
               && !function.initStmts.exists(init => init.variable.name == lhs.name)
           ) {
             vars.add(lhs)
           }
+        case CallStmt(_, _, _, _, Some(x)) => vars.add(x)
         case _ =>
       }
     }
@@ -201,13 +231,20 @@ object BoogieTranslator {
       for (localVar <- getLocalVarsInFunction(state, function)) {
         // TODO i think this could be replaced by a none label as well
         // TODO rework how this works to instead store a list of vars
-        if (!function.initStmts.exists(x => x.variable == localVar)) initStmts += new InitStmt(localVar, uniqueLabel, s"bv${state.bvSizes(localVar.name)}")
+        if (!function.initStmts.exists(x => x.variable == localVar)) {
+          val size = {
+            if (!state.bvSizes.contains(localVar.name) && localVar.name.endsWith("_result")) 64
+            else state.bvSizes(localVar.name)
+          }
+          initStmts += new InitStmt(localVar, uniqueLabel, s"bv$size")
+        }
       }
 
       function.copy(initStmts = initStmts.toList)
     }))
   }
 
+  // TODO this is wrong, so identifyImplicitParams is wrong..
   private def isRegister(varFact: Register): Boolean = varFact.name.charAt(0) == 'X'
 
   /** Resolves outParams by crudely replacing all references to their associated register with their human-readable
@@ -230,6 +267,17 @@ object BoogieTranslator {
 
     state
   }
+
+  private def addAssignBeforeReturn(state: State): State = state.copy(functions = state.functions.map(f => 
+    f.copy(labelToBlock = f.header.getOutParam match {
+      case Some(outParam) => f.labelToBlock.map{
+        case (l, b) => (l, b.copy(lines = b.lines.flatMap{
+          case c: ExitSub => List(RegisterAssign("generatedline", outParam.getName, Extract(outParam.getName.size.get - 1, 0, outParam.getRegister)), c)
+          case x => List(x)
+        }))
+      }
+      case None => f.labelToBlock
+  })))
 
   /**
     * Infers the bv sizes for constants

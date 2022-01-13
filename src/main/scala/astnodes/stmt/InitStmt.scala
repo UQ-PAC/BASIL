@@ -5,9 +5,10 @@ import util.AssumptionViolationException
 import java.util.{Collections, List}
 import astnodes.exp.Expr
 import astnodes.exp.`var`.{Register, Var}
+import astnodes.Label
 
 // TODO is this class necassary 
-case class InitStmt(variable: Register, label: String, val varType: String, val const: Boolean = false) extends Stmt(label) {
+case class InitStmt(variable: Register, pc: String, val varType: String, val const: Boolean = false) extends Stmt(Label(pc)) {
   override def subst(v: Var, w: Var): Stmt = variable.subst(v,w) match {
     case res: Register => this.copy(variable = res)
     case _ => ???
@@ -20,6 +21,7 @@ case class InitStmt(variable: Register, label: String, val varType: String, val 
     f"${if (const) "const" else "var"} Gamma_$variable: ${
       if (varType.startsWith("bv")) "bool"
       else if (varType == "[bv64] bv8") "[bv64] bool"
+      else if (varType == "[bv64] bv64") "[bv64] bool"
       else if (varType == "[bv64] bool") "[bv64] bool" // TODO remove
       else throw new AssumptionViolationException(s"Unhandled type $varType")
     };"

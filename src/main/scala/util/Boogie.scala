@@ -54,4 +54,17 @@ object Boogie {
       |function bv1tobool(bv1) returns (bool);
       |axiom bv1tobool(1bv1) == true && bv1tobool(0bv1) == false;
       |""".stripMargin
+
+  def generateLibraryFuncHeader = """
+      |// TODO signed or unsigned div
+      |procedure malloc(size: bv64) returns (addr: bv64, Gamma_addr: bool);
+      |ensures (forall i: bv64 :: ((bv64ule(0bv64, i) && bv64ult(i, bv64udiv(size, 4bv64))) ==> old(heap_free[bv64add(addr, i)]) == true)); 
+      |ensures (forall i: bv64 :: ((bv64ule(0bv64, i) && bv64ult(i, bv64udiv(size, 4bv64))) ==> heap_free[bv64add(addr, i)] == false)); 
+      |ensures heap_sizes[addr] == bv64udiv(size, 4bv64);
+      |ensures Gamma_addr == false;
+      |
+      |procedure free_(addr: bv64) returns ();
+      |ensures (forall i: bv64 :: (bv64ule(0bv64, i) && bv64ult(i, bv64udiv(heap_sizes[addr], 4bv64))) ==> heap_free[bv64add(addr, i)] == true); 
+      |
+      |""".stripMargin
 }
