@@ -15,7 +15,9 @@ To run a single file use the command
 
 `sbt run file.bil file.elf boogie`
 
-where `file.bil` is the lifted BIL file and `file.elf` is the elf file (for an example of how to generate this, look at `src/scripts/lift\_docker.sh`). A range of sample files can be found in the `samples` folder.
+where `file.bil` is the lifted BIL file and `file.elf` is the elf file (for an example of how to generate this, look at `src/scripts/lift\_docker.sh`). A range of sample files can be found in the `samples` folder. This command must be run in the root directory of the project. For example, to run the `ifglobal` example use the command 
+
+`run samples/that_compile/if/ifglobal.bil samples/that_compile/if/ifglobal.elf boogie`
 
 If you are likely to want to run multiple files you can launch the SBT shell using `sbt` and then run each file inside this shell using
 
@@ -34,7 +36,7 @@ This runs a collection of the samples, checking that the correct number of error
 
 ### Manually executing boogie files
 
-It can be helpful to manually run boogie files. For example, to make manual edits to the generated boogie file (`boogie_out.bpl`) for debugging purposes or to run one of the sample output files. To do this run
+Boogie is automatically run on the generated file, and its output displayed, when you run a file using SBT. That being said, it can be helpful to manually run boogie files. For example, to make manual edits to the generated boogie file (`boogie_out.bpl`) for debugging purposes or to run one of the sample output files. To do this run
 
 `boogie boogie.bpl`
 
