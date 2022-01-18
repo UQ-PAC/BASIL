@@ -54,17 +54,11 @@ Alternatively, these issues do not appear when using the metals LSP (for example
 
  - Guarantees
  - Loops
+ - General lattice
 
 ### Tasks for the Summer
 
- - Value analysis 
- - Points to/alias analysis
- - Reading globals from the symbol table and global offset table
- - Using the call graph
- - Generate the verification conditions
- - Fix jumps (need to properly handle jumps to functions, calls with no return)
  - Replace nulls with option where possible
- - Move over to scala collections
  - Better handling toStrings (there is a lot of overlap between pred/exp and between toString/toBoogieString)
- - Parameter passing (is it possible to reliably detect which registers are used for parameters, particularly when optimisations are on? can we just havoc R0-R7?)
+ - At the moment all of the call registers (i.e. R0-R7) are passed as parameters, maybe it would be better to make these globals? in general this code could be neatedned up
 
