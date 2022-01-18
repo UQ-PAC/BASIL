@@ -28,11 +28,11 @@ stmt : addr ':'
 call : 'call' (('@' functionName)|var) 'with' (returnaddr | 'noreturn') ;
 
 assign : var ':=' exp ;
-exp : exp bop exp                                       # expBop
+exp : '(' exp ')'                                       # expBracket
     | literal                                           # expLiteral
-    | '(' exp ')'                                       # expBracket
-    | uop exp                                           # expUop
     | var                                               # expVar
+    | uop exp                                           # expUop
+    | exp bop exp                                       # expBop
     | exp 'with' '[' exp ',' ENDIAN ']:' nat '<-' exp   # expStore
     | exp 'with' '[' exp ']' '<-' exp                   # expStore8 // sizes can be ommited if storing a single byte
     | CAST ':' nat '[' exp ']'                          # expCast
