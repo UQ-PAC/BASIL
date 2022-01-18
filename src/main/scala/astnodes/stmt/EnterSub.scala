@@ -34,8 +34,13 @@ case class EnterSub(val pc: String, funcName: String, var requires: List[Pred], 
   }
 
   override def toString = {
-    val in = inParams.mkString(", ")
-    val out = if (outParam != None) f" returns (${outParam.get})" else ""
+    val in = 
+      if (libraryFunction) inParams.mkString(", ")
+      else CallStmt.callRegisters.map(x => s"${x}_in: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_${x}_in: bool").mkString(", ")
+    val out = 
+      // TODO gamma out
+      if (!libraryFunction) "returns (" + CallStmt.callRegisters.map(x => s"${x}_out: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_${x}_out: bool").mkString(", ") + ")"
+      else if (outParam != None) f" returns (${outParam.get})" else ""
 
     val decl = funcName + "(" + in + ")" + out
 
@@ -51,4 +56,6 @@ case class EnterSub(val pc: String, funcName: String, var requires: List[Pred], 
   }
 
   override def subst(v: Expr, w: Expr): Stmt = this
+  // override def subst(v: Var, w: Var): Stmt = this
+  def libraryFunction = CallStmt.libraryFunctions.contains(funcName)
 }

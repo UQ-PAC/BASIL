@@ -88,8 +88,10 @@ object FlowGraph {
       */
     def fromStmts(stmts: List[Stmt], types: immutable.Map[String, Int]) = {
       val stmts1 = mergeCjmp(stmts.asScala.toList)
-      val stmts2 = setFunctionsWithReturns(stmts1).asJava;
+      // val stmts2 = setFunctionsWithReturns(stmts1).asJava;
+      val stmts2 = stmts1.asJava
       // an ordered list of indexes of the given statements list, indicating where the list should be split into blocks
+      // val splits = getSplits(stmts2)
       val splits = getSplits(stmts2)
       // an ordered list of blocks, defined by the given given list of splits
       // essentially creates the nodes for this flow graph

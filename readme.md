@@ -4,7 +4,7 @@
 
 ## Setup 
 
- 1. Download and install [sbt](https://www.scala-sbt.org/download.html) and [boogie](https://www.scala-sbt.org/download.html). If you use an operating system with a package manager then the easiest way to install these is likey through your pacage manager (e.g. aur)
+ 1. Download and install [sbt](https://www.scala-sbt.org/download.html) and [boogie](https://github.com/boogie-org/boogie#installation). If you use an operating system with a package manager then the easiest way to install these is likey through your pacage manager (e.g. aur)
  2. Clone the repo
 
 This should be everything. For more details on SBT and getting SBT to work correctly with Intellij see the section below.
@@ -15,7 +15,9 @@ To run a single file use the command
 
 `sbt run file.bil file.elf boogie`
 
-where `file.bil` is the lifted BIL file and `file.elf` is the elf file (for an example of how to generate this, look at `src/scripts/lift\_docker.sh`). A range of sample files can be found in the `samples` folder.
+where `file.bil` is the lifted BIL file and `file.elf` is the elf file (for an example of how to generate this, look at `src/scripts/lift\_docker.sh`). A range of sample files can be found in the `samples` folder. This command must be run in the root directory of the project. For example, to run the `ifglobal` example use the command 
+
+`run samples/that_compile/if/ifglobal.bil samples/that_compile/if/ifglobal.elf boogie`
 
 If you are likely to want to run multiple files you can launch the SBT shell using `sbt` and then run each file inside this shell using
 
@@ -34,7 +36,7 @@ This runs a collection of the samples, checking that the correct number of error
 
 ### Manually executing boogie files
 
-It can be helpful to manually run boogie files. For example, to make manual edits to the generated boogie file (`boogie_out.bpl`) for debugging purposes or to run one of the sample output files. To do this run
+Boogie is automatically run on the generated file, and its output displayed, when you run a file using SBT. That being said, it can be helpful to manually run boogie files. For example, to make manual edits to the generated boogie file (`boogie_out.bpl`) for debugging purposes or to run one of the sample output files. To do this run
 
 `boogie boogie.bpl`
 
@@ -54,17 +56,11 @@ Alternatively, these issues do not appear when using the metals LSP (for example
 
  - Guarantees
  - Loops
+ - General lattice
 
 ### Tasks for the Summer
 
- - Value analysis 
- - Points to/alias analysis
- - Reading globals from the symbol table and global offset table
- - Using the call graph
- - Generate the verification conditions
- - Fix jumps (need to properly handle jumps to functions, calls with no return)
  - Replace nulls with option where possible
- - Move over to scala collections
  - Better handling toStrings (there is a lot of overlap between pred/exp and between toString/toBoogieString)
- - Parameter passing (is it possible to reliably detect which registers are used for parameters, particularly when optimisations are on? can we just havoc R0-R7?)
+ - At the moment all of the call registers (i.e. R0-R7) are passed as parameters, maybe it would be better to make these globals? in general this code could be neatedned up
 

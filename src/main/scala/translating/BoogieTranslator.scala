@@ -26,7 +26,8 @@ object BoogieTranslator {
   /** Peforms the BIL to IR translation
    */
   // def translate(state: State): State = inferConstantTypes(addVarDeclarations(optimiseSkips(addAssignBeforeReturn(identifyImplicitParams(addOutParam(addInParams(createLabels(state))))))))
-  def translate(state: State): State = inferConstantTypes(addVarDeclarations(optimiseSkips(addAssignBeforeReturn(addOutParam(addInParams(identifyImplicitParams(createLabels(state))))))))
+  def translate(state: State): State = 
+    inferConstantTypes(addVarDeclarations(optimiseSkips(addAssignAtRootBlock(addOutParam(addInParams(createLabels(state)))))))
 
   /**
    * delete later
@@ -90,7 +91,7 @@ object BoogieTranslator {
   }
 
   /** If a skip is not jumped to, we should remove it. Depends on createLabels
-    *   
+    * TODO: logic doesnt match docstring
     */
   private def optimiseSkips(state: State): State = {
     updateAllLines(state, {
@@ -267,6 +268,7 @@ object BoogieTranslator {
         if (!function.initStmts.exists(x => x.variable == localVar)) {
           val size = {
             if (!state.bvSizes.contains(localVar.name) && localVar.name.endsWith("_result")) 64
+            else if (CallStmt.callRegisters.contains(localVar.name)) 64
             else state.bvSizes(localVar.name)
           }
           initStmts += new InitStmt(localVar, uniqueLabel, s"bv$size")
@@ -300,6 +302,14 @@ object BoogieTranslator {
 
     state
   }
+
+  // TODO do not need to add verification conditions here
+  private def addAssignAtRootBlock(state: State) = updateAllFunctions(state, func => 
+      func.copy(
+        labelToBlock = func.labelToBlock.updated(func.rootBlockLabel, func.rootBlock.copy(
+          lines = CallStmt.callRegisters.map(x => RegisterAssign("NONE", Register(x, 64), Register(s"${x}_in", 64))).toList ++ func.rootBlock.lines 
+        ))
+      ))
 
   private def addAssignBeforeReturn(state: State): State = state.copy(functions = state.functions.map(f => 
     f.copy(labelToBlock = f.header.getOutParam match {
