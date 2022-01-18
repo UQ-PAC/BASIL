@@ -10,7 +10,7 @@ import astnodes.exp.`var`.{Register, MemLoad}
 import astnodes.stmt.assign.{GammaUpdate, RegisterAssign}
 import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, InitStmt, JmpStmt, Stmt}
 import translating.FlowGraph
-import util.Boogie.{generateBVHeader, generateBVToBoolHeader}
+import util.Boogie.{generateBVHeader, generateBVToBoolHeader, generateLibraryFuncHeader}
 import astnodes.pred.conjunct
 
 import scala.collection.{immutable, mutable}
@@ -55,13 +55,17 @@ case class State(
   // TODO modifies
   private def relyStr = "procedure rely(); modifies " + "heap, Gamma_heap" + ";\n ensures " + getCompleteRely.mkString(";\n ensures ") + ";"
 
-  override def toString: String = generateBVToBoolHeader + generateBVHeader(1) + generateBVHeader(32) + generateBVHeader(64)
+  override def toString: String = 
+    generateBVToBoolHeader + generateLibraryFuncHeader
+  + generateBVHeader(1) + generateBVHeader(32) + generateBVHeader(64)
     + globalInits.map(_.toBoogieString).mkString("\n") + "\n"
     // TODO this assumes everything is a global variable
     // + L.map((v, p) => s"axiom L_heap[${symbolTable(v.name).toBoogieString}] == $p;").mkString("\n") + "\n\n"
     + "function L(pos: bv64, heap: [bv64] bv8) returns (bool)" + lBodyStr + "\n\n"
     + relyStr + "\n\n"
     + functions.mkString("")
+
+  def functionFromCall(call: CallStmt) = functions.find(_.header.funcName == call.funcName).get
 
 }
 

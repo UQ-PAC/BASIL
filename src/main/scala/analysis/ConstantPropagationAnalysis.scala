@@ -11,6 +11,7 @@ import astnodes.stmt.*
 import astnodes.stmt.assign.*
 import translating.FlowGraph
 import translating.FlowGraph.Block
+import astnodes.exp.Concat
 
 // TODO: does not have to take this map?
 class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: Set[String],
@@ -27,36 +28,46 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
       if (state.size > 0) { 
       // println("map has element")
       // println(s"Statement: $stmt")
-      var newStmt = stmt
-      state.foreach(entry => {
-        // println(entry)
-        // stmt match {
-        //   case reg : RegisterAssign => println(s"RegAssign\n$reg")
-        //   case mem : MemAssign => println(s"MemAssign\n$mem")
-        //   case gamma : GammaUpdate => println(s"GammaUpdate\n$gamma")
-        //   case _ => println("Other")
+        var newStmt = stmt
+        // if (stmt.isInstanceOf[Assign]) {
+        //   if (stmt.asInstanceOf[Assign].getRhs.isInstanceOf[Concat]) {
+        //     println(stmt.asInstanceOf[Assign].getRhs)
+        //     println("LHS sz:")
+        //     println(stmt.asInstanceOf[Assign].getRhs.asInstanceOf[Concat].getLhs.size)
+        //     println("RHS sz:")
+        //     println(stmt.asInstanceOf[Assign].getRhs.asInstanceOf[Concat].getRhs.size)
+        //   }
         // }
-        if (newStmt.isInstanceOf[Assign] && entry._2 != null) {
-          val newExpr = findInstFromPc(flowgraph.getLines, entry._2)
-          // println(s"New expr: $newExpr")
-          newStmt = newStmt.asInstanceOf[Assign].replace(entry._1, newExpr.getRhs)
-          // println(s"New stmt: $newStmt")
-          if (newStmt.asInstanceOf[Assign].getRhs.isInstanceOf[BinOp]) {
-            val newStmtRhs = newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].simplify()
-            // println(s"New RHS: $newStmtRhs")
-            newStmt = newStmt.asInstanceOf[Assign].replace(newStmt.asInstanceOf[Assign].getRhs, newStmtRhs)
-            // println(s"New stmt: $newStmt")
-            // if (newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].canCompute()) {
-            //   val newVal = newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].compute()
-            //   val newLit = new Literal(newVal.toString)
-            //   newStmt = newStmt.asInstanceOf[Assign].replace(newStmt.asInstanceOf[Assign].getRhs, newLit)
-            // }
-          } else if (newStmt.asInstanceOf[Assign].getRhs.isInstanceOf[UniOp]) {
-
+        state.foreach(entry => {
+          // println(entry)
+          newStmt match {
+            case assignStmt : Assign => {
+              if (entry._2 != null) {
+                val newExpr = findInstFromPc(flowgraph.getLines, entry._2)
+                // println(s"New expr: $newExpr")
+                newStmt = newStmt.asInstanceOf[Assign].replace(entry._1, newExpr.getRhs)
+                // println(s"New stmt: $newStmt")
+                if (assignStmt.getRhs.isInstanceOf[BinOp]) {
+                  val newStmtRhs = newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].simplify()
+                  // println(s"New RHS: $newStmtRhs")
+                  newStmt = newStmt.asInstanceOf[Assign].replace(newStmt.asInstanceOf[Assign].getRhs, newStmtRhs)
+                } else if (assignStmt.getRhs.isInstanceOf[Concat]) {
+                  // println(newStmt)
+                  val newStmtRhs = newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[Concat].simplify
+                  // println(s"New RHS: $newStmtRhs")
+                  newStmt = newStmt.asInstanceOf[Assign].replace(newStmt.asInstanceOf[Assign].getRhs, newStmtRhs)
+                  // println(newStmt)
+                }
+              }
+            }
+            case condJump : CJmpStmt => {
+              newStmt = newStmt.asInstanceOf[CJmpStmt].subst(entry._1, findInstFromPc(flowgraph.getLines, entry._2).getRhs)
+                  // println(s"New RHS: $newStmtRhs")
+            }
+            case _ => 
           }
-        }
-      })
-      flowgraph.replaceLine(newStmt, stmt)
+        })
+        flowgraph.replaceLine(newStmt, stmt)
       }
     }
   }
@@ -86,14 +97,27 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
       //   newState.update(memAssignStmt.getLhs.asInstanceOf[MemLoad], memAssignStmt.getLabel.getPc)
       case regAssignStmt : RegisterAssign => {
         // System.out.println("in reg assign")
-        val oldStmPc = newState.getOrElse(regAssignStmt.getLhs, null)
+        if (!regAssignStmt.isFramePointer && !regAssignStmt.isLinkRegister && !regAssignStmt.isStackPointer) {
+          // println("can fold")
+          val oldStmPc = newState.getOrElse(regAssignStmt.getLhs, null)
+          if (oldStmPc != null) {
+            val oldStmt = findInstFromPc(flowgraph.getLines, oldStmPc)
+            if (oldStmt.getRhs.equals(regAssignStmt.getRhs)) {
+              toRemove+oldStmPc
+            }
+          }
+          newState.update(regAssignStmt.getLhs.asInstanceOf[Var], regAssignStmt.getLabel.getPc)
+        }
+      }
+      case memAssignStmt : MemAssign => {
+        val oldStmPc = newState.getOrElse(memAssignStmt.getLhs, null)
         if (oldStmPc != null) {
           val oldStmt = findInstFromPc(flowgraph.getLines, oldStmPc)
-          if (oldStmt.getRhs.equals(regAssignStmt.getRhs)) {
+          if (oldStmt.getRhs.equals(memAssignStmt.getRhs)) {
             toRemove+oldStmPc
           }
         }
-        newState.update(regAssignStmt.getLhs.asInstanceOf[Var], regAssignStmt.getLabel.getPc)
+        newState.update(memAssignStmt.getLhs.asInstanceOf[Var], memAssignStmt.getLabel.getPc)
       }
       case _ => {
         // System.out.println("elsewhere")

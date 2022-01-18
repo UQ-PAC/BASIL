@@ -15,8 +15,23 @@ case class Concat (left: Expr, right: Expr) extends Expr{
     case (Some(x), Some(y)) => Some(x + y)
   }
 
+  def getLhs = left
+  def getRhs = right
+
   override def vars = left.vars ++ right.vars
-  override def subst(v: Expr, w: Expr): Expr = this.copy(left = left.subst(v,w), right = right.subst(v,w))
+  override def subst(v: Expr, w: Expr): Expr = {
+    val newConcat = this.copy(left = left.subst(v,w), right = right.subst(v,w))
+    // println(s"New concat: $newConcat")
+    newConcat
+  }
+
+  def simplify: Expr = {
+    if (left.isInstanceOf[Literal] && left.asInstanceOf[Literal].toString.equals("0")) {
+      return this //right
+    }
+
+    return this
+  }
 }
 
 /**

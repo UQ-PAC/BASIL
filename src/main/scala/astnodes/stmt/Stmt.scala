@@ -8,13 +8,18 @@ import java.util
 
 /** Generic instruction fact
   */
-// TODO convert to trait when everything is in scala
-trait Stmt(val pc: String) {
-  private var label = new Label(pc)
-  def getLabel = label
-  def setLabel(label: Label) = this.label = label
-
+// TODO make var
+trait Stmt(var label: Label) {
+  // main
+  // def subst(v: Var, w: Var): Stmt
   def subst(v: Expr, w: Expr): Stmt
-  
   def toBoogieString = toString
+
+  def getLabel = label
+
+  // TODO redefine this without side effects
+  def copy(label: Label) = {
+    this.label = label
+    this
+  }
 }

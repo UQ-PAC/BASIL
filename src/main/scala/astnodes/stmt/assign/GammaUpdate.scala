@@ -8,8 +8,9 @@ import astnodes.stmt.Stmt
 
 import scala.jdk.CollectionConverters.*
 import java.util
+import astnodes.Label
 
-case class GammaUpdate (val lhs: Var | MemLoad, pred: Pred) extends Stmt("NA") {
+case class GammaUpdate (val lhs: Var | MemLoad, pred: Pred) extends Stmt(Label("NA")) {
 
   override def toBoogieString: String = s"${lhs.toBoogieString} := ${pred.toBoogieString};"
 

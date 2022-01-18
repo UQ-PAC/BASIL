@@ -72,6 +72,7 @@ class StatementLoader() extends BilBaseListener {
       if (name.charAt(0) == 'R') varSizes(name) = 64
       else if (name.charAt(0) == '#') varSizes(name) = rhs.size.get
       else if (name == "NF" || name == "ZF" || name == "CF" || name == "VF") varSizes(name) = 1
+      else if (name == "SP" || name == "FP" || name == "LR") varSizes(name) = 64
       else ???
     }
   }
@@ -89,10 +90,20 @@ class StatementLoader() extends BilBaseListener {
     case _ => ???
   }
 
+  var requires: List[Pred] = List()
+  var ensures: List[Pred] = List()
+
   override def exitSub(ctx: BilParser.SubContext): Unit = {
+    if (currentFunction != null) 
+      currentFunction.setRequiresEnsures(requires, ensures)
+
+    requires = List()
+    ensures = List()
+
     val address = ctx.addr.getText
     val name = ctx.functionName.getText
-    val function = new EnterSub(address, name)
+
+    val function = new EnterSub(address, name, List(), List())
     stmts += function
     this.currentFunction = function
   }
@@ -100,12 +111,15 @@ class StatementLoader() extends BilBaseListener {
     val id = ctx.param.getText // human-readable name
     val variable = ctx.`var`.getText // some register, probably
 
-    val size = 64
+    val size = typeToSize(ctx.nat.getText)
 
     // TODO it would be good to instead use in/out but what is in out
-    if (id.contains("result")) currentFunction.setOutParam(new OutParameter(Register(variable, size), Register(variable, size)))
-    else currentFunction.getInParams.add(new InParameter(Register(id, size), Register(variable, size)))
+    if (id.contains("result")) currentFunction.setOutParam(new OutParameter(Register(id, size), Register(variable, 64)))
+    else currentFunction.getInParams += InParameter(Register(id, size), Register(variable, size))
   }
+
+  override def exitEnsuresSpec(ctx: BilParser.EnsuresSpecContext): Unit = ensures = ensures.appended(getPred(ctx.pred))
+  override def exitRequiresSpec(ctx: BilParser.RequiresSpecContext): Unit = requires = requires.appended(getPred(ctx.pred))
 
   override def exitStmt(ctx: BilParser.StmtContext): Unit = {
     val address = ctx.addr.getText
@@ -156,7 +170,7 @@ class StatementLoader() extends BilBaseListener {
       stmts += new CJmpStmt(address, target, "TODO", cond) // TODO set up false GOTO
     } else if (ctx.call != null) { // statement is a call
       if (ctx.call.functionName == null) { // occasionally this occurs with "call LR with no return" lines
-        stmts += new ExitSub(ctx.addr.getText)
+        stmts += new ExitSub(ctx.addr.getText, None)
       } else {
         val funcName = ctx.call.functionName.getText
         stmts += new CallStmt(address, funcName, Option(ctx.call.returnaddr.addr).map(_.getText), List(), None)

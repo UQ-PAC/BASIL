@@ -22,6 +22,10 @@ case class BinOp(
     if (this.canCompute()) {
       val newVal = this.compute()
       return new Literal(newVal.toString)
+    } else if (firstExp.isInstanceOf[Literal] && firstExp.asInstanceOf[Literal].toString.equals("0") && this.getOp().equals("|")) {
+      return secondExp
+    } else if (secondExp.isInstanceOf[Literal] && secondExp.asInstanceOf[Literal].toString.equals("0") && this.getOp().equals("|")) {
+      return firstExp
     }
 
     var newLhs : Expr = firstExp
@@ -107,7 +111,11 @@ case class BinOp(
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
   override def toBoogieString = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
 
-  override def subst(v: Expr, w: Expr): Expr = this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
+  override def subst(v: Expr, w: Expr): Expr = {
+    val newBinOP = this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
+    // println(s"New BinOP: $newBinOP")
+    newBinOP
+  }
 
   override def vars = firstExp.vars ++ secondExp.vars
 

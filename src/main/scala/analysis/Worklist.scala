@@ -51,7 +51,7 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
     def printAllStates: Unit = {
         finalAnalysedStmtInfo.foreach(point => {
             println("Line:")
-            System.out.println(point._1)
+            System.out.println(point._1.getLabel.pc + " " + point._1)
             println("Dependencies:")
             point._2.asInstanceOf[ConstantPropagationAnalysis].state.foreach(varConstraint => {
                 System.out.println(varConstraint._1.toString + " : " + varConstraint._2)
@@ -69,9 +69,15 @@ class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
     def analyseFromMain = {
         workOnFunction("main");
         if (analysis.isInstanceOf[ConstantPropagationAnalysis]) {
-            finalAnalysedStmtInfo.foreach(entry => {
-                entry._2.asInstanceOf[ConstantPropagationAnalysis].resolveVar(entry._1)
+            controlFlow.getLines.forEach(stmt => {
+                val point = finalAnalysedStmtInfo.getOrElse(stmt, null)
+                if (point != null) {
+                    point.asInstanceOf[ConstantPropagationAnalysis].resolveVar(stmt)
+                }
             })
+            // finalAnalysedStmtInfo.foreach(entry => {
+            //     entry._2.asInstanceOf[ConstantPropagationAnalysis].resolveVar(entry._1)
+            // })
         }
         finish;
     }

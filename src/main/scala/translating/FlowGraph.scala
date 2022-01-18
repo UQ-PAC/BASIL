@@ -42,6 +42,7 @@ object FlowGraph {
 
   class Function(val header: EnterSub, val blocks: List[FlowGraph.Block]) {
     private val initStmts = new LinkedList[InitStmt]
+    // TODO should automatically generate these
     initStmts.add(new InitStmt(Register("ZF", -1 ), "ZF", "bv1"))
     initStmts.add(new InitStmt(Register("CF", -1 ), "CF", "bv1"))
     initStmts.add(new InitStmt(Register("NF", -1 ), "NF", "bv1"))
@@ -124,41 +125,18 @@ object FlowGraph {
         case Nil => None
       } ++ stmts.takeRight(2)).toList  // Make sure to get the last 3 lines
         // TODO check 2 or 3
-
-
-      /*
-      for (i <- 0 to (stmts.size - 3)) {
-        println(i)
-        println(stmts.size)
-        if (stmts.get(i).isInstanceOf[CallStmt]
-            && stmts.get(i + 1).isInstanceOf[JmpStmt]
-            && stmts.get(i + 3).isInstanceOf[RegisterAssign]
-        ) {
-            val call = stmts.get(i).asInstanceOf[CallStmt]
-            val cjmp = stmts.get(i + 1).asInstanceOf[JmpStmt]
-            val assign = stmts.get(i + 3).asInstanceOf[RegisterAssign]
-            if (cjmp.target == stmts.get(i + 1).getLabel.getPc) {
-                throw new AssumptionViolationException("Expected jump to next line")
-            }
-            call.setLHS(assign.getLhs)
-            stmts.remove(i + 1)
-            stmts.remove(i + 2)
-            stmts.remove(i + 3)
-        }
-      }
-
-      stmts
-      */
     }
+
+
     private def findFunction(blocks: List[FlowGraph.Block], functionName: String) = blocks.stream
-      .filter((b: FlowGraph.Block) => b.firstLine.isInstanceOf[EnterSub] && b.firstLine.asInstanceOf[EnterSub].getFuncName == functionName)
+      .filter((b: FlowGraph.Block) => b.firstLine.isInstanceOf[EnterSub] && b.firstLine.asInstanceOf[EnterSub].funcName == functionName)
       .findFirst.get
 
     private def stripBlocks(blocks: immutable.List[FlowGraph.Block]): immutable.List[FlowGraph.Block] = {
       val reachableBlocks = new ArrayBuffer[FlowGraph.Block]
       val queue = new LinkedList[FlowGraph.Block]
       val mainBlock = blocks.find(_.getLines.get(0) match {
-        case enterSub: EnterSub => enterSub.getFuncName == "main"
+        case enterSub: EnterSub => enterSub.funcName == "main"
         case _ => false
       }).get
 
@@ -175,7 +153,7 @@ object FlowGraph {
               queue.add(findBlockStartingWith(cjmp.trueTarget, blocks.asJava))
               queue.add(findBlockStartingWith(cjmp.falseTarget, blocks.asJava))
             case call: CallStmt =>
-              queue.add(findFunction(blocks.asJava, call.funcName))
+              if (!call.libraryFunction) queue.add(findFunction(blocks.asJava, call.funcName))
               if (call.returnTarget != None) queue.add(findBlockStartingWith(call.returnTarget.get, blocks.asJava))
             case _ =>
           })
@@ -237,7 +215,7 @@ object FlowGraph {
       */
     private def findInstWithPc(pc: String, stmts: List[Stmt]): Int = {
       if (pc.substring(0, 2) == "__") return -1 // TODO when jumping to a function e.g. goto @__gmon_start__
-      for (i <- 0 until stmts.size) { if (stmts.get(i).getLabel.getPc == pc) return i }
+      for (i <- 0 until stmts.size) { if (stmts.get(i).label.pc == pc) return i }
       throw new AssumptionViolationException(s"Error in constructing flow graph: No inst found with pc $pc.\n")
     }
 
@@ -259,7 +237,7 @@ object FlowGraph {
         val blockLines = new ArrayList[Stmt](lines.subList(splits.get(i), splits.get(i + 1)))
 // blocks are initially created with no children
         val block =
-          new FlowGraph.Block(blockLines.get(0).getLabel.getPc, blockLines, new ArrayList[FlowGraph.Block])
+          new FlowGraph.Block(blockLines.get(0).label.pc, blockLines, new ArrayList[FlowGraph.Block])
         blocks.add(block)
       }
       blocks
@@ -308,7 +286,7 @@ object FlowGraph {
       block.lastLine match {
         case jmp: JmpStmt => immutable.List(jmp.target)
         case cjmp: CJmpStmt => immutable.List(cjmp.trueTarget, cjmp.falseTarget)
-        // TODO case exitSub: ExitSub => immutable.List(lines.get(lines.indexOf(exitSub) + 1).getLabel.getPc)
+        // TODO case exitSub: ExitSub => immutable.List(lines.get(lines.indexOf(exitSub) + 1).getLabel.pc)
         case callStmt: CallStmt => callStmt.returnTarget.toList
         case _: ExitSub => immutable.List()
       }
@@ -344,7 +322,7 @@ object FlowGraph {
       *   the first block with a first line that contains the given pc, or null if none found
       */
     private def findBlockStartingWith(pc: String, blocks: List[FlowGraph.Block]): FlowGraph.Block = {
-      for (block <- blocks.asScala) { if (block.firstLine.getLabel.getPc == pc) return block }
+      for (block <- blocks.asScala) { if (block.firstLine.label.pc == pc) return block }
       null
     }
 
@@ -418,6 +396,8 @@ class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.M
   // TODO this isnt great
   private var globalInits: List[InitStmt] = new LinkedList[InitStmt].asInstanceOf[List[InitStmt]]
   globalInits.add(new InitStmt(Register("heap", -1), "heap", "[bv64] bv8")) // TODO label.none
+  globalInits.add(new InitStmt(Register("heap_free", -1 ), "heap_free", "[bv64] bool"))
+  globalInits.add(new InitStmt(Register("heap_sizes", -1 ), "heap_size", "[bv64] bv64"))
   globalInits.add(new InitStmt(Register("stack", -1), "stack", "[bv64] bv8"))
   globalInits.add(new InitStmt(Register("L_heap", -1), "heap", "[bv64] bool", true)) // TODO This isnt great
   globalInits.add(new InitStmt(Register("L_stack", -1), "stack", "[bv64] bool", true))
@@ -492,7 +472,7 @@ class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.M
   private def enforceUniqueLines() = {
     val linesList = getLines
     val pcList = new ArrayList[String]
-    linesList.forEach((line: Stmt) => pcList.add(line.getLabel.getPc))
+    linesList.forEach((line: Stmt) => pcList.add(line.label.pc))
     val linesSet = new HashSet[Stmt](linesList)
     val pcSet = new HashSet[String](pcList)
     if (linesSet.size != linesList.size) {
