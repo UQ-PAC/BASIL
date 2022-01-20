@@ -11,10 +11,12 @@ import BilParser.BilParser.PredContext
 import BilParser.BilParser.PredExprCompContext
 import BilParser.BilParser.PredUniOpContext
 import BilParser.BilParser.ProgSpecContext
+import BilParser.BilParser.PredLatticeElemContext
 import astnodes.parameters.InParameter
 import astnodes.parameters.OutParameter
 import astnodes.exp.*
 import astnodes.stmt.*
+import astnodes.pred.secLattice.SecLatticeElemId
 import astnodes.stmt.assign.{MemAssign, RegisterAssign}
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}
@@ -225,10 +227,11 @@ class StatementLoader() extends BilBaseListener {
   override def exitPredUniOp(ctx: PredUniOpContext): Unit = preds.put(ctx, new astnodes.pred.UniOp(ctx.uop.getText, getPred(ctx.pred)))
   override def exitPredBracket(ctx: PredBracketContext): Unit = preds.put(ctx, getPred(ctx.pred))
   override def exitPredExprComp(ctx: PredExprCompContext): Unit = preds.put(ctx, new ExprComp(ctx.expComp.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
-  override def exitPredLiteral(ctx: BilParser.PredLiteralContext): Unit = preds.put(ctx, ctx.getText match {
+  /* override def exitPredLiteral(ctx: BilParser.PredLiteralContext): Unit = preds.put(ctx, ctx.getText match {
     case "TRUE" => Bool.True
     case "FALSE" => Bool.False
-  })
+  }) */
+  override def exitPredLatticeElem(ctx: PredLatticeElemContext): Unit = SecLatticeElemId(ctx.getText)
 
   override def exitGamma(ctx: GammaContext): Unit = (getExpr(ctx.`var`), ctx.LOW, ctx.HIGH) match {
     case (v: Register, _: TerminalNode, null) => gammaMappings.put(v, Low)

@@ -119,13 +119,15 @@ pred :
     | uop pred            # predUniOp
     // TODO i dont think this is right
     | exp expComp exp     # predExprComp
-    | predLit             # predLiteral
+    // | predLit             # predLiteral
     | GAMMA_ID            # gammaVar
+	| LATTICE_ELEM 		  # predLatticeElem
     ;
 
 GAMMA_ID : 'Gamma_'ID ;
-primeVar : (ID | GAMMA_ID)'\''; // TODO
-predLit : TRUE | FALSE ;
+// PRIME_VAR : (ID | GAMMA_ID)'\''; // TODO
+// predLit : TRUE | FALSE ;
+LATTICE_ELEM : ID;
 
 
 predBop : AND | OR | NEQ_PRED | EQ_PRED ;

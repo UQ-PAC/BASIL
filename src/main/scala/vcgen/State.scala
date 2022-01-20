@@ -10,7 +10,7 @@ import astnodes.exp.`var`.{Register, MemLoad}
 import astnodes.stmt.assign.{GammaUpdate, RegisterAssign}
 import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, InitStmt, JmpStmt, Stmt}
 import translating.FlowGraph
-import util.Boogie.{generateBVHeader, generateBVToBoolHeader, generateLibraryFuncHeader}
+import util.Boogie.{generateBVHeader, generateBVToBoolHeader, generateLibraryFuncHeader, generateSecurityLatticeFuncHeader}
 import astnodes.pred.conjunct
 
 import scala.collection.{immutable, mutable}
@@ -18,6 +18,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.ListHasAsScala
 import astnodes.pred.Var
 import astnodes.pred.MemLoad
+import astnodes.pred.secLattice.SecurityLattice
 
 /** The program State
  *
@@ -36,6 +37,7 @@ case class State(
                   bvSizes: Map[String, Int],
                   private val L: Map[Register, Pred],
                   private val gamma0: Map[Register, Security],
+                  private val lattice: SecurityLattice = SecurityLattice.booleanLattice
 ) {
   def getL(v: Register): Pred = L.getOrElse(v, Bool.False)
   def getGamma(v: Register): Security = gamma0.getOrElse(v, High)
@@ -58,6 +60,7 @@ case class State(
   override def toString: String = 
     generateBVToBoolHeader + generateLibraryFuncHeader
   + generateBVHeader(1) + generateBVHeader(32) + generateBVHeader(64)
+  + lattice.toString + generateSecurityLatticeFuncHeader
     + globalInits.map(_.toBoogieString).mkString("\n") + "\n"
     // TODO this assumes everything is a global variable
     // + L.map((v, p) => s"axiom L_heap[${symbolTable(v.name).toBoogieString}] == $p;").mkString("\n") + "\n\n"
