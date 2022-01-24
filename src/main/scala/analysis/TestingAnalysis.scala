@@ -1,3 +1,4 @@
+/*
 package analysis;
 
 import analysis.AnalysisPoint;
@@ -68,3 +69,4 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
         "TestingAnalysis: " + this.currentState;
     }
 }
+*/

@@ -1,7 +1,6 @@
 package analysis;
 
 import scala.math.signum;
-import scala.collection.mutable.Map;
 import scala.jdk.CollectionConverters.ListHasAsScala;
 
 import analysis.AnalysisPoint;
@@ -12,14 +11,17 @@ import astnodes.exp.*;
 import util.SegmentationViolationException;
 import util.AssumptionViolationException
 
+import vcgen.State;
+
 class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoint {
     // i.e. map of Expr[X0] -> Expr[SP + 10]
     // "not a pointer" value is Literal(null)
     private var currentState: Map[Expr, Set[Expr]] = pointsToGraph;
 
     private var stackOffset: Int = 0;
+    private var heapAllocations: Int = 0;
 
-    var functionName: String = "";
+    var functionName: String = "main";
 
     def this() = {
         this(Map());
@@ -33,17 +35,17 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
         return count;
     }
 
-    override def equals(other: AnalysisPoint): Boolean = {
+    override def equals(other: this.type): Boolean = {
         var otherAsThis: PointsToAnalysis = typeCheck(other);
         this.currentState.equals(otherAsThis.currentState);
     }
 
-    override def compare(other: AnalysisPoint): Int = {
+    override def compare(other: this.type): Int = {
         var otherAsThis: PointsToAnalysis = typeCheck(other);
         (this.countEdges - otherAsThis.countEdges).sign;
     }
 
-    override def join(other: AnalysisPoint): AnalysisPoint = {
+    override def join(other: this.type) = {
         var otherAsThis: PointsToAnalysis = typeCheck(other);
         var combined: Map[Expr, Set[Expr]] = Map[Expr, Set[Expr]]();
 
@@ -55,10 +57,11 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
             })
         });
 
-        PointsToAnalysis(combined);
+        this.currentState = combined;
+        this;
     }
 
-    override def meet(other: AnalysisPoint): AnalysisPoint = {
+    override def meet(other: this.type) = {
         var otherAsThis: PointsToAnalysis = typeCheck(other);
         var intersected: Map[Expr, Set[Expr]] = Map[Expr, Set[Expr]]();
 
@@ -70,10 +73,11 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
             })
         });
 
-        PointsToAnalysis(intersected);
+        this.currentState = intersected;
+        this;
     }
 
-    override def transfer(stmt: Stmt): AnalysisPoint = {
+    override def transfer(stmt: Stmt) = {
         var newAnalysedMap: Map[Expr, Set[Expr]] = currentState;
         stmt match {
             case assignStmt: Assign => {
@@ -82,15 +86,15 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                 (assignStmt.rhs) match {
                     case assignFromRegister: Register => {
                         // () := foo ~ LHS points to everything that (foo) points to i.e. *foo
-                        locationValue = currentState.getOrElse(assignFromRegister, Set(Literal(null)));
+                        locationValue = currentState.getOrElse(assignFromRegister, Set(NonPointerValue));
                     }
                     case assignFromMem: MemLoad => {
                         // () := mem[foo] ~ LHS points to everything that is pointed to by memory pointed to by foo i.e. **foo
                         currentState.getOrElse(assignFromMem.exp, Set()).foreach(single => {
                             if (locationValue == null) {
-                                locationValue = currentState.getOrElse(single, Set(Literal(null)));
+                                locationValue = currentState.getOrElse(single, Set(NonPointerValue));
                             } else {
-                                locationValue = locationValue.union(currentState.getOrElse(single, Set(Literal(null))));
+                                locationValue = locationValue.union(currentState.getOrElse(single, Set(NonPointerValue)));
                             }
                         });
                     }
@@ -104,7 +108,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                     }
                     case assignFromLiteral: Literal => {
                         // () := 1 ~ LHS points to Literal(null) as constant pointers are disregarded
-                        locationValue = Set(Literal(null));
+                        locationValue = Set(NonPointerValue);
                     }
                     case _ => {
                         ;
@@ -112,13 +116,13 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                 }
 
                 if (locationValue == null) {
-                    return PointsToAnalysis(currentState);
+                    return this;
                 }
 
                 (assignStmt.lhs) match {
                     case assignToRegister: Register => {
                         // foo := () ~ basic assignment
-                        currentState.update(assignToRegister, locationValue);
+                        currentState = currentState + (assignToRegister -> locationValue);
                     }
                     case assignToMem: MemLoad => {
                         // mem[foo] := () ~ everything that foo points to could point to RHS.
@@ -127,13 +131,13 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                         
                         if (memLoadPotentialValues.size > 1) {
                             memLoadPotentialValues.foreach(pointedLoc => {
-                                currentState.update(pointedLoc, currentState.getOrElse(pointedLoc, Set()).union(locationValue));
+                                currentState = currentState + (pointedLoc -> currentState.getOrElse(pointedLoc, Set()).union(locationValue));
                             });
                         } else if (memLoadPotentialValues.size == 1) {
-                            currentState.update(memLoadPotentialValues.head, locationValue);
+                            currentState = currentState + (memLoadPotentialValues.head -> locationValue);
                         } else {
                             // if it's a known "constant pointer" - contains SP, FP, or LR - then we're fine, otherwise error
-                            currentState.update(assignToMem, locationValue);
+                            currentState = currentState + (assignToMem -> locationValue);
                         }
                     }
                     case _ => {
@@ -142,10 +146,16 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                 }
             }
             case functionCall: CallStmt => {
-                // only defined "library" functions in the worklist make it to here.
-                if (functionCall.funcName == "malloc") {
-                    // R0 -> new heap allocation (assuming malloc clobbers R0 with its return value)
-                    currentState.update(Register("R0", 64), Set(Literal("alloc")));
+                // all function calls make it here. "important" functions get a case, otherwise
+                // we just note that the SP offset is 0.
+                functionCall.funcName match {
+                    case "malloc" => {
+                        currentState = currentState + (Register("R0", 64) -> Set(HeapAllocation(heapAllocations)));
+                        heapAllocations += 1;
+                    }
+                    case _ => {
+                        functionName = functionCall.funcName;
+                    }
                 }
             }
             case returnStmt: ExitSub => {
@@ -162,7 +172,8 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
             }
         }
 
-        PointsToAnalysis(newAnalysedMap);
+        this.currentState = newAnalysedMap;
+        return this;
     }
 
     def knownPointer(expr: Expr): Boolean = {
@@ -181,8 +192,13 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
         hasKnownPointer;
     }
 
-    override def createLowest: AnalysisPoint = {
-        PointsToAnalysis(Map[Expr, Set[Expr]]());
+    override def createLowest = {
+        this.currentState = Map[Expr, Set[Expr]]();
+        this;
+    }
+
+    override def applyChanges(preState: State, information: Map[Stmt, this.type]) = {
+        preState;
     }
 
     override def toString: String = {
@@ -192,7 +208,38 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
 
 object NonPointerValue extends Literal(null, Option(64)) {
     // Represents constant integer values like 0x20.
+    // Because these can't be guaranteed to be valid (they might be unmapped, or invalid, or whatever) we just assume
+    // that they're invalid.
 }
+
+class HeapAllocation(val id: Int) extends Literal("alloc-" + id, Option(64)) {
+    // represents new heap allocations. Returned by malloc().
+}
+
+/**
+Anatomy of nested stack-affecting function call (from basicpointer example):
+.
+                                                        // start of function
+0000010c: mem := mem with [SP - 0x20, el]:u64 <- FP     // save caller's SP (FP) to stack for return
+0000010e: mem := mem with [SP - 0x18, el]:u64 <- LR     // save caller's PC (LR) to stack for return
+00000110: SP := SP - 0x20                               // allocate stack space for this function
+.
+                                                        // prep for function call
+00000114: FP := SP                                      // place our SP in FP for function call
+00000118: R0 := 4                                       // add function argument/s
+0000011c: LR := 0x764                                   // place our PC in LR for function return
+0000011f: call @malloc with return %00000121            // call function. BAP identifies the return address.
+.
+                                                        // internally, called function follows this same process
+                                                        // on return, reset SP with our provided FP
+                                                        // return to address of our provided LR
+-
+                                                        // end of function
+00000161: FP := mem[SP, el]:u64                         // pop caller's FP off the stack
+00000163: LR := mem[SP + 8, el]:u64                     // pop caller's LR off the stack
+00000165: SP := SP + 0x20                               // deallocate stack space from this function (SP := FP in some cases)
+00000169: call LR with noreturn                         // jump back to caller's PC (LR)
+**/
 
 class FunctionStackPointer(val functionName: String, val offset: Long) extends Literal("SP", Option(64)) {
     // Represents this function's SP, s.t. StackPointer(32) is SP + 32, or SP + 0x20.

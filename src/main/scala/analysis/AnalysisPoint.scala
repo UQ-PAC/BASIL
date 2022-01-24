@@ -3,12 +3,18 @@ package analysis
 import astnodes.stmt.Stmt;
 import util.LatticeViolationException;
 import util.AnalysisTypeException;
+import vcgen.State;
 
-trait AnalysisPoint {
+abstract class AnalysisPoint {
     /**
      * Whether the analysis operates forwards or backwards over the code.
      */
     val isForwards: Boolean = true;
+
+    /**
+     * Library functions that get skipped instead of inlining
+     */
+    val libraryFunctions: Set[String] = Set("malloc");
 
     /**
      * An ordering relation on the currentState of an analysis point so we can check any given transfer
@@ -17,14 +23,14 @@ trait AnalysisPoint {
      * Returns 1 iff this < other, 0 iff this ≡ other, and -1 iff this > other - so a return value of 1
      * indicates precision has been lost.
      */
-    def compare(other: AnalysisPoint): Int;
+    def compare(other: this.type): Int;
 
     /**
      * Defines equality on two analysis points. Not the same as compare == 0; compare defines an ordering relation
      * where two elements might be on the same level of the lattice, whereas equals is simply asking if the two are
      * identical
      */
-    def equals(other: AnalysisPoint): Boolean;
+    def equals(other: this.type): Boolean;
 
     /**
      * A general transfer function on the lattice. Gives us a new AnalysisPoint, which is the result of
@@ -33,19 +39,19 @@ trait AnalysisPoint {
      * Note that this function should be able to handle all the different transfer functions by if/else'ing
      * every type of statement the analysis needs to handle.
      */
-    def transfer(stmt: Stmt): AnalysisPoint;
+    def transfer(stmt: Stmt): this.type;
 
     /**
      * A union or join of two lattice states. Should contain all the information from the first state
      * as well as all the information from the second state - even if this introduces uncertainty.
      */
-    def join(other: AnalysisPoint): AnalysisPoint;
+    def join(other: this.type): this.type;
     
     /**
      * An intersection or meet of two lattice states. Should contain all the information that appears in
      * both states.
      */
-    def meet(other: AnalysisPoint): AnalysisPoint;
+    def meet(other: this.type): this.type;
 
     /**
      * Creates an AnalysisPoint in the same type of analysis as this one, but with currentState as whatever
@@ -53,7 +59,12 @@ trait AnalysisPoint {
      * 
      * For most analyses, this will be low/false/no information, but for top-down analyses
      */
-    def createLowest: AnalysisPoint;
+    def createLowest: this.type;
+
+    /**
+     * Creates a new state that reflects the information discovered by the analysis.
+     */
+    def applyChanges(preState: State, information: Map[Stmt, this.type]): State;
 
     /**
      * Basic placeholder that gives the simple name of the class, which useful for exception handling. Feel
@@ -70,8 +81,8 @@ trait AnalysisPoint {
      * The only case for overriding this function should be if the analysis is top-down rather than bottom-up
      * In that scenario, changing the comparison to < 0 should make it work.
      */
-    def transferAndCheck(stmt: Stmt): AnalysisPoint = {
-        var newState: AnalysisPoint = transfer(stmt);
+    def transferAndCheck(stmt: Stmt): this.type = {
+        var newState: this.type = transfer(stmt);
 
         if (compare(newState) > 0) {
             throw new LatticeViolationException(toString); 
@@ -81,12 +92,12 @@ trait AnalysisPoint {
     }
 
     /**
-     * A generically-named "combine" function. For must-analyses, this should be intersection(other), but for may-
-     * analyses, union(other) is fine. 
+     * A generically-named "combine" function. For must-analyses, this should be meet(other), but for may-
+     * analyses, join(other) is fine. 
      * 
      * This function gets used by the worklist to combine parents' states as well as overlapping functions' states.
      */
-    def combine(other: AnalysisPoint): AnalysisPoint = {
+    def combine(other: this.type): this.type = {
         join(other);
     }
 

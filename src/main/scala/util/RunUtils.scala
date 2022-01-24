@@ -37,9 +37,6 @@ object RunUtils {
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
-    // var worklist: BlockWorklist = BlockWorklist(Set(TestingAnal), flowGraph);
-    // worklist.workOnBlocks;
-
     val state = State(
       flowGraph,
       statementLoader.rely.getOrElse(Bool.True), // TODO check default
@@ -50,10 +47,10 @@ object RunUtils {
       statementLoader.gammaMappings.toMap
     );
 
-    val updatedState = BoogieTranslator.translate(state)
+    val aliasWorklist: Worklist = Worklist(PointsToAnalysis(), state);
+    val analysedState = aliasWorklist.doAnalysis;
 
-    var worklist: InlineWorklist = InlineWorklist(PointsToAnalysis(), flowGraph);
-    worklist.analyseFromMain;
+    val updatedState = BoogieTranslator.translate(analysedState)
 
     VCGen.genVCs(updatedState)
   }
