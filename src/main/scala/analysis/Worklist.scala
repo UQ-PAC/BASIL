@@ -1,12 +1,12 @@
 package analysis;
 
 import vcgen.*;
-import astnodes.stmt.Stmt;
+import astnodes.stmt.*;
 import scala.collection.mutable.ArrayDeque;
-import org.stringtemplate.v4.compiler.STParser.namedArg_return
+import java.lang.NullPointerException;
 
 class Worklist(val analysis: AnalysisPoint, startState: State) {
-    private val debug: Boolean = false;
+    private final val debug: Boolean = true;
     private val directionForwards: Boolean = analysis.isForwards;
     private val libraryFunctions: Set[String] = analysis.libraryFunctions;
 
@@ -16,13 +16,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
     var previousStmtAnalysisState: analysis.type = analysis.createLowest;
     var stmtAnalysisInfo: Map[Stmt, analysis.type] = Map();
     var blockAnalysisInfo: Map[Block, analysis.type] = Map();
-
-    def finish = {
-        if debug then println(getAllInfo);
-
-        previousStmtAnalysisState = null;
-        blockAnalysisInfo = null;
-    }
     
     def getAllInfo: Map[Stmt, analysis.type] = {
         stmtAnalysisInfo;
@@ -34,7 +27,11 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
 
     def doAnalysis: State = {
         analyseFunction("main");
-        finish;
+        if debug then println(getAllInfo);
+
+        previousStmtAnalysisState = null;
+        blockAnalysisInfo = null;
+
         analysis.applyChanges(startState, getAllInfo);
     }
 
@@ -58,7 +55,7 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
                 previousStmtAnalysisState = analysis.createLowest;
             }
 
-            // TODO: actual analysis goes here
+            currentFunctionAnalysedInfo = analyseBlock(nextBlockToAnalyse, currentFunctionAnalysedInfo);
 
             if (!currentWorklist.isEmpty) {
                 previousStmtAnalysisState = functionStartAnalysisState;
@@ -67,6 +64,72 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
 
         saveNewAnalysisInfo(currentFunctionAnalysedInfo);
         currentCallString = currentCallString.filter(funcName => {funcName != name});
+    }
+
+    def analyseBlock(block: Block, currentInfo: Map[Stmt, analysis.type]): Map[Stmt, analysis.type] = {
+        if debug then println("analysing block: " + block.label);
+        var outputInfo: Map[Stmt, analysis.type] = null;
+
+        block.lines.foreach(blockStmt => {
+            outputInfo = analyseStmt(blockStmt, currentInfo);
+        })
+        
+        if (blockAnalysisInfo.getOrElse(block, null) != previousStmtAnalysisState) {
+            blockAnalysisInfo = blockAnalysisInfo + (block -> previousStmtAnalysisState);
+
+            (getBlockChildren(block) + block).foreach(b => {
+                if (!currentWorklist.contains(b)) {
+                    currentWorklist.append(b);
+                }
+            })
+        } else {
+            ;
+        }
+
+        outputInfo;
+    }
+
+    def analyseStmt(stmt: Stmt, currentInfo: Map[Stmt, analysis.type]): Map[Stmt, analysis.type] = {
+        if debug then println("analysing stmt: " + stmt);
+        var outputInfo: Map[Stmt, analysis.type] = null;
+        
+        stmt match {
+            case functionCallStmt: CallStmt => {
+                var inProgressWorklist: ArrayDeque[Block] = currentWorklist;
+
+                if (!currentCallString.contains(functionCallStmt.funcName)) {
+                    previousStmtAnalysisState = previousStmtAnalysisState.transferAndCheck(stmt);
+
+                    outputInfo = currentInfo + (stmt -> previousStmtAnalysisState);
+
+                    if (!libraryFunctions.contains(functionCallStmt.funcName)) {
+                        analyseFunction(functionCallStmt.funcName);
+                    }
+                } else {
+                    println(currentCallString);
+                    println("ignoring recursive call in " + functionCallStmt.funcName);
+                }
+
+                currentWorklist = inProgressWorklist;
+            }
+            case _ => {
+                previousStmtAnalysisState = previousStmtAnalysisState.transferAndCheck(stmt);
+
+                try {
+                    outputInfo  = currentInfo + (stmt -> previousStmtAnalysisState);
+                } catch {
+                    case e: NullPointerException => {
+                        println(outputInfo);
+                        println(currentInfo);
+                        println(stmt);
+                        println(previousStmtAnalysisState);
+                        throw new NullPointerException;
+                    }
+                }
+            }
+        }
+
+        outputInfo;
     }
 
     /**
