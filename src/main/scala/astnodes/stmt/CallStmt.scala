@@ -14,7 +14,7 @@ case class CallStmt(val pc: String, funcName: String, returnTarget: Option[Strin
     // TODO neaten up call args logic
     val argsStr = 
       if (libraryFunction) args.map(arg => arg.name).mkString(", ")
-      else CallStmt.callRegisters.map(x => s"$x: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x: bool").mkString(", ")
+      else CallStmt.callRegisters.map(x => s"$x: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x: SecurityLevel").mkString(", ")
 
     val lhsStr = lhs match {
       case _ if (!libraryFunction) => CallStmt.callRegisters.mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x").mkString(", ") + " := "

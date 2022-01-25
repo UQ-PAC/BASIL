@@ -1,7 +1,7 @@
 package astnodes.exp.`var`
 
 import astnodes.exp.Expr
-import astnodes.pred
+import astnodes.sec
 
 /** Variable
  *
@@ -9,5 +9,5 @@ import astnodes.pred
  */
 trait Var extends Expr {
   override def subst(v: Var, w: Var): Var = if (v == this) w else this
-  def toGamma: pred.Var | pred.MemLoad
+  def toGamma: sec.SecVar | sec.SecMemLoad
 }

@@ -58,8 +58,8 @@ literal : NUMBER ;
 nat : (NAT | NUMBER) ;
 addr : NUMBER ;
 
-TRUE: 'TRUE' ;
-FALSE: 'FALSE' ;
+// TRUE: 'TRUE' ;
+// FALSE: 'FALSE' ;
 HIGH : 'HIGH' ;
 LOW : 'LOW' ;
 CAST : ('pad' | 'extend' | 'high' | 'low') ;
@@ -106,7 +106,7 @@ UNKNOWN_OP : '~>>' ;
 progSpec: (lpreds | gammas | lattice | rely)* ;
 
 lpreds : 'L:' lpred (',' lpred)* ;
-lpred :  (var MAPSTO pred);
+lpred :  (var MAPSTO secExpr);
 gammas : 'GAMMA:' gamma (',' gamma)* ;
 gamma :  (var MAPSTO (LOW | HIGH));
 lattice : 'Lattice:' lattice_elem (',' lattice_elem)* ;
@@ -119,15 +119,22 @@ pred :
     | uop pred            # predUniOp
     // TODO i dont think this is right
     | exp expComp exp     # predExprComp
-    | predLit             # predLiteral
+    // | predLit             # predLiteral
     | GAMMA_ID            # gammaVar
     ;
 
 GAMMA_ID : 'Gamma_'ID ;
-primeVar : (ID | GAMMA_ID)'\''; // TODO
-predLit : TRUE | FALSE ;
+// PRIME_VAR : (ID | GAMMA_ID)'\''; // TODO
+// predLit : TRUE | FALSE ;
+LATTICE_ELEM : ID;
 
 
 predBop : AND | OR | NEQ_PRED | EQ_PRED ;
 expComp : NEQ_PRED | EQ_PRED | GE | GT | LE | LT ;
+
+secExpr :
+	'if' pred 'then' secExpr 'else' secExpr #secITE
+	| ID 		  # secLatticeElem
+	;
+
 

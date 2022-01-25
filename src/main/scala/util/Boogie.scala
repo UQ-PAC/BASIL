@@ -67,4 +67,18 @@ object Boogie {
       |ensures (forall i: bv64 :: (bv64ule(0bv64, i) && bv64ult(i, bv64udiv(heap_sizes[addr], 4bv64))) ==> heap_free[bv64add(addr, i)] == true); 
       |
       |""".stripMargin
+
+  def generateSecurityLatticeFuncHeader = """
+      |function meet (SecurityLevel, SecurityLevel) returns (SecurityLevel);
+      |axiom (forall x: SecurityLevel, y: SecurityLevel :: meet(x,y) <: x && meet(x,y) <: y && (forall s: SecurityLevel :: (s <: x && s <: y) ==> (s <: meet(x,y))));
+      |
+      |function join (SecurityLevel, SecurityLevel) returns (SecurityLevel);
+      |axiom (forall x: SecurityLevel, y: SecurityLevel :: x <: join(x,y) && y <: join(x,y) && (forall s: SecurityLevel :: (x <: s && y <: s) ==> (join(x,y) <: s)));
+      |
+      |function secITE (cond: bool, first: SecurityLevel, second: SecurityLevel) returns (SecurityLevel);
+      | axiom (forall cond: bool, first: SecurityLevel, second: SecurityLevel :: (cond ==> (secITE(cond, first, second) == first)) && (!cond ==> (secITE(cond, first, second) == second))) ;
+      |
+      |
+  """.stripMargin
+
 }

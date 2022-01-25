@@ -2,8 +2,7 @@ package astnodes.exp.`var`
 
 import astnodes.exp.*
 import astnodes.pred
-
-import java.util.Collections
+import astnodes.sec.SecMemLoad
 
 /** A load from memory at location exp
  */
@@ -31,7 +30,6 @@ case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
     case _                   => false
   }
 
-  // TODO need to rework memload .....
-  def toL = new pred.MemLoad(false, true, exp)
-  def toGamma = new pred.MemLoad(true, false, exp)
+  def toL = SecMemLoad(false, true, exp)
+  override def toGamma = SecMemLoad(true, false, exp)
 }

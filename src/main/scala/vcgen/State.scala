@@ -7,10 +7,11 @@ import astnodes.pred
 import astnodes.exp
 import astnodes.Label
 import astnodes.exp.`var`.{Register, MemLoad}
+import astnodes.sec.{Sec, SecLattice, SecITE}
 import astnodes.stmt.assign.{GammaUpdate, RegisterAssign}
 import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, InitStmt, JmpStmt, Stmt}
 import translating.FlowGraph
-import util.Boogie.{generateBVHeader, generateBVToBoolHeader, generateLibraryFuncHeader}
+import util.Boogie.{generateBVHeader, generateBVToBoolHeader, generateLibraryFuncHeader, generateSecurityLatticeFuncHeader}
 import astnodes.pred.conjunct
 
 import scala.collection.{immutable, mutable}
@@ -18,6 +19,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.ListHasAsScala
 import astnodes.pred.Var
 import astnodes.pred.MemLoad
+import astnodes.sec.SecLattice
 
 /** The program State
  *
@@ -34,18 +36,19 @@ case class State(
                   globalInits: List[InitStmt],
                   symbolTable: Map[String, Literal],
                   bvSizes: Map[String, Int],
-                  private val L: Map[Register, Pred],
+                  private val L: Map[Register, Sec],
                   private val gamma0: Map[Register, Security],
+                  lattice: SecLattice = SecLattice.booleanLattice,
 ) {
-  def getL(v: Register): Pred = L.getOrElse(v, Bool.False)
+  def getL(v: Register): Sec = L.getOrElse(v, SecLattice.TRUE)
   def getGamma(v: Register): Security = gamma0.getOrElse(v, High)
 
   private def lBodyStr =
     if (L.isEmpty) ";"
     else {
-      "{ " + L.foldLeft(Bool.False: Pred) { case (prev, (v, p)) =>
-        ITE(ExprComp("==", Register("pos", 64), symbolTable(v.name)), p, prev)
-      }.toBoogieString + " }"
+      "{ " + L.foldLeft(lattice.top: Sec) { case (prev, (v, p)) =>
+        SecITE(ExprComp("==", Register("pos", 64), symbolTable(v.name)), p, prev)
+      }.toString + " }"
     }
 
   //TODO handle size of memload
@@ -58,10 +61,11 @@ case class State(
   override def toString: String = 
     generateBVToBoolHeader + generateLibraryFuncHeader
   + generateBVHeader(1) + generateBVHeader(32) + generateBVHeader(64)
+  + lattice.toString + generateSecurityLatticeFuncHeader
     + globalInits.map(_.toBoogieString).mkString("\n") + "\n"
     // TODO this assumes everything is a global variable
     // + L.map((v, p) => s"axiom L_heap[${symbolTable(v.name).toBoogieString}] == $p;").mkString("\n") + "\n\n"
-    + "function L(pos: bv64, heap: [bv64] bv8) returns (bool)" + lBodyStr + "\n\n"
+    + "function L(pos: bv64, heap: [bv64] bv8) returns (SecurityLevel)" + lBodyStr + "\n\n"
     + relyStr + "\n\n"
     + functions.mkString("")
 
@@ -71,7 +75,7 @@ case class State(
 
 case object State {
   /** Generate a State object from a flow graph */
-  def apply(flowGraph: FlowGraph, rely: Pred, guar: Pred, symbolTable: Map[String, Literal], bvSizes: Map[String, Int], lPreds: Map[Register, Pred], gamma: Map[Register, Security]): State = {
+  def apply(flowGraph: FlowGraph, rely: Pred, guar: Pred, symbolTable: Map[String, Literal], bvSizes: Map[String, Int], lPreds: Map[Register, Sec], gamma: Map[Register, Security]): State = {
     val controlledBy = lPreds.map{
       case (v, p) => (v, p.vars)
     }
@@ -89,9 +93,11 @@ case object State {
       case x if (x.header.funcName == "main") => {
         // Update the first block to contain the gamma assignments
         val (pc, block) = (x.rootBlockLabel, x.rootBlock)
-        val newBlock = block.copy(lines = block.lines.prependedAll(gamma.map{case (v, s) => GammaUpdate(pred.MemLoad(gamma = true, L = false, symbolTable(v.name)), s.toBool)}))
-        val newMap = x.labelToBlock.updated(pc, newBlock)
-        x.copy(labelToBlock = newMap)
+        // TODO (this will need to be added back when the grammar is updated) 
+        // val newBlock = block.copy(lines = block.lines.prependedAll(gamma.map{case (v, s) => GammaUpdate(pred.MemLoad(gamma = true, L = false, symbolTable(v.name)), s.toBool)}))
+        // val newMap = x.labelToBlock.updated(pc, newBlock)
+        // x.copy(labelToBlock = newMap)
+        x
       }
       case x => x
     }
