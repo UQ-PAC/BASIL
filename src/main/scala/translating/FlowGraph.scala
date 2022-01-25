@@ -395,8 +395,6 @@ class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.M
   globalInits.add(new InitStmt(Register("heap_free", -1 ), "heap_free", "[bv64] bool"))
   globalInits.add(new InitStmt(Register("heap_sizes", -1 ), "heap_size", "[bv64] bv64"))
   globalInits.add(new InitStmt(Register("stack", -1), "stack", "[bv64] bv8"))
-  globalInits.add(new InitStmt(Register("L_heap", -1), "heap", "[bv64] bool", true)) // TODO This isnt great
-  globalInits.add(new InitStmt(Register("L_stack", -1), "stack", "[bv64] bool", true))
   globalInits.add(new InitStmt(Register("SP", -1 ), "SP", "bv64"))
   globalInits.add(new InitStmt(Register("R31", -1 ), "R31", "bv64"))
 

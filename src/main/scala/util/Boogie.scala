@@ -74,6 +74,11 @@ object Boogie {
       |
       |function join (SecurityLevel, SecurityLevel) returns (SecurityLevel);
       |axiom (forall x: SecurityLevel, y: SecurityLevel :: x <: join(x,y) && y <: join(x,y) && (forall s: SecurityLevel :: (x <: s && y <: s) ==> (join(x,y) <: s)));
+      |
+      |function secITE (cond: bool, first: SecurityLevel, second: SecurityLevel) returns (SecurityLevel);
+      | axiom (forall cond: bool, first: SecurityLevel, second: SecurityLevel :: (cond ==> (secITE(cond, first, second) == first)) && (!cond ==> (secITE(cond, first, second) == second))) ;
+      |
+      |
   """.stripMargin
 
 }

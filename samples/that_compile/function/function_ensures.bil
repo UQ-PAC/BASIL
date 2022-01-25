@@ -209,7 +209,7 @@ GAMMA: x -> LOW, y -> LOW
 00000108: call @register_tm_clones with noreturn
 
 0000025b: sub get_two(get_two_result)
-ENSURES: Gamma_R0_out == true
+ENSURES: Gamma_R0_out == s_TRUE
 00000270: get_two_result :: out u32 = R0
 
 0000012b:

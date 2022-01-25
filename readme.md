@@ -68,6 +68,11 @@ The tool tries to match the ARM calling convention, which specifies that R0-R7 a
 The tool cannot yet handle the case where parameters are stored on the stack (e.g. if more than 8 parameters is passed). 
 
 
+## Producing output files
+
+The program needs a `.bil` and a `.elf` file to run. The `.bil` file is produced by the lifter and the `.elf` file is produced by running `readelf -s -r a.out`. The `lift_docker.sh` script will correctly produce both files from a `.c` file.
+
+
 
 ## Thingss left to do
 
