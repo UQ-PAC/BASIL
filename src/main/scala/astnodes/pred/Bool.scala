@@ -5,7 +5,6 @@ import astnodes.exp.`var`.{Register, Var}
 
 import java.util.Collections
 
-
 case class Bool(name: String) extends Pred {
   override def toString: String = name
 
@@ -17,4 +16,3 @@ case object Bool {
   val True = Bool("true")
   val False = Bool("false")
 }
-

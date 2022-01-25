@@ -4,9 +4,9 @@ import astnodes.exp.Expr
 import astnodes.sec
 
 /** Variable
- *
- *  Variables can be registers (e.g. R1, SP, #31) or loads from memory (e.g. mem[10])
- */
+  *
+  * Variables can be registers (e.g. R1, SP, #31) or loads from memory (e.g. mem[10])
+  */
 trait Var extends Expr {
   override def subst(v: Var, w: Var): Var = if (v == this) w else this
   def toGamma: sec.SecVar | sec.SecMemLoad

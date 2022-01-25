@@ -34,7 +34,7 @@ case object UniOperator extends Enumeration {
     val size1 = size.getOrElse(64) // TODO
     value match {
       // TODO !!!!!
-      case UnaryNegation => s"bv${size1}not" // TODO this is unarynecation right?
+      case UnaryNegation     => s"bv${size1}not" // TODO this is unarynecation right?
       case BitwiseComplement => s"bv${size1}neg"
     }
   }

@@ -1,7 +1,7 @@
 package util
 
 object Boogie {
-  def generateBVHeader (size: Int) = f"""
+  def generateBVHeader(size: Int) = f"""
       |/*****
       | * Bitvector functions for bv$size
       | ****/

@@ -1,6 +1,5 @@
 import org.scalatest.funsuite.AnyFunSuite
 
-
 class JumpTests extends AnyFunSuite {
   ignore("iflocal") {
     val result = TestUtils.processBoogieFile("if/iflocal")

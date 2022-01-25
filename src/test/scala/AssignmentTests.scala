@@ -1,8 +1,6 @@
 import org.scalatest.funsuite.AnyFunSuite
 
-
-/**
-  * TODO: write tests
+/** TODO: write tests
   *   - tests for typing
   *   - tests for correctness
   *   - tests for bv to mem conversions

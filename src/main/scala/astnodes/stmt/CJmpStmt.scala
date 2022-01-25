@@ -9,14 +9,15 @@ import astnodes.Label
 /** Conditional Jump fact
   */
 case class CJmpStmt(
-                     val pc: String,
-                     val trueTarget: String,
-                     val falseTarget: String,
-                     var condition: Expr,
+    val pc: String,
+    val trueTarget: String,
+    val falseTarget: String,
+    var condition: Expr
 ) extends Stmt(Label(pc)) {
   def getCondition = condition
   override def toString = s"if ($condition) goto label$trueTarget else goto label$falseTarget;"
-  override def toBoogieString: String = s"if (bv1tobool(${condition.toBoogieString})) { goto label$trueTarget; } goto label$falseTarget;"
+  override def toBoogieString: String =
+    s"if (bv1tobool(${condition.toBoogieString})) { goto label$trueTarget; } goto label$falseTarget;"
 
-  override def subst(v: Var, w: Var): Stmt = this.copy(condition = condition.subst(v,w))
+  override def subst(v: Var, w: Var): Stmt = this.copy(condition = condition.subst(v, w))
 }

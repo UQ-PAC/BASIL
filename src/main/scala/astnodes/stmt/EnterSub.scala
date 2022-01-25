@@ -15,7 +15,8 @@ import astnodes.Label
 // TODO rewrite statment loader to remove getters
 // TODO remove the need for this, and instead create directly place this logic in function state
 //      as we know the BIL output I think this would be fine
-case class EnterSub(val pc: String, funcName: String, var requires: List[Pred], var ensures: List[Pred]) extends Stmt(Label(pc)) {
+case class EnterSub(val pc: String, funcName: String, var requires: List[Pred], var ensures: List[Pred])
+    extends Stmt(Label(pc)) {
   private var inParams: Buffer[InParameter] = new ArrayBuffer[InParameter]()
   private var outParam: Option[OutParameter] = None
   private var modifies: Buffer[String] = new ArrayBuffer[String]() // TODO type
@@ -33,13 +34,20 @@ case class EnterSub(val pc: String, funcName: String, var requires: List[Pred], 
   }
 
   override def toString = {
-    val in = 
+    val in =
       if (libraryFunction) inParams.mkString(", ")
-      else CallStmt.callRegisters.map(x => s"${x}_in: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_${x}_in: SecurityLevel").mkString(", ")
-    val out = 
+      else
+        CallStmt.callRegisters.map(x => s"${x}_in: bv64").mkString(", ") + ", " + CallStmt.callRegisters
+          .map(x => s"Gamma_${x}_in: SecurityLevel")
+          .mkString(", ")
+    val out =
       // TODO gamma out
-      if (!libraryFunction) "returns (" + CallStmt.callRegisters.map(x => s"${x}_out: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_${x}_out: SecurityLevel").mkString(", ") + ")"
-      else if (outParam != None) f" returns (${outParam.get})" else ""
+      if (!libraryFunction)
+        "returns (" + CallStmt.callRegisters.map(x => s"${x}_out: bv64").mkString(", ") + ", " + CallStmt.callRegisters
+          .map(x => s"Gamma_${x}_out: SecurityLevel")
+          .mkString(", ") + ")"
+      else if (outParam != None) f" returns (${outParam.get})"
+      else ""
 
     val decl = funcName + "(" + in + ")" + out
 

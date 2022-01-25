@@ -8,7 +8,9 @@ import astnodes.Label
 // TODO check if we need override pc
 /** Load fact
   */
-case class RegisterAssign(val pc: String, override val lhs: Register, override val rhs: Expr) extends Assign(pc, lhs, rhs) with Stmt(Label(pc)) {
+case class RegisterAssign(val pc: String, override val lhs: Register, override val rhs: Expr)
+    extends Assign(pc, lhs, rhs)
+    with Stmt(Label(pc)) {
   override def toBoogieString: String = s"$label${lhs.toBoogieString} := ${rhs.toBoogieString};    // $pc"
 
   // Otherwise is flag (e.g. #1)

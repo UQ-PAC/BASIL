@@ -43,10 +43,10 @@ object FlowGraph {
   class Function(val header: EnterSub, val blocks: List[FlowGraph.Block]) {
     private val initStmts = new LinkedList[InitStmt]
     // TODO should automatically generate these
-    initStmts.add(new InitStmt(Register("ZF", -1 ), "ZF", "bv1"))
-    initStmts.add(new InitStmt(Register("CF", -1 ), "CF", "bv1"))
-    initStmts.add(new InitStmt(Register("NF", -1 ), "NF", "bv1"))
-    initStmts.add(new InitStmt(Register("VF", -1 ), "VF", "bv1"))
+    initStmts.add(new InitStmt(Register("ZF", -1), "ZF", "bv1"))
+    initStmts.add(new InitStmt(Register("CF", -1), "CF", "bv1"))
+    initStmts.add(new InitStmt(Register("NF", -1), "NF", "bv1"))
+    initStmts.add(new InitStmt(Register("VF", -1), "VF", "bv1"))
 
     // variable initialisations to be at the top of this function
     def getHeader = header
@@ -110,7 +110,7 @@ object FlowGraph {
       var i = 0 // TODO work out a way to not use this
 
       // TODO ideally could collect (returning a partial funciton instead of some/none)
-      (stmts.sliding(3, 1).flatMap{
+      (stmts.sliding(3, 1).flatMap {
         case (call: CallStmt) :: _ :: (assign: RegisterAssign) :: Nil =>
           call.setLHS(assign.lhs)
           i = 2
@@ -122,23 +122,27 @@ object FlowGraph {
           i -= 1
           None
         case stmt :: rest => Some(stmt)
-        case Nil => None
-      } ++ stmts.takeRight(2)).toList  // Make sure to get the last 3 lines
-        // TODO check 2 or 3
+        case Nil          => None
+      } ++ stmts.takeRight(2)).toList // Make sure to get the last 3 lines
+      // TODO check 2 or 3
     }
 
-
     private def findFunction(blocks: List[FlowGraph.Block], functionName: String) = blocks.stream
-      .filter((b: FlowGraph.Block) => b.firstLine.isInstanceOf[EnterSub] && b.firstLine.asInstanceOf[EnterSub].funcName == functionName)
-      .findFirst.get
+      .filter((b: FlowGraph.Block) =>
+        b.firstLine.isInstanceOf[EnterSub] && b.firstLine.asInstanceOf[EnterSub].funcName == functionName
+      )
+      .findFirst
+      .get
 
     private def stripBlocks(blocks: immutable.List[FlowGraph.Block]): immutable.List[FlowGraph.Block] = {
       val reachableBlocks = new ArrayBuffer[FlowGraph.Block]
       val queue = new LinkedList[FlowGraph.Block]
-      val mainBlock = blocks.find(_.getLines.get(0) match {
-        case enterSub: EnterSub => enterSub.funcName == "main"
-        case _ => false
-      }).get
+      val mainBlock = blocks
+        .find(_.getLines.get(0) match {
+          case enterSub: EnterSub => enterSub.funcName == "main"
+          case _                  => false
+        })
+        .get
 
       queue.add(mainBlock)
       while ({ !queue.isEmpty }) {
@@ -147,16 +151,18 @@ object FlowGraph {
           reachableBlocks += block
 
           // TODO can look just at the last line
-          block.getLines.forEach((stmt: Stmt) => stmt match {
-            case jmp: JmpStmt => queue.add(findBlockStartingWith(jmp.target, blocks.asJava))
-            case cjmp: CJmpStmt =>
-              queue.add(findBlockStartingWith(cjmp.trueTarget, blocks.asJava))
-              queue.add(findBlockStartingWith(cjmp.falseTarget, blocks.asJava))
-            case call: CallStmt =>
-              if (!call.libraryFunction) queue.add(findFunction(blocks.asJava, call.funcName))
-              if (call.returnTarget != None) queue.add(findBlockStartingWith(call.returnTarget.get, blocks.asJava))
-            case _ =>
-          })
+          block.getLines.forEach((stmt: Stmt) =>
+            stmt match {
+              case jmp: JmpStmt => queue.add(findBlockStartingWith(jmp.target, blocks.asJava))
+              case cjmp: CJmpStmt =>
+                queue.add(findBlockStartingWith(cjmp.trueTarget, blocks.asJava))
+                queue.add(findBlockStartingWith(cjmp.falseTarget, blocks.asJava))
+              case call: CallStmt =>
+                if (!call.libraryFunction) queue.add(findFunction(blocks.asJava, call.funcName))
+                if (call.returnTarget != None) queue.add(findBlockStartingWith(call.returnTarget.get, blocks.asJava))
+              case _ =>
+            }
+          )
         }
       }
 
@@ -192,8 +198,8 @@ object FlowGraph {
             if (falseTargetIndex != -1) splits.add(falseTargetIndex)
           case _: CallStmt => splits.add(i + 1)
           case _: EnterSub => splits.add(i)
-          case _: ExitSub => splits.add(i + 1)
-          case x => x
+          case _: ExitSub  => splits.add(i + 1)
+          case x           => x
         }
       }
 
@@ -219,8 +225,8 @@ object FlowGraph {
       throw new AssumptionViolationException(s"Error in constructing flow graph: No inst found with pc $pc.\n")
     }
 
-    /** Creates a list of blocks from each pair of consecutive splits. For example, for splits = [0, 3, 4, 8]
-      * and lines = [a, b, c, d, e, f, g, h], we will get blocks of: [a, b, c], [d], [e, f, g, h]
+    /** Creates a list of blocks from each pair of consecutive splits. For example, for splits = [0, 3, 4, 8] and lines
+      * = [a, b, c, d, e, f, g, h], we will get blocks of: [a, b, c], [d], [e, f, g, h]
       *
       * @requires
       *   splits and lines are sorted and splits.contains(0) and splits.contains(lines.size())
@@ -263,7 +269,9 @@ object FlowGraph {
           val child = findBlockStartingWith(childPc, blocks)
           // no such block was found, which means there is no block defined for this jump/cjump etc.
           if (child == null)
-            throw new AssumptionViolationException(s"Error creating flow graph. Could not find a block starting with target pc '$childPc'.")
+            throw new AssumptionViolationException(
+              s"Error creating flow graph. Could not find a block starting with target pc '$childPc'."
+            )
           block.children.add(child)
         }
       }
@@ -284,11 +292,11 @@ object FlowGraph {
       */
     private def getChildrenPcs(block: FlowGraph.Block, lines: List[Stmt]): immutable.List[String] = {
       block.lastLine match {
-        case jmp: JmpStmt => immutable.List(jmp.target)
+        case jmp: JmpStmt   => immutable.List(jmp.target)
         case cjmp: CJmpStmt => immutable.List(cjmp.trueTarget, cjmp.falseTarget)
         // TODO case exitSub: ExitSub => immutable.List(lines.get(lines.indexOf(exitSub) + 1).getLabel.pc)
         case callStmt: CallStmt => callStmt.returnTarget.toList
-        case _: ExitSub => immutable.List()
+        case _: ExitSub         => immutable.List()
       }
     }
 
@@ -326,11 +334,11 @@ object FlowGraph {
       null
     }
 
-    private def mergeCjmp (stmts: immutable.List[Stmt]): immutable.List[Stmt] = stmts match {
+    private def mergeCjmp(stmts: immutable.List[Stmt]): immutable.List[Stmt] = stmts match {
       case (cjmp: CJmpStmt) :: (jmp: JmpStmt) :: rest => cjmp.copy(falseTarget = jmp.target) +: mergeCjmp(rest)
       case (cjmp: CJmpStmt) :: _ => throw new AssumptionViolationException("Unexpected conditional jump")
-      case stmt :: rest => stmt +: mergeCjmp(rest)
-      case Nil => Nil
+      case stmt :: rest          => stmt +: mergeCjmp(rest)
+      case Nil                   => Nil
     }
 
   }
@@ -388,15 +396,15 @@ object FlowGraph {
   }
 }
 
-class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.Map[String, Int]) {
+class FlowGraph(var functions: List[FlowGraph.Function], val types: immutable.Map[String, Int]) {
   // TODO this isnt great
   private var globalInits: List[InitStmt] = new LinkedList[InitStmt].asInstanceOf[List[InitStmt]]
   globalInits.add(new InitStmt(Register("heap", -1), "heap", "[bv64] bv8")) // TODO label.none
-  globalInits.add(new InitStmt(Register("heap_free", -1 ), "heap_free", "[bv64] bool"))
-  globalInits.add(new InitStmt(Register("heap_sizes", -1 ), "heap_size", "[bv64] bv64"))
+  globalInits.add(new InitStmt(Register("heap_free", -1), "heap_free", "[bv64] bool"))
+  globalInits.add(new InitStmt(Register("heap_sizes", -1), "heap_size", "[bv64] bv64"))
   globalInits.add(new InitStmt(Register("stack", -1), "stack", "[bv64] bv8"))
-  globalInits.add(new InitStmt(Register("SP", -1 ), "SP", "bv64"))
-  globalInits.add(new InitStmt(Register("R31", -1 ), "R31", "bv64"))
+  globalInits.add(new InitStmt(Register("SP", -1), "SP", "bv64"))
+  globalInits.add(new InitStmt(Register("R31", -1), "R31", "bv64"))
 
   def getGlobalInits = globalInits
   def setGlobalInits(inits: List[InitStmt]) = this.globalInits = inits
@@ -464,13 +472,17 @@ class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.M
       linesSet.forEach(linesList.remove)
       val stringBuilder = new StringBuilder
       linesList.forEach((line: Stmt) => stringBuilder.append(line.toString))
-      throw new AssumptionViolationException(s"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder")
+      throw new AssumptionViolationException(
+        s"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder"
+      )
     }
     if (pcSet.size != pcList.size) {
       pcSet.forEach(pcList.remove)
       val stringBuilder = new StringBuilder
       pcList.forEach(stringBuilder.append)
-      throw new AssumptionViolationException(s"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder")
+      throw new AssumptionViolationException(
+        s"Flow graph error. The following lines were found twice throughout the program:\n$stringBuilder"
+      )
     }
   }
   override def toString = {

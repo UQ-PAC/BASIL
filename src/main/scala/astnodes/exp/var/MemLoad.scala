@@ -5,7 +5,7 @@ import astnodes.pred
 import astnodes.sec.SecMemLoad
 
 /** A load from memory at location exp
- */
+  */
 case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
 
   override def toString = s"${if (this.onStack) "stack" else "heap"}[$exp]"
@@ -24,10 +24,10 @@ case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
   def onStack = onStackMatch(exp)
 
   def onStackMatch(expr: Expr): Boolean = expr match {
-    case v: Register              => v.name == "R31"
+    case v: Register                  => v.name == "R31"
     case BinOp(_, e1: Expr, e2: Expr) => onStackMatch(e1) || onStackMatch(e2)
-    case UniOp(_, e1: Expr) => onStackMatch(e1)
-    case _                   => false
+    case UniOp(_, e1: Expr)           => onStackMatch(e1)
+    case _                            => false
   }
 
   def toL = SecMemLoad(false, true, exp)

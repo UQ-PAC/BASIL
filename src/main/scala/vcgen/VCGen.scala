@@ -13,11 +13,20 @@ import astnodes.pred.{BinOp, BinOperator, Bool, Pred, conjunct, SecComp}
 object VCGen {
   // This generates the VCs but also updates to gamma variables
   def genVCs(state: State): State = {
-    state.copy(functions = state.functions.map(f =>
-      f.copy(labelToBlock = f.labelToBlock.map {
-        case (pc, b) => (pc, b.copy(lines = b.lines.flatMap(line => List(rely, Assert("TODO", genVC(line, f, state)), line) ++ genGammaUpdate(line, state))))
-      })
-    ))
+    state.copy(functions =
+      state.functions.map(f =>
+        f.copy(labelToBlock = f.labelToBlock.map { case (pc, b) =>
+          (
+            pc,
+            b.copy(lines =
+              b.lines.flatMap(line =>
+                List(rely, Assert("TODO", genVC(line, f, state)), line) ++ genGammaUpdate(line, state)
+              )
+            )
+          )
+        })
+      )
+    )
   }
 
   /** Generate the verification condition for a given statement
@@ -40,14 +49,16 @@ object VCGen {
   }
 
   /** Compute the gamma value for an expression
-   */
-  def computeGamma(expr: Expr, state: State): Sec = expr.vars.map{
-    case v: Register => v.toGamma
-    case l: MemLoad => SecBinOp("meet", l.toGamma, l.toL)
-  }.join(state)
+    */
+  def computeGamma(expr: Expr, state: State): Sec = expr.vars
+    .map {
+      case v: Register => v.toGamma
+      case l: MemLoad  => SecBinOp("meet", l.toGamma, l.toL)
+    }
+    .join(state)
 
   /** Generate an assignment to a gamma variable for each variable update.
-   */
+    */
   def genGammaUpdate(stmt: Stmt, state: State): Option[Stmt] = stmt match {
     case assign: Assign => Some(GammaUpdate(assign.lhs.toGamma, computeGamma(assign.rhs, state)))
     // case assign: RegisterAssign => Some(GammaUpdate(assign.lhs.toGamma, computeGamma(assign.rhs, state)))
@@ -56,4 +67,3 @@ object VCGen {
 
   def rely = MethodCall("-1", "rely")
 }
-

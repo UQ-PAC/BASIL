@@ -8,6 +8,7 @@ import java.util.Objects
 /** Literal expression (e.g. 4, 5, 10)
   */
 case class Literal(value: String, override val size: Option[Int] = None) extends Expr {
+
   /** Value of literal */
   override def toString = String.format("%s", value)
   override def toBoogieString: String = value + s"bv${if (size.isDefined) size.get else 64}"

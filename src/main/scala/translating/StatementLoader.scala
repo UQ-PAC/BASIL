@@ -50,7 +50,6 @@ class StatementLoader() extends BilBaseListener {
     if (preds.get(node) != null) preds.get(node)
     else throw new Exception("Unparsed pred " + node.getText + " (" + node.getClass + ")")
 
-
   private val secs = ParseTreeProperty[Sec]
   private def getSec(node: ParseTree) =
     if (node == null) throw new NullPointerException("Null security")
@@ -59,7 +58,6 @@ class StatementLoader() extends BilBaseListener {
 
   val lPreds = new mutable.HashMap[Register, Sec]
   val gammaMappings = new mutable.HashMap[Register, Security]
-
 
   val varSizes = mutable.Map[String, Int]()
 
@@ -74,7 +72,7 @@ class StatementLoader() extends BilBaseListener {
     }
     varSizes(name)
   }
-  */
+   */
   private def setVarSize(name: String, rhs: Expr) = {
     if (!varSizes.contains(name)) {
       if (name.charAt(0) == 'R') varSizes(name) = 64
@@ -85,7 +83,6 @@ class StatementLoader() extends BilBaseListener {
     }
   }
 
-
   // the last function header parsed; needed for assigning parameters
   private var currentFunction: EnterSub = null
 
@@ -95,14 +92,14 @@ class StatementLoader() extends BilBaseListener {
   def typeToSize(typeStr: String): Int = typeStr match {
     case "u32" => 32
     case "u64" => 64
-    case _ => ???
+    case _     => ???
   }
 
   var requires: List[Pred] = List()
   var ensures: List[Pred] = List()
 
   override def exitSub(ctx: BilParser.SubContext): Unit = {
-    if (currentFunction != null) 
+    if (currentFunction != null)
       currentFunction.setRequiresEnsures(requires, ensures)
 
     requires = List()
@@ -127,7 +124,8 @@ class StatementLoader() extends BilBaseListener {
   }
 
   override def exitEnsuresSpec(ctx: BilParser.EnsuresSpecContext): Unit = ensures = ensures.appended(getPred(ctx.pred))
-  override def exitRequiresSpec(ctx: BilParser.RequiresSpecContext): Unit = requires = requires.appended(getPred(ctx.pred))
+  override def exitRequiresSpec(ctx: BilParser.RequiresSpecContext): Unit = requires =
+    requires.appended(getPred(ctx.pred))
 
   override def exitStmt(ctx: BilParser.StmtContext): Unit = {
     val address = ctx.addr.getText
@@ -166,7 +164,7 @@ class StatementLoader() extends BilBaseListener {
         val rhs = getExpr(assignCtx.exp)
         stmts += new Move(address, lhs, rhs)
       }
-      */
+       */
     } else if (ctx.jmp != null) { // statement is a jump
       var target = ""
       if (ctx.jmp.`var` != null) target = ctx.jmp.`var`.getText
@@ -189,9 +187,12 @@ class StatementLoader() extends BilBaseListener {
   }
 
   override def exitExpBracket(ctx: BilParser.ExpBracketContext): Unit = exprs.put(ctx, getExpr(ctx.exp))
-  override def exitExpUop(ctx: BilParser.ExpUopContext): Unit = exprs.put(ctx, new UniOp(ctx.uop.getText, getExpr(ctx.exp)))
-  override def exitExpBop(ctx: BilParser.ExpBopContext): Unit = exprs.put(ctx, new BinOp(ctx.bop.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
-  override def exitVar(ctx: BilParser.VarContext): Unit = exprs.put(ctx, new Register(ctx.getText, varSizes.get(ctx.getText)))
+  override def exitExpUop(ctx: BilParser.ExpUopContext): Unit =
+    exprs.put(ctx, new UniOp(ctx.uop.getText, getExpr(ctx.exp)))
+  override def exitExpBop(ctx: BilParser.ExpBopContext): Unit =
+    exprs.put(ctx, new BinOp(ctx.bop.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
+  override def exitVar(ctx: BilParser.VarContext): Unit =
+    exprs.put(ctx, new Register(ctx.getText, varSizes.get(ctx.getText)))
   override def exitExpVar(ctx: BilParser.ExpVarContext): Unit = exprs.put(ctx, exprs.get(ctx.`var`))
   override def exitExpLiteral(ctx: BilParser.ExpLiteralContext): Unit = exprs.put(ctx, Literal(ctx.literal.getText))
   override def exitExpExtract(ctx: BilParser.ExpExtractContext): Unit = {
@@ -206,7 +207,7 @@ class StatementLoader() extends BilBaseListener {
 
   // Currently doesnt handle high/low. these could be converted to extracts
   override def exitExpCast(ctx: BilParser.ExpCastContext): Unit = ctx.CAST().getText match {
-    case "pad" => exprs.put(ctx, Pad(getExpr(ctx.exp), ctx.nat.getText.toInt))
+    case "pad"    => exprs.put(ctx, Pad(getExpr(ctx.exp), ctx.nat.getText.toInt))
     case "extend" => exprs.put(ctx, Extend(getExpr(ctx.exp), ctx.nat.getText.toInt))
     // case "low" => exprs.put(ctx, Extract(ctx.nat.getText.toInt, 0, getExpr(ctx.exp)))
     // case "high" => exprs.put(ctx, Extract(65, ctx.nat.getText.toInt, getExpr(ctx.exp))) // TODO assumes bv size is 64
@@ -226,13 +227,16 @@ class StatementLoader() extends BilBaseListener {
   override def exitExpStore8(ctx: BilParser.ExpStore8Context): Unit =
     if (ctx.exp(0).getText == "mem") exprs.put(ctx, MemStore(getExpr(ctx.exp(1)), getExpr(ctx.exp(2)), Some(8)))
     else throw new AssumptionViolationException("Found store on variable other than mem")
-  override def exitExpFunctionCall(ctx: BilParser.ExpFunctionCallContext): Unit = exprs.put(ctx, new FunctionCall("old", ctx.argList.exp.asScala.map(a => getExpr(a)).toList))
+  override def exitExpFunctionCall(ctx: BilParser.ExpFunctionCallContext): Unit =
+    exprs.put(ctx, new FunctionCall("old", ctx.argList.exp.asScala.map(a => getExpr(a)).toList))
 
-
-  override def exitPredBinOp(ctx: PredBinOpContext): Unit = preds.put(ctx, new astnodes.pred.BinOp(ctx.predBop.getText, getPred(ctx.pred(0)), getPred(ctx.pred(1))))
-  override def exitPredUniOp(ctx: PredUniOpContext): Unit = preds.put(ctx, new astnodes.pred.UniOp(ctx.uop.getText, getPred(ctx.pred)))
+  override def exitPredBinOp(ctx: PredBinOpContext): Unit =
+    preds.put(ctx, new astnodes.pred.BinOp(ctx.predBop.getText, getPred(ctx.pred(0)), getPred(ctx.pred(1))))
+  override def exitPredUniOp(ctx: PredUniOpContext): Unit =
+    preds.put(ctx, new astnodes.pred.UniOp(ctx.uop.getText, getPred(ctx.pred)))
   override def exitPredBracket(ctx: PredBracketContext): Unit = preds.put(ctx, getPred(ctx.pred))
-  override def exitPredExprComp(ctx: PredExprCompContext): Unit = preds.put(ctx, new ExprComp(ctx.expComp.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
+  override def exitPredExprComp(ctx: PredExprCompContext): Unit =
+    preds.put(ctx, new ExprComp(ctx.expComp.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
   /* override def exitPredLiteral(ctx: BilParser.PredLiteralContext): Unit = preds.put(ctx, ctx.getText match {
     case "TRUE" => Bool.True
     case "FALSE" => Bool.False
@@ -250,8 +254,8 @@ class StatementLoader() extends BilBaseListener {
   }
 
   override def exitRely(ctx: BilParser.RelyContext): Unit = rely = Some(getPred(ctx.pred))
-  
-  private def uniquePc () =
+
+  private def uniquePc() =
     pcCount += 1
     "l" + pcCount
 }

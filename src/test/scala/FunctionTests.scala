@@ -1,6 +1,5 @@
 import org.scalatest.funsuite.AnyFunSuite
 
-
 class FunctionTests extends AnyFunSuite {
   test("function") {
     // This test passing seems to indicate that it can infer an ensures

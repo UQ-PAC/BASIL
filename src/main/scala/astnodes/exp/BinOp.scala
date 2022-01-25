@@ -7,17 +7,21 @@ import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
 
 /** Binary operation of two expressions
- */
+  */
 case class BinOp(
     operator: BinOperator.Value,
     firstExp: Expr,
     secondExp: Expr
 ) extends Expr {
-  def this(operatorStr: String, firstExp: Expr, secondExp: Expr) = this(BinOperator.fromBil(operatorStr), firstExp, secondExp)
+  def this(operatorStr: String, firstExp: Expr, secondExp: Expr) =
+    this(BinOperator.fromBil(operatorStr), firstExp, secondExp)
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
-  override def toBoogieString = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
+  override def toBoogieString = BinOperator
+    .toBoogie(operator, inputSize)
+    .fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
 
-  override def subst(v: Var, w: Var): Expr = this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
+  override def subst(v: Var, w: Var): Expr =
+    this.copy(firstExp = firstExp.subst(v, w), secondExp = secondExp.subst(v, w))
 
   override def vars = firstExp.vars ++ secondExp.vars
 
@@ -26,10 +30,13 @@ case class BinOp(
 
   def inputSize = (firstExp.size, secondExp.size) match {
     case (a: Some[Int], b: Some[int]) if (a == b) => a
-    case (a: Some[Int], b: Some[int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop should have the same size $firstExp: ${firstExp.size}, $secondExp: ${secondExp.size}")
+    case (a: Some[Int], b: Some[int]) if (a != b) =>
+      throw new AssumptionViolationException(
+        s"Both sides of binop should have the same size $firstExp: ${firstExp.size}, $secondExp: ${secondExp.size}"
+      )
     case (x: Some[Int], None) => x
     case (None, x: Some[Int]) => x
-    case (None, None) => None
+    case (None, None)         => None
   }
 }
 
@@ -58,51 +65,51 @@ case object BinOperator extends Enumeration {
   def fromBil(bilStr: String): Value = bilStr match {
     // note at the moment we do not distinguish between signed and unsigned
     // arithmetic operators
-    case "+" => Addition
-    case "-" => Subtraction
-    case "*" => Multiplication
-    case "/" => Division
-    case "%" => Modulo
-    case "&" => BitwiseAnd
-    case "|" => BitwiseOr
+    case "+"   => Addition
+    case "-"   => Subtraction
+    case "*"   => Multiplication
+    case "/"   => Division
+    case "%"   => Modulo
+    case "&"   => BitwiseAnd
+    case "|"   => BitwiseOr
     case "xor" => BitwiseXor
-    case "<<" => LogicalShiftLeft
-    case ">>" => LogicalShiftRight
+    case "<<"  => LogicalShiftLeft
+    case ">>"  => LogicalShiftRight
     case ">>>" => ArithmeticShiftRight
     // logical operators
-    case "=" => Equality
-    case "<>" => NonEquality
-    case "<" => LessThan
-    case "<=" => LessThanOrEqual
+    case "="   => Equality
+    case "<>"  => NonEquality
+    case "<"   => LessThan
+    case "<="  => LessThanOrEqual
     case "~>>" => UnknownOperator
   }
 
   def toBoogie(value: Value, size: Option[Int]): List[String] = {
     val size1 = size.get
     value match {
-      case Addition => List(s"bv${size1}add")
-      case Subtraction => List(s"bv${size1}sub")
-      case Multiplication => List(s"bv${size1}mul")
-      case Division => List(s"bv${size1}udiv")
-      case Modulo => List(s"bv${size1}mod")
-      case BitwiseAnd => List(s"bv${size1}and")
-      case BitwiseOr => List(s"bv${size1}or")
-      case BitwiseXor => List(s"bv${size1}xor")
-      case LogicalShiftLeft => List(s"bv${size1}shl")
-      case LogicalShiftRight => List(s"bv${size1}lshr")
+      case Addition             => List(s"bv${size1}add")
+      case Subtraction          => List(s"bv${size1}sub")
+      case Multiplication       => List(s"bv${size1}mul")
+      case Division             => List(s"bv${size1}udiv")
+      case Modulo               => List(s"bv${size1}mod")
+      case BitwiseAnd           => List(s"bv${size1}and")
+      case BitwiseOr            => List(s"bv${size1}or")
+      case BitwiseXor           => List(s"bv${size1}xor")
+      case LogicalShiftLeft     => List(s"bv${size1}shl")
+      case LogicalShiftRight    => List(s"bv${size1}lshr")
       case ArithmeticShiftRight => List(s"bv${size1}ashr")
-      case Equality => List(s"bv${size1}eq", "booltobv1")
-      case NonEquality => List(s"bv${size1}neq", "booltobv1")
+      case Equality             => List(s"bv${size1}eq", "booltobv1")
+      case NonEquality          => List(s"bv${size1}neq", "booltobv1")
     }
   }
-  
+
   def changesSize(value: Value) = value match {
     case Equality | NonEquality => true
-    case _ => false
+    case _                      => false
   }
 
   def size(value: Value, size: Option[Int]): Option[Int] = value match {
     case Equality | NonEquality => Some(1)
-    case _ => size
+    case _                      => size
   }
 }
