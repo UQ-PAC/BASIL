@@ -21,7 +21,11 @@ trait Assign (pc: String, val lhs: Var, val rhs: Expr) extends Stmt {
   def getRhs: Expr = rhs
 
   def replace(oldExpr: Expr, newExpr: Expr): Assign = {
+    // var updatedLhs : MemLoad = null
     var updatedRhs : Expr = null
+    // if (lhs.isInstanceOf[MemLoad]) {
+    //   updatedLhs = lhs.subst(oldExpr, newExpr).asInstanceOf[MemLoad]
+    // }
     if (rhs.equals(oldExpr)) {
       updatedRhs = newExpr
     } else {

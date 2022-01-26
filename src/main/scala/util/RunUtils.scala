@@ -52,7 +52,7 @@ object RunUtils {
 
     // var worklist: BlockWorklist = BlockWorklist(Set(TestingAnal), flowGraph);
     // worklist.workOnBlocks;
-
+    
     val state = State(
       flowGraph,
       statementLoader.rely.getOrElse(Bool.True), // TODO check default
@@ -66,6 +66,7 @@ object RunUtils {
     // println("h4")
 
     val updatedState = BoogieTranslator.translate(state)
+
     val worklist = InlineWorklist(new ConstantPropagationAnalysis(new collection.mutable.HashMap[Expr, String](),
       Set(), null, flowGraph), flowGraph)
     println("Before CP:")

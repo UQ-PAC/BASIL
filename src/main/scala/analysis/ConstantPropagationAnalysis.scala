@@ -2,7 +2,6 @@ package analysis
 
 import java.util.List
 
-//import scala.collection.mutable
 import scala.collection.mutable.HashMap
 import scala.util.control.Breaks
 import astnodes.exp.{Expr, Literal, MemStore, BinOp, UniOp, Extract}
@@ -24,49 +23,51 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
   def resolveVar(stmt: Stmt): Unit = {
     if (stmtsToRemove.contains(stmt.getLabel.getPc)) {
       flowgraph.removeLine(stmt)
+
     } else {
       if (state.size > 0) { 
-      // println("map has element")
-      // println(s"Statement: $stmt")
         var newStmt = stmt
-        // if (stmt.isInstanceOf[Assign]) {
-        //   if (stmt.asInstanceOf[Assign].getRhs.isInstanceOf[Concat]) {
-        //     println(stmt.asInstanceOf[Assign].getRhs)
-        //     println("LHS sz:")
-        //     println(stmt.asInstanceOf[Assign].getRhs.asInstanceOf[Concat].getLhs.size)
-        //     println("RHS sz:")
-        //     println(stmt.asInstanceOf[Assign].getRhs.asInstanceOf[Concat].getRhs.size)
-        //   }
-        // }
+
         state.foreach(entry => {
-          // println(entry)
+          val dependentExp = entry._1
+          val dependentInst = entry._2
+
           newStmt match {
             case assignStmt : Assign => {
-              if (entry._2 != null) {
-                val newExpr = findInstFromPc(flowgraph.getLines, entry._2)
-                // println(s"New expr: $newExpr")
-                newStmt = newStmt.asInstanceOf[Assign].replace(entry._1, newExpr.getRhs)
-                // println(s"New stmt: $newStmt")
+              if (dependentInst != null) {
+                // if (assignStmt.getLhs.isInstanceOf[MemLoad] && assignStmt.getLhs.asInstanceOf[MemLoad].onStack) {
+                //   val newExpr = findInstFromPc(flowgraph.getLines, entry._2)
+
+                //   newStmt.asInstanceOf[Assign].getLhs.asInstanceOf[MemLoad].replace(entry._1, newExpr.getRhs)
+                // }
+                val newExpr = findInstFromPc(flowgraph.getLines, dependentInst)
+                newStmt = newStmt.asInstanceOf[Assign].replace(dependentExp, newExpr.getRhs)
+
                 if (assignStmt.getRhs.isInstanceOf[BinOp]) {
                   val newStmtRhs = newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp].simplify()
-                  // println(s"New RHS: $newStmtRhs")
                   newStmt = newStmt.asInstanceOf[Assign].replace(newStmt.asInstanceOf[Assign].getRhs, newStmtRhs)
+
+                } else if (assignStmt.getRhs.isInstanceOf[Extract]) {
+                  val newStmtRhs = SimplificationUtil.bitvecExtract(newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[Extract])
+                  newStmt = newStmt.asInstanceOf[Assign].replace(newStmt.asInstanceOf[Assign].getRhs, newStmtRhs)
+
                 } else if (assignStmt.getRhs.isInstanceOf[Concat]) {
-                  // println(newStmt)
-                  val newStmtRhs = newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[Concat].simplify
-                  // println(s"New RHS: $newStmtRhs")
+                  println(assignStmt.getRhs)
+                  val newStmtRhs = SimplificationUtil.bitvecConcat(newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[Concat])
+                  println(newStmtRhs)
                   newStmt = newStmt.asInstanceOf[Assign].replace(newStmt.asInstanceOf[Assign].getRhs, newStmtRhs)
-                  // println(newStmt)
                 }
               }
             }
+
             case condJump : CJmpStmt => {
-              newStmt = newStmt.asInstanceOf[CJmpStmt].subst(entry._1, findInstFromPc(flowgraph.getLines, entry._2).getRhs)
-                  // println(s"New RHS: $newStmtRhs")
+              if (dependentInst != null) newStmt = newStmt.asInstanceOf[CJmpStmt].subst(dependentExp, findInstFromPc(flowgraph.getLines, dependentInst).getRhs)
             }
+
             case _ => 
           }
         })
+
         flowgraph.replaceLine(newStmt, stmt)
       }
     }
@@ -245,4 +246,67 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     // println("out union")
     new ConstantPropagationAnalysis(newState, newRemove, null, flowgraph)
   }
+}
+
+
+case object SimplificationUtil {
+  /*
+  1) apply bitvec concatonations
+  */
+
+  // def simplify(expr: Expr): Expr = {
+  //   expr match {
+  //     case binOp : BinOp => binArithmetic(binOp)
+  //     case uniOp : UniOp => uniArithmetic(uniOp)
+  //     case concat : Concat => bitvecConcat(concat)
+  //     case extract : Extract => bitvecExtract(extract)
+  //     case _ => expr
+  //   }
+  // }
+
+  def bitvecConcat(concat: Concat): Expr = {
+    /*
+    1) get lhs & rhs
+    2) convert to bin
+    3) concatonate bitvecs
+    4) convert to decimal
+    */
+
+    val lhs = concat.getLhs
+    val rhs = concat.getRhs
+    
+    if (lhs.isInstanceOf[Literal] && rhs.isInstanceOf[Literal]) {
+      // if pad
+      if (lhs.toString.equals("0")) return Literal(rhs.toString, Some(64))
+
+      // if extend
+      if (rhs.toString.equals("0")) {
+        val lhsExtended = Integer.parseInt(lhs.asInstanceOf[Literal].toString) << 32
+        return Literal(lhsExtended.toString, Some(64))
+      }
+    }
+
+    if (lhs.isInstanceOf[Literal] && rhs.isInstanceOf[MemLoad]) {
+      return MemLoad(rhs.asInstanceOf[MemLoad].exp, Some(64))
+    }
+
+    concat
+  }
+
+  def bitvecExtract(extract: Extract): Expr = {
+    if (extract.getStart == 0 && extract.getEnd == 31) {
+      val value = Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) & 0xFFFFFFFF
+      Literal(value.toString, Some(32))
+    }
+
+    if (extract.getStart == 32 && extract.getEnd == 63) {
+      Literal((Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) >>> 32).toString, Some(32))
+    }
+
+    extract
+  }
+
+  // def binArithmetic(binOp: BinOp): Expr = {}
+
+  // def uniArithmetic(uniOp: UniOp): Expr = {}
 }

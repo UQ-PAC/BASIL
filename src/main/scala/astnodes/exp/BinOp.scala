@@ -22,9 +22,12 @@ case class BinOp(
     if (this.canCompute()) {
       val newVal = this.compute()
       return new Literal(newVal.toString)
-    } else if (firstExp.isInstanceOf[Literal] && firstExp.asInstanceOf[Literal].toString.equals("0") && this.getOp().equals("|")) {
+    }
+
+    // change these as an equality by converting to int
+    if (firstExp.isInstanceOf[Literal] && firstExp.asInstanceOf[Literal].asLong == 0 && this.getOp().equals("|")) {
       return secondExp
-    } else if (secondExp.isInstanceOf[Literal] && secondExp.asInstanceOf[Literal].toString.equals("0") && this.getOp().equals("|")) {
+    } else if (secondExp.isInstanceOf[Literal] && secondExp.asInstanceOf[Literal].asLong == 0 && this.getOp().equals("|")) {
       return firstExp
     }
 
@@ -41,7 +44,7 @@ case class BinOp(
   }
   
   // TODO: this can be simplified a lot, but atm it seems to work allg
-  def compute(): Double = {
+  def compute(): Long = {
     if (firstExp.isInstanceOf[Literal] && secondExp.isInstanceOf[Literal]) {
       val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
       val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
@@ -65,6 +68,7 @@ case class BinOp(
     if (firstExp.isInstanceOf[Literal]) {
       try {
         val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
+        // println(firstOperand)
       } catch {
         case ex: NumberFormatException => return false
       }
@@ -77,6 +81,7 @@ case class BinOp(
     if (secondExp.isInstanceOf[Literal]) {
       try {
         val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
+        // println(secondOperand)
       } catch {
         case ex: NumberFormatException => return false
       }
@@ -93,19 +98,19 @@ case class BinOp(
     * Helper method for compute()
    */
   private def performArithmetic(firstOperand : Double, secondOperand : Double, operator : String)
-    : Double = {
-    var result : Double = 0.0
+    : Long = {
+    var result : Double = 0
     operator match {
       case "+" => result = firstOperand + secondOperand
       case "-" => result = firstOperand - secondOperand
       case "*" => result = firstOperand * secondOperand
       case "/" => result = firstOperand / secondOperand
       case "%" => result = firstOperand % secondOperand
-      case "&" => result = firstOperand.asInstanceOf[Int] & secondOperand.asInstanceOf[Int]
-      case "|" => result = firstOperand.asInstanceOf[Int] | secondOperand.asInstanceOf[Int]
+      case "&" => result = firstOperand.asInstanceOf[Long] & secondOperand.asInstanceOf[Long]
+      case "|" => result = firstOperand.asInstanceOf[Long] | secondOperand.asInstanceOf[Long]
       case _ => 
     }
-    return result
+    return result.asInstanceOf[Long]
   }
   
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)

@@ -1,0 +1,17 @@
+00000000: program
+0000048c: sub main(main_argc, main_argv, main_result)
+0000049e: main_argc :: in u32 = X0
+0000049f: main_argv :: in out u64 = X1
+000004a0: main_result :: out u32 = X0
+
+000001b9:
+000001be: SP := SP - 0x20
+000001c5: X0 := 3
+000001cc: mem := mem with [SP + 0x10, el]:u32 <- low:32[X0]
+000001d3: X0 := 7
+000001da: mem := mem with [SP + 0x18, el]:u32 <- low:32[X0]
+000001e1: X0 := pad:64[mem[SP + 0x10, el]:u32]
+000001e8: mem := mem with [SP + 0x1C, el]:u32 <- low:32[X0]
+000001ef: X0 := 0
+000001f6: SP := SP + 0x20
+000001fc: call LR with noreturn

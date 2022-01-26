@@ -34,4 +34,8 @@ case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
   // TODO need to rework memload .....
   def toL = new pred.MemLoad(false, true, exp)
   def toGamma = new pred.MemLoad(true, false, exp)
+
+  def replace(v: Expr, w: Expr): Unit = {
+    if (v == exp) exp = w
+  }
 }
