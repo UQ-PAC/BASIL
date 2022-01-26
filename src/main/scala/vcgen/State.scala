@@ -59,7 +59,7 @@ case class State(
   private def relyStr = "procedure rely(); modifies " + "heap, Gamma_heap" + ";\n ensures " + getCompleteRely.mkString(";\n ensures ") + ";"
 
   override def toString: String = 
-    generateBVToBoolHeader + generateLibraryFuncHeader
+    generateBVToBoolHeader + generateLibraryFuncHeader(lattice)
   + generateBVHeader(1) + generateBVHeader(32) + generateBVHeader(64)
   + lattice.toString + generateSecurityLatticeFuncHeader
     + globalInits.map(_.toBoogieString).mkString("\n") + "\n"

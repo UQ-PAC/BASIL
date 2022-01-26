@@ -147,36 +147,81 @@ function {:bvbuiltin "bvsge"} bv64sge(bv64,bv64) returns(bool);
 function bv64eq(x: bv64, y: bv64) returns(bool) { x == y }
 function bv64neq(x: bv64, y: bv64) returns(bool) { x != y }
 
-var heap: [bv64] bv8; var Gamma_heap: [bv64] bool;
-var heap_free: [bv64] bool; var Gamma_heap_free: [bv64] bool;
-var heap_sizes: [bv64] bv64; var Gamma_heap_sizes: [bv64] bool;
-var stack: [bv64] bv8; var Gamma_stack: [bv64] bool;
-const L_heap: [bv64] bool; const Gamma_L_heap: [bv64] bool;
-const L_stack: [bv64] bool; const Gamma_L_stack: [bv64] bool;
-var SP: bv64; var Gamma_SP: bool;
-var R31: bv64; var Gamma_R31: bool;
-function L(pos: bv64, heap: [bv64] bv8) returns (bool);
+type SecurityLevel;
+const unique s_FALSE: SecurityLevel extends  complete;
+const unique s_TRUE: SecurityLevel extends s_FALSE complete;
+ axiom (forall x: SecurityLevel :: s_TRUE <: x);
+function meet (SecurityLevel, SecurityLevel) returns (SecurityLevel);
+axiom (forall x: SecurityLevel, y: SecurityLevel :: meet(x,y) <: x && meet(x,y) <: y && (forall s: SecurityLevel :: (s <: x && s <: y) ==> (s <: meet(x,y))));
+
+function join (SecurityLevel, SecurityLevel) returns (SecurityLevel);
+axiom (forall x: SecurityLevel, y: SecurityLevel :: x <: join(x,y) && y <: join(x,y) && (forall s: SecurityLevel :: (x <: s && y <: s) ==> (join(x,y) <: s)));
+
+function secITE (cond: bool, first: SecurityLevel, second: SecurityLevel) returns (SecurityLevel);
+ axiom (forall cond: bool, first: SecurityLevel, second: SecurityLevel :: (cond ==> (secITE(cond, first, second) == first)) && (!cond ==> (secITE(cond, first, second) == second))) ;
+
+
+  var heap: [bv64] bv8; var Gamma_heap: [bv64] SecurityLevel;
+var heap_free: [bv64] bool; 
+var heap_sizes: [bv64] bv64; var Gamma_heap_sizes: [bv64] SecurityLevel;
+var stack: [bv64] bv8; var Gamma_stack: [bv64] SecurityLevel;
+var SP: bv64; var Gamma_SP: SecurityLevel;
+var R31: bv64; var Gamma_R31: SecurityLevel;
+function L(pos: bv64, heap: [bv64] bv8) returns (SecurityLevel);
 
 procedure rely(); modifies heap, Gamma_heap;
  ensures true;
  ensures (forall i: bv64 :: ((heap[i] == old(heap[i])) ==> (Gamma_heap[i] == old(Gamma_heap[i]))));
 
-procedure main() returns (main_result: bv32, Gamma_main_result: bool) 
+procedure main(R0_in: bv64, R1_in: bv64, R2_in: bv64, R3_in: bv64, R4_in: bv64, R5_in: bv64, R6_in: bv64, Gamma_R0_in: SecurityLevel, Gamma_R1_in: SecurityLevel, Gamma_R2_in: SecurityLevel, Gamma_R3_in: SecurityLevel, Gamma_R4_in: SecurityLevel, Gamma_R5_in: SecurityLevel, Gamma_R6_in: SecurityLevel)returns (R0_out: bv64, R1_out: bv64, R2_out: bv64, R3_out: bv64, R4_out: bv64, R5_out: bv64, R6_out: bv64, Gamma_R0_out: SecurityLevel, Gamma_R1_out: SecurityLevel, Gamma_R2_out: SecurityLevel, Gamma_R3_out: SecurityLevel, Gamma_R4_out: SecurityLevel, Gamma_R5_out: SecurityLevel, Gamma_R6_out: SecurityLevel) 
  modifies heap, stack, Gamma_heap, Gamma_stack, SP, R31, Gamma_SP, Gamma_R31;   {
-var ZF: bv1; var Gamma_ZF: bool;
-var CF: bv1; var Gamma_CF: bool;
-var NF: bv1; var Gamma_NF: bool;
-var VF: bv1; var Gamma_VF: bool;
-var R0: bv64; var Gamma_R0: bool;
-var #30: bv1; var Gamma_#30: bool;
-var #28: bv64; var Gamma_#28: bool;
-var R1: bv64; var Gamma_R1: bool;
-var #27: bv64; var Gamma_#27: bool;
+var ZF: bv1; var Gamma_ZF: SecurityLevel;
+var CF: bv1; var Gamma_CF: SecurityLevel;
+var NF: bv1; var Gamma_NF: SecurityLevel;
+var VF: bv1; var Gamma_VF: SecurityLevel;
+var R0: bv64; var Gamma_R0: SecurityLevel;
+var #30: bv1; var Gamma_#30: SecurityLevel;
+var R3: bv64; var Gamma_R3: SecurityLevel;
+var R2: bv64; var Gamma_R2: SecurityLevel;
+var #28: bv64; var Gamma_#28: SecurityLevel;
+var R1: bv64; var Gamma_R1: SecurityLevel;
+var R5: bv64; var Gamma_R5: SecurityLevel;
+var #27: bv64; var Gamma_#27: SecurityLevel;
+var R6: bv64; var Gamma_R6: SecurityLevel;
+var R4: bv64; var Gamma_R4: SecurityLevel;
 label00000246:
     call rely();
     assert true;
+    R0 := R0_in;    // NONE
+    Gamma_R0 := Gamma_R0_in;
+    call rely();
+    assert true;
+    R1 := R1_in;    // NONE
+    Gamma_R1 := Gamma_R1_in;
+    call rely();
+    assert true;
+    R2 := R2_in;    // NONE
+    Gamma_R2 := Gamma_R2_in;
+    call rely();
+    assert true;
+    R3 := R3_in;    // NONE
+    Gamma_R3 := Gamma_R3_in;
+    call rely();
+    assert true;
+    R4 := R4_in;    // NONE
+    Gamma_R4 := Gamma_R4_in;
+    call rely();
+    assert true;
+    R5 := R5_in;    // NONE
+    Gamma_R5 := Gamma_R5_in;
+    call rely();
+    assert true;
+    R6 := R6_in;    // NONE
+    Gamma_R6 := Gamma_R6_in;
+    call rely();
+    assert true;
     R0 := 69632bv64;    // 0000010c
-    Gamma_R0 := true;
+    Gamma_R0 := s_TRUE;
     call rely();
     assert true;
     R0 := bv64add(R0, 52bv64);    // 00000110
@@ -184,15 +229,15 @@ label00000246:
     call rely();
     assert true;
     #27 := 0bv32 ++ heap[bv64add(R0, 0bv64)] ++ heap[bv64add(R0, 1bv64)] ++ heap[bv64add(R0, 2bv64)] ++ heap[bv64add(R0, 3bv64)];    // 00000114
-    Gamma_#27 := (Gamma_heap[R0] || L(R0, heap));
+    Gamma_#27 := meet(Gamma_heap[R0], L(R0, heap));
     call rely();
     assert true;
     R0 := 0bv64;    // 00000116
-    Gamma_R0 := true;
+    Gamma_R0 := s_TRUE;
     call rely();
     assert true;
     R0 := bv64or(bv64and(R0, 18446744069414584320bv64), #27);    // 00000118
-    Gamma_R0 := (Gamma_R0 && Gamma_#27);
+    Gamma_R0 := join(Gamma_R0, Gamma_#27);
     call rely();
     assert true;
     #28 := R0[32:0] ++ 0bv32;    // 0000011c
@@ -204,43 +249,40 @@ label00000246:
     call rely();
     assert true;
     VF := bv1and(R0[32:0][32:31], bv1neg(#28[64:63]));    // 00000120
-    Gamma_VF := (Gamma_R0 && Gamma_#28);
+    Gamma_VF := join(Gamma_R0, Gamma_#28);
     call rely();
     assert true;
     ZF := booltobv1(bv64eq(#28, 0bv64));    // 00000122
     Gamma_ZF := Gamma_#28;
     call rely();
     assert true;
-    CF := bv1and(bv1or(R0[32:0][32:31], R0[32:0][32:31]), bv1neg(bv1or(#28[64:63], bv1neg(#28[64:63]))));    // 00000124
-    Gamma_CF := (Gamma_R0 && (Gamma_R0 && (Gamma_#28 && Gamma_#28)));
+    CF := bv1or(bv1and(bv1or(R0[32:0][32:31], R0[32:0][32:31]), bv1neg(#28[64:63])), bv1neg(#28[64:63]));    // 00000124
+    Gamma_CF := join(Gamma_R0, join(Gamma_R0, join(Gamma_#28, Gamma_#28)));
     call rely();
     assert true;
-    #30 := bv1neg(booltobv1(bv1neq(ZF, 0bv1)));    // 0000012d
+    #30 := booltobv1(bv1neq(bv1neg(ZF), 0bv1));    // 0000012d
     Gamma_#30 := Gamma_ZF;
     call rely();
-    assert Gamma_#30;
+    assert (Gamma_#30 <: s_TRUE);
     if (bv1tobool(#30)) { goto label00000127; } goto label00000139;
 label00000127:
     call rely();
     assert true;
     R0 := 0bv64;    // 00000130
-    Gamma_R0 := true;
+    Gamma_R0 := s_TRUE;
     call rely();
     assert true;
     R0 := bv64and(R0, 18446744069414584320bv64);    // 00000132
     Gamma_R0 := Gamma_R0;
     call rely();
     assert true;
-    main_result := R0[32:0];    // generatedline
-    Gamma_main_result := Gamma_R0;
-    call rely();
-    assert true;
-    return;
+    R0_out := R0; R1_out := R1; R2_out := R2; R3_out := R3; R4_out := R4; R5_out := R5; R6_out := R6; Gamma_R0_out := Gamma_R0; Gamma_R1_out := Gamma_R1; Gamma_R2_out := Gamma_R2; Gamma_R3_out := Gamma_R3; Gamma_R4_out := Gamma_R4; Gamma_R5_out := Gamma_R5; Gamma_R6_out := Gamma_R6;
+return;
 label00000139:
     call rely();
     assert true;
     R0 := 69632bv64;    // 0000013b
-    Gamma_R0 := true;
+    Gamma_R0 := s_TRUE;
     call rely();
     assert true;
     R0 := bv64add(R0, 52bv64);    // 0000013f
@@ -248,13 +290,13 @@ label00000139:
     call rely();
     assert true;
     R1 := 0bv64;    // 00000143
-    Gamma_R1 := true;
+    Gamma_R1 := s_TRUE;
     call rely();
     assert true;
     R1 := bv64or(bv64and(R1, 18446744069414584320bv64), 1bv64);    // 00000145
     Gamma_R1 := Gamma_R1;
     call rely();
-    assert (L(R0, heap) ==> Gamma_R1);
+    assert (Gamma_R1 <: L(R0, heap));
     heap[bv64add(R0, 0bv64)] := R1[32:0][8:0]; heap[bv64add(R0, 1bv64)] := R1[32:0][16:8]; heap[bv64add(R0, 2bv64)] := R1[32:0][24:16]; heap[bv64add(R0, 3bv64)] := R1[32:0][32:24];     // 00000149
     Gamma_heap[R0] := Gamma_R1;
     call rely();
