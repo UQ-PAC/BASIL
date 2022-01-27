@@ -6,7 +6,7 @@ import scala.collection.mutable.ArrayDeque;
 import java.lang.NullPointerException;
 
 class Worklist(val analysis: AnalysisPoint, startState: State) {
-    private final val debug: Boolean = false;
+    private final val debug: Boolean = true;
     private val directionForwards: Boolean = analysis.isForwards;
     private val libraryFunctions: Set[String] = analysis.libraryFunctions;
 
@@ -68,10 +68,10 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
 
     def analyseBlock(block: Block, currentInfo: Map[Stmt, analysis.type]): Map[Stmt, analysis.type] = {
         if debug then println("analysing block: " + block.label);
-        var outputInfo: Map[Stmt, analysis.type] = null;
+        var outputInfo: Map[Stmt, analysis.type] = currentInfo;
 
         block.lines.foreach(blockStmt => {
-            outputInfo = analyseStmt(blockStmt, currentInfo);
+            outputInfo = analyseStmt(blockStmt, outputInfo);
         })
         
         if (blockAnalysisInfo.getOrElse(block, null) != previousStmtAnalysisState) {
@@ -119,9 +119,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
             }
         }
 
-        println("\n");
-        println(stmt);
-        println(outputInfo);
         outputInfo;
     }
 
@@ -169,19 +166,8 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
      * "Commits" the info from the current function to the output map.
      */
     def saveNewAnalysisInfo(newInfo: Map[Stmt, analysis.type]) = {
-        println("\n")
-        println("new " + newInfo);
-        println("\n")
-
         newInfo.keys.foreach(newAnalysisPoint => {
-            println(newAnalysisPoint);
-            println(stmtAnalysisInfo.getOrElse(newAnalysisPoint, analysis.createLowest).asInstanceOf[analysis.type].join(newInfo.getOrElse(newAnalysisPoint, analysis.createLowest).asInstanceOf[analysis.type]));
-
             stmtAnalysisInfo = stmtAnalysisInfo + (newAnalysisPoint -> stmtAnalysisInfo.getOrElse(newAnalysisPoint, analysis.createLowest).asInstanceOf[analysis.type].join(newInfo.getOrElse(newAnalysisPoint, analysis.createLowest).asInstanceOf[analysis.type]))
         })
-
-        println("\n")
-        println("commit " + stmtAnalysisInfo);
-        println("\n")
     }
 }
