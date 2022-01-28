@@ -1,5 +1,5 @@
 L: secret -> FALSE, x -> TRUE
-GAMMA: secret -> LOW
+GAMMA: secret -> TRUE
 Rely: secret == old(secret)
 00000230: program
 00000218: sub .plt(\.plt_result)

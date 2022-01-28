@@ -1,4 +1,4 @@
-GAMMA: x -> LOW, y -> LOW
+GAMMA: x -> TRUE, y -> TRUE
 00000260: program
 00000247: sub .plt(\.plt_result)
 00000261: \.plt_result :: out u32 = R0

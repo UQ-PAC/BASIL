@@ -108,7 +108,7 @@ progSpec: (lpreds | gammas | lattice | rely)* ;
 lpreds : 'L:' lpred (',' lpred)* ;
 lpred :  (var MAPSTO secExpr);
 gammas : 'GAMMA:' gamma (',' gamma)* ;
-gamma :  (var MAPSTO (LOW | HIGH));
+gamma :  (var MAPSTO ID);
 lattice : 'Lattice:' lattice_elem (',' lattice_elem)* ;
 lattice_elem : ID '<:' 'ID'* ;
 rely: 'Rely:' pred ; 
@@ -126,7 +126,6 @@ pred :
 GAMMA_ID : 'Gamma_'ID ;
 // PRIME_VAR : (ID | GAMMA_ID)'\''; // TODO
 // predLit : TRUE | FALSE ;
-LATTICE_ELEM : ID;
 
 
 predBop : AND | OR | NEQ_PRED | EQ_PRED ;

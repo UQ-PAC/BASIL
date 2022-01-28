@@ -76,19 +76,13 @@ The program needs a `.bil` and a `.elf` file to run. The `.bil` file is produced
 
 
 
-## Thingss left to do
+## General TODOs
 
  - Guarantees
  - Loops
  - General lattice
-
-### Tasks for the Summer
-
+ - Calling convention when the stack is used
  - Replace nulls with option where possible
  - Better handling toStrings (there is a lot of overlap between pred/exp and between toString/toBoogieString)
- - At the moment all of the call registers (i.e. R0-R7) are passed as parameters, maybe it would be better to make these globals? in general this code could be neatedned up
-
-
- - calling (in particular when not all parameters can be put into registers)
- - boogie translator not as useful
+ - At the moment all of the call registers (i.e. R0-R7) are passed as parameters, it would probably be better to make these globals instead
 

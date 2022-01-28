@@ -11,7 +11,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Buffer
 import astnodes.Label
 
-// TODO scalaify
 // TODO rewrite statment loader to remove getters
 // TODO remove the need for this, and instead create directly place this logic in function state
 //      as we know the BIL output I think this would be fine
