@@ -24,7 +24,7 @@ import FlowGraph.Function
 import astnodes.pred
 import BilParser.*
 import astnodes.exp.`var`.{MemLoad, Register}
-import astnodes.pred.{Bool, ExprComp, High, Low, Pred, Security}
+import astnodes.pred.{Bool, ExprComp, Pred}
 import astnodes.sec.Sec
 import vcgen.State
 import util.AssumptionViolationException
@@ -58,7 +58,7 @@ class StatementLoader() extends BilBaseListener {
     else throw new Exception("Unparsed security " + node.getText + " (" + node.getClass + ")")
 
   val lPreds = new mutable.HashMap[Register, Sec]
-  val gammaMappings = new mutable.HashMap[Register, Security]
+  val gammaMappings = new mutable.HashMap[Register, SecVar]
 
 
   val varSizes = mutable.Map[String, Int]()
@@ -240,9 +240,8 @@ class StatementLoader() extends BilBaseListener {
 
   override def exitSecLatticeElem(ctx: SecLatticeElemContext): Unit = secs.put(ctx, SecVar(ctx.getText))
 
-  override def exitGamma(ctx: GammaContext): Unit = (getExpr(ctx.`var`), ctx.LOW, ctx.HIGH) match {
-    case (v: Register, _: TerminalNode, null) => gammaMappings.put(v, Low)
-    case (v: Register, null, _: TerminalNode) => gammaMappings.put(v, High)
+  override def exitGamma(ctx: GammaContext): Unit = getExpr(ctx.`var`) match {
+    case v: Register => gammaMappings.put(v, SecVar(ctx.ID.getText))
   }
 
   override def exitLpred(ctx: BilParser.LpredContext): Unit = (getExpr(ctx.`var`), getSec(ctx.secExpr)) match {
