@@ -20,20 +20,17 @@ trait Assign (pc: String, val lhs: Var, val rhs: Expr) extends Stmt {
   def getLhs: Var = lhs
   def getRhs: Expr = rhs
 
-  def replace(oldExpr: Expr, newExpr: Expr): Assign = {
-    // var updatedLhs : MemLoad = null
+  def fold(oldExpr: Expr, newExpr: Expr): Assign = {
     var updatedRhs : Expr = null
-    // if (lhs.isInstanceOf[MemLoad]) {
-    //   updatedLhs = lhs.subst(oldExpr, newExpr).asInstanceOf[MemLoad]
-    // }
+
     if (rhs.equals(oldExpr)) {
       updatedRhs = newExpr
     } else {
-      updatedRhs = rhs.subst(oldExpr, newExpr)
+      updatedRhs = rhs.fold(oldExpr, newExpr)
     }
-    // println(s"In BinOP. Substed RHS: $updatedRhs")
+
     lhs match {
-      case lhsRes: MemLoad => MemAssign(pc, lhsRes, rhs = updatedRhs)
+      case lhsRes: MemLoad => MemAssign(pc, if (!lhsRes.onStack) lhsRes.fold(oldExpr, newExpr).asInstanceOf[MemLoad] else lhsRes, rhs = updatedRhs)
       case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs = updatedRhs)
     }
   }

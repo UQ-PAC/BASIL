@@ -9,7 +9,7 @@ import astnodes.stmt.*;
 import astnodes.stmt.assign.*;
 import astnodes.exp.`var`.*;
 import astnodes.exp.*;
-import util.SegmentationViolationException;
+import util.SegmentationViolationException
 
 class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoint {
     // i.e. map of Expr[X0] -> Expr[SP + 10]

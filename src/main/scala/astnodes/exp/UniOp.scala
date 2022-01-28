@@ -13,6 +13,7 @@ case class UniOp(var operator: UniOperator.Value, val exp: Expr) extends Expr {
   override def toString = String.format("%s %s", operator, exp)
   override def toBoogieString: String = s"${UniOperator.toBoogie(operator, size)}(${exp.toBoogieString})"
   override def subst(v: Expr, w: Expr): Expr = this.copy(exp = exp.subst(v, w))
+  override def fold (old: Expr, sub: Expr): UniOp = this.copy(exp = exp.subst(old, sub))
 
   override def vars = exp.vars
 

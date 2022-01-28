@@ -4,6 +4,7 @@ import astnodes.exp.`var`.Var
 import java.util
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
+import analysis.tools.SimplificationUtil
 
 /**
  *  Concatenation of two bitvectors
@@ -20,17 +21,11 @@ case class Concat (left: Expr, right: Expr) extends Expr{
 
   override def vars = left.vars ++ right.vars
   override def subst(v: Expr, w: Expr): Expr = {
-    val newConcat = this.copy(left = left.subst(v,w), right = right.subst(v,w))
-    // println(s"New concat: $newConcat")
-    newConcat
+    this.copy(left = left.subst(v,w), right = right.subst(v,w))
   }
 
-  def simplify: Expr = {
-    if (left.isInstanceOf[Literal] && left.asInstanceOf[Literal].toString.equals("0")) {
-      return this //right
-    }
-
-    return this
+  override def fold(old: Expr, sub: Expr): Expr = {
+    SimplificationUtil.bitvecConcat(this.copy(left = left.fold(old,sub), right = right.fold(old,sub)))
   }
 }
 

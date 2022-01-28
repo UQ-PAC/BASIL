@@ -14,6 +14,7 @@ trait Expr {
   def subst(v: Expr, w: Expr): Expr
   def toBoogieString = toString
 
+  def fold (old: Expr, sub: Expr): Expr
   /* 
    * The size of output of the given expression.
    *

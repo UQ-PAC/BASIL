@@ -5,6 +5,7 @@ import util.AssumptionViolationException
 
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
+import analysis.tools.SimplificationUtil
 
 /** Binary operation of two expressions
  */
@@ -14,112 +15,20 @@ case class BinOp(
     secondExp: Expr
 ) extends Expr {
   def this(operatorStr: String, firstExp: Expr, secondExp: Expr) = this(BinOperator.fromBil(operatorStr), firstExp, secondExp)
-  def getOp(): String = {
-    return operator.toString
-  }
-
-  def simplify(): Expr = {
-    if (this.canCompute()) {
-      val newVal = this.compute()
-      return new Literal(newVal.toString)
-    }
-
-    // change these as an equality by converting to int
-    if (firstExp.isInstanceOf[Literal] && firstExp.asInstanceOf[Literal].asLong == 0 && this.getOp().equals("|")) {
-      return secondExp
-    } else if (secondExp.isInstanceOf[Literal] && secondExp.asInstanceOf[Literal].asLong == 0 && this.getOp().equals("|")) {
-      return firstExp
-    }
-
-    var newLhs : Expr = firstExp
-    var newRhs : Expr = secondExp
-    if (firstExp.isInstanceOf[BinOp]) { 
-      newLhs = firstExp.asInstanceOf[BinOp].simplify()
-    }
-    if (secondExp.isInstanceOf[BinOp]) {
-      newRhs = secondExp.asInstanceOf[BinOp].simplify()
-    }
-
-    this.copy(firstExp = newLhs, secondExp = newRhs)
-  }
   
-  // TODO: this can be simplified a lot, but atm it seems to work allg
-  def compute(): Long = {
-    if (firstExp.isInstanceOf[Literal] && secondExp.isInstanceOf[Literal]) {
-      val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
-      val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
-      return performArithmetic(firstOperand, secondOperand, operator.toString)
-    } else if (firstExp.isInstanceOf[Literal] && secondExp.isInstanceOf[BinOp]) {
-      val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
-      val secondOperand = secondExp.asInstanceOf[BinOp].compute()
-      return performArithmetic(firstOperand, secondOperand, operator.toString)
-    } else if (firstExp.isInstanceOf[BinOp] && secondExp.isInstanceOf[Literal]) {
-      val firstOperand = firstExp.asInstanceOf[BinOp].compute()
-      val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
-      return performArithmetic(firstOperand, secondOperand, operator.toString)
-    } else {
-      val firstOperand = firstExp.asInstanceOf[BinOp].compute()
-      val secondOperand = secondExp.asInstanceOf[BinOp].compute()
-      return performArithmetic(firstOperand, secondOperand, operator.toString)
-    }
-  }
-  
-  def canCompute(): Boolean = {
-    if (firstExp.isInstanceOf[Literal]) {
-      try {
-        val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
-        // println(firstOperand)
-      } catch {
-        case ex: NumberFormatException => return false
-      }
-    } else if (!firstExp.isInstanceOf[BinOp]) {
-      return false
-    } else if (!firstExp.asInstanceOf[BinOp].canCompute()) {
-      return false
-    }
-    
-    if (secondExp.isInstanceOf[Literal]) {
-      try {
-        val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
-        // println(secondOperand)
-      } catch {
-        case ex: NumberFormatException => return false
-      }
-    } else if (!secondExp.isInstanceOf[BinOp]) {
-      return false
-    } else if (!secondExp.asInstanceOf[BinOp].canCompute()) {
-      return false
-    }
-    
-    return true
-  }
-  
-  /**
-    * Helper method for compute()
-   */
-  private def performArithmetic(firstOperand : Double, secondOperand : Double, operator : String)
-    : Long = {
-    var result : Double = 0
-    operator match {
-      case "+" => result = firstOperand + secondOperand
-      case "-" => result = firstOperand - secondOperand
-      case "*" => result = firstOperand * secondOperand
-      case "/" => result = firstOperand / secondOperand
-      case "%" => result = firstOperand % secondOperand
-      case "&" => result = firstOperand.asInstanceOf[Long] & secondOperand.asInstanceOf[Long]
-      case "|" => result = firstOperand.asInstanceOf[Long] | secondOperand.asInstanceOf[Long]
-      case _ => 
-    }
-    return result.asInstanceOf[Long]
-  }
+  def getFirstExp = firstExp
+  def getSecondExp = secondExp
+  def getOperator = operator.toString
   
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
   override def toBoogieString = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
 
   override def subst(v: Expr, w: Expr): Expr = {
-    val newBinOP = this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
-    // println(s"New BinOP: $newBinOP")
-    newBinOP
+    this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
+  }
+
+  override def fold(old: Expr, sub: Expr): Expr = {
+    SimplificationUtil.binArithmetic(this.copy(firstExp = firstExp.fold(old,sub), secondExp = secondExp.fold(old, sub)))
   }
 
   override def vars = firstExp.vars ++ secondExp.vars
