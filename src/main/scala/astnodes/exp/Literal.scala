@@ -13,7 +13,6 @@ case class Literal(value: String, override val size: Option[Int] = None) extends
   override def toBoogieString: String = value + s"bv${if (size.isDefined) size.get else 64}"
   def asLong: Long = {
     try {
-      println(value.toLong)
       value.toLong 
     } catch {
       case e: _ => -1 

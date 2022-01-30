@@ -37,10 +37,6 @@ case object SimplificationUtil {
       }
     }
 
-    if (lhs.isInstanceOf[Literal] && rhs.isInstanceOf[astnodes.exp.`var`.MemLoad]) {
-      return astnodes.exp.`var`.MemLoad(rhs.asInstanceOf[astnodes.exp.`var`.MemLoad].exp, Some(64))
-    }
-
     concat
   }
 
@@ -104,15 +100,15 @@ case object SimplificationUtil {
       return performArithmetic(firstOperand, secondOperand, operator)
     } else if (firstExp.isInstanceOf[Literal] && secondExp.isInstanceOf[BinOp]) {
       val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
-      val secondOperand = compute(secondExp.asInstanceOf[BinOp])
+      val secondOperand = compute(secondExp.asInstanceOf[BinOp]).toDouble
       return performArithmetic(firstOperand, secondOperand, operator)
     } else if (firstExp.isInstanceOf[BinOp] && secondExp.isInstanceOf[Literal]) {
-      val firstOperand = compute(firstExp.asInstanceOf[BinOp])
+      val firstOperand = compute(firstExp.asInstanceOf[BinOp]).toDouble
       val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
       return performArithmetic(firstOperand, secondOperand, operator)
     } else {
-      val firstOperand = compute(firstExp.asInstanceOf[BinOp])
-      val secondOperand = compute(secondExp.asInstanceOf[BinOp])
+      val firstOperand = compute(firstExp.asInstanceOf[BinOp]).toDouble
+      val secondOperand = compute(secondExp.asInstanceOf[BinOp]).toDouble
       return performArithmetic(firstOperand, secondOperand, operator)
     }
   }
@@ -160,8 +156,8 @@ case object SimplificationUtil {
       case "*" => result = firstOperand * secondOperand
       case "/" => result = firstOperand / secondOperand
       case "%" => result = firstOperand % secondOperand
-      case "&" => result = firstOperand.asInstanceOf[Long] & secondOperand.asInstanceOf[Long]
-      case "|" => result = firstOperand.asInstanceOf[Long] | secondOperand.asInstanceOf[Long]
+      case "&" => result = (firstOperand.asInstanceOf[Long] & secondOperand.asInstanceOf[Long]).toDouble
+      case "|" => result = (firstOperand.asInstanceOf[Long] | secondOperand.asInstanceOf[Long]).toDouble
       case _ => 
     }
     return result.asInstanceOf[Long]

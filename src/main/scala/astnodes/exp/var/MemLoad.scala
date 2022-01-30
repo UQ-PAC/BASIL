@@ -32,7 +32,7 @@ case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
   
   override def fold(old: Expr, sub: Expr): Expr = {
     if (!this.onStack) this.copy(exp.fold(old, sub))
-    else if (this.onStack && old == this) sub
+    else if (this.onStack && old == this) return sub
     else this
   }
 
