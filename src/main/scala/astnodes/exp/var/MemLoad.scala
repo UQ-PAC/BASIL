@@ -2,8 +2,7 @@ package astnodes.exp.`var`
 
 import astnodes.exp.{Expr, BinOp, UniOp, Literal, BinOperator}
 import astnodes.pred
-
-import java.util.Collections
+import astnodes.sec.SecMemLoad
 
 /** A load from memory at location exp
  */
@@ -30,14 +29,13 @@ case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
     case UniOp(_, e1: Expr) => onStackMatch(e1)
     case _                   => false
   }
-
-  // TODO need to rework memload .....
-  def toL = new pred.MemLoad(false, true, exp)
-  def toGamma = new pred.MemLoad(true, false, exp)
-
+  
   override def fold(old: Expr, sub: Expr): Expr = {
     if (!this.onStack) this.copy(exp.fold(old, sub))
     else if (this.onStack && old == this) sub
     else this
   }
+
+  def toL = SecMemLoad(false, true, exp)
+  override def toGamma = SecMemLoad(true, false, exp)
 }

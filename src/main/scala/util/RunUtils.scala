@@ -50,6 +50,16 @@ object RunUtils {
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
+    val worklist = InlineWorklist(new ConstantPropagationAnalysis(new collection.mutable.HashMap[Expr, String](),
+      Set(), null, flowGraph), flowGraph)
+    println("Before CP:")
+    worklist.printAllLinesWithLabels
+    worklist.analyseFromMain
+    println("After CP:")
+    // worklist.printAllStates
+    worklist.printAllLinesWithLabels
+    // worklist.printAllStates
+
     // var worklist: BlockWorklist = BlockWorklist(Set(TestingAnal), flowGraph);
     // worklist.workOnBlocks;
     
@@ -66,16 +76,6 @@ object RunUtils {
     // println("h4")
 
     val updatedState = BoogieTranslator.translate(state)
-
-    val worklist = InlineWorklist(new ConstantPropagationAnalysis(new collection.mutable.HashMap[Expr, String](),
-      Set(), null, flowGraph), flowGraph)
-    println("Before CP:")
-    worklist.printAllLinesWithLabels
-    worklist.analyseFromMain
-    println("After CP:")
-    // worklist.printAllStates
-    worklist.printAllLinesWithLabels
-    // worklist.printAllStates
 
     VCGen.genVCs(updatedState)
   }

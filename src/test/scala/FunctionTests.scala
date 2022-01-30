@@ -3,8 +3,11 @@ import org.scalatest.funsuite.AnyFunSuite
 
 class FunctionTests extends AnyFunSuite {
   test("function") {
+    // This test passing seems to indicate that it can infer an ensures
+    // It would be good to check that this is the case (and that its not just a bug)
     val result = TestUtils.processBoogieFile("function/function")
-    assert(result.failures == List(237))
+    assert(result.numFailure == 1)
+    assert(result.numSuccess == 0)
   }
 
   test("function_ensures") {

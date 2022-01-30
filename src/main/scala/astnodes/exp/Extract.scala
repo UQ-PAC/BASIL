@@ -17,7 +17,7 @@ case class Extract(firstInt: Int, secondInt: Int, variable: Expr) extends Expr {
   def getEnd = secondInt
   def getExp = variable
 
-  override def subst(v: Expr, w: Expr): Expr = this.copy(variable = variable.subst(v, w))
+  override def subst(v: Var, w: Var): Expr = this.copy(variable = variable.subst(v, w))
 
   override def fold(old: Expr, sub: Expr): Expr = SimplificationUtil.bitvecExtract(this.copy(variable = variable.fold(old, sub)))
 

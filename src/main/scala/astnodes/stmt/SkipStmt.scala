@@ -12,5 +12,5 @@ case class SkipStmt(val pc: String) extends Stmt(Label(pc)) {
   // main
   // override def subst(v: Var, w: Var): Stmt = this
 
-  override def subst(v: Expr, w: Expr): Stmt = this
+  override def subst(v: Var, w: Var): Stmt = this
 }

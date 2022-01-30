@@ -50,15 +50,6 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
               }
             })
           }
-
-          // var newStmtRhs = newStmt.asInstanceOf[Assign].rhs
-          // assignStmt.getRhs match {
-          //   case binOp : BinOp => newStmtRhs = SimplificationUtil.binArithmetic(newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[BinOp])
-          //   case extract : Extract => newStmtRhs = SimplificationUtil.bitvecExtract(newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[Extract])
-          //   case concat : Concat => newStmtRhs = SimplificationUtil.bitvecConcat(newStmt.asInstanceOf[Assign].getRhs.asInstanceOf[Concat])
-          //   case _ =>
-          // }
-          // newStmt = newStmt.asInstanceOf[Assign].fold(newStmt.asInstanceOf[Assign].getRhs, newStmtRhs)
         }
 
         case _ =>

@@ -17,5 +17,5 @@ case class ExitSub(val pc: String, returnParam: Option[OutParameter]) extends St
     case None => ""
   }} + "return;"
 
-  override def subst(v: Expr, w: Expr): Stmt = this
+  override def subst(v: Var, w: Var): Stmt = this
 }

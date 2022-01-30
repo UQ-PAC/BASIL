@@ -8,7 +8,7 @@ import astnodes.Label
 import java.util
 
 class Assert(pc: String, var pred: Pred) extends Stmt(Label(pc)) {
-  override def subst(v: Expr, w: Expr): Stmt = ???
+  override def subst(v: Var, w: Var): Stmt = ???
 
 // main vers:
 // case class Assert(pc: String, var pred: Pred) extends Stmt(Label(pc)) {

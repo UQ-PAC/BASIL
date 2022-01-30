@@ -12,5 +12,5 @@ case class JmpStmt(val pc: String, val target: String) extends Stmt(Label(pc)) {
   
   // override def subst(v: Var, w: Var): Stmt = this
 
-  override def subst(v: Expr, w: Expr): Stmt = this
+  override def subst(v: Var, w: Var): Stmt = this
 }

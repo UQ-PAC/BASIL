@@ -20,7 +20,7 @@ case class Concat (left: Expr, right: Expr) extends Expr{
   def getRhs = right
 
   override def vars = left.vars ++ right.vars
-  override def subst(v: Expr, w: Expr): Expr = {
+  override def subst(v: Var, w: Var): Expr = {
     this.copy(left = left.subst(v,w), right = right.subst(v,w))
   }
 

@@ -12,7 +12,7 @@ import java.util
 trait Stmt(var label: Label) {
   // main
   // def subst(v: Var, w: Var): Stmt
-  def subst(v: Expr, w: Expr): Stmt
+  def subst(v: Var, w: Var): Stmt
   def toBoogieString = toString
 
   def getLabel = label

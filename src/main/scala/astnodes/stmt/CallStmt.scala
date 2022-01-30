@@ -14,7 +14,7 @@ case class CallStmt(val pc: String, funcName: String, returnTarget: Option[Strin
     // TODO neaten up call args logic
     val argsStr = 
       if (libraryFunction) args.map(arg => arg.name).mkString(", ")
-      else CallStmt.callRegisters.map(x => s"$x: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x: bool").mkString(", ")
+      else CallStmt.callRegisters.map(x => s"$x: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x: SecurityLevel").mkString(", ")
 
     val lhsStr = lhs match {
       case _ if (!libraryFunction) => CallStmt.callRegisters.mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x").mkString(", ") + " := "
@@ -32,7 +32,7 @@ case class CallStmt(val pc: String, funcName: String, returnTarget: Option[Strin
     s"call $label$lhsStr $name ($argsStr); $targetStr"
   }
 
-  override def subst(v: Expr, w: Expr): Stmt = this.copy(args = args.map(r => r.subst(v,w) match {
+  override def subst(v: Var, w: Var): Stmt = this.copy(args = args.map(r => r.subst(v,w) match {
       case x: Register => x
       case _ => ???
     }))

@@ -11,7 +11,7 @@ trait Expr {
   def vars: List[Var] 
 
   /* Substitute a given variable for another variable */
-  def subst(v: Expr, w: Expr): Expr
+  def subst(v: Var, w: Var): Expr
   def toBoogieString = toString
 
   def fold (old: Expr, sub: Expr): Expr

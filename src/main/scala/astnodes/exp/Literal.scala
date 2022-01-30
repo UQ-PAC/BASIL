@@ -21,7 +21,7 @@ case class Literal(value: String, override val size: Option[Int] = None) extends
   }
 
   override def vars: List[Register] = List()
-  override def subst(v: Expr, w: Expr): Expr = this
+  override def subst(v: Var, w: Var): Expr = this
   override def fold(old: Expr, sub: Expr) = this
 }
 
