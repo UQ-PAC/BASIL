@@ -11,10 +11,12 @@ import BilParser.BilParser.PredContext
 import BilParser.BilParser.PredExprCompContext
 import BilParser.BilParser.PredUniOpContext
 import BilParser.BilParser.ProgSpecContext
+import BilParser.BilParser.SecLatticeElemContext
 import astnodes.parameters.InParameter
 import astnodes.parameters.OutParameter
 import astnodes.exp.*
 import astnodes.stmt.*
+import astnodes.sec.SecVar
 import astnodes.stmt.assign.{MemAssign, RegisterAssign}
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}
@@ -22,7 +24,8 @@ import FlowGraph.Function
 import astnodes.pred
 import BilParser.*
 import astnodes.exp.`var`.{MemLoad, Register}
-import astnodes.pred.{Bool, ExprComp, High, Low, Pred, Security}
+import astnodes.pred.{Bool, ExprComp, Pred}
+import astnodes.sec.Sec
 import vcgen.State
 import util.AssumptionViolationException
 
@@ -43,14 +46,19 @@ class StatementLoader() extends BilBaseListener {
 
   private val preds = ParseTreeProperty[Pred]
   private def getPred(node: ParseTree) =
-    if (node == null) throw new NullPointerException("Null param")
-    if (preds.get(node) != null)
-      preds.get(node)
-    else
-      throw new Exception("Unparsed param " + node.getText + " (" + node.getClass + ")")
+    if (node == null) throw new NullPointerException("Null pred")
+    if (preds.get(node) != null) preds.get(node)
+    else throw new Exception("Unparsed pred " + node.getText + " (" + node.getClass + ")")
 
-  val lPreds = new mutable.HashMap[Register, Pred]
-  val gammaMappings = new mutable.HashMap[Register, Security]
+
+  private val secs = ParseTreeProperty[Sec]
+  private def getSec(node: ParseTree) =
+    if (node == null) throw new NullPointerException("Null security")
+    if (secs.get(node) != null) secs.get(node)
+    else throw new Exception("Unparsed security " + node.getText + " (" + node.getClass + ")")
+
+  val lPreds = new mutable.HashMap[Register, Sec]
+  val gammaMappings = new mutable.HashMap[Register, SecVar]
 
 
   val varSizes = mutable.Map[String, Int]()
@@ -120,7 +128,6 @@ class StatementLoader() extends BilBaseListener {
 
     val size = typeToSize(ctx.nat.getText)
 
-    // TODO it would be good to instead use in/out but what is in out
     if (id.contains("result")) currentFunction.setOutParam(new OutParameter(Register(id, size), Register(variable, 64)))
     else currentFunction.getInParams += InParameter(Register(id, size), Register(variable, size))
   }
@@ -177,7 +184,7 @@ class StatementLoader() extends BilBaseListener {
     } else if (ctx.cjmp != null) { // statement is a conditional jump
       val cond = Register(ctx.cjmp.`var`.getText, varSizes(ctx.cjmp.`var`.getText)) // conditions are always vars
       val target = ctx.cjmp.addr.getText
-      stmts += new CJmpStmt(address, target, "TODO", cond) // TODO set up false GOTO
+      stmts += new CJmpStmt(address, target, "TODO", cond)
     } else if (ctx.call != null) { // statement is a call
       if (ctx.call.functionName == null) { // occasionally this occurs with "call LR with no return" lines
         stmts += new ExitSub(ctx.addr.getText, None)
@@ -197,9 +204,6 @@ class StatementLoader() extends BilBaseListener {
   override def exitExpVar(ctx: BilParser.ExpVarContext): Unit = exprs.put(ctx, exprs.get(ctx.`var`))
   override def exitExpLiteral(ctx: BilParser.ExpLiteralContext): Unit = exprs.put(ctx, Literal(ctx.literal.getText))
   override def exitExpExtract(ctx: BilParser.ExpExtractContext): Unit = {
-    // fixme: assumes all bit vectors are 64 bits long
-    // TODO: val firstNat = 64 - ctx.nat(0).getText.toInt
-    // TODO: val secondNat = 63 - ctx.nat(1).getText.toInt
     val firstNat = ctx.nat(0).getText.toInt
     val secondNat = ctx.nat(1).getText.toInt
     val exp = getExpr(ctx.exp)
@@ -210,8 +214,6 @@ class StatementLoader() extends BilBaseListener {
   override def exitExpCast(ctx: BilParser.ExpCastContext): Unit = ctx.CAST().getText match {
     case "pad" => exprs.put(ctx, Pad(getExpr(ctx.exp), ctx.nat.getText.toInt))
     case "extend" => exprs.put(ctx, Extend(getExpr(ctx.exp), ctx.nat.getText.toInt))
-    // case "low" => exprs.put(ctx, Extract(ctx.nat.getText.toInt, 0, getExpr(ctx.exp)))
-    // case "high" => exprs.put(ctx, Extract(65, ctx.nat.getText.toInt, getExpr(ctx.exp))) // TODO assumes bv size is 64
     case "low" | "high" => exprs.put(ctx, getExpr(ctx.exp))
   }
 
@@ -235,18 +237,19 @@ class StatementLoader() extends BilBaseListener {
   override def exitPredUniOp(ctx: PredUniOpContext): Unit = preds.put(ctx, new astnodes.pred.UniOp(ctx.uop.getText, getPred(ctx.pred)))
   override def exitPredBracket(ctx: PredBracketContext): Unit = preds.put(ctx, getPred(ctx.pred))
   override def exitPredExprComp(ctx: PredExprCompContext): Unit = preds.put(ctx, new ExprComp(ctx.expComp.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
-  override def exitPredLiteral(ctx: BilParser.PredLiteralContext): Unit = preds.put(ctx, ctx.getText match {
+  /* override def exitPredLiteral(ctx: BilParser.PredLiteralContext): Unit = preds.put(ctx, ctx.getText match {
     case "TRUE" => Bool.True
     case "FALSE" => Bool.False
-  })
+  }) */
 
-  override def exitGamma(ctx: GammaContext): Unit = (getExpr(ctx.`var`), ctx.LOW, ctx.HIGH) match {
-    case (v: Register, _: TerminalNode, null) => gammaMappings.put(v, Low)
-    case (v: Register, null, _: TerminalNode) => gammaMappings.put(v, High)
+  override def exitSecLatticeElem(ctx: SecLatticeElemContext): Unit = secs.put(ctx, SecVar(ctx.getText))
+
+  override def exitGamma(ctx: GammaContext): Unit = getExpr(ctx.`var`) match {
+    case v: Register => gammaMappings.put(v, SecVar(ctx.ID.getText))
   }
 
-  override def exitLpred(ctx: BilParser.LpredContext): Unit = (getExpr(ctx.`var`), getPred(ctx.pred)) match {
-    case (v: Register, p: Pred) => lPreds.put(v, p)
+  override def exitLpred(ctx: BilParser.LpredContext): Unit = (getExpr(ctx.`var`), getSec(ctx.secExpr)) match {
+    case (v: Register, p: Sec) => lPreds.put(v, p)
   }
 
   override def exitRely(ctx: BilParser.RelyContext): Unit = rely = Some(getPred(ctx.pred))

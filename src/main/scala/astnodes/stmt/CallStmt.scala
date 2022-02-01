@@ -11,8 +11,13 @@ case class CallStmt(val pc: String, funcName: String, returnTarget: Option[Strin
   def setLHS(reg: Register) = lhs = Some(reg)
 
   override def toString = {
-    val argsStr = args.map(arg => arg.name).mkString(", ")
+    // TODO neaten up call args logic
+    val argsStr = 
+      if (libraryFunction) args.map(arg => arg.name).mkString(", ")
+      else CallStmt.callRegisters.map(x => s"$x: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x: SecurityLevel").mkString(", ")
+
     val lhsStr = lhs match {
+      case _ if (!libraryFunction) => CallStmt.callRegisters.mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x").mkString(", ") + " := "
       case Some(x) => s"$x, ${x.toGamma} := "
       case None => ""
     }
@@ -42,6 +47,8 @@ case object CallStmt {
       "realloc" -> LibraryFunction(Some(Register("R0", 64)), List()), 
       "free" -> LibraryFunction(None, List(Register("R0", 64)), Some("free_"))
     ).toMap
+
+  val callRegisters = Range(0, 7).map(x => s"R$x")
 }
 
 case class LibraryFunction(lhs: Option[Register], args: List[Register], mappedName: Option[String] = None)

@@ -5,9 +5,10 @@ import astnodes.exp.{Expr, Literal}
 import astnodes.stmt.assign.{Assign, GammaUpdate, MemAssign, RegisterAssign}
 import astnodes.stmt.{Assert, CJmpStmt, Stmt, MethodCall}
 import translating.FlowGraph
+import astnodes.sec.{SecBinOp, join, Sec}
 
 import collection.JavaConverters.*
-import astnodes.pred.{BinOp, BinOperator, Bool, Pred, conjunct}
+import astnodes.pred.{BinOp, BinOperator, Bool, Pred, conjunct, SecComp}
 
 object VCGen {
   // This generates the VCs but also updates to gamma variables
@@ -22,7 +23,7 @@ object VCGen {
   /** Generate the verification condition for a given statement
     */
   def genVC(stmt: Stmt, fState: FunctionState, state: State): Pred = stmt match {
-    case cjmpStmt: CJmpStmt     => computeGamma(cjmpStmt.getCondition, state)
+    case cjmpStmt: CJmpStmt     => SecComp(computeGamma(cjmpStmt.getCondition, state), state.lattice.attackerLevel)
     case assign: RegisterAssign => Bool.True // will need to add rely/guar later
     // TODO for each part
     case assign: MemAssign =>
@@ -30,7 +31,7 @@ object VCGen {
         case true  => Bool.True // these are thread local
         case false =>
           // TODO need to be careful bc these could be global or thead local (if they are in the GOT)
-          BinOp(BinOperator.Implication, assign.lhs.toL, computeGamma(assign.rhs, state))
+          SecComp(computeGamma(assign.rhs, state), assign.lhs.toL)
         // Use the GOT/ST to get the exact variable being referenced, except if it uses pointer arithmetic etc etc
         // would be interesting to see if making the substitution actually made a meaningful difference
       }
@@ -40,10 +41,10 @@ object VCGen {
 
   /** Compute the gamma value for an expression
    */
-  def computeGamma(expr: Expr, state: State) = expr.vars.map{
+  def computeGamma(expr: Expr, state: State): Sec = expr.vars.map{
     case v: Register => v.toGamma
-    case l: MemLoad => BinOp(BinOperator.Disjunction, l.toGamma, l.toL)
-  }.conjunct
+    case l: MemLoad => SecBinOp("meet", l.toGamma, l.toL)
+  }.join(state)
 
   /** Generate an assignment to a gamma variable for each variable update.
    */

@@ -1,5 +1,7 @@
 package util
 
+import astnodes.sec.SecLattice
+
 object Boogie {
   def generateBVHeader (size: Int) = f"""
       |/*****
@@ -55,16 +57,30 @@ object Boogie {
       |axiom bv1tobool(1bv1) == true && bv1tobool(0bv1) == false;
       |""".stripMargin
 
-  def generateLibraryFuncHeader = """
+  def generateLibraryFuncHeader(lattice: SecLattice) = s"""
       |// TODO signed or unsigned div
-      |procedure malloc(size: bv64) returns (addr: bv64, Gamma_addr: bool);
+      |procedure malloc(size: bv64) returns (addr: bv64, Gamma_addr: SecurityLevel);
       |ensures (forall i: bv64 :: ((bv64ule(0bv64, i) && bv64ult(i, bv64udiv(size, 4bv64))) ==> old(heap_free[bv64add(addr, i)]) == true)); 
       |ensures (forall i: bv64 :: ((bv64ule(0bv64, i) && bv64ult(i, bv64udiv(size, 4bv64))) ==> heap_free[bv64add(addr, i)] == false)); 
       |ensures heap_sizes[addr] == bv64udiv(size, 4bv64);
-      |ensures Gamma_addr == false;
+      |ensures Gamma_addr == ${lattice.bottom};
       |
       |procedure free_(addr: bv64) returns ();
       |ensures (forall i: bv64 :: (bv64ule(0bv64, i) && bv64ult(i, bv64udiv(heap_sizes[addr], 4bv64))) ==> heap_free[bv64add(addr, i)] == true); 
       |
       |""".stripMargin
+
+  def generateSecurityLatticeFuncHeader = """
+      |function meet (SecurityLevel, SecurityLevel) returns (SecurityLevel);
+      |axiom (forall x: SecurityLevel, y: SecurityLevel :: meet(x,y) <: x && meet(x,y) <: y && (forall s: SecurityLevel :: (s <: x && s <: y) ==> (s <: meet(x,y))));
+      |
+      |function join (SecurityLevel, SecurityLevel) returns (SecurityLevel);
+      |axiom (forall x: SecurityLevel, y: SecurityLevel :: x <: join(x,y) && y <: join(x,y) && (forall s: SecurityLevel :: (x <: s && y <: s) ==> (join(x,y) <: s)));
+      |
+      |function secITE (cond: bool, first: SecurityLevel, second: SecurityLevel) returns (SecurityLevel);
+      | axiom (forall cond: bool, first: SecurityLevel, second: SecurityLevel :: (cond ==> (secITE(cond, first, second) == first)) && (!cond ==> (secITE(cond, first, second) == second))) ;
+      |
+      |
+  """.stripMargin
+
 }

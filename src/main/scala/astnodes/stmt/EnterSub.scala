@@ -11,7 +11,6 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Buffer
 import astnodes.Label
 
-// TODO scalaify
 // TODO rewrite statment loader to remove getters
 // TODO remove the need for this, and instead create directly place this logic in function state
 //      as we know the BIL output I think this would be fine
@@ -35,8 +34,13 @@ case class EnterSub(val pc: String, funcName: String, var requires: List[Pred], 
   }
 
   override def toString = {
-    val in = inParams.mkString(", ")
-    val out = if (outParam != None) f" returns (${outParam.get})" else ""
+    val in = 
+      if (libraryFunction) inParams.mkString(", ")
+      else CallStmt.callRegisters.map(x => s"${x}_in: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_${x}_in: SecurityLevel").mkString(", ")
+    val out = 
+      // TODO gamma out
+      if (!libraryFunction) "returns (" + CallStmt.callRegisters.map(x => s"${x}_out: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_${x}_out: SecurityLevel").mkString(", ") + ")"
+      else if (outParam != None) f" returns (${outParam.get})" else ""
 
     val decl = funcName + "(" + in + ")" + out
 
@@ -52,4 +56,5 @@ case class EnterSub(val pc: String, funcName: String, var requires: List[Pred], 
   }
 
   override def subst(v: Var, w: Var): Stmt = this
+  def libraryFunction = CallStmt.libraryFunctions.contains(funcName)
 }

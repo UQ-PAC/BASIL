@@ -1,4 +1,4 @@
-GAMMA: x -> LOW, y -> LOW
+GAMMA: x -> TRUE, y -> TRUE
 00000260: program
 00000247: sub .plt(\.plt_result)
 00000261: \.plt_result :: out u32 = R0
@@ -209,7 +209,7 @@ GAMMA: x -> LOW, y -> LOW
 00000108: call @register_tm_clones with noreturn
 
 0000025b: sub get_two(get_two_result)
-ENSURES: Gamma_get_two_result == true
+ENSURES: Gamma_R0_out == s_TRUE
 00000270: get_two_result :: out u32 = R0
 
 0000012b:

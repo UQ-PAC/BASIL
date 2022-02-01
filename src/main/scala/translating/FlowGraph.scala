@@ -86,8 +86,10 @@ object FlowGraph {
       */
     def fromStmts(stmts: List[Stmt], types: immutable.Map[String, Int]) = {
       val stmts1 = mergeCjmp(stmts.asScala.toList)
-      val stmts2 = setFunctionsWithReturns(stmts1).asJava;
+      // val stmts2 = setFunctionsWithReturns(stmts1).asJava;
+      val stmts2 = stmts1.asJava
       // an ordered list of indexes of the given statements list, indicating where the list should be split into blocks
+      // val splits = getSplits(stmts2)
       val splits = getSplits(stmts2)
       // an ordered list of blocks, defined by the given given list of splits
       // essentially creates the nodes for this flow graph
@@ -393,8 +395,6 @@ class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.M
   globalInits.add(new InitStmt(Register("heap_free", -1 ), "heap_free", "[bv64] bool"))
   globalInits.add(new InitStmt(Register("heap_sizes", -1 ), "heap_size", "[bv64] bv64"))
   globalInits.add(new InitStmt(Register("stack", -1), "stack", "[bv64] bv8"))
-  globalInits.add(new InitStmt(Register("L_heap", -1), "heap", "[bv64] bool", true)) // TODO This isnt great
-  globalInits.add(new InitStmt(Register("L_stack", -1), "stack", "[bv64] bool", true))
   globalInits.add(new InitStmt(Register("SP", -1 ), "SP", "bv64"))
   globalInits.add(new InitStmt(Register("R31", -1 ), "R31", "bv64"))
 

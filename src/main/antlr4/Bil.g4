@@ -28,11 +28,11 @@ stmt : addr ':'
 call : 'call' (('@' functionName)|var) 'with' (returnaddr | 'noreturn') ;
 
 assign : var ':=' exp ;
-exp : exp bop exp                                       # expBop
+exp : '(' exp ')'                                       # expBracket
     | literal                                           # expLiteral
-    | '(' exp ')'                                       # expBracket
-    | uop exp                                           # expUop
     | var                                               # expVar
+    | uop exp                                           # expUop
+    | exp bop exp                                       # expBop
     | exp 'with' '[' exp ',' ENDIAN ']:' nat '<-' exp   # expStore
     | exp 'with' '[' exp ']' '<-' exp                   # expStore8 // sizes can be ommited if storing a single byte
     | CAST ':' nat '[' exp ']'                          # expCast
@@ -58,8 +58,8 @@ literal : NUMBER ;
 nat : (NAT | NUMBER) ;
 addr : NUMBER ;
 
-TRUE: 'TRUE' ;
-FALSE: 'FALSE' ;
+// TRUE: 'TRUE' ;
+// FALSE: 'FALSE' ;
 HIGH : 'HIGH' ;
 LOW : 'LOW' ;
 CAST : ('pad' | 'extend' | 'high' | 'low') ;
@@ -106,9 +106,9 @@ UNKNOWN_OP : '~>>' ;
 progSpec: (lpreds | gammas | lattice | rely)* ;
 
 lpreds : 'L:' lpred (',' lpred)* ;
-lpred :  (var MAPSTO pred);
+lpred :  (var MAPSTO secExpr);
 gammas : 'GAMMA:' gamma (',' gamma)* ;
-gamma :  (var MAPSTO (LOW | HIGH));
+gamma :  (var MAPSTO ID);
 lattice : 'Lattice:' lattice_elem (',' lattice_elem)* ;
 lattice_elem : ID '<:' 'ID'* ;
 rely: 'Rely:' pred ; 
@@ -119,15 +119,21 @@ pred :
     | uop pred            # predUniOp
     // TODO i dont think this is right
     | exp expComp exp     # predExprComp
-    | predLit             # predLiteral
+    // | predLit             # predLiteral
     | GAMMA_ID            # gammaVar
     ;
 
 GAMMA_ID : 'Gamma_'ID ;
-primeVar : (ID | GAMMA_ID)'\''; // TODO
-predLit : TRUE | FALSE ;
+// PRIME_VAR : (ID | GAMMA_ID)'\''; // TODO
+// predLit : TRUE | FALSE ;
 
 
 predBop : AND | OR | NEQ_PRED | EQ_PRED ;
 expComp : NEQ_PRED | EQ_PRED | GE | GT | LE | LT ;
+
+secExpr :
+	'if' pred 'then' secExpr 'else' secExpr #secITE
+	| ID 		  # secLatticeElem
+	;
+
 
