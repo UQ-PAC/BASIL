@@ -1,6 +1,6 @@
 package astnodes.exp.`var`
 
-import astnodes.exp.{Expr, BinOp, UniOp, Literal, BinOperator}
+import astnodes.exp.*
 import astnodes.pred
 import astnodes.sec.SecMemLoad
 

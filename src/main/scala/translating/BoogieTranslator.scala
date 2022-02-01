@@ -25,7 +25,6 @@ import java.util.Base64
 object BoogieTranslator {
   /** Peforms the BIL to IR translation
    */
-  // def translate(state: State): State = inferConstantTypes(addVarDeclarations(optimiseSkips(addAssignBeforeReturn(identifyImplicitParams(addOutParam(addInParams(createLabels(state))))))))
   def translate(state: State): State = 
     inferConstantTypes(addVarDeclarations(optimiseSkips(addAssignAtRootBlock(addOutParam(addInParams(createLabels(state)))))))
 
@@ -51,7 +50,6 @@ object BoogieTranslator {
     })
 
     updateAllLines(state, stmt => {
-      // TODO do we need to explicitly hide in the else branch
       if (usedLabels.contains(stmt.label.pc)) stmt.copy(stmt.label.copy(visible = true))
       else stmt
     })
@@ -65,78 +63,6 @@ object BoogieTranslator {
       case x if (!x.isInstanceOf[SkipStmt]) => x
     })
   }
-
-  /** Many facts.parameters are implicit in BIL, represented not as statements but as a particular pattern of loading
-    * registers which have not been previously assigned within the function to memory addresses based on the SP, at the
-    * beginning of the function. This method identifies this pattern and adds any facts.parameters found to the
-    * function's parameter list. It is assumed that out-facts.parameters are always explicitly stated in BIL, and
-    * therefore translating.StatementLoader would have added them already. It is assumed that the first block (i.e. root
-    * block) of any function will contain all loadings of facts.parameters.
-    *
-    * We assume that these store instructions contain only the register on the rhs. We also assume that identical memory
-    * accesses (e.g. mem[2]) are never written differently (e.g. mem[1+1]), as this is what we use for identifying and
-    * substituting implicit facts.parameters. We assume that these registers are only accessed once - i.e. by the store
-    * instruction - before they are assigned.
-    */
-  private def identifyImplicitParams(state: State): State = {
-    state.functions.foreach(function => {
-      val params = function.header.getInParams
-      val rootBlock = function.rootBlock
-      val assignedRegisters = new mutable.HashSet[Register]
-
-      // TODO could neaten this further with case classes by combiling the nested matches
-      rootBlock.lines.foreach {
-        case store: MemAssign => store.rhs match {
-          case rhsVar: Register if (isRegister(rhsVar) && assignedRegisters.contains(rhsVar)) =>
-            val param = new InParameter(new Register(uniqueVarName, rhsVar.size), rhsVar)
-            param.setAlias(store.lhs.asInstanceOf[MemLoad])
-            params += param
-          case _ =>
-        }
-        case assign: Assign => assign.lhs match {
-          case lhsVar: Register if (isRegister(lhsVar)) => assignedRegisters.add(lhsVar)
-          case _: Register =>
-        }
-        case _ =>
-      }
-
-      function.header.setInParams(removeDuplicateParamsAndMerge(params.toList).toBuffer)
-      createCallArguments(state, function.header)
-    })
-
-    state
-  }
-
-  // TODO update below two methods to make everything immutable
-
-  /** Implicit params found may contain params already listed explicitly. If so, we take the var name of the explicit
-    * param, and the alias of the implicit param.
-    */
-  private def removeDuplicateParamsAndMerge(params: scala.collection.immutable.List[InParameter]): List[InParameter] = {
-    // TODO this has side effects
-    params.filter(param => {
-      val otherparams = params.filter(otherParam => {
-        (param != otherParam) && param.getRegister == otherParam.getRegister
-      })
-
-      otherparams.foreach {
-        case x if (x.getAlias == null) => x.setName(param.getName) // null alias => this is the explicit param
-        case x => x.setAlias(param.getAlias) // non-null alias => this is the implicit param
-      }
-
-      otherparams.nonEmpty
-    })
-  }
-
-  /** Provides function calls with a list of the parameters they will need to provide arguments for.
-    */
-  private def createCallArguments(state: State, func: EnterSub): Unit =
-    updateAllLines(state, {
-      case callStmt: CallStmt if (callStmt.funcName == func.funcName) => {
-        callStmt.copy(args = func.getInParams.map(_.getRegister).toList)
-      }
-    })
-
 
   private def addInParams(state: State): State = updateAllBlocks(state, block => block.lines(block.lines.size - 1) match {
     case call: CallStmt if (call.libraryFunction) =>
@@ -160,45 +86,6 @@ object BoogieTranslator {
     }
     case _ => stmt
   })
-
-  // TODO is this necassary / when is this used (I'm not sure it matches the arm calling convetion)
-  /** We want to replace mem expressions which represent parameters, like mem[SP + 1], with the human-readable
-    * names of those facts.parameters. We do this by first removing the initialising store fact "mem[SP + 1] := X0",
-    * then replacing all instances of "mem[SP + 1]" with the variable name. Depends on:
-    *   - {@link #identifyImplicitParams ( )} Assumes:
-    *   - Registers on the RHS of the initialising store fact are reassigned before they are used again.
-    *   - No parameter is initialised twice (i.e. there is no more than one initialising store fact per mem facts.exp).
-    *   - Equivalent mem expressions are never written differently, e.g. mem[SP + 1] is never written as mem[SP + 0 +
-    *     1].
-    *   - SP is equivalent at every line of code in the function, except the beginning and end.
-    *   - All parameter initialisations occur in the first block of the function.
-    *   - ...plus many other assumptions.
-    */
-  private def resolveInParams(state: State): State = {
-    updateAllFunctions(state, function => {
-      // get all InParameters that have been assigned aliases
-      val paramsWithAliases = function.header.getInParams.filter(param => param.getAlias != null)
-
-      // remove all parameter initialisations from the first block
-      val rootBlock = function.rootBlock.copy(lines = function.rootBlock.lines.filter{
-        case store: MemAssign => (store.rhs, store.lhs) match {
-          case (rhs: Register, lhs: MemLoad) => !paramsWithAliases.exists(param => param.getAlias == lhs && param.getRegister == rhs)
-          case (_: Register, _) => ??? // We may need to handle this later
-          case _ => true
-        }
-        case _ => true
-      })
-
-      // replace all instances of the alias with the human readable parameter name
-      for (param <- paramsWithAliases) {
-        function.labelToBlock.foreach{case (pc, b) => b.lines.foreach(line =>
-          line.subst(param.getAlias, param.getName)
-        )}
-      }
-
-      function.copy(labelToBlock = function.labelToBlock.updated(function.rootBlockLabel, rootBlock))
-    })
-  }
 
   private def getLocalVarsInFunction(state: State, function: FunctionState) = {
     val vars = new mutable.HashSet[Register]
@@ -246,31 +133,6 @@ object BoogieTranslator {
     }))
   }
 
-  // TODO this is wrong, so identifyImplicitParams is wrong..
-  private def isRegister(varFact: Register): Boolean = varFact.name.charAt(0) == 'X'
-
-  /** Resolves outParams by crudely replacing all references to their associated register with their human-readable
-    * name.
-    */
-  private def resolveOutParams(state: State): State = {
-    // TODO not sure if this actually helps with readability
-
-    for (function <- state.functions) {
-      val outParamOp = function.header.getOutParam
-      // TODO check will not be necassary if outparam is a scala class
-      if (outParamOp.isDefined) {
-        val outParam = outParamOp.get
-
-        function.labelToBlock.foreach{case (pc, b) => b.lines.foreach(line =>
-          line.subst(outParam.getRegister, outParam.getName)
-        )}
-      }
-    }
-
-    state
-  }
-
-  // TODO do not need to add verification conditions here
   private def addAssignAtRootBlock(state: State) = updateAllFunctions(state, func => 
       func.copy(
         labelToBlock = func.labelToBlock.updated(func.rootBlockLabel, func.rootBlock.copy(

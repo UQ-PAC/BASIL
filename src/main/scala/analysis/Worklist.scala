@@ -1,338 +1,190 @@
 package analysis;
 
-import scala.collection.mutable.Map;
-import scala.collection.mutable.Set;
-import scala.collection.mutable.Stack;
-import scala.collection.mutable.ArrayDeque;
-import scala.jdk.CollectionConverters.IteratorHasAsScala;
-import scala.jdk.CollectionConverters.ListHasAsScala;
-import scala.jdk.CollectionConverters.SeqHasAsJava;
-import java.util.MissingResourceException;
-
+import vcgen.*;
 import astnodes.stmt.*;
-import translating.FlowGraph;
-import translating.FlowGraph.Block;
-import translating.FlowGraph.Function;
-import analysis.AnalysisPoint;
+import scala.collection.mutable.ArrayDeque;
+import java.lang.NullPointerException;
 
-class InlineWorklist(analysis: AnalysisPoint, controlFlow: FlowGraph) {
-    private final val debug: Boolean = false;
-
+class Worklist(val analysis: AnalysisPoint, startState: State) {
+    private final val debug: Boolean = true;
     private val directionForwards: Boolean = analysis.isForwards;
+    private val libraryFunctions: Set[String] = analysis.libraryFunctions;
 
-    // functions that we abstract away and don't traverse. If we encounter a call to any of these, it's 
-    // passed through to the analyses as a call instruction so they can decide what to do with it.
-    val libraryFunctions: Set[String] = Set("malloc");
+    var currentCallString: Set[String] = Set();
+    var currentWorklist: ArrayDeque[Block] = ArrayDeque();
 
-    var currentCallString: List[String] = List();
+    var previousStmtAnalysisState: analysis.type = analysis.createLowest;
+    var stmtAnalysisInfo: Map[Stmt, analysis.type] = Map();
+    var blockAnalysisInfo: Map[Block, analysis.type] = Map();
+    
+    def getAllInfo: Map[Stmt, analysis.type] = {
+        stmtAnalysisInfo;
+    }
 
-    var currentWorkListQueue: ArrayDeque[Block] = ArrayDeque(); // queue of blocks to work on, for the current function.
-    var previousStmtAnalysisState: AnalysisPoint = null; // previous state on a per stmt basis.
-    var finalAnalysedStmtInfo: Map[Stmt, AnalysisPoint] = Map(); // "output" info as the end result of the analysis
-    var allBlockFinalAnalysisStates: Map[Block, AnalysisPoint] = Map(); // final states of all analysed blocks
+    def getOneInfo(stmt: Stmt): analysis.type = {
+        stmtAnalysisInfo.getOrElse(stmt, analysis.createLowest);
+    }
 
-    // clears out everything except analysedStmtInfo
-    def finish = {
-        currentWorkListQueue = null;
+    def doAnalysis: State = {
+        analyseFunction("main");
+        if debug then println(getAllInfo);
+
         previousStmtAnalysisState = null;
-        allBlockFinalAnalysisStates = null;
-    }
+        blockAnalysisInfo = null;
 
-    def getAllStates: Map[Stmt, AnalysisPoint] = {
-        finalAnalysedStmtInfo;
+        analysis.applyChanges(startState, getAllInfo);
     }
     
-    def printAllLinesWithLabels: Unit = {
-        controlFlow.getLines.forEach(line => {
-            System.out.println(line.getLabel.getPc + " " + line)
-        })
-    }
+    // def printAllLinesWithLabels: Unit = {
+    //     controlFlow.getLines.forEach(line => {
+    //         System.out.println(line.getLabel.getPc + " " + line)
+    //     })
+    // }
     
-    def printAllStates: Unit = {
-        finalAnalysedStmtInfo.foreach(point => {
-            println("Line:")
-            System.out.println(point._1.getLabel.pc + " " + point._1)
-            println("Dependencies:")
-            point._2.asInstanceOf[ConstantPropagationAnalysis].state.foreach(varConstraint => {
-                System.out.println(varConstraint._1.toString + " : " + varConstraint._2)
-            })
-        })
-    }
+    // def printAllStates: Unit = {
+    //     finalAnalysedStmtInfo.foreach(point => {
+    //         println("Line:")
+    //         System.out.println(point._1.getLabel.pc + " " + point._1)
+    //         println("Dependencies:")
+    //         point._2.asInstanceOf[ConstantPropagationAnalysis].state.foreach(varConstraint => {
+    //             System.out.println(varConstraint._1.toString + " : " + varConstraint._2)
+    //         })
+    //     })
+    // }
 
-    def getOneState(stmt: Stmt): AnalysisPoint = {
-        finalAnalysedStmtInfo.getOrElse(stmt, analysis.createLowest);
-    }
+    def analyseFunction(name: String) = {
+        if debug then println("analysing function: " + name);
 
-    /**
-     * Standard "start from main" function.
-     */
-    def analyseFromMain = {
-        workOnFunction("main");
-        if (analysis.isInstanceOf[ConstantPropagationAnalysis]) {
-            controlFlow.getLines.forEach(stmt => {
-                val point = finalAnalysedStmtInfo.getOrElse(stmt, null)
-                if (point != null) {
-                    point.asInstanceOf[ConstantPropagationAnalysis].resolveVar(stmt)
-                }
-            })
-            // finalAnalysedStmtInfo.foreach(entry => {
-            //     entry._2.asInstanceOf[ConstantPropagationAnalysis].resolveVar(entry._1)
-            // })
-        }
-        finish;
-    }
+        currentCallString = currentCallString + name;
+        currentWorklist = findFunctionRootBlock(name);
 
-    /**
-     * Generic function analysis function.
-     * 
-     * N.B. Because of the way worklist algorithms work, any blocks that depend on a loop will be re-computed
-     * every time the loop is computed until that loop is stable (i.e. further iterations make no changes).
-     * Ideally, we could analyse the loop on it's own and ignore the children until we know it is stable.
-     * 
-     * For small programs, this is negligible, but the worst-case is having a large, branching structure with many
-     * blocks that all depend on a loop; forcing us to re-analyse every block until that loop stablises.
-     */
-    def workOnFunction(functionName: String): Unit = {
-        if (debug) {
-            println("analysing function: " + functionName);
-        }
-        
-        currentCallString = currentCallString ++ List(functionName);
-        currentWorkListQueue = topologicalSortFromFunction(controlFlow, functionName);
-        if !directionForwards then currentWorkListQueue = currentWorkListQueue.reverse;
+        var functionStartAnalysisState: analysis.type = previousStmtAnalysisState;
+        var currentFunctionAnalysedInfo: Map[Stmt, analysis.type] = Map();
 
-        if (previousStmtAnalysisState == null) {
-            previousStmtAnalysisState = analysis.createLowest;
-        }
+        while (!currentWorklist.isEmpty) {
+            var nextBlockToAnalyse: Block = currentWorklist.removeHead();
 
-        var functionStartAnalysisState = previousStmtAnalysisState;
-        var currentFunctionAnalysedInfo: Map[Stmt, AnalysisPoint] = Map();
-        
-        while(!currentWorkListQueue.isEmpty) {
-            var nextBlockToAnalyse: Block = currentWorkListQueue.removeHead();
-            
-            // for blocks *with* parents (i.e. not function start blocks) we take the previous state to be the combine
-            // of all parents' final states.
-            if (directionForwards) {
-                if (!findBlockParents(nextBlockToAnalyse).isEmpty) {
-                    previousStmtAnalysisState = analysis.createLowest;
-
-                    findBlockParents(nextBlockToAnalyse).foreach(nextBlockToAnalyseParent => {
-                        previousStmtAnalysisState = previousStmtAnalysisState.combine(allBlockFinalAnalysisStates.getOrElse(nextBlockToAnalyseParent, analysis.createLowest));
-                    });
-                }
+            if (!getBlockParents(nextBlockToAnalyse).isEmpty) {
+                getBlockParents(nextBlockToAnalyse).foreach(block => {
+                    previousStmtAnalysisState = previousStmtAnalysisState.combine(blockAnalysisInfo.getOrElse(block, analysis.createLowest))
+                });
             } else {
-                if (!nextBlockToAnalyse.getChildren.isEmpty) {
-                    previousStmtAnalysisState = analysis.createLowest;
-
-                    nextBlockToAnalyse.getChildren.asScala.foreach(nextBlockToAnalyseChild => {
-                        previousStmtAnalysisState = previousStmtAnalysisState.combine(allBlockFinalAnalysisStates.getOrElse(nextBlockToAnalyseChild, analysis.createLowest));
-                    });
-                }
+                previousStmtAnalysisState = analysis.createLowest;
             }
 
-            workOnBlock(nextBlockToAnalyse, currentFunctionAnalysedInfo);
+            currentFunctionAnalysedInfo = analyseBlock(nextBlockToAnalyse, currentFunctionAnalysedInfo);
 
-            if (!currentWorkListQueue.isEmpty) {
-                // if it's gonna analyse another block, we need to reset the previous state
+            if (!currentWorklist.isEmpty) {
                 previousStmtAnalysisState = functionStartAnalysisState;
             }
         }
 
-        // Once the entire function has been analysed to stability, save and/or update the info in the "output" map.
         saveNewAnalysisInfo(currentFunctionAnalysedInfo);
-        currentCallString = currentCallString.filter(elem => {elem != functionName});
+        currentCallString = currentCallString.filter(funcName => {funcName != name});
     }
 
-    /**
-     * Analyses a block (of statements) by analysing the statements in getLines(). We assume that getLines() is in execution order.
-     * 
-     * Updates the blockFinalStates map with the prevState at the end of the lines, and adds all block children
-     * to queue on update, if they weren't already there.
-     */
-    def workOnBlock(blockToWorkOn: Block, currentFunctionAnalysedInfo: Map[Stmt, AnalysisPoint]): Unit = {
-        if (debug) {
-            println("analysing block: " + blockToWorkOn.toString);
-        }
+    def analyseBlock(block: Block, currentInfo: Map[Stmt, analysis.type]): Map[Stmt, analysis.type] = {
+        if debug then println("analysing block: " + block.label);
+        var outputInfo: Map[Stmt, analysis.type] = currentInfo;
 
-        var blockLines = blockToWorkOn.getLines.asScala;
-        if !directionForwards then blockLines = blockLines.reverse;
-        blockLines.foreach(blockStmtLine => {
-            workOnStmt(blockStmtLine, currentFunctionAnalysedInfo);
-        });
+        block.lines.foreach(blockStmt => {
+            outputInfo = analyseStmt(blockStmt, outputInfo);
+        })
         
-        var currentFinalBlockState = allBlockFinalAnalysisStates.getOrElse(blockToWorkOn, null);
-        
-        // println("in work on block")
+        if (blockAnalysisInfo.getOrElse(block, null) != previousStmtAnalysisState) {
+            blockAnalysisInfo = blockAnalysisInfo + (block -> previousStmtAnalysisState);
 
-        if (currentFinalBlockState != null) {
-            if (!currentFinalBlockState.equals(previousStmtAnalysisState)) {
-                // println("Final block states different")
-                // println("previous:")
-                // println(currentFinalBlockState)
-                // println("updated:")
-                // println(previousStmtAnalysisState)
-                allBlockFinalAnalysisStates.remove(blockToWorkOn);
-                allBlockFinalAnalysisStates.update(blockToWorkOn, previousStmtAnalysisState);
-                
-                // if queue doesn't contain child, add child, *and* if queue doesn't contain this, add this
-                if (!currentWorkListQueue.contains(blockToWorkOn)) {
-                    currentWorkListQueue.append(blockToWorkOn);
+            (getBlockChildren(block) + block).foreach(b => {
+                if (!currentWorklist.contains(b)) {
+                    currentWorklist.append(b);
                 }
-
-                blockToWorkOn.getChildren.asScala.foreach(c => {
-                    if (!currentWorkListQueue.contains(c)) {
-                        currentWorkListQueue.append(c);
-                    }
-                });
-            }
+            })
         } else {
-            allBlockFinalAnalysisStates.update(blockToWorkOn, previousStmtAnalysisState);
-
-            // if queue doesn't contain child, add child, *and* if queue doesn't contain this, add this
-            if (!currentWorkListQueue.contains(blockToWorkOn)) {
-                currentWorkListQueue.append(blockToWorkOn);
-            }
-            
-            blockToWorkOn.getChildren.asScala.foreach(c => {
-                if (!currentWorkListQueue.contains(c)) {
-                    currentWorkListQueue.append(c);
-                }
-            });
+            ;
         }
 
-        // println("out work on block")
+        outputInfo;
     }
 
-    /**
-     * Analyses a single statement, from the known previous state.
-     * 
-     * Saves the new "prevState" and updates the analysedStmtInfo map.
-     */
-    def workOnStmt(singleStmt: Stmt, functionAnalysedInfo: Map[Stmt, AnalysisPoint]): Unit = {
-        if (debug) {
-            println("analysing stmt: " + singleStmt.toString);
-        }
+    def analyseStmt(stmt: Stmt, currentInfo: Map[Stmt, analysis.type]): Map[Stmt, analysis.type] = {
+        if debug then println("analysing stmt: " + stmt);
+        var outputInfo: Map[Stmt, analysis.type] = null;
         
-        singleStmt match {
+        stmt match {
             case functionCallStmt: CallStmt => {
-                // if we have a function call, pause the current analysis and analyse the given function
-                // effectively just inlines every function at every time it's called
-                var inProgressWorkListQueue: ArrayDeque[Block] = currentWorkListQueue;
+                var inProgressWorklist: ArrayDeque[Block] = currentWorklist;
 
                 if (!currentCallString.contains(functionCallStmt.funcName)) {
-                    if (!libraryFunctions.contains(functionCallStmt.funcName)) {
-                        workOnFunction(functionCallStmt.funcName);
-                    } else {
-                        // treat it like a normal statement and let the analyses define how they deal with it
-                        previousStmtAnalysisState = previousStmtAnalysisState.transferAndCheck(singleStmt);
-                    
-                        // if anything already exists for this stmt, replace it.
-                        if (functionAnalysedInfo.getOrElse(singleStmt, null) != null) {
-                            functionAnalysedInfo.remove(singleStmt);
-                        }
+                    previousStmtAnalysisState = previousStmtAnalysisState.transferAndCheck(stmt);
 
-                        functionAnalysedInfo.update(singleStmt, previousStmtAnalysisState);
+                    outputInfo = currentInfo + (stmt -> previousStmtAnalysisState);
+
+                    if (!libraryFunctions.contains(functionCallStmt.funcName)) {
+                        analyseFunction(functionCallStmt.funcName);
                     }
                 } else {
-                    // recursive or mutually recursive function call. for now, just silently drop these.
-                    // One idea for how to deal with these is to pass them to the transfer function,
-                    // and they can define how to deal with it as a call statement to non-library function,
-                    // given any statement that matches these criteria will be recursive.
+                    println(currentCallString);
+                    println("ignoring recursive call in " + functionCallStmt.funcName);
                 }
 
-                currentWorkListQueue = inProgressWorkListQueue;
+                currentWorklist = inProgressWorklist;
             }
             case _ => {
-                previousStmtAnalysisState = previousStmtAnalysisState.transferAndCheck(singleStmt);
+                previousStmtAnalysisState = previousStmtAnalysisState.transferAndCheck(stmt);
 
-                // if anything already exists for this stmt, replace it.
-                if (functionAnalysedInfo.getOrElse(singleStmt, null) != null) {
-                    functionAnalysedInfo.remove(singleStmt);
-                }
-
-                functionAnalysedInfo.update(singleStmt, previousStmtAnalysisState);
+                outputInfo  = currentInfo + (stmt -> previousStmtAnalysisState);
             }
         }
+
+        outputInfo;
     }
 
     /**
-     * Takes a FlowGraph (w/r/t code "blocks") and returns a copy of it, sorted ideally for analysis.
-     * 
-     * Do a depth-first search, removing back-edges as we see them. Once every child of a node has been finished,
-     * append that node to the *start* of the output iterator.
-     * Output list is now a topologically ordered representation of the graph. Tada!
-     */    
-    def topologicalSortFromFunction(controlFlow: FlowGraph, functionName: String): ArrayDeque[Block] = {
-        // initialise our references to stuff
-        var sorted = ArrayDeque[Block]();
-        var rmChildren = Map[Block, List[Block]]();
-        var dfsPath = Set[Block]();
+     * The process for these two is similar:
 
-        // recursive DFS from main node
-        var output = dfsHelper(
-            controlFlow.getFunctions.asScala.toList.find((func: Function) => {
-                func.getHeader.getFuncName == functionName;
-            }).get.getBlocks.asScala.head, rmChildren, dfsPath, sorted
-        );
-
-        // add back all the cycles we removed
-        rmChildren.keys.foreach(key => {
-            rmChildren.getOrElse(key, List[Block]()).foreach(rmdChild => {
-                key.children.add(rmdChild);
-            })
-        });
-
-        output;
-    }
-
-    def dfsHelper(node: Block, rmChildren: Map[Block, List[Block]], dfsPath: Set[Block], sorted: ArrayDeque[Block]): ArrayDeque[Block] = {
-        dfsPath.concat(Set(node));
-
-        node.getChildren.asScala.foreach(child => {
-            if (dfsPath.contains(child)) {
-                // if backedge, add to our rmChildren list. we can't remove them yet cause ConcurrentModificationException
-
-                if (rmChildren.contains(node)) {
-                    rmChildren.update(node, (rmChildren.getOrElse(node, null) ++ List(child)));
-                } else {
-                    rmChildren.update(node, List(child));
-                }
-            } else {
-                // or not on path, so recurse
-
-                dfsHelper(child, rmChildren, dfsPath, sorted);
-            }
-        });
-
-        // remove rmChildren
-        rmChildren.getOrElse(node, List()).foreach(cycle => {
-            node.children.remove(cycle);
+     * Find the FunctionState that the block belongs to
+     * Get the labels of its children/parents from that FunctionState
+     * Map those labels to blocks, by:
+     *  Finding the FunctionState that the label belongs to
+     *  Getting the Block from that FunctionState
+     */
+    def getBlockChildren(block: Block): Set[Block] = {
+        startState.functions.find((func: FunctionState) => {
+            func.labelToBlock.contains(block.label)
+        }).get.children(block).getOrElse(Set[String]()).map(label => {
+            startState.functions.find((func: FunctionState) => {
+                func.labelToBlock.contains(label)
+            }).get.labelToBlock.get(label).getOrElse(null)
         })
-
-        dfsPath.remove(node);
-
-        if (!sorted.contains(node)) {
-            sorted.prepend(node);
-        }
-        sorted;
     }
 
-    def findBlockParents(block: Block) = {
-        var output: Set[Block] = Set();
-
-        controlFlow.getBlocks.asScala.foreach(b => {
-            if (b.getChildren.asScala.contains(block)) {
-                output.add(b);
-            }
-        });
-
-        output;
+    def getBlockParents(block: Block): Set[Block] = {
+        startState.functions.find((func: FunctionState) => {
+            func.labelToBlock.contains(block.label)
+        }).get.parents(block).map(label => {
+            startState.functions.find((func: FunctionState) => {
+                func.labelToBlock.contains(label)
+            }).get.labelToBlock.get(label).getOrElse(null)
+        }).toSet
     }
 
-    def saveNewAnalysisInfo(functionAnalysedInfo: Map[Stmt, AnalysisPoint]) = {
-        functionAnalysedInfo.keys.foreach(currentFunctionAnalysisPoint => {
-            finalAnalysedStmtInfo.update(currentFunctionAnalysisPoint, finalAnalysedStmtInfo.getOrElse(currentFunctionAnalysisPoint, analysis.createLowest).combine(functionAnalysedInfo.getOrElse(currentFunctionAnalysisPoint, analysis.createLowest)));
-        });
+    /**
+     * Finds the root block of a function given the function's name.
+     */
+    def findFunctionRootBlock(funcName: String): ArrayDeque[Block] = {
+        ArrayDeque(
+            startState.functions.find((func: FunctionState) => {
+                func.header.getFuncName == funcName;
+            }).get.rootBlock
+        );
+    }
+
+    /**
+     * "Commits" the info from the current function to the output map.
+     */
+    def saveNewAnalysisInfo(newInfo: Map[Stmt, analysis.type]) = {
+        newInfo.keys.foreach(newAnalysisPoint => {
+            stmtAnalysisInfo = stmtAnalysisInfo + (newAnalysisPoint -> stmtAnalysisInfo.getOrElse(newAnalysisPoint, analysis.createLowest).asInstanceOf[analysis.type].join(newInfo.getOrElse(newAnalysisPoint, analysis.createLowest).asInstanceOf[analysis.type]))
+        })
     }
 }

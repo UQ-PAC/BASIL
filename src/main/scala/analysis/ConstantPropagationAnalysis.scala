@@ -12,6 +12,7 @@ import translating.FlowGraph
 import translating.FlowGraph.Block
 import astnodes.exp.Concat
 import astnodes.exp.`var`.Register
+import vcgen.State
 
 // TODO: does not have to take this map?
 class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: Set[String],
@@ -45,7 +46,7 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
               case cJump : CJmpStmt => newStmt = newStmt.asInstanceOf[CJmpStmt].fold(dependentExp, newExpr.getRhs)
               case _ =>
             }
-            
+
             // if (assignStmt.lhs.isInstanceOf[Register] && assignStmt.lhs.asInstanceOf[Register].name.equals("#31")) {
             //   println(newStmt)
             // }
@@ -72,7 +73,7 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     * 
     * @param stmt
     */
-  override def transfer(stmt: Stmt): AnalysisPoint = {
+  override def transfer(stmt: Stmt) = {
     val newState : HashMap[Expr, String] = state.clone()
     
     previousStmt match {
@@ -102,7 +103,7 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
       }
     }
     
-    new ConstantPropagationAnalysis(newState, toRemove, stmt, flowgraph)
+    this
   }
 
   /**
@@ -110,7 +111,7 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     * @param other
     * @return
     */
-  override def compare(other: AnalysisPoint): Int = {
+  override def compare(other: this.type): Int = {
     val otherAsThis : ConstantPropagationAnalysis = typeCheck(other)
     (this.countEdges - otherAsThis.countEdges).sign
   }
@@ -123,11 +124,12 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     return count;
   }
 
-  override def createLowest: AnalysisPoint = {
-    new ConstantPropagationAnalysis(new HashMap[Expr, String], Set(), null, flowgraph)
+  override def createLowest: this.type = {
+    // new ConstantPropagationAnalysis(new HashMap[Expr, String], Set(), null, flowgraph)
+    this
   }
 
-  override def equals(other: AnalysisPoint): Boolean = {
+  override def equals(other: this.type): Boolean = {
     var otherAsThis: ConstantPropagationAnalysis = typeCheck(other);
     
     if (!state.equals(otherAsThis.state) || !stmtsToRemove.equals(otherAsThis
@@ -145,7 +147,7 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     * @param other
     * @return
     */
-  override def intersection(other: AnalysisPoint): AnalysisPoint = {
+  override def meet(other: this.type) = {
     val otherAsThis : ConstantPropagationAnalysis = typeCheck(other)
     
     val newState = new HashMap[Expr, String]()
@@ -162,7 +164,7 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
       }
     })
     
-    new ConstantPropagationAnalysis(newState, newRemove, null, flowgraph)
+    this
   }
 
   /**
@@ -170,7 +172,7 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     * @param other
     * @return
     */
-  override def union(other: AnalysisPoint): AnalysisPoint = {
+  override def join(other: this.type) = {
     val otherAsThis : ConstantPropagationAnalysis = typeCheck(other)
 
     val newState = new HashMap[Expr, String]()
@@ -206,6 +208,10 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
       }
     })
 
-    new ConstantPropagationAnalysis(newState, newRemove, null, flowgraph)
+    this
+  }
+
+  override def applyChanges(preState: State, information: Map[Stmt, this.type]): State = {
+    ???
   }
 }

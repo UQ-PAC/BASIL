@@ -2,6 +2,7 @@ package analysis;
 
 import analysis.AnalysisPoint;
 import astnodes.stmt.*;
+import vcgen.State;
 
 /**
  * Dummy "testing analysis" - keeps track of all the statements that it's seen so far, as a list.
@@ -14,30 +15,36 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
         this(Set());
     }
 
-    override def equals(other: AnalysisPoint): Boolean = {
+    override def applyChanges(preState: State, information: Map[Stmt, this.type]): State = {
+        preState;
+    }
+
+    override def equals(other: this.type): Boolean = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
         this.toString == otherAsThis.toString;
     }
 
-    override def compare(other: AnalysisPoint): Int = {
+    override def compare(other: this.type): Int = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
         (this.currentState.size - otherAsThis.currentState.size).sign;
     }
 
-    override def union(other: AnalysisPoint): AnalysisPoint = {
+    override def join(other: this.type): this.type = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
-        new TestingAnalysis(currentState.union(otherAsThis.currentState));
+        this.currentState = currentState.union(otherAsThis.currentState);
+        this;
     }
 
-    override def intersection(other: AnalysisPoint): AnalysisPoint = {
+    override def meet(other: this.type): this.type = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
-        new TestingAnalysis(currentState.intersect(otherAsThis.currentState));
+        this.currentState = currentState.intersect(otherAsThis.currentState);
+        this;
     }
 
-    override def transfer(stmt: Stmt): AnalysisPoint = {
+    override def transfer(stmt: Stmt): this.type = {
         var newState: Set[Stmt] = Set();
         stmt match {
             case callStmt: CallStmt => {
@@ -56,11 +63,13 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
             };
         }
 
-        new TestingAnalysis(newState);
+        this.currentState = newState;
+        this;
     }
 
-    override def createLowest: AnalysisPoint = {
-        new TestingAnalysis(Set());
+    override def createLowest: this.type = {
+        this.currentState = Set();
+        this;
     }
 
     override def toString: String = {

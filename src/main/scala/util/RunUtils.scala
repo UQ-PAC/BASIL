@@ -6,8 +6,8 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import vcgen.{State, VCGen}
-import analysis.*
-import astnodes.exp.Expr
+
+import analysis.*;
 
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
@@ -36,13 +36,13 @@ object RunUtils {
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
-    val worklist = InlineWorklist(new ConstantPropagationAnalysis(new collection.mutable.HashMap[Expr, String](),
-      Set(), null, flowGraph), flowGraph)
-    println("Before CP:")
-    worklist.printAllLinesWithLabels
-    worklist.analyseFromMain
-    println("After CP:")
-    worklist.printAllLinesWithLabels
+    // val worklist = InlineWorklist(new ConstantPropagationAnalysis(new collection.mutable.HashMap[Expr, String](),
+    //   Set(), null, flowGraph), flowGraph)
+    // println("Before CP:")
+    // worklist.printAllLinesWithLabels
+    // worklist.analyseFromMain
+    // println("After CP:")
+    // worklist.printAllLinesWithLabels
 
     val state = State(
       flowGraph,
@@ -52,9 +52,11 @@ object RunUtils {
       statementLoader.varSizes.toMap,
       statementLoader.lPreds.toMap,
       statementLoader.gammaMappings.toMap
-    )
+    );
 
-    val updatedState = BoogieTranslator.translate(state)
+    val analysedState = Worklist(TestingAnalysis(), state).doAnalysis;
+
+    val updatedState = BoogieTranslator.translate(analysedState)
 
     VCGen.genVCs(updatedState)
   }

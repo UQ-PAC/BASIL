@@ -90,7 +90,7 @@ case object BinOperator extends Enumeration {
   }
 
   def toBoogie(value: Value, size: Option[Int]): List[String] = {
-    val size1 = size.get
+    val size1 = size.getOrElse("64")
     value match {
       case Addition => List(s"bv${size1}add")
       case Subtraction => List(s"bv${size1}sub")

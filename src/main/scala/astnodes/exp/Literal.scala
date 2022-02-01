@@ -28,7 +28,8 @@ case object Literal {
   def apply(value: String, size: Option[Int] = None) = new Literal(parseHex(value), size)
 
   private def parseHex(value: String): String = {
-    if (value.length < 3 || !(value.substring(0, 2) == "0x")) value
+    if (value == null) "0"
+    else if (value.length < 3 || !(value.substring(0, 2) == "0x")) value
     else java.lang.Long.toUnsignedString(java.lang.Long.parseUnsignedLong(value.substring(2), 16))
   }
 }

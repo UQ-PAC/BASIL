@@ -5,9 +5,7 @@ import astnodes.exp.`var`.Var
 import astnodes.pred.Pred
 import astnodes.Label
 
-import java.util
-
-class Assert(pc: String, var pred: Pred) extends Stmt(Label(pc)) {
+case class Assert(pc: String, var pred: Pred) extends Stmt(Label(pc)) {
   override def subst(v: Var, w: Var): Stmt = ???
 
 // main vers:

@@ -33,10 +33,9 @@ case object UniOperator extends Enumeration {
   }
 
   def toBoogie(value: Value, size: Option[Int]): String = {
-    val size1 = size.getOrElse(64) // TODO
+    val size1 = size.getOrElse(64)
     value match {
-      // TODO !!!!!
-      case UnaryNegation => s"bv${size1}not" // TODO this is unarynecation right?
+      case UnaryNegation => s"bv${size1}not" 
       case BitwiseComplement => s"bv${size1}neg"
     }
   }
