@@ -32,6 +32,7 @@ trait Assign (pc: String, val lhs: Var, val rhs: Expr) extends Stmt {
     lhs match {
       case lhsRes: MemLoad => MemAssign(pc, if (!lhsRes.onStack) lhsRes.fold(oldExpr, newExpr).asInstanceOf[MemLoad] else lhsRes, rhs = updatedRhs)
       case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs = updatedRhs)
+      case _ => this
     }
   }
 }

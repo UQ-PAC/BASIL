@@ -19,4 +19,5 @@ case class CJmpStmt(
   override def toBoogieString: String = s"if (bv1tobool(${condition.toBoogieString})) { goto label$trueTarget; } goto label$falseTarget;"
 
   override def subst(v: Var, w: Var): Stmt = this.copy(condition = condition.subst(v,w))
+  def fold(old: Expr, sub: Expr): Stmt = this.copy(condition = condition.fold(old, sub))
 }

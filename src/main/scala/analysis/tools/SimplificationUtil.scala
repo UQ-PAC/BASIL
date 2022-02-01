@@ -9,48 +9,52 @@ import astnodes.stmt.assign.*
  * variables)
  */
 case object SimplificationUtil {
-  // def simplify(expr: Expr): Expr = {
-  //   expr match {
-  //     case binOp : BinOp => binArithmetic(binOp)
-  //     // case uniOp : UniOp => uniArithmetic(uniOp)
-  //     case concat : Concat => bitvecConcat(concat)
-  //     case extract : Extract => bitvecExtract(extract)
-  //     case _ => expr
-  //   }
-  // }
 
   /**
-   * Simplifies a concat expressions.
+   * Simplifies a concat expressions. Assumes every concat is either a pad or extend.
    */
   def bitvecConcat(concat: Concat): Expr = {
-    val lhs = concat.getLhs
-    val rhs = concat.getRhs
-    
-    if (lhs.isInstanceOf[Literal] && rhs.isInstanceOf[Literal]) {
-      // if pad
-      if (lhs.toString.equals("0")) return Literal(rhs.toString, Some(64))
+    if (concat.left.isInstanceOf[Literal] && concat.left.asInstanceOf[Literal].value.equals("0")) simplifyPad(concat)
+    else if (concat.right.isInstanceOf[Literal] && concat.right.asInstanceOf[Literal].value.equals("0")) simplifyExtend(concat)
+    else concat
+  }
 
-      // if extend
-      if (rhs.toString.equals("0")) {
-        val lhsExtended = Integer.parseInt(lhs.asInstanceOf[Literal].toString) << 32
-        return Literal(lhsExtended.toString, Some(64))
-      }
+  /**
+   * Simplifies a concat that appends 0s to lhs of bitvector.
+   */
+  private def simplifyPad(concat: Concat): Expr = {
+    concat.right match {
+      // Due to the nature of BIL extdn & pad expressions, it is assumed the value returned from them will always be a bitvector of size 64
+      case literal: Literal => return Literal(literal.value, Some(literal.size.getOrElse(32) + concat.left.size.getOrElse(32)))
+      case _ => concat
     }
+  }
 
-    concat
+  /**
+   * Simplifies a concat that appends 0s to rhs of bitvector.
+   */
+  private def simplifyExtend(concat: Concat): Expr = {
+    concat.left match {
+      case literal: Literal => {
+        // Due to the nature of BIL extdn & pad expressions, it is assumed the value returned from them will always be a bitvector of size 64
+        val lhsExtended = Integer.parseInt(literal.value) << concat.right.size.getOrElse(0)
+        return Literal(lhsExtended.toString, Some(literal.size.getOrElse(32) + concat.right.size.getOrElse(32)))
+      }
+      case _ => concat
+    }
   }
 
   /**
    * Simplifies an extract expressions.
    */
   def bitvecExtract(extract: Extract): Expr = {
-    if (extract.getStart == 0 && extract.getEnd == 31) {
+    if (extract.getStart == 31 && extract.getEnd == 0 && extract.variable.isInstanceOf[Literal]) {
       val value = Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) & 0xFFFFFFFF
-      Literal(value.toString, Some(32))
+      return Literal(value.toString, Some(32))
     }
 
-    if (extract.getStart == 32 && extract.getEnd == 63) {
-      Literal((Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) >>> 32).toString, Some(32))
+    if (extract.getStart == 63 && extract.getEnd == 32 && extract.variable.isInstanceOf[Literal]) {
+      return Literal((Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) >>> 32).toString, Some(32))
     }
 
     extract
@@ -163,5 +167,18 @@ case object SimplificationUtil {
     return result.asInstanceOf[Long]
   }
 
-  // def uniArithmetic(uniOp: UniOp): Expr = {}
+  def uniArithmetic(uniOp: UniOp): Expr = {
+    if (uniOp.exp.isInstanceOf[Literal]) {
+      uniOp.operator.toString match {
+        // Performs binary one's complement
+        case "~" => {
+          return Literal((~Integer.parseInt(uniOp.exp.asInstanceOf[Literal].value)).toString, uniOp.exp.asInstanceOf[Literal].size)
+        }
+
+        case _ =>
+      }
+    }
+    
+    uniOp
+  }
 }

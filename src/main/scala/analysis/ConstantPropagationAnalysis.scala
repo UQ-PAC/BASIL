@@ -28,31 +28,29 @@ class ConstantPropagationAnalysis(constraints: HashMap[Expr, String], toRemove: 
     } else {
       var newStmt = stmt
 
-      newStmt match {
-        case assignStmt : Assign => {
-          if (state.size > 0) { 
-            state.foreach(entry => {
-              val dependentExp = entry._1
-              val dependentInst = entry._2
+      if (state.size > 0) { 
+        state.foreach(entry => {
+          val dependentExp = entry._1
+          val dependentInst = entry._2
 
-              if (dependentInst != null) {
-                val newExpr = findInstFromPc(flowgraph.getLines, dependentInst)
+          if (dependentInst != null) {
+            val newExpr = findInstFromPc(flowgraph.getLines, dependentInst)
 
-                // if (assignStmt.lhs.isInstanceOf[Register] && assignStmt.lhs.asInstanceOf[Register].name.equals("#31")) {
-                //   println(newStmt)
-                // }
+            // if (assignStmt.lhs.isInstanceOf[Register] && assignStmt.lhs.asInstanceOf[Register].name.equals("#31")) {
+            //   println(newStmt)
+            // }
 
-                newStmt = newStmt.asInstanceOf[Assign].fold(dependentExp, newExpr.getRhs)
-
-                // if (assignStmt.lhs.isInstanceOf[Register] && assignStmt.lhs.asInstanceOf[Register].name.equals("#31")) {
-                //   println(newStmt)
-                // }
-              }
-            })
+            newStmt match {
+              case assignStmt : Assign => newStmt = newStmt.asInstanceOf[Assign].fold(dependentExp, newExpr.getRhs)
+              case cJump : CJmpStmt => newStmt = newStmt.asInstanceOf[CJmpStmt].fold(dependentExp, newExpr.getRhs)
+              case _ =>
+            }
+            
+            // if (assignStmt.lhs.isInstanceOf[Register] && assignStmt.lhs.asInstanceOf[Register].name.equals("#31")) {
+            //   println(newStmt)
+            // }
           }
-        }
-
-        case _ =>
+        })
       }
 
       flowgraph.replaceLine(newStmt, stmt)

@@ -16,9 +16,6 @@ case class Concat (left: Expr, right: Expr) extends Expr{
     case (Some(x), Some(y)) => Some(x + y)
   }
 
-  def getLhs = left
-  def getRhs = right
-
   override def vars = left.vars ++ right.vars
   override def subst(v: Var, w: Var): Expr = {
     this.copy(left = left.subst(v,w), right = right.subst(v,w))
