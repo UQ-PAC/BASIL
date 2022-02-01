@@ -7,6 +7,8 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import vcgen.{State, VCGen}
 
+import analysis.*;
+
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
 
@@ -35,9 +37,6 @@ object RunUtils {
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
-    // var worklist: BlockWorklist = BlockWorklist(Set(TestingAnal), flowGraph);
-    // worklist.workOnBlocks;
-
     val state = State(
       flowGraph,
       statementLoader.rely.getOrElse(Bool.True), // TODO check default
@@ -46,9 +45,11 @@ object RunUtils {
       statementLoader.varSizes.toMap,
       statementLoader.lPreds.toMap,
       statementLoader.gammaMappings.toMap
-    )
+    );
 
-    val updatedState = BoogieTranslator.translate(state)
+    val analysedState = Worklist(TestingAnalysis(), state).doAnalysis;
+
+    val updatedState = BoogieTranslator.translate(analysedState)
 
     VCGen.genVCs(updatedState)
   }

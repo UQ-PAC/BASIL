@@ -10,7 +10,7 @@
 000004e7: main_argc :: in u32 = X0
 000004e8: main_argv :: in out u64 = X1
 000004e9: main_result :: out u32 = X0
-000001b9:
+000001b9: 
 000001be: mem := mem with [SP - 0x10, el]:u64 <- FP
 000001c3: mem := mem with [SP - 8, el]:u64 <- LR
 000001c8: SP := SP - 0x10

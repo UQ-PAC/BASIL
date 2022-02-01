@@ -75,13 +75,20 @@ class StatementLoader() extends BilBaseListener {
     varSizes(name)
   }
   */
+
+  /**
+   * TODO: fix samples so 'X' is unnecessary; confirm pointer sizes for SP, FP, & LR
+   */
   private def setVarSize(name: String, rhs: Expr) = {
     if (!varSizes.contains(name)) {
-      if (name.charAt(0) == 'R') varSizes(name) = 64
+      if (name.charAt(0) == 'R' || name.charAt(0) == 'X') varSizes(name) = 64
       else if (name.charAt(0) == '#') varSizes(name) = rhs.size.get
       else if (name == "NF" || name == "ZF" || name == "CF" || name == "VF") varSizes(name) = 1
       else if (name == "SP" || name == "FP" || name == "LR") varSizes(name) = 64
-      else ???
+      else {
+          println(name);
+          throw new RuntimeException;
+      }
     }
   }
 
@@ -125,8 +132,11 @@ class StatementLoader() extends BilBaseListener {
     else currentFunction.getInParams += InParameter(Register(id, size), Register(variable, size))
   }
 
+  /*
+  TODO!!!!
   override def exitEnsuresSpec(ctx: BilParser.EnsuresSpecContext): Unit = ensures = ensures.appended(getPred(ctx.pred))
   override def exitRequiresSpec(ctx: BilParser.RequiresSpecContext): Unit = requires = requires.appended(getPred(ctx.pred))
+  */
 
   override def exitStmt(ctx: BilParser.StmtContext): Unit = {
     val address = ctx.addr.getText

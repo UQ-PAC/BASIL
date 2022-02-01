@@ -25,6 +25,6 @@ L: secret -> FALSE, z -> TRUE
 0000014c: R1 := mem[R31 + 8, el]:u64
 00000150: mem := mem with [R0, el]:u64 <- R1  // z = x
 00000154: R0 := 0
-00000156: R0 := R0 & 0xFFFFFFFF00000000
+00000156: R0 := R0 & 0xFFFFFFFF00000000d
 0000015a: R31 := R31 + 0x10
 0000015e: call R30 with noreturn
