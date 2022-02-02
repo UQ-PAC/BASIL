@@ -13,7 +13,7 @@ This should be everything. For more details on SBT and getting SBT to work corre
 
 To run a single file use the command 
 
-`sbt run file.bil file.elf boogie`
+`sbt "run file.bil file.elf boogie"`
 
 where `file.bil` is the lifted BIL file and `file.elf` is the elf file (for an example of how to generate this, look at `src/scripts/lift\_docker.sh`). A range of sample files can be found in the `samples` folder. This command must be run in the root directory of the project. For example, to run the `ifglobal` example use the command 
 
