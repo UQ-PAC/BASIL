@@ -171,7 +171,7 @@ object BoogieTranslator {
         case (a: Some[Int], b: Some[Int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop ($binOp) should have the same size (${binOp1.firstExp}: ${a}, ${binOp1.secondExp}: ${b})")
         case (x: Some[Int], None) => binOp1.copy(secondExp = inferConstantTypes(binOp1.secondExp, x))
         case (None, x: Some[Int]) => binOp1.copy(firstExp = inferConstantTypes(binOp1.firstExp, x))
-        case (None, None) => binOp1
+        case _ => binOp1
       }
     }
     case uniOp: UniOp =>
