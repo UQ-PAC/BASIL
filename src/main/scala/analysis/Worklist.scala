@@ -134,7 +134,7 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
 
     def analyseStmt(stmt: Stmt, currentInfo: Map[Stmt, analysis.type]): Map[Stmt, analysis.type] = {
         if debug then println("analysing stmt: " + stmt);
-        var outputInfo: Map[Stmt, analysis.type] = null;
+        var outputInfo: Map[Stmt, analysis.type] = currentInfo;
         
         stmt match {
             case functionCallStmt: CallStmt => {
@@ -209,23 +209,8 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
      * "Commits" the info from the current function to the output map.
      */
     def saveNewAnalysisInfo(newInfo: Map[Stmt, analysis.type]) = {
-
-        // newInfo.foreach(point => {
-        //     println(point._1)
-        //     point._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
-        // })
-
-        // println("whole thing")
-        // stmtAnalysisInfo.foreach(point => {
-        //     println(point._1)
-        //     point._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
-        // })
-
-        println("SAVING INFO")
-        newInfo.foreach(newAnalysisPoint => {
-            println(newAnalysisPoint._1)
-            newAnalysisPoint._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
-            stmtAnalysisInfo = stmtAnalysisInfo + (newAnalysisPoint._1 -> stmtAnalysisInfo.getOrElse(newAnalysisPoint._1, analysis.createLowest).asInstanceOf[analysis.type].join(newAnalysisPoint._2.asInstanceOf[analysis.type]))
-        })
+        for ((key, value) <- newInfo) {
+            stmtAnalysisInfo = stmtAnalysisInfo + (key -> value.asInstanceOf[analysis.type]);
+        }
     }
 }

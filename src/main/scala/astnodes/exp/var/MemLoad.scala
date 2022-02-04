@@ -21,7 +21,7 @@ case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
 
   /** Assumes: anything on the stack is represented as SP + val (where val is an int etc)
     */
-  def onStack = onStackMatch(exp)
+  var onStack: Boolean = onStackMatch(exp)
 
   def onStackMatch(expr: Expr): Boolean = expr match {
     case v: Register              => v.name == "R31"
