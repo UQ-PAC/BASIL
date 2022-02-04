@@ -36,14 +36,6 @@ object RunUtils {
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
-    // val worklist = InlineWorklist(new ConstantPropagationAnalysis(new collection.mutable.HashMap[Expr, String](),
-    //   Set(), null, flowGraph), flowGraph)
-    // println("Before CP:")
-    // worklist.printAllLinesWithLabels
-    // worklist.analyseFromMain
-    // println("After CP:")
-    // worklist.printAllLinesWithLabels
-
     val state = State(
       flowGraph,
       statementLoader.rely.getOrElse(Bool.True), // TODO check default
@@ -54,7 +46,7 @@ object RunUtils {
       statementLoader.gammaMappings.toMap
     );
 
-    val analysedState = Worklist(TestingAnalysis(), state).doAnalysis;
+    val analysedState = Worklist(ConstantPropagationAnalysis(state), state).doAnalysis;
 
     val updatedState = BoogieTranslator.translate(analysedState)
 

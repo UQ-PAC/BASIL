@@ -6,7 +6,7 @@ import scala.collection.mutable.ArrayDeque;
 import java.lang.NullPointerException;
 
 class Worklist(val analysis: AnalysisPoint, startState: State) {
-    private final val debug: Boolean = true;
+    private final val debug: Boolean = false;
     private val directionForwards: Boolean = analysis.isForwards;
     private val libraryFunctions: Set[String] = analysis.libraryFunctions;
 
@@ -14,6 +14,7 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
     var currentWorklist: ArrayDeque[Block] = ArrayDeque();
 
     var previousStmtAnalysisState: analysis.type = analysis.createLowest;
+    var finalStmtAnalysisState: analysis.type = analysis.createLowest;
     var stmtAnalysisInfo: Map[Stmt, analysis.type] = Map();
     var blockAnalysisInfo: Map[Block, analysis.type] = Map();
     
@@ -26,20 +27,25 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
     }
 
     def doAnalysis: State = {
+        printAllLinesWithLabels
         analyseFunction("main");
         if debug then println(getAllInfo);
 
+        // finalStmtAnalysisState.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
         previousStmtAnalysisState = null;
         blockAnalysisInfo = null;
 
-        analysis.applyChanges(startState, getAllInfo);
+        finalStmtAnalysisState.applyChanges(startState, getAllInfo);
     }
     
-    // def printAllLinesWithLabels: Unit = {
-    //     controlFlow.getLines.forEach(line => {
-    //         System.out.println(line.getLabel.getPc + " " + line)
-    //     })
-    // }
+    def printAllLinesWithLabels: Unit = {
+        startState.functions.foreach(function =>
+            {function.labelToBlock.values.foreach(block => {
+                block.lines.foreach(line => {
+                    println(line.label.pc + " : " + line)
+                })
+            })})
+    }
     
     // def printAllStates: Unit = {
     //     finalAnalysedStmtInfo.foreach(point => {
@@ -72,13 +78,33 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
                 previousStmtAnalysisState = analysis.createLowest;
             }
 
+            // println("BEFORE")
+            // currentFunctionAnalysedInfo.foreach(newAnalysisPoint => {
+            //     println(newAnalysisPoint._1)
+            //     newAnalysisPoint._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
+            // })
+
             currentFunctionAnalysedInfo = analyseBlock(nextBlockToAnalyse, currentFunctionAnalysedInfo);
+
+            // println("AFTER")
+            // currentFunctionAnalysedInfo.foreach(newAnalysisPoint => {
+            //     println(newAnalysisPoint._1)
+            //     newAnalysisPoint._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
+            // })
 
             if (!currentWorklist.isEmpty) {
                 previousStmtAnalysisState = functionStartAnalysisState;
             }
+
+            finalStmtAnalysisState = previousStmtAnalysisState
+            // previousStmtAnalysisState.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
         }
 
+        // println("END")
+        // currentFunctionAnalysedInfo.foreach(newAnalysisPoint => {
+        //     println(newAnalysisPoint._1)
+        //     newAnalysisPoint._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
+        // })
         saveNewAnalysisInfo(currentFunctionAnalysedInfo);
         currentCallString = currentCallString.filter(funcName => {funcName != name});
     }
@@ -183,8 +209,23 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
      * "Commits" the info from the current function to the output map.
      */
     def saveNewAnalysisInfo(newInfo: Map[Stmt, analysis.type]) = {
-        newInfo.keys.foreach(newAnalysisPoint => {
-            stmtAnalysisInfo = stmtAnalysisInfo + (newAnalysisPoint -> stmtAnalysisInfo.getOrElse(newAnalysisPoint, analysis.createLowest).asInstanceOf[analysis.type].join(newInfo.getOrElse(newAnalysisPoint, analysis.createLowest).asInstanceOf[analysis.type]))
+
+        // newInfo.foreach(point => {
+        //     println(point._1)
+        //     point._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
+        // })
+
+        // println("whole thing")
+        // stmtAnalysisInfo.foreach(point => {
+        //     println(point._1)
+        //     point._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
+        // })
+
+        println("SAVING INFO")
+        newInfo.foreach(newAnalysisPoint => {
+            println(newAnalysisPoint._1)
+            newAnalysisPoint._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
+            stmtAnalysisInfo = stmtAnalysisInfo + (newAnalysisPoint._1 -> stmtAnalysisInfo.getOrElse(newAnalysisPoint._1, analysis.createLowest).asInstanceOf[analysis.type].join(newAnalysisPoint._2.asInstanceOf[analysis.type]))
         })
     }
 }

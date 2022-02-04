@@ -48,16 +48,39 @@ case object SimplificationUtil {
    * Simplifies an extract expressions.
    */
   def bitvecExtract(extract: Extract): Expr = {
-    if (extract.getStart == 31 && extract.getEnd == 0 && extract.variable.isInstanceOf[Literal]) {
-      val value = Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) & 0xFFFFFFFF
-      return Literal(value.toString, Some(32))
+    var rhs = extract.secondInt
+    var mask = extract.firstInt - extract.secondInt + 1
+    var lhs = 63 - extract.firstInt
+    var bitMask : String = ""
+
+    while (rhs > 0) {
+      rhs -= 1
+      bitMask += "0"
     }
 
-    if (extract.getStart == 63 && extract.getEnd == 32 && extract.variable.isInstanceOf[Literal]) {
-      return Literal((Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) >>> 32).toString, Some(32))
+    while (mask > 0) {
+      mask -= 1
+      bitMask += "1"
     }
 
-    extract
+    while (lhs > 0) {
+      lhs -= 1
+      bitMask += "0"
+    }
+
+    val newValue = Integer.parseInt(extract.variable.asInstanceOf[Literal].toString) & Integer.parseInt(bitMask, 2)
+    Literal(newValue.toString, Some(extract.firstInt - extract.secondInt + 1))
+
+    // if (extract.getStart == 31 && extract.getEnd == 0 && extract.variable.isInstanceOf[Literal]) {
+    //   val value = Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) & 0xFFFFFFFF
+    //   return Literal(value.toString, Some(32))
+    // }
+
+    // if (extract.getStart == 63 && extract.getEnd == 32 && extract.variable.isInstanceOf[Literal]) {
+    //   return Literal((Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) >>> 32).toString, Some(32))
+    // }
+
+    // extract
   }
 
   /**
