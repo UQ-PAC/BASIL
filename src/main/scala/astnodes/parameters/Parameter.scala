@@ -2,7 +2,9 @@ package astnodes.parameters
 
 import astnodes.exp.`var`.Register;
 
-abstract class Parameter(var name: Register, register: Register) {
+abstract class Parameter(newName: Register, register: Register) {
+    private var name: Register = newName;
+
     def getName: Register = {
         name
     }
