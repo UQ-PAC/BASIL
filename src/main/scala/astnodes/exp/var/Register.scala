@@ -4,7 +4,6 @@ import astnodes.exp.{Expr, `var`}
 import astnodes.pred
 import astnodes.sec.SecVar
 
-
 /** A register
   */
 case class Register(name: String, override val size: Option[Int]) extends Var {

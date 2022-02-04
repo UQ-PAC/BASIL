@@ -213,7 +213,7 @@ L: x -> FALSE, secret -> FALSE, z -> TRUE
 000002a1: main_argv :: in out u64 = R1
 000002a2: main_result :: out u32 = R0
 
-0000010a:
+0000010a: 
 0000010c: R0 := 0x11000
 00000110: R0 := R0 + 0x3C
 00000114: #27 := pad:64[mem[R0, el]:u32]
