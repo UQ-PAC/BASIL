@@ -14,7 +14,7 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
     var currentWorklist: ArrayDeque[Block] = ArrayDeque();
 
     var previousStmtAnalysisState: analysis.type = analysis.createLowest;
-    var finalStmtAnalysisState: analysis.type = analysis.createLowest;
+    // var finalStmtAnalysisState: analysis.type = analysis.createLowest;
     var stmtAnalysisInfo: Map[Stmt, analysis.type] = Map();
     var blockAnalysisInfo: Map[Block, analysis.type] = Map();
     
@@ -35,7 +35,7 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
         previousStmtAnalysisState = null;
         blockAnalysisInfo = null;
 
-        finalStmtAnalysisState.applyChanges(startState, getAllInfo);
+        analysis.applyChanges(startState, getAllInfo);
     }
     
     def printAllLinesWithLabels: Unit = {
@@ -96,7 +96,7 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
                 previousStmtAnalysisState = functionStartAnalysisState;
             }
 
-            finalStmtAnalysisState = previousStmtAnalysisState
+            // finalStmtAnalysisState = previousStmtAnalysisState
             // previousStmtAnalysisState.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
         }
 

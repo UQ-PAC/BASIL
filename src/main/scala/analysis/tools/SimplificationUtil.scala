@@ -68,9 +68,11 @@ case object SimplificationUtil {
       bitMask += "0"
     }
 
-    val newValue = Integer.parseInt(extract.variable.asInstanceOf[Literal].toString) & Integer.parseInt(bitMask, 2)
-    Literal(newValue.toString, Some(extract.firstInt - extract.secondInt + 1))
-
+    if (extract.variable.isInstanceOf[Literal]) {
+      val newValue = Integer.parseInt(extract.variable.asInstanceOf[Literal].toString) & Integer.parseInt(bitMask, 2)
+      Literal(newValue.toString, Some(extract.firstInt - extract.secondInt + 1))
+    }
+    
     // if (extract.getStart == 31 && extract.getEnd == 0 && extract.variable.isInstanceOf[Literal]) {
     //   val value = Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) & 0xFFFFFFFF
     //   return Literal(value.toString, Some(32))
@@ -80,7 +82,7 @@ case object SimplificationUtil {
     //   return Literal((Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) >>> 32).toString, Some(32))
     // }
 
-    // extract
+    extract
   }
 
   /**

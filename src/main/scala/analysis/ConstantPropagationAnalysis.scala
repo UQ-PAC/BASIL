@@ -254,11 +254,13 @@ class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
       val stmt = analysis._1
       val state = analysis._2
 
-      // println(stmt)
+      println("New statement")
+      println(stmt)
       // state.debugPrint()
       val func = findStmtFunc(stmt)
 
       var simpleStmt = stmt
+      println("Folds:")
       state.functionLocalState
         .getOrElse(func.header.funcName, throw new Exception(s"CP Analysis: Function unknown: ${func.header.funcName}"))
         .foreach(constraint => {
@@ -267,6 +269,7 @@ class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
 
           if (dependentInst != None) {
             val newExpr = func.findStmtFromLabel(dependentInst.get).getOrElse(throw new Exception("CP Analysis: Cannot find statement."))
+            println(newExpr)
 
             // if (assignStmt.lhs.isInstanceOf[Register] && assignStmt.lhs.asInstanceOf[Register].name.equals("#31")) {
             //   println(newStmt)
@@ -291,6 +294,7 @@ class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
 
           if (dependentInst != None) {
             val newExpr = func.findStmtFromLabel(dependentInst.get).getOrElse(throw new Exception("CP Analysis: Cannot find statement."))
+            println(newExpr)
 
             // if (assignStmt.lhs.isInstanceOf[Register] && assignStmt.lhs.asInstanceOf[Register].name.equals("#31")) {
             //   println(newStmt)
