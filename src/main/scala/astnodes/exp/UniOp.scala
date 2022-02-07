@@ -5,6 +5,7 @@ import astnodes.exp.`var`.Var
 import java.util.Collections
 import java.util
 import java.util.Objects
+import analysis.tools.SimplificationUtil
 
 /** Unary operator fact
   */
@@ -13,6 +14,7 @@ case class UniOp(var operator: UniOperator.Value, val exp: Expr) extends Expr {
   override def toString = String.format("%s %s", operator, exp)
   override def toBoogieString: String = s"${UniOperator.toBoogie(operator, size)}(${exp.toBoogieString})"
   override def subst(v: Var, w: Var): Expr = this.copy(exp = exp.subst(v, w))
+  override def fold (old: Expr, sub: Expr): Expr = SimplificationUtil.uniArithmetic(this.copy(exp = exp.fold(old, sub)))
 
   override def vars = exp.vars
 

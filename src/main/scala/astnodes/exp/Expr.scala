@@ -14,11 +14,12 @@ trait Expr {
   def subst(v: Var, w: Var): Expr
   def toBoogieString = toString
 
+  def fold (old: Expr, sub: Expr): Expr
   /* 
    * The size of output of the given expression.
    *
    * Note: for binary operators in some cases the input and output sizes will not match.
    */
-  def size: Option[Int]
+  def size: Option[Int] 
 }
 

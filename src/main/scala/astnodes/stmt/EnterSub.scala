@@ -21,12 +21,11 @@ case class EnterSub(val pc: String, funcName: String, var requires: List[Pred], 
   // TODO dont like this
   modifies.addAll(immutable.List("heap", "stack", "Gamma_heap", "Gamma_stack", "SP", "R31", "Gamma_SP", "Gamma_R31"))
 
-  def getFuncName = funcName
-
   def getInParams = inParams
   def getOutParam = outParam
   def setOutParam(outParam: OutParameter) = this.outParam = Some(outParam)
   def setInParams(newInParms: Buffer[InParameter]) = inParams = newInParms
+  def getFuncName = funcName
 
   def setRequiresEnsures(requires: List[Pred], ensures: List[Pred]) = {
     this.requires = requires

@@ -1,3 +1,5 @@
+// package scala
+
 import astnodes.stmt.Stmt
 import org.antlr.v4.runtime.CharStreams
 import org.antlr.v4.runtime.CommonTokenStream
@@ -14,14 +16,14 @@ import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableLis
 import BilParser.*
 import analysis.*
 import astnodes.pred.Bool
-import util.RunUtils
 import vcgen.{State, VCGen}
+import astnodes.exp.*
 
 import collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
-import collection.JavaConverters.*
 import sys.process.*
 import scala.language.postfixOps
+import util.RunUtils
 
 @main def main(fileName: String, elfFileName: String) = {
   val state = RunUtils.generateVCs(fileName, elfFileName)

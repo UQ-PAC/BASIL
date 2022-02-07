@@ -66,6 +66,8 @@ object FlowGraph {
       builder.append("}")
       builder.toString.replaceAll("\n", "\n  ") + "\n"
     }
+    
+    
   }
 
   /** Factory for a flow graph. It works, at a high level, as follows: Take a list of statements. Partition the list
@@ -361,6 +363,10 @@ object FlowGraph {
       */
     def setLines(lines: List[Stmt]) = this.lines = lines
 
+    def replaceStmt(newStmt: Stmt, index: Int) = {
+      lines.set(index, newStmt)
+    }
+
     /** @return
       *   the list object containing the children of this block
       */
@@ -425,6 +431,15 @@ class FlowGraph (var functions: List[FlowGraph.Function], val types: immutable.M
     blocks
   }
   def removeLine(line: Stmt) = getBlocks.forEach((block: FlowGraph.Block) => block.getLines.remove(line))
+
+  def replaceLine(newStmt: Stmt, oldStmt: Stmt) = {
+    getBlocks.forEach(block => {
+      if (block.getLines.contains(oldStmt)) {
+        val index = block.getLines.indexOf(oldStmt)
+        block.replaceStmt(newStmt, index)
+      }
+    })
+  }
 
   /** Enforce guaranteed properties of this flow graph. Exceptions are thrown when these constraints are not met.
     */

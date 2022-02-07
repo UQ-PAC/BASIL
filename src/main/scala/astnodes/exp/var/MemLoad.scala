@@ -29,6 +29,12 @@ case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
     case UniOp(_, e1: Expr) => onStackMatch(e1)
     case _                   => false
   }
+  
+  override def fold(old: Expr, sub: Expr): Expr = {
+    if (!this.onStack) this.copy(exp.fold(old, sub))
+    else if (this.onStack && old == this) return sub
+    else this
+  }
 
   def toL = SecMemLoad(false, true, exp)
   override def toGamma = SecMemLoad(true, false, exp)

@@ -5,6 +5,7 @@ import util.AssumptionViolationException
 
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters.*
+import analysis.tools.SimplificationUtil
 
 /** Binary operation of two expressions
  */
@@ -14,10 +15,21 @@ case class BinOp(
     secondExp: Expr
 ) extends Expr {
   def this(operatorStr: String, firstExp: Expr, secondExp: Expr) = this(BinOperator.fromBil(operatorStr), firstExp, secondExp)
+  
+  def getFirstExp = firstExp
+  def getSecondExp = secondExp
+  def getOperator = operator.toString
+  
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
   override def toBoogieString = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
 
-  override def subst(v: Var, w: Var): Expr = this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
+  override def subst(v: Var, w: Var): Expr = {
+    this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
+  }
+
+  override def fold(old: Expr, sub: Expr): Expr = {
+    SimplificationUtil.binArithmetic(this.copy(firstExp = firstExp.fold(old,sub), secondExp = secondExp.fold(old, sub)))
+  }
 
   override def vars = firstExp.vars ++ secondExp.vars
 

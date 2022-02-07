@@ -88,7 +88,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                         // () := foo ~ LHS points to everything that (foo) points to i.e. *foo
                         locationValue = currentState.getOrElse(assignFromRegister, Set(NonPointerValue));
                     }
-                    case assignFromMem: MemLoad => {
+                    case assignFromMem: `var`.MemLoad => {
                         // () := mem[foo] ~ LHS points to everything that is pointed to by memory pointed to by foo i.e. **foo
                         currentState.getOrElse(assignFromMem.exp, Set()).foreach(single => {
                             if (locationValue == null) {
@@ -124,7 +124,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
                         // foo := () ~ basic assignment
                         currentState = currentState + (assignToRegister -> locationValue);
                     }
-                    case assignToMem: MemLoad => {
+                    case assignToMem: astnodes.exp.`var`.MemLoad => {
                         // mem[foo] := () ~ everything that foo points to could point to RHS.
                         // special exception: if foo can only point to one thing, then mem[foo] can only point to RHS.
                         var memLoadPotentialValues = currentState.getOrElse(assignToMem.exp, Set());

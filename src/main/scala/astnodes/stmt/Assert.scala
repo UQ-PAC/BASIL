@@ -8,6 +8,10 @@ import astnodes.Label
 case class Assert(pc: String, var pred: Pred) extends Stmt(Label(pc)) {
   override def subst(v: Var, w: Var): Stmt = ???
 
+// main vers:
+// case class Assert(pc: String, var pred: Pred) extends Stmt(Label(pc)) {
+//   override def subst(v: Var, w: Var): Stmt = ???
+
   // TODO is there a way to merge these two methods
   override def toString: String = s"assert $pred;"
   override def toBoogieString: String = s"assert ${pred.toBoogieString};"

@@ -13,4 +13,8 @@ case class RegisterAssign(val pc: String, override val lhs: Register, override v
 
   // Otherwise is flag (e.g. #1)
   def isRegister = lhs.name.charAt(0) == 'R'
+  
+  def isStackPointer = this.isRegister && lhs.name.substring(1).equals("31")
+  def isFramePointer = this.isRegister && lhs.name.substring(1).equals("29")
+  def isLinkRegister = this.isRegister && lhs.name.substring(1).equals("30")
 }

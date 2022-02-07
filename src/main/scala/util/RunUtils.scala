@@ -15,7 +15,6 @@ import scala.jdk.CollectionConverters._
 object RunUtils {
 
   def generateVCs(fileName: String, elfFileName: String): State = {
-    // generate abstract syntax tree
     val bilLexer = new BilLexer(CharStreams.fromFileName(fileName));
     val tokens = new CommonTokenStream(bilLexer);
     val parser = new BilParser(tokens);
@@ -33,7 +32,7 @@ object RunUtils {
     symsParser.setBuildParseTree(true)
     val symsListener = new SymbolTableListener()
     walker.walk(symsListener, symsParser.syms)
-
+    
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
@@ -47,7 +46,11 @@ object RunUtils {
       statementLoader.gammaMappings.toMap
     );
 
-    val analysedState = Worklist(TestingAnalysis(), state).doAnalysis;
+    println("Before CP")
+    val WL = Worklist(ConstantPropagationAnalysis(state), state)
+    val analysedState = WL.doAnalysis;
+    println("After CP")
+    WL.printAllLinesWithLabels
 
     val updatedState = BoogieTranslator.translate(analysedState)
 

@@ -13,6 +13,7 @@ import astnodes.pred.{BinOp, BinOperator, Bool, Pred, conjunct, SecComp}
 object VCGen {
   // This generates the VCs but also updates to gamma variables
   def genVCs(state: State): State = {
+    println("generating VCs")
     state.copy(functions = state.functions.map(f =>
       f.copy(labelToBlock = f.labelToBlock.map {
         case (pc, b) => (pc, b.copy(lines = b.lines.flatMap(line => List(rely, Assert("TODO", genVC(line, f, state)), line) ++ genGammaUpdate(line, state))))

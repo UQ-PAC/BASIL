@@ -1,0 +1,38 @@
+0000052c: program
+00000519: sub main(main_argc, main_argv, main_result)
+0000053e: main_argc :: in u32 = X0
+0000053f: main_argv :: in out u64 = X1
+00000540: main_result :: out u32 = X0
+
+000001cf:
+000001d4: SP := SP - 0x10
+000001db: mem := mem with [SP + 8, el]:u32 <- 0
+000001e2: X0 := pad:64[mem[SP + 8, el]:u32]
+000001e9: X0 := X0 + 1
+000001f0: mem := mem with [SP + 0xC, el]:u32 <- low:32[X0]
+000001f7: X0 := pad:64[mem[SP + 8, el]:u32]
+000001fd: #43 := 0xFFFFFFFFFFFFFFFF + X0
+00000201: NF := extract:63:63[#43]
+00000205: VF := extract:63:63[X0] & ~extract:63:63[#43]
+00000209: ZF := #43 = 0
+0000020d: CF := extract:63:63[X0] | ~extract:63:63[#43] | extract:63:63[X0] &
+          ~extract:63:63[#43]
+0000021c: #45 := ZF
+00000216: when #45 goto %00000214
+00000528: goto %0000036a
+
+00000214:
+00000222: X0 := 5
+00000229: mem := mem with [SP + 8, el]:u32 <- low:32[X0]
+00000529: goto %0000022b
+
+0000036a:
+0000036f: X0 := pad:64[mem[SP + 0xC, el]:u32]
+00000376: X0 := X0 + 2
+0000037d: mem := mem with [SP + 0xC, el]:u32 <- low:32[X0]
+00000383: goto %0000022b
+
+0000022b:
+00000230: X0 := 0
+00000237: SP := SP + 0x10
+0000023d: call LR with noreturn

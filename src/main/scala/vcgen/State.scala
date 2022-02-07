@@ -132,6 +132,14 @@ case class FunctionState (
     + initStmts.map(_.toBoogieString).mkString("\n")
     + labelToBlock.values.mkString("") + "\n}"
 
+  // Constant Prop analysis requires these for expression simplification
+  def replaceLine(oldStmt: Stmt, newStmt: Stmt) = labelToBlock.values.foreach(block => block.replaceLine(oldStmt, newStmt))
+  def findStmtFromLabel(label: Label): Option[Stmt] = {
+    labelToBlock.values.foreach(block => {
+      if (!block.findStmtFromLabel(label).isEmpty) return block.findStmtFromLabel(label)
+    })
+    None
+  }
 }
 
 case object FunctionState {
@@ -153,9 +161,18 @@ case object FunctionState {
  */
 case class Block (
   label: String,
-  lines: List[Stmt],
+  var lines: List[Stmt],    // I (Kaitlyn) changed lines to var b/c it was the only practical way for the CP to apply changes to a State
 ) {
   def this(block: FlowGraph.Block) = this(block.getLabel, block.getLines.asScala.toList)
 
   override def toString: String = "\nlabel" + label + ":\n    " + lines.map(l => l.toBoogieString).mkString("\n    ")
+
+  // Constant Prop analysis requires these for expression simplification
+  def findStmtFromLabel(label: Label): Option[Stmt] = lines.find(stmt => stmt.label == label)
+  def replaceLine(oldStmt: Stmt, newStmt: Stmt) = {
+    var index = lines.indexOf(oldStmt)
+    if (index != -1) {
+      lines = lines.updated(index, newStmt)
+    }
+  }
 }
