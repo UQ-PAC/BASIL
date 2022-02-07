@@ -20,10 +20,10 @@ import java.{util => ju}
 class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
 
   // the state of all the local variables of a function
-  var functionLocalState : HashMap[String, HashMap[Expr, Option[Label]]] = new HashMap[String, HashMap[Expr, Option[Label]]]()
+  var functionLocalState : HashMap[String, HashMap[Expr, Option[RegisterAssign]]] = new HashMap[String, HashMap[Expr, Option[RegisterAssign]]]()
 
   // the state of the program heap i.e. global variables
-  var programGlobalState : HashMap[MemLoad, Option[Label]] = new HashMap[MemLoad, Option[Label]]()
+  var programGlobalState : HashMap[Label, Option[MemAssign]] = new HashMap[Label, Option[MemAssign]]()
 
   var previousStmt : Stmt = null
   
@@ -36,25 +36,31 @@ class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
     val prevStmtFunc = if (previousStmt != null) findStmtFunc(previousStmt) else null
     val currStmtFunc = findStmtFunc(stmt)
 
-    if (!functionLocalState.contains(currStmtFunc.header.funcName)) functionLocalState.update(currStmtFunc.header.funcName, new HashMap[Expr, Option[Label]]())
+    if (!functionLocalState.contains(currStmtFunc.header.funcName)) functionLocalState.update(currStmtFunc.header.funcName, new HashMap[Expr, Option[RegisterAssign]]())
 
-    previousStmt match {
-      case regAssignStmt : RegisterAssign => {
-        if (!regAssignStmt.isFramePointer && !regAssignStmt.isLinkRegister && !regAssignStmt.isStackPointer) {
-          prevStmtFunc.header.funcName.equals(currStmtFunc.header.funcName) match {
-            case true => functionLocalState.getOrElseUpdate(currStmtFunc.header.funcName, new HashMap[Expr, Option[Label]]()).update(regAssignStmt.lhs, Some(previousStmt.label))
-            case false => if (!functionLocalState.contains(currStmtFunc.header.funcName)) functionLocalState.update(prevStmtFunc.header.funcName, new HashMap[Expr, Option[Label]]())
-          }
-          // println(prevStmtFunc.header.funcName)
-          // println(functionLocalState.get(prevStmtFunc.header.funcName))
-        }
+    // println("New Stmt")
+    // println(previousStmt)
+    if (previousStmt != null && previousStmt.isInstanceOf[Assign]) {
+      var newPrevStmt : Assign = previousStmt.asInstanceOf[Assign]
+      functionLocalState.get(prevStmtFunc.header.funcName).get.foreach(constraint => {
+        val variable = constraint._1
+        val assignment = constraint._2
+
+        if (assignment != None) newPrevStmt = newPrevStmt.fold(variable, assignment.get.rhs)
+      })
+
+      programGlobalState.foreach(constraint => {
+        val label = constraint._1
+        val memAssign = constraint._2
+
+        if (memAssign != None) newPrevStmt = newPrevStmt.fold(memAssign.get.lhs.asInstanceOf[Expr], memAssign.get.rhs.asInstanceOf[Expr])
+      })
+
+      newPrevStmt match {
+        case regAssignStmt : RegisterAssign => if (!regAssignStmt.isFramePointer && !regAssignStmt.isLinkRegister && !regAssignStmt.isStackPointer) functionLocalState.get(prevStmtFunc.header.funcName).get.update(newPrevStmt.lhs, Some(regAssignStmt))
+        case memAssignStmt : MemAssign => programGlobalState.update(newPrevStmt.label, Some(memAssignStmt))
+        case _ =>
       }
-      case memAssignStmt : MemAssign => {
-        if (memAssignStmt.lhs.onStack) functionLocalState.getOrElseUpdate(prevStmtFunc.header.funcName, new HashMap[Expr, Option[Label]]()).update(memAssignStmt.lhs, Some(previousStmt.label))
-        else programGlobalState.update(memAssignStmt.lhs, Some(previousStmt.label))
-      }
-      case null =>
-      case _ => if (!functionLocalState.contains(currStmtFunc.header.funcName)) functionLocalState+=(prevStmtFunc.header.funcName, new HashMap[Expr, Option[Label]]())
     }
 
     previousStmt = stmt
@@ -64,6 +70,10 @@ class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
 
     this
   }
+
+  // private def foldLocals: Expr = {}
+
+  // private def foldGlobals: Expr = {}
 
   /**
     * If this has less variables than other, return 1. 
@@ -91,8 +101,8 @@ class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
   }
 
   override def createLowest: this.type = {
-    functionLocalState = new HashMap[String, HashMap[Expr, Option[Label]]]()
-    programGlobalState = new HashMap[MemLoad, Option[Label]]()
+    functionLocalState = new HashMap[String, HashMap[Expr, Option[RegisterAssign]]]()
+    programGlobalState = new HashMap[Label, Option[MemAssign]]()
     previousStmt = null
     this
   }
@@ -138,11 +148,11 @@ class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
         val constraint = local._2
 
         otherAsThis.functionLocalState.getOrElse(function, throw new Exception("CP Analysis: join error.")).getOrElse(variable, "Any") match {
-          case label : Option[Label] if !label.isEmpty => {
-            if (constraint != label) functionLocalState.getOrElse(function, throw new Exception("CP Analysis: join error.")).update(variable, null)
+          case stmt : Option[RegisterAssign] if !stmt.isEmpty => {
+            if (constraint.get != stmt.get) functionLocalState.getOrElse(function, throw new Exception("CP Analysis: join error.")).update(variable, None)
           }
           case "Any" =>
-          case None => functionLocalState.getOrElse(function, throw new Exception("CP Analysis: join error.")).update(variable, null)
+          case None => functionLocalState.getOrElse(function, throw new Exception("CP Analysis: join error.")).update(variable, None)
           case _ => 
         }
       })
@@ -167,7 +177,7 @@ class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
       val constraint = globalConstraint._2
 
       otherAsThis.programGlobalState.getOrElse(global, "Any") match {
-        case label : Option[Label] if !label.isEmpty => if (constraint.get != label.get) programGlobalState.update(global, None)
+        case stmt : Option[RegisterAssign] if !stmt.isEmpty => if (constraint.get != stmt.get) programGlobalState.update(global, None)
         case "Any" =>
         case None => programGlobalState.update(global, None)
         case _ =>
@@ -205,9 +215,9 @@ class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
         val constraint = local._2
 
         otherAsThis.functionLocalState.getOrElse(function, throw new Exception("CP Analysis: meet error.")).getOrElse(variable, "Any") match {
-          case label : Option[Label] if !label.isEmpty => {
-            if (constraint == null) functionLocalState.getOrElse(function, throw new Exception("CP Analysis: meet error.")).update(variable, label) 
-            else if (label != constraint) functionLocalState.getOrElse(function, throw new Exception("CP Analysis: meet error.")).remove(variable)
+          case stmt : Option[RegisterAssign] if !stmt.isEmpty => {
+            if (constraint == None) functionLocalState.getOrElse(function, throw new Exception("CP Analysis: meet error.")).update(variable, stmt) 
+            else if (stmt.get != constraint.get) functionLocalState.getOrElse(function, throw new Exception("CP Analysis: meet error.")).remove(variable)
           }
           case "Any" =>  functionLocalState.getOrElse(function, throw new Exception("CP Analysis: meet error.")).remove(variable)
           case None => 
@@ -222,7 +232,7 @@ class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
 
       otherAsThis.programGlobalState.getOrElse(global, "Any") match {
         // constant
-        case label : Option[Label] if !label.isEmpty => if (constraint == null) programGlobalState.update(global, label) else if (label != constraint) programGlobalState.remove(global)
+        case stmt : Option[MemAssign] if !stmt.isEmpty => if (constraint == None) programGlobalState.update(global, stmt) else if (stmt.get != constraint.get) programGlobalState.remove(global)
         // bottom element
         case "Any" => programGlobalState.remove(global)
         // top element
@@ -244,75 +254,26 @@ class ConstantPropagationAnalysis(state: State) extends AnalysisPoint {
   }
 
   override def applyChanges(preState: State, information: Map[Stmt, this.type]): State = {
-    // println(functionLocalState)
-    // println(programGlobalState)
-    // println(previousStmt)
-
-    // information.foreach(analysis => analysis._2.debugPrint())
+    // information.foreach(analysis => {
+    //   val stmt = analysis._1
+    //   val state = analysis._2
+    //
+    //   println(stmt.label.pc + " : " + stmt)
+    //   println(state.functionLocalState)
+    // })
 
     information.foreach(analysis => {
       val stmt = analysis._1
       val state = analysis._2
 
-      println("New statement")
-      println(stmt)
-      // state.debugPrint()
       val func = findStmtFunc(stmt)
 
-      var simpleStmt = stmt
-      println("Folds:")
-      state.functionLocalState
-        .getOrElse(func.header.funcName, throw new Exception(s"CP Analysis: Function unknown: ${func.header.funcName}"))
-        .foreach(constraint => {
-          val dependentExp = constraint._1
-          val dependentInst = constraint._2
-
-          if (dependentInst != None) {
-            val newExpr = func.findStmtFromLabel(dependentInst.get).getOrElse(throw new Exception("CP Analysis: Cannot find statement."))
-            println(newExpr)
-
-            // if (assignStmt.lhs.isInstanceOf[Register] && assignStmt.lhs.asInstanceOf[Register].name.equals("#31")) {
-            //   println(newStmt)
-            // }
-
-            simpleStmt match {
-              case assignStmt : Assign => simpleStmt = simpleStmt.asInstanceOf[Assign].fold(dependentExp, newExpr.asInstanceOf[Assign].getRhs)
-              case cJump : CJmpStmt => simpleStmt = simpleStmt.asInstanceOf[CJmpStmt].fold(dependentExp, newExpr.asInstanceOf[Assign].getRhs)
-              case _ =>
-            }
-
-            // if (assignStmt.lhs.isInstanceOf[Register] && assignStmt.lhs.asInstanceOf[Register].name.equals("#31")) {
-            //   println(newStmt)
-            // }
-          }
-        })
-      
-      state.programGlobalState
-        .foreach(constraint => {
-          val dependentExp = constraint._1
-          val dependentInst = constraint._2
-
-          if (dependentInst != None) {
-            val newExpr = func.findStmtFromLabel(dependentInst.get).getOrElse(throw new Exception("CP Analysis: Cannot find statement."))
-            println(newExpr)
-
-            // if (assignStmt.lhs.isInstanceOf[Register] && assignStmt.lhs.asInstanceOf[Register].name.equals("#31")) {
-            //   println(newStmt)
-            // }
-
-            simpleStmt match {
-              case assignStmt : Assign => simpleStmt = simpleStmt.asInstanceOf[Assign].fold(dependentExp, newExpr.asInstanceOf[Assign].getRhs)
-              case cJump : CJmpStmt => simpleStmt = simpleStmt.asInstanceOf[CJmpStmt].fold(dependentExp, newExpr.asInstanceOf[Assign].getRhs)
-              case _ =>
-            }
-
-            // if (assignStmt.lhs.isInstanceOf[Register] && assignStmt.lhs.asInstanceOf[Register].name.equals("#31")) {
-            //   println(newStmt)
-            // }
-          }
-        })
-
-      func.replaceLine(stmt, simpleStmt)
+      stmt match {
+        case regAssign : RegisterAssign => if (state.functionLocalState.get(func.header.funcName).get.get(regAssign.lhs) != None) func.replaceLine(stmt, state.functionLocalState.get(func.header.funcName).get.get(regAssign.lhs).get.get)
+        case memAssign : MemAssign => if (state.programGlobalState.get(stmt.label) != None) func.replaceLine(stmt, state.programGlobalState.get(stmt.label).get.get)
+        // case cJump: CJmpStmt => func.replaceLine(stmt, cJump.fold())
+        case _ => 
+      }
     })
 
     preState

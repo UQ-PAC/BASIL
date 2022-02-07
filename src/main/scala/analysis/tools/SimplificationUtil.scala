@@ -45,42 +45,32 @@ case object SimplificationUtil {
   }
 
   /**
-   * Simplifies an extract expressions.
+   * Simplifies an extract expression with digusting nested match statements
    */
   def bitvecExtract(extract: Extract): Expr = {
-    var rhs = extract.secondInt
-    var mask = extract.firstInt - extract.secondInt + 1
-    var lhs = 63 - extract.firstInt
-    var bitMask : String = ""
-
-    while (rhs > 0) {
-      rhs -= 1
-      bitMask += "0"
-    }
-
-    while (mask > 0) {
-      mask -= 1
-      bitMask += "1"
-    }
-
-    while (lhs > 0) {
-      lhs -= 1
-      bitMask += "0"
-    }
-
     if (extract.variable.isInstanceOf[Literal]) {
-      val newValue = Integer.parseInt(extract.variable.asInstanceOf[Literal].toString) & Integer.parseInt(bitMask, 2)
-      Literal(newValue.toString, Some(extract.firstInt - extract.secondInt + 1))
-    }
-    
-    // if (extract.getStart == 31 && extract.getEnd == 0 && extract.variable.isInstanceOf[Literal]) {
-    //   val value = Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) & 0xFFFFFFFF
-    //   return Literal(value.toString, Some(32))
-    // }
+      val literal = extract.variable.asInstanceOf[Literal]
 
-    // if (extract.getStart == 63 && extract.getEnd == 32 && extract.variable.isInstanceOf[Literal]) {
-    //   return Literal((Integer.parseInt(extract.getExp.asInstanceOf[Literal].toString) >>> 32).toString, Some(32))
-    // }
+      extract.firstInt match {
+        case 63 => { 
+          extract.secondInt match {
+            // case 63 => return Literal((literal.value.toInt & 1).toString, Some(1))
+            case 32 => return Literal(((literal.value.toInt >>> 32) << 32).toString, Some(32))
+            case 0 => return Literal(literal.value, Some(64))
+            case _ =>
+          }
+        }
+        case 31 => {
+          extract.secondInt match {
+            // case 63 => 
+            case 31 => return Literal((literal.value.toInt & Integer.parseInt("1000000000000000000000000000000", 2)).toString, Some(1))
+            case 0 => return Literal((literal.value.toInt & 0xFFFFFFFF).toString, Some(32))
+            case _ =>
+          }
+        }
+        case _ =>
+      }
+    }
 
     extract
   }
@@ -104,6 +94,10 @@ case object SimplificationUtil {
     }
 
     if (newLhs.isInstanceOf[Literal] && newLhs.asInstanceOf[Literal].asLong == 0 && binOp.getOperator.equals("|")) {
+      // binOp.getOperator match {
+      //   case "|" => return newRhs
+      //   case "&" => return Literal("0", )
+      // }
       return newRhs
     } else if (newRhs.isInstanceOf[Literal] && newRhs.asInstanceOf[Literal].asLong == 0 && binOp.getOperator.equals("|")) {
       return newLhs
