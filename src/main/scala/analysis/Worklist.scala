@@ -14,7 +14,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
     var currentWorklist: ArrayDeque[Block] = ArrayDeque();
 
     var previousStmtAnalysisState: analysis.type = analysis.createLowest;
-    // var finalStmtAnalysisState: analysis.type = analysis.createLowest;
     var stmtAnalysisInfo: Map[Stmt, analysis.type] = Map();
     var blockAnalysisInfo: Map[Block, analysis.type] = Map();
     
@@ -27,7 +26,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
     }
 
     def doAnalysis: State = {
-        printAllLinesWithLabels
         analyseFunction("main");
         if debug then println(getAllInfo);
 
@@ -35,15 +33,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
         blockAnalysisInfo = null;
 
         analysis.applyChanges(startState, getAllInfo);
-    }
-    
-    def printAllLinesWithLabels: Unit = {
-        startState.functions.foreach(function =>
-            {function.labelToBlock.values.foreach(block => {
-                block.lines.foreach(line => {
-                    println(line.label.pc + " : " + line)
-                })
-            })})
     }
 
     def analyseFunction(name: String) = {
@@ -73,12 +62,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
             }
         }
 
-        println("Hello Andrew :) As you can see, this is where all analysis points become the same. What is being printed is CP's internal state, which should be different for every statement.")
-        currentFunctionAnalysedInfo.foreach(newAnalysisPoint => {
-            println(newAnalysisPoint._1)
-            newAnalysisPoint._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
-        })
-
         saveNewAnalysisInfo(currentFunctionAnalysedInfo);
         currentCallString = currentCallString.filter(funcName => {funcName != name});
     }
@@ -88,9 +71,7 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
         var outputInfo: Map[Stmt, analysis.type] = currentInfo;
 
         block.lines.foreach(blockStmt => {
-            // println(s"New block stmt: $blockStmt")
             outputInfo = analyseStmt(blockStmt, outputInfo);
-            // println(outputInfo.get(blockStmt).get.asInstanceOf[ConstantPropagationAnalysis].functionLocalState)
         })
         
         if (blockAnalysisInfo.getOrElse(block, null) != previousStmtAnalysisState) {
@@ -185,10 +166,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
      * "Commits" the info from the current function to the output map.
      */
     def saveNewAnalysisInfo(newInfo: Map[Stmt, analysis.type]) = {
-        // newInfo.foreach(point => {
-        //     println(s"New block stmt: ${point._1}")
-        //     println(point._2.asInstanceOf[ConstantPropagationAnalysis].functionLocalState)
-        // })
         for ((key, value) <- newInfo) {
             stmtAnalysisInfo = stmtAnalysisInfo + (key -> value.asInstanceOf[analysis.type]);
         }

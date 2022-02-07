@@ -17,21 +17,10 @@ trait Assign (pc: String, val lhs: Var, val rhs: Expr) extends Stmt {
     case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs = rhs.subst(v,w)),
   }
 
-  def getLhs: Var = lhs
-  def getRhs: Expr = rhs
-
   def fold(oldExpr: Expr, newExpr: Expr): Assign = {
-    var updatedRhs : Expr = null
-
-    if (rhs.equals(oldExpr)) {
-      updatedRhs = newExpr
-    } else {
-      updatedRhs = rhs.fold(oldExpr, newExpr)
-    }
-
     lhs match {
-      case lhsRes: MemLoad => MemAssign(pc, if (!lhsRes.onStack) lhsRes.fold(oldExpr, newExpr).asInstanceOf[MemLoad] else lhsRes, rhs = updatedRhs)
-      case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs = updatedRhs)
+      case lhsRes: MemLoad => MemAssign(pc, if (!lhsRes.onStack) lhsRes.fold(oldExpr, newExpr).asInstanceOf[MemLoad] else lhsRes, rhs.fold(oldExpr, newExpr))
+      case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs.fold(oldExpr, newExpr))
       case _ => this
     }
   }

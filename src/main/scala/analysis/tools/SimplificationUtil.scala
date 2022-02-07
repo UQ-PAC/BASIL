@@ -45,7 +45,7 @@ case object SimplificationUtil {
   }
 
   /**
-   * Simplifies an extract expression with digusting nested match statements
+   * Simplifies an extract expression with nested match statements
    */
   def bitvecExtract(extract: Extract): Expr = {
     if (extract.variable.isInstanceOf[Literal]) {
@@ -75,100 +75,36 @@ case object SimplificationUtil {
     extract
   }
 
-  /**
-   * Simplifies an arithmetic expressions.
-   */
   def binArithmetic(binOp: BinOp): Expr = {
-    if (this.canCompute(binOp)) {
-      val newVal = compute(binOp)
-      return new Literal(newVal.toString)
+    var newLhs : Expr = binOp.firstExp
+    var newRhs : Expr = binOp.secondExp
+    if (binOp.firstExp.isInstanceOf[BinOp]) { 
+      newLhs = binArithmetic(binOp.firstExp.asInstanceOf[BinOp])
+    }
+    if (binOp.secondExp.isInstanceOf[BinOp]) {
+      newRhs = binArithmetic(binOp.secondExp.asInstanceOf[BinOp])
     }
 
-    var newLhs : Expr = binOp.getFirstExp
-    var newRhs : Expr = binOp.getSecondExp
-    if (binOp.getFirstExp.isInstanceOf[BinOp]) { 
-      newLhs = binArithmetic(binOp.getFirstExp.asInstanceOf[BinOp])
-    }
-    if (binOp.getSecondExp.isInstanceOf[BinOp]) {
-      newRhs = binArithmetic(binOp.getSecondExp.asInstanceOf[BinOp])
+    if (newLhs.isInstanceOf[Literal] && newRhs.isInstanceOf[Literal]) {
+      val solution = performArithmetic(binOp.firstExp.asInstanceOf[Literal].value.toDouble, binOp.secondExp.asInstanceOf[Literal].value.toDouble, binOp.operator.toString)
+      return Literal(solution.toString)
     }
 
-    if (newLhs.isInstanceOf[Literal] && newLhs.asInstanceOf[Literal].asLong == 0 && binOp.getOperator.equals("|")) {
+    if (newLhs.isInstanceOf[Literal] && newLhs.asInstanceOf[Literal].toString.toInt == 0 && binOp.operator.equals("|")) {
       // binOp.getOperator match {
       //   case "|" => return newRhs
       //   case "&" => return Literal("0", )
       // }
       return newRhs
-    } else if (newRhs.isInstanceOf[Literal] && newRhs.asInstanceOf[Literal].asLong == 0 && binOp.getOperator.equals("|")) {
+    } else if (newRhs.isInstanceOf[Literal] && newRhs.asInstanceOf[Literal].toString.toInt == 0 && binOp.operator.equals("|")) {
       return newLhs
     }
 
     binOp.copy(firstExp = newLhs, secondExp = newRhs)
   }
-  
-  // Do not change the conversion to Double! The integers BIL spits out to perform bitmasking for
-  // extraction purposes is too big to be stored by Scala Int and Long data types. Double has been
-  // the only data type able to store them
-  //
-  // By the time the expressions are finished being simplified, they are generally small enough to be
-  // stored by Long data types. Although this may need to be revised in future, for now it works
-  private def compute(binOp: BinOp): Long = {
-    val firstExp = binOp.getFirstExp
-    val secondExp = binOp.getSecondExp
-    val operator = binOp.getOperator
 
-    if (firstExp.isInstanceOf[Literal] && secondExp.isInstanceOf[Literal]) {
-      val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
-      val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
-      return performArithmetic(firstOperand, secondOperand, operator)
-    } else if (firstExp.isInstanceOf[Literal] && secondExp.isInstanceOf[BinOp]) {
-      val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
-      val secondOperand = compute(secondExp.asInstanceOf[BinOp]).toDouble
-      return performArithmetic(firstOperand, secondOperand, operator)
-    } else if (firstExp.isInstanceOf[BinOp] && secondExp.isInstanceOf[Literal]) {
-      val firstOperand = compute(firstExp.asInstanceOf[BinOp]).toDouble
-      val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
-      return performArithmetic(firstOperand, secondOperand, operator)
-    } else {
-      val firstOperand = compute(firstExp.asInstanceOf[BinOp]).toDouble
-      val secondOperand = compute(secondExp.asInstanceOf[BinOp]).toDouble
-      return performArithmetic(firstOperand, secondOperand, operator)
-    }
-  }
-  
-  private def canCompute(binOp: BinOp): Boolean = {
-    val firstExp = binOp.getFirstExp
-    val secondExp = binOp.getSecondExp
-
-    if (firstExp.isInstanceOf[Literal]) {
-      try {
-        val firstOperand = firstExp.asInstanceOf[Literal].toString.toDouble
-      } catch {
-        case ex: NumberFormatException => return false
-      }
-    } else if (!firstExp.isInstanceOf[BinOp]) {
-      return false
-    } else if (!canCompute(firstExp.asInstanceOf[BinOp])) {
-      return false
-    }
-    
-    if (secondExp.isInstanceOf[Literal]) {
-      try {
-        val secondOperand = secondExp.asInstanceOf[Literal].toString.toDouble
-      } catch {
-        case ex: NumberFormatException => return false
-      }
-    } else if (!secondExp.isInstanceOf[BinOp]) {
-      return false
-    } else if (!canCompute(secondExp.asInstanceOf[BinOp])) {
-      return false
-    }
-    
-    return true
-  }
-  
   /**
-    * Helper method for compute()
+    * Helper method for binArithmetic()
    */
   private def performArithmetic(firstOperand : Double, secondOperand : Double, operator : String)
     : Long = {
@@ -186,6 +122,9 @@ case object SimplificationUtil {
     return result.asInstanceOf[Long]
   }
 
+  /**
+   * Simplifies unary operations
+   */
   def uniArithmetic(uniOp: UniOp): Expr = {
     if (uniOp.exp.isInstanceOf[Literal]) {
       uniOp.operator.toString match {
