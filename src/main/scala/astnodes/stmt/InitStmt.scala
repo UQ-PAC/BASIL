@@ -10,12 +10,6 @@ import astnodes.Label
 // TODO is this class necassary 
 case class InitStmt(variable: Register, pc: String, val varType: String, val const: Boolean = false) extends Stmt(Label(pc)) {
   override def subst(v: Var, w: Var): Stmt = variable.subst(v,w) match {
-
-// main vers
-// case class InitStmt(variable: Register, pc: String, val varType: String, val const: Boolean = false) extends Stmt(Label(pc)) {
-//   override def subst(v: Var, w: Var): Stmt = variable.subst(v,w) match {
-
-
     case res: Register => this.copy(variable = res)
     case _ => ???
   }

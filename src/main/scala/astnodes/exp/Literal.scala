@@ -11,13 +11,6 @@ case class Literal(value: String, override val size: Option[Int] = None) extends
   /** Value of literal */
   override def toString = String.format("%s", value)
   override def toBoogieString: String = value + s"bv${if (size.isDefined) size.get else 64}"
-  def asLong: Long = {
-    try {
-      value.toLong 
-    } catch {
-      case e: _ => -1 
-    }
-  }
 
   override def vars: List[Register] = List()
   override def subst(v: Var, w: Var): Expr = this

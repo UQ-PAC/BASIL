@@ -16,10 +16,6 @@ case class BinOp(
 ) extends Expr {
   def this(operatorStr: String, firstExp: Expr, secondExp: Expr) = this(BinOperator.fromBil(operatorStr), firstExp, secondExp)
   
-  def getFirstExp = firstExp
-  def getSecondExp = secondExp
-  def getOperator = operator.toString
-  
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
   override def toBoogieString = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
 

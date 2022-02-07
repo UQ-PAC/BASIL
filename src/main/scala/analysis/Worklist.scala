@@ -14,7 +14,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
     var currentWorklist: ArrayDeque[Block] = ArrayDeque();
 
     var previousStmtAnalysisState: analysis.type = analysis.createLowest;
-    // var finalStmtAnalysisState: analysis.type = analysis.createLowest;
     var stmtAnalysisInfo: Map[Stmt, analysis.type] = Map();
     var blockAnalysisInfo: Map[Block, analysis.type] = Map();
     
@@ -27,36 +26,14 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
     }
 
     def doAnalysis: State = {
-        printAllLinesWithLabels
         analyseFunction("main");
         if debug then println(getAllInfo);
 
-        // finalStmtAnalysisState.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
         previousStmtAnalysisState = null;
         blockAnalysisInfo = null;
 
         analysis.applyChanges(startState, getAllInfo);
     }
-    
-    def printAllLinesWithLabels: Unit = {
-        startState.functions.foreach(function =>
-            {function.labelToBlock.values.foreach(block => {
-                block.lines.foreach(line => {
-                    println(line.label.pc + " : " + line)
-                })
-            })})
-    }
-    
-    // def printAllStates: Unit = {
-    //     finalAnalysedStmtInfo.foreach(point => {
-    //         println("Line:")
-    //         System.out.println(point._1.getLabel.pc + " " + point._1)
-    //         println("Dependencies:")
-    //         point._2.asInstanceOf[ConstantPropagationAnalysis].state.foreach(varConstraint => {
-    //             System.out.println(varConstraint._1.toString + " : " + varConstraint._2)
-    //         })
-    //     })
-    // }
 
     def analyseFunction(name: String) = {
         if debug then println("analysing function: " + name);
@@ -78,33 +55,13 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
                 previousStmtAnalysisState = analysis.createLowest;
             }
 
-            // println("BEFORE")
-            // currentFunctionAnalysedInfo.foreach(newAnalysisPoint => {
-            //     println(newAnalysisPoint._1)
-            //     newAnalysisPoint._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
-            // })
-
             currentFunctionAnalysedInfo = analyseBlock(nextBlockToAnalyse, currentFunctionAnalysedInfo);
-
-            // println("AFTER")
-            // currentFunctionAnalysedInfo.foreach(newAnalysisPoint => {
-            //     println(newAnalysisPoint._1)
-            //     newAnalysisPoint._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
-            // })
 
             if (!currentWorklist.isEmpty) {
                 previousStmtAnalysisState = functionStartAnalysisState;
             }
-
-            // finalStmtAnalysisState = previousStmtAnalysisState
-            // previousStmtAnalysisState.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
         }
 
-        // println("END")
-        // currentFunctionAnalysedInfo.foreach(newAnalysisPoint => {
-        //     println(newAnalysisPoint._1)
-        //     newAnalysisPoint._2.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
-        // })
         saveNewAnalysisInfo(currentFunctionAnalysedInfo);
         currentCallString = currentCallString.filter(funcName => {funcName != name});
     }
