@@ -1,4 +1,4 @@
-package analysis;
+ package analysis;
 
 import analysis.AnalysisPoint;
 import astnodes.stmt.*;
@@ -9,19 +9,28 @@ import vcgen.State;
  * Prints a line if it sees a call statement.
  */
 class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
-    private var currentState: Set[Stmt] = state;
+    var currentState: Set[Stmt] = state;
 
     def this() = {
         this(Set());
     }
 
     override def applyChanges(preState: State, information: Map[Stmt, this.type]): State = {
+        // println("applying changes\n")
+        // information.foreach(analysis => {
+        //     val stmt = analysis._1
+        //     val state = analysis._2
+            
+        //     println(stmt.label.pc + " : " + stmt)
+        //     println(state.currentState)
+        // })
         preState;
     }
 
     override def equals(other: this.type): Boolean = {
-        var otherAsThis: TestingAnalysis = typeCheck(other);
-        this.toString == otherAsThis.toString;
+        if (other == null) return false
+
+        this.toString == other.toString;
     }
 
     override def compare(other: this.type): Int = {
@@ -33,15 +42,15 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
     override def join(other: this.type): this.type = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
-        this.currentState = currentState.union(otherAsThis.currentState);
-        this;
+        val newState = currentState.union(otherAsThis.currentState);
+        TestingAnalysis(newState).asInstanceOf[this.type]
     }
 
     override def meet(other: this.type): this.type = {
         var otherAsThis: TestingAnalysis = typeCheck(other);
 
-        this.currentState = currentState.intersect(otherAsThis.currentState);
-        this;
+        val newState = currentState.intersect(otherAsThis.currentState);
+        TestingAnalysis(newState).asInstanceOf[this.type]
     }
 
     override def transfer(stmt: Stmt): this.type = {
@@ -63,13 +72,11 @@ class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
             };
         }
 
-        this.currentState = newState;
-        this;
+        TestingAnalysis(newState).asInstanceOf[this.type]
     }
 
     override def createLowest: this.type = {
-        this.currentState = Set();
-        this;
+        TestingAnalysis(Set()).asInstanceOf[this.type]
     }
 
     override def toString: String = {

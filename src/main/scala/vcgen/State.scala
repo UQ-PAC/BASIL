@@ -161,7 +161,7 @@ case object FunctionState {
  */
 case class Block (
   label: String,
-  var lines: List[Stmt],    // I (Kaitlyn) changed lines to var b/c it was the only practical way for the CP to apply changes to a State
+  var lines: List[Stmt],    // changed lines to var b/c it was the only practical way for the CP to apply changes to a State
 ) {
   def this(block: FlowGraph.Block) = this(block.getLabel, block.getLines.asScala.toList)
 

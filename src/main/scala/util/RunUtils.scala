@@ -46,9 +46,14 @@ object RunUtils {
       statementLoader.gammaMappings.toMap
     );
 
-    // val analysedState = Worklist(ConstantPropagationAnalysis(state), state).doAnalysis
+    val WL = Worklist(ConstantPropagationAnalysis(state), state)
+    println("Before CP")
+    WL.printAllLinesWithLabels
+    val analysedState = WL.doAnalysis
+    println("After CP")
+    WL.printAllLinesWithLabels
 
-    val updatedState = BoogieTranslator.translate(state)
+    val updatedState = BoogieTranslator.translate(analysedState)
 
     VCGen.genVCs(updatedState)
   }
