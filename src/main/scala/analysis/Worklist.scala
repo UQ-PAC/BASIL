@@ -36,7 +36,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
     }
 
     def doAnalysis: State = {
-        println("\nDebug info:")
         analyseFunction("main");
         if debug then println(getAllInfo);
 
@@ -44,7 +43,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
         blockAnalysisInfo = null;
 
         analysis.applyChanges(startState, getAllInfo);
-        // startState
     }
 
     def analyseFunction(name: String) = {
@@ -57,11 +55,9 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
         var currentFunctionAnalysedInfo: Map[Stmt, analysis.type] = Map();
 
         while (!currentWorklist.isEmpty) {
-            // println("worklist")
             var nextBlockToAnalyse: Block = currentWorklist.removeHead();
 
             if (!getBlockParents(nextBlockToAnalyse).isEmpty) {
-                println(s"\nBlock ${nextBlockToAnalyse.label} has parent/s")
                 var combinedParentAnalysisPoints: analysis.type = null;
 
                 getBlockParents(nextBlockToAnalyse).foreach(block => {
@@ -73,11 +69,8 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
                     }
                 });
 
-                combinedParentAnalysisPoints.asInstanceOf[ConstantPropagationAnalysis].debugPrint()
-
                 previousStmtAnalysisState = previousStmtAnalysisState.join(combinedParentAnalysisPoints)
             } else {
-                println(s"\nBlock ${nextBlockToAnalyse.label} has no parent/s")
                 previousStmtAnalysisState = analysis.createLowest;
             }
 
@@ -86,15 +79,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
             if (!currentWorklist.isEmpty) {
                 previousStmtAnalysisState = functionStartAnalysisState;
             }
-
-            println("\nCurrent block analysis states:")
-            blockAnalysisInfo.foreach(block => {
-                println(s"Block: ${block._1.label}")
-                println("Local state:")
-                println(block._2.asInstanceOf[ConstantPropagationAnalysis].localState.get(name).get)
-                // println(block._2.asInstanceOf[ConstantPropagationAnalysis].previousStmt)
-            })
-            println("\n")
         }
 
         saveNewAnalysisInfo(currentFunctionAnalysedInfo);
@@ -105,27 +89,13 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
         if debug then println("analysing block: " + block.label);
         var outputInfo: Map[Stmt, analysis.type] = currentInfo;
 
-        println("analysing block: " + block.label + "\n");
-
         block.lines.foreach(blockStmt => {
             outputInfo = analyseStmt(blockStmt, outputInfo);
-
-            // println(s"\nNew stmt: ${blockStmt}")
-            
-            // println("\nBEFORE SAVE")
-            // outputInfo.foreach(point => {
-            //     println(s"block stmt: ${point._1}")
-            //     println(point._2.asInstanceOf[TestingAnalysis].toString)
-            // })
         })
         
-        // 
+        // A simple equality check ("==") in Scala is supposed to 1) check if either object/primitive is null & 2) call there respective equals method. For whatever spooky Scala reason this is not happening
+        // properly here so I've gotta do it manually.
         if (previousStmtAnalysisState.asInstanceOf[analysis.type] != null && !previousStmtAnalysisState.asInstanceOf[analysis.type].equals(blockAnalysisInfo.getOrElse(block, null).asInstanceOf[analysis.type])) {
-            println("\naint equal")
-            println("Previous:")
-            if (blockAnalysisInfo.getOrElse(block, null) != null) println(blockAnalysisInfo.getOrElse(block, null).asInstanceOf[ConstantPropagationAnalysis].localState)
-            println("Current:")
-            println(previousStmtAnalysisState.asInstanceOf[ConstantPropagationAnalysis].localState)
 
             blockAnalysisInfo = blockAnalysisInfo + (block -> previousStmtAnalysisState);
 
@@ -218,12 +188,6 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
      * "Commits" the info from the current function to the output map.
      */
     def saveNewAnalysisInfo(newInfo: Map[Stmt, analysis.type]) = {
-        // println("\nNEW SAVE")
-        // newInfo.foreach(point => {
-        //     println(s"New block stmt:\n ${point._1.label.pc} : ${point._1}")
-        //     println(point._2.asInstanceOf[ConstantPropagationAnalysis].localState)
-        // })
-
         for ((key, value) <- newInfo) {
             stmtAnalysisInfo = stmtAnalysisInfo + (key -> value.asInstanceOf[analysis.type]);
         }

@@ -75,6 +75,9 @@ case object SimplificationUtil {
     extract
   }
 
+  /**
+   * Simplifies arithmetic expressions.
+   */
   def binArithmetic(binOp: BinOp): Expr = {
     var newLhs : Expr = binOp.firstExp
     var newRhs : Expr = binOp.secondExp
@@ -91,10 +94,6 @@ case object SimplificationUtil {
     }
 
     if (newLhs.isInstanceOf[Literal] && BigInt(newLhs.asInstanceOf[Literal].toString) == BigInt(0) && binOp.operator.equals("|")) {
-      // binOp.getOperator match {
-      //   case "|" => return newRhs
-      //   case "&" => return Literal("0", )
-      // }
       return newRhs
     } else if (newRhs.isInstanceOf[Literal] && BigInt(newRhs.asInstanceOf[Literal].toString) == BigInt(0) && binOp.operator.equals("|")) {
       return newLhs
