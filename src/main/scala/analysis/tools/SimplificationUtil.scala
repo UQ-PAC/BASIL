@@ -75,6 +75,9 @@ case object SimplificationUtil {
     extract
   }
 
+  /**
+   * Simplifies arithmetic expressions.
+   */
   def binArithmetic(binOp: BinOp): Expr = {
     var newLhs : Expr = binOp.firstExp
     var newRhs : Expr = binOp.secondExp
@@ -86,17 +89,13 @@ case object SimplificationUtil {
     }
 
     if (newLhs.isInstanceOf[Literal] && newRhs.isInstanceOf[Literal]) {
-      val solution = performArithmetic(binOp.firstExp.asInstanceOf[Literal].value.toDouble, binOp.secondExp.asInstanceOf[Literal].value.toDouble, binOp.operator.toString)
+      val solution = performArithmetic(BigInt(binOp.firstExp.asInstanceOf[Literal].value), BigInt(binOp.secondExp.asInstanceOf[Literal].value), binOp.operator.toString)
       return Literal(solution.toString)
     }
 
-    if (newLhs.isInstanceOf[Literal] && newLhs.asInstanceOf[Literal].toString.toInt == 0 && binOp.operator.equals("|")) {
-      // binOp.getOperator match {
-      //   case "|" => return newRhs
-      //   case "&" => return Literal("0", )
-      // }
+    if (newLhs.isInstanceOf[Literal] && BigInt(newLhs.asInstanceOf[Literal].toString) == BigInt(0) && binOp.operator.equals("|")) {
       return newRhs
-    } else if (newRhs.isInstanceOf[Literal] && newRhs.asInstanceOf[Literal].toString.toInt == 0 && binOp.operator.equals("|")) {
+    } else if (newRhs.isInstanceOf[Literal] && BigInt(newRhs.asInstanceOf[Literal].toString) == BigInt(0) && binOp.operator.equals("|")) {
       return newLhs
     }
 
@@ -106,20 +105,20 @@ case object SimplificationUtil {
   /**
     * Helper method for binArithmetic()
    */
-  private def performArithmetic(firstOperand : Double, secondOperand : Double, operator : String)
-    : Long = {
-    var result : Double = 0
+  private def performArithmetic(firstOperand : BigInt, secondOperand : BigInt, operator : String)
+    : BigInt = {
+    var result : BigInt = 0
     operator match {
       case "+" => result = firstOperand + secondOperand
       case "-" => result = firstOperand - secondOperand
       case "*" => result = firstOperand * secondOperand
       case "/" => result = firstOperand / secondOperand
       case "%" => result = firstOperand % secondOperand
-      case "&" => result = (firstOperand.asInstanceOf[Long] & secondOperand.asInstanceOf[Long]).toDouble
-      case "|" => result = (firstOperand.asInstanceOf[Long] | secondOperand.asInstanceOf[Long]).toDouble
+      case "&" => result = (firstOperand & secondOperand)
+      case "|" => result = (firstOperand | secondOperand)
       case _ => 
     }
-    return result.asInstanceOf[Long]
+    return result.asInstanceOf[BigInt]
   }
 
   /**

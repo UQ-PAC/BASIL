@@ -25,6 +25,16 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
         stmtAnalysisInfo.getOrElse(stmt, analysis.createLowest);
     }
 
+    def printAllLinesWithLabels: Unit = {
+        startState.functions.foreach(function =>
+            {function.labelToBlock.values.foreach(block => {
+                println("New block: " + block.label)
+                block.lines.foreach(line => {
+                    println(line.label.pc + " : " + line)
+                })
+            })})
+    }
+
     def doAnalysis: State = {
         analyseFunction("main");
         if debug then println(getAllInfo);
@@ -48,9 +58,18 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
             var nextBlockToAnalyse: Block = currentWorklist.removeHead();
 
             if (!getBlockParents(nextBlockToAnalyse).isEmpty) {
+                var combinedParentAnalysisPoints: analysis.type = null;
+
                 getBlockParents(nextBlockToAnalyse).foreach(block => {
-                    previousStmtAnalysisState = previousStmtAnalysisState.combine(blockAnalysisInfo.getOrElse(block, analysis.createLowest))
+
+                    if (combinedParentAnalysisPoints != null) {
+                        combinedParentAnalysisPoints = combinedParentAnalysisPoints.combine(blockAnalysisInfo.getOrElse(block, analysis.createLowest))
+                    } else {
+                        combinedParentAnalysisPoints = blockAnalysisInfo.getOrElse(block, analysis.createLowest)
+                    }
                 });
+
+                previousStmtAnalysisState = previousStmtAnalysisState.join(combinedParentAnalysisPoints)
             } else {
                 previousStmtAnalysisState = analysis.createLowest;
             }
@@ -74,7 +93,10 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
             outputInfo = analyseStmt(blockStmt, outputInfo);
         })
         
-        if (blockAnalysisInfo.getOrElse(block, null) != previousStmtAnalysisState) {
+        // A simple equality check ("==") in Scala is supposed to 1) check if either object/primitive is null & 2) call there respective equals method. For whatever spooky Scala reason this is not happening
+        // properly here so I've gotta do it manually.
+        if (previousStmtAnalysisState.asInstanceOf[analysis.type] != null && !previousStmtAnalysisState.asInstanceOf[analysis.type].equals(blockAnalysisInfo.getOrElse(block, null).asInstanceOf[analysis.type])) {
+
             blockAnalysisInfo = blockAnalysisInfo + (block -> previousStmtAnalysisState);
 
             (getBlockChildren(block) + block).foreach(b => {
@@ -90,7 +112,7 @@ class Worklist(val analysis: AnalysisPoint, startState: State) {
     }
 
     def analyseStmt(stmt: Stmt, currentInfo: Map[Stmt, analysis.type]): Map[Stmt, analysis.type] = {
-        if debug then println("analysing stmt: " + stmt);
+        if debug then println("analysing stmt: " + stmt.label.pc + " : " + stmt);
         var outputInfo: Map[Stmt, analysis.type] = currentInfo;
         
         stmt match {

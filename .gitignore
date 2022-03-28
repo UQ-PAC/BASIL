@@ -14,4 +14,4 @@ metals.sbt
 password.txt
 *.iml
 *.out
-const_prop_tests/
+samples/const_prop_tests/
