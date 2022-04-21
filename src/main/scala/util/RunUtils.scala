@@ -1,18 +1,29 @@
 package util
 
-import BilParser.{BilLexer, BilParser, SymsLexer, SymsParser}
+import BilParser.{BilLexer, BilParser, BilAdtParser, SymsLexer, SymsParser}
 import astnodes.pred.Bool
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import vcgen.{State, VCGen}
-
-import analysis.*;
+import analysis.*
 
 import java.io.{BufferedWriter, FileWriter, IOException}
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 object RunUtils {
+
+  /**
+   * Generate VCs from Bil ADT.
+   */
+  def ADT_generateVCs(fileName: String, elfFileName: String): State = {
+    val bilLexer = BilLexer(CharStreams.fromFileName(fileName));
+    val tokens = new CommonTokenStream(bilLexer);
+    val parser = new BilAdtParser(tokens);
+    parser.setBuildParseTree(true);
+    val b = parser.item(); // abstract syntax tree
+    return null;
+  }
 
   def generateVCs(fileName: String, elfFileName: String): State = {
     val bilLexer = new BilLexer(CharStreams.fromFileName(fileName));

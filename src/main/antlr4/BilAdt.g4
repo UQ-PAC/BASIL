@@ -1,13 +1,9 @@
-grammar biladt;
+grammar BilAdt;
 
-//biladt : program;
 
-object : (SYMBOL OPEN_PAREN objectSequence CLOSE_PAREN) | OPEN_BRACKET objectSequence CLOSE_BRACKET | STRING | NUM | REGISTER | tuple;
+item : (SYMBOL OPEN_PAREN sequence CLOSE_PAREN) | OPEN_BRACKET sequence CLOSE_BRACKET | OPEN_PAREN sequence CLOSE_PAREN| STRING | NUM | REGISTER;
 
-tuple: OPEN_PAREN ((object COMMA) | (object (COMMA object)+)) CLOSE_PAREN;
-
-objectSequence : (object (COMMA object)*)?;
-
+sequence : (item (COMMA item)*)?;
 
 NEWLINE : '\r'? '\n' -> skip;
 WHITESPACE : ' '+ -> skip;

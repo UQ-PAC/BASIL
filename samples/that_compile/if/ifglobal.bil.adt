@@ -1,0 +1,369 @@
+
+Disassembly of section .init
+
+598: <_init>
+598:
+598: #undefined
+()
+59c: stp x29, x30, [sp, #-0x10]!
+(Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(18446744073709551600,64)),Var("R29",Imm(64)),LittleEndian(),64)), Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(18446744073709551608,64)),Var("R30",Imm(64)),LittleEndian(),64)), Move(Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(18446744073709551600,64))))
+5a0: mov x29, sp
+(Move(Var("R29",Imm(64)),Var("R31",Imm(64))))
+5a4: bl #0xd8
+(Move(Var("R30",Imm(64)),Int(1448,64)), Jmp(Int(1660,64)))
+5a8:
+5a8: ldp x29, x30, [sp], #0x10
+(Move(Var("R29",Imm(64)),Load(Var("mem",Mem(64,8)),Var("R31",Imm(64)),LittleEndian(),64)), Move(Var("R30",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(8,64)),LittleEndian(),64)), Move(Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(16,64))))
+5ac: ret
+(Jmp(Var("R30",Imm(64))))
+
+Disassembly of section .plt
+
+5d0: <__cxa_finalize>
+5d0:
+5d0: adrp x16, #0x10000
+(Move(Var("R16",Imm(64)),Int(65536,64)))
+5d4: ldr x17, [x16, #0xfa0]
+(Move(Var("R17",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R16",Imm(64)),Int(4000,64)),LittleEndian(),64)))
+5d8: add x16, x16, #0xfa0
+(Move(Var("R16",Imm(64)),PLUS(Var("R16",Imm(64)),Int(4000,64))))
+5dc: br x17
+(Jmp(Var("R17",Imm(64))))
+
+5e0: <__libc_start_main>
+5e0:
+5e0: adrp x16, #0x10000
+(Move(Var("R16",Imm(64)),Int(65536,64)))
+5e4: ldr x17, [x16, #0xfa8]
+(Move(Var("R17",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R16",Imm(64)),Int(4008,64)),LittleEndian(),64)))
+5e8: add x16, x16, #0xfa8
+(Move(Var("R16",Imm(64)),PLUS(Var("R16",Imm(64)),Int(4008,64))))
+5ec: br x17
+(Jmp(Var("R17",Imm(64))))
+
+600: <abort>
+600:
+600: adrp x16, #0x10000
+(Move(Var("R16",Imm(64)),Int(65536,64)))
+604: ldr x17, [x16, #0xfb8]
+(Move(Var("R17",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R16",Imm(64)),Int(4024,64)),LittleEndian(),64)))
+608: add x16, x16, #0xfb8
+(Move(Var("R16",Imm(64)),PLUS(Var("R16",Imm(64)),Int(4024,64))))
+60c: br x17
+(Jmp(Var("R17",Imm(64))))
+
+67c: <call_weak_fn>
+5f0:
+5f0: adrp x16, #0x10000
+(Move(Var("R16",Imm(64)),Int(65536,64)))
+5f4: ldr x17, [x16, #0xfb0]
+(Move(Var("R17",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R16",Imm(64)),Int(4016,64)),LittleEndian(),64)))
+5f8: add x16, x16, #0xfb0
+(Move(Var("R16",Imm(64)),PLUS(Var("R16",Imm(64)),Int(4016,64))))
+5fc: br x17
+(Jmp(Var("R17",Imm(64))))
+67c:
+67c: adrp x0, #0x10000
+(Move(Var("R0",Imm(64)),Int(65536,64)))
+680: ldr x0, [x0, #0xfe0]
+(Move(Var("R0",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R0",Imm(64)),Int(4064,64)),LittleEndian(),64)))
+684: cbz x0, #0x8
+(Move(Var("#5",Imm(1)),EQ(Var("R0",Imm(64)),Int(0,64))), If(Var("#5",Imm(1)), (Jmp(Int(1676,64))), ()))
+688:
+688: b #-0x98
+(Jmp(Int(1520,64)))
+68c:
+68c: ret
+(Jmp(Var("R30",Imm(64))))
+
+Disassembly of section .text
+
+640: <_start>
+640:
+640: #undefined
+()
+644: mov x29, #0x0
+(Move(Var("R29",Imm(64)),Int(0,64)))
+648: mov x30, #0x0
+(Move(Var("R30",Imm(64)),Int(0,64)))
+64c: mov x5, x0
+(Move(Var("R5",Imm(64)),Var("R0",Imm(64))))
+650: ldr x1, [sp]
+(Move(Var("R1",Imm(64)),Load(Var("mem",Mem(64,8)),Var("R31",Imm(64)),LittleEndian(),64)))
+654: add x2, sp, #0x8
+(Move(Var("R2",Imm(64)),PLUS(Var("R31",Imm(64)),Int(8,64))))
+658: mov x6, sp
+(Move(Var("R6",Imm(64)),Var("R31",Imm(64))))
+65c: adrp x0, #0x10000
+(Move(Var("R0",Imm(64)),Int(65536,64)))
+660: ldr x0, [x0, #0xff0]
+(Move(Var("R0",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R0",Imm(64)),Int(4080,64)),LittleEndian(),64)))
+664: adrp x3, #0x10000
+(Move(Var("R3",Imm(64)),Int(65536,64)))
+668: ldr x3, [x3, #0xfe8]
+(Move(Var("R3",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R3",Imm(64)),Int(4072,64)),LittleEndian(),64)))
+66c: adrp x4, #0x10000
+(Move(Var("R4",Imm(64)),Int(65536,64)))
+670: ldr x4, [x4, #0xfc8]
+(Move(Var("R4",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R4",Imm(64)),Int(4040,64)),LittleEndian(),64)))
+674: bl #-0x94
+(Move(Var("R30",Imm(64)),Int(1656,64)), Jmp(Int(1504,64)))
+678:
+678: bl #-0x78
+(Move(Var("R30",Imm(64)),Int(1660,64)), Jmp(Int(1536,64)))
+
+67c: <call_weak_fn>
+5f0:
+5f0: adrp x16, #0x10000
+(Move(Var("R16",Imm(64)),Int(65536,64)))
+5f4: ldr x17, [x16, #0xfb0]
+(Move(Var("R17",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R16",Imm(64)),Int(4016,64)),LittleEndian(),64)))
+5f8: add x16, x16, #0xfb0
+(Move(Var("R16",Imm(64)),PLUS(Var("R16",Imm(64)),Int(4016,64))))
+5fc: br x17
+(Jmp(Var("R17",Imm(64))))
+67c:
+67c: adrp x0, #0x10000
+(Move(Var("R0",Imm(64)),Int(65536,64)))
+680: ldr x0, [x0, #0xfe0]
+(Move(Var("R0",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R0",Imm(64)),Int(4064,64)),LittleEndian(),64)))
+684: cbz x0, #0x8
+(Move(Var("#5",Imm(1)),EQ(Var("R0",Imm(64)),Int(0,64))), If(Var("#5",Imm(1)), (Jmp(Int(1676,64))), ()))
+688:
+688: b #-0x98
+(Jmp(Int(1520,64)))
+68c:
+68c: ret
+(Jmp(Var("R30",Imm(64))))
+
+690: <deregister_tm_clones>
+690:
+690: adrp x0, #0x11000
+(Move(Var("R0",Imm(64)),Int(69632,64)))
+694: add x0, x0, #0x10
+(Move(Var("R0",Imm(64)),PLUS(Var("R0",Imm(64)),Int(16,64))))
+698: adrp x1, #0x11000
+(Move(Var("R1",Imm(64)),Int(69632,64)))
+69c: add x1, x1, #0x10
+(Move(Var("R1",Imm(64)),PLUS(Var("R1",Imm(64)),Int(16,64))))
+6a0: cmp x1, x0
+(Move(Var("#9",Imm(64)),PLUS(PLUS(Int(1,64),NOT(Var("R0",Imm(64)))),Var("R1",Imm(64)))), Move(Var("NF",Imm(1)),Extract(63,63,Var("#9",Imm(64)))), Move(Var("VF",Imm(1)),OR(AND(AND(Extract(63,63,Var("R1",Imm(64))),Extract(63,63,NOT(Var("R0",Imm(64))))),NOT(Extract(63,63,Var("#9",Imm(64))))),AND(AND(NOT(Extract(63,63,Var("R1",Imm(64)))),NOT(Extract(63,63,NOT(Var("R0",Imm(64)))))),Extract(63,63,Var("#9",Imm(64)))))), Move(Var("ZF",Imm(1)),EQ(Var("#9",Imm(64)),Int(0,64))), Move(Var("CF",Imm(1)),OR(OR(AND(Extract(63,63,Var("R1",Imm(64))),Extract(63,63,NOT(Var("R0",Imm(64))))),AND(Extract(63,63,NOT(Var("R0",Imm(64)))),NOT(Extract(63,63,Var("#9",Imm(64)))))),AND(Extract(63,63,Var("R1",Imm(64))),NOT(Extract(63,63,Var("#9",Imm(64))))))))
+6a4: b.eq #0x18
+(Move(Var("#11",Imm(1)),Var("ZF",Imm(1))), If(Var("#11",Imm(1)), (Jmp(Int(1724,64))), ()))
+6a8:
+6a8: adrp x1, #0x10000
+(Move(Var("R1",Imm(64)),Int(65536,64)))
+6ac: ldr x1, [x1, #0xfd0]
+(Move(Var("R1",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R1",Imm(64)),Int(4048,64)),LittleEndian(),64)))
+6b0: cbz x1, #0xc
+(Move(Var("#78",Imm(1)),EQ(Var("R1",Imm(64)),Int(0,64))), If(Var("#78",Imm(1)), (Jmp(Int(1724,64))), ()))
+6b4:
+6b4: mov x16, x1
+(Move(Var("R16",Imm(64)),Var("R1",Imm(64))))
+6b8: br x16
+(Jmp(Var("R16",Imm(64))))
+6bc:
+6bc: ret
+(Jmp(Var("R30",Imm(64))))
+
+6c0: <register_tm_clones>
+6c0:
+6c0: adrp x0, #0x11000
+(Move(Var("R0",Imm(64)),Int(69632,64)))
+6c4: add x0, x0, #0x10
+(Move(Var("R0",Imm(64)),PLUS(Var("R0",Imm(64)),Int(16,64))))
+6c8: adrp x1, #0x11000
+(Move(Var("R1",Imm(64)),Int(69632,64)))
+6cc: add x1, x1, #0x10
+(Move(Var("R1",Imm(64)),PLUS(Var("R1",Imm(64)),Int(16,64))))
+6d0: sub x1, x1, x0
+(Move(Var("R1",Imm(64)),MINUS(Var("R1",Imm(64)),Var("R0",Imm(64)))))
+6d4: lsr x2, x1, #63
+(Move(Var("R2",Imm(64)),RSHIFT(Var("R1",Imm(64)),Int(63,64))))
+6d8: add x1, x2, x1, asr #3
+(Move(Var("R1",Imm(64)),PLUS(Var("R2",Imm(64)),ARSHIFT(Var("R1",Imm(64)),Int(3,64)))))
+6dc: asr x1, x1, #1
+(Move(Var("R1",Imm(64)),RSHIFT(Var("R1",Imm(64)),Int(1,64))))
+6e0: cbz x1, #0x18
+(Move(Var("#20",Imm(1)),EQ(Var("R1",Imm(64)),Int(0,64))), If(Var("#20",Imm(1)), (Jmp(Int(1784,64))), ()))
+6e4:
+6e4: adrp x2, #0x10000
+(Move(Var("R2",Imm(64)),Int(65536,64)))
+6e8: ldr x2, [x2, #0xff8]
+(Move(Var("R2",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R2",Imm(64)),Int(4088,64)),LittleEndian(),64)))
+6ec: cbz x2, #0xc
+(Move(Var("#74",Imm(1)),EQ(Var("R2",Imm(64)),Int(0,64))), If(Var("#74",Imm(1)), (Jmp(Int(1784,64))), ()))
+6f0:
+6f0: mov x16, x2
+(Move(Var("R16",Imm(64)),Var("R2",Imm(64))))
+6f4: br x16
+(Jmp(Var("R16",Imm(64))))
+6f8:
+6f8: ret
+(Jmp(Var("R30",Imm(64))))
+
+700: <__do_global_dtors_aux>
+700:
+700: stp x29, x30, [sp, #-0x20]!
+(Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(18446744073709551584,64)),Var("R29",Imm(64)),LittleEndian(),64)), Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(18446744073709551592,64)),Var("R30",Imm(64)),LittleEndian(),64)), Move(Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(18446744073709551584,64))))
+704: mov x29, sp
+(Move(Var("R29",Imm(64)),Var("R31",Imm(64))))
+708: str x19, [sp, #0x10]
+(Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(16,64)),Var("R19",Imm(64)),LittleEndian(),64)))
+70c: adrp x19, #0x11000
+(Move(Var("R19",Imm(64)),Int(69632,64)))
+710: ldrb w0, [x19, #0x10]
+(Move(Var("#23",Imm(64)),UNSIGNED(64,Load(Var("mem",Mem(64,8)),PLUS(Var("R19",Imm(64)),Int(16,64)),BigEndian(),8))), Move(Var("R0",Imm(64)),Int(0,64)), Move(Var("R0",Imm(64)),OR(AND(Var("R0",Imm(64)),Int(18446744069414584320,64)),UNSIGNED(64,Var("#23",Imm(64))))))
+714: cbnz w0, #0x28
+(Move(Var("#24",Imm(1)),NEQ(Extract(31,0,Var("R0",Imm(64))),Int(0,64))), If(Var("#24",Imm(1)), (Jmp(Int(1852,64))), ()))
+718:
+718: adrp x0, #0x10000
+(Move(Var("R0",Imm(64)),Int(65536,64)))
+71c: ldr x0, [x0, #0xfd8]
+(Move(Var("R0",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R0",Imm(64)),Int(4056,64)),LittleEndian(),64)))
+720: cbz x0, #0x10
+(Move(Var("#72",Imm(1)),EQ(Var("R0",Imm(64)),Int(0,64))), If(Var("#72",Imm(1)), (Jmp(Int(1840,64))), ()))
+724:
+724: adrp x0, #0x11000
+(Move(Var("R0",Imm(64)),Int(69632,64)))
+728: ldr x0, [x0, #0x8]
+(Move(Var("R0",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R0",Imm(64)),Int(8,64)),LittleEndian(),64)))
+72c: bl #-0x15c
+(Move(Var("R30",Imm(64)),Int(1840,64)), Jmp(Int(1488,64)))
+730:
+730: bl #-0xa0
+(Move(Var("R30",Imm(64)),Int(1844,64)), Jmp(Int(1680,64)))
+734:
+734: mov w0, #0x1
+(Move(Var("R0",Imm(64)),Int(0,64)), Move(Var("R0",Imm(64)),OR(AND(Var("R0",Imm(64)),Int(18446744069414584320,64)),Int(1,64))))
+738: strb w0, [x19, #0x10]
+(Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),PLUS(Var("R19",Imm(64)),Int(16,64)),LOW(8,Extract(31,0,Var("R0",Imm(64)))),BigEndian(),8)))
+73c:
+73c: ldr x19, [sp, #0x10]
+(Move(Var("R19",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(16,64)),LittleEndian(),64)))
+740: ldp x29, x30, [sp], #0x20
+(Move(Var("R29",Imm(64)),Load(Var("mem",Mem(64,8)),Var("R31",Imm(64)),LittleEndian(),64)), Move(Var("R30",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(8,64)),LittleEndian(),64)), Move(Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(32,64))))
+744: ret
+(Jmp(Var("R30",Imm(64))))
+
+750: <frame_dummy>
+750:
+750: b #-0x90
+(Jmp(Int(1728,64)))
+
+754: <main>
+754:
+754: adrp x0, #0x11000
+(Move(Var("R0",Imm(64)),Int(69632,64)))
+758: add x0, x0, #0x14
+(Move(Var("R0",Imm(64)),PLUS(Var("R0",Imm(64)),Int(20,64))))
+75c: ldr w0, [x0]
+(Move(Var("#26",Imm(64)),UNSIGNED(64,Load(Var("mem",Mem(64,8)),Var("R0",Imm(64)),LittleEndian(),32))), Move(Var("R0",Imm(64)),Int(0,64)), Move(Var("R0",Imm(64)),OR(AND(Var("R0",Imm(64)),Int(18446744069414584320,64)),UNSIGNED(64,Var("#26",Imm(64))))))
+760: cmp w0, #0x0
+(Move(Var("#27",Imm(64)),SIGNED(64,Extract(31,0,Var("R0",Imm(64))))), Move(Var("NF",Imm(1)),Extract(63,63,Var("#27",Imm(64)))), Move(Var("VF",Imm(1)),AND(Extract(31,31,Extract(31,0,Var("R0",Imm(64)))),NOT(Extract(63,63,Var("#27",Imm(64)))))), Move(Var("ZF",Imm(1)),EQ(Var("#27",Imm(64)),Int(0,64))), Move(Var("CF",Imm(1)),OR(OR(Extract(31,31,Extract(31,0,Var("R0",Imm(64)))),AND(Extract(31,31,Extract(31,0,Var("R0",Imm(64)))),NOT(Extract(63,63,Var("#27",Imm(64)))))),NOT(Extract(63,63,Var("#27",Imm(64)))))))
+764: b.ne #0x14
+(Move(Var("#29",Imm(1)),NEQ(NOT(Var("ZF",Imm(1))),Int(0,1))), If(Var("#29",Imm(1)), (Jmp(Int(1912,64))), ()))
+768:
+768: adrp x0, #0x11000
+(Move(Var("R0",Imm(64)),Int(69632,64)))
+76c: add x0, x0, #0x14
+(Move(Var("R0",Imm(64)),PLUS(Var("R0",Imm(64)),Int(20,64))))
+770: mov w1, #0x1
+(Move(Var("R1",Imm(64)),Int(0,64)), Move(Var("R1",Imm(64)),OR(AND(Var("R1",Imm(64)),Int(18446744069414584320,64)),Int(1,64))))
+774: str w1, [x0]
+(Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),Var("R0",Imm(64)),LOW(32,Extract(31,0,Var("R1",Imm(64)))),LittleEndian(),32)))
+778:
+778: mov w0, #0x0
+(Move(Var("R0",Imm(64)),Int(0,64)), Move(Var("R0",Imm(64)),AND(Var("R0",Imm(64)),Int(18446744069414584320,64))))
+77c: ret
+(Jmp(Var("R30",Imm(64))))
+
+780: <__libc_csu_init>
+780:
+780: stp x29, x30, [sp, #-0x40]!
+(Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(18446744073709551552,64)),Var("R29",Imm(64)),LittleEndian(),64)), Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(18446744073709551560,64)),Var("R30",Imm(64)),LittleEndian(),64)), Move(Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(18446744073709551552,64))))
+784: mov x29, sp
+(Move(Var("R29",Imm(64)),Var("R31",Imm(64))))
+788: stp x19, x20, [sp, #0x10]
+(Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(32,64)),LittleEndian(),64)), Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(40,64)),LittleEndian(),64)))
+78c: adrp x20, #0x10000
+(Move(Var("R20",Imm(64)),Int(65536,64)))
+790: add x20, x20, #0xd90
+(Move(Var("R20",Imm(64)),PLUS(Var("R20",Imm(64)),Int(3472,64))))
+794: stp x21, x22, [sp, #0x20]
+(Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(64,64)),LittleEndian(),64)), Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(72,64)),LittleEndian(),64)))
+798: adrp x21, #0x10000
+(Move(Var("R21",Imm(64)),Int(65536,64)))
+79c: add x21, x21, #0xd88
+(Move(Var("R21",Imm(64)),PLUS(Var("R21",Imm(64)),Int(3464,64))))
+7a0: sub x20, x20, x21
+(Move(Var("R20",Imm(64)),MINUS(Var("R20",Imm(64)),Var("R21",Imm(64)))))
+7a4: mov w22, w0
+(Move(Var("#40",Imm(32)),Extract(31,0,Var("R0",Imm(64)))), Move(Var("R22",Imm(64)),Int(0,64)), Move(Var("R22",Imm(64)),OR(AND(Var("R22",Imm(64)),Int(18446744069414584320,64)),UNSIGNED(64,Var("#40",Imm(32))))))
+7a8: stp x23, x24, [sp, #0x30]
+(Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(96,64)),LittleEndian(),64)), Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(104,64)),LittleEndian(),64)))
+7ac: mov x23, x1
+(Move(Var("R23",Imm(64)),Var("R1",Imm(64))))
+7b0: mov x24, x2
+(Move(Var("R24",Imm(64)),Var("R2",Imm(64))))
+7b4: asr x20, x20, #3
+(Move(Var("R20",Imm(64)),RSHIFT(Var("R20",Imm(64)),Int(3,64))))
+7b8: bl #-0x220
+(Move(Var("R30",Imm(64)),Int(1980,64)), Jmp(Int(1432,64)))
+7bc:
+7bc: cbz x20, #0x2c
+(Move(Var("#49",Imm(1)),EQ(Var("R20",Imm(64)),Int(0,64))), If(Var("#49",Imm(1)), (Jmp(Int(2024,64))), ()))
+7c0:
+7c0: mov x19, #0x0
+(Move(Var("R19",Imm(64)),Int(0,64)))
+7c4: #undefined
+()
+7c8:
+7c8: ldr x3, [x21, x19, lsl #3]
+(Move(Var("R3",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R21",Imm(64)),LSHIFT(Var("R19",Imm(64)),Int(3,64))),LittleEndian(),64)))
+7cc: mov x2, x24
+(Move(Var("R2",Imm(64)),Var("R24",Imm(64))))
+7d0: add x19, x19, #0x1
+(Move(Var("R19",Imm(64)),PLUS(Var("R19",Imm(64)),Int(1,64))))
+7d4: mov x1, x23
+(Move(Var("R1",Imm(64)),Var("R23",Imm(64))))
+7d8: mov w0, w22
+(Move(Var("#63",Imm(32)),Extract(31,0,Var("R22",Imm(64)))), Move(Var("R0",Imm(64)),Int(0,64)), Move(Var("R0",Imm(64)),OR(AND(Var("R0",Imm(64)),Int(18446744069414584320,64)),UNSIGNED(64,Var("#63",Imm(32))))))
+7dc: blr x3
+(Move(Var("R30",Imm(64)),Int(2016,64)), Jmp(Var("R3",Imm(64))))
+7e0:
+7e0: cmp x20, x19
+(Move(Var("#67",Imm(64)),PLUS(PLUS(Int(1,64),NOT(Var("R19",Imm(64)))),Var("R20",Imm(64)))), Move(Var("NF",Imm(1)),Extract(63,63,Var("#67",Imm(64)))), Move(Var("VF",Imm(1)),OR(AND(AND(Extract(63,63,Var("R20",Imm(64))),Extract(63,63,NOT(Var("R19",Imm(64))))),NOT(Extract(63,63,Var("#67",Imm(64))))),AND(AND(NOT(Extract(63,63,Var("R20",Imm(64)))),NOT(Extract(63,63,NOT(Var("R19",Imm(64)))))),Extract(63,63,Var("#67",Imm(64)))))), Move(Var("ZF",Imm(1)),EQ(Var("#67",Imm(64)),Int(0,64))), Move(Var("CF",Imm(1)),OR(OR(AND(Extract(63,63,Var("R20",Imm(64))),Extract(63,63,NOT(Var("R19",Imm(64))))),AND(Extract(63,63,NOT(Var("R19",Imm(64)))),NOT(Extract(63,63,Var("#67",Imm(64)))))),AND(Extract(63,63,Var("R20",Imm(64))),NOT(Extract(63,63,Var("#67",Imm(64))))))))
+7e4: b.ne #-0x1c
+(Move(Var("#69",Imm(1)),NEQ(NOT(Var("ZF",Imm(1))),Int(0,1))), If(Var("#69",Imm(1)), (Jmp(Int(1992,64))), ()))
+7e8:
+7e8: ldp x19, x20, [sp, #0x10]
+(Move(Var("R19",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(16,64)),LittleEndian(),64)), Move(Var("R20",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(24,64)),LittleEndian(),64)))
+7ec: ldp x21, x22, [sp, #0x20]
+(Move(Var("R21",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(32,64)),LittleEndian(),64)), Move(Var("R22",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(40,64)),LittleEndian(),64)))
+7f0: ldp x23, x24, [sp, #0x30]
+(Move(Var("R23",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(48,64)),LittleEndian(),64)), Move(Var("R24",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(56,64)),LittleEndian(),64)))
+7f4: ldp x29, x30, [sp], #0x40
+(Move(Var("R29",Imm(64)),Load(Var("mem",Mem(64,8)),Var("R31",Imm(64)),LittleEndian(),64)), Move(Var("R30",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(8,64)),LittleEndian(),64)), Move(Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(64,64))))
+7f8: ret
+(Jmp(Var("R30",Imm(64))))
+
+800: <__libc_csu_fini>
+800:
+800: ret
+(Jmp(Var("R30",Imm(64))))
+
+Disassembly of section .fini
+
+804: <_fini>
+804:
+804: #undefined
+()
+808: stp x29, x30, [sp, #-0x10]!
+(Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(18446744073709551600,64)),Var("R29",Imm(64)),LittleEndian(),64)), Move(Var("mem",Mem(64,8)),Store(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(18446744073709551608,64)),Var("R30",Imm(64)),LittleEndian(),64)), Move(Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(18446744073709551600,64))))
+80c: mov x29, sp
+(Move(Var("R29",Imm(64)),Var("R31",Imm(64))))
+810: ldp x29, x30, [sp], #0x10
+(Move(Var("R29",Imm(64)),Load(Var("mem",Mem(64,8)),Var("R31",Imm(64)),LittleEndian(),64)), Move(Var("R30",Imm(64)),Load(Var("mem",Mem(64,8)),PLUS(Var("R31",Imm(64)),Int(8,64)),LittleEndian(),64)), Move(Var("R31",Imm(64)),PLUS(Var("R31",Imm(64)),Int(16,64))))
+814: ret
+(Jmp(Var("R30",Imm(64))))
