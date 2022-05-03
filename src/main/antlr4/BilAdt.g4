@@ -1,10 +1,12 @@
 grammar BilAdt;
 
 adt : exp
+    | stmt
     | endian
     | unimplemented
     | list
-    | tuple;
+    | tuple
+    | tid;
 
 exp : load
     | store
@@ -18,17 +20,21 @@ exp : load
     | NUM
     | REGISTER;
 
+stmt : def
+     | call;
+
 endian : ENDIAN OPEN_PAREN CLOSE_PAREN;
 
 // Load(mem, idx, endian, size)
 load : 'Load' OPEN_PAREN var COMMA exp COMMA endian COMMA NUM CLOSE_PAREN;
-store : 'Store' OPEN_PAREN var COMMA exp COMMA endian COMMA NUM CLOSE_PAREN;
+store : 'Store' OPEN_PAREN var COMMA exp COMMA adt COMMA endian COMMA NUM CLOSE_PAREN;
+// adt should be expression potentially
 
 // BINOP(exp1, exp2) -- e.g. PLUS(exp1, exp2)
 binop : BINOP OPEN_PAREN exp COMMA exp CLOSE_PAREN;
 
 // UOP(exp) -- e.g. NOT(exp1)
-uop : UOP OPEN_PAREN COMMA exp CLOSE_PAREN;
+uop : UOP OPEN_PAREN exp CLOSE_PAREN;
 
 // var(name, type)
 var : 'Var' OPEN_PAREN STRING COMMA type CLOSE_PAREN;
@@ -36,7 +42,7 @@ var : 'Var' OPEN_PAREN STRING COMMA type CLOSE_PAREN;
 // Int(num, size)
 intAdt : 'Int' OPEN_PAREN NUM COMMA NUM CLOSE_PAREN;
 
-// CAST() -- e.g. UNSIGNED(size, expr)
+// CAST(size, expr) -- e.g. UNSIGNED(size, expr)
 cast : CAST OPEN_PAREN NUM COMMA exp CLOSE_PAREN;
 
 // Let(var, val, expr) -- Unimplemented
@@ -54,7 +60,7 @@ type : imm | mem;
 
 imm : 'Imm' OPEN_PAREN NUM CLOSE_PAREN;
 
-mem : 'Mem' OPEN_PAREN NUM NUM CLOSE_PAREN;
+mem : 'Mem' OPEN_PAREN NUM COMMA NUM CLOSE_PAREN;
 
 // 'Tid'(number, name)
 tid : 'Tid' OPEN_PAREN NUM COMMA STRING CLOSE_PAREN;
@@ -65,10 +71,10 @@ call : 'Call' OPEN_PAREN tid COMMA adt COMMA adt COMMA adt CLOSE_PAREN;
 
 list : OPEN_BRACKET sequence CLOSE_BRACKET;
 
-tuple : OPEN_PAREN sequence CLOSE_PAREN;
+tuple : OPEN_PAREN ((adt COMMA) | (adt (COMMA adt)+))  CLOSE_PAREN;
 
 /* Unimportant ADTs - should be matched last */
-unimplemented : (SYMBOL OPEN_PAREN sequence CLOSE_PAREN);
+unimplemented : SYMBOL OPEN_PAREN sequence CLOSE_PAREN;
 
 sequence : (adt (COMMA adt)*)?;
 
@@ -96,10 +102,10 @@ UOP : NEG | NOT;
 
 CAST : UNSIGNED | SIGNED | HIGH | LOW;
 
-UNSIGNED : 'Unsigned';
-SIGNED : 'Signed';
-HIGH : 'High';
-LOW : 'Low';
+UNSIGNED : 'UNSIGNED';
+SIGNED : 'SIGNED';
+HIGH : 'HIGH';
+LOW : 'LOW';
 
 // BinOp alternatives
 PLUS     : 'PLUS';
