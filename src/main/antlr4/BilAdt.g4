@@ -1,49 +1,47 @@
 grammar BilAdt;
 
+file : adt EOF;
+
 adt : exp
-    | stmt
+    | term
     | endian
     | unimplemented
     | list
     | tuple
     | tid;
 
-exp : load
-    | store
-    | binop
-    | uop
-    | var
-    | intAdt
-    | cast
-    | extract
-    | STRING
-    | NUM
-    | REGISTER;
+exp : 'Load' OPEN_PAREN var=exp COMMA exp COMMA endian COMMA NUM CLOSE_PAREN                #expLoad
+    | 'Store' OPEN_PAREN var=exp COMMA exp COMMA adt COMMA endian COMMA NUM CLOSE_PAREN     #expStore
+    | BINOP OPEN_PAREN exp COMMA exp CLOSE_PAREN                                        #expBinop
+    | UOP OPEN_PAREN exp CLOSE_PAREN                                                    #expUop
+    | 'Var' OPEN_PAREN STRING COMMA type CLOSE_PAREN                                    #expVar
+    | 'Int' OPEN_PAREN NUM COMMA NUM CLOSE_PAREN                                        #expIntAdt
+    | CAST OPEN_PAREN NUM COMMA exp CLOSE_PAREN                                         #expCast
+    | 'Extract' OPEN_PAREN NUM COMMA NUM COMMA exp CLOSE_PAREN                          #expExtract
+    | STRING                                                                            #expString
+    | NUM                                                                               #expNum
+    | REGISTER                                                                          #expRegister
+    ;
 
-stmt : def
-     | call;
+term : def
+     | call
+     | jmp;
+
+jmp : call;
 
 endian : ENDIAN OPEN_PAREN CLOSE_PAREN;
 
 // Load(mem, idx, endian, size)
-load : 'Load' OPEN_PAREN var COMMA exp COMMA endian COMMA NUM CLOSE_PAREN;
-store : 'Store' OPEN_PAREN var COMMA exp COMMA adt COMMA endian COMMA NUM CLOSE_PAREN;
-// adt should be expression potentially
-
+store : ;
 // BINOP(exp1, exp2) -- e.g. PLUS(exp1, exp2)
-binop : BINOP OPEN_PAREN exp COMMA exp CLOSE_PAREN;
 
 // UOP(exp) -- e.g. NOT(exp1)
-uop : UOP OPEN_PAREN exp CLOSE_PAREN;
 
 // var(name, type)
-var : 'Var' OPEN_PAREN STRING COMMA type CLOSE_PAREN;
 
 // Int(num, size)
-intAdt : 'Int' OPEN_PAREN NUM COMMA NUM CLOSE_PAREN;
 
 // CAST(size, expr) -- e.g. UNSIGNED(size, expr)
-cast : CAST OPEN_PAREN NUM COMMA exp CLOSE_PAREN;
 
 // Let(var, val, expr) -- Unimplemented
 
@@ -52,7 +50,7 @@ cast : CAST OPEN_PAREN NUM COMMA exp CLOSE_PAREN;
 // Ite(cond, if_true, if_false) -- Unimplemented
 
 // Extract(hb, lb, exp)
-extract : 'Extract' OPEN_PAREN NUM COMMA NUM COMMA exp CLOSE_PAREN;
+extract : ;
 
 // Concat(lhs, rhs) -- Unimplemented
 
