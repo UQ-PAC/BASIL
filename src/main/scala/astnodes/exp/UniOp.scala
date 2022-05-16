@@ -28,8 +28,8 @@ case object UniOperator extends Enumeration {
   val BitwiseComplement: Operator = Value("~") // todo
 
   def fromBil(bilStr: String): Value = bilStr match {
-    case "-" => UnaryNegation
-    case "~" => BitwiseComplement
+    case "NEG" => UnaryNegation
+    case "NOT" => BitwiseComplement
   }
 
   def toBoogie(value: Value, size: Option[Int]): String = {

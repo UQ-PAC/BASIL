@@ -10,14 +10,17 @@ adt : exp
     | tuple
     | tid;
 
+
+
 exp : 'Load' OPEN_PAREN var=exp COMMA exp COMMA endian COMMA NUM CLOSE_PAREN                #expLoad
-    | 'Store' OPEN_PAREN var=exp COMMA exp COMMA adt COMMA endian COMMA NUM CLOSE_PAREN     #expStore
+    | 'Store' OPEN_PAREN var=exp COMMA exp COMMA exp COMMA endian COMMA NUM CLOSE_PAREN     #expStore
     | BINOP OPEN_PAREN exp COMMA exp CLOSE_PAREN                                        #expBinop
     | UOP OPEN_PAREN exp CLOSE_PAREN                                                    #expUop
-    | 'Var' OPEN_PAREN STRING COMMA type CLOSE_PAREN                                    #expVar
+    | 'Var' OPEN_PAREN name=STRING COMMA type CLOSE_PAREN                                    #expVar
     | 'Int' OPEN_PAREN NUM COMMA NUM CLOSE_PAREN                                        #expIntAdt
     | CAST OPEN_PAREN NUM COMMA exp CLOSE_PAREN                                         #expCast
     | 'Extract' OPEN_PAREN NUM COMMA NUM COMMA exp CLOSE_PAREN                          #expExtract
+    | 'Concat' OPEN_PAREN                                                               #expConcat
     | STRING                                                                            #expString
     | NUM                                                                               #expNum
     | REGISTER                                                                          #expRegister
@@ -25,14 +28,15 @@ exp : 'Load' OPEN_PAREN var=exp COMMA exp COMMA endian COMMA NUM CLOSE_PAREN    
 
 term : def
      | call
-     | jmp;
+     | jmp
+     ;
 
 jmp : call;
 
 endian : ENDIAN OPEN_PAREN CLOSE_PAREN;
 
 // Load(mem, idx, endian, size)
-store : ;
+//store : ;
 // BINOP(exp1, exp2) -- e.g. PLUS(exp1, exp2)
 
 // UOP(exp) -- e.g. NOT(exp1)
@@ -50,7 +54,7 @@ store : ;
 // Ite(cond, if_true, if_false) -- Unimplemented
 
 // Extract(hb, lb, exp)
-extract : ;
+//extract : ;
 
 // Concat(lhs, rhs) -- Unimplemented
 
@@ -64,7 +68,7 @@ mem : 'Mem' OPEN_PAREN NUM COMMA NUM CLOSE_PAREN;
 tid : 'Tid' OPEN_PAREN NUM COMMA STRING CLOSE_PAREN;
 
 // 'Def'(
-def : 'Def' OPEN_PAREN tid COMMA adt COMMA adt COMMA adt CLOSE_PAREN; // this is an assignment, they're called defs in the ADT.
+def : 'Def' OPEN_PAREN tid COMMA adt COMMA exp COMMA exp CLOSE_PAREN; // this is an assignment, they're called defs in the ADT.
 call : 'Call' OPEN_PAREN tid COMMA adt COMMA adt COMMA adt CLOSE_PAREN;
 
 list : OPEN_BRACKET sequence CLOSE_BRACKET;
