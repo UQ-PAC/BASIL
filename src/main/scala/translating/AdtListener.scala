@@ -4,6 +4,8 @@ import BilParser.BilAdtParser.{ExpContext, ExpVarContext}
 import BilParser.{BilAdtBaseListener, BilAdtListener, BilAdtParser}
 import astnodes.exp.{BinOp, Expr, Extend, Extract, FunctionCall, Literal, MemStore, Pad, UniOp}
 import astnodes.exp.`var`.{MemLoad, Register, Var}
+import astnodes.parameters.OutParameter
+import astnodes.parameters.InParameter
 import astnodes.pred.Pred
 import astnodes.sec.{Sec, SecVar}
 import astnodes.stmt.assign.{MemAssign, RegisterAssign}
@@ -130,5 +132,38 @@ class AdtListener extends BilAdtBaseListener {
       case _ => throw new AssumptionViolationException("Unexpected expression")
 
     })
+  }
+
+  override def exitCall(ctx: BilAdtParser.CallContext): Unit = {
+  }
+  override def exitSub(ctx: BilAdtParser.SubContext): Unit = {
+    if (currentFunction != null)
+      currentFunction.setRequiresEnsures(requires, ensures)
+
+    requires = List()
+    ensures = List()
+    val address = ctx.tid.getText
+    val name = ctx.name.getText
+
+    val function = new EnterSub(address, name, List(), List())
+    stmts += function
+    this.currentFunction = function
+    for ( i <- 0 to ctx.args().arg.size() - 1) {
+      var arg = ctx.args.arg(i)
+
+      val id = arg.tid.getText
+      arg.rhs match {
+        case v:ExpVarContext => {
+          val name = v.name.getText
+          val size = v.`type`.imm.NUM.getText.toInt
+          if (arg.intent.getText.contains("in")) {
+            currentFunction.getInParams += new InParameter(Register(id, size), Register(name, 64))
+          } else {
+            currentFunction.setOutParam(new OutParameter(Register(id, size), Register(name, 64)))
+          }
+        }
+        case _ => throw new AssumptionViolationException("Expected RHS of arg to be a varible")
+      }
+    }
   }
 }
