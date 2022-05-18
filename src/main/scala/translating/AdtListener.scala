@@ -1,6 +1,6 @@
 package translating
 
-import BilParser.BilAdtParser.{ExpContext, ExpVarContext}
+import BilParser.BilAdtParser.{DirectContext, ExpContext, ExpIntAdtContext, ExpVarContext, IndirectContext}
 import BilParser.{BilAdtBaseListener, BilAdtListener, BilAdtParser}
 import astnodes.exp.{BinOp, Expr, Extend, Extract, FunctionCall, Literal, MemStore, Pad, UniOp}
 import astnodes.exp.`var`.{MemLoad, Register, Var}
@@ -9,7 +9,7 @@ import astnodes.parameters.InParameter
 import astnodes.pred.Pred
 import astnodes.sec.{Sec, SecVar}
 import astnodes.stmt.assign.{MemAssign, RegisterAssign}
-import astnodes.stmt.{EnterSub, Stmt}
+import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, JmpStmt, Stmt}
 import org.antlr.v4.runtime
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}
@@ -134,7 +134,33 @@ class AdtListener extends BilAdtBaseListener {
     })
   }
 
+  override def exitGotoSym(ctx: BilAdtParser.GotoSymContext): Unit = {
+    // Note in the ADT, all jumps are actually conditoinal jumps. Regular
+    // jumps simply have true/Int(1,1) as the condition.
+
+    val address = ctx.tid().getText;
+    ctx.cond match {
+      case v: ExpVarContext => {
+        val cond = Register(v.getText, v.asInstanceOf[ExpVarContext].`type`.imm.NUM.getText.toInt);
+        stmts += new CJmpStmt(address, ctx.target.getText, "TODO", cond);
+      }
+      case v: ExpIntAdtContext => {
+        // Assume that if it's an int, the int evaluates to true. This seems to be the case
+        // 99% of the time. It probably doesn't make sense to a cjump based on a falsy literal.
+        stmts += new JmpStmt(address, ctx.target.getText)
+      }
+    }
+  }
+
   override def exitCall(ctx: BilAdtParser.CallContext): Unit = {
+    val address = ctx.tid.getText;
+    var funcName = "";
+    if (ctx.calee.direct != null) {
+      funcName = ctx.calee.direct.tid.getText;
+    } else if (ctx.calee.indirect != null) {
+      funcName = ctx.calee.indirect.exp.getText;
+    }
+    stmts += CallStmt(address, funcName, Option(ctx.returnSym).map(_.getText), List(), None)
   }
   override def exitSub(ctx: BilAdtParser.SubContext): Unit = {
     if (currentFunction != null)
