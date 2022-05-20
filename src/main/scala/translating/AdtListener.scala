@@ -9,7 +9,7 @@ import astnodes.parameters.InParameter
 import astnodes.pred.Pred
 import astnodes.sec.{Sec, SecVar}
 import astnodes.stmt.assign.{MemAssign, RegisterAssign}
-import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, JmpStmt, Stmt}
+import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, JmpStmt, Stmt}
 import org.antlr.v4.runtime
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}
@@ -59,9 +59,36 @@ class AdtListener extends BilAdtBaseListener {
   var requires: List[Pred] = List()
   var ensures: List[Pred] = List()
 
+  /**
+   * For some reason, numbers in the ADT are stored as (Num, Type) where Num is the unsigned representation of the number,
+   * and type is the type (e.g. a type of 64 means 64-bit two's complement). It's assumed that it is always two's complement.
+   *
+   * For instance - Int(18446744073709551584,64) means -32.
+   *
+   * TODO: This takes and returns strings to conform with the current state. It should be converted to take and return BigInts long term
+   */
+  def castTo2sComplement(num: String, t: String): String = {
+    val n = BigInt(num);
+    val exponent = t.toInt;
+    if (n >= BigInt.apply(2).pow(exponent - 1)) {
+      // This is a negative 2's complement number
+      return (BigInt.apply(2).pow(exponent) - n).toString
+    } else {
+      return n.toString
+    }
+  }
+
+  /**
+   * Remove the quotation marks from a string
+   * e.g. "\"mem\"" becomes "mem"
+   */
+  def removeQuotes(s: String): String = {
+    return s.substring(1, s.length - 1)
+  }
+
   override def exitExpLoad(ctx: BilAdtParser.ExpLoadContext): Unit = {
-    ctx.`var` match {
-      case v: ExpVarContext => if (v.STRING.getText == "\"mem\"") {
+    ctx.memexp match {
+      case v: ExpVarContext => if (removeQuotes(v.STRING.getText) == "mem") {
         exprs.put(ctx, new MemLoad(getExpr(ctx.exp(1)), Some(ctx.NUM().getText.toInt)))
       } else {
         throw new AssumptionViolationException("Found load on on variable other than mem")
@@ -71,9 +98,9 @@ class AdtListener extends BilAdtBaseListener {
   }
 
   override def exitExpStore(ctx: BilAdtParser.ExpStoreContext): Unit = {
-    ctx.`var` match {
-      case v: ExpVarContext => if (v.STRING.getText == "\"mem\"") {
-        exprs.put(ctx, new MemStore(getExpr(ctx.exp(2)), getExpr(ctx.exp(2)), Some(ctx.NUM().getText.toInt)))
+    ctx.memexp match {
+      case v: ExpVarContext => if (removeQuotes(v.STRING.getText) == "mem") {
+        exprs.put(ctx, new MemStore(getExpr(ctx.idx), getExpr(ctx.value), Some(ctx.NUM().getText.toInt)))
       } else {
         throw new AssumptionViolationException("Found store on on variable other than mem")
       }
@@ -87,13 +114,13 @@ class AdtListener extends BilAdtBaseListener {
   override def exitExpUop(ctx: BilAdtParser.ExpUopContext): Unit = exprs.put(ctx, new UniOp(ctx.UOP.getText, getExpr(ctx.exp)))
 
   override def exitExpVar(ctx: BilAdtParser.ExpVarContext): Unit = {
-    if (ctx.STRING.getText != "\"mem\"") {  // Is a register
+    if (removeQuotes(ctx.STRING.getText) != "mem") {  // Is a register
       if (ctx.`type`.imm == null)
         throw new AssumptionViolationException("Can't find Imm argument for a non-mem variable")
-      exprs.put(ctx, new Register(ctx.name.getText, Some(ctx.`type`.imm.NUM.getText.toInt)))
+      exprs.put(ctx, new Register(removeQuotes(ctx.name.getText), Some(ctx.`type`.imm.NUM.getText.toInt)))
     } else {
       // Old parser treated mem as a register so I've replicated that behaviour here - could be unintentional
-      exprs.put(ctx, new Register(ctx.name.getText, Some(ctx.`type`.mem.NUM(1).getText.toInt)))
+      exprs.put(ctx, new Register(removeQuotes(ctx.name.getText), Some(ctx.`type`.mem.NUM(1).getText.toInt)))
     }
   }
 
@@ -117,6 +144,7 @@ class AdtListener extends BilAdtBaseListener {
     exprs.put(ctx, new Extract(first, second, exp));
   }
 
+
   override def exitDef(ctx: BilAdtParser.DefContext): Unit = {
     val address = ctx.tid.getText
     val LHS = getExpr(ctx.exp(0))
@@ -124,7 +152,7 @@ class AdtListener extends BilAdtBaseListener {
 
     stmts += ((LHS, RHS) match {
       case (v: Register, m: MemStore) =>
-        if (v.name == "\"mem\"") new MemAssign(address, new MemLoad(m.loc, m.size), m.expr)
+        if (v.name == "mem") new MemAssign(address, new MemLoad(m.loc, m.size), m.expr)
         else throw new AssumptionViolationException("expected mem for memstore")
       case (v: Register, _) => {
         new RegisterAssign(address, v, RHS)
@@ -132,6 +160,10 @@ class AdtListener extends BilAdtBaseListener {
       case _ => throw new AssumptionViolationException("Unexpected expression")
 
     })
+  }
+
+  override def exitExpParen(ctx: BilAdtParser.ExpParenContext): Unit = {
+    exprs.put(ctx, getExpr(ctx.exp))
   }
 
   override def exitGotoSym(ctx: BilAdtParser.GotoSymContext): Unit = {
@@ -157,10 +189,11 @@ class AdtListener extends BilAdtBaseListener {
     var funcName = "";
     if (ctx.calee.direct != null) {
       funcName = ctx.calee.direct.tid.getText;
+      stmts += new CallStmt(address, funcName, Option(ctx.returnSym).map(_.getText), List(), None)
     } else if (ctx.calee.indirect != null) {
-      funcName = ctx.calee.indirect.exp.getText;
+      // TODO: This mimics the behaviour of the old parser - it could be unintended
+      stmts += new ExitSub(address, None)
     }
-    stmts += CallStmt(address, funcName, Option(ctx.returnSym).map(_.getText), List(), None)
   }
   override def exitSub(ctx: BilAdtParser.SubContext): Unit = {
     if (currentFunction != null)
