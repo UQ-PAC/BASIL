@@ -1,6 +1,6 @@
 package translating
 
-import BilParser.BilAdtParser.{DirectContext, ExpContext, ExpIntAdtContext, ExpVarContext, IndirectContext}
+import BilParser.BilAdtParser.{DirectContext, ExpContext, ExpIntAdtContext, ExpVarContext, IndirectContext};
 import BilParser.{BilAdtBaseListener, BilAdtListener, BilAdtParser}
 import astnodes.exp.{BinOp, Expr, Extend, Extract, FunctionCall, Literal, MemStore, Pad, UniOp}
 import astnodes.exp.`var`.{MemLoad, Register, Var}
@@ -9,7 +9,7 @@ import astnodes.parameters.InParameter
 import astnodes.pred.Pred
 import astnodes.sec.{Sec, SecVar}
 import astnodes.stmt.assign.{MemAssign, RegisterAssign}
-import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, JmpStmt, Stmt}
+import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, JmpStmt, SkipStmt, Stmt}
 import org.antlr.v4.runtime
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}
@@ -82,13 +82,20 @@ class AdtListener extends BilAdtBaseListener {
    * Remove the quotation marks from a string
    * e.g. "\"mem\"" becomes "mem"
    */
-  def removeQuotes(s: String): String = {
-    return s.substring(1, s.length - 1)
+  def getStringBody(str: String): String = {
+    var newStr: String = str;
+    if (newStr.charAt(0) == '"') {
+      newStr = newStr.substring(1);
+    }
+    if (newStr.charAt(newStr.length - 1) == '"') {
+      newStr = newStr.substring(0, newStr.length - 1);
+    }
+    return newStr;
   }
 
   override def exitExpLoad(ctx: BilAdtParser.ExpLoadContext): Unit = {
     ctx.memexp match {
-      case v: ExpVarContext => if (removeQuotes(v.STRING.getText) == "mem") {
+      case v: ExpVarContext => if (getStringBody(v.STRING.getText) == "mem") {
         exprs.put(ctx, new MemLoad(getExpr(ctx.exp(1)), Some(ctx.NUM().getText.toInt)))
       } else {
         throw new AssumptionViolationException("Found load on on variable other than mem")
@@ -99,7 +106,7 @@ class AdtListener extends BilAdtBaseListener {
 
   override def exitExpStore(ctx: BilAdtParser.ExpStoreContext): Unit = {
     ctx.memexp match {
-      case v: ExpVarContext => if (removeQuotes(v.STRING.getText) == "mem") {
+      case v: ExpVarContext => if (getStringBody(v.STRING.getText) == "mem") {
         exprs.put(ctx, new MemStore(getExpr(ctx.idx), getExpr(ctx.value), Some(ctx.NUM().getText.toInt)))
       } else {
         throw new AssumptionViolationException("Found store on on variable other than mem")
@@ -114,13 +121,14 @@ class AdtListener extends BilAdtBaseListener {
   override def exitExpUop(ctx: BilAdtParser.ExpUopContext): Unit = exprs.put(ctx, new UniOp(ctx.UOP.getText, getExpr(ctx.exp)))
 
   override def exitExpVar(ctx: BilAdtParser.ExpVarContext): Unit = {
-    if (removeQuotes(ctx.STRING.getText) != "mem") {  // Is a register
+    if (getStringBody(ctx.STRING.getText) != "mem") {  // Is a register
       if (ctx.`type`.imm == null)
         throw new AssumptionViolationException("Can't find Imm argument for a non-mem variable")
-      exprs.put(ctx, new Register(removeQuotes(ctx.name.getText), Some(ctx.`type`.imm.NUM.getText.toInt)))
+      exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.imm.NUM.getText.toInt)))
+      varSizes.put(getStringBody(ctx.name.getText), ctx.`type`.imm.NUM.getText.toInt)
     } else {
       // Old parser treated mem as a register so I've replicated that behaviour here - could be unintentional
-      exprs.put(ctx, new Register(removeQuotes(ctx.name.getText), Some(ctx.`type`.mem.NUM(1).getText.toInt)))
+      exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.mem.NUM(1).getText.toInt)))
     }
   }
 
@@ -133,7 +141,9 @@ class AdtListener extends BilAdtBaseListener {
   // TODO: the thing being casted
   override def exitExpCast(ctx: BilAdtParser.ExpCastContext): Unit = {
     ctx.CAST.getText match {
-      case "UNSIGNED" | "SIGNED" | "LOW" | "HIGH" => exprs.put(ctx, getExpr(ctx.exp))
+      case "UNSIGNED" => exprs.put(ctx, Pad(getExpr(ctx.exp), ctx.NUM.getText.toInt))
+      case "SIGNED" => exprs.put(ctx, Extend(getExpr(ctx.exp), ctx.NUM.getText.toInt))
+      case "LOW" | "HIGH" => exprs.put(ctx, getExpr(ctx.exp))
     }
   }
 
@@ -146,7 +156,7 @@ class AdtListener extends BilAdtBaseListener {
 
 
   override def exitDef(ctx: BilAdtParser.DefContext): Unit = {
-    val address = ctx.tid.getText
+    val address = getStringBody(ctx.tid.name.getText);
     val LHS = getExpr(ctx.exp(0))
     val RHS = getExpr(ctx.exp(1))
 
@@ -170,39 +180,56 @@ class AdtListener extends BilAdtBaseListener {
     // Note in the ADT, all jumps are actually conditoinal jumps. Regular
     // jumps simply have true/Int(1,1) as the condition.
 
-    val address = ctx.tid().getText;
+    val address = getStringBody(ctx.tid.name.getText);
     ctx.cond match {
       case v: ExpVarContext => {
-        val cond = Register(v.getText, v.asInstanceOf[ExpVarContext].`type`.imm.NUM.getText.toInt);
-        stmts += new CJmpStmt(address, ctx.target.getText, "TODO", cond);
+        val cond = Register(getStringBody(v.name.getText), v.asInstanceOf[ExpVarContext].`type`.imm.NUM.getText.toInt);
+        if (ctx.target.indirect != null ) {
+          val variable: ExpVarContext = ctx.target.indirect.exp.asInstanceOf[ExpVarContext]
+          stmts += new CJmpStmt(address, getStringBody(variable.name.getText), "TODO", cond);
+        } else if (ctx.target.direct != null) {
+          stmts += new CJmpStmt(address, getStringBody(ctx.target.direct.tid.name.getText), "TODO", cond);
+        }
       }
       case v: ExpIntAdtContext => {
         // Assume that if it's an int, the int evaluates to true. This seems to be the case
         // 99% of the time. It probably doesn't make sense to a cjump based on a falsy literal.
-        stmts += new JmpStmt(address, ctx.target.getText)
+        if (ctx.target.indirect != null ) {
+            val variable: ExpVarContext = ctx.target.indirect.exp.asInstanceOf[ExpVarContext]
+          stmts += new JmpStmt(address, getStringBody(variable.name.getText))
+        } else if (ctx.target.direct != null) {
+          stmts += new JmpStmt(address, getStringBody(ctx.target.direct.tid.name.getText))
+        }
       }
     }
   }
 
+  override def exitBlk(ctx: BilAdtParser.BlkContext): Unit = {
+    // COMPATIBLITY - The previous bil parser had no real notion of "blocks" the blocks were simply started by
+    // a labelled skip statement
+    stmts += new SkipStmt(getStringBody(ctx.tid.name.getText));
+  }
+
   override def exitCall(ctx: BilAdtParser.CallContext): Unit = {
-    val address = ctx.tid.getText;
+    val address = getStringBody(ctx.tid.name.getText);
     var funcName = "";
     if (ctx.calee.direct != null) {
-      funcName = ctx.calee.direct.tid.getText;
+      funcName = getStringBody(ctx.calee.direct.tid.name.getText);
       stmts += new CallStmt(address, funcName, Option(ctx.returnSym).map(_.getText), List(), None)
     } else if (ctx.calee.indirect != null) {
       // TODO: This mimics the behaviour of the old parser - it could be unintended
       stmts += new ExitSub(address, None)
     }
   }
+
   override def exitSub(ctx: BilAdtParser.SubContext): Unit = {
     if (currentFunction != null)
       currentFunction.setRequiresEnsures(requires, ensures)
 
     requires = List()
     ensures = List()
-    val address = ctx.tid.getText
-    val name = ctx.name.getText
+    val address = getStringBody(ctx.tid.name.getText);
+    val name = getStringBody(ctx.name.getText)
 
     val function = new EnterSub(address, name, List(), List())
     stmts += function
@@ -210,7 +237,7 @@ class AdtListener extends BilAdtBaseListener {
     for ( i <- 0 to ctx.args().arg.size() - 1) {
       var arg = ctx.args.arg(i)
 
-      val id = arg.tid.getText
+      val id = getStringBody(arg.tid.name.getText)
       arg.rhs match {
         case v:ExpVarContext => {
           val name = v.name.getText
