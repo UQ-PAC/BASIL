@@ -62,7 +62,7 @@ imm : 'Imm' OPEN_PAREN size=NUM CLOSE_PAREN;
 mem : 'Mem' OPEN_PAREN addr_size=NUM COMMA value_size=NUM CLOSE_PAREN;
 
 // 'Tid'(number, name)
-tid : 'Tid' OPEN_PAREN id=NUM COMMA name=STRING CLOSE_PAREN;
+tid : 'Tid' OPEN_PAREN id=(NUM_UNDERSCORE | NUM) COMMA name=STRING CLOSE_PAREN;
 
 // 'Def'(
 def : 'Def' OPEN_PAREN tid COMMA attrs=adt COMMA lhs=exp COMMA rhs=exp CLOSE_PAREN; // this is an assignment, they're called defs in the ADT.
@@ -151,6 +151,7 @@ HEX : '0x'? HEXDIGIT+;
 REGISTER : 'R' DEC;
 DIGIT : [0-9];
 HEXDIGIT : [0-9a-fA-F];
+NUM_UNDERSCORE : [0-9_]+;
 
 // Delimiters
 OPEN_PAREN : '(';
