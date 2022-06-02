@@ -162,7 +162,7 @@ CLOSE_BRACKET : ']';
 
 
 // Strings
-ESCAPE : '\\' ( '"' | '\\' | 'n' | 'x');
+ESCAPE : '\\' ( '"' | '\\' | 'n' | 'x' | '.');
 STRING :  '"' ( ESCAPE | ~('"' | '\\' | '\n' | '\r') )+ '"' ;
 
 
