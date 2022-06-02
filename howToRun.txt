@@ -23,8 +23,8 @@ aarch64-linux-gnu-objdump -d a.out
 // this allows to match mem addresses to variable names
 aarch64-linux-gnu-objdump -t a.out
 
-// show information in GOT (when compiled with -fPIC ; necessary when using arrays) 
-readelf --relocs a.out
+// show information in GOT (when compiled with -fPIC ; necessary when using arrays); -s to show the symbol table
+readelf --relocs -s a.out
 
 // to access the .data section (for initial value of global variables):
 readelf -x .data a.out
