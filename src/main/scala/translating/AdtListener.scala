@@ -1,8 +1,8 @@
 package translating
 
-import BilParser.BilAdtParser.{DirectContext, ExpContext, ExpIntAdtContext, ExpVarContext, IndirectContext};
+import BilParser.BilAdtParser.{DirectContext, ExpContext, ExpIntAdtContext, ExpVarContext, IndirectContext}
 import BilParser.{BilAdtBaseListener, BilAdtListener, BilAdtParser}
-import astnodes.exp.{BinOp, Expr, Extend, Extract, FunctionCall, Literal, MemStore, Pad, UniOp}
+import astnodes.exp.{BinOp, BinOperator, Expr, Extend, Extract, FunctionCall, Literal, MemStore, Pad, UniOp, UniOperator}
 import astnodes.exp.`var`.{MemLoad, Register, Var}
 import astnodes.parameters.OutParameter
 import astnodes.parameters.InParameter
@@ -116,9 +116,9 @@ class AdtListener extends BilAdtBaseListener {
   }
 
   override def exitExpBinop(ctx: BilAdtParser.ExpBinopContext): Unit =
-    exprs.put(ctx, new BinOp(ctx.BINOP.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
+    exprs.put(ctx, new BinOp(BinOperator.fromAdt(ctx.BINOP.getText), getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
 
-  override def exitExpUop(ctx: BilAdtParser.ExpUopContext): Unit = exprs.put(ctx, new UniOp(ctx.UOP.getText, getExpr(ctx.exp)))
+  override def exitExpUop(ctx: BilAdtParser.ExpUopContext): Unit = exprs.put(ctx, new UniOp(UniOperator.fromAdt(ctx.UOP.getText), getExpr(ctx.exp)))
 
   override def exitExpVar(ctx: BilAdtParser.ExpVarContext): Unit = {
     if (getStringBody(ctx.STRING.getText) != "mem") {  // Is a register

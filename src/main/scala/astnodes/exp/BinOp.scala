@@ -14,8 +14,7 @@ case class BinOp(
     firstExp: Expr,
     secondExp: Expr
 ) extends Expr {
-  def this(operatorStr: String, firstExp: Expr, secondExp: Expr) = this(BinOperator.fromAdt(operatorStr), firstExp, secondExp)
-  
+
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
   override def toBoogieString = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
 
@@ -90,6 +89,7 @@ case object BinOperator extends Enumeration {
     case "SLT"     => LessThan
     case "SLE"     => LessThanOrEqual
   }
+
   def fromBil(bilStr: String): Value = bilStr match {
     // note at the moment we do not distinguish between signed and unsigned
     // arithmetic operators

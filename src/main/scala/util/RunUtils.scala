@@ -54,14 +54,11 @@ object RunUtils {
 
     VCGen.genVCs(updatedState)
   }
-  def generateVCs(fileName: String, elfFileName: String): State = {
-    // ADT
-    //val adtLexer = new BilAdtLexer(CharStreams.fromFileName(fileName));
-    val lexer = new BilLexer(CharStreams.fromFileName(fileName));
-    val tokens = new CommonTokenStream(lexer);
-    // ADT
-    val parser = new BilParser(tokens);
 
+  def generateVCs(fileName: String, elfFileName: String): State = {
+    val bilLexer = new BilLexer(CharStreams.fromFileName(fileName));
+    val tokens = new CommonTokenStream(bilLexer);
+    val parser = new BilParser(tokens);
     parser.setBuildParseTree(true);
     val b = parser.bil(); // abstract syntax tree
 
@@ -76,7 +73,7 @@ object RunUtils {
     symsParser.setBuildParseTree(true)
     val symsListener = new SymbolTableListener()
     walker.walk(symsListener, symsParser.syms)
-    
+
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
