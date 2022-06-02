@@ -1,0 +1,102 @@
+
+
+==================================
+// to cross-compile into ARMv8 binary and write it into a.out
+aarch64-linux-gnu-gcc simple1.c
+
+// turn off the layer of indirection for the address calculation (no got - global offset table - used)
+aarch64-linux-gnu-gcc -fno-plt -fno-pic simple1.c 
+
+// trial with different optimisation levels: (0,1,2,3,s,fast,g)
+aarch64-linux-gnu-gcc -O2 -fno-plt -fno-pic simple1.c 
+                 // check which optimisers are enabled at different levels (eg. at -O2)
+                 aarch64-linux-gnu-gcc -Q -O3 --help=optimizers
+                 // list/explain the different optimisation passes:
+                  arch64-linux-gnu-gcc --help=optimizers
+
+
+
+//to produce the assembly from the binary:
+aarch64-linux-gnu-objdump -d a.out  
+
+// show symbol table
+// this allows to match mem addresses to variable names
+aarch64-linux-gnu-objdump -t a.out
+
+// show information in GOT (when compiled with -fPIC ; necessary when using arrays) 
+readelf --relocs a.out
+
+// to access the .data section (for initial value of global variables):
+readelf -x .data a.out
+
+
+// create object code:
+aarch64-linux-gnu-gcc -o sum_array_simple2.o -fno-plt -fno-pic simple2.c
+
+// cannot turn off PositionIndependentCode when using arrays as compiler will be default 
+// link a call to stck_chk_guard and stck_chk_fail methods (which are not statically linked) 
+aarch64-linux-gnu-gcc -fno-plt -fPIC simple1.c 
+
+//turn off the stack guard when dealing with arrays (in which case we can use -no-pic flag):
+aarch64-linux-gnu-gcc -fno-stack-protector -fno-plt -fno-pic sum_array_simple2.c’
+======================================
+
+// Compiler Explorer: web-based cross-compiler which colour-codes resulting assembly to original code (to some extend)
+
+https://godbolt.org/
+
+// set compiler selection to ARMv8-a clang (trunk) - for example
+
+======================================
+// Lift from binary to BIL
+
+// to produce BIL with CFG (i.e., jumps are converted into goto, with constant labels)
+
+bap a.out -d > simple1.bil
+
+
+// to produce a translation to BIL for one instruction at a time (no CFG)
+           
+bap objdump a.out --show-{memory,bil,insn} > simple1_ObjDump.bil
+
+// to get the full information from BAP including CFG:
+
+bap a.out -d cfg > simple-cfg.bil
+
+// to add type information from the AST
+
+bap a.out -d bil.adt > simple-adt.bil
+
+
+==========================================
+// potentially useful passes in the BAP suite:
+
+--bil-list-passes
+
+--dump-symbols-file=FILE
+           Dump symbols to the specified FILE
+
+--dump-symbols-help[=VAL] (default=auto)
+           prints more information about the dump-symbols plugin
+
+--no-analyze
+           Disable the analyze plugin
+--print-symbol=VAL
+           same as --print-matching=symbol:VAL
+==================================
+
+// Building and running the lifter remotely on the CSS server:
+
+ssh -l uqkwinte moss.labs.eait.uq.edu.au
+ssh -l kirsten 10.176.133.38
+
+git clone https://github.com/UQ-PAC/barrier-tools.git
+
+cd barrier-tools/bap-setup
+chmod u+x *sh
+./all_in_one.sh       (* installing bap *)
+
+cd ../barrier
+chmod u+x autobuild.sh
+./autobuild.sh       (* installs our own extension, the "barrier" plugin *) 
+
