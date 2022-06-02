@@ -4,24 +4,24 @@
 
 ## Setup 
 
- 1. Download and install [sbt](https://www.scala-sbt.org/download.html) and [boogie](https://github.com/boogie-org/boogie#installation). If you use an operating system with a package manager then the easiest way to install these is likey through your pacage manager (e.g. aur)
+ 1. Download and install [sbt](https://www.scala-sbt.org/download.html) and [boogie](https://github.com/boogie-org/boogie#installation). If you use an operating system with a package manager then the easiest way to install these is likey through your pacage manager (e.g. apt, aur)
  2. Clone the repo
 
-This should be everything. For more details on SBT and getting SBT to work correctly with Intellij see the section below.
+This should be everything. For more details on SBT and getting SBT to work correctly with IntelliJ see the section below.
 
 ### Running a file
 
 To run a single file use the command 
 
-`sbt "run file.bil file.elf boogie"`
+`sbt "run file.adt file.elf boogie"`
 
-where `file.bil` is the lifted BIL file and `file.elf` is the elf file (for an example of how to generate this, look at `src/scripts/lift\_docker.sh`). A range of sample files can be found in the `samples` folder. This command must be run in the root directory of the project. For example, to run the `ifglobal` example use the command 
+where `file.adt` is the lifted ADT file and `file.elf` is the elf file (for an example of how to generate this, look at `src/scripts/lift\_docker.sh`). A range of sample files can be found in the `samples` folder. This command must be run in the root directory of the project. For example, to run the `ifglobal` example use the command 
 
-`run samples/that_compile/if/ifglobal.bil samples/that_compile/if/ifglobal.elf boogie`
+`run samples/that_compile/if/ifglobal.adt samples/that_compile/if/ifglobal.elf boogie`
 
 If you are likely to want to run multiple files you can launch the SBT shell using `sbt` and then run each file inside this shell using
 
-`run file.bil file.elf boogie`
+`run file.adt file.elf boogie`
 
 This saves the time having to wait for SBT to start.
 
@@ -72,7 +72,12 @@ The tool cannot yet handle the case where parameters are stored on the stack (e.
 
 ## Producing output files
 
-The program needs a `.bil` and a `.elf` file to run. The `.bil` file is produced by the lifter and the `.elf` file is produced by running `readelf -s -r a.out`. The `lift_docker.sh` script will correctly produce both files from a `.c` file.
+The program needs a `.adt` and a `.elf` file to run.
+The `.adt` file is produced by the lifter, by running `bap a.out -d adt`
+and the `.elf` file is produced by running `readelf -s -r a.out`.
+
+The binary (i.e `a.out`) can be generated using 
+`aarch64-linux-gnu-gcc -fno-plt -fno-pic file.c`
 
 
 
