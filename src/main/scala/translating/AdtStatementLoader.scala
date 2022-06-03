@@ -105,8 +105,8 @@ class AdtStatementLoader extends BilAdtBaseListener {
   override def exitExpLoad(ctx: BilAdtParser.ExpLoadContext): Unit = {
     ctx.memexp match {
       case v: ExpVarContext =>
-        if (getStringBody(v.STRING.getText) == "mem") {
-          exprs.put(ctx, new MemLoad(getExpr(ctx.exp(1)), Some(ctx.NUM().getText.toInt)))
+        if (getStringBody(v.name.getText) == "mem") {
+          exprs.put(ctx, new MemLoad(getExpr(ctx.idx), Some(ctx.size.getText.toInt)))
         } else {
           throw new AssumptionViolationException("Found load on on variable other than mem")
         }
@@ -117,8 +117,8 @@ class AdtStatementLoader extends BilAdtBaseListener {
   override def exitExpStore(ctx: BilAdtParser.ExpStoreContext): Unit = {
     ctx.memexp match {
       case v: ExpVarContext =>
-        if (getStringBody(v.STRING.getText) == "mem") {
-          exprs.put(ctx, new MemStore(getExpr(ctx.idx), getExpr(ctx.value), Some(ctx.NUM().getText.toInt)))
+        if (getStringBody(v.name.getText) == "mem") {
+          exprs.put(ctx, new MemStore(getExpr(ctx.idx), getExpr(ctx.value), Some(ctx.size.getText.toInt)))
         } else {
           throw new AssumptionViolationException("Found store on on variable other than mem")
         }
@@ -127,27 +127,27 @@ class AdtStatementLoader extends BilAdtBaseListener {
   }
 
   override def exitExpBinop(ctx: BilAdtParser.ExpBinopContext): Unit =
-    exprs.put(ctx, new BinOp(BinOperator.fromAdt(ctx.BINOP.getText), getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
+    exprs.put(ctx, new BinOp(BinOperator.fromAdt(ctx.op.getText), getExpr(ctx.lhs), getExpr(ctx.rhs)))
 
   override def exitExpUop(ctx: BilAdtParser.ExpUopContext): Unit =
-    exprs.put(ctx, new UniOp(UniOperator.fromAdt(ctx.UOP.getText), getExpr(ctx.exp)))
+    exprs.put(ctx, new UniOp(UniOperator.fromAdt(ctx.op.getText), getExpr(ctx.exp)))
 
   override def exitExpVar(ctx: BilAdtParser.ExpVarContext): Unit = {
-    if (getStringBody(ctx.STRING.getText) != "mem") { // Is a register
+    if (getStringBody(ctx.name.getText) != "mem") { // Is a register
       if (ctx.`type`.imm == null)
         throw new AssumptionViolationException("Can't find Imm argument for a non-mem variable")
-      exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.imm.NUM.getText.toInt)))
-      varSizes.put(getStringBody(ctx.name.getText), ctx.`type`.imm.NUM.getText.toInt)
+      exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.imm.size.getText.toInt)))
+      varSizes.put(getStringBody(ctx.name.getText), ctx.`type`.imm.size.getText.toInt)
     } else {
       // Old parser treated mem as a register so I've replicated that behaviour here - could be unintentional
-      exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.mem.NUM(1).getText.toInt)))
+      exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.mem.value_size.getText.toInt)))
     }
   }
 
   override def exitExpIntAdt(ctx: BilAdtParser.ExpIntAdtContext): Unit = {
     exprs.put(
       ctx,
-      Literal(ctx.NUM(0).getText)
+      Literal(ctx.value.getText)
     ) // We also have access to size information if needed. But current AST node doesn't ask for it
   }
 
@@ -156,23 +156,23 @@ class AdtStatementLoader extends BilAdtBaseListener {
   // TODO: the thing being casted
   override def exitExpCast(ctx: BilAdtParser.ExpCastContext): Unit = {
     ctx.CAST.getText match {
-      case "UNSIGNED"     => exprs.put(ctx, Pad(getExpr(ctx.exp), ctx.NUM.getText.toInt))
-      case "SIGNED"       => exprs.put(ctx, Extend(getExpr(ctx.exp), ctx.NUM.getText.toInt))
+      case "UNSIGNED"     => exprs.put(ctx, Pad(getExpr(ctx.exp), ctx.size.getText.toInt))
+      case "SIGNED"       => exprs.put(ctx, Extend(getExpr(ctx.exp), ctx.size.getText.toInt))
       case "LOW" | "HIGH" => exprs.put(ctx, getExpr(ctx.exp))
     }
   }
 
   override def exitExpExtract(ctx: BilAdtParser.ExpExtractContext): Unit = {
-    val first = ctx.NUM(0).getText.toInt;
-    val second = ctx.NUM(1).getText.toInt;
+    val hb = ctx.hb.getText.toInt;
+    val lb = ctx.lb.getText.toInt;
     val exp = getExpr(ctx.exp)
-    exprs.put(ctx, new Extract(first, second, exp));
+    exprs.put(ctx, new Extract(hb, lb, exp));
   }
 
   override def exitDef(ctx: BilAdtParser.DefContext): Unit = {
     val address = getStringBody(ctx.tid.name.getText);
-    val LHS = getExpr(ctx.exp(0))
-    val RHS = getExpr(ctx.exp(1))
+    val LHS = getExpr(ctx.lhs)
+    val RHS = getExpr(ctx.rhs)
 
     stmts += ((LHS, RHS) match {
       case (v: Register, m: MemStore) =>
@@ -197,7 +197,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
     val address = getStringBody(ctx.tid.name.getText);
     ctx.cond match {
       case v: ExpVarContext => {
-        val cond = Register(getStringBody(v.name.getText), v.asInstanceOf[ExpVarContext].`type`.imm.NUM.getText.toInt);
+        val cond = Register(getStringBody(v.name.getText), v.asInstanceOf[ExpVarContext].`type`.imm.size.getText.toInt);
         if (ctx.target.indirect != null) {
           val variable: ExpVarContext = ctx.target.indirect.exp.asInstanceOf[ExpVarContext]
           stmts += new CJmpStmt(address, getStringBody(variable.name.getText), "TODO", cond);
@@ -255,7 +255,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
       arg.rhs match {
         case v: ExpVarContext => {
           val name = v.name.getText
-          val size = v.`type`.imm.NUM.getText.toInt
+          val size = v.`type`.imm.size.getText.toInt
           if (arg.intent.getText.contains("in")) {
             currentFunction.getInParams += new InParameter(Register(id, size), Register(name, 64))
           } else {
