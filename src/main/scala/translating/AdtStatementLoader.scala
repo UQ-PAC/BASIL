@@ -139,7 +139,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
       exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.imm.size.getText.toInt)))
       varSizes.put(getStringBody(ctx.name.getText), ctx.`type`.imm.size.getText.toInt)
     } else {
-      // Old parser treated mem as a register so I've replicated that behaviour here - could be unintentional
+      // FIXME: Old parser treated mem as a register so I've replicated that behaviour here - could be unintentional
       exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.mem.value_size.getText.toInt)))
     }
   }
@@ -151,9 +151,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
     ) // We also have access to size information if needed. But current AST node doesn't ask for it
   }
 
-  // Currently doesn't handle high/low. These could be converted to extracts
-  // TODO: Adt doesn't understand what pad and extend is - It might infer it from the relative size of the cast and
-  // TODO: the thing being casted
+  // TODO: Handle high and low - old parser did not handle it either
   override def exitExpCast(ctx: BilAdtParser.ExpCastContext): Unit = {
     ctx.CAST.getText match {
       case "UNSIGNED"     => exprs.put(ctx, Pad(getExpr(ctx.exp), ctx.size.getText.toInt))
@@ -193,7 +191,6 @@ class AdtStatementLoader extends BilAdtBaseListener {
   override def exitGotoSym(ctx: BilAdtParser.GotoSymContext): Unit = {
     // Note in the ADT, all jumps are actually conditoinal jumps. Regular
     // jumps simply have true/Int(1,1) as the condition.
-
     val address = getStringBody(ctx.tid.name.getText);
     ctx.cond match {
       case v: ExpVarContext => {
@@ -219,8 +216,8 @@ class AdtStatementLoader extends BilAdtBaseListener {
   }
 
   override def exitBlk(ctx: BilAdtParser.BlkContext): Unit = {
-    // COMPATIBLITY - The previous bil parser had no real notion of "blocks" the blocks were simply started by
-    // a labelled skip statement
+    // FIXME: The previous bil parser had no real notion of "blocks" the blocks were simply started by
+    //  a labelled skip statement. It may be worthwhile to introduce a Block node in the AST
     stmts += new SkipStmt(getStringBody(ctx.tid.name.getText));
   }
 
@@ -231,7 +228,9 @@ class AdtStatementLoader extends BilAdtBaseListener {
       funcName = getStringBody(ctx.calee.direct.tid.name.getText);
       stmts += new CallStmt(address, funcName, Option(ctx.returnSym).map(_.getText), List(), None)
     } else if (ctx.calee.indirect != null) {
-      // TODO: This mimics the behaviour of the old parser - it could be unintended
+      // FIXME: This mimics the behaviour of the old parser - it could be unintended
+      //  The assumption that was made is that any call on a non-literal function (i.e. a register, or LR) is indicative
+      //  of exiting the current function. This seems incorrect.
       stmts += new ExitSub(address, None)
     }
   }
