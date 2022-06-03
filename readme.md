@@ -4,7 +4,7 @@
 
 ## Setup 
 
- 1. Download and install [sbt](https://www.scala-sbt.org/download.html) and [boogie](https://github.com/boogie-org/boogie#installation). If you use an operating system with a package manager then the easiest way to install these is likey through your pacage manager (e.g. apt, aur)
+ 1. Download and install [sbt](https://www.scala-sbt.org/download.html) and [boogie](https://github.com/boogie-org/boogie#installation). If you use an operating system with a package manager then the easiest way to install these is likely through your package manager (e.g. apt, aur)
  2. Clone the repo
 
 This should be everything. For more details on SBT and getting SBT to work correctly with IntelliJ see the section below.
