@@ -30,7 +30,7 @@ import util.AssumptionViolationException
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-class AdtListener extends BilAdtBaseListener {
+class AdtStatementLoader extends BilAdtBaseListener {
 
   val stmts = ArrayBuffer[Stmt]()
   private val exprs: ParseTreeProperty[Expr] = ParseTreeProperty[Expr]
