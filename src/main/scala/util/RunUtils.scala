@@ -4,7 +4,7 @@ import BilParser.{BilAdtLexer, BilAdtParser, BilLexer, BilParser, SymsLexer, Sym
 import astnodes.pred.Bool
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating.{AdtListener, BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
+import translating.{AdtStatementLoader, BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import vcgen.{State, VCGen}
 import analysis.*
 
@@ -23,7 +23,7 @@ object RunUtils {
     val b = parser.file(); // abstract syntax tree
 
     // extract all statement objects from the tree
-    val statementLoader = new AdtListener();
+    val statementLoader = new AdtStatementLoader();
     val walker = new ParseTreeWalker();
     walker.walk(statementLoader, b);
 
