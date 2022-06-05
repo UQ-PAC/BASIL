@@ -1,18 +1,59 @@
 package util
 
-import BilParser.{BilLexer, BilParser, SymsLexer, SymsParser}
+import BilParser.{BilAdtLexer, BilAdtParser, BilLexer, BilParser, SymsLexer, SymsParser}
 import astnodes.pred.Bool
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
+import translating.{AdtStatementLoader, BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import vcgen.{State, VCGen}
-
-import analysis.*;
+import analysis.*
 
 import java.io.{BufferedWriter, FileWriter, IOException}
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 object RunUtils {
+
+  def generateVCsAdt(fileName: String, elfFileName: String): State = {
+    val adtLexer = new BilAdtLexer(CharStreams.fromFileName(fileName));
+    val tokens = new CommonTokenStream(adtLexer);
+    // ADT
+    val parser = new BilAdtParser(tokens);
+
+    parser.setBuildParseTree(true);
+    val b = parser.file(); // abstract syntax tree
+
+    // extract all statement objects from the tree
+    val statementLoader = new AdtStatementLoader();
+    val walker = new ParseTreeWalker();
+    walker.walk(statementLoader, b);
+
+    val symsLexer = new SymsLexer(CharStreams.fromFileName(elfFileName))
+    val symsTokens = new CommonTokenStream(symsLexer)
+    val symsParser = new SymsParser(symsTokens)
+    symsParser.setBuildParseTree(true)
+    val symsListener = new SymbolTableListener()
+    walker.walk(symsListener, symsParser.syms)
+
+    // TODO duplicated code for default value
+    val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
+
+    val state = State(
+      flowGraph,
+      statementLoader.rely.getOrElse(Bool.True), // TODO check default
+      Bool.False,
+      symsListener.symbolTable.toMap,
+      statementLoader.varSizes.toMap,
+      statementLoader.lPreds.toMap,
+      statementLoader.gammaMappings.toMap
+    );
+
+    val WL = Worklist(ConstantPropagationAnalysis(state, true), state)
+    val analysedState = WL.doAnalysis
+
+    val updatedState = BoogieTranslator.translate(analysedState)
+
+    VCGen.genVCs(updatedState)
+  }
 
   def generateVCs(fileName: String, elfFileName: String): State = {
     val bilLexer = new BilLexer(CharStreams.fromFileName(fileName));
@@ -32,7 +73,7 @@ object RunUtils {
     symsParser.setBuildParseTree(true)
     val symsListener = new SymbolTableListener()
     walker.walk(symsListener, symsParser.syms)
-    
+
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
@@ -64,5 +105,4 @@ object RunUtils {
       case _: IOException => System.err.println("Error writing to file.")
     }
   }
-
 }

@@ -14,8 +14,7 @@ case class BinOp(
     firstExp: Expr,
     secondExp: Expr
 ) extends Expr {
-  def this(operatorStr: String, firstExp: Expr, secondExp: Expr) = this(BinOperator.fromBil(operatorStr), firstExp, secondExp)
-  
+
   override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
   override def toBoogieString = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
 
@@ -62,6 +61,34 @@ case object BinOperator extends Enumeration {
   val LessThan: Operator = Value("<")
   val LessThanOrEqual: Operator = Value("<=")
   val UnknownOperator: Operator = Value("???") // currently just ~>>
+
+  /*
+  Using the ADT could make it easier to differentiate between signed and unsigned operators,
+  if we need it.
+
+  Currently it does not differentiate between signed and unsigned operators
+  */
+  def fromAdt(adtStr: String) : Value = adtStr match {
+    case "PLUS"    => Addition
+    case "MINUS"   => Subtraction
+    case "TIMES"   => Multiplication
+    case "DIVIDE"  => Division
+    case "SDIVIDE" => Division
+    case "MOD"     => Modulo
+    case "SMOD"    => Modulo
+    case "LSHIFT"  => LogicalShiftLeft
+    case "RSHIFT"  => LogicalShiftRight
+    case "ARSHIFT" => ArithmeticShiftRight
+    case "AND"     => BitwiseAnd
+    case "OR"      => BitwiseOr
+    case "XOR"     => BitwiseXor
+    case "EQ"      => Equality
+    case "NEQ"     => NonEquality
+    case "LT"      => LessThan
+    case "LE"      => LessThanOrEqual
+    case "SLT"     => LessThan
+    case "SLE"     => LessThanOrEqual
+  }
 
   def fromBil(bilStr: String): Value = bilStr match {
     // note at the moment we do not distinguish between signed and unsigned

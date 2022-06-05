@@ -30,6 +30,8 @@ case class Concat (left: Expr, right: Expr) extends Expr{
  * Construct a Concatenation from a Bil extend operation
  */
 case object Extend {
+  // FIXME: This implementation is wrong. Extend is the same as Pad, but it uses the most signficant bit, rather than
+  //  always adding 0's. This can be thought of as an signed pad.
   def apply(expr: Expr, size: Int) =
     if (size - expr.size.get > 0) Concat(expr, Literal("0", Some(size - expr.size.get)))
     else expr

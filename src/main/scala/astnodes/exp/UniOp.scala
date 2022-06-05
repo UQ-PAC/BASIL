@@ -10,7 +10,6 @@ import analysis.tools.SimplificationUtil
 /** Unary operator fact
   */
 case class UniOp(var operator: UniOperator.Value, val exp: Expr) extends Expr {
-  def this(operatorStr: String, exp: Expr) = this(UniOperator.fromBil(operatorStr), exp)
   override def toString = String.format("%s %s", operator, exp)
   override def toBoogieString: String = s"${UniOperator.toBoogie(operator, size)}(${exp.toBoogieString})"
   override def subst(v: Var, w: Var): Expr = this.copy(exp = exp.subst(v, w))
@@ -30,6 +29,11 @@ case object UniOperator extends Enumeration {
   def fromBil(bilStr: String): Value = bilStr match {
     case "-" => UnaryNegation
     case "~" => BitwiseComplement
+  }
+
+  def fromAdt(bilStr: String): Value = bilStr match {
+    case "NEG" => UnaryNegation
+    case "NOT" => BitwiseComplement
   }
 
   def toBoogie(value: Value, size: Option[Int]): String = {

@@ -122,6 +122,7 @@ class StatementLoader() extends BilBaseListener {
     stmts += function
     this.currentFunction = function
   }
+  
   override def exitParamTypes(ctx: BilParser.ParamTypesContext): Unit = {
     val id = ctx.param.getText // human-readable name
     val variable = ctx.`var`.getText // some register, probably
@@ -198,8 +199,9 @@ class StatementLoader() extends BilBaseListener {
   }
 
   override def exitExpBracket(ctx: BilParser.ExpBracketContext): Unit = exprs.put(ctx, getExpr(ctx.exp))
-  override def exitExpUop(ctx: BilParser.ExpUopContext): Unit = exprs.put(ctx, new UniOp(ctx.uop.getText, getExpr(ctx.exp)))
-  override def exitExpBop(ctx: BilParser.ExpBopContext): Unit = exprs.put(ctx, new BinOp(ctx.bop.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
+  override def exitExpUop(ctx: BilParser.ExpUopContext): Unit = exprs.put(ctx, new UniOp(UniOperator.fromBil(ctx.uop.getText), getExpr(ctx.exp)))
+  override def exitExpBop(ctx: BilParser.ExpBopContext): Unit =
+    exprs.put(ctx, new BinOp(BinOperator.fromBil(ctx.bop.getText), getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
   override def exitVar(ctx: BilParser.VarContext): Unit = exprs.put(ctx, new Register(ctx.getText, varSizes.get(ctx.getText)))
   override def exitExpVar(ctx: BilParser.ExpVarContext): Unit = exprs.put(ctx, exprs.get(ctx.`var`))
   override def exitExpLiteral(ctx: BilParser.ExpLiteralContext): Unit = exprs.put(ctx, Literal(ctx.literal.getText))
@@ -231,7 +233,6 @@ class StatementLoader() extends BilBaseListener {
     if (ctx.exp(0).getText == "mem") exprs.put(ctx, MemStore(getExpr(ctx.exp(1)), getExpr(ctx.exp(2)), Some(8)))
     else throw new AssumptionViolationException("Found store on variable other than mem")
   override def exitExpFunctionCall(ctx: BilParser.ExpFunctionCallContext): Unit = exprs.put(ctx, new FunctionCall("old", ctx.argList.exp.asScala.map(a => getExpr(a)).toList))
-
 
   override def exitPredBinOp(ctx: PredBinOpContext): Unit = preds.put(ctx, new astnodes.pred.BinOp(ctx.predBop.getText, getPred(ctx.pred(0)), getPred(ctx.pred(1))))
   override def exitPredUniOp(ctx: PredUniOpContext): Unit = preds.put(ctx, new astnodes.pred.UniOp(ctx.uop.getText, getPred(ctx.pred)))

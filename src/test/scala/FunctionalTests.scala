@@ -9,7 +9,7 @@ import translating.{BoogieTranslator, FlowGraph, StatementLoader}
 import collection.JavaConverters.*
 import java.io.FileNotFoundException
 import scala.collection.mutable.ArrayBuffer
-import jdk.nashorn.internal.objects.NativeError.printStackTrace
+//import jdk.nashorn.internal.objects.NativeError.printStackTrace
 
 import scala.collection.mutable
 
