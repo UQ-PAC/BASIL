@@ -10,11 +10,11 @@ import java.util
 /** Assignment (e.g. x := facts.exp)
   */
 trait Assign (pc: String, val lhs: Var, val rhs: Expr) extends Stmt {
-  override def toString = String.format("%s%s := %s;", label, lhs, rhs)
+  override def toString: String = String.format("%s%s := %s;", label, lhs, rhs)
 
   override def subst(v: Var, w: Var): Stmt = lhs.subst(v,w) match {
     case lhsRes: MemLoad => MemAssign(pc, lhsRes, rhs.subst(v,w))
-    case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs = rhs.subst(v,w)),
+    case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs = rhs.subst(v,w))
   }
 
   def fold(oldExpr: Expr, newExpr: Expr): Assign = {
