@@ -14,18 +14,18 @@ import scala.jdk.CollectionConverters.*
 object RunUtils {
 
   def generateVCsAdt(fileName: String, elfFileName: String): State = {
-    val adtLexer = new BilAdtLexer(CharStreams.fromFileName(fileName));
-    val tokens = new CommonTokenStream(adtLexer);
+    val adtLexer = new BilAdtLexer(CharStreams.fromFileName(fileName))
+    val tokens = new CommonTokenStream(adtLexer)
     // ADT
-    val parser = new BilAdtParser(tokens);
+    val parser = new BilAdtParser(tokens)
 
-    parser.setBuildParseTree(true);
+    parser.setBuildParseTree(true)
     val b = parser.file(); // abstract syntax tree
 
     // extract all statement objects from the tree
-    val statementLoader = new AdtStatementLoader();
-    val walker = new ParseTreeWalker();
-    walker.walk(statementLoader, b);
+    val statementLoader = new AdtStatementLoader()
+    val walker = new ParseTreeWalker()
+    walker.walk(statementLoader, b)
 
     val symsLexer = new SymsLexer(CharStreams.fromFileName(elfFileName))
     val symsTokens = new CommonTokenStream(symsLexer)
@@ -45,10 +45,10 @@ object RunUtils {
       statementLoader.varSizes.toMap,
       statementLoader.lPreds.toMap,
       statementLoader.gammaMappings.toMap
-    );
+    )
 
     val WL = Worklist(ConstantPropagationAnalysis(state, true), state)
-    val analysedState = WL.doAnalysis
+    val analysedState = WL.doAnalysis()
 
     val updatedState = BoogieTranslator.translate(analysedState)
 
@@ -56,16 +56,16 @@ object RunUtils {
   }
 
   def generateVCs(fileName: String, elfFileName: String): State = {
-    val bilLexer = new BilLexer(CharStreams.fromFileName(fileName));
-    val tokens = new CommonTokenStream(bilLexer);
-    val parser = new BilParser(tokens);
-    parser.setBuildParseTree(true);
+    val bilLexer = new BilLexer(CharStreams.fromFileName(fileName))
+    val tokens = new CommonTokenStream(bilLexer)
+    val parser = new BilParser(tokens)
+    parser.setBuildParseTree(true)
     val b = parser.bil(); // abstract syntax tree
 
     // extract all statement objects from the tree
-    val statementLoader = new StatementLoader();
-    val walker = new ParseTreeWalker();
-    walker.walk(statementLoader, b);
+    val statementLoader = new StatementLoader()
+    val walker = new ParseTreeWalker()
+    walker.walk(statementLoader, b)
 
     val symsLexer = new SymsLexer(CharStreams.fromFileName(elfFileName))
     val symsTokens = new CommonTokenStream(symsLexer)
@@ -85,10 +85,10 @@ object RunUtils {
       statementLoader.varSizes.toMap,
       statementLoader.lPreds.toMap,
       statementLoader.gammaMappings.toMap
-    );
+    )
 
     val WL = Worklist(ConstantPropagationAnalysis(state, true), state)
-    val analysedState = WL.doAnalysis
+    val analysedState = WL.doAnalysis()
 
     val updatedState = BoogieTranslator.translate(analysedState)
 

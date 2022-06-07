@@ -15,8 +15,8 @@ case class BinOp(
     secondExp: Expr
 ) extends Expr {
 
-  override def toString = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
-  override def toBoogieString = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
+  override def toString: String = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
+  override def toBoogieString: String = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
 
   override def subst(v: Var, w: Var): Expr = {
     this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
@@ -26,14 +26,18 @@ case class BinOp(
     SimplificationUtil.binArithmetic(this.copy(firstExp = firstExp.fold(old,sub), secondExp = secondExp.fold(old, sub)))
   }
 
-  override def vars = firstExp.vars ++ secondExp.vars
+  override def vars: List[Var] = firstExp.vars ++ secondExp.vars
 
-  // Finish resolveTypes and then remove thsi
-  override def size = BinOperator.size(operator, inputSize)
+  // Finish resolveTypes and then remove this
+  override def size: Option[Int] = BinOperator.size(operator, inputSize)
 
-  def inputSize = (firstExp.size, secondExp.size) match {
-    case (a: Some[Int], b: Some[int]) if (a == b) => a
-    case (a: Some[Int], b: Some[int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop should have the same size $firstExp: ${firstExp.size}, $secondExp: ${secondExp.size}")
+  def inputSize: Option[Int] = (firstExp.size, secondExp.size) match {
+    case (a: Some[Int], b: Some[int]) =>
+      if (a == b) {
+        a
+      } else {
+        throw new AssumptionViolationException(s"Both sides of binop should have the same size $firstExp: ${firstExp.size}, $secondExp: ${secondExp.size}")
+      }
     case (x: Some[Int], None) => x
     case (None, x: Some[Int]) => x
     case (None, None) => None
@@ -131,7 +135,7 @@ case object BinOperator extends Enumeration {
     }
   }
   
-  def changesSize(value: Value) = value match {
+  def changesSize(value: Value): Boolean = value match {
     case Equality | NonEquality => true
     case _ => false
   }

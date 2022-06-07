@@ -1,22 +1,24 @@
+package utils
+
 import util.RunUtils
 
 import scala.util.Random
 import scala.language.postfixOps
-import utils.BoogieReturnResult
 
+import scala.util.matching.Regex
 import sys.process.*
 
 
 object TestUtils{
-  val errorRegex=".*\\.bpl\\((\\d+),\\d+\\): Error: This assertion might not hold.".r
-  val finalLineRegex="Boogie program verifier finished with (\\d+) verified, (\\d+) error".r
+  val errorRegex: Regex =".*\\.bpl\\((\\d+),\\d+\\): Error: This assertion might not hold.".r
+  val finalLineRegex: Regex ="Boogie program verifier finished with (\\d+) verified, (\\d+) error".r
 
   def processBoogieFile(filePath:String,elfFilePath:Option[String]=None):BoogieReturnResult = {
-    val state = RunUtils.generateVCs(s"samples/that_compile/$filePath.bil",if(elfFilePath==None)s"samples/that_compile/$filePath.elf" else s"samples/that_compile/${elfFilePath.get}")
+    val state = RunUtils.generateVCs(s"samples/that_compile/$filePath.bil",if(elfFilePath.isEmpty)s"samples/that_compile/$filePath.elf" else s"samples/that_compile/${elfFilePath.get}")
     val outputFilePath = s"/tmp/${Random.alphanumeric.take(20).mkString("")}.bpl"
     RunUtils.writeToFile(state,outputFilePath)
 
-    val output = (s"boogie $outputFilePath"!!)
+    val output = s"boogie $outputFilePath"!!
 
 
 

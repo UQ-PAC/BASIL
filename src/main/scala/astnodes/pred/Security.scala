@@ -6,7 +6,7 @@ sealed trait Security extends Ordered[Security] {
     else if (this == High) 1
     else -1
 
-  def toBool = if (this == Low) Bool.True else Bool.False
+  def toBool: Bool = if (this == Low) Bool.True else Bool.False
 
   def &&(that: Security): Security = if (this == High && that == High) High else Low
 }

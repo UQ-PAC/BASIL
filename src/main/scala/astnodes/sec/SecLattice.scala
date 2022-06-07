@@ -4,7 +4,7 @@ import vcgen.State
 
 // TODO add checks to make sure attackerLevel is in elements
 case class SecLattice(elements: List[SecLevelDefn], attackerLevel: SecVar, bottom: SecVar, top: SecVar) {
-  override def toString = "type SecurityLevel;\n" + elements.mkString("\n") + s"\n axiom (forall x: SecurityLevel :: $bottom <: x);"
+  override def toString: String = "type SecurityLevel;\n" + elements.mkString("\n") + s"\n axiom (forall x: SecurityLevel :: $bottom <: x);"
 }
 
 case class SecLevelDefn(name: String, parents: List[String]) {
@@ -12,9 +12,9 @@ case class SecLevelDefn(name: String, parents: List[String]) {
 }
 
 case object SecLattice {
-  val booleanLattice = SecLattice(List(SecLevelDefn("FALSE", List()), SecLevelDefn("TRUE", List("FALSE"))), SecVar("TRUE"), SecVar("TRUE"), SecVar("FALSE"))
-  val TRUE = SecVar("TRUE")
-  val FALSE = SecVar("FALSE")
+  val booleanLattice: SecLattice = SecLattice(List(SecLevelDefn("FALSE", List()), SecLevelDefn("TRUE", List("FALSE"))), SecVar("TRUE"), SecVar("TRUE"), SecVar("FALSE"))
+  val TRUE: SecVar = SecVar("TRUE")
+  val FALSE: SecVar = SecVar("FALSE")
 }
 
 

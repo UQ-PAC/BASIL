@@ -9,7 +9,7 @@ import astnodes.Label
 
 import astnodes.sec.{Sec, SecVar, SecMemLoad}
 
-case class GammaUpdate (val lhs: SecVar | SecMemLoad, sec: Sec) extends Stmt(Label("NA")) {
+case class GammaUpdate (lhs: SecVar | SecMemLoad, sec: Sec) extends Stmt(Label("NA")) {
 
   override def toBoogieString: String = s"${lhs.toString} := ${sec.toString};"
 

@@ -1,4 +1,5 @@
 import org.scalatest.funsuite.AnyFunSuite
+import utils.TestUtils
 
 
 class JumpTests extends AnyFunSuite {

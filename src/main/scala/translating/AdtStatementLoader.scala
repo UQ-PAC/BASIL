@@ -32,7 +32,7 @@ import scala.collection.mutable.ArrayBuffer
 
 class AdtStatementLoader extends BilAdtBaseListener {
 
-  val stmts = ArrayBuffer[Stmt]()
+  val stmts: ArrayBuffer[Stmt] = ArrayBuffer[Stmt]()
   private val exprs: ParseTreeProperty[Expr] = ParseTreeProperty[Expr]
 
   private def getExpr(node: ParseTree) =
@@ -59,11 +59,11 @@ class AdtStatementLoader extends BilAdtBaseListener {
   val lPreds = new mutable.HashMap[Register, Sec]
   val gammaMappings = new mutable.HashMap[Register, SecVar]
 
-  val varSizes = mutable.Map[String, Int]()
+  val varSizes: mutable.Map[String, Int] = mutable.Map[String, Int]()
 
-  var rely: Option[Pred] = None
+  val rely: Option[Pred] = None
 
-  private var currentFunction: EnterSub = null
+  private var currentFunction: Option[EnterSub] = None
   private var pcCount = 0
 
   var requires: List[Pred] = List()
@@ -79,38 +79,38 @@ class AdtStatementLoader extends BilAdtBaseListener {
     * BigInts long term
     */
   def castTo2sComplement(num: String, t: String): String = {
-    val n = BigInt(num);
-    val exponent = t.toInt;
+    val n = BigInt(num)
+    val exponent = t.toInt
     if (n >= BigInt.apply(2).pow(exponent - 1)) {
       // This is a negative 2's complement number
-      return (BigInt.apply(2).pow(exponent) - n).toString
+      (BigInt.apply(2).pow(exponent) - n).toString
     } else {
-      return n.toString
+      n.toString
     }
   }
 
   /** Remove the quotation marks from a string e.g. "\"mem\"" becomes "mem"
     */
   def getStringBody(str: String): String = {
-    var newStr: String = str;
+    var newStr: String = str
     if (newStr.charAt(0) == '"') {
-      newStr = newStr.substring(1);
+      newStr = newStr.substring(1)
     }
     if (newStr.charAt(newStr.length - 1) == '"') {
-      newStr = newStr.substring(0, newStr.length - 1);
+      newStr = newStr.substring(0, newStr.length - 1)
     }
-    return newStr;
+    newStr
   }
 
   override def exitExpLoad(ctx: BilAdtParser.ExpLoadContext): Unit = {
     ctx.memexp match {
       case v: ExpVarContext =>
         if (getStringBody(v.name.getText) == "mem") {
-          exprs.put(ctx, new MemLoad(getExpr(ctx.idx), Some(ctx.size.getText.toInt)))
+          exprs.put(ctx, MemLoad(getExpr(ctx.idx), Some(ctx.size.getText.toInt)))
         } else {
           throw new AssumptionViolationException("Found load on on variable other than mem")
         }
-      case v: ExpContext => throw new AssumptionViolationException("Expected ExpVarContext, but got " + v.getClass())
+      case v: ExpContext => throw new AssumptionViolationException("Expected ExpVarContext, but got " + v.getClass)
     }
   }
 
@@ -118,19 +118,19 @@ class AdtStatementLoader extends BilAdtBaseListener {
     ctx.memexp match {
       case v: ExpVarContext =>
         if (getStringBody(v.name.getText) == "mem") {
-          exprs.put(ctx, new MemStore(getExpr(ctx.idx), getExpr(ctx.value), Some(ctx.size.getText.toInt)))
+          exprs.put(ctx, MemStore(getExpr(ctx.idx), getExpr(ctx.value), Some(ctx.size.getText.toInt)))
         } else {
           throw new AssumptionViolationException("Found store on on variable other than mem")
         }
-      case v: ExpContext => throw new AssumptionViolationException("Expected ExpVarContext, but got " + v.getClass())
+      case v: ExpContext => throw new AssumptionViolationException("Expected ExpVarContext, but got " + v.getClass)
     }
   }
 
   override def exitExpBinop(ctx: BilAdtParser.ExpBinopContext): Unit =
-    exprs.put(ctx, new BinOp(BinOperator.fromAdt(ctx.op.getText), getExpr(ctx.lhs), getExpr(ctx.rhs)))
+    exprs.put(ctx, BinOp(BinOperator.fromAdt(ctx.op.getText), getExpr(ctx.lhs), getExpr(ctx.rhs)))
 
   override def exitExpUop(ctx: BilAdtParser.ExpUopContext): Unit =
-    exprs.put(ctx, new UniOp(UniOperator.fromAdt(ctx.op.getText), getExpr(ctx.exp)))
+    exprs.put(ctx, UniOp(UniOperator.fromAdt(ctx.op.getText), getExpr(ctx.exp)))
 
   override def exitExpVar(ctx: BilAdtParser.ExpVarContext): Unit = {
     if (getStringBody(ctx.name.getText) != "mem") { // Is a register
@@ -161,26 +161,23 @@ class AdtStatementLoader extends BilAdtBaseListener {
   }
 
   override def exitExpExtract(ctx: BilAdtParser.ExpExtractContext): Unit = {
-    val hb = ctx.hb.getText.toInt;
-    val lb = ctx.lb.getText.toInt;
+    val hb = ctx.hb.getText.toInt
+    val lb = ctx.lb.getText.toInt
     val exp = getExpr(ctx.exp)
-    exprs.put(ctx, new Extract(hb, lb, exp));
+    exprs.put(ctx, Extract(hb, lb, exp))
   }
 
   override def exitDef(ctx: BilAdtParser.DefContext): Unit = {
-    val address = getStringBody(ctx.tid.name.getText);
+    val address = getStringBody(ctx.tid.name.getText)
     val LHS = getExpr(ctx.lhs)
     val RHS = getExpr(ctx.rhs)
 
     stmts += ((LHS, RHS) match {
       case (v: Register, m: MemStore) =>
-        if (v.name == "mem") new MemAssign(address, new MemLoad(m.loc, m.size), m.expr)
+        if (v.name == "mem") MemAssign(address, MemLoad(m.loc, m.size), m.expr)
         else throw new AssumptionViolationException("expected mem for memstore")
-      case (v: Register, _) => {
-        new RegisterAssign(address, v, RHS)
-      }
+      case (v: Register, _) => RegisterAssign(address, v, RHS)
       case _ => throw new AssumptionViolationException("Unexpected expression")
-
     })
   }
 
@@ -189,79 +186,78 @@ class AdtStatementLoader extends BilAdtBaseListener {
   }
 
   override def exitGotoSym(ctx: BilAdtParser.GotoSymContext): Unit = {
-    // Note in the ADT, all jumps are actually conditoinal jumps. Regular
+    // Note in the ADT, all jumps are actually conditional jumps. Regular
     // jumps simply have true/Int(1,1) as the condition.
-    val address = getStringBody(ctx.tid.name.getText);
+    val address = getStringBody(ctx.tid.name.getText)
     ctx.cond match {
-      case v: ExpVarContext => {
-        val cond = Register(getStringBody(v.name.getText), v.asInstanceOf[ExpVarContext].`type`.imm.size.getText.toInt);
+      case v: ExpVarContext => 
+        val cond = Register(getStringBody(v.name.getText), v.`type`.imm.size.getText.toInt)
         if (ctx.target.indirect != null) {
           val variable: ExpVarContext = ctx.target.indirect.exp.asInstanceOf[ExpVarContext]
-          stmts += new CJmpStmt(address, getStringBody(variable.name.getText), "TODO", cond);
+          stmts += CJmpStmt(address, getStringBody(variable.name.getText), "TODO", cond)
         } else if (ctx.target.direct != null) {
-          stmts += new CJmpStmt(address, getStringBody(ctx.target.direct.tid.name.getText), "TODO", cond);
+          stmts += CJmpStmt(address, getStringBody(ctx.target.direct.tid.name.getText), "TODO", cond)
         }
-      }
-      case v: ExpIntAdtContext => {
+      case v: ExpIntAdtContext => 
         // Assume that if it's an int, the int evaluates to true. This seems to be the case
         // 99% of the time. It probably doesn't make sense to a cjump based on a falsy literal.
         if (ctx.target.indirect != null) {
           val variable: ExpVarContext = ctx.target.indirect.exp.asInstanceOf[ExpVarContext]
-          stmts += new JmpStmt(address, getStringBody(variable.name.getText))
+          stmts += JmpStmt(address, getStringBody(variable.name.getText))
         } else if (ctx.target.direct != null) {
-          stmts += new JmpStmt(address, getStringBody(ctx.target.direct.tid.name.getText))
+          stmts += JmpStmt(address, getStringBody(ctx.target.direct.tid.name.getText))
         }
-      }
     }
   }
 
   override def exitBlk(ctx: BilAdtParser.BlkContext): Unit = {
     // FIXME: The previous bil parser had no real notion of "blocks" the blocks were simply started by
     //  a labelled skip statement. It may be worthwhile to introduce a Block node in the AST
-    stmts += new SkipStmt(getStringBody(ctx.tid.name.getText));
+    stmts += SkipStmt(getStringBody(ctx.tid.name.getText))
   }
 
   override def exitCall(ctx: BilAdtParser.CallContext): Unit = {
-    val address = getStringBody(ctx.tid.name.getText);
-    var funcName = "";
+    val address = getStringBody(ctx.tid.name.getText)
+    var funcName = ""
     if (ctx.calee.direct != null) {
-      funcName = getStringBody(ctx.calee.direct.tid.name.getText);
+      funcName = getStringBody(ctx.calee.direct.tid.name.getText)
       stmts += new CallStmt(address, funcName, Option(ctx.returnSym).map(_.getText), List(), None)
     } else if (ctx.calee.indirect != null) {
       // FIXME: This mimics the behaviour of the old parser - it could be unintended
       //  The assumption that was made is that any call on a non-literal function (i.e. a register, or LR) is indicative
       //  of exiting the current function. This seems incorrect.
-      stmts += new ExitSub(address, None)
+      stmts += ExitSub(address, None)
     }
   }
 
   override def exitSub(ctx: BilAdtParser.SubContext): Unit = {
-    if (currentFunction != null)
-      currentFunction.setRequiresEnsures(requires, ensures)
+    currentFunction match {
+      case Some(f) => f.setRequiresEnsures(requires, ensures)
+      case None =>
+    }
 
     requires = List()
     ensures = List()
-    val address = getStringBody(ctx.tid.name.getText);
+    val address = getStringBody(ctx.tid.name.getText)
     val name = getStringBody(ctx.name.getText)
 
-    val function = new EnterSub(address, name, List(), List())
+    val function = EnterSub(address, name, List(), List())
     stmts += function
-    this.currentFunction = function
-    for (i <- 0 to ctx.args().arg.size() - 1) {
-      var arg = ctx.args.arg(i)
+    this.currentFunction = Some(function)
+    for (i <- 0 until ctx.args().arg.size()) {
+      val arg = ctx.args.arg(i)
 
       val id = getStringBody(arg.tid.name.getText)
       arg.rhs match {
-        case v: ExpVarContext => {
+        case v: ExpVarContext => 
           val name = v.name.getText
           val size = v.`type`.imm.size.getText.toInt
           if (arg.intent.getText.contains("in")) {
-            currentFunction.getInParams += new InParameter(Register(id, size), Register(name, 64))
+            currentFunction.get.getInParams += new InParameter(Register(id, size), Register(name, 64))
           } else {
-            currentFunction.setOutParam(new OutParameter(Register(id, size), Register(name, 64)))
+            currentFunction.get.setOutParam(new OutParameter(Register(id, size), Register(name, 64)))
           }
-        }
-        case _ => throw new AssumptionViolationException("Expected RHS of arg to be a varible")
+        case _ => throw new AssumptionViolationException("Expected RHS of arg to be a variable")
       }
     }
   }

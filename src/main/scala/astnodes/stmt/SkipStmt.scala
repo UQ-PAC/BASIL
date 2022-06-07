@@ -6,7 +6,7 @@ import astnodes.Label
 
 /** No instruction fact
   */
-case class SkipStmt(val pc: String) extends Stmt(Label(pc)) {
-  override def toString = String.format("%sskip;", label)
+case class SkipStmt(pc: String) extends Stmt(Label(pc)) {
+  override def toString: String = String.format("%sskip;", label)
   override def subst(v: Var, w: Var): Stmt = this
 }
