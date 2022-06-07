@@ -1,11 +1,11 @@
+GAMMA: secret -> FALSE
+L: x -> FALSE, secret -> FALSE, z -> TRUE
 00000290: program
 
 0000028c: sub main(main_argc, main_argv, main_result)
 000002a0: main_argc :: in u32 = R0
 000002a1: main_argv :: in out u64 = R1
 000002a2: main_result :: out u32 = R0
-Gamma: secret -> HIGH
-L: x -> FALSE, secret -> FALSE, z -> TRUE
 
 0000010a:
 0000010c: R0 := 0x11000
