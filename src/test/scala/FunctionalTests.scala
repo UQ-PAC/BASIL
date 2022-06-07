@@ -5,8 +5,8 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.junit.Assert.*
 import org.junit.Test
 import translating.{BoogieTranslator, FlowGraph, StatementLoader}
+import utils.TestUtils
 
-import collection.JavaConverters.*
 import java.io.FileNotFoundException
 import scala.collection.mutable.ArrayBuffer
 //import jdk.nashorn.internal.objects.NativeError.printStackTrace

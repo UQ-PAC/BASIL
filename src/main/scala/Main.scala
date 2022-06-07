@@ -25,12 +25,12 @@ import sys.process.*
 import scala.language.postfixOps
 import util.RunUtils
 
-@main def main(fileName: String, elfFileName: String) = {
-  var state: State = null;
-  if fileName.endsWith("adt") then
-    state = RunUtils.generateVCsAdt(fileName, elfFileName)
-  else
-    state = RunUtils.generateVCs(fileName, elfFileName)
+@main def main(fileName: String, elfFileName: String): Int = {
+  val state: State = if (fileName.endsWith("adt")) {
+    RunUtils.generateVCsAdt(fileName, elfFileName)
+  } else {
+    RunUtils.generateVCs(fileName, elfFileName)
+  }
   RunUtils.writeToFile(state)
 
   // println("boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process(Seq("grep", "--color=always", ".*errors.*\\|$"), None, "GREP_COLORS" -> "'1;33"))

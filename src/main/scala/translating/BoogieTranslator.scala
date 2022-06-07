@@ -56,16 +56,16 @@ object BoogieTranslator {
   }
 
   /** If a skip is not jumped to, we should remove it. Depends on createLabels
-    * TODO: logic doesnt match docstring
+    * TODO: logic doesn't match docstring
     */
   private def optimiseSkips(state: State): State = {
     updateAllLines(state, {
-      case x if (!x.isInstanceOf[SkipStmt]) => x
+      case x if !x.isInstanceOf[SkipStmt] => x
     })
   }
 
-  private def addInParams(state: State): State = updateAllBlocks(state, block => block.lines(block.lines.size - 1) match {
-    case call: CallStmt if (call.libraryFunction) =>
+  private def addInParams(state: State): State = updateAllBlocks(state, block => block.lines.last match {
+    case call: CallStmt if call.libraryFunction =>
       block.copy(lines = block.lines.updated(block.lines.size - 1, 
         call.copy(args = CallStmt.libraryFunctions(call.funcName).args)))
     case call: CallStmt => 
@@ -76,7 +76,7 @@ object BoogieTranslator {
   })
 
   private def addOutParam(state: State): State = updateAllLines(state, stmt => stmt match {
-    case call: CallStmt if (call.libraryFunction) => 
+    case call: CallStmt if call.libraryFunction => 
       call.copy(lhs = CallStmt.libraryFunctions(call.funcName).lhs)
     case call: CallStmt => state.functionFromCall(call).header.getOutParam match {
       case Some(x) => 
@@ -94,7 +94,7 @@ object BoogieTranslator {
         case RegisterAssign(_, lhs, _) =>
           if (
             !state.globalInits.exists(init => init.variable.name == lhs.name)
-              && function.header.getInParams.filter((inParam) => inParam.getName.name == lhs.name).isEmpty // TODO check if this is needed (otherwise change to short circuting operation)
+              && !function.header.getInParams.exists(inParam => inParam.getName.name == lhs.name) // TODO check if this is needed (otherwise change to short circuting operation)
               && !(function.header.getOutParam.get.getName.name == lhs.name)
               && !function.initStmts.exists(init => init.variable.name == lhs.name)
           ) {
@@ -125,7 +125,7 @@ object BoogieTranslator {
             else if (CallStmt.callRegisters.contains(localVar.name)) 64
             else state.bvSizes(localVar.name)
           }
-          initStmts += new InitStmt(localVar, uniqueLabel, s"bv$size")
+          initStmts += InitStmt(localVar, uniqueLabel, s"bv$size")
         }
       }
 
@@ -163,24 +163,24 @@ object BoogieTranslator {
 
   // TODO improve this and perform proper type checking
   private def inferConstantTypes(expr: Expr, size: Option[Int]): Expr = expr match {
-    case binOp: BinOp => {
+    case binOp: BinOp =>
       val inputSize = if (BinOperator.changesSize(binOp.operator)) None else size
       val binOp1 = binOp.copy(firstExp = inferConstantTypes(binOp.firstExp, inputSize), secondExp = inferConstantTypes(binOp.secondExp, inputSize))
       (binOp1.firstExp.size, binOp1.secondExp.size) match {
-        case (a: Some[Int], b: Some[Int]) if (a == b) => binOp1
-        case (a: Some[Int], b: Some[Int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop ($binOp) should have the same size (${binOp1.firstExp}: ${a}, ${binOp1.secondExp}: ${b})")
+        case (a: Some[Int], b: Some[Int]) if a == b => binOp1
+        case (a: Some[Int], b: Some[Int]) if a != b => 
+          throw new AssumptionViolationException(s"Both sides of binop ($binOp) should have the same size (${binOp1.firstExp}: $a, ${binOp1.secondExp}: $b)")
         case (x: Some[Int], None) => binOp1.copy(secondExp = inferConstantTypes(binOp1.secondExp, x))
         case (None, x: Some[Int]) => binOp1.copy(firstExp = inferConstantTypes(binOp1.firstExp, x))
         case _ => binOp1
       }
-    }
     case uniOp: UniOp =>
       val inputSize = if (UniOperator.changesSize(uniOp.operator)) None else size
       uniOp.copy(exp = inferConstantTypes(uniOp.exp, inputSize))
-    case lit: Literal if (lit.size == None) => lit.copy(size = size)
+    case lit: Literal if lit.size.isEmpty => lit.copy(size = size)
     case _ => expr
   }
 
-  private def uniqueVarName: String = return "p" + "TODO"
-  private def uniqueLabel: String = return "l" + "TODO"
+  private def uniqueVarName: String = "p" + "TODO"
+  private def uniqueLabel: String = "l" + "TODO"
 }

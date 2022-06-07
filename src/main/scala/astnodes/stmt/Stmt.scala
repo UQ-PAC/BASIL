@@ -12,10 +12,10 @@ import java.util
 trait Stmt(var label: Label) {
   // main
   def subst(v: Var, w: Var): Stmt
-  def toBoogieString = toString
+  def toBoogieString: String = toString
 
   // TODO redefine this without side effects
-  def copy(label: Label) = {
+  def copy(label: Label): Stmt = {
     this.label = label
     this
   }

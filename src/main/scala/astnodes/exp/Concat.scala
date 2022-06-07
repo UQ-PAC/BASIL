@@ -14,9 +14,10 @@ case class Concat (left: Expr, right: Expr) extends Expr{
 
   override def size: Option[Int] = (left.size, right.size) match {
     case (Some(x), Some(y)) => Some(x + y)
+    case _ => None
   }
 
-  override def vars = left.vars ++ right.vars
+  override def vars: List[Var] = left.vars ++ right.vars
   override def subst(v: Var, w: Var): Expr = {
     this.copy(left = left.subst(v,w), right = right.subst(v,w))
   }
@@ -30,9 +31,9 @@ case class Concat (left: Expr, right: Expr) extends Expr{
  * Construct a Concatenation from a Bil extend operation
  */
 case object Extend {
-  // FIXME: This implementation is wrong. Extend is the same as Pad, but it uses the most signficant bit, rather than
+  // FIXME: This implementation is wrong. Extend is the same as Pad, but it uses the most significant bit, rather than
   //  always adding 0's. This can be thought of as an signed pad.
-  def apply(expr: Expr, size: Int) =
+  def apply(expr: Expr, size: Int): Expr =
     if (size - expr.size.get > 0) Concat(expr, Literal("0", Some(size - expr.size.get)))
     else expr
 
@@ -42,7 +43,7 @@ case object Extend {
  * Construct a Concatenation from a Bil pad operation
  */
 case object Pad {
-  def apply(expr: Expr, size: Int) =
+  def apply(expr: Expr, size: Int): Expr =
     if (size - expr.size.get > 0) Concat(Literal("0", Some(size - expr.size.get)), expr)
     else expr
 

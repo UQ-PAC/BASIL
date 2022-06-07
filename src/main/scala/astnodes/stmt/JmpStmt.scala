@@ -7,7 +7,7 @@ import astnodes.Label
 
 /** Jump
   */
-case class JmpStmt(val pc: String, val target: String) extends Stmt(Label(pc)) {
-  override def toString = String.format("%sgoto label%s;", label, target)
+case class JmpStmt(pc: String, target: String) extends Stmt(Label(pc)) {
+  override def toString: String = String.format("%sgoto label%s;", label, target)
   override def subst(v: Var, w: Var): Stmt = this
 }

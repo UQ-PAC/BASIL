@@ -11,8 +11,8 @@ case class FunctionCall(funcName: String, args: List[Expr], override val size: O
   /** Value of literal */
   override def toBoogieString = s"$funcName(${args.map(a => a.toBoogieString).mkString(", ")})"
 
-  override def vars = args.flatMap(a => a.vars)
+  override def vars: List[Var] = args.flatMap(a => a.vars)
   override def subst(v: Var, w: Var): Expr = copy(args = args.map(a => a.subst(v,w)))
-  override def fold(old: Expr, sub: Expr) = this
+  override def fold(old: Expr, sub: Expr): Expr = this
 }
 

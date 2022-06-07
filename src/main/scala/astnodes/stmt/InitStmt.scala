@@ -7,20 +7,22 @@ import astnodes.exp.Expr
 import astnodes.exp.`var`.{Register, Var}
 import astnodes.Label
 
+import scala.util.matching.Regex
+
 // TODO is this class necassary 
-case class InitStmt(variable: Register, pc: String, val varType: String, val const: Boolean = false) extends Stmt(Label(pc)) {
+case class InitStmt(variable: Register, pc: String, varType: String, const: Boolean = false) extends Stmt(Label(pc)) {
   override def subst(v: Var, w: Var): Stmt = variable.subst(v,w) match {
     case res: Register => this.copy(variable = res)
     case _ => ???
   }
-  override def toString  =  String.format("%s %s: %s;", if (const) "const" else "var", variable, varType)
+  override def toString: String =  String.format("%s %s: %s;", if (const) "const" else "var", variable, varType)
 
   override def toBoogieString: String = f"${if (const) "const" else "var"} $variable: $varType; " + {
-    if (gammaString != None) f"${if (const) "const" else "var"} Gamma_$variable: ${gammaString.get};"
+    if (gammaString.isDefined) f"${if (const) "const" else "var"} Gamma_$variable: ${gammaString.get};"
     else ""
   }
 
-  val BVTypePattern = "(bv.*)".r
+  val BVTypePattern: Regex = "(bv.*)".r
 
   def gammaString: Option[String] = varType match {
     case BVTypePattern(_) => Some("SecurityLevel")

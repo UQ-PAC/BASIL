@@ -12,7 +12,7 @@ trait Expr {
 
   /* Substitute a given variable for another variable */
   def subst(v: Var, w: Var): Expr
-  def toBoogieString = toString
+  def toBoogieString: String = toString
 
   def fold (old: Expr, sub: Expr): Expr
   /* 

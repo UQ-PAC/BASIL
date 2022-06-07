@@ -10,11 +10,11 @@ case class Bool(name: String) extends Pred {
   override def toString: String = name
 
   override def vars: List[Register] = List()
-  override def substExpr(v: Var, w: Var) = this
+  override def substExpr(v: Var, w: Var): Pred = this
 }
 
 case object Bool {
-  val True = Bool("true")
-  val False = Bool("false")
+  val True: Bool = Bool("true")
+  val False: Bool = Bool("false")
 }
 

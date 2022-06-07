@@ -68,7 +68,7 @@ case class State(
     + relyStr + "\n\n"
     + functions.mkString("")
 
-  def functionFromCall(call: CallStmt) = functions.find(_.header.funcName == call.funcName).get
+  def functionFromCall(call: CallStmt): FunctionState = functions.find(_.header.funcName == call.funcName).get
 
 }
 
@@ -84,18 +84,17 @@ case object State {
 
     val controls = vars.map(v => (v,
       controlledBy.collect{
-        case (c, controlled) if (controlled.contains(v)) => c
+        case (c, controlled) if controlled.contains(v) => c
       }.toSet
     )).toMap[Register, Set[Register]]
 
     val functions = flowGraph.functions.asScala.map(FunctionState.apply).toList.map{
-      case x if (x.header.funcName == "main") => {
+      case x if x.header.funcName == "main" =>
         // Update the first block to contain the gamma assignments
         val (pc, block) = (x.rootBlockLabel, x.rootBlock)
         val newBlock = block.copy(lines = block.lines.prependedAll(gamma.map{case (v, s) => GammaUpdate(SecMemLoad(gamma = true, L = false, symbolTable(v.name)), s)}))
         val newMap = x.labelToBlock.updated(pc, newBlock)
         x.copy(labelToBlock = newMap)
-      }
       case x => x
     }
 
@@ -115,10 +114,10 @@ case class FunctionState (
   labelToBlock: Map[String, Block],
   initStmts: List[InitStmt],
   header: EnterSub,
-  val rootBlockLabel: String,
+  rootBlockLabel: String,
   private val labelToChildren: Map[String, Set[String]],
 ) {
-  def rootBlock = labelToBlock(rootBlockLabel)
+  def rootBlock: Block = labelToBlock(rootBlockLabel)
 
   def children(label: String): Option[Set[String]] = labelToChildren.get(label)
   def children(block: Block): Option[Set[String]] = labelToChildren.get(block.label)
@@ -133,10 +132,10 @@ case class FunctionState (
     + labelToBlock.values.mkString("") + "\n}"
 
   // Constant Prop analysis requires these for expression simplification
-  def replaceLine(oldStmt: Stmt, newStmt: Stmt) = labelToBlock.values.foreach(block => block.replaceLine(oldStmt, newStmt))
+  def replaceLine(oldStmt: Stmt, newStmt: Stmt): Unit = labelToBlock.values.foreach(block => block.replaceLine(oldStmt, newStmt))
   def findStmtFromLabel(label: Label): Option[Stmt] = {
     labelToBlock.values.foreach(block => {
-      if (!block.findStmtFromLabel(label).isEmpty) return block.findStmtFromLabel(label)
+      if (block.findStmtFromLabel(label).isDefined) return block.findStmtFromLabel(label)
     })
     None
   }
@@ -169,8 +168,8 @@ case class Block (
 
   // Constant Prop analysis requires these for expression simplification
   def findStmtFromLabel(label: Label): Option[Stmt] = lines.find(stmt => stmt.label == label)
-  def replaceLine(oldStmt: Stmt, newStmt: Stmt) = {
-    var index = lines.indexOf(oldStmt)
+  def replaceLine(oldStmt: Stmt, newStmt: Stmt): Unit = {
+    val index = lines.indexOf(oldStmt)
     if (index != -1) {
       lines = lines.updated(index, newStmt)
     }

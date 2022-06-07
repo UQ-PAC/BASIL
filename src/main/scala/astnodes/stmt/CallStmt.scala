@@ -7,17 +7,17 @@ import astnodes.Label
 import scala.collection.immutable.HashSet
 
 // TODO remove var for lhs
-case class CallStmt(val pc: String, funcName: String, returnTarget: Option[String], args: List[Register], var lhs: Option[Register]) extends Stmt(Label(pc)) {
-  def setLHS(reg: Register) = lhs = Some(reg)
+case class CallStmt(pc: String, funcName: String, returnTarget: Option[String], args: List[Register], var lhs: Option[Register]) extends Stmt(Label(pc)) {
+  def setLHS(reg: Register): Unit = lhs = Some(reg)
 
-  override def toString = {
+  override def toString: String = {
     // TODO neaten up call args logic
     val argsStr = 
       if (libraryFunction) args.map(arg => arg.name).mkString(", ")
       else CallStmt.callRegisters.map(x => s"$x: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x: SecurityLevel").mkString(", ")
 
     val lhsStr = lhs match {
-      case _ if (!libraryFunction) => CallStmt.callRegisters.mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x").mkString(", ") + " := "
+      case _ if !libraryFunction => CallStmt.callRegisters.mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x").mkString(", ") + " := "
       case Some(x) => s"$x, ${x.toGamma} := "
       case None => ""
     }
@@ -38,17 +38,17 @@ case class CallStmt(val pc: String, funcName: String, returnTarget: Option[Strin
     }))
 
 
-  def libraryFunction = CallStmt.libraryFunctions.contains(funcName)
+  def libraryFunction: Boolean = CallStmt.libraryFunctions.contains(funcName)
 }
 
 case object CallStmt {
-  val libraryFunctions = List(
+  val libraryFunctions: Map[String, LibraryFunction] = List(
       "malloc" -> LibraryFunction(Some(Register("R0", 64)), List(Register("R0", 64))), 
       "realloc" -> LibraryFunction(Some(Register("R0", 64)), List()), 
       "free" -> LibraryFunction(None, List(Register("R0", 64)), Some("free_"))
     ).toMap
 
-  val callRegisters = Range(0, 7).map(x => s"R$x")
+  val callRegisters: IndexedSeq[String] = Range(0, 7).map(x => s"R$x")
 }
 
 case class LibraryFunction(lhs: Option[Register], args: List[Register], mappedName: Option[String] = None)
