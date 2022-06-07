@@ -203,12 +203,20 @@ class StatementLoader() extends BilBaseListener {
   }
 
   override def exitExpBracket(ctx: BilParser.ExpBracketContext): Unit = exprs.put(ctx, getExpr(ctx.exp))
-  override def exitExpUop(ctx: BilParser.ExpUopContext): Unit = exprs.put(ctx, UniOp(UniOperator.fromBil(ctx.uop.getText), getExpr(ctx.exp)))
+  
+  override def exitExpUop(ctx: BilParser.ExpUopContext): Unit =
+    exprs.put(ctx, UniOp(UniOperator.fromBil(ctx.uop.getText), getExpr(ctx.exp)))
+    
   override def exitExpBop(ctx: BilParser.ExpBopContext): Unit =
     exprs.put(ctx, BinOp(BinOperator.fromBil(ctx.bop.getText), getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
-  override def exitVar(ctx: BilParser.VarContext): Unit = exprs.put(ctx, new Register(ctx.getText, varSizes.get(ctx.getText)))
+    
+  override def exitVar(ctx: BilParser.VarContext): Unit =
+    exprs.put(ctx, new Register(ctx.getText, varSizes.get(ctx.getText)))
+    
   override def exitExpVar(ctx: BilParser.ExpVarContext): Unit = exprs.put(ctx, exprs.get(ctx.`var`))
+  
   override def exitExpLiteral(ctx: BilParser.ExpLiteralContext): Unit = exprs.put(ctx, Literal(ctx.literal.getText))
+  
   override def exitExpExtract(ctx: BilParser.ExpExtractContext): Unit = {
     val firstNat = ctx.nat(0).getText.toInt
     val secondNat = ctx.nat(1).getText.toInt
@@ -226,22 +234,33 @@ class StatementLoader() extends BilBaseListener {
   override def exitExpLoad(ctx: BilParser.ExpLoadContext): Unit =
     if (ctx.exp(0).getText == "mem") exprs.put(ctx, MemLoad(getExpr(ctx.exp(1)), Some(typeToSize(ctx.nat.getText))))
     else throw new AssumptionViolationException("Found load on variable other than mem")
+    
   override def exitExpLoad8(ctx: BilParser.ExpLoad8Context): Unit =
     if (ctx.exp(0).getText == "mem") exprs.put(ctx, MemLoad(getExpr(ctx.exp(1)), Some(8)))
     else throw new AssumptionViolationException("Found load on variable other than mem")
+    
   override def exitExpStore(ctx: BilParser.ExpStoreContext): Unit =
     if (ctx.exp(0).getText == "mem") {
       exprs.put(ctx, MemStore(getExpr(ctx.exp(1)), getExpr(ctx.exp(2)), Some(typeToSize(ctx.nat.getText))))
     } else throw new AssumptionViolationException("Found store on variable other than mem")
+    
   override def exitExpStore8(ctx: BilParser.ExpStore8Context): Unit =
     if (ctx.exp(0).getText == "mem") exprs.put(ctx, MemStore(getExpr(ctx.exp(1)), getExpr(ctx.exp(2)), Some(8)))
     else throw new AssumptionViolationException("Found store on variable other than mem")
-  override def exitExpFunctionCall(ctx: BilParser.ExpFunctionCallContext): Unit = exprs.put(ctx, FunctionCall("old", ctx.argList.exp.asScala.map(a => getExpr(a)).toList))
+    
+  override def exitExpFunctionCall(ctx: BilParser.ExpFunctionCallContext): Unit =
+    exprs.put(ctx, FunctionCall("old", ctx.argList.exp.asScala.map(a => getExpr(a)).toList))
 
-  override def exitPredBinOp(ctx: PredBinOpContext): Unit = preds.put(ctx, new astnodes.pred.BinOp(ctx.predBop.getText, getPred(ctx.pred(0)), getPred(ctx.pred(1))))
-  override def exitPredUniOp(ctx: PredUniOpContext): Unit = preds.put(ctx, astnodes.pred.UniOp(ctx.uop.getText, getPred(ctx.pred)))
+  override def exitPredBinOp(ctx: PredBinOpContext): Unit =
+    preds.put(ctx, new astnodes.pred.BinOp(ctx.predBop.getText, getPred(ctx.pred(0)), getPred(ctx.pred(1))))
+    
+  override def exitPredUniOp(ctx: PredUniOpContext): Unit = 
+    preds.put(ctx, astnodes.pred.UniOp(ctx.uop.getText, getPred(ctx.pred)))
+    
   override def exitPredBracket(ctx: PredBracketContext): Unit = preds.put(ctx, getPred(ctx.pred))
-  override def exitPredExprComp(ctx: PredExprCompContext): Unit = preds.put(ctx, ExprComp(ctx.expComp.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
+  
+  override def exitPredExprComp(ctx: PredExprCompContext): Unit =
+    preds.put(ctx, ExprComp(ctx.expComp.getText, getExpr(ctx.exp(0)), getExpr(ctx.exp(1))))
   /* override def exitPredLiteral(ctx: BilParser.PredLiteralContext): Unit = preds.put(ctx, ctx.getText match {
     case "TRUE" => Bool.True
     case "FALSE" => Bool.False

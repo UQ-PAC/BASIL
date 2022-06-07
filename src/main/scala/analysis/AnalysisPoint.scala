@@ -5,7 +5,7 @@ import util.LatticeViolationException
 import util.AnalysisTypeException
 import vcgen.State
 
-abstract class AnalysisPoint {
+abstract class AnalysisPoint[T <: AnalysisPoint[T]] {
     /**
      * Whether the analysis operates forwards or backwards over the code.
      */
@@ -23,14 +23,14 @@ abstract class AnalysisPoint {
      * Returns 1 iff this < other, 0 iff this ≡ other, and -1 iff this > other - so a return value of 1
      * indicates precision has been lost.
      */
-    def compare(other: this.type): Int
+    def compare(other: T): Int
 
   /**
      * Defines equality on two analysis points. Not the same as compare == 0; compare defines an ordering relation
      * where two elements might be on the same level of the lattice, whereas equals is simply asking if the two are
      * identical
      */
-    def equals(other: this.type): Boolean
+    def equals(other: T): Boolean
 
   /**
      * A general transfer function on the lattice. Gives us a new AnalysisPoint, which is the result of
@@ -39,19 +39,19 @@ abstract class AnalysisPoint {
      * Note that this function should be able to handle all the different transfer functions by if/else'ing
      * every type of statement the analysis needs to handle.
      */
-    def transfer(stmt: Stmt): this.type
+    def transfer(stmt: Stmt): T
 
   /**
      * A union or join of two lattice states. Should contain all the information from the first state
      * as well as all the information from the second state - even if this introduces uncertainty.
      */
-    def join(other: this.type): this.type
+    def join(other: T): T
 
   /**
      * An intersection or meet of two lattice states. Should contain all the information that appears in
      * both states.
      */
-    def meet(other: this.type): this.type
+    def meet(other: T): T
 
   /**
      * Creates an AnalysisPoint in the same type of analysis as this one, but with currentState as whatever
@@ -59,12 +59,12 @@ abstract class AnalysisPoint {
      * 
      * For most analyses, this will be low/false/no information, but for top-down analyses
      */
-    def createLowest: this.type
+    def createLowest: T
 
   /**
      * Creates a new state that reflects the information discovered by the analysis.
      */
-    def applyChanges(preState: State, information: Map[Stmt, this.type]): State
+    def applyChanges(preState: State, information: Map[Stmt, T]): State
 
   /**
      * Basic placeholder that gives the simple name of the class, which useful for exception handling. Feel
@@ -81,8 +81,8 @@ abstract class AnalysisPoint {
      * The only case for overriding this function should be if the analysis is top-down rather than bottom-up
      * In that scenario, changing the comparison to < 0 should make it work.
      */
-    def transferAndCheck(stmt: Stmt): this.type = {
-      val newState: this.type = transfer(stmt)
+    def transferAndCheck(stmt: Stmt): T = {
+      val newState: T = transfer(stmt)
 
       if (compare(newState) > 0) {
         throw new LatticeViolationException(toString)
@@ -96,7 +96,7 @@ abstract class AnalysisPoint {
      * 
      * This function gets used by the worklist to combine parents' states as well as overlapping functions' states.
      */
-    def combine(other: this.type): this.type = {
+    def combine(other: T): T = {
       join(other)
     }
 
@@ -116,9 +116,9 @@ abstract class AnalysisPoint {
      * 
      * Also, this should work with match statements, but it doesn't. Go figure.
      */
-    final def typeCheck(other: AnalysisPoint): this.type = {
+    final def typeCheck(other: AnalysisPoint[T]): T = {
       if (this.getClass == other.getClass) {
-        other.asInstanceOf[this.type]
+        other.asInstanceOf[T]
       } else {
         throw new AnalysisTypeException(this.getClass.toString + " : " + other.getClass.toString)
       }
