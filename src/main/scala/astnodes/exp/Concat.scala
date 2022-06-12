@@ -1,10 +1,7 @@
 package astnodes.exp
-import astnodes.exp.`var`.Var
 
-import java.util
-import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters.*
 import analysis.tools.SimplificationUtil
+import astnodes.exp.variable.Variable
 
 /**
  *  Concatenation of two bitvectors
@@ -17,8 +14,8 @@ case class Concat (left: Expr, right: Expr) extends Expr{
     case _ => None
   }
 
-  override def vars: List[Var] = left.vars ++ right.vars
-  override def subst(v: Var, w: Var): Expr = {
+  override def vars: List[Variable] = left.vars ++ right.vars
+  override def subst(v: Variable, w: Variable): Expr = {
     this.copy(left = left.subst(v,w), right = right.subst(v,w))
   }
 

@@ -1,21 +1,20 @@
 package vcgen
 
-import astnodes.exp.`var`.{MemLoad, Register}
 import astnodes.exp.{Expr, Literal}
+import astnodes.exp.variable.{MemLoad, Register}
+import astnodes.pred.*
+import astnodes.sec.{Sec, SecBinOp, join}
 import astnodes.stmt.assign.{Assign, GammaUpdate, MemAssign, RegisterAssign}
-import astnodes.stmt.{Assert, CJmpStmt, Stmt, MethodCall}
+import astnodes.stmt.{Assert, CJmpStmt, MethodCall, Stmt}
 import translating.FlowGraph
-import astnodes.sec.{SecBinOp, join, Sec}
-
-import astnodes.pred.{BinOp, BinOperator, Bool, Pred, conjunct, SecComp}
 
 object VCGen {
   // This generates the VCs but also updates to gamma variables
   def genVCs(state: State): State = {
     println("generating VCs")
     state.copy(functions = state.functions.map(f =>
-      f.copy(labelToBlock = f.labelToBlock.map {
-        case (pc, b) => (pc, b.copy(lines = b.lines.flatMap(line => List(rely, Assert("TODO", genVC(line, f, state)), line) ++ genGammaUpdate(line, state))))
+      f.copy(blocks = f.blocks.map {
+        b => b.copy(lines = b.lines.flatMap(line => List(rely, Assert("TODO", genVC(line, f, state)), line) ++ genGammaUpdate(line, state)))
       })
     ))
   }
@@ -46,7 +45,7 @@ object VCGen {
   /** Generate an assignment to a gamma variable for each variable update.
    */
   def genGammaUpdate(stmt: Stmt, state: State): Option[Stmt] = stmt match {
-    case assign: Assign => Some(GammaUpdate(assign.lhs.toGamma, computeGamma(assign.rhs, state)))
+    case a: Assign => Some(GammaUpdate(a.lhs.toGamma, computeGamma(a.rhs, state)))
     // case assign: RegisterAssign => Some(GammaUpdate(assign.lhs.toGamma, computeGamma(assign.rhs, state)))
     case _ => None
   }

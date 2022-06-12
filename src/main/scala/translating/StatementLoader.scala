@@ -23,7 +23,8 @@ import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, Termi
 import FlowGraph.Function
 import astnodes.pred
 import BilParser.*
-import astnodes.exp.`var`.{MemLoad, Register}
+import astnodes.exp.{BinOp, BinOperator, Expr, Extend, Extract, FunctionCall, MemStore, Pad, UniOp, UniOperator}
+import astnodes.exp.variable.{MemLoad, Register}
 import astnodes.pred.{Bool, ExprComp, Pred}
 import astnodes.sec.Sec
 import vcgen.State
@@ -31,7 +32,7 @@ import util.AssumptionViolationException
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 // TODO create a statementloaderstate class
 class StatementLoader() extends BilBaseListener {
@@ -110,7 +111,9 @@ class StatementLoader() extends BilBaseListener {
 
   override def exitSub(ctx: BilParser.SubContext): Unit = {
     currentFunction match {
-      case Some(f) => f.setRequiresEnsures(requires, ensures)
+      case Some(f) =>
+        f.requires = requires
+        f.ensures = ensures
       case None =>
     }
 
@@ -132,9 +135,9 @@ class StatementLoader() extends BilBaseListener {
     val size = typeToSize(ctx.nat.getText)
 
     if (id.contains("result")) {
-      currentFunction.get.setOutParam(new OutParameter(Register(id, size), Register(variable, 64)))
+      currentFunction.get.outParam = Some(OutParameter(Register(id, size), Register(variable, 64)))
     } else {
-      currentFunction.get.getInParams += InParameter(Register(id, size), Register(variable, size))
+      currentFunction.get.inParams += InParameter(Register(id, size), Register(variable, size))
     }
   }
 

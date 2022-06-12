@@ -1,4 +1,4 @@
-package astnodes.exp.`var`
+package astnodes.exp.variable
 
 import astnodes.exp.*
 import astnodes.pred
@@ -6,7 +6,7 @@ import astnodes.sec.SecMemLoad
 
 /** A load from memory at location exp
  */
-case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
+case class MemLoad(exp: Expr, override val size: Some[Int]) extends Variable {
 
   override def toString = s"${if (this.onStack) "stack" else "heap"}[$exp]"
 
@@ -17,17 +17,17 @@ case class MemLoad(var exp: Expr, override val size: Some[Int]) extends Var {
       .map(n => s"${toBoogieString(BinOp(BinOperator.Addition, exp, Literal(n.toString, Some(64))))}")
       .mkString(" ++ ")
 
-  override def vars = List(this) // TOOD also exp.vars????
+  override def vars: List[MemLoad] = List(this) // TOOD also exp.vars????
 
   /** Assumes: anything on the stack is represented as SP + val (where val is an int etc)
     */
   val onStack: Boolean = onStackMatch(exp)
 
   def onStackMatch(expr: Expr): Boolean = expr match {
-    case v: Register              => v.name == "R31"
+    case v: Register => v.name == "R31"
     case BinOp(_, e1: Expr, e2: Expr) => onStackMatch(e1) || onStackMatch(e2)
     case UniOp(_, e1: Expr) => onStackMatch(e1)
-    case _                   => false
+    case _ => false
   }
   
   override def fold(old: Expr, sub: Expr): Expr = {

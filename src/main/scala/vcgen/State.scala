@@ -1,27 +1,17 @@
 package vcgen
 
+import analysis.*
 import astnodes.exp.{Expr, Literal}
-import translating.FlowGraph.{Block, Function}
-import astnodes.pred.{BinOp, BinOperator, Bool, ExprComp, Pred, ITE, Forall}
-import astnodes.pred
-import astnodes.exp
-import astnodes.Label
-import astnodes.exp.`var`.{Register, MemLoad}
-import astnodes.sec.{Sec, SecLattice, SecITE}
+import astnodes.exp.variable.{MemLoad, Register}
+import astnodes.pred.*
+import astnodes.sec.*
 import astnodes.stmt.assign.{GammaUpdate, RegisterAssign}
-import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, InitStmt, JmpStmt, Stmt}
+import astnodes.stmt.*
 import translating.FlowGraph
+import translating.FlowGraph.Function
 import util.Boogie.{generateBVHeader, generateBVToBoolHeader, generateLibraryFuncHeader, generateSecurityLatticeFuncHeader}
-import astnodes.pred.conjunct
 
-import scala.collection.{immutable, mutable}
 import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters.ListHasAsScala
-import astnodes.pred.Var
-import astnodes.pred.MemLoad
-import astnodes.sec.SecLattice
-import astnodes.sec.SecMemLoad
-import astnodes.sec.SecVar
 
 /** The program State
  *
@@ -55,7 +45,7 @@ case class State(
 
   //TODO handle size of memload
   /** Returns the complete rely (including automatically generated conditions) */
-  private def getCompleteRely: List[Pred] = List(rely.vars.collect{case v: Register => v}.foldLeft(rely)((p, v) => p.substExpr(v, exp.`var`.MemLoad(symbolTable(v.name), Some(8)))), Forall("i: bv64", "((heap[i] == old(heap[i])) ==> (Gamma_heap[i] == old(Gamma_heap[i])))")) // TODO
+  private def getCompleteRely: List[Pred] = List(rely.vars.collect{case v: Register => v}.foldLeft(rely)((p, v) => p.substExpr(v, MemLoad(symbolTable(v.name), Some(8)))), Forall("i: bv64", "((heap[i] == old(heap[i])) ==> (Gamma_heap[i] == old(Gamma_heap[i])))")) // TODO
 
   private def relyStr = "procedure rely(); modifies " + "heap, Gamma_heap" + ";\n ensures " + getCompleteRely.mkString(";\n ensures ") + ";"
 
@@ -70,17 +60,30 @@ case class State(
 
   def functionFromCall(call: CallStmt): FunctionState = functions.find(_.header.funcName == call.funcName).get
 
+  def findStatementFunction(stmt: Stmt): FunctionState = {
+    functions.collectFirst {
+      case function: FunctionState if function.blocks.exists(_.lines.contains(stmt)) => function
+    }
+  }.get
+
+  def applyAnalysis[T <: AnalysisPoint[T]](analysis: Map[Stmt, T]): State =
+    copy(functions = functions.map { _.applyAnalysis[T](analysis) })
+
 }
 
 case object State {
   /** Generate a State object from a flow graph */
-  def apply(flowGraph: FlowGraph, rely: Pred, guar: Pred, symbolTable: Map[String, Literal], bvSizes: Map[String, Int], lPreds: Map[Register, Sec], gamma: Map[Register, SecVar]): State = {
-    val controlledBy = lPreds.map{
-      case (v, p) => (v, p.vars)
-    }
+  def apply(flowGraph: FlowGraph,
+            rely: Pred,
+            guar: Pred,
+            symbolTable: Map[String, Literal],
+            bvSizes: Map[String, Int],
+            lPreds: Map[Register, Sec],
+            gamma: Map[Register, SecVar]): State = {
+    val controlledBy = lPreds.map { (v, p) => (v, p.vars) }
 
     // TODO alternatively could use the GOT
-    val vars = flowGraph.getFunctions.asScala.flatMap(func => func.getInitStmts.asScala.map(init => init.variable)).toSet
+    val vars = flowGraph.functions.flatMap(func => func.initStmts.map(init => init.variable)).toSet
 
     val controls = vars.map(v => (v,
       controlledBy.collect{
@@ -88,17 +91,18 @@ case object State {
       }.toSet
     )).toMap[Register, Set[Register]]
 
-    val functions = flowGraph.functions.asScala.map(FunctionState.apply).toList.map{
-      case x if x.header.funcName == "main" =>
+    val functions = flowGraph.functions.map(FunctionState.apply).map{
+      case main if main.header.funcName == "main" =>
         // Update the first block to contain the gamma assignments
-        val (pc, block) = (x.rootBlockLabel, x.rootBlock)
-        val newBlock = block.copy(lines = block.lines.prependedAll(gamma.map{case (v, s) => GammaUpdate(SecMemLoad(gamma = true, L = false, symbolTable(v.name)), s)}))
-        val newMap = x.labelToBlock.updated(pc, newBlock)
-        x.copy(labelToBlock = newMap)
+        val gammaAssignments = gamma.map {
+          case (v, s) => GammaUpdate(SecMemLoad(gamma = true, L = false, symbolTable(v.name)), s)
+        }
+        val mainHeadUpdate = main.blocks.head.copy(lines = gammaAssignments ++: main.blocks.head.lines)
+        main.copy(blocks = main.blocks.updated(0, mainHeadUpdate))
       case x => x
     }
 
-    State(functions, rely, guar, controls, flowGraph.getGlobalInits.asScala.toList, symbolTable, bvSizes, lPreds, gamma)
+    State(functions, rely, guar, controls, flowGraph.globalInits, symbolTable, bvSizes, lPreds, gamma)
   }
 }
 
@@ -110,68 +114,78 @@ case object State {
  *  @param rootBlockLabel the label of the root block
  *  @param labelToChildren a mapping from a blocks label to its children
  */
-case class FunctionState (
-  labelToBlock: Map[String, Block],
-  initStmts: List[InitStmt],
-  header: EnterSub,
-  rootBlockLabel: String,
-  private val labelToChildren: Map[String, Set[String]],
-) {
-  def rootBlock: Block = labelToBlock(rootBlockLabel)
-
-  def children(label: String): Option[Set[String]] = labelToChildren.get(label)
-  def children(block: Block): Option[Set[String]] = labelToChildren.get(block.label)
-  
-  def parents(label: String): List[String] = labelToChildren.collect{
-    case (l, ls) if ls.contains(label) => l
-  }.toList
-  def parents(block: Block): List[String] = parents(block.label)
+case class FunctionState(blocks: List[Block],
+                         initStmts: List[InitStmt],
+                         header: EnterSub,
+                         name: String) {
 
   override def toString: String = header.toString + "\n"
     + initStmts.map(_.toBoogieString).mkString("\n")
-    + labelToBlock.values.mkString("") + "\n}"
+    + blocks.mkString("") + "\n}"
+
+  def applyAnalysis[T <: AnalysisPoint[T]](analysis: Map[Stmt, T]): FunctionState = {
+    copy(blocks = blocks.map { _.applyAnalysis[T](analysis) })
+  }
 
   // Constant Prop analysis requires these for expression simplification
-  def replaceLine(oldStmt: Stmt, newStmt: Stmt): Unit = labelToBlock.values.foreach(block => block.replaceLine(oldStmt, newStmt))
-  def findStmtFromLabel(label: Label): Option[Stmt] = {
-    labelToBlock.values.foreach(block => {
-      if (block.findStmtFromLabel(label).isDefined) return block.findStmtFromLabel(label)
+  /*
+  def replaceLine(oldStmt: Stmt, newStmt: Stmt): FunctionState = {
+    val blocksUpdate = blocks.map { block => block.replaceLine(oldStmt, newStmt) }
+    copy(blocks = blocksUpdate)
+  }
+
+  def findStmtFromLabel(pc: String): Option[Stmt] = {
+    blocks.foreach(block => {
+      if (block.findStmtFromLabel(pc).isDefined) return block.findStmtFromLabel(pc)
     })
     None
   }
+  */
 }
 
 case object FunctionState {
   /** Generate a FunctionState from a FlowGraph.Function */
   def apply(function: FlowGraph.Function): FunctionState = {
-    val blocks = function.getBlocks.asScala.map(b => (b.getLabel, new Block(b))).toMap
-    val labelToChildren = function.getBlocks.asScala.map(b => (b.label, b.lastLine match {
+    /*
+    val labelToChildren = function.blocks.map(b => (b.label -> b.lines.last match {
       case cjmp: CJmpStmt => Set(cjmp.trueTarget, cjmp.falseTarget)
       case jmp: JmpStmt => Set(jmp.target)
       case call: CallStmt => call.returnTarget.toSet
       case _: ExitSub => Set()
     })).toMap
+    */
 
-    new FunctionState(blocks, function.getInitStmts.asScala.toList, function.getHeader, function.getBlocks.get(0).label, labelToChildren)
+    FunctionState(function.blocks, function.initStmts, function.header, function.header.funcName)
   }
 }
 
 /** A basic block
  */
-case class Block (
-  label: String,
-  var lines: List[Stmt],    // changed lines to var b/c it was the only practical way for the CP to apply changes to a State
-) {
-  def this(block: FlowGraph.Block) = this(block.getLabel, block.getLines.asScala.toList)
 
+// need to handle children properly ugh
+case class Block(label: String,
+                 lines: List[Stmt],
+                 children: List[Block]) {
   override def toString: String = "\nlabel" + label + ":\n    " + lines.map(l => l.toBoogieString).mkString("\n    ")
 
+  def applyAnalysis[T <: AnalysisPoint[T]](analysis: Map[Stmt, T]): Block = {
+    val linesUpdate = lines map {
+        case line: Stmt => analysis.get(line) match {
+          case Some(a) => a.applyChange(line)
+          case _ => line
+        }
+    }
+    copy(lines = linesUpdate)
+  }
+
   // Constant Prop analysis requires these for expression simplification
-  def findStmtFromLabel(label: Label): Option[Stmt] = lines.find(stmt => stmt.label == label)
-  def replaceLine(oldStmt: Stmt, newStmt: Stmt): Unit = {
-    val index = lines.indexOf(oldStmt)
-    if (index != -1) {
-      lines = lines.updated(index, newStmt)
+  /*
+  def findStmtFromLabel(pc: String): Option[Stmt] = lines.find(stmt => stmt.pc == pc)
+  def replaceLine(oldStmt: Stmt, newStmt: Stmt): Block = {
+    lines.indexOf(oldStmt) match {
+      case -1 => this
+      case index => copy(lines = lines.updated(index, newStmt))
     }
   }
+  */
 }

@@ -1,9 +1,6 @@
 package astnodes.exp
 
-import astnodes.exp.`var`.{Register, Var}
-
-import java.util
-import java.util.Objects
+import astnodes.exp.variable.*
 
 /** Literal expression (e.g. 4, 5, 10)
   */
@@ -13,7 +10,7 @@ case class Literal(value: String, override val size: Option[Int] = None) extends
   override def toBoogieString: String = value + s"bv${if (size.isDefined) size.get else 64}"
 
   override def vars: List[Register] = List()
-  override def subst(v: Var, w: Var): Expr = this
+  override def subst(v: Variable, w: Variable): Expr = this
   override def fold(old: Expr, sub: Expr): Expr = this
 }
 

@@ -1,19 +1,15 @@
 package analysis
 
-import scala.math.signum
-import scala.jdk.CollectionConverters.ListHasAsScala
-
-import analysis.AnalysisPoint
+import astnodes.exp.{BinOp, Expr, Extract, Literal}
+import astnodes.exp.variable.*
 import astnodes.stmt.*
 import astnodes.stmt.assign.*
-import astnodes.exp.`var`.*
-import astnodes.exp.*
-import util.SegmentationViolationException
-import util.AssumptionViolationException
-
+import util.{AssumptionViolationException, SegmentationViolationException}
 import vcgen.State
 
-class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoint[PointsToAnalysis] {
+import scala.math.signum
+
+case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoint[PointsToAnalysis] {
   // i.e. map of Expr[X0] -> Expr[SP + 10]
   // "not a pointer" value is Literal(null) 
   private var currentState: Map[Expr, Set[Expr]] = pointsToGraph
@@ -22,10 +18,6 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
   private var heapAllocations: Int = 0
 
   var functionName: String = "main"
-
-  def this() = {
-    this(Map())
-  }
 
   private def countEdges: Int = {
     var count: Int = 0
@@ -36,33 +28,29 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
   }
 
   override def equals(other: PointsToAnalysis): Boolean = {
-    //val otherAsThis: PointsToAnalysis = typeCheck(other)
     this.currentState.equals(other.currentState)
   }
 
   override def compare(other: PointsToAnalysis): Int = {
-    //val otherAsThis: PointsToAnalysis = typeCheck(other)
     (this.countEdges - other.countEdges).sign
   }
 
   override def join(other: PointsToAnalysis): PointsToAnalysis = {
-    //val otherAsThis: PointsToAnalysis = typeCheck(other)
     val combined: Map[Expr, Set[Expr]] = Map[Expr, Set[Expr]]()
 
-    this.currentState.foreach(cEdge => {
-      other.currentState.foreach(oEdge => {
+    for (cEdge <- this.currentState) {
+      for (oEdge <- other.currentState) {
         if (cEdge._1 == oEdge._1) {
           combined.concat(Map(cEdge._1 -> cEdge._2.union(oEdge._2)))
         }
-      })
-    })
+      }
+    }
 
     this.currentState = combined
     this
   }
 
   override def meet(other: PointsToAnalysis): PointsToAnalysis = {
-    //val otherAsThis: PointsToAnalysis = typeCheck(other)
     val intersected: Map[Expr, Set[Expr]] = Map[Expr, Set[Expr]]()
 
     currentState.foreach(cEdge => {
@@ -87,7 +75,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
           case assignFromRegister: Register =>
             // () := foo ~ LHS points to everything that (foo) points to i.e. *foo
             locationValue = currentState.getOrElse(assignFromRegister, Set(NonPointerValue));
-          case assignFromMem: `var`.MemLoad =>
+          case assignFromMem: astnodes.exp.variable.MemLoad =>
             // () := mem[foo] ~ LHS points to everything that is pointed to by memory pointed to by foo i.e. **foo
             currentState.getOrElse(assignFromMem.exp, Set()).foreach(single => {
               if (locationValue == null) {
@@ -115,7 +103,7 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
           case assignToRegister: Register =>
             // foo := () ~ basic assignment
             currentState = currentState + (assignToRegister -> locationValue);
-          case assignToMem: astnodes.exp.`var`.MemLoad =>
+          case assignToMem: astnodes.exp.variable.MemLoad =>
             // mem[foo] := () ~ everything that foo points to could point to RHS.
             // special exception: if foo can only point to one thing, then mem[foo] can only point to RHS.
             val memLoadPotentialValues = currentState.getOrElse(assignToMem.exp, Set())
@@ -174,8 +162,8 @@ class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoin
     this
   }
 
-  override def applyChanges(preState: State, information: Map[Stmt, PointsToAnalysis]): State = {
-    preState
+  override def applyChange(stmt: Stmt): Stmt = {
+    stmt
   }
 
   override def toString: String = {

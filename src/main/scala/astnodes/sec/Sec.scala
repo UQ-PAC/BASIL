@@ -1,6 +1,6 @@
 package astnodes.sec
-import astnodes.exp.`var`.{MemLoad, Register, Var}
+import astnodes.exp.variable.{MemLoad, Register, Variable}
 
 trait Sec {
-  def vars: List[Var]
+  def vars: List[Variable]
 }

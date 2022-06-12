@@ -1,37 +1,23 @@
 package astnodes.stmt
 
-import astnodes.parameters.InParameter
 import astnodes.exp.Expr
-import astnodes.exp.`var`.Var
-import astnodes.parameters.OutParameter
-
-import scala.collection.immutable
+import astnodes.exp.variable.Variable
+import astnodes.parameters.{InParameter, OutParameter}
 import astnodes.pred.Pred
-import scala.collection.mutable.ArrayBuffer as MutableArrayBuffer
-import scala.collection.mutable.Buffer as MutableBuffer
-import astnodes.Label
+
+import scala.collection.mutable.ArrayBuffer
 
 // TODO rewrite statment loader to remove getters
 // TODO remove the need for this, and instead create directly place this logic in function state
 //      as we know the BIL output I think this would be fine
-case class EnterSub(pc: String, funcName: String, var requires: List[Pred], var ensures: List[Pred]) extends Stmt(Label(pc)) {
-  private var inParams: MutableBuffer[InParameter] = new MutableArrayBuffer[InParameter]()
-  private var outParam: Option[OutParameter] = None
-  private val modifies: MutableBuffer[String] = new MutableArrayBuffer[String]() // TODO type
-  // TODO dont like this
-  modifies.addAll(immutable.List("heap", "stack", "Gamma_heap", "Gamma_stack", "SP", "R31", "Gamma_SP", "Gamma_R31"))
-
-  def getInParams: MutableBuffer[InParameter] = inParams
-  def getOutParam: Option[OutParameter] = outParam
-  def setOutParam(outParam: OutParameter): Unit = this.outParam = Some(outParam)
-  def setInParams(newInParms: MutableBuffer[InParameter]): Unit = inParams = newInParms
-  def getFuncName: String = funcName
-
-  def setRequiresEnsures(requires: List[Pred], ensures: List[Pred]): Unit = {
-    this.requires = requires
-    this.ensures = ensures
-  }
-
+case class EnterSub(override val pc: String,
+                    funcName: String,
+                    var requires: List[Pred],
+                    var ensures: List[Pred],
+                    inParams: ArrayBuffer[InParameter] = ArrayBuffer(),
+                    var outParam: Option[OutParameter] = None,
+                    modifies: ArrayBuffer[String] = ArrayBuffer("heap", "stack", "Gamma_heap", "Gamma_stack", "SP", "R31", "Gamma_SP", "Gamma_R31")
+                   ) extends Stmt(pc) {
   override def toString: String = {
     val in = 
       if (libraryFunction) inParams.mkString(", ")
@@ -54,6 +40,6 @@ case class EnterSub(pc: String, funcName: String, var requires: List[Pred], var 
     s"procedure $decl $modifiesStr; $requiresStr $ensuresStr {"
   }
 
-  override def subst(v: Var, w: Var): Stmt = this
+  override def subst(v: Variable, w: Variable): Stmt = this
   def libraryFunction: Boolean = CallStmt.libraryFunctions.contains(funcName)
 }

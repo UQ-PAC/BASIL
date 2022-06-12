@@ -1,17 +1,14 @@
 package astnodes.stmt
 
-import util.AssumptionViolationException
-
-import java.util.{Collections, List}
 import astnodes.exp.Expr
-import astnodes.exp.`var`.{Register, Var}
-import astnodes.Label
+import astnodes.exp.variable.{Register, Variable}
+import util.AssumptionViolationException
 
 import scala.util.matching.Regex
 
 // TODO is this class necassary 
-case class InitStmt(variable: Register, pc: String, varType: String, const: Boolean = false) extends Stmt(Label(pc)) {
-  override def subst(v: Var, w: Var): Stmt = variable.subst(v,w) match {
+case class InitStmt(variable: Register, override val pc: String, varType: String, const: Boolean = false) extends Stmt(pc) {
+  override def subst(v: Variable, w: Variable): Stmt = variable.subst(v,w) match {
     case res: Register => this.copy(variable = res)
     case _ => ???
   }

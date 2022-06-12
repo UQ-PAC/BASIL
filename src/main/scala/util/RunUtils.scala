@@ -1,12 +1,12 @@
 package util
 
-import BilParser.{BilAdtLexer, BilAdtParser, BilLexer, BilParser, SymsLexer, SymsParser}
+import BilParser.*
+import analysis.*
 import astnodes.pred.Bool
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating.{AdtStatementLoader, BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
+import translating.*
 import vcgen.{State, VCGen}
-import analysis.*
 
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters.*
@@ -35,7 +35,7 @@ object RunUtils {
     walker.walk(symsListener, symsParser.syms)
 
     // TODO duplicated code for default value
-    val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
+    val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.toList, statementLoader.varSizes.toMap)
 
     val state = State(
       flowGraph,
@@ -47,7 +47,7 @@ object RunUtils {
       statementLoader.gammaMappings.toMap
     )
 
-    val WL = Worklist[ConstantPropagationAnalysis](ConstantPropagationAnalysis(state, true), state)
+    val WL = Worklist(ConstantPropagationAnalysis(state, true), state)
     val analysedState = WL.doAnalysis()
 
     val updatedState = BoogieTranslator.translate(analysedState)
@@ -75,7 +75,7 @@ object RunUtils {
     walker.walk(symsListener, symsParser.syms)
 
     // TODO duplicated code for default value
-    val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
+    val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.toList, statementLoader.varSizes.toMap)
 
     val state = State(
       flowGraph,

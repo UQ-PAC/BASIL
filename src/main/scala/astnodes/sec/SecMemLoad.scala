@@ -1,8 +1,8 @@
 package astnodes.sec
 
-import astnodes.exp
 import astnodes.exp.{BinOp, Expr}
-import astnodes.exp.`var`.Var
+import astnodes.exp
+import astnodes.exp.variable.Variable
 
 case class SecMemLoad (gamma: Boolean, L: Boolean, loc: Expr) extends Sec {
   override def toString: String =
@@ -11,10 +11,10 @@ case class SecMemLoad (gamma: Boolean, L: Boolean, loc: Expr) extends Sec {
 
   def onStack: Boolean = loc match {
     // TODO improve
-    case v: exp.`var`.Register => v.name == "R31"
-    case BinOp(_, v: exp.`var`.Register, _) => v.name == "R31"
+    case v: astnodes.exp.variable.Register => v.name == "R31"
+    case BinOp(_, v: astnodes.exp.variable.Register, _) => v.name == "R31"
     case _ => false
   }
 
-  override def vars = List()
+  override def vars: List[Variable] = List()
 }

@@ -1,22 +1,20 @@
 package astnodes.stmt
 
-import astnodes.Label
 import astnodes.exp.Expr
-import astnodes.exp.`var`.Var
-
-import java.util
+import astnodes.exp.variable.Variable
 
 /** Generic instruction fact
   */
-// TODO make var
-trait Stmt(var label: Label) {
-  // main
-  def subst(v: Var, w: Var): Stmt
+trait Stmt(val pc: String, val labelVisible: Boolean = false) {
+  def subst(v: Variable, w: Variable): Stmt
+
   def toBoogieString: String = toString
 
-  // TODO redefine this without side effects
-  def copy(label: Label): Stmt = {
-    this.label = label
-    this
+  def labelString: String = if (labelVisible) {
+    "label" + pc + ": "
+  } else {
+    ""
   }
+
+  //def withVisibleLabel: Stmt
 }

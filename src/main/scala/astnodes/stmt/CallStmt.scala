@@ -1,14 +1,9 @@
 package astnodes.stmt
 
-import java.util
 import astnodes.exp.Expr
-import astnodes.exp.`var`.{Register, Var}
-import astnodes.Label
-import scala.collection.immutable.HashSet
+import astnodes.exp.variable.{Register, Variable}
 
-// TODO remove var for lhs
-case class CallStmt(pc: String, funcName: String, returnTarget: Option[String], args: List[Register], var lhs: Option[Register]) extends Stmt(Label(pc)) {
-  def setLHS(reg: Register): Unit = lhs = Some(reg)
+case class CallStmt(override val pc: String, funcName: String, returnTarget: Option[String], args: List[Register], lhs: Option[Register]) extends Stmt(pc) {
 
   override def toString: String = {
     // TODO neaten up call args logic
@@ -18,7 +13,7 @@ case class CallStmt(pc: String, funcName: String, returnTarget: Option[String], 
 
     val lhsStr = lhs match {
       case _ if !libraryFunction => CallStmt.callRegisters.mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x").mkString(", ") + " := "
-      case Some(x) => s"$x, ${x.toGamma} := "
+      case Some(x: Variable) => s"$x, ${x.toGamma} := "
       case None => ""
     }
     val targetStr = returnTarget match {
@@ -29,10 +24,10 @@ case class CallStmt(pc: String, funcName: String, returnTarget: Option[String], 
       if (libraryFunction) CallStmt.libraryFunctions(funcName).mappedName.getOrElse(funcName)
       else funcName
 
-    s"call $label$lhsStr $name ($argsStr); $targetStr"
+    s"call $labelString$lhsStr $name ($argsStr); $targetStr"
   }
 
-  override def subst(v: Var, w: Var): Stmt = this.copy(args = args.map(r => r.subst(v,w) match {
+  override def subst(v: Variable, w: Variable): Stmt = copy(args = args.map(r => r.subst(v,w) match {
       case x: Register => x
       case _ => ???
     }))

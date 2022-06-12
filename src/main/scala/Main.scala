@@ -1,29 +1,20 @@
 // package scala
 
-import astnodes.stmt.Stmt
-import org.antlr.v4.runtime.CharStreams
-import org.antlr.v4.runtime.CommonTokenStream
-import org.antlr.v4.runtime.tree.ParseTreeWalker
-
-import scala.collection.mutable.Set
-import java.io.BufferedWriter
-import java.io.FileWriter
-import java.io.IOException
-import java.util.ArrayList
-import java.util.Arrays
-import java.util.List
-import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import BilParser.*
 import analysis.*
-import astnodes.pred.Bool
-import vcgen.{State, VCGen}
 import astnodes.exp.*
-
-import collection.{immutable, mutable}
-import scala.collection.mutable.ArrayBuffer
-import sys.process.*
-import scala.language.postfixOps
+import astnodes.pred.Bool
+import astnodes.stmt.Stmt
+import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
+import org.antlr.v4.runtime.tree.ParseTreeWalker
+import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
 import util.RunUtils
+import vcgen.{State, VCGen}
+
+import scala.collection.mutable.{ArrayBuffer, Set}
+import scala.collection.{immutable, mutable}
+import scala.language.postfixOps
+import scala.sys.process.*
 
 @main def main(fileName: String, elfFileName: String): Int = {
   val state: State = if (fileName.endsWith("adt")) {

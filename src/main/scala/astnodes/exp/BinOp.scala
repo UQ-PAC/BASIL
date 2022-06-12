@@ -1,11 +1,8 @@
 package astnodes.exp
 
-import astnodes.exp.`var`.Var
-import util.AssumptionViolationException
-
-import scala.collection.mutable.ArrayBuffer
-import scala.jdk.CollectionConverters.*
 import analysis.tools.SimplificationUtil
+import astnodes.exp.variable.*
+import util.AssumptionViolationException
 
 /** Binary operation of two expressions
  */
@@ -18,7 +15,7 @@ case class BinOp(
   override def toString: String = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
   override def toBoogieString: String = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
 
-  override def subst(v: Var, w: Var): Expr = {
+  override def subst(v: Variable, w: Variable): Expr = {
     this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
   }
 
@@ -26,20 +23,20 @@ case class BinOp(
     SimplificationUtil.binArithmetic(this.copy(firstExp = firstExp.fold(old,sub), secondExp = secondExp.fold(old, sub)))
   }
 
-  override def vars: List[Var] = firstExp.vars ++ secondExp.vars
+  override def vars: List[Variable] = firstExp.vars ++ secondExp.vars
 
   // Finish resolveTypes and then remove this
   override def size: Option[Int] = BinOperator.size(operator, inputSize)
 
   def inputSize: Option[Int] = (firstExp.size, secondExp.size) match {
-    case (a: Some[Int], b: Some[int]) =>
+    case (Some(a), Some(b)) =>
       if (a == b) {
-        a
+        Some(a)
       } else {
         throw new AssumptionViolationException(s"Both sides of binop should have the same size $firstExp: ${firstExp.size}, $secondExp: ${secondExp.size}")
       }
-    case (x: Some[Int], None) => x
-    case (None, x: Some[Int]) => x
+    case (Some(x), None) => Some(x)
+    case (None, Some(x)) => Some(x)
     case (None, None) => None
   }
 }

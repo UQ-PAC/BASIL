@@ -1,13 +1,13 @@
 package astnodes.stmt.assign
 
-import astnodes.exp.`var`.{MemLoad, Var}
-import astnodes.exp.{BinOp, BinOperator, Expr, Extract, Literal}
+import astnodes.exp.{BinOp, BinOperator, Expr, Extract}
+import astnodes.exp.variable.{MemLoad, Variable}
+import astnodes.exp.*
 import astnodes.stmt.Stmt
-import astnodes.Label
 
 /** Store fact
   */
-case class MemAssign(pc: String, override val lhs: MemLoad, override val rhs: Expr) extends Assign (pc, lhs, rhs) with Stmt(Label(pc))  {
+case class MemAssign(override val pc: String, override val lhs: MemLoad, override val rhs: Expr) extends Assign(pc, lhs, rhs) with Stmt(pc) with MaybeNonConstantMemAssign {
 
   // TODO this tostring method is bad as well
   // need to really sort out a good way to handle the differnet ways memload is presented
@@ -22,3 +22,5 @@ case class MemAssign(pc: String, override val lhs: MemLoad, override val rhs: Ex
 
 }
 
+trait MaybeNonConstantMemAssign
+class NonConstantMemAssign extends MaybeNonConstantMemAssign

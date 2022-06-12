@@ -1,11 +1,11 @@
 package analysis
 
-import vcgen.*
 import astnodes.stmt.*
+import astnodes.stmt.assign.*
+import vcgen.*
 
-import scala.collection.mutable.ArrayDeque
-import java.lang.NullPointerException
 import scala.collection.mutable
+import scala.collection.mutable.ArrayDeque
 
 class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
   private final val debug: Boolean = false
@@ -19,16 +19,14 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
   var stmtAnalysisInfo: Map[Stmt, T] = Map()
   var blockAnalysisInfo: Map[Block, T] = Map()
 
-  def getAllInfo: Map[Stmt, T] = stmtAnalysisInfo
-
   def getOneInfo(stmt: Stmt): T = stmtAnalysisInfo.getOrElse(stmt, analysis.createLowest)
 
   def printAllLinesWithLabels(): Unit = {
     for (function <- startState.functions) {
-      for (block <- function.labelToBlock.values) {
+      for (block <- function.blocks) {
         println("New block: " + block.label)
         for (line <- block.lines) {
-          println(line.label.pc + " : " + line)
+          println(line.pc + " : " + line)
         }
       }
     }
@@ -36,19 +34,18 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
 
   def doAnalysis(): State = {
     analyseFunction("main")
-    if debug then println(getAllInfo)
+    if debug then println(stmtAnalysisInfo)
 
     //previousStmtAnalysisState = None
     //blockAnalysisInfo = Map()
-
-    analysis.applyChanges(startState, getAllInfo)
+    startState.applyAnalysis[T](stmtAnalysisInfo)
   }
 
   def analyseFunction(name: String): Unit = {
     if debug then println("analysing function: " + name)
 
     currentCallString = currentCallString + name
-    currentWorklist = findFunctionRootBlock(name)
+    currentWorklist = mutable.ArrayDeque(findFunctionRootBlock(name))
 
     val functionStartAnalysisState = previousStmtAnalysisState
     var currentFunctionAnalysedInfo: Map[Stmt, T] = Map()
@@ -104,7 +101,7 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
     blockAnalysisInfo.get(block) match {
       case Some(t) if previousStmtAnalysisState == t =>
         blockAnalysisInfo = blockAnalysisInfo + (block -> previousStmtAnalysisState)
-        for (b <- getBlockChildren(block) + block) {
+        for (b <- block.children :+ block) {
           if (!currentWorklist.contains(b)) {
             currentWorklist.append(b)
           }
@@ -132,7 +129,7 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
   }
 
   def analyseStmt(stmt: Stmt, currentInfo: Map[Stmt, T]): Map[Stmt, T] = {
-    if debug then println("analysing stmt: " + stmt.label.pc + " : " + stmt)
+    if debug then println("analysing stmt: " + stmt.pc + " : " + stmt)
     var outputInfo: Map[Stmt, T] = currentInfo
 
     stmt match {
@@ -158,52 +155,37 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
     outputInfo
   }
 
-    /**
-     * The process for these two is similar:
+  /**
+   * The process for these two is similar:
 
-     * Find the FunctionState that the block belongs to
-     * Get the labels of its children/parents from that FunctionState
-     * Map those labels to blocks, by:
-     *  Finding the FunctionState that the label belongs to
-     *  Getting the Block from that FunctionState
-     */
-    def getBlockChildren(block: Block): Set[Block] = {
-        startState.functions.find((func: FunctionState) => {
-            func.labelToBlock.contains(block.label)
-        }).get.children(block).getOrElse(Set[String]()).map(label => {
-            startState.functions.find((func: FunctionState) => {
-              func.labelToBlock.contains(label)
-            }).get.labelToBlock.get(label).orNull
-        })
-    }
+   * Find the FunctionState that the block belongs to
+   * Get the labels of its children/parents from that FunctionState
+   * Map those labels to blocks, by:
+   *  Finding the FunctionState that the label belongs to
+   *  Getting the Block from that FunctionState
+   */
 
-    def getBlockParents(block: Block): Set[Block] = {
-        startState.functions.find((func: FunctionState) => {
-            func.labelToBlock.contains(block.label)
-        }).get.parents(block).map(label => {
-            startState.functions.find((func: FunctionState) => {
-              func.labelToBlock.contains(label)
-            }).get.labelToBlock.get(label).orNull
-        }).toSet
-    }
+  def getBlockParents(block: Block): Set[Block] = {
+    val function = startState.functions.find { _.blocks.contains(block) }.get
+    val parents = function.blocks.collect { case b: Block if b.children.contains(block) => b }
+    parents.toSet
+  }
 
-    /**
-     * Finds the root block of a function given the function's name.
-     */
-    def findFunctionRootBlock(funcName: String): mutable.ArrayDeque[Block] = {
-      mutable.ArrayDeque(
-        startState.functions.find((func: FunctionState) => {
-          func.header.getFuncName == funcName
-        }).get.rootBlock
-      )
-    }
+  /**
+   * Finds the root block of a function given the function's name.
+   */
+  def findFunctionRootBlock(funcName: String): Block = {
+      startState.functions.find((func: FunctionState) => {
+        func.name == funcName
+      }).get.blocks.head
+  }
 
-    /**
-     * "Commits" the info from the current function to the output map.
-     */
-    def saveNewAnalysisInfo(newInfo: Map[Stmt, T]): Unit = {
-      for ((key, value) <- newInfo) {
-        stmtAnalysisInfo = stmtAnalysisInfo + (key -> value)
-      }
+  /**
+   * "Commits" the info from the current function to the output map.
+   */
+  def saveNewAnalysisInfo(newInfo: Map[Stmt, T]): Unit = {
+    for ((key, value) <- newInfo) {
+      stmtAnalysisInfo = stmtAnalysisInfo + (key -> value)
     }
+  }
 }

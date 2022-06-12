@@ -1,10 +1,10 @@
 package astnodes.pred
 
-import astnodes.exp.`var`.{MemLoad, Register, Var}
+import astnodes.exp.variable.{MemLoad, Register, Variable}
 
 trait Pred {
-  def vars: List[Var]
-  def substExpr(v: Var, w: Var): Pred
+  def vars: List[Variable]
+  def substExpr(v: Variable, w: Variable): Pred
   def toBoogieString: String = toString
 }
 

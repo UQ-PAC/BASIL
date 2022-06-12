@@ -1,13 +1,11 @@
 package astnodes.stmt
 
-import java.util
 import astnodes.exp.Expr
-import astnodes.exp.`var`.Var
-import astnodes.Label
+import astnodes.exp.variable.Variable
 
 /** Jump
   */
-case class JmpStmt(pc: String, target: String) extends Stmt(Label(pc)) {
-  override def toString: String = String.format("%sgoto label%s;", label, target)
-  override def subst(v: Var, w: Var): Stmt = this
+case class JmpStmt(override val pc: String, target: String) extends Stmt(pc) {
+  override def toString: String = String.format("%sgoto label%s;", labelString, target)
+  override def subst(v: Variable, w: Variable): Stmt = this
 }

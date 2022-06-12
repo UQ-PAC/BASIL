@@ -1,5 +1,6 @@
 package astnodes.sec
 import astnodes.exp
+import astnodes.exp.variable.Variable
 import astnodes.pred.Pred
 
 /**
@@ -8,5 +9,5 @@ import astnodes.pred.Pred
  */
 case class SecVar (name: String, gamma: Boolean = false) extends Sec {
   override def toString: String = s"${if (gamma) "Gamma" else "s"}_$name"
-  override def vars = List()
+  override def vars: List[Variable] = List()
 }

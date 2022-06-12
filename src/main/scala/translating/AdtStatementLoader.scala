@@ -1,27 +1,15 @@
 package translating
 
-import BilParser.BilAdtParser.{DirectContext, ExpContext, ExpIntAdtContext, ExpVarContext, IndirectContext}
+import BilParser.BilAdtParser.*
 import BilParser.{BilAdtBaseListener, BilAdtListener, BilAdtParser}
-import astnodes.exp.{
-  BinOp,
-  BinOperator,
-  Expr,
-  Extend,
-  Extract,
-  FunctionCall,
-  Literal,
-  MemStore,
-  Pad,
-  UniOp,
-  UniOperator
-}
-import astnodes.exp.`var`.{MemLoad, Register, Var}
-import astnodes.parameters.OutParameter
-import astnodes.parameters.InParameter
+import astnodes.exp.{BinOp, BinOperator, Expr, Extend, Extract, MemStore, Pad, UniOp, UniOperator}
+import astnodes.exp.variable.{MemLoad, Register, Variable}
+import astnodes.exp.*
+import astnodes.parameters.{InParameter, OutParameter}
 import astnodes.pred.Pred
 import astnodes.sec.{Sec, SecVar}
 import astnodes.stmt.assign.{MemAssign, RegisterAssign}
-import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, JmpStmt, SkipStmt, Stmt}
+import astnodes.stmt.*
 import org.antlr.v4.runtime
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}
@@ -232,7 +220,9 @@ class AdtStatementLoader extends BilAdtBaseListener {
 
   override def exitSub(ctx: BilAdtParser.SubContext): Unit = {
     currentFunction match {
-      case Some(f) => f.setRequiresEnsures(requires, ensures)
+      case Some(f) =>
+        f.requires = requires
+        f.ensures = ensures
       case None =>
     }
 
@@ -253,9 +243,9 @@ class AdtStatementLoader extends BilAdtBaseListener {
           val name = v.name.getText
           val size = v.`type`.imm.size.getText.toInt
           if (arg.intent.getText.contains("in")) {
-            currentFunction.get.getInParams += new InParameter(Register(id, size), Register(name, 64))
+            currentFunction.get.inParams += InParameter(Register(id, size), Register(name, 64))
           } else {
-            currentFunction.get.setOutParam(new OutParameter(Register(id, size), Register(name, 64)))
+            currentFunction.get.outParam = Some(OutParameter(Register(id, size), Register(name, 64)))
           }
         case _ => throw new AssumptionViolationException("Expected RHS of arg to be a variable")
       }

@@ -1,15 +1,14 @@
 package astnodes.stmt.assign
 
 import astnodes.exp.Expr
-import astnodes.exp.`var`.{Register, Var}
+import astnodes.exp.variable.{Register, Variable}
 import astnodes.stmt.Stmt
-import astnodes.Label
 
 // TODO check if we need override pc
 /** Load fact
   */
-case class RegisterAssign(pc: String, override val lhs: Register, override val rhs: Expr) extends Assign(pc, lhs, rhs) with Stmt(Label(pc)) {
-  override def toBoogieString: String = s"$label${lhs.toBoogieString} := ${rhs.toBoogieString};    // $pc"
+case class RegisterAssign(override val pc: String, override val lhs: Register, override val rhs: Expr) extends Assign(pc, lhs, rhs) with Stmt(pc) {
+  override def toBoogieString: String = s"$labelString${lhs.toBoogieString} := ${rhs.toBoogieString};    // $pc"
 
   // Otherwise is flag (e.g. #1)
   def isRegister: Boolean = lhs.name.charAt(0) == 'R'

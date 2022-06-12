@@ -1,18 +1,14 @@
 package astnodes.stmt.assign
 
-import astnodes.exp.{Expr, `var`}
+import astnodes.exp.Expr
+import astnodes.exp.variable.Variable
+import astnodes.sec.{Sec, SecMemLoad, SecVar}
 import astnodes.stmt.Stmt
 
-import scala.jdk.CollectionConverters.*
-import java.util
-import astnodes.Label
-
-import astnodes.sec.{Sec, SecVar, SecMemLoad}
-
-case class GammaUpdate (lhs: SecVar | SecMemLoad, sec: Sec) extends Stmt(Label("NA")) {
+case class GammaUpdate (lhs: SecVar | SecMemLoad, sec: Sec) extends Stmt("NA") {
 
   override def toBoogieString: String = s"${lhs.toString} := ${sec.toString};"
 
   // TODO
-  override def subst(v: `var`.Var, w: `var`.Var): Stmt = this
+  override def subst(v: Variable, w: Variable): Stmt = this
 }

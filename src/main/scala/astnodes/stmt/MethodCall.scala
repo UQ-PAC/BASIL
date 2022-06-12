@@ -1,11 +1,10 @@
 package astnodes.stmt
 
 import astnodes.exp.Expr
-import astnodes.exp.`var`.Var
+import astnodes.exp.variable.Variable
 import astnodes.pred.Pred
-import astnodes.Label
 
-class MethodCall(pc: String, name: String) extends Stmt(Label(pc)) {
-  override def subst(v: Var, w: Var): Stmt = ???
+case class MethodCall(override val pc: String, name: String) extends Stmt(pc) {
+  override def subst(v: Variable, w: Variable): Stmt = ???
   override def toString = s"call $name();"
 }

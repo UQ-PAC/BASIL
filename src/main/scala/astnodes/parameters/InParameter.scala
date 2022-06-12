@@ -1,9 +1,8 @@
 package astnodes.parameters
 
-import astnodes.exp.`var`.Register
-import astnodes.exp.`var`.MemLoad
+import astnodes.exp.variable.{MemLoad, Register}
 
-class InParameter(inName: Register, register: Register) extends Parameter(inName, register) {
+case class InParameter(name: Register, register: Register) extends Parameter(name, register) {
   /*  
   var alias: MemLoad = null
 

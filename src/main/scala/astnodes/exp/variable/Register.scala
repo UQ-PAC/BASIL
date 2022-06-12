@@ -1,12 +1,12 @@
-package astnodes.exp.`var`
+package astnodes.exp.variable
 
-import astnodes.exp.{Expr, `var`}
+import astnodes.exp.Expr
 import astnodes.pred
 import astnodes.sec.SecVar
 
 /** A register
   */
-case class Register(name: String, override val size: Option[Int]) extends Var {
+case class Register(name: String, override val size: Option[Int]) extends Variable {
   override def toString: String = name
   override def vars: List[Register] = List(this)
   override def toGamma: SecVar = SecVar(name, true)

@@ -1,15 +1,15 @@
 package astnodes.pred
 
 import astnodes.exp.Expr
-import astnodes.exp.`var`.Var
+import astnodes.exp.variable.Variable
 import astnodes.sec.Sec
 
 /**
  *  
  */
 case class SecComp(first: Sec, second: Sec) extends Pred {
-  override def vars: List[Var] = ???
+  override def vars: List[Variable] = ???
   override def toString: String = s"($first <: $second)"
-  override def substExpr(v: Var, w: Var): Pred = ???
+  override def substExpr(v: Variable, w: Variable): Pred = ???
 }
 

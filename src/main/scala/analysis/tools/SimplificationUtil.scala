@@ -1,7 +1,8 @@
 package analysis.tools
 
-import astnodes.exp.`var`.*
-import astnodes.exp.*
+import astnodes.exp.{BinOp, Concat, Expr, Extract, Literal, UniOp}
+import astnodes.exp
+import astnodes.exp.variable.*
 import astnodes.stmt.assign.*
 
 /**
@@ -49,7 +50,7 @@ case object SimplificationUtil {
     * Simplifies an extract expression with nested match statements
     */
   def bitvecExtract(extract: Extract): Expr = {
-    extract.variable match {
+    extract.body match {
       case literal: Literal =>
         extract.firstInt match {
           case 63 =>
