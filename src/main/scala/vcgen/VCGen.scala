@@ -1,11 +1,6 @@
 package vcgen
 
-import astnodes.exp.{Expr, Literal}
-import astnodes.exp.variable.{MemLoad, Register}
-import astnodes.pred.*
-import astnodes.sec.{Sec, SecBinOp, join}
-import astnodes.stmt.assign.{Assign, GammaUpdate, MemAssign, RegisterAssign}
-import astnodes.stmt.{Assert, CJmpStmt, MethodCall, Stmt}
+import astnodes.*
 import translating.FlowGraph
 
 object VCGen {

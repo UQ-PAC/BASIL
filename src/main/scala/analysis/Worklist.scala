@@ -1,7 +1,6 @@
 package analysis
 
-import astnodes.stmt.*
-import astnodes.stmt.assign.*
+import astnodes.*
 import vcgen.*
 
 import scala.collection.mutable

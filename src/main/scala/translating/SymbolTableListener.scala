@@ -1,7 +1,7 @@
 package translating
 
 import BilParser.{SymsBaseListener, SymsParser}
-import astnodes.exp.Literal
+import astnodes.*
 
 import scala.collection.mutable
 

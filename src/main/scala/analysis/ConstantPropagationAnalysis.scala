@@ -1,11 +1,6 @@
 package analysis
 
-import astnodes.exp.Expr
-import astnodes.exp.variable.{MemLoad, Register, Variable}
-import astnodes.exp.*
-import astnodes.pred
-import astnodes.stmt.*
-import astnodes.stmt.assign.*
+import astnodes.*
 import vcgen.{FunctionState, State}
 
 case class ConstantPropagationAnalysis(state: State,

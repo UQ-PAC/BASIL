@@ -2,7 +2,7 @@ package util
 
 import BilParser.*
 import analysis.*
-import astnodes.pred.Bool
+import astnodes.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*

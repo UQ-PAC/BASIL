@@ -2,14 +2,12 @@
 
 import BilParser.*
 import analysis.*
-import astnodes.exp.*
-import astnodes.pred.Bool
-import astnodes.stmt.Stmt
+import astnodes.*
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
-import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
+import translating.*
 import util.RunUtils
-import vcgen.{State, VCGen}
+import vcgen.*
 
 import scala.collection.mutable.{ArrayBuffer, Set}
 import scala.collection.{immutable, mutable}

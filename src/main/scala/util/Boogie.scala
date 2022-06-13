@@ -1,6 +1,6 @@
 package util
 
-import astnodes.sec.SecLattice
+import astnodes.SecLattice
 
 object Boogie {
   def generateBVHeader (size: Int): String = f"""

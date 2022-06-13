@@ -1,6 +1,6 @@
 package analysis
 
-import astnodes.stmt.Stmt
+import astnodes.*
 import util.{AnalysisTypeException, LatticeViolationException}
 import vcgen.State
 

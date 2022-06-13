@@ -1,12 +1,7 @@
 package vcgen
 
 import analysis.*
-import astnodes.exp.{Expr, Literal}
-import astnodes.exp.variable.{MemLoad, Register}
-import astnodes.pred.*
-import astnodes.sec.*
-import astnodes.stmt.assign.{GammaUpdate, RegisterAssign}
-import astnodes.stmt.*
+import astnodes.*
 import translating.FlowGraph
 import translating.FlowGraph.Function
 import util.Boogie.{generateBVHeader, generateBVToBoolHeader, generateLibraryFuncHeader, generateSecurityLatticeFuncHeader}

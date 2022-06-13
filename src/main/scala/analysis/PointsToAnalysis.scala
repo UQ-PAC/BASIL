@@ -1,9 +1,6 @@
 package analysis
 
-import astnodes.exp.{BinOp, Expr, Extract, Literal}
-import astnodes.exp.variable.*
-import astnodes.stmt.*
-import astnodes.stmt.assign.*
+import astnodes.*
 import util.{AssumptionViolationException, SegmentationViolationException}
 import vcgen.State
 
@@ -75,7 +72,7 @@ case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends Analysi
           case assignFromRegister: Register =>
             // () := foo ~ LHS points to everything that (foo) points to i.e. *foo
             locationValue = currentState.getOrElse(assignFromRegister, Set(NonPointerValue));
-          case assignFromMem: astnodes.exp.variable.MemLoad =>
+          case assignFromMem: MemLoad =>
             // () := mem[foo] ~ LHS points to everything that is pointed to by memory pointed to by foo i.e. **foo
             currentState.getOrElse(assignFromMem.exp, Set()).foreach(single => {
               if (locationValue == null) {
@@ -103,7 +100,7 @@ case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends Analysi
           case assignToRegister: Register =>
             // foo := () ~ basic assignment
             currentState = currentState + (assignToRegister -> locationValue);
-          case assignToMem: astnodes.exp.variable.MemLoad =>
+          case assignToMem: MemLoad =>
             // mem[foo] := () ~ everything that foo points to could point to RHS.
             // special exception: if foo can only point to one thing, then mem[foo] can only point to RHS.
             val memLoadPotentialValues = currentState.getOrElse(assignToMem.exp, Set())

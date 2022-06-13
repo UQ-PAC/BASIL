@@ -1,15 +1,8 @@
 package translating
 
-import BilParser.BilAdtParser.*
+import astnodes.*
 import BilParser.{BilAdtBaseListener, BilAdtListener, BilAdtParser}
-import astnodes.exp.{BinOp, BinOperator, Expr, Extend, Extract, MemStore, Pad, UniOp, UniOperator}
-import astnodes.exp.variable.{MemLoad, Register, Variable}
-import astnodes.exp.*
-import astnodes.parameters.{InParameter, OutParameter}
-import astnodes.pred.Pred
-import astnodes.sec.{Sec, SecVar}
-import astnodes.stmt.assign.{MemAssign, RegisterAssign}
-import astnodes.stmt.*
+import BilParser.BilAdtParser.*
 import org.antlr.v4.runtime
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}

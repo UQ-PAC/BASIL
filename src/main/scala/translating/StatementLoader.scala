@@ -1,32 +1,11 @@
 package translating
 
-import BilParser.BilParser.ExpCompContext
-import BilParser.BilParser.GammaContext
-import BilParser.BilParser.GammasContext
-import BilParser.BilParser.LpredsContext
-import BilParser.BilParser.PredBinOpContext
-import BilParser.BilParser.PredBopContext
-import BilParser.BilParser.PredBracketContext
-import BilParser.BilParser.PredContext
-import BilParser.BilParser.PredExprCompContext
-import BilParser.BilParser.PredUniOpContext
-import BilParser.BilParser.ProgSpecContext
-import BilParser.BilParser.SecLatticeElemContext
-import astnodes.parameters.InParameter
-import astnodes.parameters.OutParameter
-import astnodes.exp.*
-import astnodes.stmt.*
-import astnodes.sec.SecVar
-import astnodes.stmt.assign.{MemAssign, RegisterAssign}
+import astnodes.*
+import BilParser.BilParser.*
+import BilParser.*
 import org.antlr.v4.runtime.ParserRuleContext
 import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}
 import FlowGraph.Function
-import astnodes.pred
-import BilParser.*
-import astnodes.exp.{BinOp, BinOperator, Expr, Extend, Extract, FunctionCall, MemStore, Pad, UniOp, UniOperator}
-import astnodes.exp.variable.{MemLoad, Register}
-import astnodes.pred.{Bool, ExprComp, Pred}
-import astnodes.sec.Sec
 import vcgen.State
 import util.AssumptionViolationException
 
@@ -255,10 +234,10 @@ class StatementLoader() extends BilBaseListener {
     exprs.put(ctx, FunctionCall("old", ctx.argList.exp.asScala.map(a => getExpr(a)).toList))
 
   override def exitPredBinOp(ctx: PredBinOpContext): Unit =
-    preds.put(ctx, new astnodes.pred.BinOp(ctx.predBop.getText, getPred(ctx.pred(0)), getPred(ctx.pred(1))))
+    preds.put(ctx, new PredBinOp(ctx.predBop.getText, getPred(ctx.pred(0)), getPred(ctx.pred(1))))
     
   override def exitPredUniOp(ctx: PredUniOpContext): Unit = 
-    preds.put(ctx, astnodes.pred.UniOp(ctx.uop.getText, getPred(ctx.pred)))
+    preds.put(ctx, PredUniOp(ctx.uop.getText, getPred(ctx.pred)))
     
   override def exitPredBracket(ctx: PredBracketContext): Unit = preds.put(ctx, getPred(ctx.pred))
   

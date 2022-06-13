@@ -1,10 +1,6 @@
 package analysis.tools
 
-import astnodes.exp.{BinOp, Concat, Expr, Extract, Literal, UniOp}
-import astnodes.exp
-import astnodes.exp.variable.*
-import astnodes.stmt.assign.*
-
+import astnodes.*
 /**
  * A tool for simplifying IR expressions (i.e. used by Constant Propagation after folding 
  * variables)

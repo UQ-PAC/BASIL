@@ -1,6 +1,6 @@
 package analysis
 
-import astnodes.stmt.*
+import astnodes.*
 import vcgen.State
 
 /** Dummy "testing analysis" - keeps track of all the statements that it's seen so far, as a list. Prints a line if it

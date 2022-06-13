@@ -1,8 +1,6 @@
 package translating
 
-import astnodes.exp.variable.Register
-import astnodes.stmt.*
-import astnodes.stmt.assign.{Assign, RegisterAssign}
+import astnodes.*
 import vcgen.Block
 
 import scala.collection.mutable.StringBuilder

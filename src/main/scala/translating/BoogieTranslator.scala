@@ -1,11 +1,6 @@
 package translating
 
-import astnodes.exp.*
-import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
-import astnodes.stmt.*
-import astnodes.parameters.{InParameter, OutParameter}
-import astnodes.exp.{BinOp, BinOperator, Expr, Extract, Literal, UniOp, UniOperator}
-import astnodes.exp.variable.{MemLoad, Register, Variable}
+import astnodes.*
 import translating.FlowGraph
 import vcgen.{FunctionState, State}
 
@@ -13,7 +8,6 @@ import scala.collection.mutable.HashSet
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.collection.{immutable, mutable}
 import util.AssumptionViolationException
-
 import vcgen.Block
 
 import java.util.Base64
