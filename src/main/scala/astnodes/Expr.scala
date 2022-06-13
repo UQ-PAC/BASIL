@@ -13,7 +13,7 @@ trait Expr {
   def subst(v: Variable, w: Variable): Expr
   def toBoogieString: String = toString
 
-  def fold(old: Expr, sub: Expr): Expr
+  def simplify(old: Expr, sub: Expr): Expr
   /*
    * The size of output of the given expression.
    *
@@ -25,7 +25,7 @@ trait Expr {
 /**
   *  Concatenation of two bitvectors
   */
-case class Concat (left: Expr, right: Expr) extends Expr{
+case class Concat(left: Expr, right: Expr) extends Expr {
   override def toBoogieString: String = s"${left.toBoogieString} ++ ${right.toBoogieString}"
 
   override def size: Option[Int] = (left.size, right.size) match {
@@ -35,11 +35,11 @@ case class Concat (left: Expr, right: Expr) extends Expr{
 
   override def vars: List[Variable] = left.vars ++ right.vars
   override def subst(v: Variable, w: Variable): Expr = {
-    this.copy(left = left.subst(v,w), right = right.subst(v,w))
+    copy(left = left.subst(v,w), right = right.subst(v,w))
   }
 
-  override def fold(old: Expr, sub: Expr): Expr = {
-    SimplificationUtil.bitvecConcat(this.copy(left = left.fold(old,sub), right = right.fold(old,sub)))
+  override def simplify(old: Expr, sub: Expr): Expr = {
+    SimplificationUtil.bitvecConcat(copy(left = left.simplify(old,sub), right = right.simplify(old,sub)))
   }
 }
 
@@ -73,8 +73,8 @@ case class Extract(firstInt: Int, secondInt: Int, body: Expr) extends Expr {
 
   override def subst(v: Variable, w: Variable): Expr = this.copy(body = body.subst(v, w))
 
-  override def fold(old: Expr, sub: Expr): Expr =
-    SimplificationUtil.bitvecExtract(this.copy(body = body.fold(old, sub)))
+  override def simplify(old: Expr, sub: Expr): Expr =
+    SimplificationUtil.bitvecExtract(this.copy(body = body.simplify(old, sub)))
 
   override def size: Option[Int] = Some(
     firstInt - secondInt + 1
@@ -92,7 +92,7 @@ case class Literal(value: String, override val size: Option[Int] = None) extends
 
   override def vars: List[Register] = List()
   override def subst(v: Variable, w: Variable): Expr = this
-  override def fold(old: Expr, sub: Expr): Expr = this
+  override def simplify(old: Expr, sub: Expr): Expr = this
 }
 
 case object Literal {
@@ -105,6 +105,8 @@ case object Literal {
   }
 }
 
+// TODO: Literal that has BigInt instead of string, handle size properly
+
 /** Function call
   */
 case class FunctionCall(funcName: String, args: List[Expr], override val size: Option[Int] = None) extends Expr {
@@ -114,22 +116,22 @@ case class FunctionCall(funcName: String, args: List[Expr], override val size: O
 
   override def vars: List[Variable] = args.flatMap(a => a.vars)
   override def subst(v: Variable, w: Variable): Expr = copy(args = args.map(a => a.subst(v, w)))
-  override def fold(old: Expr, sub: Expr): Expr = this
+  override def simplify(old: Expr, sub: Expr): Expr = this
 }
 
 case class MemStore(loc: Expr, expr: Expr, override val size: Some[Int]) extends Expr {
   override def vars: List[Register] = ???
   override def subst(v: Variable, w: Variable): Expr = ???
-  override def fold(old: Expr, sub: Expr): Expr = this
+  override def simplify(old: Expr, sub: Expr): Expr = this
 }
 
 /** Unary operator
   */
-case class UniOp(var operator: UniOperator.Value, exp: Expr) extends Expr {
+case class UniOp(operator: UniOperator, exp: Expr) extends Expr {
   override def toString: String = String.format("%s %s", operator, exp)
-  override def toBoogieString: String = s"${UniOperator.toBoogie(operator, size)}(${exp.toBoogieString})"
-  override def subst(v: Variable, w: Variable): Expr = this.copy(exp = exp.subst(v, w))
-  override def fold (old: Expr, sub: Expr): Expr = SimplificationUtil.uniArithmetic(this.copy(exp = exp.fold(old, sub)))
+  override def toBoogieString: String = s"${operator.toBoogie(size)}(${exp.toBoogieString})"
+  override def subst(v: Variable, w: Variable): Expr = copy(exp = exp.subst(v, w))
+  override def simplify(old: Expr, sub: Expr): Expr = SimplificationUtil.uniArithmetic(copy(exp = exp.simplify(old, sub)))
 
   override def vars: List[Variable] = exp.vars
 
@@ -137,55 +139,53 @@ case class UniOp(var operator: UniOperator.Value, exp: Expr) extends Expr {
 
 }
 
-case object UniOperator extends Enumeration {
-  type Operator = Value
-  val UnaryNegation: Operator = Value("!")
-  val BitwiseComplement: Operator = Value("~") // todo
+enum UniOperator {
+  case NOT
+  case NEG
 
-  def fromBil(bilStr: String): Value = bilStr match {
-    case "-" => UnaryNegation
-    case "~" => BitwiseComplement
-  }
-
-  def fromAdt(bilStr: String): Value = bilStr match {
-    case "NEG" => UnaryNegation
-    case "NOT" => BitwiseComplement
-  }
-
-  def toBoogie(value: Value, size: Option[Int]): String = {
+  def toBoogie(size: Option[Int]): String = {
     val size1 = size.getOrElse(64)
-    value match {
-      case UnaryNegation => s"bv${size1}not"
-      case BitwiseComplement => s"bv${size1}neg"
+    this match {
+      case NOT => s"bv${size1}not"
+      case NEG => s"bv${size1}neg"
     }
   }
 
-  def changesSize(op: Value): Boolean = false
+  def changesSize: Boolean = false
 }
+
+object UniOperator {
+  def fromBil(bilStr: String): UniOperator = bilStr match {
+    case "-" => NEG
+    case "~" => NOT
+  }
+
+  def fromAdt(bilStr: String): UniOperator = bilStr match {
+    case "NEG" => NEG
+    case "NOT" => NOT
+  }
+}
+
 
 /** Binary operation of two expressions
   */
-case class BinOp(
-                  operator: BinOperator.Value,
-                  firstExp: Expr,
-                  secondExp: Expr
-                ) extends Expr {
+case class BinOp(operator: BinOperator, firstExp: Expr, secondExp: Expr) extends Expr {
 
   override def toString: String = String.format("(%s) %s (%s)", firstExp, operator, secondExp)
-  override def toBoogieString: String = BinOperator.toBoogie(operator, inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
+  override def toBoogieString: String = operator.toBoogie(inputSize).fold(s"${firstExp.toBoogieString}, ${secondExp.toBoogieString}")((inner, fun) => s"$fun($inner)")
 
   override def subst(v: Variable, w: Variable): Expr = {
-    this.copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
+    copy(firstExp = firstExp.subst(v,w), secondExp = secondExp.subst(v, w))
   }
 
-  override def fold(old: Expr, sub: Expr): Expr = {
-    SimplificationUtil.binArithmetic(this.copy(firstExp = firstExp.fold(old,sub), secondExp = secondExp.fold(old, sub)))
+  override def simplify(old: Expr, sub: Expr): Expr = {
+    SimplificationUtil.binArithmetic(copy(firstExp = firstExp.simplify(old,sub), secondExp = secondExp.simplify(old, sub)))
   }
 
   override def vars: List[Variable] = firstExp.vars ++ secondExp.vars
 
   // Finish resolveTypes and then remove this
-  override def size: Option[Int] = BinOperator.size(operator, inputSize)
+  override def size: Option[Int] = operator.size(inputSize)
 
   def inputSize: Option[Int] = (firstExp.size, secondExp.size) match {
     case (Some(a), Some(b)) =>
@@ -200,105 +200,105 @@ case class BinOp(
   }
 }
 
-// TODO look at scala 3 enums
-case object BinOperator extends Enumeration {
-  type Operator = Value
-  // arithmetic operators
-  val Addition: Operator = Value("+")
-  val Subtraction: Operator = Value("-")
-  val Multiplication: Operator = Value("*")
-  val Division: Operator = Value("/")
-  val Modulo: Operator = Value("%")
-  val BitwiseAnd: Operator = Value("&")
-  val BitwiseOr: Operator = Value("|")
-  val BitwiseXor: Operator = Value("xor")
-  val LogicalShiftLeft: Operator = Value("<<")
-  val LogicalShiftRight: Operator = Value(">>")
-  val ArithmeticShiftRight: Operator = Value(">>>")
-  // logical operators
-  val Equality: Operator = Value("==")
-  val NonEquality: Operator = Value("!=")
-  val LessThan: Operator = Value("<")
-  val LessThanOrEqual: Operator = Value("<=")
-  val UnknownOperator: Operator = Value("???") // currently just ~>>
+enum BinOperator {
+  case ADD
+  case SUB
+  case MUL
+  case DIV
+  case SDIV
+  case MOD
+  case SMOD
+  case AND
+  case OR
+  case XOR
+  case LSL
+  case LSR
+  case ASR
+  case EQ
+  case NEQ
+  case LT
+  case LE
+  case SLT
+  case SLE
 
-  /*
-  Using the ADT could make it easier to differentiate between signed and unsigned operators,
-  if we need it.
-
-  Currently it does not differentiate between signed and unsigned operators
-  */
-  def fromAdt(adtStr: String) : Value = adtStr match {
-    case "PLUS"    => Addition
-    case "MINUS"   => Subtraction
-    case "TIMES"   => Multiplication
-    case "DIVIDE"  => Division
-    case "SDIVIDE" => Division // TODO
-    case "MOD"     => Modulo
-    case "SMOD"    => Modulo
-    case "LSHIFT"  => LogicalShiftLeft
-    case "RSHIFT"  => LogicalShiftRight
-    case "ARSHIFT" => ArithmeticShiftRight
-    case "AND"     => BitwiseAnd
-    case "OR"      => BitwiseOr
-    case "XOR"     => BitwiseXor
-    case "EQ"      => Equality
-    case "NEQ"     => NonEquality
-    case "LT"      => LessThan
-    case "LE"      => LessThanOrEqual
-    case "SLT"     => LessThan
-    case "SLE"     => LessThanOrEqual
-  }
-
-  def fromBil(bilStr: String): Value = bilStr match {
-    // note at the moment we do not distinguish between signed and unsigned
-    // arithmetic operators
-    case "+" => Addition
-    case "-" => Subtraction
-    case "*" => Multiplication
-    case "/" => Division
-    case "%" => Modulo
-    case "&" => BitwiseAnd
-    case "|" => BitwiseOr
-    case "xor" => BitwiseXor
-    case "<<" => LogicalShiftLeft
-    case ">>" => LogicalShiftRight
-    case ">>>" => ArithmeticShiftRight
-    // logical operators
-    case "=" => Equality
-    case "<>" => NonEquality
-    case "<" => LessThan
-    case "<=" => LessThanOrEqual
-    case "~>>" => UnknownOperator
-  }
-
-  def toBoogie(value: Value, size: Option[Int]): List[String] = {
+  def toBoogie(size: Option[Int]): List[String] = {
     val size1 = size.getOrElse("64")
-    value match {
-      case Addition => List(s"bv${size1}add")
-      case Subtraction => List(s"bv${size1}sub")
-      case Multiplication => List(s"bv${size1}mul")
-      case Division => List(s"bv${size1}udiv")
-      case Modulo => List(s"bv${size1}mod")
-      case BitwiseAnd => List(s"bv${size1}and")
-      case BitwiseOr => List(s"bv${size1}or")
-      case BitwiseXor => List(s"bv${size1}xor")
-      case LogicalShiftLeft => List(s"bv${size1}shl")
-      case LogicalShiftRight => List(s"bv${size1}lshr")
-      case ArithmeticShiftRight => List(s"bv${size1}ashr")
-      case Equality => List(s"bv${size1}eq", "booltobv1")
-      case NonEquality => List(s"bv${size1}neq", "booltobv1")
+    this match {
+      case ADD => List(s"bv${size1}add")
+      case SUB => List(s"bv${size1}sub")
+      case MUL => List(s"bv${size1}mul")
+      case DIV => List(s"bv${size1}udiv")
+      case SDIV => List(s"bv${size1}sdiv")
+      case MOD => List(s"bv${size1}mod")
+      case SMOD => List(s"bv${size1}srem") // TODO: check BIL semantics here, it could be smod instead?
+      case AND => List(s"bv${size1}and")
+      case OR => List(s"bv${size1}or")
+      case XOR => List(s"bv${size1}xor")
+      case LSL => List(s"bv${size1}shl")
+      case LSR => List(s"bv${size1}lshr")
+      case ASR => List(s"bv${size1}ashr")
+      case EQ => List(s"bv${size1}eq", "booltobv1") // TODO: remove booltobv1 which is redundant
+      case NEQ => List(s"bv${size1}neq", "booltobv1")
+      case LT => List(s"bv${size1}ult")
+      case LE => List(s"bv${size1}ule")
+      case SLT => List(s"bv${size1}slt")
+      case SLE => List(s"bv${size1}sle")
     }
   }
 
-  def changesSize(value: Value): Boolean = value match {
-    case Equality | NonEquality => true
+  def changesSize: Boolean = this match {
+    case EQ | NEQ => true
     case _ => false
   }
 
-  def size(value: Value, size: Option[Int]): Option[Int] = value match {
-    case Equality | NonEquality => Some(1)
+  def size(size: Option[Int]): Option[Int] = this match {
+    case EQ | NEQ | LT | LE | SLT | SLE => Some(1)
     case _ => size
+  }
+
+}
+
+object BinOperator {
+  def fromAdt(adtStr: String): BinOperator = adtStr match {
+    case "PLUS"    => ADD
+    case "MINUS"   => SUB
+    case "TIMES"   => MUL
+    case "DIVIDE"  => DIV
+    case "SDIVIDE" => SDIV
+    case "MOD"     => MOD
+    case "SMOD"    => SMOD
+    case "LSHIFT"  => LSL
+    case "RSHIFT"  => LSR
+    case "ARSHIFT" => ASR
+    case "AND"     => AND
+    case "OR"      => OR
+    case "XOR"     => XOR
+    case "EQ"      => EQ
+    case "NEQ"     => NEQ
+    case "LT"      => LT
+    case "LE"      => LE
+    case "SLT"     => SLT
+    case "SLE"     => SLE
+  }
+
+  def fromBil(bilStr: String): BinOperator = bilStr match {
+    // note at the moment we do not distinguish between signed and unsigned
+    // arithmetic operators
+    case "+" => ADD
+    case "-" => SUB
+    case "*" => MUL
+    case "/" => DIV
+    case "%" => MOD
+    case "&" => AND
+    case "|" => OR
+    case "xor" => XOR
+    case "<<" => LSL
+    case ">>" => LSR
+    case "~>>" => ASR
+    case "=" => EQ
+    case "<>" => NEQ
+    case "<" => LT
+    case "<=" => LE
   }
 }
 
@@ -317,7 +317,7 @@ case class Register(name: String, override val size: Option[Int]) extends Variab
   override def toString: String = name
   override def vars: List[Register] = List(this)
   override def toGamma: SecVar = SecVar(name, true)
-  override def fold(old: Expr, sub: Expr): Expr = if (old == this) sub else this
+  override def simplify(old: Expr, sub: Expr): Expr = if (old == this) sub else this
 }
 
 case object Register {
@@ -334,7 +334,7 @@ case class MemLoad(exp: Expr, override val size: Some[Int]) extends Variable {
   def toBoogieString(exp: Expr) = s"${if (this.onStack) "stack" else "heap"}[${exp.toBoogieString}]"
   override def toBoogieString: String =
     (0 until size.get / 8)
-      .map(n => s"${toBoogieString(BinOp(BinOperator.Addition, exp, Literal(n.toString, Some(64))))}")
+      .map(n => s"${toBoogieString(BinOp(BinOperator.ADD, exp, Literal(n.toString, Some(64))))}")
       .mkString(" ++ ")
 
   override def vars: List[MemLoad] = List(this) // TOOD also exp.vars????
@@ -350,8 +350,8 @@ case class MemLoad(exp: Expr, override val size: Some[Int]) extends Variable {
     case _ => false
   }
 
-  override def fold(old: Expr, sub: Expr): Expr = {
-    if (!this.onStack) this.copy(exp.fold(old, sub))
+  override def simplify(old: Expr, sub: Expr): Expr = {
+    if (!this.onStack) this.copy(exp.simplify(old, sub))
     else if (this.onStack && old == this) sub
     else this
   }

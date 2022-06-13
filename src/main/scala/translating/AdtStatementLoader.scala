@@ -83,7 +83,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
     newStr
   }
 
-  override def exitExpLoad(ctx: BilAdtParser.ExpLoadContext): Unit = {
+  override def exitExpLoad(ctx: ExpLoadContext): Unit = {
     ctx.memexp match {
       case v: ExpVarContext =>
         if (getStringBody(v.name.getText) == "mem") {
@@ -95,7 +95,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
     }
   }
 
-  override def exitExpStore(ctx: BilAdtParser.ExpStoreContext): Unit = {
+  override def exitExpStore(ctx: ExpStoreContext): Unit = {
     ctx.memexp match {
       case v: ExpVarContext =>
         if (getStringBody(v.name.getText) == "mem") {
@@ -107,25 +107,25 @@ class AdtStatementLoader extends BilAdtBaseListener {
     }
   }
 
-  override def exitExpBinop(ctx: BilAdtParser.ExpBinopContext): Unit =
+  override def exitExpBinop(ctx: ExpBinopContext): Unit =
     exprs.put(ctx, BinOp(BinOperator.fromAdt(ctx.op.getText), getExpr(ctx.lhs), getExpr(ctx.rhs)))
 
-  override def exitExpUop(ctx: BilAdtParser.ExpUopContext): Unit =
+  override def exitExpUop(ctx: ExpUopContext): Unit =
     exprs.put(ctx, UniOp(UniOperator.fromAdt(ctx.op.getText), getExpr(ctx.exp)))
 
-  override def exitExpVar(ctx: BilAdtParser.ExpVarContext): Unit = {
+  override def exitExpVar(ctx: ExpVarContext): Unit = {
     if (getStringBody(ctx.name.getText) != "mem") { // Is a register
       if (ctx.`type`.imm == null)
         throw new AssumptionViolationException("Can't find Imm argument for a non-mem variable")
-      exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.imm.size.getText.toInt)))
+      exprs.put(ctx, Register(getStringBody(ctx.name.getText), Some(ctx.`type`.imm.size.getText.toInt)))
       varSizes.put(getStringBody(ctx.name.getText), ctx.`type`.imm.size.getText.toInt)
     } else {
       // FIXME: Old parser treated mem as a register so I've replicated that behaviour here - could be unintentional
-      exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.mem.value_size.getText.toInt)))
+      exprs.put(ctx, Register(getStringBody(ctx.name.getText), Some(ctx.`type`.mem.value_size.getText.toInt)))
     }
   }
 
-  override def exitExpIntAdt(ctx: BilAdtParser.ExpIntAdtContext): Unit = {
+  override def exitExpIntAdt(ctx: ExpIntAdtContext): Unit = {
     exprs.put(
       ctx,
       Literal(ctx.value.getText)
@@ -133,7 +133,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
   }
 
   // TODO: Handle high and low - old parser did not handle it either
-  override def exitExpCast(ctx: BilAdtParser.ExpCastContext): Unit = {
+  override def exitExpCast(ctx: ExpCastContext): Unit = {
     ctx.CAST.getText match {
       case "UNSIGNED"     => exprs.put(ctx, Pad(getExpr(ctx.exp), ctx.size.getText.toInt))
       case "SIGNED"       => exprs.put(ctx, Extend(getExpr(ctx.exp), ctx.size.getText.toInt))
@@ -141,14 +141,14 @@ class AdtStatementLoader extends BilAdtBaseListener {
     }
   }
 
-  override def exitExpExtract(ctx: BilAdtParser.ExpExtractContext): Unit = {
+  override def exitExpExtract(ctx: ExpExtractContext): Unit = {
     val hb = ctx.hb.getText.toInt
     val lb = ctx.lb.getText.toInt
     val exp = getExpr(ctx.exp)
     exprs.put(ctx, Extract(hb, lb, exp))
   }
 
-  override def exitDef(ctx: BilAdtParser.DefContext): Unit = {
+  override def exitDef(ctx: DefContext): Unit = {
     val address = getStringBody(ctx.tid.name.getText)
     val LHS = getExpr(ctx.lhs)
     val RHS = getExpr(ctx.rhs)
@@ -162,11 +162,11 @@ class AdtStatementLoader extends BilAdtBaseListener {
     })
   }
 
-  override def exitExpParen(ctx: BilAdtParser.ExpParenContext): Unit = {
+  override def exitExpParen(ctx: ExpParenContext): Unit = {
     exprs.put(ctx, getExpr(ctx.exp))
   }
 
-  override def exitGotoSym(ctx: BilAdtParser.GotoSymContext): Unit = {
+  override def exitGotoSym(ctx: GotoSymContext): Unit = {
     // Note in the ADT, all jumps are actually conditional jumps. Regular
     // jumps simply have true/Int(1,1) as the condition.
     val address = getStringBody(ctx.tid.name.getText)
@@ -191,19 +191,19 @@ class AdtStatementLoader extends BilAdtBaseListener {
     }
   }
 
-  override def exitBlk(ctx: BilAdtParser.BlkContext): Unit = {
+  override def exitBlk(ctx: BlkContext): Unit = {
     // FIXME: The previous bil parser had no real notion of "blocks" the blocks were simply started by
     //  a labelled skip statement. It may be worthwhile to introduce a Block node in the AST
     stmts += SkipStmt(getStringBody(ctx.tid.name.getText))
   }
 
-  override def exitCall(ctx: BilAdtParser.CallContext): Unit = {
+  override def exitCall(ctx: CallContext): Unit = {
     val address = getStringBody(ctx.tid.name.getText)
     var funcName = ""
-    if (ctx.calee.direct != null) {
-      funcName = getStringBody(ctx.calee.direct.tid.name.getText)
+    if (ctx.callee.direct != null) {
+      funcName = getStringBody(ctx.callee.direct.tid.name.getText)
       stmts += new CallStmt(address, funcName, Option(ctx.returnSym).map(_.getText), List(), None)
-    } else if (ctx.calee.indirect != null) {
+    } else if (ctx.callee.indirect != null) {
       // FIXME: This mimics the behaviour of the old parser - it could be unintended
       //  The assumption that was made is that any call on a non-literal function (i.e. a register, or LR) is indicative
       //  of exiting the current function. This seems incorrect.
@@ -211,7 +211,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
     }
   }
 
-  override def exitSub(ctx: BilAdtParser.SubContext): Unit = {
+  override def exitSub(ctx: SubContext): Unit = {
     currentFunction match {
       case Some(f) =>
         f.requires = requires

@@ -73,14 +73,14 @@ case class LibraryFunction(lhs: Option[Register], args: List[Register], mappedNa
 case class CJmpStmt(override val pc: String,
                     trueTarget: String,
                     falseTarget: String,
-                    var condition: Expr,
+                    condition: Expr,
                    ) extends Stmt(pc) {
   def getCondition: Expr = condition
   override def toString = s"if ($condition) goto label$trueTarget else goto label$falseTarget;"
   override def toBoogieString: String = s"if (bv1tobool(${condition.toBoogieString})) { goto label$trueTarget; } goto label$falseTarget;"
 
-  override def subst(v: Variable, w: Variable): Stmt = this.copy(condition = condition.subst(v,w))
-  def fold(old: Expr, sub: Expr): Stmt = this.copy(condition = condition.fold(old, sub))
+  override def subst(v: Variable, w: Variable): Stmt = copy(condition = condition.subst(v,w))
+  def simplify(old: Expr, sub: Expr): Stmt = copy(condition = condition.simplify(old, sub))
 }
 
 /** Jump
@@ -115,16 +115,16 @@ trait Assign(override val pc: String, val lhs: Variable, val rhs: Expr) extends 
   }
 
   // this would be nicer to have per type instead
-  def fold(oldExpr: Expr, newExpr: Expr): Assign = {
+  def simplify(oldExpr: Expr, newExpr: Expr): Assign = {
     lhs match {
       case lhsRes: MemLoad =>
         val newLhs = if (!lhsRes.onStack) {
-          lhsRes.fold(oldExpr, newExpr).asInstanceOf[MemLoad]
+          lhsRes.simplify(oldExpr, newExpr).asInstanceOf[MemLoad]
         } else {
           lhsRes
         }
-        MemAssign(pc, newLhs, rhs.fold(oldExpr, newExpr))
-      case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs.fold(oldExpr, newExpr))
+        MemAssign(pc, newLhs, rhs.simplify(oldExpr, newExpr))
+      case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs.simplify(oldExpr, newExpr))
       case _ => this
     }
   }
@@ -150,12 +150,13 @@ case class MemAssign(override val pc: String, override val lhs: MemLoad, overrid
   // TODO maybe lhs should not be a memload
   def lhsToString(exp: Expr) = s"heap[${exp.toBoogieString}]"
 
-  override def toBoogieString: String =
+  override def toBoogieString: String = {
     (0 until lhs.size.get / 8).map(n => {
-      val newMemExp = BinOp(BinOperator.Addition, lhs.exp, Literal(n.toString))
+      val newMemExp = BinOp(BinOperator.ADD, lhs.exp, Literal(n.toString))
       s"${lhsToString(newMemExp)} := ${Extract(8 * (n + 1) - 1, 8 * n, rhs).toBoogieString}"
     }).mkString("; ") + s";     // $pc"
-
+  }
+    
 }
 
 trait MaybeNonConstantMemAssign

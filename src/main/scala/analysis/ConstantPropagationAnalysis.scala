@@ -29,13 +29,13 @@ case class ConstantPropagationAnalysis(state: State,
         // fold statement with all local and global variables
         for ((variable, assignment) <- localStateWithFunc(funcName)) {
           assignment match {
-            case a: Assign => newPrevStmt = newPrevStmt.fold(variable, a.rhs)
+            case a: Assign => newPrevStmt = newPrevStmt.simplify(variable, a.rhs)
             case _ =>
           }
         }
         for ((_, memAssign) <- globalState) {
           memAssign match {
-            case a: MemAssign => newPrevStmt = newPrevStmt.fold(a.lhs, a.rhs)
+            case a: MemAssign => newPrevStmt = newPrevStmt.simplify(a.lhs, a.rhs)
             case _ =>
           }
         }

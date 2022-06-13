@@ -86,9 +86,9 @@ case object SimplificationUtil {
 
     (newLhs, newRhs) match {
       case (l: Literal, r: Literal) =>
-        Literal(performArithmetic(BigInt(l.value), BigInt(r.value), binOp.operator.toString).toString)
-      case (l: Literal, r: _) if BigInt(l.toString) == BigInt(0) && binOp.operator.equals("|") => newRhs
-      case (l: _, r: Literal) if BigInt(r.toString) == BigInt(0) && binOp.operator.equals("|") => newLhs
+        Literal(performArithmetic(BigInt(l.value), BigInt(r.value), binOp.operator).toString)
+      case (l: Literal, r: _) if BigInt(l.value) == BigInt(0) && (binOp.operator == BinOperator.OR) => newRhs
+      case (l: _, r: Literal) if BigInt(r.value) == BigInt(0) && (binOp.operator == BinOperator.OR) => newLhs
       case _ => binOp.copy(firstExp = newLhs, secondExp = newRhs)
     }
   }
@@ -96,20 +96,20 @@ case object SimplificationUtil {
   /**
     * Helper method for binArithmetic()
     */
-  private def performArithmetic(firstOperand: BigInt, secondOperand: BigInt, operator: String)
-  : BigInt = {
-    var result: BigInt = 0
-    operator match {
-      case "+" => result = firstOperand + secondOperand
-      case "-" => result = firstOperand - secondOperand
-      case "*" => result = firstOperand * secondOperand
-      case "/" => result = firstOperand / secondOperand
-      case "%" => result = firstOperand % secondOperand
-      case "&" => result = firstOperand & secondOperand
-      case "|" => result = firstOperand | secondOperand
-      case _ =>
+
+  // TODO: take into account overflow, signed-ness, other operators
+  private def performArithmetic(firstOperand: BigInt, secondOperand: BigInt, op: BinOperator): BigInt = {
+    op match {
+      case BinOperator.ADD => firstOperand + secondOperand
+      case BinOperator.SUB => firstOperand - secondOperand
+      case BinOperator.MUL => firstOperand * secondOperand
+      case BinOperator.DIV => firstOperand / secondOperand
+      case BinOperator.MOD => firstOperand % secondOperand
+      case BinOperator.AND => firstOperand & secondOperand
+      case BinOperator.OR => firstOperand | secondOperand
+      case BinOperator.XOR => firstOperand ^ secondOperand
+      case _ => 0 //throw new Exception("unhandled operator for simplification: " + op)
     }
-    result
   }
 
   /**
@@ -117,10 +117,9 @@ case object SimplificationUtil {
     */
   def uniArithmetic(uniOp: UniOp): Expr = uniOp.exp match {
     case literal: Literal =>
-      uniOp.operator.toString match {
-        // Performs binary one's complement
-        case "~" => Literal((~Integer.parseInt(literal.value)).toString, literal.size)
-        case _ => uniOp
+      uniOp.operator match {
+        case UniOperator.NOT => Literal((~literal.value.toInt).toString, literal.size)
+        case UniOperator.NEG => Literal((-literal.value.toInt).toString, literal.size)
       }
     case _ => uniOp
   }

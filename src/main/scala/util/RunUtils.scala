@@ -87,11 +87,13 @@ object RunUtils {
       statementLoader.gammaMappings.toMap
     )
 
-    val WL = Worklist(ConstantPropagationAnalysis(state, true), state)
+    // TODO: fix constant propagation arithmetic before turning back on
+    /*
+     val WL = Worklist(ConstantPropagationAnalysis(state, true), state)
     val analysedState = WL.doAnalysis()
-
     val updatedState = BoogieTranslator.translate(analysedState)
-
+    */
+    val updatedState = BoogieTranslator.translate(state)
     VCGen.genVCs(updatedState)
   }
 

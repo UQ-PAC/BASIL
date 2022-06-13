@@ -93,6 +93,7 @@ object BoogieTranslator {
     case _ => stmt
   })
 
+  // TODO: make this deterministic using an ordering on the variables
   private def getLocalVarsInFunction(state: State, function: FunctionState) = {
     val vars = function.blocks flatMap {
       b => b.lines collect {
@@ -103,7 +104,7 @@ object BoogieTranslator {
         case CallStmt(_, _, _, _, Some(x)) => x
       }
     }
-    vars
+    vars.toSet
   }
 
   /** In boogie, all local variables seem to want to be initialised at the beginning of functions. Do we want to make
@@ -162,8 +163,11 @@ object BoogieTranslator {
   // TODO improve this and perform proper type checking
   private def inferConstantTypes(expr: Expr, size: Option[Int]): Expr = expr match {
     case binOp: BinOp =>
-      val inputSize = if (BinOperator.changesSize(binOp.operator)) None else size
-      val binOp1 = binOp.copy(firstExp = inferConstantTypes(binOp.firstExp, inputSize), secondExp = inferConstantTypes(binOp.secondExp, inputSize))
+      val inputSize = if (binOp.operator.changesSize) None else size
+      val binOp1 = binOp.copy(
+        firstExp = inferConstantTypes(binOp.firstExp, inputSize),
+        secondExp = inferConstantTypes(binOp.secondExp, inputSize)
+      )
       (binOp1.firstExp.size, binOp1.secondExp.size) match {
         case (Some(a), Some(b)) =>
           if (a == b) {
@@ -176,7 +180,7 @@ object BoogieTranslator {
         case _ => binOp1
       }
     case uniOp: UniOp =>
-      val inputSize = if (UniOperator.changesSize(uniOp.operator)) None else size
+      val inputSize = if (uniOp.operator.changesSize) None else size
       uniOp.copy(exp = inferConstantTypes(uniOp.exp, inputSize))
     case lit: Literal if lit.size.isEmpty => lit.copy(size = size)
     case _ => expr
