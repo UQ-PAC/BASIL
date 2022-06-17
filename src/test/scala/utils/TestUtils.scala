@@ -6,7 +6,7 @@ import scala.util.Random
 import scala.language.postfixOps
 
 import scala.util.matching.Regex
-import sys.process.*
+import sys.process._
 
 
 object TestUtils{

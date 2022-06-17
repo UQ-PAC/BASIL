@@ -1,7 +1,8 @@
+/*
 package analysis
 
-import astnodes.*
-import vcgen.*
+import astnodes._
+import vcgen._
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayDeque
@@ -15,10 +16,10 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
   var currentWorklist: mutable.ArrayDeque[Block] = mutable.ArrayDeque()
 
   var previousStmtAnalysisState: T = analysis.createLowest
-  var stmtAnalysisInfo: Map[Stmt, T] = Map()
+  var stmtAnalysisInfo: Map[Statement, T] = Map()
   var blockAnalysisInfo: Map[Block, T] = Map()
 
-  def getOneInfo(stmt: Stmt): T = stmtAnalysisInfo.getOrElse(stmt, analysis.createLowest)
+  def getOneInfo(stmt: Statement): T = stmtAnalysisInfo.getOrElse(stmt, analysis.createLowest)
 
   def printAllLinesWithLabels(): Unit = {
     for (function <- startState.functions) {
@@ -47,7 +48,7 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
     currentWorklist = mutable.ArrayDeque(findFunctionRootBlock(name))
 
     val functionStartAnalysisState = previousStmtAnalysisState
-    var currentFunctionAnalysedInfo: Map[Stmt, T] = Map()
+    var currentFunctionAnalysedInfo: Map[Statement, T] = Map()
 
     while (currentWorklist.nonEmpty) {
       val nextBlockToAnalyse: Block = currentWorklist.removeHead()
@@ -91,9 +92,9 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
     currentCallString = currentCallString.filter(funcName => {funcName != name})
   }
 
-  def analyseBlock(block: Block, currentInfo: Map[Stmt, T]): Map[Stmt, T] = {
+  def analyseBlock(block: Block, currentInfo: Map[Statement, T]): Map[Statement, T] = {
     if debug then println("analysing block: " + block.label)
-    var outputInfo: Map[Stmt, T] = currentInfo
+    var outputInfo: Map[Statement, T] = currentInfo
 
     block.lines.foreach(blockStmt => outputInfo = analyseStmt(blockStmt, outputInfo))
 
@@ -127,9 +128,9 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
     outputInfo
   }
 
-  def analyseStmt(stmt: Stmt, currentInfo: Map[Stmt, T]): Map[Stmt, T] = {
+  def analyseStmt(stmt: Statement, currentInfo: Map[Statement, T]): Map[Statement, T] = {
     if debug then println("analysing stmt: " + stmt.pc + " : " + stmt)
-    var outputInfo: Map[Stmt, T] = currentInfo
+    var outputInfo: Map[Statement, T] = currentInfo
 
     stmt match {
       case functionCallStmt: CallStmt =>
@@ -182,9 +183,10 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
   /**
    * "Commits" the info from the current function to the output map.
    */
-  def saveNewAnalysisInfo(newInfo: Map[Stmt, T]): Unit = {
+  def saveNewAnalysisInfo(newInfo: Map[Statement, T]): Unit = {
     for ((key, value) <- newInfo) {
       stmtAnalysisInfo = stmtAnalysisInfo + (key -> value)
     }
   }
 }
+ */

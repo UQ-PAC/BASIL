@@ -1,6 +1,7 @@
+/*
 package analysis
 
-import astnodes.*
+import astnodes._
 import util.{AssumptionViolationException, SegmentationViolationException}
 import vcgen.State
 
@@ -62,17 +63,17 @@ case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends Analysi
     this
   }
 
-  override def transfer(stmt: Stmt): PointsToAnalysis = {
+  override def transfer(stmt: Statement): PointsToAnalysis = {
     val newAnalysedMap: Map[Expr, Set[Expr]] = currentState
     stmt match {
-      case assignStmt: Assign =>
+      case assignStmt: AssignStatement =>
         var locationValue: Set[Expr] = null
 
         assignStmt.rhs match {
-          case assignFromRegister: Register =>
+          case assignFromRegister: LocalVar =>
             // () := foo ~ LHS points to everything that (foo) points to i.e. *foo
-            locationValue = currentState.getOrElse(assignFromRegister, Set(NonPointerValue));
-          case assignFromMem: MemLoad =>
+            locationValue = currentState.getOrElse(assignFromRegister, Set(NonPointerValue))
+          case assignFromMem: MemAccess =>
             // () := mem[foo] ~ LHS points to everything that is pointed to by memory pointed to by foo i.e. **foo
             currentState.getOrElse(assignFromMem.exp, Set()).foreach(single => {
               if (locationValue == null) {
@@ -88,7 +89,7 @@ case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends Analysi
             // () := X0[x:y] ~ idk if we need to consider this;
           case assignFromLiteral: Literal =>
             // () := 1 ~ LHS points to Literal(null) as constant pointers are disregarded
-            locationValue = Set(NonPointerValue);
+            locationValue = Set(NonPointerValue)
           case _ =>
         }
 
@@ -97,10 +98,10 @@ case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends Analysi
         }
 
         assignStmt.lhs match {
-          case assignToRegister: Register =>
+          case assignToRegister: LocalVar =>
             // foo := () ~ basic assignment
-            currentState = currentState + (assignToRegister -> locationValue);
-          case assignToMem: MemLoad =>
+            currentState = currentState + (assignToRegister -> locationValue)
+          case assignToMem: MemAccess =>
             // mem[foo] := () ~ everything that foo points to could point to RHS.
             // special exception: if foo can only point to one thing, then mem[foo] can only point to RHS.
             val memLoadPotentialValues = currentState.getOrElse(assignToMem.exp, Set())
@@ -122,14 +123,14 @@ case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends Analysi
         // we just note that the SP offset is 0.
         functionCall.funcName match {
           case "malloc" =>
-            currentState = currentState + (Register("R0", 64) -> Set(HeapAllocation(heapAllocations)))
+            currentState = currentState + (LocalVar("R0", 64) -> Set(HeapAllocation(heapAllocations)))
             heapAllocations += 1
           case _ => functionName = functionCall.funcName
         }
       case returnStmt: ExitSub =>
         // function returns i.e. "call LR with noreturn"
         // test that LR & FP point to the correct thing?;
-      case skipStmt: SkipStmt =>
+      case skipStmt: Skip =>
         // explicitly do nothing for these statements;
       case _ => println(stmt.getClass.getSimpleName)
     }
@@ -139,19 +140,13 @@ case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends Analysi
   }
 
   def knownPointer(expr: Expr): Boolean = {
-    var hasKnownPointer: Boolean = false
+    // TODO fix this
+    expr.vars.foreach {
+      case r: LocalVar if r.name == "SP" || r.name == "FP" || r.name == "LR" => return true
+      case _ =>
+    }
   
-    expr.vars.foreach(c => {
-      if (c == Register("SP", None) || c == Register("FP", None) || c == Register("LR", None)) {
-          hasKnownPointer = true
-      }
-
-      if (hasKnownPointer) {
-          return hasKnownPointer
-      }
-    })
-  
-    hasKnownPointer
+    false
   }
 
   override def createLowest: PointsToAnalysis = {
@@ -159,7 +154,7 @@ case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends Analysi
     this
   }
 
-  override def applyChange(stmt: Stmt): Stmt = {
+  override def applyChange(stmt: Statement): Statement = {
     stmt
   }
 
@@ -168,13 +163,14 @@ case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends Analysi
   }
 }
 
-object NonPointerValue extends Literal(null, Option(64)) {
+// TODO: fix these
+object NonPointerValue extends Literal(BigInt(-1), 64) {
   // Represents constant integer values like 0x20.
   // Because these can't be guaranteed to be valid (they might be unmapped, or invalid, or whatever) we just assume
   // that they're invalid.
 }
 
-class HeapAllocation(val id: Int) extends Literal("alloc-" + id, Option(64)) {
+class HeapAllocation(val id: Int) extends Literal(BigInt(-1), 64) {
   // represents new heap allocations. Returned by malloc().
 }
 
@@ -203,13 +199,16 @@ Anatomy of nested stack-affecting function call (from basicpointer example):
 00000169: call LR with noreturn                         // jump back to caller's PC (LR)
 **/
 
-class FunctionStackPointer(val functionName: String, val offset: Long) extends Literal("SP", Option(64)) {
+/*
+class FunctionStackPointer(val functionName: String, val offset: Long) extends Literal("SP", 64) {
   // Represents this function's SP, s.t. StackPointer(32) is SP + 32, or SP + 0x20.
   // Used to track stack accesses on a per-function basis, so multiple calls to the same function are considered
   // to have the same base offset regardless of what truly happens at runtime.
 }
 
-class ReturnFramePointer(val functionName: String, val offset: Long) extends Literal("FP", Option(64)) {
+class ReturnFramePointer(val functionName: String, val offset: Long) extends Literal("FP", 64) {
   // Represents this function's FP.
   // On return (call to true LR), the analysis checks that the FP points to this value.
 }
+*/
+*/

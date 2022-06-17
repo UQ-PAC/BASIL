@@ -1,12 +1,13 @@
+/*
 package analysis
 
-import astnodes.*
+import astnodes._
 import vcgen.State
 
 /** Dummy "testing analysis" - keeps track of all the statements that it's seen so far, as a list. Prints a line if it
   * sees a call statement.
   */
-case class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint[TestingAnalysis] {
+case class TestingAnalysis(state: Set[Statement]) extends AnalysisPoint[TestingAnalysis] {
   override def equals(other: TestingAnalysis): Boolean = {
     this.toString == other.toString
   }
@@ -25,8 +26,8 @@ case class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint[TestingAnalys
     TestingAnalysis(newState)
   }
 
-  override def transfer(stmt: Stmt): TestingAnalysis = {
-    var newState: Set[Stmt] = Set()
+  override def transfer(stmt: Statement): TestingAnalysis = {
+    var newState: Set[Statement] = Set()
     stmt match {
       case callStmt: CallStmt =>
         if (!state.contains(stmt)) {
@@ -53,9 +54,10 @@ case class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint[TestingAnalys
     "TestingAnalysis: " + this.state
   }
 
-  override def applyChange(stmt: Stmt): Stmt = {
+  override def applyChange(stmt: Statement): Statement = {
     //println(stmt.pc + " : " + stmt)
     //println(state)
     stmt
   }
 }
+*/

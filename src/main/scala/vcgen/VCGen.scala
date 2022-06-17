@@ -1,6 +1,7 @@
+/*
 package vcgen
 
-import astnodes.*
+import astnodes._
 import translating.FlowGraph
 
 object VCGen {
@@ -16,9 +17,9 @@ object VCGen {
 
   /** Generate the verification condition for a given statement
     */
-  def genVC(stmt: Stmt, fState: FunctionState, state: State): Pred = stmt match {
+  def genVC(stmt: Statement, fState: FunctionState, state: State): Pred = stmt match {
     case cjmpStmt: CJmpStmt => SecComp(computeGamma(cjmpStmt.getCondition, state), state.lattice.attackerLevel)
-    case assign: RegisterAssign => Bool.True // will need to add rely/guar later
+    case assign: LocalAssign => Bool.True // will need to add rely/guar later
     // TODO for each part
     case assign: MemAssign =>
       if (assign.lhs.onStack) {
@@ -33,18 +34,18 @@ object VCGen {
   /** Compute the gamma value for an expression
    */
   def computeGamma(expr: Expr, state: State): Sec = expr.vars.map{
-    case v: Register => v.toGamma
-    case l: MemLoad => SecBinOp("meet", l.toGamma, l.toL)
+    case v: LocalVar => v.toGamma
+    case l: MemAccess => SecBinOp("meet", l.toGamma, l.toL)
   }.join(state)
 
   /** Generate an assignment to a gamma variable for each variable update.
    */
-  def genGammaUpdate(stmt: Stmt, state: State): Option[Stmt] = stmt match {
-    case a: Assign => Some(GammaUpdate(a.lhs.toGamma, computeGamma(a.rhs, state)))
+  def genGammaUpdate(stmt: Statement, state: State): Option[Statement] = stmt match {
+    case a: AssignStatement => Some(GammaUpdate(a.lhs.toGamma, computeGamma(a.rhs, state)))
     // case assign: RegisterAssign => Some(GammaUpdate(assign.lhs.toGamma, computeGamma(assign.rhs, state)))
     case _ => None
   }
 
   def rely: MethodCall = MethodCall("-1", "rely")
 }
-
+*/

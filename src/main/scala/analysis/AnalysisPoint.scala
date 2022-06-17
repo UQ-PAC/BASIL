@@ -1,8 +1,8 @@
 package analysis
 
-import astnodes.*
+import astnodes._
 import util.{AnalysisTypeException, LatticeViolationException}
-import vcgen.State
+//import vcgen.State
 
 trait AnalysisPoint[T <: AnalysisPoint[T]] {
   /**
@@ -38,7 +38,7 @@ trait AnalysisPoint[T <: AnalysisPoint[T]] {
    * Note that this function should be able to handle all the different transfer functions by if/else'ing
    * every type of statement the analysis needs to handle.
    */
-  def transfer(stmt: Stmt): T
+  def transfer(stmt: Statement): T
 
   /**
    * A union or join of two lattice states. Should contain all the information from the first state
@@ -75,7 +75,7 @@ trait AnalysisPoint[T <: AnalysisPoint[T]] {
    * The only case for overriding this function should be if the analysis is top-down rather than bottom-up
    * In that scenario, changing the comparison to < 0 should make it work.
    */
-  def transferAndCheck(stmt: Stmt): T = {
+  def transferAndCheck(stmt: Statement): T = {
     val newState: T = transfer(stmt)
 
     if (compare(newState) > 0) {
@@ -94,7 +94,7 @@ trait AnalysisPoint[T <: AnalysisPoint[T]] {
     join(other)
   }
 
-  def applyChange(stmt: Stmt): Stmt
+  def applyChange(stmt: Statement): Statement
 
     /**
      * Another fancy, method that casts "other" to an instance of "this". Please use  this in your transfer, union,

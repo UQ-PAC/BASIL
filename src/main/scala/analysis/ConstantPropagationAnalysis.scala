@@ -1,6 +1,7 @@
+/*
 package analysis
 
-import astnodes.*
+import astnodes._
 import vcgen.{FunctionState, State}
 
 case class ConstantPropagationAnalysis(state: State,
@@ -16,8 +17,8 @@ case class ConstantPropagationAnalysis(state: State,
     * Performs a transfer on the entry analysis point state and returns the exit state.
     *
     */
-  override def transfer(stmt: Stmt): ConstantPropagationAnalysis = stmt match {
-      case assign: Assign =>
+  override def transfer(stmt: Statement): ConstantPropagationAnalysis = stmt match {
+      case assign: AssignStatement =>
         val funcName = state.findStatementFunction(stmt).name
         var newPrevStmt = assign
         val localStateWithFunc = if (!localState.contains(funcName)) {
@@ -29,7 +30,7 @@ case class ConstantPropagationAnalysis(state: State,
         // fold statement with all local and global variables
         for ((variable, assignment) <- localStateWithFunc(funcName)) {
           assignment match {
-            case a: Assign => newPrevStmt = newPrevStmt.simplify(variable, a.rhs)
+            case a: AssignStatement => newPrevStmt = newPrevStmt.simplify(variable, a.rhs)
             case _ =>
           }
         }
@@ -47,7 +48,7 @@ case class ConstantPropagationAnalysis(state: State,
         }
 
         val updateLocalState = newPrevStmt match {
-          case regAssignStmt: RegisterAssign
+          case regAssignStmt: LocalAssign
             if !regAssignStmt.isFramePointer && !regAssignStmt.isLinkRegister && !regAssignStmt.isStackPointer =>
             localStateWithFunc + (funcName -> (localStateWithFunc(funcName) + (newPrevStmt.lhs -> regAssignStmt)))
           case memAssignStmt: MemAssign if memAssignStmt.lhs.onStack =>
@@ -214,20 +215,20 @@ case class ConstantPropagationAnalysis(state: State,
     println(globalState)
   }
   
-  override def applyChange(stmt: Stmt): Stmt = {
+  override def applyChange(stmt: Statement): Statement = {
     // this is still bad but should replace it with propagating through later
     val func = state.findStatementFunction(stmt)
     if (simplification) {
       stmt match {
-        case regAssign: RegisterAssign =>
+        case regAssign: LocalAssign =>
           localState(func.name).get(regAssign.lhs) match {
-            case Some(s: Assign) => s
+            case Some(s: AssignStatement) => s
             case _ => stmt
           }
         case memAssign: MemAssign =>
           if (memAssign.lhs.onStack) {
             localState(func.name).get(memAssign.lhs) match {
-              case Some(s: Assign) => s
+              case Some(s: AssignStatement) => s
               case _ => stmt
             }
           } else {
@@ -279,3 +280,4 @@ object ConstantPropagationAnalysis {
   def apply(state: State, simplify: Boolean): ConstantPropagationAnalysis =
     ConstantPropagationAnalysis(state, Map(), Map(), simplify)
 }
+ */

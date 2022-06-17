@@ -1,6 +1,6 @@
 package astnodes
 
-import vcgen.State
+//import vcgen.State
 
 trait Sec {
   def vars: List[Variable]
@@ -32,6 +32,7 @@ case object SecLattice {
   val FALSE: SecVar = SecVar("FALSE")
 }
 
+/*
 extension (secs: List[Sec]) {
   def join(state: State): Sec = secs match {
     case sec :: Nil => sec
@@ -39,6 +40,7 @@ extension (secs: List[Sec]) {
     case Nil => state.lattice.attackerLevel
   }
 }
+*/
 
 case class SecMemLoad (gamma: Boolean, L: Boolean, loc: Expr) extends Sec {
   override def toString: String =
@@ -47,8 +49,8 @@ case class SecMemLoad (gamma: Boolean, L: Boolean, loc: Expr) extends Sec {
 
   def onStack: Boolean = loc match {
     // TODO improve
-    case v: Register => v.name == "R31"
-    case BinOp(_, v: Register, _) => v.name == "R31"
+    case v: LocalVar => v.name == "R31"
+    case BinOp(_, v: LocalVar, _) => v.name == "R31"
     case _ => false
   }
 

@@ -1,6 +1,6 @@
 package astnodes
 
-// TODO: actually use this?
+// TODO actually use this?
 sealed trait Security extends Ordered[Security] {
   def compare(that: Security): Int =
     if (this == that) 0

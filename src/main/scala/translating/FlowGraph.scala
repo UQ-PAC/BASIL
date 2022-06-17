@@ -1,6 +1,7 @@
+/*
 package translating
 
-import astnodes.*
+import astnodes._
 import vcgen.Block
 
 import scala.collection.mutable.StringBuilder
@@ -11,9 +12,10 @@ import scala.collection.mutable.Queue
 import util.AssumptionViolationException
 
 import scala.collection.mutable
+*/
 
 // TODO neaten scala code
-
+/*
 /** A flow graph is a graphical representation of a bil/boogie program. Nodes in the graph represent basic blocks, which
   * are defined by jumps, conditional jumps, function headers, function returns and lines which are jumped to. Edges in
   * the graph represent 'links' (i.e. conditional jumps, jumps or simply the following line) between blocks. In this
@@ -33,7 +35,7 @@ object FlowGraph {
   /** Creates a FlowGraph from the given list of statements. Assumes no line is reachable from more than one function
     * header (i.e. EnterSub).
     */
-  def fromStmts(stmts: List[Stmt], types: Map[String, Int]): FlowGraph = {
+  def fromStmts(stmts: List[Statement], types: Map[String, Int]): FlowGraph = {
     val flowGraph = FlowGraphFactory.fromStmts(stmts, types)
     flowGraph.enforceDisjointFunctions()
     flowGraph
@@ -41,13 +43,13 @@ object FlowGraph {
 
   case class Function(header: EnterSub, blocks: List[Block]) {
     // TODO should automatically generate these
-    def initStmts: List[InitStmt] = List(InitStmt(Register("ZF", -1), "ZF", "bv1"),
-      InitStmt(Register("CF", -1), "CF", "bv1"),
-      InitStmt(Register("NF", -1), "NF", "bv1"),
-      InitStmt(Register("VF", -1), "VF", "bv1")
+    def initStmts: List[InitStmt] = List(InitStmt(LocalVar("ZF", -1), "ZF", "bv1"),
+      InitStmt(LocalVar("CF", -1), "CF", "bv1"),
+      InitStmt(LocalVar("NF", -1), "NF", "bv1"),
+      InitStmt(LocalVar("VF", -1), "VF", "bv1")
     )
 
-    def lines: List[Stmt] = blocks flatMap {block => block.lines }
+    def lines: List[Statement] = blocks flatMap { block => block.lines }
 
     override def toString: String = {
       val builder = mutable.StringBuilder()
@@ -75,7 +77,7 @@ object FlowGraph {
       * @return
       *   a new flow graph with an empty global block and no constraints
       */
-    def fromStmts(stmts: List[Stmt], types: Map[String, Int]): FlowGraph = {
+    def fromStmts(stmts: List[Statement], types: Map[String, Int]): FlowGraph = {
       val stmts2 = mergeCjmp(stmts)
       // val stmts2 = setFunctionsWithReturns(stmts1);
       //val stmts2 = stmts1
@@ -96,12 +98,12 @@ object FlowGraph {
       flowGraph
     }
 
-    private def setFunctionsWithReturns(stmts: List[Stmt]): List[Stmt] = {
+    private def setFunctionsWithReturns(stmts: List[Statement]): List[Statement] = {
       var i = 0 // TODO work out a way to not use this
 
       // TODO ideally could collect (returning a partial function instead of some/none)
       (stmts.sliding(3, 1).flatMap{
-        case (call: CallStmt) :: _ :: (assign: RegisterAssign) :: Nil =>
+        case (call: CallStmt) :: _ :: (assign: LocalAssign) :: Nil =>
           call.copy(lhs = Some(assign.lhs))
           i = 2
           Some(call)
@@ -170,7 +172,7 @@ object FlowGraph {
       * @return
       *   a list of splits indicating where blocks should be defined in the given statements list
       */
-    private def getSplits(stmts: List[Stmt]): Vector[Int] = { // we use a set to avoid double-ups, as some lines may be jumped to twice
+    private def getSplits(stmts: List[Statement]): Vector[Int] = { // we use a set to avoid double-ups, as some lines may be jumped to twice
       val splits: mutable.HashSet[Int] = mutable.HashSet()
       for (i <- stmts.indices) {
         stmts(i) match {
@@ -211,7 +213,7 @@ object FlowGraph {
       * @return
       *   the statement in the given list that has the given PC.
       */
-    private def findInstWithPc(pc: String, stmts: List[Stmt]): Option[Int] = {
+    private def findInstWithPc(pc: String, stmts: List[Statement]): Option[Int] = {
       if (pc.substring(0, 2) == "__") return None // TODO when jumping to a function e.g. goto @__gmon_start__
       for (i <- stmts.indices) {
         if (stmts(i).pc == pc) return Some(i)
@@ -231,7 +233,7 @@ object FlowGraph {
       * @return
       *   a list of blocks consisting of sublists of the given statements list, as defined by the given splits list
       */
-    private def createBlocksFromSplits(splits: Vector[Int], lines: List[Stmt]): List[Block] = {
+    private def createBlocksFromSplits(splits: Vector[Int], lines: List[Statement]): List[Block] = {
       for (i <- 0 until splits.size - 1) yield {
         val blockLines = lines.slice(splits(i), splits(i + 1))
         // blocks are initially created with no children
@@ -252,7 +254,7 @@ object FlowGraph {
       *   directly follow the last statement in a block, as it may represent a child of this block if the last line is,
       *   for instance, not a jump
       */
-    private def setChildren(blocks: List[Block], stmts: List[Stmt]): List[Block] = {
+    private def setChildren(blocks: List[Block], stmts: List[Statement]): List[Block] = {
       for (block <- blocks) yield {
         // the PCs of all statements this block jumps to (for instance, the targets of jumps)
         val childrenPcs = getChildrenPcs(block, stmts)
@@ -283,7 +285,7 @@ object FlowGraph {
       * @return
       *   a list of PCs representing the children of the given block
       */
-    private def getChildrenPcs(block: Block, lines: List[Stmt]): List[String] = {
+    private def getChildrenPcs(block: Block, lines: List[Statement]): List[String] = {
       block.lines.last match {
         case jmp: JmpStmt => List(jmp.target)
         case cjmp: CJmpStmt => List(cjmp.trueTarget, cjmp.falseTarget)
@@ -335,7 +337,7 @@ object FlowGraph {
       None
     }
 
-    private def mergeCjmp (stmts: List[Stmt]): List[Stmt] = stmts match {
+    private def mergeCjmp (stmts: List[Statement]): List[Statement] = stmts match {
       case (cjmp: CJmpStmt) :: (jmp: JmpStmt) :: rest => cjmp.copy(falseTarget = jmp.target) +: mergeCjmp(rest)
       case (cjmp: CJmpStmt) :: _ => throw new AssumptionViolationException("Unexpected conditional jump")
       case stmt :: rest => stmt +: mergeCjmp(rest)
@@ -346,18 +348,18 @@ object FlowGraph {
 }
 
 case class FlowGraph (functions: List[FlowGraph.Function], types: Map[String, Int]) {
-  def globalInits: List[InitStmt] = List(InitStmt(Register("heap", -1), "heap", "[bv64] bv8"), // TODO label.none
-    InitStmt(Register("heap_free", -1), "heap_free", "[bv64] bool"),
-    InitStmt(Register("heap_sizes", -1), "heap_size", "[bv64] bv64"),
-    InitStmt(Register("stack", -1), "stack", "[bv64] bv8"),
-    InitStmt(Register("SP", -1), "SP", "bv64"),
-    InitStmt(Register("R31", -1), "R31", "bv64")
+  def globalInits: List[InitStmt] = List(InitStmt(LocalVar("heap", -1), "heap", "[bv64] bv8"), // TODO label.none
+    InitStmt(LocalVar("heap_free", -1), "heap_free", "[bv64] bool"),
+    InitStmt(LocalVar("heap_sizes", -1), "heap_size", "[bv64] bv64"),
+    InitStmt(LocalVar("stack", -1), "stack", "[bv64] bv8"),
+    InitStmt(LocalVar("SP", -1), "SP", "bv64"),
+    InitStmt(LocalVar("R31", -1), "R31", "bv64")
   )
 
   /** @return
     *   all lines of all blocks within this flow graph
     */
-  def lines: List[Stmt] = blocks flatMap { block => block.lines}
+  def lines: List[Statement] = blocks flatMap { block => block.lines}
 
   /** @return
     *   all blocks within this flow graph
@@ -424,3 +426,4 @@ case class FlowGraph (functions: List[FlowGraph.Function], types: Map[String, In
     builder.toString
   }
 }
+*/

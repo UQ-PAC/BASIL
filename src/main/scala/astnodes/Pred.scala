@@ -19,7 +19,7 @@ extension (preds: List[Pred]) {
 case class Bool(name: String) extends Pred {
   override def toString: String = name
 
-  override def vars: List[Register] = List()
+  override def vars: List[LocalVar] = List()
   override def substExpr(v: Variable, w: Variable): Pred = this
 }
 
@@ -31,14 +31,14 @@ case object Bool {
 case class ExprComp(op: String, firstExpr: Expr, secondExpr: Expr) extends Pred {
   override def vars: List[Variable] = firstExpr.vars ++ secondExpr.vars
   override def toString: String = s"(${firstExpr.toBoogieString} $op ${secondExpr.toBoogieString})"
-  override def substExpr(v: Variable, w: Variable): Pred = this.copy(firstExpr = firstExpr.subst(v, w), secondExpr = secondExpr.subst(v,w))
+  override def substExpr(v: Variable, w: Variable): Pred = copy(firstExpr = firstExpr.subst(v, w), secondExpr = secondExpr.subst(v,w))
 }
 
 case class PredBinOp(op: PredBinOperator, firstPred: Pred, secondPred: Pred) extends Pred {
   def this(operatorStr: String, firstPred: Pred, secondPred: Pred) = this(PredBinOperator.valueOf(operatorStr), firstPred, secondPred)
   override def vars: List[Variable] = firstPred.vars ++ secondPred.vars
   override def toString = s"($firstPred $op $secondPred)"
-  override def substExpr(v: Variable, w: Variable): Pred = this.copy(firstPred = firstPred.substExpr(v,w), secondPred = secondPred.substExpr(v,w))
+  override def substExpr(v: Variable, w: Variable): Pred = copy(firstPred = firstPred.substExpr(v,w), secondPred = secondPred.substExpr(v,w))
 }
 
 enum PredBinOperator(val boogieRepr: String) {
@@ -81,13 +81,13 @@ case class SecComp(first: Sec, second: Sec) extends Pred {
   override def substExpr(v: Variable, w: Variable): Pred = ???
 }
 case class PredMemLoad(loc: Expr) extends Pred {
-  override def vars: List[Register] = ??? // TODO we cant handle this atm
+  override def vars: List[LocalVar] = ??? // TODO we cant handle this atm
   override def toString = s"${if (this.onStack) "stack" else "heap"}[${loc.toBoogieString}]"
 
   def onStack: Boolean = loc match {
     // TODO improve
-    case v: Register => v.name == "R31"
-    case PredBinOp(_, v: Register, _) => v.name == "R31"
+    case v: LocalVar => v.name == "R31"
+    case PredBinOp(_, v: LocalVar, _) => v.name == "R31"
     case _ => false
   }
 
@@ -97,7 +97,7 @@ case class PredMemLoad(loc: Expr) extends Pred {
 
 // TODO are all predicate variables gamma?
 case class PredVariable(name: String) extends Pred {
-  override def vars: List[Register] = ??? // List(new exp.Var(name))
+  override def vars: List[LocalVar] = ??? // List(new exp.Var(name))
 
   override def toString: String = name
   override def substExpr(v: Variable, w: Variable): Pred = this

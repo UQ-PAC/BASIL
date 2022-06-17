@@ -1,7 +1,7 @@
-package vcgen
-
-import analysis.*
-import astnodes.*
+//package vcgen
+/*
+import analysis._
+import astnodes._
 import translating.FlowGraph
 import translating.FlowGraph.Function
 import util.Boogie.{generateBVHeader, generateBVToBoolHeader, generateLibraryFuncHeader, generateSecurityLatticeFuncHeader}
@@ -15,32 +15,33 @@ import scala.collection.mutable.ArrayBuffer
  *  @param controls the control variables for any given variable
  *  @param symbolTable a mapping from variable id to its location in memory (from the symbol table)
  */
+
 case class State(
                   functions: List[FunctionState],
                   rely: Pred,
                   guar: Pred,
-                  controls: Map[Register, Set[Register]],
+                  controls: Map[LocalVar, Set[LocalVar]],
                   globalInits: List[InitStmt],
                   symbolTable: Map[String, Literal],
                   bvSizes: Map[String, Int],
-                  private val L: Map[Register, Sec],
-                  private val gamma0: Map[Register, SecVar],
+                  private val L: Map[LocalVar, Sec],
+                  private val gamma0: Map[LocalVar, SecVar],
                   lattice: SecLattice = SecLattice.booleanLattice,
 ) {
-  def getL(v: Register): Sec = L.getOrElse(v, SecLattice.TRUE)
-  def getGamma(v: Register): SecVar = gamma0.getOrElse(v, lattice.top)
+  def getL(v: LocalVar): Sec = L.getOrElse(v, SecLattice.TRUE)
+  def getGamma(v: LocalVar): SecVar = gamma0.getOrElse(v, lattice.top)
 
   private def lBodyStr =
     if (L.isEmpty) ";"
     else {
       "{ " + L.foldLeft(lattice.top: Sec) { case (prev, (v, p)) =>
-        SecITE(ExprComp("==", Register("pos", 64), symbolTable(v.name)), p, prev)
+        SecITE(ExprComp("==", LocalVar("pos", 64), symbolTable(v.name)), p, prev)
       }.toString + " }"
     }
 
   //TODO handle size of memload
   /** Returns the complete rely (including automatically generated conditions) */
-  private def getCompleteRely: List[Pred] = List(rely.vars.collect{case v: Register => v}.foldLeft(rely)((p, v) => p.substExpr(v, MemLoad(symbolTable(v.name), Some(8)))), Forall("i: bv64", "((heap[i] == old(heap[i])) ==> (Gamma_heap[i] == old(Gamma_heap[i])))")) // TODO
+  private def getCompleteRely: List[Pred] = List(rely.vars.collect{case v: LocalVar => v}.foldLeft(rely)((p, v) => p.substExpr(v, MemAccess(symbolTable(v.name), 8))), Forall("i: bv64", "((heap[i] == old(heap[i])) ==> (Gamma_heap[i] == old(Gamma_heap[i])))")) // TODO
 
   private def relyStr = "procedure rely(); modifies " + "heap, Gamma_heap" + ";\n ensures " + getCompleteRely.mkString(";\n ensures ") + ";"
 
@@ -55,13 +56,13 @@ case class State(
 
   def functionFromCall(call: CallStmt): FunctionState = functions.find(_.header.funcName == call.funcName).get
 
-  def findStatementFunction(stmt: Stmt): FunctionState = {
+  def findStatementFunction(stmt: Statement): FunctionState = {
     functions.collectFirst {
       case function: FunctionState if function.blocks.exists(_.lines.contains(stmt)) => function
     }
   }.get
 
-  def applyAnalysis[T <: AnalysisPoint[T]](analysis: Map[Stmt, T]): State =
+  def applyAnalysis[T <: AnalysisPoint[T]](analysis: Map[Statement, T]): State =
     copy(functions = functions.map { _.applyAnalysis[T](analysis) })
 
 }
@@ -73,8 +74,8 @@ case object State {
             guar: Pred,
             symbolTable: Map[String, Literal],
             bvSizes: Map[String, Int],
-            lPreds: Map[Register, Sec],
-            gamma: Map[Register, SecVar]): State = {
+            lPreds: Map[LocalVar, Sec],
+            gamma: Map[LocalVar, SecVar]): State = {
     val controlledBy = lPreds.map { (v, p) => (v, p.vars) }
 
     // TODO alternatively could use the GOT
@@ -84,7 +85,7 @@ case object State {
       controlledBy.collect{
         case (c, controlled) if controlled.contains(v) => c
       }.toSet
-    )).toMap[Register, Set[Register]]
+    )).toMap[LocalVar, Set[LocalVar]]
 
     val functions = flowGraph.functions.map(FunctionState.apply).map{
       case main if main.header.funcName == "main" =>
@@ -111,14 +112,13 @@ case object State {
  */
 case class FunctionState(blocks: List[Block],
                          initStmts: List[InitStmt],
-                         header: EnterSub,
                          name: String) {
 
   override def toString: String = header.toString + "\n"
     + initStmts.map(_.toBoogieString).mkString("\n")
     + blocks.mkString("") + "\n}"
 
-  def applyAnalysis[T <: AnalysisPoint[T]](analysis: Map[Stmt, T]): FunctionState = {
+  def applyAnalysis[T <: AnalysisPoint[T]](analysis: Map[Statement, T]): FunctionState = {
     copy(blocks = blocks.map { _.applyAnalysis[T](analysis) })
   }
 
@@ -159,13 +159,13 @@ case object FunctionState {
 
 // need to handle children properly ugh
 case class Block(label: String,
-                 lines: List[Stmt],
+                 lines: List[Statement],
                  children: List[Block]) {
   override def toString: String = "\nlabel" + label + ":\n    " + lines.map(l => l.toBoogieString).mkString("\n    ")
 
-  def applyAnalysis[T <: AnalysisPoint[T]](analysis: Map[Stmt, T]): Block = {
+  def applyAnalysis[T <: AnalysisPoint[T]](analysis: Map[Statement, T]): Block = {
     val linesUpdate = lines map {
-        case line: Stmt => analysis.get(line) match {
+        case line: Statement => analysis.get(line) match {
           case Some(a) => a.applyChange(line)
           case _ => line
         }
@@ -184,3 +184,4 @@ case class Block(label: String,
   }
   */
 }
+*/

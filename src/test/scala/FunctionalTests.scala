@@ -1,5 +1,5 @@
 import BilParser.{BilLexer, BilParser}
-import astnodes.stmt.Stmt
+import astnodes._
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.junit.Assert.*
@@ -39,7 +39,7 @@ class FunctionalTests:
     parser.setBuildParseTree(true)
     val b = parser.bil()
     // extract all statement objects from the tree
-    val stmts = new ArrayBuffer[Stmt]()
+    val stmts = new ArrayBuffer[Statement]()
     // val statementLoader = new StatementLoader(stmts)
     // val walker = new ParseTreeWalker()
     // walker.walk(statementLoader, b)
