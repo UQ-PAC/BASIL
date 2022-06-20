@@ -49,6 +49,7 @@ object RunUtils {
     -type checking
     --coerce bv literals to be the right size (bap sometimes messes this up for comparisons)
     --coerce bv1 to boolean properly instead of current mediocre approach
+    -make sure there's no sneaky stack accesses
     -determine which is initial procedure - unclear?
     -define all global variables & functions - only ones that are used
     -constant propagation to properly analyse control flow and replace all indirect calls

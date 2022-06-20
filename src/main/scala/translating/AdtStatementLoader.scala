@@ -29,7 +29,7 @@ object AdtStatementLoader {
   }
 
   def visitLoad(ctx: LoadContext): MemAccess = {
-    MemAccess(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitEndian(ctx.endian), parseInt(ctx.num))
+    MemAccess.init(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitEndian(ctx.endian), parseInt(ctx.num))
   }
 
   def visitStore(ctx: StoreContext): Store = {
@@ -125,7 +125,7 @@ object AdtStatementLoader {
     FunctionNode(visitQuoteString(ctx.name), address, ctx.blks.blk.asScala.map(visitBlk).toList, in.toList, out.toList)
   }
 
-  def visitBlk(ctx: BlkContext): BlockNode = {
+  def visitBlk(ctx: BlkContext): Block = {
     val statements: Vector[(String, Statement)] = ctx.defs.assign.asScala.map(visitAssign).toVector ++
       ctx.jmps.jmp.asScala.map(visitJmp).toVector
 
@@ -151,7 +151,7 @@ object AdtStatementLoader {
       case None => None
     }
 
-    BlockNode(label, address, instructions.toList)
+    Block(label, address, instructions.toList)
   }
 
   def visitEndian(ctx: EndianContext): Endian = ctx.ENDIAN.getText match {
@@ -175,7 +175,7 @@ object AdtStatementLoader {
     if (lhs != rhs.memory) {
       throw new Exception("trying to store memory in unrelated memory")
     }
-    val assign = MemAssign(MemAccess(lhs, rhs.index, rhs.endian, rhs.size), rhs.value)
+    val assign = MemAssign(MemAccess.init(lhs, rhs.index, rhs.endian, rhs.size), rhs.value)
     (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), assign)
   }
 

@@ -3,18 +3,18 @@ package astnodes
 //import vcgen.State
 
 trait Sec {
-  def vars: List[Variable]
+  //def vars: List[Variable]
 }
 
 case class SecBinOp(op: String, first: Sec, second: Sec) extends Sec {
   override def toString = s"$op($first, $second)"
-  override def vars: List[Variable] = first.vars ++ second.vars
+  //override def vars: List[Variable] = first.vars ++ second.vars
 }
 
 // TODO not used
 case class SecITE(cond: Pred, first: Sec, second: Sec) extends Sec {
   override def toString = s"secITE($cond, $first, $second)"
-  override def vars: List[Variable] = cond.vars ++ first.vars ++ second.vars
+  //override def vars: List[Variable] = cond.vars ++ first.vars ++ second.vars
 }
 
 // TODO add checks to make sure attackerLevel is in elements
@@ -54,7 +54,7 @@ case class SecMemLoad (gamma: Boolean, L: Boolean, loc: Expr) extends Sec {
     case _ => false
   }
 
-  override def vars: List[Variable] = List()
+  //override def vars: List[Variable] = List()
 }
 
 /**
@@ -63,5 +63,5 @@ case class SecMemLoad (gamma: Boolean, L: Boolean, loc: Expr) extends Sec {
   */
 case class SecVar (name: String, gamma: Boolean = false) extends Sec {
   override def toString: String = s"${if (gamma) "Gamma" else "s"}_$name"
-  override def vars: List[Variable] = List()
+  //override def vars: List[Variable] = List()
 }

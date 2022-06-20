@@ -5,9 +5,7 @@ import util.AssumptionViolationException
 
 /** Expression
   */
-trait Expr extends Node {
-  /*  All of the variables in a given expression */
-  def vars: List[Variable]
+trait Expr {
 
   /* Substitute a given variable for another variable */
   def subst(v: Variable, w: Variable): Expr
@@ -20,6 +18,8 @@ trait Expr extends Node {
    * Note: for binary operators in some cases the input and output sizes will not match.
    */
   def size: Int
+
+  def locals: Set[LocalVar]
 }
 
 /**
@@ -30,7 +30,7 @@ case class Concat(left: Expr, right: Expr) extends Expr {
 
   override def size: Int = left.size + right.size
 
-  override def vars: List[Variable] = left.vars ++ right.vars
+  override def locals: Set[LocalVar] = left.locals ++ right.locals
   override def subst(v: Variable, w: Variable): Expr = {
     copy(left = left.subst(v,w), right = right.subst(v,w))
   }
@@ -48,7 +48,7 @@ case class Concat(left: Expr, right: Expr) extends Expr {
 
 case class SignExtend(width: Int, body: Expr) extends Expr {
   //override def toString: String = String.format("%s[%d:%d]", body, high, low)
-  override def vars: List[Variable] = body.vars
+  override def locals: Set[LocalVar] = body.locals
   override def subst(v: Variable, w: Variable): Expr = copy(body = body.subst(v, w))
   //override def simplify(old: Expr, sub: Expr): Expr = ???
 
@@ -64,7 +64,7 @@ case class SignExtend(width: Int, body: Expr) extends Expr {
 
 case class ZeroExtend(width: Int, body: Expr) extends Expr {
   //override def toString: String = String.format("%s[%d:%d]", body, high, low)
-  override def vars: List[Variable] = body.vars
+  override def locals: Set[LocalVar] = body.locals
   override def subst(v: Variable, w: Variable): Expr = copy(body = body.subst(v, w))
   //override def simplify(old: Expr, sub: Expr): Expr = ???
 
@@ -78,7 +78,7 @@ case class ZeroExtend(width: Int, body: Expr) extends Expr {
   */
 case class Extract(high: Int, low: Int, body: Expr) extends Expr {
   override def toString: String = String.format("%s[%d:%d]", body, high, low)
-  override def vars: List[Variable] = body.vars
+  override def locals: Set[LocalVar] = body.locals
 
   override def subst(v: Variable, w: Variable): Expr = this.copy(body = body.subst(v, w))
 
@@ -107,7 +107,7 @@ case class Literal(value: BigInt, size: Int) extends Expr {
   override def toString: String = toBoogieString //String.format("%s", value)
   override def toBoogieString: String = value.toString + s"bv$size"
 
-  override def vars: List[Variable] = List()
+  override def locals: Set[LocalVar] = Set()
   override def subst(v: Variable, w: Variable): Expr = this
   //override def simplify(old: Expr, sub: Expr): Expr = this
 }
@@ -136,7 +136,7 @@ case class UniOp(operator: UniOperator, exp: Expr) extends Expr {
   override def subst(v: Variable, w: Variable): Expr = copy(exp = exp.subst(v, w))
   //override def simplify(old: Expr, sub: Expr): Expr = SimplificationUtil.uniArithmetic(copy(exp = exp.simplify(old, sub)))
 
-  override def vars: List[Variable] = exp.vars
+  override def locals: Set[LocalVar] = exp.locals
 
   override def size: Int = exp.size
 
@@ -205,7 +205,7 @@ case class BinOp(operator: BinOperator, lhs: Expr, rhs: Expr) extends Expr {
     SimplificationUtil.binArithmetic(copy(lhs = lhs.simplify(old,sub), rhs = rhs.simplify(old, sub)))
   } */
 
-  override def vars: List[Variable] = lhs.vars ++ rhs.vars
+  override def locals: Set[LocalVar] = lhs.locals ++ rhs.locals
 
   // Finish resolveTypes and then remove this
   override def size: Int = operator.size(lhs.size, rhs.size)
@@ -288,7 +288,7 @@ trait Variable extends Expr {
   */
 case class LocalVar(name: String, override val size: Int) extends Variable {
   override def toString: String = name
-  override def vars: List[Variable] = List(this)
+  override def locals: Set[LocalVar] = Set(this)
   override def toGamma: SecVar = SecVar(name, true)
   //override def simplify(old: Expr, sub: Expr): Expr = if (old == this) sub else this
 }
@@ -308,18 +308,7 @@ case class MemAccess(memory: Memory, index: Expr, endian: Endian, override val s
       .mkString(" ++ ")
   */
 
-  override def vars: List[MemAccess] = List(this) // TODO also exp.vars????
-
-  /** Assumes: anything on the stack is represented as SP + val (where val is an int etc)
-    */
-  val onStack: Boolean = onStackMatch(index)
-
-  def onStackMatch(expr: Expr): Boolean = expr match {
-    case v: LocalVar => v.name == "R31"
-    case BinOp(_, e1: Expr, e2: Expr) => onStackMatch(e1) || onStackMatch(e2)
-    case UniOp(_, e1: Expr) => onStackMatch(e1)
-    case _ => false
-  }
+  override def locals: Set[LocalVar] = index.locals
 
   /*
   override def simplify(old: Expr, sub: Expr): Expr = {
@@ -333,10 +322,20 @@ case class MemAccess(memory: Memory, index: Expr, endian: Endian, override val s
   override def toGamma: SecMemLoad = SecMemLoad(true, false, index)
 }
 
+object MemAccess {
+  // initialise to replace stack references
+  def init(memory: Memory, index: Expr, endian: Endian, size: Int): MemAccess = {
+    if (index.locals.contains(LocalVar("R31", 64))) {
+      MemAccess(memory.copy(name = "stack"), index, endian, size)
+    } else {
+      MemAccess(memory, index, endian, size)
+    }
+  }
+}
+
 
 case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr {
   override def size: Int = valueSize
-  override def subst(v: astnodes.Variable, w: astnodes.Variable): astnodes.Expr = ???
-  override def vars: List[astnodes.Variable] = ???
-
+  override def subst(v: Variable, w: Variable): Expr = ???
+  override def locals: Set[LocalVar] = Set()
 }

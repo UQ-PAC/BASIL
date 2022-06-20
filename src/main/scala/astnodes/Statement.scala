@@ -1,9 +1,12 @@
 package astnodes
 
-trait Statement extends Node {
+trait Statement {
   //def subst(v: Variable, w: Variable): Stmt
 
   def toBoogieString: String = toString
+
+  def modifies: Set[Memory]
+  def locals: Set[LocalVar]
 
   /*
   def labelString: String = if (labelVisible) {
@@ -16,13 +19,6 @@ trait Statement extends Node {
   //def withVisibleLabel: Stmt
 }
 
-case class Assert(pred: Pred) extends Statement {
-  //override def subst(v: Variable, w: Variable): Stmt = ???
-
-  override def toString: String = toBoogieString
-  override def toBoogieString: String = s"assert ${pred.toBoogieString};"
-}
-
 case class DirectCall(target: String, condition: Expr, returnTarget: Option[String]) extends Statement {
   override def toBoogieString: String = {
     if (condition == Literal(BigInt(1), 1)) {
@@ -32,6 +28,9 @@ case class DirectCall(target: String, condition: Expr, returnTarget: Option[Stri
     }
   }
   def noCondition: String = "call " + target + "(); // with return " + returnTarget.getOrElse("none")
+
+  override def modifies: Set[Memory] = Set()
+  override def locals: Set[LocalVar] = condition.locals
 }
 
 case class IndirectCall(target: LocalVar, condition: Expr, returnTarget: Option[String]) extends Statement {
@@ -43,6 +42,9 @@ case class IndirectCall(target: LocalVar, condition: Expr, returnTarget: Option[
     }
   }
   def noCondition: String = "call " + target.toBoogieString + "; // with return " + returnTarget.getOrElse("none")
+
+  override def modifies: Set[Memory] = Set()
+  override def locals: Set[LocalVar] = condition.locals + target
 }
 
 case class GoTo(target: String, condition: Expr) extends Statement {
@@ -54,6 +56,10 @@ case class GoTo(target: String, condition: Expr) extends Statement {
     }
   }
   def noCondition: String = "goto " + target + ";"
+
+  override def modifies: Set[Memory] = Set()
+
+  override def locals: Set[LocalVar] = condition.locals
 }
 
 
@@ -147,6 +153,10 @@ object Skip extends Statement {
   //override def subst(v: Variable, w: Variable): Stmt = this
 
   //override def withVisibleLabel: Stmt = copy(labelVisible = true)
+
+  override def modifies: Set[Memory] = Set()
+
+  override def locals: Set[LocalVar] = Set()
 }
 
 // TODO not happy with setup for STMT -> Assign -> MemAssign/RegisterAssign
@@ -154,7 +164,7 @@ object Skip extends Statement {
   */
 
 
-trait AssignStatement(lhs: Variable, rhs: Expr) extends Statement with MaybeNonConstantAssign {
+trait Assign(lhs: Variable, rhs: Expr) extends Statement with MaybeNonConstantAssign {
   override def toString: String = String.format("%s := %s;", lhs, rhs)
 
   /*
@@ -189,13 +199,16 @@ case class GammaUpdate (lhs: SecVar | SecMemLoad, sec: Sec) extends Statement {
 
   override def toBoogieString: String = s"${lhs.toString} := ${sec.toString};"
 
+  override def modifies: Set[Memory] = Set()
+  override def locals: Set[LocalVar] = Set()
+
   // TODO
   //override def subst(v: Variable, w: Variable): Stmt = this
 }
 
 /** Memory store
   */
-case class MemAssign(lhs: MemAccess, rhs: Expr) extends AssignStatement(lhs, rhs) with MaybeNonConstantMemAssign {
+case class MemAssign(lhs: MemAccess, rhs: Expr) extends Assign(lhs, rhs) with MaybeNonConstantMemAssign {
 
   // TODO this tostring method is bad as well
   // need to really sort out a good way to handle the differnet ways memload is presented
@@ -212,12 +225,15 @@ case class MemAssign(lhs: MemAccess, rhs: Expr) extends AssignStatement(lhs, rhs
   }
   */
 
+  override def modifies: Set[Memory] = Set(lhs.memory)
+
+  override def locals: Set[LocalVar] = lhs.locals ++ rhs.locals
 }
 
 trait MaybeNonConstantMemAssign
 class NonConstantMemAssign extends MaybeNonConstantMemAssign
 
-case class LocalAssign(lhs: LocalVar, rhs: Expr) extends AssignStatement(lhs, rhs) {
+case class LocalAssign(lhs: LocalVar, rhs: Expr) extends Assign(lhs, rhs) {
   override def toBoogieString: String = s"${lhs.toBoogieString} := ${rhs.toBoogieString};"
 
   // Otherwise is flag (e.g. #1)
@@ -226,5 +242,9 @@ case class LocalAssign(lhs: LocalVar, rhs: Expr) extends AssignStatement(lhs, rh
   def isStackPointer: Boolean = this.isRegister && lhs.name.substring(1).equals("31")
   def isFramePointer: Boolean = this.isRegister && lhs.name.substring(1).equals("29")
   def isLinkRegister: Boolean = this.isRegister && lhs.name.substring(1).equals("30")
+
+  override def modifies: Set[Memory] = Set()
+
+  override def locals: Set[LocalVar] = rhs.locals + lhs
 }
 
