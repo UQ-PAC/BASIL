@@ -31,12 +31,12 @@ case class BinOp(
   // Finish resolveTypes and then remove thsi
   override def size = BinOperator.size(operator, inputSize)
 
-  def inputSize = (firstExp.size, secondExp.size) match {
-    case (a: Some[Int], b: Some[int]) if (a == b) => a
-    case (a: Some[Int], b: Some[int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop should have the same size $firstExp: ${firstExp.size}, $secondExp: ${secondExp.size}")
-    case (x: Some[Int], None) => x
-    case (None, x: Some[Int]) => x
-    case (None, None) => None
+  def inputSize: Option[Int] = (firstExp.size, secondExp.size) match {
+    case (Some(a: Int), Some(b: Int)) if (a == b) => Some(a)
+    case (Some(a: Int), Some(b: Int)) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop should have the same size $firstExp: ${firstExp.size}, $secondExp: ${secondExp.size}")
+    case (Some(x: Int), None) => Some(x)
+    case (None, Some(x: Int)) => Some(x)
+    case _ => None
   }
 }
 

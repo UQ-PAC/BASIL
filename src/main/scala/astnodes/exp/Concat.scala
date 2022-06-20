@@ -14,6 +14,7 @@ case class Concat (left: Expr, right: Expr) extends Expr{
 
   override def size: Option[Int] = (left.size, right.size) match {
     case (Some(x), Some(y)) => Some(x + y)
+    case _ => None
   }
 
   override def vars = left.vars ++ right.vars
