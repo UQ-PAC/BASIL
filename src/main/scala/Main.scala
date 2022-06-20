@@ -24,17 +24,23 @@ import scala.collection.mutable.ArrayBuffer
 import sys.process.*
 import scala.language.postfixOps
 import util.RunUtils
+import scala.util.CommandLineParser
 
-@main def main(fileName: String, elfFileName: String) = {
-  var state: State = null;
-  if fileName.endsWith("adt") then
-    state = RunUtils.generateVCsAdt(fileName, elfFileName)
-  else
-    state = RunUtils.generateVCs(fileName, elfFileName)
-  RunUtils.writeToFile(state)
+@main def main(fileName: String, elfFileName: String, options: String*) = {
+  val outFileName = if (options.isEmpty) {
+    "boogie_out.bpl"
+  } else {
+    options.head
+  }
+  val state: State = if (fileName.endsWith(".adt")) {
+    RunUtils.generateVCsAdt(fileName, elfFileName)
+  } else {
+    RunUtils.generateVCs(fileName, elfFileName)
+  }
+  RunUtils.writeToFile(state, outFileName)
 
   // println("boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process(Seq("grep", "--color=always", ".*errors.*\\|$"), None, "GREP_COLORS" -> "'1;33"))
   // ("boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process(Seq("GREP_COLORS='1;32'", "grep", "--color=always", ".*errors.*\\|$"), None, "GREP_COLORS" -> "'1;32")) !
   // "boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process("grep --color=always '.*errors.*\\|$'", None, "GREP_COLORS" -> "'1;33")  !
-  "boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| "grep --color=always '.*parse errors.*\\|$'" !
+  //"boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| "grep --color=always '.*parse errors.*\\|$'" !
 }

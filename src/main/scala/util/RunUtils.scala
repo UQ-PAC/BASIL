@@ -34,8 +34,6 @@ object RunUtils {
     val symsListener = new SymbolTableListener()
     walker.walk(symsListener, symsParser.syms)
 
-    print(statementLoader.stmts)
-
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
@@ -76,8 +74,6 @@ object RunUtils {
     val symsListener = new SymbolTableListener()
     walker.walk(symsListener, symsParser.syms)
 
-    print(statementLoader.stmts)
-
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
@@ -100,7 +96,7 @@ object RunUtils {
   }
 
   // TODO copy pasted
-  def writeToFile(state: State, outputFileName: String = "boogie_out.bpl"): Unit = {
+  def writeToFile(state: State, outputFileName: String): Unit = {
     try {
       val writer = new BufferedWriter(new FileWriter(outputFileName, false))
       writer.write(state.toString)

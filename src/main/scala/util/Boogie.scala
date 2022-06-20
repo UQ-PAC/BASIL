@@ -58,7 +58,6 @@ object Boogie {
       |""".stripMargin
 
   def generateLibraryFuncHeader(lattice: SecLattice) = s"""
-      |// TODO signed or unsigned div
       |procedure malloc(size: bv64) returns (addr: bv64, Gamma_addr: SecurityLevel);
       |ensures (forall i: bv64 :: ((bv64ule(0bv64, i) && bv64ult(i, bv64udiv(size, 4bv64))) ==> old(heap_free[bv64add(addr, i)]) == true)); 
       |ensures (forall i: bv64 :: ((bv64ule(0bv64, i) && bv64ult(i, bv64udiv(size, 4bv64))) ==> heap_free[bv64add(addr, i)] == false)); 

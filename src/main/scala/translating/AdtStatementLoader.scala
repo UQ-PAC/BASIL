@@ -89,7 +89,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
     }
   }
 
-  /** Remove the quotation marks from a string e.g. "\"mem\"" becomes "mem"
+  /** Remove the quotation marks, @, and % from a string e.g. "\"mem\"" becomes "mem"
     */
   def getStringBody(str: String): String = {
     var newStr: String = str;
@@ -99,7 +99,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
     if (newStr.charAt(newStr.length - 1) == '"') {
       newStr = newStr.substring(0, newStr.length - 1);
     }
-    return newStr;
+    return newStr.stripPrefix("%").stripPrefix("@");
   }
 
   override def exitExpLoad(ctx: BilAdtParser.ExpLoadContext): Unit = {
@@ -215,7 +215,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
     }
   }
 
-  override def exitBlk(ctx: BilAdtParser.BlkContext): Unit = {
+  override def enterBlk(ctx: BilAdtParser.BlkContext): Unit = {
     // FIXME: The previous bil parser had no real notion of "blocks" the blocks were simply started by
     //  a labelled skip statement. It may be worthwhile to introduce a Block node in the AST
     stmts += new SkipStmt(getStringBody(ctx.tid.name.getText));
@@ -226,7 +226,16 @@ class AdtStatementLoader extends BilAdtBaseListener {
     var funcName = "";
     if (ctx.calee.direct != null) {
       funcName = getStringBody(ctx.calee.direct.tid.name.getText);
-      stmts += new CallStmt(address, funcName, Option(ctx.returnSym).map(_.getText), List(), None)
+      val returnName: Option[String] = Option(ctx.returnSym) match {
+        case Some(r) =>
+          if (r.direct != null) {
+            Some(getStringBody(r.direct.tid.name.getText))
+          } else {
+            None
+          }
+        case _ => None
+      }
+      stmts += new CallStmt(address, funcName, returnName, List(), None)
     } else if (ctx.calee.indirect != null) {
       // FIXME: This mimics the behaviour of the old parser - it could be unintended
       //  The assumption that was made is that any call on a non-literal function (i.e. a register, or LR) is indicative
