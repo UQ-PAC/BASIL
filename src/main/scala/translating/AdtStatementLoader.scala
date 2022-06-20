@@ -235,7 +235,7 @@ class AdtStatementLoader extends BilAdtBaseListener {
     }
   }
 
-  override def exitSub(ctx: BilAdtParser.SubContext): Unit = {
+  override def enterSub(ctx: BilAdtParser.SubContext): Unit = {
     if (currentFunction != null)
       currentFunction.setRequiresEnsures(requires, ensures)
 

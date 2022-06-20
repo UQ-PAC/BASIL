@@ -34,6 +34,8 @@ object RunUtils {
     val symsListener = new SymbolTableListener()
     walker.walk(symsListener, symsParser.syms)
 
+    print(statementLoader.stmts)
+
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
 
@@ -73,6 +75,8 @@ object RunUtils {
     symsParser.setBuildParseTree(true)
     val symsListener = new SymbolTableListener()
     walker.walk(symsListener, symsParser.syms)
+
+    print(statementLoader.stmts)
 
     // TODO duplicated code for default value
     val flowGraph = FlowGraph.fromStmts(statementLoader.stmts.asJava, statementLoader.varSizes.toMap)
