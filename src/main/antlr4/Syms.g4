@@ -34,7 +34,7 @@ symbolTableHeader :
 symbolTableRow : HEX ':' HEX HEX ALPHA ALPHA ALPHA (ALPHA | HEX) name? ;
 // symbolTableRow : HEX ':' HEX HEX symbolType bind vis ndx name? ;
 
-name : (ALPHA|'_'|'$') (ALPHA | HEX | '_' | '[...]' | '@' | '.' | '(' | ')' | '-' )*  ;
+name : (ALPHA|'_'|'$'|'/') (ALPHA | HEX | '_' | '[...]' | '@' | '.' | '(' | ')' | '-' | '/')*  ;
 
 /*
 symbolType : 'FUNC' | 'OBJECT' | 'FILE' | 'SECTION' | 'NOTYPE' ;

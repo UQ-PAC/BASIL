@@ -66,7 +66,7 @@ object RunUtils {
   }
 
   // TODO copy pasted
-  def writeToFile(program: Program, outputFileName: String = "boogie_out.bpl"): Unit = {
+  def writeToFile(program: Program, outputFileName: String): Unit = {
     try {
       val writer = new BufferedWriter(new FileWriter(outputFileName, false))
       writer.write(program.toBoogieString)
