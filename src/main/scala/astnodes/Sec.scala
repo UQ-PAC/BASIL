@@ -1,6 +1,8 @@
+/*
 package astnodes
 
 //import vcgen.State
+
 
 trait Sec {
   //def vars: List[Variable]
@@ -65,3 +67,4 @@ case class SecVar (name: String, gamma: Boolean = false) extends Sec {
   override def toString: String = s"${if (gamma) "Gamma" else "s"}_$name"
   //override def vars: List[Variable] = List()
 }
+*/

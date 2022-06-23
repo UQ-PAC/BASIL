@@ -1,3 +1,4 @@
+/*
 package analysis.tools
 
 import astnodes._
@@ -115,12 +116,13 @@ case object SimplificationUtil {
   /**
     * Simplifies unary operations
     */
-  def uniArithmetic(uniOp: UniOp): Expr = uniOp.exp match {
+  def uniArithmetic(uniOp: UnOp): Expr = uniOp.exp match {
     case literal: Literal =>
       uniOp.operator match {
-        case UniOperator.NOT => Literal(~literal.value, literal.size)
-        case UniOperator.NEG => Literal(-literal.value, literal.size)
+        case UnOperator.NOT => Literal(~literal.value, literal.size)
+        case UnOperator.NEG => Literal(-literal.value, literal.size)
       }
     case _ => uniOp
   }
 }
+ */

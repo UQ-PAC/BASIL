@@ -40,8 +40,8 @@ object AdtStatementLoader {
     BinOp(BinOperator(ctx.op.getText), visitExp(ctx.lhs), visitExp(ctx.rhs))
   }
 
-  def visitUOp(ctx: UOpContext): UniOp = {
-    UniOp(UniOperator(ctx.op.getText), visitExp(ctx.exp))
+  def visitUOp(ctx: UOpContext): UnOp = {
+    UnOp(UnOperator(ctx.op.getText), visitExp(ctx.exp))
   }
 
   def visitImmVar(ctx: ImmVarContext): LocalVar = {
@@ -57,8 +57,8 @@ object AdtStatementLoader {
   }
 
   def visitCast(ctx: CastContext): Expr = ctx.CAST.getText match {
-    case "UNSIGNED"     => ZeroExtend(parseInt(ctx.size), visitExp(ctx.exp))
-    case "SIGNED"       => SignExtend(parseInt(ctx.size), visitExp(ctx.exp))
+    case "UNSIGNED"     => UnsignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
+    case "SIGNED"       => SignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
     case "LOW"          => LowCast(parseInt(ctx.size), visitExp(ctx.exp))
     case "HIGH"         => HighCast(parseInt(ctx.size), visitExp(ctx.exp))
   }
@@ -75,7 +75,7 @@ object AdtStatementLoader {
 
   def visitIndirectCall(ctx: IndirectCallContext): (String, IndirectCall) = {
     val returnTarget = Option(ctx.returnTarget) match {
-      case Some(r: DirectContext) => Some(visitQuoteString(r.tid.name))
+      case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
       case None => None
     }
     val jump = IndirectCall(visitImmVar(ctx.callee.immVar), visitExp(ctx.cond), returnTarget)
@@ -84,7 +84,7 @@ object AdtStatementLoader {
 
   def visitDirectCall(ctx: DirectCallContext): (String, DirectCall) = {
     val returnTarget = Option(ctx.returnTarget) match {
-      case Some(r: DirectContext) => Some(visitQuoteString(r.tid.name))
+      case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
       case None => None
     }
     val jump = DirectCall(visitQuoteString(ctx.callee.tid.name).stripPrefix("@"), visitExp(ctx.cond), returnTarget)
@@ -107,6 +107,10 @@ object AdtStatementLoader {
       }
     }
 
+    val alwaysIn = List(Parameter("FP", 64, LocalVar("R29", 64)),
+      Parameter("LR", 64, LocalVar("R30", 64)),
+      Parameter("SP", 64, LocalVar("R31", 64)))
+
     val out = ctx.args.arg.asScala.flatMap { arg =>
       val lhs = visitImmVar(arg.lhs)
       val register = visitImmVar(arg.rhs)
@@ -117,12 +121,16 @@ object AdtStatementLoader {
       }
     }
 
+    val alwaysOut = List(Parameter("FP_out", 64, LocalVar("R29", 64)),
+      Parameter("LR_out", 64, LocalVar("R30", 64)),
+      Parameter("SP_out", 64, LocalVar("R31", 64)))
+
     val address = parseFromAttrs(ctx.attrs, "address") match {
       case Some(x: String) => Integer.parseInt(x.stripPrefix("0x"), 16)
       case None => -1
     }
 
-    FunctionNode(visitQuoteString(ctx.name), address, ctx.blks.blk.asScala.map(visitBlk).toList, in.toList, out.toList)
+    FunctionNode(visitQuoteString(ctx.name), address, ctx.blks.blk.asScala.map(visitBlk).toList, in.toList ++ alwaysIn, out.toList ++ alwaysOut)
   }
 
   def visitBlk(ctx: BlkContext): Block = {

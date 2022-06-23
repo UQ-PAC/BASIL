@@ -3,6 +3,7 @@ package util
 import BilParser._
 //import analysis._
 import astnodes._
+import boogie._
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
@@ -13,7 +14,7 @@ import scala.jdk.CollectionConverters._
 
 object RunUtils {
 
-  def generateVCsAdt(fileName: String, elfFileName: String): Program = {
+  def generateVCsAdt(fileName: String, elfFileName: String): BProgram = {
     val adtLexer = new BilAdtLexer(CharStreams.fromFileName(fileName))
     val tokens = new CommonTokenStream(adtLexer)
     // ADT
@@ -48,28 +49,23 @@ object RunUtils {
     TODO analyses/transformations
     -type checking
     --coerce bv literals to be the right size (bap sometimes messes this up for comparisons)
-    --coerce bv1 to boolean properly instead of current mediocre approach
     -make sure there's no sneaky stack accesses
-    -determine which is initial procedure - unclear?
-    -define all global variables & functions - only ones that are used
     -constant propagation to properly analyse control flow and replace all indirect calls
-    -initialise function calls properly with required variables including adding modifies clause, passing in any uninitialised registers
-    -exit function calls properly
-    -points to/alias analysis to split memory into separate maps as much as possible
-    -replace all memory accesses with proper versions that correctly split things per byte
-    -deal with overflow ugh
-    -general simplification of multiple extracts etc.
+    -identify external calls
+    -check for use of uninitialised registers in procedures to pass them in
+    -add R29/R30/R31 to all procedure in/out
+    -points to/alias analysis to split memory into separate maps as much as possible? do we want this?
+    -make memory reads better?
     -instrument with gammas, vcs, rely, guarantee
      */
 
-    program
+    BoogieTranslator(program).translate
   }
 
-  // TODO copy pasted
-  def writeToFile(program: Program, outputFileName: String): Unit = {
+  def writeToFile(program: BProgram, outputFileName: String): Unit = {
     try {
       val writer = new BufferedWriter(new FileWriter(outputFileName, false))
-      writer.write(program.toBoogieString)
+      writer.write(program.toString)
       writer.flush()
     } catch {
       case _: IOException => System.err.println("Error writing to file.")

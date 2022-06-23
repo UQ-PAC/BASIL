@@ -3,6 +3,7 @@
 import BilParser._
 import analysis._
 import astnodes._
+import boogie._
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import translating._
@@ -20,7 +21,7 @@ import scala.sys.process.*
   } else {
     options.head
   }
-  val program: Program = RunUtils.generateVCsAdt(fileName, elfFileName)
+  val program: BProgram = RunUtils.generateVCsAdt(fileName, elfFileName)
   RunUtils.writeToFile(program, outFileName)
 
   // println("boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process(Seq("grep", "--color=always", ".*errors.*\\|$"), None, "GREP_COLORS" -> "'1;33"))

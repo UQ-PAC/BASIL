@@ -1,6 +1,8 @@
+/*
 package astnodes
 
 // TODO actually use this?
+
 sealed trait Security extends Ordered[Security] {
   def compare(that: Security): Int =
     if (this == that) 0
@@ -16,3 +18,4 @@ sealed trait Security extends Ordered[Security] {
 case object High extends Security
 
 case object Low extends Security
+*/

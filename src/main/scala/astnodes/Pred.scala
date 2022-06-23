@@ -1,5 +1,6 @@
-package astnodes
 
+/*
+package astnodes
 trait Pred {
   //def vars: List[Variable]
   def substExpr(v: Variable, w: Variable): Pred
@@ -102,3 +103,4 @@ case class PredVariable(name: String) extends Pred {
   override def toString: String = name
   override def substExpr(v: Variable, w: Variable): Pred = this
 }
+*/

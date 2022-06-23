@@ -2,6 +2,7 @@ package astnodes
 
 //import analysis.tools.SimplificationUtil
 import util.AssumptionViolationException
+import boogie._
 
 /** Expression
   */
@@ -9,7 +10,9 @@ trait Expr {
 
   /* Substitute a given variable for another variable */
   def subst(v: Variable, w: Variable): Expr
-  def toBoogieString: String = toString
+
+  def toBoogie: BExpr
+  //def toBoogieString: String = toString
 
   //def simplify(old: Expr, sub: Expr): Expr
   /*
@@ -26,7 +29,7 @@ trait Expr {
   *  Concatenation of two bitvectors
   */
 case class Concat(left: Expr, right: Expr) extends Expr {
-  override def toBoogieString: String = s"${left.toBoogieString} ++ ${right.toBoogieString}"
+  override def toBoogie: BinaryBExpr = BinaryBExpr(BVCONCAT, left.toBoogie, right.toBoogie)
 
   override def size: Int = left.size + right.size
 
@@ -46,32 +49,44 @@ case class Concat(left: Expr, right: Expr) extends Expr {
   * Signed extend - extend in BIL
   */
 
-case class SignExtend(width: Int, body: Expr) extends Expr {
+case class SignedExtend(width: Int, body: Expr) extends Expr {
   //override def toString: String = String.format("%s[%d:%d]", body, high, low)
   override def locals: Set[LocalVar] = body.locals
   override def subst(v: Variable, w: Variable): Expr = copy(body = body.subst(v, w))
   //override def simplify(old: Expr, sub: Expr): Expr = ???
 
-  override def toString: String = toBoogieString
-  override def toBoogieString: String = s"sign_extend${width}_${body.size}(${body.toBoogieString})"
-
   override def size: Int = width
+
+  override def toBoogie: BExpr = {
+    val extend = width - body.size
+    if (extend == 0) {
+      body.toBoogie
+    } else {
+      BVSignExtend(extend, body.toBoogie)
+    }
+  }
 }
 
 /**
   * Unsigned extend - pad in BIL
   */
 
-case class ZeroExtend(width: Int, body: Expr) extends Expr {
+case class UnsignedExtend(width: Int, body: Expr) extends Expr {
   //override def toString: String = String.format("%s[%d:%d]", body, high, low)
   override def locals: Set[LocalVar] = body.locals
   override def subst(v: Variable, w: Variable): Expr = copy(body = body.subst(v, w))
   //override def simplify(old: Expr, sub: Expr): Expr = ???
 
-  override def toString: String = toBoogieString
-  override def toBoogieString: String = s"zero_extend${width}_${body.size}(${body.toBoogieString})"
-
   override def size: Int = width
+
+  override def toBoogie: BExpr = {
+    val extend = width - body.size
+    if (extend == 0) {
+      body.toBoogie
+    } else {
+      BVZeroExtend(extend, body.toBoogie)
+    }
+  }
 }
 
 /** Extracts the bits from firstInt to secondInt (inclusive) from variable.
@@ -89,7 +104,13 @@ case class Extract(high: Int, low: Int, body: Expr) extends Expr {
   // + 1 as extracts are inclusive (e.g. [31:0] has 32 bits)
   override def size: Int = high - low + 1
 
-  override def toBoogieString: String = s"${body.toBoogieString}[${high + 1}:$low]"
+  override def toBoogie: BVExtract = {
+    val boogieBody = body.toBoogie
+    boogieBody match {
+      case extract: BVExtract => BVExtract(high + 1 + extract.start, low + extract.start, extract.body)
+      case _ => BVExtract(high + 1, low, body.toBoogie)
+    }
+  }
 }
 
 case object HighCast {
@@ -104,99 +125,47 @@ case object LowCast {
   */
 case class Literal(value: BigInt, size: Int) extends Expr {
   /** Value of literal */
-  override def toString: String = toBoogieString //String.format("%s", value)
-  override def toBoogieString: String = value.toString + s"bv$size"
+  override def toString: String = s"${value}bv$size"
 
   override def locals: Set[LocalVar] = Set()
   override def subst(v: Variable, w: Variable): Expr = this
   //override def simplify(old: Expr, sub: Expr): Expr = this
+
+  override def toBoogie: BitVecLiteral = BitVecLiteral(value, size)
 }
-
-// TODO: Literal that has BigInt instead of string, handle size properly
-
-/** Function call
-  */
-/*
-case class FunctionCall(funcName: String, args: List[Expr], override val size: Option[Int] = None) extends Expr {
-
-  /** Value of literal */
-  override def toBoogieString = s"$funcName(${args.map(a => a.toBoogieString).mkString(", ")})"
-
-  override def vars: List[Variable] = args.flatMap(a => a.vars)
-  //override def subst(v: Variable, w: Variable): Expr = copy(args = args.map(a => a.subst(v, w)))
-  override def simplify(old: Expr, sub: Expr): Expr = this
-}
-*/
 
 /** Unary operator
   */
-case class UniOp(operator: UniOperator, exp: Expr) extends Expr {
-  override def toString: String = toBoogieString //String.format("%s %s", operator, exp)
-  override def toBoogieString: String = s"${operator.toBoogie(size)}(${exp.toBoogieString})"
+case class UnOp(operator: UnOperator, exp: Expr) extends Expr {
   override def subst(v: Variable, w: Variable): Expr = copy(exp = exp.subst(v, w))
   //override def simplify(old: Expr, sub: Expr): Expr = SimplificationUtil.uniArithmetic(copy(exp = exp.simplify(old, sub)))
 
   override def locals: Set[LocalVar] = exp.locals
-
   override def size: Int = exp.size
 
-}
-
-enum UniOperator {
-  case NOT
-  case NEG
-
-  def toBoogie(size: Int): String = {
-    //val size1 = size.getOrElse(64)
-    this match {
-      case NOT => s"bv${size}not"
-      case NEG => s"bv${size}neg"
-    }
+  override def toBoogie: UnaryBExpr = operator match {
+    case NOT => UnaryBExpr(BVNOT, exp.toBoogie)
+    case NEG => UnaryBExpr(BVNEG, exp.toBoogie)
   }
-
-  def changesSize: Boolean = false
 }
 
-object UniOperator {
-  def apply(bilStr: String): UniOperator = bilStr match {
-    case "NEG" => NEG
+sealed trait UnOperator(op: String) {
+  override def toString: String = op
+}
+
+case object NOT extends UnOperator("NOT")
+case object NEG extends UnOperator("NEG")
+
+object UnOperator {
+  def apply(op: String): UnOperator = op match {
     case "NOT" => NOT
+    case "NEG" => NEG
   }
 }
-
 
 /** Binary operation of two expressions
   */
 case class BinOp(operator: BinOperator, lhs: Expr, rhs: Expr) extends Expr {
-
-  override def toString: String = toBoogieString
-  //override def toString String: String = String.format("(%s) %s (%s)", lhs, operator, rhs)
-  override def toBoogieString: String = operator match {
-    case BinOperator.ADD => s"bv${size}add(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.SUB => s"bv${size}sub(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.MUL => s"bv${size}mul(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.DIV => s"bv${size}udiv(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.SDIV => s"bv${size}sdiv(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.MOD => s"bv${size}mod(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.SMOD => s"bv${size}srem(${lhs.toBoogieString}, ${rhs.toBoogieString})" // TODO: check BIL semantics here, it could be smod instead?
-    case BinOperator.AND => s"bv${size}and(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.OR => s"bv${size}or(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.XOR => s"bv${size}xor(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.LSL => s"bv${size}shl(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.LSR => s"bv${size}lshr(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.ASR => s"bv${size}ashr(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.LT => s"bv${size}ult(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.LE => s"bv${size}ule(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.SLT => s"bv${size}slt(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.SLE => s"bv${size}sle(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-    case BinOperator.EQ => s"if (${lhs.toBoogieString} == ${rhs.toBoogieString}) then 0bv1 else 0bv0"
-    case BinOperator.NEQ => s"if (${lhs.toBoogieString} != ${rhs.toBoogieString}) then 0bv1 else 0bv0"
-  }
-
-    //s"${operator.toBoogie(size)}(${lhs.toBoogieString}, ${rhs.toBoogieString})"
-
-    //operator.toBoogie(operator.size(lhs.size, rhs.size)).fold(s"${lhs.toBoogieString}, ${rhs.toBoogieString}")((inner, fun) => s"$fun($inner)")
-
   override def subst(v: Variable, w: Variable): Expr = {
     copy(lhs = lhs.subst(v,w), rhs = rhs.subst(v, w))
   }
@@ -207,73 +176,98 @@ case class BinOp(operator: BinOperator, lhs: Expr, rhs: Expr) extends Expr {
 
   override def locals: Set[LocalVar] = lhs.locals ++ rhs.locals
 
-  // Finish resolveTypes and then remove this
-  override def size: Int = operator.size(lhs.size, rhs.size)
-  /*
-  if (lhs.size != rhs.size) {
-    throw new AssumptionViolationException(s"Both sides of binop should have the same size: $lhs: ${lhs.size}, $rhs: ${rhs.size}")
-  } else {
-    operator.size(lhs.size, rhs.size)
+  override def size: Int = operator match {
+    case EQ | NEQ | LT | LE | SLT | SLE => 1
+    case _ => lhs.size
   }
-  */
 
+  override def toBoogie: BExpr = operator match {
+    case PLUS => BinaryBExpr(BVADD, lhs.toBoogie, rhs.toBoogie)
+    case MINUS => BinaryBExpr(BVSUB, lhs.toBoogie, rhs.toBoogie)
+    case TIMES => BinaryBExpr(BVMUL, lhs.toBoogie, rhs.toBoogie)
+    case DIVIDE => BinaryBExpr(BVUDIV, lhs.toBoogie, rhs.toBoogie)
+    case SDIVIDE => BinaryBExpr(BVUDIV, lhs.toBoogie, rhs.toBoogie)
+    // counterintuitive but correct according to BAP source
+    case MOD => BinaryBExpr(BVSREM, lhs.toBoogie, rhs.toBoogie)
+    // counterintuitive but correct according to BAP source
+    case SMOD => BinaryBExpr(BVUREM, lhs.toBoogie, rhs.toBoogie)
+    case LSHIFT => // BAP says caring about this case is necessary?
+      if (lhs.size == rhs.size) {
+        BinaryBExpr(BVSHL, lhs.toBoogie, rhs.toBoogie)
+      } else {
+        BinaryBExpr(BVSHL, lhs.toBoogie, BVZeroExtend(lhs.size - rhs.size, rhs.toBoogie))
+      }
+    case RSHIFT =>
+      if (lhs.size == rhs.size) {
+        BinaryBExpr(BVLSHR, lhs.toBoogie, rhs.toBoogie)
+      } else {
+        BinaryBExpr(BVLSHR, lhs.toBoogie, BVZeroExtend(lhs.size - rhs.size, rhs.toBoogie))
+      }
+    case ARSHIFT =>
+      if (lhs.size == rhs.size) {
+        BinaryBExpr(BVASHR, lhs.toBoogie, rhs.toBoogie)
+      } else {
+        BinaryBExpr(BVASHR, lhs.toBoogie, BVZeroExtend(lhs.size - rhs.size, rhs.toBoogie))
+      }
+    case AND => BinaryBExpr(BVAND, lhs.toBoogie, rhs.toBoogie)
+    case OR => BinaryBExpr(BVOR, lhs.toBoogie, rhs.toBoogie)
+    case XOR => BinaryBExpr(BVXOR, lhs.toBoogie, rhs.toBoogie)
+    case EQ => BinaryBExpr(BVCOMP, lhs.toBoogie, rhs.toBoogie)
+    case NEQ => UnaryBExpr(BVNOT, BinaryBExpr(BVCOMP, lhs.toBoogie, rhs.toBoogie))
+    case LT => BinaryBExpr(BVULT, lhs.toBoogie, rhs.toBoogie)
+    case LE => BinaryBExpr(BVULE, lhs.toBoogie, rhs.toBoogie)
+    case SLT => BinaryBExpr(BVSLT, lhs.toBoogie, rhs.toBoogie)
+    case SLE => BinaryBExpr(BVSLE, lhs.toBoogie, rhs.toBoogie)
+  }
 }
 
-enum BinOperator {
-  case ADD
-  case SUB
-  case MUL
-  case DIV
-  case SDIV
-  case MOD
-  case SMOD
-  case AND
-  case OR
-  case XOR
-  case LSL
-  case LSR
-  case ASR
-  case EQ
-  case NEQ
-  case LT
-  case LE
-  case SLT
-  case SLE
-
-  def changesSize: Boolean = this match {
-    case EQ | NEQ => true
-    case _ => false
-  }
-
-  def size(lhsSize: Int, rhsSize: Int): Int = this match {
-    case EQ | NEQ | LT | LE | SLT | SLE => 1
-    case _ => lhsSize
-  }
+sealed trait BinOperator(op: String) {
+  override def toString: String = op
 }
 
 object BinOperator {
-  def apply(adtStr: String): BinOperator = adtStr match {
-    case "PLUS"    => ADD
-    case "MINUS"   => SUB
-    case "TIMES"   => MUL
-    case "DIVIDE"  => DIV
-    case "SDIVIDE" => SDIV
-    case "MOD"     => MOD
-    case "SMOD"    => SMOD
-    case "LSHIFT"  => LSL
-    case "RSHIFT"  => LSR
-    case "ARSHIFT" => ASR
-    case "AND"     => AND
-    case "OR"      => OR
-    case "XOR"     => XOR
-    case "EQ"      => EQ
-    case "NEQ"     => NEQ
-    case "LT"      => LT
-    case "LE"      => LE
-    case "SLT"     => SLT
-    case "SLE"     => SLE
+  def apply(op: String): BinOperator = op match {
+    case "PLUS" => PLUS
+    case "MINUS" => MINUS
+    case "TIMES" => TIMES
+    case "DIVIDE" => DIVIDE
+    case "SDIVIDE" => SDIVIDE
+    case "MOD" => MOD
+    case "SMOD" => SMOD
+    case "LSHIFT" => LSHIFT
+    case "RSHIFT" => RSHIFT
+    case "ARSHIFT" => ARSHIFT
+    case "AND" => AND
+    case "OR" => OR
+    case "XOR" => XOR
+    case "EQ" => EQ
+    case "NEQ" => NEQ
+    case "LT" => LT
+    case "LE" => LE
+    case "SLT" => SLT
+    case "SLE" => SLE
   }
 }
+
+case object PLUS extends BinOperator("PLUS")
+case object MINUS extends BinOperator("MINUS")
+case object TIMES extends BinOperator("TIMES")
+case object DIVIDE extends BinOperator("DIVIDE")
+case object SDIVIDE extends BinOperator("SDIVIDE")
+case object MOD extends BinOperator("MOD")
+case object SMOD extends BinOperator("SMOD")
+case object LSHIFT extends BinOperator("LSHIFT")
+case object RSHIFT extends BinOperator("RSHIFT")
+case object ARSHIFT extends BinOperator("ARSHIFT")
+case object AND extends BinOperator("AND")
+case object OR extends BinOperator("OR")
+case object XOR extends BinOperator("XOR")
+case object EQ extends BinOperator("EQ")
+case object NEQ extends BinOperator("NEQ")
+case object LT extends BinOperator("LT")
+case object LE extends BinOperator("LE")
+case object SLT extends BinOperator("SLT")
+case object SLE extends BinOperator("SLE")
 
 /** Variable
   *
@@ -281,7 +275,7 @@ object BinOperator {
   */
 trait Variable extends Expr {
   override def subst(v: Variable, w: Variable): Variable = if (v == this) w else this
-  def toGamma: SecVar | SecMemLoad
+  //def toGamma: SecVar | SecMemLoad
 }
 
 /** A register
@@ -289,7 +283,8 @@ trait Variable extends Expr {
 case class LocalVar(name: String, override val size: Int) extends Variable {
   override def toString: String = name
   override def locals: Set[LocalVar] = Set(this)
-  override def toGamma: SecVar = SecVar(name, true)
+  //override def toGamma: SecVar = SecVar(name, true)
+  override def toBoogie: BVar = BVariable(name, BitVec(size), Scope.Local)
   //override def simplify(old: Expr, sub: Expr): Expr = if (old == this) sub else this
 }
 
@@ -297,17 +292,6 @@ case class LocalVar(name: String, override val size: Int) extends Variable {
   */
 case class MemAccess(memory: Memory, index: Expr, endian: Endian, override val size: Int) extends Variable {
   override def toString: String = s"${memory.name}[$index]"
-
-  /*override def toString = s"${if (this.onStack) "stack" else "heap"}[$index]"
-
-  // TODO this is a mess
-  def toBoogieString(exp: Expr) = s"${if (this.onStack) "stack" else "heap"}[${exp.toBoogieString}]"
-  override def toBoogieString: String =
-    (0 until size / 8)
-      .map(n => s"${toBoogieString(BinOp(BinOperator.ADD, index, Literal(n, 64)))}")
-      .mkString(" ++ ")
-  */
-
   override def locals: Set[LocalVar] = index.locals
 
   /*
@@ -318,8 +302,30 @@ case class MemAccess(memory: Memory, index: Expr, endian: Endian, override val s
   }
   */
 
-  def toL: SecMemLoad = SecMemLoad(false, true, index)
-  override def toGamma: SecMemLoad = SecMemLoad(true, false, index)
+  //def toL: SecMemLoad = SecMemLoad(false, true, index)
+  //override def toGamma: SecMemLoad = SecMemLoad(true, false, index)
+
+  def boogieAccesses: Seq[MapAccess] = {
+    val boogieMap = memory.toBoogie
+    val boogieIndex = index.toBoogie
+    val accesses = for (i <- 0 until (size / memory.valueSize)) yield {
+      if (i == 0) {
+        MapAccess(boogieMap, boogieIndex)
+      } else {
+        MapAccess(boogieMap, BinaryBExpr(BVADD, index.toBoogie, BitVecLiteral(i, memory.addressSize)))
+      }
+    }
+    endian match {
+      case Endian.BigEndian => accesses.reverse
+      case Endian.LittleEndian => accesses
+    }
+  }
+
+  override def toBoogie: BExpr = {
+    boogieAccesses.tail.foldLeft(boogieAccesses.head) {
+      (concat: BExpr, next: MapAccess) => BinaryBExpr(BVCONCAT, next, concat)
+    }
+  }
 }
 
 object MemAccess {
@@ -338,4 +344,6 @@ case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr {
   override def size: Int = valueSize
   override def subst(v: Variable, w: Variable): Expr = ???
   override def locals: Set[LocalVar] = Set()
+
+  override def toBoogie: MapVar = MapVar(name, MapType(BitVec(addressSize), BitVec(valueSize)))
 }

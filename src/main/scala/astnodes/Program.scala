@@ -1,5 +1,7 @@
 package astnodes
 
+import boogie._
+
 /* to add:
 
 relies
@@ -12,26 +14,26 @@ globals (get from symbol table, just name, GOT address?)
 
 case class Program(functions: List[FunctionNode]) {
   override def toString: String = functions.mkString("\n")
-  def toBoogieString: String = functions.map(_.toBoogieString).mkString("\n")
+  //def toBoogieString: String = functions.map(_.toBoogieString).mkString("\n")
+  
+  def getFunction(name: String): Option[FunctionNode] = {
+    functions.find(f => f.name == name).map(_.copy(blocks = List()))
+  }
+  
+  def getFunction(address: Int): Option[FunctionNode] = {
+    functions.find(f => f.address == address).map(_.copy(blocks = List()))
+  }
 }
 
 case class FunctionNode(name: String, address: Int, blocks: List[Block], in: List[Parameter], out: List[Parameter]) {
   override def toString: String = name + " " + address + " " + in + " " + out + "[\n" + blocks.mkString("\n") + "\n]"
-  def toBoogieString: String = "procedure " + name + "(" + in.map(_.toBoogieString).mkString(", ") + ") returns (" + out.map(_.toBoogieString).mkString(", ") + ") {\n  " +
-    blocks.map(_.toBoogieString).mkString("\n  ") + "\n\n}"
+  //def toBoogieString: String = "procedure " + name + "(" + in.map(_.toBoogieString).mkString(", ") + ") returns (" + out.map(_.toBoogieString).mkString(", ") + ") {\n  " +
+  //  blocks.map(_.toBoogieString).mkString("\n  ") + "\n\n}"
 }
-
-/*
-object FunctionNode {
-  def init(name: String, address: Int, blocks: List[Block], in: List[Parameter], out: List[Parameter]): FunctionNode = {
-    S
-  }
-}
-*/
 
 case class Block(label: String, address: Option[Int], instructions: List[Instruction]) {
   override def toString: String = label + " " + address + "\n" + instructions.mkString("\n")
-  def toBoogieString: String = label + ":\n    " + instructions.flatMap(_.statements).map(_.toBoogieString).mkString("\n    ")
+  //def toBoogieString: String = label + ":\n    " + instructions.flatMap(_.statements).map(_.toBoogieString).mkString("\n    ")
   
   def modifies: Set[Memory] = instructions.flatMap(_.statements).flatMap(_.modifies).toSet
 
@@ -42,8 +44,8 @@ case class Instruction(asm: String, statements: List[Statement]) {
   override def toString: String = asm + " {\n  " + statements.mkString("\n  ") + "\n}"
 }
 
-case class Parameter(name: String, size: Int, register: LocalVar){
-  def toBoogieString: String = name + ": bv" + size
+case class Parameter(name: String, size: Int, register: LocalVar) {
+ // def toBoogieString: String = name + ": bv" + size
 }
 
 // used in parsing only

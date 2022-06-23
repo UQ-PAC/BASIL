@@ -1,10 +1,10 @@
 package astnodes
+import boogie._
 
 trait Statement {
   //def subst(v: Variable, w: Variable): Stmt
 
-  def toBoogieString: String = toString
-
+  //def toBoogieString: String = toString
   def modifies: Set[Memory]
   def locals: Set[LocalVar]
 
@@ -20,6 +20,7 @@ trait Statement {
 }
 
 case class DirectCall(target: String, condition: Expr, returnTarget: Option[String]) extends Statement {
+  /*
   override def toBoogieString: String = {
     if (condition == Literal(BigInt(1), 1)) {
       noCondition
@@ -28,12 +29,14 @@ case class DirectCall(target: String, condition: Expr, returnTarget: Option[Stri
     }
   }
   def noCondition: String = "call " + target + "(); // with return " + returnTarget.getOrElse("none")
+  */
 
   override def modifies: Set[Memory] = Set()
   override def locals: Set[LocalVar] = condition.locals
 }
 
 case class IndirectCall(target: LocalVar, condition: Expr, returnTarget: Option[String]) extends Statement {
+  /*
   override def toBoogieString: String = {
     if (condition == Literal(BigInt(1), 1)) {
       noCondition
@@ -42,12 +45,14 @@ case class IndirectCall(target: LocalVar, condition: Expr, returnTarget: Option[
     }
   }
   def noCondition: String = "call " + target.toBoogieString + "; // with return " + returnTarget.getOrElse("none")
+  */
 
   override def modifies: Set[Memory] = Set()
   override def locals: Set[LocalVar] = condition.locals + target
 }
 
 case class GoTo(target: String, condition: Expr) extends Statement {
+  /*
   override def toBoogieString: String = {
     if (condition == Literal(BigInt(1), 1)) {
       noCondition
@@ -56,99 +61,14 @@ case class GoTo(target: String, condition: Expr) extends Statement {
     }
   }
   def noCondition: String = "goto " + target + ";"
+  */
 
   override def modifies: Set[Memory] = Set()
 
   override def locals: Set[LocalVar] = condition.locals
 }
 
-
-
-/*
-case class CallStmt(funcName: String, returnTarget: Option[String], args: List[LocalVar], lhs: Option[LocalVar]) extends Statement {
-
-  override def toString: String = {
-    // TODO neaten up call args logic
-    val argsStr =
-      if (libraryFunction) args.map(arg => arg.name).mkString(", ")
-      else CallStmt.callRegisters.map(x => s"$x: bv64").mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x: SecurityLevel").mkString(", ")
-
-    val lhsStr = lhs match {
-      case _ if !libraryFunction => CallStmt.callRegisters.mkString(", ") + ", " + CallStmt.callRegisters.map(x => s"Gamma_$x").mkString(", ") + " := "
-      case Some(x: Variable) => s"$x, ${x.toGamma} := "
-      case None => ""
-    }
-    val targetStr = returnTarget match {
-      case Some(x) => s"goto label$x;"
-      case None => ""
-    }
-    val name =
-      if (libraryFunction) CallStmt.libraryFunctions(funcName).mappedName.getOrElse(funcName)
-      else funcName
-
-    s"call $labelString$lhsStr $name ($argsStr); $targetStr"
-  }
-
-  /*
-  override def subst(v: Variable, w: Variable): Stmt = copy(args = args.map(r => r.subst(v,w) match {
-    case x: Register => x
-    case _ => ???
-  }))
-  */
-
-  def libraryFunction: Boolean = CallStmt.libraryFunctions.contains(funcName)
-}
-
-case object CallStmt {
-  val libraryFunctions: Map[String, LibraryFunction] = List(
-    "malloc" -> LibraryFunction(Some(LocalVar("R0", 64)), List(LocalVar("R0", 64))),
-    "realloc" -> LibraryFunction(Some(LocalVar("R0", 64)), List()),
-    "free" -> LibraryFunction(None, List(LocalVar("R0", 64)), Some("free_"))
-  ).toMap
-
-  val callRegisters: IndexedSeq[String] = Range(0, 7).map(x => s"R$x")
-}
-
-case class LibraryFunction(lhs: Option[LocalVar], args: List[LocalVar], mappedName: Option[String] = None)
-*/
-
-/** Conditional Jump
-  */
-/*
-case class CJmpStmt(override val pc: String,
-                    trueTarget: String,
-                    falseTarget: String,
-                    condition: Expr,
-                   ) extends Statement(pc) {
-  def getCondition: Expr = condition
-  override def toString = s"if ($condition) goto label$trueTarget else goto label$falseTarget;"
-  override def toBoogieString: String = s"if (bv1tobool(${condition.toBoogieString})) { goto label$trueTarget; } goto label$falseTarget;"
-
-  //override def subst(v: Variable, w: Variable): Stmt = copy(condition = condition.subst(v,w))
-  def simplify(old: Expr, sub: Expr): Statement = copy(condition = condition.simplify(old, sub))
-}
-*/
-
-/** Jump
-  */
-/*
-case class JmpStmt(target: String) extends Statement(pc) {
-  override def toString: String = String.format("%sgoto label%s;", labelString, target)
-  //override def subst(v: Variable, w: Variable): Stmt = this
-}
-*/
-
-/*
-case class MethodCall(name: String) extends Statement(pc) {
-  //override def subst(v: Variable, w: Variable): Stmt = ???
-  override def toString = s"call $name();"
-}
-*/
-
-
-/** No instruction fact
-  */
-object Skip extends Statement {
+case object Skip extends Statement {
   override def toString: String = "skip;"
   //override def subst(v: Variable, w: Variable): Stmt = this
 
@@ -159,12 +79,7 @@ object Skip extends Statement {
   override def locals: Set[LocalVar] = Set()
 }
 
-// TODO not happy with setup for STMT -> Assign -> MemAssign/RegisterAssign
-/** Assignment (e.g. x := facts.exp)
-  */
-
-
-trait Assign(lhs: Variable, rhs: Expr) extends Statement with MaybeNonConstantAssign {
+trait Assign(lhs: Variable, rhs: Expr) extends Statement {
   override def toString: String = String.format("%s := %s;", lhs, rhs)
 
   /*
@@ -192,9 +107,7 @@ trait Assign(lhs: Variable, rhs: Expr) extends Statement with MaybeNonConstantAs
   */
 }
 
-trait MaybeNonConstantAssign
-class NonConstantAssign extends MaybeNonConstantAssign
-
+/*
 case class GammaUpdate (lhs: SecVar | SecMemLoad, sec: Sec) extends Statement {
 
   override def toBoogieString: String = s"${lhs.toString} := ${sec.toString};"
@@ -205,16 +118,13 @@ case class GammaUpdate (lhs: SecVar | SecMemLoad, sec: Sec) extends Statement {
   // TODO
   //override def subst(v: Variable, w: Variable): Stmt = this
 }
+*/
 
 /** Memory store
   */
-case class MemAssign(lhs: MemAccess, rhs: Expr) extends Assign(lhs, rhs) with MaybeNonConstantMemAssign {
+case class MemAssign(lhs: MemAccess, rhs: Expr) extends Assign(lhs, rhs) {
 
-  // TODO this tostring method is bad as well
-  // need to really sort out a good way to handle the differnet ways memload is presented
-  // TODO maybe lhs should not be a memload
-
-  override def toBoogieString: String = s"${lhs.toBoogieString} := ${rhs.toBoogieString};"
+  //override def toBoogieString: String = s"${lhs.toBoogieString} := ${rhs.toBoogieString};"
   /*
   def lhsToString(exp: Expr) = s"heap[${exp.toBoogieString}]"
 
@@ -230,18 +140,17 @@ case class MemAssign(lhs: MemAccess, rhs: Expr) extends Assign(lhs, rhs) with Ma
   override def locals: Set[LocalVar] = lhs.locals ++ rhs.locals
 }
 
-trait MaybeNonConstantMemAssign
-class NonConstantMemAssign extends MaybeNonConstantMemAssign
-
 case class LocalAssign(lhs: LocalVar, rhs: Expr) extends Assign(lhs, rhs) {
-  override def toBoogieString: String = s"${lhs.toBoogieString} := ${rhs.toBoogieString};"
+  //override def toBoogieString: String = s"${lhs.toBoogieString} := ${rhs.toBoogieString};"
 
   // Otherwise is flag (e.g. #1)
+  /*
   def isRegister: Boolean = lhs.name.charAt(0) == 'R'
 
   def isStackPointer: Boolean = this.isRegister && lhs.name.substring(1).equals("31")
   def isFramePointer: Boolean = this.isRegister && lhs.name.substring(1).equals("29")
   def isLinkRegister: Boolean = this.isRegister && lhs.name.substring(1).equals("30")
+  */
 
   override def modifies: Set[Memory] = Set()
 
