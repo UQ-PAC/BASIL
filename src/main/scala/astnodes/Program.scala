@@ -29,6 +29,8 @@ case class FunctionNode(name: String, address: Int, blocks: List[Block], in: Lis
   override def toString: String = name + " " + address + " " + in + " " + out + "[\n" + blocks.mkString("\n") + "\n]"
   //def toBoogieString: String = "procedure " + name + "(" + in.map(_.toBoogieString).mkString(", ") + ") returns (" + out.map(_.toBoogieString).mkString(", ") + ") {\n  " +
   //  blocks.map(_.toBoogieString).mkString("\n  ") + "\n\n}"
+  
+  def calls: Set[String] = blocks.flatMap(b => b.calls).toSet
 }
 
 case class Block(label: String, address: Option[Int], instructions: List[Instruction]) {
@@ -38,10 +40,13 @@ case class Block(label: String, address: Option[Int], instructions: List[Instruc
   def modifies: Set[Memory] = instructions.flatMap(_.statements).flatMap(_.modifies).toSet
 
   def locals: Set[LocalVar] = instructions.flatMap(_.statements).flatMap(_.locals).toSet
+  def calls: Set[String] = instructions.flatMap(i => i.calls).toSet
+  
 }
 
 case class Instruction(asm: String, statements: List[Statement]) {
   override def toString: String = asm + " {\n  " + statements.mkString("\n  ") + "\n}"
+  def calls: Set[String] = statements.flatMap(s => s.calls).toSet
 }
 
 case class Parameter(name: String, size: Int, register: LocalVar) {

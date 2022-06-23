@@ -47,7 +47,7 @@ case class ProcedureCall(name: String, lhss: List[BVar], params: List[BExpr]) ex
 }
 
 case class AssignCmd(lhss: List[BVar], rhss: List[BExpr]) extends BCmd {
-  override def toString: String = s"${lhss.mkString(", ")} := ${rhss.mkString(", ")}"
+  override def toString: String = s"${lhss.mkString(", ")} := ${rhss.mkString(", ")};"
   override def modifies: Set[BVar] = lhss.collect { case l if l.scope == Scope.Global => l }.toSet
   override def bvFunctions: Set[BFunction] = rhss.flatMap(r => r.bvFunctions).toSet
   override def locals: Set[BVar] = lhss.flatMap(l => l.locals).toSet ++ rhss.flatMap(r => r.locals).toSet
@@ -58,7 +58,7 @@ object AssignCmd {
 }
 
 case class MapAssignCmd(lhs: MapAccess, rhs: BExpr) extends BCmd {
-  override def toString: String = s"$lhs := $rhs"
+  override def toString: String = s"$lhs := $rhs;"
   override def modifies: Set[BVar] = Set(lhs.mapVar)
   override def bvFunctions: Set[BFunction] = lhs.bvFunctions ++ rhs.bvFunctions
   override def locals: Set[BVar] = lhs.locals ++ rhs.locals

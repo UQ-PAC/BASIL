@@ -5,8 +5,9 @@ trait Statement {
   //def subst(v: Variable, w: Variable): Stmt
 
   //def toBoogieString: String = toString
-  def modifies: Set[Memory]
-  def locals: Set[LocalVar]
+  def modifies: Set[Memory] = Set()
+  def locals: Set[LocalVar] = Set()
+  def calls: Set[String] = Set() // names of functions called by this statement
 
   /*
   def labelString: String = if (labelVisible) {
@@ -31,7 +32,7 @@ case class DirectCall(target: String, condition: Expr, returnTarget: Option[Stri
   def noCondition: String = "call " + target + "(); // with return " + returnTarget.getOrElse("none")
   */
 
-  override def modifies: Set[Memory] = Set()
+  override def calls: Set[String] = Set(target)
   override def locals: Set[LocalVar] = condition.locals
 }
 
@@ -46,8 +47,7 @@ case class IndirectCall(target: LocalVar, condition: Expr, returnTarget: Option[
   }
   def noCondition: String = "call " + target.toBoogieString + "; // with return " + returnTarget.getOrElse("none")
   */
-
-  override def modifies: Set[Memory] = Set()
+  
   override def locals: Set[LocalVar] = condition.locals + target
 }
 
@@ -63,8 +63,6 @@ case class GoTo(target: String, condition: Expr) extends Statement {
   def noCondition: String = "goto " + target + ";"
   */
 
-  override def modifies: Set[Memory] = Set()
-
   override def locals: Set[LocalVar] = condition.locals
 }
 
@@ -73,10 +71,7 @@ case object Skip extends Statement {
   //override def subst(v: Variable, w: Variable): Stmt = this
 
   //override def withVisibleLabel: Stmt = copy(labelVisible = true)
-
-  override def modifies: Set[Memory] = Set()
-
-  override def locals: Set[LocalVar] = Set()
+  
 }
 
 trait Assign(lhs: Variable, rhs: Expr) extends Statement {
@@ -151,9 +146,6 @@ case class LocalAssign(lhs: LocalVar, rhs: Expr) extends Assign(lhs, rhs) {
   def isFramePointer: Boolean = this.isRegister && lhs.name.substring(1).equals("29")
   def isLinkRegister: Boolean = this.isRegister && lhs.name.substring(1).equals("30")
   */
-
-  override def modifies: Set[Memory] = Set()
-
   override def locals: Set[LocalVar] = rhs.locals + lhs
 }
 

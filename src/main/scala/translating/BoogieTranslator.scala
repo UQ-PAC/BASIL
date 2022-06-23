@@ -15,13 +15,37 @@ case class BoogieTranslator(program: Program) {
 
   def translate(f: FunctionNode): BProcedure = {
     val in = f.in.map(i => BParam(i.name, BitVec(i.size)))
-    val out = f.out.map(i => BParam(i.name, BitVec(i.size)))
-    val returns = f.out.map(i => AssignCmd(BParam(i.name, BitVec(i.size)), i.register.toBoogie)) // TODO make sizes match
+    val out = f.out.map(o => BParam(o.name, BitVec(o.size)))
+    val returns = f.out.map(p => outParamToAssign(p))
     val body = f.blocks.map(b => translate(b, returns))
     val modifies = body.flatMap(b => b.modifies).toSet
-    val inits = f.in.map(i => AssignCmd(i.register.toBoogie, BParam(i.name, BitVec(i.size)))) // TODO make sizes match
+    val inits = f.in.map(p => inParamToAssign(p)) // TODO make sizes match
 
     BProcedure(f.name, in, out, List(), List(), modifies, inits ++ body)
+  }
+
+  private def outParamToAssign(p: Parameter): AssignCmd = {
+    val param = BParam(p.name, BitVec(p.size))
+    val register = p.register.toBoogie
+    if (p.size > p.register.size) {
+      AssignCmd(param, BVZeroExtend(p.size - p.register.size, register))
+    } else if (p.size < p.register.size) {
+      AssignCmd(param, BVExtract(p.size, 0, register))
+    } else {
+      AssignCmd(param, register)
+    }
+  }
+
+  private def inParamToAssign(p: Parameter): AssignCmd = {
+    val param = BParam(p.name, BitVec(p.size))
+    val register = p.register.toBoogie
+    if (p.size > p.register.size) {
+      AssignCmd(register, BVExtract(p.register.size, 0, param))
+    } else if (p.size < p.register.size) {
+      AssignCmd(register, BVZeroExtend(p.register.size - p.size, param))
+    } else {
+      AssignCmd(register, param)
+    }
   }
 
   def translate(b: Block, returns: List[BCmd]): BBlock = {
@@ -37,9 +61,7 @@ case class BoogieTranslator(program: Program) {
         case Some(s) => s
         case None => throw new Exception("trying to call non-existent procedure " + d.target)
       }
-      val params = functionHeader.in.map(p => p.register.toBoogie)
-      val out = functionHeader.out.map(p => p.register.toBoogie)
-      val call = List(ProcedureCall(d.target, out, params))
+      val call = coerceProcedureCall(d.target, functionHeader.in, functionHeader.out)
       val returnTarget = d.returnTarget match {
         case Some(r) => List(GoToCmd(r))
         case None => List(Assume(FalseLiteral))
@@ -100,9 +122,55 @@ case class BoogieTranslator(program: Program) {
     case l: LocalAssign => List(AssignCmd(l.lhs.toBoogie, l.rhs.toBoogie))
   }
 
+  def coerceProcedureCall(target: String, in: List[Parameter], out: List[Parameter]): List[BCmd] = {
+    val params = for (i <- in) yield {
+      val register = i.register.toBoogie
+      if (i.register.size > i.size) {
+        BVExtract(i.size, 0, register)
+      } else if (i.register.size < i.size) {
+        BVZeroExtend(i.size - i.register.size, register)
+      } else {
+        register
+      }
+    }
+    val outTemp = for (o <- out.indices) yield {
+      BVariable(s"#temp$o", BitVec(out(o).size), Scope.Local)
+    }
+    val outRegisters = out.map(o => o.register.toBoogie)
+    val outAssigned = for (o <- out.indices if out(o).register.size != out(o).size) yield {
+      val regSize = out(o).register.size
+      val paramSize = out(o).size
+      if (regSize > paramSize) {
+        AssignCmd(outRegisters(o), BVZeroExtend(regSize - paramSize, outTemp(o)))
+      } else {
+        AssignCmd(outRegisters(o), BVExtract(regSize, 0, outTemp(o)))
+      }
+    }
+    val returned = for (o <- out.indices) yield {
+      if (out(o).register.size == out(o).size) {
+        outRegisters(o)
+      } else {
+        outTemp(o)
+      }
+    }
+    List(ProcedureCall(target, returned.toList, params)) ++ outAssigned
+  }
+
   def coerceToBool(e: BExpr): BExpr = e.getType match {
     case BoolType => e
     case bv: BitVec => BinaryBExpr(BVNEQ, e, BitVecLiteral(0, bv.size))
     case _ => ???
+  }
+
+  def stripUnreachableFunctions: Program = {
+    val functionToChildren = program.functions.map(f => f.name -> f.calls).toMap
+    val reachableFunctionNames = reachableFrom("main", functionToChildren, Set("main"))
+    val reachableFunctions = program.functions.filter(f => reachableFunctionNames.contains(f.name))
+    program.copy(functions = reachableFunctions)
+  }
+
+  private def reachableFrom(next: String, functionToChildren: Map[String, Set[String]], reached: Set[String]): Set[String] = {
+    val reachable = functionToChildren(next) -- reached
+    reached ++ reachable.flatMap(s => reachableFrom(s, functionToChildren, reachable ++ reached))
   }
 }

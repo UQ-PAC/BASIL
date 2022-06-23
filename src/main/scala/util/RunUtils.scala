@@ -59,7 +59,8 @@ object RunUtils {
     -instrument with gammas, vcs, rely, guarantee
      */
 
-    BoogieTranslator(program).translate
+    val programUnusedRemoved = BoogieTranslator(program).stripUnreachableFunctions
+    BoogieTranslator(programUnusedRemoved).translate
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {
