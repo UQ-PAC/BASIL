@@ -48,7 +48,9 @@ object RunUtils {
     -instrument with gammas, vcs, rely, guarantee
      */
 
-    val programUnusedRemoved = BoogieTranslator(program).stripUnreachableFunctions
+    val externalNames = externalFunctions.map(e => e.name)
+
+    val programUnusedRemoved = BoogieTranslator(program).stripUnreachableFunctions(externalNames)
     BoogieTranslator(programUnusedRemoved).translate
   }
 

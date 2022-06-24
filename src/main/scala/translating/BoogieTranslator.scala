@@ -19,7 +19,11 @@ case class BoogieTranslator(program: Program) {
     val returns = f.out.map(p => outParamToAssign(p))
     val body = f.blocks.map(b => translate(b, returns))
     val modifies = body.flatMap(b => b.modifies).toSet
-    val inits = f.in.map(p => inParamToAssign(p)) // TODO make sizes match
+    val inits = if (body.isEmpty) {
+      List()
+    } else {
+      f.in.map(p => inParamToAssign(p))
+    }
 
     BProcedure(f.name, in, out, List(), List(), modifies, inits ++ body)
   }
@@ -162,11 +166,15 @@ case class BoogieTranslator(program: Program) {
     case _ => ???
   }
 
-  def stripUnreachableFunctions: Program = {
+  def stripUnreachableFunctions(externalNames: Set[String]): Program = {
     val functionToChildren = program.functions.map(f => f.name -> f.calls).toMap
     val reachableFunctionNames = reachableFrom("main", functionToChildren, Set("main"))
     val reachableFunctions = program.functions.filter(f => reachableFunctionNames.contains(f.name))
-    program.copy(functions = reachableFunctions)
+    val externalsStubbed = reachableFunctions.map {
+      case f: FunctionNode if externalNames.contains(f.name) => f.copy(blocks = List())
+      case f: _ => f
+    }
+    program.copy(functions = externalsStubbed)
   }
 
   private def reachableFrom(next: String, functionToChildren: Map[String, Set[String]], reached: Set[String]): Set[String] = {

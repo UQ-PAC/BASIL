@@ -25,7 +25,12 @@ case class BProcedure(name: String, in: List[BParam], out: List[BParam], ensures
     val ensuresStrs = ensures.map(e => s"  ensures $e;")
     val locals = body.flatMap(l => l.locals).distinct
     val localDefs = locals.map(l => "  " + BVarDecl(l).toString)
-    List(header + returns) ++ modifiesStr ++ requiresStrs ++ ensuresStrs ++ List("{") ++ localDefs ++ body.flatMap(x => x.toBoogie).map(s => "  " + s) ++ List("}", "")
+    val bodyStr = if (body.nonEmpty) {
+      List("{") ++ localDefs ++ body.flatMap(x => x.toBoogie).map(s => "  " + s) ++ List("}")
+    } else {
+      List()
+    }
+    List(header + returns) ++ modifiesStr ++ requiresStrs ++ ensuresStrs ++ bodyStr ++ List("")
   }
   override def toString: String = toBoogie.mkString("\n")
   def bvFunctions: Set[BFunction] = body.flatMap(c => c.bvFunctions).toSet
