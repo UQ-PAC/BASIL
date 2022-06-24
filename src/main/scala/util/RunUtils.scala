@@ -15,35 +15,25 @@ import scala.jdk.CollectionConverters._
 object RunUtils {
 
   def generateVCsAdt(fileName: String, elfFileName: String): BProgram = {
-    val adtLexer = new BilAdtLexer(CharStreams.fromFileName(fileName))
-    val tokens = new CommonTokenStream(adtLexer)
+    val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
+    val tokens = CommonTokenStream(adtLexer)
     // ADT
-    val parser = new BilAdtParser(tokens)
+    val parser = BilAdtParser(tokens)
 
     parser.setBuildParseTree(true)
 
     val program = AdtStatementLoader.visitProject(parser.project())
 
-    /*
-    TODO: do we still need symbol table?
+    val elfLexer = SymsLexer(CharStreams.fromFileName(elfFileName))
+    val elfTokens = CommonTokenStream(elfLexer)
+    val elfParser = SymsParser(elfTokens)
+    elfParser.setBuildParseTree(true)
 
-    val walker = new ParseTreeWalker()
-    walker.walk(statementLoader, b)
+    val (externalFunctions, globals) = ElfLoader.visitSyms(elfParser.syms())
 
-    val symsLexer = new SymsLexer(CharStreams.fromFileName(elfFileName))
-    val symsTokens = new CommonTokenStream(symsLexer)
-    val symsParser = new SymsParser(symsTokens)
-    symsParser.setBuildParseTree(true)
-    val symsListener = new SymbolTableListener()
-    walker.walk(symsListener, symsParser.syms)
-    */
+    //println(externalFunctions)
+    //println(globals)
 
-    // TODO: fix constant propagation arithmetic before turning back on
-    /*
-     val WL = Worklist(ConstantPropagationAnalysis(state, true), state)
-    val analysedState = WL.doAnalysis()
-    val updatedState = BoogieTranslator.translate(analysedState)
-    */
 
     /*
     TODO analyses/transformations
@@ -53,7 +43,6 @@ object RunUtils {
     -constant propagation to properly analyse control flow and replace all indirect calls
     -identify external calls
     -check for use of uninitialised registers in procedures to pass them in
-    -add R29/R30/R31 to all procedure in/out
     -points to/alias analysis to split memory into separate maps as much as possible? do we want this?
     -make memory reads better?
     -instrument with gammas, vcs, rely, guarantee

@@ -11,10 +11,10 @@ syms : relocationTable+ symbolTable+ ;
 */
 relocationTable : relocationTableHeader relocationTableRow* ;
 relocationTableHeader :
-  'Relocation section \'' (ALPHA | '.')+ '\' at offset 0x' HEX 'contains' HEX 'entries:'
+  'Relocation section' tableName 'at offset 0x' HEX 'contains' HEX 'entries:'
   'Offset' 'Info' 'Type' 'Sym. Value' 'Sym. Name + Addend'
   ;
-relocationTableRow : HEX HEX (ALPHA|'_')+ HEX? (name ('+' HEX))?;
+relocationTableRow : offset=HEX HEX STRING HEX? ((name=STRING '+' HEX) | HEX);
 
 /* Guide from https://stackoverflow.com/questions/3065535/what-are-the-meanings-of-the-columns-of-the-symbol-table-displayed-by-readelf
     Num: = The symbol number
@@ -28,13 +28,13 @@ relocationTableRow : HEX HEX (ALPHA|'_')+ HEX? (name ('+' HEX))?;
 */
 symbolTable : symbolTableHeader symbolTableRow* ;
 symbolTableHeader :
-  'Symbol table \'' ('.' | ALPHA)+ '\' contains' HEX 'entries:' // TODO hex is actually dec
+  'Symbol table' tableName 'contains' HEX 'entries:'
   'Num:' 'Value' 'Size' 'Type' 'Bind' 'Vis' 'Ndx' 'Name'  // Mainly a sanity check for the column order
   ;
-symbolTableRow : HEX ':' HEX HEX ALPHA ALPHA ALPHA (ALPHA | HEX) name? ;
+symbolTableRow : HEX ':' value=HEX size=HEX entrytype=STRING bind=STRING vis=STRING (HEX | STRING) name=STRING? STRING?;
 // symbolTableRow : HEX ':' HEX HEX symbolType bind vis ndx name? ;
 
-name : (ALPHA|'_'|'$'|'/') (ALPHA | HEX | '_' | '[...]' | '@' | '.' | '(' | ')' | '-' | '/')*  ;
+tableName : '\'' STRING '\'' ;
 
 /*
 symbolType : 'FUNC' | 'OBJECT' | 'FILE' | 'SECTION' | 'NOTYPE' ;
@@ -45,8 +45,6 @@ ndx : 'UND' | 'ABS' | HEX;
 
 // DEC : [0-9]+ ;
 HEX : ([0-9]|[a-f])+ ;
-ALPHA : ([A-Z]|[a-z])+ ;
+STRING : ([0-9]|[a-z]|[A-Z]|'_'|'$'|'[...]'|'@'|'.'|'('|')'|'-'|'/')+ ;
 NEWLINE : '\r'? '\n' -> skip ;
 WHITESPACE : ' '+ -> skip ;
-
-
