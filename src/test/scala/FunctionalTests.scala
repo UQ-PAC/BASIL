@@ -1,4 +1,4 @@
-import BilParser.{BilLexer, BilParser}
+/* import BilParser.{BilLexer, BilParser}
 import astnodes._
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
@@ -96,3 +96,4 @@ class FunctionalTests:
       case e: FileNotFoundException => println("Could not find file.")
       case e: Exception => throw new AssertionError("Test failed.")
     }
+*/

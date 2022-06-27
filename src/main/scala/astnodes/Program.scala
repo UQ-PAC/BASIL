@@ -9,7 +9,7 @@ guarantees
 security predicates
   security lattice
   control variables map
-globals (get from symbol table, just name, GOT address?)
+globals
 */
 
 case class Program(functions: List[FunctionNode]) {

@@ -6,11 +6,11 @@ import boogie._
 case class BoogieTranslator(program: Program) {
   def translate: BProgram = {
     val procedures = program.functions.map(f => translate(f))
-    val globals = procedures.flatMap(p => p.modifies).map(b => BVarDecl(b)).distinct
+    val globals = procedures.flatMap(p => p.globals).map(b => BVarDecl(b)).distinct
     val functionsUsed = procedures.flatMap(p => p.bvFunctions).distinct
 
     val declarations = globals ++ functionsUsed ++ procedures
-    BProgram(declarations)
+    avoidReserved(BProgram(declarations))
   }
 
   def translate(f: FunctionNode): BProcedure = {
@@ -180,5 +180,11 @@ case class BoogieTranslator(program: Program) {
   private def reachableFrom(next: String, functionToChildren: Map[String, Set[String]], reached: Set[String]): Set[String] = {
     val reachable = functionToChildren(next) -- reached
     reached ++ reachable.flatMap(s => reachableFrom(s, functionToChildren, reachable ++ reached))
+  }
+
+  private val reserved = Set("free")
+
+  def avoidReserved(program: BProgram): BProgram = {
+    program.replaceReserved(reserved)
   }
 }
