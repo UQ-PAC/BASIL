@@ -1,85 +1,63 @@
- package analysis;
+/*
+package analysis
 
-import analysis.AnalysisPoint;
-import astnodes.stmt.*;
-import vcgen.State;
+import astnodes._
+import vcgen.State
 
-/**
- * Dummy "testing analysis" - keeps track of all the statements that it's seen so far, as a list.
- * Prints a line if it sees a call statement.
+/** Dummy "testing analysis" - keeps track of all the statements that it's seen so far, as a list. Prints a line if it
+ * sees a call statement.
  */
-class TestingAnalysis(state: Set[Stmt]) extends AnalysisPoint {
-    var currentState: Set[Stmt] = state;
+case class TestingAnalysis(state: Set[Statement]) extends AnalysisPoint[TestingAnalysis] {
+  override def equals(other: TestingAnalysis): Boolean = {
+    this.toString == other.toString
+  }
 
-    def this() = {
-        this(Set());
-    }
+  override def compare(other: TestingAnalysis): Int = {
+    (this.state.size - other.state.size).sign
+  }
 
-    override def applyChanges(preState: State, information: Map[Stmt, this.type]): State = {
-        // println("applying changes\n")
-        // information.foreach(analysis => {
-        //     val stmt = analysis._1
-        //     val state = analysis._2
-            
-        //     println(stmt.label.pc + " : " + stmt)
-        //     println(state.currentState)
-        // })
-        preState;
-    }
+  override def join(other: TestingAnalysis): TestingAnalysis = {
+    val newState = state.union(other.state)
+    TestingAnalysis(newState)
+  }
 
-    override def equals(other: this.type): Boolean = {
-        if (other == null) return false
+  override def meet(other: TestingAnalysis): TestingAnalysis = {
+    val newState = state.intersect(other.state)
+    TestingAnalysis(newState)
+  }
 
-        this.toString == other.toString;
-    }
-
-    override def compare(other: this.type): Int = {
-        var otherAsThis: TestingAnalysis = typeCheck(other);
-
-        (this.currentState.size - otherAsThis.currentState.size).sign;
-    }
-
-    override def join(other: this.type): this.type = {
-        var otherAsThis: TestingAnalysis = typeCheck(other);
-
-        val newState = currentState.union(otherAsThis.currentState);
-        TestingAnalysis(newState).asInstanceOf[this.type]
-    }
-
-    override def meet(other: this.type): this.type = {
-        var otherAsThis: TestingAnalysis = typeCheck(other);
-
-        val newState = currentState.intersect(otherAsThis.currentState);
-        TestingAnalysis(newState).asInstanceOf[this.type]
-    }
-
-    override def transfer(stmt: Stmt): this.type = {
-        var newState: Set[Stmt] = Set();
-        stmt match {
-            case callStmt: CallStmt => {
-                if (!currentState.contains(stmt)) {
-                    newState = currentState ++ Set(stmt);
-                } else {
-                    newState = currentState;
-                }
-            }
-            case _ => {
-                if (!currentState.contains(stmt)) {
-                    newState = currentState ++ Set(stmt);
-                } else {
-                    newState = currentState;
-                }
-            };
+  override def transfer(stmt: Statement): TestingAnalysis = {
+    var newState: Set[Statement] = Set()
+    stmt match {
+      case callStmt: CallStmt =>
+        if (!state.contains(stmt)) {
+          newState = state ++ Set(stmt)
+        } else {
+          newState = state
         }
-
-        TestingAnalysis(newState).asInstanceOf[this.type]
+      case _ =>
+        if (!state.contains(stmt)) {
+          newState = state ++ Set(stmt)
+        } else {
+          newState = state
+        };
     }
 
-    override def createLowest: this.type = {
-        TestingAnalysis(Set()).asInstanceOf[this.type]
-    }
+    TestingAnalysis(newState)
+  }
 
-    override def toString: String = {
-        "TestingAnalysis: " + this.currentState;
-    }
+  override def createLowest: TestingAnalysis = {
+    TestingAnalysis(Set())
+  }
+
+  override def toString: String = {
+    "TestingAnalysis: " + this.state
+  }
+
+  override def applyChange(stmt: Statement): Statement = {
+    //println(stmt.pc + " : " + stmt)
+    //println(state)
+    stmt
+  }
 }
+ */

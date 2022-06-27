@@ -1,373 +1,283 @@
+/*
 package analysis
 
-import java.util.List
+import astnodes._
+import vcgen.{FunctionState, State}
 
-import scala.collection.mutable.HashMap
-import scala.util.control.Breaks
-import astnodes.exp.{Expr, Literal, MemStore, BinOp, UniOp, Extract}
-import astnodes.exp.`var`.{MemLoad, Var}
-import astnodes.stmt.*
-import astnodes.stmt.assign.*
-import translating.FlowGraph
-import translating.FlowGraph.Block
-import astnodes.exp.Concat
-import astnodes.exp.`var`.Register
-import vcgen.State
-import astnodes.exp.FunctionCall
-import astnodes.Label
-import java.{util => ju}
-import scala.annotation.varargs
+case class ConstantPropagationAnalysis(state: State,
+                                       // the state of all the local variables of a function
+                                       localState: Map[String, Map[Expr, MaybeNonConstantAssign]],
+                                       // the state of the program heap i.e. global variables
+                                       globalState: Map[String, MaybeNonConstantMemAssign],
+                                       // true for folding + expression simplification, false for just heap address resolution
+                                       simplification: Boolean)
+  extends AnalysisPoint[ConstantPropagationAnalysis] {
 
-class ConstantPropagationAnalysis(state: State, locals : HashMap[String, HashMap[Expr, Option[Assign]]],
-  globals : HashMap[Label, Option[MemAssign]], simplification : Boolean) extends AnalysisPoint {
-
-  // the state of all the local variables of a function
-  var localState : HashMap[String, HashMap[Expr, Option[Assign]]] = locals
-
-  // the state of the program heap i.e. global variables
-  var globalState : HashMap[Label, Option[MemAssign]] = globals
-
-  // true for folding + expression simplification, false for just heap address resolution
-  var simplificationOn : Boolean = simplification
-
-  def this(state: State, simplify : Boolean) = this(state, new HashMap[String, HashMap[Expr, Option[Assign]]], new HashMap[Label, Option[MemAssign]], simplify)
-  
   /**
-    * Performs a transfer on the entry analysis point state and returns the exit state.
-    * 
-    */
-  override def transfer(stmt: Stmt) = {
-    var functionLocalState : HashMap[String, HashMap[Expr, Option[Assign]]] = new HashMap[String, HashMap[Expr, Option[Assign]]]
-    localState.foreach(function => {
-      functionLocalState(function._1) = function._2.clone
-    })
-    var programGlobalState = globals.clone
+ * Performs a transfer on the entry analysis point state and returns the exit state.
+ *
+ */
+  override def transfer(stmt: Statement): ConstantPropagationAnalysis = stmt match {
+      case assign: AssignStatement =>
+        val funcName = state.findStatementFunction(stmt).name
+        var newPrevStmt = assign
+        val localStateWithFunc = if (!localState.contains(funcName)) {
+          localState + (funcName -> Map())
+        } else {
+          localState
+        }
 
-    val currStmtFunc = findStmtFunc(stmt)
+        // fold statement with all local and global variables
+        for ((variable, assignment) <- localStateWithFunc(funcName)) {
+          assignment match {
+            case a: AssignStatement => newPrevStmt = newPrevStmt.simplify(variable, a.rhs)
+            case _ =>
+          }
+        }
+        for ((_, memAssign) <- globalState) {
+          memAssign match {
+            case a: MemAssign => newPrevStmt = newPrevStmt.simplify(a.lhs, a.rhs)
+            case _ =>
+          }
+        }
 
-    if (!functionLocalState.contains(currStmtFunc.header.funcName)) functionLocalState.update(currStmtFunc.header.funcName, new HashMap[Expr, Option[Assign]]())
+        val updateGlobalState = newPrevStmt match {
+          case memAssignStmt: MemAssign if !memAssignStmt.lhs.onStack =>
+            globalState + (newPrevStmt.pc -> memAssignStmt)
+          case _ => globalState
+        }
 
-    if (stmt.isInstanceOf[Assign]) {
-      var newPrevStmt : Assign = stmt.asInstanceOf[Assign]
-      functionLocalState.get(currStmtFunc.header.funcName).get.foreach(constraint => {
-        val variable = constraint._1
-        val assignment = constraint._2
-
-        if (assignment != None) newPrevStmt = newPrevStmt.fold(variable, assignment.get.rhs)
-      })
-
-      programGlobalState.foreach(constraint => {
-        val label = constraint._1
-        val memAssign = constraint._2
-
-        if (memAssign != None) newPrevStmt = newPrevStmt.fold(memAssign.get.lhs.asInstanceOf[Expr], memAssign.get.rhs.asInstanceOf[Expr])
-      })
-
-      newPrevStmt match {
-        case regAssignStmt : RegisterAssign => if (!regAssignStmt.isFramePointer && !regAssignStmt.isLinkRegister && !regAssignStmt.isStackPointer) functionLocalState.get(currStmtFunc.header.funcName).get.update(newPrevStmt.lhs, Some(regAssignStmt))
-        case memAssignStmt : MemAssign if !memAssignStmt.lhs.onStack => programGlobalState.update(newPrevStmt.label, Some(memAssignStmt))
-        case memAssignStmt : MemAssign if memAssignStmt.lhs.onStack => functionLocalState.get(currStmtFunc.header.funcName).get.update(newPrevStmt.lhs, Some(memAssignStmt))
-        case _ =>
-      }
+        val updateLocalState = newPrevStmt match {
+          case regAssignStmt: LocalAssign
+            if !regAssignStmt.isFramePointer && !regAssignStmt.isLinkRegister && !regAssignStmt.isStackPointer =>
+            localStateWithFunc + (funcName -> (localStateWithFunc(funcName) + (newPrevStmt.lhs -> regAssignStmt)))
+          case memAssignStmt: MemAssign if memAssignStmt.lhs.onStack =>
+            localStateWithFunc + (funcName -> (localStateWithFunc(funcName) + (newPrevStmt.lhs -> memAssignStmt)))
+          case _ => localStateWithFunc
+        }
+        copy (localState = updateLocalState, globalState = updateGlobalState)
+      case _ => this
     }
 
-    ConstantPropagationAnalysis(state, functionLocalState, programGlobalState, simplificationOn).asInstanceOf[this.type]
-  }
+  /**
+ * Returns 1 if the analysis point is higher up in the lattice than other, -1 if it is lower and 0 if they are at the
+ * same level.
+ */
+  override def compare(other: ConstantPropagationAnalysis): Int = (this.countEdges - other.countEdges).sign
 
   /**
-   * Returns 1 if the analysis point is higher up in the lattice than other, -1 if it is lower and 0 if they are at the same level.
-   * 
-   */
-  override def compare(other: this.type): Int = {
-    (this.countEdges - other.countEdges).sign
-  }
-
-  /**
-   * Returns the number of edges that the analysis point contains.
-   * 
-   */
+ * Returns the number of edges that the analysis point contains.
+ *
+ */
   private def countEdges: Int = {
     var count: Int = 0
 
-    localState.values.foreach(localState => 
-      localState.values.foreach(constraint => {
+    for (l <- localState.values) {
+      for (_ <- l.values) {
         count += 1
-    }))
-
-    globalState.values.foreach(constraint => {
-      count += 1
-    })
-    
-    count;
-  }
-
-  /**
-   * Creates an analysis point at the bottom of the lattice.
-   * 
-   */
-  override def createLowest: this.type = {
-    ConstantPropagationAnalysis(state, new HashMap[String, HashMap[Expr, Option[Assign]]], new HashMap[Label, Option[MemAssign]], simplificationOn).asInstanceOf[this.type]
-  }
-
-  /**
-   * Determines whether two ConstantPropagation analysis points are equal.
-   * 
-   */
-  override def equals(other: this.type): Boolean = {
-
-    if (other == null) {
-      return false
+      }
     }
 
-    localState.foreach(function => {
-      val funcName = function._1
-      val localMap = function._2
-
-      if (!other.localState.contains(funcName)) { return false }
-
-      localMap.foreach(local => {
-        val variable = local._1
-        val value = local._2
-
-        if (!other.localState.get(funcName).get.contains(variable)) { return false }
-
-        (value, other.localState.get(funcName).get.get(variable).get) match {
-          case (Some(a), Some(b)) => if (a != b) { return false }
-          case (None, None) =>
-          case _ => { return false }
-        }
-      })
-    })
-
-    other.localState.foreach(function => {
-      val funcName = function._1
-      val localMap = function._2
-
-      if (!localState.contains(funcName)) { return false }
-
-      localMap.foreach(local => {
-        val variable = local._1
-        val value = local._2
-
-        if (!localState.get(funcName).get.contains(variable)) { return false }
-      })
-    })
-
-    globalState.foreach(global => {
-      val label = global._1
-      val value = global._2
-
-      if (!other.globalState.contains(label)) { return false }
-
-      (value, other.globalState.get(label).get) match {
-        case (Some(a), Some(b)) => if (a != b) { return false }
-        case (None, None) =>
-        case _ => { return false }
-      }
-    })
-
-    other.globalState.foreach(global => {
-      val label = global._1
-      val value = global._2
-
-      if (!globalState.contains(label)) { return false }
-    })
-
-    return true
+    for (_ <- globalState.values) {
+      count += 1
+    }
+    count
   }
 
   /**
-   * Constant propagation is a must-analysis, meaning that to derive the entry state of a block a meet operation must be performed on the block parents.
-   * 
-   */
-  override def combine(other: this.type): this.type = {
-    meet(other);
+ * Creates an analysis point at the bottom of the lattice.
+ *
+ */
+  override def createLowest: ConstantPropagationAnalysis = ConstantPropagationAnalysis(state, simplification)
+
+  /**
+ * Determines whether two ConstantPropagation analysis points are equal.
+ *
+ */
+  override def equals(other: ConstantPropagationAnalysis): Boolean = {
+    // need to include state, simplification here ???
+    if (other.localState == this.localState && other.globalState == this.globalState) {
+      true
+    } else {
+      false
+    }
+    /*
+    for ((funcName, localMap) <- localState) {
+      if (!other.localState.contains(funcName)) {
+        return false
+      }
+      for ((variable, value) <- localMap) {
+        other.localState(funcName).get(variable) match {
+          case Some(v) if v != value => return false
+          case None => return false
+          case _ =>
+        }
+      }
+    }
+
+    for ((funcName, localMap) <- other.localState) {
+      if (!localState.contains(funcName)) {
+        return false
+      }
+      for ((variable, value) <- localMap) {
+        if (!localState(funcName).contains(variable)) {
+          return false
+        }
+      }
+    }
+
+    for ((label, value) <- globalState) {
+      if (!other.globalState.contains(label)) {
+        return false
+      }
+      if (value != other.globalState(label)) {
+        return false
+      }
+    }
+
+    for ((label, value) <- globalState) {
+      if (!globalState.contains(label)) {
+        return false
+      }
+    }
+
+    true
+ */
   }
 
   /**
-    * Performs a join on two ConstantPropagation analysis points and returns a new ConstantPropagation analysis point.
-    * 
-    */
-  override def join(other: this.type) = {
-    var functionLocalState : HashMap[String, HashMap[Expr, Option[Assign]]] = new HashMap[String, HashMap[Expr, Option[Assign]]]
-    localState.foreach(function => {
-      functionLocalState(function._1) = function._2.clone
-    })
-    var programGlobalState = globals.clone
+ * Constant propagation is a must-analysis, meaning that to derive the entry state of a block a meet operation must
+ * be performed on the block parents.
+ *
+ */
+  override def combine(other: ConstantPropagationAnalysis): ConstantPropagationAnalysis = meet(other)
 
-    // iterate over all functions for THIS, and if OTHER contains function, set all variables that contain different constraints in
-    // THIS to null
-    functionLocalState.foreach(localState => {
-      val function = localState._1    // function name
-      val locals = localState._2      // map expr -> label
+  /**
+ * Performs a join on two ConstantPropagation analysis points and returns a new ConstantPropagation analysis point.
+ *
+ */
+  override def join(other: ConstantPropagationAnalysis): ConstantPropagationAnalysis = {
+    if (state != other.state) {
+      throw new Exception("trying to join unrelated analyses")
+    }
 
-      if (other.localState.contains(function)) locals.foreach(local => {
-        val variable = local._1
-        val constraint = local._2
-
-        other.localState.getOrElse(function, throw new Exception("CP Analysis: join error.")).getOrElse(variable, "Any") match {
-          // due to Scala type erasure, encoding the concrete parameter type will be useless and only produce pesky warnings
-          case stmt : Option[_] if !stmt.isEmpty => {
-            if (constraint.get != stmt.get) functionLocalState.getOrElse(function, throw new Exception("CP Analysis: join error.")).update(variable, None)
-          }
-          case "Any" =>
-          case None => functionLocalState.getOrElse(function, throw new Exception("CP Analysis: join error.")).update(variable, None)
-          case _ => 
-        }
-      })
-    })
-
-    // if there exists a function state or variable in OTHER not in THIS, add to THIS
-    other.localState.foreach(localState => {
-      val function = localState._1    // function name
-      val locals = localState._2      // map expr -> label
-
-      if (!functionLocalState.contains(function)) functionLocalState.update(function, other.localState.getOrElse(function, null))
-      else locals.foreach(local => {
-        val variable = local._1
-        val constraint = local._2
-
-        if (!functionLocalState.getOrElse(function, throw new Exception("CP Analysis: join error.")).contains(variable)) functionLocalState.getOrElse(function, throw new Exception("CP Analysis: join error.")).update(variable, constraint)
-      })
-    })
-
-    programGlobalState.foreach(globalConstraint => {
-      val global = globalConstraint._1
-      val constraint = globalConstraint._2
-
-      other.globalState.getOrElse(global, "Any") match {
-        case stmt : Option[_] if !stmt.isEmpty => if (constraint.get != stmt.get) programGlobalState.update(global, None)
-        case "Any" =>
-        case None => programGlobalState.update(global, None)
-        case _ =>
+    val localStateOut = ((localState.keySet union other.localState.keySet) map {
+      function => (localState.get(function), other.localState.get(function)) match {
+        case (Some(t), Some(o)) =>
+          val mapUpdate = ((t.keySet union o.keySet) map {
+            variable => (t.get(variable), o.get(variable)) match {
+              case (Some(a), Some(b)) if a == b => variable -> a
+              case (Some(a), None) => variable -> a
+              case (None, Some(b)) => variable -> b
+              case _ => variable -> NonConstantAssign() // case where a != b
+            }
+          }).toMap
+          function -> mapUpdate
+        case (None, Some(o)) => function -> o
+        case (Some(t), None) => function -> t
+        case _ => function -> Map() // shouldn't happen
       }
-    })
+    }).toMap
 
-    other.globalState.foreach(globalConstraint => {
-      val global = globalConstraint._1
-      val constraint = globalConstraint._2
+    val globalStateOut = ((globalState.keySet union other.globalState.keySet) map {
+      global => (globalState.get(global), other.globalState.get(global)) match {
+        case (Some(t), Some(o)) if t == o => global -> t
+        case (Some(t), None) => global -> t
+        case (None, Some(o)) => global -> o
+        case _ => global -> NonConstantMemAssign() // case where t != o
+      }
+    }).toMap
 
-      if (!programGlobalState.contains(global)) programGlobalState.update(global, constraint)
-    })
-
-    ConstantPropagationAnalysis(state, functionLocalState, programGlobalState, simplificationOn).asInstanceOf[this.type]
+    ConstantPropagationAnalysis(state, localStateOut, globalStateOut, simplification)
   }
 
   /**
-    * Performs a meet on two ConstantPropagation analysis points and returns a new ConstantPropagation analysis point.
-    * 
-    */
-  override def meet(other: this.type) = {
-    var functionLocalState : HashMap[String, HashMap[Expr, Option[Assign]]] = new HashMap[String, HashMap[Expr, Option[Assign]]]
-    localState.foreach(function => {
-      functionLocalState(function._1) = function._2.clone
-    })
-    var programGlobalState = globals.clone
-    
-    functionLocalState.foreach(localState => {
-      val function = localState._1    // function name
-      val locals = localState._2      // map expr -> label
+ * Performs a meet on two ConstantPropagation analysis points and returns a new ConstantPropagation analysis point.
+ *
+ */
+  override def meet(other: ConstantPropagationAnalysis): ConstantPropagationAnalysis = {
+    val localStateOut = ((localState.keySet intersect other.localState.keySet) map {
+      function => function -> ((localState(function).keySet intersect other.localState(function).keySet) collect {
+        case variable if localState(function)(variable) == other.localState(function)(variable) =>
+          variable -> localState(function)(variable)
+      }).toMap
+    }).toMap
 
-      if (!other.localState.contains(function)) functionLocalState.remove(function)
-      else locals.foreach(local => {
-        val variable = local._1
-        val constraint = local._2
+    val globalStateOut = ((globalState.keySet intersect other.globalState.keySet) collect {
+      case global if globalState(global) == other.globalState(global) => global -> globalState(global)
+    }).toMap
 
-        other.localState.getOrElse(function, throw new Exception("CP Analysis: meet error.")).getOrElse(variable, "Any") match {
-          case stmt : Option[_] if !stmt.isEmpty => {
-            if (constraint == None) functionLocalState.getOrElse(function, throw new Exception("CP Analysis: meet error.")).update(variable, Some(stmt.get.asInstanceOf[Assign])) 
-            else if (stmt.get != constraint.get) { functionLocalState.getOrElse(function, throw new Exception("CP Analysis: meet error.")).remove(variable); }
-          }
-          case "Any" =>  functionLocalState.getOrElse(function, throw new Exception("CP Analysis: meet error.")).remove(variable)
-          case _ => 
-        }
-      })
-    })
-
-    programGlobalState.foreach(globalConstraint => {
-      val global = globalConstraint._1
-      val constraint = globalConstraint._2
-
-      other.globalState.getOrElse(global, "Any") match {
-        // constant
-        case stmt : Option[_] if !stmt.isEmpty => if (constraint == None) programGlobalState.update(global, Some(stmt.get.asInstanceOf[MemAssign])) else if (stmt.get != constraint.get) programGlobalState.remove(global);
-        case "Any" => programGlobalState.remove(global);
-        // top element
-        case None => 
-        case _ => 
-      }
-    })
-
-    ConstantPropagationAnalysis(state, functionLocalState, programGlobalState, simplificationOn).asInstanceOf[this.type]
+    ConstantPropagationAnalysis(state, localStateOut, globalStateOut, simplification)
   }
 
-  def debugPrint() = {
+  def debugPrint(): Unit = {
     println(localState)
     println(globalState)
   }
 
-  /**
-   * Substitutes each statement in the State with the folded and simplified statement from the analysis.
-   * 
-   */
-  override def applyChanges(preState: State, information: Map[Stmt, this.type]): State = {
-    information.foreach(analysis => {
-      val stmt = analysis._1
-      val state = analysis._2
-      val func = findStmtFunc(stmt)
-
-      if (simplificationOn) stmt match {
-        case regAssign : RegisterAssign => if (state.localState.get(func.header.funcName).get.get(regAssign.lhs) != None) func.replaceLine(stmt, state.localState.get(func.header.funcName).get.get(regAssign.lhs).get.get)
-        case memAssign : MemAssign if !memAssign.lhs.onStack => if (state.globalState.get(stmt.label) != None) func.replaceLine(stmt, state.globalState.get(stmt.label).get.get)
-        case stackAssign : MemAssign if stackAssign.lhs.onStack => if (state.localState.get(func.header.funcName).get.get(stackAssign.lhs) != None) func.replaceLine(stmt, state.localState.get(func.header.funcName).get.get(stackAssign.lhs).get.get)
-
-        /* TODO: this does not really work
-        */
-      //   case cJump: CJmpStmt => {
-      //     val condition = cJump.condition
-      //     condition match {
-      //       case reg : Register => {
-      //         val constraint = state.localState.getOrElse(func.header.funcName, throw new Exception("CP: applyChanges error.")).get(reg).get
-      //         val newCJump = cJump.fold(reg, constraint.get.rhs)
-      //         if (!constraint.isEmpty) func.replaceLine(cJump, constraint.get)
-      //       }
-      //       case heap : MemLoad if !heap.onStack =>
-      //       //   val constraint = state.globalState.getOrElse(func.header.funcName, throw new Exception("CP: applyChanges error.")).get(reg).get
-      //       //   if (!constraint.isEmpty) func.replaceLine(reg, constraint.get.rhs)
-      //       // }
-      //       case stack : MemLoad if stack.onStack => {
-      //         val constraint = state.localState.getOrElse(func.header.funcName, throw new Exception("CP: applyChanges error.")).get(stack).get
-      //         val newCJump = cJump.fold(stack, constraint.get.rhs)
-      //         if (!constraint.isEmpty) func.replaceLine(cJump, constraint.get)
-      //       }
-      //       case _ =>
-      //     }
-      //   }
-        case _ => 
+  override def applyChange(stmt: Statement): Statement = {
+    // this is still bad but should replace it with propagating through later
+    val func = state.findStatementFunction(stmt)
+    if (simplification) {
+      stmt match {
+        case regAssign: LocalAssign =>
+          localState(func.name).get(regAssign.lhs) match {
+            case Some(s: AssignStatement) => s
+            case _ => stmt
+          }
+        case memAssign: MemAssign =>
+          if (memAssign.lhs.onStack) {
+            localState(func.name).get(memAssign.lhs) match {
+              case Some(s: AssignStatement) => s
+              case _ => stmt
+            }
+          } else {
+            globalState.get(stmt.pc) match {
+              case Some(s: MemAssign) => s
+              case _ => stmt
+            }
+          }
+        case _ => stmt
+        /* TODO: this does not really work */
+        //   case cJump: CJmpStmt => {
+        //     val condition = cJump.condition
+        //     condition match {
+        //       case reg : Register => {
+        //         val constraint = state.localState.getOrElse(func.header.funcName, throw new Exception("CP: applyChanges error.")).get(reg).get
+        //         val newCJump = cJump.fold(reg, constraint.get.rhs)
+        //         if (!constraint.isEmpty) func.replaceLine(cJump, constraint.get)
+        //       }
+        //       case heap : MemLoad if !heap.onStack =>
+        //       //   val constraint = state.globalState.getOrElse(func.header.funcName, throw new Exception("CP: applyChanges error.")).get(reg).get
+        //       //   if (!constraint.isEmpty) func.replaceLine(reg, constraint.get.rhs)
+        //       // }
+        //       case stack : MemLoad if stack.onStack => {
+        //         val constraint = state.localState.getOrElse(func.header.funcName, throw new Exception("CP: applyChanges error.")).get(stack).get
+        //         val newCJump = cJump.fold(stack, constraint.get.rhs)
+        //         if (!constraint.isEmpty) func.replaceLine(cJump, constraint.get)
+        //       }
+        //       case _ =>
+        //     }
+        //   }
       }
-
-      // In a perfect world we could exclusively resolve and fold through heap addresses, but unfortunately the current data structure/internal representation makes this quite convoluted,
+    } else {
+      // In a perfect world we could exclusively resolve and fold through heap addresses,
+      // but unfortunately the current data structure/internal representation makes this quite convoluted,
       // so it is currently not certain this functionality is worth implementing
-      else {
-        stmt match {
-          case memAssign : MemAssign if !memAssign.lhs.onStack => if (state.globalState.get(stmt.label) != None) func.replaceLine(stmt, state.globalState.get(stmt.label).get.get)
-          case _ =>
-        }
+      stmt match {
+        case memAssign: MemAssign if !memAssign.lhs.onStack =>
+          globalState.get(stmt.pc) match {
+            case Some(s: MemAssign) => s
+            case _ => stmt
+          }
+        case _ => stmt
       }
-      
-    })
-
-    preState
+    }
   }
-
-  /**
-   * Returns the function containing stmt.
-   * 
-   */
-  private def findStmtFunc(stmt: Stmt) = state.functions.find(func => 
-        {!func.labelToBlock.values.find(block => 
-          !block.lines.find(line => 
-            line.label == stmt.label).isEmpty).isEmpty})
-            .getOrElse(throw new Exception("CP Analysis: Statement does not belong to a function."))
-
 }
+
+object ConstantPropagationAnalysis {
+  def apply(state: State, simplify: Boolean): ConstantPropagationAnalysis =
+    ConstantPropagationAnalysis(state, Map(), Map(), simplify)
+}
+ */

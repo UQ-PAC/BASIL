@@ -1,277 +1,221 @@
 package translating
 
-import BilParser.BilAdtParser.{DirectContext, ExpContext, ExpIntAdtContext, ExpVarContext, IndirectContext}
-import BilParser.{BilAdtBaseListener, BilAdtListener, BilAdtParser}
-import astnodes.exp.{
-  BinOp,
-  BinOperator,
-  Expr,
-  Extend,
-  Extract,
-  FunctionCall,
-  Literal,
-  MemStore,
-  Pad,
-  UniOp,
-  UniOperator
-}
-import astnodes.exp.`var`.{MemLoad, Register, Var}
-import astnodes.parameters.OutParameter
-import astnodes.parameters.InParameter
-import astnodes.pred.Pred
-import astnodes.sec.{Sec, SecVar}
-import astnodes.stmt.assign.{MemAssign, RegisterAssign}
-import astnodes.stmt.{CJmpStmt, CallStmt, EnterSub, ExitSub, JmpStmt, SkipStmt, Stmt}
-import org.antlr.v4.runtime
-import org.antlr.v4.runtime.ParserRuleContext
-import org.antlr.v4.runtime.tree.{ErrorNode, ParseTree, ParseTreeProperty, TerminalNode}
+import BilParser.BilAdtParser._
+import astnodes._
 import util.AssumptionViolationException
 
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
+import scala.annotation.tailrec
+import scala.jdk.CollectionConverters._
 
-class AdtStatementLoader extends BilAdtBaseListener {
+object AdtStatementLoader {
 
-  val stmts = ArrayBuffer[Stmt]()
-  private val exprs: ParseTreeProperty[Expr] = ParseTreeProperty[Expr]
+  def visitProject(ctx: ProjectContext): Program = visitProgram(ctx.program)
 
-  private def getExpr(node: ParseTree) =
-    if (node == null) throw new NullPointerException("Null expression")
-    if (exprs.get(node) != null)
-      exprs.get(node)
-    else
-      throw new Exception("Unparsed expression " + node.getText + " (" + node.getClass + ")")
+  def visitProgram(ctx: ProgramContext): Program = {
+    val functions = ctx.subs.sub.asScala.map(visitSub).toList
+    Program(functions)
+  }
 
-  private val preds = ParseTreeProperty[Pred]
+  @tailrec
+  def visitExp(ctx: ExpContext): Expr = ctx match {
+    case e: ExpParenContext  => visitExp(e.exp)
+    case e: LoadContext      => visitLoad(e)
+    case e: BinOpContext     => visitBinOp(e)
+    case e: UOpContext       => visitUOp(e)
+    case e: ExpImmVarContext => visitImmVar(e.immVar)
+    case e: ExpIntContext    => visitExpInt(e)
+    case e: CastContext      => visitCast(e)
+    case e: ExtractContext   => visitExtract(e)
+  }
 
-  private def getPred(node: ParseTree) =
-    if (node == null) throw new NullPointerException("Null pred")
-    if (preds.get(node) != null) preds.get(node)
-    else throw new Exception("Unparsed pred " + node.getText + " (" + node.getClass + ")")
+  def visitLoad(ctx: LoadContext): MemAccess = {
+    MemAccess.init(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitEndian(ctx.endian), parseInt(ctx.num))
+  }
 
-  private val secs = ParseTreeProperty[Sec]
+  def visitStore(ctx: StoreContext): Store = {
+    Store(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitExp(ctx.value), visitEndian(ctx.endian), parseInt(ctx.num))
+  }
 
-  private def getSec(node: ParseTree) =
-    if (node == null) throw new NullPointerException("Null security")
-    if (secs.get(node) != null) secs.get(node)
-    else throw new Exception("Unparsed security " + node.getText + " (" + node.getClass + ")")
+  def visitBinOp(ctx: BinOpContext): BinOp = {
+    BinOp(BinOperator(ctx.op.getText), visitExp(ctx.lhs), visitExp(ctx.rhs))
+  }
 
-  val lPreds = new mutable.HashMap[Register, Sec]
-  val gammaMappings = new mutable.HashMap[Register, SecVar]
+  def visitUOp(ctx: UOpContext): UnOp = {
+    UnOp(UnOperator(ctx.op.getText), visitExp(ctx.exp))
+  }
 
-  val varSizes = mutable.Map[String, Int]()
+  def visitImmVar(ctx: ImmVarContext): LocalVar = {
+    LocalVar(visitQuoteString(ctx.name), parseInt(ctx.size))
+  }
 
-  var rely: Option[Pred] = None
+  def visitMemVar(ctx: MemVarContext): Memory = {
+    Memory(visitQuoteString(ctx.name), parseInt(ctx.addr_size), parseInt(ctx.value_size))
+  }
 
-  private var currentFunction: EnterSub = null
-  private var pcCount = 0
+  def visitExpInt(ctx: ExpIntContext): Literal = {
+    Literal(parseBigInt(ctx.value), parseInt(ctx.size))
+  }
 
-  var requires: List[Pred] = List()
-  var ensures: List[Pred] = List()
+  def visitCast(ctx: CastContext): Expr = ctx.CAST.getText match {
+    case "UNSIGNED" => UnsignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
+    case "SIGNED"   => SignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
+    case "LOW"      => LowCast(parseInt(ctx.size), visitExp(ctx.exp))
+    case "HIGH"     => HighCast(parseInt(ctx.size), visitExp(ctx.exp))
+  }
 
-  /** For some reason, numbers in the ADT are stored as (Num, Type) where Num is the unsigned representation of the
-    * number, and type is the type (e.g. a type of 64 means 64-bit two's complement). It's assumed that it is always
-    * two's complement.
-    *
-    * For instance - Int(18446744073709551584,64) means -32.
-    *
-    * TODO: This takes and returns strings to conform with the current state. It should be converted to take and return
-    * BigInts long term
-    */
-  def castTo2sComplement(num: String, t: String): String = {
-    val n = BigInt(num);
-    val exponent = t.toInt;
-    if (n >= BigInt.apply(2).pow(exponent - 1)) {
-      // This is a negative 2's complement number
-      return (BigInt.apply(2).pow(exponent) - n).toString
-    } else {
-      return n.toString
+  def visitExtract(ctx: ExtractContext): Extract = {
+    Extract(parseInt(ctx.hb), parseInt(ctx.lb), visitExp(ctx.exp))
+  }
+
+  def visitJmp(ctx: JmpContext): (String, Statement) = ctx match {
+    case i: IndirectCallContext => visitIndirectCall(i)
+    case d: DirectCallContext   => visitDirectCall(d)
+    case g: GotoJmpContext      => visitGotoJmp(g)
+  }
+
+  def visitIndirectCall(ctx: IndirectCallContext): (String, IndirectCall) = {
+    val returnTarget = Option(ctx.returnTarget) match {
+      case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
+      case None                   => None
     }
+    val jump = IndirectCall(visitImmVar(ctx.callee.immVar), visitExp(ctx.cond), returnTarget)
+    (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), jump)
   }
 
-  /** Remove the quotation marks, @, and % from a string e.g. "\"mem\"" becomes "mem"
-    */
-  def getStringBody(str: String): String = {
-    var newStr: String = str;
-    if (newStr.charAt(0) == '"') {
-      newStr = newStr.substring(1);
+  def visitDirectCall(ctx: DirectCallContext): (String, DirectCall) = {
+    val returnTarget = Option(ctx.returnTarget) match {
+      case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
+      case None                   => None
     }
-    if (newStr.charAt(newStr.length - 1) == '"') {
-      newStr = newStr.substring(0, newStr.length - 1);
-    }
-    return newStr.stripPrefix("%").stripPrefix("@");
+    val jump = DirectCall(visitQuoteString(ctx.callee.tid.name).stripPrefix("@"), visitExp(ctx.cond), returnTarget)
+    (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), jump)
   }
 
-  override def exitExpLoad(ctx: BilAdtParser.ExpLoadContext): Unit = {
-    ctx.memexp match {
-      case v: ExpVarContext =>
-        if (getStringBody(v.name.getText) == "mem") {
-          exprs.put(ctx, new MemLoad(getExpr(ctx.idx), Some(ctx.size.getText.toInt)))
-        } else {
-          throw new AssumptionViolationException("Found load on on variable other than mem")
-        }
-      case v: ExpContext => throw new AssumptionViolationException("Expected ExpVarContext, but got " + v.getClass())
-    }
+  def visitGotoJmp(ctx: GotoJmpContext): (String, GoTo) = {
+    val jump = GoTo(parseLabel(ctx.target.tid.name), visitExp(ctx.cond))
+    (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), jump)
   }
 
-  override def exitExpStore(ctx: BilAdtParser.ExpStoreContext): Unit = {
-    ctx.memexp match {
-      case v: ExpVarContext =>
-        if (getStringBody(v.name.getText) == "mem") {
-          exprs.put(ctx, new MemStore(getExpr(ctx.idx), getExpr(ctx.value), Some(ctx.size.getText.toInt)))
-        } else {
-          throw new AssumptionViolationException("Found store on on variable other than mem")
-        }
-      case v: ExpContext => throw new AssumptionViolationException("Expected ExpVarContext, but got " + v.getClass())
-    }
-  }
-
-  override def exitExpBinop(ctx: BilAdtParser.ExpBinopContext): Unit =
-    exprs.put(ctx, new BinOp(BinOperator.fromAdt(ctx.op.getText), getExpr(ctx.lhs), getExpr(ctx.rhs)))
-
-  override def exitExpUop(ctx: BilAdtParser.ExpUopContext): Unit =
-    exprs.put(ctx, new UniOp(UniOperator.fromAdt(ctx.op.getText), getExpr(ctx.exp)))
-
-  override def exitExpVar(ctx: BilAdtParser.ExpVarContext): Unit = {
-    if (getStringBody(ctx.name.getText) != "mem") { // Is a register
-      if (ctx.`type`.imm == null)
-        throw new AssumptionViolationException("Can't find Imm argument for a non-mem variable")
-      exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.imm.size.getText.toInt)))
-      varSizes.put(getStringBody(ctx.name.getText), ctx.`type`.imm.size.getText.toInt)
-    } else {
-      // FIXME: Old parser treated mem as a register so I've replicated that behaviour here - could be unintentional
-      exprs.put(ctx, new Register(getStringBody(ctx.name.getText), Some(ctx.`type`.mem.value_size.getText.toInt)))
-    }
-  }
-
-  override def exitExpIntAdt(ctx: BilAdtParser.ExpIntAdtContext): Unit = {
-    exprs.put(
-      ctx,
-      Literal(ctx.value.getText)
-    ) // We also have access to size information if needed. But current AST node doesn't ask for it
-  }
-
-  // TODO: Handle high and low - old parser did not handle it either
-  override def exitExpCast(ctx: BilAdtParser.ExpCastContext): Unit = {
-    ctx.CAST.getText match {
-      case "UNSIGNED"     => exprs.put(ctx, Pad(getExpr(ctx.exp), ctx.size.getText.toInt))
-      case "SIGNED"       => exprs.put(ctx, Extend(getExpr(ctx.exp), ctx.size.getText.toInt))
-      case "LOW" | "HIGH" => exprs.put(ctx, getExpr(ctx.exp))
-    }
-  }
-
-  override def exitExpExtract(ctx: BilAdtParser.ExpExtractContext): Unit = {
-    val hb = ctx.hb.getText.toInt;
-    val lb = ctx.lb.getText.toInt;
-    val exp = getExpr(ctx.exp)
-    exprs.put(ctx, new Extract(hb, lb, exp));
-  }
-
-  override def exitDef(ctx: BilAdtParser.DefContext): Unit = {
-    val address = getStringBody(ctx.tid.name.getText);
-    val LHS = getExpr(ctx.lhs)
-    val RHS = getExpr(ctx.rhs)
-
-    stmts += ((LHS, RHS) match {
-      case (v: Register, m: MemStore) =>
-        if (v.name == "mem") new MemAssign(address, new MemLoad(m.loc, m.size), m.expr)
-        else throw new AssumptionViolationException("expected mem for memstore")
-      case (v: Register, _) => {
-        new RegisterAssign(address, v, RHS)
-      }
-      case _ => throw new AssumptionViolationException("Unexpected expression")
-
-    })
-  }
-
-  override def exitExpParen(ctx: BilAdtParser.ExpParenContext): Unit = {
-    exprs.put(ctx, getExpr(ctx.exp))
-  }
-
-  override def exitGotoSym(ctx: BilAdtParser.GotoSymContext): Unit = {
-    // Note in the ADT, all jumps are actually conditoinal jumps. Regular
-    // jumps simply have true/Int(1,1) as the condition.
-    val address = getStringBody(ctx.tid.name.getText);
-    ctx.cond match {
-      case v: ExpVarContext => {
-        val cond = Register(getStringBody(v.name.getText), v.asInstanceOf[ExpVarContext].`type`.imm.size.getText.toInt);
-        if (ctx.target.indirect != null) {
-          val variable: ExpVarContext = ctx.target.indirect.exp.asInstanceOf[ExpVarContext]
-          stmts += new CJmpStmt(address, getStringBody(variable.name.getText), "TODO", cond);
-        } else if (ctx.target.direct != null) {
-          stmts += new CJmpStmt(address, getStringBody(ctx.target.direct.tid.name.getText), "TODO", cond);
-        }
-      }
-      case v: ExpIntAdtContext => {
-        // Assume that if it's an int, the int evaluates to true. This seems to be the case
-        // 99% of the time. It probably doesn't make sense to a cjump based on a falsy literal.
-        if (ctx.target.indirect != null) {
-          val variable: ExpVarContext = ctx.target.indirect.exp.asInstanceOf[ExpVarContext]
-          stmts += new JmpStmt(address, getStringBody(variable.name.getText))
-        } else if (ctx.target.direct != null) {
-          stmts += new JmpStmt(address, getStringBody(ctx.target.direct.tid.name.getText))
-        }
+  def visitSub(ctx: SubContext): FunctionNode = {
+    val in = ctx.args.arg.asScala.flatMap { arg =>
+      val lhs = visitImmVar(arg.lhs)
+      val register = visitImmVar(arg.rhs)
+      arg.intent.getText match {
+        case "In()"   => Some(Parameter(lhs.name, lhs.size, register))
+        case "Both()" => Some(Parameter(lhs.name, lhs.size, register))
+        case _        => None
       }
     }
+
+    val alwaysIn = List(
+      Parameter("FP", 64, LocalVar("R29", 64)),
+      Parameter("LR", 64, LocalVar("R30", 64)),
+      Parameter("SP", 64, LocalVar("R31", 64))
+    )
+
+    val out = ctx.args.arg.asScala.flatMap { arg =>
+      val lhs = visitImmVar(arg.lhs)
+      val register = visitImmVar(arg.rhs)
+      arg.intent.getText match {
+        case "Out()"  => Some(Parameter(lhs.name, lhs.size, register))
+        case "Both()" => Some(Parameter(lhs.name + "_out", lhs.size, register))
+        case _        => None
+      }
+    }
+
+    val alwaysOut = List(
+      Parameter("FP_out", 64, LocalVar("R29", 64)),
+      Parameter("LR_out", 64, LocalVar("R30", 64)),
+      Parameter("SP_out", 64, LocalVar("R31", 64))
+    )
+
+    val address = parseFromAttrs(ctx.attrs, "address") match {
+      case Some(x: String) => Integer.parseInt(x.stripPrefix("0x"), 16)
+      case None            => -1
+    }
+
+    FunctionNode(
+      visitQuoteString(ctx.name),
+      address,
+      ctx.blks.blk.asScala.map(visitBlk).toList,
+      in.toList ++ alwaysIn,
+      out.toList ++ alwaysOut
+    )
   }
 
-  override def enterBlk(ctx: BilAdtParser.BlkContext): Unit = {
-    // FIXME: The previous bil parser had no real notion of "blocks" the blocks were simply started by
-    //  a labelled skip statement. It may be worthwhile to introduce a Block node in the AST
-    stmts += new SkipStmt(getStringBody(ctx.tid.name.getText));
-  }
+  def visitBlk(ctx: BlkContext): Block = {
+    val statements: Vector[(String, Statement)] = ctx.defs.assign.asScala.map(visitAssign).toVector ++
+      ctx.jmps.jmp.asScala.map(visitJmp).toVector
 
-  override def exitCall(ctx: BilAdtParser.CallContext): Unit = {
-    val address = getStringBody(ctx.tid.name.getText);
-    var funcName = "";
-    if (ctx.calee.direct != null) {
-      funcName = getStringBody(ctx.calee.direct.tid.name.getText);
-      val returnName: Option[String] = Option(ctx.returnSym) match {
-        case Some(r) =>
-          if (r.direct != null) {
-            Some(getStringBody(r.direct.tid.name.getText))
+    // group by instruction
+    val instructions = statements.foldLeft(Vector[Instruction]()) { (insns, kv) =>
+      val instruction = kv._1
+      val statement = kv._2
+      insns.lastOption match {
+        case Some(i) =>
+          if (i.asm == instruction) {
+            insns.dropRight(1) :+ i.copy(statements = i.statements :+ statement)
           } else {
-            None
+            insns :+ Instruction(instruction, List(statement))
           }
-        case _ => None
+        case None => Vector(Instruction(instruction, List(statement)))
       }
-      stmts += new CallStmt(address, funcName, returnName, List(), None)
-    } else if (ctx.calee.indirect != null) {
-      // FIXME: This mimics the behaviour of the old parser - it could be unintended
-      //  The assumption that was made is that any call on a non-literal function (i.e. a register, or LR) is indicative
-      //  of exiting the current function. This seems incorrect.
-      stmts += new ExitSub(address, None)
+    }
+
+    val label = parseLabel(ctx.tid.name)
+    val address = parseFromAttrs(ctx.attrs, "address") match {
+      case Some(x: String) => Some(Integer.parseInt(x.stripPrefix("0x"), 16))
+      case None            => None
+    }
+
+    Block(label, address, instructions.toList)
+  }
+
+  def visitEndian(ctx: EndianContext): Endian = ctx.ENDIAN.getText match {
+    case "LittleEndian" => Endian.LittleEndian
+    case "BigEndian"    => Endian.BigEndian
+  }
+
+  def visitAssign(ctx: AssignContext): (String, Statement) = ctx match {
+    case imm: ImmDefContext => visitImmDef(imm)
+    case mem: MemDefContext => visitMemDef(mem)
+  }
+
+  def visitImmDef(ctx: ImmDefContext): (String, LocalAssign) = {
+    val assign = LocalAssign(visitImmVar(ctx.lhs), visitExp(ctx.rhs))
+    (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), assign)
+  }
+
+  def visitMemDef(ctx: MemDefContext): (String, MemAssign) = {
+    val lhs = visitMemVar(ctx.lhs)
+    val rhs = visitStore(ctx.rhs)
+    if (lhs != rhs.memory) {
+      throw new Exception("trying to store memory in unrelated memory")
+    }
+    val assign = MemAssign(MemAccess.init(lhs, rhs.index, rhs.endian, rhs.size), rhs.value)
+    (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), assign)
+  }
+
+  def visitQuoteString(ctx: QuoteStringContext): String = ctx.getText.stripPrefix("\"").stripSuffix("\"")
+
+  def parseLabel(ctx: QuoteStringContext): String = "l" + visitQuoteString(ctx).stripPrefix("@").stripPrefix("%")
+
+  def parseFromAttrs(ctx: AttrsContext, field: String): Option[String] = {
+    ctx.attr.asScala.map(visitAttr).collectFirst {
+      case (lhs: String, rhs: String) if lhs == field => rhs
     }
   }
 
-  override def enterSub(ctx: BilAdtParser.SubContext): Unit = {
-    if (currentFunction != null)
-      currentFunction.setRequiresEnsures(requires, ensures)
-
-    requires = List()
-    ensures = List()
-    val address = getStringBody(ctx.tid.name.getText);
-    val name = getStringBody(ctx.name.getText)
-
-    val function = new EnterSub(address, name, List(), List())
-    stmts += function
-    this.currentFunction = function
-    for (i <- 0 to ctx.args().arg.size() - 1) {
-      var arg = ctx.args.arg(i)
-
-      val id = getStringBody(arg.tid.name.getText)
-      arg.rhs match {
-        case v: ExpVarContext => {
-          val name = v.name.getText
-          val size = v.`type`.imm.size.getText.toInt
-          if (arg.intent.getText.contains("in")) {
-            currentFunction.getInParams += new InParameter(Register(id, size), Register(name, 64))
-          } else {
-            currentFunction.setOutParam(new OutParameter(Register(id, size), Register(name, 64)))
-          }
-        }
-        case _ => throw new AssumptionViolationException("Expected RHS of arg to be a varible")
-      }
-    }
+  def parseInt(ctx: NumContext): Int = ctx match {
+    case _: NumHexContext => Integer.parseInt(ctx.getText.stripPrefix("0x"), 16)
+    case _: NumDecContext => ctx.getText.toInt
   }
+
+  def parseBigInt(ctx: NumContext): BigInt = ctx match {
+    case _: NumHexContext => BigInt(ctx.getText.stripPrefix("0x"), 16)
+    case _: NumDecContext => BigInt(ctx.getText)
+  }
+
+  def visitAttr(ctx: AttrContext): (String, String) = (visitQuoteString(ctx.lhs), visitQuoteString(ctx.rhs))
+
 }

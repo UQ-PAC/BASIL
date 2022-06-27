@@ -1,43 +1,25 @@
 // package scala
 
-import astnodes.stmt.Stmt
-import org.antlr.v4.runtime.CharStreams
-import org.antlr.v4.runtime.CommonTokenStream
-import org.antlr.v4.runtime.tree.ParseTreeWalker
-
-import scala.collection.mutable.Set
-import java.io.BufferedWriter
-import java.io.FileWriter
-import java.io.IOException
-import java.util.ArrayList
-import java.util.Arrays
-import java.util.List
-import translating.{BoogieTranslator, FlowGraph, StatementLoader, SymbolTableListener}
-import BilParser.*
-import analysis.*
-import astnodes.pred.Bool
-import vcgen.{State, VCGen}
-import astnodes.exp.*
-
-import collection.{immutable, mutable}
-import scala.collection.mutable.ArrayBuffer
-import sys.process.*
-import scala.language.postfixOps
+import analysis._
+import astnodes._
+import boogie._
+import translating._
 import util.RunUtils
-import scala.util.CommandLineParser
+//import vcgen._
 
-@main def main(fileName: String, elfFileName: String, options: String*) = {
+import scala.collection.mutable.{ArrayBuffer, Set}
+import scala.collection.{immutable, mutable}
+import scala.language.postfixOps
+import scala.sys.process.*
+
+@main def main(fileName: String, elfFileName: String, options: String*): Unit = {
   val outFileName = if (options.isEmpty) {
     "boogie_out.bpl"
   } else {
     options.head
   }
-  val state: State = if (fileName.endsWith(".adt")) {
-    RunUtils.generateVCsAdt(fileName, elfFileName)
-  } else {
-    RunUtils.generateVCs(fileName, elfFileName)
-  }
-  RunUtils.writeToFile(state, outFileName)
+  val program: BProgram = RunUtils.generateVCsAdt(fileName, elfFileName)
+  RunUtils.writeToFile(program, outFileName)
 
   // println("boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process(Seq("grep", "--color=always", ".*errors.*\\|$"), None, "GREP_COLORS" -> "'1;33"))
   // ("boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process(Seq("GREP_COLORS='1;32'", "grep", "--color=always", ".*errors.*\\|$"), None, "GREP_COLORS" -> "'1;32")) !

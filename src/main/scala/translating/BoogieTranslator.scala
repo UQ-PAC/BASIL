@@ -1,186 +1,190 @@
 package translating
 
-import astnodes.exp.{BinOp, BinOperator, Concat, Expr, Literal, MemStore, UniOp, UniOperator}
-import astnodes.stmt.assign.{Assign, MemAssign, RegisterAssign}
-import astnodes.stmt.*
-import astnodes.parameters.{InParameter, OutParameter}
-import astnodes.Label
-import astnodes.exp.`var`.{MemLoad, Register, Var}
-import translating.FlowGraph
-import vcgen.{FunctionState, State}
+import astnodes._
+import boogie._
 
-import scala.collection.mutable.HashSet
-import java.io.{BufferedWriter, FileWriter, IOException}
-import scala.collection.{immutable, mutable}
-import scala.collection.mutable
-import util.AssumptionViolationException
-import scala.jdk.CollectionConverters._
-import astnodes.exp.Extract
-import vcgen.Block
-import java.util.Base64
+case class BoogieTranslator(program: Program) {
+  def translate: BProgram = {
+    val procedures = program.functions.map(f => translate(f))
+    val globals = procedures.flatMap(p => p.globals).map(b => BVarDecl(b)).distinct
+    val functionsUsed = procedures.flatMap(p => p.bvFunctions).distinct
 
-
-/** Methods to perform the translation from BIL to the IR.
- */
-object BoogieTranslator {
-  /** Peforms the BIL to IR translation
-   */
-  def translate(state: State): State = 
-    inferConstantTypes(addVarDeclarations(optimiseSkips(addAssignAtRootBlock(addOutParam(addInParams(createLabels(state)))))))
-
-  /** Update all lines by applying the given function */
-  private def updateAllLines(state: State, fn: Stmt => Stmt): State = updateAllLines(state, PartialFunction.fromFunction(fn))
-
-  /** Update all lines by applying the given partial function */
-  private def updateAllLines(state: State, fn: PartialFunction[Stmt, Stmt]): State = updateAllBlocks(state, block => block.copy(lines = block.lines.collect(fn)))
-
-  private def updateAllFunctions(state: State, fn: FunctionState => FunctionState): State = state.copy(functions = state.functions.map(fn))
-
-  private def updateAllBlocks(state: State, fn: Block => Block): State = updateAllFunctions(state, f => f.copy(labelToBlock = f.labelToBlock.map {
-    case (pc, block) => (pc, fn(block))
-  }))
-
-  /** Hides labels which are not needed */
-  private def createLabels(state: State): State = {
-    val usedLabels = state.functions.flatMap(f => f.labelToBlock.flatMap {
-      case (_, block) => block.lines.collect {
-        case jmpStmt: JmpStmt => List(jmpStmt.target)
-        case cJmpStmt: CJmpStmt => List(cJmpStmt.trueTarget, cJmpStmt.falseTarget)
-      }
-    })
-
-    updateAllLines(state, stmt => {
-      if (usedLabels.contains(stmt.label.pc)) stmt.copy(stmt.label.copy(visible = true))
-      else stmt
-    })
+    val declarations = globals ++ functionsUsed ++ procedures
+    avoidReserved(BProgram(declarations))
   }
 
-  /** If a skip is not jumped to, we should remove it. Depends on createLabels
-    * TODO: logic doesnt match docstring
-    */
-  private def optimiseSkips(state: State): State = {
-    updateAllLines(state, {
-      case x if (!x.isInstanceOf[SkipStmt]) => x
-    })
-  }
-
-  private def addInParams(state: State): State = updateAllBlocks(state, block => block.lines(block.lines.size - 1) match {
-    case call: CallStmt if (call.libraryFunction) =>
-      block.copy(lines = block.lines.updated(block.lines.size - 1, 
-        call.copy(args = CallStmt.libraryFunctions(call.funcName).args)))
-    case call: CallStmt => 
-      // TODO 
-      block.copy(lines = block.lines.updated(block.lines.size - 1, 
-        call.copy(args = state.functionFromCall(call).header.getInParams.map(p => p.getName).toList)))
-    case _ => block
-  })
-
-  private def addOutParam(state: State): State = updateAllLines(state, stmt => stmt match {
-    case call: CallStmt if (call.libraryFunction) => 
-      call.copy(lhs = CallStmt.libraryFunctions(call.funcName).lhs)
-    case call: CallStmt => state.functionFromCall(call).header.getOutParam match {
-      case Some(x) => 
-        call.copy(lhs = Some(x.getName)) 
-        call
-      case None => call
+  def translate(f: FunctionNode): BProcedure = {
+    val in = f.in.map(i => BParam(i.name, BitVec(i.size)))
+    val out = f.out.map(o => BParam(o.name, BitVec(o.size)))
+    val returns = f.out.map(p => outParamToAssign(p))
+    val body = f.blocks.map(b => translate(b, returns))
+    val modifies = body.flatMap(b => b.modifies).toSet
+    val inits = if (body.isEmpty) {
+      List()
+    } else {
+      f.in.map(p => inParamToAssign(p))
     }
-    case _ => stmt
-  })
 
-  private def getLocalVarsInFunction(state: State, function: FunctionState) = {
-    val vars = new mutable.HashSet[Register]
-    function.labelToBlock.foreach{
-      case (pc, b) => b.lines.foreach{
-        case RegisterAssign(_, lhs, _) =>
-          if (
-            !state.globalInits.exists(init => init.variable.name == lhs.name)
-              && function.header.getInParams.filter((inParam) => inParam.getName.name == lhs.name).isEmpty // TODO check if this is needed (otherwise change to short circuting operation)
-              && !(function.header.getOutParam.get.getName.name == lhs.name)
-              && !function.initStmts.exists(init => init.variable.name == lhs.name)
-          ) {
-            vars.add(lhs)
-          }
-        case CallStmt(_, _, _, _, Some(x)) => vars.add(x)
+    BProcedure(f.name, in, out, List(), List(), modifies, inits ++ body)
+  }
+
+  private def outParamToAssign(p: Parameter): AssignCmd = {
+    val param = BParam(p.name, BitVec(p.size))
+    val register = p.register.toBoogie
+    if (p.size > p.register.size) {
+      AssignCmd(param, BVZeroExtend(p.size - p.register.size, register))
+    } else if (p.size < p.register.size) {
+      AssignCmd(param, BVExtract(p.size, 0, register))
+    } else {
+      AssignCmd(param, register)
+    }
+  }
+
+  private def inParamToAssign(p: Parameter): AssignCmd = {
+    val param = BParam(p.name, BitVec(p.size))
+    val register = p.register.toBoogie
+    if (p.size > p.register.size) {
+      AssignCmd(register, BVExtract(p.register.size, 0, param))
+    } else if (p.size < p.register.size) {
+      AssignCmd(register, BVZeroExtend(p.register.size - p.size, param))
+    } else {
+      AssignCmd(register, param)
+    }
+  }
+
+  def translate(b: Block, returns: List[BCmd]): BBlock = {
+    // TODO at some point we want to take into account the instruction borders
+    val statements = b.instructions.flatMap(_.statements)
+    val cmds = statements.flatMap(s => translate(s, returns))
+    BBlock(b.label, cmds)
+  }
+
+  def translate(s: Statement, returns: List[BCmd]): List[BCmd] = s match {
+    case d: DirectCall =>
+      val functionHeader = program.getFunction(d.target) match {
+        case Some(s) => s
+        case None => throw new Exception("trying to call non-existent procedure " + d.target)
+      }
+      val call = coerceProcedureCall(d.target, functionHeader.in, functionHeader.out)
+      val returnTarget = d.returnTarget match {
+        case Some(r) => List(GoToCmd(r))
+        case None => List(Assume(FalseLiteral))
+      }
+      d.condition match {
+        case l: Literal if l.value > BigInt(0) =>
+          call ++ returnTarget
         case _ =>
+          val guard = coerceToBool(d.condition.toBoogie)
+          List(IfCmd(guard, call ++ returnTarget))
       }
-    }
-
-    vars.toList
-  }
-
-  /** In boogie, all local variables seem to want to be initialised at the beginning of functions. Do we want to make
-    * all registers local variables? This should be done before memFacts are replaced by global variables, or the global
-    * variables will have var initialisations. Depends on:
-    *   - resolveRegisters()
-    */
-  private def addVarDeclarations(state: State): State = {
-    state.copy(functions = state.functions.map(function => {
-      val initStmts = function.initStmts.toBuffer
-      for (localVar <- getLocalVarsInFunction(state, function)) {
-        // TODO i think this could be replaced by a none label as well
-        // TODO rework how this works to instead store a list of vars
-        if (!function.initStmts.exists(x => x.variable == localVar)) {
-          val size = {
-            if (!state.bvSizes.contains(localVar.name) && localVar.name.endsWith("_result")) 64
-            else if (CallStmt.callRegisters.contains(localVar.name)) 64
-            else state.bvSizes(localVar.name)
-          }
-          initStmts += new InitStmt(localVar, uniqueLabel, s"bv$size")
+    case i: IndirectCall =>
+      val returnTarget = i.returnTarget match {
+        case Some(r) => List(GoToCmd(r))
+        case None => List(Assume(FalseLiteral))
+      }
+      val call = if (i.target.name == "R30") {
+        returns :+ ReturnCmd
+      } else {
+        List(Comment(s"TODO: call ${i.target.name}")) ++ returnTarget // TODO determine call target
+      }
+      i.condition match {
+        case l: Literal if l.value > BigInt(0) =>
+          call
+        case _ =>
+          val guard = coerceToBool(i.condition.toBoogie)
+          List(IfCmd(guard, call))
+      }
+    case g: GoTo =>
+      g.condition match {
+        case l: Literal if l.value > BigInt(0) =>
+          List(GoToCmd(g.target))
+        case _ =>
+          val guard = coerceToBool(g.condition.toBoogie)
+          List(IfCmd(guard, List(GoToCmd(g.target))))
+      }
+    case m: MemAssign =>
+      val rhsBoogie = m.rhs.toBoogie
+      val lhss = m.lhs.boogieAccesses
+      if (lhss.size > 1) {
+        val tempLocal = rhsBoogie match {
+          case b: BVar => b
+          case _ => BVariable("#temp", BitVec(m.rhs.size), Scope.Local)
         }
+        val tempAssign = if (rhsBoogie == tempLocal) {
+          List()
+        } else {
+          List(AssignCmd(tempLocal, rhsBoogie))
+        }
+        val width = m.lhs.memory.valueSize
+        val assigns = for (i <- lhss.indices) yield {
+          MapAssignCmd(lhss(i), BVExtract((i + 1) * width, i * width, tempLocal))
+        }
+        tempAssign ++ assigns
+      } else {
+        List(MapAssignCmd(lhss.head, rhsBoogie))
       }
-
-      function.copy(initStmts = initStmts.toList)
-    }))
+    case l: LocalAssign => List(AssignCmd(l.lhs.toBoogie, l.rhs.toBoogie))
   }
 
-  private def addAssignAtRootBlock(state: State) = updateAllFunctions(state, func => 
-      func.copy(
-        labelToBlock = func.labelToBlock.updated(func.rootBlockLabel, func.rootBlock.copy(
-          lines = CallStmt.callRegisters.map(x => RegisterAssign("NONE", Register(x, 64), Register(s"${x}_in", 64))).toList ++ func.rootBlock.lines 
-        ))
-      ))
-
-  private def addAssignBeforeReturn(state: State): State = state.copy(functions = state.functions.map(f => 
-    f.copy(labelToBlock = f.header.getOutParam match {
-      case Some(outParam) => f.labelToBlock.map{
-        case (l, b) => (l, b.copy(lines = b.lines.flatMap{
-          case c: ExitSub => List(RegisterAssign("generatedline", outParam.getName, Extract(outParam.getName.size.get - 1, 0, outParam.getRegister)), c)
-          case x => List(x)
-        }))
-      }
-      case None => f.labelToBlock
-  })))
-
-  /**
-    * Infers the bv sizes for constants
-    */
-  private def inferConstantTypes(state: State): State = updateAllLines(state, s => inferConstantTypes(s))
-
-  private def inferConstantTypes(stmt: Stmt): Stmt = stmt match {
-    case assign: RegisterAssign => assign.copy(rhs = inferConstantTypes(assign.rhs, assign.lhs.size))
-    case x => x
-  }
-
-  // TODO improve this and perform proper type checking
-  private def inferConstantTypes(expr: Expr, size: Option[Int]): Expr = expr match {
-    case binOp: BinOp => {
-      val inputSize = if (BinOperator.changesSize(binOp.operator)) None else size
-      val binOp1 = binOp.copy(firstExp = inferConstantTypes(binOp.firstExp, inputSize), secondExp = inferConstantTypes(binOp.secondExp, inputSize))
-      (binOp1.firstExp.size, binOp1.secondExp.size) match {
-        case (a: Some[Int], b: Some[Int]) if (a == b) => binOp1
-        case (a: Some[Int], b: Some[Int]) if (a != b) => throw new AssumptionViolationException(s"Both sides of binop ($binOp) should have the same size (${binOp1.firstExp}: ${a}, ${binOp1.secondExp}: ${b})")
-        case (x: Some[Int], None) => binOp1.copy(secondExp = inferConstantTypes(binOp1.secondExp, x))
-        case (None, x: Some[Int]) => binOp1.copy(firstExp = inferConstantTypes(binOp1.firstExp, x))
-        case _ => binOp1
+  def coerceProcedureCall(target: String, in: List[Parameter], out: List[Parameter]): List[BCmd] = {
+    val params = for (i <- in) yield {
+      val register = i.register.toBoogie
+      if (i.register.size > i.size) {
+        BVExtract(i.size, 0, register)
+      } else if (i.register.size < i.size) {
+        BVZeroExtend(i.size - i.register.size, register)
+      } else {
+        register
       }
     }
-    case uniOp: UniOp =>
-      val inputSize = if (UniOperator.changesSize(uniOp.operator)) None else size
-      uniOp.copy(exp = inferConstantTypes(uniOp.exp, inputSize))
-    case lit: Literal if (lit.size == None) => lit.copy(size = size)
-    case _ => expr
+    val outTemp = for (o <- out.indices) yield {
+      BVariable(s"#temp$o", BitVec(out(o).size), Scope.Local)
+    }
+    val outRegisters = out.map(o => o.register.toBoogie)
+    val outAssigned = for (o <- out.indices if out(o).register.size != out(o).size) yield {
+      val regSize = out(o).register.size
+      val paramSize = out(o).size
+      if (regSize > paramSize) {
+        AssignCmd(outRegisters(o), BVZeroExtend(regSize - paramSize, outTemp(o)))
+      } else {
+        AssignCmd(outRegisters(o), BVExtract(regSize, 0, outTemp(o)))
+      }
+    }
+    val returned = for (o <- out.indices) yield {
+      if (out(o).register.size == out(o).size) {
+        outRegisters(o)
+      } else {
+        outTemp(o)
+      }
+    }
+    List(ProcedureCall(target, returned.toList, params)) ++ outAssigned
   }
 
-  private def uniqueVarName: String = return "p" + "TODO"
-  private def uniqueLabel: String = return "l" + "TODO"
+  def coerceToBool(e: BExpr): BExpr = e.getType match {
+    case BoolType => e
+    case bv: BitVec => BinaryBExpr(BVNEQ, e, BitVecLiteral(0, bv.size))
+    case _ => ???
+  }
+
+  def stripUnreachableFunctions(externalNames: Set[String]): Program = {
+    val functionToChildren = program.functions.map(f => f.name -> f.calls).toMap
+    val reachableFunctionNames = reachableFrom("main", functionToChildren, Set("main"))
+    val reachableFunctions = program.functions.filter(f => reachableFunctionNames.contains(f.name))
+    val externalsStubbed = reachableFunctions.map {
+      case f: FunctionNode if externalNames.contains(f.name) => f.copy(blocks = List())
+      case f: _ => f
+    }
+    program.copy(functions = externalsStubbed)
+  }
+
+  private def reachableFrom(next: String, functionToChildren: Map[String, Set[String]], reached: Set[String]): Set[String] = {
+    val reachable = functionToChildren(next) -- reached
+    reached ++ reachable.flatMap(s => reachableFrom(s, functionToChildren, reachable ++ reached))
+  }
+
+  private val reserved = Set("free")
+
+  def avoidReserved(program: BProgram): BProgram = {
+    program.replaceReserved(reserved)
+  }
 }

@@ -1,0 +1,1 @@
+GAMMA: x -> TRUE, y -> FALSE

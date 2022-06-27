@@ -1,3 +1,4 @@
+/*
 package utils
 
 case class BoogieReturnResult(failures: List[Int], numSuccess: Int, numFailure: Int)
@@ -7,3 +8,4 @@ case object BoogieReturnResult {
     new BoogieReturnResult(failures, numSuccess, numFailure)
   }
 }
+*/
