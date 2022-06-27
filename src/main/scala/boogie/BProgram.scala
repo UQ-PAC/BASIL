@@ -63,7 +63,7 @@ case class BAxiom(body: BExpr) extends BDeclaration {
 
 case class BFunction(name: String, bvbuiltin: String, in: List[BParam], out: BParam, body: Option[BExpr]) extends BDeclaration {
   override def toBoogie: List[String] = {
-    val bvbuiltinString = if (bvbuiltin.isBlank) {
+    val bvbuiltinString = if (bvbuiltin.isEmpty) {
       ""
     } else {
       s" {:bvbuiltin \"$bvbuiltin\"}"

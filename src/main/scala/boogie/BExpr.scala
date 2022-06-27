@@ -101,7 +101,7 @@ case class BVSignExtend(extension: Int, body: BExpr) extends BExpr {
 trait BVar(val name: String, val bType: BType, val scope: Scope) extends BExpr {
   override def getType: BType = bType
   override def toString: String = name
-  def withType: String = if (name.isBlank) {
+  def withType: String = if (name.isEmpty) {
     s"$bType"
   } else {
     s"$name: $bType"

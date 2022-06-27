@@ -1,93 +1,98 @@
-# Bil-to-Boogie Translator
+# BAP-to-Boogie Translator
 
-## Development 
+## About
+The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
 
-## Setup 
+## Installation
+The tool is OS-independent, but producing input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. On Windows, WSL2 can be used to run any Linux-specific tasks.
 
- 1. Download and install [sbt](https://www.scala-sbt.org/download.html) and [boogie](https://github.com/boogie-org/boogie#installation). If you use an operating system with a package manager then the easiest way to install these is likely through your package manager (e.g. apt, aur)
- 2. Clone the repo
+Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 8](https://openjdk.org/install/) (or higher) is required.
 
-This should be everything. For more details on SBT and getting SBT to work correctly with IntelliJ see the section below.
+The tool takes as inputs a BAP ADT file (here denoted with `.adt`) and a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.
 
-### Running a file
+To build and run the tool using sbt, use the following command:
 
-To run a single file use the command 
+`sbt "run file.adt file.relf [output.bpl]"` where the output filename is optional
 
-`sbt "run file.adt file.elf boogie"`
+The sbt shell can also be used for multiple tasks with less overhead by executing `sbt` and then the relevant sbt commands.
 
-where `file.adt` is the lifted ADT file and `file.elf` is the elf file (for an example of how to generate this, look at `src/scripts/lift\_docker.sh`). A range of sample files can be found in the `samples` folder. This command must be run in the root directory of the project. For example, to run the `ifglobal` example use the command 
+To build a standalone `.jar` file, use the following command:
 
-`run samples/that_compile/if/ifglobal.adt samples/that_compile/if/ifglobal.elf boogie`
+`sbt assembly`
 
-If you are likely to want to run multiple files you can launch the SBT shell using `sbt` and then run each file inside this shell using
+The standalone `.jar` can then be executed with the following command:
 
-`run file.adt file.elf boogie`
+`./run.sh file.adt file.relf [output.bpl]`
 
-This saves the time having to wait for SBT to start.
+## Generating inputs
+The tool takes a `.adt` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.
 
+[BAP](https://github.com/BinaryAnalysisPlatform/bap) can be installed by following the instructions in the link given.
 
-### Running test suit
+Given a AArch64/ARM64 binary file (`*.out`), the `.adt` file can be produced by running
 
-To run the test suite run
+`bap *.out -d adt:*.adt`
 
-`sbt test`
+and the `.relf` file can be produced by running
 
-This runs a collection of the samples, checking that the correct number of errors are produced and that these occur on the corect line numbers. 
+`readelf -s -r *.out > *.relf`.
 
-### Manually executing boogie files
+To cross-compile a C source file to a AArch64 binary, `gcc-aarch64-linux-gnu` must be installed. This can be done with the following commands on Ubuntu:
 
-Boogie is automatically run on the generated file, and its output displayed, when you run a file using SBT. That being said, it can be helpful to manually run boogie files. For example, to make manual edits to the generated boogie file (`boogie_out.bpl`) for debugging purposes or to run one of the sample output files. To do this run
+`sudo apt-get update`
 
-`boogie boogie.bpl`
+`sudo apt-get install gcc-aarch64-linux-gnu`
 
-where `boogie.bpl` is the name of the boogie file.
+The binary (i.e `*.out`) can then be generated from a C source file using:
 
+`aarch64-linux-gnu-gcc *.c -o *.out`
 
-### Notes about SBT
+To compile a binary from a C source and immediately generate the required .adt and .relf files, the following command can be used:
 
-The project uses the scala build tool (SBT) to build the project. For the most part this should *just work*, and there are intellij run files (located in the .run folder) which automatically compile and run the project.
-However, there are some issues when it comes to using the project in intellij. In particular, it is necassary to go into `target/scala-3.0.0/src_managed` and unmark `main` as a sources root folder. It may also be necassary
-to go into a java file and manually enabling `Highlight: All Problems` using the tick in the top right.
-Alternatively, these issues do not appear when using the metals LSP (for example when using neovim or vscode).
+`./lift.sh *.c *.adt *.relf` where `*.adt` and `*.relf` are the output file names.
 
-## Tool Overview
+To compile a C source and then run the tool on it, generating the required files first, the following command can be used:
 
-The tool consists of 3 distinct parts: the translation, static analysis and vc generation. 
+`./run_c.sh *.c [output.bpl]` where the output filename is optional (requires `sbt assembly` first)
 
-The translator takes a `State`, generated by the parser, and transforms it to fit the intermediate representation. It has a range of steps, including ...
+To generate the required files from a AArch64 binary and then run the tool on it, the following command can be used:
 
-The static analysis performs a range of different analysies. The aim of these analysies is generally to speed up the Boogie processing time by reducing the complexity of the predicates. Static analysis steps can be 
+`./run_binary.sh *.c [output.bpl]` where the output filename is optional (requires `sbt assembly` first)
 
-The VC generation is performed after the previous two steps and generates the final verification conditions (this includes relies). 
-Additional verification conditions could be added. For example, ...(TODO: double free)...
+## Running Boogie on output .bpl
 
-### Flow Graph vs State
+[Boogie](https://github.com/boogie-org/boogie#installation) can be installed by following the instructions in the given link.
 
-### Calling Convention
+Boogie can be run on the output `.bpl` file with the command `boogie *.bpl`. At present, there are no verification conditions, so this is just a syntax check.
 
-The tool tries to match the ARM calling convention, which specifies that R0-R7 are the parameter/return registers and may be modified by the calling function. As such all of these parameters are passed into and returned from each function.
+### Note about using sbt with IntelliJ
 
-The tool cannot yet handle the case where parameters are stored on the stack (e.g. if more than 8 parameters is passed). 
+The project uses sbt to build the project. For the most part this should *just work*, and there are IntelliJ run files (located in the .run folder) which automatically compile and run the project.
+However, to prevent some issues in IntelliJ, it is necessary to unmark `target/scala-3.1.0/src_managed/` as a sources root folder, in the `File > Project Structure > Modules` dialog.
 
+## Other useful commands 
+To compile a C file without the global offset table being used in address calculation, use the following command:
 
-## Producing output files
+`aarch64-linux-gnu-gcc -fno-plt -fno-pic *.c -o *.out`
 
-The program needs a `.adt` and a `.elf` file to run.
-The `.adt` file is produced by the lifter, by running `bap a.out -d adt`
-and the `.elf` file is produced by running `readelf -s -r a.out`.
+To produce assembly from the binary, use either of the following commands:
 
-The binary (i.e `a.out`) can be generated using 
-`aarch64-linux-gnu-gcc -fno-plt -fno-pic file.c`
+`aarch64-linux-gnu-objdump -d *.out`
 
+`bap *.out -d asm`
 
+To view the hex dump of the data section of the binary:
 
-## General TODOs
+`readelf -x .data *.out`
 
- - Guarantees
- - Loops
- - General lattice
- - Calling convention when the stack is used
- - Replace nulls with option where possible
- - Better handling toStrings (there is a lot of overlap between pred/exp and between toString/toBoogieString)
- - At the moment all of the call registers (i.e. R0-R7) are passed as parameters, it would probably be better to make these globals instead
+To produce a BIR (BAP Intermediate Representation) file (which contains similar information to the BAP ADT file but is more human-readable):
 
+`bap *.out -d:*.bir`
+
+To compile a C file with the stack guard turned off:
+
+`aarch64-linux-gnu-gcc -fno-stack-protector -fno-plt -fno-pic *.c -o *.out`
+
+To produce a translation to BIL (BAP Intermediate Language) for one instruction at a time:
+
+`bap objdump *.out --show-{memory,bil,insn}`
