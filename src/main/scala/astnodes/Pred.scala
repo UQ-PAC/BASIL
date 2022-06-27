@@ -1,4 +1,3 @@
-
 /*
 package astnodes
 trait Pred {
@@ -8,7 +7,7 @@ trait Pred {
 }
 
 /** Define custom methods for List[Expr]
-  */
+ */
 extension (preds: List[Pred]) {
   def conjunct: Pred = preds match {
     case pred :: Nil => pred
@@ -66,7 +65,7 @@ case class Forall(ids: String, pred: String) extends Pred {
 }
 
 /** If then else expression
-  */
+ */
 case class ITE(cond: Pred, firstPred: Pred, secondPred: Pred) extends Pred {
   //override def vars: List[Variable] = cond.vars ++ firstPred.vars ++ secondPred.vars
   override def toString = s"if ($cond) then $firstPred else $secondPred"
@@ -74,8 +73,8 @@ case class ITE(cond: Pred, firstPred: Pred, secondPred: Pred) extends Pred {
 }
 
 /**
-  *
-  */
+ *
+ */
 case class SecComp(first: Sec, second: Sec) extends Pred {
   //override def vars: List[Variable] = ???
   override def toString: String = s"($first <: $second)"
@@ -103,4 +102,4 @@ case class PredVariable(name: String) extends Pred {
   override def toString: String = name
   override def substExpr(v: Variable, w: Variable): Pred = this
 }
-*/
+ */

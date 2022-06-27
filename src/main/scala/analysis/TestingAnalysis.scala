@@ -5,8 +5,8 @@ import astnodes._
 import vcgen.State
 
 /** Dummy "testing analysis" - keeps track of all the statements that it's seen so far, as a list. Prints a line if it
-  * sees a call statement.
-  */
+ * sees a call statement.
+ */
 case class TestingAnalysis(state: Set[Statement]) extends AnalysisPoint[TestingAnalysis] {
   override def equals(other: TestingAnalysis): Boolean = {
     this.toString == other.toString
@@ -60,4 +60,4 @@ case class TestingAnalysis(state: Set[Statement]) extends AnalysisPoint[TestingA
     stmt
   }
 }
-*/
+ */

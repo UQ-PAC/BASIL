@@ -16,7 +16,7 @@ object VCGen {
   }
 
   /** Generate the verification condition for a given statement
-    */
+ */
   def genVC(stmt: Statement, fState: FunctionState, state: State): Pred = stmt match {
     case cjmpStmt: CJmpStmt => SecComp(computeGamma(cjmpStmt.getCondition, state), state.lattice.attackerLevel)
     case assign: LocalAssign => Bool.True // will need to add rely/guar later
@@ -32,14 +32,14 @@ object VCGen {
     case _ => Bool.True // TODO
   }
   /** Compute the gamma value for an expression
-   */
+ */
   def computeGamma(expr: Expr, state: State): Sec = expr.vars.map{
     case v: LocalVar => v.toGamma
     case l: MemAccess => SecBinOp("meet", l.toGamma, l.toL)
   }.join(state)
 
   /** Generate an assignment to a gamma variable for each variable update.
-   */
+ */
   def genGammaUpdate(stmt: Statement, state: State): Option[Statement] = stmt match {
     case a: AssignStatement => Some(GammaUpdate(a.lhs.toGamma, computeGamma(a.rhs, state)))
     // case assign: RegisterAssign => Some(GammaUpdate(assign.lhs.toGamma, computeGamma(assign.rhs, state)))
@@ -48,4 +48,4 @@ object VCGen {
 
   def rely: MethodCall = MethodCall("-1", "rely")
 }
-*/
+ */

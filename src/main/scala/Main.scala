@@ -1,11 +1,8 @@
 // package scala
 
-import BilParser._
 import analysis._
 import astnodes._
 import boogie._
-import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import org.antlr.v4.runtime.tree.ParseTreeWalker
 import translating._
 import util.RunUtils
 //import vcgen._

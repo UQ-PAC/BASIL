@@ -3,14 +3,14 @@ package analysis.tools
 
 import astnodes._
 /**
- * A tool for simplifying IR expressions (i.e. used by Constant Propagation after folding 
+ * A tool for simplifying IR expressions (i.e. used by Constant Propagation after folding
  * variables)
  */
 case object SimplificationUtil {
 
   /**
-    * Simplifies a concat expressions. Assumes every concat is either a pad or extend.
-    */
+ * Simplifies a concat expressions. Assumes every concat is either a pad or extend.
+ */
   def bitvecConcat(concat: Concat): Expr = concat.left match {
     case l: Literal if l.value == BigInt(0) => simplifyPad(concat)
     case _ => concat.right match {
@@ -20,8 +20,8 @@ case object SimplificationUtil {
   }
 
   /**
-    * Simplifies a concat that appends 0s to lhs of bitvector.
-    */
+ * Simplifies a concat that appends 0s to lhs of bitvector.
+ */
   private def simplifyPad(concat: Concat): Expr = {
     concat.right match {
       // Due to the nature of BIL extend & pad expressions, it is assumed the value returned from them will always be a bitvector of size 64
@@ -31,8 +31,8 @@ case object SimplificationUtil {
   }
 
   /**
-    * Simplifies a concat that appends 0s to rhs of bitvector.
-    */
+ * Simplifies a concat that appends 0s to rhs of bitvector.
+ */
   private def simplifyExtend(concat: Concat): Expr = {
     concat.left match {
       case literal: Literal =>
@@ -44,8 +44,8 @@ case object SimplificationUtil {
   }
 
   /**
-    * Simplifies an extract expression with nested match statements
-    */
+ * Simplifies an extract expression with nested match statements
+ */
   def bitvecExtract(extract: Extract): Expr = {
     extract.body match {
       case literal: Literal =>
@@ -73,8 +73,8 @@ case object SimplificationUtil {
   }
 
   /**
-    * Simplifies arithmetic expressions.
-    */
+ * Simplifies arithmetic expressions.
+ */
   def binArithmetic(binOp: BinOp): Expr = {
     val newLhs = binOp.lhs match {
       case b: BinOp => binArithmetic(b)
@@ -95,8 +95,8 @@ case object SimplificationUtil {
   }
 
   /**
-    * Helper method for binArithmetic()
-    */
+ * Helper method for binArithmetic()
+ */
 
   // TODO: take into account overflow, signed-ness, other operators
   private def performArithmetic(firstOperand: BigInt, secondOperand: BigInt, op: BinOperator): BigInt = {
@@ -114,8 +114,8 @@ case object SimplificationUtil {
   }
 
   /**
-    * Simplifies unary operations
-    */
+ * Simplifies unary operations
+ */
   def uniArithmetic(uniOp: UnOp): Expr = uniOp.exp match {
     case literal: Literal =>
       uniOp.operator match {

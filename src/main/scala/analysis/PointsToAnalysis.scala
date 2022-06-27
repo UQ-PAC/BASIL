@@ -9,7 +9,7 @@ import scala.math.signum
 
 case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends AnalysisPoint[PointsToAnalysis] {
   // i.e. map of Expr[X0] -> Expr[SP + 10]
-  // "not a pointer" value is Literal(null) 
+  // "not a pointer" value is Literal(null)
   private var currentState: Map[Expr, Set[Expr]] = pointsToGraph
 
   private var stackOffset: Int = 0
@@ -145,7 +145,7 @@ case class PointsToAnalysis(pointsToGraph: Map[Expr, Set[Expr]]) extends Analysi
       case r: LocalVar if r.name == "SP" || r.name == "FP" || r.name == "LR" => return true
       case _ =>
     }
-  
+
     false
   }
 
@@ -210,5 +210,5 @@ class ReturnFramePointer(val functionName: String, val offset: Long) extends Lit
   // Represents this function's FP.
   // On return (call to true LR), the analysis checks that the FP points to this value.
 }
-*/
-*/
+ */
+ */

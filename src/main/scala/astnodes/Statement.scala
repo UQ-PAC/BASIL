@@ -15,7 +15,7 @@ trait Statement {
   } else {
     ""
   }
-  */
+   */
 
   //def withVisibleLabel: Stmt
 }
@@ -30,7 +30,7 @@ case class DirectCall(target: String, condition: Expr, returnTarget: Option[Stri
     }
   }
   def noCondition: String = "call " + target + "(); // with return " + returnTarget.getOrElse("none")
-  */
+   */
 
   override def calls: Set[String] = Set(target)
   override def locals: Set[LocalVar] = condition.locals
@@ -46,8 +46,8 @@ case class IndirectCall(target: LocalVar, condition: Expr, returnTarget: Option[
     }
   }
   def noCondition: String = "call " + target.toBoogieString + "; // with return " + returnTarget.getOrElse("none")
-  */
-  
+   */
+
   override def locals: Set[LocalVar] = condition.locals + target
 }
 
@@ -61,7 +61,7 @@ case class GoTo(target: String, condition: Expr) extends Statement {
     }
   }
   def noCondition: String = "goto " + target + ";"
-  */
+   */
 
   override def locals: Set[LocalVar] = condition.locals
 }
@@ -71,7 +71,7 @@ case object Skip extends Statement {
   //override def subst(v: Variable, w: Variable): Stmt = this
 
   //override def withVisibleLabel: Stmt = copy(labelVisible = true)
-  
+
 }
 
 trait Assign(lhs: Variable, rhs: Expr) extends Statement {
@@ -82,7 +82,7 @@ trait Assign(lhs: Variable, rhs: Expr) extends Statement {
     case lhsRes: MemLoad => MemAssign(pc, lhsRes, rhs.subst(v,w))
     case lhsRes: Register => RegisterAssign(pc, lhsRes, rhs = rhs.subst(v,w))
   }
-  */
+   */
 
   // this would be nicer to have per type instead
   /*
@@ -99,7 +99,7 @@ trait Assign(lhs: Variable, rhs: Expr) extends Statement {
       case _ => this
     }
   }
-  */
+   */
 }
 
 /*
@@ -113,7 +113,7 @@ case class GammaUpdate (lhs: SecVar | SecMemLoad, sec: Sec) extends Statement {
   // TODO
   //override def subst(v: Variable, w: Variable): Stmt = this
 }
-*/
+ */
 
 /** Memory store
   */
@@ -128,7 +128,7 @@ case class MemAssign(lhs: MemAccess, rhs: Expr) extends Assign(lhs, rhs) {
       s"heap[${lhs.index.toBoogieString} + $n] := ${Extract(8 * (n + 1) - 1, 8 * n, rhs).toBoogieString}"
     }).mkString("; ") + s";"
   }
-  */
+   */
 
   override def modifies: Set[Memory] = Set(lhs.memory)
 
@@ -145,7 +145,6 @@ case class LocalAssign(lhs: LocalVar, rhs: Expr) extends Assign(lhs, rhs) {
   def isStackPointer: Boolean = this.isRegister && lhs.name.substring(1).equals("31")
   def isFramePointer: Boolean = this.isRegister && lhs.name.substring(1).equals("29")
   def isLinkRegister: Boolean = this.isRegister && lhs.name.substring(1).equals("30")
-  */
+   */
   override def locals: Set[LocalVar] = rhs.locals + lhs
 }
-

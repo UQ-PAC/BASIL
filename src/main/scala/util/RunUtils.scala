@@ -1,9 +1,8 @@
 package util
-
-import BilParser._
 //import analysis._
 import astnodes._
 import boogie._
+import BilParser._
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
@@ -33,7 +32,6 @@ object RunUtils {
 
     //println(externalFunctions)
     //println(globals)
-
 
     /*
     TODO analyses/transformations
@@ -65,8 +63,8 @@ object RunUtils {
   }
 }
 
-class AnalysisTypeException(message: String) extends
-  Exception("Tried to operate on two analyses of different types: " + message) {
+class AnalysisTypeException(message: String)
+    extends Exception("Tried to operate on two analyses of different types: " + message) {
 
   def this(message: String, cause: Throwable) = {
     this(message)
@@ -74,8 +72,7 @@ class AnalysisTypeException(message: String) extends
   }
 }
 
-class AssumptionViolationException(message: String) extends
-  Exception("Assumption Violation: " + message) {
+class AssumptionViolationException(message: String) extends Exception("Assumption Violation: " + message) {
 
   def this(message: String, cause: Throwable) = {
     this(message)
@@ -83,8 +80,8 @@ class AssumptionViolationException(message: String) extends
   }
 }
 
-class LatticeViolationException(message: String) extends
-  Exception("A lattice transfer function broke monotonicity: " + message) {
+class LatticeViolationException(message: String)
+    extends Exception("A lattice transfer function broke monotonicity: " + message) {
 
   def this(message: String, cause: Throwable) = {
     this(message)
@@ -92,8 +89,8 @@ class LatticeViolationException(message: String) extends
   }
 }
 
-class SegmentationViolationException(message: String) extends
-  Exception("The code attempts to dereference a pointer we don't know about: " + message) {
+class SegmentationViolationException(message: String)
+    extends Exception("The code attempts to dereference a pointer we don't know about: " + message) {
 
   def this(message: String, cause: Throwable) = {
     this(message)

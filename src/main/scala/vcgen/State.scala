@@ -45,7 +45,7 @@ case class State(
 
   private def relyStr = "procedure rely(); modifies " + "heap, Gamma_heap" + ";\n ensures " + getCompleteRely.mkString(";\n ensures ") + ";"
 
-  override def toString: String = 
+  override def toString: String =
     generateBVToBoolHeader + generateLibraryFuncHeader(lattice)
   + generateBVHeader(1) + generateBVHeader(32) + generateBVHeader(64)
   + lattice.toString + generateSecurityLatticeFuncHeader
@@ -135,7 +135,7 @@ case class FunctionState(blocks: List[Block],
     })
     None
   }
-  */
+ */
 }
 
 case object FunctionState {
@@ -148,7 +148,7 @@ case object FunctionState {
       case call: CallStmt => call.returnTarget.toSet
       case _: ExitSub => Set()
     })).toMap
-    */
+ */
 
     FunctionState(function.blocks, function.initStmts, function.header, function.header.funcName)
   }
@@ -182,6 +182,6 @@ case class Block(label: String,
       case index => copy(lines = lines.updated(index, newStmt))
     }
   }
-  */
+ */
 }
-*/
+ */

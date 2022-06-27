@@ -1,8 +1,8 @@
 package astnodes
 
 //import analysis.tools.SimplificationUtil
-import util.AssumptionViolationException
 import boogie._
+import util.AssumptionViolationException
 
 /** Expression
   */
@@ -25,8 +25,7 @@ trait Expr {
   def locals: Set[LocalVar]
 }
 
-/**
-  *  Concatenation of two bitvectors
+/** Concatenation of two bitvectors
   */
 case class Concat(left: Expr, right: Expr) extends Expr {
   override def toBoogie: BinaryBExpr = BinaryBExpr(BVCONCAT, left.toBoogie, right.toBoogie)
@@ -35,18 +34,17 @@ case class Concat(left: Expr, right: Expr) extends Expr {
 
   override def locals: Set[LocalVar] = left.locals ++ right.locals
   override def subst(v: Variable, w: Variable): Expr = {
-    copy(left = left.subst(v,w), right = right.subst(v,w))
+    copy(left = left.subst(v, w), right = right.subst(v, w))
   }
 
   /*
   override def simplify(old: Expr, sub: Expr): Expr = {
     SimplificationUtil.bitvecConcat(copy(left = left.simplify(old,sub), right = right.simplify(old,sub)))
   }
-  */
+   */
 }
 
-/**
-  * Signed extend - extend in BIL
+/** Signed extend - extend in BIL
   */
 
 case class SignedExtend(width: Int, body: Expr) extends Expr {
@@ -67,8 +65,7 @@ case class SignedExtend(width: Int, body: Expr) extends Expr {
   }
 }
 
-/**
-  * Unsigned extend - pad in BIL
+/** Unsigned extend - pad in BIL
   */
 
 case class UnsignedExtend(width: Int, body: Expr) extends Expr {
@@ -100,7 +97,7 @@ case class Extract(high: Int, low: Int, body: Expr) extends Expr {
   /*
   override def simplify(old: Expr, sub: Expr): Expr =
     SimplificationUtil.bitvecExtract(copy(body = body.simplify(old, sub)))
-  */
+   */
   // + 1 as extracts are inclusive (e.g. [31:0] has 32 bits)
   override def size: Int = high - low + 1
 
@@ -108,7 +105,7 @@ case class Extract(high: Int, low: Int, body: Expr) extends Expr {
     val boogieBody = body.toBoogie
     boogieBody match {
       case extract: BVExtract => BVExtract(high + 1 + extract.start, low + extract.start, extract.body)
-      case _ => BVExtract(high + 1, low, body.toBoogie)
+      case _                  => BVExtract(high + 1, low, body.toBoogie)
     }
   }
 }
@@ -124,6 +121,7 @@ case object LowCast {
 /** Literal expression (e.g. 4, 5, 10)
   */
 case class Literal(value: BigInt, size: Int) extends Expr {
+
   /** Value of literal */
   override def toString: String = s"${value}bv$size"
 
@@ -167,7 +165,7 @@ object UnOperator {
   */
 case class BinOp(operator: BinOperator, lhs: Expr, rhs: Expr) extends Expr {
   override def subst(v: Variable, w: Variable): Expr = {
-    copy(lhs = lhs.subst(v,w), rhs = rhs.subst(v, w))
+    copy(lhs = lhs.subst(v, w), rhs = rhs.subst(v, w))
   }
 
   /* override def simplify(old: Expr, sub: Expr): Expr = {
@@ -178,14 +176,14 @@ case class BinOp(operator: BinOperator, lhs: Expr, rhs: Expr) extends Expr {
 
   override def size: Int = operator match {
     case EQ | NEQ | LT | LE | SLT | SLE => 1
-    case _ => lhs.size
+    case _                              => lhs.size
   }
 
   override def toBoogie: BExpr = operator match {
-    case PLUS => BinaryBExpr(BVADD, lhs.toBoogie, rhs.toBoogie)
-    case MINUS => BinaryBExpr(BVSUB, lhs.toBoogie, rhs.toBoogie)
-    case TIMES => BinaryBExpr(BVMUL, lhs.toBoogie, rhs.toBoogie)
-    case DIVIDE => BinaryBExpr(BVUDIV, lhs.toBoogie, rhs.toBoogie)
+    case PLUS    => BinaryBExpr(BVADD, lhs.toBoogie, rhs.toBoogie)
+    case MINUS   => BinaryBExpr(BVSUB, lhs.toBoogie, rhs.toBoogie)
+    case TIMES   => BinaryBExpr(BVMUL, lhs.toBoogie, rhs.toBoogie)
+    case DIVIDE  => BinaryBExpr(BVUDIV, lhs.toBoogie, rhs.toBoogie)
     case SDIVIDE => BinaryBExpr(BVUDIV, lhs.toBoogie, rhs.toBoogie)
     // counterintuitive but correct according to BAP source
     case MOD => BinaryBExpr(BVSREM, lhs.toBoogie, rhs.toBoogie)
@@ -210,12 +208,12 @@ case class BinOp(operator: BinOperator, lhs: Expr, rhs: Expr) extends Expr {
         BinaryBExpr(BVASHR, lhs.toBoogie, BVZeroExtend(lhs.size - rhs.size, rhs.toBoogie))
       }
     case AND => BinaryBExpr(BVAND, lhs.toBoogie, rhs.toBoogie)
-    case OR => BinaryBExpr(BVOR, lhs.toBoogie, rhs.toBoogie)
+    case OR  => BinaryBExpr(BVOR, lhs.toBoogie, rhs.toBoogie)
     case XOR => BinaryBExpr(BVXOR, lhs.toBoogie, rhs.toBoogie)
-    case EQ => BinaryBExpr(BVCOMP, lhs.toBoogie, rhs.toBoogie)
+    case EQ  => BinaryBExpr(BVCOMP, lhs.toBoogie, rhs.toBoogie)
     case NEQ => UnaryBExpr(BVNOT, BinaryBExpr(BVCOMP, lhs.toBoogie, rhs.toBoogie))
-    case LT => BinaryBExpr(BVULT, lhs.toBoogie, rhs.toBoogie)
-    case LE => BinaryBExpr(BVULE, lhs.toBoogie, rhs.toBoogie)
+    case LT  => BinaryBExpr(BVULT, lhs.toBoogie, rhs.toBoogie)
+    case LE  => BinaryBExpr(BVULE, lhs.toBoogie, rhs.toBoogie)
     case SLT => BinaryBExpr(BVSLT, lhs.toBoogie, rhs.toBoogie)
     case SLE => BinaryBExpr(BVSLE, lhs.toBoogie, rhs.toBoogie)
   }
@@ -227,25 +225,25 @@ sealed trait BinOperator(op: String) {
 
 object BinOperator {
   def apply(op: String): BinOperator = op match {
-    case "PLUS" => PLUS
-    case "MINUS" => MINUS
-    case "TIMES" => TIMES
-    case "DIVIDE" => DIVIDE
+    case "PLUS"    => PLUS
+    case "MINUS"   => MINUS
+    case "TIMES"   => TIMES
+    case "DIVIDE"  => DIVIDE
     case "SDIVIDE" => SDIVIDE
-    case "MOD" => MOD
-    case "SMOD" => SMOD
-    case "LSHIFT" => LSHIFT
-    case "RSHIFT" => RSHIFT
+    case "MOD"     => MOD
+    case "SMOD"    => SMOD
+    case "LSHIFT"  => LSHIFT
+    case "RSHIFT"  => RSHIFT
     case "ARSHIFT" => ARSHIFT
-    case "AND" => AND
-    case "OR" => OR
-    case "XOR" => XOR
-    case "EQ" => EQ
-    case "NEQ" => NEQ
-    case "LT" => LT
-    case "LE" => LE
-    case "SLT" => SLT
-    case "SLE" => SLE
+    case "AND"     => AND
+    case "OR"      => OR
+    case "XOR"     => XOR
+    case "EQ"      => EQ
+    case "NEQ"     => NEQ
+    case "LT"      => LT
+    case "LE"      => LE
+    case "SLT"     => SLT
+    case "SLE"     => SLE
   }
 }
 
@@ -271,7 +269,7 @@ case object SLE extends BinOperator("SLE")
 
 /** Variable
   *
-  *  Variables can be registers (e.g. R1, SP, #31) or loads from memory (e.g. mem[10])
+  * Variables can be registers (e.g. R1, SP, #31) or loads from memory (e.g. mem[10])
   */
 trait Variable extends Expr {
   override def subst(v: Variable, w: Variable): Variable = if (v == this) w else this
@@ -300,7 +298,7 @@ case class MemAccess(memory: Memory, index: Expr, endian: Endian, override val s
     else if (onStack && old == this) sub
     else this
   }
-  */
+   */
 
   //def toL: SecMemLoad = SecMemLoad(false, true, index)
   //override def toGamma: SecMemLoad = SecMemLoad(true, false, index)
@@ -316,14 +314,14 @@ case class MemAccess(memory: Memory, index: Expr, endian: Endian, override val s
       }
     }
     endian match {
-      case Endian.BigEndian => accesses.reverse
+      case Endian.BigEndian    => accesses.reverse
       case Endian.LittleEndian => accesses
     }
   }
 
   override def toBoogie: BExpr = {
-    boogieAccesses.tail.foldLeft(boogieAccesses.head) {
-      (concat: BExpr, next: MapAccess) => BinaryBExpr(BVCONCAT, next, concat)
+    boogieAccesses.tail.foldLeft(boogieAccesses.head) { (concat: BExpr, next: MapAccess) =>
+      BinaryBExpr(BVCONCAT, next, concat)
     }
   }
 }
@@ -338,7 +336,6 @@ object MemAccess {
     }
   }
 }
-
 
 case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr {
   override def size: Int = valueSize

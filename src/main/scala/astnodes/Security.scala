@@ -18,4 +18,4 @@ sealed trait Security extends Ordered[Security] {
 case object High extends Security
 
 case object Low extends Security
-*/
+ */

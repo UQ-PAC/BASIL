@@ -14,9 +14,9 @@ case class ConstantPropagationAnalysis(state: State,
   extends AnalysisPoint[ConstantPropagationAnalysis] {
 
   /**
-    * Performs a transfer on the entry analysis point state and returns the exit state.
-    *
-    */
+ * Performs a transfer on the entry analysis point state and returns the exit state.
+ *
+ */
   override def transfer(stmt: Statement): ConstantPropagationAnalysis = stmt match {
       case assign: AssignStatement =>
         val funcName = state.findStatementFunction(stmt).name
@@ -60,15 +60,15 @@ case class ConstantPropagationAnalysis(state: State,
     }
 
   /**
-   * Returns 1 if the analysis point is higher up in the lattice than other, -1 if it is lower and 0 if they are at the
-   * same level.
-   */
+ * Returns 1 if the analysis point is higher up in the lattice than other, -1 if it is lower and 0 if they are at the
+ * same level.
+ */
   override def compare(other: ConstantPropagationAnalysis): Int = (this.countEdges - other.countEdges).sign
 
   /**
-   * Returns the number of edges that the analysis point contains.
-   *
-   */
+ * Returns the number of edges that the analysis point contains.
+ *
+ */
   private def countEdges: Int = {
     var count: Int = 0
 
@@ -85,15 +85,15 @@ case class ConstantPropagationAnalysis(state: State,
   }
 
   /**
-   * Creates an analysis point at the bottom of the lattice.
-   *
-   */
+ * Creates an analysis point at the bottom of the lattice.
+ *
+ */
   override def createLowest: ConstantPropagationAnalysis = ConstantPropagationAnalysis(state, simplification)
 
   /**
-   * Determines whether two ConstantPropagation analysis points are equal.
-   *
-   */
+ * Determines whether two ConstantPropagation analysis points are equal.
+ *
+ */
   override def equals(other: ConstantPropagationAnalysis): Boolean = {
     // need to include state, simplification here ???
     if (other.localState == this.localState && other.globalState == this.globalState) {
@@ -142,20 +142,20 @@ case class ConstantPropagationAnalysis(state: State,
     }
 
     true
-    */
+ */
   }
 
   /**
-   * Constant propagation is a must-analysis, meaning that to derive the entry state of a block a meet operation must
-   * be performed on the block parents.
-   *
-   */
+ * Constant propagation is a must-analysis, meaning that to derive the entry state of a block a meet operation must
+ * be performed on the block parents.
+ *
+ */
   override def combine(other: ConstantPropagationAnalysis): ConstantPropagationAnalysis = meet(other)
 
   /**
-    * Performs a join on two ConstantPropagation analysis points and returns a new ConstantPropagation analysis point.
-    *
-    */
+ * Performs a join on two ConstantPropagation analysis points and returns a new ConstantPropagation analysis point.
+ *
+ */
   override def join(other: ConstantPropagationAnalysis): ConstantPropagationAnalysis = {
     if (state != other.state) {
       throw new Exception("trying to join unrelated analyses")
@@ -192,9 +192,9 @@ case class ConstantPropagationAnalysis(state: State,
   }
 
   /**
-    * Performs a meet on two ConstantPropagation analysis points and returns a new ConstantPropagation analysis point.
-    *
-    */
+ * Performs a meet on two ConstantPropagation analysis points and returns a new ConstantPropagation analysis point.
+ *
+ */
   override def meet(other: ConstantPropagationAnalysis): ConstantPropagationAnalysis = {
     val localStateOut = ((localState.keySet intersect other.localState.keySet) map {
       function => function -> ((localState(function).keySet intersect other.localState(function).keySet) collect {
@@ -214,7 +214,7 @@ case class ConstantPropagationAnalysis(state: State,
     println(localState)
     println(globalState)
   }
-  
+
   override def applyChange(stmt: Statement): Statement = {
     // this is still bad but should replace it with propagating through later
     val func = state.findStatementFunction(stmt)

@@ -1,8 +1,8 @@
 package translating
 
-import scala.jdk.CollectionConverters.*
-import BilParser.SymsParser._
 import astnodes._
+import BilParser.SymsParser._
+import scala.jdk.CollectionConverters._
 
 object ElfLoader {
   def visitSyms(ctx: SymsContext): (Set[ExternalFunction], Set[GlobalVariable]) = {

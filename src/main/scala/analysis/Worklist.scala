@@ -74,7 +74,7 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
             combinedParentAnalysisPoints = blockAnalysisInfo.getOrElse(block, analysis.createLowest)
           }
         })
-        */
+ */
 
         previousStmtAnalysisState = previousStmtAnalysisState.join(combinedParentAnalysisPoints.get)
       } else {
@@ -124,7 +124,7 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
     } else {
       ;
     }
-    */
+ */
     outputInfo
   }
 
@@ -156,14 +156,14 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
   }
 
   /**
-   * The process for these two is similar:
+ * The process for these two is similar:
 
-   * Find the FunctionState that the block belongs to
-   * Get the labels of its children/parents from that FunctionState
-   * Map those labels to blocks, by:
-   *  Finding the FunctionState that the label belongs to
-   *  Getting the Block from that FunctionState
-   */
+ * Find the FunctionState that the block belongs to
+ * Get the labels of its children/parents from that FunctionState
+ * Map those labels to blocks, by:
+ *  Finding the FunctionState that the label belongs to
+ *  Getting the Block from that FunctionState
+ */
 
   def getBlockParents(block: Block): Set[Block] = {
     val function = startState.functions.find { _.blocks.contains(block) }.get
@@ -172,8 +172,8 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
   }
 
   /**
-   * Finds the root block of a function given the function's name.
-   */
+ * Finds the root block of a function given the function's name.
+ */
   def findFunctionRootBlock(funcName: String): Block = {
       startState.functions.find((func: FunctionState) => {
         func.name == funcName
@@ -181,8 +181,8 @@ class Worklist[T <: AnalysisPoint[T]](val analysis: T, startState: State) {
   }
 
   /**
-   * "Commits" the info from the current function to the output map.
-   */
+ * "Commits" the info from the current function to the output map.
+ */
   def saveNewAnalysisInfo(newInfo: Map[Statement, T]): Unit = {
     for ((key, value) <- newInfo) {
       stmtAnalysisInfo = stmtAnalysisInfo + (key -> value)

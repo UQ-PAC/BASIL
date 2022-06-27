@@ -61,7 +61,7 @@ case class ProcedureCall(name: String, lhss: List[BVar], params: List[BExpr]) ex
   override def modifies: Set[BVar] = lhss.collect { case l if l.scope == Scope.Global => l }.toSet
   override def bvFunctions: Set[BFunction] = params.flatMap(p => p.bvFunctions).toSet
   override def locals: Set[BVar] = params.flatMap(p => p.locals).toSet
-  override def globals: Set[BVar] =  params.flatMap(p => p.globals).toSet
+  override def globals: Set[BVar] = params.flatMap(p => p.globals).toSet
 
   override def replaceReserved(reserved: Set[String]): ProcedureCall = {
     val nameUpdate = if (reserved.contains(name)) {

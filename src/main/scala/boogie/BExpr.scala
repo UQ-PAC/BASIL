@@ -41,7 +41,7 @@ case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
 
   private def bodySize: Int = body.getType match {
     case bv: BitVec => bv.size
-    case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of extract: " + this)
+    case _          => throw new Exception("type mismatch, non bv expression: " + body + " in body of extract: " + this)
   }
   private def fnName: String = s"repeat${repeats}_$bodySize"
 
@@ -107,11 +107,11 @@ trait BVar(val name: String, val bType: BType, val scope: Scope) extends BExpr {
     s"$name: $bType"
   }
   override def locals: Set[BVar] = scope match {
-    case Scope.Local => Set(this)
+    case Scope.Local  => Set(this)
     case Scope.Global => Set()
   }
   override def globals: Set[BVar] = scope match {
-    case Scope.Local => Set()
+    case Scope.Local  => Set()
     case Scope.Global => Set(this)
   }
   override def replaceReserved(reserved: Set[String]): BVar
@@ -139,7 +139,8 @@ enum Scope {
   case Global
 }
 
-case class BVariable(override val name: String, override val bType: BType, override val scope: Scope) extends BVar(name, bType, scope) {
+case class BVariable(override val name: String, override val bType: BType, override val scope: Scope)
+    extends BVar(name, bType, scope) {
   override def replaceReserved(reserved: Set[String]): BVariable = {
     val nameUpdate = if (reserved.contains(name)) {
       '#' + name
@@ -188,12 +189,12 @@ case class UnaryBExpr(op: BUnOp, arg: BExpr) extends BExpr {
 
   private def inSize = arg.getType match {
     case bv: BitVec => bv.size
-    case _ => throw new Exception("type mismatch")
+    case _          => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
     case uOp: BoolUnOp => s"$uOp$arg"
-    case uOp: BVUnOp => s"bv$uOp$inSize($arg)"
+    case uOp: BVUnOp   => s"bv$uOp$inSize($arg)"
   }
 
   override def bvFunctions: Set[BFunction] = {
@@ -230,38 +231,40 @@ case object BVNEG extends BVUnOp("neg")
 case class BinaryBExpr(op: BBinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
   override def getType: BType = (op, arg1.getType, arg2.getType) match {
     case (_: BoolBinOp, BoolType, BoolType) => BoolType
-    case (binOp: BVBinOp, bv1: BitVec, bv2: BitVec) => binOp match {
-      case BVCONCAT =>
-        BitVec(bv1.size + bv2.size)
-      case BVAND | BVOR | BVADD | BVMUL | BVUDIV | BVUREM | BVSHL | BVLSHR | BVNAND | BVNOR | BVXOR | BVXNOR | BVSUB | BVSREM | BVSDIV | BVSMOD | BVASHR =>
-        if (bv1.size == bv2.size) {
-          bv1
-        } else {
-          throw new Exception("bitvector size mismatch")
-        }
-      case BVCOMP =>
-        if (bv1.size == bv2.size) {
-          BitVec(1)
-        } else {
-          BitVec(1)
-          //throw new Exception("bitvector size mismatch") TODO
-        }
-      case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
-        if (bv1.size == bv2.size) {
+    case (binOp: BVBinOp, bv1: BitVec, bv2: BitVec) =>
+      binOp match {
+        case BVCONCAT =>
+          BitVec(bv1.size + bv2.size)
+        case BVAND | BVOR | BVADD | BVMUL | BVUDIV | BVUREM | BVSHL | BVLSHR | BVNAND | BVNOR | BVXOR | BVXNOR | BVSUB |
+            BVSREM | BVSDIV | BVSMOD | BVASHR =>
+          if (bv1.size == bv2.size) {
+            bv1
+          } else {
+            throw new Exception("bitvector size mismatch")
+          }
+        case BVCOMP =>
+          if (bv1.size == bv2.size) {
+            BitVec(1)
+          } else {
+            BitVec(1)
+            //throw new Exception("bitvector size mismatch") TODO
+          }
+        case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
+          if (bv1.size == bv2.size) {
+            BoolType
+          } else {
+            throw new Exception("bitvector size mismatch")
+          }
+        case BVEQ | BVNEQ =>
           BoolType
-        } else {
-          throw new Exception("bitvector size mismatch")
-        }
-      case BVEQ | BVNEQ =>
-        BoolType
-    }
+      }
     case _ =>
       throw new Exception("type mismatch, operator " + op + " type doesn't match args: (" + arg1 + ", " + arg2 + ")")
   }
 
   private def inSize = arg1.getType match {
     case bv: BitVec => bv.size
-    case _ => throw new Exception("type mismatch")
+    case _          => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
@@ -277,11 +280,20 @@ case class BinaryBExpr(op: BBinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
 
   override def bvFunctions: Set[BFunction] = {
     val thisFn = op match {
-      case b: BVBinOp => b match {
-        case BVEQ | BVNEQ | BVCONCAT => Set()
-        case _ =>
-          Set(BFunction(s"bv$b$inSize", s"bv$b", List(BParam(arg1.getType), BParam(arg2.getType)), BParam(getType), None))
-      }
+      case b: BVBinOp =>
+        b match {
+          case BVEQ | BVNEQ | BVCONCAT => Set()
+          case _ =>
+            Set(
+              BFunction(
+                s"bv$b$inSize",
+                s"bv$b",
+                List(BParam(arg1.getType), BParam(arg2.getType)),
+                BParam(getType),
+                None
+              )
+            )
+        }
       case _ => Set()
     }
     arg1.bvFunctions ++ arg2.bvFunctions ++ thisFn
@@ -356,7 +368,11 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def locals: Set[BVar] = guard.locals ++ thenExpr.locals ++ elseExpr.locals
   override def globals: Set[BVar] = guard.globals ++ thenExpr.globals ++ elseExpr.globals
   override def replaceReserved(reserved: Set[String]): IfThenElse = {
-    copy(guard = guard.replaceReserved(reserved), thenExpr = thenExpr.replaceReserved(reserved), elseExpr = elseExpr.replaceReserved(reserved))
+    copy(
+      guard = guard.replaceReserved(reserved),
+      thenExpr = thenExpr.replaceReserved(reserved),
+      elseExpr = elseExpr.replaceReserved(reserved)
+    )
   }
 }
 
@@ -408,5 +424,6 @@ case class MapAccess(mapVar: MapVar, index: BExpr) extends BExpr {
   override def bvFunctions: Set[BFunction] = index.bvFunctions
   override def locals: Set[BVar] = index.locals
   override def globals: Set[BVar] = index.globals ++ mapVar.globals
-  override def replaceReserved(reserved: Set[String]): MapAccess = copy(mapVar = mapVar.replaceReserved(reserved), index = index.replaceReserved(reserved))
+  override def replaceReserved(reserved: Set[String]): MapAccess =
+    copy(mapVar = mapVar.replaceReserved(reserved), index = index.replaceReserved(reserved))
 }

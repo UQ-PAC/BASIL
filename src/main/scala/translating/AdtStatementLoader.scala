@@ -1,11 +1,11 @@
 package translating
 
-import astnodes.*
-
-import scala.jdk.CollectionConverters.*
-import util.AssumptionViolationException
 import BilParser.BilAdtParser._
+import astnodes._
+import util.AssumptionViolationException
+
 import scala.annotation.tailrec
+import scala.jdk.CollectionConverters._
 
 object AdtStatementLoader {
 
@@ -18,14 +18,14 @@ object AdtStatementLoader {
 
   @tailrec
   def visitExp(ctx: ExpContext): Expr = ctx match {
-    case e: ExpParenContext => visitExp(e.exp)
-    case e: LoadContext => visitLoad(e)
-    case e: BinOpContext => visitBinOp(e)
-    case e: UOpContext => visitUOp(e)
+    case e: ExpParenContext  => visitExp(e.exp)
+    case e: LoadContext      => visitLoad(e)
+    case e: BinOpContext     => visitBinOp(e)
+    case e: UOpContext       => visitUOp(e)
     case e: ExpImmVarContext => visitImmVar(e.immVar)
-    case e: ExpIntContext => visitExpInt(e)
-    case e: CastContext => visitCast(e)
-    case e: ExtractContext => visitExtract(e)
+    case e: ExpIntContext    => visitExpInt(e)
+    case e: CastContext      => visitCast(e)
+    case e: ExtractContext   => visitExtract(e)
   }
 
   def visitLoad(ctx: LoadContext): MemAccess = {
@@ -57,10 +57,10 @@ object AdtStatementLoader {
   }
 
   def visitCast(ctx: CastContext): Expr = ctx.CAST.getText match {
-    case "UNSIGNED"     => UnsignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
-    case "SIGNED"       => SignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
-    case "LOW"          => LowCast(parseInt(ctx.size), visitExp(ctx.exp))
-    case "HIGH"         => HighCast(parseInt(ctx.size), visitExp(ctx.exp))
+    case "UNSIGNED" => UnsignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
+    case "SIGNED"   => SignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
+    case "LOW"      => LowCast(parseInt(ctx.size), visitExp(ctx.exp))
+    case "HIGH"     => HighCast(parseInt(ctx.size), visitExp(ctx.exp))
   }
 
   def visitExtract(ctx: ExtractContext): Extract = {
@@ -69,14 +69,14 @@ object AdtStatementLoader {
 
   def visitJmp(ctx: JmpContext): (String, Statement) = ctx match {
     case i: IndirectCallContext => visitIndirectCall(i)
-    case d: DirectCallContext => visitDirectCall(d)
-    case g: GotoJmpContext => visitGotoJmp(g)
+    case d: DirectCallContext   => visitDirectCall(d)
+    case g: GotoJmpContext      => visitGotoJmp(g)
   }
 
   def visitIndirectCall(ctx: IndirectCallContext): (String, IndirectCall) = {
     val returnTarget = Option(ctx.returnTarget) match {
       case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
-      case None => None
+      case None                   => None
     }
     val jump = IndirectCall(visitImmVar(ctx.callee.immVar), visitExp(ctx.cond), returnTarget)
     (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), jump)
@@ -85,7 +85,7 @@ object AdtStatementLoader {
   def visitDirectCall(ctx: DirectCallContext): (String, DirectCall) = {
     val returnTarget = Option(ctx.returnTarget) match {
       case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
-      case None => None
+      case None                   => None
     }
     val jump = DirectCall(visitQuoteString(ctx.callee.tid.name).stripPrefix("@"), visitExp(ctx.cond), returnTarget)
     (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), jump)
@@ -101,36 +101,46 @@ object AdtStatementLoader {
       val lhs = visitImmVar(arg.lhs)
       val register = visitImmVar(arg.rhs)
       arg.intent.getText match {
-        case "In()" => Some(Parameter(lhs.name, lhs.size, register))
+        case "In()"   => Some(Parameter(lhs.name, lhs.size, register))
         case "Both()" => Some(Parameter(lhs.name, lhs.size, register))
-        case _ => None
+        case _        => None
       }
     }
 
-    val alwaysIn = List(Parameter("FP", 64, LocalVar("R29", 64)),
+    val alwaysIn = List(
+      Parameter("FP", 64, LocalVar("R29", 64)),
       Parameter("LR", 64, LocalVar("R30", 64)),
-      Parameter("SP", 64, LocalVar("R31", 64)))
+      Parameter("SP", 64, LocalVar("R31", 64))
+    )
 
     val out = ctx.args.arg.asScala.flatMap { arg =>
       val lhs = visitImmVar(arg.lhs)
       val register = visitImmVar(arg.rhs)
       arg.intent.getText match {
-        case "Out()" => Some(Parameter(lhs.name, lhs.size, register))
+        case "Out()"  => Some(Parameter(lhs.name, lhs.size, register))
         case "Both()" => Some(Parameter(lhs.name + "_out", lhs.size, register))
-        case _ => None
+        case _        => None
       }
     }
 
-    val alwaysOut = List(Parameter("FP_out", 64, LocalVar("R29", 64)),
+    val alwaysOut = List(
+      Parameter("FP_out", 64, LocalVar("R29", 64)),
       Parameter("LR_out", 64, LocalVar("R30", 64)),
-      Parameter("SP_out", 64, LocalVar("R31", 64)))
+      Parameter("SP_out", 64, LocalVar("R31", 64))
+    )
 
     val address = parseFromAttrs(ctx.attrs, "address") match {
       case Some(x: String) => Integer.parseInt(x.stripPrefix("0x"), 16)
-      case None => -1
+      case None            => -1
     }
 
-    FunctionNode(visitQuoteString(ctx.name), address, ctx.blks.blk.asScala.map(visitBlk).toList, in.toList ++ alwaysIn, out.toList ++ alwaysOut)
+    FunctionNode(
+      visitQuoteString(ctx.name),
+      address,
+      ctx.blks.blk.asScala.map(visitBlk).toList,
+      in.toList ++ alwaysIn,
+      out.toList ++ alwaysOut
+    )
   }
 
   def visitBlk(ctx: BlkContext): Block = {
@@ -138,11 +148,10 @@ object AdtStatementLoader {
       ctx.jmps.jmp.asScala.map(visitJmp).toVector
 
     // group by instruction
-    val instructions = statements.foldLeft(Vector[Instruction]()) {
-      (insns, kv) =>
-        val instruction = kv._1
-        val statement = kv._2
-        insns.lastOption match {
+    val instructions = statements.foldLeft(Vector[Instruction]()) { (insns, kv) =>
+      val instruction = kv._1
+      val statement = kv._2
+      insns.lastOption match {
         case Some(i) =>
           if (i.asm == instruction) {
             insns.dropRight(1) :+ i.copy(statements = i.statements :+ statement)
@@ -156,7 +165,7 @@ object AdtStatementLoader {
     val label = parseLabel(ctx.tid.name)
     val address = parseFromAttrs(ctx.attrs, "address") match {
       case Some(x: String) => Some(Integer.parseInt(x.stripPrefix("0x"), 16))
-      case None => None
+      case None            => None
     }
 
     Block(label, address, instructions.toList)
@@ -164,7 +173,7 @@ object AdtStatementLoader {
 
   def visitEndian(ctx: EndianContext): Endian = ctx.ENDIAN.getText match {
     case "LittleEndian" => Endian.LittleEndian
-    case "BigEndian" => Endian.BigEndian
+    case "BigEndian"    => Endian.BigEndian
   }
 
   def visitAssign(ctx: AssignContext): (String, Statement) = ctx match {
