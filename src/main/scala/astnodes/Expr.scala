@@ -184,7 +184,7 @@ case class BinOp(operator: BinOperator, lhs: Expr, rhs: Expr) extends Expr {
     case MINUS   => BinaryBExpr(BVSUB, lhs.toBoogie, rhs.toBoogie)
     case TIMES   => BinaryBExpr(BVMUL, lhs.toBoogie, rhs.toBoogie)
     case DIVIDE  => BinaryBExpr(BVUDIV, lhs.toBoogie, rhs.toBoogie)
-    case SDIVIDE => BinaryBExpr(BVUDIV, lhs.toBoogie, rhs.toBoogie)
+    case SDIVIDE => BinaryBExpr(BVSDIV, lhs.toBoogie, rhs.toBoogie)
     // counterintuitive but correct according to BAP source
     case MOD => BinaryBExpr(BVSREM, lhs.toBoogie, rhs.toBoogie)
     // counterintuitive but correct according to BAP source

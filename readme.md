@@ -3,7 +3,7 @@
 ## About
 The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
 
-## Installation
+## Installation and use
 The tool is OS-independent, but producing input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. On Windows, WSL2 can be used to run any Linux-specific tasks.
 
 Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 8](https://openjdk.org/install/) (or higher) is required.
