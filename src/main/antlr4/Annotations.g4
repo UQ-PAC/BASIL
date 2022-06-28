@@ -1,107 +1,108 @@
 grammar Annotations;
-/**
-This was initially in Bil.g4, but I thought it would make more sense to have the annotations as its own file.
-*/
 
-/**
-  The grammar which follows this is used to specify the program
-*/
-progSpec: (lpreds | gammas | lattice | rely)* ;
+progSpec : (lpreds | gammas | lattice | rely)*;
 
-lpreds : 'L:' lpred (',' lpred)* ;
-lpred :  (var MAPSTO secExpr);
-gammas : 'GAMMA:' gamma (',' gamma)* ;
-gamma :  (var MAPSTO ID);
-lattice : 'Lattice:' lattice_elem (',' lattice_elem)* ;
-lattice_elem : ID '<:' 'ID'* ;
-rely: 'Rely:' pred ;
+lpreds : 'L:' lpred (COMMA lpred)*;
+lpred : id MAPSTO expr;
+gammas : 'GAMMA:' gamma (COMMA gamma)*;
+gamma : id MAPSTO id;
+lattice: 'Lattice' lattice_elem (COMMA lattice_elem)* ;
 
-pred :
-    pred predBop pred  # predBinOp
-    | '(' pred ')'        # predBracket
-    | uop pred            # predUniOp
-    // TODO i dont think this is right
-    | exp expComp exp     # predExprComp
-    // | predLit             # predLiteral
-    | GAMMA_ID            # gammaVar
-    ;
+// FIXME: Not sure if the 'ID' string is meant to be an ID token, but this was the implementation in the old annotations
+//  parser (which was integrated as part of the old bil parser).
+lattice_elem : ID '<:' 'ID'*;
 
+rely: 'Rely:' expr;
 
+expr : e0;
+e0 : exp=e1 | lhs=e1 EQUIV_OP rhs=e0;
+e1 : exp=e2 | lhs=e2 IMPL_OP rhs=e1;
+e2 : exp=e3 | exp=e3 eOr+ | exp=e3 eAnd+;
+eOr : OR_OP exp=e3;
+eAnd : AND_OP exp=e3;
+e3 : exp=e4 | lhs=e4 relOp rhs=e4;
+e4 : exp=e5 | lhs=e4 CONCAT_OP rhs=e5;
+e5 : exp=e6 | lhs=e5 ADD_OP rhs=e6;
+e6 : exp=e7 | lhs=e6 MUL_OP rhs=e7;
+e7 : UN_OP* exp=e8;
+e8 : e9 mapOp*;
 
-predBop : AND | OR | NEQ_PRED | EQ_PRED ;
-expComp : NEQ_PRED | EQ_PRED | GE | GT | LE | LT ;
+e9 : KW_FALSE
+   | KW_TRUE
+   | NUMBER
+   // BITVEC
+   | ID funcApplication
+   | KW_OLD LPAREN expr RPAREN
+   | LPAREN QOP typeArgs? idsType (COMMA idsType)* QSEP trigAttr* expr RPAREN
+   | LPAREN expr RPAREN
+   ;
 
-secExpr :
-	'if' pred 'then' secExpr 'else' secExpr #secITE
-	| ID 		  # secLatticeElem
-	;
+mapOp : LBRACKET expr (COMMA expr)* mapUpdate? RBRACKET | LBRACKET NUMBER COLON NUMBER RBRACKET;
 
-exp : '(' exp ')'                                       # expBracket
-    | literal                                           # expLiteral
-    | var                                               # expVar
-    | uop exp                                           # expUop
-    | exp bop exp                                       # expBop
-    | exp 'with' '[' exp ',' ENDIAN ']:' nat '<-' exp   # expStore
-    | exp 'with' '[' exp ']' '<-' exp                   # expStore8 // sizes can be ommited if storing a single byte
-    | CAST ':' nat '[' exp ']'                          # expCast
-    // TODO maybe merge these instead??
-    | exp '[' exp ',' ENDIAN ']:' nat                   # expLoad
-    | exp '[' exp ']'                                   # expLoad8
-    | 'extract' ':' nat ':' nat '[' exp ']'             # expExtract
-	| functionName'(' argList ')'						# expFunctionCall
-    ;
+mapUpdate : '::=' expr;
+idsType : id (COMMA id)* COLON type;
 
-argList : exp (',' exp)* ;
+type : typeAtom | mapType | id typeCtorArgs?;
+typeAtom : KW_BOOL | KW_INT | KW_BV NUMBER | LPAREN type RPAREN;
+mapType : typeArgs? LBRACKET type (COMMA type)* RBRACKET type;
+typeCtorArgs : typeAtom typeCtorArgs? | id typeCtorArgs? | mapType;
+typeArgs : LANGLE id (COMMA id)* RANGLE;
+funcApplication : LPAREN (expr (COMMA expr)*)? RPAREN;
 
-var : ID ;
-functionName : ID | '.'ID ;
+trigAttr : trigger | attribute;
 
-bop : PLUS | MINUS | TIMES | DIVIDE | MODULO | LSL | LSR | ASR | BAND | BOR | BXOR | EQ | NEQ | LT | LE | UNKNOWN_OP ;
-uop : NOT ;
+// Bitvector
+bitVector : NUMBER KW_BV NUMBER;
 
-nat : (NAT | NUMBER) ;
-addr : NUMBER ;
-literal : NUMBER ;
+trigger : LCURLY expr+ RCURLY;
+attribute : LCURLY COLON ID attrArg* RCURLY;
+attrArg : expr | STRING;
 
+id : IDENTIFIER;
 
-GAMMA_ID : 'Gamma_'ID ;
-// PRIME_VAR : (ID | GAMMA_ID)'\''; // TODO
-// predLit : TRUE | FALSE ;
+COMMA : ',';
+COLON : ':';
+EQUIV_OP : '<==>';
+IMPL_OP : '==>';
+OR_OP : '||';
+AND_OP : '&&';
+relOp : '==' | '!=' | LANGLE | RANGLE | '<=' | '>=' | '<:';
 
-HIGH : 'HIGH' ;
-LOW : 'LOW' ;
-CAST : ('pad' | 'extend' | 'high' | 'low') ;
-NAT : ('u32' | 'u64') ;
-ENDIAN : ('el' | 'be');
-ID : (ALPHA|'_'|'#') (ALPHA | NUMBER | '_')* ;
-NUMBER : HEX | DECIMAL;
-DECIMAL : [0-9]+ ;
-HEX : '0x'? ([0-9]|[a-f]|[A-F])+ ;
-ALPHA : ([A-Z]|[a-z])+ ;
+CONCAT_OP : '++';
+ADD_OP : '+' | '-';
+MUL_OP : '*' | '/' | '%';
+UN_OP : '!' | '-';
+QOP : KW_FORALL | KW_EXISTS;
+QSEP : '::';
+
+KW_INT : 'int';
+KW_FORALL : 'forall';
+KW_EXISTS : 'exists';
+KW_BOOL : 'bool';
+
+KW_BV : 'bv';
+
+LPAREN : '(';
+RPAREN : ')';
+LCURLY : '{';
+RCURLY : '}';
+LANGLE : '<';
+RANGLE: '>';
+LBRACKET : '[';
+RBRACKET : ']';
+KW_FALSE : 'false';
+KW_TRUE : 'true';
+KW_OLD : 'old';
+NUMBER : [0-9]+;
+MAPSTO : '->';
+// Technically this can support all non-english unicode letters as well
+// and explicitly supports the following symbols [-, ., $, @, ', `, ~, ^, \, ?].
+
+// Strings
+ESCAPE : '\\' ( '"' | '\\' | 'n' | 'x' | '.');
+STRING :  '"' ( ESCAPE | ~('"' | '\\' | '\n' | '\r') )+ '"' ;
+
+// Ignored
 NEWLINE : '\r'? '\n' -> skip;
 WHITESPACE : ' '+ -> skip;
 COMMENT : '//' ~[\r\n]* -> skip;
-AND : '&&' ;
-OR : '||' ;
-NEQ_PRED : '!=' ;
-EQ_PRED : '==' ;
-GT: '>' ;
-GE: '>=' ;
-MAPSTO : '->' ;
-PLUS : '+' ;
-MINUS : '-' ;
-TIMES : '*' ;
-DIVIDE : '/' ;
-MODULO : '%' ;
-LSL : '<<' ; // Inferred
-LSR : '>>' ; // Inferred
-ASR : '>>>' ; // Inferred
-BAND : '&' ;
-BOR : '|' ;
-BXOR : 'xor' ;
-EQ : '=' ;
-NEQ : '<>' ;
-LT : '<' ;
-LE : '<=' ;
-NOT : '~' ;
-UNKNOWN_OP : '~>>' ;
