@@ -31,6 +31,10 @@ case class FunctionNode(name: String, address: Int, blocks: List[Block], in: Lis
   //  blocks.map(_.toBoogieString).mkString("\n  ") + "\n\n}"
 
   def calls: Set[String] = blocks.flatMap(b => b.calls).toSet
+
+  def getBlock(label: String): Option[Block] = {
+    blocks.find(b => b.label == label)
+  }
 }
 
 case class Block(label: String, address: Option[Int], instructions: List[Instruction]) {
