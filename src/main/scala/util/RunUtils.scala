@@ -2,6 +2,7 @@ package util
 //import analysis._
 import astnodes._
 import boogie._
+import analysis._
 import BilParser._
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
@@ -49,6 +50,7 @@ object RunUtils {
     val externalNames = externalFunctions.map(e => e.name)
 
     val programUnusedRemoved = BoogieTranslator(program).stripUnreachableFunctions(externalNames)
+    val cfg = Cfg.generateCfg(programUnusedRemoved)
     BoogieTranslator(programUnusedRemoved).translate
   }
 
