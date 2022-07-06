@@ -16,13 +16,13 @@ procedure main(main_argc: bv32, main_argv: bv64, FP: bv64, LR: bv64, SP: bv64) r
   var R29: bv64;
   var R30: bv64;
   var R31: bv64;
-  var #34: bv64;
-  var ZF: bv1;
   var CF: bv1;
-  var VF: bv1;
-  var NF: bv1;
-  var #33: bv64;
   var #temp: bv32;
+  var NF: bv1;
+  var #34: bv64;
+  var #33: bv64;
+  var VF: bv1;
+  var ZF: bv1;
   var #36: bv1;
   R0 := zero_extend32_32(main_argc);
   R1 := main_argv;

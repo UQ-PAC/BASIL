@@ -50,7 +50,7 @@ object RunUtils {
     val externalNames = externalFunctions.map(e => e.name)
 
     val programUnusedRemoved = BoogieTranslator(program).stripUnreachableFunctions(externalNames)
-    val cfg = Cfg.generateCfg(programUnusedRemoved)
+    val cfg = Cfg.generateCfgProgram(programUnusedRemoved)
     BoogieTranslator(programUnusedRemoved).translate
   }
 
