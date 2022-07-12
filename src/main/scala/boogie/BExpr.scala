@@ -1,8 +1,9 @@
 package boogie
+import astnodes.Endian
 
 trait BExpr {
   def getType: BType
-  def bvFunctions: Set[BFunction] = Set()
+  def functionOps: Set[FunctionOp] = Set()
   def locals: Set[BVar] = Set()
   def globals: Set[BVar] = Set()
   def replaceReserved(reserved: Set[String]): BExpr
@@ -13,13 +14,15 @@ trait BLiteral(bType: BType) extends BExpr {
   override def replaceReserved(reserved: Set[String]): BLiteral = this
 }
 
-abstract class BoolLit extends BLiteral(BoolType)
+sealed trait BoolLit extends BLiteral
 
-object TrueLiteral extends BoolLit {
+case object TrueLiteral extends BoolLit {
+  override def getType: BType = BoolType
   override def toString: String = "true"
 }
 
-object FalseLiteral extends BoolLit {
+case object FalseLiteral extends BoolLit {
+  override def getType: BType = BoolType
   override def toString: String = "false"
 }
 
@@ -30,7 +33,7 @@ case class BitVecLiteral(value: BigInt, size: Int) extends BLiteral(BitVec(size)
 case class BVExtract(end: Int, start: Int, body: BExpr) extends BExpr {
   override def getType: BitVec = BitVec(end - start)
   override def toString: String = s"$body[$end:$start]"
-  override def bvFunctions: Set[BFunction] = body.bvFunctions
+  override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
   override def replaceReserved(reserved: Set[String]): BVExtract = copy(body = body.replaceReserved(reserved))
@@ -47,9 +50,9 @@ case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
 
   override def toString: String = s"$fnName($body)"
 
-  override def bvFunctions: Set[BFunction] = {
-    val thisFn = BFunction(fnName, s"repeat $repeats", List(BParam(BitVec(bodySize))), BParam(getType), None)
-    body.bvFunctions + thisFn
+  override def functionOps: Set[FunctionOp] = {
+    val thisFn = BVFunctionOp(fnName, s"repeat $repeats", List(BParam(BitVec(bodySize))), BParam(getType))
+    body.functionOps + thisFn
   }
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
@@ -68,9 +71,9 @@ case class BVZeroExtend(extension: Int, body: BExpr) extends BExpr {
 
   override def toString: String = s"$fnName($body)"
 
-  override def bvFunctions: Set[BFunction] = {
-    val thisFn = BFunction(fnName, s"zero_extend $extension", List(BParam(BitVec(bodySize))), BParam(getType), None)
-    body.bvFunctions + thisFn
+  override def functionOps: Set[FunctionOp] = {
+    val thisFn = BVFunctionOp(fnName, s"zero_extend $extension", List(BParam(BitVec(bodySize))), BParam(getType))
+    body.functionOps + thisFn
   }
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
@@ -89,16 +92,16 @@ case class BVSignExtend(extension: Int, body: BExpr) extends BExpr {
 
   override def toString: String = s"$fnName($body)"
 
-  override def bvFunctions: Set[BFunction] = {
-    val thisFn = BFunction(fnName, s"sign_extend $extension", List(BParam(BitVec(bodySize))), BParam(getType), None)
-    body.bvFunctions + thisFn
+  override def functionOps: Set[FunctionOp] = {
+    val thisFn = BVFunctionOp(fnName, s"sign_extend $extension", List(BParam(BitVec(bodySize))), BParam(getType))
+    body.functionOps + thisFn
   }
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
   override def replaceReserved(reserved: Set[String]): BVSignExtend = copy(body = body.replaceReserved(reserved))
 }
 
-trait BVar(val name: String, val bType: BType, val scope: Scope) extends BExpr {
+abstract class BVar(val name: String, val bType: BType, val scope: Scope) extends BExpr {
   override def getType: BType = bType
   override def toString: String = name
   def withType: String = if (name.isEmpty) {
@@ -107,36 +110,14 @@ trait BVar(val name: String, val bType: BType, val scope: Scope) extends BExpr {
     s"$name: $bType"
   }
   override def locals: Set[BVar] = scope match {
-    case Scope.Local  => Set(this)
-    case Scope.Global => Set()
+    case Scope.Local => Set(this)
+    case _ => Set()
   }
   override def globals: Set[BVar] = scope match {
-    case Scope.Local  => Set()
     case Scope.Global => Set(this)
+    case _ => Set()
   }
   override def replaceReserved(reserved: Set[String]): BVar
-}
-
-case class BParam(override val name: String, override val bType: BType) extends BVar(name, bType, Scope.Local) {
-  override def locals: Set[BVar] = Set()
-  override def globals: Set[BVar] = Set()
-  override def replaceReserved(reserved: Set[String]): BParam = {
-    val nameUpdate = if (reserved.contains(name)) {
-      '#' + name
-    } else {
-      name
-    }
-    copy(name = nameUpdate)
-  }
-}
-
-object BParam {
-  def apply(bType: BType): BParam = BParam("", bType)
-}
-
-enum Scope {
-  case Local
-  case Global
 }
 
 case class BVariable(override val name: String, override val bType: BType, override val scope: Scope)
@@ -151,7 +132,18 @@ case class BVariable(override val name: String, override val bType: BType, overr
   }
 }
 
-case class MapVar(override val name: String, override val bType: MapType) extends BVar(name, bType, Scope.Global) {
+enum Scope {
+  case Local
+  case Global
+  case Parameter
+}
+
+object BParam {
+  def apply(bType: BType): BVariable = BVariable("", bType, Scope.Parameter)
+  def apply(name: String, bType: BType): BVariable = BVariable(name, bType, Scope.Parameter)
+}
+
+case class MapVar(override val name: String, override val bType: MapType, override val scope: Scope) extends BVar(name, bType, scope) {
   override def getType: MapType = bType
   override def replaceReserved(reserved: Set[String]): MapVar = {
     val nameUpdate = if (reserved.contains(name)) {
@@ -166,7 +158,7 @@ case class MapVar(override val name: String, override val bType: MapType) extend
 case class FunctionCall(name: String, args: List[BExpr], bType: BType) extends BExpr {
   override def getType: BType = bType
   override def toString: String = s"$name(${args.mkString(", ")})"
-  override def bvFunctions: Set[BFunction] = args.flatMap(a => a.bvFunctions).toSet // TODO add this?
+  override def functionOps: Set[FunctionOp] = args.flatMap(a => a.functionOps).toSet
   override def locals: Set[BVar] = args.flatMap(a => a.locals).toSet
   override def globals: Set[BVar] = args.flatMap(a => a.globals).toSet
   override def replaceReserved(reserved: Set[String]): FunctionCall = {
@@ -175,7 +167,7 @@ case class FunctionCall(name: String, args: List[BExpr], bType: BType) extends B
     } else {
       name
     }
-    val argsUpdate = args.map(a => replaceReserved(reserved))
+    val argsUpdate = args.map(a => a.replaceReserved(reserved))
     copy(name = nameUpdate, args = argsUpdate)
   }
 }
@@ -197,13 +189,13 @@ case class UnaryBExpr(op: BUnOp, arg: BExpr) extends BExpr {
     case uOp: BVUnOp   => s"bv$uOp$inSize($arg)"
   }
 
-  override def bvFunctions: Set[BFunction] = {
+  override def functionOps: Set[FunctionOp] = {
     val thisFn = op match {
       case b: BVUnOp =>
-        Set(BFunction(s"bv$b$inSize", s"bv$b", List(BParam(arg.getType)), BParam(getType), None))
+        Set(BVFunctionOp(s"bv$b$inSize", s"bv$b", List(BParam(arg.getType)), BParam(getType)))
       case _ => Set()
     }
-    arg.bvFunctions ++ thisFn
+    arg.functionOps ++ thisFn
   }
 
   override def locals: Set[BVar] = arg.locals
@@ -278,25 +270,17 @@ case class BinaryBExpr(op: BBinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
       }
   }
 
-  override def bvFunctions: Set[BFunction] = {
+  override def functionOps: Set[FunctionOp] = {
     val thisFn = op match {
       case b: BVBinOp =>
         b match {
           case BVEQ | BVNEQ | BVCONCAT => Set()
           case _ =>
-            Set(
-              BFunction(
-                s"bv$b$inSize",
-                s"bv$b",
-                List(BParam(arg1.getType), BParam(arg2.getType)),
-                BParam(getType),
-                None
-              )
-            )
+            Set(BVFunctionOp(s"bv$b$inSize", s"bv$b", List(BParam(arg1.getType), BParam(arg2.getType)), BParam(getType)))
         }
       case _ => Set()
     }
-    arg1.bvFunctions ++ arg2.bvFunctions ++ thisFn
+    arg1.functionOps ++ arg2.functionOps ++ thisFn
   }
 
   override def locals: Set[BVar] = arg1.locals ++ arg2.locals
@@ -364,7 +348,7 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   }
 
   override def toString: String = s"(if $guard then $thenExpr else $elseExpr)"
-  override def bvFunctions: Set[BFunction] = guard.bvFunctions ++ thenExpr.bvFunctions ++ elseExpr.bvFunctions
+  override def functionOps: Set[FunctionOp] = guard.functionOps ++ thenExpr.functionOps ++ elseExpr.functionOps
   override def locals: Set[BVar] = guard.locals ++ thenExpr.locals ++ elseExpr.locals
   override def globals: Set[BVar] = guard.globals ++ thenExpr.globals ++ elseExpr.globals
   override def replaceReserved(reserved: Set[String]): IfThenElse = {
@@ -382,7 +366,7 @@ trait QuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends B
     s"sort $boundString :: ($body)"
   }
   override def getType: BType = BoolType
-  override def bvFunctions: Set[BFunction] = body.bvFunctions
+  override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals -- bound.toSet
   override def globals: Set[BVar] = body.globals -- bound.toSet
 }
@@ -411,7 +395,7 @@ case class Exists(bound: List[BVar], body: BExpr) extends QuantifierExpr(Quantif
 case class Old(body: BExpr) extends BExpr {
   override def toString: String = s"old($body)"
   override def getType: BType = body.getType
-  override def bvFunctions: Set[BFunction] = body.bvFunctions
+  override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
 
@@ -421,9 +405,102 @@ case class Old(body: BExpr) extends BExpr {
 case class MapAccess(mapVar: MapVar, index: BExpr) extends BExpr {
   override def toString: String = s"$mapVar[$index]"
   override def getType: BType = mapVar.getType.result
-  override def bvFunctions: Set[BFunction] = index.bvFunctions
+  override def functionOps: Set[FunctionOp] = index.functionOps
   override def locals: Set[BVar] = index.locals
   override def globals: Set[BVar] = index.globals ++ mapVar.globals
   override def replaceReserved(reserved: Set[String]): MapAccess =
     copy(mapVar = mapVar.replaceReserved(reserved), index = index.replaceReserved(reserved))
+}
+
+case class MapUpdate(map: BExpr, index: BExpr, value: BExpr) extends BExpr {
+  override def toString = s"$map[$index := $value]"
+  override def getType: BType = map.getType
+  override def functionOps: Set[FunctionOp] = map.functionOps ++ index.functionOps ++ value.functionOps
+  override def locals: Set[BVar] = map.locals ++ index.locals ++ value.globals
+  override def globals: Set[BVar] = index.globals ++ map.globals ++ value.globals
+  override def replaceReserved(reserved: Set[String]): MapUpdate =
+    copy(
+      map = map.replaceReserved(reserved),
+      index = index.replaceReserved(reserved),
+      value = value.replaceReserved(reserved)
+    )
+}
+
+sealed trait FunctionOp
+
+case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BVar) extends FunctionOp
+
+case class MemoryLoad(memory: MapVar, index: BExpr, endian: Endian, bits: Int) extends BExpr with FunctionOp {
+  override def toString: String = s"$fnName($memory, $index)"
+
+  def fnName: String = endian match {
+    case Endian.LittleEndian => s"memory_load${bits}_le"
+    case Endian.BigEndian => s"memory_load${bits}_be"
+  }
+  /*
+  override def toFunction: BFunction = {
+
+  }
+  */
+
+  override def getType: BType = memory.getType.result
+  override def functionOps: Set[FunctionOp] = memory.functionOps ++ index.functionOps + this
+  override def locals: Set[BVar] = memory.locals ++ index.locals
+  override def globals: Set[BVar] = index.globals ++ memory.globals
+  override def replaceReserved(reserved: Set[String]): MemoryLoad =
+    copy(memory = memory.replaceReserved(reserved), index = index.replaceReserved(reserved))
+
+}
+
+case class MemoryStore(memory: MapVar, index: BExpr, value: BExpr, endian: Endian, bits: Int) extends BExpr with FunctionOp {
+  override def toString: String = s"$fnName($memory, $index)"
+
+  def fnName: String = endian match {
+    case Endian.LittleEndian => s"memory_store${bits}_le"
+    case Endian.BigEndian => s"memory_store${bits}_be"
+  }
+
+  override def getType: BType = memory.getType
+  override def functionOps: Set[FunctionOp] = memory.functionOps ++ index.functionOps ++ value.functionOps + this
+  override def locals: Set[BVar] = memory.locals ++ index.locals ++ value.globals
+  override def globals: Set[BVar] = index.globals ++ memory.globals ++ value.globals
+  override def replaceReserved(reserved: Set[String]): MemoryStore =
+    copy(
+      memory = memory.replaceReserved(reserved),
+      index = index.replaceReserved(reserved),
+      value = value.replaceReserved(reserved)
+    )
+}
+
+case class GammaLoad(gammaMap: MapVar, index: BExpr, bits: Int, accesses: Int) extends BExpr with FunctionOp {
+  override def toString: String = s"$fnName($gammaMap, $index)"
+  def fnName: String = s"gamma_load${bits}"
+
+  override def getType: BType = gammaMap.getType.result
+  override def functionOps: Set[FunctionOp] = gammaMap.functionOps ++ index.functionOps + this
+  override def locals: Set[BVar] = gammaMap.locals ++ index.locals
+  override def globals: Set[BVar] = index.globals ++ gammaMap.globals
+  override def replaceReserved(reserved: Set[String]): GammaLoad =
+    copy(gammaMap = gammaMap.replaceReserved(reserved), index = index.replaceReserved(reserved))
+
+}
+
+case class GammaStore(gammaMap: MapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int) extends BExpr with FunctionOp {
+  override def toString: String = s"$fnName($gammaMap, $index)"
+  def fnName: String = s"gamma_store${bits}"
+
+  override def getType: BType = gammaMap.getType
+  override def functionOps: Set[FunctionOp] = gammaMap.functionOps ++ index.functionOps ++ value.functionOps + this
+  override def locals: Set[BVar] = gammaMap.locals ++ index.locals ++ value.globals
+  override def globals: Set[BVar] = index.globals ++ gammaMap.globals ++ value.globals
+  override def replaceReserved(reserved: Set[String]): GammaStore =
+    copy(
+      gammaMap = gammaMap.replaceReserved(reserved),
+      index = index.replaceReserved(reserved),
+      value = value.replaceReserved(reserved)
+    )
+}
+
+case class L(memory: MapVar, index: BExpr) extends BExpr {
+
 }

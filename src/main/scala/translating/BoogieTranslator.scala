@@ -7,15 +7,116 @@ case class BoogieTranslator(program: Program) {
   def translate: BProgram = {
     val procedures = program.functions.map(f => translate(f))
     val globals = procedures.flatMap(p => p.globals).map(b => BVarDecl(b)).distinct
-    val functionsUsed = procedures.flatMap(p => p.bvFunctions).distinct
+    val functionsUsed: List[BFunction] = procedures.flatMap(p => p.functionOps).distinct.map(p => functionOpToDefinition(p))
 
     val declarations = globals ++ functionsUsed ++ procedures
     avoidReserved(BProgram(declarations))
   }
 
+  def functionOpToDefinition(f: FunctionOp): BFunction = {
+    f match {
+      case b: BVFunctionOp => BFunction(b.name, b.bvbuiltin, b.in, b.out, None)
+      case m: MemoryLoad =>
+        val memVar = MapVar("memory", m.memory.getType, Scope.Parameter)
+        val indexVar = BParam("index", m.memory.getType.param)
+        val in = List(memVar, indexVar)
+        val out = BParam(BitVec(m.bits))
+        val accesses: Seq[MapAccess] = for (i <- 0 until m.accesses) yield {
+          if (i == 0) {
+            MapAccess(memVar, indexVar)
+          } else {
+            MapAccess(memVar, BinaryBExpr(BVADD, indexVar, BitVecLiteral(i, m.memory.getType.param)))
+          }
+        }
+        val accessesEndian = m.endian match {
+          case Endian.BigEndian    => accesses.reverse
+          case Endian.LittleEndian => accesses
+        }
+
+        val body: BExpr = accessesEndian.tail.foldLeft(accessesEndian.head) {
+          (concat: BExpr, next: MapAccess) => BinaryBExpr(BVCONCAT, next, concat)
+        }
+
+        BFunction(m.fnName, "", in, out, Some(body))
+      case g: GammaLoad =>
+        val gammaMapVar = MapVar("gammaMap", g.gammaMap.getType, Scope.Parameter)
+        val indexVar = BParam("index", g.gammaMap.getType.param)
+        val in = List(gammaMapVar, indexVar)
+        val out = BParam(BoolType)
+        val accesses: Seq[MapAccess] = for (i <- 0 until g.accesses) yield {
+          if (i == 0) {
+            MapAccess(gammaMapVar, indexVar)
+          } else {
+            MapAccess(gammaMapVar, BinaryBExpr(BVADD, indexVar, BitVecLiteral(i, g.gammaMap.getType.param)))
+          }
+        }
+
+        val body: BExpr = accesses.tail.foldLeft(accesses.head) {
+          (and: BExpr, next: MapAccess) => BinaryBExpr(BoolAND, next, and)
+        }
+
+        BFunction(g.fnName, "", in, out, Some(body))
+      case m: MemoryStore =>
+        val memVar = MapVar("memory", m.memory.getType, Scope.Parameter)
+        val indexVar = BParam("index", m.memory.getType.param)
+        val valueVar = BParam("value", BitVec(m.bits))
+        val in = List(memVar, indexVar, valueVar)
+        val out = BParam(m.memory.getType)
+        val indices: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
+          if (i == 0) {
+            indexVar
+          } else {
+            BinaryBExpr(BVADD, indexVar, BitVecLiteral(i, m.memory.getType.param))
+          }
+        }
+        val values: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
+          BVExtract((i + 1) * (m.accesses / m.bits), i * (m.accesses / m.bits), valueVar)
+        }
+        val valuesEndian = m.endian match {
+          case Endian.BigEndian    => values.reverse
+          case Endian.LittleEndian => values
+        }
+        val indiceValues = for (i <- 0 until m.accesses) yield {
+          (indices(i), valuesEndian(i))
+        }
+
+        val body: MapUpdate = indiceValues.tail.foldLeft(MapUpdate(memVar, indices.head, valuesEndian.head)) {
+          (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+        }
+
+        BFunction(m.fnName, "", in, out, Some(body))
+      case g: GammaStore =>
+        val gammaMapVar = MapVar("gammaMap", g.gammaMap.getType, Scope.Parameter)
+        val indexVar = BParam("index", g.gammaMap.getType.param)
+        val valueVar = BParam("value", BitVec(g.bits))
+        val in = List(gammaMapVar, indexVar, valueVar)
+        val out = BParam(g.gammaMap.getType)
+
+        val indices: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
+          if (i == 0) {
+            indexVar
+          } else {
+            BinaryBExpr(BVADD, indexVar, BitVecLiteral(i, g.bits))
+          }
+        }
+        val values: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
+          BVExtract((i + 1) * (g.accesses / g.bits), i * (g.accesses / g.bits), valueVar)
+        }
+        val indiceValues = for (i <- 0 until g.accesses) yield {
+          (indices(i), values(i))
+        }
+
+        val body: MapUpdate = indiceValues.tail.foldLeft(MapUpdate(gammaMapVar, indices.head, values.head)) {
+          (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+        }
+
+        BFunction(g.fnName, "", in, out, Some(body))
+    }
+  }
+
   def translate(f: FunctionNode): BProcedure = {
-    val in = f.in.map(i => BParam(i.name, BitVec(i.size)))
-    val out = f.out.map(o => BParam(o.name, BitVec(o.size)))
+    val in = f.in.flatMap(i => List(BParam(i.name, BitVec(i.size)), BParam(s"Gamma_${i.name}", BoolType)))
+    val out = f.out.flatMap(o => List(BParam(o.name, BitVec(o.size)), BParam(s"Gamma_${o.name}", BoolType)))
     val returns = f.out.map(p => outParamToAssign(p))
     val body = f.blocks.map(b => translate(b, returns))
     val modifies = body.flatMap(b => b.modifies).toSet
@@ -31,29 +132,35 @@ case class BoogieTranslator(program: Program) {
   private def outParamToAssign(p: Parameter): AssignCmd = {
     val param = BParam(p.name, BitVec(p.size))
     val register = p.register.toBoogie
-    if (p.size > p.register.size) {
-      AssignCmd(param, BVZeroExtend(p.size - p.register.size, register))
+    val paramGamma = BParam(s"Gamma_${p.name}", BoolType)
+    val registerGamma = p.register.toGamma
+    val assigned = if (p.size > p.register.size) {
+      BVZeroExtend(p.size - p.register.size, register)
     } else if (p.size < p.register.size) {
-      AssignCmd(param, BVExtract(p.size, 0, register))
+      BVExtract(p.size, 0, register)
     } else {
-      AssignCmd(param, register)
+      register
     }
+    AssignCmd(List(param, paramGamma), List(assigned, registerGamma))
   }
 
   private def inParamToAssign(p: Parameter): AssignCmd = {
     val param = BParam(p.name, BitVec(p.size))
     val register = p.register.toBoogie
-    if (p.size > p.register.size) {
-      AssignCmd(register, BVExtract(p.register.size, 0, param))
+    val paramGamma = BParam(s"Gamma_${p.name}", BoolType)
+    val registerGamma = p.register.toGamma
+    val assigned = if (p.size > p.register.size) {
+      BVExtract(p.register.size, 0, param)
     } else if (p.size < p.register.size) {
-      AssignCmd(register, BVZeroExtend(p.register.size - p.size, param))
+      BVZeroExtend(p.register.size - p.size, param)
     } else {
-      AssignCmd(register, param)
+      param
     }
+    AssignCmd(List(register, registerGamma), List(assigned, registerGamma))
   }
 
   def translate(b: Block, returns: List[BCmd]): BBlock = {
-    // TODO at some point we want to take into account the instruction borders
+    // at some point we may want to take into account the instruction borders
     val statements = b.instructions.flatMap(_.statements)
     val cmds = statements.flatMap(s => translate(s, returns))
     BBlock(b.label, cmds)
@@ -103,12 +210,18 @@ case class BoogieTranslator(program: Program) {
           List(IfCmd(guard, List(GoToCmd(g.target))))
       }
     case m: MemAssign =>
+      val lhs = m.lhs.toBoogie
+      val rhs = m.rhs.toBoogie
+      val lhsGamma = m.lhs.toGamma
+      val rhsGamma = m.rhs.toGamma
+      List(AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma)))
+      /*
       val rhsBoogie = m.rhs.toBoogie
       val lhss = m.lhs.boogieAccesses
       if (lhss.size > 1) {
         val tempLocal = rhsBoogie match {
           case b: BVar => b
-          case _ => BVariable("#temp", BitVec(m.rhs.size), Scope.Local)
+          case _ => BVariable("#temp", BitVec(m.rhs.size), true, false)
         }
         val tempAssign = if (rhsBoogie == tempLocal) {
           List()
@@ -123,7 +236,13 @@ case class BoogieTranslator(program: Program) {
       } else {
         List(MapAssignCmd(lhss.head, rhsBoogie))
       }
-    case l: LocalAssign => List(AssignCmd(l.lhs.toBoogie, l.rhs.toBoogie))
+      */
+    case l: LocalAssign =>
+      val lhs = l.lhs.toBoogie
+      val rhs = l.rhs.toBoogie
+      val lhsGamma = l.lhs.toGamma
+      val rhsGamma = l.rhs.toGamma
+      List(AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma)))
   }
 
   def coerceProcedureCall(target: String, in: List[Parameter], out: List[Parameter]): List[BCmd] = {

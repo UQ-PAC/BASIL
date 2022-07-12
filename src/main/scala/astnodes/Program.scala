@@ -53,14 +53,6 @@ case class Parameter(name: String, size: Int, register: LocalVar) {
   // def toBoogieString: String = name + ": bv" + size
 }
 
-// used in parsing only
-case class Store(memory: Memory, index: Expr, value: Expr, endian: Endian, size: Int)
-
-enum Endian {
-  case LittleEndian
-  case BigEndian
-}
-
 case class GlobalVariable(name: String, size: Int, address: BigInt)
 
 case class ExternalFunction(name: String, offset: BigInt)

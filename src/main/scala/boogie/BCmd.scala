@@ -3,7 +3,7 @@ package boogie
 sealed trait BCmdOrBlock {
   def toBoogie: List[String]
   def modifies: Set[BVar] = Set()
-  def bvFunctions: Set[BFunction] = Set()
+  def functionOps: Set[FunctionOp] = Set()
   def locals: Set[BVar] = Set()
   def globals: Set[BVar] = Set()
   def replaceReserved(reserved: Set[String]): BCmdOrBlock
@@ -15,7 +15,7 @@ case class BBlock(label: String, body: List[BCmd]) extends BCmdOrBlock {
   }
   override def toString: String = toBoogie.mkString("\n")
   override def modifies: Set[BVar] = body.flatMap(c => c.modifies).toSet
-  override def bvFunctions: Set[BFunction] = body.flatMap(c => c.bvFunctions).toSet
+  override def functionOps: Set[FunctionOp] = body.flatMap(c => c.functionOps).toSet
   override def locals: Set[BVar] = body.flatMap(c => c.locals).toSet
   override def globals: Set[BVar] = body.flatMap(c => c.globals).toSet
   override def replaceReserved(reserved: Set[String]): BBlock = {
@@ -36,7 +36,7 @@ sealed trait BCmd extends BCmdOrBlock {
 
 case class Assert(body: BExpr) extends BCmd {
   override def toString: String = s"assert $body;"
-  override def bvFunctions: Set[BFunction] = body.bvFunctions
+  override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
   override def replaceReserved(reserved: Set[String]): Assert = copy(body = body.replaceReserved(reserved))
@@ -44,7 +44,7 @@ case class Assert(body: BExpr) extends BCmd {
 
 case class Assume(body: BExpr) extends BCmd {
   override def toString: String = s"assume $body;"
-  override def bvFunctions: Set[BFunction] = body.bvFunctions
+  override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
   override def replaceReserved(reserved: Set[String]): Assume = copy(body = body.replaceReserved(reserved))
@@ -59,7 +59,7 @@ case class ProcedureCall(name: String, lhss: List[BVar], params: List[BExpr]) ex
     }
   }
   override def modifies: Set[BVar] = lhss.collect { case l if l.scope == Scope.Global => l }.toSet
-  override def bvFunctions: Set[BFunction] = params.flatMap(p => p.bvFunctions).toSet
+  override def functionOps: Set[FunctionOp] = params.flatMap(p => p.functionOps).toSet
   override def locals: Set[BVar] = params.flatMap(p => p.locals).toSet
   override def globals: Set[BVar] = params.flatMap(p => p.globals).toSet
 
@@ -78,7 +78,7 @@ case class ProcedureCall(name: String, lhss: List[BVar], params: List[BExpr]) ex
 case class AssignCmd(lhss: List[BVar], rhss: List[BExpr]) extends BCmd {
   override def toString: String = s"${lhss.mkString(", ")} := ${rhss.mkString(", ")};"
   override def modifies: Set[BVar] = lhss.collect { case l if l.scope == Scope.Global => l }.toSet
-  override def bvFunctions: Set[BFunction] = rhss.flatMap(r => r.bvFunctions).toSet
+  override def functionOps: Set[FunctionOp] = rhss.flatMap(r => r.functionOps).toSet
   override def locals: Set[BVar] = lhss.flatMap(l => l.locals).toSet ++ rhss.flatMap(r => r.locals).toSet
   override def globals: Set[BVar] = lhss.flatMap(l => l.globals).toSet ++ rhss.flatMap(r => r.globals).toSet
 
@@ -96,7 +96,7 @@ object AssignCmd {
 case class MapAssignCmd(lhs: MapAccess, rhs: BExpr) extends BCmd {
   override def toString: String = s"$lhs := $rhs;"
   override def modifies: Set[BVar] = Set(lhs.mapVar)
-  override def bvFunctions: Set[BFunction] = lhs.bvFunctions ++ rhs.bvFunctions
+  override def functionOps: Set[FunctionOp] = lhs.functionOps ++ rhs.functionOps
   override def locals: Set[BVar] = lhs.locals ++ rhs.locals
   override def globals: Set[BVar] = lhs.globals ++ rhs.globals
 
@@ -128,7 +128,7 @@ case class IfCmd(guard: BExpr, thenCmds: List[BCmd]) extends BCmd {
   }
   override def toString: String = toBoogie.mkString("\n")
   override def modifies: Set[BVar] = thenCmds.flatMap(c => c.modifies).toSet
-  override def bvFunctions: Set[BFunction] = guard.bvFunctions ++ thenCmds.flatMap(c => c.bvFunctions).toSet
+  override def functionOps: Set[FunctionOp] = guard.functionOps ++ thenCmds.flatMap(c => c.functionOps).toSet
   override def locals: Set[BVar] = guard.locals ++ thenCmds.flatMap(c => c.locals).toSet
   override def globals: Set[BVar] = guard.globals ++ thenCmds.flatMap(c => c.globals).toSet
   override def replaceReserved(reserved: Set[String]): IfCmd = {

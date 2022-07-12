@@ -187,12 +187,7 @@ object AdtStatementLoader {
   }
 
   def visitMemDef(ctx: MemDefContext): (String, MemAssign) = {
-    val lhs = visitMemVar(ctx.lhs)
-    val rhs = visitStore(ctx.rhs)
-    if (lhs != rhs.memory) {
-      throw new Exception("trying to store memory in unrelated memory")
-    }
-    val assign = MemAssign(MemAccess.init(lhs, rhs.index, rhs.endian, rhs.size), rhs.value)
+    val assign = MemAssign(visitMemVar(ctx.lhs), visitStore(ctx.rhs))
     (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), assign)
   }
 
