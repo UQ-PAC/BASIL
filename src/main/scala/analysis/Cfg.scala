@@ -1,5 +1,4 @@
 package analysis
-
 import scala.collection.mutable
 
 import astnodes._
@@ -44,15 +43,6 @@ trait CfgNodeWithData[T] extends CfgNode:
 
   def data: T
 
-/** Control-flow graph node for a statement.
-  */
-case class CfgStatementNode(
-    override val id: Int = CfgNode.nextId(),
-    override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-    override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-    data: Statement
-) extends CfgNodeWithData[Statement]
-
 /** Control-flow graph node for the entry of a function.
   */
 case class CfgFunctionEntryNode(
@@ -71,23 +61,16 @@ case class CfgFunctionExitNode(
     data: FunctionNode
 ) extends CfgNodeWithData[FunctionNode]
 
-/** Control-flow graph node for the entry of a block.
+/** Control-flow graph node for a block.
   */
-case class CfgBlockEntryNode(
+case class CfgBlockNode(
     override val id: Int = CfgNode.nextId(),
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     data: Block
-) extends CfgNodeWithData[Block]
-
-/** Control-flow graph node for the exit of a block.
-  */
-case class CfgBlockExitNode(
-    override val id: Int = CfgNode.nextId(),
-    override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-    override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-    data: Block
-) extends CfgNodeWithData[Block]
+) extends CfgNodeWithData[Block]:
+  def getStatements(): List[Statement] =
+    data.instructions.flatMap(_.statements)
 
 /** A control-flow graph.
   * @param entries
@@ -101,19 +84,17 @@ class Cfg(val entries: Set[CfgNode], val exits: Set[CfgNode]):
     */
   def isUnit: Boolean = entries.isEmpty && exits.isEmpty
 
-  /** Performs the concatenation of two cfgs by adding edges between the two.
-    */
-  def concat(other: Cfg): Cfg =
-    if isUnit then other
-    else if other.isUnit then this
-    else
-      exits.foreach(exitNode => other.entries.foreach(entryNode => exitNode.addEdge(entryNode)))
-      Cfg(entries, other.exits)
-
   /** Returns all of the nodes in the graph.
     */
   def nodes: Set[CfgNode] =
     entries.flatMap(entry => dfs(entry, mutable.Set()).toSet)
+
+  def concat(other: Cfg): Cfg =
+    if isUnit then other
+    else if other.isUnit then this
+    else
+      exits.foreach(exit => other.entries.foreach(entry => exit.addEdge(entry)))
+      Cfg(entries, other.exits)
 
   /** Performs a depth-first traversal of the graph.
     */
@@ -127,8 +108,8 @@ class Cfg(val entries: Set[CfgNode], val exits: Set[CfgNode]):
     */
   def lookup(branchLabel: String): Option[CfgNode] =
     nodes.find {
-      case CfgBlockEntryNode(_, _, _, Block(branchLabel, _, _)) => true
-      case _                                                    => false
+      case CfgBlockNode(_, _, _, Block(branchLabel, _, _)) => true
+      case _                                               => false
     }
 
 object Cfg:
@@ -151,36 +132,30 @@ object Cfg:
   def generateCfgFunc(func: FunctionNode): Cfg =
     val entryNode = CfgFunctionEntryNode(data = func)
     val exitNode = CfgFunctionExitNode(data = func)
-    val blocks = func.blocks.foldLeft(unit())((acc, block) => acc.concat(generateCfgBlock(block)))
-    addBranches(blocks)
+    val blocks = func.blocks.foldLeft(unit())((acc, block) => acc.concat(singletonGraph(CfgBlockNode(data = block))))
 
-    singletonGraph(entryNode).concat(blocks).concat(singletonGraph(exitNode))
+    val cfg = singletonGraph(entryNode).concat(blocks).concat(singletonGraph(exitNode))
+    addBranches(cfg)
 
-  /** Generate the cfg for a block.
+    cfg
+
+  /** Get all branches from the current block.
     */
-  def generateCfgBlock(block: Block): Cfg =
-    val entryNode = CfgBlockEntryNode(data = block)
-    val exitNode = CfgBlockExitNode(data = block)
-    val instrs = block.instructions.foldLeft(unit())((acc, instr) => acc.concat(generateCfgInstr(instr)))
+  def getBranches(block: Block): Set[String] =
+    val stmts = block.instructions.flatMap(_.statements)
+    var branches: Set[String] = Set()
 
-    singletonGraph(entryNode).concat(instrs).concat(singletonGraph(exitNode))
+    stmts.foreach {
+      case GoTo(target, condition) => branches += target
+      case _                       =>
+    }
 
-  /** Generate the cfg for an instruction.
-    */
-  def generateCfgInstr(instr: Instruction): Cfg =
-    instr.statements.foldLeft(unit())((acc, stmt) => acc.concat(generateCfgStmt(stmt)))
+    branches
 
-  /** Generate the cfg for a statement.
-    */
-  def generateCfgStmt(stmt: Statement): Cfg =
-    val node = CfgStatementNode(data = stmt)
-
-    singletonGraph(node)
-
-  /** Add edge for branching caused by a GoTo statement.
+  /** Add edge for GoTo statements.
     */
   def addBranches(cfg: Cfg): Unit =
     cfg.nodes.foreach {
-      case n @ CfgStatementNode(_, _, _, GoTo(target, condition)) => cfg.lookup(target).map(n.addEdge(_))
-      case _                                                      =>
+      case b: CfgBlockNode => getBranches(b.data).foreach(label => cfg.lookup(label).map(_.addEdge(b)))
+      case _               =>
     }
