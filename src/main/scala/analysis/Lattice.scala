@@ -1,5 +1,7 @@
 package analysis
 
+/** Lattice data structure used for
+  */
 trait Lattice[Element]:
 
   /** A union or join of two lattice elements. Should contain all the information from the first state as well as all
