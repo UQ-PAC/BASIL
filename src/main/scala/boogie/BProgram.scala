@@ -89,7 +89,7 @@ case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar,
     val inString = in.map(_.withType).mkString(", ")
     val declString = s"function$bvbuiltinString $name($inString) returns (${out.withType})"
     body match {
-      case Some(b) => List(declString + " {", "  " + b.toString, "}")
+      case Some(b) => List(declString + " {", "  " + b.toString, "}", "")
       case None    => List(declString + ";")
     }
   }
@@ -108,7 +108,11 @@ case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar,
 }
 
 case class BVarDecl(variable: BVar) extends BDeclaration {
-  override def toString: String = s"var $variable: ${variable.getType};"
+  override def toString: String = if (variable.scope == Scope.Const) {
+    s"const $variable: ${variable.getType};"
+  } else {
+    s"var $variable: ${variable.getType};"
+  }
   override def replaceReserved(reserved: Set[String]): BVarDecl = {
     copy(variable = variable.replaceReserved(reserved))
   }

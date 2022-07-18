@@ -9,8 +9,7 @@ trait BExpr {
   def replaceReserved(reserved: Set[String]): BExpr
 }
 
-trait BLiteral(bType: BType) extends BExpr {
-  override def getType: BType = bType
+trait BLiteral extends BExpr {
   override def replaceReserved(reserved: Set[String]): BLiteral = this
 }
 
@@ -26,7 +25,8 @@ case object FalseLiteral extends BoolLit {
   override def toString: String = "false"
 }
 
-case class BitVecLiteral(value: BigInt, size: Int) extends BLiteral(BitVec(size)) {
+case class BitVecLiteral(value: BigInt, size: Int) extends BLiteral {
+  override def getType: BType = BitVec(size)
   override def toString: String = s"${value}bv$size"
 }
 
@@ -136,6 +136,7 @@ enum Scope {
   case Local
   case Global
   case Parameter
+  case Const
 }
 
 object BParam {
@@ -416,7 +417,7 @@ case class MapUpdate(map: BExpr, index: BExpr, value: BExpr) extends BExpr {
   override def toString = s"$map[$index := $value]"
   override def getType: BType = map.getType
   override def functionOps: Set[FunctionOp] = map.functionOps ++ index.functionOps ++ value.functionOps
-  override def locals: Set[BVar] = map.locals ++ index.locals ++ value.globals
+  override def locals: Set[BVar] = map.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ map.globals ++ value.globals
   override def replaceReserved(reserved: Set[String]): MapUpdate =
     copy(
@@ -437,11 +438,18 @@ case class MemoryLoad(memory: MapVar, index: BExpr, endian: Endian, bits: Int) e
     case Endian.LittleEndian => s"memory_load${bits}_le"
     case Endian.BigEndian => s"memory_load${bits}_be"
   }
-  /*
-  override def toFunction: BFunction = {
 
+  def addressSize: Int = memory.getType.param match {
+    case b: BitVec => b.size
+    case _ => throw new Exception(s"MemoryStore does not have Bitvector type: $this" )
   }
-  */
+
+  def valueSize: Int = memory.getType.result match {
+    case b: BitVec => b.size
+    case _ => throw new Exception(s"MemoryLoad does not have Bitvector type: $this" )
+  }
+
+  def accesses: Int = bits/valueSize
 
   override def getType: BType = memory.getType.result
   override def functionOps: Set[FunctionOp] = memory.functionOps ++ index.functionOps + this
@@ -460,9 +468,21 @@ case class MemoryStore(memory: MapVar, index: BExpr, value: BExpr, endian: Endia
     case Endian.BigEndian => s"memory_store${bits}_be"
   }
 
+  def addressSize: Int = memory.getType.param match {
+    case b: BitVec => b.size
+    case _ => throw new Exception(s"MemoryStore does not have Bitvector type: $this" )
+  }
+
+  def valueSize: Int = memory.getType.result match {
+    case b: BitVec => b.size
+    case _ => throw new Exception(s"MemoryStore does not have Bitvector type: $this" )
+  }
+
+  def accesses: Int = bits/valueSize
+
   override def getType: BType = memory.getType
   override def functionOps: Set[FunctionOp] = memory.functionOps ++ index.functionOps ++ value.functionOps + this
-  override def locals: Set[BVar] = memory.locals ++ index.locals ++ value.globals
+  override def locals: Set[BVar] = memory.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ memory.globals ++ value.globals
   override def replaceReserved(reserved: Set[String]): MemoryStore =
     copy(
@@ -474,7 +494,14 @@ case class MemoryStore(memory: MapVar, index: BExpr, value: BExpr, endian: Endia
 
 case class GammaLoad(gammaMap: MapVar, index: BExpr, bits: Int, accesses: Int) extends BExpr with FunctionOp {
   override def toString: String = s"$fnName($gammaMap, $index)"
-  def fnName: String = s"gamma_load${bits}"
+  def fnName: String = s"gamma_load$bits"
+
+  def addressSize: Int = gammaMap.getType.param match {
+    case b: BitVec => b.size
+    case _ => throw new Exception(s"GammaLoad does not have Bitvector type: $this" )
+  }
+
+  def valueSize: Int = bits/accesses
 
   override def getType: BType = gammaMap.getType.result
   override def functionOps: Set[FunctionOp] = gammaMap.functionOps ++ index.functionOps + this
@@ -487,11 +514,18 @@ case class GammaLoad(gammaMap: MapVar, index: BExpr, bits: Int, accesses: Int) e
 
 case class GammaStore(gammaMap: MapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int) extends BExpr with FunctionOp {
   override def toString: String = s"$fnName($gammaMap, $index)"
-  def fnName: String = s"gamma_store${bits}"
+  def fnName: String = s"gamma_store$bits"
+
+  def addressSize: Int = gammaMap.getType.param match {
+    case b: BitVec => b.size
+    case _ => throw new Exception(s"GammaStore does not have Bitvector type: $this" )
+  }
+
+  def valueSize: Int = bits/accesses
 
   override def getType: BType = gammaMap.getType
   override def functionOps: Set[FunctionOp] = gammaMap.functionOps ++ index.functionOps ++ value.functionOps + this
-  override def locals: Set[BVar] = gammaMap.locals ++ index.locals ++ value.globals
+  override def locals: Set[BVar] = gammaMap.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ gammaMap.globals ++ value.globals
   override def replaceReserved(reserved: Set[String]): GammaStore =
     copy(
@@ -501,6 +535,11 @@ case class GammaStore(gammaMap: MapVar, index: BExpr, value: BExpr, bits: Int, a
     )
 }
 
-case class L(memory: MapVar, index: BExpr) extends BExpr {
-
+case class L(memory: MapVar, index: BExpr) extends BExpr with FunctionOp {
+  override def toString: String = s"L($memory, $index)"
+  override def getType: BType = BoolType
+  override def replaceReserved(reserved: Set[String]): L = this
+  override def functionOps: Set[FunctionOp] = index.functionOps + this
+  override def locals: Set[BVar] = index.locals
+  override def globals: Set[BVar] = index.globals
 }

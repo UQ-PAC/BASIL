@@ -33,7 +33,7 @@ object AdtStatementLoader {
   }
 
   def visitStore(ctx: StoreContext): Store = {
-    Store(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitExp(ctx.value), visitEndian(ctx.endian), parseInt(ctx.num))
+    Store.init(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitExp(ctx.value), visitEndian(ctx.endian), parseInt(ctx.num))
   }
 
   def visitBinOp(ctx: BinOpContext): BinOp = {
@@ -187,7 +187,7 @@ object AdtStatementLoader {
   }
 
   def visitMemDef(ctx: MemDefContext): (String, MemAssign) = {
-    val assign = MemAssign(visitMemVar(ctx.lhs), visitStore(ctx.rhs))
+    val assign = MemAssign.init(visitMemVar(ctx.lhs), visitStore(ctx.rhs))
     (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), assign)
   }
 

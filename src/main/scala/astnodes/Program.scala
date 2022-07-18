@@ -53,6 +53,10 @@ case class Parameter(name: String, size: Int, register: LocalVar) {
   // def toBoogieString: String = name + ": bv" + size
 }
 
-case class GlobalVariable(name: String, size: Int, address: BigInt)
+case class GlobalVariable(name: String, size: Int, address: BigInt) {
+  def toAddrVar: BVar = BVariable("$" + s"${name}_addr", BitVec(64), Scope.Const)
+  def toOldVar: BVar = BVariable(s"${name}_old", BitVec(size), Scope.Local)
+  def toOldGamma: BVar = BVariable(s"Gamma_${name}_old", BoolType, Scope.Local)
+}
 
 case class ExternalFunction(name: String, offset: BigInt)

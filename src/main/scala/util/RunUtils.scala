@@ -30,6 +30,11 @@ object RunUtils {
 
     val (externalFunctions, globals) = ElfLoader.visitSyms(elfParser.syms())
 
+    val relies: Map[GlobalVariable, BExpr] = Map()
+    val guarantees: Map[GlobalVariable, BExpr] = Map()
+    val LPreds: Map[GlobalVariable, BExpr] = Map()
+    val controls: Map[GlobalVariable, Set[GlobalVariable]] = Map()
+    val controlledBy: Map[GlobalVariable, Set[GlobalVariable]] = Map()
     //println(externalFunctions)
     //println(globals)
 
@@ -48,8 +53,8 @@ object RunUtils {
 
     val externalNames = externalFunctions.map(e => e.name)
 
-    val programUnusedRemoved = BoogieTranslator(program).stripUnreachableFunctions(externalNames)
-    BoogieTranslator(programUnusedRemoved).translate
+    val programUnusedRemoved = BoogieTranslator(program, globals, relies, guarantees, LPreds, controls, controlledBy).stripUnreachableFunctions(externalNames)
+    BoogieTranslator(programUnusedRemoved, globals, relies, guarantees, LPreds, controls, controlledBy).translate
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {
