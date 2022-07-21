@@ -8,12 +8,26 @@ case class BoogieTranslator(program: Program, globals: Set[GlobalVariable], reli
     val procedures = program.functions.map(f => translate(f))
     val globalDecls = procedures.flatMap(p => p.globals).map(b => BVarDecl(b)).distinct
 
-    val globalConsts = globals.map(g => BVarDecl(g.toAddrVar)).toList
+    val globalConsts: List[BDeclaration] = globals.map(g => List(BVarDecl(g.toAddrVar), g.toAxiom)).toList.flatten
 
     val functionsUsed: List[BFunction] = procedures.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct
 
-    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ procedures
+    val relyProcs = genRely(relies)
+
+    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ relyProcs ++ procedures
     avoidReserved(BProgram(declarations))
+  }
+
+  def genRely(relies: Map[GlobalVariable, BExpr]): List[BProcedure] = {
+    val mem = MapVar("mem", MapType(BitVec(64), BitVec(8)), Scope.Global)
+    val Gamma_mem = MapVar("Gamma_mem", MapType(BitVec(64), BoolType), Scope.Global)
+    val i = BVariable("i", BitVec(64), Scope.Local)
+    val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem, i), Old(MapAccess(mem, i))), BinaryBExpr(BVEQ, MapAccess(Gamma_mem, i), Old(MapAccess(Gamma_mem, i)))))
+    val ensures = List(rely2) ++ relies.values.toList
+    val relyProc = BProcedure("rely", List(), List(), ensures, List(), Set(mem, Gamma_mem), List())
+    val relyTransitive = BProcedure("rely_transitive", List(), List(), relies.values.toList, List(), Set(mem, Gamma_mem), List(ProcedureCall("rely", List(), List()), ProcedureCall("rely", List(), List())))
+    //val relyReflexive = BProcedure("rely_reflexive", List(), List(), List())
+    List(relyProc, relyTransitive)
   }
 
   def functionOpToDefinition(f: FunctionOp): BFunction = {
@@ -239,10 +253,17 @@ case class BoogieTranslator(program: Program, globals: Set[GlobalVariable], reli
         List(store)
       } else {
         val rely = ProcedureCall("rely", List(), List())
-        val gammaValueCheck = Assert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), rhsGamma))
+        val gammaValueCheck = Assert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.rhs.value.toGamma))
         val oldAssigns = controls.keys.map(g => AssignCmd(g.toOldVar, MemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size))).toList
-        val oldGammaAssigns = controlledBy.keys.map(g => AssignCmd(g.toOldGamma, BinaryBExpr(BoolOR, GammaLoad(lhsGamma, g.toAddrVar, g.size, g.size / m.lhs.valueSize), L(lhs, g.toAddrVar)))).toList
-        List(rely, gammaValueCheck) ++ oldAssigns ++ oldGammaAssigns :+ store
+        val oldGammaAssigns = guarantees.keys.map(g => AssignCmd(g.toOldGamma, BinaryBExpr(BoolOR, GammaLoad(lhsGamma, g.toAddrVar, g.size, g.size / m.lhs.valueSize), L(lhs, g.toAddrVar)))).toList
+        val secureUpdate = for (c <- controls.keys) yield {
+          val addrCheck = BinaryBExpr(BVEQ, rhs.index, c.toAddrVar)
+          val checks = controls(c).map(v => BinaryBExpr(BoolIMPLIES, L(lhs, v.toAddrVar), v.toOldGamma)).toList
+          val checksAnd = checks.tail.foldLeft(checks.head)((next: BExpr, ands: BExpr) => BinaryBExpr(BoolAND, next, ands))
+          Assert(BinaryBExpr(BoolIMPLIES, addrCheck, checksAnd))
+        }
+        val guaranteeChecks = guarantees.values.map(v => Assert(v)).toList
+        (List(rely, gammaValueCheck) ++ oldAssigns ++ oldGammaAssigns :+ store) ++ secureUpdate ++ guaranteeChecks
       }
     case l: LocalAssign =>
       val lhs = l.lhs.toBoogie

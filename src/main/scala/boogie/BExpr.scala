@@ -364,7 +364,7 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
 trait QuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends BExpr {
   override def toString: String = {
     val boundString = bound.map(_.withType).mkString(", ")
-    s"sort $boundString :: ($body)"
+    s"$sort $boundString :: ($body)"
   }
   override def getType: BType = BoolType
   override def functionOps: Set[FunctionOp] = body.functionOps
@@ -451,7 +451,7 @@ case class MemoryLoad(memory: MapVar, index: BExpr, endian: Endian, bits: Int) e
 
   def accesses: Int = bits/valueSize
 
-  override def getType: BType = memory.getType.result
+  override def getType: BType = BitVec(bits)
   override def functionOps: Set[FunctionOp] = memory.functionOps ++ index.functionOps + this
   override def locals: Set[BVar] = memory.locals ++ index.locals
   override def globals: Set[BVar] = index.globals ++ memory.globals
@@ -461,7 +461,7 @@ case class MemoryLoad(memory: MapVar, index: BExpr, endian: Endian, bits: Int) e
 }
 
 case class MemoryStore(memory: MapVar, index: BExpr, value: BExpr, endian: Endian, bits: Int) extends BExpr with FunctionOp {
-  override def toString: String = s"$fnName($memory, $index)"
+  override def toString: String = s"$fnName($memory, $index, $value)"
 
   def fnName: String = endian match {
     case Endian.LittleEndian => s"memory_store${bits}_le"
@@ -503,7 +503,7 @@ case class GammaLoad(gammaMap: MapVar, index: BExpr, bits: Int, accesses: Int) e
 
   def valueSize: Int = bits/accesses
 
-  override def getType: BType = gammaMap.getType.result
+  override def getType: BType = BoolType
   override def functionOps: Set[FunctionOp] = gammaMap.functionOps ++ index.functionOps + this
   override def locals: Set[BVar] = gammaMap.locals ++ index.locals
   override def globals: Set[BVar] = index.globals ++ gammaMap.globals
@@ -513,7 +513,7 @@ case class GammaLoad(gammaMap: MapVar, index: BExpr, bits: Int, accesses: Int) e
 }
 
 case class GammaStore(gammaMap: MapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int) extends BExpr with FunctionOp {
-  override def toString: String = s"$fnName($gammaMap, $index)"
+  override def toString: String = s"$fnName($gammaMap, $index, $value)"
   def fnName: String = s"gamma_store$bits"
 
   def addressSize: Int = gammaMap.getType.param match {
