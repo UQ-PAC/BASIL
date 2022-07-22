@@ -30,6 +30,11 @@ case class BitVecLiteral(value: BigInt, size: Int) extends BLiteral {
   override def toString: String = s"${value}bv$size"
 }
 
+case class IntLiteral(value: BigInt) extends BLiteral {
+  override def getType: BType = IntType
+  override def toString: String = value.toString
+}
+
 case class BVExtract(end: Int, start: Int, body: BExpr) extends BExpr {
   override def getType: BitVec = BitVec(end - start)
   override def toString: String = s"$body[$end:$start]"
@@ -177,6 +182,7 @@ case class UnaryBExpr(op: BUnOp, arg: BExpr) extends BExpr {
   override def getType: BType = (op, arg.getType) match {
     case (_: BoolUnOp, BoolType) => BoolType
     case (_: BVUnOp, bv: BitVec) => bv
+    case (_: IntUnOp, IntType) => IntType
     case _ => throw new Exception("type mismatch, operator " + op + " type doesn't match arg: " + arg)
   }
 
@@ -188,6 +194,7 @@ case class UnaryBExpr(op: BUnOp, arg: BExpr) extends BExpr {
   override def toString: String = op match {
     case uOp: BoolUnOp => s"$uOp$arg"
     case uOp: BVUnOp   => s"bv$uOp$inSize($arg)"
+    case uOp: IntUnOp  => s"$uOp$arg"
   }
 
   override def functionOps: Set[FunctionOp] = {
@@ -213,6 +220,12 @@ sealed trait BoolUnOp(op: String) extends BUnOp {
 }
 
 case object BoolNOT extends BoolUnOp("!")
+
+sealed trait IntUnOp(op: String) extends BUnOp {
+  override def toString: String = op
+}
+
+case object IntNEG extends IntUnOp("-")
 
 sealed trait BVUnOp(op: String) extends BUnOp {
   override def toString: String = op
@@ -251,6 +264,11 @@ case class BinaryBExpr(op: BBinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
         case BVEQ | BVNEQ =>
           BoolType
       }
+    case (intOp: IntBinOp, IntType, IntType) =>
+      intOp match {
+        case IntADD | IntSUB | IntMUL | IntDIV | IntMOD => IntType
+        case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => BoolType
+      }
     case _ =>
       throw new Exception("type mismatch, operator " + op + " type doesn't match args: (" + arg1 + ", " + arg2 + ")")
   }
@@ -260,6 +278,7 @@ case class BinaryBExpr(op: BBinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
     case _          => throw new Exception("type mismatch")
   }
 
+  // TODO automatically add brackets if necessary
   override def toString: String = op match {
     case bOp: BoolBinOp => s"$arg1 $bOp $arg2"
     case bOp: BVBinOp =>
@@ -269,6 +288,7 @@ case class BinaryBExpr(op: BBinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
         case _ =>
           s"bv$bOp$inSize($arg1, $arg2)"
       }
+    case bOp: IntBinOp => s"$arg1 $bOp $arg2"
   }
 
   override def functionOps: Set[FunctionOp] = {
@@ -338,6 +358,22 @@ case object BVSGE extends BVBinOp("sge")
 case object BVEQ extends BVBinOp("==")
 case object BVNEQ extends BVBinOp("!=")
 case object BVCONCAT extends BVBinOp("++")
+
+sealed trait IntBinOp(op: String) extends BBinOp {
+  override def toString: String = op
+}
+
+case object IntADD extends IntBinOp("+")
+case object IntMUL extends IntBinOp("*")
+case object IntSUB extends IntBinOp("-")
+case object IntDIV extends IntBinOp("div")
+case object IntMOD extends IntBinOp("mod")
+case object IntEQ extends IntBinOp("==")
+case object IntNEQ extends IntBinOp("!=")
+case object IntLT extends IntBinOp("<")
+case object IntLE extends IntBinOp("<=")
+case object IntGT extends IntBinOp(">")
+case object IntGE extends IntBinOp(">=")
 
 case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BExpr {
   override def getType: BType = {
