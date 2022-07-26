@@ -1,11 +1,11 @@
 package translating
 
-import astnodes._
 import BilParser.SymsParser._
+import specification._
 import scala.jdk.CollectionConverters._
 
 object ElfLoader {
-  def visitSyms(ctx: SymsContext): (Set[ExternalFunction], Set[GlobalVariable]) = {
+  def visitSyms(ctx: SymsContext): (Set[ExternalFunction], Set[SpecGlobal]) = {
     val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTable(r)).toSet
     val globalVariables = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toSet
     (externalFunctions, globalVariables)
@@ -24,7 +24,7 @@ object ElfLoader {
     ExternalFunction(ctx.name.getText.stripSuffix("@GLIBC_2.17"), BigInt(ctx.offset.getText, 16))
   }
 
-  def visitSymbolTable(ctx: SymbolTableContext): Set[GlobalVariable] = {
+  def visitSymbolTable(ctx: SymbolTableContext): Set[SpecGlobal] = {
     if (ctx.symbolTableHeader.tableName.STRING.getText == ".symtab") {
       val rows = ctx.symbolTableRow.asScala
       rows.flatMap(r => visitSymbolTableRow(r)).toSet
@@ -33,9 +33,9 @@ object ElfLoader {
     }
   }
 
-  def visitSymbolTableRow(ctx: SymbolTableRowContext): Option[GlobalVariable] = {
+  def visitSymbolTableRow(ctx: SymbolTableRowContext): Option[SpecGlobal] = {
     if (ctx.entrytype.getText == "OBJECT" && ctx.bind.getText == "GLOBAL" && ctx.vis.getText == "DEFAULT") {
-      Some(GlobalVariable(ctx.name.getText, ctx.size.getText.toInt * 8, BigInt(ctx.value.getText, 16)))
+      Some(SpecGlobal(ctx.name.getText, ctx.size.getText.toInt * 8, BigInt(ctx.value.getText, 16)))
     } else {
       None
     }

@@ -52,12 +52,3 @@ case class Instruction(asm: String, statements: List[Statement]) {
 case class Parameter(name: String, size: Int, register: LocalVar) {
   // def toBoogieString: String = name + ": bv" + size
 }
-
-case class GlobalVariable(name: String, size: Int, address: BigInt) {
-  def toAddrVar: BVar = BVariable("$" + s"${name}_addr", BitVec(64), Scope.Const)
-  def toOldVar: BVar = BVariable(s"${name}_old", BitVec(size), Scope.Local)
-  def toOldGamma: BVar = BVariable(s"Gamma_${name}_old", BoolType, Scope.Local)
-  def toAxiom: BAxiom = BAxiom(BinaryBExpr(BoolEQ, toAddrVar, BitVecLiteral(address, 64)))
-}
-
-case class ExternalFunction(name: String, offset: BigInt)

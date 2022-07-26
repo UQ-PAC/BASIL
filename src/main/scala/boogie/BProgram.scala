@@ -105,6 +105,10 @@ case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar,
     val bodyUpdate = body.map(b => b.replaceReserved(reserved))
     copy(name = nameUpdate, in = inUpdate, out = outUpdate, body = bodyUpdate)
   }
+  def functionOps: Set[FunctionOp] = body match {
+    case Some(b) => b.functionOps
+    case None => Set()
+  }
 }
 
 case class BVarDecl(variable: BVar) extends BDeclaration {
