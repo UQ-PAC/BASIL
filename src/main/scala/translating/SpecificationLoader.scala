@@ -18,6 +18,10 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
       case Some(_) => visitGammaInits(ctx.gammaInits)
       case None => Map()
     }
+    val inits = Option(ctx.inits) match {
+      case Some(_) => visitInits(ctx.inits)
+      case None => Map()
+    }
     val relies = Option(ctx.relies) match {
       case Some(_) => visitRelies(ctx.relies)
       case None => List()
@@ -26,7 +30,7 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
       case Some(_) => visitGuarantees(ctx.guarantees)
       case None => List()
     }
-    specification.Specification(globals, lPreds, gammaInits, relies, guarantees)
+    specification.Specification(globals, lPreds, gammaInits, inits, relies, guarantees)
   }
 
   def visitLPred(ctx: LPredContext): (SpecGlobal, BExpr) = {
@@ -39,6 +43,14 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
 
   def visitGammaInits(ctx: GammaInitsContext): Map[SpecGlobal, BoolLit] = {
     ctx.gamma.asScala.map(g => visitGamma(g)).toMap
+  }
+
+  def visitInit(ctx: InitContext): (SpecGlobal, IntLiteral) = {
+    (idToGlobals(ctx.id.getText), visitNat(ctx.nat))
+  }
+
+  def visitInits(ctx: InitsContext): Map[SpecGlobal, IntLiteral] = {
+    ctx.init.asScala.map(i => visitInit(i)).toMap
   }
 
   def visitLPreds(ctx: LPredsContext): Map[SpecGlobal, BExpr] = {
@@ -103,7 +115,7 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
 
   def visitAtomExpr(ctx: AtomExprContext): BExpr = ctx match {
     case b: BoolLitExprContext => visitBoolLit(b.boolLit)
-    case n: NatContext => visitNat(n)
+    case n: NatExprContext => visitNat(n.nat)
     case i: IdExprContext => visitId(i.id)
     case g: GammaIdExprContext => visitGammaId(g.gammaId)
     case o: OldExprContext => visitOldExpr(o)

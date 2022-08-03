@@ -1,11 +1,13 @@
 grammar Specifications;
 
-specification: lPreds? gammaInits? relies? guarantees?;
+specification: lPreds? gammaInits? inits? relies? guarantees?;
 
 lPreds : 'L:' lPred (COMMA lPred)*;
 lPred : id MAPSTO expr;
-gammaInits : 'GAMMA:' gamma (COMMA gamma)*;
+gammaInits : 'Gamma:' gamma (COMMA gamma)*;
 gamma : id MAPSTO boolLit;
+inits : 'Init:' init (COMMA init)*;
+init : id MAPSTO nat;
 //lattice: 'Lattice:' lattice_elem (COMMA lattice_elem)* ;
 
 relies: 'Rely:' expr (COMMA expr)*;
@@ -41,6 +43,7 @@ gammaId : 'Gamma_' id;
 id : NON_DIGIT ( NON_DIGIT | DIGIT )*;
 NON_DIGIT : ( [A-Z] | [a-z] | '\'' | '~' | '#' | '$' | '^' | '_' | '.' | '?' | '`') ;
 DIGIT : [0-9] ;
+nat: (DIGIT)+ ;
 
 // based upon boogie grammar: https://boogie-docs.readthedocs.io/en/latest/LangRef.html#grammar
 expr : impliesExpr ( EQUIV_OP impliesExpr )* ;
@@ -58,7 +61,7 @@ unaryExpr : atomExpr #atomUnaryExpr
           ;
 
 atomExpr : boolLit #boolLitExpr
-         | (DIGIT)+ #nat
+         | nat #natExpr
          | id #idExpr
          | gammaId #gammaIdExpr
          | 'old' LPAREN expr RPAREN #oldExpr

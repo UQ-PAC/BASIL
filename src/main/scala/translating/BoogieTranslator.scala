@@ -11,8 +11,11 @@ case class BoogieTranslator(program: Program, spec: Specification) {
   private val relies = spec.relies.map(r => r.resolveSpec)
   private val reliesReflexive = spec.relies.map(r => r.removeOld)
   private val guarantees = spec.guarantees.map(g => g.resolveOld)
+  private val guaranteesReflexive = spec.guarantees.map(g => g.removeOld)
   private val guaranteeOldVars = spec.guaranteeOldVars
-  private val LPreds = spec.LPreds.map((k, v) => k -> v.resolveSpec)
+  private val LPreds = spec.LPreds.map((k, v) => k -> v.resolveSpecL)
+  private val gammaInits = spec.gammaInits.map((k, v) => BinaryBExpr(BVEQ, SpecGamma(k).resolveSpec, v))
+  private val inits = spec.inits.map((k, v) => BinaryBExpr(BVEQ, k.resolveSpec, BitVecLiteral(v.value, k.size)))
 
   def translate: BProgram = {
     val procedures = program.functions.map(f => translate(f))
@@ -22,13 +25,13 @@ case class BoogieTranslator(program: Program, spec: Specification) {
 
     val functionsUsed1: List[BFunction] = procedures.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct
 
-    val relyProcs = genRely(relies)
+    val rgProcs = genRely(relies) :+ BProcedure("guarantee_reflexive", List(), List(), List(), List(), Set(), guaranteesReflexive.map(g => Assert(g)))
 
-    val functionsUsed2 = relyProcs.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct
+    val functionsUsed2 = rgProcs.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct
     val functionsUsed3 = functionsUsed1.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct
     val functionsUsed = (functionsUsed1 ++ functionsUsed2 ++ functionsUsed3).distinct
 
-    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ relyProcs ++ procedures
+    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgProcs ++ procedures
     avoidReserved(BProgram(declarations))
   }
 
@@ -119,7 +122,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
       case g: GammaStore =>
         val gammaMapVar = MapVar("gammaMap", g.gammaMap.getType, Scope.Parameter)
         val indexVar = BParam("index", g.gammaMap.getType.param)
-        val valueVar = BParam("value", BitVec(g.bits))
+        val valueVar = BParam("value", BoolType)
         val in = List(gammaMapVar, indexVar, valueVar)
         val out = BParam(g.gammaMap.getType)
 
@@ -131,7 +134,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
           }
         }
         val values: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
-          BVExtract((i + 1) * g.valueSize, i * g.valueSize, valueVar)
+          valueVar
         }
         val indiceValues = for (i <- 0 until g.accesses) yield {
           (indices(i), values(i))
@@ -143,6 +146,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
 
         BFunction(g.fnName, "", in, out, Some(body))
       case l: L =>
+        val memoryVar = BParam("memory", l.memory.getType)
         val indexVar = BParam("index", l.index.getType)
         val body: BExpr = LPreds.keys.foldLeft(FalseLiteral) {
           (ite: BExpr, next: SpecGlobal) => {
@@ -156,7 +160,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
             IfThenElse(guard, LPred, ite)
           }
         }
-        BFunction("L", "", List(BParam("memory", l.memory.getType), indexVar), BParam(BoolType), Some(body))
+        BFunction("L", "", List(memoryVar, indexVar), BParam(BoolType), Some(body))
     }
   }
 
@@ -166,13 +170,18 @@ case class BoogieTranslator(program: Program, spec: Specification) {
     val returns = f.out.map(p => outParamToAssign(p))
     val body = f.blocks.map(b => translate(b, returns))
     val modifies = body.flatMap(b => b.modifies).toSet
-    val inits = if (body.isEmpty) {
+    val requires: List[BExpr] = if (f.name == "main") {
+      gammaInits.toList ++ inits.toList
+    } else {
+      List()
+    }
+    val inInits = if (body.isEmpty) {
       List()
     } else {
       f.in.map(p => inParamToAssign(p))
     }
 
-    BProcedure(f.name, in, out, List(), List(), modifies, inits ++ body)
+    BProcedure(f.name, in, out, List(), requires, modifies, inInits ++ body)
   }
 
   private def outParamToAssign(p: Parameter): AssignCmd = {

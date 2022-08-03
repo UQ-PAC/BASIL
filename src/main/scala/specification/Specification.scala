@@ -20,6 +20,7 @@ case class SpecGlobal(name: String, size: Int, address: BigInt) extends SpecVar 
   override def resolveSpec: MemoryLoad = MemoryLoad(MapVar("mem", MapType(BitVec(64), BitVec(8)), Scope.Global), toAddrVar, Endian.LittleEndian, size)
   override def resolveOld: MemoryLoad = resolveSpec
   override def removeOld: MemoryLoad = resolveSpec
+  override def resolveSpecL: MemoryLoad = MemoryLoad(MapVar("memory", MapType(BitVec(64), BitVec(8)), Scope.Parameter), toAddrVar, Endian.LittleEndian, size)
 }
 
 case class SpecGamma(global: SpecGlobal) extends SpecVar {
@@ -27,9 +28,10 @@ case class SpecGamma(global: SpecGlobal) extends SpecVar {
   override def resolveSpec: GammaLoad = GammaLoad(MapVar("Gamma_mem", MapType(BitVec(64), BoolType), Scope.Global), global.toAddrVar, global.size, global.size/8)
   override def resolveOld: GammaLoad = resolveSpec
   override def removeOld: GammaLoad = resolveSpec
+  override def resolveSpecL: GammaLoad = resolveSpec
 }
 
-case class Specification(globals: Set[SpecGlobal], LPreds: Map[SpecGlobal, BExpr], gammaInits: Map[SpecGlobal, BoolLit], relies: List[BExpr], guarantees: List[BExpr]) {
+case class Specification(globals: Set[SpecGlobal], LPreds: Map[SpecGlobal, BExpr], gammaInits: Map[SpecGlobal, BoolLit], inits: Map[SpecGlobal, IntLiteral], relies: List[BExpr], guarantees: List[BExpr]) {
   val guaranteeOldVars: List[SpecGlobal] = guarantees.flatMap(g => g.oldSpecVars.collect{ case s: SpecGlobal => s })
 
   val controls: Map[SpecGlobal, Set[SpecGlobal]] = {

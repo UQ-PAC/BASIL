@@ -13,6 +13,7 @@ trait BExpr {
   def resolveSpec: BExpr = this
   def resolveOld: BExpr = this
   def removeOld: BExpr = this
+  def resolveSpecL: BExpr = this
 }
 
 trait BLiteral extends BExpr {
@@ -39,6 +40,7 @@ case class BitVecLiteral(value: BigInt, size: Int) extends BLiteral {
 case class IntLiteral(value: BigInt) extends BLiteral {
   override def getType: BType = IntType
   override def toString: String = value.toString
+  override def resolveSpecL: BitVecLiteral = BitVecLiteral(value, 32) // TODO
   override def resolveSpec: BitVecLiteral = BitVecLiteral(value, 32) // TODO
   override def resolveOld: BitVecLiteral = BitVecLiteral(value, 32) // TODO
   override def removeOld: BitVecLiteral = BitVecLiteral(value, 32) // TODO
@@ -54,6 +56,7 @@ case class BVExtract(end: Int, start: Int, body: BExpr) extends BExpr {
   override def oldSpecVars: Set[SpecVar] = body.oldSpecVars
   override def replaceReserved(reserved: Set[String]): BVExtract = copy(body = body.replaceReserved(reserved))
   override def resolveSpec: BVExtract = copy(body = body.resolveSpec)
+  override def resolveSpecL: BVExtract = copy(body = body.resolveSpecL)
   override def resolveOld: BVExtract = copy(body = body.resolveOld)
   override def removeOld: BVExtract = copy(body = body.removeOld)
 }
@@ -78,6 +81,7 @@ case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
   override def specVars: Set[SpecVar] = body.specVars
   override def oldSpecVars: Set[SpecVar] = body.oldSpecVars
   override def resolveSpec: BVRepeat = copy(body = body.resolveSpec)
+  override def resolveSpecL: BVRepeat = copy(body = body.resolveSpecL)
   override def resolveOld: BVRepeat = copy(body = body.resolveOld)
   override def removeOld: BVRepeat = copy(body = body.removeOld)
   override def replaceReserved(reserved: Set[String]): BVRepeat = copy(body = body.replaceReserved(reserved))
@@ -104,6 +108,7 @@ case class BVZeroExtend(extension: Int, body: BExpr) extends BExpr {
   override def specVars: Set[SpecVar] = body.specVars
   override def oldSpecVars: Set[SpecVar] = body.oldSpecVars
   override def resolveSpec: BVZeroExtend = copy(body = body.resolveSpec)
+  override def resolveSpecL: BVZeroExtend = copy(body = body.resolveSpecL)
   override def resolveOld: BExpr = copy(body = body.resolveOld)
   override def removeOld: BExpr = copy(body = body.removeOld)
   override def replaceReserved(reserved: Set[String]): BVZeroExtend = copy(body = body.replaceReserved(reserved))
@@ -129,6 +134,7 @@ case class BVSignExtend(extension: Int, body: BExpr) extends BExpr {
   override def globals: Set[BVar] = body.globals
   override def specVars: Set[SpecVar] = body.specVars
   override def oldSpecVars: Set[SpecVar] = body.oldSpecVars
+  override def resolveSpecL: BVSignExtend = copy(body = body.resolveSpecL)
   override def resolveSpec: BVSignExtend = copy(body = body.resolveSpec)
   override def resolveOld: BExpr = copy(body = body.resolveOld)
   override def removeOld: BExpr = copy(body = body.removeOld)
@@ -199,6 +205,7 @@ case class FunctionCall(name: String, args: List[BExpr], bType: BType) extends B
   override def specVars: Set[SpecVar] = args.flatMap(a => a.specVars).toSet
   override def oldSpecVars: Set[SpecVar] = args.flatMap(a => a.oldSpecVars).toSet
   override def resolveSpec: FunctionCall = copy(args = args.map(a => a.resolveSpec))
+  override def resolveSpecL: FunctionCall = copy(args = args.map(a => a.resolveSpecL))
   override def resolveOld: BExpr = copy(args = args.map(a => a.resolveOld))
   override def removeOld: BExpr = copy(args = args.map(a => a.removeOld))
   override def replaceReserved(reserved: Set[String]): FunctionCall = {
@@ -247,6 +254,10 @@ case class UnaryBExpr(op: BUnOp, arg: BExpr) extends BExpr {
   override def resolveSpec: UnaryBExpr = op match {
     case i: IntUnOp => copy(op = i.toBV, arg = arg.resolveSpec)
     case _ => copy(arg = arg.resolveSpec)
+  }
+  override def resolveSpecL: UnaryBExpr = op match {
+    case i: IntUnOp => copy(op = i.toBV, arg = arg.resolveSpecL)
+    case _ => copy(arg = arg.resolveSpecL)
   }
   override def resolveOld: BExpr = op match {
     case i: IntUnOp => copy(op = i.toBV, arg = arg.resolveOld)
@@ -367,6 +378,11 @@ case class BinaryBExpr(op: BBinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
     case _ => copy(arg1 = arg1.resolveSpec, arg2 = arg2.resolveSpec)
   }
 
+  override def resolveSpecL: BinaryBExpr = op match {
+    case i: IntBinOp => copy(op = i.toBV, arg1 = arg1.resolveSpecL, arg2 = arg2.resolveSpecL)
+    case _ => copy(arg1 = arg1.resolveSpecL, arg2 = arg2.resolveSpecL)
+  }
+
   override def resolveOld: BinaryBExpr = op match {
     case i: IntBinOp => copy(op = i.toBV, arg1 = arg1.resolveOld, arg2 = arg2.resolveOld)
     case _ => copy(arg1 = arg1.resolveOld, arg2 = arg2.resolveOld)
@@ -474,6 +490,7 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def specVars: Set[SpecVar] = guard.specVars ++ thenExpr.specVars ++ elseExpr.specVars
   override def oldSpecVars: Set[SpecVar] = guard.oldSpecVars ++ thenExpr.oldSpecVars ++ elseExpr.oldSpecVars
   override def resolveSpec: IfThenElse = copy(guard = guard.resolveSpec, thenExpr = thenExpr.resolveSpec, elseExpr = elseExpr.resolveSpec)
+  override def resolveSpecL: IfThenElse = copy(guard = guard.resolveSpecL, thenExpr = thenExpr.resolveSpecL, elseExpr = elseExpr.resolveSpecL)
   override def resolveOld: IfThenElse = copy(guard = guard.resolveOld, thenExpr = thenExpr.resolveOld, elseExpr = elseExpr.resolveOld)
   override def removeOld: IfThenElse = copy(guard = guard.removeOld, thenExpr = thenExpr.removeOld, elseExpr = elseExpr.removeOld)
   override def replaceReserved(reserved: Set[String]): IfThenElse = {
@@ -527,6 +544,7 @@ case class Old(body: BExpr) extends BExpr {
   override def globals: Set[BVar] = body.globals
   override def oldSpecVars: Set[SpecVar] = body.specVars
   override def resolveSpec: BExpr = copy(body = body.resolveSpec)
+  override def resolveSpecL: BExpr = copy(body = body.resolveSpecL)
   override def resolveOld: BExpr = body match {
     case s: SpecGlobal => s.toOldVar
     case s: SpecGamma => s.global.toOldGamma
