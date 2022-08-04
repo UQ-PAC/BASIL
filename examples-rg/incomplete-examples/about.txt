@@ -1,0 +1,1 @@
+This folder is for examples which look promising but which need some specifications or rely-guarantee conditions to be derived or proven.
