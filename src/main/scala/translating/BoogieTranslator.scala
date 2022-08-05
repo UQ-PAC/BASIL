@@ -298,7 +298,13 @@ case class BoogieTranslator(program: Program, spec: Specification) {
       val rhs = l.rhs.toBoogie
       val lhsGamma = l.lhs.toGamma
       val rhsGamma = l.rhs.toGamma
-      List(AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma)))
+      val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
+      if (rhs.functionOps.collect { case m: MemoryLoad => m}.nonEmpty) {
+        List(ProcedureCall("rely", List(), List()), assign)
+      } else {
+        List(assign)
+      }
+
   }
 
   def coerceProcedureCall(target: String, in: List[Parameter], out: List[Parameter]): List[BCmd] = {
