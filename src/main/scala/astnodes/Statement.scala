@@ -117,7 +117,7 @@ case class GammaUpdate (lhs: SecVar | SecMemLoad, sec: Sec) extends Statement {
 
 /** Memory store
   */
-case class MemAssign(lhs: MemAccess, rhs: Expr) extends Assign(lhs, rhs) {
+case class MemAssign(lhs: Memory, rhs: Store) extends Assign(lhs, rhs) {
 
   //override def toBoogieString: String = s"${lhs.toBoogieString} := ${rhs.toBoogieString};"
   /*
@@ -130,9 +130,19 @@ case class MemAssign(lhs: MemAccess, rhs: Expr) extends Assign(lhs, rhs) {
   }
    */
 
-  override def modifies: Set[Memory] = Set(lhs.memory)
+  override def modifies: Set[Memory] = Set(lhs)
 
-  override def locals: Set[LocalVar] = lhs.locals ++ rhs.locals
+  override def locals: Set[LocalVar] = rhs.locals
+}
+
+object MemAssign {
+  def init(lhs: Memory, rhs: Store): MemAssign = {
+    if (rhs.memory.name == "stack") {
+      MemAssign(lhs.copy(name = "stack"), rhs)
+    } else {
+      MemAssign(lhs, rhs)
+    }
+  }
 }
 
 case class LocalAssign(lhs: LocalVar, rhs: Expr) extends Assign(lhs, rhs) {

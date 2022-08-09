@@ -2,6 +2,7 @@ package util
 //import analysis._
 import astnodes._
 import boogie._
+import specification._
 import BilParser._
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
@@ -13,7 +14,7 @@ import scala.jdk.CollectionConverters._
 
 object RunUtils {
 
-  def generateVCsAdt(fileName: String, elfFileName: String): BProgram = {
+  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: String): BProgram = {
     val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(adtLexer)
     // ADT
@@ -29,6 +30,13 @@ object RunUtils {
     elfParser.setBuildParseTree(true)
 
     val (externalFunctions, globals) = ElfLoader.visitSyms(elfParser.syms())
+
+    val specLexer = SpecificationsLexer(CharStreams.fromFileName(specFileName))
+    val specTokens = CommonTokenStream(specLexer)
+    val specParser = SpecificationsParser(specTokens)
+    specParser.setBuildParseTree(true)
+    val specLoader = SpecificationLoader(globals)
+    val specification = specLoader.visitSpecification(specParser.specification())
 
     //println(externalFunctions)
     //println(globals)
@@ -48,8 +56,9 @@ object RunUtils {
 
     val externalNames = externalFunctions.map(e => e.name)
 
-    val programUnusedRemoved = BoogieTranslator(program).stripUnreachableFunctions(externalNames)
-    BoogieTranslator(programUnusedRemoved).translate
+    val translator = BoogieTranslator(program, specification)
+    val translatorUnusedRemoved = translator.stripUnreachableFunctions(externalNames)
+    translatorUnusedRemoved.translate
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {

@@ -33,7 +33,7 @@ object AdtStatementLoader {
   }
 
   def visitStore(ctx: StoreContext): Store = {
-    Store(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitExp(ctx.value), visitEndian(ctx.endian), parseInt(ctx.num))
+    Store.init(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitExp(ctx.value), visitEndian(ctx.endian), parseInt(ctx.num))
   }
 
   def visitBinOp(ctx: BinOpContext): BinOp = {
@@ -187,12 +187,7 @@ object AdtStatementLoader {
   }
 
   def visitMemDef(ctx: MemDefContext): (String, MemAssign) = {
-    val lhs = visitMemVar(ctx.lhs)
-    val rhs = visitStore(ctx.rhs)
-    if (lhs != rhs.memory) {
-      throw new Exception("trying to store memory in unrelated memory")
-    }
-    val assign = MemAssign(MemAccess.init(lhs, rhs.index, rhs.endian, rhs.size), rhs.value)
+    val assign = MemAssign.init(visitMemVar(ctx.lhs), visitStore(ctx.rhs))
     (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), assign)
   }
 
