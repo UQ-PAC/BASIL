@@ -1,0 +1,5 @@
+From the WPIF paper.
+
+read waits for z to be even, indicating a low value for x. It then stores that value in local variable, but later checks if z has changed in the meantime. If so, it means the environment may have also changed x just before it was stored locally. In this case, read throws away the value and loops back around. Otherwise, it returns the value.
+
+Verification depends on read knowing that sync_write can't set z to odd, update x and then re-set z back to the same value. One way to express this as a rely condition is that z is always increasing or always decreasing, but we specifically need that z will never be assigned a value it has had before.

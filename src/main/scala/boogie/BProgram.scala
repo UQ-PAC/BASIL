@@ -13,8 +13,8 @@ trait BDeclaration {
 
 case class BProcedure(
     name: String,
-    in: List[BParam],
-    out: List[BParam],
+    in: List[BVar],
+    out: List[BVar],
     ensures: List[BExpr],
     requires: List[BExpr],
     modifies: Set[BVar],
@@ -45,7 +45,7 @@ case class BProcedure(
     List(header + returns + semicolon) ++ modifiesStr ++ requiresStrs ++ ensuresStrs ++ bodyStr ++ List("")
   }
   override def toString: String = toBoogie.mkString("\n")
-  def bvFunctions: Set[BFunction] = body.flatMap(c => c.bvFunctions).toSet
+  def functionOps: Set[FunctionOp] = body.flatMap(c => c.functionOps).toSet
   def globals: Set[BVar] = body.flatMap(c => c.globals).toSet
 
   override def replaceReserved(reserved: Set[String]): BProcedure = {
@@ -78,7 +78,7 @@ case class BAxiom(body: BExpr) extends BDeclaration {
   override def replaceReserved(reserved: Set[String]): BAxiom = copy(body = body.replaceReserved(reserved))
 }
 
-case class BFunction(name: String, bvbuiltin: String, in: List[BParam], out: BParam, body: Option[BExpr])
+case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar, body: Option[BExpr])
     extends BDeclaration {
   override def toBoogie: List[String] = {
     val bvbuiltinString = if (bvbuiltin.isEmpty) {
@@ -89,7 +89,7 @@ case class BFunction(name: String, bvbuiltin: String, in: List[BParam], out: BPa
     val inString = in.map(_.withType).mkString(", ")
     val declString = s"function$bvbuiltinString $name($inString) returns (${out.withType})"
     body match {
-      case Some(b) => List(declString + " {", "  " + b.toString, "}")
+      case Some(b) => List(declString + " {", "  " + b.toString, "}", "")
       case None    => List(declString + ";")
     }
   }
@@ -105,10 +105,18 @@ case class BFunction(name: String, bvbuiltin: String, in: List[BParam], out: BPa
     val bodyUpdate = body.map(b => b.replaceReserved(reserved))
     copy(name = nameUpdate, in = inUpdate, out = outUpdate, body = bodyUpdate)
   }
+  def functionOps: Set[FunctionOp] = body match {
+    case Some(b) => b.functionOps
+    case None => Set()
+  }
 }
 
 case class BVarDecl(variable: BVar) extends BDeclaration {
-  override def toString: String = s"var $variable: ${variable.getType};"
+  override def toString: String = if (variable.scope == Scope.Const) {
+    s"const $variable: ${variable.getType};"
+  } else {
+    s"var $variable: ${variable.getType};"
+  }
   override def replaceReserved(reserved: Set[String]): BVarDecl = {
     copy(variable = variable.replaceReserved(reserved))
   }

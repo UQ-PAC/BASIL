@@ -1,0 +1,3 @@
+Sourced from the ReGaSol paper.
+
+loop represents a simple loop with an invariant which needs to be weakened to account for potential interference. The rely-guarantee conditions presented here are my own interpretation of the ones given in the paper and this interpretations is not yet formally verified by hand.

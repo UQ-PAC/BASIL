@@ -1,0 +1,3 @@
+Created by James T.
+
+Like basic_sec_policy, except the assignments r := 0 and r := x are swapped. Thus, read requires the environment to maintain the security policy once it has been established true.
