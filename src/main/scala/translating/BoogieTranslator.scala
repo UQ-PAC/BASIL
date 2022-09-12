@@ -186,12 +186,12 @@ case class BoogieTranslator(program: Program, spec: Specification) {
 
   private def outParamToAssign(p: Parameter): AssignCmd = {
     val param = BParam(p.name, BitVec(p.size))
-    val register = p.register.toBoogie
+    val register = p.value.toBoogie
     val paramGamma = BParam(s"Gamma_${p.name}", BoolType)
-    val registerGamma = p.register.toGamma
-    val assigned = if (p.size > p.register.size) {
-      BVZeroExtend(p.size - p.register.size, register)
-    } else if (p.size < p.register.size) {
+    val registerGamma = p.value.toGamma
+    val assigned = if (p.size > p.value.size) {
+      BVZeroExtend(p.size - p.value.size, register)
+    } else if (p.size < p.value.size) {
       BVExtract(p.size, 0, register)
     } else {
       register
@@ -201,13 +201,13 @@ case class BoogieTranslator(program: Program, spec: Specification) {
 
   private def inParamToAssign(p: Parameter): AssignCmd = {
     val param = BParam(p.name, BitVec(p.size))
-    val register = p.register.toBoogie
+    val register = p.value.toBoogie
     val paramGamma = BParam(s"Gamma_${p.name}", BoolType)
-    val registerGamma = p.register.toGamma
-    val assigned = if (p.size > p.register.size) {
-      BVExtract(p.register.size, 0, param)
-    } else if (p.size < p.register.size) {
-      BVZeroExtend(p.register.size - p.size, param)
+    val registerGamma = p.value.toGamma
+    val assigned = if (p.size > p.value.size) {
+      BVExtract(p.value.size, 0, param)
+    } else if (p.size < p.value.size) {
+      BVZeroExtend(p.value.size - p.size, param)
     } else {
       param
     }
@@ -309,12 +309,12 @@ case class BoogieTranslator(program: Program, spec: Specification) {
 
   def coerceProcedureCall(target: String, in: List[Parameter], out: List[Parameter]): List[BCmd] = {
     val params = for (i <- in) yield {
-      val register = i.register.toBoogie
-      val registerGamma = i.register.toGamma
-      if (i.register.size > i.size) {
+      val register = i.value.toBoogie
+      val registerGamma = i.value.toGamma
+      if (i.value.size > i.size) {
         List(BVExtract(i.size, 0, register), registerGamma)
-      } else if (i.register.size < i.size) {
-        List(BVZeroExtend(i.size - i.register.size, register), registerGamma)
+      } else if (i.value.size < i.size) {
+        List(BVZeroExtend(i.size - i.value.size, register), registerGamma)
       } else {
         List(register, registerGamma)
       }
@@ -325,10 +325,10 @@ case class BoogieTranslator(program: Program, spec: Specification) {
     val outTempGamma = for (o <- out.indices) yield {
       BVariable(s"Gamma_#temp$o", BoolType, Scope.Local)
     }
-    val outRegisters = out.map(o => o.register.toBoogie)
-    val outRegisterGammas = out.map(o => o.register.toGamma)
-    val outAssigned = for (o <- out.indices if out(o).register.size != out(o).size) yield {
-      val regSize = out(o).register.size
+    val outRegisters = out.map(o => o.value.toBoogie)
+    val outRegisterGammas = out.map(o => o.value.toGamma)
+    val outAssigned = for (o <- out.indices if out(o).value.size != out(o).size) yield {
+      val regSize = out(o).value.size
       val paramSize = out(o).size
       if (regSize > paramSize) {
         AssignCmd(List(outRegisters(o), outRegisterGammas(o)), List(BVZeroExtend(regSize - paramSize, outTemp(o)), outTempGamma(o)))
@@ -337,7 +337,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
       }
     }
     val returned = for (o <- out.indices) yield {
-      if (out(o).register.size == out(o).size) {
+      if (out(o).value.size == out(o).size) {
         List(outRegisters(o), outRegisterGammas(o))
       } else {
         List(outTemp(o), outTempGamma(o))

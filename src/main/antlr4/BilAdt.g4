@@ -21,10 +21,15 @@ exp : OPEN_PAREN exp CLOSE_PAREN #expParen
     | op=UOP OPEN_PAREN exp CLOSE_PAREN #uOp
     | immVar #expImmVar
     | 'Int' OPEN_PAREN value=num COMMA size=num CLOSE_PAREN #expInt
-    | CAST OPEN_PAREN size=num COMMA exp CLOSE_PAREN #cast
+    | cast #expCast
     | 'Extract' OPEN_PAREN hb=num COMMA lb=num COMMA exp CLOSE_PAREN #extract
     ;
 
+castImm : cast #castOpt
+        | immVar #immOpt
+        ;
+
+cast : CAST OPEN_PAREN size=num COMMA exp CLOSE_PAREN;
 store : 'Store' OPEN_PAREN memVar COMMA idx=exp COMMA value=exp COMMA endian COMMA size=num CLOSE_PAREN;
 immVar : 'Var' OPEN_PAREN name=quoteString COMMA 'Imm' OPEN_PAREN size=num CLOSE_PAREN CLOSE_PAREN;
 memVar : 'Var' OPEN_PAREN name=quoteString COMMA 'Mem' OPEN_PAREN addr_size=num COMMA value_size=num CLOSE_PAREN CLOSE_PAREN;
@@ -50,7 +55,7 @@ blks : 'Blks' OPEN_PAREN OPEN_BRACKET (blk (COMMA blk)*)? CLOSE_BRACKET CLOSE_PA
 blk : 'Blk' OPEN_PAREN tid COMMA attrs COMMA phis COMMA defs COMMA jmps CLOSE_PAREN;
 
 args : 'Args' OPEN_PAREN OPEN_BRACKET (arg (COMMA arg)*)? CLOSE_BRACKET CLOSE_PAREN;
-arg : 'Arg' OPEN_PAREN tid COMMA attrs COMMA lhs=immVar COMMA rhs=immVar COMMA intent CLOSE_PAREN;
+arg : 'Arg' OPEN_PAREN tid COMMA attrs COMMA lhs=immVar COMMA rhs=castImm COMMA intent CLOSE_PAREN;
 
 attr : 'Attr' OPEN_PAREN lhs=quoteString COMMA rhs=quoteString CLOSE_PAREN;
 attrs : 'Attrs' OPEN_PAREN OPEN_BRACKET (attr (COMMA attr)*)? CLOSE_BRACKET CLOSE_PAREN;
