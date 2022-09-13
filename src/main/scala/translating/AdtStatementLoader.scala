@@ -24,7 +24,7 @@ object AdtStatementLoader {
     case e: UOpContext       => visitUOp(e)
     case e: ExpImmVarContext => visitImmVar(e.immVar)
     case e: ExpIntContext    => visitExpInt(e)
-    case e: CastContext      => visitCast(e)
+    case e: ExpCastContext   => visitCast(e.cast)
     case e: ExtractContext   => visitExtract(e)
   }
 
@@ -96,33 +96,32 @@ object AdtStatementLoader {
     (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), jump)
   }
 
-  def visitSub(ctx: SubContext): FunctionNode = {
-    val in = ctx.args.arg.asScala.flatMap { arg =>
-      val lhs = visitImmVar(arg.lhs)
-      val register = visitImmVar(arg.rhs)
-      arg.intent.getText match {
-        case "In()"   => Some(Parameter(lhs.name, lhs.size, register))
-        case "Both()" => Some(Parameter(lhs.name, lhs.size, register))
-        case _        => None
+  def visitArg(ctx: ArgContext): (Option[Parameter], Option[Parameter]) = {
+    val lhs = visitImmVar(ctx.lhs)
+    val rhs = ctx.rhs match {
+      case i: ImmOptContext => visitImmVar(i.immVar)
+      case c: CastOptContext => c.cast.exp match {
+        case e: ExpImmVarContext => visitImmVar(e.immVar)
+        case _ => return (None, None)
       }
     }
+    ctx.intent.getText match {
+      case "In()"   => (Some(Parameter(lhs.name, lhs.size, rhs)), None)
+      case "Out()"  => (None, Some(Parameter(lhs.name, lhs.size, rhs)))
+      case "Both()" => (Some(Parameter(lhs.name, lhs.size, rhs)), Some(Parameter(lhs.name + "_out", lhs.size, rhs)))
+      case _        => (None, None)
+    }
+  }
 
+  def visitSub(ctx: SubContext): FunctionNode = {
+    val inOut = ctx.args.arg.asScala.map { arg => visitArg(arg) }.unzip
+    val in = inOut._1.flatten
+    val out = inOut._2.flatten
     val alwaysIn = List(
       Parameter("FP", 64, LocalVar("R29", 64)),
       Parameter("LR", 64, LocalVar("R30", 64)),
       Parameter("SP", 64, LocalVar("R31", 64))
     )
-
-    val out = ctx.args.arg.asScala.flatMap { arg =>
-      val lhs = visitImmVar(arg.lhs)
-      val register = visitImmVar(arg.rhs)
-      arg.intent.getText match {
-        case "Out()"  => Some(Parameter(lhs.name, lhs.size, register))
-        case "Both()" => Some(Parameter(lhs.name + "_out", lhs.size, register))
-        case _        => None
-      }
-    }
-
     val alwaysOut = List(
       Parameter("FP_out", 64, LocalVar("R29", 64)),
       Parameter("LR_out", 64, LocalVar("R30", 64)),
