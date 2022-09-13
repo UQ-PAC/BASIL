@@ -1,1 +1,1 @@
-L: x -> TRUE
+L: x -> true
