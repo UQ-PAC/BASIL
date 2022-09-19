@@ -1,3 +1,14 @@
+//package analysis
+//
+//object ConstantPropagationAnalysis:
+//
+//  object Intraprocedural:
+//
+//    /** Intraprocedural analysis that uses the simple fixpoint solver.
+//      */
+//    class SimpleSolver(cfg: IntraproceduralProgramCfg)(implicit declData: DeclarationData)
+//        extends IntraprocValueAnalysisSimpleSolver(cfg, ConstantPropagationLattice)
+
 /*
 package analysis
 

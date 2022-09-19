@@ -94,49 +94,58 @@ case class CfgStatementNode(
   * @param exits
   *   the exit to he graph (sink)
   */
-class Cfg(val entry: Option[CfgNode], val exit: Option[CfgNode]):
+class Cfg(val entries: Set[CfgNode], val exits: Set[CfgNode]):
 
   /** Returns whether or not the graph is empty.
     */
-  def isUnit: Boolean = entry.isEmpty && exit.isEmpty
+  def isUnit: Boolean = entries.isEmpty && exits.isEmpty
 
-  /** Returns all of the nodes in the graph.
+  /** Returns the concatenation of this CFG with `after`.
+    */
+  def concat(after: Cfg): Cfg =
+    if isUnit then after
+    else if after.isUnit then this
+    else
+      exits.foreach(_.succ ++= after.entries)
+      after.entries.foreach(_.pred ++= exits)
+      new Cfg(entries, after.exits)
+
+  /** Returns the union of this CFG with `other`.
+    */
+  def union(other: Cfg): Cfg =
+    new Cfg(other.entries.union(entries), other.exits.union(exits))
+
+  /** Returns the set of nodes in the CFG.
     */
   def nodes: Set[CfgNode] =
-    entry match
-      case Some(node) => dfs(node, mutable.Set()).toSet
-      case None       => Set()
+    entries.flatMap { entry =>
+      nodesRec(entry).toSet
+    }
 
-  def concat(other: Cfg): Cfg =
-    if isUnit then other
-    else if other.isUnit then this
-    else
-      exit.get.addEdge(other.entry.get)
-      Cfg(entry, other.exit)
-
-  /** Performs a depth-first traversal of the graph.
-    */
-  def dfs(n: CfgNode, visited: mutable.Set[CfgNode]): mutable.Set[CfgNode] =
-    if !visited.contains(n) then
+  protected def nodesRec(n: CfgNode, visited: mutable.Set[CfgNode] = mutable.Set()): mutable.Set[CfgNode] = {
+    if (!visited.contains(n)) {
       visited += n
-      n.succ.foreach(n => dfs(n, visited))
+      n.succ.foreach { n =>
+        nodesRec(n, visited)
+      }
+    }
     visited
+  }
 
 object Cfg:
 
   /** Creates an empty cfg.
     */
-  def unit(): Cfg = Cfg(None, None)
+  def unit(): Cfg = Cfg(Set(), Set())
 
   /** Creates a cfg consisting of a single node.
     */
-  def singletonGraph(node: CfgNode): Cfg = Cfg(Some(node), Some(node))
+  def singletonGraph(node: CfgNode): Cfg = Cfg(Set(node), Set(node))
 
   /** Generate the cfg for each function of the program.
     */
-  def generateCfgProgram(program: Program): Cfg =
-    // generate cfg for main only for now
-    generateCfgFunc(program.functions.head)
+  def generateCfgProgram(program: Program): Map[FunctionNode, Cfg] =
+    program.functions.map(f => f -> generateCfgFunc(f)).toMap
 
   /** Generate the cfg for a function.
     */
@@ -172,3 +181,26 @@ object Cfg:
     cfgs.get("lmain") match
       case Some(cfg) => singletonGraph(entryNode).concat(cfg).concat(singletonGraph(exitNode))
       case _         => throw new RuntimeException("no main block detected")
+
+abstract class ProgramCfg(
+    val prog: Program,
+    val funEntries: Map[FunctionNode, CfgFunctionEntryNode],
+    val funExits: Map[FunctionNode, CfgFunctionExitNode]
+) extends Cfg(funEntries.values.toSet, funExits.values.toSet)
+
+object IntraproceduralProgramCfg {
+
+  def generateFromProgram(prog: Program): IntraproceduralProgramCfg = {
+    val funGraphs = Cfg.generateCfgProgram(prog)
+    val allEntries = funGraphs.view.mapValues(cfg => cfg.entries.head.asInstanceOf[CfgFunctionEntryNode]).toMap
+    val allExits = funGraphs.view.mapValues(cfg => cfg.exits.head.asInstanceOf[CfgFunctionExitNode]).toMap
+
+    new IntraproceduralProgramCfg(prog, allEntries, allExits)
+  }
+}
+
+class IntraproceduralProgramCfg(
+    prog: Program,
+    funEntries: Map[FunctionNode, CfgFunctionEntryNode],
+    funExits: Map[FunctionNode, CfgFunctionExitNode]
+) extends ProgramCfg(prog, funEntries, funExits)

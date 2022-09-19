@@ -99,16 +99,48 @@ class MapLattice[A, +L <: Lattice](val sublattice: L) extends Lattice:
   def lub(x: Element, y: Element): Element =
     x.keys.foldLeft(y)((m, a) => m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
 
+/** The lift lattice for `sublattice`. Supports implicit lifting and unlifting.
+  */
+class LiftLattice[+L <: Lattice](val sublattice: L) extends Lattice:
+
+  type Element = Lifted
+
+  enum Lifted:
+    case Bottom
+    case Lift(n: sublattice.Element)
+
+  val bottom: Element = Lifted.Bottom
+
+  def lub(x: Element, y: Element): Element =
+    (x, y) match {
+      case (Lifted.Bottom, t)               => t
+      case (t, Lifted.Bottom)               => t
+      case (Lifted.Lift(a), Lifted.Lift(b)) => Lifted.Lift(sublattice.lub(a, b))
+    }
+
+  /** Lift elements of the sublattice to this lattice. Note that this method is declared as implicit, so the conversion
+    * can be done automatically.
+    */
+  implicit def lift(x: sublattice.Element): Element = Lifted.Lift(x)
+
+  /** Un-lift elements of this lattice to the sublattice. Throws an IllegalArgumentException if trying to unlift the
+    * bottom element Note that this method is declared as implicit, so the conversion can be done automatically.
+    */
+  implicit def unlift(x: Element): sublattice.Element = x match
+    case Lifted.Lift(s) => s
+    case Lifted.Bottom  => throw new IllegalArgumentException("Cannot unlift bottom")
+
 /** Constant propagation lattice.
   */
 object ConstantPropagationLattice extends FlatLattice[Int]() with LatticeWithOps:
 
-  private def apply(op: (Int, Int) => Int, a: Element, b: Element): Element = (a, b) match
+  private def apply(op: (Int, Int) => Int, a: Element, b: Element): Element = (a, b) match {
     case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => FlatElement.FlatEl(op(x, y))
     case (FlatElement.Bot, _)                           => FlatElement.Bot
     case (_, FlatElement.Bot)                           => FlatElement.Bot
     case (_, FlatElement.Top)                           => FlatElement.Top
     case (FlatElement.Top, _)                           => FlatElement.Top
+  }
 
   def num(i: Int): Element = FlatElement.FlatEl(i)
 
