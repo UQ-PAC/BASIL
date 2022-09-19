@@ -33,7 +33,13 @@ object AdtStatementLoader {
   }
 
   def visitStore(ctx: StoreContext): Store = {
-    Store.init(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitExp(ctx.value), visitEndian(ctx.endian), parseInt(ctx.num))
+    Store.init(
+      visitMemVar(ctx.memVar),
+      visitExp(ctx.idx),
+      visitExp(ctx.value),
+      visitEndian(ctx.endian),
+      parseInt(ctx.num)
+    )
   }
 
   def visitBinOp(ctx: BinOpContext): BinOp = {
@@ -100,10 +106,11 @@ object AdtStatementLoader {
     val lhs = visitImmVar(ctx.lhs)
     val rhs = ctx.rhs match {
       case i: ImmOptContext => visitImmVar(i.immVar)
-      case c: CastOptContext => c.cast.exp match {
-        case e: ExpImmVarContext => visitImmVar(e.immVar)
-        case _ => return (None, None)
-      }
+      case c: CastOptContext =>
+        c.cast.exp match {
+          case e: ExpImmVarContext => visitImmVar(e.immVar)
+          case _                   => return (None, None)
+        }
     }
     ctx.intent.getText match {
       case "In()"   => (Some(Parameter(lhs.name, lhs.size, rhs)), None)

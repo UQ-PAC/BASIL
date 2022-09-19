@@ -1,5 +1,5 @@
 package util
-import analysis._
+//import analysis._
 import astnodes._
 import boogie._
 import specification._
@@ -7,6 +7,7 @@ import BilParser._
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
+//import vcgen.{State, VCGen}
 
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
@@ -57,9 +58,6 @@ object RunUtils {
 
     val translator = BoogieTranslator(program, specification)
     val translatorUnusedRemoved = translator.stripUnreachableFunctions(externalNames)
-
-    val cfg = Cfg.generateCfgProgram(translatorUnusedRemoved.program)
-
     translatorUnusedRemoved.translate
   }
 
