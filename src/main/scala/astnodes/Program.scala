@@ -53,6 +53,6 @@ case class Instruction(asm: String, statements: List[Statement]) {
   def calls: Set[String] = statements.flatMap(s => s.calls).toSet
 }
 
-case class Parameter(name: String, size: Int, register: LocalVar) {
+case class Parameter(name: String, size: Int, value: LocalVar) {
   // def toBoogieString: String = name + ": bv" + size
 }

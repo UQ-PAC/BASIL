@@ -1,0 +1,6 @@
+Created by James T.
+
+A basic test of function calls, with multi-returns thrown in for good measure.
+Verification depends on knowing that y is high not only when x != 1 but when x == 0 precisely.
+Strengthening the security policy to L(y) -> x != 0 relieves the burden on the RG conditions to
+specify this in the second conjunct of reader's rely.

@@ -1,3 +1,3 @@
-L: secret -> FALSE, x -> TRUE
-GAMMA: secret -> TRUE
+L: secret -> false, x -> true
+Gamma: secret -> true
 Rely: secret == old(secret)

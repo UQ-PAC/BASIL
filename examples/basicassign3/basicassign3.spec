@@ -1,1 +1,1 @@
-L: z -> TRUE, secret -> FALSE
+L: z -> true, secret -> false
