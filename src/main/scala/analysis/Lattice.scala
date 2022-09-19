@@ -1,87 +1,125 @@
 package analysis
 
-/** Lattice data structure used for
+/** Basic lattice
   */
-trait Lattice[Element]:
+trait Lattice:
 
-  /** A union or join of two lattice elements. Should contain all the information from the first state as well as all
-    * the information from the second state - even if this introduces uncertainty.
+  /** The type of the elements of this lattice.
     */
-  def join(x: Element, y: Element): Element
+  type Element
 
-  /** An intersection or meet of two lattice elements. Should contain all the information that appears in both states.
+  /** The bottom element of this lattice.
     */
-  def meet(x: Element, y: Element): Element
+  val bottom: Element
 
-  /** An ordering relation on the lattice elements so we check any given transfer for loss of precision. A return value
-    * of true indicates that x is at least as precise as y
+  /** The top element of this lattice. Default: not implemented.
     */
-  def leq(x: Element, y: Element): Boolean = join(x, y) == y
+  def top: Element = ???
 
-  /** Bottom element.
+  /** The least upper bound of `x` and `y`.
     */
-  def bottom: Element
+  def lub(x: Element, y: Element): Element
 
-  /** Top element.
+  /** Returns true whenever `x` <= `y`.
     */
-  def top: Element
+  def leq(x: Element, y: Element): Boolean = lub(x, y) == y // rarely used, but easy to implement :-)
 
-trait LatticeWithOps[T] extends Lattice[T]:
-  def num(i: Int): T
-  def plus(a: T, b: T): T
-  def times(a: T, b: T): T
-  def eqq(a: T, b: T): T
-  def gt(a: T, b: T): T
+/** Lattice with abstract operators.
+  */
+trait LatticeWithOps extends Lattice:
 
-enum FlatElement[+T]:
-  case Top
-  case Bottom
-  case Elem(value: T)
+  /** Abstract number.
+    */
+  def num(i: Int): Element
 
-class FlatLattice[T] extends Lattice[FlatElement[T]]:
+  /** Abstract plus.
+    */
+  def plus(a: Element, b: Element): Element
 
-  override def join(x: FlatElement[T], y: FlatElement[T]): FlatElement[T] = x match
-    case FlatElement.Top         => x
-    case FlatElement.Bottom      => y
-    case FlatElement.Elem(value) => if y == FlatElement.Bottom then x else FlatElement.Top
+  /** Abstract minus.
+    */
+  def minus(a: Element, b: Element): Element
 
-  override def meet(x: FlatElement[T], y: FlatElement[T]): FlatElement[T] = x match
-    case FlatElement.Top         => y
-    case FlatElement.Bottom      => x
-    case FlatElement.Elem(value) => if y == FlatElement.Top then x else FlatElement.Bottom
+  /** Abstract times.
+    */
+  def times(a: Element, b: Element): Element
 
-  override def bottom = FlatElement.Bottom
+  /** Abstract division.
+    */
+  def div(a: Element, b: Element): Element
 
-  override def top = FlatElement.Top
+  /** Abstract equals.
+    */
+  def eqq(a: Element, b: Element): Element
 
-class MapLattice[A, B, L <: Lattice[B]](val sublattice: L) extends Lattice[Map[A, B]]:
+  /** Abstract greater-than.
+    */
+  def gt(a: Element, b: Element): Element
 
-  override def join(x: Map[A, B], y: Map[A, B]): Map[A, B] =
-    x.keys.foldLeft(y)((m, a) => m + (a -> sublattice.join(x(a), y(a)))).withDefaultValue(sublattice.bottom)
+/** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
+  * other element. No additional ordering is defined.
+  */
+class FlatLattice[X] extends Lattice:
 
-  override def meet(x: Map[A, B], y: Map[A, B]): Map[A, B] = ???
+  enum FlatElement:
+    case FlatEl(el: X)
+    case Top
+    case Bot
 
-  override def bottom = Map().withDefaultValue(sublattice.bottom)
+  type Element = FlatElement
 
-  override def top = Map().withDefaultValue(sublattice.top)
+  /** Wrap an element of `X` into an element of the flat lattice.
+    */
+  implicit def wrap(a: X): Element = FlatElement.FlatEl(a)
 
-object ConstantPropagationLattice extends FlatLattice[Int] with LatticeWithOps[FlatElement[Int]]:
+  /** Unwrap an element of the lattice to an element of `X`. If the element is Top or Bot then IllegalArgumentException
+    * is thrown. Note that this method is declared as implicit, so the conversion can be done automatically.
+    */
+  implicit def unwrap(a: Element): X = a match
+    case FlatElement.FlatEl(n) => n
+    case _                     => throw new IllegalArgumentException(s"Cannot unlift $a")
 
-  def apply(op: (Int, Int) => Int, a: FlatElement[Int], b: FlatElement[Int]): FlatElement[Int] = (a, b) match
-    case (FlatElement.Elem(x), FlatElement.Elem(y)) => FlatElement.Elem(op(x, y))
-    case (FlatElement.Bottom, _)                    => FlatElement.Bottom
-    case (_, FlatElement.Bottom)                    => FlatElement.Bottom
-    case (FlatElement.Top, _)                       => FlatElement.Top
-    case (_, FlatElement.Top)                       => FlatElement.Top
+  val bottom: Element = FlatElement.Bot
 
-  override def plus(a: FlatElement[Int], b: FlatElement[Int]): FlatElement[Int] = apply(_ + _, a, b)
+  override val top: Element = FlatElement.Top
 
-  override def times(a: FlatElement[Int], b: FlatElement[Int]): FlatElement[Int] = apply(_ * _, a, b)
+  def lub(x: Element, y: Element): Element =
+    if x == FlatElement.Bot || y == FlatElement.Top || x == y then y
+    else if y == FlatElement.Bot || x == FlatElement.Top then x
+    else FlatElement.Top
 
-  override def eqq(a: FlatElement[Int], b: FlatElement[Int]): FlatElement[Int] =
-    apply((x, y) => if (x == y) 1 else 0, a, b)
+/** A lattice of maps from a set of elements of type `A` to the lattice `sublattice`. Bottom is the default value.
+  */
+class MapLattice[A, +L <: Lattice](val sublattice: L) extends Lattice:
 
-  override def gt(a: FlatElement[Int], b: FlatElement[Int]): FlatElement[Int] =
-    apply((x, y) => if (x > y) 1 else 0, a, b)
+  type Element = Map[A, sublattice.Element]
 
-  override def num(i: Int): FlatElement[Int] = FlatElement.Elem(i)
+  val bottom: Element = Map().withDefaultValue(sublattice.bottom)
+
+  def lub(x: Element, y: Element): Element =
+    x.keys.foldLeft(y)((m, a) => m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
+
+/** Constant propagation lattice.
+  */
+object ConstantPropagationLattice extends FlatLattice[Int]() with LatticeWithOps:
+
+  private def apply(op: (Int, Int) => Int, a: Element, b: Element): Element = (a, b) match
+    case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => FlatElement.FlatEl(op(x, y))
+    case (FlatElement.Bot, _)                           => FlatElement.Bot
+    case (_, FlatElement.Bot)                           => FlatElement.Bot
+    case (_, FlatElement.Top)                           => FlatElement.Top
+    case (FlatElement.Top, _)                           => FlatElement.Top
+
+  def num(i: Int): Element = FlatElement.FlatEl(i)
+
+  def plus(a: Element, b: Element): Element = apply(_ + _, a, b)
+
+  def minus(a: Element, b: Element): Element = apply(_ - _, a, b)
+
+  def times(a: Element, b: Element): Element = apply(_ * _, a, b)
+
+  def div(a: Element, b: Element): Element = apply((x, y) => if y != 0 then x / y else FlatElement.Bot, a, b)
+
+  def eqq(a: Element, b: Element): Element = apply((x, y) => if x == y then 1 else 0, a, b)
+
+  def gt(a: Element, b: Element): Element = apply((x, y) => if x > y then 1 else 0, a, b)
