@@ -20,6 +20,10 @@ To build a standalone `.jar` file, use the following command:
 
 `sbt assembly`
 
+To compile sources so that IntelliJ is happy, use the following command:
+
+`sbt compile`
+
 The standalone `.jar` can then be executed with the following command:
 
 `./run.sh file.adt file.relf [output.bpl]`
