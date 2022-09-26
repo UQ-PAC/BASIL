@@ -122,15 +122,13 @@ class Cfg(val entries: Set[CfgNode], val exits: Set[CfgNode]):
       nodesRec(entry).toSet
     }
 
-  protected def nodesRec(n: CfgNode, visited: mutable.Set[CfgNode] = mutable.Set()): mutable.Set[CfgNode] = {
-    if (!visited.contains(n)) {
+  protected def nodesRec(n: CfgNode, visited: mutable.Set[CfgNode] = mutable.Set()): mutable.Set[CfgNode] =
+    if (!visited.contains(n)) then
       visited += n
       n.succ.foreach { n =>
         nodesRec(n, visited)
       }
-    }
     visited
-  }
 
 object Cfg:
 
@@ -182,23 +180,34 @@ object Cfg:
       case Some(cfg) => singletonGraph(entryNode).concat(cfg).concat(singletonGraph(exitNode))
       case _         => throw new RuntimeException("no main block detected")
 
+/** Control-flow graph for an entire program.
+  *
+  * @param prog
+  *   AST of the program
+  * @param funEntries
+  *   map from AST function declarations to CFG function entry nodes
+  * @param funExits
+  *   map from AST function declarations to CFG function exit nodes
+  */
 abstract class ProgramCfg(
     val prog: Program,
     val funEntries: Map[FunctionNode, CfgFunctionEntryNode],
     val funExits: Map[FunctionNode, CfgFunctionExitNode]
 ) extends Cfg(funEntries.values.toSet, funExits.values.toSet)
 
-object IntraproceduralProgramCfg {
-
-  def generateFromProgram(prog: Program): IntraproceduralProgramCfg = {
+object IntraproceduralProgramCfg:
+  /** Generates an [[IntraproceduralProgramCfg]] from a program.
+    */
+  def generateFromProgram(prog: Program): IntraproceduralProgramCfg =
     val funGraphs = Cfg.generateCfgProgram(prog)
     val allEntries = funGraphs.view.mapValues(cfg => cfg.entries.head.asInstanceOf[CfgFunctionEntryNode]).toMap
     val allExits = funGraphs.view.mapValues(cfg => cfg.exits.head.asInstanceOf[CfgFunctionExitNode]).toMap
 
     new IntraproceduralProgramCfg(prog, allEntries, allExits)
-  }
-}
 
+/** Control-flow graph for a program, where function calls are represented as expressions, without using call/after-call
+  * nodes.
+  */
 class IntraproceduralProgramCfg(
     prog: Program,
     funEntries: Map[FunctionNode, CfgFunctionEntryNode],

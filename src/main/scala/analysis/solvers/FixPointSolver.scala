@@ -1,20 +1,6 @@
-/** Copyright 2022 The University of Queensland
-  *
-  * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with
-  * the License. You may obtain a copy of the License at
-  *
-  * http://www.apache.org/licenses/LICENSE-2.0
-  *
-  * Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on
-  * an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the
-  * specific language governing permissions and limitations under the License.
-  *
-  * The following classes were adapted from TIP (https://github.com/cs-au-dk/TIP) LatticeSolver, SimpleFixpointSolver,
-  * MapLatticeSolver, SimpleMapLatticeFixpointSolver
-  */
 package analysis.solvers
 
-import analysis.*
+import analysis._
 
 import scala.collection.immutable.ListSet
 
@@ -67,7 +53,7 @@ trait MapLatticeSolver[N] extends LatticeSolver with Dependencies[N]:
   * @tparam N
   *   type of the elements in the worklist.
   */
-trait Worklist[N] {
+trait Worklist[N]:
 
   /** Called by [[run]] to process an item from the worklist.
     */
@@ -87,71 +73,57 @@ trait Worklist[N] {
     *   the initial contents of the worklist
     */
   def run(first: Set[N]): Unit
-}
 
-/** A simple worklist algorithm based on `scala.collection.immutable.ListSet`. (Using a priority queue would typically
-  * be faster.)
+/** A simple worklist algorithm based on `scala.collection.immutable.ListSet`.
   *
   * @tparam N
   *   type of the elements in the worklist.
   */
-trait ListSetWorklist[N] extends Worklist[N] {
+trait ListSetWorklist[N] extends Worklist[N]:
 
   private var worklist = new ListSet[N]
 
-  def add(n: N) = {
+  def add(n: N) =
     worklist += n
-  }
 
-  def add(ns: Set[N]) = {
-    worklist ++= ns
-  }
+  def add(ns: Set[N]) = worklist ++= ns
 
-  def run(first: Set[N]) = {
+  def run(first: Set[N]) =
     worklist = new ListSet[N] ++ first
-    while (worklist.nonEmpty) {
+    while (worklist.nonEmpty) do
       val n = worklist.head;
       worklist = worklist.tail
       process(n)
-    }
-  }
-}
 
 /** Base trait for worklist-based fixpoint solvers.
   *
   * @tparam N
   *   type of the elements in the worklist.
   */
-trait WorklistFixpointSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[N] with Dependencies[N] {
-
+trait WorklistFixpointSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[N] with Dependencies[N]:
   /** The current lattice element.
     */
   var x: lattice.Element = _
 
-  def process(n: N) = {
+  def process(n: N) =
     val xn = x(n)
     val y = funsub(n, x)
-    if (y != xn) {
+    if (y != xn) then
       x += n -> y
       add(outdep(n))
-    }
-  }
-}
 
 /** Worklist-based fixpoint solver.
   *
   * @tparam N
   *   type of the elements in the worklist.
   */
-trait SimpleWorklistFixpointSolver[N] extends WorklistFixpointSolver[N] {
+trait SimpleWorklistFixpointSolver[N] extends WorklistFixpointSolver[N]:
 
   /** The map domain.
     */
   val domain: Set[N]
 
-  def analyze(): lattice.Element = {
+  def analyze(): lattice.Element =
     x = lattice.bottom
     run(domain)
     x
-  }
-}

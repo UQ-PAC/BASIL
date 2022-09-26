@@ -8,12 +8,11 @@ import analysis.solvers._
   * @tparam R
   *   the type of the analysis result
   */
-trait Analysis[+R] {
+trait Analysis[+R]:
 
   /** Performs the analysis and returns the result.
     */
   def analyze(): R
-}
 
 /** A flow-sensitive analysis.
   * @param stateAfterNode
@@ -22,7 +21,7 @@ trait Analysis[+R] {
   */
 abstract class FlowSensitiveAnalysis(val stateAfterNode: Boolean) extends Analysis[Any]
 
-trait ValueAnalysisMisc {
+trait ValueAnalysisMisc:
 
   val cfg: ProgramCfg
 
@@ -40,15 +39,15 @@ trait ValueAnalysisMisc {
 
   /** Default implementation of eval.
     */
-  def eval(exp: Expr, env: statelattice.Element): valuelattice.Element = {
+  def eval(exp: Expr, env: statelattice.Element): valuelattice.Element =
     import valuelattice._
-    exp match {
+    exp match
       case id: LocalVar => env(id)
       case n: Literal   => num(n.value)
       case bin: BinOp =>
         val left = eval(bin.lhs, env)
         val right = eval(bin.rhs, env)
-        bin.operator match {
+        bin.operator match
           case PLUS    => plus(left, right)
           case MINUS   => minus(left, right)
           case TIMES   => times(left, right)
@@ -62,37 +61,31 @@ trait ValueAnalysisMisc {
           case LT      => lt(left, right)
           case LE      => lte(left, right)
           case _       => valuelattice.top
-        }
+
       case un: UnOp =>
         val arg = eval(un.exp, env)
-        un.operator match {
+        un.operator match
           case NEG => neg(arg)
           case NOT => not(arg)
-        }
+
       case _ => valuelattice.top
-    }
-  }
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: statelattice.Element): statelattice.Element = {
-    n match {
+  def localTransfer(n: CfgNode, s: statelattice.Element): statelattice.Element =
+    n match
       case r: CfgStatementNode =>
-        r.data match {
+        r.data match
           // assignments
           case LocalAssign(lhs: LocalVar, rhs: Expr) => s + (lhs -> eval(rhs, s))
 
           // all others: like no-ops
           case _ => s
-        }
       case _ => s
-    }
-  }
-}
 
 /** Base class for value analysis with simple (non-lifted) lattice.
   */
-abstract class SimpleValueAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAnalysis(true) with ValueAnalysisMisc {
+abstract class SimpleValueAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAnalysis(true) with ValueAnalysisMisc:
 
   /** The analysis lattice.
     */
@@ -103,9 +96,8 @@ abstract class SimpleValueAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAna
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
   def transfer(n: CfgNode, s: statelattice.Element): statelattice.Element = localTransfer(n, s)
-}
 
-/** Intraprocedural value analysis that uses [[tip.solvers.SimpleWorklistFixpointSolver]].
+/** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
   */
 abstract class IntraprocValueAnalysisWorklistSolver[L <: LatticeWithOps](
     cfg: IntraproceduralProgramCfg,
@@ -114,10 +106,8 @@ abstract class IntraprocValueAnalysisWorklistSolver[L <: LatticeWithOps](
     with SimpleWorklistFixpointSolver[CfgNode]
     with ForwardDependencies
 
-object ConstantPropagationAnalysis {
-
+object ConstantPropagationAnalysis:
   /** Intraprocedural analysis that uses the worklist solver.
     */
   class WorklistSolver(cfg: IntraproceduralProgramCfg)
       extends IntraprocValueAnalysisWorklistSolver(cfg, ConstantPropagationLattice)
-}

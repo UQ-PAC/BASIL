@@ -60,16 +60,28 @@ trait LatticeWithOps extends Lattice:
     */
   def lt(a: Element, b: Element): Element
 
+  /** Abstract less-than or equal.
+    */
   def lte(a: Element, b: Element): Element
 
+  /** Abstract bitwise and.
+    */
   def and(a: Element, b: Element): Element
 
+  /** Abstract bitwise or.
+    */
   def or(a: Element, b: Element): Element
 
+  /** Abstract bitwise xor.
+    */
   def xor(a: Element, b: Element): Element
 
+  /** Abstract bitwise not.
+    */
   def not(a: Element): Element
 
+  /** Abstract negation.
+    */
   def neg(a: Element): Element
 
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
@@ -119,19 +131,17 @@ class MapLattice[A, +L <: Lattice](val sublattice: L) extends Lattice:
   */
 object ConstantPropagationLattice extends FlatLattice[BigInt]() with LatticeWithOps:
 
-  private def apply(op: (BigInt, BigInt) => BigInt, a: Element, b: Element): Element = (a, b) match {
+  private def apply(op: (BigInt, BigInt) => BigInt, a: Element, b: Element): Element = (a, b) match
     case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => FlatElement.FlatEl(op(x, y))
     case (FlatElement.Bot, _)                           => FlatElement.Bot
     case (_, FlatElement.Bot)                           => FlatElement.Bot
     case (_, FlatElement.Top)                           => FlatElement.Top
     case (FlatElement.Top, _)                           => FlatElement.Top
-  }
 
-  private def apply(op: (BigInt) => BigInt, a: Element): Element = a match {
+  private def apply(op: (BigInt) => BigInt, a: Element): Element = a match
     case FlatElement.FlatEl(x) => FlatElement.FlatEl(op(a))
     case FlatElement.Top       => FlatElement.Top
     case FlatElement.Bot       => FlatElement.Bot
-  }
 
   def num(i: BigInt): Element = FlatElement.FlatEl(i)
 
