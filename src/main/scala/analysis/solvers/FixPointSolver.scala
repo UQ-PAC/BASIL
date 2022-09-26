@@ -1,6 +1,8 @@
 package analysis.solvers
 
-import analysis._
+import analysis.*
+
+import scala.collection.immutable.ListSet
 
 /** Base trait for lattice solvers.
   */
@@ -13,30 +15,6 @@ trait LatticeSolver:
   /** The analyze function.
     */
   def analyze(): lattice.Element
-
-/** Simple fixpoint solver.
-  */
-trait SimpleFixpointSolver extends LatticeSolver:
-
-  /** The constraint function for which the least fixpoint is to be computed.
-    * @param x
-    *   the input lattice element
-    * @return
-    *   the output lattice element
-    */
-  def fun(x: lattice.Element): lattice.Element
-
-  /** The basic Kleene fixpoint solver.
-    */
-  def analyze(): lattice.Element =
-    var x = lattice.bottom
-    var t = x
-    while
-      t = x
-      x = fun(x)
-      x != t
-    do ()
-    x
 
 /** Base trait for map lattice solvers.
   * @tparam N
@@ -70,27 +48,96 @@ trait MapLatticeSolver[N] extends LatticeSolver with Dependencies[N]:
     val states = indep(n).map(o(_))
     states.foldLeft(lattice.sublattice.bottom)((acc, pred) => lattice.sublattice.lub(acc, pred))
 
-/** Simple fixpoint solver for map lattices where the constraint function is defined pointwise.
+/** An abstract worklist algorithm.
+  *
   * @tparam N
-  *   type of the elements in the map domain.
+  *   type of the elements in the worklist.
   */
-trait SimpleMapLatticeFixpointSolver[N] extends SimpleFixpointSolver with MapLatticeSolver[N]:
+trait Worklist[N] {
+
+  /** Called by [[run]] to process an item from the worklist.
+    */
+  def process(n: N): Unit
+
+  /** Adds an item to the worklist.
+    */
+  def add(n: N): Unit
+
+  /** Adds a set of items to the worklist.
+    */
+  def add(ns: Set[N]): Unit
+
+  /** Iterates until there is no more work to do.
+    *
+    * @param first
+    *   the initial contents of the worklist
+    */
+  def run(first: Set[N]): Unit
+}
+
+/** A simple worklist algorithm based on `scala.collection.immutable.ListSet`. (Using a priority queue would typically
+  * be faster.)
+  *
+  * @tparam N
+  *   type of the elements in the worklist.
+  */
+trait ListSetWorklist[N] extends Worklist[N] {
+
+  private var worklist = new ListSet[N]
+
+  def add(n: N) = {
+    worklist += n
+  }
+
+  def add(ns: Set[N]) = {
+    worklist ++= ns
+  }
+
+  def run(first: Set[N]) = {
+    worklist = new ListSet[N] ++ first
+    while (worklist.nonEmpty) {
+      val n = worklist.head;
+      worklist = worklist.tail
+      process(n)
+    }
+  }
+}
+
+/** Base trait for worklist-based fixpoint solvers.
+  *
+  * @tparam N
+  *   type of the elements in the worklist.
+  */
+trait WorklistFixpointSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[N] with Dependencies[N] {
+
+  /** The current lattice element.
+    */
+  var x: lattice.Element = _
+
+  def process(n: N) = {
+    val xn = x(n)
+    val y = funsub(n, x)
+    if (y != xn) {
+      x += n -> y
+      add(outdep(n))
+    }
+  }
+}
+
+/** Worklist-based fixpoint solver.
+  *
+  * @tparam N
+  *   type of the elements in the worklist.
+  */
+trait SimpleWorklistFixpointSolver[N] extends WorklistFixpointSolver[N] {
 
   /** The map domain.
     */
   val domain: Set[N]
 
-  /** The function for which the least fixpoint is to be computed. Applies the sublattice constraint function pointwise
-    * to each entry.
-    * @param x
-    *   the input lattice element
-    * @return
-    *   the output lattice element
-    */
-  def fun(x: lattice.Element): lattice.Element = {
-    domain.foldLeft(lattice.bottom)((m, a) =>
-      m + (a -> {
-        funsub(a, x)
-      })
-    )
+  def analyze(): lattice.Element = {
+    x = lattice.bottom
+    run(domain)
+    x
   }
+}

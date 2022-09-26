@@ -30,7 +30,7 @@ trait LatticeWithOps extends Lattice:
 
   /** Abstract number.
     */
-  def num(i: Int): Element
+  def num(i: BigInt): Element
 
   /** Abstract plus.
     */
@@ -52,9 +52,25 @@ trait LatticeWithOps extends Lattice:
     */
   def eqq(a: Element, b: Element): Element
 
-  /** Abstract greater-than.
+  /** Abstract not equal.
     */
-  def gt(a: Element, b: Element): Element
+  def neqq(a: Element, b: Element): Element
+
+  /** Abstract less-than.
+    */
+  def lt(a: Element, b: Element): Element
+
+  def lte(a: Element, b: Element): Element
+
+  def and(a: Element, b: Element): Element
+
+  def or(a: Element, b: Element): Element
+
+  def xor(a: Element, b: Element): Element
+
+  def not(a: Element): Element
+
+  def neg(a: Element): Element
 
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
   * other element. No additional ordering is defined.
@@ -99,42 +115,11 @@ class MapLattice[A, +L <: Lattice](val sublattice: L) extends Lattice:
   def lub(x: Element, y: Element): Element =
     x.keys.foldLeft(y)((m, a) => m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
 
-/** The lift lattice for `sublattice`. Supports implicit lifting and unlifting.
-  */
-class LiftLattice[+L <: Lattice](val sublattice: L) extends Lattice:
-
-  type Element = Lifted
-
-  enum Lifted:
-    case Bottom
-    case Lift(n: sublattice.Element)
-
-  val bottom: Element = Lifted.Bottom
-
-  def lub(x: Element, y: Element): Element =
-    (x, y) match {
-      case (Lifted.Bottom, t)               => t
-      case (t, Lifted.Bottom)               => t
-      case (Lifted.Lift(a), Lifted.Lift(b)) => Lifted.Lift(sublattice.lub(a, b))
-    }
-
-  /** Lift elements of the sublattice to this lattice. Note that this method is declared as implicit, so the conversion
-    * can be done automatically.
-    */
-  implicit def lift(x: sublattice.Element): Element = Lifted.Lift(x)
-
-  /** Un-lift elements of this lattice to the sublattice. Throws an IllegalArgumentException if trying to unlift the
-    * bottom element Note that this method is declared as implicit, so the conversion can be done automatically.
-    */
-  implicit def unlift(x: Element): sublattice.Element = x match
-    case Lifted.Lift(s) => s
-    case Lifted.Bottom  => throw new IllegalArgumentException("Cannot unlift bottom")
-
 /** Constant propagation lattice.
   */
-object ConstantPropagationLattice extends FlatLattice[Int]() with LatticeWithOps:
+object ConstantPropagationLattice extends FlatLattice[BigInt]() with LatticeWithOps:
 
-  private def apply(op: (Int, Int) => Int, a: Element, b: Element): Element = (a, b) match {
+  private def apply(op: (BigInt, BigInt) => BigInt, a: Element, b: Element): Element = (a, b) match {
     case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => FlatElement.FlatEl(op(x, y))
     case (FlatElement.Bot, _)                           => FlatElement.Bot
     case (_, FlatElement.Bot)                           => FlatElement.Bot
@@ -142,7 +127,13 @@ object ConstantPropagationLattice extends FlatLattice[Int]() with LatticeWithOps
     case (FlatElement.Top, _)                           => FlatElement.Top
   }
 
-  def num(i: Int): Element = FlatElement.FlatEl(i)
+  private def apply(op: (BigInt) => BigInt, a: Element): Element = a match {
+    case FlatElement.FlatEl(x) => FlatElement.FlatEl(op(a))
+    case FlatElement.Top       => FlatElement.Top
+    case FlatElement.Bot       => FlatElement.Bot
+  }
+
+  def num(i: BigInt): Element = FlatElement.FlatEl(i)
 
   def plus(a: Element, b: Element): Element = apply(_ + _, a, b)
 
@@ -154,4 +145,18 @@ object ConstantPropagationLattice extends FlatLattice[Int]() with LatticeWithOps
 
   def eqq(a: Element, b: Element): Element = apply((x, y) => if x == y then 1 else 0, a, b)
 
-  def gt(a: Element, b: Element): Element = apply((x, y) => if x > y then 1 else 0, a, b)
+  def neqq(a: Element, b: Element): Element = apply((x, y) => if x == y then 0 else 1, a, b)
+
+  def lt(a: Element, b: Element): Element = apply((x, y) => if x < y then 1 else 0, a, b)
+
+  def lte(a: Element, b: Element): Element = apply((x, y) => if x <= y then 1 else 0, a, b)
+
+  def and(a: Element, b: Element): Element = apply(_ & _, a, b)
+
+  def or(a: Element, b: Element): Element = apply(_ | _, a, b)
+
+  def xor(a: Element, b: Element): Element = apply(_ ^ _, a, b)
+
+  def not(a: Element): Element = apply(~_, a)
+
+  def neg(a: Element): Element = apply(-_, a)
