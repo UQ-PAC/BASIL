@@ -26,6 +26,7 @@ object AdtStatementLoader {
     case e: ExpIntContext    => visitExpInt(e)
     case e: ExpCastContext   => visitCast(e.cast)
     case e: ExtractContext   => visitExtract(e)
+    case e: ConcatContext    => visitConcat(e)
   }
 
   def visitLoad(ctx: LoadContext): MemAccess = {
@@ -65,6 +66,10 @@ object AdtStatementLoader {
 
   def visitExtract(ctx: ExtractContext): Extract = {
     Extract(parseInt(ctx.hb), parseInt(ctx.lb), visitExp(ctx.exp))
+  }
+
+  def visitConcat(ctx: ConcatContext): Concat = {
+    Concat(visitExp(ctx.lhs), visitExp(ctx.rhs))
   }
 
   def visitJmp(ctx: JmpContext): (String, Statement) = ctx match {
