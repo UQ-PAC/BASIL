@@ -8,16 +8,22 @@ import scala.collection.mutable.ArrayBuffer
   * Refer to the existing tests for the expected directory structure and file-name patterns.
   */
 class SystemTests extends AnyFunSuite {
+  // directory containing all test programs
   val programsDir = "./src/test/programs"
+  // all subdirectories of programsDir
   val programs = getTests(programsDir)
+  // create a test for each test-program directory
   programs.foreach(t => test(t) {
+    // expected pathnames given the standardised structure of test directories
     val stdPath = "%s/%s/%s".format(programsDir, t, t)
     val actualOutPath = stdPath + "_actual_out.bpl"
     val expectedOutPath = stdPath + "_expected_out.bpl"
+    // run the tool and write the output to the standard location within the test directory
     main(stdPath + ".adt", stdPath + ".relf", stdPath + ".spec", actualOutPath)
-    // check success/failure of verification matches expectation
+    // check that the success/failure of the verification matches expectation
       // todo: run boogie?
-    // check that boogie output matches expected
+    // check that the boogie output matches expectation
+      // fixme: this always fails because the output bpl is not deterministic
     if(!Source.fromFile(actualOutPath).getLines.mkString.equals(
       Source.fromFile(expectedOutPath).getLines().mkString)) {
       fail("boogie file differs from expected")
