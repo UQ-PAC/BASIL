@@ -3,17 +3,13 @@ import java.io.File
 import scala.io.Source
 import scala.collection.mutable.ArrayBuffer
 
-
-/*
-In future, we could have a predefined structure for test file names and locations for a cleaner and
-more manageable test suite.
-*/
-
-
+/**
+  * Add more tests by simply adding them to the programs directory.
+  * Refer to the existing tests for the expected directory structure and file-name patterns.
+  */
 class SystemTests extends AnyFunSuite {
   val programsDir = "./src/test/programs"
   val programs = getTests(programsDir)
-
   programs.foreach(t => test(t) {
     val stdPath = "%s/%s/%s".format(programsDir, t, t)
     val actualOutPath = stdPath + "_actual_out.bpl"
@@ -28,7 +24,10 @@ class SystemTests extends AnyFunSuite {
     }
   })
 
-  // gets the names all subdirectories in src/test/programs
+  /**
+    * @param directoryName of the parent directory
+    * @return the names all subdirectories of the given parent directory
+    */
   def getTests(directoryName: String): Array[String] = {
     (new File(directoryName))
       .listFiles
