@@ -43,27 +43,42 @@ trait ValueAnalysisMisc:
     import valuelattice._
     exp match
       case id: LocalVar => env(id)
-      case n: Literal   => num(n.value)
+      case n: Literal   => literal(n)
+      case se: SignedExtend => 
+        
+    case use: UnsignedExtend => 
+
+      case e: Extract =>
+        val body = eval(e.body, env)
+        extract(e.high, e.low, body)
       case bin: BinOp =>
         val left = eval(bin.lhs, env)
         val right = eval(bin.rhs, env)
+
         bin.operator match
           case PLUS    => plus(left, right)
           case MINUS   => minus(left, right)
           case TIMES   => times(left, right)
-          case DIVIDE  => div(left, right)
-          case SDIVIDE => div(left, right)
+          case DIVIDE  => divide(left, right)
+          case SDIVIDE => sdivide(left, right)
           case AND     => and(left, right)
           case OR      => or(left, right)
           case XOR     => xor(left, right)
+          case MOD     => mod(left, right)
+          case SMOD    => smod(left, right)
+          case LSHIFT  => lshift(left, right)
+          case RSHIFT  => rshift(left, right)
+          case ARSHIFT => arshift(left, right)
           case EQ      => eqq(left, right)
-          case NEQ     => neqq(left, right)
+          case NEQ     => neq(left, right)
           case LT      => lt(left, right)
-          case LE      => lte(left, right)
-          case _       => valuelattice.top
+          case LE      => le(left, right)
+          case SLT     => slt(left, right)
+          case SLE     => sle(left, right)
 
       case un: UnOp =>
         val arg = eval(un.exp, env)
+
         un.operator match
           case NEG => neg(arg)
           case NOT => not(arg)
@@ -107,6 +122,7 @@ abstract class IntraprocValueAnalysisWorklistSolver[L <: LatticeWithOps](
     with ForwardDependencies
 
 object ConstantPropagationAnalysis:
+
   /** Intraprocedural analysis that uses the worklist solver.
     */
   class WorklistSolver(cfg: IntraproceduralProgramCfg)

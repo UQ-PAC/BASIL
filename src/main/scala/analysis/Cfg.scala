@@ -196,6 +196,7 @@ abstract class ProgramCfg(
 ) extends Cfg(funEntries.values.toSet, funExits.values.toSet)
 
 object IntraproceduralProgramCfg:
+
   /** Generates an [[IntraproceduralProgramCfg]] from a program.
     */
   def generateFromProgram(prog: Program): IntraproceduralProgramCfg =

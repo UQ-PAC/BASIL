@@ -1,5 +1,8 @@
 package analysis
 
+import astnodes.*
+import util.*
+
 /** Basic lattice
   */
 trait Lattice:
@@ -28,60 +31,30 @@ trait Lattice:
   */
 trait LatticeWithOps extends Lattice:
 
-  /** Abstract number.
-    */
-  def num(i: BigInt): Element
-
-  /** Abstract plus.
-    */
+  def literal(l: Literal): Element
   def plus(a: Element, b: Element): Element
-
-  /** Abstract minus.
-    */
   def minus(a: Element, b: Element): Element
-
-  /** Abstract times.
-    */
   def times(a: Element, b: Element): Element
-
-  /** Abstract division.
-    */
-  def div(a: Element, b: Element): Element
-
-  /** Abstract equals.
-    */
-  def eqq(a: Element, b: Element): Element
-
-  /** Abstract not equal.
-    */
-  def neqq(a: Element, b: Element): Element
-
-  /** Abstract less-than.
-    */
-  def lt(a: Element, b: Element): Element
-
-  /** Abstract less-than or equal.
-    */
-  def lte(a: Element, b: Element): Element
-
-  /** Abstract bitwise and.
-    */
+  def divide(a: Element, b: Element): Element
+  def sdivide(a: Element, b: Element): Element
+  def mod(a: Element, b: Element): Element
+  def smod(a: Element, b: Element): Element
   def and(a: Element, b: Element): Element
-
-  /** Abstract bitwise or.
-    */
   def or(a: Element, b: Element): Element
-
-  /** Abstract bitwise xor.
-    */
   def xor(a: Element, b: Element): Element
-
-  /** Abstract bitwise not.
-    */
+  def lshift(a: Element, b: Element): Element
+  def rshift(a: Element, b: Element): Element
+  def arshift(a: Element, b: Element): Element
+  def eqq(a: Element, b: Element): Element
+  def neq(a: Element, b: Element): Element
+  def lt(a: Element, b: Element): Element
+  def le(a: Element, b: Element): Element
+  def slt(a: Element, b: Element): Element
+  def sle(a: Element, b: Element): Element
+  def signedextend(width: Int, a: Element): Element
+  def unsignedextend(width: Int, a: Element): Element
+  def extract(high: Int, low: Int, a: Element): Element
   def not(a: Element): Element
-
-  /** Abstract negation.
-    */
   def neg(a: Element): Element
 
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
@@ -129,44 +102,42 @@ class MapLattice[A, +L <: Lattice](val sublattice: L) extends Lattice:
 
 /** Constant propagation lattice.
   */
-object ConstantPropagationLattice extends FlatLattice[BigInt]() with LatticeWithOps:
+object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWithOps:
 
-  private def apply(op: (BigInt, BigInt) => BigInt, a: Element, b: Element): Element = (a, b) match
+  private def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element = (a, b) match
     case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => FlatElement.FlatEl(op(x, y))
     case (FlatElement.Bot, _)                           => FlatElement.Bot
     case (_, FlatElement.Bot)                           => FlatElement.Bot
     case (_, FlatElement.Top)                           => FlatElement.Top
     case (FlatElement.Top, _)                           => FlatElement.Top
 
-  private def apply(op: (BigInt) => BigInt, a: Element): Element = a match
-    case FlatElement.FlatEl(x) => FlatElement.FlatEl(op(a))
+  private def apply(op: (Literal) => Literal, a: Element): Element = a match
+    case FlatElement.FlatEl(x) => FlatElement.FlatEl(op(x))
     case FlatElement.Top       => FlatElement.Top
     case FlatElement.Bot       => FlatElement.Bot
 
-  def num(i: BigInt): Element = FlatElement.FlatEl(i)
-
-  def plus(a: Element, b: Element): Element = apply(_ + _, a, b)
-
-  def minus(a: Element, b: Element): Element = apply(_ - _, a, b)
-
-  def times(a: Element, b: Element): Element = apply(_ * _, a, b)
-
-  def div(a: Element, b: Element): Element = apply((x, y) => if y != 0 then x / y else FlatElement.Bot, a, b)
-
-  def eqq(a: Element, b: Element): Element = apply((x, y) => if x == y then 1 else 0, a, b)
-
-  def neqq(a: Element, b: Element): Element = apply((x, y) => if x == y then 0 else 1, a, b)
-
-  def lt(a: Element, b: Element): Element = apply((x, y) => if x < y then 1 else 0, a, b)
-
-  def lte(a: Element, b: Element): Element = apply((x, y) => if x <= y then 1 else 0, a, b)
-
-  def and(a: Element, b: Element): Element = apply(_ & _, a, b)
-
-  def or(a: Element, b: Element): Element = apply(_ | _, a, b)
-
-  def xor(a: Element, b: Element): Element = apply(_ ^ _, a, b)
-
-  def not(a: Element): Element = apply(~_, a)
-
-  def neg(a: Element): Element = apply(-_, a)
+  override def literal(l: Literal): Element = FlatElement.FlatEl(l)
+  override def plus(a: Element, b: Element): Element = apply(bvadd, a, b)
+  override def minus(a: Element, b: Element): Element = apply(bvsub, a, b)
+  override def times(a: Element, b: Element): Element = apply(bvmul, a, b)
+  override def divide(a: Element, b: Element): Element = apply(bvudiv, a, b)
+  override def and(a: Element, b: Element): Element = apply(bvand, a, b)
+  override def or(a: Element, b: Element): Element = apply(bvor, a, b)
+  override def xor(a: Element, b: Element): Element = apply(bvxor, a, b)
+  override def not(a: Element): Element = apply(bvnot, a)
+  override def neg(a: Element): Element = apply(bvneg, a)
+  override def sdivide(a: Element, b: Element): Element = FlatElement.Top
+  override def mod(a: Element, b: Element): Element = FlatElement.Top
+  override def smod(a: Element, b: Element): Element = FlatElement.Top
+  override def lshift(a: Element, b: Element): Element = FlatElement.Top
+  override def rshift(a: Element, b: Element): Element = FlatElement.Top
+  override def arshift(a: Element, b: Element): Element = FlatElement.Top
+  override def eqq(a: Element, b: Element): Element = FlatElement.Top
+  override def neq(a: Element, b: Element): Element = FlatElement.Top
+  override def lt(a: Element, b: Element): Element = FlatElement.Top
+  override def le(a: Element, b: Element): Element = FlatElement.Top
+  override def slt(a: Element, b: Element): Element = FlatElement.Top
+  override def sle(a: Element, b: Element): Element = FlatElement.Top
+  override def signedextend(width: Int, a: Element): Element = FlatElement.Top
+  override def unsignedextend(width: Int, a: Element): Element = apply(zero_extend(width, _: Literal), a)
+  override def extract(high: Int, low: Int, a: Element): Element = apply(bvextract(high, low, _: Literal), a)

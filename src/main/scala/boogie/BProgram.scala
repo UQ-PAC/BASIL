@@ -107,7 +107,7 @@ case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar,
   }
   def functionOps: Set[FunctionOp] = body match {
     case Some(b) => b.functionOps
-    case None => Set()
+    case None    => Set()
   }
 }
 
