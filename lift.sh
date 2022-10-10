@@ -5,5 +5,5 @@ if [ $# -lt 3 ]
 fi
 aarch64-linux-gnu-gcc -fno-plt -fno-pic "$1"
 bap "$1".out -d adt:"$2"
-readelf -r -s "$1".out > "$3"
+readelf -r -s -W "$1".out > "$3"
 #rm "$1".out
