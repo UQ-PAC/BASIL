@@ -42,12 +42,11 @@ trait ValueAnalysisMisc:
   def eval(exp: Expr, env: statelattice.Element): valuelattice.Element =
     import valuelattice._
     exp match
-      case id: LocalVar => env(id)
-      case n: Literal   => literal(n)
-      case se: SignedExtend => 
-        
-    case use: UnsignedExtend => 
-
+      case id: LocalVar        => env(id)
+      case n: Literal          => literal(n)
+      case se: SignedExtend    => ???
+      case use: UnsignedExtend => ???
+      case c: Concat           => ???
       case e: Extract =>
         val body = eval(e.body, env)
         extract(e.high, e.low, body)
