@@ -1,8 +1,10 @@
 package translating
 
-import astnodes._
-import boogie._
-import specification._
+import astnodes.*
+import boogie.*
+import specification.*
+
+import scala.language.postfixOps
 
 case class BoogieTranslator(program: Program, spec: Specification) {
   private val globals = spec.globals
@@ -165,9 +167,29 @@ case class BoogieTranslator(program: Program, spec: Specification) {
   }
 
   def translate(f: FunctionNode): BProcedure = {
-    val in = f.in.flatMap(i => List(BParam(i.name, BitVec(i.size)), BParam(s"Gamma_${i.name}", BoolType)))
-    val out = f.out.flatMap(o => List(BParam(o.name, BitVec(o.size)), BParam(s"Gamma_${o.name}", BoolType)))
-    val returns = f.out.map(p => outParamToAssign(p))
+    val in = f.in.flatMap(i => i.toBoogie)
+
+    var outRegisters: Set[LocalVar] = Set()
+
+    val out = (for (o <- f.out) yield {
+      if (outRegisters.contains(o.value)) {
+        List()
+      } else {
+        outRegisters = outRegisters + o.value
+        o.toBoogie
+      }
+    }).flatten
+
+    outRegisters = Set()
+    val returns = (for (o <- f.out) yield {
+      if (outRegisters.contains(o.value)) {
+        List()
+      } else {
+        outRegisters = outRegisters + o.value
+        List(outParamToAssign(o))
+      }
+    }).flatten
+
     val body = f.blocks.map(b => translate(b, returns))
     val modifies = body.flatMap(b => b.modifies).toSet
     val requires: List[BExpr] = if (f.name == "main") {
@@ -319,6 +341,16 @@ case class BoogieTranslator(program: Program, spec: Specification) {
         List(register, registerGamma)
       }
     }
+
+    var outUsedRegisters: Set[LocalVar] = Set()
+    var outIndices: Set[Int] = Set()
+    for (o <- out.indices) {
+      if (!outUsedRegisters.contains(out(o).value)) {
+        outIndices = outIndices + o
+        outUsedRegisters = outUsedRegisters + out(o).value
+      }
+    }
+
     val outTemp = for (o <- out.indices) yield {
       BVariable(s"#temp$o", BitVec(out(o).size), Scope.Local)
     }
@@ -327,7 +359,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
     }
     val outRegisters = out.map(o => o.value.toBoogie)
     val outRegisterGammas = out.map(o => o.value.toGamma)
-    val outAssigned = for (o <- out.indices if out(o).value.size != out(o).size) yield {
+    val outAssigned = for (o <- out.indices if out(o).value.size != out(o).size && outIndices.contains(o)) yield {
       val regSize = out(o).value.size
       val paramSize = out(o).size
       if (regSize > paramSize) {
@@ -336,7 +368,8 @@ case class BoogieTranslator(program: Program, spec: Specification) {
         AssignCmd(List(outRegisters(o), outRegisterGammas(o)), List(BVExtract(regSize, 0, outTemp(o)), outTempGamma(o)))
       }
     }
-    val returned = for (o <- out.indices) yield {
+
+    val returned = for (o <- out.indices if outIndices.contains(o)) yield {
       if (out(o).value.size == out(o).size) {
         List(outRegisters(o), outRegisterGammas(o))
       } else {
