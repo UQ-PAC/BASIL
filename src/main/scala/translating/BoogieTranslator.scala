@@ -387,18 +387,29 @@ case class BoogieTranslator(program: Program, spec: Specification) {
 
   def stripUnreachableFunctions(externalNames: Set[String]): BoogieTranslator = {
     val functionToChildren = program.functions.map(f => f.name -> f.calls).toMap
-    val reachableFunctionNames = reachableFrom("main", functionToChildren, Set("main"))
-    val reachableFunctions = program.functions.filter(f => reachableFunctionNames.contains(f.name))
+
+    var next = "main"
+    var reachableNames: Set[String] = Set("main")
+    var toVisit: List[String] = List()
+    var reachableFound = true;
+    while (reachableFound) {
+      val children = functionToChildren(next) -- reachableNames -- toVisit - next
+      reachableNames = reachableNames ++ children
+      toVisit = toVisit ++ children
+      if (toVisit.isEmpty) {
+        reachableFound = false
+      } else {
+        next = toVisit.head
+        toVisit = toVisit.tail
+      }
+    }
+
+    val reachableFunctions = program.functions.filter(f => reachableNames.contains(f.name))
     val externalsStubbed = reachableFunctions.map {
       case f: FunctionNode if externalNames.contains(f.name) => f.copy(blocks = List())
       case f: _ => f
     }
     copy(program = program.copy(functions = externalsStubbed))
-  }
-
-  private def reachableFrom(next: String, functionToChildren: Map[String, Set[String]], reached: Set[String]): Set[String] = {
-    val reachable = functionToChildren(next) -- reached
-    reached ++ reachable.flatMap(s => reachableFrom(s, functionToChildren, reachable ++ reached))
   }
 
   private val reserved = Set("free")
