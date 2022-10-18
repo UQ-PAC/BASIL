@@ -10,19 +10,16 @@ val scalactic = "org.scalactic" %% "scalactic" % "3.2.10"
 val antlrRuntime = "org.antlr" % "antlr4-runtime" % "4.9.3"
 
 lazy val root = project
-    .in(file("."))
-    .enablePlugins(Antlr4Plugin)
-    .settings(
-        name := "wptool-boogie",
-
-        Antlr4 / antlr4Version := "4.9.3",
-        Antlr4 / antlr4GenVisitor := true,
-        Antlr4 / antlr4PackageName := Some("BilParser"),
-
-        Compile / run / mainClass := Some("main"),
-
-        libraryDependencies += javaTests,
-        libraryDependencies += antlrRuntime,
-        libraryDependencies += scalactic,
-        libraryDependencies += scalaTests
-    )
+  .in(file("."))
+  .enablePlugins(Antlr4Plugin)
+  .settings(
+    name := "wptool-boogie",
+    Antlr4 / antlr4Version := "4.9.3",
+    Antlr4 / antlr4GenVisitor := true,
+    Antlr4 / antlr4PackageName := Some("BilParser"),
+    Compile / run / mainClass := Some("main"),
+    libraryDependencies += javaTests,
+    libraryDependencies += antlrRuntime,
+    libraryDependencies += scalactic,
+    libraryDependencies += scalaTests
+  )
