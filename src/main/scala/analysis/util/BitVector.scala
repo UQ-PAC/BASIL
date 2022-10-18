@@ -3,29 +3,6 @@ import astnodes._
 
 import scala.math.pow
 
-/** Simplifies a concat expressions. Assumes every concat is either a pad or extend.
-  */
-def bitvecConcat(concat: Concat): Expr = concat.left match {
-  case l: Literal if l.value == BigInt(0) => simplifyPad(concat)
-  case _ =>
-    concat.right match {
-      case r: Literal if r.value == BigInt(0) => simplifyExtend(concat)
-      case _                                  => concat
-    }
-}
-
-/** Simplifies a concat that appends 0s to rhs of bitvector.
-  */
-private def simplifyExtend(concat: Concat): Expr = {
-  concat.left match {
-    case literal: Literal =>
-      // Due to the nature of BIL extend & pad expressions, it is assumed the value returned from them will always be a bitvector of size 64
-      val lhsExtended = literal.value << concat.right.size
-      Literal(lhsExtended, literal.size + concat.right.size)
-    case _ => concat
-  }
-}
-
 /** nat2bv[m], with 0 < m, which takes a non-negative integer n and returns the (unique) bitvector b: [0, m) → {0, 1}
   * such that b(m-1)*2^{m-1} + ⋯ + b(0)*2^0 = n rem 2^m
   */
@@ -103,3 +80,32 @@ def bvextract(i: Int, j: Int, s: Literal): Literal =
 def zero_extend(i: Int, s: Literal): Literal =
   require(i >= 0, "bits to be extended must be non-negative")
   Literal(s.value, s.size + i)
+
+def bvcomp(s: Literal, t: Literal) =
+  if s.size != t.size then Literal(0, 1)
+
+  if bv2nat(s) == bv2nat(t) then Literal(1, 1)
+  else Literal(0, 1)
+
+def bvneq(s: Literal, t: Literal) =
+  if s.size != t.size then Literal(1, 1)
+
+  if bv2nat(s) != bv2nat(t) then Literal(1, 1)
+  else Literal(0, 1)
+
+def bvult(s: Literal, t: Literal) =
+  if bv2nat(s) < bv2nat(t) then Literal(1, 1)
+  else Literal(0, 1)
+
+def bvulte(s: Literal, t: Literal) =
+  if bv2nat(s) < bv2nat(t) then Literal(1, 1)
+  else if bv2nat(s) == bv2nat(t) && s.size == t.size then Literal(1, 1)
+  else Literal(0, 1)
+
+def bvshl(s: Literal, t: Literal) =
+  require(s.size == t.size, "bitvector sizes must be the same")
+  nat2bv(s.size, bv2nat(s) * pow(2, bv2nat(t).toDouble).toInt)
+
+def bvlshr(s: Literal, t: Literal) =
+  require(s.size == t.size, "bitvector sizes must be the same")
+  nat2bv(s.size, bv2nat(s) / pow(2, bv2nat(t).toDouble).toInt)

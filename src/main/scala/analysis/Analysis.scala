@@ -44,36 +44,27 @@ trait ValueAnalysisMisc:
     exp match
       case id: LocalVar        => env(id)
       case n: Literal          => literal(n)
-      case se: SignedExtend    => ???
-      case use: UnsignedExtend => ???
-      case c: Concat           => ???
-      case e: Extract =>
-        val body = eval(e.body, env)
-        extract(e.high, e.low, body)
+      case use: UnsignedExtend => unsignedextend(use.width, eval(use.body, env))
+      case e: Extract          => extract(e.high, e.low, eval(e.body, env))
       case bin: BinOp =>
         val left = eval(bin.lhs, env)
         val right = eval(bin.rhs, env)
 
         bin.operator match
-          case PLUS    => plus(left, right)
-          case MINUS   => minus(left, right)
-          case TIMES   => times(left, right)
-          case DIVIDE  => divide(left, right)
-          case SDIVIDE => sdivide(left, right)
-          case AND     => and(left, right)
-          case OR      => or(left, right)
-          case XOR     => xor(left, right)
-          case MOD     => mod(left, right)
-          case SMOD    => smod(left, right)
-          case LSHIFT  => lshift(left, right)
-          case RSHIFT  => rshift(left, right)
-          case ARSHIFT => arshift(left, right)
-          case EQ      => eqq(left, right)
-          case NEQ     => neq(left, right)
-          case LT      => lt(left, right)
-          case LE      => le(left, right)
-          case SLT     => slt(left, right)
-          case SLE     => sle(left, right)
+          case PLUS   => plus(left, right)
+          case MINUS  => minus(left, right)
+          case TIMES  => times(left, right)
+          case DIVIDE => divide(left, right)
+          case AND    => and(left, right)
+          case OR     => or(left, right)
+          case XOR    => xor(left, right)
+          case LSHIFT => lshift(left, right)
+          case RSHIFT => rshift(left, right)
+          case EQ     => eqq(left, right)
+          case NEQ    => neq(left, right)
+          case LT     => lt(left, right)
+          case LE     => le(left, right)
+          case _      => valuelattice.top
 
       case un: UnOp =>
         val arg = eval(un.exp, env)

@@ -36,22 +36,15 @@ trait LatticeWithOps extends Lattice:
   def minus(a: Element, b: Element): Element
   def times(a: Element, b: Element): Element
   def divide(a: Element, b: Element): Element
-  def sdivide(a: Element, b: Element): Element
-  def mod(a: Element, b: Element): Element
-  def smod(a: Element, b: Element): Element
   def and(a: Element, b: Element): Element
   def or(a: Element, b: Element): Element
   def xor(a: Element, b: Element): Element
   def lshift(a: Element, b: Element): Element
   def rshift(a: Element, b: Element): Element
-  def arshift(a: Element, b: Element): Element
   def eqq(a: Element, b: Element): Element
   def neq(a: Element, b: Element): Element
   def lt(a: Element, b: Element): Element
   def le(a: Element, b: Element): Element
-  def slt(a: Element, b: Element): Element
-  def sle(a: Element, b: Element): Element
-  def signedextend(width: Int, a: Element): Element
   def unsignedextend(width: Int, a: Element): Element
   def extract(high: Int, low: Int, a: Element): Element
   def not(a: Element): Element
@@ -126,18 +119,11 @@ object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWit
   override def xor(a: Element, b: Element): Element = apply(bvxor, a, b)
   override def not(a: Element): Element = apply(bvnot, a)
   override def neg(a: Element): Element = apply(bvneg, a)
-  override def sdivide(a: Element, b: Element): Element = FlatElement.Top
-  override def mod(a: Element, b: Element): Element = FlatElement.Top
-  override def smod(a: Element, b: Element): Element = FlatElement.Top
-  override def lshift(a: Element, b: Element): Element = FlatElement.Top
-  override def rshift(a: Element, b: Element): Element = FlatElement.Top
-  override def arshift(a: Element, b: Element): Element = FlatElement.Top
-  override def eqq(a: Element, b: Element): Element = FlatElement.Top
-  override def neq(a: Element, b: Element): Element = FlatElement.Top
-  override def lt(a: Element, b: Element): Element = FlatElement.Top
-  override def le(a: Element, b: Element): Element = FlatElement.Top
-  override def slt(a: Element, b: Element): Element = FlatElement.Top
-  override def sle(a: Element, b: Element): Element = FlatElement.Top
-  override def signedextend(width: Int, a: Element): Element = FlatElement.Top
+  override def lshift(a: Element, b: Element): Element = apply(bvshl, a, b)
+  override def rshift(a: Element, b: Element): Element = apply(bvlshr, a, b)
+  override def eqq(a: Element, b: Element): Element = apply(bvcomp, a, b)
+  override def neq(a: Element, b: Element): Element = apply(bvneq, a, b)
+  override def lt(a: Element, b: Element): Element = apply(bvult, a, b)
+  override def le(a: Element, b: Element): Element = apply(bvulte, a, b)
   override def unsignedextend(width: Int, a: Element): Element = apply(zero_extend(width, _: Literal), a)
   override def extract(high: Int, low: Int, a: Element): Element = apply(bvextract(high, low, _: Literal), a)
