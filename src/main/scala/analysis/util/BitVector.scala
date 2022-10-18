@@ -77,35 +77,49 @@ def bvxor(s: Literal, t: Literal): Literal =
 def bvextract(i: Int, j: Int, s: Literal): Literal =
   Literal((s.value >> j - 1) & (1 << (i - j + 1)) - 1, i - j + 1)
 
+/** ((_ zero_extend i) t) abbreviates (concat ((_ repeat i) #b0) t)
+  */
 def zero_extend(i: Int, s: Literal): Literal =
   require(i >= 0, "bits to be extended must be non-negative")
   Literal(s.value, s.size + i)
 
+/** bit comparator: equals 1 iff all bits are equal otherwise 0
+  */
 def bvcomp(s: Literal, t: Literal) =
   if s.size != t.size then Literal(0, 1)
 
   if bv2nat(s) == bv2nat(t) then Literal(1, 1)
   else Literal(0, 1)
 
+/** bit comparator: equals 0 iff all bits are equal otherwise 1
+  */
 def bvneq(s: Literal, t: Literal) =
   if s.size != t.size then Literal(1, 1)
 
   if bv2nat(s) != bv2nat(t) then Literal(1, 1)
   else Literal(0, 1)
 
+/** [[bvult s t]] := true iff bv2nat([[s]]) < bv2nat([[t]])
+  */
 def bvult(s: Literal, t: Literal) =
   if bv2nat(s) < bv2nat(t) then Literal(1, 1)
   else Literal(0, 1)
 
+/** (bvule s t) abbreviates (or (bvult s t) (= s t))
+  */
 def bvulte(s: Literal, t: Literal) =
   if bv2nat(s) < bv2nat(t) then Literal(1, 1)
   else if bv2nat(s) == bv2nat(t) && s.size == t.size then Literal(1, 1)
   else Literal(0, 1)
 
+/** shift left (equivalent to multiplication by 2^x where x is the value of the second argument)
+  */
 def bvshl(s: Literal, t: Literal) =
   require(s.size == t.size, "bitvector sizes must be the same")
   nat2bv(s.size, bv2nat(s) * pow(2, bv2nat(t).toDouble).toInt)
 
+/** logical shift right (equivalent to unsigned division by 2^x where x is the value of the second argument)
+  */
 def bvlshr(s: Literal, t: Literal) =
   require(s.size == t.size, "bitvector sizes must be the same")
   nat2bv(s.size, bv2nat(s) / pow(2, bv2nat(t).toDouble).toInt)
