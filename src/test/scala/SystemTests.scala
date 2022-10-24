@@ -2,6 +2,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import java.io.File
 import scala.io.Source
 import scala.collection.mutable.ArrayBuffer
+import scala.sys.process._
 
 /**
   * Add more tests by simply adding them to the programs directory.
@@ -21,13 +22,18 @@ class SystemTests extends AnyFunSuite {
     // run the tool and write the output to the standard location within the test directory
     main(stdPath + ".adt", stdPath + ".relf", stdPath + ".spec", actualOutPath)
     // check that the success/failure of the verification matches expectation
-      // todo: run boogie?
+    // creates an xml file which may take a while to display
+    // in future, we may want to automatically analyse this file
+    val xmlArg = "/xml:" + stdPath + "_boogie_result.xml"
+    // executes "boogie /printVerifiedProceduresCount:0 /xml:<xml path>, <actual out path>"
+    val boogieResult = Seq("boogie", "/printVerifiedProceduresCount:0", xmlArg, actualOutPath).!!
+    assert(boogieResult.strip().equals("Boogie program verifier finished with 0 errors"));
     // check that the boogie output matches expectation
-      // fixme: this always fails because the output bpl is not deterministic
-    if(!Source.fromFile(actualOutPath).getLines.mkString.equals(
-      Source.fromFile(expectedOutPath).getLines().mkString)) {
-      fail("boogie file differs from expected")
-    }
+//    fixme: this always fails because the output bpl is not deterministic
+//    if(!Source.fromFile(actualOutPath).getLines.mkString.equals(
+//      Source.fromFile(expectedOutPath).getLines().mkString)) {
+//      fail("boogie file differs from expected")
+//    }
   })
 
   /**
