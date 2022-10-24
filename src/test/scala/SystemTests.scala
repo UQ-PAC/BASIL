@@ -27,13 +27,13 @@ class SystemTests extends AnyFunSuite {
     val xmlArg = "/xml:" + stdPath + "_boogie_result.xml"
     // executes "boogie /printVerifiedProceduresCount:0 /xml:<xml path>, <actual out path>"
     val boogieResult = Seq("boogie", "/printVerifiedProceduresCount:0", xmlArg, actualOutPath).!!
-    assert(boogieResult.strip().equals("Boogie program verifier finished with 0 errors"));
+    val boogieVerificationResult = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
+    assert(boogieVerificationResult);
     // check that the boogie output matches expectation
-//    fixme: this always fails because the output bpl is not deterministic
-//    if(!Source.fromFile(actualOutPath).getLines.mkString.equals(
-//      Source.fromFile(expectedOutPath).getLines().mkString)) {
-//      fail("boogie file differs from expected")
-//    }
+    if (!Source.fromFile(actualOutPath).getLines.mkString.equals(
+      Source.fromFile(expectedOutPath).getLines().mkString)) {
+      info("Warning: Boogie file differs from expected")
+    }
   })
 
   /**
