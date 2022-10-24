@@ -19,8 +19,8 @@ trait Expr {
     } else if (gammaVars.size == 1) {
       gammaVars.head
     } else {
-      gammaVars.tail.foldLeft(gammaVars.head) {
-        (join: BExpr, next: BExpr) => BinaryBExpr(BoolAND, next, join)
+      gammaVars.tail.foldLeft(gammaVars.head) { (join: BExpr, next: BExpr) =>
+        BinaryBExpr(BoolAND, next, join)
       }
     }
   }
@@ -311,9 +311,12 @@ case class MemAccess(memory: Memory, index: Expr, endian: Endian, override val s
   override def toGamma: BExpr = if (memory.name == "stack") {
     GammaLoad(memory.toGamma, index.toBoogie, size, size / memory.valueSize)
   } else {
-    BinaryBExpr(BoolOR, GammaLoad(memory.toGamma, index.toBoogie, size, size / memory.valueSize), L(memory.toBoogie, index.toBoogie))
+    BinaryBExpr(
+      BoolOR,
+      GammaLoad(memory.toGamma, index.toBoogie, size, size / memory.valueSize),
+      L(memory.toBoogie, index.toBoogie)
+    )
   }
-
 
   /*
   override def simplify(old: Expr, sub: Expr): Expr = {
@@ -348,7 +351,7 @@ case class MemAccess(memory: Memory, index: Expr, endian: Endian, override val s
       BinaryBExpr(BVCONCAT, next, concat)
     }
   }
-  */
+   */
 }
 
 object MemAccess {
@@ -376,7 +379,8 @@ case class Store(memory: Memory, index: Expr, value: Expr, endian: Endian, size:
   override def locals: Set[LocalVar] = index.locals ++ value.locals
   override def gammas: Set[Variable] = Set()
   override def toBoogie: MemoryStore = MemoryStore(memory.toBoogie, index.toBoogie, value.toBoogie, endian, size)
-  override def toGamma: GammaStore = GammaStore(memory.toGamma, index.toBoogie, value.toGamma, size, size / memory.valueSize)
+  override def toGamma: GammaStore =
+    GammaStore(memory.toGamma, index.toBoogie, value.toGamma, size, size / memory.valueSize)
   //def toBoogieProc: String
 }
 

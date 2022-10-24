@@ -1,12 +1,13 @@
 package util
 //import analysis._
-import astnodes._
-import boogie._
-import specification._
-import BilParser._
+import astnodes.*
+import boogie.*
+import specification.*
+import BilParser.*
+import analysis.{ConstantPropagationAnalysis, ConstantPropagationLattice, IntraproceduralProgramCfg}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating._
+import translating.*
 //import vcgen.{State, VCGen}
 
 import java.io.{BufferedWriter, FileWriter, IOException}
@@ -58,6 +59,10 @@ object RunUtils {
 
     val translator = BoogieTranslator(program, specification)
     val translatorUnusedRemoved = translator.stripUnreachableFunctions(externalNames)
+
+    val cfg = IntraproceduralProgramCfg.generateFromProgram(translatorUnusedRemoved.program)
+    val result = new ConstantPropagationAnalysis.WorklistSolver(cfg).analyze()
+
     translatorUnusedRemoved.translate
   }
 
