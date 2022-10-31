@@ -1,7 +1,5 @@
 package analysis
 
-import scala.collection.immutable.Set
-
 /** Dependency methods for worklist-based analyses.
   */
 trait Dependencies[N]:

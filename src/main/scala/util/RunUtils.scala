@@ -1,14 +1,12 @@
 package util
-//import analysis._
-import astnodes.*
-import boogie.*
-import specification.*
-import BilParser.*
+import astnodes._
+import boogie._
+import specification._
+import BilParser._
 import analysis.{ConstantPropagationAnalysis, ConstantPropagationLattice, IntraproceduralProgramCfg}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating.*
-//import vcgen.{State, VCGen}
+import translating._
 
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._

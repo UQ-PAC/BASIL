@@ -1,16 +1,14 @@
 // package scala
 
-import analysis._
 import astnodes._
 import boogie._
 import translating._
 import util.RunUtils
-//import vcgen._
 
 import scala.collection.mutable.{ArrayBuffer, Set}
 import scala.collection.{immutable, mutable}
 import scala.language.postfixOps
-import scala.sys.process.*
+import scala.sys.process._
 
 @main def main(fileName: String, elfFileName: String, specFileName: String, options: String*): Unit = {
   val outFileName = if (options.isEmpty) {
