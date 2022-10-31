@@ -35,10 +35,17 @@ object ElfLoader {
 
   def visitSymbolTableRow(ctx: SymbolTableRowContext): Option[SpecGlobal] = {
     if (ctx.entrytype.getText == "OBJECT" && ctx.bind.getText == "GLOBAL" && ctx.vis.getText == "DEFAULT") {
-      Some(SpecGlobal(ctx.name.getText, ctx.size.getText.toInt * 8, BigInt(ctx.value.getText, 16)))
+      val name = ctx.name.getText
+      if (name.forall(allowedChars.contains)) {
+        Some(SpecGlobal(name, ctx.size.getText.toInt * 8, BigInt(ctx.value.getText, 16)))
+      } else {
+        None
+      }
     } else {
       None
     }
   }
+
+  val allowedChars: Set[Char] = ('A' to 'Z').toSet ++ ('a' to 'z') ++ ('0' to '9') + '_'
 
 }

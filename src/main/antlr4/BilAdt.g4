@@ -23,6 +23,7 @@ exp : OPEN_PAREN exp CLOSE_PAREN #expParen
     | 'Int' OPEN_PAREN value=num COMMA size=num CLOSE_PAREN #expInt
     | cast #expCast
     | 'Extract' OPEN_PAREN hb=num COMMA lb=num COMMA exp CLOSE_PAREN #extract
+    | 'Concat' OPEN_PAREN lhs=exp COMMA rhs=exp CLOSE_PAREN #concat
     ;
 
 castImm : cast #castOpt
@@ -114,7 +115,8 @@ BINOP : PLUS
       | LT
       | LE
       | SLT
-      | SLE;
+      | SLE
+      ;
 
 UOP : NEG | NOT;
 
@@ -145,6 +147,7 @@ LT       : 'LT';
 LE       : 'LE';
 SLT      : 'SLT';
 SLE      : 'SLE';
+
 
 // UnOp alternatives
 NOT      : 'NOT';
@@ -178,7 +181,7 @@ STRING :  '"' ( ESCAPE | ~('"' | '\\' | '\n' | '\r') )+ '"' ;
 
 
 // Ignored
-NEWLINE : '\r'? '\n' -> skip;
+NEWLINE : ('\r\n' | '\n') -> skip;
 WHITESPACE : ' '+ -> skip;
 COMMENT : '//' ~[\r\n]* -> skip;
 
