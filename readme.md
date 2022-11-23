@@ -12,7 +12,7 @@ The tool takes as inputs a BAP ADT file (here denoted with `.adt`) and a file co
 
 To build and run the tool using sbt, use the following command:
 
-`sbt "run file.adt file.relf [output.bpl]"` where the output filename is optional
+`sbt "run file.adt file.relf [file.spec] [output.bpl]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
 
 The sbt shell can also be used for multiple tasks with less overhead by executing `sbt` and then the relevant sbt commands.
 
@@ -22,7 +22,7 @@ To build a standalone `.jar` file, use the following command:
 
 The standalone `.jar` can then be executed with the following command:
 
-`./run.sh file.adt file.relf [output.bpl]`
+`./run.sh file.adt file.relf [file.spec] [output.bpl]`
 
 ## Generating inputs
 The tool takes a `.adt` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.
@@ -35,7 +35,7 @@ Given a AArch64/ARM64 binary file (`*.out`), the `.adt` file can be produced by 
 
 and the `.relf` file can be produced by running
 
-`readelf -s -r *.out > *.relf`.
+`readelf -s -r -W *.out > *.relf`.
 
 To cross-compile a C source file to a AArch64 binary, `gcc-aarch64-linux-gnu` must be installed. This can be done with the following commands on Ubuntu:
 

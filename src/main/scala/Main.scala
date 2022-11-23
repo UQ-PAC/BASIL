@@ -12,12 +12,28 @@ import scala.collection.{immutable, mutable}
 import scala.language.postfixOps
 import scala.sys.process.*
 
-@main def main(fileName: String, elfFileName: String, specFileName: String, options: String*): Unit = {
-  val outFileName = if (options.isEmpty) {
-    "boogie_out.bpl"
+@main def main(fileName: String, elfFileName: String, options: String*): Unit = {
+  println(options)
+  val specFileName: Option[String] = if (options.nonEmpty && options.head.endsWith(".spec")) {
+    Some(options.head)
   } else {
-    options.head
+    None
   }
+  val outFileName = if (specFileName.isEmpty) {
+    if (options.isEmpty) {
+      "boogie_out.bpl"
+    } else {
+      options.head
+    }
+  } else {
+    if (options.tail.isEmpty) {
+      "boogie_out.bpl"
+    } else {
+      options.tail.head
+    }
+  }
+  println("spec " + specFileName)
+  println("out " + outFileName)
   val program: BProgram = RunUtils.generateVCsAdt(fileName, elfFileName, specFileName)
   RunUtils.writeToFile(program, outFileName)
 
