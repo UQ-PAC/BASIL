@@ -32,8 +32,8 @@ import scala.sys.process.*
       options.tail.head
     }
   }
-  println("spec " + specFileName)
-  println("out " + outFileName)
+  //println("spec " + specFileName)
+  //println("out " + outFileName)
   val program: BProgram = RunUtils.generateVCsAdt(fileName, elfFileName, specFileName)
   RunUtils.writeToFile(program, outFileName)
 

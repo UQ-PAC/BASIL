@@ -50,7 +50,7 @@ case class Assume(body: BExpr) extends BCmd {
   override def replaceReserved(reserved: Set[String]): Assume = copy(body = body.replaceReserved(reserved))
 }
 
-case class ProcedureCall(name: String, lhss: List[BVar], params: List[BExpr]) extends BCmd {
+case class ProcedureCall(name: String, lhss: List[BVar], params: List[BExpr], modify: List[BVar]) extends BCmd {
   override def toString: String = {
     if (lhss.isEmpty) {
       s"call $name();"
@@ -58,7 +58,7 @@ case class ProcedureCall(name: String, lhss: List[BVar], params: List[BExpr]) ex
       s"call ${lhss.mkString(", ")} := $name(${params.mkString(", ")});"
     }
   }
-  override def modifies: Set[BVar] = lhss.collect { case l if l.scope == Scope.Global => l }.toSet
+  override def modifies: Set[BVar] = lhss.collect { case l if l.scope == Scope.Global => l }.toSet ++ modify.toSet
   override def functionOps: Set[FunctionOp] = params.flatMap(p => p.functionOps).toSet
   override def locals: Set[BVar] = params.flatMap(p => p.locals).toSet
   override def globals: Set[BVar] = params.flatMap(p => p.globals).toSet

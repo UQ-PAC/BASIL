@@ -44,7 +44,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
     val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem, i), Old(MapAccess(mem, i))), BinaryBExpr(BVEQ, MapAccess(Gamma_mem, i), Old(MapAccess(Gamma_mem, i)))))
     val ensures = List(rely2) ++ relies
     val relyProc = BProcedure("rely", List(), List(), ensures, List(), Set(mem, Gamma_mem), List())
-    val relyTransitive = BProcedure("rely_transitive", List(), List(), relies, List(), Set(mem, Gamma_mem), List(ProcedureCall("rely", List(), List()), ProcedureCall("rely", List(), List())))
+    val relyTransitive = BProcedure("rely_transitive", List(), List(), relies, List(), Set(mem, Gamma_mem), List(ProcedureCall("rely", List(), List(), List(mem, Gamma_mem)), ProcedureCall("rely", List(), List(), List(mem, Gamma_mem))))
     val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), Set(), reliesReflexive.map(r => Assert(r)))
     List(relyProc, relyTransitive, relyReflexive)
   }
@@ -298,9 +298,9 @@ case class BoogieTranslator(program: Program, spec: Specification) {
       if (m.lhs.name == "stack") {
         List(store)
       } else {
-        val rely = ProcedureCall("rely", List(), List())
+        val rely = ProcedureCall("rely", List(), List(), List(rhs.memory, rhsGamma.gammaMap))
         val gammaValueCheck = Assert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.rhs.value.toGamma))
-        val oldAssigns = guaranteeOldVars.map(g => AssignCmd(g.toOldVar, MemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size))).toList
+        val oldAssigns = guaranteeOldVars.map(g => AssignCmd(g.toOldVar, MemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size)))
         val oldGammaAssigns = controlled.map(g => AssignCmd(g.toOldGamma, BinaryBExpr(BoolOR, GammaLoad(lhsGamma, g.toAddrVar, g.size, g.size / m.lhs.valueSize), L(lhs, g.toAddrVar))))
         val secureUpdate = for (c <- controls.keys) yield {
           val addrCheck = BinaryBExpr(BVEQ, rhs.index, c.toAddrVar)
@@ -321,8 +321,11 @@ case class BoogieTranslator(program: Program, spec: Specification) {
       val lhsGamma = l.lhs.toGamma
       val rhsGamma = l.rhs.toGamma
       val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
-      if (rhs.functionOps.collect { case m: MemoryLoad => m}.nonEmpty) {
-        List(ProcedureCall("rely", List(), List()), assign)
+      val loads = rhs.functionOps.collect { case m: MemoryLoad => m}
+      if (loads.nonEmpty) {
+        val gammas = rhsGamma.functionOps.collect { case g: GammaLoad => g.gammaMap}.toList
+        val memories = loads.map(m => m.memory).toList
+        List(ProcedureCall("rely", List(), List(), memories ++ gammas), assign)
       } else {
         List(assign)
       }
@@ -376,7 +379,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
         List(outTemp(o), outTempGamma(o))
       }
     }
-    List(ProcedureCall(target, returned.flatten.toList, params.flatten)) ++ outAssigned
+    List(ProcedureCall(target, returned.flatten.toList, params.flatten, List())) ++ outAssigned
   }
 
   def coerceToBool(e: BExpr): BExpr = e.getType match {
