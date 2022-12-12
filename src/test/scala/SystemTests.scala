@@ -27,8 +27,14 @@ class SystemTests extends AnyFunSuite {
     val xmlArg = "/xml:" + stdPath + "_boogie_result.xml"
     // executes "boogie /printVerifiedProceduresCount:0 /xml:<xml path>, <actual out path>"
     val boogieResult = Seq("boogie", "/printVerifiedProceduresCount:0", xmlArg, actualOutPath).!!
-    val boogieVerificationResult = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
-    assert(boogieVerificationResult);
+    /* For now, we only test for verification success. In future, we want to test for verification
+    failure as well. Since a program can be verified iff RG conditions can be found for it,
+    verification failure can be tested by checking for their absence. Until RG-generation is
+    integrated, this can be mocked with 'null' or 'default' RG conditions. Expected verification
+    results may be expressed in the .spec file, or the test programs directory can be split into
+    success and failure cases. */
+    val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
+    assert(verified);
     // check that the boogie output matches expectation
     if (!Source.fromFile(actualOutPath).getLines.mkString.equals(
       Source.fromFile(expectedOutPath).getLines().mkString)) {
