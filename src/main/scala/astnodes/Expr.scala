@@ -69,12 +69,18 @@ case class SignedExtend(width: Int, body: Expr) extends Expr {
   override def size: Int = width
 
   override def toBoogie: BExpr = {
+    if (width > body.size) {
+      BVSignExtend(width - body.size, body.toBoogie)
+    } else {
+      Extract(width - 1, 0, body).toBoogie
+    }
+    /*
     val extend = width - body.size
     if (extend == 0) {
       body.toBoogie
     } else {
       BVSignExtend(extend, body.toBoogie)
-    }
+    }*/
   }
 
   override def gammas: Set[Variable] = body.gammas
@@ -92,12 +98,19 @@ case class UnsignedExtend(width: Int, body: Expr) extends Expr {
   override def size: Int = width
 
   override def toBoogie: BExpr = {
+    if (width > body.size) {
+      BVZeroExtend(width - body.size, body.toBoogie)
+    } else {
+      Extract(width - 1, 0, body).toBoogie
+    }
+    /*
     val extend = width - body.size
     if (extend == 0) {
       body.toBoogie
     } else {
       BVZeroExtend(extend, body.toBoogie)
     }
+    */
   }
   override def gammas: Set[Variable] = body.gammas
 }
@@ -115,14 +128,26 @@ case class Extract(high: Int, low: Int, body: Expr) extends Expr {
     SimplificationUtil.bitvecExtract(copy(body = body.simplify(old, sub)))
    */
   // + 1 as extracts are inclusive (e.g. [31:0] has 32 bits)
-  override def size: Int = high - low + 1
+  override val size: Int = high - low + 1
 
-  override def toBoogie: BVExtract = {
+  override def toBoogie: BExpr = {
+    val bodySize = body.size
+    if (size > bodySize) {
+      if (low == 0) {
+        BVZeroExtend(size - bodySize, body.toBoogie)
+      } else {
+        BVExtract(high + 1, low, BVZeroExtend(size - bodySize, body.toBoogie))
+      }
+    } else {
+      BVExtract(high + 1, low, body.toBoogie)
+    }
+    /*
     val boogieBody = body.toBoogie
     boogieBody match {
       case extract: BVExtract => BVExtract(high + 1 + extract.start, low + extract.start, extract.body)
       case _                  => BVExtract(high + 1, low, body.toBoogie)
     }
+    */
   }
   override def gammas: Set[Variable] = body.gammas
 }

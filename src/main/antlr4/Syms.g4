@@ -12,7 +12,7 @@ syms : relocationTable+ symbolTable+ ;
 relocationTable : relocationTableHeader relocationTableRow* ;
 relocationTableHeader :
   'Relocation section' tableName 'at offset 0x' HEX 'contains' HEX 'entries:'
-  'Offset' 'Info' 'Type' 'Sym. Value' 'Sym. Name + Addend'
+  'Offset' 'Info' 'Type' ('Sym. Value' | 'Symbol\'s Value') ('Symbol\'s Name + Addend' | 'Sym. Name + Addend')
   ;
 relocationTableRow : offset=HEX HEX STRING HEX? ((name=STRING '+' HEX) | HEX);
 

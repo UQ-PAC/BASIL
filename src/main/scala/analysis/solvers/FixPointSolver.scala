@@ -1,7 +1,6 @@
 package analysis.solvers
 
 import analysis._
-
 import scala.collection.immutable.ListSet
 
 /** Base trait for lattice solvers.

@@ -26,6 +26,7 @@ object AdtStatementLoader {
     case e: ExpIntContext    => visitExpInt(e)
     case e: ExpCastContext   => visitCast(e.cast)
     case e: ExtractContext   => visitExtract(e)
+    case e: ConcatContext    => visitConcat(e)
   }
 
   def visitLoad(ctx: LoadContext): MemAccess = {
@@ -51,11 +52,11 @@ object AdtStatementLoader {
   }
 
   def visitImmVar(ctx: ImmVarContext): LocalVar = {
-    LocalVar(visitQuoteString(ctx.name), parseInt(ctx.size))
+    LocalVar(parseAllowed(visitQuoteString(ctx.name)), parseInt(ctx.size))
   }
 
   def visitMemVar(ctx: MemVarContext): Memory = {
-    Memory(visitQuoteString(ctx.name), parseInt(ctx.addr_size), parseInt(ctx.value_size))
+    Memory(parseAllowed(visitQuoteString(ctx.name)), parseInt(ctx.addr_size), parseInt(ctx.value_size))
   }
 
   def visitExpInt(ctx: ExpIntContext): Literal = {
@@ -71,6 +72,10 @@ object AdtStatementLoader {
 
   def visitExtract(ctx: ExtractContext): Extract = {
     Extract(parseInt(ctx.hb), parseInt(ctx.lb), visitExp(ctx.exp))
+  }
+
+  def visitConcat(ctx: ConcatContext): Concat = {
+    Concat(visitExp(ctx.lhs), visitExp(ctx.rhs))
   }
 
   def visitJmp(ctx: JmpContext): (String, Statement) = ctx match {
@@ -93,7 +98,7 @@ object AdtStatementLoader {
       case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
       case None                   => None
     }
-    val jump = DirectCall(visitQuoteString(ctx.callee.tid.name).stripPrefix("@"), visitExp(ctx.cond), returnTarget)
+    val jump = DirectCall(parseAllowed(visitQuoteString(ctx.callee.tid.name).stripPrefix("@")), visitExp(ctx.cond), returnTarget)
     (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), jump)
   }
 
@@ -141,7 +146,7 @@ object AdtStatementLoader {
     }
 
     FunctionNode(
-      visitQuoteString(ctx.name),
+      parseAllowed(visitQuoteString(ctx.name)),
       address,
       ctx.blks.blk.asScala.map(visitBlk).toList,
       in.toList ++ alwaysIn,
@@ -199,7 +204,9 @@ object AdtStatementLoader {
 
   def visitQuoteString(ctx: QuoteStringContext): String = ctx.getText.stripPrefix("\"").stripSuffix("\"")
 
-  def parseLabel(ctx: QuoteStringContext): String = "l" + visitQuoteString(ctx).stripPrefix("@").stripPrefix("%")
+  def parseAllowed(s: String): String = s.map(c => if allowedChars.contains(c) then c else '$')
+
+  def parseLabel(ctx: QuoteStringContext): String = "l" + parseAllowed(visitQuoteString(ctx).stripPrefix("@").stripPrefix("%"))
 
   def parseFromAttrs(ctx: AttrsContext, field: String): Option[String] = {
     ctx.attr.asScala.map(visitAttr).collectFirst {
@@ -218,5 +225,7 @@ object AdtStatementLoader {
   }
 
   def visitAttr(ctx: AttrContext): (String, String) = (visitQuoteString(ctx.lhs), visitQuoteString(ctx.rhs))
+
+  val allowedChars: Set[Char] = Set('_', '\'', '~', '#', '$', '^', '_', '.', '?', '`') ++ ('A' to 'Z') ++ ('a' to 'z') ++ ('0' to '9')
 
 }

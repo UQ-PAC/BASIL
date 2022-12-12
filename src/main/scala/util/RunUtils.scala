@@ -1,21 +1,19 @@
 package util
-//import analysis._
-import astnodes.*
-import boogie.*
-import specification.*
-import BilParser.*
+import astnodes._
+import boogie._
+import specification._
+import BilParser._
 import analysis.{ConstantPropagationAnalysis, ConstantPropagationLattice, IntraproceduralProgramCfg}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating.*
-//import vcgen.{State, VCGen}
+import translating._
 
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
 
 object RunUtils {
 
-  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: String): BProgram = {
+  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String]): BProgram = {
     val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(adtLexer)
     // ADT
@@ -32,12 +30,15 @@ object RunUtils {
 
     val (externalFunctions, globals) = ElfLoader.visitSyms(elfParser.syms())
 
-    val specLexer = SpecificationsLexer(CharStreams.fromFileName(specFileName))
-    val specTokens = CommonTokenStream(specLexer)
-    val specParser = SpecificationsParser(specTokens)
-    specParser.setBuildParseTree(true)
-    val specLoader = SpecificationLoader(globals)
-    val specification = specLoader.visitSpecification(specParser.specification())
+    val specification = specFileName match {
+      case Some(s) => val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
+        val specTokens = CommonTokenStream(specLexer)
+        val specParser = SpecificationsParser(specTokens)
+        specParser.setBuildParseTree(true)
+        val specLoader = SpecificationLoader(globals)
+        specLoader.visitSpecification(specParser.specification())
+      case None => Specification(globals, Map(), Map(), Map(), List(), List())
+    }
 
     //println(externalFunctions)
     //println(globals)

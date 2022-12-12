@@ -36,6 +36,12 @@ case class DirectCall(target: String, condition: Expr, returnTarget: Option[Stri
   override def locals: Set[LocalVar] = condition.locals
 }
 
+case class IntrinsicCall(target: String, condition: Expr, returnTarget: Option[String]) extends Statement {
+
+  override def calls: Set[String] = Set(target)
+  override def locals: Set[LocalVar] = condition.locals
+}
+
 case class IndirectCall(target: LocalVar, condition: Expr, returnTarget: Option[String]) extends Statement {
   /*
   override def toBoogieString: String = {

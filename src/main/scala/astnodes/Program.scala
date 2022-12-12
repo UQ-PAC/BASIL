@@ -54,5 +54,6 @@ case class Instruction(asm: String, statements: List[Statement]) {
 }
 
 case class Parameter(name: String, size: Int, value: LocalVar) {
+  def toBoogie: List[BVariable] = List(BParam(name, BitVec(size)), BParam(s"Gamma_$name", BoolType))
   // def toBoogieString: String = name + ": bv" + size
 }
