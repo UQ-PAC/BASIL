@@ -11,7 +11,6 @@ import scala.language.postfixOps
 import scala.sys.process._
 
 @main def main(fileName: String, elfFileName: String, options: String*): Unit = {
-  println(options)
   val specFileName: Option[String] = if (options.nonEmpty && options.head.endsWith(".spec")) {
     Some(options.head)
   } else {
@@ -30,8 +29,6 @@ import scala.sys.process._
       options.tail.head
     }
   }
-  //println("spec " + specFileName)
-  //println("out " + outFileName)
   val program: BProgram = RunUtils.generateVCsAdt(fileName, elfFileName, specFileName)
   RunUtils.writeToFile(program, outFileName)
 

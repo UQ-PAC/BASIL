@@ -61,8 +61,11 @@ object RunUtils {
     val translator = BoogieTranslator(program, specification)
     val translatorUnusedRemoved = translator.stripUnreachableFunctions(externalNames)
 
-    val cfg = IntraproceduralProgramCfg.generateFromProgram(translatorUnusedRemoved.program)
-    val result = new ConstantPropagationAnalysis.WorklistSolver(cfg).analyze()
+    // does not work properly
+    //val cfg = IntraproceduralProgramCfg.generateFromProgram(translatorUnusedRemoved.program)
+    //val result = new ConstantPropagationAnalysis.WorklistSolver(cfg).analyze()
+
+
 
     translatorUnusedRemoved.translate
   }

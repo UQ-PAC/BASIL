@@ -4,7 +4,7 @@ import BilParser.SpecificationsParser._
 import boogie._
 import specification._
 
-import scala.jdk.CollectionConverters.*
+import scala.jdk.CollectionConverters._
 
 case class SpecificationLoader(globals: Set[SpecGlobal]) {
   private val idToGlobals = globals.map(g => (g.name, g)).toMap

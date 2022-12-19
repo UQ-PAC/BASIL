@@ -1,8 +1,8 @@
 package translating
 
-import astnodes.*
-import boogie.*
-import specification.*
+import astnodes._
+import boogie._
+import specification._
 
 import scala.language.postfixOps
 
@@ -166,7 +166,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
     }
   }
 
-  def translate(f: FunctionNode): BProcedure = {
+  def translate(f: Subroutine): BProcedure = {
     val in = f.in.flatMap(i => i.toBoogie)
 
     var outRegisters: Set[LocalVar] = Set()
@@ -237,9 +237,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
   }
 
   def translate(b: Block, returns: List[BCmd]): BBlock = {
-    // at some point we may want to take into account the instruction borders
-    val statements = b.instructions.flatMap(_.statements)
-    val cmds = statements.flatMap(s => translate(s, returns))
+    val cmds = b.statements.flatMap(s => translate(s, returns))
     BBlock(b.label, cmds)
   }
 
@@ -409,7 +407,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
 
     val reachableFunctions = program.functions.filter(f => reachableNames.contains(f.name))
     val externalsStubbed = reachableFunctions.map {
-      case f: FunctionNode if externalNames.contains(f.name) => f.copy(blocks = List())
+      case f: Subroutine if externalNames.contains(f.name) => f.copy(blocks = List())
       case f: _ => f
     }
     copy(program = program.copy(functions = externalsStubbed))
