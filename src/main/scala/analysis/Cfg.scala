@@ -49,8 +49,8 @@ case class CfgFunctionEntryNode(
     override val id: Int = CfgNode.nextId(),
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-    data: FunctionNode
-) extends CfgNodeWithData[FunctionNode]
+    data: Subroutine
+) extends CfgNodeWithData[Subroutine]
 
 /** Control-flow graph node for the exit of a function.
   */
@@ -58,8 +58,8 @@ case class CfgFunctionExitNode(
     override val id: Int = CfgNode.nextId(),
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-    data: FunctionNode
-) extends CfgNodeWithData[FunctionNode]
+    data: Subroutine
+) extends CfgNodeWithData[Subroutine]
 
 /** Control-flow graph node for a block.
   */
@@ -142,12 +142,12 @@ object Cfg:
 
   /** Generate the cfg for each function of the program.
     */
-  def generateCfgProgram(program: Program): Map[FunctionNode, Cfg] =
+  def generateCfgProgram(program: Program): Map[Subroutine, Cfg] =
     program.functions.map(f => f -> generateCfgFunc(f)).toMap
 
   /** Generate the cfg for a function.
     */
-  def generateCfgFunc(func: FunctionNode): Cfg =
+  def generateCfgFunc(func: Subroutine): Cfg =
     val entryNode = CfgFunctionEntryNode(data = func)
     val exitNode = CfgFunctionExitNode(data = func)
 
@@ -160,7 +160,7 @@ object Cfg:
       val node = CfgStatementNode(data = stmt)
 
       stmt match
-        case GoTo(target, condition) =>
+        case GoTo(target, condition, _, _) =>
           blocks.get(target) match
             case Some(blockNode) => node.addEdge(blockNode)
             case _               =>
@@ -170,15 +170,21 @@ object Cfg:
 
     for (_, entryNode) <- blocks do
       val exitNode = CfgBlockExitNode(data = entryNode.data)
-      val stmts = entryNode.data.instructions.flatMap(_.statements)
+      val stmts = entryNode.data.statements
       val body = stmts.foldLeft(unit())((acc, stmt) => acc.concat(generateCfgStatement(stmt)))
 
       val cfg = singletonGraph(entryNode).concat(body).concat(singletonGraph(exitNode))
       cfgs += (entryNode.data.label -> cfg)
 
-    cfgs.get("lmain") match
-      case Some(cfg) => singletonGraph(entryNode).concat(cfg).concat(singletonGraph(exitNode))
-      case _         => throw new RuntimeException("no main block detected")
+    // this is not good
+    if (func.blocks.nonEmpty) {
+      cfgs.get(func.blocks.head.label) match
+        case Some(cfg) => singletonGraph(entryNode).concat(cfg).concat(singletonGraph(exitNode))
+        case _ => throw new RuntimeException("error generating function cfg")
+    } else {
+      singletonGraph(entryNode).concat(singletonGraph(exitNode))
+    }
+
 
 /** Control-flow graph for an entire program.
   *
@@ -190,9 +196,9 @@ object Cfg:
   *   map from AST function declarations to CFG function exit nodes
   */
 abstract class ProgramCfg(
-    val prog: Program,
-    val funEntries: Map[FunctionNode, CfgFunctionEntryNode],
-    val funExits: Map[FunctionNode, CfgFunctionExitNode]
+                           val prog: Program,
+                           val funEntries: Map[Subroutine, CfgFunctionEntryNode],
+                           val funExits: Map[Subroutine, CfgFunctionExitNode]
 ) extends Cfg(funEntries.values.toSet, funExits.values.toSet)
 
 object IntraproceduralProgramCfg:
@@ -210,7 +216,7 @@ object IntraproceduralProgramCfg:
   * nodes.
   */
 class IntraproceduralProgramCfg(
-    prog: Program,
-    funEntries: Map[FunctionNode, CfgFunctionEntryNode],
-    funExits: Map[FunctionNode, CfgFunctionExitNode]
+                                 prog: Program,
+                                 funEntries: Map[Subroutine, CfgFunctionEntryNode],
+                                 funExits: Map[Subroutine, CfgFunctionExitNode]
 ) extends ProgramCfg(prog, funEntries, funExits)

@@ -78,33 +78,36 @@ object AdtStatementLoader {
     Concat(visitExp(ctx.lhs), visitExp(ctx.rhs))
   }
 
-  def visitJmp(ctx: JmpContext): (String, Statement) = ctx match {
+  def visitJmp(ctx: JmpContext): Statement = ctx match {
     case i: IndirectCallContext => visitIndirectCall(i)
     case d: DirectCallContext   => visitDirectCall(d)
     case g: GotoJmpContext      => visitGotoJmp(g)
   }
 
-  def visitIndirectCall(ctx: IndirectCallContext): (String, IndirectCall) = {
+  def visitIndirectCall(ctx: IndirectCallContext): IndirectCall = {
     val returnTarget = Option(ctx.returnTarget) match {
       case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
       case None                   => None
     }
-    val jump = IndirectCall(visitImmVar(ctx.callee.immVar), visitExp(ctx.cond), returnTarget)
-    (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), jump)
+    val line = visitQuoteString(ctx.tid.name)
+    val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
+    IndirectCall(visitImmVar(ctx.callee.immVar), visitExp(ctx.cond), returnTarget, line, insn)
   }
 
-  def visitDirectCall(ctx: DirectCallContext): (String, DirectCall) = {
+  def visitDirectCall(ctx: DirectCallContext): DirectCall = {
     val returnTarget = Option(ctx.returnTarget) match {
       case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
       case None                   => None
     }
-    val jump = DirectCall(parseAllowed(visitQuoteString(ctx.callee.tid.name).stripPrefix("@")), visitExp(ctx.cond), returnTarget)
-    (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), jump)
+    val line = visitQuoteString(ctx.tid.name)
+    val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
+    DirectCall(parseAllowed(visitQuoteString(ctx.callee.tid.name).stripPrefix("@")), visitExp(ctx.cond), returnTarget, line, insn)
   }
 
-  def visitGotoJmp(ctx: GotoJmpContext): (String, GoTo) = {
-    val jump = GoTo(parseLabel(ctx.target.tid.name), visitExp(ctx.cond))
-    (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), jump)
+  def visitGotoJmp(ctx: GotoJmpContext): GoTo = {
+    val line = visitQuoteString(ctx.tid.name)
+    val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
+    GoTo(parseLabel(ctx.target.tid.name), visitExp(ctx.cond), line, insn)
   }
 
   def visitArg(ctx: ArgContext): (Option[Parameter], Option[Parameter]) = {
@@ -125,7 +128,7 @@ object AdtStatementLoader {
     }
   }
 
-  def visitSub(ctx: SubContext): FunctionNode = {
+  def visitSub(ctx: SubContext): Subroutine = {
     val inOut = ctx.args.arg.asScala.map { arg => visitArg(arg) }.unzip
     val in = inOut._1.flatten
     val out = inOut._2.flatten
@@ -145,7 +148,7 @@ object AdtStatementLoader {
       case None            => -1
     }
 
-    FunctionNode(
+    Subroutine(
       parseAllowed(visitQuoteString(ctx.name)),
       address,
       ctx.blks.blk.asScala.map(visitBlk).toList,
@@ -155,9 +158,10 @@ object AdtStatementLoader {
   }
 
   def visitBlk(ctx: BlkContext): Block = {
-    val statements: Vector[(String, Statement)] = ctx.defs.assign.asScala.map(visitAssign).toVector ++
-      ctx.jmps.jmp.asScala.map(visitJmp).toVector
+    val statements: List[Statement] = ctx.defs.assign.asScala.map(visitAssign).toList ++
+      ctx.jmps.jmp.asScala.map(visitJmp).toList
 
+    /*
     // group by instruction
     val instructions = statements.foldLeft(Vector[Instruction]()) { (insns, kv) =>
       val instruction = kv._1
@@ -172,6 +176,7 @@ object AdtStatementLoader {
         case None => Vector(Instruction(instruction, List(statement)))
       }
     }
+    */
 
     val label = parseLabel(ctx.tid.name)
     val address = parseFromAttrs(ctx.attrs, "address") match {
@@ -179,7 +184,7 @@ object AdtStatementLoader {
       case None            => None
     }
 
-    Block(label, address, instructions.toList)
+    Block(label, address, statements)
   }
 
   def visitEndian(ctx: EndianContext): Endian = ctx.ENDIAN.getText match {
@@ -187,19 +192,21 @@ object AdtStatementLoader {
     case "BigEndian"    => Endian.BigEndian
   }
 
-  def visitAssign(ctx: AssignContext): (String, Statement) = ctx match {
+  def visitAssign(ctx: AssignContext): Statement = ctx match {
     case imm: ImmDefContext => visitImmDef(imm)
     case mem: MemDefContext => visitMemDef(mem)
   }
 
-  def visitImmDef(ctx: ImmDefContext): (String, LocalAssign) = {
-    val assign = LocalAssign(visitImmVar(ctx.lhs), visitExp(ctx.rhs))
-    (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), assign)
+  def visitImmDef(ctx: ImmDefContext): LocalAssign = {
+    val line = visitQuoteString(ctx.tid.name)
+    val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
+    LocalAssign(visitImmVar(ctx.lhs), visitExp(ctx.rhs), line, insn)
   }
 
-  def visitMemDef(ctx: MemDefContext): (String, MemAssign) = {
-    val assign = MemAssign.init(visitMemVar(ctx.lhs), visitStore(ctx.rhs))
-    (parseFromAttrs(ctx.attrs, "insn").getOrElse(""), assign)
+  def visitMemDef(ctx: MemDefContext): MemAssign = {
+    val line = visitQuoteString(ctx.tid.name)
+    val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
+    MemAssign.init(visitMemVar(ctx.lhs), visitStore(ctx.rhs), line, insn)
   }
 
   def visitQuoteString(ctx: QuoteStringContext): String = ctx.getText.stripPrefix("\"").stripSuffix("\"")

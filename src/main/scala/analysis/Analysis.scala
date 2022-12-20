@@ -90,7 +90,7 @@ trait ValueAnalysisMisc:
       case r: CfgStatementNode =>
         r.data match
           // assignments
-          case LocalAssign(lhs: LocalVar, rhs: Expr) => s + (lhs -> eval(rhs, s))
+          case LocalAssign(lhs: LocalVar, rhs: Expr, _, _) => s + (lhs -> eval(rhs, s))
 
           // all others: like no-ops
           case _ => s

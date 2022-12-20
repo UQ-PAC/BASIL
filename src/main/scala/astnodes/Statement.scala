@@ -20,7 +20,7 @@ trait Statement {
   //def withVisibleLabel: Stmt
 }
 
-case class DirectCall(target: String, condition: Expr, returnTarget: Option[String]) extends Statement {
+case class DirectCall(target: String, condition: Expr, returnTarget: Option[String], line: String, instruction: String) extends Statement {
   /*
   override def toBoogieString: String = {
     if (condition == Literal(BigInt(1), 1)) {
@@ -36,13 +36,13 @@ case class DirectCall(target: String, condition: Expr, returnTarget: Option[Stri
   override def locals: Set[LocalVar] = condition.locals
 }
 
-case class IntrinsicCall(target: String, condition: Expr, returnTarget: Option[String]) extends Statement {
+case class IntrinsicCall(target: String, condition: Expr, returnTarget: Option[String], line: String, instruction: String) extends Statement {
 
   override def calls: Set[String] = Set(target)
   override def locals: Set[LocalVar] = condition.locals
 }
 
-case class IndirectCall(target: LocalVar, condition: Expr, returnTarget: Option[String]) extends Statement {
+case class IndirectCall(target: LocalVar, condition: Expr, returnTarget: Option[String], line: String, instruction: String) extends Statement {
   /*
   override def toBoogieString: String = {
     if (condition == Literal(BigInt(1), 1)) {
@@ -57,7 +57,7 @@ case class IndirectCall(target: LocalVar, condition: Expr, returnTarget: Option[
   override def locals: Set[LocalVar] = condition.locals + target
 }
 
-case class GoTo(target: String, condition: Expr) extends Statement {
+case class GoTo(target: String, condition: Expr, line: String, instruction: String) extends Statement {
   /*
   override def toBoogieString: String = {
     if (condition == Literal(BigInt(1), 1)) {
@@ -72,7 +72,7 @@ case class GoTo(target: String, condition: Expr) extends Statement {
   override def locals: Set[LocalVar] = condition.locals
 }
 
-case object Skip extends Statement {
+case class Skip(line: String, instruction: String) extends Statement {
   override def toString: String = "skip;"
   //override def subst(v: Variable, w: Variable): Stmt = this
 
@@ -80,7 +80,7 @@ case object Skip extends Statement {
 
 }
 
-trait Assign(lhs: Variable, rhs: Expr) extends Statement {
+trait Assign(lhs: Variable, rhs: Expr, line: String, instruction: String) extends Statement {
   override def toString: String = String.format("%s := %s;", lhs, rhs)
 
   /*
@@ -123,7 +123,7 @@ case class GammaUpdate (lhs: SecVar | SecMemLoad, sec: Sec) extends Statement {
 
 /** Memory store
   */
-case class MemAssign(lhs: Memory, rhs: Store) extends Assign(lhs, rhs) {
+case class MemAssign(lhs: Memory, rhs: Store, line: String, instruction: String) extends Assign(lhs, rhs, line, instruction) {
 
   //override def toBoogieString: String = s"${lhs.toBoogieString} := ${rhs.toBoogieString};"
   /*
@@ -142,16 +142,16 @@ case class MemAssign(lhs: Memory, rhs: Store) extends Assign(lhs, rhs) {
 }
 
 object MemAssign {
-  def init(lhs: Memory, rhs: Store): MemAssign = {
+  def init(lhs: Memory, rhs: Store, line: String, instruction: String): MemAssign = {
     if (rhs.memory.name == "stack") {
-      MemAssign(lhs.copy(name = "stack"), rhs)
+      MemAssign(lhs.copy(name = "stack"), rhs, line, instruction)
     } else {
-      MemAssign(lhs, rhs)
+      MemAssign(lhs, rhs, line, instruction)
     }
   }
 }
 
-case class LocalAssign(lhs: LocalVar, rhs: Expr) extends Assign(lhs, rhs) {
+case class LocalAssign(lhs: LocalVar, rhs: Expr, line: String, instruction: String) extends Assign(lhs, rhs, line, instruction) {
   //override def toBoogieString: String = s"${lhs.toBoogieString} := ${rhs.toBoogieString};"
 
   // Otherwise is flag (e.g. #1)
