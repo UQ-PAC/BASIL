@@ -29,7 +29,9 @@ case class BProcedure(
     }
     val semicolon = if body.nonEmpty then "" else ";"
     val modifiesStr = if (modifies.nonEmpty) {
-      List(s"  modifies ${modifies.mkString(", ")};")
+      // hardcode to make boogie happy until we have proper analysis TODO
+      List("  modifies mem, Gamma_mem, stack, Gamma_stack;")
+      //List(s"  modifies ${modifies.mkString(", ")};")
     } else {
       List()
     }

@@ -321,8 +321,8 @@ case class LocalVar(name: String, override val size: Int) extends Variable {
   override def toString: String = name
   override def locals: Set[LocalVar] = Set(this)
   override def gammas: Set[Variable] = Set(this)
-  override def toGamma: BVar = BVariable(s"Gamma_$name", BoolType, Scope.Local)
-  override def toBoogie: BVar = BVariable(name, BitVec(size), Scope.Local)
+  override def toGamma: BVar = BVariable(s"Gamma_$name$size", BoolType, Scope.Local)
+  override def toBoogie: BVar = BVariable(s"$name$size", BitVec(size), Scope.Local)
   //override def simplify(old: Expr, sub: Expr): Expr = if (old == this) sub else this
 }
 
