@@ -15,3 +15,4 @@ password.txt
 *.iml
 *.out
 samples/const_prop_tests/
+src/main/antlr4/.antlr
