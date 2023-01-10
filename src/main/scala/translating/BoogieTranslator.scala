@@ -1,8 +1,8 @@
 package translating
 
-import astnodes._
-import boogie._
-import specification._
+import astnodes.*
+import boogie.*
+import specification.*
 
 import scala.language.postfixOps
 
@@ -21,17 +21,17 @@ case class BoogieTranslator(program: Program, spec: Specification) {
 
   def translate: BProgram = {
     val procedures = program.functions.map(f => translate(f))
-    val globalDecls = procedures.flatMap(p => p.globals).map(b => BVarDecl(b)).distinct
+    val globalDecls = procedures.flatMap(p => p.globals).map(b => BVarDecl(b)).distinct.sorted
 
-    val globalConsts: List[BDeclaration] = globals.map(g => List(BVarDecl(g.toAddrVar), g.toAxiom)).toList.flatten
+    val globalConsts: List[BConstAxiomPair] = globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar), g.toAxiom)).toList.sorted
 
-    val functionsUsed1: List[BFunction] = procedures.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct
+    val functionsUsed1: List[BFunction] = procedures.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted
 
-    val rgProcs = genRely(relies) :+ BProcedure("guarantee_reflexive", List(), List(), List(), List(), Set(), guaranteesReflexive.map(g => Assert(g)))
+    val rgProcs = genRely(relies) :+ BProcedure("guarantee_reflexive", List(), List(), List(), List(), Seq(), guaranteesReflexive.map(g => Assert(g)))
 
-    val functionsUsed2 = rgProcs.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct
-    val functionsUsed3 = functionsUsed1.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct
-    val functionsUsed = (functionsUsed1 ++ functionsUsed2 ++ functionsUsed3).distinct
+    val functionsUsed2 = rgProcs.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted
+    val functionsUsed3 = functionsUsed1.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted
+    val functionsUsed = (functionsUsed1 ++ functionsUsed2 ++ functionsUsed3).distinct.sorted
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgProcs ++ procedures
     avoidReserved(BProgram(declarations))
@@ -43,9 +43,9 @@ case class BoogieTranslator(program: Program, spec: Specification) {
     val i = BVariable("i", BitVec(64), Scope.Local)
     val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem, i), Old(MapAccess(mem, i))), BinaryBExpr(BVEQ, MapAccess(Gamma_mem, i), Old(MapAccess(Gamma_mem, i)))))
     val ensures = List(rely2) ++ relies
-    val relyProc = BProcedure("rely", List(), List(), ensures, List(), Set(mem, Gamma_mem), List())
-    val relyTransitive = BProcedure("rely_transitive", List(), List(), relies, List(), Set(mem, Gamma_mem), List(ProcedureCall("rely", List(), List(), List(mem, Gamma_mem)), ProcedureCall("rely", List(), List(), List(mem, Gamma_mem))))
-    val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), Set(), reliesReflexive.map(r => Assert(r)))
+    val relyProc = BProcedure("rely", List(), List(), ensures, List(), Seq(mem, Gamma_mem), List())
+    val relyTransitive = BProcedure("rely_transitive", List(), List(), relies, List(), Seq(mem, Gamma_mem), List(ProcedureCall("rely", List(), List(), List(mem, Gamma_mem)), ProcedureCall("rely", List(), List(), List(mem, Gamma_mem))))
+    val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), Seq(), reliesReflexive.map(r => Assert(r)))
     List(relyProc, relyTransitive, relyReflexive)
   }
 
@@ -203,7 +203,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
       f.in.map(p => inParamToAssign(p))
     }
 
-    BProcedure(f.name, in, out, List(), requires, modifies, inInits ++ body)
+    BProcedure(f.name, in, out, List(), requires, modifies.toSeq.sorted, inInits ++ body)
   }
 
   private def outParamToAssign(p: Parameter): AssignCmd = {
@@ -321,9 +321,9 @@ case class BoogieTranslator(program: Program, spec: Specification) {
       val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val loads = rhs.functionOps.collect { case m: MemoryLoad => m}
       if (loads.nonEmpty) {
-        val gammas = rhsGamma.functionOps.collect { case g: GammaLoad => g.gammaMap}.toList
-        val memories = loads.map(m => m.memory).toList
-        List(ProcedureCall("rely", List(), List(), memories ++ gammas), assign)
+        val gammas = rhsGamma.functionOps.collect { case g: GammaLoad => g.gammaMap}.toSeq.sorted
+        val memories = loads.map(m => m.memory).toSeq.sorted
+        List(ProcedureCall("rely", Seq(), Seq(), memories ++ gammas), assign)
       } else {
         List(assign)
       }

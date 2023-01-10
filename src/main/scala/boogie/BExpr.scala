@@ -141,7 +141,9 @@ case class BVSignExtend(extension: Int, body: BExpr) extends BExpr {
   override def replaceReserved(reserved: Set[String]): BVSignExtend = copy(body = body.replaceReserved(reserved))
 }
 
-abstract class BVar(val name: String, val bType: BType, val scope: Scope) extends BExpr {
+abstract class BVar(val name: String, val bType: BType, val scope: Scope) extends BExpr with Ordered[BVar] {
+  def compare(that: BVar): Int = this.name.compare(that.name)
+
   override def getType: BType = bType
   override def toString: String = name
   def withType: String = if (name.isEmpty) {

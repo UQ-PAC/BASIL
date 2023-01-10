@@ -17,9 +17,10 @@ case class BProcedure(
     out: List[BVar],
     ensures: List[BExpr],
     requires: List[BExpr],
-    modifies: Set[BVar],
+    modifies: Seq[BVar],
     body: List[BCmdOrBlock]
-) extends BDeclaration {
+) extends BDeclaration with Ordered[BProcedure] {
+  override def compare(that: BProcedure): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
     val header = s"procedure $name(${in.map(_.withType).mkString(", ")})"
     val returns = if (out.nonEmpty) {
@@ -37,7 +38,7 @@ case class BProcedure(
     }
     val requiresStrs = requires.map(r => s"  requires $r;")
     val ensuresStrs = ensures.map(e => s"  ensures $e;")
-    val locals = body.flatMap(l => l.locals).distinct
+    val locals = body.flatMap(l => l.locals).distinct.sorted
     val localDefs = locals.map(l => "  " + BVarDecl(l).toString)
     val bodyStr = if (body.nonEmpty) {
       List("{") ++ localDefs ++ body.flatMap(x => x.toBoogie).map(s => "  " + s) ++ List("}")
@@ -81,7 +82,8 @@ case class BAxiom(body: BExpr) extends BDeclaration {
 }
 
 case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar, body: Option[BExpr])
-    extends BDeclaration {
+    extends BDeclaration with Ordered[BFunction] {
+  override def compare(that: BFunction): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
     val bvbuiltinString = if (bvbuiltin.isEmpty) {
       ""
@@ -113,7 +115,8 @@ case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar,
   }
 }
 
-case class BVarDecl(variable: BVar) extends BDeclaration {
+case class BVarDecl(variable: BVar) extends BDeclaration with Ordered[BVarDecl] {
+  def compare(that: BVarDecl): Int = variable.compare(that.variable)
   override def toString: String = if (variable.scope == Scope.Const) {
     s"const $variable: ${variable.getType};"
   } else {
@@ -121,5 +124,13 @@ case class BVarDecl(variable: BVar) extends BDeclaration {
   }
   override def replaceReserved(reserved: Set[String]): BVarDecl = {
     copy(variable = variable.replaceReserved(reserved))
+  }
+}
+
+case class BConstAxiomPair(const: BVarDecl, axiom: BAxiom) extends BDeclaration with Ordered[BConstAxiomPair] {
+  override def compare(that: BConstAxiomPair): Int = const.compare(that.const)
+  override def toString: String = const.toString + "\n" + axiom.toString
+  override def replaceReserved(reserved: Set[String]): BConstAxiomPair = {
+    copy(const = const.replaceReserved(reserved), axiom = axiom.replaceReserved(reserved))
   }
 }

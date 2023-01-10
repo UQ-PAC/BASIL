@@ -50,7 +50,7 @@ case class Assume(body: BExpr) extends BCmd {
   override def replaceReserved(reserved: Set[String]): Assume = copy(body = body.replaceReserved(reserved))
 }
 
-case class ProcedureCall(name: String, lhss: List[BVar], params: List[BExpr], modify: List[BVar]) extends BCmd {
+case class ProcedureCall(name: String, lhss: Seq[BVar], params: Seq[BExpr], modify: Seq[BVar]) extends BCmd {
   override def toString: String = {
     if (lhss.isEmpty) {
       s"call $name();"
@@ -75,7 +75,7 @@ case class ProcedureCall(name: String, lhss: List[BVar], params: List[BExpr], mo
   }
 }
 
-case class AssignCmd(lhss: List[BVar], rhss: List[BExpr]) extends BCmd {
+case class AssignCmd(lhss: Seq[BVar], rhss: Seq[BExpr]) extends BCmd {
   override def toString: String = s"${lhss.mkString(", ")} := ${rhss.mkString(", ")};"
   override def modifies: Set[BVar] = lhss.collect { case l if l.scope == Scope.Global => l }.toSet
   override def functionOps: Set[FunctionOp] = rhss.flatMap(r => r.functionOps).toSet
@@ -90,7 +90,7 @@ case class AssignCmd(lhss: List[BVar], rhss: List[BExpr]) extends BCmd {
 }
 
 object AssignCmd {
-  def apply(lhs: BVar, rhs: BExpr): AssignCmd = AssignCmd(List(lhs), List(rhs))
+  def apply(lhs: BVar, rhs: BExpr): AssignCmd = AssignCmd(Seq(lhs), Seq(rhs))
 }
 
 case class MapAssignCmd(lhs: MapAccess, rhs: BExpr) extends BCmd {
