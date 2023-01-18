@@ -159,11 +159,13 @@ object Cfg:
     def generateCfgStatement(stmt: Statement): Cfg =
       val node = CfgStatementNode(data = stmt)
 
+      // TODO: commented out the GoTo case because it is not supported yet and it was causing an error when the ast was
+      // made mutable (ie. case class -> class)
       stmt match
-        case GoTo(target, condition, _, _) =>
-          blocks.get(target) match
-            case Some(blockNode) => node.addEdge(blockNode)
-            case _               =>
+//        case GoTo(target, condition, _, _) =>
+//          blocks.get(target) match
+//            case Some(blockNode) => node.addEdge(blockNode)
+//            case _               =>
         case _ =>
 
       singletonGraph(node)

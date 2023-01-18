@@ -90,7 +90,8 @@ trait ValueAnalysisMisc:
       case r: CfgStatementNode =>
         r.data match
           // assignments
-          case LocalAssign(lhs: LocalVar, rhs: Expr, _, _) => s + (lhs -> eval(rhs, s))
+          // changed the class comparison to the actual class because of removal of case class (no unapply function needed for below now)
+          case la: LocalAssign => s + (la.lhs -> eval(la.rhs, s))
 
           // all others: like no-ops
           case _ => s
