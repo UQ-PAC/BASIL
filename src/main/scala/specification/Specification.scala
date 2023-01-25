@@ -31,7 +31,7 @@ case class SpecGamma(global: SpecGlobal) extends SpecVar {
   override def resolveSpecL: GammaLoad = resolveSpec
 }
 
-case class Specification(globals: Set[SpecGlobal], LPreds: Map[SpecGlobal, BExpr], gammaInits: Map[SpecGlobal, BoolLit], inits: Map[SpecGlobal, IntLiteral], relies: List[BExpr], guarantees: List[BExpr]) {
+case class Specification(globals: Set[SpecGlobal], LPreds: Map[SpecGlobal, BExpr], /* gammaInits: Map[SpecGlobal, BoolLit], inits: Map[SpecGlobal, IntLiteral], */ relies: List[BExpr], guarantees: List[BExpr], subroutines: List[SubroutineSpec]) {
   val guaranteeOldVars: List[SpecGlobal] = guarantees.flatMap(g => g.oldSpecVars.collect{ case s: SpecGlobal => s })
 
   val controls: Map[SpecGlobal, Set[SpecGlobal]] = {
@@ -40,5 +40,7 @@ case class Specification(globals: Set[SpecGlobal], LPreds: Map[SpecGlobal, BExpr
   }
   val controlled: Set[SpecGlobal] = controls.values.flatten.toSet
 }
+
+case class SubroutineSpec(name: String, requires: List[BExpr], ensures: List[BExpr])
 
 case class ExternalFunction(name: String, offset: BigInt)
