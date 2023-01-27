@@ -55,6 +55,8 @@ class Concat(var left: Expr, var right: Expr) extends Expr {
     SimplificationUtil.bitvecConcat(copy(left = left.simplify(old,sub), right = right.simplify(old,sub)))
   }
    */
+
+  override def toString: String = String.format("%s ++ %s", left, right)
 }
 
 /** Signed extend - extend in BIL
@@ -84,6 +86,8 @@ class SignedExtend(var width: Int, var body: Expr) extends Expr {
   }
 
   override def gammas: Set[Variable] = body.gammas
+
+  override def toString: String = String.format("extend(%d, %s)", width, body)
 }
 
 /** Unsigned extend - pad in BIL
@@ -113,6 +117,8 @@ class UnsignedExtend(var width: Int, var body: Expr) extends Expr {
     */
   }
   override def gammas: Set[Variable] = body.gammas
+
+  override def toString: String = String.format("pad(%d, %s)", width, body)
 }
 
 /** Extracts the bits from firstInt to secondInt (inclusive) from variable.
@@ -189,6 +195,8 @@ class UnOp(var operator: UnOperator, var exp: Expr) extends Expr {
     case NEG => UnaryBExpr(BVNEG, exp.toBoogie)
   }
   override def gammas: Set[Variable] = exp.gammas
+
+  override def toString: String = s"$operator $exp"
 }
 
 sealed trait UnOperator(op: String) {
@@ -262,6 +270,8 @@ class BinOp(var operator: BinOperator, var lhs: Expr, var rhs: Expr) extends Exp
     case SLT => BinaryBExpr(BVSLT, lhs.toBoogie, rhs.toBoogie)
     case SLE => BinaryBExpr(BVSLE, lhs.toBoogie, rhs.toBoogie)
   }
+
+  override def toString: String = s"$lhs $operator $rhs"
 }
 
 sealed trait BinOperator(op: String) {
@@ -400,6 +410,8 @@ case class Memory(var name: String, var addressSize: Int, var valueSize: Int) ex
   def copy(name: String = this.name, addressSize: Int = this.addressSize, valueSize: Int = this.valueSize): Memory = {
     Memory(name, addressSize, valueSize)
   }
+
+  override def toString: String = s"MemoryRegion($name, $addressSize, $valueSize)"
 }
 
 class Store(var memory: Memory, var index: Expr, var value: Expr, var endian: Endian, var size: Int) extends Expr {
@@ -410,6 +422,8 @@ class Store(var memory: Memory, var index: Expr, var value: Expr, var endian: En
   override def toGamma: GammaStore =
     GammaStore(memory.toGamma, index.toBoogie, value.toGamma, size, size / memory.valueSize)
   //def toBoogieProc: String
+
+  override def toString: String = s"${memory.name}[$index] := $value"
 }
 
 object Store {

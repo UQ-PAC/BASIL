@@ -57,6 +57,7 @@ class Block(var label: String, var address: Option[Int], var statements: List[St
 }
 
 class Parameter(var name: String, var size: Int, var value: LocalVar) {
+  override def toString: String = name + " " + size + " " + value
   def toBoogie: List[BVariable] = List(BParam(name, BitVec(size)), BParam(s"Gamma_$name", BoolType))
   // def toBoogieString: String = name + ": bv" + size
 }
