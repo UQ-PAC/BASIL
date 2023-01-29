@@ -1,16 +1,16 @@
 package util
+import analysis._
+import cfg_visualiser.{OtherOutput, Output, OutputKindE}
 import astnodes._
 import boogie._
 import specification._
 import BilParser._
-import analysis.{ConstantPropagationAnalysis, ConstantPropagationLattice, IntraproceduralProgramCfg}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
 
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
-
 object RunUtils {
 
   def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String]): BProgram = {
@@ -22,6 +22,7 @@ object RunUtils {
     parser.setBuildParseTree(true)
 
     val program = AdtStatementLoader.visitProject(parser.project())
+
 
     val elfLexer = SymsLexer(CharStreams.fromFileName(elfFileName))
     val elfTokens = CommonTokenStream(elfLexer)
@@ -43,6 +44,20 @@ object RunUtils {
     //println(externalFunctions)
     //println(globals)
 
+//    val wcfg = IntraproceduralProgramCfg.generateFromProgram(program)
+//
+////    //print(wcfg.nodes)
+////    Output.output(OtherOutput(OutputKindE.cfg), wcfg.toDot({ x =>
+////      x.toString
+////    }, Output.dotIder))
+//
+//
+//    val an = ConstantPropagationAnalysis.WorklistSolver(wcfg)
+//    val res = an.analyze().asInstanceOf[Map[CfgNode, _]]
+//    print(res.keys)
+//    Output.output(OtherOutput(OutputKindE.cfg), an.cfg.toDot(Output.labeler(res, an.stateAfterNode), Output.dotIder))
+
+
     /*
     TODO analyses/transformations
     -type checking
@@ -61,9 +76,13 @@ object RunUtils {
     val translator = BoogieTranslator(program, specification)
     val translatorUnusedRemoved = translator.stripUnreachableFunctions(externalNames)
 
-    // does not work properly
-    //val cfg = IntraproceduralProgramCfg.generateFromProgram(translatorUnusedRemoved.program)
-    //val result = new ConstantPropagationAnalysis.WorklistSolver(cfg).analyze()
+    // does not work properly (old comment)
+    // run using sbt shell and:    run ./examples/secret_write/secret_write.adt ./examples/secret_write/secret_write.relf
+    val cfg = IntraproceduralProgramCfg.generateFromProgram(translatorUnusedRemoved.program)
+    val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
+    val result = solver.analyze()
+    print(result)
+    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder))
 
 
 
