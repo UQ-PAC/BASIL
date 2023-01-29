@@ -38,7 +38,7 @@ class DotNode(val id: String, val label: String, val additionalParams: Map[Strin
   override def toString: String = toDotString
 
   def toDotString: String =
-    id + "[label=\"" + Output.escape(label) + "\"" +
+    s"\"${id}\"" + "[label=\"" + Output.escape(label) + "\"" +
       additionalParams.map(p => s"${p._1} = ${p._2}").mkString(",") + "]"
 
 }
@@ -50,7 +50,7 @@ class DotArrow(val fromNode: DotNode, arrow: String, val toNode: DotNode, val la
 
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
 
-  def toDotString: String = fromNode.id + " " + arrow + " " + toNode.id + "[label=\"" + Output.escape(label) + "\"]"
+  def toDotString: String = s"\"${fromNode.id}\"" + " " + arrow + " " + s"\"${toNode.id}\"" + "[label=\"" + Output.escape(label) + "\"]"
 }
 
 /**
@@ -58,6 +58,8 @@ class DotArrow(val fromNode: DotNode, arrow: String, val toNode: DotNode, val la
   */
 class DotDirArrow(fromNode: DotNode, toNode: DotNode, label: String) extends DotArrow(fromNode, "->", toNode, label) {
   def this(fromNode: DotNode, toNode: DotNode) = this(fromNode, toNode, "")
+
+  override def toString: String = super.toDotString
 }
 
 /**
