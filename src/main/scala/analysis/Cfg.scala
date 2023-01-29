@@ -1,7 +1,7 @@
 package analysis
 import scala.collection.mutable
-
 import astnodes._
+import cfg_visualiser.{DotArrow, DotDirArrow, DotGraph, DotNode}
 
 object CfgNode:
 
@@ -50,7 +50,8 @@ case class CfgFunctionEntryNode(
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     data: Subroutine
-) extends CfgNodeWithData[Subroutine]
+) extends CfgNodeWithData[Subroutine]:
+  override def toString: String = s"[FunctionEntry] $data"
 
 /** Control-flow graph node for the exit of a function.
   */
@@ -59,7 +60,8 @@ case class CfgFunctionExitNode(
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     data: Subroutine
-) extends CfgNodeWithData[Subroutine]
+) extends CfgNodeWithData[Subroutine]:
+  override def toString: String = s"[FunctionExit] $data"
 
 /** Control-flow graph node for a block.
   */
@@ -68,7 +70,8 @@ case class CfgBlockEntryNode(
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     data: Block
-) extends CfgNodeWithData[Block]
+) extends CfgNodeWithData[Block]:
+  override def toString: String = s"[BlockEntry] $data"
 
 /** Control-flow graph node for a block.
   */
@@ -77,7 +80,8 @@ case class CfgBlockExitNode(
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     data: Block
-) extends CfgNodeWithData[Block]
+) extends CfgNodeWithData[Block]:
+  override def toString: String = s"[BlockExit] $data"
 
 /** Control-flow graph node for a statement.
   */
@@ -86,7 +90,8 @@ case class CfgStatementNode(
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     data: Statement
-) extends CfgNodeWithData[Statement]
+) extends CfgNodeWithData[Statement]:
+  override def toString: String = s"[Stmt] $data"
 
 /** A control-flow graph.
   * @param entry
@@ -118,12 +123,14 @@ class Cfg(val entries: Set[CfgNode], val exits: Set[CfgNode]):
   /** Returns the set of nodes in the CFG.
     */
   def nodes: Set[CfgNode] =
-    entries.flatMap { entry =>
+    //val visited = mutable.Set[CfgNode]()
+    entries.flatMap {
+      entry =>
       nodesRec(entry).toSet
     }
 
-  protected def nodesRec(n: CfgNode, visited: mutable.Set[CfgNode] = mutable.Set()): mutable.Set[CfgNode] =
-    if (!visited.contains(n)) then
+  protected def nodesRec(n: CfgNode, visited: mutable.Set[CfgNode] = mutable.Set[CfgNode]()): mutable.Set[CfgNode] =
+    if !visited.contains(n) then
       visited += n
       n.succ.foreach { n =>
         nodesRec(n, visited)
@@ -147,11 +154,19 @@ object Cfg:
 
   /** Generate the cfg for a function.
     */
-  def generateCfgFunc(func: Subroutine): Cfg =
+
+  // what does it mean when the block is not found? do we create that block (but what statements would be inside that block?) or do we throw an error or we pass?
+  // should we assume that the target is always a new block (cause normally it could be pointing to a set of instruction inside that block)?
+  // Design choice: what do we do with indirect calls when we don't know the target and also we don't know if the LocalVars would point to a block target or not
+  // if not do we point that indirect call to a default block that is a place holder (unknown location block) so that when we do the analysis we resolve those locations
+
+  def generateCfgFunc(func: Subroutine): Cfg = {
+    val blocks = func.blocks.map(block => block.label -> CfgBlockEntryNode(data = block)).toMap
+    //val blocks = collection.mutable.Map(blockss.toSeq: _*)
     val entryNode = CfgFunctionEntryNode(data = func)
     val exitNode = CfgFunctionExitNode(data = func)
 
-    val blocks = func.blocks.map(block => block.label -> CfgBlockEntryNode(data = block)).toMap
+
 
     val cfgs = mutable.Map[String, Cfg]()
 
@@ -161,12 +176,61 @@ object Cfg:
 
       // TODO: commented out the GoTo case because it is not supported yet and it was causing an error when the ast was
       // made mutable (ie. case class -> class)
-      stmt match
-//        case GoTo(target, condition, _, _) =>
-//          blocks.get(target) match
-//            case Some(blockNode) => node.addEdge(blockNode)
-//            case _               =>
+//      stmt match {
+//                case GoTo(target, condition, _, _) =>
+//                  blocks.get(target) match
+//                    case Some(blockNode) => node.addEdge(blockNode)
+//                    case _               =>
+//
+//
+//        case _ =>
+//      }
+
+      stmt match {
+        case goTo: GoTo =>
+          blocks.get(goTo.target) match
+            case Some(blockNode) => node.addEdge(blockNode)
+            case _ =>
+
+        case directCall: DirectCall =>
+          blocks.get(directCall.target) match
+            case Some(blockNode) => node.addEdge(blockNode)
+            case _ =>
+
+//            {
+//              // make a new block node and add edge
+//              val newBlockNode = CfgBlockEntryNode(data = Block(label = directCall.target, statements = List()))
+//              blocks += (directCall.target -> newBlockNode)
+//              node.addEdge(newBlockNode)
+//            }
+            directCall.returnTarget match
+              case Some(returnTarget) =>
+                blocks.get(returnTarget) match
+                  case Some(returnBlockNode) => returnBlockNode.addEdge(node)
+                  case _ =>
+//                  {
+//                    // make a new block node and add edge
+//                    val newBlockNode = CfgBlockEntryNode(data = Block(label = returnTarget, statements = List()))
+//                    blocks += (returnTarget -> newBlockNode)
+//                    node.addEdge(newBlockNode)
+//                  }
+              case _ =>
+
+        case indirectCall: IndirectCall =>
+            indirectCall.returnTarget match
+              case Some(returnTarget) =>
+                blocks.get(returnTarget) match
+                  case Some(returnBlockNode) => node.addEdge(returnBlockNode)
+                  case _ =>
+//                  {
+//                    // make a new block node and add edge
+//                    val newBlockNode = CfgBlockEntryNode(data = Block(label = returnTarget, statements = List()))
+//                    blocks += (returnTarget -> newBlockNode)
+//                    node.addEdge(newBlockNode)
+//                  }
+              case _ =>
         case _ =>
+      }
 
       singletonGraph(node)
 
@@ -186,6 +250,51 @@ object Cfg:
     } else {
       singletonGraph(entryNode).concat(singletonGraph(exitNode))
     }
+  }
+
+
+//  def generateForNode(node: Any): Cfg = {
+//    node match {
+//      case func: Subroutine => {
+//        val blocks = generateForNode(func.blocks.toSet)
+//        val entryNode = CfgFunctionEntryNode(data = func)
+//        val exitNode = CfgFunctionExitNode(data = func)
+//
+//        singletonGraph(entryNode).concat(blocks).concat(singletonGraph(exitNode))
+//      }
+//      case blkList: List[Block] => {
+//        for (blk <- blkList) {
+//          val stmts = generateForNode(blk.statements.toSet)
+//          val entryNode = CfgBlockEntryNode(data = blk)
+//          val exitNode = CfgFunctionExitNode(data = entryNode.data)
+//
+//          singletonGraph(entryNode).concat(stmts).concat(singletonGraph(exitNode))
+//        }
+//      }
+//      case stmtList: List[Statement] => {
+//        for (stmt <- stmtList) {
+//          val node = CfgStatementNode(data = stmt)
+//          singletonGraph(node)
+//        }
+//      }
+//  }
+//
+//    // for each statement type generate a cfg
+//    def generateCfgForStatement(stmt: Statement): Cfg = {
+//      val node = CfgStatementNode(data = stmt)
+//      stmt match {
+//        case DirectCall(target, condition, returnTarget, line, instruction) => {
+//
+//        }
+//      }
+//        case _ => singletonGraph(node)
+//      }
+//  }
+
+
+
+
+
 
 
 /** Control-flow graph for an entire program.
@@ -201,7 +310,27 @@ abstract class ProgramCfg(
                            val prog: Program,
                            val funEntries: Map[Subroutine, CfgFunctionEntryNode],
                            val funExits: Map[Subroutine, CfgFunctionExitNode]
-) extends Cfg(funEntries.values.toSet, funExits.values.toSet)
+) extends Cfg(funEntries.values.toSet, funExits.values.toSet):
+  /**
+   * Returns a Graphviz dot representation of the CFG.
+   * Each node is labeled using the given function labeler.
+   */
+  def toDot(labeler: CfgNode => String, idGen: CfgNode => String): String = {
+    val dotNodes = mutable.Map[CfgNode, DotNode]()
+    var dotArrows = mutable.ListBuffer[DotArrow]()
+    nodes.foreach { n =>
+
+      dotNodes += (n -> new DotNode(s"${idGen(n)}", labeler(n), Map()))
+    }
+    nodes.foreach { n =>
+      n.succ.foreach { dest =>
+        dotArrows += new DotDirArrow(dotNodes(n), dotNodes(dest))
+      }
+    }
+    dotArrows = dotArrows.sortBy(arr => arr.fromNode.id + "-" + arr.toNode.id)
+    val allNodes = dotNodes.values.seq.toList.sortBy(n => n.id)
+    new DotGraph("CFG", allNodes, dotArrows).toDotString
+  }
 
 object IntraproceduralProgramCfg:
 
@@ -221,4 +350,5 @@ class IntraproceduralProgramCfg(
                                  prog: Program,
                                  funEntries: Map[Subroutine, CfgFunctionEntryNode],
                                  funExits: Map[Subroutine, CfgFunctionExitNode]
-) extends ProgramCfg(prog, funEntries, funExits)
+) extends ProgramCfg(prog, funEntries, funExits):
+  override def toString: String = funEntries.keys.toString()
