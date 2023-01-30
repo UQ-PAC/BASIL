@@ -8,32 +8,32 @@ const $_IO_stdin_used_addr: bv64;
 axiom ($_IO_stdin_used_addr == 2084bv64);
 const $secret_addr: bv64;
 axiom ($secret_addr == 69660bv64);
+function gamma_load32(gammaMap: [bv64]bool, index: bv64) returns (bool) {
+  (gammaMap[bvadd64(index, 3bv64)] && (gammaMap[bvadd64(index, 2bv64)] && (gammaMap[bvadd64(index, 1bv64)] && gammaMap[index])))
+}
+
 function L(memory: [bv64]bv8, index: bv64) returns (bool) {
   (if (index == $secret_addr) then false else (if (index == $x_addr) then (bvsmod32(memory_load32_le(memory, $z_addr), 2bv32) == 0bv32) else (if (index == $z_addr) then true else false)))
 }
 
-function {:bvbuiltin "sign_extend 32"} sign_extend32_32(bv32) returns (bv64);
+function {:bvbuiltin "bvor"} bvor64(bv64, bv64) returns (bv64);
+function {:bvbuiltin "bvsge"} bvsge32(bv32, bv32) returns (bool);
 function memory_load32_le(memory: [bv64]bv8, index: bv64) returns (bv32) {
   (memory[bvadd64(index, 3bv64)] ++ (memory[bvadd64(index, 2bv64)] ++ (memory[bvadd64(index, 1bv64)] ++ memory[index])))
-}
-
-function gamma_load32(gammaMap: [bv64]bool, index: bv64) returns (bool) {
-  (gammaMap[bvadd64(index, 3bv64)] && (gammaMap[bvadd64(index, 2bv64)] && (gammaMap[bvadd64(index, 1bv64)] && gammaMap[index])))
 }
 
 function gamma_store32(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
   gammaMap[index := value][bvadd64(index, 1bv64) := value][bvadd64(index, 2bv64) := value][bvadd64(index, 3bv64) := value]
 }
 
+function {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
 function memory_store32_le(memory: [bv64]bv8, index: bv64, value: bv32) returns ([bv64]bv8) {
   memory[index := value[8:0]][bvadd64(index, 1bv64) := value[16:8]][bvadd64(index, 2bv64) := value[24:16]][bvadd64(index, 3bv64) := value[32:24]]
 }
 
-function {:bvbuiltin "bvsge"} bvsge32(bv32, bv32) returns (bool);
-function {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
-function {:bvbuiltin "bvand"} bvand64(bv64, bv64) returns (bv64);
-function {:bvbuiltin "bvor"} bvor64(bv64, bv64) returns (bv64);
+function {:bvbuiltin "sign_extend 32"} sign_extend32_32(bv32) returns (bv64);
 function {:bvbuiltin "zero_extend 32"} zero_extend32_32(bv32) returns (bv64);
+function {:bvbuiltin "bvand"} bvand64(bv64, bv64) returns (bv64);
 function {:bvbuiltin "bvsmod"} bvsmod32(bv32, bv32) returns (bv32);
 procedure rely();
   modifies mem, Gamma_mem;
@@ -78,18 +78,18 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
   var Gamma_R30: bool;
   var R31: bv64;
   var Gamma_R31: bool;
+  var Gamma_#39: bool;
+  var Gamma_#38: bool;
   var Gamma_x_old: bool;
-  var #33: bv64;
   var #39: bv64;
   var Gamma_#33: bool;
-  var Gamma_#38: bool;
-  var Gamma_#32: bool;
-  var #32: bv64;
-  var z_old: bv32;
   var #38: bv64;
+  var #33: bv64;
+  var Gamma_#32: bool;
+  var z_old: bv32;
   var #35: bv64;
-  var Gamma_#39: bool;
   var Gamma_#35: bool;
+  var #32: bv64;
   R0, Gamma_R0 := zero_extend32_32(main_argc), Gamma_main_argc;
   R1, Gamma_R1 := main_argv, Gamma_main_argv;
   R29, Gamma_R29 := FP, Gamma_FP;
@@ -110,17 +110,17 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
     call rely();
     #32, Gamma_#32 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
     R0, Gamma_R0 := 0bv64, true;
-    R0, Gamma_R0 := bvor64(bvand64(R0, 18446744069414584320bv64), #32), (Gamma_#32 && Gamma_R0);
+    R0, Gamma_R0 := bvor64(bvand64(R0, 18446744069414584320bv64), #32[64:0]), (Gamma_#32 && Gamma_R0);
     #33, Gamma_#33 := bvadd64(sign_extend32_32(R0[32:0]), 1bv64), Gamma_R0;
     R1, Gamma_R1 := 0bv64, true;
-    R1, Gamma_R1 := bvor64(bvand64(R1, 18446744069414584320bv64), #33), (Gamma_#33 && Gamma_R1);
+    R1, Gamma_R1 := bvor64(bvand64(R1, 18446744069414584320bv64), #33[64:0]), (Gamma_#33 && Gamma_R1);
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 20bv64), Gamma_R0;
     call rely();
     assert (L(mem, R0) ==> Gamma_R1);
     z_old := memory_load32_le(mem, $z_addr);
     Gamma_x_old := (gamma_load32(Gamma_mem, $x_addr) || L(mem, $x_addr));
-    mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
+    mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0][32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
     assert ((R0 == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assert bvsge32(memory_load32_le(mem, $z_addr), z_old);
     R0, Gamma_R0 := 69632bv64, true;
@@ -128,14 +128,14 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
     call rely();
     #35, Gamma_#35 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
     R1, Gamma_R1 := 0bv64, true;
-    R1, Gamma_R1 := bvor64(bvand64(R1, 18446744069414584320bv64), #35), (Gamma_#35 && Gamma_R1);
+    R1, Gamma_R1 := bvor64(bvand64(R1, 18446744069414584320bv64), #35[64:0]), (Gamma_#35 && Gamma_R1);
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 24bv64), Gamma_R0;
     call rely();
     assert (L(mem, R0) ==> Gamma_R1);
     z_old := memory_load32_le(mem, $z_addr);
     Gamma_x_old := (gamma_load32(Gamma_mem, $x_addr) || L(mem, $x_addr));
-    mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
+    mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0][32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
     assert ((R0 == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assert bvsge32(memory_load32_le(mem, $z_addr), z_old);
     R0, Gamma_R0 := 69632bv64, true;
@@ -152,17 +152,17 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
     call rely();
     #38, Gamma_#38 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
     R0, Gamma_R0 := 0bv64, true;
-    R0, Gamma_R0 := bvor64(bvand64(R0, 18446744069414584320bv64), #38), (Gamma_#38 && Gamma_R0);
+    R0, Gamma_R0 := bvor64(bvand64(R0, 18446744069414584320bv64), #38[64:0]), (Gamma_#38 && Gamma_R0);
     #39, Gamma_#39 := bvadd64(sign_extend32_32(R0[32:0]), 1bv64), Gamma_R0;
     R1, Gamma_R1 := 0bv64, true;
-    R1, Gamma_R1 := bvor64(bvand64(R1, 18446744069414584320bv64), #39), (Gamma_#39 && Gamma_R1);
+    R1, Gamma_R1 := bvor64(bvand64(R1, 18446744069414584320bv64), #39[64:0]), (Gamma_#39 && Gamma_R1);
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 20bv64), Gamma_R0;
     call rely();
     assert (L(mem, R0) ==> Gamma_R1);
     z_old := memory_load32_le(mem, $z_addr);
     Gamma_x_old := (gamma_load32(Gamma_mem, $x_addr) || L(mem, $x_addr));
-    mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
+    mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0][32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
     assert ((R0 == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assert bvsge32(memory_load32_le(mem, $z_addr), z_old);
     R0, Gamma_R0 := 0bv64, true;
