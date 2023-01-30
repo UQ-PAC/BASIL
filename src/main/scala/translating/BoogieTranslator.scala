@@ -6,7 +6,7 @@ import specification.*
 
 import scala.language.postfixOps
 
-case class BoogieTranslator(program: Program, spec: Specification) {
+class BoogieTranslator(var program: Program, var spec: Specification) {
   private val globals = spec.globals
   private val controls = spec.controls
   private val controlled = spec.controlled
@@ -386,7 +386,7 @@ case class BoogieTranslator(program: Program, spec: Specification) {
     case _ => ???
   }
 
-  def stripUnreachableFunctions(externalNames: Set[String]): BoogieTranslator = {
+  def stripUnreachableFunctions(externalNames: Set[String]): Unit = {
     val functionToChildren = program.functions.map(f => f.name -> f.calls).toMap
 
     var next = "main"
@@ -405,12 +405,13 @@ case class BoogieTranslator(program: Program, spec: Specification) {
       }
     }
 
-    val reachableFunctions = program.functions.filter(f => reachableNames.contains(f.name))
-    val externalsStubbed = reachableFunctions.map {
-      case f: Subroutine if externalNames.contains(f.name) => f.copy(blocks = List())
-      case f: _ => f
+    program.functions = program.functions.filter(f => reachableNames.contains(f.name))
+    for (f <- program.functions) {
+      f match {
+        case f: Subroutine if externalNames.contains(f.name) => f.blocks = List()
+        case _ =>
+      }
     }
-    copy(program = program.copy(functions = externalsStubbed))
   }
 
   private val reserved = Set("free")

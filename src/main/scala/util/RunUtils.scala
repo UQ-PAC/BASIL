@@ -59,7 +59,7 @@ object RunUtils {
     val externalNames = externalFunctions.map(e => e.name)
 
     val translator = BoogieTranslator(program, specification)
-    val translatorUnusedRemoved = translator.stripUnreachableFunctions(externalNames)
+    translator.stripUnreachableFunctions(externalNames)
 
     // does not work properly
     //val cfg = IntraproceduralProgramCfg.generateFromProgram(translatorUnusedRemoved.program)
@@ -67,7 +67,7 @@ object RunUtils {
 
 
 
-    translatorUnusedRemoved.translate
+    translator.translate
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {
