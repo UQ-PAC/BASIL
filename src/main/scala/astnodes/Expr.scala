@@ -7,10 +7,6 @@ import util.AssumptionViolationException
 /** Expression
   */
 trait Expr {
-
-  /* Substitute a given variable for another variable */
-  //def subst(v: Variable, w: Variable): Expr
-
   def toBoogie: BExpr
   def toGamma: BExpr = {
     val gammaVars: Set[BExpr] = gammas.map(_.toGamma)
@@ -24,9 +20,6 @@ trait Expr {
       }
     }
   }
-  //def toBoogieString: String = toString
-
-  //def simplify(old: Expr, sub: Expr): Expr
   /*
    * The size of output of the given expression.
    *
@@ -46,15 +39,6 @@ class Concat(var left: Expr, var right: Expr) extends Expr {
   override def size: Int = left.size + right.size
   override def gammas: Set[Variable] = left.gammas ++ right.gammas
   override def locals: Set[LocalVar] = left.locals ++ right.locals
-  //override def subst(v: Variable, w: Variable): Expr = {
-  //  copy(left = left.subst(v, w), right = right.subst(v, w))
-  //}
-
-  /*
-  override def simplify(old: Expr, sub: Expr): Expr = {
-    SimplificationUtil.bitvecConcat(copy(left = left.simplify(old,sub), right = right.simplify(old,sub)))
-  }
-   */
 
   override def toString: String = String.format("%s ++ %s", left, right)
 }
@@ -63,11 +47,7 @@ class Concat(var left: Expr, var right: Expr) extends Expr {
   */
 
 class SignedExtend(var width: Int, var body: Expr) extends Expr {
-  //override def toString: String = String.format("%s[%d:%d]", body, high, low)
   override def locals: Set[LocalVar] = body.locals
-  //override def subst(v: Variable, w: Variable): Expr = copy(body = body.subst(v, w))
-  //override def simplify(old: Expr, sub: Expr): Expr = ???
-
   override def size: Int = width
 
   override def toBoogie: BExpr = {
@@ -127,12 +107,6 @@ class Extract(var high: Int, var low: Int, var body: Expr) extends Expr {
   override def toString: String = String.format("%s[%d:%d]", body, high, low)
   override def locals: Set[LocalVar] = body.locals
 
-  //override def subst(v: Variable, w: Variable): Expr = this.copy(body = body.subst(v, w))
-
-  /*
-  override def simplify(old: Expr, sub: Expr): Expr =
-    SimplificationUtil.bitvecExtract(copy(body = body.simplify(old, sub)))
-   */
   // + 1 as extracts are inclusive (e.g. [31:0] has 32 bits)
   override val size: Int = high - low + 1
 
@@ -168,15 +142,12 @@ case object LowCast {
 
 /** Literal expression (e.g. 4, 5, 10)
   */
-class Literal(var value: BigInt, var size: Int) extends Expr {
+case class Literal(value: BigInt, size: Int) extends Expr {
 
   /** Value of literal */
   override def toString: String = s"${value}bv$size"
 
   override def locals: Set[LocalVar] = Set()
-  //override def subst(v: Variable, w: Variable): Expr = this
-  //override def simplify(old: Expr, sub: Expr): Expr = this
-
   override def toBoogie: BitVecLiteral = BitVecLiteral(value, size)
   override def gammas: Set[Variable] = Set()
 }
@@ -184,9 +155,6 @@ class Literal(var value: BigInt, var size: Int) extends Expr {
 /** Unary operator
   */
 class UnOp(var operator: UnOperator, var exp: Expr) extends Expr {
-  //override def subst(v: Variable, w: Variable): Expr = copy(exp = exp.subst(v, w))
-  //override def simplify(old: Expr, sub: Expr): Expr = SimplificationUtil.uniArithmetic(copy(exp = exp.simplify(old, sub)))
-
   override def locals: Set[LocalVar] = exp.locals
   override def size: Int = exp.size
 
@@ -216,14 +184,6 @@ object UnOperator {
 /** Binary operation of two expressions
   */
 class BinOp(var operator: BinOperator, var lhs: Expr, var rhs: Expr) extends Expr {
-  //override def subst(v: Variable, w: Variable): Expr = {
-  //  copy(lhs = lhs.subst(v, w), rhs = rhs.subst(v, w))
-  //}
-
-  /* override def simplify(old: Expr, sub: Expr): Expr = {
-    SimplificationUtil.binArithmetic(copy(lhs = lhs.simplify(old,sub), rhs = rhs.simplify(old, sub)))
-  } */
-
   override def locals: Set[LocalVar] = lhs.locals ++ rhs.locals
   override def gammas: Set[Variable] = lhs.gammas ++ rhs.gammas
 
@@ -322,23 +282,19 @@ case object LE extends BinOperator("LE")
 case object SLT extends BinOperator("SLT")
 case object SLE extends BinOperator("SLE")
 
-trait Variable extends Expr {
-  //override def subst(v: Variable, w: Variable): Variable = if (v == this) w else this
-  //def toGamma: SecVar | SecMemLoad
-}
+trait Variable extends Expr
 
-class LocalVar(var name: String, override val size: Int) extends Variable {
+case class LocalVar(name: String, override val size: Int) extends Variable {
   override def toString: String = name
   override def locals: Set[LocalVar] = Set(this)
   override def gammas: Set[Variable] = Set(this)
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", BitVec(size), Scope.Local)
-  //override def simplify(old: Expr, sub: Expr): Expr = if (old == this) sub else this
 }
 
 /** A load from memory at location exp
   */
-class MemAccess(var memory: Memory, var index: Expr, var endian: Endian, override val size: Int) extends Variable {
+class MemAccess(var memory: Memory, var index: Expr, var endian: Endian, var size: Int) extends Variable {
   override def toString: String = s"${memory.name}[$index]"
   override def locals: Set[LocalVar] = index.locals
   override def toBoogie: MemoryLoad = MemoryLoad(memory.toBoogie, index.toBoogie, endian, size)
@@ -352,41 +308,6 @@ class MemAccess(var memory: Memory, var index: Expr, var endian: Endian, overrid
       L(memory.toBoogie, index.toBoogie)
     )
   }
-
-  /*
-  override def simplify(old: Expr, sub: Expr): Expr = {
-    if (!onStack) copy(index = index.simplify(old, sub))
-    else if (onStack && old == this) sub
-    else this
-  }
-   */
-
-  //def toL: SecMemLoad = SecMemLoad(false, true, index)
-  //override def toGamma: SecMemLoad = SecMemLoad(true, false, index)
-
-  /*
-  def boogieAccesses: Seq[MapAccess] = {
-    val boogieMap = memory.toBoogie
-    val boogieIndex = index.toBoogie
-    val accesses = for (i <- 0 until (size / memory.valueSize)) yield {
-      if (i == 0) {
-        MapAccess(boogieMap, boogieIndex)
-      } else {
-        MapAccess(boogieMap, BinaryBExpr(BVADD, index.toBoogie, BitVecLiteral(i, memory.addressSize)))
-      }
-    }
-    endian match {
-      case Endian.BigEndian    => accesses.reverse
-      case Endian.LittleEndian => accesses
-    }
-  }
-
-  override def toBoogie: BExpr = {
-    boogieAccesses.tail.foldLeft(boogieAccesses.head) { (concat: BExpr, next: MapAccess) =>
-      BinaryBExpr(BVCONCAT, next, concat)
-    }
-  }
-   */
 }
 
 object MemAccess {
@@ -400,9 +321,8 @@ object MemAccess {
   }
 }
 
-case class Memory(var name: String, var addressSize: Int, var valueSize: Int) extends Variable {
+case class Memory(name: String, addressSize: Int, valueSize: Int) extends Variable {
   override def size: Int = valueSize // should reconsider
-  //override def subst(v: Variable, w: Variable): Expr = ???
   override def locals: Set[LocalVar] = Set()
   override def gammas: Set[Variable] = Set()
   override def toBoogie: MapVar = MapVar(name, MapType(BitVec(addressSize), BitVec(valueSize)), Scope.Global)
@@ -415,13 +335,11 @@ case class Memory(var name: String, var addressSize: Int, var valueSize: Int) ex
 }
 
 class Store(var memory: Memory, var index: Expr, var value: Expr, var endian: Endian, var size: Int) extends Expr {
-  //override def subst(v: Variable, w: Variable): Expr = ???
   override def locals: Set[LocalVar] = index.locals ++ value.locals
   override def gammas: Set[Variable] = Set()
   override def toBoogie: MemoryStore = MemoryStore(memory.toBoogie, index.toBoogie, value.toBoogie, endian, size)
   override def toGamma: GammaStore =
     GammaStore(memory.toGamma, index.toBoogie, value.toGamma, size, size / memory.valueSize)
-  //def toBoogieProc: String
 
   override def toString: String = s"${memory.name}[$index] := $value"
 }

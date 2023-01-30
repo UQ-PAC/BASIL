@@ -74,7 +74,7 @@ object RunUtils {
     val externalNames = externalFunctions.map(e => e.name)
 
     val translator = BoogieTranslator(program, specification)
-    val translatorUnusedRemoved = translator.stripUnreachableFunctions(externalNames)
+    translator.stripUnreachableFunctions(externalNames)
 
     // does not work properly (old comment)
     // run using sbt shell and:    run ./examples/secret_write/secret_write.adt ./examples/secret_write/secret_write.relf
@@ -86,7 +86,7 @@ object RunUtils {
 
 
 
-    translatorUnusedRemoved.translate
+    translator.translate
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {
