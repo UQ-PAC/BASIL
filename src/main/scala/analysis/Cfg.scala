@@ -155,7 +155,7 @@ object Cfg:
   /** Generate the cfg for a function.
     */
 
-  // what does it mean when the block is not found? do we create that block (but what statements would be inside that block?) or do we throw an error or we pass?
+  // what does it mean when the block is not found? do we create that block (but what statements would be inside that block?) or do we throw an error or we pass?   ans: make a node for each unknown block
   // should we assume that the target is always a new block (cause normally it could be pointing to a set of instruction inside that block)?
   // Design choice: what do we do with indirect calls when we don't know the target and also we don't know if the LocalVars would point to a block target or not
   // if not do we point that indirect call to a default block that is a place holder (unknown location block) so that when we do the analysis we resolve those locations
@@ -217,10 +217,11 @@ object Cfg:
               case _ =>
 
         case indirectCall: IndirectCall =>
+            node.addEdge(CfgBlockEntryNode(data = Block(label = indirectCall.locals.toString(), address = null, statements = List())))
             indirectCall.returnTarget match
               case Some(returnTarget) =>
                 blocks.get(returnTarget) match
-                  case Some(returnBlockNode) => node.addEdge(returnBlockNode)
+                  case Some(returnBlockNode) => returnBlockNode.addEdge(node)
                   case _ =>
 //                  {
 //                    // make a new block node and add edge
