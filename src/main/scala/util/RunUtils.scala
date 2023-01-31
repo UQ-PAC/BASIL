@@ -78,7 +78,7 @@ object RunUtils {
 
     // does not work properly (old comment)
     // run using sbt shell and:    run ./examples/secret_write/secret_write.adt ./examples/secret_write/secret_write.relf
-    val cfg = IntraproceduralProgramCfg.generateFromProgram(translatorUnusedRemoved.program)
+    val cfg = IntraproceduralProgramCfg.generateFromProgram(translator.program)
     val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
     val result = solver.analyze()
     print(result)

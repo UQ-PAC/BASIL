@@ -11,7 +11,7 @@ class DirectCall(var target: String, var condition: Expr, var returnTarget: Opti
   override def calls: Set[String] = Set(target)
   override def locals: Set[LocalVar] = condition.locals
 
-  override def toString: String = String.format("call %s(); // with return %s", target, returnTarget.getOrElse("none"))
+  override def toString: String = String.format("call %s(); with return %s", target, returnTarget.getOrElse("none"))
 }
 
 class IntrinsicCall(var target: String, var condition: Expr, var returnTarget: Option[String], var line: String, var instruction: String) extends Statement {
@@ -22,7 +22,7 @@ class IntrinsicCall(var target: String, var condition: Expr, var returnTarget: O
 class IndirectCall(var target: LocalVar, var condition: Expr, var returnTarget: Option[String], var line: String, var instruction: String) extends Statement {
   override def locals: Set[LocalVar] = condition.locals + target
 
-  override def toString: String = String.format("call %s(); // with return %s", target, returnTarget.getOrElse("none"))
+  override def toString: String = String.format("call %s(); with return %s", target, returnTarget.getOrElse("none"))
 }
 
 class GoTo(var target: String, var condition: Expr, var line: String, var instruction: String) extends Statement {
