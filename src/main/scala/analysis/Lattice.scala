@@ -143,3 +143,48 @@ object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWit
   override def unsigned(width: Int, a: Element): Element = apply(sign_extend(width, _: Literal), a)
   override def extract(high: Int, low: Int, a: Element): Element = apply(extract(high, low, _: Literal), a)
   override def concat(a: Element, b: Element): Element = apply(concat, a, b)
+  
+  
+// value-set lattice
+/** Constant propagation lattice.
+ */
+object ValueSetLattice extends FlatLattice[Literal]() with LatticeWithOps:
+
+  private def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element = (a, b) match
+    case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => FlatElement.FlatEl(op(x, y))
+    case (FlatElement.Bot, _)                           => FlatElement.Bot
+    case (_, FlatElement.Bot)                           => FlatElement.Bot
+    case (_, FlatElement.Top)                           => FlatElement.Top
+    case (FlatElement.Top, _)                           => FlatElement.Top
+
+  private def apply(op: (Literal) => Literal, a: Element): Element = a match
+    case FlatElement.FlatEl(x) => FlatElement.FlatEl(op(x))
+    case FlatElement.Top       => FlatElement.Top
+    case FlatElement.Bot       => FlatElement.Bot
+
+  override def literal(l: Literal): Element = FlatElement.FlatEl(l)
+  override def plus(a: Element, b: Element): Element = apply(bvadd, a, b)
+  override def minus(a: Element, b: Element): Element = apply(bvsub, a, b)
+  override def times(a: Element, b: Element): Element = apply(bvmul, a, b)
+  override def divide(a: Element, b: Element): Element = apply(bvudiv, a, b)
+  override def sdivide(a: Element, b: Element): Element = apply(bvsdiv, a, b)
+  override def mod(a: Element, b: Element): Element = apply(bvsrem, a, b)
+  override def smod(a: Element, b: Element): Element = apply(bvurem, a, b)
+  override def and(a: Element, b: Element): Element = apply(bvand, a, b)
+  override def or(a: Element, b: Element): Element = apply(bvor, a, b)
+  override def xor(a: Element, b: Element): Element = apply(bvxor, a, b)
+  override def not(a: Element): Element = apply(bvnot, a)
+  override def neg(a: Element): Element = apply(bvneg, a)
+  override def lshift(a: Element, b: Element): Element = apply(bvshl, a, b)
+  override def rshift(a: Element, b: Element): Element = apply(bvlshr, a, b)
+  override def arshift(a: Element, b: Element): Element = apply(bvashr, a, b)
+  override def equ(a: Element, b: Element): Element = apply(bvcomp, a, b)
+  override def neq(a: Element, b: Element): Element = apply(bvneq, a, b)
+  override def lt(a: Element, b: Element): Element = apply(bvult, a, b)
+  override def le(a: Element, b: Element): Element = apply(bvule, a, b)
+  override def slt(a: Element, b: Element): Element = apply(bvslt, a, b)
+  override def sle(a: Element, b: Element): Element = apply(bvsle, a, b)
+  override def signed(width: Int, a: Element): Element = apply(zero_extend(width, _: Literal), a)
+  override def unsigned(width: Int, a: Element): Element = apply(sign_extend(width, _: Literal), a)
+  override def extract(high: Int, low: Int, a: Element): Element = apply(extract(high, low, _: Literal), a)
+  override def concat(a: Element, b: Element): Element = apply(concat, a, b)

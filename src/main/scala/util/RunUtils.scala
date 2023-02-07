@@ -8,6 +8,7 @@ import BilParser._
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
+import java.io.{File, PrintWriter}
 
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
@@ -71,18 +72,38 @@ object RunUtils {
     -instrument with gammas, vcs, rely, guarantee
      */
 
+    def dump_file(content: String, name: String): Unit = {
+      val outFile = new File(s"${name}.txt")
+      val pw = new PrintWriter(outFile, "UTF-8")
+      pw.write(content)
+      pw.close()
+    }
+
+
+
     val externalNames = externalFunctions.map(e => e.name)
 
     val translator = BoogieTranslator(program, specification)
     translator.stripUnreachableFunctions(externalNames)
 
     // does not work properly (old comment)
-    // run using sbt shell and:    run ./examples/secret_write/secret_write.adt ./examples/secret_write/secret_write.relf
+    // run using sbt shell and:
+    // run ./examples/secret_write/secret_write.adt ./examples/secret_write/secret_write.relf
+    // run ./examples/basicpointer/basicpointer.adt ./examples/basicpointer/basicpointer.relf
+
     val cfg = IntraproceduralProgramCfg.generateFromProgram(translator.program)
+//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
+//      x.toString
+//    }, Output.dotIder))
     val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
     val result = solver.analyze()
-    print(result)
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder))
+
+
+//    val solver2 = new SteensgaardAnalysis(translator.program)
+//    val result2 = solver2.analyze()
+//    print(solver2.pointsTo())
+
 
 
 

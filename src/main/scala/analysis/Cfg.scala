@@ -163,16 +163,28 @@ object Cfg:
   def generateCfgFunc(func: Subroutine): Cfg = {
     val blocks = func.blocks.map(block => block.label -> CfgBlockEntryNode(data = block)).toMap
     //val blocks = collection.mutable.Map(blockss.toSeq: _*)
-    val entryNode = CfgFunctionEntryNode(data = func)
-    val exitNode = CfgFunctionExitNode(data = func)
+    val functionEntryNode = CfgFunctionEntryNode(data = func)
+    val functionExitNode = CfgFunctionExitNode(data = func)
 
 
 
     val cfgs = mutable.Map[String, Cfg]()
 
+    var predNode: CfgNode = null
+
     // generate cfg for a statement
-    def generateCfgStatement(stmt: Statement): Cfg =
-      val node = CfgStatementNode(data = stmt)
+    def generateCfgStatement(stmt: Statement, entryN: CfgBlockEntryNode): Cfg =
+      if (predNode == null) {
+        predNode = entryN
+      }
+
+      val temp = predNode
+      var node: CfgNode = CfgStatementNode(data = stmt)
+      node.pred += predNode
+      predNode = node
+      temp.succ += node
+
+
 
       // TODO: commented out the GoTo case because it is not supported yet and it was causing an error when the ast was
       // made mutable (ie. case class -> class)
@@ -190,46 +202,42 @@ object Cfg:
         case goTo: GoTo =>
           blocks.get(goTo.target) match
             case Some(blockNode) => node.addEdge(blockNode)
-            case _ =>
+            case _ => print(s"ERROR: goto target in '${goTo}' not found\n")
 
         case directCall: DirectCall =>
+          // edge between current -> target
           blocks.get(directCall.target) match
             case Some(blockNode) => node.addEdge(blockNode)
-            case _ =>
-
-//            {
-//              // make a new block node and add edge
-//              val newBlockNode = CfgBlockEntryNode(data = Block(label = directCall.target, statements = List()))
-//              blocks += (directCall.target -> newBlockNode)
-//              node.addEdge(newBlockNode)
-//            }
+            case _ => print(s"ERROR: direct call target in '${directCall}' not found\n")
             directCall.returnTarget match
               case Some(returnTarget) =>
                 blocks.get(returnTarget) match
-                  case Some(returnBlockNode) => returnBlockNode.addEdge(node)
+                  case Some(returnBlockNode) =>
+                    blocks.get(directCall.target) match
+                      // edge between target -> return target
+                      case Some(blockNode) => blockNode.addEdge(returnBlockNode)
+                      case _ =>
                   case _ =>
-//                  {
-//                    // make a new block node and add edge
-//                    val newBlockNode = CfgBlockEntryNode(data = Block(label = returnTarget, statements = List()))
-//                    blocks += (returnTarget -> newBlockNode)
-//                    node.addEdge(newBlockNode)
-//                  }
+                    print(s"ERROR: direct call return target in '${returnTarget}' not found\n")
               case _ =>
+                // edge between target -> current (if no return target)
+                blocks.get(directCall.target) match
+                  case Some(blockNode) => blockNode.addEdge(node)
+                  case _ =>
 
         case indirectCall: IndirectCall =>
-            node.addEdge(CfgBlockEntryNode(data = Block(label = indirectCall.locals.toString(), address = null, statements = List())))
+            // edge between current -> unknown block
+            val unknownBlockNode = CfgBlockEntryNode(data = Block(label = s"Unknown: ${indirectCall.locals.toString()}", address = null, statements = List()))
+            node.addEdge(unknownBlockNode)
+            print(s"ERROR: indirect call target in '${indirectCall.target}' not found\n")
             indirectCall.returnTarget match
               case Some(returnTarget) =>
+                // edge between unknown block -> return target
                 blocks.get(returnTarget) match
-                  case Some(returnBlockNode) => returnBlockNode.addEdge(node)
-                  case _ =>
-//                  {
-//                    // make a new block node and add edge
-//                    val newBlockNode = CfgBlockEntryNode(data = Block(label = returnTarget, statements = List()))
-//                    blocks += (returnTarget -> newBlockNode)
-//                    node.addEdge(newBlockNode)
-//                  }
-              case _ =>
+                  case Some(returnBlockNode) => unknownBlockNode.addEdge(returnBlockNode)
+                  case _ => print(s"ERROR: indirect call return target in '${returnTarget}' not found\n")
+              // edge between unknown block -> current (if no return target)
+              case _ => unknownBlockNode.addEdge(node)
         case _ =>
       }
 
@@ -238,7 +246,7 @@ object Cfg:
     for (_, entryNode) <- blocks do
       val exitNode = CfgBlockExitNode(data = entryNode.data)
       val stmts = entryNode.data.statements
-      val body = stmts.foldLeft(unit())((acc, stmt) => acc.concat(generateCfgStatement(stmt)))
+      val body = stmts.foldLeft(unit())((acc, stmt) => acc.concat(generateCfgStatement(stmt, entryNode)))
 
       val cfg = singletonGraph(entryNode).concat(body).concat(singletonGraph(exitNode))
       cfgs += (entryNode.data.label -> cfg)
@@ -246,10 +254,10 @@ object Cfg:
     // this is not good
     if (func.blocks.nonEmpty) {
       cfgs.get(func.blocks.head.label) match
-        case Some(cfg) => singletonGraph(entryNode).concat(cfg).concat(singletonGraph(exitNode))
+        case Some(cfg) => singletonGraph(functionEntryNode).concat(cfg).concat(singletonGraph(functionExitNode))
         case _ => throw new RuntimeException("error generating function cfg")
     } else {
-      singletonGraph(entryNode).concat(singletonGraph(exitNode))
+      singletonGraph(functionEntryNode).concat(singletonGraph(functionExitNode))
     }
   }
 

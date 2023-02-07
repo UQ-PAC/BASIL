@@ -355,6 +355,8 @@ object Store {
   }
 }
 
+case class AAlloc(exp: Expr)
+
 enum Endian {
   case LittleEndian
   case BigEndian
