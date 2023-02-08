@@ -218,7 +218,7 @@ object Cfg:
                       case Some(blockNode) => blockNode.addEdge(returnBlockNode)
                       case _ =>
                   case _ =>
-                    print(s"ERROR: direct call return target in '${returnTarget}' not found\n")
+                    print(s"ERROR: direct call return target in '${directCall}' not found\n")
               case _ =>
                 // edge between target -> current (if no return target)
                 blocks.get(directCall.target) match
@@ -229,13 +229,14 @@ object Cfg:
             // edge between current -> unknown block
             val unknownBlockNode = CfgBlockEntryNode(data = Block(label = s"Unknown: ${indirectCall.locals.toString()}", address = null, statements = List()))
             node.addEdge(unknownBlockNode)
-            print(s"ERROR: indirect call target in '${indirectCall.target}' not found\n")
+            //print(blocks)
+            print(s"ERROR: indirect call target in '${indirectCall}' not found\n")
             indirectCall.returnTarget match
               case Some(returnTarget) =>
                 // edge between unknown block -> return target
                 blocks.get(returnTarget) match
                   case Some(returnBlockNode) => unknownBlockNode.addEdge(returnBlockNode)
-                  case _ => print(s"ERROR: indirect call return target in '${returnTarget}' not found\n")
+                  case _ => print(s"ERROR: indirect call return target in '${indirectCall}' not found\n")
               // edge between unknown block -> current (if no return target)
               case _ => unknownBlockNode.addEdge(node)
         case _ =>
