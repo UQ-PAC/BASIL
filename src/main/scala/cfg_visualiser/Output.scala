@@ -91,13 +91,13 @@ object Output {
   /**
     * Generate an unique ID string for the given AST node.
     */
-  def dotIder(n: CfgNode): String =
+  def dotIder(n: CfgNode, uniqueId: Int): String =
     n match {
-      case real: CfgStatementNode => s"real${real.data}_${real.data}"
-      case entry: CfgFunctionEntryNode => s"entry${entry.data}_${entry.data}"
-      case exit: CfgFunctionExitNode => s"exit${exit.data}_${exit.data}"
-      case blockExit: CfgBlockExitNode => s"blockExit${blockExit.data}_${blockExit.data}"
-      case blockEntry: CfgBlockEntryNode => s"blockEntry${blockEntry.data}_${blockEntry.data}"
+      case real: CfgStatementNode => s"real${real.data}_${uniqueId}"
+      case entry: CfgFunctionEntryNode => s"entry${entry.data}_${uniqueId}"
+      case exit: CfgFunctionExitNode => s"exit${exit.data}_${uniqueId}"
+      case blockExit: CfgBlockExitNode => s"blockExit${blockExit.data}_${uniqueId}"
+      case blockEntry: CfgBlockEntryNode => s"blockEntry${blockEntry.data}_${uniqueId}"
       case _ => ???
     }
 }

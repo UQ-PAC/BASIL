@@ -26,10 +26,10 @@ abstract class DotElement {
 /**
   * Represents a node in a Graphviz dot file.
   */
-class DotNode(val id: String, val label: String, val additionalParams: Map[String, String]) extends DotElement {
+class DotNode(val id: String, val label: String) extends DotElement {
 
-  def this(label: String, additionalParams: Map[String, String] = Map()) =
-    this("n" + IDGenerator.getNewId, label, additionalParams)
+  def this(label: String) =
+    this("n" + IDGenerator.getNewId, label)
 
   def this() = this("")
 
@@ -38,8 +38,7 @@ class DotNode(val id: String, val label: String, val additionalParams: Map[Strin
   override def toString: String = toDotString
 
   def toDotString: String =
-    s"\"${id}\"" + "[label=\"" + Output.escape(label) + "\"" +
-      additionalParams.map(p => s"${p._1} = ${p._2}").mkString(",") + "]"
+    s"\"${id}\"" + "[label=\"" + label + "\"]"
 
 }
 
@@ -50,7 +49,7 @@ class DotArrow(val fromNode: DotNode, arrow: String, val toNode: DotNode, val la
 
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
 
-  def toDotString: String = s"\"${fromNode.id}\"" + " " + arrow + " " + s"\"${toNode.id}\"" + "[label=\"" + Output.escape(label) + "\"]"
+  def toDotString: String = s"\"${fromNode.id}\"" + " " + arrow + " " + s"\"${toNode.id}\"" + "[label=\"" + label + "\"]"
 }
 
 /**
