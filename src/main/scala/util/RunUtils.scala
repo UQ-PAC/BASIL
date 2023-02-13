@@ -92,12 +92,18 @@ object RunUtils {
     // run ./examples/basicpointer/basicpointer.adt ./examples/basicpointer/basicpointer.relf
 
     val cfg = IntraproceduralProgramCfg.generateFromProgram(translator.program)
+    
+
 //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
 //      x.toString
 //    }, Output.dotIder))
     val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
     val result = solver.analyze()
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder))
+
+    dump_file(cfg.getEdges.toString(), "result")
+
+
 
 
 //    val solver2 = new SteensgaardAnalysis(translator.program)
