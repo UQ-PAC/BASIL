@@ -1,17 +1,23 @@
 grammar Specifications;
 
-specification: lPreds? gammaInits? inits? relies? guarantees?;
+specification: lPreds? /* gammaInits? inits? */ relies? guarantees? subroutine*;
 
 lPreds : 'L:' lPred (COMMA lPred)*;
 lPred : id MAPSTO expr;
-gammaInits : 'Gamma:' gamma (COMMA gamma)*;
-gamma : id MAPSTO boolLit;
-inits : 'Init:' init (COMMA init)*;
-init : id MAPSTO nat;
+//gammaInits : 'Gamma:' gamma (COMMA gamma)*;
+//gamma : id MAPSTO boolLit;
+//inits : 'Init:' init (COMMA init)*;
+//init : id MAPSTO nat;
 //lattice: 'Lattice:' lattice_elem (COMMA lattice_elem)* ;
+
+
 
 relies: 'Rely:' expr (COMMA expr)*;
 guarantees: 'Guarantee:' expr (COMMA expr)*;
+subroutine: 'Subroutine:' id requires* ensures*;
+requires: 'Requires:' expr;
+ensures: 'Ensures:' expr;
+
 
 COMMA : ',';
 

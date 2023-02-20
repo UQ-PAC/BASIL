@@ -14,6 +14,7 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
       case Some(_) => visitLPreds(ctx.lPreds)
       case None => Map()
     }
+    /*
     val gammaInits = Option(ctx.gammaInits) match {
       case Some(_) => visitGammaInits(ctx.gammaInits)
       case None => Map()
@@ -22,6 +23,7 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
       case Some(_) => visitInits(ctx.inits)
       case None => Map()
     }
+    */
     val relies = Option(ctx.relies) match {
       case Some(_) => visitRelies(ctx.relies)
       case None => List()
@@ -30,13 +32,15 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
       case Some(_) => visitGuarantees(ctx.guarantees)
       case None => List()
     }
-    specification.Specification(globals, lPreds, gammaInits, inits, relies, guarantees)
+    val subroutines = ctx.subroutine.asScala.map(s => visitSubroutine(s)).toList
+    Specification(globals, lPreds, relies, guarantees, subroutines)
   }
 
   def visitLPred(ctx: LPredContext): (SpecGlobal, BExpr) = {
     (idToGlobals(ctx.id.getText), visitExpr(ctx.expr))
   }
 
+  /*
   def visitGamma(ctx: GammaContext): (SpecGlobal, BoolLit) = {
     (idToGlobals(ctx.id.getText), visitBoolLit(ctx.boolLit))
   }
@@ -53,6 +57,7 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
     ctx.init.asScala.map(i => visitInit(i)).toMap
   }
 
+   */
   def visitLPreds(ctx: LPredsContext): Map[SpecGlobal, BExpr] = {
     ctx.lPred.asScala.map(l => visitLPred(l)).toMap
   }
@@ -163,5 +168,11 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
     case ">=" => IntGE
     case "<" => IntLT
     case "<=" => IntLE
+  }
+
+  def visitSubroutine(ctx: SubroutineContext): SubroutineSpec = {
+    val requires = ctx.requires.asScala.map(r => visitExpr(r.expr)).toList
+    val ensures = ctx.ensures.asScala.map(e => visitExpr(e.expr)).toList
+    SubroutineSpec(ctx.id.getText, requires, ensures)
   }
 }

@@ -37,7 +37,7 @@ object RunUtils {
         specParser.setBuildParseTree(true)
         val specLoader = SpecificationLoader(globals)
         specLoader.visitSpecification(specParser.specification())
-      case None => Specification(globals, Map(), Map(), Map(), List(), List())
+      case None => Specification(globals, Map(), List(), List(), List())
     }
 
     //println(externalFunctions)
