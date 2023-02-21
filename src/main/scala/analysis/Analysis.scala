@@ -2,8 +2,9 @@ package analysis
 
 import astnodes.*
 import analysis.solvers.*
+import boogie.BExpr
 
-import scala.collection.mutable.HashMap
+import scala.collection.mutable.{HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import java.util
 import scala.collection.mutable
@@ -133,16 +134,65 @@ object ConstantPropagationAnalysis:
       extends IntraprocValueAnalysisWorklistSolver(cfg, ConstantPropagationLattice)
 
 
+///** Base class for value analysis with simple (non-lifted) lattice.
+// */
+//abstract class ValueSetAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAnalysis(true) with ValueAnalysisMisc:
+//
+//  /** The analysis lattice.
+//   */
+//  val lattice: MapLattice[CfgNode, statelattice.type] = new MapLattice(statelattice)
+//
+//  val domain: Set[CfgNode] = cfg.nodes
+//
+//  /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
+//   */
+//  def transfer(n: CfgNode, s: statelattice.Element): statelattice.Element =
+//    n match
+//      case r: CfgStatementNode =>
+//        r.data match
+//          // assignments
+//          case la: LocalAssign =>
+//            s + (la.lhs -> eval(la.rhs, s))
+//
+//          case ma: MemAssign =>
+//            s + (ma.rhs.value -> eval(ma.rhs.value, s))
+//
+//          // all others: like no-ops
+//          case _ => s
+//      case _ => s
+//
+///** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
+// */
+//abstract class IntraprocValueSetAnalysisWorklistSolver[L <: LatticeWithOps](cfg: IntraproceduralProgramCfg, val valuelattice: L)
+//  extends ValueSetAnalysis(cfg)
+//  with SimpleWorklistFixpointSolver[CfgNode]
+//  with ForwardDependencies
+//
+//object ValueSetAnalysis:
+//
+//  /** Intraprocedural analysis that uses the worklist solver.
+//   */
+//  class WorklistSolver(cfg: IntraproceduralProgramCfg)
+//    extends IntraprocValueAnalysisWorklistSolver(cfg, ValueSetLattice)
+
 /**
  * Steensgaard-style pointer analysis.
  * The analysis associates an [[StTerm]] with each variable declaration and expression node in the AST.
  * It is implemented using [[tip.solvers.UnionFindSolver]].
  */
-class SteensgaardAnalysis(program: Program) extends Analysis[Any] {
+class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _]) extends Analysis[Any] {
 
   val solver = new UnionFindSolver[StTerm]
 
   val stringArr = new util.ArrayList[String]()
+
+  var mallocCallTarget = ""
+
+  val constantPropResult2: Map[CfgNode, _] = constantPropResult
+
+  constantPropResult2.values.foreach(v =>
+    print(v)
+  )
 
   /**
    * @inheritdoc
@@ -169,7 +219,8 @@ class SteensgaardAnalysis(program: Program) extends Analysis[Any] {
     def exprToStTerm(expr: Expr): Term[StTerm] = ExpressionVariable(expr)
     def allocToTerm(alloc: AAlloc): Term[StTerm] = AllocVariable(alloc)
 
-    print(s"Visiting ${node.getClass.getSimpleName}\n")
+
+    //print(s"Visiting ${node.getClass.getSimpleName}\n")
     node match {
 //      case AAssignStmt(id1: AIdentifier, alloc: AAlloc, _) => ??? //<--- Complete here
 //      case AAssignStmt(id1: AIdentifier, AVarRef(id2: AIdentifier, _), _) => ??? //<--- Complete here
@@ -178,65 +229,48 @@ class SteensgaardAnalysis(program: Program) extends Analysis[Any] {
 //      case AAssignStmt(ADerefWrite(id1: AIdentifier, _), id2: AIdentifier, _) => ??? //<--- Complete here
 
 
-
       case localAssign: LocalAssign =>
-        //stringArr.add(s"{instr: ${localAssign.instruction} translated: ${localAssign.toString}}")
-        stringArr.add(localAssign.instruction)
-        stringArr.forEach(st => println(st))
-        //unify(varToStTerm(localAssign.lhs), exprToStTerm(localAssign.rhs))
-        //localAssign.rhs.locals.foreach(r => unify(varToStTerm(localAssign.lhs), varToStTerm(r)))
-
-
-//        if (localAssign.rhs.toString == "R0") { // R0 is the malloc result and gets stored in the memory
-//          print(s"R0 found\n")
-//          unify(varToStTerm(localAssign.lhs), PointerRef(allocToTerm(AAlloc(localAssign.rhs))))
-//        } else if (localAssign.rhs.toString.contains("R")) {
-//          // X1 = &X2
-//          unify(varToStTerm(localAssign.lhs), PointerRef(exprToStTerm(localAssign.rhs)))
-//        } else {
-//          // X1 = X2
-//          unify(varToStTerm(localAssign.lhs), exprToStTerm(localAssign.rhs))
-//        }
-
-
+        localAssign.rhs match {
+          case variable: Variable =>
+            localAssign.lhs match
+              case variable2: Variable =>
+                // X1 = X2
+                unify(varToStTerm(variable2), varToStTerm(variable))
+                // *X1 = X2: [[X1]] = α ∧ [[X2]] = α where α is a fresh term variable
+              case _ =>
+                val alpha = FreshVariable()
+                unify(varToStTerm(localAssign.lhs), PointerRef(alpha))
+                unify(varToStTerm(variable), alpha)
+          case _ =>
+            // X1 = *X2: [[X2]] = α ∧ [[X1]] = α where α is a fresh term variable
+            val alpha = FreshVariable()
+            unify(exprToStTerm(localAssign.rhs), PointerRef(alpha))
+            unify(varToStTerm(localAssign.lhs), alpha)
+        }
+      case memAssign: MemAssign =>
 
         // X = alloc P
-      case memAssign: MemAssign =>
-        //stringArr.add(s"{instr: ${memAssign.instruction} translated: ${memAssign.toString}}")
-        stringArr.add(memAssign.instruction)
-        stringArr.forEach(st => println(st))
-//        if (memAssign.rhs.value.toString == "R0") { // R0 is the malloc result and gets stored in the memory
-//          print(s"R0 found\n")
-//          unify(varToStTerm(memAssign.lhs), PointerRef(allocToTerm(AAlloc(memAssign.rhs.value))))
-//        } else if (memAssign.rhs.value.toString.contains("R")) {
-//          // X = &Y
-//          unify(varToStTerm(memAssign.lhs), PointerRef(exprToStTerm(memAssign.rhs.value)))
-//        } else if (memAssign.lhs.toString.contains("R")) {
-//          // X = *Y
-//          val a = FreshVariable()
-//          unify(PointerRef(a), exprToStTerm(memAssign.rhs.value))
-//          unify(varToStTerm(memAssign.lhs), a)
-//        } else {
-//          // X = Y
-//          unify(varToStTerm(memAssign.lhs), exprToStTerm(memAssign.rhs.value))
-//        }
-
-        if (memAssign.instruction.contains("!")) {
-          unify(varToStTerm(memAssign.lhs), PointerRef(allocToTerm(AAlloc(memAssign.rhs.value))))
-        } else if (memAssign.rhs.value.toString.contains("R")) {
-          // X = &Y
+        if (memAssign.line.matches(mallocCallTarget)) {
+          val pointer = memAssign.rhs.value
+          val alloc = AAlloc(pointer)
+            unify(varToStTerm(memAssign.lhs), PointerRef(allocToTerm(alloc)))
+        }
+        // X = &Y
+        else {
           unify(varToStTerm(memAssign.lhs), PointerRef(exprToStTerm(memAssign.rhs.value)))
-        } else if (memAssign.lhs.toString.contains("R")) {
-          // X = *Y
-          val a = FreshVariable()
-          unify(PointerRef(a), exprToStTerm(memAssign.rhs.value))
-          unify(varToStTerm(memAssign.lhs), a)
-        } else {
-          // X = Y
-          unify(varToStTerm(memAssign.lhs), exprToStTerm(memAssign.rhs.value))
         }
 
 
+
+      case call: DirectCall =>
+        if (call.target.contains("malloc")) {
+          call.returnTarget match {
+            case Some(ret) =>
+              mallocCallTarget = ret
+            case None =>
+              throw new Exception("malloc call without return target")
+          }
+        }
 
 
 
@@ -268,7 +302,7 @@ class SteensgaardAnalysis(program: Program) extends Analysis[Any] {
   }
 
   private def unify(t1: Term[StTerm], t2: Term[StTerm]): Unit = {
-    print(s"univfying constraint $t1 = $t2\n")
+    //print(s"univfying constraint $t1 = $t2\n")
     solver.unify(t1, t2) // note that unification cannot fail, because there is only one kind of term constructor and no constants
   }
 
@@ -370,3 +404,325 @@ case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
 
   override def toString: String = s"$of"
 }
+
+/**
+ * Steensgaard-style pointer analysis.
+ * The analysis associates an [[StTerm]] with each variable declaration and expression node in the AST.
+ * It is implemented using [[tip.solvers.UnionFindSolver]].
+ */
+class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
+
+  val memoryTracker = new mutable.HashMap[Expr, Set[Expr]]()
+  val variableTracker = new mutable.HashMap[Expr, Set[Expr]]()
+
+  /**
+   * @inheritdoc
+   */
+  def analyze(): Unit =
+  // generate the constraints by traversing the AST and solve them on-the-fly
+    visit(program, ())
+
+  def dump_file(content: util.ArrayList[String], name: String): Unit = {
+    val outFile = new File(s"${name}")
+    val pw = new PrintWriter(outFile, "UTF-8")
+    content.forEach(s => pw.append(s + "\n"))
+    pw.close()
+  }
+
+  /**
+   * Generates the constraints for the given sub-AST.
+   * @param node the node for which it generates the constraints
+   * @param arg unused for this visitor
+   */
+  def visit(node: Object, arg: Unit): Unit = {
+    node match {
+      case memAssign: MemAssign =>
+//        if (variableTracker.contains(memAssign.rhs.value)) {
+//          if (memoryTracker.contains(memAssign.rhs.index))
+//            memoryTracker(memAssign.rhs.index) += variableTracker.get(memAssign.rhs.value)
+//          else
+//            memoryTracker(memAssign.rhs.index) = variableTracker.getOrElse(memAssign.rhs.value, Set())
+//        } else {
+//          if (memoryTracker.contains(memAssign.rhs.index))
+//            memoryTracker(memAssign.rhs.index) += memAssign.rhs.value
+//          else
+//            memoryTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
+//        }
+
+
+        if (memoryTracker.contains(memAssign.rhs.index))
+          memoryTracker(memAssign.rhs.index) += memAssign.rhs.value
+        else
+          memoryTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
+
+
+
+      case localAssign: LocalAssign =>
+//        if (memoryTracker.contains(localAssign.rhs)) {
+//          if (variableTracker.contains(localAssign.lhs))
+//            variableTracker(localAssign.lhs) += memoryTracker.get(localAssign.rhs)
+//          else
+//            variableTracker(localAssign.lhs) = memoryTracker.getOrElse(localAssign.rhs, Set())
+//        } else {
+//          if (variableTracker.contains(localAssign.lhs))
+//            variableTracker(localAssign.lhs) += localAssign.rhs
+//          else
+//            variableTracker(localAssign.lhs) = Set(localAssign.rhs)
+//        }
+
+
+        if (variableTracker.contains(localAssign.lhs))
+          variableTracker(localAssign.lhs) += localAssign.rhs
+        else
+          variableTracker(localAssign.lhs) = Set(localAssign.rhs)
+
+
+      case _ => // ignore other kinds of nodes
+    }
+    visitChildren(node, ())
+  }
+
+  def visitChildren(node: Object, arg: Unit): Unit = {
+    node match {
+      case program: Program =>
+        program.functions.foreach(visit(_, ()))
+
+      case function: Subroutine =>
+        function.blocks.foreach(visit(_, ()))
+
+      case block: Block =>
+        block.statements.foreach(visit(_, ()))
+
+      case _ => // ignore other kinds of nodes
+
+    }
+  }
+
+  def solveMemory(): mutable.Map[Expr, Set[Expr]] = {
+    def add_map(map: mutable.Map[Expr, Set[Expr]], register: Expr, ptr: Expr): Unit = {
+      if (map.contains(register))
+        map(register) += ptr
+      else
+        map(register) = Set(ptr)
+    }
+
+    val pointerTracker: mutable.Map[Expr, Set[Expr]] = mutable.Map[Expr, Set[Expr]]()
+    val pointerPool: PointerPool = new PointerPool()
+    print(s"Memory Tracker: \n${memoryTracker.mkString(",\n")}\n")
+    print(s"Variable Tracker: \n${variableTracker.mkString(",\n")}\n")
+//    variableTracker.foreach { case (k, v) =>
+//      v.foreach(e =>
+//        if (e.locals.contains(LocalVar("R31", 64))) {
+//          e match {
+//            case binOp: BinOp =>
+//              add_map(pointerTracker, k, pointerPool.get(new Pointer((binOp.lhs, binOp.rhs))))
+//            case memAccess: MemAccess =>
+//              memAccess.index match {
+//                case binOp: BinOp =>
+//                  add_map(pointerTracker, k, pointerPool.get(new Pointer((binOp.lhs, binOp.rhs))))
+//                case localVar: LocalVar =>
+//                  add_map(pointerTracker, k, pointerPool.get(new Pointer((localVar, null))))
+//                case _ =>
+//                  print(s"inner type: ${memAccess.index.getClass} ${memAccess.index}\n")
+//                  throw new Exception("Unknown type")
+//              }
+//            case localVar: LocalVar =>
+//              add_map(pointerTracker, k, pointerPool.get(new Pointer((localVar, null))))
+//            case _ =>
+//              add_map(pointerTracker, k, pointerPool.get(new Pointer((e, e))))
+//              print(s"type: ${e.getClass} $e\n")
+//              throw new Exception("Unknown type")
+//          }
+//        }
+//      )
+//    }
+
+    variableTracker.foreach { case (k, v) =>
+      v.foreach(e =>
+        if (e.locals.contains(LocalVar("R31", 64))) {
+          add_map(pointerTracker, k, pointerPool.extractPointer(e))
+        }
+      )
+    }
+
+    memoryTracker.foreach { case (k, v) =>
+      if (k.locals.contains(LocalVar("R31", 64))) {
+        val lhsPointer = pointerPool.extractPointer(k)
+        v.foreach(e =>
+          // ptr -> ptr
+          if (e.locals.contains(LocalVar("R31", 64))) {
+            //add_map(pointerTracker, lhsPointer, pointerPool.extractPointer(e))
+            lhsPointer.value = pointerPool.extractPointer(e)
+          }
+            // ptr -> exp
+          else {
+            //add_map(pointerTracker, lhsPointer, e)
+            lhsPointer.value = e
+          }
+        )
+      } else {
+        v.foreach(e =>
+          // exp -> ptr
+          if (e.locals.contains(LocalVar("R31", 64))) {
+            add_map(pointerTracker, k, pointerPool.extractPointer(e))
+          }
+          // exp -> exp (ignore, no pointer)
+//          else {
+//            add_map(pointerTracker, k, e)
+//          }
+        )
+      }
+    }
+
+    pointerTracker
+  }
+}
+
+class Pointer(allocation: (Expr, Expr), inVal: Expr = null) extends Expr {
+  var value: Expr = inVal
+  var alloc: Expr = allocation._1
+  var offset: Expr = allocation._2
+
+  override def toString(): String = {
+    s"Pointer(Value: $value, [ptr: $alloc, Offset: $offset])"
+  }
+
+  override def gammas: Set[Variable] = ???
+
+  override def locals: Set[LocalVar] = ???
+
+  override def size: Int = ???
+
+  override def toBoogie: BExpr = ???
+
+  override def equals(obj: Any): Boolean = {
+      obj match {
+      case ptr: Pointer =>
+          ptr.alloc == alloc && ptr.offset == offset
+      case _ => false
+      }
+  }
+
+  override def hashCode(): Int = {
+      alloc.hashCode() + offset.hashCode()
+  }
+}
+
+class PointerPool {
+  val pointers: mutable.ListBuffer[Pointer] = mutable.ListBuffer[Pointer]()
+
+  def get(ptr: Pointer): Pointer = {
+    if (pointers.contains(ptr)) {
+      pointers(pointers.indexOf(ptr))
+    } else {
+      pointers += ptr
+      ptr
+    }
+  }
+
+
+
+  def extractPointer(e: Expr): Pointer = {
+    e match {
+      case binOp: BinOp =>
+        get(new Pointer((binOp.lhs, binOp.rhs)))
+      case memAccess: MemAccess =>
+        memAccess.index match {
+          case binOp: BinOp =>
+            get(new Pointer((binOp.lhs, binOp.rhs)))
+          case localVar: LocalVar =>
+            get(new Pointer((localVar, null)))
+          case _ =>
+            print(s"inner type: ${memAccess.index.getClass} ${memAccess.index}\n")
+            throw new Exception("Unknown type")
+        }
+      case localVar: LocalVar =>
+        get(new Pointer((localVar, null)))
+      case unsignedExtend: UnsignedExtend =>
+        extractPointer(unsignedExtend.body)
+      case _ =>
+        print(s"type: ${e.getClass} $e\n")
+        throw new Exception("Unknown type")
+    }
+  }
+}
+
+//case class StackReconstructor() {
+//  var stackPointer: Byte = 16
+//  var framePointer: Byte = 0
+//  var linkRegister: Byte = 0
+//  def stringToInt(hex: String): Int = {
+//    var hex2 = ""
+//    if (hex.contains("0x")) {
+//      // strip the 0x
+//      hex2 = hex.split("0x")(1)
+//    } else {
+//      hex2 = hex
+//    }
+//    if (hex.contains("-")) {
+//      -1 * Integer.parseInt(hex2, 16)
+//    } else {
+//      Integer.parseInt(hex2, 16)
+//    }
+//  }
+//
+//  def getStackPointer(): (String, Int) = {
+//    ("R31", stackPointer)
+//  }
+//
+//  def getFramePointer(): (String, Int) = {
+//    ("R29", framePointer)
+//  }
+//
+//  def getLinkRegister(): (String, Int) = {
+//    ("R30", linkRegister)
+//  }
+//
+//  def evaluateInstruction(instruction: String): Unit = {
+//    val instructionArr = instruction.split(" ")
+//    if (instruction.contains("sp")) {
+//      println("sp found")
+//    }
+//    instructionArr(0) match {
+//      case "stp" | "ldp" =>
+//        if (instructionArr.length == 4) {
+//          if (instruction.contains('!')) {
+//            // stp x0, x1, [sp, #-16]!
+//            //  0   1   2    3     4
+//            // get the -16 value
+//            val value: String = instruction.split(" ")(4).split("#")(1).split("]")(0)
+//            stackPointer = (stackPointer + stringToInt(value)).toByte
+//            framePointer = stackPointer
+//            linkRegister = (stackPointer + 8).toByte
+//          } else {
+//            // stp x0, x1, [sp], #-16
+//            //  0   1   2    3     4
+//            // get the -16 value
+//            val value: String = instruction.split(" ")(4).split("#")(1).split("]")(0)
+//            framePointer = stackPointer
+//            linkRegister = (stackPointer + 8).toByte
+//            stackPointer = (stackPointer + stringToInt(value)).toByte
+//          }
+//        }
+//        else {
+//          // stp x0, x1, [sp]
+//          //  0   1   2    3
+//          framePointer = stackPointer
+//          linkRegister = (stackPointer + 8).toByte
+//        }
+//
+//      case _ =>
+//        // do nothing
+//
+////
+////      case "ldp" =>
+////        // ldp x29, x30, [sp], #0x10
+////        //  0   1   2    3     4
+////        // get the 0x10 value
+////        val value: String = instruction.split(" ")(4).split("#")(0)
+////        stackPointer = stringToInt(value)
+////        framePointer = stackPointer
+////        linkRegister = stackPointer + 8
+//    }
+//  }
+//}

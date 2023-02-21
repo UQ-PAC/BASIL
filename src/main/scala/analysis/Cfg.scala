@@ -16,7 +16,9 @@ object CfgNode:
     id
 
 // EdgeType
-abstract class Edge(from: CfgNode, to: CfgNode)
+abstract class Edge(from: CfgNode, to: CfgNode):
+  def getFrom(): CfgNode = from
+  def getTo():CfgNode = to
 case class conditionalEdge(cond: Expr, from: CfgNode, to: CfgNode) extends Edge(from, to) {
   override def toString: String = s"conditionalEdge(cond: $cond, From: $from, To: $to)"
 }

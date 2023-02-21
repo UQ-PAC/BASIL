@@ -1,5 +1,6 @@
 package util
 import analysis._
+import analysis.util.SSA
 import cfg_visualiser.{OtherOutput, Output, OutputKindE}
 import astnodes._
 import boogie._
@@ -79,6 +80,13 @@ object RunUtils {
       pw.close()
     }
 
+    def dump_plot(content: String, name: String): Unit = {
+      val outFile = new File(s"${name}.dot")
+      val pw = new PrintWriter(outFile, "UTF-8")
+      pw.write(content)
+      pw.close()
+    }
+
 
 
     val externalNames = externalFunctions.map(e => e.name)
@@ -103,12 +111,27 @@ object RunUtils {
 
     dump_file(cfg.getEdges.toString(), "result")
 
+    print(s"\n****************  ${result.values}  *****************\n")
 
 
-
-//    val solver2 = new SteensgaardAnalysis(translator.program)
+//    val solver2 = new SteensgaardAnalysis(translator.program, result)
 //    val result2 = solver2.analyze()
 //    print(solver2.pointsTo())
+
+    val ssa = new SSA(cfg)
+    ssa.analyze()
+
+
+    val solver3 = new MemoryRegionAnalysis(translator.program)
+    val result3 = solver3.analyze()
+    print(solver3.solveMemory())
+    val stringBuilder: StringBuilder = new StringBuilder()
+    stringBuilder.append("digraph G {\n")
+    for ((k, v) <- solver3.solveMemory()) {
+      v.foreach(x => stringBuilder.append(s"\"${k}\" -> \"${x}\";\n"))
+    }
+    stringBuilder.append("}")
+    dump_plot(stringBuilder.toString(), "result")
 
 
 

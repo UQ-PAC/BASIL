@@ -7,6 +7,7 @@ import util.AssumptionViolationException
 /** Expression
   */
 trait Expr {
+  var ssa_id: Int = 0
   def toBoogie: BExpr
   def toGamma: BExpr = {
     val gammaVars: Set[BExpr] = gammas.map(_.toGamma)
@@ -29,6 +30,14 @@ trait Expr {
   def gammas: Set[Variable]
 
   def locals: Set[LocalVar]
+
+  def setSSA(num: Int): Unit = {
+    ssa_id = num
+  }
+
+  def getSSA(): Int = {
+    ssa_id
+  }
 }
 
 /** Concatenation of two bitvectors
