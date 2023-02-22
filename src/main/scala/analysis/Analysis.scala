@@ -413,6 +413,7 @@ case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
 class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
 
   val memoryTracker = new mutable.HashMap[Expr, Set[Expr]]()
+  val heapTracker = new mutable.HashMap[Expr, Set[Expr]]()
   val variableTracker = new mutable.HashMap[Expr, Set[Expr]]()
 
   /**
@@ -450,10 +451,19 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
 //        }
 
 
-        if (memoryTracker.contains(memAssign.rhs.index))
-          memoryTracker(memAssign.rhs.index) += memAssign.rhs.value
-        else
-          memoryTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
+        if (memAssign.rhs.memory.name == "stack") {
+          if (memoryTracker.contains(memAssign.rhs.index))
+            memoryTracker(memAssign.rhs.index) += memAssign.rhs.value
+          else
+            memoryTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
+        } else {
+            if (heapTracker.contains(memAssign.rhs.index))
+                heapTracker(memAssign.rhs.index) += memAssign.rhs.value
+            else
+                heapTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
+        }
+
+
 
 
 
@@ -510,6 +520,7 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
     val pointerPool: PointerPool = new PointerPool()
     print(s"Memory Tracker: \n${memoryTracker.mkString(",\n")}\n")
     print(s"Variable Tracker: \n${variableTracker.mkString(",\n")}\n")
+    print(s"Heap Tracker: \n${heapTracker.mkString(",\n")}\n")
 //    variableTracker.foreach { case (k, v) =>
 //      v.foreach(e =>
 //        if (e.locals.contains(LocalVar("R31", 64))) {
@@ -537,54 +548,85 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
 //      )
 //    }
 
+
+    heapTracker.foreach { case (k, v) =>
+      v.foreach(e =>
+        val heapPointer = pointerPool.extractPointer(k, "Heap")
+        // ptr -> ptr
+        if (e.locals.contains(LocalVar("R31", 64))) {
+          add_map(pointerTracker, heapPointer, pointerPool.extractPointer(e))
+        }
+        // ptr -> exp
+        else {
+          heapPointer.value = e
+        }
+      )
+    }
+
+
     variableTracker.foreach { case (k, v) =>
       v.foreach(e =>
         if (e.locals.contains(LocalVar("R31", 64))) {
           add_map(pointerTracker, k, pointerPool.extractPointer(e))
+        } else {
+//          print(s"e: $e\n")
+//          print(s"e type: ${e.getClass}\n")
+          if (e.isInstanceOf[MemAccess]) {
+            add_map(pointerTracker, k, pointerPool.extractPointer(e, "Heap"))
+          }
         }
       )
     }
 
     memoryTracker.foreach { case (k, v) =>
-      if (k.locals.contains(LocalVar("R31", 64))) {
-        val lhsPointer = pointerPool.extractPointer(k)
-        v.foreach(e =>
-          // ptr -> ptr
-          if (e.locals.contains(LocalVar("R31", 64))) {
-            //add_map(pointerTracker, lhsPointer, pointerPool.extractPointer(e))
-            lhsPointer.value = pointerPool.extractPointer(e)
-          }
+        if (k.locals.contains(LocalVar("R31", 64))) {
+          val lhsPointer = pointerPool.extractPointer(k)
+          v.foreach(e =>
+            // ptr -> ptr
+            if (e.locals.contains(LocalVar("R31", 64))) {
+              //add_map(pointerTracker, lhsPointer, pointerPool.extractPointer(e))
+              lhsPointer.value = pointerPool.extractPointer(e)
+            }
             // ptr -> exp
-          else {
-            //add_map(pointerTracker, lhsPointer, e)
-            lhsPointer.value = e
-          }
-        )
-      } else {
-        v.foreach(e =>
-          // exp -> ptr
-          if (e.locals.contains(LocalVar("R31", 64))) {
-            add_map(pointerTracker, k, pointerPool.extractPointer(e))
-          }
-          // exp -> exp (ignore, no pointer)
-//          else {
-//            add_map(pointerTracker, k, e)
-//          }
-        )
-      }
+            else {
+              //add_map(pointerTracker, lhsPointer, e)
+              lhsPointer.value = e
+            }
+          )
+        } else {
+          v.foreach(e =>
+            // exp -> ptr
+            if (e.locals.contains(LocalVar("R31", 64))) {
+              add_map(pointerTracker, k, pointerPool.extractPointer(e))
+            }
+            // exp -> exp (ignore, no pointer)
+            else {
+              //            if (pointerTracker.contains(k)) {
+              //              pointerTracker(k).asInstanceOf[Pointer].value = e
+              //            } else {
+              //              if (pointerTracker.contains(e)) {
+              //                pointerTracker(e).asInstanceOf[Pointer].value = k
+              //              }
+              //            }
+            }
+          )
+        }
     }
-
     pointerTracker
   }
 }
 
-class Pointer(allocation: (Expr, Expr), inVal: Expr = null) extends Expr {
+class Pointer(allocation: (Expr, Expr), ptrType: String = "Stack", inVal: Expr = null) extends Expr {
   var value: Expr = inVal
   var alloc: Expr = allocation._1
   var offset: Expr = allocation._2
+  val pointerType: String = ptrType
+  if (!pointerType.equals("Stack") && !pointerType.equals("Heap")) {
+    throw new Exception("Unknown pointer type")
+  }
 
   override def toString(): String = {
-    s"Pointer(Value: $value, [ptr: $alloc, Offset: $offset])"
+    s"${pointerType} Pointer(Value: $value, [ptr: $alloc, Offset: $offset])"
   }
 
   override def gammas: Set[Variable] = ???
@@ -598,13 +640,13 @@ class Pointer(allocation: (Expr, Expr), inVal: Expr = null) extends Expr {
   override def equals(obj: Any): Boolean = {
       obj match {
       case ptr: Pointer =>
-          ptr.alloc == alloc && ptr.offset == offset
+          ptr.alloc == alloc && ptr.offset == offset && ptr.pointerType == pointerType
       case _ => false
       }
   }
 
   override def hashCode(): Int = {
-      alloc.hashCode() + offset.hashCode()
+      alloc.hashCode() + offset.hashCode() + pointerType.hashCode()
   }
 }
 
@@ -622,22 +664,22 @@ class PointerPool {
 
 
 
-  def extractPointer(e: Expr): Pointer = {
+  def extractPointer(e: Expr, ptrType: String = "Stack"): Pointer = {
     e match {
       case binOp: BinOp =>
-        get(new Pointer((binOp.lhs, binOp.rhs)))
+        get(new Pointer((binOp.lhs, binOp.rhs), ptrType))
       case memAccess: MemAccess =>
         memAccess.index match {
           case binOp: BinOp =>
-            get(new Pointer((binOp.lhs, binOp.rhs)))
+            get(new Pointer((binOp.lhs, binOp.rhs), ptrType))
           case localVar: LocalVar =>
-            get(new Pointer((localVar, null)))
+            get(new Pointer((localVar, null), ptrType))
           case _ =>
             print(s"inner type: ${memAccess.index.getClass} ${memAccess.index}\n")
             throw new Exception("Unknown type")
         }
       case localVar: LocalVar =>
-        get(new Pointer((localVar, null)))
+        get(new Pointer((localVar, null), ptrType))
       case unsignedExtend: UnsignedExtend =>
         extractPointer(unsignedExtend.body)
       case _ =>
