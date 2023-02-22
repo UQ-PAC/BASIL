@@ -406,13 +406,15 @@ case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
 }
 
 /**
- * Steensgaard-style pointer analysis.
- * The analysis associates an [[StTerm]] with each variable declaration and expression node in the AST.
- * It is implemented using [[tip.solvers.UnionFindSolver]].
+ * Memory region analysis.
+ * This algorithm splits the memory into two regions: the heap and the stack. The variables are tracked for localAssign
+ * operations.
+ *
+ * @param program the program to analyze
  */
 class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
 
-  val memoryTracker = new mutable.HashMap[Expr, Set[Expr]]()
+  val stackTracker = new mutable.HashMap[Expr, Set[Expr]]()
   val heapTracker = new mutable.HashMap[Expr, Set[Expr]]()
   val variableTracker = new mutable.HashMap[Expr, Set[Expr]]()
 
@@ -438,54 +440,25 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
   def visit(node: Object, arg: Unit): Unit = {
     node match {
       case memAssign: MemAssign =>
-//        if (variableTracker.contains(memAssign.rhs.value)) {
-//          if (memoryTracker.contains(memAssign.rhs.index))
-//            memoryTracker(memAssign.rhs.index) += variableTracker.get(memAssign.rhs.value)
-//          else
-//            memoryTracker(memAssign.rhs.index) = variableTracker.getOrElse(memAssign.rhs.value, Set())
-//        } else {
-//          if (memoryTracker.contains(memAssign.rhs.index))
-//            memoryTracker(memAssign.rhs.index) += memAssign.rhs.value
-//          else
-//            memoryTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
-//        }
-
-
+        // if the memory is acting on a stack operation, then we need to track the stack
         if (memAssign.rhs.memory.name == "stack") {
-          if (memoryTracker.contains(memAssign.rhs.index))
-            memoryTracker(memAssign.rhs.index) += memAssign.rhs.value
+          if (stackTracker.contains(memAssign.rhs.index))
+            stackTracker(memAssign.rhs.index) += memAssign.rhs.value
           else
-            memoryTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
+            stackTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
+        // the memory is not stack so it must be heap
         } else {
             if (heapTracker.contains(memAssign.rhs.index))
                 heapTracker(memAssign.rhs.index) += memAssign.rhs.value
             else
                 heapTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
         }
-
-
-
-
-
+      // local assign is just lhs assigned to rhs
       case localAssign: LocalAssign =>
-//        if (memoryTracker.contains(localAssign.rhs)) {
-//          if (variableTracker.contains(localAssign.lhs))
-//            variableTracker(localAssign.lhs) += memoryTracker.get(localAssign.rhs)
-//          else
-//            variableTracker(localAssign.lhs) = memoryTracker.getOrElse(localAssign.rhs, Set())
-//        } else {
-//          if (variableTracker.contains(localAssign.lhs))
-//            variableTracker(localAssign.lhs) += localAssign.rhs
-//          else
-//            variableTracker(localAssign.lhs) = Set(localAssign.rhs)
-//        }
-
-
         if (variableTracker.contains(localAssign.lhs))
           variableTracker(localAssign.lhs) += localAssign.rhs
         else
           variableTracker(localAssign.lhs) = Set(localAssign.rhs)
-
 
       case _ => // ignore other kinds of nodes
     }
@@ -504,11 +477,17 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
         block.statements.foreach(visit(_, ()))
 
       case _ => // ignore other kinds of nodes
-
     }
   }
 
   def solveMemory(): mutable.Map[Expr, Set[Expr]] = {
+
+    /**
+     * Captures an Expr to Pointer relationship in the map. Ensures set is created if it does not exist.
+     * @param map the map to add to
+     * @param register the register (ie. R1)
+     * @param ptr the pointer to add (ie. stack[R31 + 0x8])
+     */
     def add_map(map: mutable.Map[Expr, Set[Expr]], register: Expr, ptr: Expr): Unit = {
       if (map.contains(register))
         map(register) += ptr
@@ -518,36 +497,9 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
 
     val pointerTracker: mutable.Map[Expr, Set[Expr]] = mutable.Map[Expr, Set[Expr]]()
     val pointerPool: PointerPool = new PointerPool()
-    print(s"Memory Tracker: \n${memoryTracker.mkString(",\n")}\n")
+    print(s"Stack Tracker: \n${stackTracker.mkString(",\n")}\n")
     print(s"Variable Tracker: \n${variableTracker.mkString(",\n")}\n")
     print(s"Heap Tracker: \n${heapTracker.mkString(",\n")}\n")
-//    variableTracker.foreach { case (k, v) =>
-//      v.foreach(e =>
-//        if (e.locals.contains(LocalVar("R31", 64))) {
-//          e match {
-//            case binOp: BinOp =>
-//              add_map(pointerTracker, k, pointerPool.get(new Pointer((binOp.lhs, binOp.rhs))))
-//            case memAccess: MemAccess =>
-//              memAccess.index match {
-//                case binOp: BinOp =>
-//                  add_map(pointerTracker, k, pointerPool.get(new Pointer((binOp.lhs, binOp.rhs))))
-//                case localVar: LocalVar =>
-//                  add_map(pointerTracker, k, pointerPool.get(new Pointer((localVar, null))))
-//                case _ =>
-//                  print(s"inner type: ${memAccess.index.getClass} ${memAccess.index}\n")
-//                  throw new Exception("Unknown type")
-//              }
-//            case localVar: LocalVar =>
-//              add_map(pointerTracker, k, pointerPool.get(new Pointer((localVar, null))))
-//            case _ =>
-//              add_map(pointerTracker, k, pointerPool.get(new Pointer((e, e))))
-//              print(s"type: ${e.getClass} $e\n")
-//              throw new Exception("Unknown type")
-//          }
-//        }
-//      )
-//    }
-
 
     heapTracker.foreach { case (k, v) =>
       v.foreach(e =>
@@ -563,7 +515,6 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
       )
     }
 
-
     variableTracker.foreach { case (k, v) =>
       v.foreach(e =>
         if (e.locals.contains(LocalVar("R31", 64))) {
@@ -578,18 +529,16 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
       )
     }
 
-    memoryTracker.foreach { case (k, v) =>
+    stackTracker.foreach { case (k, v) =>
         if (k.locals.contains(LocalVar("R31", 64))) {
           val lhsPointer = pointerPool.extractPointer(k)
           v.foreach(e =>
             // ptr -> ptr
             if (e.locals.contains(LocalVar("R31", 64))) {
-              //add_map(pointerTracker, lhsPointer, pointerPool.extractPointer(e))
               lhsPointer.value = pointerPool.extractPointer(e)
             }
             // ptr -> exp
             else {
-              //add_map(pointerTracker, lhsPointer, e)
               lhsPointer.value = e
             }
           )
@@ -601,13 +550,13 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
             }
             // exp -> exp (ignore, no pointer)
             else {
-              //            if (pointerTracker.contains(k)) {
-              //              pointerTracker(k).asInstanceOf[Pointer].value = e
-              //            } else {
-              //              if (pointerTracker.contains(e)) {
-              //                pointerTracker(e).asInstanceOf[Pointer].value = k
-              //              }
-              //            }
+//                if (pointerTracker.contains(k)) {
+//                  pointerTracker(k).asInstanceOf[Pointer].value = e
+//                } else {
+//                  if (pointerTracker.contains(e)) {
+//                    pointerTracker(e).asInstanceOf[Pointer].value = k
+//                  }
+//                }
             }
           )
         }
@@ -661,8 +610,6 @@ class PointerPool {
       ptr
     }
   }
-
-
 
   def extractPointer(e: Expr, ptrType: String = "Stack"): Pointer = {
     e match {
