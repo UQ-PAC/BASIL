@@ -522,7 +522,8 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
         } else {
 //          print(s"e: $e\n")
 //          print(s"e type: ${e.getClass}\n")
-          if (e.isInstanceOf[MemAccess]) {
+
+          if (e.toString.contains("mem")) {
             add_map(pointerTracker, k, pointerPool.extractPointer(e, "Heap"))
           }
         }
@@ -561,6 +562,7 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
           )
         }
     }
+    print(s"Pointers: \n${pointerPool.pointers.mkString(",\n")}\n")
     pointerTracker
   }
 }
