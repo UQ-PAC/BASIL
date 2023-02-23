@@ -1,6 +1,6 @@
 package analysis
 
-import astnodes._
+import bap._
 import analysis.util._
 
 /** Basic lattice
@@ -31,7 +31,7 @@ trait Lattice:
   */
 trait LatticeWithOps extends Lattice:
 
-  def literal(l: Literal): Element
+  def literal(l: BAPLiteral): Element
   def plus(a: Element, b: Element): Element
   def minus(a: Element, b: Element): Element
   def times(a: Element, b: Element): Element
@@ -103,21 +103,21 @@ class MapLattice[A, +L <: Lattice](val sublattice: L) extends Lattice:
 
 /** Constant propagation lattice.
   */
-object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWithOps:
+object ConstantPropagationLattice extends FlatLattice[BAPLiteral]() with LatticeWithOps:
 
-  private def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element = (a, b) match
+  private def apply(op: (BAPLiteral, BAPLiteral) => BAPLiteral, a: Element, b: Element): Element = (a, b) match
     case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => FlatElement.FlatEl(op(x, y))
     case (FlatElement.Bot, _)                           => FlatElement.Bot
     case (_, FlatElement.Bot)                           => FlatElement.Bot
     case (_, FlatElement.Top)                           => FlatElement.Top
     case (FlatElement.Top, _)                           => FlatElement.Top
 
-  private def apply(op: (Literal) => Literal, a: Element): Element = a match
+  private def apply(op: (BAPLiteral) => BAPLiteral, a: Element): Element = a match
     case FlatElement.FlatEl(x) => FlatElement.FlatEl(op(x))
     case FlatElement.Top       => FlatElement.Top
     case FlatElement.Bot       => FlatElement.Bot
 
-  override def literal(l: Literal): Element = FlatElement.FlatEl(l)
+  override def literal(l: BAPLiteral): Element = FlatElement.FlatEl(l)
   override def plus(a: Element, b: Element): Element = apply(bvadd, a, b)
   override def minus(a: Element, b: Element): Element = apply(bvsub, a, b)
   override def times(a: Element, b: Element): Element = apply(bvmul, a, b)
@@ -139,7 +139,7 @@ object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWit
   override def le(a: Element, b: Element): Element = apply(bvule, a, b)
   override def slt(a: Element, b: Element): Element = apply(bvslt, a, b)
   override def sle(a: Element, b: Element): Element = apply(bvsle, a, b)
-  override def signed(width: Int, a: Element): Element = apply(zero_extend(width, _: Literal), a)
-  override def unsigned(width: Int, a: Element): Element = apply(sign_extend(width, _: Literal), a)
-  override def extract(high: Int, low: Int, a: Element): Element = apply(extract(high, low, _: Literal), a)
+  override def signed(width: Int, a: Element): Element = apply(zero_extend(width, _: BAPLiteral), a)
+  override def unsigned(width: Int, a: Element): Element = apply(sign_extend(width, _: BAPLiteral), a)
+  override def extract(high: Int, low: Int, a: Element): Element = apply(extract(high, low, _: BAPLiteral), a)
   override def concat(a: Element, b: Element): Element = apply(concat, a, b)

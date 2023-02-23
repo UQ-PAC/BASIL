@@ -1,6 +1,6 @@
 package analysis
 
-import astnodes._
+import bap._
 import analysis.solvers._
 
 /** Trait for program analyses.
@@ -31,24 +31,24 @@ trait ValueAnalysisMisc:
 
   /** Set of declared variables, used by `statelattice`.
     */
-  val declaredVars: Set[LocalVar] = cfg.prog.functions.flatMap(_.blocks).flatMap(_.locals).toSet
+  //val declaredVars: Set[BAPLocalVar] = cfg.prog.subroutines.flatMap(_.blocks).flatMap(_.locals).toSet
 
   /** The lattice of abstract states.
     */
-  val statelattice: MapLattice[LocalVar, valuelattice.type] = new MapLattice(valuelattice)
+  val statelattice: MapLattice[BAPLocalVar, valuelattice.type] = new MapLattice(valuelattice)
 
   /** Default implementation of eval.
     */
-  def eval(exp: Expr, env: statelattice.Element): valuelattice.Element =
+  def eval(exp: BAPExpr, env: statelattice.Element): valuelattice.Element =
     import valuelattice._
     exp match
-      case id: LocalVar        => env(id)
-      case n: Literal          => literal(n)
-      case use: UnsignedExtend => unsigned(use.width, eval(use.body, env))
-      case se: SignedExtend => signed(se.width, eval(se.body, env))
-      case e: Extract          => extract(e.high, e.low, eval(e.body, env))
-      case c: Concat => concat(eval(c.left, env), eval(c.right, env))
-      case bin: BinOp =>
+      case id: BAPLocalVar        => env(id)
+      case n: BAPLiteral          => literal(n)
+      case use: BAPUnsignedExtend => unsigned(use.width, eval(use.body, env))
+      case se: BAPSignedExtend => signed(se.width, eval(se.body, env))
+      case e: BAPExtract          => extract(e.high, e.low, eval(e.body, env))
+      case c: BAPConcat => concat(eval(c.left, env), eval(c.right, env))
+      case bin: BAPBinOp =>
         val left = eval(bin.lhs, env)
         val right = eval(bin.rhs, env)
 
@@ -74,7 +74,7 @@ trait ValueAnalysisMisc:
           case SLE     => sle(left, right)
           //case _      => valuelattice.top
 
-      case un: UnOp =>
+      case un: BAPUnOp =>
         val arg = eval(un.exp, env)
 
         un.operator match
@@ -91,7 +91,7 @@ trait ValueAnalysisMisc:
         r.data match
           // assignments
           // changed the class comparison to the actual class because of removal of case class (no unapply function needed for below now)
-          case la: LocalAssign => s + (la.lhs -> eval(la.rhs, s))
+          case la: BAPLocalAssign => s + (la.lhs -> eval(la.rhs, s))
 
           // all others: like no-ops
           case _ => s

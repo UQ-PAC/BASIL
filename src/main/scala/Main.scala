@@ -1,6 +1,6 @@
 // package scala
 
-import astnodes._
+import bap._
 import boogie._
 import translating._
 import util.RunUtils

@@ -3,6 +3,7 @@ package translating
 import BilParser.SpecificationsParser._
 import boogie._
 import specification._
+import ir._
 
 import scala.jdk.CollectionConverters._
 
@@ -134,11 +135,11 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
     IfThenElse(visitExpr(ctx.guard), visitExpr(ctx.thenExpr), visitExpr(ctx.elseExpr))
   }
 
-  def visitNat(ctx: NatContext): IntLiteral = IntLiteral(BigInt(ctx.getText))
+  def visitNat(ctx: NatContext): IntBLiteral = IntBLiteral(BigInt(ctx.getText))
 
-  def visitBoolLit(ctx: BoolLitContext): BoolLit = ctx.getText match {
-    case "true" => TrueLiteral
-    case "false" => FalseLiteral
+  def visitBoolLit(ctx: BoolLitContext): BoolBLiteral = ctx.getText match {
+    case "true" => TrueBLiteral
+    case "false" => FalseBLiteral
   }
 
   def visitGammaId(ctx: GammaIdContext): SpecGamma = {

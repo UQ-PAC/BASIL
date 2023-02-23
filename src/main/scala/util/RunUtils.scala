@@ -1,5 +1,5 @@
 package util
-import astnodes._
+import bap._
 import boogie._
 import specification._
 import BilParser._
@@ -58,16 +58,17 @@ object RunUtils {
 
     val externalNames = externalFunctions.map(e => e.name)
 
-    val translator = BoogieTranslator(program, specification)
-    translator.stripUnreachableFunctions(externalNames)
+    val IRTranslator = BAPToIR(program)
+    val IRProgram = IRTranslator.translate
+
+    val boogieTranslator = IRToBoogie(IRProgram, specification)
+    boogieTranslator.stripUnreachableFunctions(externalNames)
 
     // does not work properly
     //val cfg = IntraproceduralProgramCfg.generateFromProgram(translatorUnusedRemoved.program)
     //val result = new ConstantPropagationAnalysis.WorklistSolver(cfg).analyze()
 
-
-
-    translator.translate
+    boogieTranslator.translate
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {

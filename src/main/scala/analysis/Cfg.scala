@@ -1,7 +1,7 @@
 package analysis
 import scala.collection.mutable
 
-import astnodes._
+import bap._
 
 object CfgNode:
 
@@ -49,8 +49,8 @@ case class CfgFunctionEntryNode(
     override val id: Int = CfgNode.nextId(),
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-    data: Subroutine
-) extends CfgNodeWithData[Subroutine]
+    data: BAPSubroutine
+) extends CfgNodeWithData[BAPSubroutine]
 
 /** Control-flow graph node for the exit of a function.
   */
@@ -58,8 +58,8 @@ case class CfgFunctionExitNode(
     override val id: Int = CfgNode.nextId(),
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-    data: Subroutine
-) extends CfgNodeWithData[Subroutine]
+    data: BAPSubroutine
+) extends CfgNodeWithData[BAPSubroutine]
 
 /** Control-flow graph node for a block.
   */
@@ -67,8 +67,8 @@ case class CfgBlockEntryNode(
     override val id: Int = CfgNode.nextId(),
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-    data: Block
-) extends CfgNodeWithData[Block]
+    data: BAPBlock
+) extends CfgNodeWithData[BAPBlock]
 
 /** Control-flow graph node for a block.
   */
@@ -76,8 +76,8 @@ case class CfgBlockExitNode(
     override val id: Int = CfgNode.nextId(),
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-    data: Block
-) extends CfgNodeWithData[Block]
+    data: BAPBlock
+) extends CfgNodeWithData[BAPBlock]
 
 /** Control-flow graph node for a statement.
   */
@@ -85,8 +85,8 @@ case class CfgStatementNode(
     override val id: Int = CfgNode.nextId(),
     override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
     override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-    data: Statement
-) extends CfgNodeWithData[Statement]
+    data: BAPStatement
+) extends CfgNodeWithData[BAPStatement]
 
 /** A control-flow graph.
   * @param entry
@@ -142,12 +142,12 @@ object Cfg:
 
   /** Generate the cfg for each function of the program.
     */
-  def generateCfgProgram(program: Program): Map[Subroutine, Cfg] =
-    program.functions.map(f => f -> generateCfgFunc(f)).toMap
+  def generateCfgProgram(program: BAPProgram): Map[BAPSubroutine, Cfg] =
+    program.subroutines.map(f => f -> generateCfgFunc(f)).toMap
 
   /** Generate the cfg for a function.
     */
-  def generateCfgFunc(func: Subroutine): Cfg =
+  def generateCfgFunc(func: BAPSubroutine): Cfg =
     val entryNode = CfgFunctionEntryNode(data = func)
     val exitNode = CfgFunctionExitNode(data = func)
 
@@ -156,7 +156,7 @@ object Cfg:
     val cfgs = mutable.Map[String, Cfg]()
 
     // generate cfg for a statement
-    def generateCfgStatement(stmt: Statement): Cfg =
+    def generateCfgStatement(stmt: BAPStatement): Cfg =
       val node = CfgStatementNode(data = stmt)
 
       // TODO: commented out the GoTo case because it is not supported yet and it was causing an error when the ast was
@@ -198,16 +198,16 @@ object Cfg:
   *   map from AST function declarations to CFG function exit nodes
   */
 abstract class ProgramCfg(
-                           val prog: Program,
-                           val funEntries: Map[Subroutine, CfgFunctionEntryNode],
-                           val funExits: Map[Subroutine, CfgFunctionExitNode]
+                           val prog: BAPProgram,
+                           val funEntries: Map[BAPSubroutine, CfgFunctionEntryNode],
+                           val funExits: Map[BAPSubroutine, CfgFunctionExitNode]
 ) extends Cfg(funEntries.values.toSet, funExits.values.toSet)
 
 object IntraproceduralProgramCfg:
 
   /** Generates an [[IntraproceduralProgramCfg]] from a program.
     */
-  def generateFromProgram(prog: Program): IntraproceduralProgramCfg =
+  def generateFromProgram(prog: BAPProgram): IntraproceduralProgramCfg =
     val funGraphs = Cfg.generateCfgProgram(prog)
     val allEntries = funGraphs.view.mapValues(cfg => cfg.entries.head.asInstanceOf[CfgFunctionEntryNode]).toMap
     val allExits = funGraphs.view.mapValues(cfg => cfg.exits.head.asInstanceOf[CfgFunctionExitNode]).toMap
@@ -218,7 +218,7 @@ object IntraproceduralProgramCfg:
   * nodes.
   */
 class IntraproceduralProgramCfg(
-                                 prog: Program,
-                                 funEntries: Map[Subroutine, CfgFunctionEntryNode],
-                                 funExits: Map[Subroutine, CfgFunctionExitNode]
+                                 prog: BAPProgram,
+                                 funEntries: Map[BAPSubroutine, CfgFunctionEntryNode],
+                                 funExits: Map[BAPSubroutine, CfgFunctionExitNode]
 ) extends ProgramCfg(prog, funEntries, funExits)

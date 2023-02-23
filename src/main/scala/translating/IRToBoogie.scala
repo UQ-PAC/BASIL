@@ -1,12 +1,11 @@
 package translating
 
-import astnodes._
 import boogie._
 import specification._
+import ir._
+import scala.collection.mutable.ArrayBuffer
 
-import scala.language.postfixOps
-
-class BoogieTranslator(var program: Program, var spec: Specification) {
+class IRToBoogie(var program: Program, var spec: Specification) {
   private val globals = spec.globals
   private val controls = spec.controls
   private val controlled = spec.controlled
@@ -18,22 +17,20 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
   private val LPreds = spec.LPreds.map((k, v) => k -> v.resolveSpecL)
   private val requires = spec.subroutines.map(s => s.name -> s.requires.map(e => e.resolveSpec)).toMap
   private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(e => e.resolveSpec)).toMap
-  //private val gammaInits = spec.gammaInits.map((k, v) => BinaryBExpr(BVEQ, SpecGamma(k).resolveSpec, v))
-  //private val inits = spec.inits.map((k, v) => BinaryBExpr(BVEQ, k.resolveSpec, BitVecLiteral(v.value, k.size)))
 
   def translate: BProgram = {
-    val procedures = program.functions.map(f => translate(f, requires, ensures))
+    val procedures = program.procedures.map(f => translateProcedure(f, requires, ensures))
     // TODO remove this once proper analysis for modifies is done
-    val defaultGlobals = List(BVarDecl(MapVar("mem", MapType(BitVec(64), BitVec(8)), Scope.Global)),
-      BVarDecl(MapVar("Gamma_mem", MapType(BitVec(64), BoolType), Scope.Global)),
-      BVarDecl(MapVar("stack", MapType(BitVec(64), BitVec(8)), Scope.Global)),
-      BVarDecl(MapVar("Gamma_stack", MapType(BitVec(64), BoolType), Scope.Global))
+    val defaultGlobals = List(BVarDecl(BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)),
+      BVarDecl(BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)),
+      BVarDecl(BMapVar("stack", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)),
+      BVarDecl(BMapVar("Gamma_stack", MapBType(BitVecBType(64), BoolBType), Scope.Global))
     )
-    val globalDecls = (procedures.flatMap(p => p.globals).map(b => BVarDecl(b)) ++ defaultGlobals).distinct.sorted
+    val globalDecls = (procedures.flatMap(p => p.globals).map(b => BVarDecl(b)) ++ defaultGlobals).distinct.sorted.toList
 
     val globalConsts: List[BConstAxiomPair] = globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar), g.toAxiom)).toList.sorted
 
-    val functionsUsed1: List[BFunction] = procedures.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted
+    val functionsUsed1: List[BFunction] = procedures.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted.toList
 
     val rgProcs = genRely(relies) :+ BProcedure("guarantee_reflexive", List(), List(), List(), List(), Seq(), guaranteesReflexive.map(g => Assert(g)))
 
@@ -46,15 +43,15 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
   }
 
   def genRely(relies: List[BExpr]): List[BProcedure] = {
-    val mem = MapVar("mem", MapType(BitVec(64), BitVec(8)), Scope.Global)
-    val Gamma_mem = MapVar("Gamma_mem", MapType(BitVec(64), BoolType), Scope.Global)
+    val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+    val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
     val reliesUsed = if (relies.nonEmpty) {
       relies
     } else {
       // default case where no rely is given - rely on no external changes
       List(BinaryBExpr(BVEQ, mem, Old(mem)), BinaryBExpr(BVEQ, Gamma_mem, Old(Gamma_mem)))
     }
-    val i = BVariable("i", BitVec(64), Scope.Local)
+    val i = BVariable("i", BitVecBType(64), Scope.Local)
     val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem, i), Old(MapAccess(mem, i))), BinaryBExpr(BVEQ, MapAccess(Gamma_mem, i), Old(MapAccess(Gamma_mem, i)))))
     val relyEnsures = List(rely2) ++ reliesUsed
     val relyProc = BProcedure("rely", List(), List(), relyEnsures, List(), Seq(mem, Gamma_mem), List())
@@ -66,20 +63,20 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
   def functionOpToDefinition(f: FunctionOp): BFunction = {
     f match {
       case b: BVFunctionOp => BFunction(b.name, b.bvbuiltin, b.in, b.out, None)
-      case m: MemoryLoad =>
-        val memVar = MapVar("memory", m.memory.getType, Scope.Parameter)
+      case m: BMemoryLoad =>
+        val memVar = BMapVar("memory", m.memory.getType, Scope.Parameter)
         val indexVar = BParam("index", m.memory.getType.param)
         val in = List(memVar, indexVar)
-        val out = BParam(BitVec(m.bits))
+        val out = BParam(BitVecBType(m.bits))
         val accesses: Seq[MapAccess] = for (i <- 0 until m.accesses) yield {
           if (i == 0) {
             MapAccess(memVar, indexVar)
           } else {
-            MapAccess(memVar, BinaryBExpr(BVADD, indexVar, BitVecLiteral(i, m.addressSize)))
+            MapAccess(memVar, BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, m.addressSize)))
           }
         }
         val accessesEndian = m.endian match {
-          case Endian.BigEndian    => accesses.reverse
+          case Endian.BigEndian => accesses.reverse
           case Endian.LittleEndian => accesses
         }
 
@@ -89,15 +86,15 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
 
         BFunction(m.fnName, "", in, out, Some(body))
       case g: GammaLoad =>
-        val gammaMapVar = MapVar("gammaMap", g.gammaMap.getType, Scope.Parameter)
+        val gammaMapVar = BMapVar("gammaMap", g.gammaMap.getType, Scope.Parameter)
         val indexVar = BParam("index", g.gammaMap.getType.param)
         val in = List(gammaMapVar, indexVar)
-        val out = BParam(BoolType)
+        val out = BParam(BoolBType)
         val accesses: Seq[MapAccess] = for (i <- 0 until g.accesses) yield {
           if (i == 0) {
             MapAccess(gammaMapVar, indexVar)
           } else {
-            MapAccess(gammaMapVar, BinaryBExpr(BVADD, indexVar, BitVecLiteral(i, g.addressSize)))
+            MapAccess(gammaMapVar, BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, g.addressSize)))
           }
         }
 
@@ -106,24 +103,24 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
         }
 
         BFunction(g.fnName, "", in, out, Some(body))
-      case m: MemoryStore =>
-        val memVar = MapVar("memory", m.memory.getType, Scope.Parameter)
+      case m: BMemoryStore =>
+        val memVar = BMapVar("memory", m.memory.getType, Scope.Parameter)
         val indexVar = BParam("index", m.memory.getType.param)
-        val valueVar = BParam("value", BitVec(m.bits))
+        val valueVar = BParam("value", BitVecBType(m.bits))
         val in = List(memVar, indexVar, valueVar)
         val out = BParam(m.memory.getType)
         val indices: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
           if (i == 0) {
             indexVar
           } else {
-            BinaryBExpr(BVADD, indexVar, BitVecLiteral(i, m.addressSize))
+            BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, m.addressSize))
           }
         }
         val values: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
           BVExtract((i + 1) * m.valueSize, i * m.valueSize, valueVar)
         }
         val valuesEndian = m.endian match {
-          case Endian.BigEndian    => values.reverse
+          case Endian.BigEndian => values.reverse
           case Endian.LittleEndian => values
         }
         val indiceValues = for (i <- 0 until m.accesses) yield {
@@ -136,9 +133,9 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
 
         BFunction(m.fnName, "", in, out, Some(body))
       case g: GammaStore =>
-        val gammaMapVar = MapVar("gammaMap", g.gammaMap.getType, Scope.Parameter)
+        val gammaMapVar = BMapVar("gammaMap", g.gammaMap.getType, Scope.Parameter)
         val indexVar = BParam("index", g.gammaMap.getType.param)
-        val valueVar = BParam("value", BoolType)
+        val valueVar = BParam("value", BoolBType)
         val in = List(gammaMapVar, indexVar, valueVar)
         val out = BParam(g.gammaMap.getType)
 
@@ -146,7 +143,7 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
           if (i == 0) {
             indexVar
           } else {
-            BinaryBExpr(BVADD, indexVar, BitVecLiteral(i, g.addressSize))
+            BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, g.addressSize))
           }
         }
         val values: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
@@ -164,28 +161,28 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
       case l: L =>
         val memoryVar = BParam("memory", l.memory.getType)
         val indexVar = BParam("index", l.index.getType)
-        val body: BExpr = LPreds.keys.foldLeft(FalseLiteral) {
+        val body: BExpr = LPreds.keys.foldLeft(FalseBLiteral) {
           (ite: BExpr, next: SpecGlobal) => {
             val guard = BinaryBExpr(BoolEQ, indexVar, next.toAddrVar)
             val LPred = LPreds(next)
-              /*if (controlled.contains(next)) {
-              FunctionCall(s"L_${next.name}", List(l.memory), BoolType)
-            } else {
-              LPreds(next)
-            } */
+            /*if (controlled.contains(next)) {
+            FunctionCall(s"L_${next.name}", List(l.memory), BoolType)
+          } else {
+            LPreds(next)
+          } */
             IfThenElse(guard, LPred, ite)
           }
         }
-        BFunction("L", "", List(memoryVar, indexVar), BParam(BoolType), Some(body))
+        BFunction("L", "", List(memoryVar, indexVar), BParam(BoolBType), Some(body))
     }
   }
 
-  def translate(f: Subroutine, requiresSpec: Map[String, List[BExpr]], ensuresSpec: Map[String, List[BExpr]]): BProcedure = {
-    val in = f.in.flatMap(i => i.toBoogie)
+  def translateProcedure(p: Procedure,  requiresSpec: Map[String, List[BExpr]], ensuresSpec: Map[String, List[BExpr]]): BProcedure = {
+    val in = p.in.flatMap(i => i.toBoogie)
 
-    var outRegisters: Set[LocalVar] = Set()
+    var outRegisters: Set[Variable] = Set()
 
-    val out = (for (o <- f.out) yield {
+    val out = (for (o <- p.out) yield {
       if (outRegisters.contains(o.value)) {
         List()
       } else {
@@ -195,40 +192,34 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
     }).flatten
 
     outRegisters = Set()
-    val returns = (for (o <- f.out) yield {
+    val returns = (for (o <- p.out) yield {
       if (outRegisters.contains(o.value)) {
         List()
       } else {
         outRegisters = outRegisters + o.value
         List(outParamToAssign(o))
       }
-    }).flatten
+    }).flatten.toList
 
-    val body = f.blocks.map(b => translate(b, returns))
+    val body = p.blocks.map(b => translateBlock(b, returns))
     val modifies = body.flatMap(b => b.modifies).toSet
 
-    /*
-    val requires: List[BExpr] = if (f.name == "main") {
-      gammaInits.toList ++ inits.toList
-    } else {
-      List()
-    }
-    */
-    val requires: List[BExpr] = requiresSpec.getOrElse(f.name, List())
-    val ensures: List[BExpr] = ensuresSpec.getOrElse(f.name, List())
+    val requires: List[BExpr] = requiresSpec.getOrElse(p.name, List())
+    val ensures: List[BExpr] = ensuresSpec.getOrElse(p.name, List())
+
     val inInits = if (body.isEmpty) {
       List()
     } else {
-      f.in.map(p => inParamToAssign(p))
+      p.in.map(i => inParamToAssign(i)).toList
     }
 
-    BProcedure(f.name, in, out, ensures, requires, modifies.toSeq.sorted, inInits ++ body)
+    BProcedure(p.name, in.toList, out.toList, ensures, requires, modifies.toSeq.sorted, inInits ++ body.toList)
   }
 
   private def outParamToAssign(p: Parameter): AssignCmd = {
-    val param = BParam(p.name, BitVec(p.size))
+    val param = BParam(p.name, BitVecBType(p.size))
     val register = p.value.toBoogie
-    val paramGamma = BParam(s"Gamma_${p.name}", BoolType)
+    val paramGamma = BParam(s"Gamma_${p.name}", BoolBType)
     val registerGamma = p.value.toGamma
     val assigned = if (p.size > p.value.size) {
       BVZeroExtend(p.size - p.value.size, register)
@@ -241,9 +232,9 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
   }
 
   private def inParamToAssign(p: Parameter): AssignCmd = {
-    val param = BParam(p.name, BitVec(p.size))
+    val param = BParam(p.name, BitVecBType(p.size))
     val register = p.value.toBoogie
-    val paramGamma = BParam(s"Gamma_${p.name}", BoolType)
+    val paramGamma = BParam(s"Gamma_${p.name}", BoolBType)
     val registerGamma = p.value.toGamma
     val assigned = if (p.size > p.value.size) {
       BVExtract(p.value.size, 0, param)
@@ -255,58 +246,58 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
     AssignCmd(List(register, registerGamma), List(assigned, paramGamma))
   }
 
-  def translate(b: Block, returns: List[BCmd]): BBlock = {
-    val cmds = b.statements.flatMap(s => translate(s, returns))
-    BBlock(b.label, cmds)
+  def translateBlock(b: Block, returns: List[BCmd]): BBlock = {
+    val cmds = b.statements.flatMap(s => translate(s)) ++ b.jumps.flatMap(j => translate(j, returns))
+    BBlock(b.label, cmds.toList)
   }
 
-  def translate(s: Statement, returns: List[BCmd]): List[BCmd] = s match {
+  def translate(j: Jump, returns: List[BCmd]): List[BCmd] = j match {
     case d: DirectCall =>
-      val functionHeader = program.getFunction(d.target) match {
-        case Some(s) => s
-        case None => throw new Exception("trying to call non-existent procedure " + d.target)
-      }
-      val call = coerceProcedureCall(d.target, functionHeader.in, functionHeader.out)
+      val call = coerceProcedureCall(d.target)
       val returnTarget = d.returnTarget match {
-        case Some(r) => List(GoToCmd(r))
-        case None => List(Assume(FalseLiteral))
+        case Some(r) => List(GoToCmd(r.label))
+        case None => List(Comment("no return target"), Assume(FalseBLiteral))
       }
       d.condition match {
-        case l: Literal if l.value > BigInt(0) =>
-          call ++ returnTarget
-        case _ =>
-          val guard = coerceToBool(d.condition.toBoogie)
-          val guardGamma = d.condition.toGamma
+        case Some(c) =>
+          val guard = c.toBoogie
+          val guardGamma = c.toGamma
           List(Assert(guardGamma), IfCmd(guard, call ++ returnTarget))
+        case None =>
+          call ++ returnTarget
       }
     case i: IndirectCall =>
       val returnTarget = i.returnTarget match {
-        case Some(r) => List(GoToCmd(r))
-        case None => List(Assume(FalseLiteral))
+        case Some(r) => List(GoToCmd(r.label))
+        case None => List(Comment("no return target"), Assume(FalseBLiteral))
       }
+      // TODO put this elsewhere
       val call = if (i.target.name == "R30") {
         returns :+ ReturnCmd
       } else {
-        List(Comment(s"TODO: call ${i.target.name}")) ++ returnTarget // TODO determine call target
+        List(Comment(s"TODO: call ${i.target.name}"), Assume(FalseBLiteral)) ++ returnTarget // TODO determine call target
       }
       i.condition match {
-        case l: Literal if l.value > BigInt(0) =>
-          call
-        case _ =>
-          val guard = coerceToBool(i.condition.toBoogie)
-          val guardGamma = i.condition.toGamma
-          List(Assert(guardGamma), IfCmd(guard, call))
+        case Some(c) =>
+          val guard = c.toBoogie
+          val guardGamma = c.toGamma
+          List(Assert(guardGamma), IfCmd(guard, call ++ returnTarget))
+        case None =>
+          call ++ returnTarget
       }
     case g: GoTo =>
       g.condition match {
-        case l: Literal if l.value > BigInt(0) =>
-          List(GoToCmd(g.target))
-        case _ =>
-          val guard = coerceToBool(g.condition.toBoogie)
-          val guardGamma = g.condition.toGamma
-          List(Assert(guardGamma), IfCmd(guard, List(GoToCmd(g.target))))
+        case Some(c) =>
+          val guard = c.toBoogie
+          val guardGamma = c.toGamma
+          List(Assert(guardGamma), IfCmd(guard, List(GoToCmd(g.target.label))))
+        case None =>
+          List(GoToCmd(g.target.label))
       }
-    case m: MemAssign =>
+  }
+
+  def translate(s: Statement): List[BCmd] = s match {
+    case m: MemoryAssign =>
       val lhs = m.lhs.toBoogie
       val rhs = m.rhs.toBoogie
       val lhsGamma = m.lhs.toGamma
@@ -317,7 +308,7 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
       } else {
         val rely = ProcedureCall("rely", List(), List(), List(rhs.memory, rhsGamma.gammaMap))
         val gammaValueCheck = Assert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.rhs.value.toGamma))
-        val oldAssigns = guaranteeOldVars.map(g => AssignCmd(g.toOldVar, MemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size)))
+        val oldAssigns = guaranteeOldVars.map(g => AssignCmd(g.toOldVar, BMemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size)))
         val oldGammaAssigns = controlled.map(g => AssignCmd(g.toOldGamma, BinaryBExpr(BoolOR, GammaLoad(lhsGamma, g.toAddrVar, g.size, g.size / m.lhs.valueSize), L(lhs, g.toAddrVar))))
         val secureUpdate = for (c <- controls.keys) yield {
           val addrCheck = BinaryBExpr(BVEQ, rhs.index, c.toAddrVar)
@@ -338,9 +329,9 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
       val lhsGamma = l.lhs.toGamma
       val rhsGamma = l.rhs.toGamma
       val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
-      val loads = rhs.functionOps.collect { case m: MemoryLoad => m}
+      val loads = rhs.functionOps.collect { case m: BMemoryLoad => m }
       if (loads.nonEmpty) {
-        val gammas = rhsGamma.functionOps.collect { case g: GammaLoad => g.gammaMap}.toSeq.sorted
+        val gammas = rhsGamma.functionOps.collect { case g: GammaLoad => g.gammaMap }.toSeq.sorted
         val memories = loads.map(m => m.memory).toSeq.sorted
         List(ProcedureCall("rely", Seq(), Seq(), memories ++ gammas), assign)
       } else {
@@ -349,8 +340,8 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
 
   }
 
-  def coerceProcedureCall(target: String, in: List[Parameter], out: List[Parameter]): List[BCmd] = {
-    val params = for (i <- in) yield {
+  def coerceProcedureCall(target: Procedure): List[BCmd] = {
+    val params = for (i <- target.in) yield {
       val register = i.value.toBoogie
       val registerGamma = i.value.toGamma
       if (i.value.size > i.size) {
@@ -361,27 +352,26 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
         List(register, registerGamma)
       }
     }
-
-    var outUsedRegisters: Set[LocalVar] = Set()
+    var outUsedRegisters: Set[Variable] = Set()
     var outIndices: Set[Int] = Set()
-    for (o <- out.indices) {
-      if (!outUsedRegisters.contains(out(o).value)) {
+    for (o <- target.out.indices) {
+      if (!outUsedRegisters.contains(target.out(o).value)) {
         outIndices = outIndices + o
-        outUsedRegisters = outUsedRegisters + out(o).value
+        outUsedRegisters = outUsedRegisters + target.out(o).value
       }
     }
 
-    val outTemp = for (o <- out.indices) yield {
-      BVariable(s"#temp$o", BitVec(out(o).size), Scope.Local)
+    val outTemp = for (o <- target.out.indices) yield {
+      BVariable(s"#temp$o", BitVecBType(target.out(o).size), Scope.Local)
     }
-    val outTempGamma = for (o <- out.indices) yield {
-      BVariable(s"Gamma_#temp$o", BoolType, Scope.Local)
+    val outTempGamma = for (o <- target.out.indices) yield {
+      BVariable(s"Gamma_#temp$o", BoolBType, Scope.Local)
     }
-    val outRegisters = out.map(o => o.value.toBoogie)
-    val outRegisterGammas = out.map(o => o.value.toGamma)
-    val outAssigned = for (o <- out.indices if out(o).value.size != out(o).size && outIndices.contains(o)) yield {
-      val regSize = out(o).value.size
-      val paramSize = out(o).size
+    val outRegisters = target.out.map(o => o.value.toBoogie)
+    val outRegisterGammas = target.out.map(o => o.value.toGamma)
+    val outAssigned = for (o <- target.out.indices if target.out(o).value.size != target.out(o).size && outIndices.contains(o)) yield {
+      val regSize = target.out(o).value.size
+      val paramSize = target.out(o).size
       if (regSize > paramSize) {
         AssignCmd(List(outRegisters(o), outRegisterGammas(o)), List(BVZeroExtend(regSize - paramSize, outTemp(o)), outTempGamma(o)))
       } else {
@@ -389,24 +379,19 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
       }
     }
 
-    val returned = for (o <- out.indices if outIndices.contains(o)) yield {
-      if (out(o).value.size == out(o).size) {
+    val returned = for (o <- target.out.indices if outIndices.contains(o)) yield {
+      if (target.out(o).value.size == target.out(o).size) {
         List(outRegisters(o), outRegisterGammas(o))
       } else {
         List(outTemp(o), outTempGamma(o))
       }
     }
-    List(ProcedureCall(target, returned.flatten.toList, params.flatten, List())) ++ outAssigned
+    List(ProcedureCall(target.name, returned.flatten.toList, params.flatten.toList, List())) ++ outAssigned
   }
 
-  def coerceToBool(e: BExpr): BExpr = e.getType match {
-    case BoolType => e
-    case bv: BitVec => BinaryBExpr(BVNEQ, e, BitVecLiteral(0, bv.size))
-    case _ => ???
-  }
-
+  // TODO put this elsewhere
   def stripUnreachableFunctions(externalNames: Set[String]): Unit = {
-    val functionToChildren = program.functions.map(f => f.name -> f.calls).toMap
+    val functionToChildren = program.procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
     var next = "main"
     var reachableNames: Set[String] = Set("main")
@@ -424,10 +409,10 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
       }
     }
 
-    program.functions = program.functions.filter(f => reachableNames.contains(f.name))
-    for (f <- program.functions) {
+    program.procedures = program.procedures.filter(f => reachableNames.contains(f.name))
+    for (f <- program.procedures) {
       f match {
-        case f: Subroutine if externalNames.contains(f.name) => f.blocks = List()
+        case f: Procedure if externalNames.contains(f.name) => f.blocks = ArrayBuffer()
         case _ =>
       }
     }
@@ -438,4 +423,5 @@ class BoogieTranslator(var program: Program, var spec: Specification) {
   def avoidReserved(program: BProgram): BProgram = {
     program.replaceReserved(reserved)
   }
+
 }

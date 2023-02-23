@@ -1,7 +1,8 @@
 package translating
 
 import BilParser.BilAdtParser._
-import astnodes._
+import bap._
+import ir.Endian
 import util.AssumptionViolationException
 
 import scala.annotation.tailrec
@@ -9,15 +10,15 @@ import scala.jdk.CollectionConverters._
 
 object AdtStatementLoader {
 
-  def visitProject(ctx: ProjectContext): Program = visitProgram(ctx.program)
+  def visitProject(ctx: ProjectContext): BAPProgram = visitProgram(ctx.program)
 
-  def visitProgram(ctx: ProgramContext): Program = {
+  def visitProgram(ctx: ProgramContext): BAPProgram = {
     val functions = ctx.subs.sub.asScala.map(visitSub).toList
-    Program(functions)
+    BAPProgram(functions)
   }
 
   @tailrec
-  def visitExp(ctx: ExpContext): Expr = ctx match {
+  def visitExp(ctx: ExpContext): BAPExpr = ctx match {
     case e: ExpParenContext  => visitExp(e.exp)
     case e: LoadContext      => visitLoad(e)
     case e: BinOpContext     => visitBinOp(e)
@@ -29,12 +30,12 @@ object AdtStatementLoader {
     case e: ConcatContext    => visitConcat(e)
   }
 
-  def visitLoad(ctx: LoadContext): MemAccess = {
-    MemAccess.init(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitEndian(ctx.endian), parseInt(ctx.num))
+  def visitLoad(ctx: LoadContext): BAPMemAccess = {
+    BAPMemAccess.init(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitEndian(ctx.endian), parseInt(ctx.num))
   }
 
-  def visitStore(ctx: StoreContext): Store = {
-    Store.init(
+  def visitStore(ctx: StoreContext): BAPStore = {
+    BAPStore.init(
       visitMemVar(ctx.memVar),
       visitExp(ctx.idx),
       visitExp(ctx.value),
@@ -43,74 +44,74 @@ object AdtStatementLoader {
     )
   }
 
-  def visitBinOp(ctx: BinOpContext): BinOp = {
-    BinOp(BinOperator(ctx.op.getText), visitExp(ctx.lhs), visitExp(ctx.rhs))
+  def visitBinOp(ctx: BinOpContext): BAPBinOp = {
+    BAPBinOp(BAPBinOperator(ctx.op.getText), visitExp(ctx.lhs), visitExp(ctx.rhs))
   }
 
-  def visitUOp(ctx: UOpContext): UnOp = {
-    UnOp(UnOperator(ctx.op.getText), visitExp(ctx.exp))
+  def visitUOp(ctx: UOpContext): BAPUnOp = {
+    BAPUnOp(BAPUnOperator(ctx.op.getText), visitExp(ctx.exp))
   }
 
-  def visitImmVar(ctx: ImmVarContext): LocalVar = {
-    LocalVar(parseAllowed(visitQuoteString(ctx.name)), parseInt(ctx.size))
+  def visitImmVar(ctx: ImmVarContext): BAPLocalVar = {
+    BAPLocalVar(parseAllowed(visitQuoteString(ctx.name)), parseInt(ctx.size))
   }
 
-  def visitMemVar(ctx: MemVarContext): Memory = {
-    Memory(parseAllowed(visitQuoteString(ctx.name)), parseInt(ctx.addr_size), parseInt(ctx.value_size))
+  def visitMemVar(ctx: MemVarContext): BAPMemory = {
+    BAPMemory(parseAllowed(visitQuoteString(ctx.name)), parseInt(ctx.addr_size), parseInt(ctx.value_size))
   }
 
-  def visitExpInt(ctx: ExpIntContext): Literal = {
-    Literal(parseBigInt(ctx.value), parseInt(ctx.size))
+  def visitExpInt(ctx: ExpIntContext): BAPLiteral = {
+    BAPLiteral(parseBigInt(ctx.value), parseInt(ctx.size))
   }
 
-  def visitCast(ctx: CastContext): Expr = ctx.CAST.getText match {
-    case "UNSIGNED" => UnsignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
-    case "SIGNED"   => SignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
-    case "LOW"      => LowCast(parseInt(ctx.size), visitExp(ctx.exp))
-    case "HIGH"     => HighCast(parseInt(ctx.size), visitExp(ctx.exp))
+  def visitCast(ctx: CastContext): BAPExpr = ctx.CAST.getText match {
+    case "UNSIGNED" => BAPUnsignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
+    case "SIGNED"   => BAPSignedExtend(parseInt(ctx.size), visitExp(ctx.exp))
+    case "LOW"      => BAPLowCast(parseInt(ctx.size), visitExp(ctx.exp))
+    case "HIGH"     => BAPHighCast(parseInt(ctx.size), visitExp(ctx.exp))
   }
 
-  def visitExtract(ctx: ExtractContext): Extract = {
-    Extract(parseInt(ctx.hb), parseInt(ctx.lb), visitExp(ctx.exp))
+  def visitExtract(ctx: ExtractContext): BAPExtract = {
+    BAPExtract(parseInt(ctx.hb), parseInt(ctx.lb), visitExp(ctx.exp))
   }
 
-  def visitConcat(ctx: ConcatContext): Concat = {
-    Concat(visitExp(ctx.lhs), visitExp(ctx.rhs))
+  def visitConcat(ctx: ConcatContext): BAPConcat = {
+    BAPConcat(visitExp(ctx.lhs), visitExp(ctx.rhs))
   }
 
-  def visitJmp(ctx: JmpContext): Statement = ctx match {
+  def visitJmp(ctx: JmpContext): BAPJump = ctx match {
     case i: IndirectCallContext => visitIndirectCall(i)
     case d: DirectCallContext   => visitDirectCall(d)
     case g: GotoJmpContext      => visitGotoJmp(g)
   }
 
-  def visitIndirectCall(ctx: IndirectCallContext): IndirectCall = {
+  def visitIndirectCall(ctx: IndirectCallContext): BAPIndirectCall = {
     val returnTarget = Option(ctx.returnTarget) match {
       case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
       case None                   => None
     }
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    IndirectCall(visitImmVar(ctx.callee.immVar), visitExp(ctx.cond), returnTarget, line, insn)
+    BAPIndirectCall(visitImmVar(ctx.callee.immVar), visitExp(ctx.cond), returnTarget, line, insn)
   }
 
-  def visitDirectCall(ctx: DirectCallContext): DirectCall = {
+  def visitDirectCall(ctx: DirectCallContext): BAPDirectCall = {
     val returnTarget = Option(ctx.returnTarget) match {
       case Some(r: DirectContext) => Some(parseLabel(r.tid.name))
       case None                   => None
     }
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    DirectCall(parseAllowed(visitQuoteString(ctx.callee.tid.name).stripPrefix("@")), visitExp(ctx.cond), returnTarget, line, insn)
+    BAPDirectCall(parseAllowed(visitQuoteString(ctx.callee.tid.name).stripPrefix("@")), visitExp(ctx.cond), returnTarget, line, insn)
   }
 
-  def visitGotoJmp(ctx: GotoJmpContext): GoTo = {
+  def visitGotoJmp(ctx: GotoJmpContext): BAPGoTo = {
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    GoTo(parseLabel(ctx.target.tid.name), visitExp(ctx.cond), line, insn)
+    BAPGoTo(parseLabel(ctx.target.tid.name), visitExp(ctx.cond), line, insn)
   }
 
-  def visitArg(ctx: ArgContext): (Option[Parameter], Option[Parameter]) = {
+  def visitArg(ctx: ArgContext): (Option[BAPParameter], Option[BAPParameter]) = {
     val lhs = visitImmVar(ctx.lhs)
     val rhs = ctx.rhs match {
       case i: ImmOptContext => visitImmVar(i.immVar)
@@ -121,26 +122,26 @@ object AdtStatementLoader {
         }
     }
     ctx.intent.getText match {
-      case "In()"   => (Some(Parameter(lhs.name, lhs.size, rhs)), None)
-      case "Out()"  => (None, Some(Parameter(lhs.name, lhs.size, rhs)))
-      case "Both()" => (Some(Parameter(lhs.name, lhs.size, rhs)), Some(Parameter(lhs.name + "_out", lhs.size, rhs)))
+      case "In()"   => (Some(BAPParameter(lhs.name, lhs.size, rhs)), None)
+      case "Out()"  => (None, Some(BAPParameter(lhs.name, lhs.size, rhs)))
+      case "Both()" => (Some(BAPParameter(lhs.name, lhs.size, rhs)), Some(BAPParameter(lhs.name + "_out", lhs.size, rhs)))
       case _        => (None, None)
     }
   }
 
-  def visitSub(ctx: SubContext): Subroutine = {
+  def visitSub(ctx: SubContext): BAPSubroutine = {
     val inOut = ctx.args.arg.asScala.map { arg => visitArg(arg) }.unzip
     val in = inOut._1.flatten
     val out = inOut._2.flatten
     val alwaysIn = List(
-      Parameter("FP", 64, LocalVar("R29", 64)),
-      Parameter("LR", 64, LocalVar("R30", 64)),
-      Parameter("SP", 64, LocalVar("R31", 64))
+      BAPParameter("FP", 64, BAPLocalVar("R29", 64)),
+      BAPParameter("LR", 64, BAPLocalVar("R30", 64)),
+      BAPParameter("SP", 64, BAPLocalVar("R31", 64))
     )
     val alwaysOut = List(
-      Parameter("FP_out", 64, LocalVar("R29", 64)),
-      Parameter("LR_out", 64, LocalVar("R30", 64)),
-      Parameter("SP_out", 64, LocalVar("R31", 64))
+      BAPParameter("FP_out", 64, BAPLocalVar("R29", 64)),
+      BAPParameter("LR_out", 64, BAPLocalVar("R30", 64)),
+      BAPParameter("SP_out", 64, BAPLocalVar("R31", 64))
     )
 
     val address = parseFromAttrs(ctx.attrs, "address") match {
@@ -148,7 +149,7 @@ object AdtStatementLoader {
       case None            => -1
     }
 
-    Subroutine(
+    BAPSubroutine(
       parseAllowed(visitQuoteString(ctx.name)),
       address,
       ctx.blks.blk.asScala.map(visitBlk).toList,
@@ -157,9 +158,9 @@ object AdtStatementLoader {
     )
   }
 
-  def visitBlk(ctx: BlkContext): Block = {
-    val statements: List[Statement] = ctx.defs.assign.asScala.map(visitAssign).toList ++
-      ctx.jmps.jmp.asScala.map(visitJmp).toList
+  def visitBlk(ctx: BlkContext): BAPBlock = {
+    val statements: List[BAPStatement] = ctx.defs.assign.asScala.map(visitAssign).toList
+    val jumps: List[BAPJump] = ctx.jmps.jmp.asScala.map(visitJmp).toList
 
     /*
     // group by instruction
@@ -184,7 +185,7 @@ object AdtStatementLoader {
       case None            => None
     }
 
-    Block(label, address, statements)
+    BAPBlock(label, address, statements, jumps)
   }
 
   def visitEndian(ctx: EndianContext): Endian = ctx.ENDIAN.getText match {
@@ -192,21 +193,21 @@ object AdtStatementLoader {
     case "BigEndian"    => Endian.BigEndian
   }
 
-  def visitAssign(ctx: AssignContext): Statement = ctx match {
+  def visitAssign(ctx: AssignContext): BAPStatement = ctx match {
     case imm: ImmDefContext => visitImmDef(imm)
     case mem: MemDefContext => visitMemDef(mem)
   }
 
-  def visitImmDef(ctx: ImmDefContext): LocalAssign = {
+  def visitImmDef(ctx: ImmDefContext): BAPLocalAssign = {
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    LocalAssign(visitImmVar(ctx.lhs), visitExp(ctx.rhs), line, insn)
+    BAPLocalAssign(visitImmVar(ctx.lhs), visitExp(ctx.rhs), line, insn)
   }
 
-  def visitMemDef(ctx: MemDefContext): MemAssign = {
+  def visitMemDef(ctx: MemDefContext): BAPMemAssign = {
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    MemAssign.init(visitMemVar(ctx.lhs), visitStore(ctx.rhs), line, insn)
+    BAPMemAssign.init(visitMemVar(ctx.lhs), visitStore(ctx.rhs), line, insn)
   }
 
   def visitQuoteString(ctx: QuoteStringContext): String = ctx.getText.stripPrefix("\"").stripSuffix("\"")
