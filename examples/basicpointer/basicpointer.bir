@@ -309,15 +309,28 @@
 
 0000013d:
 0000013f: mem := mem with [R31 + 0x18, el]:u64 <- R0
+
+R0 is foo
+foo = &bar
 00000143: R0 := R31 + 0x18
+
+0x18: bar (pointer from malloc)
+0x20: foo (R31 + 0x18: pointer to bar)
+foo on the stack
 00000147: mem := mem with [R31 + 0x20, el]:u64 <- R0
+
+R0 is now foo = bar
 0000014b: R0 := mem[R31 + 0x18, el]:u64
 0000014f: mem := mem with [R31 + 0x20, el]:u64 <- R0
-00000153: R0 := mem[R31 + 0x18, el]:u64
+
+0x18: bar (pointer from malloc)
+0x20: foo = bar (pointer from malloc)
+
+00000153: R0 := mem[R31 + 0x18, el]:u64   // loading value of bar
 00000157: #39 := extract:31:0[R0]
 00000159: R1 := 0
 0000015b: R1 := R1 & 0xFFFFFFFF00000000 | pad:64[#39]
-0000015f: R0 := mem[R31 + 0x20, el]:u64
+0000015f: R0 := mem[R31 + 0x20, el]:u64    // loading value of foo
 00000163: mem := mem with [R0, el]:u32 <- low:32[extract:31:0[R1]]
 00000167: R0 := mem[R31 + 0x20, el]:u64
 0000016b: #41 := pad:64[mem[R0, el]:u32]

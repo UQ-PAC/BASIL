@@ -1,16 +1,18 @@
 package util
+import analysis._
+import analysis.util.SSA
+import cfg_visualiser.{OtherOutput, Output, OutputKindE}
 import bap._
 import boogie._
 import specification._
 import BilParser._
-import analysis.{ConstantPropagationAnalysis, ConstantPropagationLattice, IntraproceduralProgramCfg}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
+import java.io.{File, PrintWriter}
 
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
-
 object RunUtils {
 
   def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String]): BProgram = {
@@ -43,6 +45,20 @@ object RunUtils {
     //println(externalFunctions)
     //println(globals)
 
+//    val wcfg = IntraproceduralProgramCfg.generateFromProgram(program)
+//
+////    //print(wcfg.nodes)
+////    Output.output(OtherOutput(OutputKindE.cfg), wcfg.toDot({ x =>
+////      x.toString
+////    }, Output.dotIder))
+//
+//
+//    val an = ConstantPropagationAnalysis.WorklistSolver(wcfg)
+//    val res = an.analyze().asInstanceOf[Map[CfgNode, _]]
+//    print(res.keys)
+//    Output.output(OtherOutput(OutputKindE.cfg), an.cfg.toDot(Output.labeler(res, an.stateAfterNode), Output.dotIder))
+
+
     /*
     TODO analyses/transformations
     -type checking
@@ -56,6 +72,22 @@ object RunUtils {
     -instrument with gammas, vcs, rely, guarantee
      */
 
+    def dump_file(content: String, name: String): Unit = {
+      val outFile = new File(s"${name}.txt")
+      val pw = new PrintWriter(outFile, "UTF-8")
+      pw.write(content)
+      pw.close()
+    }
+
+    def dump_plot(content: String, name: String): Unit = {
+      val outFile = new File(s"${name}.dot")
+      val pw = new PrintWriter(outFile, "UTF-8")
+      pw.write(content)
+      pw.close()
+    }
+
+
+
     val externalNames = externalFunctions.map(e => e.name)
 
     val IRTranslator = BAPToIR(program)
@@ -64,9 +96,45 @@ object RunUtils {
     val boogieTranslator = IRToBoogie(IRProgram, specification)
     boogieTranslator.stripUnreachableFunctions(externalNames)
 
-    // does not work properly
-    //val cfg = IntraproceduralProgramCfg.generateFromProgram(translatorUnusedRemoved.program)
-    //val result = new ConstantPropagationAnalysis.WorklistSolver(cfg).analyze()
+    // does not work properly (old comment)
+    // run using sbt shell and:
+    // run ./examples/secret_write/secret_write.adt ./examples/secret_write/secret_write.relf
+    // run ./examples/basicpointer/basicpointer.adt ./examples/basicpointer/basicpointer.relf
+
+    val cfg = IntraproceduralProgramCfg.generateFromProgram(translator.program)
+
+
+//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
+//      x.toString
+//    }, Output.dotIder))
+    val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
+    val result = solver.analyze()
+    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder))
+
+    dump_file(cfg.getEdges.toString(), "result")
+
+    print(s"\n****************  ${result.values}  *****************\n")
+
+
+//    val solver2 = new SteensgaardAnalysis(translator.program, result)
+//    val result2 = solver2.analyze()
+//    print(solver2.pointsTo())
+
+    val ssa = new SSA(cfg)
+    ssa.analyze()
+
+
+    val solver3 = new MemoryRegionAnalysis(translator.program)
+    val result3 = solver3.analyze()
+    print(solver3.solveMemory())
+    val stringBuilder: StringBuilder = new StringBuilder()
+    stringBuilder.append("digraph G {\n")
+    for ((k, v) <- solver3.solveMemory()) {
+      v.foreach(x => stringBuilder.append(s"\"${k}\" -> \"${x}\";\n"))
+    }
+    stringBuilder.append("}")
+    dump_plot(stringBuilder.toString(), "result")
+
 
     boogieTranslator.translate
   }
