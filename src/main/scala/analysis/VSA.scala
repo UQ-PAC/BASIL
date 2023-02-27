@@ -1,8 +1,8 @@
 package analysis
 
-import astnodes.*
-import analysis.*
-import analysis.solvers.*
+import ir._
+import analysis._
+import analysis.solvers._
 
 class VSA {
 
@@ -23,7 +23,7 @@ abstract class ValueSetAnalysis(cfg: Cfg) extends FlowSensitiveAnalysis(true) wi
       case goTo: GoTo =>
         s
 
-      case memAssign: MemAssign =>
+      case memAssign: MemoryAssign =>
         s
 
       case localAssign: LocalAssign =>

@@ -2,10 +2,10 @@ package analysis
 
 import ir._
 import analysis.solvers._
+import boogie.BExpr
 
-import scala.collection.mutable.{HashMap, ListBuffer}
+import scala.collection.mutable.{HashMap, ListBuffer, ArrayBuffer}
 import java.io.{File, PrintWriter}
-import java.util
 import scala.collection.mutable
 
 /** Trait for program analyses.
@@ -34,10 +34,6 @@ trait ValueAnalysisMisc:
     */
   val valuelattice: LatticeWithOps
 
-  /** Set of declared variables, used by `statelattice`.
-    */
-  val declaredVars: Set[Variable] = cfg.prog.subroutines.flatMap(_.blocks).flatMap(_.locals).toSet
-
   /** The lattice of abstract states.
     */
   val statelattice: MapLattice[Variable, valuelattice.type] = new MapLattice(valuelattice)
@@ -49,42 +45,50 @@ trait ValueAnalysisMisc:
     exp match
       case id: Variable        => env(id)
       case n: Literal          => literal(n)
-      case use: UnsignedExtend => unsigned(use.width, eval(use.body, env))
-      case se: SignedExtend => signed(se.width, eval(se.body, env))
-      case e: Extract          => extract(e.high, e.low, eval(e.body, env))
-      case c: Concat => concat(eval(c.left, env), eval(c.right, env))
-      case bin: BinOp =>
-        val left = eval(bin.lhs, env)
-        val right = eval(bin.rhs, env)
+      case ze: ZeroExtend => zero_extend(ze.extension, eval(ze.body, env))
+      case se: SignExtend => sign_extend(se.extension, eval(se.body, env))
+      case e: Extract          => extract(e.end, e.start, eval(e.body, env))
+      case bin: BinaryExpr =>
+        val left = eval(bin.arg1, env)
+        val right = eval(bin.arg2, env)
 
-        bin.operator match
-          case PLUS   => plus(left, right)
-          case MINUS  => minus(left, right)
-          case TIMES  => times(left, right)
-          case DIVIDE => divide(left, right)
-          case SDIVIDE => sdivide(left, right)
-          case MOD => mod(left, right)
-          case SMOD => smod(left, right)
-          case AND    => and(left, right)
-          case OR     => or(left, right)
-          case XOR    => xor(left, right)
-          case LSHIFT => lshift(left, right)
-          case RSHIFT => rshift(left, right)
-          case ARSHIFT => arshift(left, right)
-          case EQ     => equ(left, right)
-          case NEQ    => neq(left, right)
-          case LT     => lt(left, right)
-          case LE     => le(left, right)
-          case SLT     => slt(left, right)
-          case SLE     => sle(left, right)
-          //case _      => valuelattice.top
+        bin.op match
+          case BVAND => bvadd(left, right)
+          case BVOR => bvor(left, right)
+          case BVADD => bvand(left, right)
+          case BVMUL => bvmul(left, right)
+          case BVUDIV => bvudiv(left, right)
+          case BVUREM => bvurem(left, right)
+          case BVSHL => bvshl(left, right)
+          case BVLSHR => bvlshr(left, right)
+          case BVULT => bvult(left, right)
+          case BVNAND => ???
+          case BVNOR => ???
+          case BVXOR => ???
+          case BVXNOR => ???
+          case BVCOMP => bvcomp(left, right)
+          case BVSUB => bvsub(left, right)
+          case BVSDIV => bvsdiv(left, right)
+          case BVSREM => bvsrem(left, right)
+          case BVSMOD => ???
+          case BVASHR => bvashr(left, right)
+          case BVULE => bvule(left, right)
+          case BVUGT => ???
+          case BVUGE => ???
+          case BVSLT => bvslt(left, right)
+          case BVSLE => bvsle(left, right)
+          case BVSGT => ???
+          case BVSGE => ???
+          case BVEQ => bvneq(left, right)
+          case BVNEQ => bvneq(left, right)
+          case BVCONCAT => concat(left, right)
 
-      case un: UnOp =>
-        val arg = eval(un.exp, env)
+      case un: UnaryExpr =>
+        val arg = eval(un.arg, env)
 
-        un.operator match
-          case NEG => neg(arg)
-          case NOT => not(arg)
+        un.op match
+          case BVNEG => bvneg(arg)
+          case BVNOT => bvnot(arg)
 
       case _ => valuelattice.top
 
@@ -92,10 +96,9 @@ trait ValueAnalysisMisc:
     */
   def localTransfer(n: CfgNode, s: statelattice.Element): statelattice.Element =
     n match
-      case r: CfgStatementNode =>
+      case r: CfgCommandNode =>
         r.data match
           // assignments
-          // changed the class comparison to the actual class because of removal of case class (no unapply function needed for below now)
           case la: LocalAssign => s + (la.lhs -> eval(la.rhs, s))
 
           // all others: like no-ops
@@ -108,7 +111,7 @@ abstract class SimpleValueAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAna
 
   /** The analysis lattice.
     */
-  val lattice: MapLattice[CfgNode, statelattice.type] = new MapLattice(statelattice)
+  val lattice: MapLattice[CfgNode, statelattice.type] = MapLattice(statelattice)
 
   val domain: Set[CfgNode] = cfg.nodes
 
@@ -181,11 +184,11 @@ object ConstantPropagationAnalysis:
  */
 class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _]) extends Analysis[Any] {
 
-  val solver = new UnionFindSolver[StTerm]
+  val solver: UnionFindSolver[StTerm] = UnionFindSolver()
 
-  val stringArr = new util.ArrayList[String]()
+  val stringArr: ArrayBuffer[String] = ArrayBuffer()
 
-  var mallocCallTarget = ""
+  var mallocCallTarget: Option[Block] = None
 
   val constantPropResult2: Map[CfgNode, _] = constantPropResult
 
@@ -200,10 +203,10 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   // generate the constraints by traversing the AST and solve them on-the-fly
     visit(program, ())
 
-  def dump_file(content: util.ArrayList[String], name: String): Unit = {
-    val outFile = new File(s"${name}")
-    val pw = new PrintWriter(outFile, "UTF-8")
-    content.forEach(s => pw.append(s + "\n"))
+  def dump_file(content: ArrayBuffer[String], name: String): Unit = {
+    val outFile = File(s"${name}")
+    val pw = PrintWriter(outFile, "UTF-8")
+    for (s <- content) { pw.append(s + "\n") }
     pw.close()
   }
 
@@ -236,19 +239,24 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
                 // X1 = X2
                 unify(varToStTerm(variable2), varToStTerm(variable))
                 // *X1 = X2: [[X1]] = α ∧ [[X2]] = α where α is a fresh term variable
+                /*
               case _ =>
                 val alpha = FreshVariable()
                 unify(varToStTerm(localAssign.lhs), PointerRef(alpha))
                 unify(varToStTerm(variable), alpha)
+                */
           case _ =>
             // X1 = *X2: [[X2]] = α ∧ [[X1]] = α where α is a fresh term variable
             val alpha = FreshVariable()
             unify(exprToStTerm(localAssign.rhs), PointerRef(alpha))
             unify(varToStTerm(localAssign.lhs), alpha)
         }
-      case memAssign: MemAssign =>
+      case memAssign: MemoryAssign =>
 
+        ???
+        /*
         // X = alloc P
+        // TODO not a good way to do this, cannot rely on the line number of a statement like this
         if (memAssign.line.matches(mallocCallTarget)) {
           val pointer = memAssign.rhs.value
           val alloc = AAlloc(pointer)
@@ -256,23 +264,20 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
         }
         // X = &Y
         else {
-          unify(varToStTerm(memAssign.lhs), PointerRef(exprToStTerm(memAssign.rhs.value)))
+          // TODO this is not what a memory assign is
+          unify(varToStTerm((memAssign.lhs), PointerRef(exprToStTerm(memAssign.rhs.value)))
         }
-
-
+        */
 
       case call: DirectCall =>
-        if (call.target.contains("malloc")) {
+        if (call.target.name.contains("malloc")) {
           call.returnTarget match {
             case Some(ret) =>
-              mallocCallTarget = ret
+              mallocCallTarget = Some(ret)
             case None =>
               throw new Exception("malloc call without return target")
           }
         }
-
-
-
 
       case _ => // ignore other kinds of nodes
     }
@@ -287,13 +292,14 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   def visitChildren(node: Object, arg: Unit): Unit = {
     node match {
       case program: Program =>
-        program.functions.foreach(visit(_, ()))
+        program.procedures.foreach(visit(_, ()))
 
-      case function: Subroutine =>
+      case function: Procedure =>
         function.blocks.foreach(visit(_, ()))
 
       case block: Block =>
         block.statements.foreach(visit(_, ()))
+        block.jumps.foreach(visit(_, ()))
 
       case _ => // ignore other kinds of nodes
 
@@ -320,7 +326,9 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
     val pointsto = vars.foldLeft(Map[Object, Set[Object]]()) {
       case (a, v: IdentifierVariable) =>
         val pt = unifications(solution(v))
-          .collect({ case PointerRef(IdentifierVariable(id)) => id; case PointerRef(AllocVariable(alloc)) => alloc })
+          .collect({
+            case PointerRef(IdentifierVariable(id)) => id
+            case PointerRef(AllocVariable(alloc)) => alloc })
           .toSet
         a + (v.id -> pt)
     }
@@ -413,9 +421,11 @@ case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
  */
 class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
 
-  val stackTracker = new mutable.HashMap[Expr, Set[Expr]]()
-  val heapTracker = new mutable.HashMap[Expr, Set[Expr]]()
-  val variableTracker = new mutable.HashMap[Expr, Set[Expr]]()
+  private val stackPointer = Variable("R31", BitVecType(64))
+
+  val stackTracker = HashMap[Expr, Set[Expr]]()
+  val heapTracker = HashMap[Expr, Set[Expr]]()
+  val variableTracker = HashMap[Expr, Set[Expr]]()
 
   /**
    * @inheritdoc
@@ -424,10 +434,10 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
   // generate the constraints by traversing the AST and solve them on-the-fly
     visit(program, ())
 
-  def dump_file(content: util.ArrayList[String], name: String): Unit = {
+  def dump_file(content: ArrayBuffer[String], name: String): Unit = {
     val outFile = new File(s"${name}")
     val pw = new PrintWriter(outFile, "UTF-8")
-    content.forEach(s => pw.append(s + "\n"))
+    for (s <- content) { pw.append(s + "\n") }
     pw.close()
   }
 
@@ -438,19 +448,19 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
    */
   def visit(node: Object, arg: Unit): Unit = {
     node match {
-      case memAssign: MemAssign =>
+      case memAssign: MemoryAssign =>
         // if the memory is acting on a stack operation, then we need to track the stack
-        if (memAssign.rhs.memory.name == "stack") {
+        if (memAssign.rhs.mem.name == "stack") {
           if (stackTracker.contains(memAssign.rhs.index))
             stackTracker(memAssign.rhs.index) += memAssign.rhs.value
           else
             stackTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
         // the memory is not stack so it must be heap
         } else {
-            if (heapTracker.contains(memAssign.rhs.index))
-                heapTracker(memAssign.rhs.index) += memAssign.rhs.value
-            else
-                heapTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
+          if (heapTracker.contains(memAssign.rhs.index))
+            heapTracker(memAssign.rhs.index) += memAssign.rhs.value
+          else
+            heapTracker(memAssign.rhs.index) = Set(memAssign.rhs.value)
         }
       // local assign is just lhs assigned to rhs
       case localAssign: LocalAssign =>
@@ -467,13 +477,14 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
   def visitChildren(node: Object, arg: Unit): Unit = {
     node match {
       case program: Program =>
-        program.functions.foreach(visit(_, ()))
+        program.procedures.foreach(visit(_, ()))
 
-      case function: Subroutine =>
+      case function: Procedure =>
         function.blocks.foreach(visit(_, ()))
 
       case block: Block =>
         block.statements.foreach(visit(_, ()))
+        block.jumps.foreach(visit(_, ()))
 
       case _ => // ignore other kinds of nodes
     }
@@ -495,57 +506,58 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
     }
 
     val pointerTracker: mutable.Map[Expr, Set[Expr]] = mutable.Map[Expr, Set[Expr]]()
-    val pointerPool: PointerPool = new PointerPool()
+    val pointerPool: PointerPool = PointerPool()
     print(s"Stack Tracker: \n${stackTracker.mkString(",\n")}\n")
     print(s"Variable Tracker: \n${variableTracker.mkString(",\n")}\n")
     print(s"Heap Tracker: \n${heapTracker.mkString(",\n")}\n")
 
     heapTracker.foreach { case (k, v) =>
       v.foreach(e =>
-        val heapPointer = pointerPool.extractPointer(k, "Heap")
+        val heapPointer = pointerPool.extractPointer(k, PointerType.Heap)
         // ptr -> ptr
-        if (e.locals.contains(LocalVar("R31", 64))) {
+        if (e.locals.contains(stackPointer)) {
           add_map(pointerTracker, heapPointer, pointerPool.extractPointer(e))
         }
         // ptr -> exp
         else {
-          heapPointer.value = e
+          heapPointer.value = Some(e)
         }
       )
     }
 
     variableTracker.foreach { case (k, v) =>
       v.foreach(e =>
-        if (e.locals.contains(LocalVar("R31", 64))) {
+        if (e.locals.contains(stackPointer)) {
           add_map(pointerTracker, k, pointerPool.extractPointer(e))
         } else {
 //          print(s"e: $e\n")
 //          print(s"e type: ${e.getClass}\n")
 
+          // this is a really bad way to do this
           if (e.toString.contains("mem")) {
-            add_map(pointerTracker, k, pointerPool.extractPointer(e, "Heap"))
+            add_map(pointerTracker, k, pointerPool.extractPointer(e, PointerType.Heap))
           }
         }
       )
     }
 
     stackTracker.foreach { case (k, v) =>
-        if (k.locals.contains(LocalVar("R31", 64))) {
+        if (k.locals.contains(stackPointer)) {
           val lhsPointer = pointerPool.extractPointer(k)
           v.foreach(e =>
             // ptr -> ptr
-            if (e.locals.contains(LocalVar("R31", 64))) {
-              lhsPointer.value = pointerPool.extractPointer(e)
+            if (e.locals.contains(stackPointer)) {
+              lhsPointer.value = Some(pointerPool.extractPointer(e))
             }
             // ptr -> exp
             else {
-              lhsPointer.value = e
+              lhsPointer.value = Some(e)
             }
           )
         } else {
           v.foreach(e =>
             // exp -> ptr
-            if (e.locals.contains(LocalVar("R31", 64))) {
+            if (e.locals.contains(stackPointer)) {
               add_map(pointerTracker, k, pointerPool.extractPointer(e))
             }
             // exp -> exp (ignore, no pointer)
@@ -566,25 +578,27 @@ class MemoryRegionAnalysis(program: Program) extends Analysis[Any] {
   }
 }
 
-class Pointer(allocation: (Expr, Expr), ptrType: String = "Stack", inVal: Expr = null) extends Expr {
-  var value: Expr = inVal
+class Pointer(allocation: (Expr, Option[Expr]), ptrType: PointerType = PointerType.Stack, inVal: Option[Expr] = None) extends Expr {
+  var value: Option[Expr] = inVal
   var alloc: Expr = allocation._1
-  var offset: Expr = allocation._2
-  val pointerType: String = ptrType
-  if (!pointerType.equals("Stack") && !pointerType.equals("Heap")) {
-    throw new Exception("Unknown pointer type")
+  var offset: Option[Expr] = allocation._2
+  val pointerType: PointerType = ptrType
+
+  override def toString: String = {
+    val valueStr: String = value match {
+      case Some(v) => v.toString
+      case None => "None"
+    }
+    val offsetStr: String = offset match {
+      case Some(o) => o.toString
+      case None => "None"
+    }
+    s"${pointerType} Pointer(Value: $valueStr, [ptr: $alloc, Offset: $offsetStr])"
   }
 
-  override def toString(): String = {
-    s"${pointerType} Pointer(Value: $value, [ptr: $alloc, Offset: $offset])"
-  }
-
-  override def gammas: Set[Variable] = ???
-
-  override def locals: Set[LocalVar] = ???
-
-  override def size: Int = ???
-
+  override def getType: IRType = ???
+  override def gammas: Set[Expr] = ???
+  override def locals: Set[Variable] = ???
   override def toBoogie: BExpr = ???
 
   override def equals(obj: Any): Boolean = {
@@ -593,15 +607,18 @@ class Pointer(allocation: (Expr, Expr), ptrType: String = "Stack", inVal: Expr =
           ptr.alloc == alloc && ptr.offset == offset && ptr.pointerType == pointerType
       case _ => false
       }
+
   }
 
+  /*
   override def hashCode(): Int = {
       alloc.hashCode() + offset.hashCode() + pointerType.hashCode()
   }
+  */
 }
 
 class PointerPool {
-  val pointers: mutable.ListBuffer[Pointer] = mutable.ListBuffer[Pointer]()
+  val pointers: ListBuffer[Pointer] = ListBuffer[Pointer]()
 
   def get(ptr: Pointer): Pointer = {
     if (pointers.contains(ptr)) {
@@ -612,23 +629,23 @@ class PointerPool {
     }
   }
 
-  def extractPointer(e: Expr, ptrType: String = "Stack"): Pointer = {
+  def extractPointer(e: Expr, ptrType: PointerType = PointerType.Stack): Pointer = {
     e match {
-      case binOp: BinOp =>
-        get(new Pointer((binOp.lhs, binOp.rhs), ptrType))
-      case memAccess: MemAccess =>
+      case binOp: BinaryExpr =>
+        get(Pointer((binOp.arg1, Some(binOp.arg2)), ptrType))
+      case memAccess: MemoryLoad =>
         memAccess.index match {
-          case binOp: BinOp =>
-            get(new Pointer((binOp.lhs, binOp.rhs), ptrType))
-          case localVar: LocalVar =>
-            get(new Pointer((localVar, null), ptrType))
+          case binOp: BinaryExpr =>
+            get(Pointer((binOp.arg1, Some(binOp.arg2)), ptrType))
+          case localVar: Variable =>
+            get(Pointer((localVar, None), ptrType))
           case _ =>
             print(s"inner type: ${memAccess.index.getClass} ${memAccess.index}\n")
             throw new Exception("Unknown type")
         }
-      case localVar: LocalVar =>
-        get(new Pointer((localVar, null), ptrType))
-      case unsignedExtend: UnsignedExtend =>
+      case localVar: Variable =>
+        get(Pointer((localVar, None), ptrType))
+      case unsignedExtend: ZeroExtend =>
         extractPointer(unsignedExtend.body)
       case _ =>
         print(s"type: ${e.getClass} $e\n")
@@ -636,6 +653,13 @@ class PointerPool {
     }
   }
 }
+
+enum PointerType {
+  case Stack
+  case Heap
+}
+
+case class AAlloc(exp: Expr)
 
 //case class StackReconstructor() {
 //  var stackPointer: Byte = 16

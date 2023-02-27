@@ -93,7 +93,7 @@ object Output {
     */
   def dotIder(n: CfgNode, uniqueId: Int): String =
     n match {
-      case real: CfgStatementNode => s"real${real.data}_${uniqueId}"
+      case real: CfgCommandNode => s"real${real.data}_${uniqueId}"
       case entry: CfgFunctionEntryNode => s"entry${entry.data}_${uniqueId}"
       case exit: CfgFunctionExitNode => s"exit${exit.data}_${uniqueId}"
       case blockExit: CfgBlockExitNode => s"blockExit${blockExit.data}_${uniqueId}"

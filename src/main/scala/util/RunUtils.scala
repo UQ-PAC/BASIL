@@ -101,7 +101,7 @@ object RunUtils {
     // run ./examples/secret_write/secret_write.adt ./examples/secret_write/secret_write.relf
     // run ./examples/basicpointer/basicpointer.adt ./examples/basicpointer/basicpointer.relf
 
-    val cfg = IntraproceduralProgramCfg.generateFromProgram(translator.program)
+    val cfg = IntraproceduralProgramCfg.generateFromProgram(IRProgram)
 
 
 //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
@@ -124,7 +124,7 @@ object RunUtils {
     ssa.analyze()
 
 
-    val solver3 = new MemoryRegionAnalysis(translator.program)
+    val solver3 = new MemoryRegionAnalysis(IRProgram)
     val result3 = solver3.analyze()
     print(solver3.solveMemory())
     val stringBuilder: StringBuilder = new StringBuilder()

@@ -3,6 +3,7 @@ package ir
 import boogie._
 
 trait Expr {
+  var ssa_id: Int = 0
   def toBoogie: BExpr
   def toGamma: BExpr = {
     val gammaVars: Set[BExpr] = gammas.map(_.toGamma)
@@ -54,6 +55,7 @@ class Extract(var end: Int, var start: Int, var body: Expr) extends Expr {
   override def gammas: Set[Expr] = body.gammas
   override def locals: Set[Variable] = body.locals
   override def getType: BitVecType = BitVecType(end - start)
+  override def toString: String = s"$body[$end:$start]"
 }
 
 class Repeat(var repeats: Int, var body: Expr) extends Expr {
@@ -65,6 +67,7 @@ class Repeat(var repeats: Int, var body: Expr) extends Expr {
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of zero extend: " + this)
   }
+  override def toString: String = s"Repeat($repeats, $body)"
 }
 
 class ZeroExtend(var extension: Int, var body: Expr) extends Expr {
@@ -76,6 +79,8 @@ class ZeroExtend(var extension: Int, var body: Expr) extends Expr {
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of zero extend: " + this)
   }
+  override def toString: String = s"ZeroExtend($extension, $body)"
+
 }
 
 class SignExtend(var extension: Int, var body: Expr) extends Expr {
@@ -87,6 +92,7 @@ class SignExtend(var extension: Int, var body: Expr) extends Expr {
     case bv: BitVecType => bv.size
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of sign extend: " + this)
   }
+  override def toString: String = s"SignExtend($extension, $body)"
 }
 
 class UnaryExpr(var op: UnOp, var arg: Expr) extends Expr {
@@ -99,6 +105,18 @@ class UnaryExpr(var op: UnOp, var arg: Expr) extends Expr {
     case (_: IntUnOp, IntType) => IntType
     case _ => throw new Exception("type mismatch, operator " + op + " type doesn't match arg: " + arg)
   }
+
+  private def inSize = arg.getType match {
+    case bv: BitVecType => bv.size
+    case _ => throw new Exception("type mismatch")
+  }
+
+  override def toString: String = op match {
+    case uOp: BoolUnOp => s"($uOp$arg)"
+    case uOp: BVUnOp => s"bv$uOp$inSize($arg)"
+    case uOp: IntUnOp => s"($uOp$arg)"
+  }
+
 }
 
 trait UnOp
@@ -138,24 +156,27 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            //println(arg1)
-            //println(arg2)
-            //println(this)
+            println(arg1)
+            println(arg2)
+            println(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVCOMP =>
           if (bv1.size == bv2.size) {
             BitVecType(1)
           } else {
-            BitVecType(1)
-            //throw new Exception("bitvector size mismatch") TODO
+            //BitVecType(1)
+            println(arg1)
+            println(arg2)
+            println(this)
+            throw new Exception("bitvector size mismatch")
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolType
           } else {
-            //println(arg1)
-            //println(arg2)
+            println(arg1)
+            println(arg2)
             throw new Exception("bitvector size mismatch")
           }
         case BVEQ | BVNEQ =>
@@ -169,6 +190,24 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
     case _ =>
       throw new Exception("type mismatch, operator " + op + " type doesn't match args: (" + arg1 + ", " + arg2 + ")")
   }
+
+  private def inSize = arg1.getType match {
+    case bv: BitVecType => bv.size
+    case _ => throw new Exception("type mismatch")
+  }
+
+  override def toString: String = op match {
+    case bOp: BoolBinOp => s"($arg1 $bOp $arg2)"
+    case bOp: BVBinOp =>
+      bOp match {
+        case BVEQ | BVNEQ | BVCONCAT =>
+          s"($arg1 $bOp $arg2)"
+        case _ =>
+          s"bv$bOp$inSize($arg1, $arg2)"
+      }
+    case bOp: IntBinOp => s"($arg1 $bOp $arg2)"
+  }
+
 }
 
 trait BinOp
@@ -261,6 +300,7 @@ class MemoryStore(var mem: Memory, var index: Expr, var value: Expr, var endian:
   override def locals: Set[Variable] = index.locals ++ value.locals
 
   override def getType: IRType = BitVecType(size)
+  override def toString: String = s"MemoryStore($mem, $index, $value, $endian, $size)"
 }
 
 class MemoryLoad(var mem: Memory, var index: Expr, var endian: Endian, var size: Int) extends Expr {
@@ -277,12 +317,14 @@ class MemoryLoad(var mem: Memory, var index: Expr, var endian: Endian, var size:
   override def locals: Set[Variable] = index.locals
   override def gammas: Set[Expr] = Set(this)
   override def getType: IRType = BitVecType(size)
+  override def toString: String = s"MemoryLoad($mem, $index, $endian, $size)"
 }
 
 case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr {
   override def toBoogie: BMapVar = BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
   override def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapBType(BitVecBType(addressSize), BoolBType), Scope.Global)
-  override def getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
+  override val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
+  override def toString: String = s"Memory($name, $addressSize, $valueSize)"
 }
 
 case class Variable(name: String, irType: IRType) extends Expr {
@@ -296,4 +338,5 @@ case class Variable(name: String, irType: IRType) extends Expr {
     case b: BitVecType => b.size
     case _ => throw new Exception("tried to get size of non-bitvector")
   }
+  override def toString: String = s"Variable($name, $irType)"
 }

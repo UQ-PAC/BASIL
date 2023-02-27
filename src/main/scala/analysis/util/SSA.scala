@@ -1,8 +1,8 @@
 package analysis.util
 
 import analysis._
-import astnodes.*
-import analysis.solvers.*
+import ir._
+import analysis.solvers._
 
 import scala.collection.mutable
 import scala.collection.mutable.HashMap
@@ -39,12 +39,12 @@ class SSA(cfg: Cfg) {
         node match {
             case localAssign: LocalAssign =>
                 //localAssign.lhs = LocalVar(s"${localAssign.lhs.name}_${checkAssignment(localAssign.lhs.name)}", localAssign.lhs.size)
-                localAssign.lhs.setSSA(checkAssignment(localAssign.lhs.toString))
-                localAssign.rhs.setSSA(checkUse(localAssign.rhs.toString))
-            case memAssign: MemAssign =>
+                localAssign.lhs.ssa_id = checkAssignment(localAssign.lhs.toString)
+                localAssign.rhs.ssa_id = checkUse(localAssign.rhs.toString)
+            case memAssign: MemoryAssign =>
 //                memAssign.rhs = Store(memAssign.rhs.memory, s"${memAssign.rhs.index}_${checkAssignment(memAssign.rhs.index.toString)}", value, memAssign.rhs.endian, memAssign.rhs.size)
-                  memAssign.rhs.index.setSSA(checkAssignment(memAssign.rhs.index.toString))
-                  memAssign.rhs.value.setSSA(checkUse(memAssign.rhs.value.toString))
+                  memAssign.rhs.index.ssa_id = checkAssignment(memAssign.rhs.index.toString)
+                  memAssign.rhs.value.ssa_id = checkUse(memAssign.rhs.value.toString)
             case _ =>
         }
         visitChildren(node, ())
@@ -100,19 +100,20 @@ class SSA(cfg: Cfg) {
 
             case node: CfgNode =>
               node match {
-                case stmtNode: CfgStatementNode =>
+                case stmtNode: CfgCommandNode =>
                   visit(stmtNode.data, ())
                 case _ =>
               }
 
             case program: Program =>
-                program.functions.foreach(visit(_, ()))
+                program.procedures.foreach(visit(_, ()))
 
-            case function: Subroutine =>
+            case function: Procedure =>
                 function.blocks.foreach(visit(_, ()))
 
             case block: Block =>
                 block.statements.foreach(visit(_, ()))
+                block.jumps.foreach(visit(_, ()))
 
             case _ => // ignore other kinds of nodes
 
@@ -121,7 +122,7 @@ class SSA(cfg: Cfg) {
 
     def post_SSA(cfg: Cfg): Unit = {
       cfg.nodes.foreach {
-        case statementNode: CfgStatementNode =>
+        case statementNode: CfgCommandNode =>
           resolve_phi(statementNode, cfg)
         case _ =>
       }
@@ -130,7 +131,7 @@ class SSA(cfg: Cfg) {
     def get_incoming_edges(cfg: Cfg, node: CfgNode): ListBuffer[Edge] = {
       val incomingEdges: ListBuffer[Edge] = ListBuffer()
       for (e <- cfg.getEdges.toList) {
-        if (e.getTo().equals(node)) {
+        if (e.getTo.equals(node)) {
           incomingEdges.addOne(e)
         }
       }
@@ -153,14 +154,14 @@ class SSA(cfg: Cfg) {
       val incomingMatches2: mutable.Map[Expr, ListBuffer[Expr]] = mutable.Map[Expr, ListBuffer[Expr]]()
       for (e <- incomingEdges) {
         node match {
-          case stmtNode: CfgStatementNode =>
+          case stmtNode: CfgCommandNode =>
             stmtNode.data match
-              case memAssign: MemAssign =>
+              case memAssign: MemoryAssign =>
                 memAssign.rhs.value.locals.foreach(l => {
-                  e.getFrom() match {
-                    case fromStmtNode: CfgStatementNode =>
+                  e.getFrom match {
+                    case fromStmtNode: CfgCommandNode =>
                       fromStmtNode.data match
-                        case memAssign2: MemAssign =>
+                        case memAssign2: MemoryAssign =>
                           if (memAssign2.rhs.index.locals.contains(l)) {
                             memAssign2.rhs.index.locals.foreach(l2 => {
                               if (l2.equals(l)) {
@@ -184,10 +185,10 @@ class SSA(cfg: Cfg) {
                 })
               case localAssign: LocalAssign =>
                 localAssign.rhs.locals.foreach(l => {
-                  e.getFrom() match {
-                    case fromStmtNode: CfgStatementNode =>
+                  e.getFrom match {
+                    case fromStmtNode: CfgCommandNode =>
                       fromStmtNode.data match
-                        case memAssign: MemAssign =>
+                        case memAssign: MemoryAssign =>
                           if (memAssign.rhs.index.locals.contains(l)) {
                             memAssign.rhs.index.locals.foreach(l2 => {
                               if (l2.equals(l)) {
@@ -218,12 +219,12 @@ class SSA(cfg: Cfg) {
 //      // for whole expression
 //      for (e <- incomingEdges) {
 //        node match {
-//          case stmtNode: CfgStatementNode =>
+//          case stmtNode: CfgCommandNode =>
 //            stmtNode.data match
 //              case memAssign: MemAssign =>
 //                val l = memAssign.rhs.value
 //                  e.getFrom() match {
-//                    case fromStmtNode: CfgStatementNode =>
+//                    case fromStmtNode: CfgCommandNode =>
 //                      fromStmtNode.data match
 //                        case memAssign2: MemAssign =>
 //                            val l2 = memAssign2.rhs.index
@@ -241,7 +242,7 @@ class SSA(cfg: Cfg) {
 //              case localAssign: LocalAssign =>
 //                val l = localAssign.rhs
 //                  e.getFrom() match {
-//                    case fromStmtNode: CfgStatementNode =>
+//                    case fromStmtNode: CfgCommandNode =>
 //                      fromStmtNode.data match
 //                        case memAssign: MemAssign =>
 //                            val l2 = memAssign.rhs.index
@@ -268,12 +269,12 @@ class SSA(cfg: Cfg) {
       incomingMatches.foreach((key, value) =>
         if (value.length == 1) {
             // replace key with value
-            key.setSSA(value.head.getSSA())
+            key.ssa_id = value.head.ssa_id
             } else if (value.length > 1) {
             // replace key with phi
             value.foreach(v =>
-              if (v.getSSA() > key.getSSA()) {
-                key.setSSA(v.getSSA())
+              if (v.ssa_id > key.ssa_id) {
+                key.ssa_id = v.ssa_id
               }
             )
             } else {
@@ -282,14 +283,14 @@ class SSA(cfg: Cfg) {
       )
 
 //      incomingMatches2.foreach((key, value) =>
-//        print(s"key: ($key, ${key.getSSA()}), value: ")
-//        value.foreach(v => print(s"($v,${v.getSSA()})"))
+//        print(s"key: ($key, ${key.ssa_id}), value: ")
+//        value.foreach(v => print(s"($v,${v.ssa_id})"))
 //        println()
 //      )
 
       incomingMatches.foreach((key, value) =>
-        print(s"key: ($key, ${key.getSSA()}), value: ")
-        value.foreach(v => print(s"($v,${v.getSSA()})"))
+        print(s"key: ($key, ${key.ssa_id}), value: ")
+        value.foreach(v => print(s"($v,${v.ssa_id})"))
         println()
       )
     }
@@ -311,12 +312,12 @@ class SSA(cfg: Cfg) {
 //
 //      for (e <- incomingEdges) {
 //        node match {
-//          case stmtNode: CfgStatementNode =>
+//          case stmtNode: CfgCommandNode =>
 //            stmtNode.data match
 //              case memAssign: MemAssign =>
 //                memAssign.rhs.value.locals.foreach(l => {
 //                  e.getFrom() match {
-//                    case fromStmtNode: CfgStatementNode =>
+//                    case fromStmtNode: CfgCommandNode =>
 //                      fromStmtNode.data match
 //                        case memAssign2: MemAssign =>
 //                          if (memAssign2.rhs.index.locals.contains(l)) {
@@ -343,7 +344,7 @@ class SSA(cfg: Cfg) {
 //              case localAssign: LocalAssign =>
 //                localAssign.rhs.locals.foreach(l => {
 //                  e.getFrom() match {
-//                    case fromStmtNode: CfgStatementNode =>
+//                    case fromStmtNode: CfgCommandNode =>
 //                      fromStmtNode.data match
 //                        case memAssign: MemAssign =>
 //                          if (memAssign.rhs.index.locals.contains(l)) {

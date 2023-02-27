@@ -1,8 +1,7 @@
 package analysis
-import analysis.Cfg.nodePool
 
 import scala.collection.mutable
-import bap._
+import ir._
 import cfg_visualiser.{DotArrow, DotDirArrow, DotGraph, DotNode}
 
 import scala.collection.mutable.ListBuffer
@@ -17,8 +16,8 @@ object CfgNode:
 
 // EdgeType
 abstract class Edge(from: CfgNode, to: CfgNode):
-  def getFrom(): CfgNode = from
-  def getTo():CfgNode = to
+  def getFrom: CfgNode = from
+  def getTo: CfgNode = to
 case class conditionalEdge(cond: Expr, from: CfgNode, to: CfgNode) extends Edge(from, to) {
   override def toString: String = s"conditionalEdge(cond: $cond, From: $from, To: $to)"
 }
@@ -93,14 +92,14 @@ case class CfgBlockExitNode(
                            ) extends CfgNodeWithData[Block]:
   override def toString: String = s"[BlockExit] $data"
 
-/** Control-flow graph node for a statement.
+/** Control-flow graph node for a command (statement or jump).
  */
-case class CfgStatementNode(
+case class CfgCommandNode(
                              override val id: Int = CfgNode.nextId(),
                              override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
                              override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-                             data: Statement
-                           ) extends CfgNodeWithData[Statement]:
+                             data: Command
+                           ) extends CfgNodeWithData[Command]:
   override def toString: String = s"[Stmt] $data"
 
 /** A control-flow graph.
@@ -130,13 +129,13 @@ class Cfg(cfg: Cfg = null):
 
   /** Add an outgoing edge from the current node.
    */
-  def addEdge(from: CfgNode, to: CfgNode, cond: Expr): Unit =
+  def addEdge(from: CfgNode, to: CfgNode, cond: Option[Expr] = None): Unit =
     from.succ += to
     to.pred += from
-    if cond != null then
-      edges += conditionalEdge(cond, from, to)
-    else
-      edges += unconditionalEdge(from, to)
+    cond match {
+      case Some(c) => edges += conditionalEdge(c, from, to)
+      case None => edges += unconditionalEdge(from, to)
+    }
 
   def addNode(node: CfgNode): Unit =
     entries += node
@@ -158,7 +157,7 @@ class Cfg(cfg: Cfg = null):
     visited
 
   override def toString: String = {
-    val sb = new StringBuilder()
+    val sb = StringBuilder()
     sb.append("CFG {")
     sb.append(" nodes: ")
     sb.append(nodes)
@@ -169,28 +168,26 @@ class Cfg(cfg: Cfg = null):
   }
 
 case class NodePool() {
-  val pool = mutable.Map[(Statement, CfgBlockEntryNode), CfgNode]()
-  var latestAdded: (Statement, CfgBlockEntryNode) = (null: Statement, null: CfgBlockEntryNode)
+  val pool = mutable.Map[(Command, CfgBlockEntryNode), CfgNode]()
+  var latestAdded: Option[(Command, CfgBlockEntryNode)] = None
 
-  def get(statement: Statement, context: CfgBlockEntryNode, fromCall: Boolean = false): CfgNode = {
-    if (!statement.isInstanceOf[GoTo] && !fromCall) {
-      latestAdded = (statement, context)
+  def get(command: Command, context: CfgBlockEntryNode, fromCall: Boolean = false): CfgNode = {
+    command match {
+      case g: GoTo if fromCall =>
+      case _ => latestAdded = Some(command, context)
     }
-    if (pool.contains((statement, context))) {
-      pool((statement, context))
+    if (pool.contains((command, context))) {
+      pool((command, context))
     }
     else {
-      val node = CfgStatementNode(data = statement)
-      pool((statement, context)) = node
+      val node = CfgCommandNode(data = command)
+      pool((command, context)) = node
       node
     }
   }
 
-  def getLatestAdded(): CfgNode = {
-    if (latestAdded == (null, null)) {
-      return null
-    }
-    pool(latestAdded)
+  def getLatestAdded: Option[CfgNode] = {
+    latestAdded.map { l => pool(l) }
   }
 }
 
@@ -202,14 +199,14 @@ object Cfg:
   /** Generate the cfg for each function of the program.
    */
   def generateCfgProgram(program: Program): Cfg = {
-    program.functions.map(f => f -> generateCfgFunc(f))
+    program.procedures.map(f => f -> generateCfgFunc(f))
     cfg
   }
 
   /** Generate the cfg for a function.
    */
 
-  def generateCfgFunc(func: Subroutine): Cfg = {
+  def generateCfgFunc(func: Procedure): Cfg = {
     val blocks = func.blocks.map(block => block.label -> CfgBlockEntryNode(data = block)).toMap
     val functionEntryNode = CfgFunctionEntryNode(data = func)
     val functionExitNode = CfgFunctionExitNode(data = func)
@@ -219,54 +216,65 @@ object Cfg:
     // generate cfg for a statement
     def generateCfgStatement(stmt: Statement, context: CfgBlockEntryNode): CfgNode =
       println(stmt)
-      var previous: CfgNode = nodePool.getLatestAdded()
+      var previous: Option[CfgNode] = nodePool.getLatestAdded
       val node: CfgNode = nodePool.get(stmt, context)
-      if (!stmt.isInstanceOf[GoTo]) {
-        if (previous == null) {
-          cfg.addEdge(functionEntryNode, node, null)
-        } else {
-          cfg.addEdge(previous, node, null)
-        }
+      previous match {
+        case Some(p) => cfg.addEdge(p, node)
+        case None => cfg.addEdge(functionEntryNode, node)
       }
-      stmt match {
+      node
+
+    def generateCfgJump(jump: Jump, context: CfgBlockEntryNode): CfgNode =
+      println(jump)
+      var previous: Option[CfgNode] = nodePool.getLatestAdded
+      val node: CfgNode = nodePool.get(jump, context)
+      jump match {
+        case g: GoTo =>
+        case _ =>
+          previous match {
+            case Some(p) => cfg.addEdge(p, node)
+            case None => cfg.addEdge(functionEntryNode, node)
+          }
+      }
+      jump match {
         case goTo: GoTo =>
-          blocks.get(goTo.target) match
+          blocks.get(goTo.target.label) match
             case Some(blockNode) => cfg.addEdge(cfg.entries.last, nodePool.get(blockNode.data.statements.head, blockNode, true), goTo.condition)
             case _ => print(s"ERROR: goto target in '${goTo}' not found\n")
 
         case directCall: DirectCall =>
           // edge between current -> target
-          blocks.get(directCall.target) match
-            case Some(blockNode) => cfg.addEdge(node, blockNode, null)
+          blocks.get(directCall.target.name) match
+            case Some(blockNode) => cfg.addEdge(node, blockNode)
             case _ => print(s"ERROR: direct call target in '${directCall}' not found\n")
           directCall.returnTarget match
             case Some(returnTarget) =>
-              blocks.get(returnTarget) match
+              blocks.get(returnTarget.label) match
                 case Some(returnBlockNode) =>
-                  blocks.get(directCall.target) match
+                  blocks.get(directCall.target.name) match
                     // edge between target -> return target
-                    case Some(blockNode) => cfg.addEdge(blockNode, returnBlockNode, null)
+                    case Some(blockNode) => cfg.addEdge(blockNode, returnBlockNode)
                     case _ =>
                 case _ =>
                   print(s"ERROR: direct call return target in '${directCall}' not found\n")
             case _ =>
               // edge between target -> current (if no return target)
-              blocks.get(directCall.target) match
-                case Some(blockNode) => cfg.addEdge(blockNode, node, null)
+              blocks.get(directCall.target.name) match
+                case Some(blockNode) => cfg.addEdge(blockNode, node)
                 case _ =>
 
         case indirectCall: IndirectCall =>
           // edge between current -> unknown block
-          val unknownBlockNode = CfgBlockEntryNode(data = Block(label = s"Unknown: ${indirectCall.locals.toString()}", address = null, statements = List()))
+          //val unknownBlockNode = CfgBlockEntryNode(data = Block(label = s"Unknown: ${indirectCall.locals.toString()}", address = null, statements = ArrayBuffer()))
           //node.addEdge(unknownBlockNode)
           if (indirectCall.target.name == "R30") {
-            cfg.addEdge(node, functionExitNode, null)
+            cfg.addEdge(node, functionExitNode)
           }
           print(s"ERROR: indirect call target in '${indirectCall}' not found\n")
           indirectCall.returnTarget match
             case Some(returnTarget) =>
               // edge between unknown block -> return target
-              blocks.get(returnTarget) match
+              blocks.get(returnTarget.label) match
                 case Some(returnBlockNode) => //unknownBlockNode.addEdge(returnBlockNode)
                 case _ => print(s"ERROR: indirect call return target in '${indirectCall}' not found\n")
             // edge between unknown block -> current (if no return target)
@@ -277,17 +285,14 @@ object Cfg:
 
     for (_, entryNode) <- blocks do
       val stmts = entryNode.data.statements
-
-      stmts.foreach(stmt => {
-        if (stmt.isInstanceOf[GoTo]) {
-          generateCfgStatement(stmt, entryNode)
-        } else {
-          cfg.addNode(generateCfgStatement(stmt, entryNode))
-        }
-      })
+      stmts.foreach(stmt => cfg.addNode(generateCfgStatement(stmt, entryNode)))
+      entryNode.data.jumps.foreach {
+        case g: GoTo => generateCfgJump(g, entryNode)
+        case j:_ => cfg.addNode(generateCfgJump(j, entryNode))
+      }
 
     if (blocks.isEmpty) {
-      cfg.addEdge(functionEntryNode, functionExitNode, null)
+      cfg.addEdge(functionEntryNode, functionExitNode)
     }
 
     //nodePool.pool.foreach(p => print(s"\n Pool(${p})\n"))
