@@ -124,7 +124,9 @@ object RunUtils {
     ssa.analyze()
 
 
-    val solver3 = new MemoryRegionAnalysis(IRProgram)
+    /*
+    TODO - solveMemory parameters not set
+    val solver3 = new MemoryRegionAnalysis(cfg)
     val result3 = solver3.analyze()
     print(solver3.solveMemory())
     val stringBuilder: StringBuilder = new StringBuilder()
@@ -134,6 +136,7 @@ object RunUtils {
     }
     stringBuilder.append("}")
     dump_plot(stringBuilder.toString(), "result")
+    */
 
 
     boogieTranslator.translate

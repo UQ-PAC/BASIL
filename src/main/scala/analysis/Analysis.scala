@@ -427,7 +427,7 @@ class MemoryRegionAnalysis(cfg: Cfg) extends Analysis[Any] {
 //  val stackTracker = new immutable.HashMap[Expr, Set[Expr]]()
 //  val heapTracker = new immutable.HashMap[Expr, Set[Expr]]()
 //  val variableTracker = new immutable.HashMap[Expr, Set[Expr]]()
-  val mapping = mutable.HashMap[CfgNode,  mutable.Map[Expr, Set[Expr]]]()
+  val mapping = mutable.HashMap[CfgNode, mutable.Map[Expr, Set[Expr]]]()
 
   /**
    * @inheritdoc
@@ -464,7 +464,7 @@ class MemoryRegionAnalysis(cfg: Cfg) extends Analysis[Any] {
         cmd.data match {
           case memAssign: MemoryAssign =>
             // if the memory is acting on a stack operation, then we need to track the stack
-            if (memAssign.rhs.memory.name == "stack") {
+            if (memAssign.rhs.mem.name == "stack") {
               if (stackTracker.contains(memAssign.rhs.index))
                 stackTracker = stackTracker + (memAssign.rhs.index -> (stackTracker(memAssign.rhs.index) + memAssign.rhs.value))
               else
@@ -481,7 +481,8 @@ class MemoryRegionAnalysis(cfg: Cfg) extends Analysis[Any] {
             if (variableTracker.contains(localAssign.lhs))
               variableTracker = variableTracker + (localAssign.lhs -> (variableTracker(localAssign.lhs) + localAssign.rhs))
             else
-              variableTracker = variableTracker + (localAssign.lhs -> Set(localAssign.rhs))case _ =>
+              variableTracker = variableTracker + (localAssign.lhs -> Set(localAssign.rhs))
+          case _ =>
         }
         // this is a phi node (we merge incoming edges)
         if (mapping.contains(node)) {
@@ -540,7 +541,12 @@ class MemoryRegionAnalysis(cfg: Cfg) extends Analysis[Any] {
     mapping
   }
 
-  def solveMemory(): mutable.Map[Expr, Set[Expr]] = {
+  def solveMemory(stackTracker: immutable.Map[Expr, Set[Expr]], heapTracker: immutable.Map[Expr, Set[Expr]], variableTracker: immutable.Map[Expr, Set[Expr]]): mutable.Map[Expr, Set[Expr]] = {
+    val pointerTracker: mutable.Map[Expr, Set[Expr]] = mutable.Map[Expr, Set[Expr]]()
+    val pointerPool: PointerPool = PointerPool()
+    print(s"Stack Tracker: \n${stackTracker.mkString(",\n")}\n")
+    print(s"Variable Tracker: \n${variableTracker.mkString(",\n")}\n")
+    print(s"Heap Tracker: \n${heapTracker.mkString(",\n")}\n")
 
     /**
      * Captures an Expr to Pointer relationship in the map. Ensures set is created if it does not exist.
@@ -555,12 +561,6 @@ class MemoryRegionAnalysis(cfg: Cfg) extends Analysis[Any] {
       else
         map(register) = Set(ptr)
     }
-
-    val pointerTracker: mutable.Map[Expr, Set[Expr]] = mutable.Map[Expr, Set[Expr]]()
-    val pointerPool: PointerPool = PointerPool()
-    print(s"Stack Tracker: \n${stackTracker.mkString(",\n")}\n")
-    print(s"Variable Tracker: \n${variableTracker.mkString(",\n")}\n")
-    print(s"Heap Tracker: \n${heapTracker.mkString(",\n")}\n")
 
     heapTracker.foreach { case (k, v) =>
       v.foreach(e =>
