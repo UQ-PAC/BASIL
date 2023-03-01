@@ -18,21 +18,24 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val requires = spec.subroutines.map(s => s.name -> s.requires.map(e => e.resolveSpec)).toMap
   private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(e => e.resolveSpec)).toMap
 
+  private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+  private val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+  private val stack = BMapVar("stack", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+  private val Gamma_stack = BMapVar("Gamma_stack", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+
   def translate: BProgram = {
     val procedures = program.procedures.map(f => translateProcedure(f, requires, ensures))
     // TODO remove this once proper analysis for modifies is done
-    val defaultGlobals = List(BVarDecl(BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)),
-      BVarDecl(BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)),
-      BVarDecl(BMapVar("stack", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)),
-      BVarDecl(BMapVar("Gamma_stack", MapBType(BitVecBType(64), BoolBType), Scope.Global))
-    )
+    val defaultGlobals = List(BVarDecl(mem), BVarDecl(Gamma_mem), BVarDecl(stack), BVarDecl(Gamma_stack))
     val globalDecls = (procedures.flatMap(p => p.globals).map(b => BVarDecl(b)) ++ defaultGlobals).distinct.sorted.toList
 
     val globalConsts: List[BConstAxiomPair] = globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar), g.toAxiom)).toList.sorted
 
     val functionsUsed1: List[BFunction] = procedures.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted.toList
 
-    val rgProcs = genRely(relies) :+ BProcedure("guarantee_reflexive", List(), List(), List(), List(), Seq(), guaranteesReflexive.map(g => Assert(g)))
+    val guaranteeReflexive = BProcedure("guarantee_reflexive", List(), List(), List(), List(), Seq(mem, Gamma_mem), guaranteesReflexive.map(g => Assert(g)))
+
+    val rgProcs = genRely(relies) :+ guaranteeReflexive
 
     val functionsUsed2 = rgProcs.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted
     val functionsUsed3 = functionsUsed1.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted
@@ -43,8 +46,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   }
 
   def genRely(relies: List[BExpr]): List[BProcedure] = {
-    val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-    val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
     val reliesUsed = if (relies.nonEmpty) {
       relies
     } else {
@@ -177,7 +178,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }
   }
 
-  def translateProcedure(p: Procedure,  requiresSpec: Map[String, List[BExpr]], ensuresSpec: Map[String, List[BExpr]]): BProcedure = {
+  def translateProcedure(p: Procedure, requiresSpec: Map[String, List[BExpr]], ensuresSpec: Map[String, List[BExpr]]): BProcedure = {
     val in = p.in.flatMap(i => i.toBoogie)
 
     var outRegisters: Set[Variable] = Set()
@@ -202,7 +203,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }).flatten.toList
 
     val body = p.blocks.map(b => translateBlock(b, returns))
-    val modifies = body.flatMap(b => b.modifies).toSet
+    //val modifies = body.flatMap(b => b.modifies).toSet
+    val modifies = Set(mem, Gamma_mem, stack, Gamma_stack) // TODO placeholder until proper modifies analysis
 
     val requires: List[BExpr] = requiresSpec.getOrElse(p.name, List())
     val ensures: List[BExpr] = ensuresSpec.getOrElse(p.name, List())
@@ -212,6 +214,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     } else {
       p.in.map(i => inParamToAssign(i)).toList
     }
+
 
     BProcedure(p.name, in.toList, out.toList, ensures, requires, modifies.toSeq.sorted, inInits ++ body.toList)
   }
@@ -267,23 +270,23 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           call ++ returnTarget
       }
     case i: IndirectCall =>
-      val returnTarget = i.returnTarget match {
-        case Some(r) => List(GoToCmd(r.label))
-        case None => List(Comment("no return target"), Assume(FalseBLiteral))
-      }
       // TODO put this elsewhere
-      val call = if (i.target.name == "R30") {
+      val call: List[BCmd] = if (i.target.name == "R30") {
         returns :+ ReturnCmd
       } else {
-        List(Comment(s"TODO: call ${i.target.name}"), Assume(FalseBLiteral)) ++ returnTarget // TODO determine call target
+        val unresolved: List[BCmd] = List(Comment(s"UNRESOLVED: call ${i.target.name}"), Assume(FalseBLiteral))
+        i.returnTarget match {
+          case Some(r) => unresolved :+ GoToCmd(r.label)
+          case None => unresolved ++ List(Comment("no return target"), Assume(FalseBLiteral))
+        }
       }
       i.condition match {
         case Some(c) =>
           val guard = c.toBoogie
           val guardGamma = c.toGamma
-          List(Assert(guardGamma), IfCmd(guard, call ++ returnTarget))
+          List(Assert(guardGamma), IfCmd(guard, call))
         case None =>
-          call ++ returnTarget
+          call
       }
     case g: GoTo =>
       g.condition match {

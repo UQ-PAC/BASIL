@@ -12,7 +12,9 @@ The tool takes as inputs a BAP ADT file (here denoted with `.adt`) and a file co
 
 To build and run the tool using sbt, use the following command:
 
-`sbt "run file.adt file.relf [file.spec] [output.bpl]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
+`sbt "run file.adt file.relf [file.spec] [output.bpl] [-analyse]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
+
+The `-analyse` flag is optional and enables the static analysis functionality.
 
 The sbt shell can also be used for multiple tasks with less overhead by executing `sbt` and then the relevant sbt commands.
 
@@ -20,13 +22,13 @@ To build a standalone `.jar` file, use the following command:
 
 `sbt assembly`
 
-To compile sources so that IntelliJ is happy, use the following command:
+To compile the source without running it - this helps IntelliJ highlight things properly:
 
 `sbt compile`
 
 The standalone `.jar` can then be executed with the following command:
 
-`./run.sh file.adt file.relf [file.spec] [output.bpl]`
+`./run.sh file.adt file.relf [file.spec] [output.bpl] [-analyse]`
 
 ## Generating inputs
 The tool takes a `.adt` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.

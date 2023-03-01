@@ -3,6 +3,7 @@ import analysis._
 import analysis.util.SSA
 import cfg_visualiser.{OtherOutput, Output, OutputKindE}
 import bap._
+import ir._
 import boogie._
 import specification._
 import BilParser._
@@ -15,7 +16,7 @@ import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
 object RunUtils {
 
-  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String]): BProgram = {
+  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean): BProgram = {
     val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(adtLexer)
     // ADT
@@ -44,21 +45,6 @@ object RunUtils {
 
     //println(externalFunctions)
     //println(globals)
-
-//    val wcfg = IntraproceduralProgramCfg.generateFromProgram(program)
-//
-////    //print(wcfg.nodes)
-////    Output.output(OtherOutput(OutputKindE.cfg), wcfg.toDot({ x =>
-////      x.toString
-////    }, Output.dotIder))
-//
-//
-//    val an = ConstantPropagationAnalysis.WorklistSolver(wcfg)
-//    val res = an.analyze().asInstanceOf[Map[CfgNode, _]]
-//    print(res.keys)
-//    Output.output(OtherOutput(OutputKindE.cfg), an.cfg.toDot(Output.labeler(res, an.stateAfterNode), Output.dotIder))
-
-
     /*
     TODO analyses/transformations
     -type checking
@@ -72,22 +58,6 @@ object RunUtils {
     -instrument with gammas, vcs, rely, guarantee
      */
 
-    def dump_file(content: String, name: String): Unit = {
-      val outFile = new File(s"${name}.txt")
-      val pw = new PrintWriter(outFile, "UTF-8")
-      pw.write(content)
-      pw.close()
-    }
-
-    def dump_plot(content: String, name: String): Unit = {
-      val outFile = new File(s"${name}.dot")
-      val pw = new PrintWriter(outFile, "UTF-8")
-      pw.write(content)
-      pw.close()
-    }
-
-
-
     val externalNames = externalFunctions.map(e => e.name)
 
     val IRTranslator = BAPToIR(program)
@@ -96,17 +66,31 @@ object RunUtils {
     val boogieTranslator = IRToBoogie(IRProgram, specification)
     boogieTranslator.stripUnreachableFunctions(externalNames)
 
-    // does not work properly (old comment)
-    // run using sbt shell and:
-    // run ./examples/secret_write/secret_write.adt ./examples/secret_write/secret_write.relf
-    // run ./examples/basicpointer/basicpointer.adt ./examples/basicpointer/basicpointer.relf
+    if (performAnalysis) {
+      analyse(IRProgram)
+    }
+
+    boogieTranslator.translate
+  }
+
+  def analyse(IRProgram: Program): Unit = {
+    //    val wcfg = IntraproceduralProgramCfg.generateFromProgram(program)
+    //
+    ////    //print(wcfg.nodes)
+    ////    Output.output(OtherOutput(OutputKindE.cfg), wcfg.toDot({ x =>
+    ////      x.toString
+    ////    }, Output.dotIder))
+    //
+    //
+    //    val an = ConstantPropagationAnalysis.WorklistSolver(wcfg)
+    //    val res = an.analyze().asInstanceOf[Map[CfgNode, _]]
+    //    print(res.keys)
+    //    Output.output(OtherOutput(OutputKindE.cfg), an.cfg.toDot(Output.labeler(res, an.stateAfterNode), Output.dotIder))
 
     val cfg = IntraproceduralProgramCfg.generateFromProgram(IRProgram)
-
-
-//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
-//      x.toString
-//    }, Output.dotIder))
+    //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
+    //      x.toString
+    //    }, Output.dotIder))
     val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
     val result = solver.analyze()
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder))
@@ -116,9 +100,9 @@ object RunUtils {
     print(s"\n****************  ${result.values}  *****************\n")
 
 
-//    val solver2 = new SteensgaardAnalysis(translator.program, result)
-//    val result2 = solver2.analyze()
-//    print(solver2.pointsTo())
+    //    val solver2 = new SteensgaardAnalysis(translator.program, result)
+    //    val result2 = solver2.analyze()
+    //    print(solver2.pointsTo())
 
     val ssa = new SSA(cfg)
     ssa.analyze()
@@ -137,9 +121,6 @@ object RunUtils {
     stringBuilder.append("}")
     dump_plot(stringBuilder.toString(), "result")
     */
-
-
-    boogieTranslator.translate
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {
@@ -151,6 +132,21 @@ object RunUtils {
       case _: IOException => System.err.println("Error writing to file.")
     }
   }
+
+  def dump_file(content: String, name: String): Unit = {
+    val outFile = new File(s"${name}.txt")
+    val pw = new PrintWriter(outFile, "UTF-8")
+    pw.write(content)
+    pw.close()
+  }
+
+  def dump_plot(content: String, name: String): Unit = {
+    val outFile = new File(s"${name}.dot")
+    val pw = new PrintWriter(outFile, "UTF-8")
+    pw.write(content)
+    pw.close()
+  }
+
 }
 
 class AnalysisTypeException(message: String)
