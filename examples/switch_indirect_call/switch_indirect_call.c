@@ -1,5 +1,9 @@
 #include <stdlib.h>
 
+int r() {
+    return 1;
+}
+
 void main(int argc, char** argv) {
 	int new = 0;
 	switch (argc) {
@@ -10,8 +14,4 @@ void main(int argc, char** argv) {
         case 5: new = 4;
 		default: new = 5;
 	}
-
-    int r() {
-        return 1;
-    }
 }
