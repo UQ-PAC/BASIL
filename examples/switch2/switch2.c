@@ -15,3 +15,4 @@ void main(int argc, char** argv) {
 		default: new = 5;
 	}
 }
+
