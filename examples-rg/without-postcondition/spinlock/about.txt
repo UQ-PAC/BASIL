@@ -2,3 +2,5 @@ From the WPIF paper.
 
 Information on compare and swap (cs) was retrieved from
 https://www.ibm.com/docs/en/zos/2.3.0?topic=functions-cs-compare-swap.
+
+Note: cs is only available in the IBM zOS C implementation so this example will require further work

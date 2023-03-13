@@ -16,3 +16,7 @@ password.txt
 *.out
 samples/const_prop_tests/
 src/main/antlr4/.antlr
+*.bpl
+*.dot
+result.txt
+examplesold/

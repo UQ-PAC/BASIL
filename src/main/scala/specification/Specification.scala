@@ -4,7 +4,6 @@ import boogie._
 import ir._
 
 trait SpecVar extends BExpr {
-  override def specVars: Set[SpecVar] = Set(this)
   override def getType: BType = {
     println(this)
     ???
@@ -13,6 +12,7 @@ trait SpecVar extends BExpr {
 }
 
 case class SpecGlobal(name: String, size: Int, address: BigInt) extends SpecVar {
+  override def specGlobals: Set[SpecGlobal] = Set(this)
   val toAddrVar: BVar = BVariable("$" + s"${name}_addr", BitVecBType(64), Scope.Const)
   val toOldVar: BVar = BVariable(s"${name}_old", BitVecBType(size), Scope.Local)
   val toOldGamma: BVar = BVariable(s"Gamma_${name}_old", BoolBType, Scope.Local)
@@ -31,11 +31,19 @@ case class SpecGamma(global: SpecGlobal) extends SpecVar {
   override def resolveSpecL: GammaLoad = resolveSpec
 }
 
+case class SpecParameter(name: String) extends SpecVar {
+
+}
+
+case class SpecParameterGamma(param: SpecParameter) extends SpecVar {
+
+}
+
 case class Specification(globals: Set[SpecGlobal], LPreds: Map[SpecGlobal, BExpr], relies: List[BExpr], guarantees: List[BExpr], subroutines: List[SubroutineSpec]) {
-  val guaranteeOldVars: List[SpecGlobal] = guarantees.flatMap(g => g.oldSpecVars.collect{ case s: SpecGlobal => s })
+  val guaranteeOldVars: List[SpecGlobal] = guarantees.flatMap(g => g.oldSpecGlobals)
 
   val controls: Map[SpecGlobal, Set[SpecGlobal]] = {
-    val controlledBy = LPreds.map((k, v) => k -> v.specVars.collect{ case s: SpecGlobal => s }).collect{ case (k, v) if v.nonEmpty => (k, v) }
+    val controlledBy = LPreds.map((k, v) => k -> v.specGlobals).collect{ case (k, v) if v.nonEmpty => (k, v) }
     controlledBy.toSet.flatMap((k, v) => v.map(_ -> k)).groupMap(_._1)(_._2)
   }
   val controlled: Set[SpecGlobal] = controls.values.flatten.toSet

@@ -8,8 +8,8 @@ trait BExpr {
   def locals: Set[BVar] = Set()
   def globals: Set[BVar] = Set()
   def replaceReserved(reserved: Set[String]): BExpr
-  def specVars: Set[SpecVar] = Set()
-  def oldSpecVars: Set[SpecVar] = Set()
+  def specGlobals: Set[SpecGlobal] = Set()
+  def oldSpecGlobals: Set[SpecGlobal] = Set()
   def resolveSpec: BExpr = this
   def resolveOld: BExpr = this
   def removeOld: BExpr = this
@@ -52,8 +52,8 @@ case class BVExtract(end: Int, start: Int, body: BExpr) extends BExpr {
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
-  override def specVars: Set[SpecVar] = body.specVars
-  override def oldSpecVars: Set[SpecVar] = body.oldSpecVars
+  override def specGlobals: Set[SpecGlobal] = body.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobal] = body.oldSpecGlobals
   override def replaceReserved(reserved: Set[String]): BVExtract = copy(body = body.replaceReserved(reserved))
   override def resolveSpec: BVExtract = copy(body = body.resolveSpec)
   override def resolveSpecL: BVExtract = copy(body = body.resolveSpecL)
@@ -78,8 +78,8 @@ case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
   }
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
-  override def specVars: Set[SpecVar] = body.specVars
-  override def oldSpecVars: Set[SpecVar] = body.oldSpecVars
+  override def specGlobals: Set[SpecGlobal] = body.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobal] = body.oldSpecGlobals
   override def resolveSpec: BVRepeat = copy(body = body.resolveSpec)
   override def resolveSpecL: BVRepeat = copy(body = body.resolveSpecL)
   override def resolveOld: BVRepeat = copy(body = body.resolveOld)
@@ -105,8 +105,8 @@ case class BVZeroExtend(extension: Int, body: BExpr) extends BExpr {
   }
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
-  override def specVars: Set[SpecVar] = body.specVars
-  override def oldSpecVars: Set[SpecVar] = body.oldSpecVars
+  override def specGlobals: Set[SpecGlobal] = body.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobal] = body.oldSpecGlobals
   override def resolveSpec: BVZeroExtend = copy(body = body.resolveSpec)
   override def resolveSpecL: BVZeroExtend = copy(body = body.resolveSpecL)
   override def resolveOld: BExpr = copy(body = body.resolveOld)
@@ -132,8 +132,8 @@ case class BVSignExtend(extension: Int, body: BExpr) extends BExpr {
   }
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
-  override def specVars: Set[SpecVar] = body.specVars
-  override def oldSpecVars: Set[SpecVar] = body.oldSpecVars
+  override def specGlobals: Set[SpecGlobal] = body.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobal] = body.oldSpecGlobals
   override def resolveSpecL: BVSignExtend = copy(body = body.resolveSpecL)
   override def resolveSpec: BVSignExtend = copy(body = body.resolveSpec)
   override def resolveOld: BExpr = copy(body = body.resolveOld)
@@ -205,8 +205,8 @@ case class BFunctionCall(name: String, args: List[BExpr], bType: BType) extends 
   override def functionOps: Set[FunctionOp] = args.flatMap(a => a.functionOps).toSet
   override def locals: Set[BVar] = args.flatMap(a => a.locals).toSet
   override def globals: Set[BVar] = args.flatMap(a => a.globals).toSet
-  override def specVars: Set[SpecVar] = args.flatMap(a => a.specVars).toSet
-  override def oldSpecVars: Set[SpecVar] = args.flatMap(a => a.oldSpecVars).toSet
+  override def specGlobals: Set[SpecGlobal] = args.flatMap(a => a.specGlobals).toSet
+  override def oldSpecGlobals: Set[SpecGlobal] = args.flatMap(a => a.oldSpecGlobals).toSet
   override def resolveSpec: BFunctionCall = copy(args = args.map(a => a.resolveSpec))
   override def resolveSpecL: BFunctionCall = copy(args = args.map(a => a.resolveSpecL))
   override def resolveOld: BExpr = copy(args = args.map(a => a.resolveOld))
@@ -252,8 +252,8 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
 
   override def locals: Set[BVar] = arg.locals
   override def globals: Set[BVar] = arg.globals
-  override def specVars: Set[SpecVar] = arg.specVars
-  override def oldSpecVars: Set[SpecVar] = arg.oldSpecVars
+  override def specGlobals: Set[SpecGlobal] = arg.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobal] = arg.oldSpecGlobals
   override def resolveSpec: UnaryBExpr = op match {
     case i: IntUnOp => copy(op = i.toBV, arg = arg.resolveSpec)
     case _          => copy(arg = arg.resolveSpec)
@@ -298,8 +298,8 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
           if (bv1.size == bv2.size) {
             BitVecBType(1)
           } else {
+            throw new Exception("bitvector size mismatch")
             BitVecBType(1)
-            //throw new Exception("bitvector size mismatch") TODO
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
@@ -355,8 +355,8 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
 
   override def locals: Set[BVar] = arg1.locals ++ arg2.locals
   override def globals: Set[BVar] = arg1.globals ++ arg2.globals
-  override def specVars: Set[SpecVar] = arg1.specVars ++ arg2.specVars
-  override def oldSpecVars: Set[SpecVar] = arg1.oldSpecVars ++ arg2.oldSpecVars
+  override def specGlobals: Set[SpecGlobal] = arg1.specGlobals ++ arg2.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobal] = arg1.oldSpecGlobals ++ arg2.oldSpecGlobals
 
   override def resolveSpec: BinaryBExpr = op match {
     case i: IntBinOp => copy(op = i.toBV, arg1 = arg1.resolveSpec, arg2 = arg2.resolveSpec)
@@ -396,8 +396,8 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def functionOps: Set[FunctionOp] = guard.functionOps ++ thenExpr.functionOps ++ elseExpr.functionOps
   override def locals: Set[BVar] = guard.locals ++ thenExpr.locals ++ elseExpr.locals
   override def globals: Set[BVar] = guard.globals ++ thenExpr.globals ++ elseExpr.globals
-  override def specVars: Set[SpecVar] = guard.specVars ++ thenExpr.specVars ++ elseExpr.specVars
-  override def oldSpecVars: Set[SpecVar] = guard.oldSpecVars ++ thenExpr.oldSpecVars ++ elseExpr.oldSpecVars
+  override def specGlobals: Set[SpecGlobal] = guard.specGlobals ++ thenExpr.specGlobals ++ elseExpr.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobal] = guard.oldSpecGlobals ++ thenExpr.oldSpecGlobals ++ elseExpr.oldSpecGlobals
   override def resolveSpec: IfThenElse =
     copy(guard = guard.resolveSpec, thenExpr = thenExpr.resolveSpec, elseExpr = elseExpr.resolveSpec)
   override def resolveSpecL: IfThenElse =
@@ -424,8 +424,8 @@ trait QuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends B
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals -- bound.toSet
   override def globals: Set[BVar] = body.globals -- bound.toSet
-  override def specVars: Set[SpecVar] = body.specVars
-  override def oldSpecVars: Set[SpecVar] = body.oldSpecVars
+  override def specGlobals: Set[SpecGlobal] = body.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobal] = body.oldSpecGlobals
 }
 
 enum Quantifier {
@@ -455,7 +455,7 @@ case class Old(body: BExpr) extends BExpr {
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
-  override def oldSpecVars: Set[SpecVar] = body.specVars
+  override def oldSpecGlobals: Set[SpecGlobal] = body.specGlobals
   override def resolveSpec: BExpr = copy(body = body.resolveSpec)
   override def resolveSpecL: BExpr = copy(body = body.resolveSpecL)
   override def resolveOld: BExpr = body match {

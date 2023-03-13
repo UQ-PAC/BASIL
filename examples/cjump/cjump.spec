@@ -1,1 +1,3 @@
-Gamma: x -> true, y -> false
+Subroutine: main
+Requires: Gamma_x == true
+Requires: Gamma_y == false
