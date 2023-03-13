@@ -33,16 +33,6 @@ object RunUtils {
 
     val (externalFunctions, globals) = ElfLoader.visitSyms(elfParser.syms())
 
-    val specification = specFileName match {
-      case Some(s) => val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
-        val specTokens = CommonTokenStream(specLexer)
-        val specParser = SpecificationsParser(specTokens)
-        specParser.setBuildParseTree(true)
-        val specLoader = SpecificationLoader(globals)
-        specLoader.visitSpecification(specParser.specification())
-      case None => Specification(globals, Map(), List(), List(), List())
-    }
-
     //println(externalFunctions)
     //println(globals)
     /*
@@ -62,6 +52,16 @@ object RunUtils {
 
     val IRTranslator = BAPToIR(program)
     val IRProgram = IRTranslator.translate
+
+    val specification = specFileName match {
+      case Some(s) => val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
+        val specTokens = CommonTokenStream(specLexer)
+        val specParser = SpecificationsParser(specTokens)
+        specParser.setBuildParseTree(true)
+        val specLoader = SpecificationLoader(globals, IRProgram)
+        specLoader.visitSpecification(specParser.specification())
+      case None => Specification(globals, Map(), List(), List(), List())
+    }
 
     val boogieTranslator = IRToBoogie(IRProgram, specification)
     boogieTranslator.stripUnreachableFunctions(externalNames)

@@ -46,7 +46,7 @@ case class BProcedure(
     List(header + returns + semicolon) ++ modifiesStr ++ requiresStrs ++ ensuresStrs ++ bodyStr ++ List("")
   }
   override def toString: String = toBoogie.mkString("\n")
-  def functionOps: Set[FunctionOp] = body.flatMap(c => c.functionOps).toSet
+  def functionOps: Set[FunctionOp] = body.flatMap(c => c.functionOps).toSet ++ ensures.flatMap(c => c.functionOps).toSet ++ requires.flatMap(c => c.functionOps).toSet
   def globals: Set[BVar] = body.flatMap(c => c.globals).toSet
 
   override def replaceReserved(reserved: Set[String]): BProcedure = {

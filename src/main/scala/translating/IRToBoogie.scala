@@ -15,7 +15,11 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val guaranteesReflexive = spec.guarantees.map(g => g.removeOld)
   private val guaranteeOldVars = spec.guaranteeOldVars
   private val LPreds = spec.LPreds.map((k, v) => k -> v.resolveSpecL)
-  private val requires = spec.subroutines.map(s => s.name -> s.requires.map(e => e.resolveSpec)).toMap
+  private val requires = {
+
+
+    spec.subroutines.map(s => s.name -> s.requires.map(e => e.resolveSpec)).toMap
+  }
   private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(e => e.resolveSpec)).toMap
 
   private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
@@ -24,7 +28,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val Gamma_stack = BMapVar("Gamma_stack", MapBType(BitVecBType(64), BoolBType), Scope.Global)
 
   def translate: BProgram = {
-    val procedures = program.procedures.map(f => translateProcedure(f, requires, ensures))
+    val procedures = program.procedures.map(f => translateProcedure(f))
     // TODO remove this once proper analysis for modifies is done
     val defaultGlobals = List(BVarDecl(mem), BVarDecl(Gamma_mem), BVarDecl(stack), BVarDecl(Gamma_stack))
     val globalDecls = (procedures.flatMap(p => p.globals).map(b => BVarDecl(b)) ++ defaultGlobals).distinct.sorted.toList
@@ -178,8 +182,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }
   }
 
-  def translateProcedure(p: Procedure, requiresSpec: Map[String, List[BExpr]], ensuresSpec: Map[String, List[BExpr]]): BProcedure = {
-    val in = p.in.flatMap(i => i.toBoogie)
+  def translateProcedure(p: Procedure): BProcedure = {
+    val in = p.in.flatMap(i => List(i.toBoogie, i.toGamma))
 
     var outRegisters: Set[Variable] = Set()
 
@@ -188,7 +192,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         List()
       } else {
         outRegisters = outRegisters + o.value
-        o.toBoogie
+        List(o.toBoogie, o.toGamma)
       }
     }).flatten
 
@@ -206,8 +210,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     //val modifies = body.flatMap(b => b.modifies).toSet
     val modifies = Set(mem, Gamma_mem, stack, Gamma_stack) // TODO placeholder until proper modifies analysis
 
-    val requires: List[BExpr] = requiresSpec.getOrElse(p.name, List())
-    val ensures: List[BExpr] = ensuresSpec.getOrElse(p.name, List())
+    val procRequires: List[BExpr] = requires.getOrElse(p.name, List())
+    val procEnsures: List[BExpr] = ensures.getOrElse(p.name, List())
 
     val inInits = if (body.isEmpty) {
       List()
@@ -216,7 +220,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }
 
 
-    BProcedure(p.name, in.toList, out.toList, ensures, requires, modifies.toSeq.sorted, inInits ++ body.toList)
+    BProcedure(p.name, in.toList, out.toList, procEnsures, procRequires, modifies.toSeq.sorted, inInits ++ body.toList)
   }
 
   private def outParamToAssign(p: Parameter): AssignCmd = {

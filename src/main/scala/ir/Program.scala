@@ -21,5 +21,6 @@ class Block(var label: String, var address: Option[Int], var statements: ArrayBu
 class Offset(var name: String, var memory: Memory, var size: Int, var value: BigInt)
 
 class Parameter(var name: String, var size: Int, var value: Variable) {
-  def toBoogie: List[BVariable] = List(BParam(name, BitVecBType(size)), BParam(s"Gamma_$name", BoolBType))
+  def toBoogie: BVariable = BParam(name, BitVecBType(size))
+  def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
 }

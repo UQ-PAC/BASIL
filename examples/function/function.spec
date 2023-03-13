@@ -1,5 +1,6 @@
-Gamma: x -> true, y -> true
+Subroutine: main
+Requires: Gamma_x == true
+Requires: Gamma_y == true
 
-//not yet implemented, needs further work
-//get_two:
-//ensures: Gamma_R0_out == s_TRUE
+Subroutine: get_two
+Ensures: Gamma_get_two_result == true

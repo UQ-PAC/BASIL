@@ -5,9 +5,10 @@ import boogie._
 import specification._
 import ir._
 
+import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
 
-case class SpecificationLoader(globals: Set[SpecGlobal]) {
+case class SpecificationLoader(globals: Set[SpecGlobal], program: Program) {
   private val idToGlobals = globals.map(g => (g.name, g)).toMap
 
   def visitSpecification(ctx: SpecificationContext): Specification = {
@@ -71,8 +72,8 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
     ctx.expr.asScala.map(e => visitExpr(e)).toList
   }
 
-  def visitExpr(ctx: ExprContext): BExpr = {
-    val exprs = ctx.impliesExpr.asScala.map(e => visitImpliesExpr(e))
+  def visitExpr(ctx: ExprContext, params: Map[String, Parameter] = Map()): BExpr = {
+    val exprs = ctx.impliesExpr.asScala.map(e => visitImpliesExpr(e, params))
     if (exprs.size > 1) {
       exprs.tail.foldLeft(exprs.head)((opExpr: BExpr, next: BExpr) => BinaryBExpr(BoolEQUIV, opExpr, next))
     } else {
@@ -80,13 +81,13 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
     }
   }
 
-  def visitImpliesExpr(ctx: ImpliesExprContext): BExpr = Option(ctx.arg2) match {
-    case Some(_) => BinaryBExpr(BoolIMPLIES, visitLogicalExpr(ctx.arg1), visitImpliesExpr(ctx.arg2))
-    case None => visitLogicalExpr(ctx.arg1)
+  def visitImpliesExpr(ctx: ImpliesExprContext, params: Map[String, Parameter] = Map()): BExpr = Option(ctx.arg2) match {
+    case Some(_) => BinaryBExpr(BoolIMPLIES, visitLogicalExpr(ctx.arg1, params), visitImpliesExpr(ctx.arg2, params))
+    case None => visitLogicalExpr(ctx.arg1, params)
   }
 
-  def visitLogicalExpr(ctx: LogicalExprContext): BExpr = {
-    val rels = ctx.relExpr.asScala.map(r => visitRelExpr(r))
+  def visitLogicalExpr(ctx: LogicalExprContext, params: Map[String, Parameter] = Map()): BExpr = {
+    val rels = ctx.relExpr.asScala.map(r => visitRelExpr(r, params))
     if (rels.size > 1) {
       val op = if (ctx.AND_OP.size > 0) {
         BoolAND
@@ -99,40 +100,40 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
     }
   }
 
-  def visitRelExpr(ctx: RelExprContext): BExpr = Option(ctx.arg2) match {
-    case Some(_) => BinaryBExpr(visitRelOp(ctx.op), visitTerm(ctx.arg1), visitTerm(ctx.arg2))
-    case None => visitTerm(ctx.arg1)
+  def visitRelExpr(ctx: RelExprContext, params: Map[String, Parameter] = Map()): BExpr = Option(ctx.arg2) match {
+    case Some(_) => BinaryBExpr(visitRelOp(ctx.op), visitTerm(ctx.arg1, params), visitTerm(ctx.arg2, params))
+    case None => visitTerm(ctx.arg1, params)
   }
 
-  def visitTerm(ctx: TermContext): BExpr = Option(ctx.arg2) match {
-    case Some(_) => BinaryBExpr(visitAddSubOp(ctx.op), visitFactor(ctx.arg1), visitFactor(ctx.arg2))
-    case None => visitFactor(ctx.arg1)
+  def visitTerm(ctx: TermContext, params: Map[String, Parameter] = Map()): BExpr = Option(ctx.arg2) match {
+    case Some(_) => BinaryBExpr(visitAddSubOp(ctx.op), visitFactor(ctx.arg1, params), visitFactor(ctx.arg2, params))
+    case None => visitFactor(ctx.arg1, params)
   }
 
-  def visitFactor(ctx: FactorContext): BExpr = Option(ctx.arg2) match {
-    case Some(_) => BinaryBExpr(visitMulDivModOp(ctx.op), visitUnaryExpr(ctx.arg1), visitUnaryExpr(ctx.arg2))
-    case None => visitUnaryExpr(ctx.arg1)
+  def visitFactor(ctx: FactorContext, params: Map[String, Parameter] = Map()): BExpr = Option(ctx.arg2) match {
+    case Some(_) => BinaryBExpr(visitMulDivModOp(ctx.op), visitUnaryExpr(ctx.arg1, params), visitUnaryExpr(ctx.arg2, params))
+    case None => visitUnaryExpr(ctx.arg1, params)
   }
 
-  def visitUnaryExpr(ctx: UnaryExprContext): BExpr = ctx match {
-    case n: NegExprContext => UnaryBExpr(IntNEG, visitUnaryExpr(n.unaryExpr))
-    case a: AtomUnaryExprContext => visitAtomExpr(a.atomExpr)
+  def visitUnaryExpr(ctx: UnaryExprContext, params: Map[String, Parameter] = Map()): BExpr = ctx match {
+    case n: NegExprContext => UnaryBExpr(IntNEG, visitUnaryExpr(n.unaryExpr, params))
+    case a: AtomUnaryExprContext => visitAtomExpr(a.atomExpr, params)
   }
 
-  def visitAtomExpr(ctx: AtomExprContext): BExpr = ctx match {
+  def visitAtomExpr(ctx: AtomExprContext, params: Map[String, Parameter] = Map()): BExpr = ctx match {
     case b: BoolLitExprContext => visitBoolLit(b.boolLit)
     case n: NatExprContext => visitNat(n.nat)
-    case i: IdExprContext => visitId(i.id)
-    case g: GammaIdExprContext => visitGammaId(g.gammaId)
-    case o: OldExprContext => visitOldExpr(o)
-    case p: ParenExprContext => visitExpr(p.expr)
-    case i: IfThenElseExprContext => visitIfThenElseExpr(i)
+    case i: IdExprContext => visitId(i.id, params)
+    case g: GammaIdExprContext => visitGammaId(g.gammaId, params)
+    case o: OldExprContext => visitOldExpr(o, params)
+    case p: ParenExprContext => visitExpr(p.expr, params)
+    case i: IfThenElseExprContext => visitIfThenElseExpr(i, params)
   }
 
-  def visitOldExpr(ctx: OldExprContext): Old = Old(visitExpr(ctx.expr))
+  def visitOldExpr(ctx: OldExprContext, params: Map[String, Parameter] = Map()): Old = Old(visitExpr(ctx.expr))
 
-  def visitIfThenElseExpr(ctx: IfThenElseExprContext): IfThenElse = {
-    IfThenElse(visitExpr(ctx.guard), visitExpr(ctx.thenExpr), visitExpr(ctx.elseExpr))
+  def visitIfThenElseExpr(ctx: IfThenElseExprContext, params: Map[String, Parameter] = Map()): IfThenElse = {
+    IfThenElse(visitExpr(ctx.guard, params), visitExpr(ctx.thenExpr, params), visitExpr(ctx.elseExpr, params))
   }
 
   def visitNat(ctx: NatContext): IntBLiteral = IntBLiteral(BigInt(ctx.getText))
@@ -142,12 +143,26 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
     case "false" => FalseBLiteral
   }
 
-  def visitGammaId(ctx: GammaIdContext): SpecGamma = {
-    SpecGamma(visitId(ctx.id))
+  def visitGammaId(ctx: GammaIdContext, params: Map[String, Parameter] = Map()): BExpr = {
+    val id = ctx.id.getText
+    params.get(id) match {
+      case Some(p: Parameter) => p.toGamma
+      case None => idToGlobals.get(id) match {
+        case Some(g: SpecGlobal) => SpecGamma(g)
+        case None => throw new Exception(s"unresolveable reference to 'Gamma_$id' in specification")
+      }
+    }
   }
 
-  def visitId(ctx: IdContext): SpecGlobal = {
-    idToGlobals(ctx.getText)
+  def visitId(ctx: IdContext, params: Map[String, Parameter] = Map()): BExpr = {
+    val id = ctx.getText
+    params.get(id) match {
+      case Some(p: Parameter) => p.toBoogie
+      case None => idToGlobals.get(ctx.getText) match {
+        case Some(g: SpecGlobal) => g
+        case None => throw new Exception(s"unresolveable reference to '$id' in specification")
+      }
+    }
   }
 
   def visitMulDivModOp(ctx: MulDivModOpContext): IntBinOp = ctx.getText match {
@@ -172,8 +187,16 @@ case class SpecificationLoader(globals: Set[SpecGlobal]) {
   }
 
   def visitSubroutine(ctx: SubroutineContext): SubroutineSpec = {
-    val requires = ctx.requires.asScala.map(r => visitExpr(r.expr)).toList
-    val ensures = ctx.ensures.asScala.map(e => visitExpr(e.expr)).toList
+    val name = ctx.id.getText
+    val irProc = program.procedures.collectFirst { case p if p.name == name => p }
+
+    val params: Map[String, Parameter] = irProc match {
+      case None => Map()
+      case Some(p) => p.in.map { (p: Parameter) => p.name -> p }.toMap ++ p.out.map { (p: Parameter) => p.name -> p }.toMap
+    }
+
+    val requires = ctx.requires.asScala.map(r => visitExpr(r.expr, params)).toList
+    val ensures = ctx.ensures.asScala.map(e => visitExpr(e.expr, params)).toList
     SubroutineSpec(ctx.id.getText, requires, ensures)
   }
 }
