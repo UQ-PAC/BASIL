@@ -6,4 +6,4 @@ Subroutine: main
 Requires: Gamma_main_argc == false
 
 Subroutine: zero
-Ensures: zero_result == 0
+Ensures: zero_result == 0 && Gamma_zero_result
