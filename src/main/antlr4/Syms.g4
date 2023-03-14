@@ -14,7 +14,7 @@ relocationTableHeader :
   'Relocation section' tableName 'at offset 0x' HEX 'contains' HEX 'entries:'
   'Offset' 'Info' 'Type' ('Sym. Value' | 'Symbol\'s Value') ('Symbol\'s Name + Addend' | 'Sym. Name + Addend')
   ;
-relocationTableRow : offset=HEX HEX STRING HEX? ((name=STRING '+' HEX) | HEX);
+relocationTableRow : offset=HEX HEX relocType=STRING HEX? ((name=STRING '+' HEX) | gotName=HEX);
 
 /* Guide from https://stackoverflow.com/questions/3065535/what-are-the-meanings-of-the-columns-of-the-symbol-table-displayed-by-readelf
     Num: = The symbol number

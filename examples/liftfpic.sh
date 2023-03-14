@@ -1,4 +1,7 @@
-cd $1
+echo "$1"
+echo "$1"
+echo "$1.c"
+cd "${1}"
 aarch64-linux-gnu-gcc -fno-plt -fPIC "$1.c" -o "$1.out"
 bap "$1.out" -d adt:"$1.adt" -d bir:"$1.bir" --primus-lisp-semantics=disable \
             --asli-prelude=$ASLI_PATH/prelude.asl \

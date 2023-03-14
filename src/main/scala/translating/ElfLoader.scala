@@ -5,23 +5,41 @@ import specification._
 import scala.jdk.CollectionConverters._
 
 object ElfLoader {
-  def visitSyms(ctx: SymsContext): (Set[ExternalFunction], Set[SpecGlobal]) = {
-    val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTable(r)).toSet
+  def visitSyms(ctx: SymsContext): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt]) = {
+    val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableExtFunc(r)).toSet
+    val relocationOffsets = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableOffsets(r)).toMap
     val globalVariables = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toSet
-    (externalFunctions, globalVariables)
+    (externalFunctions, globalVariables, relocationOffsets)
   }
 
-  def visitRelocationTable(ctx: RelocationTableContext): Set[ExternalFunction] = {
+  def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {
     if (ctx.relocationTableHeader.tableName.STRING.getText == ".rela.plt") {
       val rows = ctx.relocationTableRow.asScala
-      rows.map(r => visitRelocationTableRow(r)).toSet
+      rows.map(r => visitRelocationTableRowExtFunc(r)).toSet
     } else {
       Set()
     }
   }
 
-  def visitRelocationTableRow(ctx: RelocationTableRowContext): ExternalFunction = {
-    ExternalFunction(ctx.name.getText.stripSuffix("@GLIBC_2.17"), BigInt(ctx.offset.getText, 16))
+  def visitRelocationTableRowExtFunc(ctx: RelocationTableRowContext): ExternalFunction = {
+    ExternalFunction(ctx.name.getText.stripSuffix("@GLIBC_2.17"), hexToBigInt(ctx.offset.getText))
+  }
+
+  def visitRelocationTableOffsets(ctx: RelocationTableContext): Map[BigInt, BigInt] = {
+    if (ctx.relocationTableHeader.tableName.STRING.getText == ".rela.dyn") {
+      val rows = ctx.relocationTableRow.asScala
+      rows.flatMap(r => visitRelocationTableRowOffset(r)).toMap
+    } else {
+      Map()
+    }
+  }
+
+  def visitRelocationTableRowOffset(ctx: RelocationTableRowContext): Option[(BigInt, BigInt)] = {
+    if (ctx.relocType.getText == "R_AARCH64_RELATIVE") {
+      Some((hexToBigInt(ctx.offset.getText), hexToBigInt(ctx.gotName.getText)))
+    } else {
+      None
+    }
   }
 
   def visitSymbolTable(ctx: SymbolTableContext): Set[SpecGlobal] = {
@@ -37,7 +55,7 @@ object ElfLoader {
     if (ctx.entrytype.getText == "OBJECT" && ctx.bind.getText == "GLOBAL" && ctx.vis.getText == "DEFAULT") {
       val name = ctx.name.getText
       if (name.forall(allowedChars.contains)) {
-        Some(SpecGlobal(name, ctx.size.getText.toInt * 8, BigInt(ctx.value.getText, 16)))
+        Some(SpecGlobal(name, ctx.size.getText.toInt * 8, hexToBigInt(ctx.value.getText)))
       } else {
         None
       }
@@ -45,6 +63,8 @@ object ElfLoader {
       None
     }
   }
+
+  def hexToBigInt(hex: String): BigInt = BigInt(hex, 16)
 
   val allowedChars: Set[Char] = ('A' to 'Z').toSet ++ ('a' to 'z') ++ ('0' to '9') + '_'
 
