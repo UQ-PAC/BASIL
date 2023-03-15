@@ -216,7 +216,7 @@ object Cfg:
     // generate cfg for a statement
     def generateCfgStatement(stmt: Statement, context: CfgBlockEntryNode): CfgNode =
       println(stmt)
-      var previous: Option[CfgNode] = nodePool.getLatestAdded
+      val previous: Option[CfgNode] = nodePool.getLatestAdded
       val node: CfgNode = nodePool.get(stmt, context)
       previous match {
         case Some(p) => cfg.addEdge(p, node)

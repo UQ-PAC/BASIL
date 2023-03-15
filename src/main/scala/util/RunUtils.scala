@@ -92,13 +92,15 @@ object RunUtils {
     //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
     //      x.toString
     //    }, Output.dotIder))
+
+
     val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
     val result = solver.analyze()
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder))
 
     dump_file(cfg.getEdges.toString(), "result")
 
-    print(s"\n****************  ${result.values}  *****************\n")
+    print(s"\n Constant prop results\n ****************\n  ${result.values}  \n *****************\n")
 
 
     //    val solver2 = new SteensgaardAnalysis(translator.program, result)
@@ -122,6 +124,15 @@ object RunUtils {
     stringBuilder.append("}")
     dump_plot(stringBuilder.toString(), "result")
     */
+
+//    val solver2 = new MemoryRegionAnalysis(cfg)
+//    val result2 = solver2.analyze()
+//    print(s"\n Mem region results\n ****************\n  ${solver2.getMapping}  \n *****************\n")
+//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(solver2.getMapping, solver.stateAfterNode), Output.dotIder))
+
+    val solver2 = new MemoryRegionAnalysis.WorklistSolver(cfg)
+    val result2 = solver2.analyze()
+    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder))
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {

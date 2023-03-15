@@ -313,6 +313,8 @@ case class BAPStore(memory: BAPMemory, index: BAPExpr, value: BAPExpr, endian: E
   override def toGamma: GammaStore =
     GammaStore(memory.toGamma, index.toIR, value.toGamma, size, size / memory.valueSize)
   */
+
+  override def toString: String = s"${memory.name}[$index] := $value"
 }
 
 object BAPStore {
