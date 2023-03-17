@@ -15,9 +15,9 @@ void sub_seven() {
 void (*jump_table[3])() = {add_two, add_six, sub_seven};
 
 int main(int argc, char **argv) {
+    jump_table[0]();
     jump_table[1]();
     jump_table[2]();
-    jump_table[3]();
     return 0;
 }
 
