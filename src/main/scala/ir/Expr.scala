@@ -20,9 +20,12 @@ trait Expr {
   def getType: IRType
   def gammas: Set[Expr] = Set()
   def locals: Set[Variable] = Set()
+  def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
-trait Literal extends Expr
+trait Literal extends Expr {
+  override def acceptVisit(visitor: Visitor): Literal = visitor.visitLiteral(this)
+}
 
 sealed trait BoolLit extends Literal
 
@@ -56,6 +59,7 @@ class Extract(var end: Int, var start: Int, var body: Expr) extends Expr {
   override def locals: Set[Variable] = body.locals
   override def getType: BitVecType = BitVecType(end - start)
   override def toString: String = s"$body[$end:$start]"
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitExtract(this)
 }
 
 class Repeat(var repeats: Int, var body: Expr) extends Expr {
@@ -68,6 +72,7 @@ class Repeat(var repeats: Int, var body: Expr) extends Expr {
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of zero extend: " + this)
   }
   override def toString: String = s"Repeat($repeats, $body)"
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitRepeat(this)
 }
 
 class ZeroExtend(var extension: Int, var body: Expr) extends Expr {
@@ -80,7 +85,7 @@ class ZeroExtend(var extension: Int, var body: Expr) extends Expr {
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of zero extend: " + this)
   }
   override def toString: String = s"ZeroExtend($extension, $body)"
-
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitZeroExtend(this)
 }
 
 class SignExtend(var extension: Int, var body: Expr) extends Expr {
@@ -93,6 +98,7 @@ class SignExtend(var extension: Int, var body: Expr) extends Expr {
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of sign extend: " + this)
   }
   override def toString: String = s"SignExtend($extension, $body)"
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitSignExtend(this)
 }
 
 class UnaryExpr(var op: UnOp, var arg: Expr) extends Expr {
@@ -117,6 +123,7 @@ class UnaryExpr(var op: UnOp, var arg: Expr) extends Expr {
     case uOp: IntUnOp => s"($uOp$arg)"
   }
 
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitUnaryExpr(this)
 }
 
 trait UnOp
@@ -207,6 +214,8 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
       }
     case bOp: IntBinOp => s"($arg1 $bOp $arg2)"
   }
+
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitBinaryExpr(this)
 
 }
 
@@ -301,6 +310,7 @@ class MemoryStore(var mem: Memory, var index: Expr, var value: Expr, var endian:
 
   override def getType: IRType = BitVecType(size)
   override def toString: String = s"MemoryStore($mem, $index, $value, $endian, $size)"
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemoryStore(this)
 }
 
 class MemoryLoad(var mem: Memory, var index: Expr, var endian: Endian, var size: Int) extends Expr {
@@ -318,13 +328,16 @@ class MemoryLoad(var mem: Memory, var index: Expr, var endian: Endian, var size:
   override def gammas: Set[Expr] = Set(this)
   override def getType: IRType = BitVecType(size)
   override def toString: String = s"MemoryLoad($mem, $index, $endian, $size)"
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemoryLoad(this)
 }
 
+// name == stack or mem
 case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr {
   override def toBoogie: BMapVar = BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
   override def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapBType(BitVecBType(addressSize), BoolBType), Scope.Global)
   override val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
   override def toString: String = s"Memory($name, $addressSize, $valueSize)"
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemory(this)
 }
 
 case class Variable(name: String, irType: IRType) extends Expr {
@@ -339,4 +352,7 @@ case class Variable(name: String, irType: IRType) extends Expr {
     case _ => throw new Exception("tried to get size of non-bitvector")
   }
   override def toString: String = s"Variable($name, $irType)"
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitVariable(this)
+
+  val isRegister: Boolean = name.startsWith("R") || name.startsWith("V") && name != "VF"
 }

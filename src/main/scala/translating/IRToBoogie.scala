@@ -15,11 +15,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val guaranteesReflexive = spec.guarantees.map(g => g.removeOld)
   private val guaranteeOldVars = spec.guaranteeOldVars
   private val LPreds = spec.LPreds.map((k, v) => k -> v.resolveSpecL)
-  private val requires = {
-
-
-    spec.subroutines.map(s => s.name -> s.requires.map(e => e.resolveSpec)).toMap
-  }
+  private val requires = spec.subroutines.map(s => s.name -> s.requires.map(e => e.resolveSpec)).toMap
   private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(e => e.resolveSpec)).toMap
 
   private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
@@ -46,7 +42,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val functionsUsed = (functionsUsed1 ++ functionsUsed2 ++ functionsUsed3).distinct.sorted
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgProcs ++ procedures
-    avoidReserved(BProgram(declarations))
+    BProgram(declarations)
+    //avoidReserved(BProgram(declarations))
   }
 
   def genRely(relies: List[BExpr]): List[BProcedure] = {
@@ -397,7 +394,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   }
 
   // TODO put this elsewhere
-  def stripUnreachableFunctions(externalNames: Set[String]): Unit = {
+  def stripUnreachableFunctions(): Unit = {
     val functionToChildren = program.procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
     var next = "main"
@@ -417,12 +414,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }
 
     program.procedures = program.procedures.filter(f => reachableNames.contains(f.name))
-    for (f <- program.procedures) {
-      f match {
-        case f: Procedure if externalNames.contains(f.name) => f.blocks = ArrayBuffer()
-        case _ =>
-      }
-    }
   }
 
   private val reserved = Set("free")
