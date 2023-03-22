@@ -448,7 +448,7 @@ case class MemoryRegion(basePointer: Expr, size: Expr, regionType: RegionType):
 
 trait MemoryRegionAnalysisMisc:
 
-  val assigmentsMap: mutable.HashMap[(Expr, Int), Expr] = mutable.HashMap.empty
+  val assigmentsMap: mutable.HashMap[(Expr, CfgNode), Expr] = mutable.HashMap.empty
 
   val cfg: ProgramCfg
 
@@ -465,9 +465,22 @@ trait MemoryRegionAnalysisMisc:
   private val stackPointer = Variable("R31", BitVecType(64))
 
 
+  /** Find decl of variables */
+  def findDecl(variable: Variable, n: CfgNode): mutable.ListBuffer[CfgNode] =
+    var decls: mutable.ListBuffer[CfgNode] = mutable.ListBuffer.empty
+    for (succ <- n.succ) {
+      if (assigmentsMap.contains((variable, succ))) {
+        decls.addOne(succ)
+      } else {
+        decls.addAll(findDecl(variable, succ))
+      }
+    }
+    decls
+
+
   /** Default implementation of eval.
    */
-  def eval(exp: Expr, memType: RegionType, env: lattice.sublattice.Element): lattice.sublattice.Element = {
+  def eval(exp: Expr, memType: RegionType, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
 //      val currentSize: Int = env.head._2 match {
 //        case Some(memRegion: MemoryRegion) => memRegion.size
 //        case _ => 0
@@ -495,25 +508,31 @@ trait MemoryRegionAnalysisMisc:
           }
 
         case zeroExtend: ZeroExtend =>
-          eval(zeroExtend.body, memType, env)
+          eval(zeroExtend.body, memType, env, n)
         case memoryLoad: MemoryLoad => // TODO: Pointer access here
           //eval(memoryLoad.index, memType, env)
           lattice.sublattice.bottom
         case variable: Variable =>
-          if (assigmentsMap.contains((variable, variable.ssa_id))) {
-            eval(assigmentsMap((variable, variable.ssa_id)), memType, env)
-          } else {
-            print(assigmentsMap.toString() + "\n")
-            print("hey " + variable + " " + variable.ssa_id.toString + ");\n")
-            Set(MemoryRegion(variable, variable, RegionType.Data))
+          // check successors for assignments and return the lub of all their offsets if exist (workaround for phi nodes)
+          var tempLattice: lattice.sublattice.Element = env
+          for (succ <- findDecl(variable, n)) {
+            tempLattice = lattice.sublattice.lub(tempLattice, eval(assigmentsMap((variable, succ)), memType, env, succ))
           }
+          // if no assignments were found, then it could be a global
+          if (tempLattice.equals(env)) {
+            Set(MemoryRegion(variable, variable, RegionType.Data))
+          } else {
+            tempLattice
+          }
+
         case extract: Extract =>
-          eval(extract.body, memType, env)
+          eval(extract.body, memType, env, n)
         case unaryExpr: UnaryExpr =>
           lattice.sublattice.bottom
         case signExtend: SignExtend =>
-          eval(signExtend.body, memType, env)
+          eval(signExtend.body, memType, env, n)
         case bitVecLiteral: BitVecLiteral =>
+          print("hi")
           lattice.sublattice.bottom
         case _ =>
           print(s"type: ${exp.getClass} $exp\n")
@@ -531,15 +550,15 @@ trait MemoryRegionAnalysisMisc:
             // if the memory is acting on a stack operation, then we need to track the stack
             if (memAssign.rhs.mem.name == "stack") {
                 //eval(memAssign.rhs.index, RegionType.Stack, s)
-                lattice.sublattice.lub(s, eval(memAssign.rhs.index, RegionType.Stack, s))
+                lattice.sublattice.lub(s, eval(memAssign.rhs.index, RegionType.Stack, s, n))
               // the memory is not stack so it must be heap
             } else {
-              lattice.sublattice.lub(s, eval(memAssign.rhs.index, RegionType.Heap, s))
+              lattice.sublattice.lub(s, eval(memAssign.rhs.index, RegionType.Heap, s, n))
             }
           // local assign is just lhs assigned to rhs we only need this information to track a prior register operation
           // AKA: R1 <- R1 + 8; mem(R1) <- 0x1234
           case localAssign: LocalAssign =>
-            assigmentsMap.addOne((localAssign.lhs, localAssign.lhs.ssa_id) -> localAssign.rhs)
+            assigmentsMap.addOne((localAssign.lhs, n) -> localAssign.rhs)
 //            if (localAssign.rhs.locals.contains(stackPointer)) {
 //              lattice.sublattice.lub(s, eval(localAssign.rhs, RegionType.Stack, s))
 //            } else {
