@@ -15,6 +15,7 @@ import java.io.{File, PrintWriter}
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
 object RunUtils {
+  var globals_ToUSE: Set[SpecGlobal] = Set()
 
   def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean): BProgram = {
     val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
@@ -32,6 +33,7 @@ object RunUtils {
     elfParser.setBuildParseTree(true)
 
     val (externalFunctions, globals, globalOffsets) = ElfLoader.visitSyms(elfParser.syms())
+    globals_ToUSE = globals
     print("Globals: \n")
     print(globals)
     print("\nGlobal Offsets: \n")
@@ -111,8 +113,8 @@ object RunUtils {
     //    val result2 = solver2.analyze()
     //    print(solver2.pointsTo())
 
-    val ssa = new SSA(cfg)
-    ssa.analyze()
+//    val ssa = new SSA(cfg)
+//    ssa.analyze()
 
 
     /*
@@ -134,7 +136,7 @@ object RunUtils {
 //    print(s"\n Mem region results\n ****************\n  ${solver2.getMapping}  \n *****************\n")
 //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(solver2.getMapping, solver.stateAfterNode), Output.dotIder))
 
-    val solver2 = new MemoryRegionAnalysis.WorklistSolver(cfg)
+    val solver2 = new MemoryRegionAnalysis.WorklistSolver(cfg, globals_ToUSE)
     val result2 = solver2.analyze()
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder))
   }

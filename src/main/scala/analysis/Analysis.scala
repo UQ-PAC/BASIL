@@ -1,10 +1,11 @@
 package analysis
 
-import ir._
-import analysis.solvers._
+import ir.*
+import analysis.solvers.*
 import boogie.BExpr
+import specification.SpecGlobal
 
-import scala.collection.mutable.{HashMap, ListBuffer, ArrayBuffer}
+import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
@@ -434,74 +435,153 @@ enum RegionType {
 //  }
 //}
 
+abstract class MemorySpace
 
 /**
  * Represents a memory region. The region is defined by a base pointer and a size.
  * There can exist two regions with the same size (offset) but have a different base pointer. As such the base pointer
  * is tracked but not printed in the toString method.
- * @param basePointer R1 in case of mem[R1 + 0x1234] <- ...
- * @param size 0x1234 in case of mem[R1 + 0x1234] <- ...
+ * @param start 0x1234 in case of mem[R1 + 0x1234] <- ...
  * @param regionType The type of the region. This is used to distinguish between stack, heap, data and code regions.
  */
-case class MemoryRegion(basePointer: Expr, size: Expr, regionType: RegionType):
-  override def toString: String = s"${regionType}(${size})"
+case class MemoryRegion(regionBase: Expr, start: Expr, regionType: RegionType) extends MemorySpace:
+  override def toString: String = s"${regionType}(${regionBase}, ${start})"
+
+
+case class RegionAccess(regionBase: Expr, start: Expr) extends MemorySpace:
+  override def toString: String = s"ArrayAccess(${regionBase}, ${start})"
+
 
 trait MemoryRegionAnalysisMisc:
 
   val assigmentsMap: mutable.HashMap[(Expr, CfgNode), Expr] = mutable.HashMap.empty
+  var dataItemDiscovered: Option[MemoryRegion] = None
 
   val cfg: ProgramCfg
+  val globals: Set[SpecGlobal]
 
   /** The lattice of abstract values.
    */
-  val powersetLattice: PowersetLattice[MemoryRegion]
+  val powersetLattice: PowersetLattice[MemorySpace]
 
   /** The lattice of abstract states.
    */
-  val lattice: MapLattice[CfgNode, PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CfgNode, PowersetLattice[MemorySpace]] = MapLattice(powersetLattice)
 
   val domain: Set[CfgNode] = cfg.nodes
 
   private val stackPointer = Variable("R31", BitVecType(64))
 
 
-  /** Find decl of variables */
-  def findDecl(variable: Variable, n: CfgNode): mutable.ListBuffer[CfgNode] =
-    var decls: mutable.ListBuffer[CfgNode] = mutable.ListBuffer.empty
-    for (succ <- n.succ) {
-      if (assigmentsMap.contains((variable, succ))) {
-        decls.addOne(succ)
-      } else {
-        decls.addAll(findDecl(variable, succ))
+  /** Find decl of variables from node predecessors */
+  def findDecl(variable: Variable, n: CfgNode): mutable.ListBuffer[CfgNode] = {
+    val decls: mutable.ListBuffer[CfgNode] = mutable.ListBuffer.empty
+    // if we have a temporary variable then ignore it
+    if (variable.name.contains("#")) {
+        return decls
+    }
+    for (pred <- n.pred) {
+//      if (assigmentsMap.contains((variable, pred))) {
+//        decls.addOne(pred)
+//      } else {
+//        decls.addAll(findDecl(variable, pred))
+//      }
+      pred match {
+        case cmd: CfgCommandNode =>
+          cmd.data match {
+            case localAssign: LocalAssign =>
+              if (localAssign.lhs == variable) {
+                assigmentsMap.addOne((variable, pred), localAssign.rhs)
+                decls.addOne(pred)
+              } else {
+                decls.addAll(findDecl(variable, pred))
+              }
+            case _ =>
+          }
+        case _ =>
       }
     }
     decls
+  }
+
+  def is_global(bigInt: BigInt): Boolean = {
+      for (global <- globals) {
+          if (global.address == bigInt) {
+          return true
+          }
+      }
+      false
+  }
+
+  /**
+   * Evaluate an expression in a hope of finding a global variable.
+   * @param exp: The expression to evaluate (e.g. R1 + 0x1234)
+   * @param n: The node where the expression is evaluated (e.g. mem[R1 + 0x1234] <- ...)
+   * @return: The evaluated expression (e.g. 0x69632)
+   */
+  def evaluateExpression(exp: Expr, n: CfgNode): Expr = {
+      exp match {
+        case binOp: BinaryExpr =>
+          for (pred <- findDecl(binOp.arg1.asInstanceOf[Variable], n)) {
+            assigmentsMap.get(binOp.arg1, pred) match
+              case Some(value) =>
+                value match
+                  case bitVecLiteral: BitVecLiteral =>
+                    val calculated: BigInt = bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value)
+                    dataItemDiscovered = Some(MemoryRegion(BitVecLiteral(bitVecLiteral.value, bitVecLiteral.size), BitVecLiteral(binOp.arg2.asInstanceOf[BitVecLiteral].value, binOp.arg2.asInstanceOf[BitVecLiteral].size), RegionType.Data))
+                    return BitVecLiteral(calculated, bitVecLiteral.size)
+                  case _ => evaluateExpression(value, pred)
+              case _ =>
+                print("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(binOp.arg1, pred) + " FOR " + binOp + "\n")
+          }
+          exp
+        case bitVecLiteral: BitVecLiteral =>
+          bitVecLiteral
+        case _ =>
+          exp
+      }
+  }
 
 
   /** Default implementation of eval.
    */
   def eval(exp: Expr, memType: RegionType, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
-//      val currentSize: Int = env.head._2 match {
-//        case Some(memRegion: MemoryRegion) => memRegion.size
-//        case _ => 0
-//      }
-
+      var regionType: RegionType = memType
       exp match {
         case binOp: BinaryExpr =>
-//          val calculatedSize = binOp.op
-//          match {
-//            case bitVec: BitVecType => bitVec
-//            case IntADD => currentSize + bitVec
-//            case IntSUB => currentSize - binOp.arg2
-//            case _ => throw new Exception("Unknown operation")
-//          }
-//            case _ => throw new Exception("Unknown type")
-//          }
-
+          for (pred <- findDecl(binOp.arg1.asInstanceOf[Variable], n)) {
+            assigmentsMap.get(binOp.arg1, pred) match
+              case Some(value) =>
+                print("FOUND: " + value + " FOR " + binOp + "\n")
+                value match
+                  case bitVecLiteral: BitVecLiteral =>
+                    if (is_global(bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value))) {
+                      regionType = RegionType.Data
+                    }
+                  case _ =>
+                    val evaluated = evaluateExpression(value, pred)
+                    evaluated match {
+                      case literal: BitVecLiteral =>
+                        if (is_global(literal.value)) {
+                          binOp.op match {
+                            case BVADD =>
+                              var tempLattice: lattice.sublattice.Element = env
+                              tempLattice = lattice.sublattice.lub(tempLattice, Set(dataItemDiscovered.get))
+                              return lattice.sublattice.lub(tempLattice, Set(RegionAccess(literal, binOp.arg2)))
+                            case _ =>
+                              print("ERROR: CASE NOT HANDLED: " + binOp.op.toString + " FOR " + binOp + "\n")
+                              return lattice.sublattice.bottom
+                          }
+                        }
+                      case _ =>
+                    }
+              case _ =>
+                print("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(binOp.arg1, pred) + " FOR " + binOp + "\n")
+          }
 
           binOp.op match {
-              case BVADD => Set(MemoryRegion(binOp.arg1, binOp.arg2, memType))
-              case BVSUB => Set(MemoryRegion(binOp.arg1, binOp.arg2, memType))   // TODO: MUST BE NEGATION
+              case BVADD => Set(MemoryRegion(binOp.arg1, binOp.arg2, regionType))
+              case BVSUB => Set(MemoryRegion(binOp.arg1, binOp.arg2, regionType))   // TODO: MUST BE NEGATION
               case _ =>
                 print("ERROR: CASE NOT HANDLED: " + binOp.op.toString + " FOR " + binOp + "\n")
                 lattice.sublattice.bottom
@@ -513,17 +593,13 @@ trait MemoryRegionAnalysisMisc:
           //eval(memoryLoad.index, memType, env)
           lattice.sublattice.bottom
         case variable: Variable =>
-          // check successors for assignments and return the lub of all their offsets if exist (workaround for phi nodes)
+          // check predecessors for assignments and return the lub of all their offsets if exist (workaround for phi nodes)
           var tempLattice: lattice.sublattice.Element = env
-          for (succ <- findDecl(variable, n)) {
-            tempLattice = lattice.sublattice.lub(tempLattice, eval(assigmentsMap((variable, succ)), memType, env, succ))
+          for (pred <- findDecl(variable, n)) {
+            tempLattice = lattice.sublattice.lub(tempLattice, eval(assigmentsMap((variable, pred)), memType, env, pred))
           }
           // if no assignments were found, then it could be a global
-          if (tempLattice.equals(env)) {
-            Set(MemoryRegion(variable, variable, RegionType.Data))
-          } else {
-            tempLattice
-          }
+          tempLattice
 
         case extract: Extract =>
           eval(extract.body, memType, env, n)
@@ -532,7 +608,7 @@ trait MemoryRegionAnalysisMisc:
         case signExtend: SignExtend =>
           eval(signExtend.body, memType, env, n)
         case bitVecLiteral: BitVecLiteral =>
-          print("hi")
+          print(s"Saw a bit vector literal ${bitVecLiteral}\n")
           lattice.sublattice.bottom
         case _ =>
           print(s"type: ${exp.getClass} $exp\n")
@@ -549,7 +625,6 @@ trait MemoryRegionAnalysisMisc:
           case memAssign: MemoryAssign =>
             // if the memory is acting on a stack operation, then we need to track the stack
             if (memAssign.rhs.mem.name == "stack") {
-                //eval(memAssign.rhs.index, RegionType.Stack, s)
                 lattice.sublattice.lub(s, eval(memAssign.rhs.index, RegionType.Stack, s, n))
               // the memory is not stack so it must be heap
             } else {
@@ -557,14 +632,9 @@ trait MemoryRegionAnalysisMisc:
             }
           // local assign is just lhs assigned to rhs we only need this information to track a prior register operation
           // AKA: R1 <- R1 + 8; mem(R1) <- 0x1234
-          case localAssign: LocalAssign =>
-            assigmentsMap.addOne((localAssign.lhs, n) -> localAssign.rhs)
-//            if (localAssign.rhs.locals.contains(stackPointer)) {
-//              lattice.sublattice.lub(s, eval(localAssign.rhs, RegionType.Stack, s))
-//            } else {
-//              lattice.sublattice.lub(s, eval(localAssign.rhs, RegionType.Heap, s))
-//            }
-              s
+//          case localAssign: LocalAssign =>
+//            assigmentsMap.addOne((localAssign.lhs, n) -> localAssign.rhs)
+//              s
           case _ => s
         }
       case _ => s // ignore other kinds of nodes
@@ -573,7 +643,7 @@ trait MemoryRegionAnalysisMisc:
 
 /** Base class for memory region analysis (non-lifted) lattice.
  */
-abstract class MemoryRegionAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
+abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal]) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
    */
@@ -581,8 +651,8 @@ abstract class MemoryRegionAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAn
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: IntraproceduralProgramCfg, val powersetLattice: L)
-  extends MemoryRegionAnalysis(cfg)
+abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemorySpace]](cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal], val powersetLattice: L)
+  extends MemoryRegionAnalysis(cfg, globals)
   with SimpleWorklistFixpointSolver[CfgNode]
   with ForwardDependencies
 
@@ -590,8 +660,8 @@ object MemoryRegionAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
    */
-  class WorklistSolver(cfg: IntraproceduralProgramCfg)
-    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, PowersetLattice[MemoryRegion])
+  class WorklistSolver(cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal])
+    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, PowersetLattice[MemorySpace])
 
 ///**
 // * Memory region analysis.
