@@ -416,10 +416,12 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     program.procedures = program.procedures.filter(f => reachableNames.contains(f.name))
   }
 
+  /*
   private val reserved = Set("free")
 
   def avoidReserved(program: BProgram): BProgram = {
     program.replaceReserved(reserved)
   }
+  */
 
 }
