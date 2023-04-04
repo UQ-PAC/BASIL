@@ -174,12 +174,12 @@ case class NodePool() {
   private var latestAdded: CfgNode = null;
   private val pool = mutable.HashMap[Command, CfgNode]()
 
-  def get(command: Command, fromCall: Boolean = false): CfgNode = {
+  def get(command: Command): CfgNode = {
     if (!pool.contains(command)) {
       pool += command -> CfgCommandNode(data = command)
     }
     command match {
-      case g: GoTo if fromCall =>
+      case g: GoTo =>
       case _ => latestAdded = pool(command)
     }
     pool(command)
@@ -202,6 +202,9 @@ object Cfg:
   /** Generate the cfg for each function of the program.
    */
   def generateCfgProgram(program: Program): Cfg = {
+    print("\nGenerating CFG... \n")
+    print(program.procedures.map(f => f -> f.blocks.map(b => b -> b.statements.map(s => s -> s).mkString("\n")).mkString("\n")).mkString("\n"))
+    print("\n")
     program.procedures.map(f => f -> generateCfgFunc(f))
     cfg
   }
@@ -227,36 +230,53 @@ object Cfg:
 
     def generateCfgJump(jump: Jump, previous: CfgNode): CfgNode =
       val node: CfgNode = nodePool.get(jump)
+      nodePool.setLatestAdded(previous)
       jump match {
         case goTo: GoTo =>
           blocks.get(goTo.target.label) match
             case
               Some(blockNode) =>
-              nodePool.setLatestAdded(previous)
+              //nodePool.setLatestAdded(previous)
               visitBlock(blockNode, goTo.target.label)
             case _ => print(s"ERROR: goto target in '${goTo}' not found\n")
 
         case directCall: DirectCall =>
-          throw new Exception("Direct call not supported") // TODO: fix this
+          print(directCall.calls)
+          val previousNode = nodePool.getLatestAdded
+          if (node.pred.isEmpty) then
+            cfg.addEdge(previousNode, node)
+            directCall.returnTarget match {
+              case Some(returnTarget) =>
+                blocks.get(returnTarget.label) match {
+                  case Some(returnBlockNode) =>
+                    nodePool.setLatestAdded(node)
+                    visitBlock(returnBlockNode, returnTarget.label)
+                  case _ =>
+                }
+              case _ =>
+            }
+            print(node)
+          return node
+          //throw new Exception("Direct call not supported") // TODO: fix this
           // edge between current -> target
-          blocks.get(directCall.target.name) match
-            case Some(blockNode) => cfg.addEdge(node, blockNode)
-            case _ => print(s"ERROR: direct call target in '${directCall}' not found\n")
-          directCall.returnTarget match
-            case Some(returnTarget) =>
-              blocks.get(returnTarget.label) match
-                case Some(returnBlockNode) =>
-                  blocks.get(directCall.target.name) match
-                    // edge between target -> return target
-                    case Some(blockNode) => cfg.addEdge(blockNode, returnBlockNode)
-                    case _ =>
-                case _ =>
-                  print(s"ERROR: direct call return target in '${directCall}' not found\n")
-            case _ =>
-              // edge between target -> current (if no return target)
-              blocks.get(directCall.target.name) match
-                case Some(blockNode) => cfg.addEdge(blockNode, node)
-                case _ =>
+//          blocks.get(directCall.target.name) match
+//            case Some(blockNode) => cfg.addEdge(node, blockNode)
+//            case _ => print(s"ERROR: direct call target in '${directCall}' not found\n")
+//          directCall.returnTarget match
+//            case Some(returnTarget) =>
+//              blocks.get(returnTarget.label) match
+//                case Some(returnBlockNode) =>
+//                  blocks.get(directCall.target.name) match
+//                    // edge between target -> return target
+//                    case Some(blockNode) => cfg.addEdge(blockNode, returnBlockNode)
+//                    case _ =>
+//                case _ =>
+//                  print(s"ERROR: direct call return target in '${directCall}' not found\n")
+//            case _ =>
+//              // edge between target -> current (if no return target)
+//              blocks.get(directCall.target.name) match
+//                case Some(blockNode) => cfg.addEdge(blockNode, node)
+//                case _ =>
 
         case indirectCall: IndirectCall =>
           // edge between current -> unknown block
@@ -295,16 +315,19 @@ object Cfg:
     }
 
     var firstRun: Boolean = true
-    val (blockName, entryNode) = blocks.head
-    if (firstRun) {
-      nodePool.setLatestAdded(functionEntryNode)
-      firstRun = false
-    }
-    visitBlock(entryNode, blockName)
 
     if (blocks.isEmpty) {
       cfg.addEdge(functionEntryNode, functionExitNode)
+    } else {
+      val (blockName, entryNode) = blocks.head
+      if (firstRun) {
+        nodePool.setLatestAdded(functionEntryNode)
+        firstRun = false
+      }
+      visitBlock(entryNode, blockName)
     }
+
+
 
     cfg
   }
