@@ -9,6 +9,10 @@ class Program(var procedures: ArrayBuffer[Procedure] /*, var memories: ArrayBuff
 
 class Procedure(var name: String, var address: Int, var blocks: ArrayBuffer[Block], var in: ArrayBuffer[Parameter], var out: ArrayBuffer[Parameter]) {
   def calls: Set[Procedure] = blocks.flatMap(_.calls).toSet
+
+  override def toString: String = {
+    s"Procedure $name at $address with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
+  }
 }
 
 class Block(var label: String, var address: Option[Int], var statements: ArrayBuffer[Statement], var jumps: ArrayBuffer[Jump]) {
