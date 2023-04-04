@@ -1,6 +1,6 @@
 package analysis
 
-import ir.*
+import ir.{DirectCall, *}
 import analysis.solvers.*
 import boogie.BExpr
 import specification.SpecGlobal
@@ -444,9 +444,8 @@ abstract class MemorySpace
  * @param start 0x1234 in case of mem[R1 + 0x1234] <- ...
  * @param regionType The type of the region. This is used to distinguish between stack, heap, data and code regions.
  */
-case class MemoryRegion(regionBase: Expr, start: Expr, regionType: RegionType) extends MemorySpace:
+case class MemoryRegion(regionBase: Object, start: Expr, var regionType: RegionType) extends MemorySpace:
   override def toString: String = s"${regionType}(${regionBase}, ${start})"
-
 
 case class RegionAccess(regionBase: Expr, start: Expr) extends MemorySpace:
   override def toString: String = s"ArrayAccess(${regionBase}, ${start})"
@@ -456,6 +455,12 @@ trait MemoryRegionAnalysisMisc:
 
   val assigmentsMap: mutable.HashMap[(Expr, CfgNode), Expr] = mutable.HashMap.empty
   var dataItemDiscovered: Option[MemoryRegion] = None
+
+  var mallocCount: Int = 0
+  def getNextMallocCount(): String = {
+    mallocCount += 1
+    s"malloc_$mallocCount"
+  }
 
   val cfg: ProgramCfg
   val globals: Set[SpecGlobal]
@@ -471,7 +476,13 @@ trait MemoryRegionAnalysisMisc:
   val domain: Set[CfgNode] = cfg.nodes
 
   private val stackPointer = Variable("R31", BitVecType(64))
+  private val linkRegister = Variable("R30", BitVecType(64))
+  private val framePointer = Variable("R29", BitVecType(64))
 
+  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
+
+  var recentMallocSize: Option[Expr] = None
+  val mallocVariable = Variable("R0", BitVecType(64))
 
   /** Find decl of variables from node predecessors */
   def findDecl(variable: Variable, n: CfgNode): mutable.ListBuffer[CfgNode] = {
@@ -535,6 +546,8 @@ trait MemoryRegionAnalysisMisc:
                 print("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(binOp.arg1, pred) + " FOR " + binOp + "\n")
           }
           exp
+        case memLoad: MemoryLoad =>
+          evaluateExpression(memLoad.index, n)
         case bitVecLiteral: BitVecLiteral =>
           bitVecLiteral
         case _ =>
@@ -546,6 +559,21 @@ trait MemoryRegionAnalysisMisc:
   /** Default implementation of eval.
    */
   def eval(exp: Expr, memType: RegionType, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
+    n match {
+      case cmd: CfgCommandNode =>
+        cmd.data match {
+          case memoryAssign: MemoryAssign =>
+            if (memoryAssign.rhs.value.equals(mallocVariable)) {
+              if (recentMallocSize.isDefined) {
+                val mallocSize = recentMallocSize.get
+                recentMallocSize = None
+                return lattice.sublattice.lub(env, Set(MemoryRegion(getNextMallocCount(), mallocSize, RegionType.Heap)))
+              }
+            }
+          case _ =>
+        }
+      case _ =>
+    }
       var regionType: RegionType = memType
       exp match {
         case binOp: BinaryExpr =>
@@ -573,6 +601,19 @@ trait MemoryRegionAnalysisMisc:
                               return lattice.sublattice.bottom
                           }
                         }
+//                        } else {
+//                          binOp.op match {
+//                            case BVADD =>
+//                              var tempLattice: lattice.sublattice.Element = env
+//                              val region: MemoryRegion = dataItemDiscovered.get
+//                              region.regionType = RegionType.Stack
+//                              tempLattice = lattice.sublattice.lub(tempLattice, Set(region))
+//                              return lattice.sublattice.lub(tempLattice, Set(RegionAccess(literal, binOp.arg2)))
+//                            case _ =>
+//                              print("ERROR: CASE NOT HANDLED: " + binOp.op.toString + " FOR " + binOp + "\n")
+//                              return lattice.sublattice.bottom
+//                          }
+//                        }
                       case _ =>
                     }
               case _ =>
@@ -622,7 +663,16 @@ trait MemoryRegionAnalysisMisc:
     n match {
       case cmd: CfgCommandNode =>
         cmd.data match {
+          case directCall: DirectCall =>
+            if (directCall.target.name == "malloc") {
+              val decl = findDecl(mallocVariable, n).headOption
+              recentMallocSize = assigmentsMap.get(mallocVariable, decl.get)
+            }
+            s
           case memAssign: MemoryAssign =>
+            if (ignoreRegions.contains(memAssign.rhs.value)) {
+              return s
+            }
             // if the memory is acting on a stack operation, then we need to track the stack
             if (memAssign.rhs.mem.name == "stack") {
                 lattice.sublattice.lub(s, eval(memAssign.rhs.index, RegionType.Stack, s, n))
