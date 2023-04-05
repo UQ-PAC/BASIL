@@ -585,6 +585,12 @@ trait MemoryRegionAnalysisMisc:
                   case bitVecLiteral: BitVecLiteral =>
                     if (is_global(bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value))) {
                       regionType = RegionType.Data
+                      binOp.op match {
+                        case BVADD => return Set(MemoryRegion(value, binOp.arg2, regionType))
+                        case _ =>
+                          print("ERROR: CASE NOT HANDLED: " + binOp.op.toString + " FOR " + binOp + "\n")
+                          return lattice.sublattice.bottom
+                      }
                     }
                   case _ =>
                     val evaluated = evaluateExpression(value, pred)
