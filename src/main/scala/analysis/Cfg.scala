@@ -197,12 +197,14 @@ case class NodePool() {
 object Cfg:
 
   var cfg: Cfg = Cfg()
-  private val nodePool = NodePool()
+  private var nodePool = NodePool()
 
   /** Generate the cfg for each function of the program.
    */
   def generateCfgProgram(program: Program): Cfg = {
     print("\nGenerating CFG... \n")
+    cfg = Cfg()
+    nodePool = NodePool()
     print(program.procedures.map(f => f -> f.blocks.map(b => b -> b.statements.map(s => s -> s).mkString("\n")).mkString("\n")).mkString("\n"))
     print("\n")
     program.procedures.map(f => f -> generateCfgFunc(f))
