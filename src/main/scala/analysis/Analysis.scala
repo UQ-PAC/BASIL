@@ -481,8 +481,7 @@ trait MemoryRegionAnalysisMisc:
 
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
 
-  var recentMallocSize: Option[Expr] = None
-  val mallocVariable = Variable("R0", BitVecType(64))
+  private val mallocVariable = Variable("R0", BitVecType(64))
 
   /** Find decl of variables from node predecessors */
   def findDecl(variable: Variable, n: CfgNode): mutable.ListBuffer[CfgNode] = {
@@ -559,21 +558,6 @@ trait MemoryRegionAnalysisMisc:
   /** Default implementation of eval.
    */
   def eval(exp: Expr, memType: RegionType, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
-    n match {
-      case cmd: CfgCommandNode =>
-        cmd.data match {
-          case memoryAssign: MemoryAssign =>
-            if (memoryAssign.rhs.value.equals(mallocVariable)) {
-              if (recentMallocSize.isDefined) {
-                val mallocSize = recentMallocSize.get
-                recentMallocSize = None
-                return lattice.sublattice.lub(env, Set(MemoryRegion(getNextMallocCount(), mallocSize, RegionType.Heap)))
-              }
-            }
-          case _ =>
-        }
-      case _ =>
-    }
       var regionType: RegionType = memType
       exp match {
         case binOp: BinaryExpr =>
@@ -672,7 +656,8 @@ trait MemoryRegionAnalysisMisc:
           case directCall: DirectCall =>
             if (directCall.target.name == "malloc") {
               val decl = findDecl(mallocVariable, n).headOption
-              recentMallocSize = assigmentsMap.get(mallocVariable, decl.get)
+              val recentMallocSize = assigmentsMap.get(mallocVariable, decl.get).get
+              return lattice.sublattice.lub(s, Set(MemoryRegion(getNextMallocCount(), recentMallocSize, RegionType.Heap)))
             }
             s
           case memAssign: MemoryAssign =>
@@ -709,7 +694,7 @@ abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGl
  */
 abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemorySpace]](cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal], val powersetLattice: L)
   extends MemoryRegionAnalysis(cfg, globals)
-  with SimpleWorklistFixpointSolver[CfgNode]
+  with SimpleMonotonicSolver[CfgNode]
   with ForwardDependencies
 
 object MemoryRegionAnalysis:

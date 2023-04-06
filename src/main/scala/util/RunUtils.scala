@@ -14,8 +14,10 @@ import java.io.{File, PrintWriter}
 
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
+import analysis.solvers._
 object RunUtils {
   var globals_ToUSE: Set[SpecGlobal] = Set()
+  var memoryRegionAnalysisResults = None: Option[Map[CfgNode, _]]
 
   def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean): BProgram = {
     val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
@@ -138,6 +140,7 @@ object RunUtils {
 
     val solver2 = new MemoryRegionAnalysis.WorklistSolver(cfg, globals_ToUSE)
     val result2 = solver2.analyze()
+    memoryRegionAnalysisResults = Some(result2)
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder))
   }
 
