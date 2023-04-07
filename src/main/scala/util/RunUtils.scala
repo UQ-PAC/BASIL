@@ -16,7 +16,7 @@ import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
 object RunUtils {
 
-  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean): BProgram = {
+  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
     val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(adtLexer)
     // ADT
@@ -69,6 +69,9 @@ object RunUtils {
 
     if (performAnalysis) {
       analyse(IRProgram)
+    }
+    if (performInterpret) {
+      Interpreter(IRProgram)
     }
 
     boogieTranslator.translate

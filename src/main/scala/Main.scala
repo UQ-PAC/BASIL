@@ -30,7 +30,8 @@ import scala.sys.process._
     }
   }
   val performAnalysis = if options.nonEmpty && options.contains("-analyse") then true else false
-  val program: BProgram = RunUtils.generateVCsAdt(fileName, elfFileName, specFileName, performAnalysis)
+  val performInterpret = (options.nonEmpty && options.contains("-interpret"))
+  val program: BProgram = RunUtils.generateVCsAdt(fileName, elfFileName, specFileName, performAnalysis, performInterpret)
   RunUtils.writeToFile(program, outFileName)
 
   // println("boogie boogie_out.bpl" #| "grep --color=always '.*Error.*\\|$'" #| Process(Seq("grep", "--color=always", ".*errors.*\\|$"), None, "GREP_COLORS" -> "'1;33"))
