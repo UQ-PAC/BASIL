@@ -71,7 +71,7 @@ object RunUtils {
       analyse(IRProgram)
     }
     if (performInterpret) {
-      Interpreter(IRProgram)
+      Interpret(IRProgram)
     }
 
     boogieTranslator.translate
