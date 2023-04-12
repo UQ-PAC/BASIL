@@ -204,10 +204,14 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }).flatten.toList
 
     val body = p.blocks.map(b => translateBlock(b, returns))
-    //val modifies = body.flatMap(b => b.modifies).toSet
-    val modifies = Set(mem, Gamma_mem, stack, Gamma_stack) // TODO placeholder until proper modifies analysis
+    //val modifies = p.modifies.map(m => m.name).toSeq.sorted
+    val modifies = Seq(mem, Gamma_mem, stack, Gamma_stack) // TODO placeholder until proper modifies analysis
 
-    val procRequires: List[BExpr] = requires.getOrElse(p.name, List())
+    val procRequires: List[BExpr] = if (p.name == "main") {
+      requires.getOrElse(p.name, List()).prependedAll(initialiseMemory)
+    } else {
+      requires.getOrElse(p.name, List())
+    }
     val procEnsures: List[BExpr] = ensures.getOrElse(p.name, List())
 
     val inInits = if (body.isEmpty) {
@@ -217,7 +221,19 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }
 
 
-    BProcedure(p.name, in.toList, out.toList, procEnsures, procRequires, modifies.toSeq.sorted, inInits ++ body.toList)
+    BProcedure(p.name, in.toList, out.toList, procEnsures, procRequires, modifies, inInits ++ body.toList)
+  }
+
+  private def initialiseMemory: List[BExpr] = {
+    val dataSection = program.initialMemory.collectFirst { case s if s.name == ".data" => s }
+    dataSection match {
+      case Some(d) =>
+        val bytes = for (b <- d.bytes.indices) yield {
+          BinaryBExpr(BVEQ, BMemoryLoad(mem, BitVecBLiteral(d.address + b, 64), Endian.LittleEndian, 8), d.bytes(b).toBoogie)
+        }
+        bytes.toList
+      case None => List()
+    }
   }
 
   private def outParamToAssign(p: Parameter): AssignCmd = {

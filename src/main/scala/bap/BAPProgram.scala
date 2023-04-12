@@ -2,7 +2,7 @@ package bap
 
 import ir._
 
-case class BAPProgram(subroutines: List[BAPSubroutine]) {
+case class BAPProgram(subroutines: List[BAPSubroutine], memorySections: List[BAPMemorySection]) {
   override def toString: String = subroutines.mkString("\n")
 
   /*
@@ -42,3 +42,5 @@ case class BAPBlock(label: String, address: Option[Int], statements: List[BAPSta
 case class BAPParameter(name: String, size: Int, value: BAPLocalVar) {
   def toIR: Parameter = Parameter(name, size, value.toIR)
 }
+
+case class BAPMemorySection(name: String, address: Int, size: Int, bytes: Seq[BAPLiteral])

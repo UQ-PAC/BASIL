@@ -1,6 +1,7 @@
 package ir
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
 
 abstract class Visitor {
 
@@ -229,6 +230,24 @@ abstract class ReadOnlyVisitor extends Visitor {
   override def visitProgram(node: Program): Program = {
     for (i <- node.procedures) {
       visitProcedure(i)
+    }
+    node
+  }
+
+}
+
+abstract class ControlFlowInterproceduralVisitor extends Visitor {
+  val visited: mutable.Set[Procedure] = mutable.Set()
+
+  override def visitProcedure(node: Procedure): Procedure = {
+    for (i <- node.blocks.indices) {
+      node.blocks(i) = visitBlock(node.blocks(i))
+    }
+    for (i <- node.in.indices) {
+      node.in(i) = visitParameter(node.in(i))
+    }
+    for (i <- node.out.indices) {
+      node.out(i) = visitParameter(node.out(i))
     }
     node
   }
