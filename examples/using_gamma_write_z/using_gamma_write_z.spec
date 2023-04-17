@@ -1,3 +1,6 @@
 L: x -> z == 0, z -> true
-Rely: true
+Rely: old(x) == x && old(z) == z
 Guarantee: old(Gamma_x) ==> Gamma_x
+
+Subroutine: main
+Requires: z == 0 ==> Gamma_x
