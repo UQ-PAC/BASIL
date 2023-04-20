@@ -322,7 +322,7 @@ object Cfg:
 
     def visitBlocks(blocks: Map[String, CfgBlockEntryNode]): Unit = {
       val newBlocks: Map[String, mutable.ArrayBuffer[CfgNode]] = transformBlocks(blocks)
-      blocks.keys.foreach(block => visitBlock(block))
+      visitBlock("l" + func.name)
 
       def visitBlock(blockName: String): Unit = {
         val statementNodes = newBlocks(blockName)
@@ -351,6 +351,7 @@ object Cfg:
           case g: GoTo =>
             val target: CfgNode = newBlocks(g.target.label).head
             cfg.addEdge(lastAdded, target)
+            visitBlock(g.target.label)
           case d: DirectCall =>
             val call = nodePool.get(d)
             cfg.addNode(call)
