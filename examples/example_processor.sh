@@ -30,10 +30,10 @@ filename="${filename%.*}"
 aarch64-linux-gnu-gcc -fno-plt -fno-pic "$1" -o "${filename}.out"
 
 # generate the ADT file using bap
-bap "${filename}.out" -d adt:"${filename}.adt"
+bap --primus-lisp-semantics=disable "${filename}.out" -d adt:"${filename}.adt"
 
 # generate the BIR file using bap
-bap "${filename}.out" -d bir:"${filename}.bir"
+bap --primus-lisp-semantics=disable "${filename}.out" -d bir:"${filename}.bir"
 
 # generate the REFL file using readelf
 readelf -s -r -W "${filename}.out" > "${filename}.relf"
