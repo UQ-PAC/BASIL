@@ -117,14 +117,6 @@ class Cfg(cfg: Cfg = null):
     this.edges = cfg.edges
     this.entries = cfg.entries
 
-  def concatBefore(before: CfgNode): Unit =
-    before.succ += entries.head
-    entries.head.pred += before
-
-  def concatAfter(after: CfgNode): Unit =
-    after.pred += entries.last
-    entries.last.succ += after
-
   def getEdges: ListBuffer[Edge] = {
     edges
   }
@@ -170,16 +162,9 @@ class Cfg(cfg: Cfg = null):
   }
 
 case class NodePool() {
-  //val pool = mutable.Map[(Command, CfgBlockEntryNode), CfgNode]()
   private var latestAdded: CfgNode = null;
-  private val pool = mutable.HashMap[Command, CfgNode]()
 
   def get(command: Command): CfgNode = {
-//    if (!pool.contains(command)) {
-//      pool += command -> CfgCommandNode(data = command)
-//    }
-//    latestAdded = pool(command)
-//    pool(command)
     CfgCommandNode(data = command)
   }
 
@@ -209,122 +194,33 @@ object Cfg:
     cfg
   }
 
-//  // generate cfg for a statement
-//  def generateCfgStatement(stmt: Statement): CfgNode =
-//    val previousNode = nodePool.getLatestAdded
-//    val node: CfgNode = nodePool.get(stmt)
-//    if (node.pred.isEmpty) then
-//      cfg.addEdge(previousNode, node)
-//    node
-//
-//  def generateCfgJump(jump: Jump, previous: CfgNode): CfgNode =
-//    val node: CfgNode = nodePool.get(jump)
-//    nodePool.setLatestAdded(previous)
-//    jump match {
-//      case goTo: GoTo =>
-//        blocks.get(goTo.target.label) match
-//          case
-//            Some(blockNode) =>
-//            //nodePool.setLatestAdded(previous)
-//            visitBlock(blockNode, goTo.target.label)
-//          case _ => print(s"ERROR: goto target in '${goTo}' not found\n")
-//
-//      case directCall: DirectCall =>
-//        print(directCall.calls)
-//        val previousNode = nodePool.getLatestAdded
-//        if (node.pred.isEmpty) then
-//          cfg.addEdge(previousNode, node)
-//          directCall.returnTarget match {
-//            case Some(returnTarget) =>
-//              blocks.get(returnTarget.label) match {
-//                case Some(returnBlockNode) =>
-//                  nodePool.setLatestAdded(node)
-//                  visitBlock(returnBlockNode, returnTarget.label)
-//                case _ =>
-//              }
-//            case _ =>
-//          }
-//          print(node)
-//        return node
-//      //throw new Exception("Direct call not supported") // TODO: fix this
-//      // edge between current -> target
-//      //          blocks.get(directCall.target.name) match
-//      //            case Some(blockNode) => cfg.addEdge(node, blockNode)
-//      //            case _ => print(s"ERROR: direct call target in '${directCall}' not found\n")
-//      //          directCall.returnTarget match
-//      //            case Some(returnTarget) =>
-//      //              blocks.get(returnTarget.label) match
-//      //                case Some(returnBlockNode) =>
-//      //                  blocks.get(directCall.target.name) match
-//      //                    // edge between target -> return target
-//      //                    case Some(blockNode) => cfg.addEdge(blockNode, returnBlockNode)
-//      //                    case _ =>
-//      //                case _ =>
-//      //                  print(s"ERROR: direct call return target in '${directCall}' not found\n")
-//      //            case _ =>
-//      //              // edge between target -> current (if no return target)
-//      //              blocks.get(directCall.target.name) match
-//      //                case Some(blockNode) => cfg.addEdge(blockNode, node)
-//      //                case _ =>
-//
-//      case indirectCall: IndirectCall =>
-//        // edge between current -> unknown block
-//        if (indirectCall.target.name == "R30") {
-//          cfg.addEdge(previous, functionExitNode)
-//        } else {
-//          print(s"ERROR: indirect call target in '${indirectCall}' not found\n")
-//          indirectCall.returnTarget match // TODO: check if this is correct below
-//            case Some(returnTarget) =>
-//              // edge between unknown block -> return target
-//              blocks.get(returnTarget.label) match
-//                case Some(returnBlockNode) => //unknownBlockNode.addEdge(returnBlockNode)
-//                case _ => print(s"ERROR: indirect call return target in '${indirectCall}' not found\n")
-//            // edge between unknown block -> current (if no return target)
-//            case _ => //unknownBlockNode.addEdge(node)
-//        }
-//      case _ =>
-//    }
-//    previous
-//
-//  def visitBlock(entryNode: CfgBlockEntryNode, blockName: String): Unit = {
-//    if (!visitedBlocks.contains(blockName)) {
-//      visitedBlocks += blockName
-//      val stmts = entryNode.data.statements
-//      stmts.foreach(stmt => cfg.addNode(generateCfgStatement(stmt)))
-//      var previous = cfg.entries.last
-//      entryNode.data.jumps.foreach {
-//        case g: GoTo =>
-//          previous = generateCfgJump(g, previous)
-//        case j: _ =>
-//          previous = generateCfgJump(j, previous)
-//      }
-//    } else {
-//      cfg.addEdge(cfg.entries.last, nodePool.get(entryNode.data.statements.head))
-//    }
-//  }
-
-
+  /** Transforms blocks into lists of stmt nodes */
   def transformBlocks(blocks: Map[String, CfgBlockEntryNode]): Map[String, mutable.ArrayBuffer[CfgNode]] = {
     blocks.map(block => block._1 -> block._2.data.statements.map(stmt => nodePool.get(stmt)))
   }
 
 
-
   /** Generate the cfg for a function.
    */
-
   def generateCfgFunc(func: Procedure): Cfg = {
     val blocks: Map[String, CfgBlockEntryNode] = func.blocks.map(block => block.label -> CfgBlockEntryNode(data = block)).toMap
     val functionEntryNode = CfgFunctionEntryNode(data = func)
     val functionExitNode = CfgFunctionExitNode(data = func)
     cfg.addNode(functionEntryNode)
     cfg.addNode(functionExitNode)
+    val processedBlocks: mutable.Set[String] = mutable.Set[String]()
 
     def visitBlocks(blocks: Map[String, CfgBlockEntryNode]): Unit = {
       val newBlocks: Map[String, mutable.ArrayBuffer[CfgNode]] = transformBlocks(blocks)
       visitBlock("l" + func.name)
 
       def visitBlock(blockName: String): Unit = {
+        if (!processedBlocks.contains(blockName)) {
+          processedBlocks += blockName
+        } else {
+          return
+        }
+
         val statementNodes = newBlocks(blockName)
         statementNodes.foreach(stmtNode =>
           if (!(stmtNode.pred.nonEmpty && stmtNode == statementNodes.head)) {
@@ -334,29 +230,21 @@ object Cfg:
           nodePool.setLatestAdded(stmtNode)
         )
         val lastAdded: CfgNode = nodePool.getLatestAdded
-//        block.jumps.foreach {
-//          case g: GoTo =>
-//            val target: Statement = blocks(g.target.label).data.statements.head
-//            cfg.addNode(nodePool.get(target))
-//            cfg.addEdge(lastAdded, nodePool.getLatestAdded)
-//            nodePool.setLatestAdded(lastAdded)
-//          case d: DirectCall =>
-//            cfg.addNode(nodePool.get(d))
-//            cfg.addEdge(lastAdded, nodePool.getLatestAdded)
-//          case i: IndirectCall =>
-//            cfg.addEdge(lastAdded, functionExitNode)
-//            nodePool.setLatestAdded(lastAdded)
-//        }
+
         blocks(blockName).data.jumps.foreach {
           case g: GoTo =>
             val target: CfgNode = newBlocks(g.target.label).head
             cfg.addEdge(lastAdded, target)
+            nodePool.setLatestAdded(target)
             visitBlock(g.target.label)
           case d: DirectCall =>
             val call = nodePool.get(d)
             cfg.addNode(call)
             cfg.addEdge(lastAdded, call)
             nodePool.setLatestAdded(call)
+            if (d.returnTarget.isDefined) {
+              visitBlock(d.returnTarget.get.label)
+            }
           case i: IndirectCall =>
 //            val call = nodePool.get(i)
 //            cfg.addNode(call)
