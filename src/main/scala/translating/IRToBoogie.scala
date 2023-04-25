@@ -43,7 +43,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgProcs ++ procedures
     BProgram(declarations)
-    //avoidReserved(BProgram(declarations))
   }
 
   def genRely(relies: List[BExpr]): List[BProcedure] = {

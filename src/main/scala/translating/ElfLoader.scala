@@ -55,7 +55,7 @@ object ElfLoader {
     if (ctx.entrytype.getText == "OBJECT" && ctx.bind.getText == "GLOBAL" && ctx.vis.getText == "DEFAULT") {
       val name = ctx.name.getText
       if (name.forall(allowedChars.contains)) {
-        Some(SpecGlobal(name, ctx.size.getText.toInt * 8, hexToBigInt(ctx.value.getText)))
+        Some(SpecGlobal(name, ctx.size.getText.toInt * 8, None, hexToBigInt(ctx.value.getText)))
       } else {
         None
       }

@@ -1,3 +1,6 @@
+Globals:
+x: int
+
 L: x -> true
 Rely: x == old(x) || x == 1 || x == 6
 Guarantee: x == old(x) || x == 5
