@@ -181,15 +181,24 @@ object Cfg:
 
   var cfg: Cfg = Cfg()
   private var nodePool = NodePool()
+  private val funcEntryExit: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]()
+  private var interProc: Boolean = false
 
   /** Generate the cfg for each function of the program.
    */
-  def generateCfgProgram(program: Program): Cfg = {
+  def generateCfgProgram(program: Program, interProc: Boolean): Cfg = {
     print("\nGenerating CFG... \n")
     cfg = Cfg()
     nodePool = NodePool()
-    print(program.procedures.map(f => f -> f.blocks.map(b => b -> b.statements.map(s => s -> s).mkString("\n")).mkString("\n")).mkString("\n"))
-    print("\n")
+    funcEntryExit.clear()
+    this.interProc = interProc
+    for (func <- program.procedures) {
+      val functionEntryNode = CfgFunctionEntryNode(data = func)
+      val functionExitNode = CfgFunctionExitNode(data = func)
+      cfg.addNode(functionEntryNode)
+      cfg.addNode(functionExitNode)
+      funcEntryExit.addOne(func -> (functionEntryNode, functionExitNode))
+    }
     program.procedures.map(f => f -> generateCfgFunc(f))
     cfg
   }
@@ -204,10 +213,8 @@ object Cfg:
    */
   def generateCfgFunc(func: Procedure): Cfg = {
     val blocks: Map[String, CfgBlockEntryNode] = func.blocks.map(block => block.label -> CfgBlockEntryNode(data = block)).toMap
-    val functionEntryNode = CfgFunctionEntryNode(data = func)
-    val functionExitNode = CfgFunctionExitNode(data = func)
-    cfg.addNode(functionEntryNode)
-    cfg.addNode(functionExitNode)
+    val functionEntryNode = funcEntryExit(func)._1
+    val functionExitNode = funcEntryExit(func)._2
     val processedBlocks: mutable.Set[String] = mutable.Set[String]()
 
     def visitBlocks(blocks: Map[String, CfgBlockEntryNode]): Unit = {
@@ -231,27 +238,55 @@ object Cfg:
         )
         val lastAdded: CfgNode = nodePool.getLatestAdded
 
-        blocks(blockName).data.jumps.foreach {
-          case g: GoTo =>
-            val target: CfgNode = newBlocks(g.target.label).head
-            cfg.addEdge(lastAdded, target)
-            nodePool.setLatestAdded(target)
-            visitBlock(g.target.label)
-          case d: DirectCall =>
-            val call = nodePool.get(d)
-            cfg.addNode(call)
-            cfg.addEdge(lastAdded, call)
-            nodePool.setLatestAdded(call)
-            if (d.returnTarget.isDefined) {
-              visitBlock(d.returnTarget.get.label)
-            }
-          case i: IndirectCall =>
-//            val call = nodePool.get(i)
-//            cfg.addNode(call)
-//            cfg.addEdge(lastAdded, call)
-//            cfg.addEdge(call, functionExitNode)
+        if (interProc) {
+          blocks(blockName).data.jumps.foreach {
+            case g: GoTo =>
+              val target: CfgNode = newBlocks(g.target.label).head
+              cfg.addEdge(lastAdded, target)
+              nodePool.setLatestAdded(target)
+              visitBlock(g.target.label)
+            case d: DirectCall =>
+              val call = nodePool.get(d)
+              val (localEntry, localExit): (CfgFunctionEntryNode, CfgFunctionExitNode) = funcEntryExit(d.target)
+              cfg.addNode(call)
+              cfg.addEdge(lastAdded, call)
+              cfg.addEdge(call, localEntry)
+              cfg.addEdge(localExit, call)
+              nodePool.setLatestAdded(call)
+              if (d.returnTarget.isDefined) {
+                visitBlock(d.returnTarget.get.label)
+              }
+            case i: IndirectCall =>
+              //            val call = nodePool.get(i)
+              //            cfg.addNode(call)
+              //            cfg.addEdge(lastAdded, call)
+              //            cfg.addEdge(call, functionExitNode)
 
-            cfg.addEdge(lastAdded, functionExitNode)
+              cfg.addEdge(lastAdded, functionExitNode)
+          }
+        } else {
+          blocks(blockName).data.jumps.foreach {
+            case g: GoTo =>
+              val target: CfgNode = newBlocks(g.target.label).head
+              cfg.addEdge(lastAdded, target)
+              nodePool.setLatestAdded(target)
+              visitBlock(g.target.label)
+            case d: DirectCall =>
+              val call = nodePool.get(d)
+              cfg.addNode(call)
+              cfg.addEdge(lastAdded, call)
+              nodePool.setLatestAdded(call)
+              if (d.returnTarget.isDefined) {
+                visitBlock(d.returnTarget.get.label)
+              }
+            case i: IndirectCall =>
+              //            val call = nodePool.get(i)
+              //            cfg.addNode(call)
+              //            cfg.addEdge(lastAdded, call)
+              //            cfg.addEdge(call, functionExitNode)
+
+              cfg.addEdge(lastAdded, functionExitNode)
+          }
         }
       }
     }
@@ -304,11 +339,25 @@ object IntraproceduralProgramCfg:
   /** Generates an [[IntraproceduralProgramCfg]] from a program.
    */
   def generateFromProgram(prog: Program): IntraproceduralProgramCfg =
-    val cfg: Cfg = Cfg.generateCfgProgram(prog)
+    val cfg: Cfg = Cfg.generateCfgProgram(prog, false)
     new IntraproceduralProgramCfg(prog, cfg)
 
 /** Control-flow graph for a program, where function calls are represented as expressions, without using call/after-call
  * nodes.
  */
 class IntraproceduralProgramCfg(prog: Program, cfg: Cfg) extends ProgramCfg(prog, cfg)
+
+
+object InterproceduralProgramCfg:
+
+  /** Generates an [[InterproceduralProgramCfg]] from a program.
+   */
+  def generateFromProgram(prog: Program): InterproceduralProgramCfg =
+    val cfg: Cfg = Cfg.generateCfgProgram(prog, true)
+    new InterproceduralProgramCfg(prog, cfg)
+
+/** Control-flow graph for a program, where function calls are represented as expressions, without using call/after-call
+ * nodes.
+ */
+class InterproceduralProgramCfg(prog: Program, cfg: Cfg) extends ProgramCfg(prog, cfg)
 
