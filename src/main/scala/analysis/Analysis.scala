@@ -483,6 +483,16 @@ trait MemoryRegionAnalysisMisc:
 
   private val mallocVariable = Variable("R0", BitVecType(64))
 
+  private val loopEscapeSet: mutable.Set[CfgNode] = mutable.Set.empty
+
+  def loopEscape(n: CfgNode): Boolean = {
+    if (loopEscapeSet.contains(n)) {
+      return true
+    }
+    loopEscapeSet.add(n)
+    false
+  }
+
   /** Find decl of variables from node predecessors */
   def findDecl(variable: Variable, n: CfgNode): mutable.ListBuffer[CfgNode] = {
     val decls: mutable.ListBuffer[CfgNode] = mutable.ListBuffer.empty
@@ -491,11 +501,9 @@ trait MemoryRegionAnalysisMisc:
         return decls
     }
     for (pred <- n.pred) {
-//      if (assigmentsMap.contains((variable, pred))) {
-//        decls.addOne(pred)
-//      } else {
-//        decls.addAll(findDecl(variable, pred))
-//      }
+      if (loopEscape(pred)) {
+        return mutable.ListBuffer.empty
+      }
       pred match {
         case cmd: CfgCommandNode =>
           cmd.data match {
@@ -532,6 +540,7 @@ trait MemoryRegionAnalysisMisc:
   def evaluateExpression(exp: Expr, n: CfgNode): Expr = {
       exp match {
         case binOp: BinaryExpr =>
+          loopEscapeSet.clear()
           for (pred <- findDecl(binOp.arg1.asInstanceOf[Variable], n)) {
             assigmentsMap.get(binOp.arg1, pred) match
               case Some(value) =>
@@ -561,6 +570,7 @@ trait MemoryRegionAnalysisMisc:
       var regionType: RegionType = memType
       exp match {
         case binOp: BinaryExpr =>
+          loopEscapeSet.clear()
           for (pred <- findDecl(binOp.arg1.asInstanceOf[Variable], n)) {
             assigmentsMap.get(binOp.arg1, pred) match
               case Some(value) =>
