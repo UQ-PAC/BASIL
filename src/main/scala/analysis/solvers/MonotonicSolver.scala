@@ -23,10 +23,11 @@ trait SimpleMonotonicSolver[N] extends MapLatticeSolver[N] with Dependencies[N]:
   private val loopEscape: mutable.Set[N] = mutable.Set.empty
 
   def process(n: N): Unit =
-    if loopEscape.contains(n) then
+    val xn = x(n)
+    val y = funsub(n, x)
+    if y == xn && loopEscape.contains(n) then
       return;
     loopEscape.add(n)
-    val y = funsub(n, x)
     x += n -> y
     n.asInstanceOf[CfgNode].succ.foreach(s => process(s.asInstanceOf[N]))
 
