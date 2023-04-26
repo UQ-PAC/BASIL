@@ -15,11 +15,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val guaranteesReflexive = spec.guarantees.map(g => g.removeOld)
   private val guaranteeOldVars = spec.guaranteeOldVars
   private val LPreds = spec.LPreds.map((k, v) => k -> v.resolveSpecL)
-  private val requires = {
-
-
-    spec.subroutines.map(s => s.name -> s.requires.map(e => e.resolveSpec)).toMap
-  }
+  private val requires = spec.subroutines.map(s => s.name -> s.requires.map(e => e.resolveSpec)).toMap
   private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(e => e.resolveSpec)).toMap
 
   private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
@@ -46,7 +42,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val functionsUsed = (functionsUsed1 ++ functionsUsed2 ++ functionsUsed3).distinct.sorted
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgProcs ++ procedures
-    avoidReserved(BProgram(declarations))
+    BProgram(declarations)
+    //avoidReserved(BProgram(declarations))
   }
 
   def genRely(relies: List[BExpr]): List[BProcedure] = {
@@ -207,10 +204,14 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }).flatten.toList
 
     val body = p.blocks.map(b => translateBlock(b, returns))
-    //val modifies = body.flatMap(b => b.modifies).toSet
-    val modifies = Set(mem, Gamma_mem, stack, Gamma_stack) // TODO placeholder until proper modifies analysis
+    //val modifies = p.modifies.map(m => m.name).toSeq.sorted
+    val modifies = Seq(mem, Gamma_mem, stack, Gamma_stack) // TODO placeholder until proper modifies analysis
 
-    val procRequires: List[BExpr] = requires.getOrElse(p.name, List())
+    val procRequires: List[BExpr] = if (p.name == "main") {
+      requires.getOrElse(p.name, List()).prependedAll(initialiseMemory)
+    } else {
+      requires.getOrElse(p.name, List())
+    }
     val procEnsures: List[BExpr] = ensures.getOrElse(p.name, List())
 
     val inInits = if (body.isEmpty) {
@@ -220,7 +221,19 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }
 
 
-    BProcedure(p.name, in.toList, out.toList, procEnsures, procRequires, modifies.toSeq.sorted, inInits ++ body.toList)
+    BProcedure(p.name, in.toList, out.toList, procEnsures, procRequires, modifies, inInits ++ body.toList)
+  }
+
+  private def initialiseMemory: List[BExpr] = {
+    val dataSection = program.initialMemory.collectFirst { case s if s.name == ".data" => s }
+    dataSection match {
+      case Some(d) =>
+        val bytes = for (b <- d.bytes.indices) yield {
+          BinaryBExpr(BVEQ, BMemoryLoad(mem, BitVecBLiteral(d.address + b, 64), Endian.LittleEndian, 8), d.bytes(b).toBoogie)
+        }
+        bytes.toList
+      case None => List()
+    }
   }
 
   private def outParamToAssign(p: Parameter): AssignCmd = {
@@ -397,7 +410,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   }
 
   // TODO put this elsewhere
-  def stripUnreachableFunctions(externalNames: Set[String]): Unit = {
+  def stripUnreachableFunctions(): Unit = {
     val functionToChildren = program.procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
     var next = "main"
@@ -417,18 +430,14 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }
 
     program.procedures = program.procedures.filter(f => reachableNames.contains(f.name))
-    for (f <- program.procedures) {
-      f match {
-        case f: Procedure if externalNames.contains(f.name) => f.blocks = ArrayBuffer()
-        case _ =>
-      }
-    }
   }
 
+  /*
   private val reserved = Set("free")
 
   def avoidReserved(program: BProgram): BProgram = {
     program.replaceReserved(reserved)
   }
+  */
 
 }

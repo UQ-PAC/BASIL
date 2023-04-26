@@ -77,10 +77,13 @@ assign : 'Def' OPEN_PAREN tid COMMA attrs COMMA lhs=immVar COMMA rhs=exp CLOSE_P
     | 'Def' OPEN_PAREN tid COMMA attrs COMMA lhs=memVar COMMA rhs=store CLOSE_PAREN #memDef
     ;
 
+sections : 'Sections' OPEN_PAREN OPEN_BRACKET (section (COMMA section)*)? CLOSE_BRACKET CLOSE_PAREN;
+section : 'Section' OPEN_PAREN name=quoteString COMMA address=num COMMA QUOTE membyte+ QUOTE CLOSE_PAREN;
+
 /* Unimportant ADTs - should be matched last */
 phis : 'Phis' OPEN_PAREN list CLOSE_PAREN;
 memmap : 'Memmap' OPEN_PAREN list CLOSE_PAREN;
-sections : 'Sections' OPEN_PAREN list CLOSE_PAREN;
+
 
 list : OPEN_BRACKET sequence CLOSE_BRACKET;
 unimplemented : SYMBOL OPEN_PAREN sequence CLOSE_PAREN;
@@ -161,10 +164,12 @@ BIG_ENDIAN : 'BigEndian';
 SYMBOL : ALPHA+;
 ALPHA : [A-Za-z];
 DEC : DIGIT+;
-HEX : '0x'? HEXDIGIT+;
+HEX : '0x' HEXDIGIT+;
+MEMBYTE : '\\x' HEXDIGIT HEXDIGIT;
 DIGIT : [0-9];
 HEXDIGIT : [0-9a-fA-F];
 NUM_UNDERSCORE : [0-9_]+;
+
 
 // Delimiters
 OPEN_PAREN : '(';
@@ -172,12 +177,14 @@ CLOSE_PAREN : ')';
 COMMA : ',';
 OPEN_BRACKET : '[';
 CLOSE_BRACKET : ']';
+QUOTE : '"';
 
+membyte: MEMBYTE;
 quoteString : STRING;
 
 // quoteStrings
-ESCAPE : '\\' ( '"' | '\\' | 'n' | 'x' | '.');
-STRING :  '"' ( ESCAPE | ~('"' | '\\' | '\n' | '\r') )+ '"' ;
+ESCAPE : '\\' ( QUOTE | '\\' | 'n' | '.');
+STRING :  QUOTE ( ESCAPE | ~('"' | '\\' | '\n' | '\r') )+ QUOTE;
 
 
 // Ignored

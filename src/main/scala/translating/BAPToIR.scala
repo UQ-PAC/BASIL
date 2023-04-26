@@ -11,9 +11,8 @@ class BAPToIR(var program: BAPProgram) {
   private val nameToProcedure: Map[String, Procedure] = Map()
   private val labelToBlock: Map[String, Block] = Map()
 
-  private val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
-
   def translate: Program = {
+    val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
     for (s <- program.subroutines) {
       val blocks: ArrayBuffer[Block] = ArrayBuffer()
       for (b <- s.blocks) {
@@ -46,7 +45,13 @@ class BAPToIR(var program: BAPProgram) {
       }
     }
 
-    Program(procedures)
+    val memorySections: ArrayBuffer[MemorySection] = ArrayBuffer()
+    for (m <- program.memorySections) {
+      val bytes = m.bytes.map(_.toIR)
+      memorySections.append(MemorySection(m.name, m.address, m.size, bytes))
+    }
+
+    Program(procedures, memorySections)
   }
 
   private def translate(s: BAPStatement) = {

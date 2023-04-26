@@ -16,7 +16,11 @@ import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
 object RunUtils {
 
+  // ids reserved by boogie
+  val reserved: Set[String] = Set("free")
+
   def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
+
     val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(adtLexer)
     // ADT
@@ -52,7 +56,7 @@ object RunUtils {
     val externalNames = externalFunctions.map(e => e.name)
 
     val IRTranslator = BAPToIR(program)
-    val IRProgram = IRTranslator.translate
+    var IRProgram = IRTranslator.translate
 
     val specification = specFileName match {
       case Some(s) => val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
@@ -64,9 +68,6 @@ object RunUtils {
       case None => Specification(globals, Map(), List(), List(), List())
     }
 
-    val boogieTranslator = IRToBoogie(IRProgram, specification)
-    boogieTranslator.stripUnreachableFunctions(externalNames)
-
     if (performAnalysis) {
       analyse(IRProgram)
     }
@@ -74,6 +75,13 @@ object RunUtils {
       Interpret(IRProgram)
     }
 
+    val externalRemover = ExternalRemover(externalNames)
+    val renamer = Renamer(reserved)
+    IRProgram = externalRemover.visitProgram(IRProgram)
+    IRProgram = renamer.visitProgram(IRProgram)
+
+    val boogieTranslator = IRToBoogie(IRProgram, specification)
+    boogieTranslator.stripUnreachableFunctions()
     boogieTranslator.translate
   }
 
