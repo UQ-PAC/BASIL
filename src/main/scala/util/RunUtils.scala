@@ -19,7 +19,8 @@ object RunUtils {
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
 
-  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean): BProgram = {
+  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
+
     val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(adtLexer)
     // ADT
@@ -69,6 +70,9 @@ object RunUtils {
 
     if (performAnalysis) {
       analyse(IRProgram)
+    }
+    if (performInterpret) {
+      Interpret(IRProgram)
     }
 
     val externalRemover = ExternalRemover(externalNames)

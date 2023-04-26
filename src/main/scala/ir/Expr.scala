@@ -69,7 +69,7 @@ class Repeat(var repeats: Int, var body: Expr) extends Expr {
   override def getType: BitVecType = BitVecType(bodySize * repeats)
   private def bodySize: Int = body.getType match {
     case bv: BitVecType => bv.size
-    case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of zero extend: " + this)
+    case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of repeat: " + this)
   }
   override def toString: String = s"Repeat($repeats, $body)"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitRepeat(this)
