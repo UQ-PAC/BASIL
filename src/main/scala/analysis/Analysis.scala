@@ -509,7 +509,6 @@ trait MemoryRegionAnalysisMisc:
           cmd.data match {
             case localAssign: LocalAssign =>
               if (localAssign.lhs == variable) {
-                assigmentsMap.addOne((variable, pred), localAssign.rhs)
                 decls.addOne(pred)
               } else {
                 decls.addAll(findDecl(variable, pred))
@@ -540,25 +539,41 @@ trait MemoryRegionAnalysisMisc:
   def evaluateExpression(exp: Expr, n: CfgNode): Expr = {
       exp match {
         case binOp: BinaryExpr =>
-          loopEscapeSet.clear()
-          for (pred <- findDecl(binOp.arg1.asInstanceOf[Variable], n)) {
-            assigmentsMap.get(binOp.arg1, pred) match
-              case Some(value) =>
-                value match
-                  case bitVecLiteral: BitVecLiteral =>
-                    val calculated: BigInt = bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value)
-                    dataItemDiscovered = Some(MemoryRegion(BitVecLiteral(bitVecLiteral.value, bitVecLiteral.size), BitVecLiteral(binOp.arg2.asInstanceOf[BitVecLiteral].value, binOp.arg2.asInstanceOf[BitVecLiteral].size), RegionType.Data))
-                    return BitVecLiteral(calculated, bitVecLiteral.size)
-                  case _ => evaluateExpression(value, pred)
-              case _ =>
-                print("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(binOp.arg1, pred) + " FOR " + binOp + "\n")
+          binOp.arg1 match {
+            case variable: Variable =>
+              loopEscapeSet.clear()
+              for (pred <- findDecl(variable, n)) {
+                assigmentsMap.get(variable, pred) match
+                  case Some(value) =>
+                    value match
+                      case bitVecLiteral: BitVecLiteral =>
+                        val calculated: BigInt = bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value)
+                        dataItemDiscovered = Some(MemoryRegion(BitVecLiteral(bitVecLiteral.value, bitVecLiteral.size), BitVecLiteral(binOp.arg2.asInstanceOf[BitVecLiteral].value, binOp.arg2.asInstanceOf[BitVecLiteral].size), RegionType.Data))
+                        return BitVecLiteral(calculated, bitVecLiteral.size)
+                      case _ => evaluateExpression(value, pred)
+                  case _ =>
+                    print("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(variable, pred) + " FOR " + binOp + "\n")
+            }
+            case _ => return exp
           }
           exp
         case memLoad: MemoryLoad =>
           evaluateExpression(memLoad.index, n)
         case bitVecLiteral: BitVecLiteral =>
           bitVecLiteral
+        case extend: ZeroExtend =>
+          evaluateExpression(extend.body, n)
+        case variable: Variable =>
+          loopEscapeSet.clear()
+          for (pred <- findDecl(variable, n)) {
+            assigmentsMap(variable, pred) match
+              case bitVecLiteral: BitVecLiteral =>
+                return bitVecLiteral
+              case any:Expr => return evaluateExpression(any, n)
+          }
+          exp
         case _ =>
+          //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
           exp
       }
   }
@@ -566,88 +581,58 @@ trait MemoryRegionAnalysisMisc:
 
   /** Default implementation of eval.
    */
-  def eval(exp: Expr, memType: RegionType, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
-      var regionType: RegionType = memType
+  def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
       exp match {
         case binOp: BinaryExpr =>
-          loopEscapeSet.clear()
-          for (pred <- findDecl(binOp.arg1.asInstanceOf[Variable], n)) {
-            assigmentsMap.get(binOp.arg1, pred) match
-              case Some(value) =>
-                print("FOUND: " + value + " FOR " + binOp + "\n")
-                value match
-                  case bitVecLiteral: BitVecLiteral =>
-                    if (is_global(bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value))) {
-                      regionType = RegionType.Data
-                      binOp.op match {
-                        case BVADD => return Set(MemoryRegion(value, binOp.arg2, regionType))
-                        case _ =>
-                          print("ERROR: CASE NOT HANDLED: " + binOp.op.toString + " FOR " + binOp + "\n")
-                          return lattice.sublattice.bottom
-                      }
-                    }
-                  case _ =>
-                    val evaluated = evaluateExpression(value, pred)
-                    evaluated match {
-                      case literal: BitVecLiteral =>
-                        if (is_global(literal.value)) {
-                          binOp.op match {
-                            case BVADD =>
-                              var tempLattice: lattice.sublattice.Element = env
-                              tempLattice = lattice.sublattice.lub(tempLattice, Set(dataItemDiscovered.get))
-                              return lattice.sublattice.lub(tempLattice, Set(RegionAccess(literal, binOp.arg2)))
-                            case _ =>
-                              print("ERROR: CASE NOT HANDLED: " + binOp.op.toString + " FOR " + binOp + "\n")
-                              return lattice.sublattice.bottom
-                          }
-                        }
-//                        } else {
-//                          binOp.op match {
-//                            case BVADD =>
-//                              var tempLattice: lattice.sublattice.Element = env
-//                              val region: MemoryRegion = dataItemDiscovered.get
-//                              region.regionType = RegionType.Stack
-//                              tempLattice = lattice.sublattice.lub(tempLattice, Set(region))
-//                              return lattice.sublattice.lub(tempLattice, Set(RegionAccess(literal, binOp.arg2)))
-//                            case _ =>
-//                              print("ERROR: CASE NOT HANDLED: " + binOp.op.toString + " FOR " + binOp + "\n")
-//                              return lattice.sublattice.bottom
-//                          }
-//                        }
-                      case _ =>
-                    }
+            val lhs: Expr = evaluateExpression(binOp.arg1, n)
+            val rhs: Expr = evaluateExpression(binOp.arg2, n)
+            lhs match {
+              case bitVecLiteral: BitVecLiteral =>
+                if (is_global(bitVecLiteral.value)) {
+                  var tempLattice: lattice.sublattice.Element = env
+                  tempLattice = lattice.sublattice.lub(tempLattice, Set(dataItemDiscovered.get))
+                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(bitVecLiteral, binOp.arg2)))
+                }
+              case binOp2: BinaryExpr =>
+                print("Warning: fragile code! Assumes array by default due to double binary operation\n")
+                print(rhs)
+                return Set(RegionAccess(binOp2.arg1, binOp2.arg2))
               case _ =>
-                print("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(binOp.arg1, pred) + " FOR " + binOp + "\n")
-          }
-
-          binOp.op match {
-              case BVADD => Set(MemoryRegion(binOp.arg1, binOp.arg2, regionType))
-              case BVSUB => Set(MemoryRegion(binOp.arg1, binOp.arg2, regionType))   // TODO: MUST BE NEGATION
-              case _ =>
-                print("ERROR: CASE NOT HANDLED: " + binOp.op.toString + " FOR " + binOp + "\n")
-                lattice.sublattice.bottom
-          }
+            }
+          Set(MemoryRegion(binOp.arg1, binOp.arg2, RegionType.Stack))
 
         case zeroExtend: ZeroExtend =>
-          eval(zeroExtend.body, memType, env, n)
+          eval(zeroExtend.body, env, n)
         case memoryLoad: MemoryLoad => // TODO: Pointer access here
           //eval(memoryLoad.index, memType, env)
           lattice.sublattice.bottom
         case variable: Variable =>
-          // check predecessors for assignments and return the lub of all their offsets if exist (workaround for phi nodes)
-          var tempLattice: lattice.sublattice.Element = env
-          for (pred <- findDecl(variable, n)) {
-            tempLattice = lattice.sublattice.lub(tempLattice, eval(assigmentsMap((variable, pred)), memType, env, pred))
+          val eval = evaluateExpression(variable, n)
+          eval match {
+            case literal: BitVecLiteral =>
+              if (is_global(literal.value)) {
+                return Set(dataItemDiscovered.get)
+                //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + literal + "\n")
+//                binOp.op match {
+//                  case BVADD =>
+//                    var tempLattice: lattice.sublattice.Element = env
+//                    tempLattice = lattice.sublattice.lub(tempLattice, Set(dataItemDiscovered.get))
+//                    return lattice.sublattice.lub(tempLattice, Set(RegionAccess(literal, binOp.arg2)))
+//                  case _ =>
+//                    print("ERROR: CASE NOT HANDLED: " + binOp.op + "\n")
+//                    return lattice.sublattice.bottom
+//                }
+              }
+              lattice.sublattice.bottom
+            case _ =>
+              lattice.sublattice.bottom
           }
-          // if no assignments were found, then it could be a global
-          tempLattice
-
         case extract: Extract =>
-          eval(extract.body, memType, env, n)
+          eval(extract.body, env, n)
         case unaryExpr: UnaryExpr =>
           lattice.sublattice.bottom
         case signExtend: SignExtend =>
-          eval(signExtend.body, memType, env, n)
+          eval(signExtend.body, env, n)
         case bitVecLiteral: BitVecLiteral =>
           print(s"Saw a bit vector literal ${bitVecLiteral}\n")
           lattice.sublattice.bottom
@@ -676,16 +661,16 @@ trait MemoryRegionAnalysisMisc:
             }
             // if the memory is acting on a stack operation, then we need to track the stack
             if (memAssign.rhs.mem.name == "stack") {
-                lattice.sublattice.lub(s, eval(memAssign.rhs.index, RegionType.Stack, s, n))
+                lattice.sublattice.lub(s, eval(memAssign.rhs.index, s, n))
               // the memory is not stack so it must be heap
             } else {
-              lattice.sublattice.lub(s, eval(memAssign.rhs.index, RegionType.Heap, s, n))
+              lattice.sublattice.lub(s, eval(memAssign.rhs.index, s, n))
             }
           // local assign is just lhs assigned to rhs we only need this information to track a prior register operation
           // AKA: R1 <- R1 + 8; mem(R1) <- 0x1234
-//          case localAssign: LocalAssign =>
-//            assigmentsMap.addOne((localAssign.lhs, n) -> localAssign.rhs)
-//              s
+          case localAssign: LocalAssign =>
+            assigmentsMap.addOne((localAssign.lhs, n) -> evaluateExpression(localAssign.rhs, n))
+              s
           case _ => s
         }
       case _ => s // ignore other kinds of nodes
