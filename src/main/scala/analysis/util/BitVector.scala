@@ -89,8 +89,14 @@ def smt_extract(i: Int, j: Int, s: Literal): BitVecLiteral = s match
   case s: BitVecLiteral => BitVecLiteral((s.value >> j - 1) & (1 << (i - j + 1)) - 1, i - j + 1)
   case _ => throw new Exception("cannot apply bitvector operator to non-bitvector")
 
+/** Boogie unintuitively uses a slightly different extract operator to SMT-Lib.
+  * We are matching the Boogie semantics */
+def boogie_extract(i: Int, j: Int, s: Literal): BitVecLiteral = s match
+  case s: BitVecLiteral => smt_extract(i - 1, j, s)
+  case _ => throw new Exception("cannot apply bitvector operator to non-bitvector")
 
-/** ((_ zero_extend i) t) abbreviates (concat ((_ repeat i) #b0) t)
+
+  /** ((_ zero_extend i) t) abbreviates (concat ((_ repeat i) #b0) t)
   */
 def smt_zero_extend(i: Int, s: Literal): BitVecLiteral = s match
   case s: BitVecLiteral =>
