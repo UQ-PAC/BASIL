@@ -27,6 +27,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
       pw.close()
       val actualFile = scala.io.Source.fromFile(tempPath + s"${name}")
       actual = actualFile.mkString
+      actualFile.close()
       val expectedFile = scala.io.Source.fromFile(expectedPath + s"${name}")
       expected = expectedFile.mkString
       expectedFile.close()
@@ -46,7 +47,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
         }
         throw new Exception("TEST NOT SUPPORTED: Expected file not found " + expectedPath + s"${name}")
     }
-    assert(actual.split('\n').sorted.mkString("Array(", ", ", ")") == expected.split('\n').sorted.mkString("Array(", ", ", ")"))
+    assert(actual.split("\n").toList.sorted.map(_.trim) == expected.split("\n").toList.sorted.map(_.trim))
   }
 
 //  def compareDots(name: String): Unit = {
@@ -85,8 +86,12 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
     runMain("basicfree");
   }
 
+  test("arraysTest") {
+    runMain("arrays");
+  }
+
   // used to generate the expected files (DO NOT RUN)
 //  test("generate") {
-//    runMain("ifglobal", true);
+//    runMain("arrays", true);
 //  }
 }
