@@ -416,26 +416,7 @@ case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
   override def toString: String = s"$of"
 }
 
-enum RegionType {
-  case Stack
-  case Heap
-  case Data
-  case Code
-}
-
-//case class SSAExpr() {
-//  val assigmentsMap: mutable.HashMap[(Expr, Int), Expr] = mutable.HashMap.empty
-//
-//  def add(expr: Expr, value: Expr): Unit = {
-//    assigmentsMap.put((expr, expr.ssa_id), value)
-//  }
-//
-//  def contains(expr: Expr): Boolean = {
-//    assigmentsMap.contains(expr)
-//  }
-//}
-
-abstract class MemorySpace
+abstract class MemoryRegion
 
 /**
  * Represents a memory region. The region is defined by a base pointer and a size.
@@ -444,10 +425,26 @@ abstract class MemorySpace
  * @param start 0x1234 in case of mem[R1 + 0x1234] <- ...
  * @param regionType The type of the region. This is used to distinguish between stack, heap, data and code regions.
  */
-case class MemoryRegion(regionBase: Object, start: Expr, var regionType: RegionType) extends MemorySpace:
-  override def toString: String = s"${regionType}(${regionBase}, ${start})"
+case class StackRegion(regionIdentifier: String, start: Expr) extends MemoryRegion:
+  override def toString: String = s"Stack(${regionIdentifier}, ${start})"
+  override def hashCode(): Int = start.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case StackRegion(_, start2) => start == start2
+    case _ => false
+  }
 
-case class RegionAccess(regionBase: Expr, start: Expr) extends MemorySpace:
+case class HeapRegion(regionIdentifier: String, start: Expr) extends MemoryRegion:
+  override def toString: String = s"Heap(${regionIdentifier}, ${start})"
+  override def hashCode(): Int = start.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case HeapRegion(_, start2) => start == start2
+    case _ => false
+  }
+
+case class DataRegion(regionIdentifier: Expr, start: Expr) extends MemoryRegion:
+  override def toString: String = s"Data(${regionIdentifier}, ${start})"
+
+case class RegionAccess(regionBase: Object, start: Expr) extends MemoryRegion:
   override def toString: String = s"ArrayAccess(${regionBase}, ${start})"
 
 
@@ -457,21 +454,40 @@ trait MemoryRegionAnalysisMisc:
   var dataItemDiscovered: Option[MemoryRegion] = None
 
   var mallocCount: Int = 0
-  def getNextMallocCount(): String = {
+  var stackCount: Int = 0
+  var stackPool = mutable.HashMap[Expr, StackRegion]()
+  private def getNextMallocCount(): String = {
     mallocCount += 1
     s"malloc_$mallocCount"
   }
+
+  private def getNextStackCount(): String = {
+    stackCount += 1
+    s"stack_$stackCount"
+  }
+
+  def poolMaster(expr: Expr): StackRegion = {
+    stackPool.contains(expr) match {
+      case true => stackPool(expr)
+      case false =>
+        val newRegion = StackRegion(getNextStackCount(), expr)
+        stackPool += (expr -> newRegion)
+        newRegion
+    }
+  }
+
+
 
   val cfg: ProgramCfg
   val globals: Set[SpecGlobal]
 
   /** The lattice of abstract values.
    */
-  val powersetLattice: PowersetLattice[MemorySpace]
+  val powersetLattice: PowersetLattice[MemoryRegion]
 
   /** The lattice of abstract states.
    */
-  val lattice: MapLattice[CfgNode, PowersetLattice[MemorySpace]] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CfgNode, PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
 
   val domain: Set[CfgNode] = cfg.nodes
 
@@ -548,7 +564,7 @@ trait MemoryRegionAnalysisMisc:
                     value match
                       case bitVecLiteral: BitVecLiteral =>
                         val calculated: BigInt = bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value)
-                        dataItemDiscovered = Some(MemoryRegion(BitVecLiteral(bitVecLiteral.value, bitVecLiteral.size), BitVecLiteral(binOp.arg2.asInstanceOf[BitVecLiteral].value, binOp.arg2.asInstanceOf[BitVecLiteral].size), RegionType.Data))
+                        dataItemDiscovered = Some(DataRegion(BitVecLiteral(bitVecLiteral.value, bitVecLiteral.size), BitVecLiteral(binOp.arg2.asInstanceOf[BitVecLiteral].value, binOp.arg2.asInstanceOf[BitVecLiteral].size)))
                         return BitVecLiteral(calculated, bitVecLiteral.size)
                       case _ => evaluateExpression(value, pred)
                   case _ =>
@@ -584,7 +600,7 @@ trait MemoryRegionAnalysisMisc:
   def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
       exp match {
         case binOp: BinaryExpr =>
-            val lhs: Expr = evaluateExpression(binOp.arg1, n)
+            val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
             val rhs: Expr = evaluateExpression(binOp.arg2, n)
             lhs match {
               case bitVecLiteral: BitVecLiteral =>
@@ -594,12 +610,14 @@ trait MemoryRegionAnalysisMisc:
                   return lattice.sublattice.lub(tempLattice, Set(RegionAccess(bitVecLiteral, binOp.arg2)))
                 }
               case binOp2: BinaryExpr =>
-                print("Warning: fragile code! Assumes array by default due to double binary operation\n")
-                print(rhs)
-                return Set(RegionAccess(binOp2.arg1, binOp2.arg2))
+                  // special case: we do not want to get a unique stack name so we try to find it in the pool
+                  print("Warning: fragile code! Assumes array by default due to double binary operation\n")
+                  var tempLattice: lattice.sublattice.Element = env
+                  tempLattice = lattice.sublattice.lub(tempLattice, Set(poolMaster(binOp2.arg2)))
+                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(poolMaster(binOp2.arg2).regionIdentifier, rhs)))
               case _ =>
             }
-          Set(MemoryRegion(binOp.arg1, binOp.arg2, RegionType.Stack))
+          Set(StackRegion(getNextStackCount(), binOp.arg2))
 
         case zeroExtend: ZeroExtend =>
           eval(zeroExtend.body, env, n)
@@ -652,7 +670,7 @@ trait MemoryRegionAnalysisMisc:
             if (directCall.target.name == "malloc") {
               val decl = findDecl(mallocVariable, n).headOption
               val recentMallocSize = assigmentsMap.get(mallocVariable, decl.get).get
-              return lattice.sublattice.lub(s, Set(MemoryRegion(getNextMallocCount(), recentMallocSize, RegionType.Heap)))
+              return lattice.sublattice.lub(s, Set(HeapRegion(getNextMallocCount(), recentMallocSize)))
             }
             s
           case memAssign: MemoryAssign =>
@@ -687,7 +705,7 @@ abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGl
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemorySpace]](cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal], val powersetLattice: L)
+abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal], val powersetLattice: L)
   extends MemoryRegionAnalysis(cfg, globals)
   with SimpleMonotonicSolver[CfgNode]
   with ForwardDependencies
@@ -697,7 +715,7 @@ object MemoryRegionAnalysis:
   /** Intraprocedural analysis that uses the worklist solver.
    */
   class WorklistSolver(cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal])
-    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, PowersetLattice[MemorySpace])
+    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, PowersetLattice[MemoryRegion])
 
 ///**
 // * Memory region analysis.
