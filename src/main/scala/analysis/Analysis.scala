@@ -677,13 +677,7 @@ trait MemoryRegionAnalysisMisc:
             if (ignoreRegions.contains(memAssign.rhs.value)) {
               return s
             }
-            // if the memory is acting on a stack operation, then we need to track the stack
-            if (memAssign.rhs.mem.name == "stack") {
-                lattice.sublattice.lub(s, eval(memAssign.rhs.index, s, n))
-              // the memory is not stack so it must be heap
-            } else {
-              lattice.sublattice.lub(s, eval(memAssign.rhs.index, s, n))
-            }
+            lattice.sublattice.lub(s, eval(memAssign.rhs.index, s, n))
           // local assign is just lhs assigned to rhs we only need this information to track a prior register operation
           // AKA: R1 <- R1 + 8; mem(R1) <- 0x1234
           case localAssign: LocalAssign =>
