@@ -441,17 +441,16 @@ case class HeapRegion(regionIdentifier: String, start: Expr) extends MemoryRegio
     case _ => false
   }
 
-case class DataRegion(regionIdentifier: Expr, start: Expr) extends MemoryRegion:
+case class DataRegion(regionIdentifier: String, start: Expr) extends MemoryRegion:
   override def toString: String = s"Data(${regionIdentifier}, ${start})"
 
-case class RegionAccess(regionBase: Object, start: Expr) extends MemoryRegion:
-  override def toString: String = s"ArrayAccess(${regionBase}, ${start})"
+case class RegionAccess(regionBase: String, start: Expr) extends MemoryRegion:
+  override def toString: String = s"RegionAccess(${regionBase}, ${start})"
 
 
 trait MemoryRegionAnalysisMisc:
 
   val assigmentsMap: mutable.HashMap[(Expr, CfgNode), Expr] = mutable.HashMap.empty
-  var dataItemDiscovered: Option[MemoryRegion] = None
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
@@ -546,6 +545,15 @@ trait MemoryRegionAnalysisMisc:
       false
   }
 
+  def get_global_name(bigInt: BigInt): String = {
+      for (global <- globals) {
+          if (global.address == bigInt) {
+          return global.name
+          }
+      }
+      ""
+  }
+
   /**
    * Evaluate an expression in a hope of finding a global variable.
    * @param exp: The expression to evaluate (e.g. R1 + 0x1234)
@@ -564,7 +572,6 @@ trait MemoryRegionAnalysisMisc:
                     value match
                       case bitVecLiteral: BitVecLiteral =>
                         val calculated: BigInt = bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value)
-                        dataItemDiscovered = Some(DataRegion(BitVecLiteral(bitVecLiteral.value, bitVecLiteral.size), BitVecLiteral(binOp.arg2.asInstanceOf[BitVecLiteral].value, binOp.arg2.asInstanceOf[BitVecLiteral].size)))
                         return BitVecLiteral(calculated, bitVecLiteral.size)
                       case _ => evaluateExpression(value, pred)
                   case _ =>
@@ -606,8 +613,8 @@ trait MemoryRegionAnalysisMisc:
               case bitVecLiteral: BitVecLiteral =>
                 if (is_global(bitVecLiteral.value)) {
                   var tempLattice: lattice.sublattice.Element = env
-                  tempLattice = lattice.sublattice.lub(tempLattice, Set(dataItemDiscovered.get))
-                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(bitVecLiteral, binOp.arg2)))
+                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(get_global_name(bitVecLiteral.value), bitVecLiteral)))
+                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(get_global_name(bitVecLiteral.value), binOp.arg2)))
                 }
               case binOp2: BinaryExpr =>
                   // special case: we do not want to get a unique stack name so we try to find it in the pool
@@ -629,17 +636,7 @@ trait MemoryRegionAnalysisMisc:
           eval match {
             case literal: BitVecLiteral =>
               if (is_global(literal.value)) {
-                return Set(dataItemDiscovered.get)
-                //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + literal + "\n")
-//                binOp.op match {
-//                  case BVADD =>
-//                    var tempLattice: lattice.sublattice.Element = env
-//                    tempLattice = lattice.sublattice.lub(tempLattice, Set(dataItemDiscovered.get))
-//                    return lattice.sublattice.lub(tempLattice, Set(RegionAccess(literal, binOp.arg2)))
-//                  case _ =>
-//                    print("ERROR: CASE NOT HANDLED: " + binOp.op + "\n")
-//                    return lattice.sublattice.bottom
-//                }
+                return Set(DataRegion(get_global_name(literal.value), literal))
               }
               lattice.sublattice.bottom
             case _ =>
@@ -710,385 +707,3 @@ object MemoryRegionAnalysis:
    */
   class WorklistSolver(cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal])
     extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, PowersetLattice[MemoryRegion])
-
-///**
-// * Memory region analysis.
-// * This algorithm splits the memory into two regions: the heap and the stack. The variables are tracked for localAssign
-// * operations.
-// *
-// * @param program the program to analyze
-// */
-//class MemoryRegionAnalysis(cfg: Cfg) extends FlowSensitiveAnalysis(true) {
-//
-//  private val stackPointer = Variable("R31", BitVecType(64))
-//
-////  val stackTracker = new immutable.HashMap[Expr, Set[Expr]]()
-////  val heapTracker = new immutable.HashMap[Expr, Set[Expr]]()
-////  val variableTracker = new immutable.HashMap[Expr, Set[Expr]]()
-//  val mapping = mutable.HashMap[CfgNode, mutable.Map[Expr, Set[Expr]]]()
-//
-//  /**
-//   * @inheritdoc
-//   */
-//  def analyze(): Unit =
-//  // generate the constraints by traversing the AST and solve them on-the-fly
-//    for (entry <- cfg.entries) {
-//      entry match {
-//        case functionEntryNode: CfgFunctionEntryNode =>
-//          visit(entry, List(immutable.HashMap.empty, immutable.HashMap.empty, immutable.HashMap.empty))
-//        case _ =>
-//      }
-//    }
-//
-//  def dump_file(content: ArrayBuffer[String], name: String): Unit = {
-//    val outFile = new File(s"${name}")
-//    val pw = new PrintWriter(outFile, "UTF-8")
-//    for (s <- content) { pw.append(s + "\n") }
-//    pw.close()
-//  }
-//
-//  /**
-//   * Generates the constraints for the given sub-AST.
-//   * @param node the head node for which it generates the constraints
-//   * @param arg the stack, heap, and variable trackers
-//   */
-//  def visit(node: CfgNode, arg: List[immutable.HashMap[Expr, Set[Expr]]]): Unit = {
-//    var stackTracker: immutable.HashMap[Expr, Set[Expr]] = arg.head
-//    var heapTracker: immutable.HashMap[Expr, Set[Expr]] = arg(1)
-//    var variableTracker: immutable.HashMap[Expr, Set[Expr]] = arg.last
-//
-//    node match {
-//      case cmd: CfgCommandNode =>
-//        cmd.data match {
-//          case memAssign: MemoryAssign =>
-//            // if the memory is acting on a stack operation, then we need to track the stack
-//            if (memAssign.rhs.mem.name == "stack") {
-//              if (stackTracker.contains(memAssign.rhs.index))
-//                stackTracker = stackTracker + (memAssign.rhs.index -> (stackTracker(memAssign.rhs.index) + memAssign.rhs.value))
-//              else
-//                stackTracker = stackTracker + (memAssign.rhs.index -> Set(memAssign.rhs.value))
-//              // the memory is not stack so it must be heap
-//            } else {
-//              if (heapTracker.contains(memAssign.rhs.index))
-//                heapTracker = heapTracker + (memAssign.rhs.index -> (heapTracker(memAssign.rhs.index) + memAssign.rhs.value))
-//              else
-//                heapTracker = heapTracker + (memAssign.rhs.index -> Set(memAssign.rhs.value))
-//            }
-//          // local assign is just lhs assigned to rhs
-//          case localAssign: LocalAssign =>
-//            if (variableTracker.contains(localAssign.lhs))
-//              variableTracker = variableTracker + (localAssign.lhs -> (variableTracker(localAssign.lhs) + localAssign.rhs))
-//            else
-//              variableTracker = variableTracker + (localAssign.lhs -> Set(localAssign.rhs))
-//          case _ =>
-//        }
-//        // this is a phi node (we merge incoming edges)
-//        if (mapping.contains(node)) {
-//          val currentMemorySolution = solveMemory(stackTracker, heapTracker, variableTracker)
-//          val previousMemorySolution = mapping(node)
-//          // we need to merge the two solutions
-//          for (key <- currentMemorySolution.keySet) {
-//            if (previousMemorySolution.contains(key)) {
-//              // newSet contains the union of the two sets, however, do to pointer values not being included in the equals
-//              // method of Pointer class, we need to loop over and replace the pointer in the newSet with pointers that contain
-//              // the shared set of values
-//              var newSet: Set[Expr] = currentMemorySolution(key) ++ previousMemorySolution(key)
-//              for (ex: Expr <- currentMemorySolution(key)) {
-//                ex match {
-//                  case ptr: Pointer =>
-//                    if (previousMemorySolution(key).contains(ptr)) {
-//                      newSet = newSet - ptr
-//                      newSet = newSet + ptr.concat(previousMemorySolution(key).toSeq(previousMemorySolution(key).toSeq.indexOf(ptr)).asInstanceOf[Pointer])
-//                    }
-//                  case _ =>
-//                }
-//              }
-//              mapping(node) = mapping(node) + (key -> newSet)
-//            } else {
-//              mapping(node) = mapping(node) + (key -> currentMemorySolution(key))
-//            }
-//          }
-//        } else {
-//          mapping(node) = solveMemory(stackTracker, heapTracker, variableTracker)
-//        }
-//      case _ => // ignore other kinds of nodes
-//    }
-//    for (child <- node.succ) {
-//      visit(child, List(stackTracker, heapTracker, variableTracker))
-//    }
-//  }
-//
-///*
-//  def visitChildren(node: Object, arg: Unit): Unit = {
-//    node match {
-//      case program: Program =>
-//        program.procedures.foreach(visit(_, ()))
-//
-//      case function: Procedure =>
-//        function.blocks.foreach(visit(_, ()))
-//
-//      case block: Block =>
-//        block.statements.foreach(visit(_, ()))
-//        block.jumps.foreach(visit(_, ()))
-//
-//      case _ => // ignore other kinds of nodes
-//    }
-//  }
-//*/
-//
-//  def getMapping: Map[CfgNode, mutable.Map[Expr, Set[Expr]]] = {
-//    mapping.toMap
-//  }
-//
-//  def solveMemory(stackTracker: immutable.Map[Expr, Set[Expr]], heapTracker: immutable.Map[Expr, Set[Expr]], variableTracker: immutable.Map[Expr, Set[Expr]]): mutable.Map[Expr, Set[Expr]] = {
-//    val pointerTracker: mutable.Map[Expr, Set[Expr]] = mutable.Map[Expr, Set[Expr]]()
-//    val pointerPool: PointerPool = PointerPool()
-////    print(s"Stack Tracker: \n${stackTracker.mkString(",\n")}\n")
-////    print(s"Variable Tracker: \n${variableTracker.mkString(",\n")}\n")
-////    print(s"Heap Tracker: \n${heapTracker.mkString(",\n")}\n")
-//
-//    /**
-//     * Captures an Expr to Pointer relationship in the map. Ensures set is created if it does not exist.
-//     *
-//     * @param map      the map to add to
-//     * @param register the register (ie. R1)
-//     * @param ptr      the pointer to add (ie. stack[R31 + 0x8])
-//     */
-//    def add_map(map: mutable.Map[Expr, Set[Expr]], register: Expr, ptr: Expr): Unit = {
-//      if (map.contains(register))
-//        map(register) += ptr
-//      else
-//        map(register) = Set(ptr)
-//    }
-//
-//    heapTracker.foreach { case (k, v) =>
-//      v.foreach(e =>
-//        val heapPointer = pointerPool.extractPointer(k, PointerType.Heap)
-//        // ptr -> ptr
-//        if (e.locals.contains(stackPointer)) {
-//          add_map(pointerTracker, heapPointer, pointerPool.extractPointer(e))
-//        }
-//        // ptr -> exp
-//        else {
-//          heapPointer.value.add(e)
-//        }
-//      )
-//    }
-//
-//    variableTracker.foreach { case (k, v) =>
-//      v.foreach(e =>
-//        if (e.locals.contains(stackPointer)) {
-//          add_map(pointerTracker, k, pointerPool.extractPointer(e))
-//        } else {
-////          print(s"e: $e\n")
-////          print(s"e type: ${e.getClass}\n")
-//
-//          // TODO using toString to determine this is a really bad way to do it
-//
-//          if (e.toString.contains("mem")) {
-//            add_map(pointerTracker, k, pointerPool.extractPointer(e, PointerType.Heap))
-//          }
-//        }
-//      )
-//    }
-//
-//    stackTracker.foreach { case (k, v) =>
-//        if (k.locals.contains(stackPointer)) {
-//          val lhsPointer = pointerPool.extractPointer(k)
-//          v.foreach(e =>
-//            // ptr -> ptr
-//            if (e.locals.contains(stackPointer)) {
-//              lhsPointer.value.add(pointerPool.extractPointer(e))
-//            }
-//            // ptr -> exp
-//            else {
-//              lhsPointer.value.add(e)
-//            }
-//          )
-//        } else {
-//          v.foreach(e =>
-//            // exp -> ptr
-//            if (e.locals.contains(stackPointer)) {
-//              add_map(pointerTracker, k, pointerPool.extractPointer(e))
-//            }
-//            // exp -> exp (ignore, no pointer)
-//            else {
-////                if (pointerTracker.contains(k)) {
-////                  pointerTracker(k).asInstanceOf[Pointer].value = e
-////                } else {
-////                  if (pointerTracker.contains(e)) {
-////                    pointerTracker(e).asInstanceOf[Pointer].value = k
-////                  }
-////                }
-//            }
-//          )
-//        }
-//    }
-//    //print(s"Pointers: \n${pointerPool.pointers.mkString(",\n")}\n")
-//    pointerTracker
-//  }
-//}
-//
-//class Pointer(allocation: (Expr, Option[Expr]), ptrType: PointerType = PointerType.Stack) extends Expr {
-//  var value: mutable.Set[Expr] = mutable.Set()
-//  var alloc: Expr = allocation._1
-//  var offset: Option[Expr] = allocation._2
-//  val pointerType: PointerType = ptrType
-//
-//  override def toString: String = {
-//    val offsetStr: String = offset match {
-//      case Some(o) => o.toString
-//      case None => "None"
-//    }
-//    s"${pointerType} Pointer(Value: $value, [ptr: $alloc, Offset: $offsetStr])"
-//  }
-//
-//  def concat(other: Pointer): Pointer = {
-//    if (other.pointerType == pointerType && other.alloc == alloc && other.offset == offset) {
-//        value = value ++ other.value
-//        return this
-//    }
-//    throw new Exception("Cannot concat pointers of different types")
-//  }
-//
-//  override def getType: IRType = ???
-//  override def gammas: Set[Expr] = ???
-//  override def locals: Set[Variable] = ???
-//  override def toBoogie: BExpr = ???
-//
-//  override def equals(obj: Any): Boolean = {
-//      obj match {
-//      case ptr: Pointer =>
-//          ptr.alloc == alloc && ptr.offset == offset && ptr.pointerType == pointerType
-//      case _ => false
-//      }
-//  }
-//
-//  override def hashCode(): Int = {
-//      alloc.hashCode() + offset.hashCode() + pointerType.hashCode()
-//  }
-//}
-//
-//class PointerPool {
-//  val pointers: ListBuffer[Pointer] = ListBuffer[Pointer]()
-//
-//  def get(ptr: Pointer): Pointer = {
-//    if (pointers.contains(ptr)) {
-//      pointers(pointers.indexOf(ptr))
-//    } else {
-//      pointers += ptr
-//      ptr
-//    }
-//  }
-//
-//  def extractPointer(e: Expr, ptrType: PointerType = PointerType.Stack): Pointer = {
-//    e match {
-//      case binOp: BinaryExpr =>
-//        get(Pointer((binOp.arg1, Some(binOp.arg2)), ptrType))
-//      case memAccess: MemoryLoad =>
-//        memAccess.index match {
-//          case binOp: BinaryExpr =>
-//            get(Pointer((binOp.arg1, Some(binOp.arg2)), ptrType))
-//          case localVar: Variable =>
-//            get(Pointer((localVar, None), ptrType))
-//          case _ =>
-//            print(s"inner type: ${memAccess.index.getClass} ${memAccess.index}\n")
-//            throw new Exception("Unknown type")
-//        }
-//      case localVar: Variable =>
-//        get(Pointer((localVar, None), ptrType))
-//      case unsignedExtend: ZeroExtend =>
-//        extractPointer(unsignedExtend.body)
-//      case _ =>
-//        print(s"type: ${e.getClass} $e\n")
-//        throw new Exception("Unknown type")
-//    }
-//  }
-//}
-//
-//enum PointerType {
-//  case Stack
-//  case Heap
-//}
-//
-
-
-//case class StackReconstructor() {
-//  var stackPointer: Byte = 16
-//  var framePointer: Byte = 0
-//  var linkRegister: Byte = 0
-//  def stringToInt(hex: String): Int = {
-//    var hex2 = ""
-//    if (hex.contains("0x")) {
-//      // strip the 0x
-//      hex2 = hex.split("0x")(1)
-//    } else {
-//      hex2 = hex
-//    }
-//    if (hex.contains("-")) {
-//      -1 * Integer.parseInt(hex2, 16)
-//    } else {
-//      Integer.parseInt(hex2, 16)
-//    }
-//  }
-//
-//  def getStackPointer(): (String, Int) = {
-//    ("R31", stackPointer)
-//  }
-//
-//  def getFramePointer(): (String, Int) = {
-//    ("R29", framePointer)
-//  }
-//
-//  def getLinkRegister(): (String, Int) = {
-//    ("R30", linkRegister)
-//  }
-//
-//  def evaluateInstruction(instruction: String): Unit = {
-//    val instructionArr = instruction.split(" ")
-//    if (instruction.contains("sp")) {
-//      println("sp found")
-//    }
-//    instructionArr(0) match {
-//      case "stp" | "ldp" =>
-//        if (instructionArr.length == 4) {
-//          if (instruction.contains('!')) {
-//            // stp x0, x1, [sp, #-16]!
-//            //  0   1   2    3     4
-//            // get the -16 value
-//            val value: String = instruction.split(" ")(4).split("#")(1).split("]")(0)
-//            stackPointer = (stackPointer + stringToInt(value)).toByte
-//            framePointer = stackPointer
-//            linkRegister = (stackPointer + 8).toByte
-//          } else {
-//            // stp x0, x1, [sp], #-16
-//            //  0   1   2    3     4
-//            // get the -16 value
-//            val value: String = instruction.split(" ")(4).split("#")(1).split("]")(0)
-//            framePointer = stackPointer
-//            linkRegister = (stackPointer + 8).toByte
-//            stackPointer = (stackPointer + stringToInt(value)).toByte
-//          }
-//        }
-//        else {
-//          // stp x0, x1, [sp]
-//          //  0   1   2    3
-//          framePointer = stackPointer
-//          linkRegister = (stackPointer + 8).toByte
-//        }
-//
-//      case _ =>
-//        // do nothing
-//
-////
-////      case "ldp" =>
-////        // ldp x29, x30, [sp], #0x10
-////        //  0   1   2    3     4
-////        // get the 0x10 value
-////        val value: String = instruction.split(" ")(4).split("#")(0)
-////        stackPointer = stringToInt(value)
-////        framePointer = stackPointer
-////        linkRegister = stackPointer + 8
-//    }
-//  }
-//}
