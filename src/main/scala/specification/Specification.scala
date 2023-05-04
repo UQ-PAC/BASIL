@@ -8,7 +8,6 @@ trait SpecVar extends BExpr {
     println(this)
     ???
   }
-  override def replaceReserved(reserved: Set[String]): BExpr = this
 }
 
 case class SpecGlobal(name: String, size: Int, address: BigInt) extends SpecVar {
