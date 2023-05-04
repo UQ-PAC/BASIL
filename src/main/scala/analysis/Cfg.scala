@@ -251,8 +251,7 @@ object Cfg:
               cfg.addNode(call)
               cfg.addEdge(lastAdded, call)
               cfg.addEdge(call, localEntry)
-              cfg.addEdge(localExit, call)
-              nodePool.setLatestAdded(call)
+              nodePool.setLatestAdded(localExit)
               if (d.returnTarget.isDefined) {
                 visitBlock(d.returnTarget.get.label)
               }
