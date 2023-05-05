@@ -39,11 +39,13 @@ object RunUtils {
     elfParser.setBuildParseTree(true)
 
     val (externalFunctions, globals, globalOffsets) = ElfLoader.visitSyms(elfParser.syms())
-    globals_ToUSE = globals
-    print("Globals: \n")
-    print(globals)
-    print("\nGlobal Offsets: \n")
-    print(globalOffsets)
+    if (performAnalysis) {
+      globals_ToUSE = globals
+      print("Globals: \n")
+      print(globals)
+      print("\nGlobal Offsets: \n")
+      print(globalOffsets)
+    }
 
     //println(globalOffsets)
     //val procmap = program.subroutines.map(s => (s.name, s.address)).toMap

@@ -29,7 +29,7 @@ import scala.sys.process._
       options.tail.head
     }
   }
-  val performAnalysis = if options.nonEmpty && options.contains("-analyse") then true else false
+  val performAnalysis = options.nonEmpty && options.contains("-analyse")
   val performInterpret = options.nonEmpty && options.contains("-interpret")
   val program: BProgram = RunUtils.generateVCsAdt(fileName, elfFileName, specFileName, performAnalysis, performInterpret)
   RunUtils.writeToFile(program, outFileName)

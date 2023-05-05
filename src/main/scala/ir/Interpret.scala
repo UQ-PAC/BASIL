@@ -1,7 +1,6 @@
 package ir
 
-import analysis.Pointer
-import analysis.util.*
+import analysis.util._
 import scala.collection.mutable
 
 class Interpret(IRProgram: Program) {
@@ -93,10 +92,6 @@ class Interpret(IRProgram: Program) {
           case IntNEG  => ???
           case BoolNOT => ???
         }
-
-      case p: Pointer =>
-        println(s"\tPointer($p)")
-        ???
 
       case m: Memory =>
         println(s"\t$m")
