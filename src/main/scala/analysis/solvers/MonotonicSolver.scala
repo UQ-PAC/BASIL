@@ -32,10 +32,7 @@ trait SimpleMonotonicSolver[N] extends MapLatticeSolver[N] with Dependencies[N]:
     n.asInstanceOf[CfgNode].succ.foreach(s => process(s.asInstanceOf[N]))
 
   def run(first: Set[N]) =
-    first match
-      case nodes: Set[CfgNode] =>
-        nodes.foreach(n => if n.isInstanceOf[CfgFunctionEntryNode] then process(n))
-      case _ => print("\nNot a set of CfgNodes\n")
+    first.foreach(n => if n.isInstanceOf[CfgFunctionEntryNode] then process(n))
 
   def analyze(): lattice.Element =
     x = lattice.bottom

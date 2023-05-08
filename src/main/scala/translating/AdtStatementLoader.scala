@@ -10,12 +10,26 @@ import scala.jdk.CollectionConverters._
 
 object AdtStatementLoader {
 
-  def visitProject(ctx: ProjectContext): BAPProgram = visitProgram(ctx.program)
-
-  def visitProgram(ctx: ProgramContext): BAPProgram = {
-    val functions = ctx.subs.sub.asScala.map(visitSub).toList
-    BAPProgram(functions)
+  def visitProject(ctx: ProjectContext): BAPProgram = {
+    val memorySections = visitSections(ctx.sections)
+    val subroutines = visitProgram(ctx.program)
+    BAPProgram(subroutines, memorySections)
   }
+
+  def visitSections(ctx: SectionsContext): List[BAPMemorySection] = {
+    ctx.section.asScala.map(visitSection).toList
+  }
+
+  def visitSection(ctx: SectionContext): BAPMemorySection = {
+    val bytes = ctx.membyte.asScala.map(visitByte).toSeq
+    BAPMemorySection(visitQuoteString(ctx.name), parseInt(ctx.address), bytes.size, bytes)
+  }
+
+  def visitByte(ctx: MembyteContext): BAPLiteral = {
+    BAPLiteral(Integer.parseInt(ctx.getText.stripPrefix("\\x"), 16), 8)
+  }
+
+  def visitProgram(ctx: ProgramContext): List[BAPSubroutine] = ctx.subs.sub.asScala.map(visitSub).toList
 
   @tailrec
   def visitExp(ctx: ExpContext): BAPExpr = ctx match {

@@ -19,7 +19,11 @@ object RunUtils {
   var globals_ToUSE: Set[SpecGlobal] = Set()
   var memoryRegionAnalysisResults = None: Option[Map[CfgNode, _]]
 
-  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean): BProgram = {
+  // ids reserved by boogie
+  val reserved: Set[String] = Set("free")
+
+  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
+
     val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(adtLexer)
     // ADT
@@ -35,11 +39,13 @@ object RunUtils {
     elfParser.setBuildParseTree(true)
 
     val (externalFunctions, globals, globalOffsets) = ElfLoader.visitSyms(elfParser.syms())
-    globals_ToUSE = globals
-    print("Globals: \n")
-    print(globals)
-    print("\nGlobal Offsets: \n")
-    print(globalOffsets)
+    if (performAnalysis) {
+      globals_ToUSE = globals
+      print("Globals: \n")
+      print(globals)
+      print("\nGlobal Offsets: \n")
+      print(globalOffsets)
+    }
 
     //println(globalOffsets)
     //val procmap = program.subroutines.map(s => (s.name, s.address)).toMap
@@ -60,7 +66,7 @@ object RunUtils {
     val externalNames = externalFunctions.map(e => e.name)
 
     val IRTranslator = BAPToIR(program)
-    val IRProgram = IRTranslator.translate
+    var IRProgram = IRTranslator.translate
 
     val specification = specFileName match {
       case Some(s) => val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
@@ -72,13 +78,20 @@ object RunUtils {
       case None => Specification(globals, Map(), List(), List(), List())
     }
 
-    val boogieTranslator = IRToBoogie(IRProgram, specification)
-    boogieTranslator.stripUnreachableFunctions(externalNames)
-
     if (performAnalysis) {
       analyse(IRProgram)
     }
+    if (performInterpret) {
+      Interpret(IRProgram)
+    }
 
+    val externalRemover = ExternalRemover(externalNames)
+    val renamer = Renamer(reserved)
+    IRProgram = externalRemover.visitProgram(IRProgram)
+    IRProgram = renamer.visitProgram(IRProgram)
+
+    val boogieTranslator = IRToBoogie(IRProgram, specification)
+    boogieTranslator.stripUnreachableFunctions()
     boogieTranslator.translate
   }
 
