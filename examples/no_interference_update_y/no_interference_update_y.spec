@@ -7,4 +7,4 @@ Rely: y == old(y)
 Guarantee: x == old(x)
 
 Subroutine: main
-Ensures: y == 1
+Ensures: y == 1bv32

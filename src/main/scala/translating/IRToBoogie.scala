@@ -322,7 +322,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val lhsGamma = m.lhs.toGamma
       val rhsGamma = m.rhs.toGamma
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
-      if (m.lhs == stack) {
+      if (lhs == stack) {
         List(store)
       } else {
         val rely = ProcedureCall("rely", List(), List(), List(rhs.memory, rhsGamma.gammaMap))

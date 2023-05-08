@@ -2,9 +2,9 @@ Globals:
 x: int
 
 L: x -> true
-Rely: x == old(x) || (x <= 10 && old(x) < 10) || (x == 21 && old(x) == 20)
-Guarantee: x == old(x) || (x == 20 && old(x) == 0) || (x == 20 && old(x) <= 10)
+Rely: x == old(x) || (x <= 10bv32 && old(x) < 10bv32) || (x == 21bv32 && old(x) == 20bv32)
+Guarantee: x == old(x) || (x == 20bv32 && old(x) == 0bv32) || (x == 20bv32 && old(x) <= 10bv32)
 
 Subroutine: main
-Requires: x == 0
-Ensures: x == 20 || x == 21
+Requires: x == 0bv32
+Ensures: x == 20bv32 || x == 21bv32

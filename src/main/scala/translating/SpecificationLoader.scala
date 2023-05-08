@@ -49,7 +49,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     val id = ctx.id.getText
     val symbol = idToSymbol.get(id) match {
       case Some(g: SpecGlobal) => g
-      case None => throw new Exception(s"unresolveable reference to '$id' in specification")
+      case None => throw new Exception(s"unresolvable reference to '$id' in specification")
     }
     val size = ctx.typeName match {
       case b: BvTypeContext => Integer.parseInt(b.size.getText)
@@ -193,7 +193,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case Some(p: Parameter) => p.toGamma
       case None => nameToGlobals.get(id) match {
         case Some(g: SpecGlobal) => SpecGamma(g)
-        case None => throw new Exception(s"unresolveable reference to 'Gamma_$id' in specification")
+        case None => throw new Exception(s"unresolvable reference to 'Gamma_$id' in specification")
       }
     }
   }
@@ -204,7 +204,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case Some(p: Parameter) => p.toBoogie
       case None => nameToGlobals.get(ctx.getText) match {
         case Some(g: SpecGlobal) => g
-        case None => throw new Exception(s"unresolveable reference to '$id' in specification")
+        case None => throw new Exception(s"unresolvable reference to '$id' in specification")
       }
     }
   }
