@@ -78,9 +78,6 @@ object RunUtils {
       case None => Specification(globals, Map(), List(), List(), List())
     }
 
-    if (performAnalysis) {
-      analyse(IRProgram)
-    }
     if (performInterpret) {
       Interpret(IRProgram)
     }
@@ -90,8 +87,13 @@ object RunUtils {
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
 
+    IRProgram.stripUnreachableFunctions()
+
+    if (performAnalysis) {
+      analyse(IRProgram)
+    }
+
     val boogieTranslator = IRToBoogie(IRProgram, specification)
-    boogieTranslator.stripUnreachableFunctions()
     boogieTranslator.translate
   }
 

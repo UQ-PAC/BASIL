@@ -5,7 +5,28 @@ import scala.collection.mutable
 import boogie._
 
 class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBuffer[MemorySection] /* var memories: ArrayBuffer[Memory], var memoryOffsets: ArrayBuffer[Offset] */) {
-  
+
+  def stripUnreachableFunctions(): Unit = {
+    val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
+
+    var next = "main"
+    var reachableNames: Set[String] = Set("main")
+    var toVisit: List[String] = List()
+    var reachableFound = true;
+    while (reachableFound) {
+      val children = functionToChildren(next) -- reachableNames -- toVisit - next
+      reachableNames = reachableNames ++ children
+      toVisit = toVisit ++ children
+      if (toVisit.isEmpty) {
+        reachableFound = false
+      } else {
+        next = toVisit.head
+        toVisit = toVisit.tail
+      }
+    }
+
+    procedures = procedures.filter(f => reachableNames.contains(f.name))
+  }
 }
 
 class Procedure(var name: String, var address: Int, var blocks: ArrayBuffer[Block], var in: ArrayBuffer[Parameter], var out: ArrayBuffer[Parameter]) {
@@ -31,3 +52,4 @@ class Parameter(var name: String, var size: Int, var value: Variable) {
 }
 
 case class MemorySection(name: String, address: Int, size: Int, bytes: Seq[Literal])
+

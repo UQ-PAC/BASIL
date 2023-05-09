@@ -408,36 +408,4 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }
     List(ProcedureCall(target.name, returned.flatten.toList, params.flatten.toList, List())) ++ outAssigned
   }
-
-  // TODO put this elsewhere
-  def stripUnreachableFunctions(): Unit = {
-    val functionToChildren = program.procedures.map(f => f.name -> f.calls.map(_.name)).toMap
-
-    var next = "main"
-    var reachableNames: Set[String] = Set("main")
-    var toVisit: List[String] = List()
-    var reachableFound = true;
-    while (reachableFound) {
-      val children = functionToChildren(next) -- reachableNames -- toVisit - next
-      reachableNames = reachableNames ++ children
-      toVisit = toVisit ++ children
-      if (toVisit.isEmpty) {
-        reachableFound = false
-      } else {
-        next = toVisit.head
-        toVisit = toVisit.tail
-      }
-    }
-
-    program.procedures = program.procedures.filter(f => reachableNames.contains(f.name))
-  }
-
-  /*
-  private val reserved = Set("free")
-
-  def avoidReserved(program: BProgram): BProgram = {
-    program.replaceReserved(reserved)
-  }
-  */
-
 }
