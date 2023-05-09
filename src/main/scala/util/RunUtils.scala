@@ -14,7 +14,10 @@ import java.io.{File, PrintWriter}
 
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
+import analysis.solvers._
 object RunUtils {
+  var globals_ToUSE: Set[SpecGlobal] = Set()
+  var memoryRegionAnalysisResults = None: Option[Map[CfgNode, _]]
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
@@ -36,6 +39,13 @@ object RunUtils {
     elfParser.setBuildParseTree(true)
 
     val (externalFunctions, globals, globalOffsets) = ElfLoader.visitSyms(elfParser.syms())
+    if (performAnalysis) {
+      globals_ToUSE = globals
+      print("Globals: \n")
+      print(globals)
+      print("\nGlobal Offsets: \n")
+      print(globalOffsets)
+    }
 
     //println(globalOffsets)
     //val procmap = program.subroutines.map(s => (s.name, s.address)).toMap
@@ -103,21 +113,23 @@ object RunUtils {
     //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
     //      x.toString
     //    }, Output.dotIder))
-    val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
-    val result = solver.analyze()
-    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder))
 
-    dump_file(cfg.getEdges.toString(), "result")
 
-    print(s"\n****************  ${result.values}  *****************\n")
+//    val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
+//    val result = solver.analyze()
+//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder))
+//
+//    dump_file(cfg.getEdges.toString(), "result")
+//
+//    print(s"\n Constant prop results\n ****************\n  ${result.values}  \n *****************\n")
 
 
     //    val solver2 = new SteensgaardAnalysis(translator.program, result)
     //    val result2 = solver2.analyze()
     //    print(solver2.pointsTo())
 
-    val ssa = new SSA(cfg)
-    ssa.analyze()
+//    val ssa = new SSA(cfg)
+//    ssa.analyze()
 
 
     /*
@@ -133,6 +145,16 @@ object RunUtils {
     stringBuilder.append("}")
     dump_plot(stringBuilder.toString(), "result")
     */
+
+//    val solver2 = new MemoryRegionAnalysis(cfg)
+//    val result2 = solver2.analyze()
+//    print(s"\n Mem region results\n ****************\n  ${solver2.getMapping}  \n *****************\n")
+//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(solver2.getMapping, solver.stateAfterNode), Output.dotIder))
+
+    val solver2 = new MemoryRegionAnalysis.WorklistSolver(cfg, globals_ToUSE)
+    val result2 = solver2.analyze()
+    memoryRegionAnalysisResults = Some(result2)
+    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder))
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {

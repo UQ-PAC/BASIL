@@ -59,6 +59,19 @@ trait LatticeWithOps extends Lattice:
   def bveq(a: Element, b: Element): Element
   def concat(a: Element, b: Element): Element
 
+
+/**
+ * The powerset lattice of a set of elements of type `A` with subset ordering.
+ */
+class PowersetLattice[A] extends Lattice {
+
+  type Element = Set[A]
+
+  val bottom: Element = Set.empty //<--- Complete here
+
+  def lub(x: Element, y: Element): Element = x.union(y) //<--- Complete here
+}
+
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
   * other element. No additional ordering is defined.
   */
