@@ -241,10 +241,14 @@ object Cfg:
         if (interProc) {
           blocks(blockName).data.jumps.foreach {
             case g: GoTo =>
-              val target: CfgNode = newBlocks(g.target.label).head
-              cfg.addEdge(lastAdded, target)
-              nodePool.setLatestAdded(target)
-              visitBlock(g.target.label)
+              if (newBlocks(g.target.label).isEmpty) {
+                visitBlock(g.target.label)
+              } else {
+                val target: CfgNode = newBlocks(g.target.label).head
+                cfg.addEdge(lastAdded, target)
+                nodePool.setLatestAdded(target)
+                visitBlock(g.target.label)
+              }
             case d: DirectCall =>
               val call = nodePool.get(d)
               val (localEntry, localExit): (CfgFunctionEntryNode, CfgFunctionExitNode) = funcEntryExit(d.target)
@@ -266,10 +270,14 @@ object Cfg:
         } else {
           blocks(blockName).data.jumps.foreach {
             case g: GoTo =>
-              val target: CfgNode = newBlocks(g.target.label).head
-              cfg.addEdge(lastAdded, target)
-              nodePool.setLatestAdded(target)
-              visitBlock(g.target.label)
+              if (newBlocks(g.target.label).isEmpty) {
+                visitBlock(g.target.label)
+              } else {
+                val target: CfgNode = newBlocks(g.target.label).head
+                cfg.addEdge(lastAdded, target)
+                nodePool.setLatestAdded(target)
+                visitBlock(g.target.label)
+              }
             case d: DirectCall =>
               val call = nodePool.get(d)
               cfg.addNode(call)

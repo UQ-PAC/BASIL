@@ -115,13 +115,13 @@ object RunUtils {
     //    }, Output.dotIder))
 
 
-    val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
-    val result = solver.analyze()
-    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder))
-
-    dump_file(cfg.getEdges.toString(), "result")
-
-    print(s"\n Constant prop results\n ****************\n  ${result.values}  \n *****************\n")
+//    val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
+//    val result = solver.analyze()
+//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder))
+//
+//    dump_file(cfg.getEdges.toString(), "result")
+//
+//    print(s"\n Constant prop results\n ****************\n  ${result.values}  \n *****************\n")
 
 
     //    val solver2 = new SteensgaardAnalysis(translator.program, result)
