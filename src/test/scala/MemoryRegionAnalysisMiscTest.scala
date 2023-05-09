@@ -16,6 +16,12 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
     var output: Option[Map[analysis.CfgNode, ?]] = null
     RunUtils.generateVCsAdt(examplesPath + s"${name}/${name}.adt", examplesPath + s"${name}/${name}.relf", None, true, false)
     try {
+      // create dump folder if it does not exist
+      val dumpFolder = File(tempPath)
+      if (!dumpFolder.exists) {
+        dumpFolder.mkdir()
+      }
+
       output = RunUtils.memoryRegionAnalysisResults
       val outFile = new File(tempPath + s"${name}")
       val pw = new PrintWriter(outFile, "UTF-8")
