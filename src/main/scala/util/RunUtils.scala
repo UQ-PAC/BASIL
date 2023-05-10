@@ -1,20 +1,20 @@
 package util
-import analysis._
+import analysis.*
 import analysis.util.SSA
 import cfg_visualiser.{OtherOutput, Output, OutputKindE}
-import bap._
-import ir._
-import boogie._
-import specification._
-import BilParser._
+import bap.*
+import ir.*
+import boogie.*
+import specification.*
+import BilParser.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating._
-import java.io.{File, PrintWriter}
+import translating.*
 
+import java.io.{File, PrintWriter}
 import java.io.{BufferedWriter, FileWriter, IOException}
-import scala.jdk.CollectionConverters._
-import analysis.solvers._
+import scala.jdk.CollectionConverters.*
+import analysis.solvers.*
 object RunUtils {
   var globals_ToUSE: Set[SpecGlobal] = Set()
   var memoryRegionAnalysisResults = None: Option[Map[CfgNode, _]]
@@ -157,6 +157,16 @@ object RunUtils {
     val result2 = solver2.analyze()
     memoryRegionAnalysisResults = Some(result2)
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder))
+
+    val mmm = new MemoryModelMap
+    mmm.convertMemoryRegions(result2)
+    print(mmm)
+    val interprocCfg = InterproceduralProgramCfg.generateFromProgram(IRProgram)
+
+
+    val solver3 = new analysis.ValueSetAnalysis.WorklistSolver(interprocCfg, globals_ToUSE, mmm)
+    val result3 = solver2.analyze()
+    Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder))
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {

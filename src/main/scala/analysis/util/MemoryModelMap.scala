@@ -59,7 +59,7 @@ class MemoryModelMap {
   }
 
   // Find an object for a given value within a range
-  def findObject(value: Int, regionType: MemoryRegion, funcExit: CfgFunctionExitNode): Option[MemoryRegion] = {
+  def findObject(value: BigInt, regionType: MemoryRegion, funcExit: CfgFunctionExitNode): Option[MemoryRegion] = {
     regionType match
       case s:StackRegion =>
         for ((range, obj) <- functions(funcExit).stackMap) {
