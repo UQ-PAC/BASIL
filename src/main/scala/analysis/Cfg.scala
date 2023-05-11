@@ -264,6 +264,7 @@ object Cfg:
               //            cfg.addNode(call)
               //            cfg.addEdge(lastAdded, call)
               //            cfg.addEdge(call, functionExitNode)
+              print(s"Indirect call not supported yet ${i}\n")
 
               cfg.addEdge(lastAdded, functionExitNode)
           }

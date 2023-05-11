@@ -3,7 +3,7 @@ package analysis
 import ir.{DirectCall, *}
 import analysis.solvers.*
 import boogie.BExpr
-import specification.SpecGlobal
+import specification.{InternalFunction, SpecGlobal}
 
 import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
@@ -11,24 +11,53 @@ import scala.collection.mutable
 import scala.collection.immutable
 
 /** ValueSets are PowerSet of possible values */
-//class ValueSet extends PowersetLattice[Expr] {
-//}
+
+abstract class Value
+class AddressValue(expr: Expr) extends Value:
+  override def toString: String = {
+    val sb = new StringBuilder
+    sb.append("Address(")
+    sb.append(expr)
+    sb.append(")")
+    sb.toString()
+  }
+class LiteralValue(expr: Expr) extends Value:
+  override def toString: String = {
+    val sb = new StringBuilder
+    sb.append("Literal(")
+    sb.append(expr)
+    sb.append(")")
+    sb.toString()
+  }
+
+class ValueSet(expr: Expr, values: mutable.Set[Value]) {
+  override def toString: String = {
+    val sb = new StringBuilder
+    sb.append(expr)
+    sb.append(" -> {")
+    sb.append(values.mkString(", "))
+    sb.append("}")
+    sb.toString()
+  }
+}
 
 
 trait ValueSetAnalysisMisc:
   val assigmentsMap: mutable.HashMap[(Expr, CfgNode), Expr] = mutable.HashMap.empty
+  val regionContentMap: mutable.HashMap[MemoryRegion, mutable.Set[Value]] = mutable.HashMap.empty
 
   val cfg: ProgramCfg
   val globals: Set[SpecGlobal]
+  val internalFunctions: Set[InternalFunction]
   val mmm: MemoryModelMap
 
   /** The lattice of abstract values.
    */
-  val powersetLattice: PowersetLattice[Expr]
+  val powersetLattice: PowersetLattice[ValueSet]
 
   /** The lattice of abstract states.
    */
-  val lattice: MapLattice[CfgNode, PowersetLattice[Expr]] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CfgNode, PowersetLattice[ValueSet]] = MapLattice(powersetLattice)
 
   val domain: Set[CfgNode] = cfg.nodes
 
@@ -87,6 +116,15 @@ trait ValueSetAnalysisMisc:
     false
   }
 
+  def is_internalFunction(bigInt: BigInt): Boolean = {
+    for (internalFunction <- internalFunctions) {
+      if (internalFunction.offset == bigInt) {
+        return true
+      }
+    }
+    false
+  }
+
   /**
    * Evaluate an expression in a hope of finding a global variable.
    *
@@ -129,10 +167,36 @@ trait ValueSetAnalysisMisc:
             case any: Expr => return evaluateExpression(any, n)
         }
         exp
+      case extract: Extract =>
+        evaluateExpression(extract.body, n)
       case _ =>
         //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
         exp
     }
+  }
+
+
+  def exprToRegion(expr: Expr, n: CfgNode): Option[MemoryRegion] = {
+    expr match
+      case bitVecLiteral: BitVecLiteral =>
+        mmm.findObject(bitVecLiteral.value, "stack") match
+          case Some(obj: MemoryRegion) =>
+            return Some(obj)
+          case _ =>
+            return None
+      case binOp: BinaryExpr =>
+        val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
+        val rhs: Expr = evaluateExpression(binOp.arg2, n)
+        if (lhs.equals(stackPointer)) {
+          mmm.findObject(rhs.asInstanceOf[BitVecLiteral].value, "stack") match
+            case Some(obj: MemoryRegion) =>
+              return Some(obj)
+            case _ =>
+              return None
+        }
+        None
+      case _ =>
+        None
   }
 
 
@@ -143,9 +207,7 @@ trait ValueSetAnalysisMisc:
       case binOp: BinaryExpr =>
         val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
         val rhs: Expr = evaluateExpression(binOp.arg2, n)
-        if (lhs.equals(stackPointer)) {
-          //mmm.findObject(rhs, StackRegion("", rhs))
-        }
+
         env
 
       case zeroExtend: ZeroExtend =>
@@ -173,6 +235,12 @@ trait ValueSetAnalysisMisc:
    */
   def localTransfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element =
     n match {
+      case entry: CfgFunctionEntryNode =>
+        mmm.pushContext(entry.data.name)
+        s
+      case exitNode: CfgFunctionExitNode =>
+        mmm.popContext()
+        s
       case cmd: CfgCommandNode =>
         cmd.data match {
           case directCall: DirectCall =>
@@ -182,11 +250,52 @@ trait ValueSetAnalysisMisc:
               return s
             }
             lattice.sublattice.lub(s, eval(memAssign.rhs.value, s, n))
+            memAssign.rhs.index match
+              case binOp: BinaryExpr =>
+                val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
+                val rhs: Expr = evaluateExpression(binOp.arg2, n)
+                if (lhs.equals(stackPointer)) {
+                  mmm.findObject(rhs.asInstanceOf[BitVecLiteral].value, "stack") match
+                    case Some(obj: MemoryRegion) =>
+                      val evaluatedResults = evaluateExpression(memAssign.rhs.value, n)
+                      evaluatedResults match
+                        case bitVecLiteral: BitVecLiteral =>
+                          if (is_global(bitVecLiteral.value) || is_internalFunction(bitVecLiteral.value)) {
+                            regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(AddressValue(bitVecLiteral))
+                          } else {
+                            regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LiteralValue(bitVecLiteral))
+                          }
+                        case _ =>
+                          val region = exprToRegion(evaluatedResults, n)
+                          region match {
+                            case Some(obj: MemoryRegion) =>
+                                regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).addAll(regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]))
+                            case _ =>
+                              throw new RuntimeException("Not a value type: " + evaluatedResults + "\n")
+                          }
+                    case _ =>
+                }
+                s
 
           // local assign is just lhs assigned to rhs we only need this information to track a prior register operation
           // AKA: R1 <- R1 + 8; mem(R1) <- 0x1234
           case localAssign: LocalAssign =>
             assigmentsMap.addOne((localAssign.lhs, n) -> evaluateExpression(localAssign.rhs, n))
+            localAssign.rhs match
+              case memLoad: MemoryLoad =>
+                memLoad.index match
+                  case binOp: BinaryExpr =>
+                    val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
+                    val rhs: Expr = evaluateExpression(binOp.arg2, n)
+                    if (lhs.equals(stackPointer)) {
+                      mmm.findObject(rhs.asInstanceOf[BitVecLiteral].value, "stack") match
+                        case Some(obj: MemoryRegion) =>
+
+                          return Set(ValueSet(localAssign.lhs, regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value])))
+                        case _ =>
+                    }
+                  case _ =>
+              case _ =>
             s
           case _ => s
         }
@@ -196,7 +305,7 @@ trait ValueSetAnalysisMisc:
 
 /** Base class for memory region analysis (non-lifted) lattice.
  */
-abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal], val mmm: MemoryModelMap) extends FlowSensitiveAnalysis(true) with ValueSetAnalysisMisc:
+abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal], val internalFunctions: Set[InternalFunction], val mmm: MemoryModelMap) extends FlowSensitiveAnalysis(true) with ValueSetAnalysisMisc:
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
    */
@@ -204,8 +313,8 @@ abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntreprocValueSetAnalysisWorklistSolver[L <: PowersetLattice[Expr]](cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], mmm: MemoryModelMap, val powersetLattice: L)
-  extends ValueSetAnalysis(cfg, globals, mmm)
+abstract class IntreprocValueSetAnalysisWorklistSolver[L <: PowersetLattice[ValueSet]](cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], mmm: MemoryModelMap, val powersetLattice: L)
+  extends ValueSetAnalysis(cfg, globals, internalFunctions, mmm)
     with SimpleMonotonicSolver[CfgNode]
     with ForwardDependencies
 
@@ -213,5 +322,5 @@ object ValueSetAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
    */
-  class WorklistSolver(cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], mmm: MemoryModelMap)
-    extends IntreprocValueSetAnalysisWorklistSolver(cfg, globals, mmm, PowersetLattice[Expr])
+  class WorklistSolver(cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], mmm: MemoryModelMap)
+    extends IntreprocValueSetAnalysisWorklistSolver(cfg, globals, internalFunctions, mmm, PowersetLattice[ValueSet])

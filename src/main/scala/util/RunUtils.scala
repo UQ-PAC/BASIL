@@ -17,6 +17,7 @@ import scala.jdk.CollectionConverters.*
 import analysis.solvers.*
 object RunUtils {
   var globals_ToUSE: Set[SpecGlobal] = Set()
+  var internalFunctions_ToUSE: Set[InternalFunction] = Set()
   var memoryRegionAnalysisResults = None: Option[Map[CfgNode, _]]
 
   // ids reserved by boogie
@@ -38,9 +39,11 @@ object RunUtils {
     val elfParser = SymsParser(elfTokens)
     elfParser.setBuildParseTree(true)
 
-    val (externalFunctions, globals, globalOffsets) = ElfLoader.visitSyms(elfParser.syms())
+    val (externalFunctions, globals, globalOffsets, internalFunctions) = ElfLoader.visitSyms(elfParser.syms())
+    print(internalFunctions)
     if (performAnalysis) {
       globals_ToUSE = globals
+      internalFunctions_ToUSE = internalFunctions
       print("Globals: \n")
       print(globals)
       print("\nGlobal Offsets: \n")
@@ -164,8 +167,8 @@ object RunUtils {
     val interprocCfg = InterproceduralProgramCfg.generateFromProgram(IRProgram)
 
 
-    val solver3 = new analysis.ValueSetAnalysis.WorklistSolver(interprocCfg, globals_ToUSE, mmm)
-    val result3 = solver2.analyze()
+    val solver3 = new analysis.ValueSetAnalysis.WorklistSolver(interprocCfg, globals_ToUSE, internalFunctions_ToUSE, mmm)
+    val result3 = solver3.analyze()
     Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder))
   }
 
