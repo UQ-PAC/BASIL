@@ -479,6 +479,7 @@ trait MemoryRegionAnalysisMisc:
 
   val cfg: ProgramCfg
   val globals: Set[SpecGlobal]
+  val globalOffsets: Map[BigInt, BigInt]
 
   /** The lattice of abstract values.
    */
@@ -541,6 +542,12 @@ trait MemoryRegionAnalysisMisc:
           if (global.address == bigInt) {
           return true
           }
+      }
+
+      for (global <- globalOffsets) {
+        if (global._1 == bigInt) {
+          return true
+        }
       }
       false
   }
@@ -688,7 +695,7 @@ trait MemoryRegionAnalysisMisc:
 
 /** Base class for memory region analysis (non-lifted) lattice.
  */
-abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal]) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
+abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal], val globalOffsets: Map[BigInt, BigInt]) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
    */
@@ -696,8 +703,8 @@ abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGl
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal], val powersetLattice: L)
-  extends MemoryRegionAnalysis(cfg, globals)
+abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt], val powersetLattice: L)
+  extends MemoryRegionAnalysis(cfg, globals, globalOffsets)
   with SimpleMonotonicSolver[CfgNode]
   with ForwardDependencies
 
@@ -705,5 +712,5 @@ object MemoryRegionAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
    */
-  class WorklistSolver(cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal])
-    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, PowersetLattice[MemoryRegion])
+  class WorklistSolver(cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt])
+    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, globalOffsets, PowersetLattice[MemoryRegion])

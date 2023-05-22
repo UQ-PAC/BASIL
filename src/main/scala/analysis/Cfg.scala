@@ -260,13 +260,20 @@ object Cfg:
                 visitBlock(d.returnTarget.get.label)
               }
             case i: IndirectCall =>
-              //            val call = nodePool.get(i)
-              //            cfg.addNode(call)
-              //            cfg.addEdge(lastAdded, call)
+              val call = nodePool.get(i)
+              cfg.addNode(call)
+              cfg.addEdge(lastAdded, call)
+              nodePool.setLatestAdded(call)
               //            cfg.addEdge(call, functionExitNode)
               print(s"Indirect call not supported yet ${i}\n")
 
-              cfg.addEdge(lastAdded, functionExitNode)
+
+              if (i.returnTarget.isDefined) {
+                visitBlock(i.returnTarget.get.label)
+              } else {
+                cfg.addEdge(lastAdded, functionExitNode)
+              }
+
           }
         } else {
           blocks(blockName).data.jumps.foreach {
@@ -288,12 +295,19 @@ object Cfg:
                 visitBlock(d.returnTarget.get.label)
               }
             case i: IndirectCall =>
-              //            val call = nodePool.get(i)
-              //            cfg.addNode(call)
-              //            cfg.addEdge(lastAdded, call)
+              val call = nodePool.get(i)
+              cfg.addNode(call)
+              cfg.addEdge(lastAdded, call)
+              nodePool.setLatestAdded(call)
               //            cfg.addEdge(call, functionExitNode)
+              print(s"Indirect call not supported yet ${i}\n")
 
-              cfg.addEdge(lastAdded, functionExitNode)
+
+              if (i.returnTarget.isDefined) {
+                visitBlock(i.returnTarget.get.label)
+              } else {
+                cfg.addEdge(lastAdded, functionExitNode)
+              }
           }
         }
       }

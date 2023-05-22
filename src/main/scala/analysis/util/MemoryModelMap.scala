@@ -2,6 +2,7 @@ package analysis
 
 import analysis.*
 import ir.BitVecLiteral
+import specification.{InternalFunction, SpecGlobal}
 
 import scala.collection.mutable
 
@@ -28,7 +29,7 @@ class MemoryModelMap {
         if (stackMap.isEmpty) {
           stackMap(RangeKey(offset, MAX_BIGINT)) = regionType
         } else {
-          stackMap.last._1.end = offset - 1
+          stackMap.keys.maxBy(_.end).end = offset - 1
           stackMap(RangeKey(offset, MAX_BIGINT)) = regionType
         }
       case d: DataRegion =>
@@ -36,20 +37,28 @@ class MemoryModelMap {
         if (dataMap.isEmpty) {
           dataMap(RangeKey(offset, MAX_BIGINT)) = regionType
         } else {
-          dataMap.last._1.end = offset - 1
+          dataMap.keys.maxBy(_.end).end = offset - 1
           dataMap(RangeKey(offset, MAX_BIGINT)) = regionType
         }
     }
   }
 
-  def convertMemoryRegions(memoryRegions: Map[CfgNode, _]): Unit = {
+  def convertMemoryRegions(memoryRegions: Map[CfgNode, _], internalFunctions: Set[InternalFunction]): Unit = {
     // get all function exit node
     val exitNodes = memoryRegions.keys.filter(_.isInstanceOf[CfgFunctionExitNode]).toList
     exitNodes.foreach(exitNode =>
       // for each function exit node we get the memory region
       // and add it to the mapping
       val stackRgns = memoryRegions(exitNode).asInstanceOf[Set[Any]].filter(_.isInstanceOf[StackRegion]).map(_.asInstanceOf[StackRegion]).toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
-      val dataRgns = memoryRegions(exitNode).asInstanceOf[Set[Any]].filter(_.isInstanceOf[DataRegion]).map(_.asInstanceOf[DataRegion]).toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
+      val dataRgns = memoryRegions(exitNode).asInstanceOf[Set[Any]].filter(_.isInstanceOf[DataRegion]).map(_.asInstanceOf[DataRegion]).toList
+      // map internalFunctions name, value to DataRegion(name, value) and then sort by value
+      val internalFunctionRgns = internalFunctions.map(f => DataRegion(f.name, BitVecLiteral(f.offset, -1))).toList // assume -1 because we don't know
+
+      // add internalFunctionRgn to dataRgns and sort by value
+      val allDataRgns = (dataRgns ++ internalFunctionRgns).sortBy(_.start.asInstanceOf[BitVecLiteral].value)
+
+      print(s"allDataRgns: $allDataRgns")
+
 
       allStacks(exitNode.asInstanceOf[CfgFunctionExitNode].data.name) = stackRgns
 
@@ -57,7 +66,7 @@ class MemoryModelMap {
         add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
       }
 
-      for (dataRgn <- dataRgns) {
+      for (dataRgn <- allDataRgns) {
         add(dataRgn.start.asInstanceOf[BitVecLiteral].value, dataRgn)
       }
 

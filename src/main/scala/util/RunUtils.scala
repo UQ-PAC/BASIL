@@ -18,6 +18,7 @@ import analysis.solvers.*
 object RunUtils {
   var globals_ToUSE: Set[SpecGlobal] = Set()
   var internalFunctions_ToUSE: Set[InternalFunction] = Set()
+  var globalsOffsets_ToUSE: Map[BigInt, BigInt] = Map()
   var memoryRegionAnalysisResults = None: Option[Map[CfgNode, _]]
 
   // ids reserved by boogie
@@ -43,8 +44,11 @@ object RunUtils {
     print(internalFunctions)
     if (performAnalysis) {
       globals_ToUSE = globals
+      globalsOffsets_ToUSE = globalOffsets
       internalFunctions_ToUSE = internalFunctions
-      print("Globals: \n")
+      print("\nInternal: \n")
+      print(internalFunctions)
+      print("\nGlobals: \n")
       print(globals)
       print("\nGlobal Offsets: \n")
       print(globalOffsets)
@@ -156,20 +160,22 @@ object RunUtils {
 //    print(s"\n Mem region results\n ****************\n  ${solver2.getMapping}  \n *****************\n")
 //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(solver2.getMapping, solver.stateAfterNode), Output.dotIder))
 
-    val solver2 = new MemoryRegionAnalysis.WorklistSolver(cfg, globals_ToUSE)
+    val solver2 = new MemoryRegionAnalysis.WorklistSolver(cfg, globals_ToUSE, globalsOffsets_ToUSE)
     val result2 = solver2.analyze()
     memoryRegionAnalysisResults = Some(result2)
-    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder))
+    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder), "mra")
+
 
     val mmm = new MemoryModelMap
-    mmm.convertMemoryRegions(result2)
+    mmm.convertMemoryRegions(result2, internalFunctions_ToUSE)
+    print("Memory Model Map: \n")
     print(mmm)
     val interprocCfg = InterproceduralProgramCfg.generateFromProgram(IRProgram)
 
 
-    val solver3 = new analysis.ValueSetAnalysis.WorklistSolver(interprocCfg, globals_ToUSE, internalFunctions_ToUSE, mmm)
+    val solver3 = new analysis.ValueSetAnalysis.WorklistSolver(interprocCfg, globals_ToUSE, internalFunctions_ToUSE, globalsOffsets_ToUSE, mmm)
     val result3 = solver3.analyze()
-    Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder))
+    Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {

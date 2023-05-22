@@ -15,7 +15,7 @@ object Output {
     * @param kind output kind (determines the file name suffix)
     * @param outFolder the output directory
     */
-  def output(kind: OutputKind, content: String): Unit = {
+  def output(kind: OutputKind, content: String, fileName: String): Unit = {
     val extension = kind match {
       case OtherOutput(OutputKindE.`cfg`) => "_cfg.dot"
       case OtherOutput(OutputKindE.`icfg`) => "_icfg.dot"
@@ -23,7 +23,7 @@ object Output {
 //        s"_$k.dot"
       case _ => ???
     }
-    val outFile = new File("test.dot")
+    val outFile = new File(s"${fileName}.dot")
     val pw = new PrintWriter(outFile, "UTF-8")
     pw.write(content)
     pw.close()

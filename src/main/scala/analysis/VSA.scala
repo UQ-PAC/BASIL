@@ -21,6 +21,24 @@ class AddressValue(expr: Expr) extends Value:
     sb.append(")")
     sb.toString()
   }
+
+case class GlobalAddress(expr: Expr) extends AddressValue(expr):
+  override def toString: String = {
+    val sb = new StringBuilder
+    sb.append("GlobalAddress(")
+    sb.append(expr)
+    sb.append(")")
+    sb.toString()
+  }
+case class LocalAddress(expr: Expr) extends AddressValue(expr):
+  override def toString: String = {
+    val sb = new StringBuilder
+    sb.append("LocalAddress(")
+    sb.append(expr)
+    sb.append(")")
+    sb.toString()
+  }
+
 class LiteralValue(expr: Expr) extends Value:
   override def toString: String = {
     val sb = new StringBuilder
@@ -49,6 +67,7 @@ trait ValueSetAnalysisMisc:
   val cfg: ProgramCfg
   val globals: Set[SpecGlobal]
   val internalFunctions: Set[InternalFunction]
+  val globalOffsets: Map[BigInt, BigInt]
   val mmm: MemoryModelMap
 
   /** The lattice of abstract values.
@@ -110,6 +129,12 @@ trait ValueSetAnalysisMisc:
   def is_global(bigInt: BigInt): Boolean = {
     for (global <- globals) {
       if (global.address == bigInt) {
+        return true
+      }
+    }
+
+    for (global <- globalOffsets) {
+      if (global._1 == bigInt) {
         return true
       }
     }
@@ -212,7 +237,7 @@ trait ValueSetAnalysisMisc:
 
       case zeroExtend: ZeroExtend =>
         eval(zeroExtend.body, env, n)
-      case memoryLoad: MemoryLoad => // TODO: Pointer access here
+      case memoryLoad: MemoryLoad =>
         eval(memoryLoad.index, env, n)
       case variable: Variable =>
         lattice.sublattice.bottom
@@ -238,7 +263,7 @@ trait ValueSetAnalysisMisc:
       case entry: CfgFunctionEntryNode =>
         mmm.pushContext(entry.data.name)
         s
-      case exitNode: CfgFunctionExitNode =>
+      case _: CfgFunctionExitNode =>
         mmm.popContext()
         s
       case cmd: CfgCommandNode =>
@@ -260,9 +285,13 @@ trait ValueSetAnalysisMisc:
                       val evaluatedResults = evaluateExpression(memAssign.rhs.value, n)
                       evaluatedResults match
                         case bitVecLiteral: BitVecLiteral =>
-                          if (is_global(bitVecLiteral.value) || is_internalFunction(bitVecLiteral.value)) {
-                            regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(AddressValue(bitVecLiteral))
-                          } else {
+                          print(s"Found a bit vector literal ${bitVecLiteral}\n")
+                          if (is_internalFunction(bitVecLiteral.value)) {
+                            regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LocalAddress(bitVecLiteral))
+                          } else if (is_global(bitVecLiteral.value)) {
+                            regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(GlobalAddress(bitVecLiteral))
+                          }
+                          else {
                             regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LiteralValue(bitVecLiteral))
                           }
                         case _ =>
@@ -293,7 +322,35 @@ trait ValueSetAnalysisMisc:
 
                           return Set(ValueSet(localAssign.lhs, regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value])))
                         case _ =>
+                    } else if (lhs.isInstanceOf[BitVecLiteral]) {
+                      val summation = lhs.asInstanceOf[BitVecLiteral].value + rhs.asInstanceOf[BitVecLiteral].value
+                      mmm.findObject(summation, "data") match
+                        case Some(obj: MemoryRegion) =>
+                          if (is_global(summation)) {
+                            val setToAdd = mutable.Set.empty[Value]
+                            setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size)))
+                            return Set(ValueSet(localAssign.lhs, regionContentMap.getOrElseUpdate(obj, setToAdd)))
+                          } else if (is_internalFunction(summation)) {
+                            val setToAdd = mutable.Set.empty[Value]
+                            setToAdd.add(LocalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size)))
+                            return Set(ValueSet(localAssign.lhs, regionContentMap.getOrElseUpdate(obj, setToAdd)))
+                          } else {
+                            val setToAdd = mutable.Set.empty[Value]
+                            setToAdd.add(LiteralValue(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size)))
+                            return Set(ValueSet(localAssign.lhs, regionContentMap.getOrElseUpdate(obj, setToAdd)))
+                          }
+                        case _ =>
                     }
+//                    } else if (lhs.isInstanceOf[BitVecLiteral]) {
+//                      val summation = lhs.asInstanceOf[BitVecLiteral].value + rhs.asInstanceOf[BitVecLiteral].value
+//                      if (is_global(summation)) {
+//                        return lattice.sublattice.lub(s, Set(ValueSet(localAssign.lhs, mutable.Set(GlobalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size))))))
+//                      } else if (is_internalFunction(summation)) {
+//                        return lattice.sublattice.lub(s, Set(ValueSet(localAssign.lhs, mutable.Set(LocalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size))))))
+//                      } else {
+//                        return lattice.sublattice.lub(s, Set(ValueSet(localAssign.lhs, mutable.Set(LiteralValue(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size))))))
+//                      }
+//                    }
                   case _ =>
               case _ =>
             s
@@ -305,7 +362,7 @@ trait ValueSetAnalysisMisc:
 
 /** Base class for memory region analysis (non-lifted) lattice.
  */
-abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal], val internalFunctions: Set[InternalFunction], val mmm: MemoryModelMap) extends FlowSensitiveAnalysis(true) with ValueSetAnalysisMisc:
+abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal], val internalFunctions: Set[InternalFunction], val globalOffsets: Map[BigInt, BigInt], val mmm: MemoryModelMap) extends FlowSensitiveAnalysis(true) with ValueSetAnalysisMisc:
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
    */
@@ -313,8 +370,8 @@ abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntreprocValueSetAnalysisWorklistSolver[L <: PowersetLattice[ValueSet]](cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], mmm: MemoryModelMap, val powersetLattice: L)
-  extends ValueSetAnalysis(cfg, globals, internalFunctions, mmm)
+abstract class IntreprocValueSetAnalysisWorklistSolver[L <: PowersetLattice[ValueSet]](cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], globalOffsets: Map[BigInt, BigInt], mmm: MemoryModelMap, val powersetLattice: L)
+  extends ValueSetAnalysis(cfg, globals, internalFunctions, globalOffsets, mmm)
     with SimpleMonotonicSolver[CfgNode]
     with ForwardDependencies
 
@@ -322,5 +379,5 @@ object ValueSetAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
    */
-  class WorklistSolver(cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], mmm: MemoryModelMap)
-    extends IntreprocValueSetAnalysisWorklistSolver(cfg, globals, internalFunctions, mmm, PowersetLattice[ValueSet])
+  class WorklistSolver(cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], globalOffsets: Map[BigInt, BigInt], mmm: MemoryModelMap)
+    extends IntreprocValueSetAnalysisWorklistSolver(cfg, globals, internalFunctions, globalOffsets, mmm, PowersetLattice[ValueSet])
