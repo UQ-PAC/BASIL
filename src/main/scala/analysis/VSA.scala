@@ -48,16 +48,16 @@ class LiteralValue(expr: Expr) extends Value:
     sb.toString()
   }
 
-class ValueSet(expr: Expr, values: mutable.Set[Value]) {
-  override def toString: String = {
-    val sb = new StringBuilder
-    sb.append(expr)
-    sb.append(" -> {")
-    sb.append(values.mkString(", "))
-    sb.append("}")
-    sb.toString()
-  }
-}
+//class ValueSet(expr: Expr, values: mutable.Set[Value]) {
+//  override def toString: String = {
+//    val sb = new StringBuilder
+//    sb.append(expr)
+//    sb.append(" -> {")
+//    sb.append(values.mkString(", "))
+//    sb.append("}")
+//    sb.toString()
+//  }
+//}
 
 
 trait ValueSetAnalysisMisc:
@@ -72,11 +72,11 @@ trait ValueSetAnalysisMisc:
 
   /** The lattice of abstract values.
    */
-  val powersetLattice: PowersetLattice[ValueSet]
+  val powersetLattice: MapLattice[Expr, PowersetLattice[Value]]
 
   /** The lattice of abstract states.
    */
-  val lattice: MapLattice[CfgNode, PowersetLattice[ValueSet]] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CfgNode, MapLattice[Expr, PowersetLattice[Value]]] = MapLattice(powersetLattice)
 
   val domain: Set[CfgNode] = cfg.nodes
 
@@ -227,31 +227,78 @@ trait ValueSetAnalysisMisc:
 
   /** Default implementation of eval.
    */
-  def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
-    exp match {
-      case binOp: BinaryExpr =>
-        val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
-        val rhs: Expr = evaluateExpression(binOp.arg2, n)
-
-        env
-
-      case zeroExtend: ZeroExtend =>
-        eval(zeroExtend.body, env, n)
-      case memoryLoad: MemoryLoad =>
-        eval(memoryLoad.index, env, n)
-      case variable: Variable =>
-        lattice.sublattice.bottom
-      case extract: Extract =>
-        eval(extract.body, env, n)
-      case unaryExpr: UnaryExpr =>
-        lattice.sublattice.bottom
-      case signExtend: SignExtend =>
-        eval(signExtend.body, env, n)
-      case bitVecLiteral: BitVecLiteral =>
-        print(s"Saw a bit vector literal ${bitVecLiteral}\n")
-        lattice.sublattice.bottom
+  def eval(stmt: Statement, s: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
+    stmt match {
+      case memAssign: MemoryAssign =>
+        if (ignoreRegions.contains(memAssign.rhs.value)) {
+          return s
+        }
+        memAssign.rhs.index match
+          case binOp: BinaryExpr =>
+            val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
+            val rhs: Expr = evaluateExpression(binOp.arg2, n)
+            if (lhs.equals(stackPointer)) {
+              mmm.findObject(rhs.asInstanceOf[BitVecLiteral].value, "stack") match
+                case Some(obj: MemoryRegion) =>
+                  val evaluatedResults = evaluateExpression(memAssign.rhs.value, n)
+                  evaluatedResults match
+                    case bitVecLiteral: BitVecLiteral =>
+                      print(s"Found a bit vector literal ${bitVecLiteral}\n")
+                      if (is_internalFunction(bitVecLiteral.value)) {
+                        regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LocalAddress(bitVecLiteral))
+                      } else if (is_global(bitVecLiteral.value)) {
+                        regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(GlobalAddress(bitVecLiteral))
+                      }
+                      else {
+                        regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LiteralValue(bitVecLiteral))
+                      }
+                    case _ =>
+                      val region = exprToRegion(evaluatedResults, n)
+                      region match {
+                        case Some(obj: MemoryRegion) =>
+                          regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).addAll(regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]))
+                        case _ =>
+                          throw new RuntimeException("Not a value type: " + evaluatedResults + "\n")
+                      }
+                case _ =>
+            }
+            s
+      case localAssign: LocalAssign =>
+        localAssign.rhs match
+          case memLoad: MemoryLoad =>
+            memLoad.index match
+              case binOp: BinaryExpr =>
+                val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
+                val rhs: Expr = evaluateExpression(binOp.arg2, n)
+                if (lhs.equals(stackPointer)) {
+                  mmm.findObject(rhs.asInstanceOf[BitVecLiteral].value, "stack") match
+                    case Some(obj: MemoryRegion) =>
+                      s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).toSet)
+                    case _ =>
+                } else if (lhs.isInstanceOf[BitVecLiteral]) {
+                  val summation = lhs.asInstanceOf[BitVecLiteral].value + rhs.asInstanceOf[BitVecLiteral].value
+                  mmm.findObject(summation, "data") match
+                    case Some(obj: MemoryRegion) =>
+                      if (is_global(summation)) {
+                        val setToAdd = mutable.Set.empty[Value]
+                        setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size)))
+                        return s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, setToAdd).toSet)
+                      } else if (is_internalFunction(summation)) {
+                        val setToAdd = mutable.Set.empty[Value]
+                        setToAdd.add(LocalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size)))
+                        return s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, setToAdd).toSet)
+                      } else {
+                        val setToAdd = mutable.Set.empty[Value]
+                        setToAdd.add(LiteralValue(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size)))
+                        return s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, setToAdd).toSet)
+                      }
+                    case _ =>
+                }
+              case _ =>
+          case _ =>
+        s
       case _ =>
-        print(s"type: ${exp.getClass} $exp\n")
+        print(s"type: ${stmt.getClass} $stmt\n")
         throw new Exception("Unknown type")
     }
   }
@@ -271,89 +318,13 @@ trait ValueSetAnalysisMisc:
           case directCall: DirectCall =>
             throw new RuntimeException("ERROR: CASE NOT HANDLED: " + directCall + "\n")
           case memAssign: MemoryAssign =>
-            if (ignoreRegions.contains(memAssign.rhs.value)) {
-              return s
-            }
-            lattice.sublattice.lub(s, eval(memAssign.rhs.value, s, n))
-            memAssign.rhs.index match
-              case binOp: BinaryExpr =>
-                val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
-                val rhs: Expr = evaluateExpression(binOp.arg2, n)
-                if (lhs.equals(stackPointer)) {
-                  mmm.findObject(rhs.asInstanceOf[BitVecLiteral].value, "stack") match
-                    case Some(obj: MemoryRegion) =>
-                      val evaluatedResults = evaluateExpression(memAssign.rhs.value, n)
-                      evaluatedResults match
-                        case bitVecLiteral: BitVecLiteral =>
-                          print(s"Found a bit vector literal ${bitVecLiteral}\n")
-                          if (is_internalFunction(bitVecLiteral.value)) {
-                            regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LocalAddress(bitVecLiteral))
-                          } else if (is_global(bitVecLiteral.value)) {
-                            regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(GlobalAddress(bitVecLiteral))
-                          }
-                          else {
-                            regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LiteralValue(bitVecLiteral))
-                          }
-                        case _ =>
-                          val region = exprToRegion(evaluatedResults, n)
-                          region match {
-                            case Some(obj: MemoryRegion) =>
-                                regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).addAll(regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]))
-                            case _ =>
-                              throw new RuntimeException("Not a value type: " + evaluatedResults + "\n")
-                          }
-                    case _ =>
-                }
-                s
+            lattice.sublattice.lub(s, eval(memAssign, s, n))
 
           // local assign is just lhs assigned to rhs we only need this information to track a prior register operation
           // AKA: R1 <- R1 + 8; mem(R1) <- 0x1234
           case localAssign: LocalAssign =>
             assigmentsMap.addOne((localAssign.lhs, n) -> evaluateExpression(localAssign.rhs, n))
-            localAssign.rhs match
-              case memLoad: MemoryLoad =>
-                memLoad.index match
-                  case binOp: BinaryExpr =>
-                    val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
-                    val rhs: Expr = evaluateExpression(binOp.arg2, n)
-                    if (lhs.equals(stackPointer)) {
-                      mmm.findObject(rhs.asInstanceOf[BitVecLiteral].value, "stack") match
-                        case Some(obj: MemoryRegion) =>
-
-                          return Set(ValueSet(localAssign.lhs, regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value])))
-                        case _ =>
-                    } else if (lhs.isInstanceOf[BitVecLiteral]) {
-                      val summation = lhs.asInstanceOf[BitVecLiteral].value + rhs.asInstanceOf[BitVecLiteral].value
-                      mmm.findObject(summation, "data") match
-                        case Some(obj: MemoryRegion) =>
-                          if (is_global(summation)) {
-                            val setToAdd = mutable.Set.empty[Value]
-                            setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size)))
-                            return Set(ValueSet(localAssign.lhs, regionContentMap.getOrElseUpdate(obj, setToAdd)))
-                          } else if (is_internalFunction(summation)) {
-                            val setToAdd = mutable.Set.empty[Value]
-                            setToAdd.add(LocalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size)))
-                            return Set(ValueSet(localAssign.lhs, regionContentMap.getOrElseUpdate(obj, setToAdd)))
-                          } else {
-                            val setToAdd = mutable.Set.empty[Value]
-                            setToAdd.add(LiteralValue(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size)))
-                            return Set(ValueSet(localAssign.lhs, regionContentMap.getOrElseUpdate(obj, setToAdd)))
-                          }
-                        case _ =>
-                    }
-//                    } else if (lhs.isInstanceOf[BitVecLiteral]) {
-//                      val summation = lhs.asInstanceOf[BitVecLiteral].value + rhs.asInstanceOf[BitVecLiteral].value
-//                      if (is_global(summation)) {
-//                        return lattice.sublattice.lub(s, Set(ValueSet(localAssign.lhs, mutable.Set(GlobalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size))))))
-//                      } else if (is_internalFunction(summation)) {
-//                        return lattice.sublattice.lub(s, Set(ValueSet(localAssign.lhs, mutable.Set(LocalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size))))))
-//                      } else {
-//                        return lattice.sublattice.lub(s, Set(ValueSet(localAssign.lhs, mutable.Set(LiteralValue(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size))))))
-//                      }
-//                    }
-                  case _ =>
-              case _ =>
-            s
+            lattice.sublattice.lub(s, eval(localAssign, s, n))
           case _ => s
         }
       case _ => s // ignore other kinds of nodes
@@ -370,7 +341,7 @@ abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntreprocValueSetAnalysisWorklistSolver[L <: PowersetLattice[ValueSet]](cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], globalOffsets: Map[BigInt, BigInt], mmm: MemoryModelMap, val powersetLattice: L)
+abstract class IntreprocValueSetAnalysisWorklistSolver[L <: MapLattice[Expr, PowersetLattice[Value]]](cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], globalOffsets: Map[BigInt, BigInt], mmm: MemoryModelMap, val powersetLattice: L)
   extends ValueSetAnalysis(cfg, globals, internalFunctions, globalOffsets, mmm)
     with SimpleMonotonicSolver[CfgNode]
     with ForwardDependencies
@@ -380,4 +351,4 @@ object ValueSetAnalysis:
   /** Intraprocedural analysis that uses the worklist solver.
    */
   class WorklistSolver(cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], globalOffsets: Map[BigInt, BigInt], mmm: MemoryModelMap)
-    extends IntreprocValueSetAnalysisWorklistSolver(cfg, globals, internalFunctions, globalOffsets, mmm, PowersetLattice[ValueSet])
+    extends IntreprocValueSetAnalysisWorklistSolver(cfg, globals, internalFunctions, globalOffsets, mmm, MapLattice[Expr, PowersetLattice[Value]](PowersetLattice[Value]))
