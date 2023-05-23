@@ -168,6 +168,9 @@ trait ValueSetAnalysisMisc:
                 case Some(value) =>
                   value match
                     case bitVecLiteral: BitVecLiteral =>
+                      if (!binOp.arg2.isInstanceOf[BitVecLiteral]) {
+                        return exp
+                      }
                       val calculated: BigInt = bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value)
                       return BitVecLiteral(calculated, bitVecLiteral.size)
                     case _ => evaluateExpression(value, pred)
@@ -203,12 +206,6 @@ trait ValueSetAnalysisMisc:
 
   def exprToRegion(expr: Expr, n: CfgNode): Option[MemoryRegion] = {
     expr match
-      case bitVecLiteral: BitVecLiteral =>
-        mmm.findObject(bitVecLiteral.value, "stack") match
-          case Some(obj: MemoryRegion) =>
-            return Some(obj)
-          case _ =>
-            return None
       case binOp: BinaryExpr =>
         val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
         val rhs: Expr = evaluateExpression(binOp.arg2, n)
@@ -253,16 +250,20 @@ trait ValueSetAnalysisMisc:
                         regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LiteralValue(bitVecLiteral))
                       }
                     case _ =>
-                      val region = exprToRegion(evaluatedResults, n)
-                      region match {
-                        case Some(obj: MemoryRegion) =>
-                          regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).addAll(regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]))
-                        case _ =>
-                          throw new RuntimeException("Not a value type: " + evaluatedResults + "\n")
-                      }
+//                      val region = exprToRegion(evaluatedResults, n)
+//                      region match {
+//                        case Some(obj: MemoryRegion) =>
+//                          regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).addAll(regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]))
+//                        case _ =>
+//                          throw new RuntimeException("Not a value type: " + evaluatedResults + "\n")
+//                      }
+                        return s
                 case _ =>
+            } else {
+              // should do something here
             }
-            s
+          case _ =>
+          s
       case localAssign: LocalAssign =>
         localAssign.rhs match
           case memLoad: MemoryLoad =>
@@ -315,8 +316,8 @@ trait ValueSetAnalysisMisc:
         s
       case cmd: CfgCommandNode =>
         cmd.data match {
-          case directCall: DirectCall =>
-            throw new RuntimeException("ERROR: CASE NOT HANDLED: " + directCall + "\n")
+//          case directCall: DirectCall =>
+//            throw new RuntimeException("ERROR: CASE NOT HANDLED: " + directCall + "\n")
           case memAssign: MemoryAssign =>
             lattice.sublattice.lub(s, eval(memAssign, s, n))
 

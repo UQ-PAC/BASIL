@@ -94,7 +94,7 @@ object RunUtils {
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
 
-    IRProgram.stripUnreachableFunctions()
+    //IRProgram.stripUnreachableFunctions()
 
     if (performAnalysis) {
       analyse(IRProgram)

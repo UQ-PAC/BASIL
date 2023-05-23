@@ -578,6 +578,9 @@ trait MemoryRegionAnalysisMisc:
                   case Some(value) =>
                     value match
                       case bitVecLiteral: BitVecLiteral =>
+                        if (!binOp.arg2.isInstanceOf[BitVecLiteral]) {
+                          return exp
+                        }
                         val calculated: BigInt = bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value)
                         return BitVecLiteral(calculated, bitVecLiteral.size)
                       case _ => evaluateExpression(value, pred)
