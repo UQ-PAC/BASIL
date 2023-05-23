@@ -193,13 +193,10 @@ object Cfg:
     funcEntryExit.clear()
     this.interProc = interProc
     for (func <- program.procedures) {
-      val functionEntryNode = CfgFunctionEntryNode(data = func)
-      val functionExitNode = CfgFunctionExitNode(data = func)
-      cfg.addNode(functionEntryNode)
-      cfg.addNode(functionExitNode)
-      funcEntryExit.addOne(func -> (functionEntryNode, functionExitNode))
+      if (!funcEntryExit.contains(func)) {
+        generateCfgFunc(func)
+      }
     }
-    program.procedures.map(f => f -> generateCfgFunc(f))
     cfg
   }
 
@@ -213,8 +210,11 @@ object Cfg:
    */
   def generateCfgFunc(func: Procedure): Cfg = {
     val blocks: Map[String, CfgBlockEntryNode] = func.blocks.map(block => block.label -> CfgBlockEntryNode(data = block)).toMap
-    val functionEntryNode = funcEntryExit(func)._1
-    val functionExitNode = funcEntryExit(func)._2
+    val functionEntryNode = CfgFunctionEntryNode(data = func)
+    val functionExitNode = CfgFunctionExitNode(data = func)
+    cfg.addNode(functionEntryNode)
+    cfg.addNode(functionExitNode)
+    funcEntryExit.addOne(func -> (functionEntryNode, functionExitNode))
     val processedBlocks: mutable.Set[String] = mutable.Set[String]()
 
     def visitBlocks(blocks: Map[String, CfgBlockEntryNode]): Unit = {
@@ -251,11 +251,12 @@ object Cfg:
               }
             case d: DirectCall =>
               val call = nodePool.get(d)
-              val (localEntry, localExit): (CfgFunctionEntryNode, CfgFunctionExitNode) = funcEntryExit(d.target)
               cfg.addNode(call)
               cfg.addEdge(lastAdded, call)
-              cfg.addEdge(call, localEntry)
-              nodePool.setLatestAdded(localExit)
+              nodePool.setLatestAdded(call)
+              generateCfgFunc(d.target)
+              cfg.addEdge(call, funcEntryExit(d.target)._1)
+              //nodePool.setLatestAdded(funcEntryExit(d.target)._2)
               if (d.returnTarget.isDefined) {
                 visitBlock(d.returnTarget.get.label)
               }
@@ -271,7 +272,7 @@ object Cfg:
               if (i.returnTarget.isDefined) {
                 visitBlock(i.returnTarget.get.label)
               } else {
-                cfg.addEdge(lastAdded, functionExitNode)
+                cfg.addEdge(nodePool.getLatestAdded, functionExitNode)
               }
 
           }
@@ -320,6 +321,7 @@ object Cfg:
       visitBlocks(blocks)
     }
     cfg.addEdge(nodePool.getLatestAdded, functionExitNode)
+    nodePool.setLatestAdded(functionExitNode)
     cfg
   }
 
