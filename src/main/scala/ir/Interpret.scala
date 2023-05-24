@@ -5,10 +5,13 @@ import scala.collection.mutable
 
 class Interpret(IRProgram: Program) {
   val regs: mutable.Map[Variable, BitVecLiteral] = mutable.Map()
-  val mems: mutable.Map[Memory, BitVecLiteral] = mutable.Map()
-  var nextBlock: Block = IRProgram.procedures.head.blocks.head
+  val memSize: Int = IRProgram.initialMemory.last.address / 8 + IRProgram.initialMemory.last.size
+  val mems: Array[BitVecLiteral] = Array.fill(memSize)(BitVecLiteral(0, 8))
+  val mainProcedure: Procedure = IRProgram.procedures.find(_.name == "main").get
+  val exitVariable: Variable = mainProcedure.out.find(_.name == "LR_out").get.value
+  var nextBlock: Block = _
 
-  def eval(exp: Expr, env: mutable.Map[Variable, BitVecLiteral]): BitVecLiteral = {
+  def eval(exp: Expr, env: mutable.Map[Variable, BitVecLiteral]): Literal = {
     exp match {
       case id: Variable =>
         env.get(id) match {
@@ -36,7 +39,14 @@ class Interpret(IRProgram: Program) {
 
       case e: Extract =>
         println(s"\tExtract($e, ${e.start}, ${e.end})")
-        smt_extract(e.end - 1, e.start + 1, eval(e.body, env))
+        // TODO: wait for smt_extract return correct result
+//        smt_extract(e.end - 1, e.start + 1, eval(e.body, env))
+        // return dummy result
+        val body: Literal = eval(e.body, env)
+        body match {
+          case BitVecLiteral(value, size) => BitVecLiteral(value, e.end - e.start)
+          case _                          => throw new Exception("error")
+        }
 
       case r: Repeat =>
         println(s"\t$r")
@@ -48,38 +58,38 @@ class Interpret(IRProgram: Program) {
         result
 
       case bin: BinaryExpr =>
-        val left: BitVecLiteral = eval(bin.arg1, env)
-        val right: BitVecLiteral = eval(bin.arg2, env)
+        val left: Literal = eval(bin.arg1, env)
+        val right: Literal = eval(bin.arg2, env)
         println(s"\tBinaryExpr($left ${bin.op} $right)")
         bin.op match {
-          case BVAND  => smt_bvand(left, right)
-          case BVOR   => smt_bvor(left, right)
-          case BVADD  => smt_bvadd(left, right)
-          case BVMUL  => smt_bvmul(left, right)
-          case BVUDIV => smt_bvudiv(left, right)
-          case BVUREM => smt_bvurem(left, right)
-          case BVSHL  => smt_bvshl(left, right)
-          case BVLSHR => smt_bvlshr(left, right)
-          //          case BVULT    => smt_bvult(left, right)
-          case BVNAND => ???
-          case BVNOR  => ???
-          case BVXOR  => ???
-          case BVXNOR => ???
-          case BVCOMP => smt_bvcomp(left, right)
-          case BVSUB  => smt_bvsub(left, right)
-          case BVSDIV => smt_bvsdiv(left, right)
-          case BVSREM => smt_bvsrem(left, right)
-          case BVSMOD => ???
-          case BVASHR => smt_bvashr(left, right)
-          //          case BVULE    => smt_bvule(left, right)
-          case BVUGT => ???
-          case BVUGE => ???
-          //          case BVSLT    => smt_bvslt(left, right)
-          //          case BVSLE    => smt_bvsle(left, right)
-          case BVSGT => ???
-          case BVSGE => ???
-          //          case BVEQ     => smt_bveq(left, right)
-          //          case BVNEQ    => smt_bvneq(left, right)
+          case BVAND    => smt_bvand(left, right)
+          case BVOR     => smt_bvor(left, right)
+          case BVADD    => smt_bvadd(left, right)
+          case BVMUL    => smt_bvmul(left, right)
+          case BVUDIV   => smt_bvudiv(left, right)
+          case BVUREM   => smt_bvurem(left, right)
+          case BVSHL    => smt_bvshl(left, right)
+          case BVLSHR   => smt_bvlshr(left, right)
+          case BVULT    => smt_bvult(left, right)
+          case BVNAND   => ???
+          case BVNOR    => ???
+          case BVXOR    => ???
+          case BVXNOR   => ???
+          case BVCOMP   => smt_bvcomp(left, right)
+          case BVSUB    => smt_bvsub(left, right)
+          case BVSDIV   => smt_bvsdiv(left, right)
+          case BVSREM   => smt_bvsrem(left, right)
+          case BVSMOD   => ???
+          case BVASHR   => smt_bvashr(left, right)
+          case BVULE    => smt_bvule(left, right)
+          case BVUGT    => ???
+          case BVUGE    => ???
+          case BVSLT    => smt_bvslt(left, right)
+          case BVSLE    => smt_bvsle(left, right)
+          case BVSGT    => ???
+          case BVSGE    => ???
+          case BVEQ     => smt_bveq(left, right)
+          case BVNEQ    => smt_bvneq(left, right)
           case BVCONCAT => smt_concat(left, right)
         }
 
@@ -99,7 +109,8 @@ class Interpret(IRProgram: Program) {
 
       case ml: MemoryLoad =>
         println(s"\t$ml")
-        BitVecLiteral(0, 0)
+        // TODO: load bv from mems
+        BitVecLiteral(0, ml.size)
 
       case ms: MemoryStore =>
         println(s"\t$ms")
@@ -137,9 +148,13 @@ class Interpret(IRProgram: Program) {
     for ((jump, index) <- b.jumps.zipWithIndex) {
       println(s"jump[$index]:")
       jump match {
-        case gt: GoTo         => println(s"$gt")
-        case dc: DirectCall   => println(s"$dc")
-        case ic: IndirectCall => println(s"$ic")
+        case gt: GoTo       => println(s"$gt")
+        case dc: DirectCall => println(s"$dc")
+        case ic: IndirectCall =>
+          println(s"$ic")
+          if (ic.target == exitVariable) {
+            println("EXIT")
+          }
       }
     }
   }
@@ -149,28 +164,32 @@ class Interpret(IRProgram: Program) {
       case assign: LocalAssign =>
         println(s"LocalAssign ${assign.lhs} = ${assign.rhs}")
         val evalRight = eval(assign.rhs, regs)
-        regs += (assign.lhs -> evalRight)
         println(s"LocalAssign ${assign.lhs} -> ${evalRight}\n")
+
+        evalRight match {
+          case BitVecLiteral(_, 64) => regs += (assign.lhs -> evalRight.asInstanceOf[BitVecLiteral])
+          case _                    => throw new Exception("cannot register non-bitvectors")
+        }
 
       case assign: MemoryAssign =>
         println(s"MemoryAssign ${assign.lhs} = ${assign.rhs}")
         val evalRight = eval(assign.rhs, regs)
-        mems += (assign.lhs -> evalRight)
-        println(s"MemoryAssign ${assign.lhs} -> ${evalRight}\n")
+        evalRight match {
+          // TODO: assign the memory array
+          case BitVecLiteral(_, _) => println(s"MemoryAssign ${assign.lhs} -> ${evalRight}\n")
+          case _                   => throw new Exception("cannot register non-bitvectors")
+        }
     }
   }
 
+  // TODO: initialize memory array from IRProgram
+
   // Program.Procedure
-  interpretProcedure(IRProgram.procedures.head)
+  interpretProcedure(mainProcedure)
 
   println("\nREGS:")
   for (reg <- regs) {
     println(s"${reg._1} -> ${reg._2}")
-  }
-
-  println("\nMEMS:")
-  for (mem <- mems) {
-    println(s"${mem._1} -> ${mem._2}")
   }
 
   println("Interpret End")
