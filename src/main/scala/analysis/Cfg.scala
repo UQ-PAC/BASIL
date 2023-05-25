@@ -111,11 +111,13 @@ case class CfgCommandNode(
  *   the exit to he graph (sink)
  */
 class Cfg(cfg: Cfg = null):
+  var nodeToBlock: mutable.Map[CfgNode, Block] = mutable.Map[CfgNode, Block]()
   var edges: ListBuffer[Edge] = ListBuffer[Edge]()
   var entries: ListBuffer[CfgNode] = ListBuffer[CfgNode]()
   if (cfg != null) then
     this.edges = cfg.edges
     this.entries = cfg.entries
+    this.nodeToBlock = cfg.nodeToBlock
 
   def getEdges: ListBuffer[Edge] = {
     edges
@@ -262,6 +264,7 @@ object Cfg:
               }
             case i: IndirectCall =>
               val call = nodePool.get(i)
+              cfg.nodeToBlock += (call -> func.blocks.find(block => block.label == blockName).get)
               cfg.addNode(call)
               cfg.addEdge(lastAdded, call)
               nodePool.setLatestAdded(call)
@@ -274,7 +277,6 @@ object Cfg:
               } else {
                 cfg.addEdge(nodePool.getLatestAdded, functionExitNode)
               }
-
           }
         } else {
           blocks(blockName).data.jumps.foreach {
@@ -297,6 +299,7 @@ object Cfg:
               }
             case i: IndirectCall =>
               val call = nodePool.get(i)
+              cfg.nodeToBlock += (call -> func.blocks.find(block => block.label == blockName).get)
               cfg.addNode(call)
               cfg.addEdge(lastAdded, call)
               nodePool.setLatestAdded(call)

@@ -22,7 +22,7 @@ class AddressValue(expr: Expr) extends Value:
     sb.toString()
   }
 
-case class GlobalAddress(expr: Expr) extends AddressValue(expr):
+case class GlobalAddress(expr: Expr, name: String) extends AddressValue(expr):
   override def toString: String = {
     val sb = new StringBuilder
     sb.append("GlobalAddress(")
@@ -30,7 +30,7 @@ case class GlobalAddress(expr: Expr) extends AddressValue(expr):
     sb.append(")")
     sb.toString()
   }
-case class LocalAddress(expr: Expr) extends AddressValue(expr):
+case class LocalAddress(expr: Expr, name: String) extends AddressValue(expr):
   override def toString: String = {
     val sb = new StringBuilder
     sb.append("LocalAddress(")
@@ -141,6 +141,21 @@ trait ValueSetAnalysisMisc:
     false
   }
 
+  def getName_global(bigInt: BigInt): String = {
+    for (global <- globals) {
+      if (global.address == bigInt) {
+        return global.name
+      }
+    }
+
+    for (global <- globalOffsets) {
+      if (global._1 == bigInt) {
+        return getName_global(global._2)
+      }
+    }
+    throw new RuntimeException("Not possible to get name of global offset" + bigInt)
+  }
+
   def is_internalFunction(bigInt: BigInt): Boolean = {
     for (internalFunction <- internalFunctions) {
       if (internalFunction.offset == bigInt) {
@@ -148,6 +163,15 @@ trait ValueSetAnalysisMisc:
       }
     }
     false
+  }
+
+  def getName_internalFunction(bigInt: BigInt): String = {
+    for (internalFunction <- internalFunctions) {
+      if (internalFunction.offset == bigInt) {
+        return internalFunction.name
+      }
+    }
+    "ERROR" // not possible
   }
 
   /**
@@ -242,9 +266,9 @@ trait ValueSetAnalysisMisc:
                     case bitVecLiteral: BitVecLiteral =>
                       print(s"Found a bit vector literal ${bitVecLiteral}\n")
                       if (is_internalFunction(bitVecLiteral.value)) {
-                        regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LocalAddress(bitVecLiteral))
+                        regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LocalAddress(bitVecLiteral, getName_internalFunction(bitVecLiteral.value)))
                       } else if (is_global(bitVecLiteral.value)) {
-                        regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(GlobalAddress(bitVecLiteral))
+                        regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(GlobalAddress(bitVecLiteral, getName_global(bitVecLiteral.value)))
                       }
                       else {
                         regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LiteralValue(bitVecLiteral))
@@ -282,11 +306,11 @@ trait ValueSetAnalysisMisc:
                     case Some(obj: MemoryRegion) =>
                       if (is_global(summation)) {
                         val setToAdd = mutable.Set.empty[Value]
-                        setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size)))
+                        setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size), getName_global(summation)))
                         return s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, setToAdd).toSet)
                       } else if (is_internalFunction(summation)) {
                         val setToAdd = mutable.Set.empty[Value]
-                        setToAdd.add(LocalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size)))
+                        setToAdd.add(LocalAddress(BitVecLiteral(summation, lhs.asInstanceOf[BitVecLiteral].size), getName_internalFunction(summation)))
                         return s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, setToAdd).toSet)
                       } else {
                         val setToAdd = mutable.Set.empty[Value]
