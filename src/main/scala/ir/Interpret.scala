@@ -1,12 +1,13 @@
 package ir
 
-import analysis.util._
+import analysis.util.*
+
 import scala.collection.mutable
 
 class Interpret(IRProgram: Program) {
   val regs: mutable.Map[Variable, BitVecLiteral] = mutable.Map()
-  val memSize: Int = IRProgram.initialMemory.last.address / 8 + IRProgram.initialMemory.last.size
-  val mems: Array[BitVecLiteral] = Array.fill(memSize)(BitVecLiteral(0, 8))
+  val mems: Array[BitVecLiteral] =
+    Array.fill(IRProgram.initialMemory.map(section => section.address + section.size).max)(BitVecLiteral(0, 8))
   val mainProcedure: Procedure = IRProgram.procedures.find(_.name == "main").get
   val exitVariable: Variable = mainProcedure.out.find(_.name == "LR_out").get.value
   var nextBlock: Block = _
@@ -153,7 +154,7 @@ class Interpret(IRProgram: Program) {
         case ic: IndirectCall =>
           println(s"$ic")
           if (ic.target == exitVariable) {
-            println("EXIT")
+            println("EXIT main")
           }
       }
     }
@@ -164,7 +165,7 @@ class Interpret(IRProgram: Program) {
       case assign: LocalAssign =>
         println(s"LocalAssign ${assign.lhs} = ${assign.rhs}")
         val evalRight = eval(assign.rhs, regs)
-        println(s"LocalAssign ${assign.lhs} -> ${evalRight}\n")
+        println(s"LocalAssign ${assign.lhs} -> $evalRight\n")
 
         evalRight match {
           case BitVecLiteral(_, 64) => regs += (assign.lhs -> evalRight.asInstanceOf[BitVecLiteral])
@@ -176,13 +177,26 @@ class Interpret(IRProgram: Program) {
         val evalRight = eval(assign.rhs, regs)
         evalRight match {
           // TODO: assign the memory array
-          case BitVecLiteral(_, _) => println(s"MemoryAssign ${assign.lhs} -> ${evalRight}\n")
+          case BitVecLiteral(_, _) => println(s"MemoryAssign ${assign.lhs} -> $evalRight\n")
           case _                   => throw new Exception("cannot register non-bitvectors")
         }
     }
   }
 
-  // TODO: initialize memory array from IRProgram
+  // initialize memory array from IRProgram
+  var currentAddr = 0
+  IRProgram.initialMemory
+    .sortBy(_.address)
+    .foreach { im =>
+      if (im.address + im.size > currentAddr) {
+        val start = im.address.max(currentAddr)
+        val data = if (im.address < currentAddr) im.bytes.slice(currentAddr - im.address, im.size) else im.bytes
+        data.zipWithIndex.foreach { case (byte, index) =>
+          mems(start + index) = byte.asInstanceOf[BitVecLiteral]
+        }
+        currentAddr = im.address + im.size
+      }
+    }
 
   // Program.Procedure
   interpretProcedure(mainProcedure)
