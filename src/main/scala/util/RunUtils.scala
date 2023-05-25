@@ -178,7 +178,7 @@ object RunUtils {
     val solver3 = new analysis.ValueSetAnalysis.WorklistSolver(interprocCfg, globals_ToUSE, internalFunctions_ToUSE, globalsOffsets_ToUSE, mmm)
     val result3 = solver3.analyze()
     Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
-    val newCFG = resolveCFG(interprocCfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram)
+    val newCFG = InterproceduralProgramCfg.generateFromProgram(resolveCFG(interprocCfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram))
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot({ x => x.toString}, Output.dotIder), "resolvedCFG")
   }
 
@@ -191,12 +191,7 @@ object RunUtils {
 //    Program(IRProgram.procedures, IRProgram.initialMemory)
 //  }
 
-  def alterProgram(IRProgram: Program): Program = {
-    return IRProgram
-  }
-
-  def resolveCFG(interproceduralProgramCfg: InterproceduralProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): InterproceduralProgramCfg = {
-    val newBuffer: ListBuffer[CfgNode] = ListBuffer[CfgNode]()
+  def resolveCFG(interproceduralProgramCfg: InterproceduralProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): Program = {
     interproceduralProgramCfg.entries.foreach(
       n => process(n))
 
@@ -209,37 +204,28 @@ object RunUtils {
                 val functionNames = resolveAddresses(valueSet(indirectCall.target))
                 //TODO: if this does not work, it means function names should be "l"+name
                 functionNames.size match
-                  case 0 => newBuffer += n
                   case 1 =>
-                    val newDirectCall = CfgCommandNode(CfgNode.nextId(), n.pred, n.succ, DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head)).head, indirectCall.condition, indirectCall.returnTarget))
-                    newBuffer += newDirectCall
-                    fixEdges(n, newDirectCall)
+//                    val newDirectCall = CfgCommandNode(CfgNode.nextId(), n.pred, n.succ, DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head)).head, indirectCall.condition, indirectCall.returnTarget))
+//                    newBuffer += newDirectCall
+//                    fixEdges(n, newDirectCall)
+                    interproceduralProgramCfg.nodeToBlock.get(n) match
+                      case Some(block) =>
+                        block.jumps = block.jumps.filter(!_.equals(indirectCall))
+                        block.jumps = block.jumps ++ Set(DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head)).head, indirectCall.condition, indirectCall.returnTarget))
+                      case _ => throw new Exception("Node not found in nodeToBlock map")
                   case _ =>
                     var lastAdded: Option[CfgCommandNode] = Option.empty[CfgCommandNode]
                     functionNames.foreach(
                       name => {
-                        val newDirectCall = CfgCommandNode(CfgNode.nextId(), n.pred, n.succ, DirectCall(IRProgram.procedures.filter(_.name.equals(name)).head, indirectCall.condition, indirectCall.returnTarget))
-                        newBuffer += newDirectCall
-                        fixEdges(n, newDirectCall)
-                        lastAdded match
-                          case Some(last) =>
-                            last.succ.add(newDirectCall)
-                            newDirectCall.pred.add(last)
-                          case None => ()
-                        lastAdded = Some(newDirectCall)
+                        interproceduralProgramCfg.nodeToBlock.get(n) match
+                          case Some(block) =>
+                            block.jumps = block.jumps.filter(!_.equals(indirectCall))
+                            block.jumps = block.jumps ++ Set(DirectCall(IRProgram.procedures.filter(_.name.equals(name)).head, indirectCall.condition, indirectCall.returnTarget))
+                          case _ => throw new Exception("Node not found in nodeToBlock map")
                       }
                     )
-            case _ => newBuffer += n
-        case _ => newBuffer += n
-    }
-
-    def fixEdges(oldNode: CfgNode, newNode: CfgNode): Unit = {
-        oldNode.pred.foreach(
-            pred => {
-              pred.succ.add(newNode)
-              pred.succ.remove(oldNode)
-            }
-        )
+            case _ =>
+        case _ =>
     }
 
     def nameExists(name: String): Boolean = {
@@ -269,8 +255,7 @@ object RunUtils {
       functionNames
     }
 
-    interproceduralProgramCfg.entries = newBuffer
-    interproceduralProgramCfg
+    IRProgram
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {
