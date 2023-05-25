@@ -182,15 +182,6 @@ object RunUtils {
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot({ x => x.toString}, Output.dotIder), "resolvedCFG")
   }
 
-//  def CFGtoProgram(cfg: InterproceduralProgramCfg, IRProgram: Program): Program = {
-//    val newProcedures: ListBuffer[Procedure] = ArrayBuffer[Procedure]()
-//
-//
-//
-//
-//    Program(IRProgram.procedures, IRProgram.initialMemory)
-//  }
-
   def resolveCFG(interproceduralProgramCfg: InterproceduralProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): Program = {
     interproceduralProgramCfg.entries.foreach(
       n => process(n))
@@ -202,19 +193,14 @@ object RunUtils {
             case indirectCall: IndirectCall =>
                 val valueSet: Map[Expr, Set[Value]] = valueSets(n)
                 val functionNames = resolveAddresses(valueSet(indirectCall.target))
-                //TODO: if this does not work, it means function names should be "l"+name
                 functionNames.size match
                   case 1 =>
-//                    val newDirectCall = CfgCommandNode(CfgNode.nextId(), n.pred, n.succ, DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head)).head, indirectCall.condition, indirectCall.returnTarget))
-//                    newBuffer += newDirectCall
-//                    fixEdges(n, newDirectCall)
                     interproceduralProgramCfg.nodeToBlock.get(n) match
                       case Some(block) =>
                         block.jumps = block.jumps.filter(!_.equals(indirectCall))
                         block.jumps = block.jumps ++ Set(DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head)).head, indirectCall.condition, indirectCall.returnTarget))
                       case _ => throw new Exception("Node not found in nodeToBlock map")
                   case _ =>
-                    var lastAdded: Option[CfgCommandNode] = Option.empty[CfgCommandNode]
                     functionNames.foreach(
                       name => {
                         interproceduralProgramCfg.nodeToBlock.get(n) match
