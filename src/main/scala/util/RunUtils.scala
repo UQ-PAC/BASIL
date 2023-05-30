@@ -218,6 +218,10 @@ object RunUtils {
       IRProgram.procedures.exists(_.name.equals(name))
     }
 
+    def addFakeProcedure(name: String): Unit = {
+      IRProgram.procedures = IRProgram.procedures ++ Set(new Procedure(name, -1, ArrayBuffer[Block](), ArrayBuffer[Parameter](), ArrayBuffer[Parameter]()))
+    }
+
     def resolveAddresses(valueSet: Set[Value]): Set[String] = {
       var functionNames: Set[String] = Set()
       valueSet.foreach {
@@ -226,6 +230,8 @@ object RunUtils {
              functionNames += globalAddress.name
              print(s"Global address ${globalAddress.name} resolved.\n")
            } else {
+             addFakeProcedure(globalAddress.name)
+             functionNames += globalAddress.name
              print(s"Global address ${globalAddress.name} does not exist in the program.\n")
            }
 
@@ -234,6 +240,8 @@ object RunUtils {
             functionNames += localAddress.name
             print(s"Local address ${localAddress.name} resolved.\n")
           } else {
+            addFakeProcedure(localAddress.name)
+            functionNames += localAddress.name
             print(s"Local address ${localAddress.name} does not exist in the program.\n")
           }
         case _ =>

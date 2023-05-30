@@ -51,13 +51,13 @@ class MemoryModelMap {
       // and add it to the mapping
       val stackRgns = memoryRegions(exitNode).asInstanceOf[Set[Any]].filter(_.isInstanceOf[StackRegion]).map(_.asInstanceOf[StackRegion]).toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
       val dataRgns = memoryRegions(exitNode).asInstanceOf[Set[Any]].filter(_.isInstanceOf[DataRegion]).map(_.asInstanceOf[DataRegion]).toList
+      val heapRgns = memoryRegions(exitNode).asInstanceOf[Set[Any]].filter(_.isInstanceOf[HeapRegion]).map(_.asInstanceOf[HeapRegion]).toList
+      val accessRgns = memoryRegions(exitNode).asInstanceOf[Set[Any]].filter(_.isInstanceOf[RegionAccess]).map(_.asInstanceOf[RegionAccess]).toList
       // map internalFunctions name, value to DataRegion(name, value) and then sort by value
       val internalFunctionRgns = internalFunctions.map(f => DataRegion(f.name, BitVecLiteral(f.offset, -1))).toList // assume -1 because we don't know
 
       // add internalFunctionRgn to dataRgns and sort by value
       val allDataRgns = (dataRgns ++ internalFunctionRgns).sortBy(_.start.asInstanceOf[BitVecLiteral].value)
-
-      print(s"allDataRgns: $allDataRgns")
 
 
       allStacks(exitNode.asInstanceOf[CfgFunctionExitNode].data.name) = stackRgns

@@ -264,7 +264,6 @@ trait ValueSetAnalysisMisc:
                   val evaluatedResults = evaluateExpression(memAssign.rhs.value, n)
                   evaluatedResults match
                     case bitVecLiteral: BitVecLiteral =>
-                      print(s"Found a bit vector literal ${bitVecLiteral}\n")
                       if (is_internalFunction(bitVecLiteral.value)) {
                         regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LocalAddress(bitVecLiteral, getName_internalFunction(bitVecLiteral.value)))
                       } else if (is_global(bitVecLiteral.value)) {

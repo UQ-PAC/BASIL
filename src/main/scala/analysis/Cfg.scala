@@ -218,6 +218,7 @@ object Cfg:
     cfg.addNode(functionExitNode)
     funcEntryExit.addOne(func -> (functionEntryNode, functionExitNode))
     val processedBlocks: mutable.Set[String] = mutable.Set[String]()
+    val otherLatestAdded: mutable.Set[CfgNode] = mutable.Set.empty // used if multiple DirectCalls need to join at the same node
 
     def visitBlocks(blocks: Map[String, CfgBlockEntryNode]): Unit = {
       val newBlocks: Map[String, mutable.ArrayBuffer[CfgNode]] = transformBlocks(blocks)
@@ -235,11 +236,15 @@ object Cfg:
           if (!(stmtNode.pred.nonEmpty && stmtNode == statementNodes.head)) {
             cfg.addNode(stmtNode)
             cfg.addEdge(nodePool.getLatestAdded, stmtNode)
+            if (otherLatestAdded.nonEmpty) {
+              otherLatestAdded.foreach(otherLatestAddedNode => cfg.addEdge(otherLatestAddedNode, stmtNode))
+              otherLatestAdded.clear()
+            }
           }
           nodePool.setLatestAdded(stmtNode)
         )
         val lastAdded: CfgNode = nodePool.getLatestAdded
-
+        otherLatestAdded.clear()
         if (interProc) {
           blocks(blockName).data.jumps.foreach {
             case g: GoTo =>
@@ -252,6 +257,7 @@ object Cfg:
                 visitBlock(g.target.label)
               }
             case d: DirectCall =>
+              val originalLastAdded = lastAdded
               val call = nodePool.get(d)
               cfg.addNode(call)
               cfg.addEdge(lastAdded, call)
@@ -260,7 +266,11 @@ object Cfg:
               cfg.addEdge(call, funcEntryExit(d.target)._1)
               //nodePool.setLatestAdded(funcEntryExit(d.target)._2)
               if (d.returnTarget.isDefined) {
-                visitBlock(d.returnTarget.get.label)
+                if (processedBlocks.contains(d.returnTarget.get.label)) {
+                  otherLatestAdded.add(nodePool.getLatestAdded)
+                } else {
+                  visitBlock(d.returnTarget.get.label)
+                }
               }
             case i: IndirectCall =>
               val call = nodePool.get(i)
@@ -268,10 +278,7 @@ object Cfg:
               cfg.addNode(call)
               cfg.addEdge(lastAdded, call)
               nodePool.setLatestAdded(call)
-              //            cfg.addEdge(call, functionExitNode)
               print(s"Indirect call not supported yet ${i}\n")
-
-
               if (i.returnTarget.isDefined) {
                 visitBlock(i.returnTarget.get.label)
               } else {
@@ -295,7 +302,11 @@ object Cfg:
               cfg.addEdge(lastAdded, call)
               nodePool.setLatestAdded(call)
               if (d.returnTarget.isDefined) {
-                visitBlock(d.returnTarget.get.label)
+                if (processedBlocks.contains(d.returnTarget.get.label)) {
+                  otherLatestAdded.add(nodePool.getLatestAdded)
+                } else {
+                  visitBlock(d.returnTarget.get.label)
+                }
               }
             case i: IndirectCall =>
               val call = nodePool.get(i)
@@ -324,6 +335,10 @@ object Cfg:
       visitBlocks(blocks)
     }
     cfg.addEdge(nodePool.getLatestAdded, functionExitNode)
+    if (otherLatestAdded.nonEmpty) {
+      otherLatestAdded.foreach(otherLatestAddedNode => cfg.addEdge(otherLatestAddedNode, functionExitNode))
+      otherLatestAdded.clear()
+    }
     nodePool.setLatestAdded(functionExitNode)
     cfg
   }
