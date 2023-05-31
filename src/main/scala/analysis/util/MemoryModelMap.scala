@@ -26,20 +26,35 @@ class MemoryModelMap {
     regionType match {
       case s: StackRegion =>
         val stackMap = rangeMap.stackMap
+        if (stackMap.contains(RangeKey(offset, MAX_BIGINT))) {
+          println(s"StackMap contains ${stackMap(RangeKey(offset, MAX_BIGINT))} regions but trying to add ${regionType}")
+          if (stackMap(RangeKey(offset, MAX_BIGINT)) != regionType) {
+            throw new Exception(s"StackMap region conflict at ${offset}")
+          }
+          return
+        }
         if (stackMap.isEmpty) {
           stackMap(RangeKey(offset, MAX_BIGINT)) = regionType
         } else {
           stackMap.keys.maxBy(_.end).end = offset - 1
           stackMap(RangeKey(offset, MAX_BIGINT)) = regionType
         }
-      case d: DataRegion =>
+      case d: DataRegion => {
         val dataMap = rangeMap.dataMap
+        if (dataMap.contains(RangeKey(offset, MAX_BIGINT))) {
+          println(s"DataMap contains ${dataMap(RangeKey(offset, MAX_BIGINT))} regions but trying to add ${regionType}")
+          if (dataMap(RangeKey(offset, MAX_BIGINT)) != regionType) {
+            throw new Exception(s"DataMap region conflict at ${offset}")
+          }
+          return
+        }
         if (dataMap.isEmpty) {
           dataMap(RangeKey(offset, MAX_BIGINT)) = regionType
         } else {
           dataMap.keys.maxBy(_.end).end = offset - 1
           dataMap(RangeKey(offset, MAX_BIGINT)) = regionType
         }
+      }
     }
   }
 
@@ -62,9 +77,9 @@ class MemoryModelMap {
 
       allStacks(exitNode.asInstanceOf[CfgFunctionExitNode].data.name) = stackRgns
 
-      for (stackRgn <- stackRgns) {
-        add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
-      }
+//      for (stackRgn <- stackRgns) {
+//        add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
+//      }
 
       for (dataRgn <- allDataRgns) {
         add(dataRgn.start.asInstanceOf[BitVecLiteral].value, dataRgn)

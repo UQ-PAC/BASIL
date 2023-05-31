@@ -278,7 +278,7 @@ object Cfg:
               cfg.addNode(call)
               cfg.addEdge(lastAdded, call)
               nodePool.setLatestAdded(call)
-              print(s"Indirect call not supported yet ${i}\n")
+              print(s"Indirect call not supported yet ${i} ${func.name}\n")
               if (i.returnTarget.isDefined) {
                 visitBlock(i.returnTarget.get.label)
               } else {
