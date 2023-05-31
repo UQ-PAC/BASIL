@@ -198,15 +198,19 @@ object RunUtils {
                     interproceduralProgramCfg.nodeToBlock.get(n) match
                       case Some(block) =>
                         block.jumps = block.jumps.filter(!_.equals(indirectCall))
-                        block.jumps = block.jumps ++ Set(DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head)).head, indirectCall.condition, indirectCall.returnTarget))
+                        block.jumps = block.jumps ++ Set(DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head._name)).head, indirectCall.condition, indirectCall.returnTarget))
                       case _ => throw new Exception("Node not found in nodeToBlock map")
                   case _ =>
                     functionNames.foreach(
-                      name => {
+                      addressValue => {
                         interproceduralProgramCfg.nodeToBlock.get(n) match
                           case Some(block) =>
                             block.jumps = block.jumps.filter(!_.equals(indirectCall))
-                            block.jumps = block.jumps ++ Set(DirectCall(IRProgram.procedures.filter(_.name.equals(name)).head, indirectCall.condition, indirectCall.returnTarget))
+                            if (indirectCall.condition.isDefined) {
+                              block.jumps = block.jumps ++ Set(DirectCall(IRProgram.procedures.filter(_.name.equals(addressValue._name)).head, Option(BinaryExpr(BVAND, indirectCall.condition.get, BinaryExpr(BVEQ, indirectCall.target, addressValue._expr))), indirectCall.returnTarget))
+                            } else {
+                              block.jumps = block.jumps ++ Set(DirectCall(IRProgram.procedures.filter(_.name.equals(addressValue._name)).head, Option(BinaryExpr(BVEQ, indirectCall.target, addressValue._expr)), indirectCall.returnTarget))
+                            }
                           case _ => throw new Exception("Node not found in nodeToBlock map")
                       }
                     )
@@ -222,26 +226,26 @@ object RunUtils {
       IRProgram.procedures = IRProgram.procedures ++ Set(new Procedure(name, -1, ArrayBuffer[Block](), ArrayBuffer[Parameter](), ArrayBuffer[Parameter]()))
     }
 
-    def resolveAddresses(valueSet: Set[Value]): Set[String] = {
-      var functionNames: Set[String] = Set()
+    def resolveAddresses(valueSet: Set[Value]): Set[AddressValue] = {
+      var functionNames: Set[AddressValue] = Set()
       valueSet.foreach {
         case globalAddress: GlobalAddress =>
            if (nameExists(globalAddress.name)) {
-             functionNames += globalAddress.name
+             functionNames += globalAddress
              print(s"Global address ${globalAddress.name} resolved.\n")
            } else {
              addFakeProcedure(globalAddress.name)
-             functionNames += globalAddress.name
+             functionNames += globalAddress
              print(s"Global address ${globalAddress.name} does not exist in the program.\n")
            }
 
         case localAddress: LocalAddress =>
           if (nameExists(localAddress.name)) {
-            functionNames += localAddress.name
+            functionNames += localAddress
             print(s"Local address ${localAddress.name} resolved.\n")
           } else {
             addFakeProcedure(localAddress.name)
-            functionNames += localAddress.name
+            functionNames += localAddress
             print(s"Local address ${localAddress.name} does not exist in the program.\n")
           }
         case _ =>

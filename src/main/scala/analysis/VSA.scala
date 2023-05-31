@@ -13,16 +13,16 @@ import scala.collection.immutable
 /** ValueSets are PowerSet of possible values */
 
 abstract class Value
-class AddressValue(expr: Expr) extends Value:
+class AddressValue(var _expr: Expr, var _name: String) extends Value:
   override def toString: String = {
     val sb = new StringBuilder
     sb.append("Address(")
-    sb.append(expr)
+    sb.append(_expr)
     sb.append(")")
     sb.toString()
   }
 
-case class GlobalAddress(expr: Expr, name: String) extends AddressValue(expr):
+case class GlobalAddress(expr: Expr, name: String) extends AddressValue(expr, name):
   override def toString: String = {
     val sb = new StringBuilder
     sb.append("GlobalAddress(")
@@ -30,7 +30,7 @@ case class GlobalAddress(expr: Expr, name: String) extends AddressValue(expr):
     sb.append(")")
     sb.toString()
   }
-case class LocalAddress(expr: Expr, name: String) extends AddressValue(expr):
+case class LocalAddress(expr: Expr, name: String) extends AddressValue(expr, name):
   override def toString: String = {
     val sb = new StringBuilder
     sb.append("LocalAddress(")
