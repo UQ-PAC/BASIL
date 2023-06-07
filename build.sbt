@@ -23,3 +23,35 @@ lazy val root = project
     libraryDependencies += scalactic,
     libraryDependencies += scalaTests
   )
+
+lazy val updateExpected = taskKey[Unit]("updates .expected for test cases")
+
+updateExpected := {
+  val correctPath = baseDirectory.value / "src" / "test" / "correct"
+  val incorrectPath = baseDirectory.value / "src" / "test" / "incorrect"
+
+  def expectedUpdate(path: File, shouldVerify: Boolean): Unit = {
+    val log = streams.value.log
+    val examples = (path * "*") filter { _.isDirectory }
+    for (e <- examples.get()) {
+      val variations = (e * "*") filter { _.isDirectory }
+      for (v <- variations.get()) {
+        val name = e.getName
+        val outPath = v / (name + ".bpl")
+        val expectedPath = v / (name + ".expected")
+        val resultPath = v / (name + "_result.txt")
+        if (resultPath.exists()) {
+          val result = IO.read(resultPath)
+          val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
+          if (verified == shouldVerify && outPath.exists()) {
+            IO.copyFile(outPath, expectedPath)
+          }
+        }
+      }
+    }
+  }
+
+  expectedUpdate(correctPath, true)
+  expectedUpdate(incorrectPath, false)
+}
+
