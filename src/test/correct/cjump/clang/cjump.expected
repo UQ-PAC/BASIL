@@ -166,6 +166,6 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
     main_result, Gamma_main_result := R0[32:0], Gamma_R0;
     FP_out, Gamma_FP_out := R29, Gamma_R29;
     LR_out, Gamma_LR_out := R30, Gamma_R30;
-    SP_out, Gamma_SP_out := R31, Gamma_R31; fgdfg
+    SP_out, Gamma_SP_out := R31, Gamma_R31;
     return;
 }

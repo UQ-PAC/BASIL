@@ -1,7 +1,6 @@
 import org.scalatest.funsuite.AnyFunSuite
 
 import java.io.{BufferedWriter, File, FileWriter}
-import java.nio.file.{Files, Path}
 import scala.io.Source
 import scala.sys.process._
 
@@ -49,16 +48,41 @@ class SystemTests extends AnyFunSuite {
     log(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
     val failureMsg = if shouldVerify then "Expected verification success, but got failure."
-        else "Expected verification failure, but got success."
+    else "Expected verification failure, but got success."
     if (verified != shouldVerify) fail(failureMsg)
     // finally check that the actual output boogie file matches the expected output boogie file
 
     val expectedOutPath = variationPath + ".expected"
     if (File(expectedOutPath).exists) {
-      if (Files.mismatch(Path.of(expectedOutPath), Path.of(outPath)) != -1) {
+      if (!compareFiles(expectedOutPath, outPath)) {
         info("Warning: Boogie file differs from expected")
       }
     }
+  }
+
+  def compareFiles(path1: String, path2: String): Boolean = {
+    val source1 = Source.fromFile(path1)
+    val source2 = Source.fromFile(path2)
+    val lines1 = source1.getLines
+    val lines2 = source2.getLines
+    while (lines1.hasNext && lines2.hasNext) {
+      val line1 = lines1.next()
+      val line2 = lines2.next()
+      if (line1 != line2) {
+        source1.close
+        source2.close
+        return false
+      }
+    }
+    if (lines1.hasNext || lines2.hasNext) {
+      source1.close
+      source2.close
+      return false
+    }
+
+    source1.close
+    source2.close
+    true
   }
 
   /**
