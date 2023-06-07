@@ -1,7 +1,8 @@
 import org.scalatest.funsuite.AnyFunSuite
-import java.io.File
+
+import java.io.{BufferedWriter, File, FileWriter}
+import java.nio.file.{Files, Path}
 import scala.io.Source
-import scala.collection.mutable.ArrayBuffer
 import scala.sys.process._
 
 /**
@@ -9,44 +10,54 @@ import scala.sys.process._
   * Refer to the existing tests for the expected directory structure and file-name patterns.
   */
 class SystemTests extends AnyFunSuite {
-  // get test-program directories
-  val correctProgramsDir = "./src/test/correct_programs"
-  val correctPrograms = getSubdirectories(correctProgramsDir)
-  val incorrectProgramsDir = "./src/test/incorrect_programs"
-  val incorrectPrograms = getSubdirectories(incorrectProgramsDir)
-  // create a test for each test-program directory
-  correctPrograms.foreach(t => test(t) {
-    test(correctProgramsDir, t, true)
-  })
-  incorrectPrograms.foreach(t => test(t) {
-    test(incorrectProgramsDir, t, false)
-  })
+  val correctPath = "./src/test/correct"
+  val correctPrograms: Array[String] = getSubdirectories(correctPath)
+  val incorrectPath = "./src/test/incorrect"
+  val incorrectPrograms: Array[String] = getSubdirectories(incorrectPath)
 
-  def test(programsDir: String, test: String, expectedCorrect: Boolean) = {
-    // expected pathnames given the standardised structure of test directories
-    val stdPath = "%s/%s/%s".format(programsDir, test, test)
-    // the tool's output boogie file
-    val actualOutPath = stdPath + "_actual_out.bpl"
-    // the expected output boogie file
-    val expectedOutPath = stdPath + "_expected_out.bpl"
-    // run the tool and write the output boogie file to the test directory
-    main(stdPath + ".adt", stdPath + ".relf", stdPath + ".spec", actualOutPath)
-    // check that the success/failure of the verification matches expectation
-    // creates an xml file which may take a while to display
-    // in future, we may want to automatically analyse this file
-    val xmlArg = "/xml:" + stdPath + "_boogie_result.xml"
-    // verify the output boogie file
-    // executes "boogie /printVerifiedProceduresCount:0 /xml:<xml path>, <actual out path>"
-    val boogieResult = Seq("boogie", "/printVerifiedProceduresCount:0", xmlArg, actualOutPath).!!
-    // for now, verification is checked by string-matching the success message
+  // get all variations of each program
+  for (p <- correctPrograms) {
+    val path = correctPath + "/" + p
+    val variations = getSubdirectories(path)
+    variations.foreach(t => test(p + "/" + t) {
+      runTest(correctPath, p, t, true)
+    })
+  }
+
+  for (p <- incorrectPrograms) {
+    val path = incorrectPath + "/" + p
+    val variations = getSubdirectories(path)
+    variations.foreach(t => test(p + "/" + t) {
+      runTest(incorrectPath, p, t, false)
+    })
+  }
+
+  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean): Unit = {
+    val directoryPath = path + "/" + name + "/"
+    val variationPath = directoryPath + variation + "/" + name
+    val specPath = directoryPath + name + ".spec"
+    val outPath = variationPath + ".bpl"
+    val ADTPath = variationPath + ".adt"
+    val RELFPath = variationPath + ".relf"
+    if (File(specPath).exists) {
+      main(ADTPath, RELFPath, specPath, outPath)
+    } else {
+      main(ADTPath, RELFPath, outPath)
+    }
+    val boogieResult = Seq("boogie", "/printVerifiedProceduresCount:0", outPath).!!
+    val resultPath = variationPath + "_result.txt"
+    log(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
-    val failureMsg = if expectedCorrect then "Expected verification success, but got failure."
+    val failureMsg = if shouldVerify then "Expected verification success, but got failure."
         else "Expected verification failure, but got success."
-    if (verified != expectedCorrect) fail(failureMsg)
+    if (verified != shouldVerify) fail(failureMsg)
     // finally check that the actual output boogie file matches the expected output boogie file
-    if (!Source.fromFile(actualOutPath).getLines.mkString.equals(
-      Source.fromFile(expectedOutPath).getLines().mkString)) {
-      info("Warning: Boogie file differs from expected")
+
+    val expectedOutPath = variationPath + ".expected"
+    if (File(expectedOutPath).exists) {
+      if (Files.mismatch(Path.of(expectedOutPath), Path.of(outPath)) != -1) {
+        info("Warning: Boogie file differs from expected")
+      }
     }
   }
 
@@ -55,9 +66,13 @@ class SystemTests extends AnyFunSuite {
     * @return the names all subdirectories of the given parent directory
     */
   def getSubdirectories(directoryName: String): Array[String] = {
-    (new File(directoryName))
-      .listFiles
-      .filter(_.isDirectory)
-      .map(_.getName)
+    File(directoryName).listFiles.filter(_.isDirectory).map(_.getName)
+  }
+
+  def log(text: String, path: String): Unit = {
+    val writer = BufferedWriter(FileWriter(path, false))
+    writer.write(text)
+    writer.flush()
+    writer.close()
   }
 }
