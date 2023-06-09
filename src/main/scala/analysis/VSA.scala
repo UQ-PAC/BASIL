@@ -1,6 +1,6 @@
 package analysis
 
-import ir.{DirectCall, *}
+import ir.{DirectCall, UnaryExpr, *}
 import analysis.solvers.*
 import boogie.BExpr
 import specification.{InternalFunction, SpecGlobal}
@@ -118,9 +118,9 @@ trait ValueSetAnalysisMisc:
               } else {
                 decls.addAll(findDecl(variable, pred))
               }
-            case _ =>
+            case _ => decls.addAll(findDecl(variable, pred))
           }
-        case _ =>
+        case _ => decls.addAll(findDecl(variable, pred))
       }
     }
     decls
@@ -201,7 +201,7 @@ trait ValueSetAnalysisMisc:
                 case _ =>
                   print("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(variable, pred) + " FOR " + binOp + "\n")
             }
-          case _ => return exp
+          case _ => return evaluateExpression(binOp.arg1, n)
         }
         exp
       case memLoad: MemoryLoad =>
@@ -212,11 +212,22 @@ trait ValueSetAnalysisMisc:
         evaluateExpression(extend.body, n)
       case variable: Variable =>
         loopEscapeSet.clear()
+        val ssss = findDecl(variable, n)
+        loopEscapeSet.clear()
         for (pred <- findDecl(variable, n)) {
-          assigmentsMap(variable, pred) match
-            case bitVecLiteral: BitVecLiteral =>
-              return bitVecLiteral
-            case any: Expr => return evaluateExpression(any, n)
+          if (!assigmentsMap.contains((variable, pred))) {
+            pred match
+              case cmd: CfgCommandNode =>
+                cmd.data match
+                  case localAssign: LocalAssign =>
+                    assigmentsMap.addOne((localAssign.lhs, pred) -> evaluateExpression(localAssign.rhs, pred))
+                    return evaluateExpression(localAssign.rhs, pred)
+          } else {
+            assigmentsMap(variable, pred) match
+              case bitVecLiteral: BitVecLiteral =>
+                return bitVecLiteral
+              case any: Expr => return evaluateExpression(any, n)
+          }
         }
         exp
       case extract: Extract =>
@@ -310,7 +321,11 @@ trait ValueSetAnalysisMisc:
           case memLoad: MemoryLoad =>
             memLoad.index match
               case binOp: BinaryExpr =>
+                if (binOp.arg1.isInstanceOf[Variable] && binOp.arg1.asInstanceOf[Variable].name.equals("R21")) {
+                  print("\n")
+                }
                 val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
+                println("lhs: " + binOp.arg1 + " " + lhs)
                 val rhs: Expr = evaluateExpression(binOp.arg2, n)
                 if (!rhs.isInstanceOf[BitVecLiteral]) {
                   println("WARNING: RHS is not BitVecLiteral and is skipped " + rhs + "\n")
@@ -341,6 +356,8 @@ trait ValueSetAnalysisMisc:
                     case _ =>
                 }
               case _ =>
+          case variable: Variable =>
+            return s + (localAssign.lhs -> s.getOrElse(variable, Set.empty))
           case _ =>
         s
       case _ =>

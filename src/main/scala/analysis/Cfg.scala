@@ -223,7 +223,7 @@ object Cfg:
 
     def visitBlocks(blocks: Map[String, CfgBlockEntryNode]): Unit = {
       val newBlocks: Map[String, mutable.ArrayBuffer[CfgNode]] = transformBlocks(blocks)
-      visitBlock("l" + func.name)
+      visitBlock("l" + func.name.stripPrefix("#"))
 
       def visitBlock(blockName: String): Unit = {
         if (!processedBlocks.contains(blockName)) {
@@ -292,11 +292,16 @@ object Cfg:
               cfg.addNode(call)
               cfg.addEdge(lastAdded, call)
               nodePool.setLatestAdded(call)
-              print(s"Indirect call not supported yet ${i} ${func.name}\n")
-              if (i.returnTarget.isDefined) {
-                visitBlock(i.returnTarget.get.label)
-              } else {
+              //print(s"Indirect call not supported yet ${i} ${func.name}\n")
+//              if (i.returnTarget.isDefined) {
+//                visitBlock(i.returnTarget.get.label)
+//              } else {
+//                cfg.addEdge(nodePool.getLatestAdded, functionExitNode)
+//              }
+              if (i.target.name.equals("R30") && i.returnTarget.isEmpty) {
                 cfg.addEdge(nodePool.getLatestAdded, functionExitNode)
+              } else {
+                print(s"Cannot reach here ${i} ${func.name}\n")
               }
           }
         } else {

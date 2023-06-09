@@ -66,7 +66,7 @@ object ElfLoader {
   }
 
   def visitSymbolTableRow(ctx: SymbolTableRowContext): Option[SpecGlobal] = {
-    if ((ctx.entrytype.getText == "OBJECT" || ctx.entrytype.getText == "FUNC") && ctx.bind.getText == "GLOBAL") { // TODO: check if this is correct
+    if ((ctx.entrytype.getText == "OBJECT" || ctx.entrytype.getText == "FUNC") && (ctx.bind.getText == "GLOBAL" || ctx.bind.getText == "LOCAL")) { // TODO: check if this is correct
       val name = ctx.name.getText
       if (name.forall(allowedChars.contains)) {
         Some(SpecGlobal(name, ctx.size.getText.toInt * 8, hexToBigInt(ctx.value.getText)))
