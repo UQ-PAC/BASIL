@@ -49,18 +49,21 @@ object RunUtils {
       globals_ToUSE = globals
       globalsOffsets_ToUSE = globalOffsets
       internalFunctions_ToUSE = internalFunctions
+      internalFunctions_ToUSE = internalFunctions ++ externalFunctions.map(e => InternalFunction(e.name, e.offset))
       print("\nInternal: \n")
       print(internalFunctions)
       print("\nGlobals: \n")
       print(globals)
       print("\nGlobal Offsets: \n")
       print(globalOffsets)
+      print("\nExternal: \n")
+      print(externalFunctions)
     }
 
     //println(globalOffsets)
     //val procmap = program.subroutines.map(s => (s.name, s.address)).toMap
     //println(procmap)
-    //println(externalFunctions)
+    println(externalFunctions)
     //println(globals)
     /*
     TODO analyses/transformations

@@ -239,7 +239,13 @@ trait ValueSetAnalysisMisc:
               return Some(obj)
             case _ =>
               return None
-        }
+        } else {
+            mmm.findObject(lhs.asInstanceOf[BitVecLiteral].value, "data") match
+                case Some(obj: MemoryRegion) =>
+                  return Some(obj)
+                case _ =>
+                return None
+            }
         None
       case _ =>
         None
@@ -258,6 +264,10 @@ trait ValueSetAnalysisMisc:
           case binOp: BinaryExpr =>
             val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
             val rhs: Expr = evaluateExpression(binOp.arg2, n)
+            if (!rhs.isInstanceOf[BitVecLiteral]) {
+              println("WARNING: RHS is not BitVecLiteral and is skipped " + rhs + "\n")
+              return s
+            }
             if (lhs.equals(stackPointer)) {
               mmm.findObject(rhs.asInstanceOf[BitVecLiteral].value, "stack") match
                 case Some(obj: MemoryRegion) =>
@@ -272,18 +282,26 @@ trait ValueSetAnalysisMisc:
                       else {
                         regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LiteralValue(bitVecLiteral))
                       }
-                    case _ =>
-//                      val region = exprToRegion(evaluatedResults, n)
-//                      region match {
-//                        case Some(obj: MemoryRegion) =>
-//                          regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).addAll(regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]))
-//                        case _ =>
-//                          throw new RuntimeException("Not a value type: " + evaluatedResults + "\n")
-//                      }
-                        return s
+                    case _ => return s
                 case _ =>
-            } else {
+            } else if (lhs.isInstanceOf[BitVecLiteral]) {
               // should do something here
+              val summation = lhs.asInstanceOf[BitVecLiteral].value + rhs.asInstanceOf[BitVecLiteral].value
+              mmm.findObject(summation, "data") match
+                case Some(obj: MemoryRegion) =>
+                  val evaluatedResults = evaluateExpression(memAssign.rhs.value, n)
+                  evaluatedResults match
+                    case bitVecLiteral: BitVecLiteral =>
+                      if (is_internalFunction(bitVecLiteral.value)) {
+                        regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LocalAddress(bitVecLiteral, getName_internalFunction(bitVecLiteral.value)))
+                      } else if (is_global(bitVecLiteral.value)) {
+                        regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(GlobalAddress(bitVecLiteral, getName_global(bitVecLiteral.value)))
+                      }
+                      else {
+                        regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).add(LiteralValue(bitVecLiteral))
+                      }
+                    case _ => return s
+                case _ =>
             }
           case _ =>
           s
@@ -294,6 +312,10 @@ trait ValueSetAnalysisMisc:
               case binOp: BinaryExpr =>
                 val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
                 val rhs: Expr = evaluateExpression(binOp.arg2, n)
+                if (!rhs.isInstanceOf[BitVecLiteral]) {
+                  println("WARNING: RHS is not BitVecLiteral and is skipped " + rhs + "\n")
+                  return s
+                }
                 if (lhs.equals(stackPointer)) {
                   mmm.findObject(rhs.asInstanceOf[BitVecLiteral].value, "stack") match
                     case Some(obj: MemoryRegion) =>

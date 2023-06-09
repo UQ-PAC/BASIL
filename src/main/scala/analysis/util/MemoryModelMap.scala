@@ -26,35 +26,34 @@ class MemoryModelMap {
     regionType match {
       case s: StackRegion =>
         val stackMap = rangeMap.stackMap
-        if (stackMap.contains(RangeKey(offset, MAX_BIGINT))) {
-          println(s"StackMap contains ${stackMap(RangeKey(offset, MAX_BIGINT))} regions but trying to add ${regionType}")
-          if (stackMap(RangeKey(offset, MAX_BIGINT)) != regionType) {
-            throw new Exception(s"StackMap region conflict at ${offset}")
-          }
-          return
-        }
-        if (stackMap.isEmpty) {
-          stackMap(RangeKey(offset, MAX_BIGINT)) = regionType
+        if (stackMap.values.exists(_ == regionType)) {
+          println(s"StackMap contains ${stackMap.values.find(_ == regionType)} regions but trying to add ${regionType}")
         } else {
-          stackMap.keys.maxBy(_.end).end = offset - 1
-          stackMap(RangeKey(offset, MAX_BIGINT)) = regionType
+          if (stackMap.isEmpty) {
+            stackMap(RangeKey(offset, MAX_BIGINT)) = regionType
+          } else {
+            stackMap.keys.maxBy(_.end).end = offset - 1
+            stackMap(RangeKey(offset, MAX_BIGINT)) = regionType
+          }
         }
-      case d: DataRegion => {
+      case d: DataRegion =>
         val dataMap = rangeMap.dataMap
-        if (dataMap.contains(RangeKey(offset, MAX_BIGINT))) {
-          println(s"DataMap contains ${dataMap(RangeKey(offset, MAX_BIGINT))} regions but trying to add ${regionType}")
-          if (dataMap(RangeKey(offset, MAX_BIGINT)) != regionType) {
-            throw new Exception(s"DataMap region conflict at ${offset}")
-          }
-          return
-        }
-        if (dataMap.isEmpty) {
-          dataMap(RangeKey(offset, MAX_BIGINT)) = regionType
+        if (dataMap.values.exists(_ == regionType)) {
+//          if (!offset.equals(dataMap.foreach(k => if (k._2 == regionType) k._1.start else offset))) {
+//            println(s"DataMap contains ${dataMap.foreach(k => if (k._2 == regionType) k._1.start)} regions but trying to add ${regionType}")
+//            throw new Exception(s"DataMap region conflict at ${offset} and ${dataMap.foreach(k => if (k._2 == regionType) k._1.start else offset)}")
+//          }
+
+          println(s"Offset ${offset} is already in dataMap")
+
         } else {
-          dataMap.keys.maxBy(_.end).end = offset - 1
-          dataMap(RangeKey(offset, MAX_BIGINT)) = regionType
+          if (dataMap.isEmpty) {
+            dataMap(RangeKey(offset, MAX_BIGINT)) = regionType
+          } else {
+            dataMap.keys.maxBy(_.end).end = offset - 1
+            dataMap(RangeKey(offset, MAX_BIGINT)) = regionType
+          }
         }
-      }
     }
   }
 

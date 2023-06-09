@@ -185,6 +185,7 @@ object Cfg:
   private var nodePool = NodePool()
   private val funcEntryExit: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]()
   private var interProc: Boolean = false
+  private var functionCloningLimit: Int = 0
 
   /** Generate the cfg for each function of the program.
    */
@@ -245,6 +246,7 @@ object Cfg:
         )
         val lastAdded: CfgNode = nodePool.getLatestAdded
         otherLatestAdded.clear()
+        val clonedFunctions: mutable.Set[String] = mutable.Set[String]()
         if (interProc) {
           blocks(blockName).data.jumps.foreach {
             case g: GoTo =>
@@ -258,12 +260,22 @@ object Cfg:
               }
             case d: DirectCall =>
               val originalLastAdded = lastAdded
-              val call = nodePool.get(d)
-              cfg.addNode(call)
-              cfg.addEdge(lastAdded, call)
-              nodePool.setLatestAdded(call)
-              generateCfgFunc(d.target)
-              cfg.addEdge(call, funcEntryExit(d.target)._1)
+              if (!clonedFunctions.contains(d.target.name)) {
+                clonedFunctions.add(d.target.name)
+                val call = nodePool.get(d)
+                cfg.addNode(call)
+                cfg.addEdge(lastAdded, call)
+                nodePool.setLatestAdded(call)
+                if (functionEntryNode.data.name.equals(d.target.name)) {
+                  cfg.addEdge(call, functionEntryNode)
+                } else {
+                  generateCfgFunc(d.target)
+                  cfg.addEdge(call, funcEntryExit(d.target)._1) // From DirectCall to FunctionEntry of called function
+                }
+              } else {
+                clonedFunctions.remove(d.target.name)
+              }
+
               //nodePool.setLatestAdded(funcEntryExit(d.target)._2)
               if (d.returnTarget.isDefined) {
                 if (processedBlocks.contains(d.returnTarget.get.label)) {
@@ -271,6 +283,8 @@ object Cfg:
                 } else {
                   visitBlock(d.returnTarget.get.label)
                 }
+              } else {
+                otherLatestAdded.add(nodePool.getLatestAdded)
               }
             case i: IndirectCall =>
               val call = nodePool.get(i)
