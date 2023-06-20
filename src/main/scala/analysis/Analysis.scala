@@ -44,25 +44,16 @@ trait ValueAnalysisMisc:
     */
   def eval(exp: Expr, env: statelattice.Element): valuelattice.Element =
     import valuelattice._
-    println(s"Evaluating:        $exp")
-    println("..")
     exp match
-      case id: Variable        => 
-        println(s"!variable:   size ${id.size} of ${id}")
-        val envid = env(id)
-        println(s"!env val:    val  ${envid}")
-        env(id)
-      case n: Literal          => 
-        println(s"!literal:    size ${n}")
-        literal(n)
+      case id: Variable        => env(id)
+      case n: Literal          => literal(n)
       case ze: ZeroExtend => zero_extend(ze.extension, eval(ze.body, env))
       case se: SignExtend => sign_extend(se.extension, eval(se.body, env))
       case e: Extract          => extract(e.end, e.start, eval(e.body, env))
       case bin: BinaryExpr =>
         val left = eval(bin.arg1, env)
         val right = eval(bin.arg2, env)
-
-        bin.op match // These match up with in `lattice.scala:140`
+        bin.op match 
           case BVAND => bvand(left, right)
           case BVOR => bvor(left, right)
           case BVADD => bvadd(left, right)
@@ -89,7 +80,7 @@ trait ValueAnalysisMisc:
           case BVSLE => bvsle(left, right)
           case BVSGT => ???
           case BVSGE => ???
-          case BVEQ => bvneq(left, right)
+          case BVEQ => bveq(left, right)
           case BVNEQ => bvneq(left, right)
           case BVCONCAT => concat(left, right)
 
@@ -110,21 +101,7 @@ trait ValueAnalysisMisc:
         r.data match
           // assignments
           case la: LocalAssign => 
-            println("==")
-            println(s"At this node:    $n")
-            println(s"With this state: $s")
-            //println(s"Predecessors   : ${n.pred.head.pred}")
-
-            println(s"Before eval: ${la.rhs}")
-            println(s"with: $s")
-            val rhs_eval = eval(la.rhs, s)
-            println(s"After eva: ${rhs_eval}")
-            println(s"with: $s")
-            println("++++")
-
-            // s + (la.lhs -> eval(la.rhs, s))
-            s + (la.lhs -> rhs_eval)
-
+            s + (la.lhs -> eval(la.rhs, s))
           // all others: like no-ops
           case _ => s
       case _ => s
@@ -577,7 +554,7 @@ trait MemoryRegionAnalysisMisc:
   def get_global_name(bigInt: BigInt): String = {
       for (global <- globals) {
           if (global.address == bigInt) {
-          return global.name
+            return global.name
           }
       }
       ""

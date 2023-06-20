@@ -85,8 +85,12 @@ def smt_bvxor(s: Literal, t: Literal): BitVecLiteral = (s, t) match
 
 /** [[((_ extract i j) s))]] := λx:[0, i-j+1). [[s]](j + x) where s is of sort (_ BitVec l), 0 ≤ j ≤ i < l.
   */
-def smt_extract(i: Int, j: Int, s: Literal): BitVecLiteral = s match
-  case s: BitVecLiteral => BitVecLiteral((s.value >> j - 1) & (1 << (i - j + 1)) - 1, i - j + 1)
+def smt_extract(hi: Int, lo: Int, s: Literal): BitVecLiteral = s match
+  case s: BitVecLiteral => 
+    println(s"!!EXTRACTING!!: $hi $lo with literal $s")
+    val v = BitVecLiteral((s.value >> lo) & (1 << (hi - lo + 1)) - 1, hi - lo + 1)
+    println(s"Generated val $v")
+    v
   case _ => throw new Exception("cannot apply bitvector operator to non-bitvector")
 
 

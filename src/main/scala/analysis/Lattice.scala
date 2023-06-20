@@ -122,8 +122,6 @@ object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWit
   private def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element = try {
       (a, b) match
         case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => 
-          println(s"Evaluating with $a and $b")
-          
           FlatElement.FlatEl(op(x, y))
         case (FlatElement.Bot, _) => FlatElement.Bot
         case (_, FlatElement.Bot) => FlatElement.Bot
@@ -163,7 +161,8 @@ object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWit
   override def bvsle(a: Element, b: Element): Element = apply(smt_bvsle, a, b)
   override def zero_extend(width: Int, a: Element): Element = apply(smt_zero_extend(width, _: Literal), a)
   override def sign_extend(width: Int, a: Element): Element = apply(smt_sign_extend(width, _: Literal), a)
-  override def extract(high: Int, low: Int, a: Element): Element = apply(smt_extract(high, low, _: Literal), a)
+  /* Boogie has exclusive bounds for extracting, i.e. [lo, hi), but smt-lib expects inclusive bounds, i.e. [lo, hi]*/
+  override def extract(high: Int, low: Int, a: Element): Element = apply(smt_extract(high - 1, low, _: Literal), a)
   override def concat(a: Element, b: Element): Element = apply(smt_concat, a, b)
   override def bvneq(a: Element, b: Element): Element = apply(smt_bvneq, a, b)
   override def bveq(a: Element, b: Element): Element = apply(smt_bveq, a, b)
