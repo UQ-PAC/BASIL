@@ -111,10 +111,7 @@ def smt_bvxnor(s: Literal, t: Literal): BitVecLiteral = (s, t) match
   */
 def smt_extract(hi: Int, lo: Int, s: Literal): BitVecLiteral = s match
   case s: BitVecLiteral => 
-    println(s"!!EXTRACTING!!: $hi $lo with literal $s")
-    val v = BitVecLiteral((s.value >> lo) & (1 << (hi - lo + 1)) - 1, hi - lo + 1)
-    println(s"Generated val $v")
-    v
+    BitVecLiteral((s.value >> lo) & (1 << (hi - lo + 1)) - 1, hi - lo + 1)
   case _ => throw new Exception("cannot apply bitvector operator to non-bitvector")
 
 
