@@ -83,6 +83,30 @@ def smt_bvxor(s: Literal, t: Literal): BitVecLiteral = (s, t) match
     smt_bvor(smt_bvand(s, smt_bvnot(t)), smt_bvand(smt_bvnot(s), t))
   case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
 
+/** (bvnand s t) abbreviates (bvnot (bvand s t))
+  */
+def smt_bvnand(s: Literal, t: Literal): BitVecLiteral = (s, t) match
+  case (s: BitVecLiteral, t: BitVecLiteral) =>
+    require(s.size == t.size, "bitvector sizes must be the same")
+    smt_bvnot(smt_bvand(s, t))
+  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
+
+/** (bvnor s t) abbreviates (bvnot (bvor s t))
+  */
+def smt_bvnor(s: Literal, t: Literal): BitVecLiteral = (s, t) match
+  case (s: BitVecLiteral, t: BitVecLiteral) =>
+    require(s.size == t.size, "bitvector sizes must be the same")
+    smt_bvnot(smt_bvor(s, t))
+  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
+
+/** (bvxnor s t) abbreviates (bvnot (bvxor s t))
+  */
+def smt_bvxnor(s: Literal, t: Literal): BitVecLiteral = (s, t) match
+  case (s: BitVecLiteral, t: BitVecLiteral) =>
+    require(s.size == t.size, "bitvector sizes must be the same")
+    smt_bvnot(smt_bvxor(s, t))
+  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
+
 /** [[((_ extract i j) s))]] := λx:[0, i-j+1). [[s]](j + x) where s is of sort (_ BitVec l), 0 ≤ j ≤ i < l.
   */
 def smt_extract(hi: Int, lo: Int, s: Literal): BitVecLiteral = s match
@@ -116,21 +140,6 @@ def smt_bvneq(s: Literal, t: Literal) = (s, t) match
   case (s: BitVecLiteral, t: BitVecLiteral) => if s != t then TrueLiteral else FalseLiteral
   case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
 
-/** [[smt_bvult s t]] := true iff bv2nat([[s]]) < bv2nat([[t]])
-  */
-def smt_bvult(s: Literal, t: Literal) = (s, t) match
-  case (s: BitVecLiteral, t: BitVecLiteral) =>
-    if bv2nat(s) < bv2nat(t) then TrueLiteral
-    else FalseLiteral
-  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
-
-/** (bvule s t) abbreviates (or (bvult s t) (= s t))
-  */
-def smt_bvule(s: Literal, t: Literal) = (s, t) match
-  case (s: BitVecLiteral, t: BitVecLiteral) =>
-    if bv2nat(s) <= bv2nat(t) then TrueLiteral
-    else FalseLiteral
-  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
 
 /** shift left (equivalent to multiplication by 2^x where x is the value of the second argument)
   */
@@ -190,6 +199,37 @@ def smt_bvsrem(s: Literal, t: Literal) = (s, t) match
     }
   case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
 
+/** [[smt_bvult s t]] := true iff bv2nat([[s]]) < bv2nat([[t]])
+  */
+def smt_bvult(s: Literal, t: Literal) = (s, t) match
+  case (s: BitVecLiteral, t: BitVecLiteral) =>
+    if bv2nat(s) < bv2nat(t) then TrueLiteral
+    else FalseLiteral
+  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
+
+/** (bvule s t) abbreviates (or (bvult s t) (= s t))
+  */
+def smt_bvule(s: Literal, t: Literal) = (s, t) match
+  case (s: BitVecLiteral, t: BitVecLiteral) =>
+    if bv2nat(s) <= bv2nat(t) then TrueLiteral
+    else FalseLiteral
+  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
+
+/** (bvugt s t) abbreviates (bvult t s)
+  */
+def smt_bvugt(s: Literal, t: Literal) = (s, t) match
+  case (s: BitVecLiteral, t: BitVecLiteral) =>
+    smt_bvult(t, s)
+  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
+
+/** (bvuge s t) abbreviates (bvule t s)
+  */
+def smt_bvuge(s: Literal, t: Literal) = (s, t) match
+  case (s: BitVecLiteral, t: BitVecLiteral) =>
+    smt_bvule(t, s)
+  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
+
+
 def smt_bvslt(s: Literal, t: Literal) = (s, t) match
   case (s: BitVecLiteral, t: BitVecLiteral) =>
     val sNeg = isNegative(s)
@@ -210,6 +250,16 @@ def smt_bvsle(s: Literal, t: Literal) = (s, t) match
     } else {
       FalseLiteral
     }
+  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
+
+def smt_bvsgt(s: Literal, t: Literal) = (s, t) match
+  case (s: BitVecLiteral, t: BitVecLiteral) =>
+    smt_bvslt(t, s)
+  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
+
+def smt_bvsge(s: Literal, t: Literal) = (s, t) match
+  case (s: BitVecLiteral, t: BitVecLiteral) =>
+    smt_bvsle(t, s)
   case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
 
 def smt_bvashr(s: Literal, t: Literal) = (s, t) match
