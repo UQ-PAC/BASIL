@@ -1,0 +1,265 @@
+000005f2: program
+000005bb: sub __cxa_finalize(__cxa_finalize_result)
+000005f3: __cxa_finalize_result :: out u32 = low:32[R0]
+
+0000038a:
+000004a2: R16 := 0x11000
+000004a9: R17 := mem[R16 + 8, el]:u64
+000004af: R16 := R16 + 8
+000004b4: call R17 with noreturn
+
+000005bc: sub __do_global_dtors_aux(__do_global_dtors_aux_result)
+000005f4: __do_global_dtors_aux_result :: out u32 = low:32[R0]
+
+00000286:
+0000028a: #3 := R31 - 0x20
+00000290: mem := mem with [#3, el]:u64 <- R29
+00000296: mem := mem with [#3 + 8, el]:u64 <- R30
+0000029a: R31 := #3
+000002a0: R29 := R31
+000002a8: mem := mem with [R31 + 0x10, el]:u64 <- R19
+000002ad: R19 := 0x11000
+000002b4: R0 := pad:64[mem[R19 + 0x40]]
+000002bb: when 31:0[R0] <> 0 goto %000002b9
+000005e8: goto %00000353
+
+00000353:
+00000356: R0 := 0x10000
+0000035d: R0 := mem[R0 + 0xFC8, el]:u64
+00000363: when R0 = 0 goto %00000361
+000005e9: goto %0000037a
+
+0000037a:
+0000037d: R0 := 0x11000
+00000384: R0 := mem[R0 + 0x38, el]:u64
+00000389: R30 := 0x7B0
+0000038c: call @__cxa_finalize with return %00000361
+
+00000361:
+00000369: R30 := 0x7B4
+0000036b: call @deregister_tm_clones with return %0000036d
+
+0000036d:
+00000370: R0 := 1
+00000378: mem := mem with [R19 + 0x40] <- 7:0[R0]
+000005ea: goto %000002b9
+
+000002b9:
+000002c3: R19 := mem[R31 + 0x10, el]:u64
+000002ca: R29 := mem[R31, el]:u64
+000002cf: R30 := mem[R31 + 8, el]:u64
+000002d3: R31 := R31 + 0x20
+000002d8: call R30 with noreturn
+
+000005c0: sub __libc_start_main(__libc_start_main_main, __libc_start_main_arg2, __libc_start_main_arg3, __libc_start_main_auxv, __libc_start_main_result)
+000005f5: __libc_start_main_main :: in u64 = R0
+000005f6: __libc_start_main_arg2 :: in u32 = low:32[R1]
+000005f7: __libc_start_main_arg3 :: in out u64 = R2
+000005f8: __libc_start_main_auxv :: in out u64 = R3
+000005f9: __libc_start_main_result :: out u32 = low:32[R0]
+
+000001df:
+0000048c: R16 := 0x11000
+00000493: R17 := mem[R16, el]:u64
+00000499: R16 := R16
+0000049e: call R17 with noreturn
+
+000005c1: sub _fini(_fini_result)
+000005fa: _fini_result :: out u32 = low:32[R0]
+
+0000001f:
+00000025: #0 := R31 - 0x10
+0000002b: mem := mem with [#0, el]:u64 <- R29
+00000031: mem := mem with [#0 + 8, el]:u64 <- R30
+00000035: R31 := #0
+0000003b: R29 := R31
+00000042: R29 := mem[R31, el]:u64
+00000047: R30 := mem[R31 + 8, el]:u64
+0000004b: R31 := R31 + 0x10
+00000050: call R30 with noreturn
+
+000005c2: sub _init(_init_result)
+000005fb: _init_result :: out u32 = low:32[R0]
+
+00000528:
+0000052e: #7 := R31 - 0x10
+00000534: mem := mem with [#7, el]:u64 <- R29
+0000053a: mem := mem with [#7 + 8, el]:u64 <- R30
+0000053e: R31 := #7
+00000544: R29 := R31
+00000549: R30 := 0x600
+0000054b: call @call_weak_fn with return %0000054d
+
+0000054d:
+00000552: R29 := mem[R31, el]:u64
+00000557: R30 := mem[R31 + 8, el]:u64
+0000055b: R31 := R31 + 0x10
+00000560: call R30 with noreturn
+
+000005c3: sub _start(_start_result)
+000005fc: _start_result :: out u32 = low:32[R0]
+
+000001a0:
+000001a5: R29 := 0
+000001aa: R30 := 0
+000001b0: R5 := R0
+000001b7: R1 := mem[R31, el]:u64
+000001bd: R2 := R31 + 8
+000001c3: R6 := R31
+000001c8: R0 := 0x10000
+000001cf: R0 := mem[R0 + 0xFD8, el]:u64
+000001d4: R3 := 0
+000001d9: R4 := 0
+000001de: R30 := 0x6F0
+000001e1: call @__libc_start_main with return %000001e3
+
+000001e3:
+000001e6: R30 := 0x6F4
+000001e9: call @abort with return %000005eb
+
+000005eb:
+000005ec: call @call_weak_fn with noreturn
+
+000005c6: sub abort()
+
+
+000001e7:
+000004e4: R16 := 0x11000
+000004eb: R17 := mem[R16 + 0x20, el]:u64
+000004f1: R16 := R16 + 0x20
+000004f6: call R17 with noreturn
+
+000005c7: sub call_weak_fn(call_weak_fn_result)
+000005fd: call_weak_fn_result :: out u32 = low:32[R0]
+
+000001eb:
+000001ee: R0 := 0x10000
+000001f5: R0 := mem[R0 + 0xFD0, el]:u64
+000001fb: when R0 = 0 goto %000001f9
+000005ed: goto %000003ca
+
+000001f9:
+00000201: call R30 with noreturn
+
+000003ca:
+000003cd: goto @__gmon_start__
+
+000003cb:
+000004ce: R16 := 0x11000
+000004d5: R17 := mem[R16 + 0x18, el]:u64
+000004db: R16 := R16 + 0x18
+000004e0: call R17 with noreturn
+
+000005c9: sub deregister_tm_clones(deregister_tm_clones_result)
+000005fe: deregister_tm_clones_result :: out u32 = low:32[R0]
+
+00000207:
+0000020a: R0 := 0x11000
+00000210: R0 := R0 + 0x40
+00000215: R1 := 0x11000
+0000021b: R1 := R1 + 0x40
+00000221: #1 := ~R0
+00000226: #2 := R1 + ~R0
+0000022c: VF := extend:65[#2 + 1] <> extend:65[R1] + extend:65[#1] + 1
+00000232: CF := pad:65[#2 + 1] <> pad:65[R1] + pad:65[#1] + 1
+00000236: ZF := #2 + 1 = 0
+0000023a: NF := 63:63[#2 + 1]
+00000240: when ZF goto %0000023e
+000005ee: goto %000003ac
+
+000003ac:
+000003af: R1 := 0x10000
+000003b6: R1 := mem[R1 + 0xFC0, el]:u64
+000003bb: when R1 = 0 goto %0000023e
+000005ef: goto %000003bf
+
+0000023e:
+00000246: call R30 with noreturn
+
+000003bf:
+000003c3: R16 := R1
+000003c8: call R16 with noreturn
+
+000005cc: sub frame_dummy(frame_dummy_result)
+000005ff: frame_dummy_result :: out u32 = low:32[R0]
+
+000002de:
+000002e0: call @register_tm_clones with noreturn
+
+000005cd: sub free(free_ptr)
+00000600: free_ptr :: in out u64 = R0
+
+00000334:
+000004fa: R16 := 0x11000
+00000501: R17 := mem[R16 + 0x28, el]:u64
+00000507: R16 := R16 + 0x28
+0000050c: call R17 with noreturn
+
+000005ce: sub main(main_argc, main_argv, main_result)
+00000601: main_argc :: in u32 = low:32[R0]
+00000602: main_argv :: in out u64 = R1
+00000603: main_result :: out u32 = low:32[R0]
+
+000002e2:
+000002e6: R31 := R31 - 0x20
+000002ec: #4 := R31 + 0x10
+000002f2: mem := mem with [#4, el]:u64 <- R29
+000002f8: mem := mem with [#4 + 8, el]:u64 <- R30
+000002fe: R29 := R31 + 0x10
+00000303: R0 := 4
+00000308: R30 := 0x7E8
+0000030b: call @malloc with return %0000030d
+
+0000030d:
+00000313: mem := mem with [R31 + 8, el]:u64 <- R0
+0000031a: R9 := mem[R31 + 8, el]:u64
+0000031f: R8 := 1
+00000327: mem := mem with [R9, el]:u32 <- 31:0[R8]
+0000032e: R0 := mem[R31 + 8, el]:u64
+00000333: R30 := 0x800
+00000336: call @free with return %00000338
+
+00000338:
+0000033c: #5 := R31 + 0x10
+00000341: R29 := mem[#5, el]:u64
+00000346: R30 := mem[#5 + 8, el]:u64
+0000034c: R31 := R31 + 0x20
+00000351: call R30 with noreturn
+
+000005cf: sub malloc(malloc_size, malloc_result)
+00000604: malloc_size :: in u64 = R0
+00000605: malloc_result :: out u64 = R0
+
+00000309:
+000004b8: R16 := 0x11000
+000004bf: R17 := mem[R16 + 0x10, el]:u64
+000004c5: R16 := R16 + 0x10
+000004ca: call R17 with noreturn
+
+000005d0: sub register_tm_clones(register_tm_clones_result)
+00000606: register_tm_clones_result :: out u32 = low:32[R0]
+
+00000248:
+0000024b: R0 := 0x11000
+00000251: R0 := R0 + 0x40
+00000256: R1 := 0x11000
+0000025c: R1 := R1 + 0x40
+00000263: R1 := R1 + ~R0 + 1
+00000269: R2 := 0.63:63[R1]
+00000270: R1 := R2 + (R1 ~>> 3)
+00000276: R1 := extend:64[63:1[R1]]
+0000027c: when R1 = 0 goto %0000027a
+000005f0: goto %0000038e
+
+0000038e:
+00000391: R2 := 0x10000
+00000398: R2 := mem[R2 + 0xFE0, el]:u64
+0000039d: when R2 = 0 goto %0000027a
+000005f1: goto %000003a1
+
+0000027a:
+00000282: call R30 with noreturn
+
+000003a1:
+000003a5: R16 := R2
+000003aa: call R16 with noreturn

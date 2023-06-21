@@ -69,7 +69,7 @@ object ElfLoader {
     if ((ctx.entrytype.getText == "OBJECT" || ctx.entrytype.getText == "FUNC") && (ctx.bind.getText == "GLOBAL" || ctx.bind.getText == "LOCAL")) { // TODO: check if this is correct
       val name = ctx.name.getText
       if (name.forall(allowedChars.contains)) {
-        Some(SpecGlobal(name, ctx.size.getText.toInt * 8, hexToBigInt(ctx.value.getText)))
+        Some(SpecGlobal(name, ctx.size.getText.toInt * 8, None, hexToBigInt(ctx.value.getText)))
       } else {
         None
       }

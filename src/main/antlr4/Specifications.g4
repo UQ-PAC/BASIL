@@ -1,9 +1,18 @@
 grammar Specifications;
 
-specification: lPreds? /* gammaInits? inits? */ relies? guarantees? subroutine*;
+specification: globals? lPreds? /* gammaInits? inits? */ relies? guarantees? subroutine*;
 
-lPreds : 'L:' lPred (COMMA lPred)*;
-lPred : id MAPSTO expr;
+globals: 'Globals:' globalDef*;
+globalDef: id COLON typeName arraySize?;
+lPreds: 'L:' lPred (COMMA lPred)*;
+lPred: id MAPSTO expr;
+typeName: ('bv' size=nat) #bvType
+        | LONG #longType
+        | SHORT #shortType
+        | INT #intType
+        | CHAR #charType
+        ;
+arraySize: '[' size=nat ']';
 //gammaInits : 'Gamma:' gamma (COMMA gamma)*;
 //gamma : id MAPSTO boolLit;
 //inits : 'Init:' init (COMMA init)*;
@@ -45,11 +54,18 @@ DIV_OP : 'div';
 MOD_OP : 'mod';
 boolLit : TRUE | FALSE;
 
+arrayAccess: id '[' nat ']';
 gammaId : 'Gamma_' id;
 id : NON_DIGIT ( NON_DIGIT | DIGIT )*;
 NON_DIGIT : ( [A-Z] | [a-z] | '\'' | '~' | '#' | '$' | '^' | '_' | '.' | '?' | '`') ;
 DIGIT : [0-9] ;
 nat: (DIGIT)+ ;
+bv: value=nat 'bv' size=nat;
+LONG: 'long';
+SHORT: 'short';
+INT: 'int';
+CHAR: 'char';
+COLON: ':';
 
 // based upon boogie grammar: https://boogie-docs.readthedocs.io/en/latest/LangRef.html#grammar
 expr : impliesExpr ( EQUIV_OP impliesExpr )* ;
@@ -67,9 +83,10 @@ unaryExpr : atomExpr #atomUnaryExpr
           ;
 
 atomExpr : boolLit #boolLitExpr
-         | nat #natExpr
+         | bv #bvExpr
          | id #idExpr
          | gammaId #gammaIdExpr
+         | arrayAccess #arrayAccessExpr
          | 'old' LPAREN expr RPAREN #oldExpr
          | LPAREN expr RPAREN #parenExpr
          | 'if' guard=expr 'then' thenExpr=expr 'else' elseExpr=expr #ifThenElseExpr

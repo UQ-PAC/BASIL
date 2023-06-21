@@ -261,9 +261,10 @@ object RunUtils {
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {
     try {
-      val writer = new BufferedWriter(new FileWriter(outputFileName, false))
+      val writer = BufferedWriter(FileWriter(outputFileName, false))
       writer.write(program.toString)
       writer.flush()
+      writer.close()
     } catch {
       case _: IOException => System.err.println("Error writing to file.")
     }
