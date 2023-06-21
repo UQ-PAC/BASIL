@@ -129,11 +129,16 @@ object RunUtils {
     //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
     //      x.toString
     //    }, Output.dotIder))
+    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
+       x.toString
+        }, Output.dotIder), "tmp_cfg")
 
 
-//    val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
-//    val result = solver.analyze()
-//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder))
+    println("==Generating Constant Prop Analysis")
+    val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
+    val result = solver.analyze()
+    
+    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder), "constant_prop")
 //
 //    dump_file(cfg.getEdges.toString(), "result")
 //
@@ -167,22 +172,22 @@ object RunUtils {
 //    print(s"\n Mem region results\n ****************\n  ${solver2.getMapping}  \n *****************\n")
 //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(solver2.getMapping, solver.stateAfterNode), Output.dotIder))
 
-    val solver2 = new MemoryRegionAnalysis.WorklistSolver(cfg, globals_ToUSE, globalsOffsets_ToUSE)
-    val result2 = solver2.analyze()
-    memoryRegionAnalysisResults = Some(result2)
-    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder), "mra")
+    // val solver2 = new MemoryRegionAnalysis.WorklistSolver(cfg, globals_ToUSE, globalsOffsets_ToUSE)
+    // val result2 = solver2.analyze()
+    // memoryRegionAnalysisResults = Some(result2)
+    // Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder), "mra")
 
 
-    val mmm = new MemoryModelMap
-    mmm.convertMemoryRegions(result2, internalFunctions_ToUSE)
-    print("Memory Model Map: \n")
-    print(mmm)
-    val interprocCfg = InterproceduralProgramCfg.generateFromProgram(IRProgram)
-    val solver3 = new analysis.ValueSetAnalysis.WorklistSolver(interprocCfg, globals_ToUSE, internalFunctions_ToUSE, globalsOffsets_ToUSE, mmm)
-    val result3 = solver3.analyze()
-    Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
-    val newCFG = InterproceduralProgramCfg.generateFromProgram(resolveCFG(interprocCfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram))
-    Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot({ x => x.toString}, Output.dotIder), "resolvedCFG")
+    // val mmm = new MemoryModelMap
+    // mmm.convertMemoryRegions(result2, internalFunctions_ToUSE)
+    // //print("Memory Model Map: \n")
+    // //print(mmm)
+    // val interprocCfg = InterproceduralProgramCfg.generateFromProgram(IRProgram)
+    // val solver3 = new analysis.ValueSetAnalysis.WorklistSolver(interprocCfg, globals_ToUSE, internalFunctions_ToUSE, globalsOffsets_ToUSE, mmm)
+    // val result3 = solver3.analyze()
+    // Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
+    // val newCFG = InterproceduralProgramCfg.generateFromProgram(resolveCFG(interprocCfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram))
+    // Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot({ x => x.toString}, Output.dotIder), "resolvedCFG")
   }
 
   def resolveCFG(interproceduralProgramCfg: InterproceduralProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): Program = {

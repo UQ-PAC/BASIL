@@ -53,44 +53,47 @@ trait ValueAnalysisMisc:
       case bin: BinaryExpr =>
         val left = eval(bin.arg1, env)
         val right = eval(bin.arg2, env)
-
-        bin.op match
-          case BVAND => bvadd(left, right)
-          case BVOR => bvor(left, right)
-          case BVADD => bvand(left, right)
+        bin.op match 
+          case BVADD => bvadd(left, right)
+          case BVSUB => bvsub(left, right)
           case BVMUL => bvmul(left, right)
           case BVUDIV => bvudiv(left, right)
-          case BVUREM => bvurem(left, right)
-          case BVSHL => bvshl(left, right)
-          case BVLSHR => bvlshr(left, right)
-          case BVULT => bvult(left, right)
-          case BVNAND => ???
-          case BVNOR => ???
-          case BVXOR => ???
-          case BVXNOR => ???
-          case BVCOMP => bvcomp(left, right)
-          case BVSUB => bvsub(left, right)
           case BVSDIV => bvsdiv(left, right)
           case BVSREM => bvsrem(left, right)
-          case BVSMOD => ???
+          case BVUREM => bvurem(left, right)
+          case BVSMOD => ??? // Signed modulus. NOTE: this is used.
+          case BVAND => bvand(left, right)
+          case BVOR => bvor(left, right)
+          case BVXOR => bvxor(left, right)
+          case BVNAND => bvnand(left, right)
+          case BVNOR => bvnor(left, right)
+          case BVXNOR => bvxnor(left, right)
+          case BVSHL => bvshl(left, right)
+          case BVLSHR => bvlshr(left, right)
           case BVASHR => bvashr(left, right)
-          case BVULE => bvule(left, right)
-          case BVUGT => ???
-          case BVUGE => ???
-          case BVSLT => bvslt(left, right)
-          case BVSLE => bvsle(left, right)
-          case BVSGT => ???
-          case BVSGE => ???
-          case BVEQ => bvneq(left, right)
-          case BVNEQ => bvneq(left, right)
-          case BVCONCAT => concat(left, right)
+          case BVCOMP => bvcomp(left, right)
 
+          case BVULE => bvule(left, right)
+          case BVUGE => bvuge(left, right)
+          case BVULT => bvult(left, right)
+          case BVUGT => bvugt(left, right)
+
+          case BVSLE => bvsle(left, right)
+          case BVSGE => bvsge(left, right)
+          case BVSLT => bvslt(left, right)
+          case BVSGT => bvsgt(left, right)
+          
+          case BVCONCAT => concat(left, right)
+          case BVNEQ => bvneq(left, right)
+          case BVEQ => bveq(left, right)
+
+          
       case un: UnaryExpr =>
         val arg = eval(un.arg, env)
 
         un.op match
-          case BVNEG => bvneg(arg)
           case BVNOT => bvnot(arg)
+          case BVNEG => bvneg(arg)
 
       case _ => valuelattice.top
 
@@ -101,8 +104,8 @@ trait ValueAnalysisMisc:
       case r: CfgCommandNode =>
         r.data match
           // assignments
-          case la: LocalAssign => s + (la.lhs -> eval(la.rhs, s))
-
+          case la: LocalAssign => 
+            s + (la.lhs -> eval(la.rhs, s))
           // all others: like no-ops
           case _ => s
       case _ => s
@@ -555,7 +558,7 @@ trait MemoryRegionAnalysisMisc:
   def get_global_name(bigInt: BigInt): String = {
       for (global <- globals) {
           if (global.address == bigInt) {
-          return global.name
+            return global.name
           }
       }
       ""
