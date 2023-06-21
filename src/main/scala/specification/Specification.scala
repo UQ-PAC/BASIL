@@ -10,7 +10,7 @@ trait SpecVar extends BExpr {
   }
 }
 
-case class SpecGlobal(name: String, size: Int, address: BigInt) extends SpecVar {
+case class SpecGlobal(name: String, size: Int, arraySize: Option[Int], address: BigInt) extends SpecVar {
   override def specGlobals: Set[SpecGlobal] = Set(this)
   val toAddrVar: BVar = BVariable("$" + s"${name}_addr", BitVecBType(64), Scope.Const)
   val toOldVar: BVar = BVariable(s"${name}_old", BitVecBType(size), Scope.Local)
@@ -30,12 +30,13 @@ case class SpecGamma(global: SpecGlobal) extends SpecVar {
   override def resolveSpecL: GammaLoad = resolveSpec
 }
 
-case class SpecParameter(name: String) extends SpecVar {
-
-}
-
-case class SpecParameterGamma(param: SpecParameter) extends SpecVar {
-
+case class ArrayAccess(global: SpecGlobal, index: Int) extends SpecVar {
+  private val accessIndex = BitVecBLiteral(index * (global.size / 8), 64)
+  override def specGlobals: Set[SpecGlobal] = Set(global)
+  override def resolveSpec: BMemoryLoad = BMemoryLoad(BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global), BinaryBExpr(BVADD, global.toAddrVar, accessIndex), Endian.LittleEndian, global.size)
+  override def resolveOld: BMemoryLoad = resolveSpec
+  override def removeOld: BMemoryLoad = resolveSpec
+  override def resolveSpecL: BMemoryLoad = BMemoryLoad(BMapVar("memory", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter), BinaryBExpr(BVADD, global.toAddrVar, accessIndex), Endian.LittleEndian, global.size)
 }
 
 case class Specification(globals: Set[SpecGlobal], LPreds: Map[SpecGlobal, BExpr], relies: List[BExpr], guarantees: List[BExpr], subroutines: List[SubroutineSpec]) {

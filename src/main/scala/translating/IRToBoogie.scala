@@ -43,7 +43,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgProcs ++ procedures
     BProgram(declarations)
-    //avoidReserved(BProgram(declarations))
   }
 
   def genRely(relies: List[BExpr]): List[BProcedure] = {
@@ -323,7 +322,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val lhsGamma = m.lhs.toGamma
       val rhsGamma = m.rhs.toGamma
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
-      if (m.lhs.name == "stack") {
+      if (lhs == stack) {
         List(store)
       } else {
         val rely = ProcedureCall("rely", List(), List(), List(rhs.memory, rhsGamma.gammaMap))
@@ -350,14 +349,13 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val rhsGamma = l.rhs.toGamma
       val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val loads = rhs.functionOps.collect { case m: BMemoryLoad => m }
-      if (loads.nonEmpty) {
+      if (loads.isEmpty || loads.forall(_.memory == stack)) {
+        List(assign)
+      } else {
         val gammas = rhsGamma.functionOps.collect { case g: GammaLoad => g.gammaMap }.toSeq.sorted
         val memories = loads.map(m => m.memory).toSeq.sorted
         List(ProcedureCall("rely", Seq(), Seq(), memories ++ gammas), assign)
-      } else {
-        List(assign)
       }
-
   }
 
   def coerceProcedureCall(target: Procedure): List[BCmd] = {
