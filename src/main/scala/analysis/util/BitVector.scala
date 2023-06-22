@@ -202,6 +202,29 @@ def smt_bvsrem(s: Literal, t: Literal) = (s, t) match
     }
   case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
 
+def smt_bvsmod(s: Literal, t: Literal) = (s, t) match 
+  case (s: BitVecLiteral, t: BitVecLiteral) =>
+    val msb_s = isNegative(s)
+    val msb_t = isNegative(t)
+
+    val abs_s = if (msb_s) then s else smt_bvneg(s)
+    val abs_t = if (msb_t) then t else smt_bvneg(t)
+
+    val u = smt_bvurem(abs_s, abs_t)
+
+    if (u.value == 0) {
+      u
+    } else if (!msb_s && !msb_t) {
+      u
+    } else if (msb_s && !msb_t) {
+      smt_bvadd(smt_bvneg(u), t)
+    } else if (!msb_t && msb_t) {
+      smt_bvadd(u, t)
+    } else {
+      smt_bvneg(u)
+    }
+  case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
+
 /** [[smt_bvult s t]] := true iff bv2nat([[s]]) < bv2nat([[t]])
   */
 def smt_bvult(s: Literal, t: Literal) = (s, t) match
