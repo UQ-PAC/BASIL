@@ -103,6 +103,48 @@ To produce a translation to BIL (BAP Intermediate Language) for one instruction 
 
 `bap objdump *.out --show-{memory,bil,insn}`
 
+## Debugging in VSCode
+
+There is a plugin called "Scala (Metals)" which is the standard for debugging Scala in vscode. However, we're currently using an outdated version 
+of Scala which Metals doesn't directly support anymore, so it has to be configured manually.
+
+Once you've installed Metals, import the (vscode command prompt: `> Metals: Import Build`). It will then import the project from `build.sbt`. It will also probably say it 
+runs into errors trying to import the project - you can ignore these.
+
+Next, vscode needs to know how to connect to the debugger. Add a new vcsode configuration (in `.vscode/launch.json`): 
+
+```json
+"configurations": [
+        {
+            "type": "scala",
+            "request": "attach",
+            "name": "sbt debugger",
+            "buildTarget": "root",
+            "hostName": "localhost",
+            "port": <port>,
+        }
+    ]
+```
+
+Note that the `buildTarget` name is what is found in the `lazy val root` line from `build.sbt`. You can also find it by opening up the Metals plugin's "doctor" (called `Metals Doctor`, started with `> Run doctor`).
+
+To start the debugger, when you open up your sbt terminal (or in the command you use to run the tool), add the flag `-jvm-debug <port>`, e.g.
+
+```
+$ sbt -jvm-debug <port>
+```
+
+Once this has loaded, you can attach the vscode debugger using the configuration you made earlier (from the run+debug tab, or under Run->Start Debugging). You should then be able to debug like normal in vscode.
+
+NOTE: if when setting breakpoints you get errors saying "unverified breakpoint", this is because the vscode debugger can't match the files you're setting them in to locations in the sbt session being debugged. To 
+fix this you can try a few things:
+
+- Restarting debugger
+- Force Metals to re-import your build
+- Change debugger to launch project with debugging flags instead of attaching to a debugger
+
+
+
 ## Open Source License
 
 Copyright 2022 The University of Queensland
