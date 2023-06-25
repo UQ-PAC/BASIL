@@ -21,6 +21,11 @@ abstract class Visitor {
     node
   }
 
+  def visitAssert(node: Assert): Statement = {
+    node.body = visitExpr(node.body)
+    node
+  }
+
   def visitJump(node: Jump): Jump = node.acceptVisit(this)
 
   def visitGoTo(node: GoTo): Jump = {
@@ -180,6 +185,11 @@ abstract class ReadOnlyVisitor extends Visitor {
   override def visitMemoryAssign(node: MemoryAssign): Statement = {
     visitMemory(node.lhs)
     visitMemoryStore(node.rhs)
+    node
+  }
+
+  override def visitAssert(node: Assert): Statement = {
+    visitExpr(node.body)
     node
   }
 
