@@ -298,10 +298,19 @@ object Cfg:
 //              } else {
 //                cfg.addEdge(nodePool.getLatestAdded, functionExitNode)
 //              }
-              if (i.target.name.equals("R30") && i.returnTarget.isEmpty) {
+              if (i.target.name.equals("R30")) {
                 cfg.addEdge(nodePool.getLatestAdded, functionExitNode)
               } else {
-                print(s"Cannot reach here ${i} ${func.name}\n")
+                print(s"Cannot resolve indirect call ${i} ${func.name}\n")
+              }
+              if (i.returnTarget.isDefined) {
+                if (processedBlocks.contains(i.returnTarget.get.label)) {
+                  otherLatestAdded.add(nodePool.getLatestAdded)
+                } else {
+                  visitBlock(i.returnTarget.get.label)
+                }
+              } else {
+                otherLatestAdded.add(nodePool.getLatestAdded)
               }
           }
         } else {

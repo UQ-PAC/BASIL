@@ -197,9 +197,10 @@ trait ValueSetAnalysisMisc:
                       }
                       val calculated: BigInt = bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value)
                       return BitVecLiteral(calculated, bitVecLiteral.size)
-                    case _ => evaluateExpression(value, pred)
+                    case _ => return exp
                 case _ =>
                   print("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(variable, pred) + " FOR " + binOp + "\n")
+                  return exp
             }
           case _ => return evaluateExpression(binOp.arg1, n)
         }
@@ -226,7 +227,7 @@ trait ValueSetAnalysisMisc:
             assigmentsMap(variable, pred) match
               case bitVecLiteral: BitVecLiteral =>
                 return bitVecLiteral
-              case any: Expr => return evaluateExpression(any, n)
+              case any: Expr => return exp
           }
         }
         exp
@@ -325,7 +326,6 @@ trait ValueSetAnalysisMisc:
                   print("\n")
                 }
                 val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
-                println("lhs: " + binOp.arg1 + " " + lhs)
                 val rhs: Expr = evaluateExpression(binOp.arg2, n)
                 if (!rhs.isInstanceOf[BitVecLiteral]) {
                   println("WARNING: RHS is not BitVecLiteral and is skipped " + rhs + "\n")
@@ -406,7 +406,7 @@ abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal
  */
 abstract class IntreprocValueSetAnalysisWorklistSolver[L <: MapLattice[Expr, PowersetLattice[Value]]](cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], globalOffsets: Map[BigInt, BigInt], mmm: MemoryModelMap, val powersetLattice: L)
   extends ValueSetAnalysis(cfg, globals, internalFunctions, globalOffsets, mmm)
-    with SimpleMonotonicSolver[CfgNode]
+    with SimpleWorklistFixpointSolver[CfgNode]
     with ForwardDependencies
 
 object ValueSetAnalysis:
