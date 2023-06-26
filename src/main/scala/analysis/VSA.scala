@@ -60,6 +60,7 @@ class LiteralValue(expr: Expr) extends Value:
 //}
 
 
+// TODO: rename to make it cleaer this is for memory analysis.
 trait ValueSetAnalysisMisc:
   val assigmentsMap: mutable.HashMap[(Expr, CfgNode), Expr] = mutable.HashMap.empty
   val regionContentMap: mutable.HashMap[MemoryRegion, mutable.Set[Value]] = mutable.HashMap.empty

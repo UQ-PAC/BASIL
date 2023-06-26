@@ -164,6 +164,8 @@ class Cfg(cfg: Cfg = null):
   }
 
 case class NodePool() {
+  // TODO: change latestAdded to Option[CfgNode]?
+
   private var latestAdded: CfgNode = null;
 
   def get(command: Command): CfgNode = {
@@ -179,9 +181,12 @@ case class NodePool() {
   }
 }
 
+// maybe refactor this to avoid global state in instance of Cfg?
+// E.g. move into Cfg class or a CfgBuilder class?
 object Cfg:
 
   var cfg: Cfg = Cfg()
+  // TODO: replace nodePool by Option[CfgNode] to track latest added node.
   private var nodePool = NodePool()
   private val funcEntryExit: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]()
   private var interProc: Boolean = false

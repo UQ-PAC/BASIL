@@ -6,10 +6,14 @@ import scala.collection.immutable.ListSet
 import scala.collection.mutable
 
 
-/** Worklist-based fixpoint solver.
+/** Fixpoint solver.
  *
  * @tparam N
- *   type of the elements in the worklist.
+ *   type of the elements in the solver.
+  *
+  *   TODO: investigate how to visit all reachable nodes at least once, then remove loopEscape.
+  *   TODO: in longer term, add a worklist to avoid processing nodes twice.
+  *
  */
 trait SimpleMonotonicSolver[N] extends MapLatticeSolver[N] with Dependencies[N]:
   /** The current lattice element.
