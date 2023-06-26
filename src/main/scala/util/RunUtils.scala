@@ -196,13 +196,13 @@ object RunUtils {
 
   def resolveCFG(interproceduralProgramCfg: InterproceduralProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): Program = {
     // print the count of the value sets of the exit nodes
-    for (comdNode <- interproceduralProgramCfg.nodes.filter(_.isInstanceOf[CfgCommandNode])) {
-//      if (comdNode.asInstanceOf[CfgCommandNode].data.isInstanceOf[IndirectCall]) {
-//        //println(s"Node: ${comdNode}")
-//        println(s"${valueSets(comdNode).size}")
-//      }
-      println(s"${valueSets(comdNode).size}")
-    }
+//    for (comdNode <- interproceduralProgramCfg.nodes.filter(_.isInstanceOf[CfgCommandNode])) {
+////      if (comdNode.asInstanceOf[CfgCommandNode].data.isInstanceOf[IndirectCall]) {
+////        //println(s"Node: ${comdNode}")
+////        println(s"${valueSets(comdNode).size}")
+////      }
+//      println(s"${valueSets(comdNode).size}")
+//    }
     interproceduralProgramCfg.entries.foreach(
       n => process(n))
 

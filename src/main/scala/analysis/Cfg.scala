@@ -171,7 +171,7 @@ object Cfg:
   private var latestAdded: Option[CfgNode] = None // to track latest added node.
   private val funcEntryExit: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]()
   private var interProc: Boolean = false
-  private var functionCloningLimit: Int = 0
+  private var functionCloningLimit: Int = 1
 
   /** Generate the cfg for each function of the program.
    */
@@ -256,8 +256,18 @@ object Cfg:
                 if (functionEntryNode.data.name.equals(d.target.name)) {
                   cfg.addEdge(call, functionEntryNode)
                 } else {
-                  generateCfgFunc(d.target)
-                  cfg.addEdge(call, funcEntryExit(d.target)._1) // From DirectCall to FunctionEntry of called function
+                  if (functionCloningLimit > 0) {
+                    functionCloningLimit -= 1
+                    generateCfgFunc(d.target)
+                  }
+                  //cfg.addEdge(call, funcEntryExit.getOrElse(d.target, )) // From DirectCall to FunctionEntry of called function
+                  if (funcEntryExit.contains(d.target)) {
+                    cfg.addEdge(call, funcEntryExit(d.target)._1) // From DirectCall to FunctionEntry of called function
+                  } else {
+                    val functionEntryNode = CfgFunctionEntryNode(data = d.target)
+                    val functionExitNode = CfgFunctionExitNode(data = d.target)
+                    funcEntryExit.addOne(d.target -> (functionEntryNode, functionExitNode))
+                  }
                 }
               } else {
                 clonedFunctions.remove(d.target.name)

@@ -48,20 +48,8 @@ class LiteralValue(expr: Expr) extends Value:
     sb.toString()
   }
 
-//class ValueSet(expr: Expr, values: mutable.Set[Value]) {
-//  override def toString: String = {
-//    val sb = new StringBuilder
-//    sb.append(expr)
-//    sb.append(" -> {")
-//    sb.append(values.mkString(", "))
-//    sb.append("}")
-//    sb.toString()
-//  }
-//}
 
-
-// TODO: rename to make it cleaer this is for memory analysis.
-trait ValueSetAnalysisMisc:
+trait MemoryRegionValueSetAnalysis:
   val assigmentsMap: mutable.HashMap[(Expr, CfgNode), Expr] = mutable.HashMap.empty
   val regionContentMap: mutable.HashMap[MemoryRegion, mutable.Set[Value]] = mutable.HashMap.empty
 
@@ -397,7 +385,7 @@ trait ValueSetAnalysisMisc:
 
 /** Base class for memory region analysis (non-lifted) lattice.
  */
-abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal], val internalFunctions: Set[InternalFunction], val globalOffsets: Map[BigInt, BigInt], val mmm: MemoryModelMap) extends FlowSensitiveAnalysis(true) with ValueSetAnalysisMisc:
+abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal], val internalFunctions: Set[InternalFunction], val globalOffsets: Map[BigInt, BigInt], val mmm: MemoryModelMap) extends FlowSensitiveAnalysis(true) with MemoryRegionValueSetAnalysis:
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
    */
@@ -407,7 +395,7 @@ abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal
  */
 abstract class IntreprocValueSetAnalysisWorklistSolver[L <: MapLattice[Expr, PowersetLattice[Value]]](cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], globalOffsets: Map[BigInt, BigInt], mmm: MemoryModelMap, val powersetLattice: L)
   extends ValueSetAnalysis(cfg, globals, internalFunctions, globalOffsets, mmm)
-    with SimpleWorklistFixpointSolver[CfgNode]
+    with SimpleMonotonicSolver[CfgNode]
     with ForwardDependencies
 
 object ValueSetAnalysis:

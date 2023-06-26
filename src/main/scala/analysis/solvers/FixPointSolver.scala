@@ -94,6 +94,13 @@ trait ListSetWorklist[N] extends Worklist[N]:
       worklist = worklist.tail
       process(n)
 
+  def monotonic_run(first: Set[N]) =
+    worklist = new ListSet[N] ++ first.filter(n => n.isInstanceOf[CfgFunctionEntryNode])
+    while (worklist.nonEmpty) do
+      val n = worklist.head;
+      worklist = worklist.tail
+      process(n)
+
 /** Base trait for worklist-based fixpoint solvers.
   *
   * @tparam N
