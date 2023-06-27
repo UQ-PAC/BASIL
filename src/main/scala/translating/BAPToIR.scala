@@ -6,12 +6,13 @@ import specification._
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 
-class BAPToIR(var program: BAPProgram) {
+class BAPToIR(var program: BAPProgram, mainAddress: Int) {
 
   private val nameToProcedure: Map[String, Procedure] = Map()
   private val labelToBlock: Map[String, Block] = Map()
 
   def translate: Program = {
+    var mainProcedure: Option[Procedure] = None
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
     for (s <- program.subroutines) {
       val blocks: ArrayBuffer[Block] = ArrayBuffer()
@@ -29,6 +30,9 @@ class BAPToIR(var program: BAPProgram) {
         out.append(p.toIR)
       }
       val procedure = Procedure(s.name, s.address, blocks, in, out)
+      if (s.address == mainAddress) {
+        mainProcedure = Some(procedure)
+      }
       procedures.append(procedure)
       nameToProcedure.addOne(s.name, procedure)
     }
@@ -51,7 +55,7 @@ class BAPToIR(var program: BAPProgram) {
       memorySections.append(MemorySection(m.name, m.address, m.size, bytes))
     }
 
-    Program(procedures, memorySections)
+    Program(procedures, memorySections, mainProcedure.get)
   }
 
   private def translate(s: BAPStatement) = {

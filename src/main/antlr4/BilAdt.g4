@@ -80,9 +80,13 @@ assign : 'Def' OPEN_PAREN tid COMMA attrs COMMA lhs=immVar COMMA rhs=exp CLOSE_P
 sections : 'Sections' OPEN_PAREN OPEN_BRACKET (section (COMMA section)*)? CLOSE_BRACKET CLOSE_PAREN;
 section : 'Section' OPEN_PAREN name=quoteString COMMA address=num COMMA QUOTE membyte+ QUOTE CLOSE_PAREN;
 
+memmap : 'Memmap' OPEN_PAREN OPEN_BRACKET (annotation (COMMA annotation)*)? CLOSE_BRACKET CLOSE_PAREN;
+annotation: 'Annotation' OPEN_PAREN region COMMA attr CLOSE_PAREN;
+region: 'Region' OPEN_PAREN start=num COMMA end=num CLOSE_PAREN;
+
 /* Unimportant ADTs - should be matched last */
 phis : 'Phis' OPEN_PAREN list CLOSE_PAREN;
-memmap : 'Memmap' OPEN_PAREN list CLOSE_PAREN;
+
 
 
 list : OPEN_BRACKET sequence CLOSE_BRACKET;

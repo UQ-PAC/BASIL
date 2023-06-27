@@ -206,7 +206,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     //val modifies = p.modifies.map(m => m.name).toSeq.sorted
     val modifies = Seq(mem, Gamma_mem, stack, Gamma_stack) // TODO placeholder until proper modifies analysis
 
-    val procRequires: List[BExpr] = if (p.name == "main") {
+    val procRequires: List[BExpr] = if (p == program.mainProcedure) {
       requires.getOrElse(p.name, List()).prependedAll(initialiseMemory)
     } else {
       requires.getOrElse(p.name, List())
@@ -414,8 +414,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   def stripUnreachableFunctions(): Unit = {
     val functionToChildren = program.procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
-    var next = "main"
-    var reachableNames: Set[String] = Set("main")
+    var next = program.mainProcedure.name
+    var reachableNames: Set[String] = Set(next)
     var toVisit: List[String] = List()
     var reachableFound = true;
     while (reachableFound) {

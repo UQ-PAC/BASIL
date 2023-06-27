@@ -4,7 +4,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
 import boogie._
 
-class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBuffer[MemorySection] /* var memories: ArrayBuffer[Memory], var memoryOffsets: ArrayBuffer[Offset] */) {
+class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBuffer[MemorySection], var mainProcedure: Procedure) {
   
 }
 

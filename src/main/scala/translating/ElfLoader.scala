@@ -5,11 +5,15 @@ import specification._
 import scala.jdk.CollectionConverters._
 
 object ElfLoader {
-  def visitSyms(ctx: SymsContext): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt]) = {
+  def visitSyms(ctx: SymsContext): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
     val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableExtFunc(r)).toSet
     val relocationOffsets = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableOffsets(r)).toMap
     val globalVariables = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toSet
-    (externalFunctions, globalVariables, relocationOffsets)
+    val mainAddress = ctx.symbolTable.asScala.flatMap(s => getMainAddress(s))
+    if (mainAddress.isEmpty) {
+      throw Exception("no main function in symbol table")
+    }
+    (externalFunctions, globalVariables, relocationOffsets, mainAddress.head)
   }
 
   def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {
@@ -48,6 +52,19 @@ object ElfLoader {
       rows.flatMap(r => visitSymbolTableRow(r)).toSet
     } else {
       Set()
+    }
+  }
+
+  def getMainAddress(ctx: SymbolTableContext): Option[Int] = {
+    if (ctx.symbolTableHeader.tableName.STRING.getText == ".symtab") {
+      val rows = ctx.symbolTableRow.asScala
+      val mainAddress = rows.collectFirst {
+        case r if r.entrytype.getText == "FUNC" && r.bind.getText == "GLOBAL" && r.name.getText == "main" =>
+          Integer.parseInt(r.value.getText, 16)
+      }
+      mainAddress
+    } else {
+      None
     }
   }
 

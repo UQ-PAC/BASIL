@@ -34,7 +34,7 @@ object RunUtils {
     val elfParser = SymsParser(elfTokens)
     elfParser.setBuildParseTree(true)
 
-    val (externalFunctions, globals, globalOffsets) = ElfLoader.visitSyms(elfParser.syms())
+    val (externalFunctions, globals, globalOffsets, mainAddress) = ElfLoader.visitSyms(elfParser.syms())
 
     //println(globalOffsets)
     //val procmap = program.subroutines.map(s => (s.name, s.address)).toMap
@@ -54,7 +54,7 @@ object RunUtils {
 
     val externalNames = externalFunctions.map(e => e.name)
 
-    val IRTranslator = BAPToIR(program)
+    val IRTranslator = BAPToIR(program, mainAddress)
     var IRProgram = IRTranslator.translate
 
     val specification = specFileName match {

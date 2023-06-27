@@ -74,7 +74,12 @@ abstract class Visitor {
 
   def visitProgram(node: Program): Program = {
     for (i <- node.procedures.indices) {
-      node.procedures(i) = visitProcedure(node.procedures(i))
+      val updatedProcedure = visitProcedure(node.procedures(i))
+      val targetProcedure = node.procedures(i)
+      if (targetProcedure == node.mainProcedure) {
+        node.mainProcedure = updatedProcedure
+      }
+      node.procedures(i) = updatedProcedure
     }
     node
   }
