@@ -6,6 +6,7 @@ import boogie._
 
 class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBuffer[MemorySection] /* var memories: ArrayBuffer[Memory], var memoryOffsets: ArrayBuffer[Offset] */) {
 
+  // This shouldn't be run before indirect calls are resolved?
   def stripUnreachableFunctions(): Unit = {
     val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 

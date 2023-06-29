@@ -20,23 +20,56 @@ object CfgNode:
 abstract class Edge(from: CfgNode, to: CfgNode):
   def getFrom: CfgNode = from
   def getTo: CfgNode = to
-case class conditionalEdge(cond: Expr, from: CfgNode, to: CfgNode) extends Edge(from, to) {
-  override def toString: String = s"conditionalEdge(cond: $cond, From: $from, To: $to)"
+
+/**
+  * Edge between two command nodes in the CFG 
+  */
+case class regularEdge(from: CfgNode, to: CfgNode) extends Edge(from, to) {
+  override def toString: String = s"regularEdge(From: $from, To: $to)"
 }
 
-case class unconditionalEdge(from: CfgNode, to: CfgNode) extends Edge(from = from, to = to) {
-  override def toString: String = s"unconditionalEdge(From: $from, To: $to)"
+/**
+  * Procedure call between node and procedure. 
+  */
+case class interprocEdge(from: CfgNode, to: CfgNode) extends Edge(from, to) {
+  override def toString: String = s"interprocEdge(From: $from, To: $to)"
+}
+
+/**
+  * Edge which skips over a procedure call. Used for "jumping over" function 
+  * calls, i.e. in an intra-procedural CFG walk. 
+  */
+case class skipCallEdge(from: CfgNode, to: CfgNode) extends Edge(from, to) {
+  override def toString: String = s"skipCallEdge(From: $from, To: $to)"
 }
 
 /** Node in the control-flow graph.
  */
 trait CfgNode:
 
-  /** Predecessors of the current node. */
-  val pred: mutable.Set[CfgNode]
+  /** Predecessor commands of current node
+    */
+  val predCmds : mutable.Set[CfgNode]
+  /** Procedures which call this node
+   * Likely empty unless this node is a [[CfgFunctionEntryNode]]
+    */
+  val predCalls: mutable.Set[CfgNode]
+  /** If `intra` True only walk the intraprocedural CFG,
+   *    i.e., don't include procedure calls
+    */
+  def preds(intra: Boolean) = if (intra) predCmds else predCmds.union(predCalls)
+  
 
-  /** Successors of the current node. */
-  val succ: mutable.Set[CfgNode]
+  /** Successor commands of current node
+    */
+  val succCmds : mutable.Set[CfgNode]
+  /** Procedures which this node calls
+    */
+  val succCalls: mutable.Set[CfgNode]
+  /** If `intra` True only walk the intraprocedural CFG,
+   *    i.e., don't include procedure calls
+    */
+  def succs(intra: Boolean) = if (intra) succCmds else succCmds.union(succCalls)
 
   /** Unique identifier. */
   val id: Int
@@ -125,12 +158,22 @@ class Cfg(cfg: Cfg = null):
 
   /** Add an outgoing edge from the current node.
    */
-  def addEdge(from: CfgNode, to: CfgNode, cond: Option[Expr] = None): Unit =
-    from.succ += to
-    to.pred += from
-    cond match {
-      case Some(c) => edges += conditionalEdge(c, from, to)
-      case None => edges += unconditionalEdge(from, to)
+  def addEdge(from: CfgNode, to: CfgNode): Unit =
+
+    // TODO: add edges to set of edges here too
+    (from, to) match {
+      case (from: CfgFunctionEntryNode, to: CfgFunctionEntryNode) =>
+        from.succCalls += to
+        to.predCalls += from
+      case (from: CfgFunctionEntryNode, _) =>
+        from.succCmds += to
+        to.predCalls += from
+      case (_, to: CfgFunctionEntryNode) =>
+        from.succCalls += to
+        to.predCmds += from
+      case (_,_) =>
+        from.succCmds += to
+        to.predCmds += from
     }
 
   def addNode(node: CfgNode): Unit =

@@ -95,9 +95,11 @@ object RunUtils {
       Interpret(IRProgram)
     }
 
-    val externalRemover = ExternalRemover(externalNames)
-    val renamer = Renamer(reserved)
+    // Remove external function references (e.g. @printf)
+    val externalRemover = ExternalRemover(externalNames) 
     IRProgram = externalRemover.visitProgram(IRProgram)
+    // Removes BAP naming artefacts (e.g. # preceding variable names)
+    val renamer = Renamer(reserved) 
     IRProgram = renamer.visitProgram(IRProgram)
 
     //IRProgram.stripUnreachableFunctions()
