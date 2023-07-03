@@ -126,76 +126,45 @@ object RunUtils {
     //    print(res.keys)
     //    Output.output(OtherOutput(OutputKindE.cfg), an.cfg.toDot(Output.labeler(res, an.stateAfterNode), Output.dotIder))
 
-    val cfg = IntraproceduralProgramCfg.generateFromProgram(IRProgram)
+    val cfg = ProgramCfg.fromIR(IRProgram, 1)
     //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
     //      x.toString
     //    }, Output.dotIder))
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
        x.toString
-        }, Output.dotIder), "intra_cfg")
+        }, Output.dotIder), "new_cfg_test")
+
+    //val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
+    //val result = solver.analyze()
+    
+    //Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder), "constant_prop")
 
 
-//    println("==Generating Constant Prop Analysis")
-//    val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
-//    val result = solver.analyze()
-//
-//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder), "constant_prop")
-//
-//    dump_file(cfg.getEdges.toString(), "result")
-//
-//    print(s"\n Constant prop results\n ****************\n  ${result.values}  \n *****************\n")
+
+    //  val solver2 = new MemoryRegionAnalysis.WorklistSolver(cfg, globals_ToUSE, globalsOffsets_ToUSE)
+    //  val result2 = solver2.analyze()
+    //  memoryRegionAnalysisResults = Some(result2)
+    //  Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder), "mra")
 
 
-    //    val solver2 = new SteensgaardAnalysis(translator.program, result)
-    //    val result2 = solver2.analyze()
-    //    print(solver2.pointsTo())
+    //  val mmm = new MemoryModelMap
+    //  mmm.convertMemoryRegions(result2, internalFunctions_ToUSE)
+    //  //print("Memory Model Map: \n")
+    //  //print(mmm)
+    //  val interprocCfg = InterproceduralProgramCfg.generateFromProgram(IRProgram)
+    // Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot({ x =>
+    //   x.toString
+    // }, Output.dotIder), "inter_cfg")
 
-//    val ssa = new SSA(cfg)
-//    ssa.analyze()
+    // val solver3 = new analysis.ValueSetAnalysis.WorklistSolver(interprocCfg, globals_ToUSE, internalFunctions_ToUSE, globalsOffsets_ToUSE, mmm)
+    // val result3 = solver3.analyze()
+    // Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
 
-
-    /*
-    TODO - solveMemory parameters not set
-    val solver3 = new MemoryRegionAnalysis(cfg)
-    val result3 = solver3.analyze()
-    print(solver3.solveMemory())
-    val stringBuilder: StringBuilder = new StringBuilder()
-    stringBuilder.append("digraph G {\n")
-    for ((k, v) <- solver3.solveMemory()) {
-      v.foreach(x => stringBuilder.append(s"\"${k}\" -> \"${x}\";\n"))
-    }
-    stringBuilder.append("}")
-    dump_plot(stringBuilder.toString(), "result")
-    */
-
-//    val solver2 = new MemoryRegionAnalysis(cfg)
-//    val result2 = solver2.analyze()
-//    print(s"\n Mem region results\n ****************\n  ${solver2.getMapping}  \n *****************\n")
-//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(solver2.getMapping, solver.stateAfterNode), Output.dotIder))
-
-     val solver2 = new MemoryRegionAnalysis.WorklistSolver(cfg, globals_ToUSE, globalsOffsets_ToUSE)
-     val result2 = solver2.analyze()
-     memoryRegionAnalysisResults = Some(result2)
-     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder), "mra")
-
-
-     val mmm = new MemoryModelMap
-     mmm.convertMemoryRegions(result2, internalFunctions_ToUSE)
-     //print("Memory Model Map: \n")
-     //print(mmm)
-     val interprocCfg = InterproceduralProgramCfg.generateFromProgram(IRProgram)
-    Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot({ x =>
-      x.toString
-    }, Output.dotIder), "inter_cfg")
-
-    val solver3 = new analysis.ValueSetAnalysis.WorklistSolver(interprocCfg, globals_ToUSE, internalFunctions_ToUSE, globalsOffsets_ToUSE, mmm)
-    val result3 = solver3.analyze()
-    Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
-
-    val newCFG = InterproceduralProgramCfg.generateFromProgram(resolveCFG(interprocCfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram))
-     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot({ x => x.toString}, Output.dotIder), "resolvedCFG")
+    // val newCFG = InterproceduralProgramCfg.generateFromProgram(resolveCFG(interprocCfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram))
+    //  Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot({ x => x.toString}, Output.dotIder), "resolvedCFG")
   }
 
+  /*
   def resolveCFG(interproceduralProgramCfg: InterproceduralProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): Program = {
     // print the count of the value sets of the exit nodes
 //    for (comdNode <- interproceduralProgramCfg.nodes.filter(_.isInstanceOf[CfgCommandNode])) {
@@ -277,7 +246,8 @@ object RunUtils {
 
     IRProgram
   }
-
+  */
+  
   def writeToFile(program: BProgram, outputFileName: String): Unit = {
     try {
       val writer = BufferedWriter(FileWriter(outputFileName, false))
