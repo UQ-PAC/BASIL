@@ -330,7 +330,11 @@ object ProgramCfg:
   val cfg: ProgramCfg = ProgramCfg()
   
   // Mapping from procedures to the start of their individual (intra) cfgs
-  val procToCfg: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]() 
+  val procToCfg: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]()
+  // Mapping from procedures to procedure call nodes (all the calls made within this procedure, including inlined functions)
+  val procToCalls: mutable.HashMap[Procedure, Set[CfgCommandNode]] = mutable.HashMap[Procedure, Set[CfgCommandNode]]()
+  // Mapping from procedures to nodes in the cfg which call that procedure
+  val procToCallers: mutable.HashMap[Procedure, Set[CfgCommandNode]] = mutable.HashMap[Procedure, Set[CfgCommandNode]]()
 
   /** Generate the cfg for each function of the program. NOTE: is this functionally different to a constructor?
    *    Do we ever expect to generate a CFG from any other data structure? If not then the `class` could probably 
@@ -350,9 +354,7 @@ object ProgramCfg:
       proc => cfgForProcedure(proc)
     )
 
-
-
-    // Add 
+    // Inline functions up to `nth` level
 
     cfg
   }
@@ -370,21 +372,41 @@ object ProgramCfg:
 
   }
 
-  /**
-    * Recursively add 
+  /** Recursively add 
     * 
-    * @param procs
+    * @param procNodes
     * @param inlineAmount
-    * @return
     */
-  private def inlineProcedures(procs: Set[CfgFunctionEntryNode], inlineAmount: Int): Unit = {
+  private def inlineProcedureCalls(procNodes: Set[CfgCommandNode], inlineAmount: Int): Unit = {
     assert(inlineAmount >= 0)
 
     if (inlineAmount == 0) {
       return;
     }
 
-    // procs.foreach(proc => )
+    val currProcNodes: Set[CfgCommandNode] = procToCalls.values.flatten.toSet.diff(procNodes)
+
+    // Update `procToCalls` etc
+    // Add edges to start and from end of proc call (returned from `cloneProcedureCFG`)
+
+    // Q : will editing these inlined procedures all affect the same IR procedure?
+    // TODO: review this section. There's almost certainly a better way to do it. 
+    procNodes.foreach(
+      procNode => 
+        val targetProc: Procedure = procNode.data.asInstanceOf[DirectCall].target
+        val (procEntry, procExit) = cloneProcedureCFG(targetProc)
+
+        procToCallers(targetProc) += procNode
+
+        cfg.addEdge(procNode, procEntry)
+
+        procNode.succConds(intra = true).foreach(
+          (succ,cond) => cfg.addEdge(procExit, succ, cond)
+        )
+    )
+
+    val freshProcNodes: Set[CfgCommandNode] = procToCalls.values.flatten.toSet.diff(currProcNodes)
+    inlineProcedureCalls(freshProcNodes, inlineAmount - 1)
   }
 
   /** Clones the intraproc-cfg of the given procedure, with unique CfgNode ids.
@@ -394,7 +416,7 @@ object ProgramCfg:
     * @param proc - the procedure to clone (used to index the pre-computed cfgs)
     * @return (CfgFunctionEntryNode, CfgFunctionExitNode)
     */
-  def cloneProcedureCFG(proc: Procedure): (CfgFunctionEntryNode, CfgFunctionExitNode) = {
+  private def cloneProcedureCFG(proc: Procedure): (CfgFunctionEntryNode, CfgFunctionExitNode) = {
 
     val (entryNode: CfgFunctionEntryNode, exitNode: CfgFunctionExitNode) = procToCfg(proc)
     val newEntry: CfgFunctionEntryNode = CfgFunctionEntryNode(data = entryNode.data)
@@ -402,7 +424,6 @@ object ProgramCfg:
 
     // Entry is guaranteed to only have one successor (by our cfg design)
     var currNode: CfgNode = entryNode.succ(intra = true).head
-
     visitNode(currNode, newEntry, TrueLiteral)
  
     /** Walk this proc's cfg until we reach the exit node on each branch. We 
