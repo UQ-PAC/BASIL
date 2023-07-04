@@ -24,6 +24,7 @@ trait Dependencies[N]:
   */
 trait ForwardDependencies extends Dependencies[CfgNode]:
 
+  /* TODO: add functionality here for distinguishing between Intra / Inter */
   def outdep(n: CfgNode): Set[CfgNode] = n.succ.toSet
 
   def indep(n: CfgNode): Set[CfgNode] = n.pred.toSet

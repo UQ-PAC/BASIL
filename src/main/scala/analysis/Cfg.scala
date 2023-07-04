@@ -25,60 +25,89 @@ object CfgNode:
     id += 1
     id
 
-// EdgeType
-abstract class Edge(from: CfgNode, to: CfgNode):
+/**
+  * Edge type. 
+  * 
+  * `cond` : condition if this is a conditional edge. By default, assume True.
+  */
+trait CfgEdge(from: CfgNode, to: CfgNode, cond: Expr = TrueLiteral):
   def getFrom: CfgNode = from
   def getTo: CfgNode = to
+  def getCond: Expr = cond
 
 /**
-  * Edge between two command nodes in the CFG 
+  * Edge between two command nodes in the CFG. Used for `GoTo` branches 
+  * as well (with a condition added for the branch).
   */
-case class RegularEdge(from: CfgNode, to: CfgNode) extends Edge(from, to) {
+case class RegularEdge(from: CfgNode, to: CfgNode) extends CfgEdge(from, to) {
   override def toString: String = s"RegularEdge(From: $from, To: $to)"
-}
-
-/**
-  * Procedure call between node and procedure. 
-  */
-case class InterprocEdge(from: CfgNode, to: CfgNode) extends Edge(from, to) {
-  override def toString: String = s"InterprocEdge(From: $from, To: $to)"
 }
 
 /**
   * Edge which skips over a procedure call. Used for "jumping over" function 
   * calls, i.e. in an intra-procedural CFG walk. 
   */
-case class IntraprocEdge(from: CfgNode, to: CfgNode) extends Edge(from, to) {
+case class IntraprocEdge(from: CfgNode, to: CfgNode) extends CfgEdge(from, to) {
   override def toString: String = s"IntraprocEdge(From: $from, To: $to)"
+}
+
+/**
+  * Procedure call between node and procedure. 
+  */
+case class InterprocEdge(from: CfgNode, to: CfgNode) extends CfgEdge(from, to) {
+  override def toString: String = s"InterprocEdge(From: $from, To: $to)"
 }
 
 /** Node in the control-flow graph.
  */
 trait CfgNode:
 
-  /** Predecessor commands of current node
-    */
-  val predCmds : mutable.Set[CfgNode]
-  /** Procedures which call this node
-   * Likely empty unless this node is a [[CfgFunctionEntryNode]]
-    */
-  val predCalls: mutable.Set[CfgNode]
-  /** If `intra` True only walk the intraprocedural CFG,
-   *    i.e., don't include procedure calls
-    */
-  def preds(intra: Boolean) = if (intra) predCmds else predCmds.union(predCalls)
+  /** Edges to this node from regular statements or ignored procedure calls.
+   * 
+   * `predCmds` <: Set[RegularEdge | IntraprocEdge]
+   */
+  val predCmds : mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
   
+  /** Edges to this node from procedure calls. Likely empty unless this node is a [[CfgFunctionEntryNode]]
+   * 
+   * `predCalls` <: Set[InterprocEdge]
+   */
+  val predCalls: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
 
-  /** Successor commands of current node
+  /** Retrieve predecessor nodes, and the conditions that lead to this node.
+    * 
+    * @param intra if true, only walk the intraprocedural cfg.
+    * @return (Node, EdgeCondition)
     */
-  val succCmds : mutable.Set[CfgNode]
-  /** Procedures which this node calls
+  def pred(intra: Boolean): mutable.Set[(CfgNode, Expr)] = {
+    intra match 
+      case true => predCmds.map(edge => (edge.getFrom, edge.getCond))
+      case false => predCmds.union(predCalls).map(edge => (edge.getFrom, edge.getCond))
+  }
+  
+  
+  /** Edges to successor nodes, either regular or ignored procedure calls
+   * 
+   * `succCmds` <: Set[RegularEdge | IntraprocEdge]
+   */
+  val succCmds : mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
+
+  /** Edges to successor procedure calls. Used when walking inter-proc cfg. 
+   * 
+   * `succCalls` <: Set[InerprocEdge]
+   */
+  val succCalls: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
+
+  /** Retrieve succesor nodes and associated conditions, if they exist.
+    * 
+    * @param intra if true, only walk the intraprocedural cfg.
+    * @return (Node, EdgeCondition)
     */
-  val succCalls: mutable.Set[CfgNode]
-  /** If `intra` True only walk the intraprocedural CFG,
-   *    i.e., don't include procedure calls
-    */
-  def succs(intra: Boolean) = if (intra) succCmds else succCmds.union(succCalls)
+  def succ(intra: Boolean): mutable.Set[(CfgNode, Expr)] = {
+    intra match 
+      case true => succCmds.map(edge => (edge.getFrom, edge.getCond))
+      case false => succCmds.union(succCalls).map(edge => (edge.getFrom, edge.getCond))
+  }
 
   /** Unique identifier. */
   val id: NodeId = CfgNode.nextId()
@@ -98,28 +127,53 @@ trait CfgNodeWithData[T] extends CfgNode:
 
 /** Control-flow graph node for the entry of a function.
  */
-case class CfgFunctionEntryNode() extends CfgNodeWithData[Procedure]:
+case class CfgFunctionEntryNode(id: Int = CfgNode.nextId(),
+                                data: Procedure
+                                ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionEntry] $data"
+  /** Copy this node, but give unique ID - do it ourselves because Scala won't */
+  def cloneNode(): CfgNode = this.copy(id = CfgNode.nextId())
+  
 
 /** Control-flow graph node for the exit of a function.
  */
-case class CfgFunctionExitNode() extends CfgNodeWithData[Procedure]:
+case class CfgFunctionExitNode( id: Int = CfgNode.nextId(),
+                                data: Procedure
+                              ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionExit] $data"
+  /** Copy this node, but give unique ID - do it ourselves because Scala won't */
+  def cloneNode(): CfgNode = this.copy(id = CfgNode.nextId())
 
 /** Control-flow graph node for a block.
+ * 
+ * NOTE: deprecate?
  */
-case class CfgBlockEntryNode() extends CfgNodeWithData[Block]:
+case class CfgBlockEntryNode( id: Int = CfgNode.nextId(),
+                              data: Block
+                            ) extends CfgNodeWithData[Block]:
   override def toString: String = s"[BlockEntry] $data"
+  /** Copy this node, but give unique ID - do it ourselves because Scala won't */
+  def cloneNode(): CfgNode = this.copy(id = CfgNode.nextId())
 
 /** Control-flow graph node for a block.
+ * 
+ * NOTE: deprecate?
  */
-case class CfgBlockExitNode() extends CfgNodeWithData[Block]:
+case class CfgBlockExitNode(  id: Int = CfgNode.nextId(),
+                              data: Block
+                            )  extends CfgNodeWithData[Block]:
   override def toString: String = s"[BlockExit] $data"
+  /** Copy this node, but give unique ID - do it ourselves because Scala won't */
+  def cloneNode(): CfgNode = this.copy(id = CfgNode.nextId())
 
 /** Control-flow graph node for a command (statement or jump).
  */
-case class CfgCommandNode() extends CfgNodeWithData[Command]:
+case class CfgCommandNode(  id: Int = CfgNode.nextId(),
+                            data: Command
+                            ) extends CfgNodeWithData[Command]:
   override def toString: String = s"[Stmt] $data"
+  /** Copy this node, but give unique ID - do it ourselves because Scala won't */
+  def cloneNode(): CfgNode = this.copy(id = CfgNode.nextId())
 
 /** 
  * A control-flow graph. Provides the ability to walk it as both an intra and inter 
@@ -127,7 +181,7 @@ case class CfgCommandNode() extends CfgNodeWithData[Command]:
  * Basil IR blocks.
  * 
  */
-class ProgramCfg: 
+class ProgramCfg:
 
   // CFG Block -> IR Block
   var nodeToBlock: mutable.Map[CfgNode, Block] = mutable.Map[CfgNode, Block]()
@@ -136,16 +190,19 @@ class ProgramCfg:
 
   /** Add an outgoing edge from the current node.
    */
-  def addEdge(from: CfgNode, to: CfgNode): Unit
+  def addEdge(from: CfgNode, to: CfgNode): Unit 
+    
 
   /** Add a node to the CFG.
     */
-  def addNode(node: CfgNode): Unit
+  def addNode(node: CfgNode): Unit = 
+    nodes += node
 
   /**
    * Returns a Graphviz dot representation of the CFG.
    * Each node is labeled using the given function labeler.
    */
+  /*
   def toDot(labeler: CfgNode => String, idGen: (CfgNode, Int) => String): String = {
     val dotNodes = mutable.Map[CfgNode, DotNode]()
     var dotArrows = mutable.ListBuffer[DotArrow]()
@@ -163,6 +220,10 @@ class ProgramCfg:
     dotArrows = dotArrows.sortBy(arr => arr.fromNode.id + "-" + arr.toNode.id)
     val allNodes = dotNodes.values.seq.toList.sortBy(n => n.id)
     new DotGraph("CFG", allNodes, dotArrows).toDotString
+  }*/
+
+  def toDot(labeler: CfgNode => String, idGen: (CfgNode, Int) => String): String = {
+    return "PLACEHOLDER"
   }
 
 
@@ -204,6 +265,11 @@ object ProgramCfg:
     println("Generating CFG...")
 
     // Create CFG for individual functions
+    program.procedures.foreach(
+      proc => cfgForProcedure(proc)
+    )
+
+
 
     // Add 
 
@@ -211,5 +277,31 @@ object ProgramCfg:
   }
 
   private def cfgForProcedure(proc: Procedure) = {
+
+    val funcEntryNode = CfgFunctionEntryNode(data = proc)
+    val funcExitNode  = CfgFunctionExitNode(data = proc)
+    cfg.addNode
     
+    // Get list of statements
+  }
+
+  private def cfgForBlock(block: Block) = {
+
+  }
+
+  /**
+    * Recursively add 
+    * 
+    * @param procs
+    * @param inlineAmount
+    * @return
+    */
+  private def inlineProcedures(procs: Set[CfgFunctionEntryNode], inlineAmount: Int): Unit = {
+    @assert(inlineAmount >= 0)
+
+    if (inlineAmount == 0) {
+      return
+    }
+
+    // procs.foreach(proc => )
   }
