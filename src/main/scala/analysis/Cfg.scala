@@ -30,7 +30,7 @@ object CfgNode:
   * 
   * `cond` : condition if this is a conditional edge. By default, assume True.
   */
-trait CfgEdge(from: CfgNode, to: CfgNode, cond: Expr = TrueLiteral):
+trait CfgEdge(from: CfgNode, to: CfgNode, cond: Expr):
   def getFrom: CfgNode = from
   def getTo: CfgNode = to
   def getCond: Expr = cond
@@ -39,7 +39,7 @@ trait CfgEdge(from: CfgNode, to: CfgNode, cond: Expr = TrueLiteral):
   * Edge between two command nodes in the CFG. Used for `GoTo` branches 
   * as well (with a condition added for the branch).
   */
-case class RegularEdge(from: CfgNode, to: CfgNode) extends CfgEdge(from, to) {
+case class RegularEdge(from: CfgNode, to: CfgNode, cond: Expr) extends CfgEdge(from, to, cond) {
   override def toString: String = s"RegularEdge(From: $from, To: $to)"
 }
 
@@ -47,14 +47,14 @@ case class RegularEdge(from: CfgNode, to: CfgNode) extends CfgEdge(from, to) {
   * Edge which skips over a procedure call. Used for "jumping over" function 
   * calls, i.e. in an intra-procedural CFG walk. 
   */
-case class IntraprocEdge(from: CfgNode, to: CfgNode) extends CfgEdge(from, to) {
+case class IntraprocEdge(from: CfgNode, to: CfgNode, cond: Expr) extends CfgEdge(from, to, cond) {
   override def toString: String = s"IntraprocEdge(From: $from, To: $to)"
 }
 
 /**
   * Procedure call between node and procedure. 
   */
-case class InterprocEdge(from: CfgNode, to: CfgNode) extends CfgEdge(from, to) {
+case class InterprocEdge(from: CfgNode, to: CfgNode, cond: Expr) extends CfgEdge(from, to, cond) {
   override def toString: String = s"InterprocEdge(From: $from, To: $to)"
 }
 
@@ -64,15 +64,15 @@ trait CfgNode:
 
   /** Edges to this node from regular statements or ignored procedure calls.
    * 
-   * `predCmds` <: Set[RegularEdge | IntraprocEdge]
+   * `predIntra` <: Set[RegularEdge | IntraprocEdge]
    */
-  val predCmds : mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
+  val predIntra : mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
   
   /** Edges to this node from procedure calls. Likely empty unless this node is a [[CfgFunctionEntryNode]]
    * 
-   * `predCalls` <: Set[InterprocEdge]
+   * `predInter` <: Set[RegularEdge | InterprocEdge]
    */
-  val predCalls: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
+  val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
 
   /** Retrieve predecessor nodes, and the conditions that lead to this node.
     * 
@@ -81,36 +81,55 @@ trait CfgNode:
     */
   def pred(intra: Boolean): mutable.Set[(CfgNode, Expr)] = {
     intra match 
-      case true => predCmds.map(edge => (edge.getFrom, edge.getCond))
-      case false => predCmds.union(predCalls).map(edge => (edge.getFrom, edge.getCond))
+      case true => predIntra.map(edge => (edge.getFrom, edge.getCond))
+      case false => predInter.map(edge => (edge.getFrom, edge.getCond))
   }
   
   
   /** Edges to successor nodes, either regular or ignored procedure calls
    * 
-   * `succCmds` <: Set[RegularEdge | IntraprocEdge]
+   * `succIntra` <: Set[RegularEdge | IntraprocEdge]
    */
-  val succCmds : mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
+  val succIntra : mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
 
   /** Edges to successor procedure calls. Used when walking inter-proc cfg. 
    * 
-   * `succCalls` <: Set[InerprocEdge]
+   * `succInter` <: Set[RegularEdge | InterprocEdge]
    */
-  val succCalls: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
+  val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
+
+  /** Retrieve successor nodes to this node.
+    * 
+    * @param intra if true, only walk the intraprocedural cfg.
+    * @return Set of successor nodes
+    */
+  def succ(intra: Boolean): mutable.Set[CfgNode] = {
+    intra match
+      case true => succIntra.map(edge => edge.getTo)
+      case false => succInter.map(edge => edge.getTo)
+  }
+
+  /** Retrieve successor edges from this node.
+    * 
+    * @param intra if true, only walk the intraprocedural cfg.
+    * @return Set of successor edges
+    */
+  def succEdges(intra: Boolean): mutable.Set[CfgEdge] = if (intra) succIntra else succInter
 
   /** Retrieve succesor nodes and associated conditions, if they exist.
     * 
     * @param intra if true, only walk the intraprocedural cfg.
     * @return (Node, EdgeCondition)
     */
-  def succ(intra: Boolean): mutable.Set[(CfgNode, Expr)] = {
+  def succConds(intra: Boolean): mutable.Set[(CfgNode, Expr)] = {
     intra match 
-      case true => succCmds.map(edge => (edge.getFrom, edge.getCond))
-      case false => succCmds.union(succCalls).map(edge => (edge.getFrom, edge.getCond))
+      case true => succIntra.map(edge => (edge.getTo, edge.getCond))
+      case false => succInter.map(edge => (edge.getTo, edge.getCond))
   }
 
   /** Unique identifier. */
   val id: NodeId = CfgNode.nextId()
+  def copyNode[T](): T
 
   override def equals(obj: scala.Any): Boolean =
     obj match
@@ -127,53 +146,65 @@ trait CfgNodeWithData[T] extends CfgNode:
 
 /** Control-flow graph node for the entry of a function.
  */
-case class CfgFunctionEntryNode(id: Int = CfgNode.nextId(),
+case class CfgFunctionEntryNode(
+                                override val id: Int = CfgNode.nextId(),
+                                override val predIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
+                                override val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
+                                override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
+                                override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                                 data: Procedure
-                                ) extends CfgNodeWithData[Procedure]:
+                              ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionEntry] $data"
   /** Copy this node, but give unique ID - do it ourselves because Scala won't */
-  def cloneNode(): CfgNode = this.copy(id = CfgNode.nextId())
+  override def copyNode(): CfgFunctionEntryNode = this.copy(
+    id = CfgNode.nextId(), 
+    succInter = mutable.Set[CfgEdge](),
+    succIntra = mutable.Set[CfgEdge](),
+    predInter = mutable.Set[CfgEdge](),
+    predIntra = mutable.Set[CfgEdge]()
+    )
+  
   
 
 /** Control-flow graph node for the exit of a function.
  */
-case class CfgFunctionExitNode( id: Int = CfgNode.nextId(),
+case class CfgFunctionExitNode(
+                                override val id: Int = CfgNode.nextId(),
+                                override val predIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
+                                override val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
+                                override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
+                                override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                                 data: Procedure
                               ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionExit] $data"
   /** Copy this node, but give unique ID - do it ourselves because Scala won't */
-  def cloneNode(): CfgNode = this.copy(id = CfgNode.nextId())
-
-/** Control-flow graph node for a block.
- * 
- * NOTE: deprecate?
- */
-case class CfgBlockEntryNode( id: Int = CfgNode.nextId(),
-                              data: Block
-                            ) extends CfgNodeWithData[Block]:
-  override def toString: String = s"[BlockEntry] $data"
-  /** Copy this node, but give unique ID - do it ourselves because Scala won't */
-  def cloneNode(): CfgNode = this.copy(id = CfgNode.nextId())
-
-/** Control-flow graph node for a block.
- * 
- * NOTE: deprecate?
- */
-case class CfgBlockExitNode(  id: Int = CfgNode.nextId(),
-                              data: Block
-                            )  extends CfgNodeWithData[Block]:
-  override def toString: String = s"[BlockExit] $data"
-  /** Copy this node, but give unique ID - do it ourselves because Scala won't */
-  def cloneNode(): CfgNode = this.copy(id = CfgNode.nextId())
+  override def copyNode(): CfgFunctionExitNode = this.copy(
+    id = CfgNode.nextId(), 
+    succInter = mutable.Set[CfgEdge](),
+    succIntra = mutable.Set[CfgEdge](),
+    predInter = mutable.Set[CfgEdge](),
+    predIntra = mutable.Set[CfgEdge]()
+    )
 
 /** Control-flow graph node for a command (statement or jump).
  */
-case class CfgCommandNode(  id: Int = CfgNode.nextId(),
-                            data: Command
+case class CfgCommandNode(
+                              override val id: Int = CfgNode.nextId(),
+                              override val predIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
+                              override val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
+                              override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
+                              override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
+                              data: Command
                             ) extends CfgNodeWithData[Command]:
   override def toString: String = s"[Stmt] $data"
   /** Copy this node, but give unique ID - do it ourselves because Scala won't */
-  def cloneNode(): CfgNode = this.copy(id = CfgNode.nextId())
+  override def copyNode(): CfgCommandNode = this.copy(
+    id = CfgNode.nextId(), 
+    succInter = mutable.Set[CfgEdge](),
+    succIntra = mutable.Set[CfgEdge](),
+    predInter = mutable.Set[CfgEdge](),
+    predIntra = mutable.Set[CfgEdge]()
+    )
 
 /** 
  * A control-flow graph. Provides the ability to walk it as both an intra and inter 
@@ -185,12 +216,61 @@ class ProgramCfg:
 
   // CFG Block -> IR Block
   var nodeToBlock: mutable.Map[CfgNode, Block] = mutable.Map[CfgNode, Block]()
-  var edges: ListBuffer[Edge] = ListBuffer[Edge]()
+  var edges: ListBuffer[CfgEdge] = ListBuffer[CfgEdge]()
   var nodes: ListBuffer[CfgNode] = ListBuffer[CfgNode]()
 
-  /** Add an outgoing edge from the current node.
+  /** Add an outgoing edge from the current node, taking into account any conditionals 
+   *  on this jump. Note that we have some duplication of storage here - this is a performance 
+   *  consideration. We don't expect >4 edges for any given node, and so the increased storage is 
+   *  relatively minimal. This saves having to filter / union sets when trying to retrieve only 
+   *  an intra/inter cfg, hopefully improving computation time.
    */
-  def addEdge(from: CfgNode, to: CfgNode): Unit 
+  def addEdge(from: CfgNode, to: CfgNode, cond: Expr = TrueLiteral): Unit = {
+
+    var newEdge: CfgEdge = _;
+
+    (from, to) match {
+      // Calling procedure (follow)
+      case (from: CfgCommandNode, to: CfgFunctionEntryNode) =>
+        newEdge = InterprocEdge(from, to, cond)
+        from.succInter += newEdge
+        to.predInter += newEdge
+      // Returning from procedure
+      case (from: CfgFunctionExitNode, to: CfgNode) =>
+        newEdge = InterprocEdge(from, to, cond)
+        from.succInter += newEdge
+        to.predInter += newEdge
+      // First instruction of procedure
+      case (from: CfgFunctionEntryNode, to: CfgNode) =>
+        newEdge = RegularEdge(from, to, cond)
+        from.succIntra += newEdge
+        from.succInter += newEdge
+        to.predIntra += newEdge
+        to.predInter += newEdge
+      // Intra-procedural flow of instructions
+      case (from: CfgCommandNode, to: CfgCommandNode)  =>
+        (from, to) match {
+          // Calling procedure (skip)
+          case from.data: (DirectCall | IndirectCall) => 
+            newEdge = IntraprocEdge(from, to, cond)
+            from.succIntra += newEdge
+            to.predIntra += newEdge
+          // Regular instruction flow
+          case _ =>
+            newEdge = RegularEdge(from, to, cond)
+            from.succIntra += newEdge
+            from.succInter += newEdge
+            to.predInter += newEdge
+            to.predIntra += newEdge
+        }
+
+      case _ => println("[!] Unexpected edge combination when adding cfg edge.")
+    }
+
+    edges += newEdge
+    nodes += from
+    nodes += to
+  }
     
 
   /** Add a node to the CFG.
@@ -247,6 +327,10 @@ class ProgramCfg:
  * update nodes with analysis).
  */
 object ProgramCfg:
+  val cfg: ProgramCfg = ProgramCfg()
+  
+  // Mapping from procedures to the start of their individual (intra) cfgs
+  val procToCfg: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]() 
 
   /** Generate the cfg for each function of the program. NOTE: is this functionally different to a constructor?
    *    Do we ever expect to generate a CFG from any other data structure? If not then the `class` could probably 
@@ -257,9 +341,6 @@ object ProgramCfg:
    * @param inlineLimit
    *  How many levels deep to inline function calls. By defualt, don't inline - this is equivalent to an intra-procedural CFG.
    */
-  
-  val cfg: ProgramCfg = ProgramCfg()
-
   def fromIR(program: Program, inlineLimit: Int = 0): ProgramCfg = {
     require(inlineLimit >= 0, "Can't inline procedures to negative depth...")
     println("Generating CFG...")
@@ -297,11 +378,62 @@ object ProgramCfg:
     * @return
     */
   private def inlineProcedures(procs: Set[CfgFunctionEntryNode], inlineAmount: Int): Unit = {
-    @assert(inlineAmount >= 0)
+    assert(inlineAmount >= 0)
 
     if (inlineAmount == 0) {
-      return
+      return;
     }
 
     // procs.foreach(proc => )
+  }
+
+  /** Clones the intraproc-cfg of the given procedure, with unique CfgNode ids.
+    * Adds the new nodes to the cfg, and returns the start/end nodes of the new 
+    * procedure cfg.
+    *
+    * @param proc - the procedure to clone (used to index the pre-computed cfgs)
+    * @return (CfgFunctionEntryNode, CfgFunctionExitNode)
+    */
+  def cloneProcedureCFG(proc: Procedure): (CfgFunctionEntryNode, CfgFunctionExitNode) = {
+
+    val (entryNode: CfgFunctionEntryNode, exitNode: CfgFunctionExitNode) = procToCfg(proc)
+    val newEntry: CfgFunctionEntryNode = CfgFunctionEntryNode(data = entryNode.data)
+    val newExit : CfgFunctionExitNode  = exitNode.copyNode()
+
+    // Entry is guaranteed to only have one successor (by our cfg design)
+    var currNode: CfgNode = entryNode.succ(intra = true).head
+
+    visitNode(currNode, newEntry, TrueLiteral)
+ 
+    /** Walk this proc's cfg until we reach the exit node on each branch. We 
+      *   do this recursively, tracking the previous node, to account for branches
+      *   and loops.
+      * 
+      * We can't represent this as an edge as one node comes from the old cfg, 
+      *   and the other from the new cfg.
+      *
+      * @param node - node in the original procedure's cfg we're up to cloning
+      * @param prevNewNode - the originating node in the new clone's cfg
+      * @param cond - the condition leading to `node` from `prevNewNode`
+      */
+    def visitNode(node: CfgNode, prevNewNode: CfgNode, cond: Expr): Unit = {
+
+      if (node == exitNode) {
+        cfg.addEdge(prevNewNode, newExit, cond)
+        return;
+      }
+
+      // Link this node with predecessor in the new cfg
+      val newNode = node.copyNode()
+      cfg.addEdge(prevNewNode, newNode, cond)
+
+      // Get intra-cfg succesors
+      val outEdges: mutable.Set[CfgEdge] = node.succEdges(intra = true)
+      outEdges.foreach(
+        edge => 
+          visitNode(edge.getTo, newNode, edge.getCond) 
+      )
+    }
+
+    (newEntry, newExit)
   }
