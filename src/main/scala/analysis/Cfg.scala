@@ -365,18 +365,150 @@ object ProgramCfg:
     cfg
   }
 
-  private def cfgForProcedure(proc: Procedure) = {
-    val funcEntryNode = CfgFunctionEntryNode(data = proc)
-    val funcExitNode  = CfgFunctionExitNode(data = proc)
+  /**
+    * TODO
+    *
+    * @param proc
+    */
+  private def cfgForProcedure(proc: Procedure): Unit = {
+    val funcEntryNode: CfgFunctionEntryNode = CfgFunctionEntryNode(data = proc)
+    val funcExitNode: CfgFunctionExitNode   = CfgFunctionExitNode(data = proc)
     cfg.addNode(funcEntryNode)
     cfg.addNode(funcExitNode)
+
+    procToCfg += (proc -> (funcEntryNode, funcExitNode))
+
+    val visitedBlocks: mutable.HashMap[Block, CfgCommandNode] = mutable.HashMap[Block, CfgCommandNode]()
+    //val visitedBlocks: mutable.Set[Block] = mutable.Set[Block]()
     
-    // Get list of statements
+    // Visit each node
+    visitBlock(proc.blocks.head, funcEntryNode, TrueLiteral)
+
+
+    /**
+      * TODO
+      * 
+      * @param block
+      * @param prevBlockEnd
+      * @param cond
+      */
+    def visitBlock(block: Block, prevBlockEnd: CfgNode, cond: Expr): Unit = {
+
+      
+
+      // Handle first node - guaranteed to have at least one
+      var prevStmtNode: CfgCommandNode = CfgCommandNode(data = block.statements.head)
+      cfg.addEdge(prevBlockEnd, prevStmtNode, cond)
+
+      /* OPTIMISATION
+      Do this if all the jump "visits" end up being the below. Can just add edges at start and use this as a recursion check.
+      if (visitedBlocks.contains(prevBlockEnd)) {
+        cfg.addEdge(prevBlockEnd, prevStmtNode, cond)
+        return;
+      }
+      
+      if do, replace with this:
+
+      visitBlock(retBlock, callNode, TrueLiteral) // true because can only return to one location (deterministic)
+      */
+      
+
+      visitedBlocks += (block -> prevStmtNode)  // record entry node for this block
+
+      // Process the rest of the statements
+      block.statements.tail.foreach(
+        stmt => 
+          val stmtNode: CfgCommandNode = CfgCommandNode(data = stmt)
+          cfg.addEdge(prevStmtNode, stmtNode)
+          prevStmtNode = stmtNode
+      )
+
+      // Process jump(s) at end of basic block
+      block.jumps.foreach {
+        case goto: GoTo =>
+          // TODO: negate the condition for cases of two GoTos. Does this happen for any other kind of jumps?
+          val targetBlock: Block = goto.target
+          val targetCond: Expr = goto.condition match {
+            case Some(c) => c
+            case None => TrueLiteral
+          }
+
+          if (visitedBlocks.contains(targetBlock)) {
+            // Already visited the target, add edge and return
+
+            // SEE OPTIMISATION ABOVE
+            val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
+            cfg.addEdge(prevStmtNode, targetBlockEntry, targetCond)
+          } else {
+            visitBlock(targetBlock, prevStmtNode, targetCond)
+          }
+
+        case dCall: DirectCall =>
+          val callNode: CfgCommandNode = CfgCommandNode(data = dCall)
+          val targetProc: Procedure = dCall.target
+          val targetCond: Expr = dCall.condition match {
+            case Some(c) => c
+            case None => TrueLiteral
+          }
+
+          // Conditional branch to this call 
+          cfg.addEdge(prevStmtNode, callNode, targetCond)
+
+          // Record process association
+          procToCalls(proc) += callNode
+          procToCallers(targetProc) += callNode
+          callToNodes(funcEntryNode) += callNode
+
+          // Handle the return location
+          dCall.returnTarget match {
+            case Some(retBlock) => 
+              if(visitedBlocks.contains(retBlock)) {
+                val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
+                cfg.addEdge(callNode, retBlockEntry)
+              } else {
+                visitBlock(retBlock, callNode, TrueLiteral)
+              }
+            case None => 
+              // At end of 
+              println("[?] Direct - Do we have to handle the \"no return\" case?")
+          }
+
+        case iCall: IndirectCall =>
+          val callNode: CfgCommandNode = CfgCommandNode(data = iCall)
+          val targetCond: Expr = iCall.condition match {
+            case Some(c) => c
+            case None => TrueLiteral
+          }
+
+          // Conditional branch to this call
+          cfg.addEdge(prevStmtNode, callNode, targetCond)
+
+          // Record process association
+          procToCalls(proc) += callNode
+          callToNodes(funcEntryNode) += callNode
+
+          // R30 is the link register - this stores the address to return to 
+          //  is this accurate in this sense? Shouldn't we be getting the stored value?
+          if (iCall.target.isRegister("R30")) {
+            cfg.addEdge(callNode, funcExitNode, targetCond)
+          }
+
+          iCall.returnTarget match {
+            case Some(retBlock) => 
+              if(visitedBlocks.contains(retBlock)) {
+                val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
+                cfg.addEdge(callNode, retBlockEntry)
+              } else {
+                visitBlock(retBlock, callNode, TrueLiteral)
+              }
+            case None =>
+              println("[?] Indirect - Do we have to handle the \"no return\" case?")
+          }
+      }
+    }
   }
 
-  private def cfgForBlock(block: Block) = {
-
-  }
+  
 
   /** Recursively add 
     * 
@@ -407,7 +539,7 @@ object ProgramCfg:
        
         val (procEntry, procExit) = cloneProcedureCFG(targetProc)
 
-        // Add link between call node and the procedure's `Entry`
+        // Add link between call node and the procedure's `Entry`. 
         cfg.addEdge(procNode, procEntry, targetCond)
 
         // Link the procedure's `Exit` to the return point. There should only be one.
@@ -469,10 +601,13 @@ object ProgramCfg:
       node match {
         case n: CfgCommandNode => 
           n.data match {
-            case d : DirectCall => 
+            case d: DirectCall => 
               procToCalls(proc) += newNode        // This procedure (general) is calling another procedure
               callToNodes(entryNode) += newNode   // This procedure (specfic) is calling another procedure
               procToCallers(d.target) += newNode  // Target of this call has a new caller
+            case i: IndirectCall =>
+              procToCalls(proc) += newNode
+              callToNodes(entryNode) += newNode
             case _ => 
           }
         case _ => 
