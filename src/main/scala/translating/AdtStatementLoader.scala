@@ -1,6 +1,6 @@
 package translating
 
-import BilParser.BilAdtParser._
+import BilParser.BilAdtBackupParser._
 import bap._
 import ir.Endian
 import util.AssumptionViolationException

@@ -21,8 +21,18 @@ lazy val root = project
     libraryDependencies += javaTests,
     libraryDependencies += antlrRuntime,
     libraryDependencies += scalactic,
-    libraryDependencies += scalaTests
+    libraryDependencies += scalaTests,
+    libraryDependencies += "org.scalameta" %% "munit" % "0.7.29" % Test
   )
+
+Compile / PB.targets := Seq(
+  scalapb.gen() -> (Compile / sourceManaged).value / "scalapb"
+)
+
+libraryDependencies ++= Seq(
+    "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
+)
+libraryDependencies += "io.spray" %%  "spray-json" % "1.3.6"
 
 lazy val updateExpected = taskKey[Unit]("updates .expected for test cases")
 

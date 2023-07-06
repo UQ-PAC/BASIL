@@ -6,15 +6,19 @@ import bap._
 import ir._
 import boogie._
 import specification._
+import gtirb._
 import BilParser._
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
-import java.io.{File, PrintWriter}
-
-import java.io.{BufferedWriter, FileWriter, IOException}
+import java.io.{File, PrintWriter, FileInputStream, BufferedWriter, FileWriter, IOException}
+import com.grammatech.gtirb.proto.IR.IR
+import com.grammatech.gtirb.proto.Module.Module
+import com.grammatech.gtirb.proto.Section.Section
+import spray.json._
 import scala.jdk.CollectionConverters._
 import analysis.solvers._
+
 object RunUtils {
   var globals_ToUSE: Set[SpecGlobal] = Set()
   var memoryRegionAnalysisResults = None: Option[Map[CfgNode, _]]
@@ -22,79 +26,96 @@ object RunUtils {
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
 
-  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
+  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean):  Unit = {
+    //FUNCTION USED TO RETURN BPROGRAM
 
-    val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
+    var fIn       = new FileInputStream(fileName)
+    val ir        = IR.parseFrom(fIn)
+    val mods      = ir.modules
+
+    val cfg       = ir.cfg
+    val texts     = mods.map(_.sections.head).filter(_.name == ".text")
+    val symbols   = mods.map(_.symbols)
+    val semantics = mods.map(getSemantics);
+
+    val adtLexer = BilAdtLexer(CharStreams.fromString(semantics.head.prettyPrint))
     val tokens = CommonTokenStream(adtLexer)
     // ADT
     val parser = BilAdtParser(tokens)
 
     parser.setBuildParseTree(true)
 
-    val program = AdtStatementLoader.visitProject(parser.project())
 
-    val elfLexer = SymsLexer(CharStreams.fromFileName(elfFileName))
-    val elfTokens = CommonTokenStream(elfLexer)
-    val elfParser = SymsParser(elfTokens)
-    elfParser.setBuildParseTree(true)
+    val tl = new TalkingListener()
 
-    val (externalFunctions, globals, globalOffsets) = ElfLoader.visitSyms(elfParser.syms())
-    if (performAnalysis) {
-      globals_ToUSE = globals
-      print("Globals: \n")
-      print(globals)
-      print("\nGlobal Offsets: \n")
-      print(globalOffsets)
-    }
+    ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
+    
 
-    //println(globalOffsets)
-    //val procmap = program.subroutines.map(s => (s.name, s.address)).toMap
-    //println(procmap)
-    //println(externalFunctions)
-    //println(globals)
-    /*
-    TODO analyses/transformations
-    -type checking
-    -make sure there's no sneaky stack accesses
-    -constant propagation to properly analyse control flow and replace all indirect calls
-    -identify external calls
-    -check for use of uninitialised registers in procedures to pass them in
-    -points to/alias analysis to split memory into separate maps as much as possible? do we want this?
-    -make memory reads better?
-     */
 
-    val externalNames = externalFunctions.map(e => e.name)
+    // val program = AdtStatementLoader.visitProject(parser.project())
 
-    val IRTranslator = BAPToIR(program)
-    var IRProgram = IRTranslator.translate
+    // val elfLexer = SymsLexer(CharStreams.fromFileName(elfFileName))
+    // val elfTokens = CommonTokenStream(elfLexer)
+    // val elfParser = SymsParser(elfTokens)
+    // elfParser.setBuildParseTree(true)
 
-    val specification = specFileName match {
-      case Some(s) => val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
-        val specTokens = CommonTokenStream(specLexer)
-        val specParser = SpecificationsParser(specTokens)
-        specParser.setBuildParseTree(true)
-        val specLoader = SpecificationLoader(globals, IRProgram)
-        specLoader.visitSpecification(specParser.specification())
-      case None => Specification(globals, Map(), List(), List(), List())
-    }
+    // val (externalFunctions, globals, globalOffsets) = ElfLoader.visitSyms(elfParser.syms())
+    // if (performAnalysis) {
+    //   globals_ToUSE = globals
+    //   print("Globals: \n")
+    //   print(globals)
+    //   print("\nGlobal Offsets: \n")
+    //   print(globalOffsets)
+    // }
 
-    if (performInterpret) {
-      Interpret(IRProgram)
-    }
+    // //println(globalOffsets)
+    // //val procmap = program.subroutines.map(s => (s.name, s.address)).toMap
+    // //println(procmap)
+    // //println(externalFunctions)
+    // //println(globals)
+    // /*
+    // TODO analyses/transformations
+    // -type checking
+    // -make sure there's no sneaky stack accesses
+    // -constant propagation to properly analyse control flow and replace all indirect calls
+    // -identify external calls
+    // -check for use of uninitialised registers in procedures to pass them in
+    // -points to/alias analysis to split memory into separate maps as much as possible? do we want this?
+    // -make memory reads better?
+    //  */
 
-    val externalRemover = ExternalRemover(externalNames)
-    val renamer = Renamer(reserved)
-    IRProgram = externalRemover.visitProgram(IRProgram)
-    IRProgram = renamer.visitProgram(IRProgram)
+    // val externalNames = externalFunctions.map(e => e.name)
 
-    IRProgram.stripUnreachableFunctions()
+    // val IRTranslator = BAPToIR(program)
+    // var IRProgram = IRTranslator.translate
 
-    if (performAnalysis) {
-      analyse(IRProgram)
-    }
+    // val specification = specFileName match {
+    //   case Some(s) => val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
+    //     val specTokens = CommonTokenStream(specLexer)
+    //     val specParser = SpecificationsParser(specTokens)
+    //     specParser.setBuildParseTree(true)
+    //     val specLoader = SpecificationLoader(globals, IRProgram)
+    //     specLoader.visitSpecification(specParser.specification())
+    //   case None => Specification(globals, Map(), List(), List(), List())
+    // }
 
-    val boogieTranslator = IRToBoogie(IRProgram, specification)
-    boogieTranslator.translate
+    // if (performInterpret) {
+    //   Interpret(IRProgram)
+    // }
+
+    // val externalRemover = ExternalRemover(externalNames)
+    // val renamer = Renamer(reserved)
+    // IRProgram = externalRemover.visitProgram(IRProgram)
+    // IRProgram = renamer.visitProgram(IRProgram)
+
+    // IRProgram.stripUnreachableFunctions()
+
+    // if (performAnalysis) {
+    //   analyse(IRProgram)
+    // }
+
+    // val boogieTranslator = IRToBoogie(IRProgram, specification)
+    // boogieTranslator.translate
   }
 
   def analyse(IRProgram: Program): Unit = {
