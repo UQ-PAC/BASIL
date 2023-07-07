@@ -1,6 +1,6 @@
 package util
 import analysis.*
-import analysis.util.SSA
+// import analysis.util.SSA
 import cfg_visualiser.{OtherOutput, Output, OutputKindE}
 import bap.*
 import ir.*
@@ -36,6 +36,7 @@ object RunUtils {
 
     parser.setBuildParseTree(true)
 
+    println("[!] Generating IR")
     val program = AdtStatementLoader.visitProject(parser.project())
 
     val elfLexer = SymsLexer(CharStreams.fromFileName(elfFileName))
@@ -43,6 +44,7 @@ object RunUtils {
     val elfParser = SymsParser(elfTokens)
     elfParser.setBuildParseTree(true)
 
+    println("[!] Parsing .relf")
     val (externalFunctions, globals, globalOffsets, internalFunctions) = ElfLoader.visitSyms(elfParser.syms())
     print(internalFunctions)
     if (performAnalysis) {
@@ -78,6 +80,7 @@ object RunUtils {
 
     val externalNames = externalFunctions.map(e => e.name)
 
+    println("[!] Translating from BAP to IR")
     val IRTranslator = BAPToIR(program)
     var IRProgram = IRTranslator.translate
 
@@ -95,6 +98,7 @@ object RunUtils {
       Interpret(IRProgram)
     }
 
+    println("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
     val externalRemover = ExternalRemover(externalNames) 
     IRProgram = externalRemover.visitProgram(IRProgram)
@@ -108,8 +112,11 @@ object RunUtils {
       analyse(IRProgram)
     }
 
+    println("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
-    boogieTranslator.translate
+    val boogieResult = boogieTranslator.translate
+    println("[!] Done! Exiting...")
+    boogieResult
   }
 
   def analyse(IRProgram: Program): Unit = {

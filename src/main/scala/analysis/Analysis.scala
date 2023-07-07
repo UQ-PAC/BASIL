@@ -19,7 +19,7 @@ trait Analysis[+R]:
 
   /** Performs the analysis and returns the result.
     */
-  def analyze(): R
+  def analyze(intra: Boolean): R
 
 /** A flow-sensitive analysis.
   * @param stateAfterNode
@@ -118,7 +118,7 @@ abstract class SimpleValueAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAna
     */
   val lattice: MapLattice[CfgNode, statelattice.type] = MapLattice(statelattice)
 
-  val domain: Set[CfgNode] = cfg.nodes
+  val domain: Set[CfgNode] = cfg.nodes.toSet
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
@@ -204,7 +204,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   /**
    * @inheritdoc
    */
-  def analyze(): Unit =
+  def analyze(intra: Boolean): Unit =
   // generate the constraints by traversing the AST and solve them on-the-fly
     visit(program, ())
 
@@ -492,7 +492,7 @@ trait MemoryRegionAnalysisMisc:
    */
   val lattice: MapLattice[CfgNode, PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
 
-  val domain: Set[CfgNode] = cfg.nodes
+  val domain: Set[CfgNode] = cfg.nodes.toSet
 
   private val stackPointer = Variable("R31", BitVecType(64))
   private val linkRegister = Variable("R30", BitVecType(64))
@@ -519,7 +519,7 @@ trait MemoryRegionAnalysisMisc:
     if (variable.name.contains("#")) {
         return decls
     }
-    for (pred <- n.pred) {
+    for (pred <- n.pred(intra = false)) {
       if (loopEscape(pred)) {
         return mutable.ListBuffer.empty
       }

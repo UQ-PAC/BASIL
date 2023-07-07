@@ -357,5 +357,5 @@ case class Variable(name: String, irType: IRType) extends Expr {
   val isRegister: Boolean = name.startsWith("R") || name.startsWith("V") && name != "VF"
 
   // `rName` : e.g. "R20"
-  def isRegister(rName: String): Boolean = isRegister && number.equals(rNname)
+  def isRegister(rName: String): Boolean = isRegister && rName.equals(name)
 }

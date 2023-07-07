@@ -67,7 +67,7 @@ trait MemoryRegionValueSetAnalysis:
    */
   val lattice: MapLattice[CfgNode, MapLattice[Expr, PowersetLattice[Value]]] = MapLattice(powersetLattice)
 
-  val domain: Set[CfgNode] = cfg.nodes
+  val domain: Set[CfgNode] = cfg.nodes.toSet
 
   private val stackPointer = Variable("R31", BitVecType(64))
   private val linkRegister = Variable("R30", BitVecType(64))
@@ -94,7 +94,7 @@ trait MemoryRegionValueSetAnalysis:
     if (variable.name.contains("#")) {
       return decls
     }
-    for (pred <- n.pred) {
+    for (pred <- n.pred(intra = false)) {
       if (loopEscape(pred)) {
         return mutable.ListBuffer.empty
       }
@@ -393,7 +393,7 @@ abstract class ValueSetAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntreprocValueSetAnalysisWorklistSolver[L <: MapLattice[Expr, PowersetLattice[Value]]](cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], globalOffsets: Map[BigInt, BigInt], mmm: MemoryModelMap, val powersetLattice: L)
+abstract class InterprocValueSetAnalysisWorklistSolver[L <: MapLattice[Expr, PowersetLattice[Value]]](cfg: ProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], globalOffsets: Map[BigInt, BigInt], mmm: MemoryModelMap, val powersetLattice: L)
   extends ValueSetAnalysis(cfg, globals, internalFunctions, globalOffsets, mmm)
     with SimpleMonotonicSolver[CfgNode]
     with ForwardDependencies
@@ -402,5 +402,5 @@ object ValueSetAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
    */
-  class WorklistSolver(cfg: InterproceduralProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], globalOffsets: Map[BigInt, BigInt], mmm: MemoryModelMap)
-    extends IntreprocValueSetAnalysisWorklistSolver(cfg, globals, internalFunctions, globalOffsets, mmm, MapLattice[Expr, PowersetLattice[Value]](PowersetLattice[Value]))
+  class WorklistSolver(cfg: ProgramCfg, globals: Set[SpecGlobal], internalFunctions: Set[InternalFunction], globalOffsets: Map[BigInt, BigInt], mmm: MemoryModelMap)
+    extends InterprocValueSetAnalysisWorklistSolver(cfg, globals, internalFunctions, globalOffsets, mmm, MapLattice[Expr, PowersetLattice[Value]](PowersetLattice[Value]))

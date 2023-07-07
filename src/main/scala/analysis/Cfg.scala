@@ -2,7 +2,7 @@ package analysis
 
 import scala.collection.mutable
 import ir._
-import cfg_visualiser.{DotArrow, DotDirArrow, DotGraph, DotNode}
+import cfg_visualiser.{DotArrow, DotRegularArrow, DotInterArrow, DotIntraArrow, DotGraph, DotNode}
 
 import scala.collection.mutable.ListBuffer
 
@@ -75,18 +75,37 @@ trait CfgNode:
    */
   val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
 
-  /** Retrieve predecessor nodes, and the conditions that lead to this node.
+  /** Retrieve predecessor nodes to this node.
     * 
     * @param intra if true, only walk the intraprocedural cfg.
+    * @return Set of predecessor nodes
+    */
+  def pred(intra: Boolean): mutable.Set[CfgNode] = {
+    intra match 
+      case true => predIntra.map(edge => edge.getFrom)
+      case false => predInter.map(edge => edge.getFrom)
+  }
+
+  /** Retrieve predecessor edges to this node.
+    *
+    * @param intra if true, only walk the intraprocedural cfg
+    * @return Set of predecessor edges
+    */
+  def predEdges(intra: Boolean): mutable.Set[CfgEdge] = if (intra) predIntra else predInter
+
+  /** Retrieve predecessor nodes and associated conditions, if they exist
+    *
+    * @param intra if true, only walk the intraprocedural cfg
     * @return (Node, EdgeCondition)
     */
-  def pred(intra: Boolean): mutable.Set[(CfgNode, Expr)] = {
+  def predConds(intra: Boolean): mutable.Set[(CfgNode, Expr)] = {
     intra match 
       case true => predIntra.map(edge => (edge.getFrom, edge.getCond))
       case false => predInter.map(edge => (edge.getFrom, edge.getCond))
   }
   
-  
+
+
   /** Edges to successor nodes, either regular or ignored procedure calls
    * 
    * `succIntra` <: Set[RegularEdge | IntraprocEdge]
@@ -130,7 +149,7 @@ trait CfgNode:
 
   /** Unique identifier. */
   val id: NodeId = CfgNode.nextId()
-  def copyNode[T](): T
+  def copyNode(): CfgNode
 
   override def equals(obj: scala.Any): Boolean =
     obj match
@@ -157,13 +176,20 @@ case class CfgFunctionEntryNode(
                               ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionEntry] $data"
   /** Copy this node, but give unique ID - do it ourselves because Scala won't */
+  // override def copyNode[CfgFunctionEntryNode](): CfgFunctionEntryNode = this.copy(
+  //   id = CfgNode.nextId(), 
+  //   succInter = mutable.Set[CfgEdge](),
+  //   succIntra = mutable.Set[CfgEdge](),
+  //   predInter = mutable.Set[CfgEdge](),
+  //   predIntra = mutable.Set[CfgEdge]()
+  //   )
   override def copyNode(): CfgFunctionEntryNode = this.copy(
     id = CfgNode.nextId(), 
     succInter = mutable.Set[CfgEdge](),
     succIntra = mutable.Set[CfgEdge](),
     predInter = mutable.Set[CfgEdge](),
     predIntra = mutable.Set[CfgEdge]()
-    )
+  ).asInstanceOf[CfgFunctionEntryNode]
   
   
 
@@ -179,13 +205,20 @@ case class CfgFunctionExitNode(
                               ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionExit] $data"
   /** Copy this node, but give unique ID - do it ourselves because Scala won't */
+  // override def copyNode(): CfgFunctionExitNode = this.copy(
+  //   id = CfgNode.nextId(), 
+  //   succInter = mutable.Set[CfgEdge](),
+  //   succIntra = mutable.Set[CfgEdge](),
+  //   predInter = mutable.Set[CfgEdge](),
+  //   predIntra = mutable.Set[CfgEdge]()
+  //   )
   override def copyNode(): CfgFunctionExitNode = this.copy(
     id = CfgNode.nextId(), 
     succInter = mutable.Set[CfgEdge](),
     succIntra = mutable.Set[CfgEdge](),
     predInter = mutable.Set[CfgEdge](),
     predIntra = mutable.Set[CfgEdge]()
-    )
+  ).asInstanceOf[CfgFunctionExitNode]
 
 /** Control-flow graph node for a command (statement or jump).
  */
@@ -199,13 +232,20 @@ case class CfgCommandNode(
                             ) extends CfgNodeWithData[Command]:
   override def toString: String = s"[Stmt] $data"
   /** Copy this node, but give unique ID - do it ourselves because Scala won't */
+  // override def copyNode(): CfgCommandNode = this.copy(
+  //   id = CfgNode.nextId(), 
+  //   succInter = mutable.Set[CfgEdge](),
+  //   succIntra = mutable.Set[CfgEdge](),
+  //   predInter = mutable.Set[CfgEdge](),
+  //   predIntra = mutable.Set[CfgEdge]()
+  //   )
   override def copyNode(): CfgCommandNode = this.copy(
     id = CfgNode.nextId(), 
     succInter = mutable.Set[CfgEdge](),
     succIntra = mutable.Set[CfgEdge](),
     predInter = mutable.Set[CfgEdge](),
     predIntra = mutable.Set[CfgEdge]()
-    )
+  ).asInstanceOf[CfgCommandNode]
 
 /** 
  * A control-flow graph. Provides the ability to walk it as both an intra and inter 
@@ -217,8 +257,8 @@ class ProgramCfg:
 
   // CFG Block -> IR Block
   var nodeToBlock: mutable.Map[CfgNode, Block] = mutable.Map[CfgNode, Block]()
-  var edges: ListBuffer[CfgEdge] = ListBuffer[CfgEdge]()
-  var nodes: ListBuffer[CfgNode] = ListBuffer[CfgNode]()
+  var edges: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
+  var nodes: mutable.Set[CfgNode] = mutable.Set[CfgNode]()
 
   /** Add an outgoing edge from the current node, taking into account any conditionals 
    *  on this jump. Note that we have some duplication of storage here - this is a performance 
@@ -228,7 +268,7 @@ class ProgramCfg:
    */
   def addEdge(from: CfgNode, to: CfgNode, cond: Expr = TrueLiteral): Unit = {
 
-    var newEdge: CfgEdge = _;
+    var newEdge: CfgEdge = RegularEdge(from, to, cond); // delete <-
 
     (from, to) match {
       // Calling procedure (follow)
@@ -283,29 +323,45 @@ class ProgramCfg:
    * Returns a Graphviz dot representation of the CFG.
    * Each node is labeled using the given function labeler.
    */
-  /*
+  
   def toDot(labeler: CfgNode => String, idGen: (CfgNode, Int) => String): String = {
     val dotNodes = mutable.Map[CfgNode, DotNode]()
     var dotArrows = mutable.ListBuffer[DotArrow]()
     var uniqueId = 0
     nodes.foreach { n =>
-
       dotNodes += (n -> new DotNode(s"${idGen(n, uniqueId)}", labeler(n)))
       uniqueId += 1
     }
     nodes.foreach { n =>
-      n.succ.foreach { dest =>
-        dotArrows += new DotDirArrow(dotNodes(n), dotNodes(dest))
+
+      val regularOut: Set[CfgNode] = n.succ(true).subtractAll(n.succ(true).intersect(n.succ(false))).toSet
+      val intraOut: Set[CfgNode] = n.succ(true).subtractAll(regularOut).toSet
+      val interOut: Set[CfgNode] = n.succ(false).subtractAll(regularOut).toSet
+
+      regularOut.foreach {
+        dest =>
+          dotArrows += DotRegularArrow(dotNodes(n), dotNodes(dest))
+      }
+
+      intraOut.foreach {
+        dest =>
+          dotArrows += DotIntraArrow(dotNodes(n), dotNodes(dest))
+      }
+
+      interOut.foreach {
+        dest =>
+          dotArrows += DotInterArrow(dotNodes(n), dotNodes(dest))
       }
     }
     dotArrows = dotArrows.sortBy(arr => arr.fromNode.id + "-" + arr.toNode.id)
     val allNodes = dotNodes.values.seq.toList.sortBy(n => n.id)
     new DotGraph("CFG", allNodes, dotArrows).toDotString
-  }*/
+  }
 
+  /*
   def toDot(labeler: CfgNode => String, idGen: (CfgNode, Int) => String): String = {
     return "PLACEHOLDER"
-  }
+  }*/
 
 
   override def toString: String = {
@@ -602,12 +658,12 @@ object ProgramCfg:
         case n: CfgCommandNode => 
           n.data match {
             case d: DirectCall => 
-              procToCalls(proc) += newNode        // This procedure (general) is calling another procedure
-              callToNodes(entryNode) += newNode   // This procedure (specfic) is calling another procedure
-              procToCallers(d.target) += newNode  // Target of this call has a new caller
+              procToCalls(proc) += newNode.asInstanceOf[CfgCommandNode]        // This procedure (general) is calling another procedure
+              callToNodes(entryNode) += newNode.asInstanceOf[CfgCommandNode]   // This procedure (specfic) is calling another procedure
+              procToCallers(d.target) += newNode.asInstanceOf[CfgCommandNode]  // Target of this call has a new caller
             case i: IndirectCall =>
-              procToCalls(proc) += newNode
-              callToNodes(entryNode) += newNode
+              procToCalls(proc) += newNode.asInstanceOf[CfgCommandNode]
+              callToNodes(entryNode) += newNode.asInstanceOf[CfgCommandNode]
             case _ => 
           }
         case _ => 
