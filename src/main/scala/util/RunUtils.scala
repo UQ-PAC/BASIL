@@ -37,6 +37,8 @@ object RunUtils {
     val texts     = mods.map(_.sections.head).filter(_.name == ".text")
     val symbols   = mods.map(_.symbols)
     val semantics = mods.map(getSemantics);
+    val keys    = mods.head.auxData.keySet
+    val func = mods.head.auxData.get("functionEntries").get
 
     val adtLexer = BilAdtLexer(CharStreams.fromString(semantics.head.prettyPrint))
     val tokens = CommonTokenStream(adtLexer)
@@ -45,13 +47,26 @@ object RunUtils {
 
     parser.setBuildParseTree(true)
 
+    
+    val decoder = new decoder(func.data)
+    val map = decoder.decode()
+    
+    //println(symbols.head.map(_.toProtoString))
+    //println(cfg.head.toProtoString)
+    val bw = new BufferedWriter(new FileWriter(new File("output")))
+    symbols.head.map(_.toProtoString).foreach(f => f -> bw.write(f))
+    bw.write(cfg.head.toProtoString)
+    bw.close()
+    println(mods.head.entryPoint)
+    println(map.mkString)
+    // val tl = new TalkingListener()
+    // ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
+    
+   
 
-    val tl = new TalkingListener()
-
-    ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
     
 
-
+    
     // val program = AdtStatementLoader.visitProject(parser.project())
 
     // val elfLexer = SymsLexer(CharStreams.fromFileName(elfFileName))
