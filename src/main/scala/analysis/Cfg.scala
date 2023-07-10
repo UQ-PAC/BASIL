@@ -175,21 +175,8 @@ case class CfgFunctionEntryNode(
                                 data: Procedure
                               ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionEntry] $data"
-  /** Copy this node, but give unique ID - do it ourselves because Scala won't */
-  // override def copyNode[CfgFunctionEntryNode](): CfgFunctionEntryNode = this.copy(
-  //   id = CfgNode.nextId(), 
-  //   succInter = mutable.Set[CfgEdge](),
-  //   succIntra = mutable.Set[CfgEdge](),
-  //   predInter = mutable.Set[CfgEdge](),
-  //   predIntra = mutable.Set[CfgEdge]()
-  //   )
-  override def copyNode(): CfgFunctionEntryNode = this.copy(
-    id = CfgNode.nextId(), 
-    succInter = mutable.Set[CfgEdge](),
-    succIntra = mutable.Set[CfgEdge](),
-    predInter = mutable.Set[CfgEdge](),
-    predIntra = mutable.Set[CfgEdge]()
-  ).asInstanceOf[CfgFunctionEntryNode]
+  /** Copy this node, but give unique ID */
+  override def copyNode(): CfgFunctionEntryNode = CfgFunctionEntryNode(data = this.data)
   
   
 
@@ -204,21 +191,8 @@ case class CfgFunctionExitNode(
                                 data: Procedure
                               ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionExit] $data"
-  /** Copy this node, but give unique ID - do it ourselves because Scala won't */
-  // override def copyNode(): CfgFunctionExitNode = this.copy(
-  //   id = CfgNode.nextId(), 
-  //   succInter = mutable.Set[CfgEdge](),
-  //   succIntra = mutable.Set[CfgEdge](),
-  //   predInter = mutable.Set[CfgEdge](),
-  //   predIntra = mutable.Set[CfgEdge]()
-  //   )
-  override def copyNode(): CfgFunctionExitNode = this.copy(
-    id = CfgNode.nextId(), 
-    succInter = mutable.Set[CfgEdge](),
-    succIntra = mutable.Set[CfgEdge](),
-    predInter = mutable.Set[CfgEdge](),
-    predIntra = mutable.Set[CfgEdge]()
-  ).asInstanceOf[CfgFunctionExitNode]
+  /** Copy this node, but give unique ID */
+  override def copyNode(): CfgFunctionExitNode = CfgFunctionExitNode(data = this.data)
 
 /** Control-flow graph node for a command (statement or jump).
  */
@@ -231,21 +205,10 @@ case class CfgCommandNode(
                               data: Command
                             ) extends CfgNodeWithData[Command]:
   override def toString: String = s"[Stmt] $data"
-  /** Copy this node, but give unique ID - do it ourselves because Scala won't */
-  // override def copyNode(): CfgCommandNode = this.copy(
-  //   id = CfgNode.nextId(), 
-  //   succInter = mutable.Set[CfgEdge](),
-  //   succIntra = mutable.Set[CfgEdge](),
-  //   predInter = mutable.Set[CfgEdge](),
-  //   predIntra = mutable.Set[CfgEdge]()
-  //   )
-  override def copyNode(): CfgCommandNode = this.copy(
-    id = CfgNode.nextId(), 
-    succInter = mutable.Set[CfgEdge](),
-    succIntra = mutable.Set[CfgEdge](),
-    predInter = mutable.Set[CfgEdge](),
-    predIntra = mutable.Set[CfgEdge]()
-  ).asInstanceOf[CfgCommandNode]
+  /** Copy this node, but give unique ID */
+
+  override def copyNode(): CfgCommandNode = CfgCommandNode(data = this.data)
+
 
 /** 
  * A control-flow graph. Provides the ability to walk it as both an intra and inter 
@@ -268,9 +231,16 @@ class ProgramCfg:
    */
   def addEdge(from: CfgNode, to: CfgNode, cond: Expr = TrueLiteral): Unit = {
 
-    var newEdge: CfgEdge = RegularEdge(from, to, cond); // delete <-
+    var newEdge: CfgEdge = RegularEdge(from, to, cond); // Placeholder 
 
     (from, to) match {
+      // Ignored procedure
+      case (from: CfgFunctionEntryNode, to: CfgFunctionExitNode) =>
+        newEdge = RegularEdge(from, to, TrueLiteral)
+        from.succIntra += newEdge
+        from.succInter += newEdge
+        to.predIntra += newEdge
+        to.predInter += newEdge
       // Calling procedure (follow)
       case (from: CfgCommandNode, to: CfgFunctionEntryNode) =>
         newEdge = InterprocEdge(from, to, cond)
@@ -289,7 +259,7 @@ class ProgramCfg:
         to.predIntra += newEdge
         to.predInter += newEdge
       // Intra-procedural flow of instructions
-      case (from: CfgCommandNode, to: CfgCommandNode)  =>
+      case (from: CfgCommandNode, to: (CfgCommandNode | CfgFunctionExitNode))  =>
         (from, to) match {
           // Calling procedure (skip)
           case from.data: (DirectCall | IndirectCall) => 
@@ -358,12 +328,6 @@ class ProgramCfg:
     new DotGraph("CFG", allNodes, dotArrows).toDotString
   }
 
-  /*
-  def toDot(labeler: CfgNode => String, idGen: (CfgNode, Int) => String): String = {
-    return "PLACEHOLDER"
-  }*/
-
-
   override def toString: String = {
     val sb = StringBuilder()
     sb.append("CFG {")
@@ -387,14 +351,18 @@ object ProgramCfg:
   val cfg: ProgramCfg = ProgramCfg()
   
   // Mapping from procedures to the start of their individual (intra) cfgs
-  val procToCfg: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]()
+  val procToCfg: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = 
+    mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]()
   // Mapping from procedures to procedure call nodes (all the calls made within this procedure, including inlined functions)
-  val procToCalls: mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]] = mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]]()
+  val procToCalls: mutable.Map[Procedure, mutable.Set[CfgCommandNode]] = 
+    mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]]().withDefaultValue(mutable.Set[CfgCommandNode]())
   // Mapping from procedure entry instances to procedure call nodes within that procedure's instance (`CfgCommandNode.data <: DirectCall`)
   //    Updated on first creation of  
-  val callToNodes: mutable.HashMap[CfgFunctionEntryNode, mutable.Set[CfgCommandNode]] = mutable.HashMap[CfgFunctionEntryNode, mutable.Set[CfgCommandNode]]() 
+  val callToNodes: mutable.Map[CfgFunctionEntryNode, mutable.Set[CfgCommandNode]] = 
+    mutable.HashMap[CfgFunctionEntryNode, mutable.Set[CfgCommandNode]]().withDefaultValue(mutable.Set[CfgCommandNode]())
   // Mapping from procedures to nodes in the cfg which call that procedure
-  val procToCallers: mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]] = mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]]()
+  val procToCallers: mutable.Map[Procedure, mutable.Set[CfgCommandNode]] = 
+    mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]]().withDefaultValue(mutable.Set[CfgCommandNode]())
 
   /** Generate the cfg for each function of the program. NOTE: is this functionally different to a constructor?
    *    Do we ever expect to generate a CFG from any other data structure? If not then the `class` could probably 
@@ -405,7 +373,7 @@ object ProgramCfg:
    * @param inlineLimit
    *  How many levels deep to inline function calls. By default, don't inline - this is equivalent to an intra-procedural CFG.
    */
-  def fromIR(program: Program, inlineLimit: Int = 0): ProgramCfg = {
+  def fromIR(program: Program, inlineLimit: Int = 1): ProgramCfg = {
     require(inlineLimit >= 0, "Can't inline procedures to negative depth...")
     println("Generating CFG...")
 
@@ -434,12 +402,20 @@ object ProgramCfg:
 
     procToCfg += (proc -> (funcEntryNode, funcExitNode))
 
-    val visitedBlocks: mutable.HashMap[Block, CfgCommandNode] = mutable.HashMap[Block, CfgCommandNode]()
-    //val visitedBlocks: mutable.Set[Block] = mutable.Set[Block]()
+    // Procedure has no content (in our case, this probably means it's an ignored procedure)
+    if (proc.blocks.size == 0) {
+      cfg.addEdge(funcEntryNode, funcExitNode)
+      return;
+    }
+
+    val visitedBlocks: mutable.HashMap[Block, CfgCommandNode] = mutable.HashMap[Block, CfgCommandNode]()    
     
     // Visit each node
+    println("=== PROCEDURE ===")
+    println(s"  ${proc}")
+    println(s"blocks:")
+    println(s"${proc.blocks}")
     visitBlock(proc.blocks.head, funcEntryNode, TrueLiteral)
-
 
     /**
       * TODO
@@ -448,120 +424,177 @@ object ProgramCfg:
       * @param prevBlockEnd
       * @param cond
       */
-    def visitBlock(block: Block, prevBlockEnd: CfgNode, cond: Expr): Unit = {
+      def visitBlock(block: Block, prevBlockEnd: CfgNode, cond: Expr): Unit = {
+        
+        block.statements.size match {
+          case i if i > 0 =>
+            // Block contains some statements
+            val endStmt: CfgCommandNode = visitStmts(block.statements.toList, prevBlockEnd, cond)
+            visitJumps(block.jumps.toList, endStmt, TrueLiteral, solitary = false)
+          case _ =>
+            // Only jumps in this block
+            visitJumps(block.jumps.toList, prevBlockEnd, cond, solitary = true)
+        }
 
-      
 
-      // Handle first node - guaranteed to have at least one
-      var prevStmtNode: CfgCommandNode = CfgCommandNode(data = block.statements.head)
-      cfg.addEdge(prevBlockEnd, prevStmtNode, cond)
+          /**
+          * TODO
+          *
+          * @param stmts
+          * @return
+          */
+        def visitStmts(stmts: List[Statement], prevNode: CfgNode, cond: Expr): CfgCommandNode = {
 
-      /* OPTIMISATION
-      Do this if all the jump "visits" end up being the below. Can just add edges at start and use this as a recursion check.
-      if (visitedBlocks.contains(prevBlockEnd)) {
-        cfg.addEdge(prevBlockEnd, prevStmtNode, cond)
-        return;
-      }
-      
-      if do, replace with this:
+          val firstNode: CfgCommandNode = CfgCommandNode(data = stmts.head)
+          cfg.addEdge(prevNode, firstNode, cond)
+          visitedBlocks += (block -> firstNode) // This is guaranteed to be entrance to block
 
-      visitBlock(retBlock, callNode, TrueLiteral) // true because can only return to one location (deterministic)
-      */
-      
-
-      visitedBlocks += (block -> prevStmtNode)  // record entry node for this block
-
-      // Process the rest of the statements
-      block.statements.tail.foreach(
-        stmt => 
-          val stmtNode: CfgCommandNode = CfgCommandNode(data = stmt)
-          cfg.addEdge(prevStmtNode, stmtNode)
-          prevStmtNode = stmtNode
-      )
-
-      // Process jump(s) at end of basic block
-      block.jumps.foreach {
-        case goto: GoTo =>
-          // TODO: negate the condition for cases of two GoTos. Does this happen for any other kind of jumps?
-          val targetBlock: Block = goto.target
-          val targetCond: Expr = goto.condition match {
-            case Some(c) => c
-            case None => TrueLiteral
+          if (stmts.size == 1) {
+            // Statements start and end here for this block
+            return firstNode
           }
 
-          if (visitedBlocks.contains(targetBlock)) {
-            // Already visited the target, add edge and return
+          var prevStmtNode: CfgCommandNode = firstNode
 
-            // SEE OPTIMISATION ABOVE
-            val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
-            cfg.addEdge(prevStmtNode, targetBlockEntry, targetCond)
-          } else {
-            visitBlock(targetBlock, prevStmtNode, targetCond)
+          // `tail` takes everything after the first element
+          stmts.tail.foreach(
+            stmt =>
+              val stmtNode: CfgCommandNode = CfgCommandNode(data = stmt)
+              cfg.addEdge(prevStmtNode, stmtNode)
+              prevStmtNode = stmtNode
+          )
+
+          prevStmtNode
+        }
+
+        /**
+          * TODO
+          *
+          * @param jmps
+          * @param prevNode
+          * @param cond
+          * @param solitary
+          * @return
+          */
+        def visitJumps(jmps: List[Jump], prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
+
+          val jmpNode: CfgCommandNode = CfgCommandNode(data = jmps.head)
+          var precNode: CfgNode = prevNode
+
+          if (solitary) {
+            // If this block contains only jumps, then the `entrance` to this block is a jump also. 
+            //  If this is a direct call, then we simply use that call node as the entrance.
+            //  If this is a GoTo, then we introduce a fake "Ghost node" to act as the entrance to
+            //    the block. This could equivalently be seen as a `GoTo` jump node, but we leave it 
+            //    general for any potential future use cases.
+            jmps.head match {
+              case jmp: GoTo =>
+                // `GoTo`s are just edges, so introduce a fake `start of block` that can be jmp'd to
+                val ghostNode = CfgCommandNode(data = NOP())
+                cfg.addEdge(prevNode, ghostNode, cond)
+                precNode = prevNode
+                visitedBlocks += (block -> ghostNode)
+              case _ =>
+                // (In)direct call - use this as entrance to block
+                visitedBlocks += (block -> jmpNode)
+            }
           }
-
-        case dCall: DirectCall =>
-          val callNode: CfgCommandNode = CfgCommandNode(data = dCall)
-          val targetProc: Procedure = dCall.target
-          val targetCond: Expr = dCall.condition match {
-            case Some(c) => c
-            case None => TrueLiteral
-          }
-
-          // Conditional branch to this call 
-          cfg.addEdge(prevStmtNode, callNode, targetCond)
-
-          // Record process association
-          procToCalls(proc) += callNode
-          procToCallers(targetProc) += callNode
-          callToNodes(funcEntryNode) += callNode
-
-          // Handle the return location
-          dCall.returnTarget match {
-            case Some(retBlock) => 
-              if(visitedBlocks.contains(retBlock)) {
-                val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
-                cfg.addEdge(callNode, retBlockEntry)
-              } else {
-                visitBlock(retBlock, callNode, TrueLiteral)
+          
+          // Possible `jmp` combinations:
+          //  1. DirectCall
+          //  2. IndirectCall
+          //  3. GoTo
+          //  4. GoTo + GoTo
+          jmps.head match {
+            case goto: GoTo =>
+              
+              // Process first jump
+              var targetBlock: Block = goto.target
+              var targetCond: Expr = goto.condition match {
+                case Some(c) => c
+                case None => TrueLiteral
               }
-            case None => 
-              // At end of 
-              println("[?] Direct - Do we have to handle the \"no return\" case?")
-          }
 
-        case iCall: IndirectCall =>
-          val callNode: CfgCommandNode = CfgCommandNode(data = iCall)
-          val targetCond: Expr = iCall.condition match {
-            case Some(c) => c
-            case None => TrueLiteral
-          }
-
-          // Conditional branch to this call
-          cfg.addEdge(prevStmtNode, callNode, targetCond)
-
-          // Record process association
-          procToCalls(proc) += callNode
-          callToNodes(funcEntryNode) += callNode
-
-          // R30 is the link register - this stores the address to return to 
-          //  is this accurate in this sense? Shouldn't we be getting the stored value?
-          if (iCall.target.isRegister("R30")) {
-            cfg.addEdge(callNode, funcExitNode, targetCond)
-          }
-
-          iCall.returnTarget match {
-            case Some(retBlock) => 
-              if(visitedBlocks.contains(retBlock)) {
-                val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
-                cfg.addEdge(callNode, retBlockEntry)
+              if (visitedBlocks.contains(targetBlock)) {
+                val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
+                cfg.addEdge(precNode, targetBlockEntry, targetCond)
               } else {
-                visitBlock(retBlock, callNode, TrueLiteral)
+                visitBlock(targetBlock, precNode, targetCond)
               }
-            case None =>
-              println("[?] Indirect - Do we have to handle the \"no return\" case?")
-          }
-      }
-    }
+
+              // If the `GoTo`s condition is not `True`, then there is another conditional jump
+              //  Equivalently, there are 2 jumps stored. We could simply check if there are 2
+              //  but this is more logical to read. If we have more than 3, something has 
+              //  gone wrong, as the IR in its current state shouldn't store more than 2 jumps
+              //  in a single basic block.
+              if (targetCond != TrueLiteral) {
+                val secondGoto: GoTo = jmps.tail.head.asInstanceOf[GoTo]
+                targetBlock = secondGoto.target
+                // IR doesn't store negation of condition, so we must do it manually
+                targetCond = UnaryExpr(BoolNOT, targetCond)
+
+                if (visitedBlocks.contains(targetBlock)) {
+                  val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
+                  cfg.addEdge(precNode, targetBlockEntry, targetCond)
+                } else {
+                  visitBlock(targetBlock, precNode, targetCond)
+                }
+              }
+
+
+            case dCall: DirectCall =>
+              val targetProc: Procedure = dCall.target
+
+              // Branch to this call
+              cfg.addEdge(precNode, jmpNode, cond)
+
+              // Record call association
+              procToCalls(proc) += jmpNode
+              procToCallers(targetProc) += jmpNode
+              callToNodes(funcEntryNode) += jmpNode
+
+              // Jump to return location
+              dCall.returnTarget match {
+                case Some(retBlock) =>
+                  if (visitedBlocks.contains(retBlock)) {
+                    val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
+                    cfg.addEdge(jmpNode, retBlockEntry)
+                  } else {
+                    visitBlock(retBlock, jmpNode, TrueLiteral)
+                  }
+                case None => 
+                  println("[?] Direct - do we have to handle the \"no return\" case?")
+              }
+
+            case iCall: IndirectCall =>
+
+              // Branch to this call
+              cfg.addEdge(precNode, jmpNode, cond)
+
+              // Record call association
+              procToCalls(proc) += jmpNode
+              callToNodes(funcEntryNode) += jmpNode
+
+              // R30 is the link register - this stores the address to return to 
+              //  is this accurate in this sense? Shouldn't we be getting the stored value?
+              if (iCall.target.isRegister("R30")) {
+                cfg.addEdge(jmpNode, funcExitNode)
+              }
+
+              iCall.returnTarget match {
+                case Some(retBlock) =>
+                  if (visitedBlocks.contains(retBlock)) {
+                    val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
+                    cfg.addEdge(jmpNode, retBlockEntry)
+                  } else {
+                    visitBlock(retBlock, jmpNode, TrueLiteral)
+                  }
+                case None => 
+                  println("[?] Indirect - Do we have to handle the \"no return\" case?")
+              }
+          } // `jmps.head match`
+        } // `visitJumps` function
+      }// `visitBlocks` function
   }
 
   
@@ -573,8 +606,10 @@ object ProgramCfg:
     */
   private def inlineProcedureCalls(procNodes: Set[CfgCommandNode], inlineAmount: Int): Unit = {
     assert(inlineAmount >= 0)
+    println(s"Inlining with ${procNodes.size} at ${inlineAmount}")
 
     if (inlineAmount == 0 || procNodes.isEmpty) {
+      println("[!] Empty procnodes")
       return;
     }
     
