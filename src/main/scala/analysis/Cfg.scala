@@ -260,18 +260,14 @@ class ProgramCfg:
         to.predInter += newEdge
       // Intra-procedural flow of instructions
       case (from: CfgCommandNode, to: (CfgCommandNode | CfgFunctionExitNode))  =>
-        println(s"from ${from} to ${to}")
-        println(s"  data type: ${from.data.getClass()}")
         from.data match {
           // Calling procedure (skip)
           case call: (DirectCall | IndirectCall) => 
-            println("  intra proc edge")
             newEdge = IntraprocEdge(from, to, cond)
             from.succIntra += newEdge
             to.predIntra += newEdge
           // Regular instruction flow
           case _ =>
-            println("  regular edge")
             newEdge = RegularEdge(from, to, cond)
             from.succIntra += newEdge
             from.succInter += newEdge
@@ -387,6 +383,8 @@ object ProgramCfg:
     )
 
     // Inline functions up to `inlineLimit` level
+    println("Proc to calls:")
+    println(procToCalls)
     val procCallNodes: Set[CfgCommandNode] = procToCalls.values.flatten.toSet
     inlineProcedureCalls(procCallNodes, inlineLimit)
 
