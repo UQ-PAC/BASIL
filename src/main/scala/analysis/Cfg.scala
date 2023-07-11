@@ -424,18 +424,18 @@ object ProgramCfg:
     val visitedBlocks: mutable.HashMap[Block, CfgCommandNode] = mutable.HashMap[Block, CfgCommandNode]()    
     
     // Visit each node
-    println("=== PROCEDURE ===")
-    println(s"  ${proc}")
-    println(s"blocks:")
-    proc.blocks.foreach(
-      block =>
-        println(s"----- BLOCK -----")
-        println(s"  label: ${block.label}")
-        println(s" STATEMENTS")
-        println(block.statements)
-        println(s" JUMPS")
-        println(block.jumps)
-    )
+    // println("=== PROCEDURE ===")
+    // println(s"  ${proc}")
+    // println(s"blocks:")
+    // proc.blocks.foreach(
+    //   block =>
+    //     println(s"----- BLOCK -----")
+    //     println(s"  label: ${block.label}")
+    //     println(s" STATEMENTS")
+    //     println(block.statements)
+    //     println(s" JUMPS")
+    //     println(block.jumps)
+    // )
     visitBlock(proc.blocks.head, funcEntryNode, TrueLiteral)
 
     /**
@@ -585,6 +585,8 @@ object ProgramCfg:
                   }
                 case None => 
                   println("[?] Direct - do we have to handle the \"no return\" case?")
+                  println("  [!] Currently we just resolve this to be exit of function. This may not be the case in future.")
+                  cfg.addEdge(jmpNode, funcExitNode)
               }
 
             case iCall: IndirectCall =>
@@ -636,31 +638,34 @@ object ProgramCfg:
     // Set of procedure calls to be discovered by inlining the ones in `procNodes`
     val nextProcNodes: mutable.Set[CfgCommandNode] = mutable.Set[CfgCommandNode]()
 
-    procNodes.foreach(
-      procNode => 
-        require(procNode.data.isInstanceOf[DirectCall], s"Trying to inline a non-function call instruction: ${procNode}")
+    procNodes.foreach{ procNode =>
+      procNode.data match { 
+        case targetCall: DirectCall => 
+          // require(procNode.data.isInstanceOf[DirectCall], s"Trying to inline a non-function call instruction: ${procNode}")
 
-        // Retrieve information about the call to the target procedure
-        val targetCall: DirectCall = procNode.data.asInstanceOf[DirectCall]
-        val targetProc: Procedure = targetCall.target
-        val targetCond: Expr = targetCall.condition match {
-          case Some(c) => c
-          case None => TrueLiteral
-        }
-       
-        val (procEntry, procExit) = cloneProcedureCFG(targetProc)
+          // Retrieve information about the call to the target procedure
+          // val targetCall: DirectCall = procNode.data.asInstanceOf[DirectCall]
+          val targetProc: Procedure = targetCall.target
+          val targetCond: Expr = targetCall.condition match {
+            case Some(c) => c
+            case None => TrueLiteral
+          }
+        
+          val (procEntry, procExit) = cloneProcedureCFG(targetProc)
 
-        // Add link between call node and the procedure's `Entry`. 
-        cfg.addEdge(procNode, procEntry, targetCond)
+          // Add link between call node and the procedure's `Entry`. 
+          cfg.addEdge(procNode, procEntry, targetCond)
 
-        // Link the procedure's `Exit` to the return point. There should only be one.
-        assert(procNode.succ(intra = true).size == 1, s"More than 1 return node... ${procNode} has ${procNode.succ(intra=true)}")
-        val returnNode = procNode.succ(intra = true).head
-        cfg.addEdge(procExit, returnNode)
+          // Link the procedure's `Exit` to the return point. There should only be one.
+          assert(procNode.succ(intra = true).size == 1, s"More than 1 return node... ${procNode} has ${procNode.succ(intra=true)}")
+          val returnNode = procNode.succ(intra = true).head
+          cfg.addEdge(procExit, returnNode)
 
-        // Add new (un-inlined) function calls to be inlined
-        nextProcNodes ++= callToNodes(procEntry)
-    )
+          // Add new (un-inlined) function calls to be inlined
+          nextProcNodes ++= callToNodes(procEntry)
+        case _ =>
+      }
+    }
 
     inlineProcedureCalls(nextProcNodes.toSet, inlineAmount - 1)
   }
@@ -678,6 +683,8 @@ object ProgramCfg:
 
     val (entryNode: CfgFunctionEntryNode, exitNode: CfgFunctionExitNode) = procToCfg(proc)
     val (newEntry: CfgFunctionEntryNode, newExit: CfgFunctionExitNode) = (entryNode.copyNode(), exitNode.copyNode())
+
+    callToNodes += (newEntry -> mutable.Set[CfgCommandNode]())
 
     // Entry is guaranteed to only have one successor (by our cfg design)
     var currNode: CfgNode = entryNode.succ(intra = true).head
