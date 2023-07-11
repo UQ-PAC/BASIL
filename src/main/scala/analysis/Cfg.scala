@@ -304,23 +304,41 @@ class ProgramCfg:
     }
     nodes.foreach { n =>
 
-      val regularOut: Set[CfgNode] = n.succ(true).intersect(n.succ(false)).toSet
-      val intraOut: Set[CfgNode] = n.succ(true).subtractAll(regularOut).toSet
-      val interOut: Set[CfgNode] = n.succ(false).subtractAll(regularOut).toSet
+      val regularOut: Set[(CfgNode, Expr)] = n.succConds(true).intersect(n.succConds(false)).toSet
+      val intraOut: Set[(CfgNode, Expr)] = n.succConds(true).subtractAll(regularOut).toSet
+      val interOut: Set[(CfgNode, Expr)] = n.succConds(false).subtractAll(regularOut).toSet
 
       regularOut.foreach {
-        dest =>
-          dotArrows += DotRegularArrow(dotNodes(n), dotNodes(dest))
+        (dest,cond) =>
+          cond match {
+            case TrueLiteral =>
+              dotArrows += DotRegularArrow(dotNodes(n), dotNodes(dest))
+            case _ =>
+              dotArrows += DotRegularArrow(dotNodes(n), dotNodes(dest), cond.toString())
+          }
+          // dotArrows += DotRegularArrow(dotNodes(n), dotNodes(dest))
       }
 
       intraOut.foreach {
-        dest =>
-          dotArrows += DotIntraArrow(dotNodes(n), dotNodes(dest))
+        (dest,cond) =>
+          cond match {
+            case TrueLiteral =>
+              dotArrows += DotIntraArrow(dotNodes(n), dotNodes(dest))
+            case _ =>
+              dotArrows += DotIntraArrow(dotNodes(n), dotNodes(dest), cond.toString())
+          }
+          // dotArrows += DotIntraArrow(dotNodes(n), dotNodes(dest))
       }
 
       interOut.foreach {
-        dest =>
-          dotArrows += DotInterArrow(dotNodes(n), dotNodes(dest))
+        (dest,cond) =>
+          cond match {
+            case TrueLiteral => 
+              dotArrows += DotInterArrow(dotNodes(n), dotNodes(dest))
+            case _ =>
+              dotArrows += DotInterArrow(dotNodes(n), dotNodes(dest), cond.toString())
+          }
+          // dotArrows += DotInterArrow(dotNodes(n), dotNodes(dest))
       }
     }
     dotArrows = dotArrows.sortBy(arr => arr.fromNode.id + "-" + arr.toNode.id)
@@ -511,6 +529,9 @@ object ProgramCfg:
             jmps.head match {
               case jmp: GoTo =>
                 // `GoTo`s are just edges, so introduce a fake `start of block` that can be jmp'd to
+                println("Double solitary GoTo")
+                println(s"  proc: ${proc.name}")
+                println(s"  jmps: ${jmps}")
                 val ghostNode = CfgCommandNode(data = NOP())
                 cfg.addEdge(prevNode, ghostNode, cond)
                 precNode = ghostNode
@@ -552,7 +573,9 @@ object ProgramCfg:
                 val secondGoto: GoTo = jmps.tail.head.asInstanceOf[GoTo]
                 targetBlock = secondGoto.target
                 // IR doesn't store negation of condition, so we must do it manually
-                targetCond = UnaryExpr(BoolNOT, targetCond)
+                println(s"  Before negation: ${targetCond}")
+                targetCond = negateConditional(targetCond) //UnaryExpr(BoolNOT, targetCond)
+                println(s"  After negation : ${targetCond}")
 
                 if (visitedBlocks.contains(targetBlock)) {
                   val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
@@ -619,6 +642,36 @@ object ProgramCfg:
         } // `visitJumps` function
       }// `visitBlocks` function
   }
+
+
+  /**
+    * This takes an expression used in a conditional (jump), and 
+    * negates it in a hopefully nice way. Currently it is quite simple.
+    *
+    * @param expr the expression to negate
+    * @return
+    */
+  private def negateConditional(expr: Expr): Expr = expr match {
+      case binop: BinaryExpr =>
+        binop.op match {
+          case BVNEQ =>
+            BinaryExpr(
+              BVEQ, binop.arg1, binop.arg2
+            )
+          case BVEQ => 
+            BinaryExpr(
+              BVNEQ, binop.arg1, binop.arg2
+            )
+          case _ =>
+            UnaryExpr(
+              BoolNOT, binop
+            )
+        }
+      case _ =>
+        UnaryExpr(
+          BoolNOT, expr
+        )
+    }
 
   
 

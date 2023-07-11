@@ -133,7 +133,7 @@ object RunUtils {
     //    print(res.keys)
     //    Output.output(OtherOutput(OutputKindE.cfg), an.cfg.toDot(Output.labeler(res, an.stateAfterNode), Output.dotIder))
 
-    val cfg = ProgramCfg.fromIR(IRProgram, inlineLimit = 1)
+    val cfg = ProgramCfg.fromIR(IRProgram, inlineLimit = 0)
     //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
     //      x.toString
     //    }, Output.dotIder))
