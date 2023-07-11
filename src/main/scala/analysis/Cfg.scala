@@ -354,15 +354,15 @@ object ProgramCfg:
   val procToCfg: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = 
     mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]()
   // Mapping from procedures to procedure call nodes (all the calls made within this procedure, including inlined functions)
-  val procToCalls: mutable.Map[Procedure, mutable.Set[CfgCommandNode]] = 
-    mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]]().withDefaultValue(mutable.Set[CfgCommandNode]())
+  val procToCalls: mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]] = 
+    mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]]()
   // Mapping from procedure entry instances to procedure call nodes within that procedure's instance (`CfgCommandNode.data <: DirectCall`)
   //    Updated on first creation of  
   val callToNodes: mutable.Map[CfgFunctionEntryNode, mutable.Set[CfgCommandNode]] = 
-    mutable.HashMap[CfgFunctionEntryNode, mutable.Set[CfgCommandNode]]().withDefaultValue(mutable.Set[CfgCommandNode]())
+    mutable.Map[CfgFunctionEntryNode, mutable.Set[CfgCommandNode]]()
   // Mapping from procedures to nodes in the cfg which call that procedure
   val procToCallers: mutable.Map[Procedure, mutable.Set[CfgCommandNode]] = 
-    mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]]().withDefaultValue(mutable.Set[CfgCommandNode]())
+    mutable.Map[Procedure, mutable.Set[CfgCommandNode]]()
 
   /** Generate the cfg for each function of the program. NOTE: is this functionally different to a constructor?
    *    Do we ever expect to generate a CFG from any other data structure? If not then the `class` could probably 
@@ -377,14 +377,24 @@ object ProgramCfg:
     require(inlineLimit >= 0, "Can't inline procedures to negative depth...")
     println("Generating CFG...")
 
-    // Create CFG for individual procedures
+    // Have to initialise these manually. Scala maps have a `.withDefaulValue`, but this is buggy and doesn't
+    //  behave as you would expect. https://github.com/scala/bug/issues/8099
+    // We don't initialise `procToCfg` here, because it will never be accessed before `cfgForProcedure`
+    //  it's set in `cfgForProcedure`
+    program.procedures.foreach(
+      proc =>
+        procToCalls += (proc -> mutable.Set[CfgCommandNode]())
+        procToCallers += (proc -> mutable.Set[CfgCommandNode]())
+    )
+
+      // Create CFG for individual procedures
     program.procedures.foreach(
       proc => cfgForProcedure(proc)
     )
 
     // Inline functions up to `inlineLimit` level
     println("Proc to calls:")
-    println(procToCalls)
+    println(procToCalls.get)
     val procCallNodes: Set[CfgCommandNode] = procToCalls.values.flatten.toSet
     inlineProcedureCalls(procCallNodes, inlineLimit)
 
@@ -403,6 +413,7 @@ object ProgramCfg:
     cfg.addNode(funcExitNode)
 
     procToCfg += (proc -> (funcEntryNode, funcExitNode))
+    callToNodes += (funcEntryNode -> mutable.Set[CfgCommandNode]())
 
     // Procedure has no content (in our case, this probably means it's an ignored procedure)
     if (proc.blocks.size == 0) {
@@ -416,7 +427,15 @@ object ProgramCfg:
     println("=== PROCEDURE ===")
     println(s"  ${proc}")
     println(s"blocks:")
-    println(s"${proc.blocks}")
+    proc.blocks.foreach(
+      block =>
+        println(s"----- BLOCK -----")
+        println(s"  label: ${block.label}")
+        println(s" STATEMENTS")
+        println(block.statements)
+        println(s" JUMPS")
+        println(block.jumps)
+    )
     visitBlock(proc.blocks.head, funcEntryNode, TrueLiteral)
 
     /**
@@ -494,7 +513,7 @@ object ProgramCfg:
                 // `GoTo`s are just edges, so introduce a fake `start of block` that can be jmp'd to
                 val ghostNode = CfgCommandNode(data = NOP())
                 cfg.addEdge(prevNode, ghostNode, cond)
-                precNode = prevNode
+                precNode = ghostNode
                 visitedBlocks += (block -> ghostNode)
               case _ =>
                 // (In)direct call - use this as entrance to block
@@ -608,10 +627,9 @@ object ProgramCfg:
     */
   private def inlineProcedureCalls(procNodes: Set[CfgCommandNode], inlineAmount: Int): Unit = {
     assert(inlineAmount >= 0)
-    println(s"Inlining with ${procNodes.size} at ${inlineAmount}")
+    println(s"[!] Inlining with ${procNodes.size} at ${inlineAmount}")
 
     if (inlineAmount == 0 || procNodes.isEmpty) {
-      println("[!] Empty procnodes")
       return;
     }
     
