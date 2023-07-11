@@ -49,7 +49,7 @@ class DotArrow(val fromNode: DotNode, arrow: String, val toNode: DotNode, val la
 
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
 
-  def toDotString: String = s"\"${fromNode.id}\" ${arrow} \"${toNode.id}\"[label=\"${label}\", style=\"${style}\", color=\"\"]"
+  def toDotString: String = s"\"${fromNode.id}\" ${arrow} \"${toNode.id}\"[label=\"${label}\", style=\"${style}\", color=\"${colour}\"]"
 }
 
 /**

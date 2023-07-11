@@ -260,14 +260,18 @@ class ProgramCfg:
         to.predInter += newEdge
       // Intra-procedural flow of instructions
       case (from: CfgCommandNode, to: (CfgCommandNode | CfgFunctionExitNode))  =>
-        (from, to) match {
+        println(s"from ${from} to ${to}")
+        println(s"  data type: ${from.data.getClass()}")
+        from.data match {
           // Calling procedure (skip)
-          case from.data: (DirectCall | IndirectCall) => 
+          case call: (DirectCall | IndirectCall) => 
+            println("  intra proc edge")
             newEdge = IntraprocEdge(from, to, cond)
             from.succIntra += newEdge
             to.predIntra += newEdge
           // Regular instruction flow
           case _ =>
+            println("  regular edge")
             newEdge = RegularEdge(from, to, cond)
             from.succIntra += newEdge
             from.succInter += newEdge
@@ -304,7 +308,7 @@ class ProgramCfg:
     }
     nodes.foreach { n =>
 
-      val regularOut: Set[CfgNode] = n.succ(true).subtractAll(n.succ(true).intersect(n.succ(false))).toSet
+      val regularOut: Set[CfgNode] = n.succ(true).intersect(n.succ(false)).toSet
       val intraOut: Set[CfgNode] = n.succ(true).subtractAll(regularOut).toSet
       val interOut: Set[CfgNode] = n.succ(false).subtractAll(regularOut).toSet
 
