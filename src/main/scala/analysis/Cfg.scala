@@ -12,22 +12,17 @@ import analysis.Fresh.next
 
 
 
-/* UUID for a node
- */
-type NodeId = Int
-
 /** Node in the control-flow graph.
  */
 object CfgNode:
 
-  var id: NodeId = 0
+  var id: Int = 0
 
   def nextId(): Int =
     id += 1
     id
 
-/**
-  * Edge type. 
+/** Edge type. 
   * 
   * `cond` : condition if this is a conditional edge. By default, assume True.
   */
@@ -36,16 +31,14 @@ trait CfgEdge(from: CfgNode, to: CfgNode, cond: Expr):
   def getTo: CfgNode = to
   def getCond: Expr = cond
 
-/**
-  * Edge between two command nodes in the CFG. Used for `GoTo` branches 
+/** Edge between two command nodes in the CFG. Used for `GoTo` branches 
   * as well (with a condition added for the branch).
   */
 case class RegularEdge(from: CfgNode, to: CfgNode, cond: Expr) extends CfgEdge(from, to, cond) {
   override def toString: String = s"RegularEdge(From: $from, To: $to)"
 }
 
-/**
-  * Edge which skips over a procedure call. Used for "jumping over" function 
+/** Edge which skips over a procedure call. Used for "jumping over" function 
   * calls, i.e. in an intra-procedural CFG walk. 
   */
 case class IntraprocEdge(from: CfgNode, to: CfgNode, cond: Expr) extends CfgEdge(from, to, cond) {
@@ -59,8 +52,40 @@ case class InterprocEdge(from: CfgNode, to: CfgNode, cond: Expr) extends CfgEdge
   override def toString: String = s"InterprocEdge(From: $from, To: $to)"
 }
 
-/** Node in the control-flow graph.
- */
+/** Node in the control-flow graph. Each node has a (simple incremental) unique identifier used to distinguish
+  *   it from other nodes in the cfg - this is mainly used for copying procedure cfgs when inlining them.  
+  * 
+  * Each node will store four separate sets: ingoing/outgoing of both inter-/intra-procedural CFG edges. 
+  *   Both intra and inter will also store regular edges in the cfg. This is duplication of storage, however
+  *   is done so knowingly.
+  *   
+  *   By separating sets into inter/intra we are able to return these directly without doing any processing.
+  *   Alternative means of achieving this same behaviour would involve some form of set operations, or
+  *   a filter operation, both of which can be expensive, especially as the successors/predecessors will 
+  *   be accessed frequently by analyses. Additionally, inspecting the space complexity of these sets, we note 
+  *   that their sizes should be relatively limited:
+  *     a. #(outgoing edges) <= 2
+  *     b. #(incoming edges) ~ N
+  *   Thus in `succIntra` + `succInter` we have at most 4 elements. For `predIntra` + `predInter` we have a maximum of 2N, resulting 
+  *     from the case that this node is a block entry that is jumped to by N other nodes. 
+  *   It should be noted that in the majority of cases (statements which are neither the start of blocks nor jumps), both sets will
+  *     be of size 1, making the storage complexity negligible.
+  * 
+  * In the case a node is part of an inlined function (i.e. it is part of a procedure which is the result of a call), all edges 
+  *   will be resolved as general edges, making no differentiation between inter/intra edges. The reason for this is that when 
+  *   walking an inter-procedural cfg we don't expect to follow intra-procedural edges within those inlined-procedures, until we 
+  *   hit the inline-depth. At that depth, we then follow the intra-procedural edge, and have no need for inter-procedural edges.
+  *   In essence we treat the calls as if they don't happen, and treat the first statement of the callee as the next instruction in 
+  *   the caller, and so is just a regular execution (i.e., directly inlining the callee's body into our procedure) The easiest way to 
+  *   do that with the api below (which is preserved from previous iterations of this tool / tip as the interface for analyses to walk 
+  *   the cfg) is to have that behaviour encoded in the structure of the cfg. Thus, for an inline depth i:
+  *     a. i == 1     : inter- and intra- procedural edges are distinguished and stored
+  *     b. 1 < i < n  : inter-procedural edges are stored as regular edges, intra-procedural edges are discarded 
+  *     c. i == n     : intra-procedural edges are stored as regular edges, inter-procedural edges are discarded
+  * 
+  * 
+  *   TODO: if we decide to go with a diamond structure for inter-procedural calls we should update this.
+  */
 trait CfgNode:
 
   /** Edges to this node from regular statements or ignored procedure calls.
@@ -148,7 +173,7 @@ trait CfgNode:
   }
 
   /** Unique identifier. */
-  val id: NodeId = CfgNode.nextId()
+  val id: Int = CfgNode.nextId()
   def copyNode(): CfgNode
 
   override def equals(obj: scala.Any): Boolean =
@@ -175,7 +200,7 @@ case class CfgFunctionEntryNode(
                                 data: Procedure
                               ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionEntry] $data"
-  /** Copy this node, but give unique ID */
+  /** Copy this node, but give unique ID and reset edges */
   override def copyNode(): CfgFunctionEntryNode = CfgFunctionEntryNode(data = this.data)
   
   
@@ -191,7 +216,7 @@ case class CfgFunctionExitNode(
                                 data: Procedure
                               ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionExit] $data"
-  /** Copy this node, but give unique ID */
+  /** Copy this node, but give unique ID and reset edges */
   override def copyNode(): CfgFunctionExitNode = CfgFunctionExitNode(data = this.data)
 
 /** Control-flow graph node for a command (statement or jump).
@@ -205,8 +230,7 @@ case class CfgCommandNode(
                               data: Command
                             ) extends CfgNodeWithData[Command]:
   override def toString: String = s"[Stmt] $data"
-  /** Copy this node, but give unique ID */
-
+  /** Copy this node, but give unique ID and reset edges */
   override def copyNode(): CfgCommandNode = CfgCommandNode(data = this.data)
 
 
@@ -304,6 +328,8 @@ class ProgramCfg:
     }
     nodes.foreach { n =>
 
+      // This can just be a match case on the types of edges?
+
       val regularOut: Set[(CfgNode, Expr)] = n.succConds(true).intersect(n.succConds(false)).toSet
       val intraOut: Set[(CfgNode, Expr)] = n.succConds(true).subtractAll(regularOut).toSet
       val interOut: Set[(CfgNode, Expr)] = n.succConds(false).subtractAll(regularOut).toSet
@@ -393,7 +419,7 @@ object ProgramCfg:
    */
   def fromIR(program: Program, inlineLimit: Int = 1): ProgramCfg = {
     require(inlineLimit >= 0, "Can't inline procedures to negative depth...")
-    println("Generating CFG...")
+    println("[!] Generating CFG...")
 
     // Have to initialise these manually. Scala maps have a `.withDefaulValue`, but this is buggy and doesn't
     //  behave as you would expect. https://github.com/scala/bug/issues/8099
@@ -411,16 +437,16 @@ object ProgramCfg:
     )
 
     // Inline functions up to `inlineLimit` level
-    println("Proc to calls:")
-    println(procToCalls.get)
     val procCallNodes: Set[CfgCommandNode] = procToCalls.values.flatten.toSet
     inlineProcedureCalls(procCallNodes, inlineLimit)
 
     cfg
   }
 
-  /**
-    * TODO
+  /** Create a CFG for the given IR procedure. The start of the CFG for a procedure is identified by 
+    *   its `CfgFunctionEntryNode, and its closure is identified by the `CfgFunctionExitNode`. 
+    * 
+    * 
     *
     * @param proc
     */
@@ -433,38 +459,45 @@ object ProgramCfg:
     procToCfg += (proc -> (funcEntryNode, funcExitNode))
     callToNodes += (funcEntryNode -> mutable.Set[CfgCommandNode]())
 
-    // Procedure has no content (in our case, this probably means it's an ignored procedure)
+    // Procedure has no content (in our case this probably means it's an ignored procedure, e.g., an external function such as @printf)
     if (proc.blocks.size == 0) {
       cfg.addEdge(funcEntryNode, funcExitNode)
       return;
     }
 
+    // Track blocks we've already processed so we don't double up
     val visitedBlocks: mutable.HashMap[Block, CfgCommandNode] = mutable.HashMap[Block, CfgCommandNode]()    
     
-    // Visit each node
-    // println("=== PROCEDURE ===")
-    // println(s"  ${proc}")
-    // println(s"blocks:")
-    // proc.blocks.foreach(
-    //   block =>
-    //     println(s"----- BLOCK -----")
-    //     println(s"  label: ${block.label}")
-    //     println(s" STATEMENTS")
-    //     println(block.statements)
-    //     println(s" JUMPS")
-    //     println(block.jumps)
-    // )
     visitBlock(proc.blocks.head, funcEntryNode, TrueLiteral)
 
-    /**
-      * TODO
-      * 
-      * @param block
-      * @param prevBlockEnd
-      * @param cond
-      */
+      /** Add a block to the CFG. A block in this case is a basic block, so contains a 
+        *   list of consecutive statements followed by a jump to another block. We process 
+        *   statements in this block (if they exist), and then follow the jump to recurse through
+        *   all other blocks. 
+        * 
+        *   This recursive approach is effectively a "reaches" approach, and will miss cases that
+        *   we encounter a jump we can't resolve, or cases where the lifter has not identified a section of 
+        *   code. In each case:
+        *     a. The only jumps we can't resolve are indirect calls. It's the intent of the tool to attempt to resolve
+        *         these through analysis however. The CFG can then be updated as these are resolved to incorporate their
+        *         jumps. In construction we do a simple check for register R30 to identify if an indirect call is a return.
+        *     b. If the lifter has failed to identify a region of code, then the problem exists at the lifter level. In 
+        *         that case we need a way to coerce the lifter into identifying it, or to use a new lifter.
+        * 
+        *   These visitations will also only produce the intra-procedural CFG - the burden of "creating" the inter-procedural 
+        *     CFG is left to the inlining processes later. The benefit of doing this is that we can completely resolve a 
+        *     procedure's CFG without jumping to other procedures mid-way through processing, which assures we don't have any issues 
+        *     with referencing nodes before they exist. Essentially this is a depth-first approach to CFG 
+        *     construction, as opposed to a breadth-first. 
+        * 
+        * 
+        * @param block          the block being added to the CFG.
+        * @param prevBlockEnd   preceding block's end node (jump)
+        * @param cond           condition on the jump from `prevNode` to the first statement of this block
+        */
       def visitBlock(block: Block, prevBlockEnd: CfgNode, cond: Expr): Unit = {
         
+        // TODO: this can probably be abstracted to `visitStmts` and `visitJumps`. Perhaps this is more readable though?
         block.statements.size match {
           case i if i > 0 =>
             // Block contains some statements
@@ -476,11 +509,13 @@ object ProgramCfg:
         }
 
 
-          /**
-          * TODO
+        /** If a block has statements, we add them to the CFG. Blocks in this case are basic blocks,
+          *   so we know consecutive statements will be linked by an unconditional, regular edge.
           *
-          * @param stmts
-          * @return
+          * @param stmts      statements in this block
+          * @param prevNode   preceding block's end node (jump)
+          * @param cond       condition on the jump from `prevNode` to the first statement of this block
+          * @return           the last statement's CFG node
           */
         def visitStmts(stmts: List[Statement], prevNode: CfgNode, cond: Expr): CfgCommandNode = {
 
@@ -506,14 +541,14 @@ object ProgramCfg:
           prevStmtNode
         }
 
-        /**
-          * TODO
+        /** All blocks end with jump(s). Add these to the CFG and visit their target blocks for processing.
           *
-          * @param jmps
-          * @param prevNode
-          * @param cond
-          * @param solitary
-          * @return
+          * @param jmps       jumps in the block being processed
+          * @param prevNode   either the previous statement in the block, or the previous block's end node 
+          *                     (in the case that this block contains no statements)
+          * @param cond       jump from `prevNode` to this. `TrueLiteral` if `prevNode` is a statement,
+          *                     and any `Expr` if `prevNode` is a jump.
+          * @param solitary   `True` if this block contains no statements, `False` otherwise
           */
         def visitJumps(jmps: List[Jump], prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
 
@@ -521,17 +556,17 @@ object ProgramCfg:
           var precNode: CfgNode = prevNode
 
           if (solitary) {
-            // If this block contains only jumps, then the `entrance` to this block is a jump also. 
-            //  If this is a direct call, then we simply use that call node as the entrance.
-            //  If this is a GoTo, then we introduce a fake "Ghost node" to act as the entrance to
-            //    the block. This could equivalently be seen as a `GoTo` jump node, but we leave it 
-            //    general for any potential future use cases.
+            /* If the block contains only jumps (no statements), then the "start" of the block is a jump. 
+                If this is a direct call, then we simply use that call node as the start of the block.
+                However, GoTos in the CFG are resolved as edges, and so there doesn't exist a node to use as
+                the start. Thus we introduce a "ghost" node to act as that jump point - it has no functionality 
+                and will simply be skipped by analyses.
+
+                Currently we display these nodes in the DOT view of the CFG, however these could be hidden if desired.
+            */
             jmps.head match {
               case jmp: GoTo =>
                 // `GoTo`s are just edges, so introduce a fake `start of block` that can be jmp'd to
-                println("Double solitary GoTo")
-                println(s"  proc: ${proc.name}")
-                println(s"  jmps: ${jmps}")
                 val ghostNode = CfgCommandNode(data = NOP())
                 cfg.addEdge(prevNode, ghostNode, cond)
                 precNode = ghostNode
@@ -542,11 +577,12 @@ object ProgramCfg:
             }
           }
           
-          // Possible `jmp` combinations:
-          //  1. DirectCall
-          //  2. IndirectCall
-          //  3. GoTo
-          //  4. GoTo + GoTo
+          /* Possible `jmp` combinations:
+              1. DirectCall
+              2. IndirectCall
+              3. GoTo
+              4. GoTo + GoTo
+          */
           jmps.head match {
             case goto: GoTo =>
               
@@ -557,6 +593,7 @@ object ProgramCfg:
                 case None => TrueLiteral
               }
 
+              // Jump to target block
               if (visitedBlocks.contains(targetBlock)) {
                 val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
                 cfg.addEdge(precNode, targetBlockEntry, targetCond)
@@ -564,19 +601,18 @@ object ProgramCfg:
                 visitBlock(targetBlock, precNode, targetCond)
               }
 
-              // If the `GoTo`s condition is not `True`, then there is another conditional jump
-              //  Equivalently, there are 2 jumps stored. We could simply check if there are 2
-              //  but this is more logical to read. If we have more than 3, something has 
-              //  gone wrong, as the IR in its current state shouldn't store more than 2 jumps
-              //  in a single basic block.
+              /* If the first GoTo's condition is not `True`, then we know there must be a second conditional jump.
+                  We could equivalently check if `jmps` has 2 jumps, though this emphasises why we check for 
+                  a second jump. We can similarly assume we only have 2 jumps, as that's what the IR (as of writing)
+                  intends.
+              */
               if (targetCond != TrueLiteral) {
                 val secondGoto: GoTo = jmps.tail.head.asInstanceOf[GoTo]
                 targetBlock = secondGoto.target
                 // IR doesn't store negation of condition, so we must do it manually
-                println(s"  Before negation: ${targetCond}")
-                targetCond = negateConditional(targetCond) //UnaryExpr(BoolNOT, targetCond)
-                println(s"  After negation : ${targetCond}")
+                targetCond = negateConditional(targetCond)
 
+                // Jump to target block
                 if (visitedBlocks.contains(targetBlock)) {
                   val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
                   cfg.addEdge(precNode, targetBlockEntry, targetCond)
@@ -613,6 +649,8 @@ object ProgramCfg:
               }
 
             case iCall: IndirectCall =>
+              println("Encounted indirect call")
+              println(iCall)
 
               // Branch to this call
               cfg.addEdge(precNode, jmpNode, cond)
@@ -622,11 +660,12 @@ object ProgramCfg:
               callToNodes(funcEntryNode) += jmpNode
 
               // R30 is the link register - this stores the address to return to 
-              //  is this accurate in this sense? Shouldn't we be getting the stored value?
+              // TODO: introduce a "returnToCaller" node? To decide in meeting.
               if (iCall.target.isRegister("R30")) {
                 cfg.addEdge(jmpNode, funcExitNode)
               }
 
+              // Jump to return location
               iCall.returnTarget match {
                 case Some(retBlock) =>
                   if (visitedBlocks.contains(retBlock)) {
@@ -638,10 +677,11 @@ object ProgramCfg:
                 case None => 
                   println("[?] Indirect - Do we have to handle the \"no return\" case?")
               }
+            case _ => assert(false, s"unexpected jump encountered, jumps: ${jmps}")
           } // `jmps.head match`
         } // `visitJumps` function
-      }// `visitBlocks` function
-  }
+      } // `visitBlocks` function
+  } // `cfgForProcedure` function
 
 
   /**
@@ -697,7 +737,6 @@ object ProgramCfg:
           // require(procNode.data.isInstanceOf[DirectCall], s"Trying to inline a non-function call instruction: ${procNode}")
 
           // Retrieve information about the call to the target procedure
-          // val targetCall: DirectCall = procNode.data.asInstanceOf[DirectCall]
           val targetProc: Procedure = targetCall.target
           val targetCond: Expr = targetCall.condition match {
             case Some(c) => c
@@ -774,11 +813,11 @@ object ProgramCfg:
           n.data match {
             case d: DirectCall => 
               procToCalls(proc) += newNode.asInstanceOf[CfgCommandNode]        // This procedure (general) is calling another procedure
-              callToNodes(entryNode) += newNode.asInstanceOf[CfgCommandNode]   // This procedure (specfic) is calling another procedure
+              callToNodes(newEntry) += newNode.asInstanceOf[CfgCommandNode]   // This procedure (specfic) is calling another procedure
               procToCallers(d.target) += newNode.asInstanceOf[CfgCommandNode]  // Target of this call has a new caller
             case i: IndirectCall =>
               procToCalls(proc) += newNode.asInstanceOf[CfgCommandNode]
-              callToNodes(entryNode) += newNode.asInstanceOf[CfgCommandNode]
+              callToNodes(newEntry) += newNode.asInstanceOf[CfgCommandNode]
             case _ => 
           }
         case _ => 
