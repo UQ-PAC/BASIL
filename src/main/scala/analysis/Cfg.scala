@@ -58,8 +58,8 @@ trait CfgNodeWithData[T] extends CfgNode:
  */
 case class CfgFunctionEntryNode(
                                  override val id: Int = CfgNode.nextId(),
-                                 override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-                                 override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
+                                 override val pred: mutable.Set[CfgNode] = mutable.Set(),
+                                 override val succ: mutable.Set[CfgNode] = mutable.Set(),
                                  data: Procedure
                                ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionEntry] $data"
@@ -68,8 +68,8 @@ case class CfgFunctionEntryNode(
  */
 case class CfgFunctionExitNode(
                                 override val id: Int = CfgNode.nextId(),
-                                override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-                                override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
+                                override val pred: mutable.Set[CfgNode] = mutable.Set(),
+                                override val succ: mutable.Set[CfgNode] = mutable.Set(),
                                 data: Procedure
                               ) extends CfgNodeWithData[Procedure]:
   override def toString: String = s"[FunctionExit] $data"
@@ -78,8 +78,8 @@ case class CfgFunctionExitNode(
  */
 case class CfgBlockEntryNode(
                               override val id: Int = CfgNode.nextId(),
-                              override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-                              override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
+                              override val pred: mutable.Set[CfgNode] = mutable.Set(),
+                              override val succ: mutable.Set[CfgNode] = mutable.Set(),
                               data: Block
                             ) extends CfgNodeWithData[Block]:
   override def toString: String = s"[BlockEntry] $data"
@@ -88,8 +88,8 @@ case class CfgBlockEntryNode(
  */
 case class CfgBlockExitNode(
                              override val id: Int = CfgNode.nextId(),
-                             override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-                             override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
+                             override val pred: mutable.Set[CfgNode] = mutable.Set(),
+                             override val succ: mutable.Set[CfgNode] = mutable.Set(),
                              data: Block
                            ) extends CfgNodeWithData[Block]:
   override def toString: String = s"[BlockExit] $data"
@@ -98,8 +98,8 @@ case class CfgBlockExitNode(
  */
 case class CfgCommandNode(
                              override val id: Int = CfgNode.nextId(),
-                             override val pred: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
-                             override val succ: mutable.Set[CfgNode] = mutable.Set[CfgNode](),
+                             override val pred: mutable.Set[CfgNode] = mutable.Set(),
+                             override val succ: mutable.Set[CfgNode] = mutable.Set(),
                              data: Command
                            ) extends CfgNodeWithData[Command]:
   override def toString: String = s"[Stmt] $data"
@@ -110,14 +110,17 @@ case class CfgCommandNode(
  * @param exits
  *   the exit to he graph (sink)
  */
-class Cfg(cfg: Cfg = null):
-  var nodeToBlock: mutable.Map[CfgNode, Block] = mutable.Map[CfgNode, Block]()
-  var edges: ListBuffer[Edge] = ListBuffer[Edge]()
-  var entries: ListBuffer[CfgNode] = ListBuffer[CfgNode]()
-  if (cfg != null) then
-    this.edges = cfg.edges
-    this.entries = cfg.entries
-    this.nodeToBlock = cfg.nodeToBlock
+class Cfg(cfg: Option[Cfg] = None):
+  var nodeToBlock: mutable.Map[CfgNode, Block] = mutable.Map()
+  var edges: ListBuffer[Edge] = ListBuffer()
+  var entries: ListBuffer[CfgNode] = ListBuffer()
+  cfg match {
+    case Some(cfg) =>
+      this.edges = cfg.edges
+      this.entries = cfg.entries
+      this.nodeToBlock = cfg.nodeToBlock
+    case _ =>
+  }
 
   def getEdges: ListBuffer[Edge] = {
     edges
@@ -144,7 +147,7 @@ class Cfg(cfg: Cfg = null):
         nodesRec(entry).toSet
     }.toSet
 
-  protected def nodesRec(n: CfgNode, visited: mutable.Set[CfgNode] = mutable.Set[CfgNode]()): mutable.Set[CfgNode] =
+  protected def nodesRec(n: CfgNode, visited: mutable.Set[CfgNode] = mutable.Set()): mutable.Set[CfgNode] =
     if !visited.contains(n) then
       visited += n
       n.succ.foreach { n =>
@@ -152,16 +155,7 @@ class Cfg(cfg: Cfg = null):
       }
     visited
 
-  override def toString: String = {
-    val sb = StringBuilder()
-    sb.append("CFG {")
-    sb.append(" nodes: ")
-    sb.append(nodes)
-    sb.append(" edges: ")
-    sb.append(edges)
-    sb.append("}")
-    sb.toString()
-  }
+  override def toString: String = "CFG { nodes: " + nodes + " edges : " + edges + "}"
 
 // maybe refactor this to avoid global state in instance of Cfg?
 // E.g. move into Cfg class or a CfgBuilder class?
@@ -169,16 +163,17 @@ object Cfg:
 
   var cfg: Cfg = Cfg()
   private var latestAdded: Option[CfgNode] = None // to track latest added node.
-  private val funcEntryExit: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]()
+  private val funcEntryExit: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = mutable.HashMap()
   private var interProc: Boolean = false
   private var functionCloningLimit: Int = 1
 
   /** Generate the cfg for each function of the program.
    */
   def generateCfgProgram(program: Program, interProc: Boolean): Cfg = {
-    print("\nGenerating CFG... \n")
+    println()
+    println("Generating CFG...")
     cfg = Cfg()
-    latestAdded = null
+    latestAdded = None
 
     funcEntryExit.clear()
     this.interProc = interProc
@@ -192,21 +187,27 @@ object Cfg:
 
   /** Transforms blocks into lists of stmt nodes */
   def transformBlocks(blocks: Map[String, CfgBlockEntryNode]): Map[String, mutable.ArrayBuffer[CfgNode]] = {
-    blocks.map(block => block._1 -> block._2.data.statements.map(stmt => CfgCommandNode(data = stmt).asInstanceOf[CfgNode]).to(mutable.ArrayBuffer))
+    blocks.map(block =>
+      block._1 -> block._2.data.statements.map(
+        stmt => CfgCommandNode(data = stmt).asInstanceOf[CfgNode]).to(mutable.ArrayBuffer
+      )
+    )
   }
 
 
   /** Generate the cfg for a function.
    */
   def generateCfgFunc(func: Procedure): Cfg = {
-    val blocks: Map[String, CfgBlockEntryNode] = func.blocks.map(block => block.label -> CfgBlockEntryNode(data = block)).toMap
+    val blocks: Map[String, CfgBlockEntryNode] = func.blocks.map(block =>
+      block.label -> CfgBlockEntryNode(data = block)
+    ).toMap
     val functionEntryNode = CfgFunctionEntryNode(data = func)
     val functionExitNode = CfgFunctionExitNode(data = func)
     cfg.addNode(functionEntryNode)
     cfg.addNode(functionExitNode)
     funcEntryExit.addOne(func -> (functionEntryNode, functionExitNode))
-    val processedBlocks: mutable.Set[String] = mutable.Set[String]()
-    val otherLatestAdded: mutable.Set[CfgNode] = mutable.Set.empty // used if multiple DirectCalls need to join at the same node
+    val processedBlocks: mutable.Set[String] = mutable.Set()
+    val otherLatestAdded: mutable.Set[CfgNode] = mutable.Set() // used if multiple DirectCalls need to join at the same node
 
     def visitBlocks(blocks: Map[String, CfgBlockEntryNode]): Unit = {
       val newBlocks: Map[String, mutable.ArrayBuffer[CfgNode]] = transformBlocks(blocks)
@@ -233,7 +234,7 @@ object Cfg:
         )
         val lastAdded: CfgNode = latestAdded.get
         otherLatestAdded.clear()
-        val clonedFunctions: mutable.Set[String] = mutable.Set[String]()
+        val clonedFunctions: mutable.Set[String] = mutable.Set()
         if (interProc) {
           blocks(blockName).data.jumps.foreach {
             case g: GoTo =>
@@ -298,7 +299,7 @@ object Cfg:
               if (i.target.name.equals("R30")) {
                 cfg.addEdge(latestAdded.get, functionExitNode)
               } else {
-                print(s"Cannot resolve indirect call ${i} ${func.name}\n")
+                println(s"Cannot resolve indirect call ${i} ${func.name}")
               }
               if (i.returnTarget.isDefined) {
                 if (processedBlocks.contains(i.returnTarget.get.label)) {
@@ -340,7 +341,7 @@ object Cfg:
               cfg.addEdge(lastAdded, call)
               latestAdded = Some(call)
               //            cfg.addEdge(call, functionExitNode)
-              print(s"Indirect call not supported yet ${i}\n")
+              println(s"Indirect call not supported yet ${i}")
 
 
               if (i.returnTarget.isDefined) {
@@ -377,7 +378,7 @@ object Cfg:
  * @param funExits
  *   map from AST function declarations to CFG function exit nodes
  */
-abstract class ProgramCfg(val prog: Program, cfg: Cfg) extends Cfg(cfg):
+abstract class ProgramCfg(val prog: Program, cfg: Cfg) extends Cfg(Some(cfg)):
   /**
    * Returns a Graphviz dot representation of the CFG.
    * Each node is labeled using the given function labeler.

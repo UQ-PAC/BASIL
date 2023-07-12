@@ -21,3 +21,4 @@ src/main/antlr4/.antlr
 result.txt
 examplesold/
 src/test/scala/dump/
+src/test/analysis/dump/

@@ -1,17 +1,16 @@
 package analysis
 
-import analysis.*
+import analysis._
 import ir.BitVecLiteral
-import specification.{InternalFunction, SpecGlobal}
 
 import scala.collection.mutable
 
 // Define a case class to represent a range
 case class RangeKey(var start: BigInt, var end: BigInt)
 case class RegionToRangesMap():
-  val stackMap = scala.collection.mutable.Map[RangeKey, MemoryRegion]()
-  val heapMap = scala.collection.mutable.Map[RangeKey, MemoryRegion]()
-  val dataMap = scala.collection.mutable.Map[RangeKey, MemoryRegion]()
+  val stackMap: mutable.Map[RangeKey, MemoryRegion] = mutable.Map()
+  val heapMap: mutable.Map[RangeKey, MemoryRegion] = mutable.Map()
+  val dataMap: mutable.Map[RangeKey, MemoryRegion] = mutable.Map()
 
 // Custom data structure for storing range-to-object mappings
 class MemoryModelMap {
@@ -19,7 +18,7 @@ class MemoryModelMap {
   private val rangeMap = RegionToRangesMap()
   private val MAX_BIGINT: BigInt = BigInt(Long.MaxValue)
   private val contextStack = mutable.Stack.empty[List[StackRegion]]
-  private val allStacks = scala.collection.mutable.Map[String, List[StackRegion]]()
+  private val allStacks = mutable.Map[String, List[StackRegion]]()
 
   // Add a range and object to the mapping
   def add(offset: BigInt, regionType: MemoryRegion): Unit = {
@@ -43,24 +42,27 @@ class MemoryModelMap {
     }
   }
 
-  def convertMemoryRegions(memoryRegions: Map[CfgNode, _], internalFunctions: Set[InternalFunction]): Unit = {
+  def convertMemoryRegions(memoryRegions: Map[CfgNode, MemoryRegion], externalFunctions: Map[BigInt, String]): Unit = {
     // get all function exit node
-    val exitNodes = memoryRegions.keys.filter(_.isInstanceOf[CfgFunctionExitNode]).toList
+    val exitNodes = memoryRegions.keys.collect { case e: CfgFunctionExitNode => e }.toList
     exitNodes.foreach(exitNode =>
+      val node = memoryRegions(exitNode).asInstanceOf[Set[Any]]
       // for each function exit node we get the memory region
       // and add it to the mapping
-      val stackRgns = memoryRegions(exitNode).asInstanceOf[Set[Any]].filter(_.isInstanceOf[StackRegion]).map(_.asInstanceOf[StackRegion]).toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
-      val dataRgns = memoryRegions(exitNode).asInstanceOf[Set[Any]].filter(_.isInstanceOf[DataRegion]).map(_.asInstanceOf[DataRegion]).toList
-      val heapRgns = memoryRegions(exitNode).asInstanceOf[Set[Any]].filter(_.isInstanceOf[HeapRegion]).map(_.asInstanceOf[HeapRegion]).toList
-      val accessRgns = memoryRegions(exitNode).asInstanceOf[Set[Any]].filter(_.isInstanceOf[RegionAccess]).map(_.asInstanceOf[RegionAccess]).toList
-      // map internalFunctions name, value to DataRegion(name, value) and then sort by value
-      val internalFunctionRgns = internalFunctions.map(f => DataRegion(f.name, BitVecLiteral(f.offset, -1))).toList // assume -1 because we don't know
+      val stackRgns = node.collect{ case r: StackRegion => r }.toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
+      val dataRgns = node.collect{ case r: DataRegion => r }.toList
+      val heapRgns = node.collect{ case r: HeapRegion => r }.toList
+      val accessRgns = node.collect{ case r: RegionAccess => r }.toList
+      // map externalFunctions name, value to DataRegion(name, value) and then sort by value
+      val externalFunctionRgns = externalFunctions.map(
+        (offset, name) => DataRegion(name, BitVecLiteral(offset, 64))
+      ).toList
 
-      // add internalFunctionRgn to dataRgns and sort by value
-      val allDataRgns = (dataRgns ++ internalFunctionRgns).sortBy(_.start.asInstanceOf[BitVecLiteral].value)
+      // add externalFunctionRgn to dataRgns and sort by value
+      val allDataRgns = (dataRgns ++ externalFunctionRgns).sortBy(_.start.asInstanceOf[BitVecLiteral].value)
 
 
-      allStacks(exitNode.asInstanceOf[CfgFunctionExitNode].data.name) = stackRgns
+      allStacks(exitNode.data.name) = stackRgns
 
 //      for (stackRgn <- stackRgns) {
 //        add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
@@ -121,12 +123,8 @@ class MemoryModelMap {
   }
 
   override def toString: String =
-    val sb = new StringBuilder()
-    sb.append(s"Stack: ${rangeMap.stackMap}\n")
-    sb.append(s"Heap: ${rangeMap.heapMap}\n")
-    sb.append(s"Data: ${rangeMap.dataMap}\n")
+    s"Stack: ${rangeMap.stackMap}\n Heap: ${rangeMap.heapMap}\n Data: ${rangeMap.dataMap}\n"
 
-    sb.toString()
 }
 
 

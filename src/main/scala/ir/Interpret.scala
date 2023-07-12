@@ -108,7 +108,7 @@ class Interpret(IRProgram: Program) {
   }
 
   def interpretProcedure(p: Procedure): Unit = {
-    println(s"Procedure(${p.name}, ${p.address})")
+    println(s"Procedure(${p.name}, ${p.address.getOrElse("None")})")
 
     // Procedure.in
     for ((in, index) <- p.in.zipWithIndex) {

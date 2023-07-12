@@ -5,27 +5,18 @@ import specification._
 import scala.jdk.CollectionConverters._
 
 object ElfLoader {
-  def visitSyms(ctx: SymsContext): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Set[InternalFunction]) = {
+  def visitSyms(ctx: SymsContext): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt]) = {
     val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableExtFunc(r)).toSet
-    val internalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableIntFunc(r)).toSet
     val relocationOffsets = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableOffsets(r)).toMap
     val globalVariables = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toSet
-    (externalFunctions, globalVariables, relocationOffsets, internalFunctions)
+    (externalFunctions, globalVariables, relocationOffsets)
   }
 
   def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {
-    if (ctx.relocationTableHeader.tableName.STRING.getText == ".rela.plt") {
+    val sectionName = ctx.relocationTableHeader.tableName.STRING.getText
+    if (sectionName == ".rela.plt" || sectionName == ".rela.dyn") {
       val rows = ctx.relocationTableRow.asScala
-      rows.map(r => visitRelocationTableRowExtFunc(r)).toSet
-    } else {
-      Set()
-    }
-  }
-
-  def visitRelocationTableIntFunc(ctx: RelocationTableContext): Set[InternalFunction] = {
-    if (ctx.relocationTableHeader.tableName.STRING.getText == ".rela.dyn") {
-      val rows = ctx.relocationTableRow.asScala
-      rows.filter(r => r.name != null).map(r => visitRelocationTableRowIntFunc(r)).toSet
+      rows.filter(r => r.name != null).map(r => visitRelocationTableRowExtFunc(r)).toSet
     } else {
       Set()
     }
@@ -33,10 +24,6 @@ object ElfLoader {
 
   def visitRelocationTableRowExtFunc(ctx: RelocationTableRowContext): ExternalFunction = {
     ExternalFunction(ctx.name.getText.stripSuffix("@GLIBC_2.17"), hexToBigInt(ctx.offset.getText))
-  }
-
-  def visitRelocationTableRowIntFunc(ctx: RelocationTableRowContext): InternalFunction = {
-    InternalFunction(ctx.name.getText.stripSuffix("@GLIBC_2.17"), hexToBigInt(ctx.offset.getText))
   }
 
   def visitRelocationTableOffsets(ctx: RelocationTableContext): Map[BigInt, BigInt] = {
@@ -66,7 +53,7 @@ object ElfLoader {
   }
 
   def visitSymbolTableRow(ctx: SymbolTableRowContext): Option[SpecGlobal] = {
-    if ((ctx.entrytype.getText == "OBJECT" || ctx.entrytype.getText == "FUNC") && (ctx.bind.getText == "GLOBAL" || ctx.bind.getText == "LOCAL")) { // TODO: check if this is correct
+    if (ctx.entrytype.getText == "OBJECT" && ctx.bind.getText == "GLOBAL" && ctx.vis.getText == "DEFAULT") {
       val name = ctx.name.getText
       if (name.forall(allowedChars.contains)) {
         Some(SpecGlobal(name, ctx.size.getText.toInt * 8, None, hexToBigInt(ctx.value.getText)))

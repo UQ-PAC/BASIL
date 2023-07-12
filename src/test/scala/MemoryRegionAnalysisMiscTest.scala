@@ -8,12 +8,12 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
 
   //C:\workdir\bil-to-boogie-translator\examples
   private val examplesPath = System.getProperty("user.dir") + "/examples/";
-  private val expectedPath = System.getProperty("user.dir") + "/src/test/scala/dotExpected/";
-  private val tempPath = System.getProperty("user.dir") + "/src/test/scala/dump/";
+  private val expectedPath = System.getProperty("user.dir") + "/src/test/analysis/dotExpected/";
+  private val tempPath = System.getProperty("user.dir") + "/src/test/analysis/dump/";
   def runMain(name: String, dump: Boolean = false): Unit = {
     var expected = ""
     var actual = ""
-    var output: Option[Map[analysis.CfgNode, ?]] = null
+    var output: Option[Map[analysis.CfgNode, ?]] = None
     RunUtils.generateVCsAdt(examplesPath + s"${name}/${name}.adt", examplesPath + s"${name}/${name}.relf", None, true, false)
     try {
       // create dump folder if it does not exist
@@ -68,31 +68,31 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
 //    assert(output == expected)
 //  }
 
-  test("ifglobalTest") {
+  test("ifglobal") {
     runMain("ifglobal");
   }
 
-  test("ifLocalTest") {
+  test("iflocal") {
     runMain("iflocal");
   }
 
-  test("secretWriteTest") {
+  test("secret_write") {
     runMain("secret_write");
   }
 
-  test("basicArraysReadTest") {
+  test("basic_arrays_read") {
     runMain("basic_arrays_read");
   }
 
-  test("basicArraysWriteTest") {
+  test("basic_arrays_write") {
     runMain("basic_arrays_write");
   }
 
-  test("basicFreeTest") {
+  test("basicfree") {
     runMain("basicfree");
   }
 
-  test("arraysTest") {
+  test("arrays") {
     runMain("arrays");
   }
 

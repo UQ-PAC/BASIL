@@ -1,9 +1,7 @@
 package analysis
 
-import ir.{DirectCall, *}
-import analysis.solvers.*
-import boogie.BExpr
-import specification.SpecGlobal
+import ir._
+import analysis.solvers._
 
 import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
@@ -457,7 +455,7 @@ trait MemoryRegionAnalysisMisc:
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
-  var stackPool = mutable.HashMap[Expr, StackRegion]()
+  var stackPool: mutable.Map[Expr, StackRegion] = mutable.HashMap()
   private def getNextMallocCount(): String = {
     mallocCount += 1
     s"malloc_$mallocCount"
@@ -469,20 +467,19 @@ trait MemoryRegionAnalysisMisc:
   }
 
   def poolMaster(expr: Expr): StackRegion = {
-    stackPool.contains(expr) match {
-      case true => stackPool(expr)
-      case false =>
-        val newRegion = StackRegion(getNextStackCount(), expr)
-        stackPool += (expr -> newRegion)
-        newRegion
+    if (stackPool.contains(expr)) {
+      stackPool(expr)
+    } else {
+      val newRegion = StackRegion(getNextStackCount(), expr)
+      stackPool += (expr -> newRegion)
+      newRegion
     }
   }
 
-
-
   val cfg: ProgramCfg
-  val globals: Set[SpecGlobal]
+  val globals: Map[BigInt, String]
   val globalOffsets: Map[BigInt, BigInt]
+  val subroutines: Map[BigInt, String]
 
   /** The lattice of abstract values.
    */
@@ -517,7 +514,7 @@ trait MemoryRegionAnalysisMisc:
     val decls: mutable.ListBuffer[CfgNode] = mutable.ListBuffer.empty
     // if we have a temporary variable then ignore it
     if (variable.name.contains("#")) {
-        return decls
+      return decls
     }
     for (pred <- n.pred) {
       if (loopEscape(pred)) {
@@ -538,30 +535,6 @@ trait MemoryRegionAnalysisMisc:
       }
     }
     decls
-  }
-
-  def is_global(bigInt: BigInt): Boolean = {
-      for (global <- globals) {
-          if (global.address == bigInt) {
-          return true
-          }
-      }
-
-      for (global <- globalOffsets) {
-        if (global._1 == bigInt) {
-          return true
-        }
-      }
-      false
-  }
-
-  def get_global_name(bigInt: BigInt): String = {
-      for (global <- globals) {
-          if (global.address == bigInt) {
-            return global.name
-          }
-      }
-      ""
   }
 
   /**
@@ -624,10 +597,16 @@ trait MemoryRegionAnalysisMisc:
             val rhs: Expr = evaluateExpression(binOp.arg2, n)
             lhs match {
               case bitVecLiteral: BitVecLiteral =>
-                if (is_global(bitVecLiteral.value)) {
+                if (globals.contains(bitVecLiteral.value)) {
                   var tempLattice: lattice.sublattice.Element = env
-                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(get_global_name(bitVecLiteral.value), bitVecLiteral)))
-                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(get_global_name(bitVecLiteral.value), binOp.arg2)))
+                  val globalName = globals(bitVecLiteral.value)
+                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(globalName, bitVecLiteral)))
+                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(globalName, binOp.arg2)))
+                } else if (subroutines.contains(bitVecLiteral.value)) {
+                  var tempLattice: lattice.sublattice.Element = env
+                  val subroutineName = subroutines(bitVecLiteral.value)
+                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(subroutineName, bitVecLiteral)))
+                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(subroutineName, binOp.arg2)))
                 }
               case binOp2: BinaryExpr =>
                   // special case: we do not want to get a unique stack name so we try to find it in the pool
@@ -648,8 +627,10 @@ trait MemoryRegionAnalysisMisc:
           val eval = evaluateExpression(variable, n)
           eval match {
             case literal: BitVecLiteral =>
-              if (is_global(literal.value)) {
-                return Set(DataRegion(get_global_name(literal.value), literal))
+              if (globals.contains(literal.value)) {
+                return Set(DataRegion(globals(literal.value), literal))
+              } else if (subroutines.contains(literal.value)) {
+                return Set(DataRegion(subroutines(literal.value), literal))
               }
               lattice.sublattice.bottom
             case _ =>
@@ -701,7 +682,7 @@ trait MemoryRegionAnalysisMisc:
 
 /** Base class for memory region analysis (non-lifted) lattice.
  */
-abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal], val globalOffsets: Map[BigInt, BigInt]) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
+abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Map[BigInt, String], val globalOffsets: Map[BigInt, BigInt], val subroutines: Map[BigInt, String]) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
    */
@@ -709,8 +690,8 @@ abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGl
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt], val powersetLattice: L)
-  extends MemoryRegionAnalysis(cfg, globals, globalOffsets)
+abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: IntraproceduralProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String], val powersetLattice: L)
+  extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines)
   with SimpleMonotonicSolver[CfgNode]
   with ForwardDependencies
 
@@ -718,5 +699,5 @@ object MemoryRegionAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
    */
-  class WorklistSolver(cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt])
-    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, globalOffsets, PowersetLattice[MemoryRegion])
+  class WorklistSolver(cfg: IntraproceduralProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String])
+    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, globalOffsets, subroutines, PowersetLattice[MemoryRegion])

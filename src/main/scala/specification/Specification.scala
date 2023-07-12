@@ -52,5 +52,3 @@ case class Specification(globals: Set[SpecGlobal], LPreds: Map[SpecGlobal, BExpr
 case class SubroutineSpec(name: String, requires: List[BExpr], ensures: List[BExpr])
 
 case class ExternalFunction(name: String, offset: BigInt)
-
-case class InternalFunction(name: String, offset: BigInt)
