@@ -1,6 +1,5 @@
 package util
 import analysis._
-import analysis.util.SSA
 import cfg_visualiser.{OtherOutput, Output, OutputKindE}
 import bap._
 import ir._
@@ -200,7 +199,7 @@ object RunUtils {
               interproceduralProgramCfg.nodeToBlock.get(n) match
                 case Some(block) =>
                   block.jumps = block.jumps.filter(!_.equals(indirectCall))
-                  block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head._name)).head, indirectCall.condition, indirectCall.returnTarget)
+                  block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head.name)).head, indirectCall.condition, indirectCall.returnTarget)
                 case _ => throw new Exception("Node not found in nodeToBlock map")
             } else {
               functionNames.foreach(addressValue =>
@@ -208,9 +207,9 @@ object RunUtils {
                   case Some(block) =>
                     block.jumps = block.jumps.filter(!_.equals(indirectCall))
                     if (indirectCall.condition.isDefined) {
-                      block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(addressValue._name)).head, Option(BinaryExpr(BVAND, indirectCall.condition.get, BinaryExpr(BVEQ, indirectCall.target, addressValue._expr))), indirectCall.returnTarget)
+                      block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(addressValue.name)).head, Option(BinaryExpr(BVAND, indirectCall.condition.get, BinaryExpr(BVEQ, indirectCall.target, addressValue.expr))), indirectCall.returnTarget)
                     } else {
-                      block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(addressValue._name)).head, Option(BinaryExpr(BVEQ, indirectCall.target, addressValue._expr)), indirectCall.returnTarget)
+                      block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(addressValue.name)).head, Option(BinaryExpr(BVEQ, indirectCall.target, addressValue.expr)), indirectCall.returnTarget)
                     }
                   case _ => throw new Exception("Node not found in nodeToBlock map")
               )

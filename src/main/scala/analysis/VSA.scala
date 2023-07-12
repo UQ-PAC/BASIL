@@ -9,23 +9,19 @@ import scala.collection.mutable
 import scala.collection.immutable
 
 /** ValueSets are PowerSet of possible values */
+trait Value
+trait AddressValue(val expr: Expr, val name: String) extends Value
 
-abstract class Value
-class AddressValue(var _expr: Expr, var _name: String) extends Value {
-  override def toString: String = "AddressValue(" + _expr + ")"
-}
-
-case class GlobalAddress(expr: Expr, name: String) extends AddressValue(expr, name) {
+case class GlobalAddress(override val expr: Expr, override val name: String) extends AddressValue(expr, name) {
   override def toString: String = "GlobalAddress(" + expr + ")"
 }
 
-case class LocalAddress(expr: Expr, name: String) extends AddressValue(expr, name) {
+case class LocalAddress(override val expr: Expr, override val name: String) extends AddressValue(expr, name) {
   override def toString: String = "LocalAddress(" + expr + ")"
 }
 
-case class LiteralValue(expr: Expr) extends Value {
+case class LiteralValue(expr: BitVecLiteral) extends Value {
   override def toString: String = "Literal(" + expr + ")"
-  override def hashCode(): Int = expr.hashCode()
 }
 
 
@@ -122,18 +118,27 @@ trait MemoryRegionValueSetAnalysis:
           case variable: Variable =>
             loopEscapeSet.clear()
             for (pred <- findDecl(variable, n)) {
-              assigmentsMap.get(variable, pred) match
+              assigmentsMap.get(variable, pred) match {
                 case Some(value) =>
-                  value match
+                  value match {
                     case bitVecLiteral: BitVecLiteral =>
-                      binOp.arg2 match
-                        case arg2: BitVecLiteral =>
-                          return BitVecLiteral(bitVecLiteral.value + arg2.value, bitVecLiteral.size)
-                        case _ => return exp
+                      binOp.op match {
+                        case BVADD =>
+                          binOp.arg2 match {
+                            case arg2: BitVecLiteral =>
+                              return BitVecLiteral(bitVecLiteral.value + arg2.value, bitVecLiteral.size)
+                            case _ => return exp
+                          }
+                        case _ =>
+                          println("ERROR: OPERATOR " + binOp.op + " NOT HANDLED: " + binOp)
+                          return exp
+                      }
                     case _ => return exp
+                  }
                 case _ =>
                   println("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(variable, pred) + " FOR " + binOp)
                   return exp
+              }
             }
           case _ => return evaluateExpression(binOp.arg1, n)
         }
@@ -235,28 +240,34 @@ trait MemoryRegionValueSetAnalysis:
                       case _ => s
                     }
                   case lhs: BitVecLiteral =>
-                    // should do something here
-                    val summation = lhs.value + rhs.value
-                    mmm.findObject(summation, "data") match {
-                      case Some(obj: MemoryRegion) =>
-                        evaluateExpression(memAssign.rhs.value, n) match {
-                          case bitVecLiteral: BitVecLiteral =>
-                            val map = regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value])
-                            if (externalFunctions.contains(bitVecLiteral.value)) {
-                              map.add(LocalAddress(bitVecLiteral, externalFunctions(bitVecLiteral.value)))
-                            } else if (globals.contains(bitVecLiteral.value)) {
-                              map.add(GlobalAddress(bitVecLiteral, globals(bitVecLiteral.value)))
-                            } else if (globalOffsets.contains(bitVecLiteral.value)) {
-                              map.add(GlobalAddress(bitVecLiteral, resolveGlobalOffset(bitVecLiteral.value)))
-                            } else if (subroutines.contains(bitVecLiteral.value)) {
-                              map.add(GlobalAddress(bitVecLiteral, subroutines(bitVecLiteral.value)))
-                            } else {
-                              map.add(LiteralValue(bitVecLiteral))
+                    binOp.op match {
+                      case BVADD =>
+                        // should do something here
+                        val summation = lhs.value + rhs.value
+                        mmm.findObject(summation, "data") match {
+                          case Some(obj: MemoryRegion) =>
+                            evaluateExpression(memAssign.rhs.value, n) match {
+                              case bitVecLiteral: BitVecLiteral =>
+                                val map = regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value])
+                                if (externalFunctions.contains(bitVecLiteral.value)) {
+                                  map.add(LocalAddress(bitVecLiteral, externalFunctions(bitVecLiteral.value)))
+                                } else if (globals.contains(bitVecLiteral.value)) {
+                                  map.add(GlobalAddress(bitVecLiteral, globals(bitVecLiteral.value)))
+                                } else if (globalOffsets.contains(bitVecLiteral.value)) {
+                                  map.add(GlobalAddress(bitVecLiteral, resolveGlobalOffset(bitVecLiteral.value)))
+                                } else if (subroutines.contains(bitVecLiteral.value)) {
+                                  map.add(GlobalAddress(bitVecLiteral, subroutines(bitVecLiteral.value)))
+                                } else {
+                                  map.add(LiteralValue(bitVecLiteral))
+                                }
+                                s
+                              case _ => s
                             }
-                            s
                           case _ => s
                         }
-                      case _ => s
+                      case _ =>
+                        println("ERROR: tried to eval operator: " + binOp.op + " in " + binOp)
+                        s
                     }
                   case _ => s
                 }
@@ -284,23 +295,29 @@ trait MemoryRegionValueSetAnalysis:
                             s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).toSet)
                           case _ => s
                       case lhs: BitVecLiteral =>
-                        val summation = lhs.value + rhs.value
-                        mmm.findObject(summation, "data") match {
-                          case Some(obj: MemoryRegion) =>
-                            val setToAdd = mutable.Set.empty[Value]
-                            if (globals.contains(summation)) {
-                              setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), globals(summation)))
-                            } else if (globalOffsets.contains(summation)) {
-                              setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), resolveGlobalOffset(summation)))
-                            } else if (subroutines.contains(summation)) {
-                              setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), subroutines(summation)))
-                            } else if (externalFunctions.contains(summation)) {
-                              setToAdd.add(LocalAddress(BitVecLiteral(summation, lhs.size), externalFunctions(summation)))
-                            } else {
-                              setToAdd.add(LiteralValue(BitVecLiteral(summation, lhs.size)))
+                        binOp.op match {
+                          case BVADD =>
+                            val summation = lhs.value + rhs.value
+                            mmm.findObject(summation, "data") match {
+                              case Some(obj: MemoryRegion) =>
+                                val setToAdd = mutable.Set.empty[Value]
+                                if (globals.contains(summation)) {
+                                  setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), globals(summation)))
+                                } else if (globalOffsets.contains(summation)) {
+                                  setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), resolveGlobalOffset(summation)))
+                                } else if (subroutines.contains(summation)) {
+                                  setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), subroutines(summation)))
+                                } else if (externalFunctions.contains(summation)) {
+                                  setToAdd.add(LocalAddress(BitVecLiteral(summation, lhs.size), externalFunctions(summation)))
+                                } else {
+                                  setToAdd.add(LiteralValue(BitVecLiteral(summation, lhs.size)))
+                                }
+                                s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, setToAdd).toSet)
+                              case _ => s
                             }
-                            s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, setToAdd).toSet)
-                          case _ => s
+                          case _ =>
+                            println("ERROR: tried to eval operator: " + binOp.op + " in " + binOp)
+                            s
                         }
                       case _ => s
                     }
