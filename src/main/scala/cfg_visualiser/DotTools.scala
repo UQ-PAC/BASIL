@@ -62,16 +62,25 @@ class DotRegularArrow(fromNode: DotNode, toNode: DotNode, label: String) extends
 }
 
 /**
-  * Represents a directed, inter-process cfg edge in a Graphviz dot file.
+  * Represents a directed, inline connection between two cfg nodes in a Graphviz dot file.
   */
-class DotInterArrow(fromNode: DotNode, toNode: DotNode, label: String) extends DotArrow(fromNode, "->", toNode, label, style = "dashed", colour = "red") {
+class DotInlineArrow(fromNode: DotNode, toNode: DotNode, label: String) extends DotArrow(fromNode, "->", toNode, label, style = "dashed", colour = "red") {
+  def this(fromNode: DotNode, toNode: DotNode) = this(fromNode, toNode, "")
+
+  override def toString: String = super.toDotString
+}
+
+/*
+ * Represents a directed, interprocedural edge between two nodes in a Graphviz dot file
+ */
+class DotInterArrow(fromNode: DotNode, toNode: DotNode, label: String) extends DotArrow(fromNode, "->", toNode, label, style = "dashed", colour = "green") {
   def this(fromNode: DotNode, toNode: DotNode) = this(fromNode, toNode, "")
 
   override def toString: String = super.toDotString
 }
 
 /**
-  * Represents a directed, intra-process cfg edge in a Graphviz dot file.
+  * Represents a directed, intraprocedural cfg edge in a Graphviz dot file.
   */
 class DotIntraArrow(fromNode: DotNode, toNode: DotNode, label: String) extends DotArrow(fromNode, "->", toNode, label, style = "dashed", colour = "blue") {
   def this(fromNode: DotNode, toNode: DotNode) = this(fromNode, toNode, "")
