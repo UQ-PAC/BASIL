@@ -164,7 +164,17 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         val indexVar = BParam("index", l.index.getType)
         val body: BExpr = LPreds.keys.foldLeft(FalseBLiteral) {
           (ite: BExpr, next: SpecGlobal) => {
-            val guard = BinaryBExpr(BoolEQ, indexVar, next.toAddrVar)
+            val guard = next.arraySize match {
+              case Some(size: Int) =>
+                val initial: BExpr = BinaryBExpr(BoolEQ, indexVar, ArrayAccess(next, 0).toAddrVar)
+                val indices = 1 until size
+                indices.foldLeft(initial) {
+                  (or: BExpr, i: Int) => {
+                    BinaryBExpr(BoolOR, BinaryBExpr(BoolEQ, indexVar, ArrayAccess(next, i).toAddrVar), or)
+                  }
+                }
+              case None => BinaryBExpr(BoolEQ, indexVar, next.toAddrVar)
+            }
             val LPred = LPreds(next)
             /*if (controlled.contains(next)) {
             FunctionCall(s"L_${next.name}", List(l.memory), BoolType)

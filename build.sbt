@@ -1,4 +1,4 @@
-import scala.sys.process.Process
+import scala.io.Source
 
 ThisBuild / scalaVersion := "3.1.0"
 ThisBuild / version := "0.0.1"
@@ -43,7 +43,7 @@ updateExpected := {
         if (resultPath.exists()) {
           val result = IO.read(resultPath)
           val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
-          if (verified == shouldVerify && outPath.exists()) {
+          if (verified == shouldVerify && outPath.exists() && !compareFiles(outPath, expectedPath)) {
             IO.copyFile(outPath, expectedPath)
           }
         }
@@ -51,7 +51,31 @@ updateExpected := {
     }
   }
 
+  def compareFiles(path1: File, path2: File): Boolean = {
+    val source1 = Source.fromFile(path1)
+    val source2 = Source.fromFile(path2)
+    val lines1 = source1.getLines
+    val lines2 = source2.getLines
+    while (lines1.hasNext && lines2.hasNext) {
+      val line1 = lines1.next()
+      val line2 = lines2.next()
+      if (line1 != line2) {
+        source1.close
+        source2.close
+        return false
+      }
+    }
+    if (lines1.hasNext || lines2.hasNext) {
+      source1.close
+      source2.close
+      return false
+    }
+
+    source1.close
+    source2.close
+    true
+  }
+
   expectedUpdate(correctPath, true)
   expectedUpdate(incorrectPath, false)
 }
-

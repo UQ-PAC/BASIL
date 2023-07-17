@@ -170,7 +170,7 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
     call rely();
     R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 56bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 56bv64)) || L(mem, bvadd64(R8, 56bv64)));
     R30, Gamma_R30 := 1992bv64, true;
-    // UNRESOLVED: call R8
+    //UNRESOLVED: call R8
     assume false;
     goto l00000422;
   l00000422:
@@ -178,7 +178,7 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
     call rely();
     R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 8bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 8bv64)) || L(mem, bvadd64(R8, 8bv64)));
     R30, Gamma_R30 := 2004bv64, true;
-    // UNRESOLVED: call R8
+    //UNRESOLVED: call R8
     assume false;
     goto l00000438;
   l00000438:
@@ -186,7 +186,7 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
     call rely();
     R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 16bv64)) || L(mem, bvadd64(R8, 16bv64)));
     R30, Gamma_R30 := 2016bv64, true;
-    // UNRESOLVED: call R8
+    //UNRESOLVED: call R8
     assume false;
     goto l0000044e;
   l0000044e:

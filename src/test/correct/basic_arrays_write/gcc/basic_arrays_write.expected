@@ -5,7 +5,7 @@ var stack: [bv64]bv8;
 const $arr_addr: bv64;
 axiom ($arr_addr == 69656bv64);
 function L(memory: [bv64]bv8, index: bv64) returns (bool) {
-  (if (index == $arr_addr) then false else false)
+  (if ((index == bvadd64($arr_addr, 4bv64)) || (index == bvadd64($arr_addr, 0bv64))) then false else false)
 }
 
 function {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);

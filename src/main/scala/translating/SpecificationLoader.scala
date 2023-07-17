@@ -70,7 +70,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   }
 
   def visitLPred(ctx: LPredContext, nameToGlobals: Map[String, SpecGlobal]): (SpecGlobal, BExpr) = {
-    (idToSymbol(ctx.id.getText), visitExpr(ctx.expr, nameToGlobals))
+    (nameToGlobals(ctx.id.getText), visitExpr(ctx.expr, nameToGlobals))
   }
 
   /*

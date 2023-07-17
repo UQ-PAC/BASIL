@@ -87,8 +87,8 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
     call rely();
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 16bv64)) || L(mem, bvadd64(R16, 16bv64)));
     R16, Gamma_R16 := bvadd64(R16, 16bv64), Gamma_R16;
-    // UNRESOLVED: call R17
+    //UNRESOLVED: call R17
     assume false;
-    // no return target
+    //no return target
     assume false;
 }
