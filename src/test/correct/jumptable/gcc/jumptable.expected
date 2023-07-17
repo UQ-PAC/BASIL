@@ -197,19 +197,19 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
     mem, Gamma_mem := memory_store64_le(mem, bvadd64(R2, 16bv64), R0), gamma_store64(Gamma_mem, bvadd64(R2, 16bv64), Gamma_R0);
     R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 32bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 32bv64));
     R30, Gamma_R30 := 2316bv64, true;
-    // UNRESOLVED: call R0
+    //UNRESOLVED: call R0
     assume false;
     goto l000004d7;
   l000004d7:
     R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 40bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 40bv64));
     R30, Gamma_R30 := 2324bv64, true;
-    // UNRESOLVED: call R0
+    //UNRESOLVED: call R0
     assume false;
     goto l000004e6;
   l000004e6:
     R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 48bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 48bv64));
     R30, Gamma_R30 := 2332bv64, true;
-    // UNRESOLVED: call R0
+    //UNRESOLVED: call R0
     assume false;
     goto l000004f5;
   l000004f5:

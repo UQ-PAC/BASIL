@@ -136,7 +136,7 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
   l000003aa:
     R8, Gamma_R8 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
     R30, Gamma_R30 := 2024bv64, true;
-    // UNRESOLVED: call R8
+    //UNRESOLVED: call R8
     assume false;
     goto l000003b9;
   l000003b9:

@@ -9,8 +9,8 @@ class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBu
   def stripUnreachableFunctions(): Unit = {
     val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
-    var next = mainProcedure
-    var reachableNames: Set[String] = Set(mainProcedure)
+    var next = mainProcedure.name
+    var reachableNames: Set[String] = Set(next)
     var toVisit: List[String] = List()
     var reachableFound = true;
     while (reachableFound) {

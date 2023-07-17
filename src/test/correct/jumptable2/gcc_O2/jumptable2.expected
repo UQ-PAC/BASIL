@@ -140,21 +140,21 @@ procedure main(main_argc: bv32, Gamma_main_argc: bool, main_argv: bv64, Gamma_ma
     call rely();
     R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 24bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 24bv64)) || L(mem, bvadd64(R0, 24bv64)));
     R30, Gamma_R30 := 1628bv64, true;
-    // UNRESOLVED: call R0
+    //UNRESOLVED: call R0
     assume false;
     goto l00000236;
   l00000236:
     call rely();
     R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R19, 8bv64)), (gamma_load64(Gamma_mem, bvadd64(R19, 8bv64)) || L(mem, bvadd64(R19, 8bv64)));
     R30, Gamma_R30 := 1636bv64, true;
-    // UNRESOLVED: call R0
+    //UNRESOLVED: call R0
     assume false;
     goto l00000245;
   l00000245:
     call rely();
     R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R19, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R19, 16bv64)) || L(mem, bvadd64(R19, 16bv64)));
     R30, Gamma_R30 := 1644bv64, true;
-    // UNRESOLVED: call R0
+    //UNRESOLVED: call R0
     assume false;
     goto l00000254;
   l00000254:

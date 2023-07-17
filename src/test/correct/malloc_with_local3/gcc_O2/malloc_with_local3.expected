@@ -213,6 +213,6 @@ procedure printCharValue(FP: bv64, Gamma_FP: bool, LR: bv64, Gamma_LR: bool, SP:
     mem, Gamma_mem := memory_store8_le(mem, R3, R2[8:0]), gamma_store8(Gamma_mem, R3, Gamma_R2);
     call #temp0, Gamma_#temp0, R29, Gamma_R29, R30, Gamma_R30, R31, Gamma_R31 := __printf_chk(R29, Gamma_R29, R30, Gamma_R30, R31, Gamma_R31);
     R0, Gamma_R0 := zero_extend32_32(#temp0), Gamma_#temp0;
-    // no return target
+    //no return target
     assume false;
 }
