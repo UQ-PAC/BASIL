@@ -17,9 +17,10 @@ object ElfLoader {
   }
 
   def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {
-    if (ctx.relocationTableHeader.tableName.STRING.getText == ".rela.plt") {
+    val sectionName = ctx.relocationTableHeader.tableName.STRING.getText
+    if (sectionName == ".rela.plt" || sectionName == ".rela.dyn") {
       val rows = ctx.relocationTableRow.asScala
-      rows.map(r => visitRelocationTableRowExtFunc(r)).toSet
+      rows.filter(r => r.name != null).map(r => visitRelocationTableRowExtFunc(r)).toSet
     } else {
       Set()
     }

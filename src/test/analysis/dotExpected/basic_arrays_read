@@ -1,0 +1,8 @@
+[Stmt] Variable(R0, bv64) := bvadd64(Variable(R0, bv64), 24bv64) -> Set()
+[Stmt] Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), Variable(R0, bv64), 0bv32, LittleEndian, 32) -> Set(Data(69632bv64, 24bv64))
+[Stmt] Variable(R0, bv64) := ZeroExtend(32, MemoryLoad(Memory(mem, 64, 8), Variable(R0, bv64), LittleEndian, 32)) -> Set(Data(69632bv64, 24bv64))
+[FunctionEntry] Procedure main at 1820 with 1 blocks and 5 in and 5 out parameters -> Set()
+[Stmt] Variable(R0, bv64) := 69632bv64 -> Set(Data(69632bv64, 24bv64))
+[FunctionExit] Procedure main at 1820 with 1 blocks and 5 in and 5 out parameters -> Set(Data(69632bv64, 24bv64))
+[Stmt] Variable(R0, bv64) := bvadd64(Variable(R0, bv64), 24bv64) -> Set(Data(69632bv64, 24bv64))
+[Stmt] Variable(R0, bv64) := 69632bv64 -> Set()

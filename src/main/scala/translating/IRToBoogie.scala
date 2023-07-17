@@ -1,8 +1,8 @@
 package translating
-
+import ir._
 import boogie._
 import specification._
-import ir._
+
 import scala.collection.mutable.ArrayBuffer
 
 class IRToBoogie(var program: Program, var spec: Specification) {

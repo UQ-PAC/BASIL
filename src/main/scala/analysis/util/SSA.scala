@@ -13,10 +13,18 @@ import scala.collection.mutable.ListBuffer
 
 class SSA(cfg: Cfg) {
     val variableTracker: mutable.Map[String, Int] = mutable.HashMap()
+    val visited: mutable.Set[CfgNode] = mutable.HashSet()
 
     def analyze(): Unit =
     // generate the constraints by traversing the AST and solve them on-the-fly
-      visit(cfg, ())
+
+        for (entry <- cfg.entries) {
+          entry match {
+            case _: CfgFunctionEntryNode =>
+              visit(entry, ())
+            case _ =>
+          }
+        }
       post_SSA(cfg)
 
     def checkAssignment(name: String): Int = {
@@ -35,19 +43,59 @@ class SSA(cfg: Cfg) {
         variableTracker(name)
     }
 
-    def visit(node: Object, arg: Unit): Unit = {
+    def visit(node: CfgNode, arg: Unit): Unit = {
+        if (visited.contains(node)) {
+            return
+        }
+        visited.add(node)
         node match {
-            case localAssign: LocalAssign =>
+          case statementNode: CfgCommandNode =>
+            statementNode.data match {
+              case localAssign: LocalAssign =>
+                checkExpr(localAssign.rhs)
                 //localAssign.lhs = LocalVar(s"${localAssign.lhs.name}_${checkAssignment(localAssign.lhs.name)}", localAssign.lhs.size)
                 localAssign.lhs.ssa_id = checkAssignment(localAssign.lhs.toString)
-                localAssign.rhs.ssa_id = checkUse(localAssign.rhs.toString)
-            case memAssign: MemoryAssign =>
-//                memAssign.rhs = Store(memAssign.rhs.memory, s"${memAssign.rhs.index}_${checkAssignment(memAssign.rhs.index.toString)}", value, memAssign.rhs.endian, memAssign.rhs.size)
-                  memAssign.rhs.index.ssa_id = checkAssignment(memAssign.rhs.index.toString)
-                  memAssign.rhs.value.ssa_id = checkUse(memAssign.rhs.value.toString)
-            case _ =>
+                //localAssign.rhs.ssa_id = checkUse(localAssign.rhs.toString)
+
+              case memAssign: MemoryAssign =>
+                checkExpr(memAssign.rhs.value)
+                //                memAssign.rhs = Store(memAssign.rhs.memory, s"${memAssign.rhs.index}_${checkAssignment(memAssign.rhs.index.toString)}", value, memAssign.rhs.endian, memAssign.rhs.size)
+                //memAssign.rhs.index.ssa_id = checkAssignment(memAssign.rhs.index.toString)
+                checkExpr(memAssign.rhs.index)
+                //memAssign.rhs.value.ssa_id = checkUse(memAssign.rhs.value.toString)
+
+              case _ =>
+            }
+          case _ =>
         }
-        visitChildren(node, ())
+        for (child <- node.succ) {
+          visit(child, ())
+        }
+    }
+
+    def checkExpr(expr: Expr): Unit = {
+      //print(s"Checking expression: ${expr}\n")
+      expr match {
+        case binExpr: BinaryExpr =>
+          checkExpr(binExpr.arg1)
+          checkExpr(binExpr.arg2)
+        case unExpr: UnaryExpr =>
+          checkExpr(unExpr.arg)
+        case zeroExtend: ZeroExtend =>
+          checkExpr(zeroExtend.body)
+        case memoryLoad: MemoryLoad =>
+          checkExpr(memoryLoad.index)
+          checkExpr(memoryLoad.mem)
+        case variable: Variable =>
+          variable.ssa_id = checkUse(variable.toString)
+        case extract: Extract =>
+          checkExpr(extract.body)
+        case signExtend: SignExtend =>
+          checkExpr(signExtend.body)
+        case memory: Memory =>
+        case bitVecLiteral: BitVecLiteral =>
+        case _ => println(s"WARNING: Unhandled expression type in SSA: ${expr.getClass}")
+      }
     }
 
 //    def replacer(node: Object): Unit = {
@@ -93,32 +141,33 @@ class SSA(cfg: Cfg) {
 //      }
 //    }
 
-    def visitChildren(node: Object, arg: Unit): Unit = {
-        node match {
-            case cfg: Cfg =>
-              cfg.nodes.foreach(visit(_, ()))
 
-            case node: CfgNode =>
-              node match {
-                case stmtNode: CfgCommandNode =>
-                  visit(stmtNode.data, ())
-                case _ =>
-              }
-
-            case program: Program =>
-                program.procedures.foreach(visit(_, ()))
-
-            case function: Procedure =>
-                function.blocks.foreach(visit(_, ()))
-
-            case block: Block =>
-                block.statements.foreach(visit(_, ()))
-                block.jumps.foreach(visit(_, ()))
-
-            case _ => // ignore other kinds of nodes
-
-        }
-    }
+//    def visitChildren(node: Object, arg: Unit): Unit = {
+//        node match {
+//            case cfg: Cfg =>
+//              cfg.nodes.foreach(visit(_, ()))
+//
+//            case node: CfgNode =>
+//              node match {
+//                case stmtNode: CfgCommandNode =>
+//                  visit(stmtNode.data, ())
+//                case _ =>
+//              }
+//
+//            case program: Program =>
+//                program.procedures.foreach(visit(_, ()))
+//
+//            case function: Procedure =>
+//                function.blocks.foreach(visit(_, ()))
+//
+//            case block: Block =>
+//                block.statements.foreach(visit(_, ()))
+//                block.jumps.foreach(visit(_, ()))
+//
+//            case _ => // ignore other kinds of nodes
+//
+//        }
+//    }
 
     def post_SSA(cfg: Cfg): Unit = {
       cfg.nodes.foreach {
@@ -288,11 +337,13 @@ class SSA(cfg: Cfg) {
 //        println()
 //      )
 
-      incomingMatches.foreach((key, value) =>
-        print(s"key: ($key, ${key.ssa_id}), value: ")
-        value.foreach(v => print(s"($v,${v.ssa_id})"))
-        println()
-      )
+
+        //TODO: print this if required
+//      incomingMatches.foreach((key, value) =>
+//        print(s"key: ($key, ${key.ssa_id}), value: ")
+//        value.foreach(v => print(s"($v,${v.ssa_id})"))
+//        println()
+//      )
     }
 
 

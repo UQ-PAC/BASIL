@@ -2,9 +2,8 @@ package analysis
 
 import ir._
 import analysis.solvers._
-import boogie.BExpr
 
-import scala.collection.mutable.{HashMap, ListBuffer, ArrayBuffer}
+import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
@@ -52,44 +51,47 @@ trait ValueAnalysisMisc:
       case bin: BinaryExpr =>
         val left = eval(bin.arg1, env)
         val right = eval(bin.arg2, env)
-
-        bin.op match
-          case BVAND => bvadd(left, right)
-          case BVOR => bvor(left, right)
-          case BVADD => bvand(left, right)
+        bin.op match 
+          case BVADD => bvadd(left, right)
+          case BVSUB => bvsub(left, right)
           case BVMUL => bvmul(left, right)
           case BVUDIV => bvudiv(left, right)
-          case BVUREM => bvurem(left, right)
-          case BVSHL => bvshl(left, right)
-          case BVLSHR => bvlshr(left, right)
-          case BVULT => bvult(left, right)
-          case BVNAND => ???
-          case BVNOR => ???
-          case BVXOR => ???
-          case BVXNOR => ???
-          case BVCOMP => bvcomp(left, right)
-          case BVSUB => bvsub(left, right)
           case BVSDIV => bvsdiv(left, right)
           case BVSREM => bvsrem(left, right)
-          case BVSMOD => ???
+          case BVUREM => bvurem(left, right)
+          case BVSMOD => ??? // Signed modulus. NOTE: this is used.
+          case BVAND => bvand(left, right)
+          case BVOR => bvor(left, right)
+          case BVXOR => bvxor(left, right)
+          case BVNAND => bvnand(left, right)
+          case BVNOR => bvnor(left, right)
+          case BVXNOR => bvxnor(left, right)
+          case BVSHL => bvshl(left, right)
+          case BVLSHR => bvlshr(left, right)
           case BVASHR => bvashr(left, right)
-          case BVULE => bvule(left, right)
-          case BVUGT => ???
-          case BVUGE => ???
-          case BVSLT => bvslt(left, right)
-          case BVSLE => bvsle(left, right)
-          case BVSGT => ???
-          case BVSGE => ???
-          case BVEQ => bvneq(left, right)
-          case BVNEQ => bvneq(left, right)
-          case BVCONCAT => concat(left, right)
+          case BVCOMP => bvcomp(left, right)
 
+          case BVULE => bvule(left, right)
+          case BVUGE => bvuge(left, right)
+          case BVULT => bvult(left, right)
+          case BVUGT => bvugt(left, right)
+
+          case BVSLE => bvsle(left, right)
+          case BVSGE => bvsge(left, right)
+          case BVSLT => bvslt(left, right)
+          case BVSGT => bvsgt(left, right)
+          
+          case BVCONCAT => concat(left, right)
+          case BVNEQ => bvneq(left, right)
+          case BVEQ => bveq(left, right)
+
+          
       case un: UnaryExpr =>
         val arg = eval(un.arg, env)
 
         un.op match
-          case BVNEG => bvneg(arg)
           case BVNOT => bvnot(arg)
+          case BVNEG => bvneg(arg)
 
       case _ => valuelattice.top
 
@@ -100,8 +102,8 @@ trait ValueAnalysisMisc:
       case r: CfgCommandNode =>
         r.data match
           // assignments
-          case la: LocalAssign => s + (la.lhs -> eval(la.rhs, s))
-
+          case la: LocalAssign => 
+            s + (la.lhs -> eval(la.rhs, s))
           // all others: like no-ops
           case _ => s
       case _ => s
@@ -362,6 +364,8 @@ object Fresh {
   }
 }
 
+case class AAlloc(exp: Expr)
+
 /**
  * Terms used in unification.
  */
@@ -413,382 +417,287 @@ case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
   override def toString: String = s"$of"
 }
 
+abstract class MemoryRegion
+
 /**
- * Memory region analysis.
- * This algorithm splits the memory into two regions: the heap and the stack. The variables are tracked for localAssign
- * operations.
- *
- * @param program the program to analyze
+ * Represents a memory region. The region is defined by a base pointer and a size.
+ * There can exist two regions with the same size (offset) but have a different base pointer. As such the base pointer
+ * is tracked but not printed in the toString method.
+ * @param start 0x1234 in case of mem[R1 + 0x1234] <- ...
+ * @param regionType The type of the region. This is used to distinguish between stack, heap, data and code regions.
  */
-class MemoryRegionAnalysis(cfg: Cfg) extends Analysis[Any] {
+case class StackRegion(regionIdentifier: String, start: Expr) extends MemoryRegion:
+  override def toString: String = s"Stack(${regionIdentifier}, ${start})"
+  override def hashCode(): Int = start.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case StackRegion(_, start2) => start == start2
+    case _ => false
+  }
+
+case class HeapRegion(regionIdentifier: String, start: Expr) extends MemoryRegion:
+  override def toString: String = s"Heap(${regionIdentifier}, ${start})"
+  override def hashCode(): Int = start.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case HeapRegion(_, start2) => start == start2
+    case _ => false
+  }
+
+case class DataRegion(regionIdentifier: String, start: Expr) extends MemoryRegion:
+  override def toString: String = s"Data(${regionIdentifier}, ${start})"
+
+case class RegionAccess(regionBase: String, start: Expr) extends MemoryRegion:
+  override def toString: String = s"RegionAccess(${regionBase}, ${start})"
+
+
+trait MemoryRegionAnalysisMisc:
+
+  val assigmentsMap: mutable.HashMap[(Expr, CfgNode), Expr] = mutable.HashMap.empty
+
+  var mallocCount: Int = 0
+  var stackCount: Int = 0
+  var stackPool: mutable.Map[Expr, StackRegion] = mutable.HashMap()
+  private def getNextMallocCount(): String = {
+    mallocCount += 1
+    s"malloc_$mallocCount"
+  }
+
+  private def getNextStackCount(): String = {
+    stackCount += 1
+    s"stack_$stackCount"
+  }
+
+  def poolMaster(expr: Expr): StackRegion = {
+    if (stackPool.contains(expr)) {
+      stackPool(expr)
+    } else {
+      val newRegion = StackRegion(getNextStackCount(), expr)
+      stackPool += (expr -> newRegion)
+      newRegion
+    }
+  }
+
+  val cfg: ProgramCfg
+  val globals: Map[BigInt, String]
+  val globalOffsets: Map[BigInt, BigInt]
+  val subroutines: Map[BigInt, String]
+
+  /** The lattice of abstract values.
+   */
+  val powersetLattice: PowersetLattice[MemoryRegion]
+
+  /** The lattice of abstract states.
+   */
+  val lattice: MapLattice[CfgNode, PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
+
+  val domain: Set[CfgNode] = cfg.nodes
 
   private val stackPointer = Variable("R31", BitVecType(64))
+  private val linkRegister = Variable("R30", BitVecType(64))
+  private val framePointer = Variable("R29", BitVecType(64))
 
-//  val stackTracker = new immutable.HashMap[Expr, Set[Expr]]()
-//  val heapTracker = new immutable.HashMap[Expr, Set[Expr]]()
-//  val variableTracker = new immutable.HashMap[Expr, Set[Expr]]()
-  val mapping = mutable.HashMap[CfgNode, mutable.Map[Expr, Set[Expr]]]()
+  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
 
-  /**
-   * @inheritdoc
-   */
-  def analyze(): Unit =
-  // generate the constraints by traversing the AST and solve them on-the-fly
-    for (entry <- cfg.entries) {
-      entry match {
-        case functionEntryNode: CfgFunctionEntryNode =>
-          visit(entry, List(immutable.HashMap.empty, immutable.HashMap.empty, immutable.HashMap.empty))
+  private val mallocVariable = Variable("R0", BitVecType(64))
+
+  private val loopEscapeSet: mutable.Set[CfgNode] = mutable.Set.empty
+
+  def loopEscape(n: CfgNode): Boolean = {
+    if (loopEscapeSet.contains(n)) {
+      return true
+    }
+    loopEscapeSet.add(n)
+    false
+  }
+
+  /** Find decl of variables from node predecessors */
+  def findDecl(variable: Variable, n: CfgNode): mutable.ListBuffer[CfgNode] = {
+    val decls: mutable.ListBuffer[CfgNode] = mutable.ListBuffer.empty
+    // if we have a temporary variable then ignore it
+    if (variable.name.contains("#")) {
+      return decls
+    }
+    for (pred <- n.pred) {
+      if (loopEscape(pred)) {
+        return mutable.ListBuffer.empty
+      }
+      pred match {
+        case cmd: CfgCommandNode =>
+          cmd.data match {
+            case localAssign: LocalAssign =>
+              if (localAssign.lhs == variable) {
+                decls.addOne(pred)
+              } else {
+                decls.addAll(findDecl(variable, pred))
+              }
+            case _ =>
+          }
         case _ =>
       }
     }
-
-  def dump_file(content: ArrayBuffer[String], name: String): Unit = {
-    val outFile = new File(s"${name}")
-    val pw = new PrintWriter(outFile, "UTF-8")
-    for (s <- content) { pw.append(s + "\n") }
-    pw.close()
+    decls
   }
 
   /**
-   * Generates the constraints for the given sub-AST.
-   * @param node the head node for which it generates the constraints
-   * @param arg the stack, heap, and variable trackers
+   * Evaluate an expression in a hope of finding a global variable.
+   * @param exp: The expression to evaluate (e.g. R1 + 0x1234)
+   * @param n: The node where the expression is evaluated (e.g. mem[R1 + 0x1234] <- ...)
+   * @return: The evaluated expression (e.g. 0x69632)
    */
-  def visit(node: CfgNode, arg: List[immutable.HashMap[Expr, Set[Expr]]]): Unit = {
-    var stackTracker: immutable.HashMap[Expr, Set[Expr]] = arg.head
-    var heapTracker: immutable.HashMap[Expr, Set[Expr]] = arg(1)
-    var variableTracker: immutable.HashMap[Expr, Set[Expr]] = arg.last
-
-    node match {
-      case cmd: CfgCommandNode =>
-        cmd.data match {
-          case memAssign: MemoryAssign =>
-            // if the memory is acting on a stack operation, then we need to track the stack
-            if (memAssign.rhs.mem.name == "stack") {
-              if (stackTracker.contains(memAssign.rhs.index))
-                stackTracker = stackTracker + (memAssign.rhs.index -> (stackTracker(memAssign.rhs.index) + memAssign.rhs.value))
-              else
-                stackTracker = stackTracker + (memAssign.rhs.index -> Set(memAssign.rhs.value))
-              // the memory is not stack so it must be heap
-            } else {
-              if (heapTracker.contains(memAssign.rhs.index))
-                heapTracker = heapTracker + (memAssign.rhs.index -> (heapTracker(memAssign.rhs.index) + memAssign.rhs.value))
-              else
-                heapTracker = heapTracker + (memAssign.rhs.index -> Set(memAssign.rhs.value))
-            }
-          // local assign is just lhs assigned to rhs
-          case localAssign: LocalAssign =>
-            if (variableTracker.contains(localAssign.lhs))
-              variableTracker = variableTracker + (localAssign.lhs -> (variableTracker(localAssign.lhs) + localAssign.rhs))
-            else
-              variableTracker = variableTracker + (localAssign.lhs -> Set(localAssign.rhs))
-          case _ =>
-        }
-        // this is a phi node (we merge incoming edges)
-        if (mapping.contains(node)) {
-          val currentMemorySolution = solveMemory(stackTracker, heapTracker, variableTracker)
-          val previousMemorySolution = mapping(node)
-          // we need to merge the two solutions
-          for (key <- currentMemorySolution.keySet) {
-            if (previousMemorySolution.contains(key)) {
-              // newSet contains the union of the two sets, however, do to pointer values not being included in the equals
-              // method of Pointer class, we need to loop over and replace the pointer in the newSet with pointers that contain
-              // the shared set of values
-              var newSet: Set[Expr] = currentMemorySolution(key) ++ previousMemorySolution(key)
-              for (ex: Expr <- currentMemorySolution(key)) {
-                ex match {
-                  case ptr: Pointer =>
-                    if (previousMemorySolution(key).contains(ptr)) {
-                      newSet = newSet - ptr
-                      newSet = newSet + ptr.concat(previousMemorySolution(key).toSeq(previousMemorySolution(key).toSeq.indexOf(ptr)).asInstanceOf[Pointer])
-                    }
+  def evaluateExpression(exp: Expr, n: CfgNode): Expr = {
+      exp match {
+        case binOp: BinaryExpr =>
+          binOp.arg1 match {
+            case variable: Variable =>
+              loopEscapeSet.clear()
+              for (pred <- findDecl(variable, n)) {
+                assigmentsMap.get(variable, pred) match
+                  case Some(value) =>
+                    value match
+                      case bitVecLiteral: BitVecLiteral =>
+                        if (!binOp.arg2.isInstanceOf[BitVecLiteral]) {
+                          return exp
+                        }
+                        val calculated: BigInt = bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value)
+                        return BitVecLiteral(calculated, bitVecLiteral.size)
+                      case _ => evaluateExpression(value, pred)
                   case _ =>
-                }
-              }
-              mapping(node) = mapping(node) + (key -> newSet)
-            } else {
-              mapping(node) = mapping(node) + (key -> currentMemorySolution(key))
+                    print("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(variable, pred) + " FOR " + binOp + "\n")
             }
+            case _ => return exp
           }
-        } else {
-          mapping(node) = solveMemory(stackTracker, heapTracker, variableTracker)
-        }
-    }
-    for (child <- node.succ) {
-      visit(child, List(stackTracker, heapTracker, variableTracker))
-    }
-  }
-
-/*
-  def visitChildren(node: Object, arg: Unit): Unit = {
-    node match {
-      case program: Program =>
-        program.procedures.foreach(visit(_, ()))
-
-      case function: Procedure =>
-        function.blocks.foreach(visit(_, ()))
-
-      case block: Block =>
-        block.statements.foreach(visit(_, ()))
-        block.jumps.foreach(visit(_, ()))
-
-      case _ => // ignore other kinds of nodes
-    }
-  }
-*/
-
-  def getMapping(): mutable.HashMap[CfgNode, mutable.Map[Expr, Set[Expr]]] = {
-    mapping
-  }
-
-  def solveMemory(stackTracker: immutable.Map[Expr, Set[Expr]], heapTracker: immutable.Map[Expr, Set[Expr]], variableTracker: immutable.Map[Expr, Set[Expr]]): mutable.Map[Expr, Set[Expr]] = {
-    val pointerTracker: mutable.Map[Expr, Set[Expr]] = mutable.Map[Expr, Set[Expr]]()
-    val pointerPool: PointerPool = PointerPool()
-    print(s"Stack Tracker: \n${stackTracker.mkString(",\n")}\n")
-    print(s"Variable Tracker: \n${variableTracker.mkString(",\n")}\n")
-    print(s"Heap Tracker: \n${heapTracker.mkString(",\n")}\n")
-
-    /**
-     * Captures an Expr to Pointer relationship in the map. Ensures set is created if it does not exist.
-     *
-     * @param map      the map to add to
-     * @param register the register (ie. R1)
-     * @param ptr      the pointer to add (ie. stack[R31 + 0x8])
-     */
-    def add_map(map: mutable.Map[Expr, Set[Expr]], register: Expr, ptr: Expr): Unit = {
-      if (map.contains(register))
-        map(register) += ptr
-      else
-        map(register) = Set(ptr)
-    }
-
-    heapTracker.foreach { case (k, v) =>
-      v.foreach(e =>
-        val heapPointer = pointerPool.extractPointer(k, PointerType.Heap)
-        // ptr -> ptr
-        if (e.locals.contains(stackPointer)) {
-          add_map(pointerTracker, heapPointer, pointerPool.extractPointer(e))
-        }
-        // ptr -> exp
-        else {
-          heapPointer.value.add(e)
-        }
-      )
-    }
-
-    variableTracker.foreach { case (k, v) =>
-      v.foreach(e =>
-        if (e.locals.contains(stackPointer)) {
-          add_map(pointerTracker, k, pointerPool.extractPointer(e))
-        } else {
-//          print(s"e: $e\n")
-//          print(s"e type: ${e.getClass}\n")
-
-          // TODO using toString to determine this is a really bad way to do it
-          if (e.toString.contains("mem")) {
-            add_map(pointerTracker, k, pointerPool.extractPointer(e, PointerType.Heap))
+          exp
+        case memLoad: MemoryLoad =>
+          evaluateExpression(memLoad.index, n)
+        case bitVecLiteral: BitVecLiteral =>
+          bitVecLiteral
+        case extend: ZeroExtend =>
+          evaluateExpression(extend.body, n)
+        case variable: Variable =>
+          loopEscapeSet.clear()
+          for (pred <- findDecl(variable, n)) {
+            assigmentsMap(variable, pred) match
+              case bitVecLiteral: BitVecLiteral =>
+                return bitVecLiteral
+              case any:Expr => return evaluateExpression(any, n)
           }
-        }
-      )
-    }
-
-    stackTracker.foreach { case (k, v) =>
-        if (k.locals.contains(stackPointer)) {
-          val lhsPointer = pointerPool.extractPointer(k)
-          v.foreach(e =>
-            // ptr -> ptr
-            if (e.locals.contains(stackPointer)) {
-              lhsPointer.value.add(pointerPool.extractPointer(e))
-            }
-            // ptr -> exp
-            else {
-              lhsPointer.value.add(e)
-            }
-          )
-        } else {
-          v.foreach(e =>
-            // exp -> ptr
-            if (e.locals.contains(stackPointer)) {
-              add_map(pointerTracker, k, pointerPool.extractPointer(e))
-            }
-            // exp -> exp (ignore, no pointer)
-            else {
-//                if (pointerTracker.contains(k)) {
-//                  pointerTracker(k).asInstanceOf[Pointer].value = e
-//                } else {
-//                  if (pointerTracker.contains(e)) {
-//                    pointerTracker(e).asInstanceOf[Pointer].value = k
-//                  }
-//                }
-            }
-          )
-        }
-    }
-    print(s"Pointers: \n${pointerPool.pointers.mkString(",\n")}\n")
-    pointerTracker
-  }
-}
-
-class Pointer(allocation: (Expr, Option[Expr]), ptrType: PointerType = PointerType.Stack) extends Expr {
-  var value: mutable.Set[Expr] = mutable.Set()
-  var alloc: Expr = allocation._1
-  var offset: Option[Expr] = allocation._2
-  val pointerType: PointerType = ptrType
-
-  override def toString: String = {
-    val offsetStr: String = offset match {
-      case Some(o) => o.toString
-      case None => "None"
-    }
-    s"${pointerType} Pointer(Value: $value, [ptr: $alloc, Offset: $offsetStr])"
-  }
-
-  def concat(other: Pointer): Pointer = {
-    if (other.pointerType == pointerType && other.alloc == alloc && other.offset == offset) {
-        value = value ++ other.value
-        return this
-    }
-    throw new Exception("Cannot concat pointers of different types")
-  }
-
-  override def getType: IRType = ???
-  override def gammas: Set[Expr] = ???
-  override def locals: Set[Variable] = ???
-  override def toBoogie: BExpr = ???
-
-  override def equals(obj: Any): Boolean = {
-      obj match {
-      case ptr: Pointer =>
-          ptr.alloc == alloc && ptr.offset == offset && ptr.pointerType == pointerType
-      case _ => false
+          exp
+        case _ =>
+          //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
+          exp
       }
   }
 
-  override def hashCode(): Int = {
-      alloc.hashCode() + offset.hashCode() + pointerType.hashCode()
+
+  /** Default implementation of eval.
+   */
+  def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
+      exp match {
+        case binOp: BinaryExpr =>
+            val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
+            val rhs: Expr = evaluateExpression(binOp.arg2, n)
+            lhs match {
+              case bitVecLiteral: BitVecLiteral =>
+                if (globals.contains(bitVecLiteral.value)) {
+                  var tempLattice: lattice.sublattice.Element = env
+                  val globalName = globals(bitVecLiteral.value)
+                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(globalName, bitVecLiteral)))
+                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(globalName, binOp.arg2)))
+                } else if (subroutines.contains(bitVecLiteral.value)) {
+                  var tempLattice: lattice.sublattice.Element = env
+                  val subroutineName = subroutines(bitVecLiteral.value)
+                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(subroutineName, bitVecLiteral)))
+                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(subroutineName, binOp.arg2)))
+                }
+              case binOp2: BinaryExpr =>
+                  // special case: we do not want to get a unique stack name so we try to find it in the pool
+                  print("Warning: fragile code! Assumes array by default due to double binary operation\n")
+                  var tempLattice: lattice.sublattice.Element = env
+                  tempLattice = lattice.sublattice.lub(tempLattice, Set(poolMaster(binOp2.arg2)))
+                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(poolMaster(binOp2.arg2).regionIdentifier, rhs)))
+              case _ =>
+            }
+          Set(StackRegion(getNextStackCount(), binOp.arg2))
+
+        case zeroExtend: ZeroExtend =>
+          eval(zeroExtend.body, env, n)
+        case memoryLoad: MemoryLoad => // TODO: Pointer access here
+          //eval(memoryLoad.index, memType, env)
+          lattice.sublattice.bottom
+        case variable: Variable =>
+          val eval = evaluateExpression(variable, n)
+          eval match {
+            case literal: BitVecLiteral =>
+              if (globals.contains(literal.value)) {
+                return Set(DataRegion(globals(literal.value), literal))
+              } else if (subroutines.contains(literal.value)) {
+                return Set(DataRegion(subroutines(literal.value), literal))
+              }
+              lattice.sublattice.bottom
+            case _ =>
+              lattice.sublattice.bottom
+          }
+        case extract: Extract =>
+          eval(extract.body, env, n)
+        case unaryExpr: UnaryExpr =>
+          lattice.sublattice.bottom
+        case signExtend: SignExtend =>
+          eval(signExtend.body, env, n)
+        case bitVecLiteral: BitVecLiteral =>
+          print(s"Saw a bit vector literal ${bitVecLiteral}\n")
+          lattice.sublattice.bottom
+        case _ =>
+          print(s"type: ${exp.getClass} $exp\n")
+          throw new Exception("Unknown type")
+      }
   }
-}
 
-class PointerPool {
-  val pointers: ListBuffer[Pointer] = ListBuffer[Pointer]()
-
-  def get(ptr: Pointer): Pointer = {
-    if (pointers.contains(ptr)) {
-      pointers(pointers.indexOf(ptr))
-    } else {
-      pointers += ptr
-      ptr
-    }
-  }
-
-  def extractPointer(e: Expr, ptrType: PointerType = PointerType.Stack): Pointer = {
-    e match {
-      case binOp: BinaryExpr =>
-        get(Pointer((binOp.arg1, Some(binOp.arg2)), ptrType))
-      case memAccess: MemoryLoad =>
-        memAccess.index match {
-          case binOp: BinaryExpr =>
-            get(Pointer((binOp.arg1, Some(binOp.arg2)), ptrType))
-          case localVar: Variable =>
-            get(Pointer((localVar, None), ptrType))
-          case _ =>
-            print(s"inner type: ${memAccess.index.getClass} ${memAccess.index}\n")
-            throw new Exception("Unknown type")
+  /** Transfer function for state lattice elements.
+   */
+  def localTransfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element =
+    n match {
+      case cmd: CfgCommandNode =>
+        cmd.data match {
+          case directCall: DirectCall =>
+            if (directCall.target.name == "malloc") {
+              val decl = findDecl(mallocVariable, n).headOption
+              val recentMallocSize = assigmentsMap.get(mallocVariable, decl.get).get
+              return lattice.sublattice.lub(s, Set(HeapRegion(getNextMallocCount(), recentMallocSize)))
+            }
+            s
+          case memAssign: MemoryAssign =>
+            if (ignoreRegions.contains(memAssign.rhs.value)) {
+              return s
+            }
+            lattice.sublattice.lub(s, eval(memAssign.rhs.index, s, n))
+          // local assign is just lhs assigned to rhs we only need this information to track a prior register operation
+          // AKA: R1 <- R1 + 8; mem(R1) <- 0x1234
+          case localAssign: LocalAssign =>
+            assigmentsMap.addOne((localAssign.lhs, n) -> evaluateExpression(localAssign.rhs, n))
+              s
+          case _ => s
         }
-      case localVar: Variable =>
-        get(Pointer((localVar, None), ptrType))
-      case unsignedExtend: ZeroExtend =>
-        extractPointer(unsignedExtend.body)
-      case _ =>
-        print(s"type: ${e.getClass} $e\n")
-        throw new Exception("Unknown type")
+      case _ => s // ignore other kinds of nodes
     }
-  }
-}
 
-enum PointerType {
-  case Stack
-  case Heap
-}
 
-case class AAlloc(exp: Expr)
+/** Base class for memory region analysis (non-lifted) lattice.
+ */
+abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Map[BigInt, String], val globalOffsets: Map[BigInt, BigInt], val subroutines: Map[BigInt, String]) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
 
-//case class StackReconstructor() {
-//  var stackPointer: Byte = 16
-//  var framePointer: Byte = 0
-//  var linkRegister: Byte = 0
-//  def stringToInt(hex: String): Int = {
-//    var hex2 = ""
-//    if (hex.contains("0x")) {
-//      // strip the 0x
-//      hex2 = hex.split("0x")(1)
-//    } else {
-//      hex2 = hex
-//    }
-//    if (hex.contains("-")) {
-//      -1 * Integer.parseInt(hex2, 16)
-//    } else {
-//      Integer.parseInt(hex2, 16)
-//    }
-//  }
-//
-//  def getStackPointer(): (String, Int) = {
-//    ("R31", stackPointer)
-//  }
-//
-//  def getFramePointer(): (String, Int) = {
-//    ("R29", framePointer)
-//  }
-//
-//  def getLinkRegister(): (String, Int) = {
-//    ("R30", linkRegister)
-//  }
-//
-//  def evaluateInstruction(instruction: String): Unit = {
-//    val instructionArr = instruction.split(" ")
-//    if (instruction.contains("sp")) {
-//      println("sp found")
-//    }
-//    instructionArr(0) match {
-//      case "stp" | "ldp" =>
-//        if (instructionArr.length == 4) {
-//          if (instruction.contains('!')) {
-//            // stp x0, x1, [sp, #-16]!
-//            //  0   1   2    3     4
-//            // get the -16 value
-//            val value: String = instruction.split(" ")(4).split("#")(1).split("]")(0)
-//            stackPointer = (stackPointer + stringToInt(value)).toByte
-//            framePointer = stackPointer
-//            linkRegister = (stackPointer + 8).toByte
-//          } else {
-//            // stp x0, x1, [sp], #-16
-//            //  0   1   2    3     4
-//            // get the -16 value
-//            val value: String = instruction.split(" ")(4).split("#")(1).split("]")(0)
-//            framePointer = stackPointer
-//            linkRegister = (stackPointer + 8).toByte
-//            stackPointer = (stackPointer + stringToInt(value)).toByte
-//          }
-//        }
-//        else {
-//          // stp x0, x1, [sp]
-//          //  0   1   2    3
-//          framePointer = stackPointer
-//          linkRegister = (stackPointer + 8).toByte
-//        }
-//
-//      case _ =>
-//        // do nothing
-//
-////
-////      case "ldp" =>
-////        // ldp x29, x30, [sp], #0x10
-////        //  0   1   2    3     4
-////        // get the 0x10 value
-////        val value: String = instruction.split(" ")(4).split("#")(0)
-////        stackPointer = stringToInt(value)
-////        framePointer = stackPointer
-////        linkRegister = stackPointer + 8
-//    }
-//  }
-//}
+  /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
+   */
+  def transfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = localTransfer(n, s)
+
+/** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
+ */
+abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: IntraproceduralProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String], val powersetLattice: L)
+  extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines)
+  with SimpleMonotonicSolver[CfgNode]
+  with ForwardDependencies
+
+object MemoryRegionAnalysis:
+
+  /** Intraprocedural analysis that uses the worklist solver.
+   */
+  class WorklistSolver(cfg: IntraproceduralProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String])
+    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, globalOffsets, subroutines, PowersetLattice[MemoryRegion])
