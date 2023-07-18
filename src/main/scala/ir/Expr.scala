@@ -18,6 +18,7 @@ trait Expr {
     }
   }
   def getType: IRType
+  def loads: Set[MemoryLoad] = Set()
   def gammas: Set[Expr] = Set()
   def locals: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
@@ -57,6 +58,7 @@ class Extract(var end: Int, var start: Int, var body: Expr) extends Expr {
   override def toBoogie: BExpr = BVExtract(end, start, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
   override def locals: Set[Variable] = body.locals
+  override def loads: Set[MemoryLoad] = body.loads
   override def getType: BitVecType = BitVecType(end - start)
   override def toString: String = s"$body[$end:$start]"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitExtract(this)
@@ -66,6 +68,7 @@ class Repeat(var repeats: Int, var body: Expr) extends Expr {
   override def toBoogie: BExpr = BVRepeat(repeats, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
   override def locals: Set[Variable] = body.locals
+  override def loads: Set[MemoryLoad] = body.loads
   override def getType: BitVecType = BitVecType(bodySize * repeats)
   private def bodySize: Int = body.getType match {
     case bv: BitVecType => bv.size
@@ -79,6 +82,7 @@ class ZeroExtend(var extension: Int, var body: Expr) extends Expr {
   override def toBoogie: BExpr = BVZeroExtend(extension, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
   override def locals: Set[Variable] = body.locals
+  override def loads: Set[MemoryLoad] = body.loads
   override def getType: BitVecType = BitVecType(bodySize + extension)
   private def bodySize: Int = body.getType match {
     case bv: BitVecType => bv.size
@@ -92,6 +96,7 @@ class SignExtend(var extension: Int, var body: Expr) extends Expr {
   override def toBoogie: BExpr = BVSignExtend(extension, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
   override def locals: Set[Variable] = body.locals
+  override def loads: Set[MemoryLoad] = body.loads
   override def getType: BitVecType = BitVecType(bodySize + extension)
   private def bodySize: Int = body.getType match {
     case bv: BitVecType => bv.size
@@ -105,6 +110,7 @@ class UnaryExpr(var op: UnOp, var arg: Expr) extends Expr {
   override def toBoogie: BExpr = UnaryBExpr(op, arg.toBoogie)
   override def gammas: Set[Expr] = arg.gammas
   override def locals: Set[Variable] = arg.locals
+  override def loads: Set[MemoryLoad] = arg.loads
   override def getType: IRType = (op, arg.getType) match {
     case (_: BoolUnOp, BoolType) => BoolType
     case (_: BVUnOp, bv: BitVecType) => bv
@@ -152,6 +158,7 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
   override def toBoogie: BExpr = BinaryBExpr(op, arg1.toBoogie, arg2.toBoogie)
   override def gammas: Set[Expr] = arg1.gammas ++ arg2.gammas
   override def locals: Set[Variable] = arg1.locals ++ arg2.locals
+  override def loads: Set[MemoryLoad] = arg1.loads ++ arg2.loads
   override def getType: IRType = (op, arg1.getType, arg2.getType) match {
     case (_: BoolBinOp, BoolType, BoolType) => BoolType
     case (binOp: BVBinOp, bv1: BitVecType, bv2: BitVecType) =>
@@ -307,7 +314,7 @@ class MemoryStore(var mem: Memory, var index: Expr, var value: Expr, var endian:
 
   override def gammas: Set[Expr] = Set()
   override def locals: Set[Variable] = index.locals ++ value.locals
-
+  override def loads: Set[MemoryLoad] = index.loads ++ value.loads
   override def getType: IRType = BitVecType(size)
   override def toString: String = s"MemoryStore($mem, $index, $value, $endian, $size)"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemoryStore(this)
@@ -325,6 +332,7 @@ class MemoryLoad(var mem: Memory, var index: Expr, var endian: Endian, var size:
     )
   }
   override def locals: Set[Variable] = index.locals
+  override def loads: Set[MemoryLoad] = Set(this)
   override def gammas: Set[Expr] = Set(this)
   override def getType: IRType = BitVecType(size)
   override def toString: String = s"MemoryLoad($mem, $index, $endian, $size)"
