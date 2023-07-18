@@ -234,15 +234,15 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   }
 
   private def initialiseMemory: List[BExpr] = {
-    val dataSection = program.initialMemory.collectFirst { case s if s.name == ".data" => s }
-    dataSection match {
-      case Some(d) =>
-        val bytes = for (b <- d.bytes.indices) yield {
-          BinaryBExpr(BVEQ, BMemoryLoad(mem, BitVecBLiteral(d.address + b, 64), Endian.LittleEndian, 8), d.bytes(b).toBoogie)
-        }
-        bytes.toList
-      case None => List()
+    val dataSections = program.initialMemory.collect {
+      case s if s.name == ".data" || s.name == ".rodata" || s.name == ".got" => s
     }
+    val sections = dataSections.flatMap { s =>
+      for (b <- s.bytes.indices) yield {
+        BinaryBExpr(BVEQ, BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8), s.bytes(b).toBoogie)
+      }
+    }
+    sections.toList
   }
 
   private def outParamToAssign(p: Parameter): AssignCmd = {

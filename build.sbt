@@ -43,8 +43,10 @@ updateExpected := {
         if (resultPath.exists()) {
           val result = IO.read(resultPath)
           val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
-          if (verified == shouldVerify && outPath.exists() && !compareFiles(outPath, expectedPath)) {
-            IO.copyFile(outPath, expectedPath)
+          if (verified == shouldVerify && outPath.exists()) {
+            if (!expectedPath.exists() || !compareFiles(outPath, expectedPath)) {
+              IO.copyFile(outPath, expectedPath)
+            }
           }
         }
       }
