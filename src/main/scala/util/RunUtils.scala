@@ -111,24 +111,28 @@ object RunUtils {
 
     val cfg = ProgramCfg.fromIR(IRProgram, inlineLimit = 0)
 
-
+    println("[!] Running MRA")
     val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, subroutines)
     val result2 = solver2.analyze(true).asInstanceOf[Map[CfgNode, MemoryRegion]]
     memoryRegionAnalysisResults = Some(result2)
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder), "mra")
 
+    println("[!] Running MMM")
     val mmm = MemoryModelMap()
     mmm.convertMemoryRegions(result2, externalAddresses)
 
+    println("[!] Running VSA")
     val solver3 = ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm)
     val result3 = solver3.analyze(false)
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
+
+    println("[!] Resolving CFG")
     val newCFG = ProgramCfg.fromIR(resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram), inlineLimit = 0)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
   }
 
   def resolveCFG(cfg: ProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): Program = {
-    cfg.entries.foreach(n => process(n))
+    cfg.nodes.foreach(n => process(n))
 
     def process(n: CfgNode): Unit = n match {
       case commandNode: CfgCommandNode =>
@@ -137,15 +141,15 @@ object RunUtils {
             val valueSet: Map[Expr, Set[Value]] = valueSets(n)
             val functionNames = resolveAddresses(valueSet(indirectCall.target))
             if (functionNames.size == 1) {
-              cfg.nodeToBlock.get(n) match
-                case Some(block) =>
+              commandNode.block match
+                case block: Block =>
                   block.jumps = block.jumps.filter(!_.equals(indirectCall))
                   block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head.name)).head, indirectCall.condition, indirectCall.returnTarget)
                 case _ => throw new Exception("Node not found in nodeToBlock map")
             } else {
               functionNames.foreach(addressValue =>
-                cfg.nodeToBlock.get(n) match
-                  case Some(block) =>
+                commandNode.block match
+                  case block: Block =>
                     block.jumps = block.jumps.filter(!_.equals(indirectCall))
                     if (indirectCall.condition.isDefined) {
                       block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(addressValue.name)).head, Option(BinaryExpr(BVAND, indirectCall.condition.get, BinaryExpr(BVEQ, indirectCall.target, addressValue.expr))), indirectCall.returnTarget)
