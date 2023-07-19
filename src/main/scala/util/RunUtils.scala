@@ -38,7 +38,7 @@ object RunUtils {
     val symbols   = mods.map(_.symbols)
     val semantics = mods.map(getSemantics);
     val keys    = mods.head.auxData.keySet
-    val func = mods.head.auxData.get("functionEntries").get
+  
 
     val adtLexer = BilAdtLexer(CharStreams.fromString(semantics.head.prettyPrint))
     val tokens = CommonTokenStream(adtLexer)
@@ -47,20 +47,30 @@ object RunUtils {
 
     parser.setBuildParseTree(true)
 
+    val functionEntryDecoder = new MapDecoder(mods.head.auxData.get("functionEntries").get.data)
+    val functionBlockDecoder = new MapDecoder(mods.head.auxData.get("functionBlocks").get.data)
+    val functionEntries = functionEntryDecoder.decode()
+    val functionBlocks = functionBlockDecoder.decode()
     
-    val decoder = new decoder(func.data)
-    val map = decoder.decode()
     
-    //println(symbols.head.map(_.toProtoString))
-    //println(cfg.head.toProtoString)
-    val bw = new BufferedWriter(new FileWriter(new File("output")))
-    symbols.head.map(_.toProtoString).foreach(f => f -> bw.write(f))
-    bw.write(cfg.head.toProtoString)
-    bw.close()
+    // val bw = new BufferedWriter(new FileWriter(new File("Function Entries + Function Blocks")))
+    // bw.write("Function Entries" + System.lineSeparator())
+    // functionEntries.map(_.toString()).foreach(f => f -> bw.write(f))
+    // bw.write(System.lineSeparator() + System.lineSeparator())
+    // bw.write("Function Blocks" + System.lineSeparator())
+    // functionBlocks.map(_.toString()).foreach(f => f -> bw.write(f))
+    // bw.close()
+
+    // val bw = new BufferedWriter(new FileWriter(new File("output")))
+    // symbols.head.map(_.toProtoString).foreach(f => f -> bw.write(f))
+    // bw.write(cfg.head.toProtoString)
+    // bw.close()
+
+    //println(keys.toString())
     println(mods.head.entryPoint)
-    println(map.mkString)
-    // val tl = new TalkingListener()
-    // ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
+
+    val tl = new TalkingListener()
+    ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
     
    
 

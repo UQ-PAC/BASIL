@@ -4,7 +4,7 @@ import com.google.protobuf.ByteString
 import java.io.ByteArrayInputStream
 
 /* Decodes functionEntries section in AuxData of gtirb */
-class decoder(bytes: ByteString) {
+class MapDecoder(bytes: ByteString) {
 
     val bytesArr: Array[Byte] = bytes.toByteArray()
     val byteStream = new ByteArrayInputStream(bytesArr)

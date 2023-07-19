@@ -3,6 +3,9 @@ package util
 import org.antlr.v4.runtime.tree.TerminalNode;
 
 import BilParser.BilAdtBaseListener;
+import BilParser.BilAdtParser.UuidContext
+import com.google.protobuf.ByteString
+import java.util.Base64
 
 class TalkingListener extends BilAdtBaseListener {
 
@@ -15,7 +18,12 @@ class TalkingListener extends BilAdtBaseListener {
 	// 	System.out.println("exitRule:\n" + ctx.getText());
 	// }
 	
-	override def visitTerminal(node: TerminalNode): Unit =  { 
-		println("enterTerminal:\n" + node.getText());
+	// override def visitTerminal(node: TerminalNode): Unit =  { 
+	// 	println("enterTerminal:\n" + node.getText());
+	// }
+
+	override def enterUuid(ctx: UuidContext): Unit = {
+		val byte = ByteString.copyFrom(Base64.getDecoder().decode(ctx.getText()))
+		println(ctx.getText() + " , " + byte)
 	}
 }
