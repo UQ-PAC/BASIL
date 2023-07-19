@@ -97,7 +97,8 @@ object Output {
       case entry: CfgFunctionEntryNode => s"entry${entry.data}_${uniqueId}"
       case exit: CfgFunctionExitNode => s"exit${exit.data}_${uniqueId}"
       case ret: CfgProcedureReturnNode => s"return_${uniqueId}"
-      case noRet: CfgProcedureNoReturnNode => s"noreturn_${uniqueId}"
+      case noCallRet: CfgCallNoReturnNode => s"callnoreturn_${uniqueId}"
+      case callRet: CfgCallReturnNode => s"callreturn_${uniqueId}"
       case _ => ???
     }
 }
@@ -110,13 +111,6 @@ object OutputKindE extends Enumeration {
 }
 
 sealed trait OutputKind
-
-///**
-//  * Output kind for a dataflow analysis (named according to the analysis).
-//  */
-//case class DataFlowOutput(kind: FlowSensitiveAnalysis.Analysis.Value) extends OutputKind {
-//  override def toString: String = kind.toString
-//}
 
 /**
   * Other output kinds (for other processing phases than the actual analysis).
