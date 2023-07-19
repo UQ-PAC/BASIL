@@ -898,14 +898,8 @@ object ProgramCfg:
         }
       case unop: UnaryExpr =>
         unop.op match {
-          case BVNEQ =>
-            UnaryExpr(
-              BVEQ, unop.arg
-            )
-          case BVEQ =>
-            UnaryExpr(
-              BVNEQ, unop.arg
-            )
+          case BVNOT | BoolNOT =>
+            unop.arg
           case _ =>
             UnaryExpr(
               BoolNOT, unop
