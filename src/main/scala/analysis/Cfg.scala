@@ -201,6 +201,8 @@ trait CfgNode:
 trait CfgNodeWithData[T] extends CfgNode:
 
   def data: T
+  // Block this node originates from
+  def block: Block
 
 /** Control-flow graph node for the entry of a function.
  */
@@ -210,8 +212,9 @@ case class CfgFunctionEntryNode(
                                 override val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                                 override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                                 override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
-                                data: Procedure
+                                data: Procedure,
                               ) extends CfgNodeWithData[Procedure]:
+  override def block = data.blocks.head
   override def toString: String = s"[FunctionEntry] $data"
   /** Copy this node, but give unique ID and reset edges */
   override def copyNode(): CfgFunctionEntryNode = CfgFunctionEntryNode(data = this.data)
@@ -224,8 +227,9 @@ case class CfgFunctionExitNode(
                                 override val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                                 override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                                 override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
-                                data: Procedure
+                                data: Procedure,
                               ) extends CfgNodeWithData[Procedure]:
+  override def block = data.blocks.head
   override def toString: String = s"[FunctionExit] $data"
   /** Copy this node, but give unique ID and reset edges */
   override def copyNode(): CfgFunctionExitNode = CfgFunctionExitNode(data = this.data)
@@ -304,11 +308,12 @@ case class CfgStatementNode (
                               override val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                               override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                               override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
-                              data: Statement
+                              data: Statement,
+                              block: Block
                             ) extends CfgCommandNode:
   override def toString: String = s"[Stmt] $data"
   /** Copy this node, but give unique ID and reset edges */
-  override def copyNode(): CfgStatementNode = CfgStatementNode(data = this.data)
+  override def copyNode(): CfgStatementNode = CfgStatementNode(data = this.data, block = this.block)
 
 /** CFG's representation of a jump. This is used as a general jump node, for both indirect 
   *   and direct calls.  
@@ -319,11 +324,12 @@ case class CfgJumpNode (
                           override val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                           override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                           override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
-                          data: Jump
+                          data: Jump,
+                          block: Block
                         ) extends CfgCommandNode:
   override def toString: String = s"[Jmp] $data"
   /** Copy this node, but give unique ID and reset edges */
-  override def copyNode(): CfgJumpNode = CfgJumpNode(data = this.data)
+  override def copyNode(): CfgJumpNode = CfgJumpNode(data = this.data, block = this.block)
 
 /** A general purpose node which in terms of the IR has no functionality, but can have purpose in the CFG.
   *   As example, this is used as a "block" start node for the case that a block contains no statements,
@@ -336,11 +342,12 @@ case class CfgGhostNode (
                           override val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                           override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                           override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
-                          data: NOP = NOP()
+                          data: NOP = NOP(),
+                          block: Block
                         ) extends CfgCommandNode:
   override def toString: String = s"[NOP]"
   /** Copy this node, but give unique ID and reset edges */
-  override def copyNode(): CfgGhostNode = CfgGhostNode()
+  override def copyNode(): CfgGhostNode = CfgGhostNode(block = this.block)
 
 /** A control-flow graph. Nodes provide the ability to walk it as both an intra and inter 
   * procedural CFG. 
@@ -689,7 +696,7 @@ object ProgramCfg:
           */
         def visitStmts(stmts: List[Statement], prevNode: CfgNode, cond: Expr): CfgCommandNode = {
 
-          val firstNode: CfgStatementNode = CfgStatementNode(data = stmts.head)
+          val firstNode: CfgStatementNode = CfgStatementNode(data = stmts.head, block = block)
           cfg.addEdge(prevNode, firstNode, cond)
           visitedBlocks += (block -> firstNode) // This is guaranteed to be entrance to block if we are here
 
@@ -703,7 +710,7 @@ object ProgramCfg:
           // `tail` takes everything after the first element of the iterable
           stmts.tail.foreach(
             stmt =>
-              val stmtNode: CfgStatementNode = CfgStatementNode(data = stmt)
+              val stmtNode: CfgStatementNode = CfgStatementNode(data = stmt, block = block)
               cfg.addEdge(prevStmtNode, stmtNode)
               prevStmtNode = stmtNode
           )
@@ -727,7 +734,7 @@ object ProgramCfg:
           */
         def visitJumps(jmps: List[Jump], prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
 
-          val jmpNode: CfgJumpNode = CfgJumpNode(data = jmps.head)
+          val jmpNode: CfgJumpNode = CfgJumpNode(data = jmps.head, block = block)
           var precNode: CfgNode = prevNode
 
           if (solitary) {
@@ -742,7 +749,7 @@ object ProgramCfg:
             jmps.head match {
               case jmp: GoTo =>
                 // `GoTo`s are just edges, so introduce a fake `start of block` that can be jmp'd to
-                val ghostNode = CfgGhostNode()
+                val ghostNode = CfgGhostNode(block = block)
                 cfg.addEdge(prevNode, ghostNode, cond)
                 precNode = ghostNode
                 visitedBlocks += (block -> ghostNode)
