@@ -26,15 +26,15 @@ trait SimpleMonotonicSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[
 
   private val loopEscape: mutable.Set[N] = mutable.Set.empty
 
-  def process(n: N): Unit =
+  def process(n: N, intra: Boolean): Unit =
     val xn = x(n)
-    val y = funsub(n, x)
+    val y = funsub(n, x, intra)
     if y != xn || !loopEscape.contains(n) then
       loopEscape.add(n)
       x += n -> y
-      add(outdep(n))
+      add(outdep(n, intra))
 
-  def analyze(): lattice.Element =
+  def analyze(intra: Boolean): lattice.Element =
     x = lattice.bottom
-    monotonic_run(domain)
+    monotonic_run(domain, intra)
     x

@@ -31,13 +31,14 @@ object RunUtils {
 
     parser.setBuildParseTree(true)
 
+    println("[!] Generating IR")
     val program = AdtStatementLoader.visitProject(parser.project())
 
     val elfLexer = SymsLexer(CharStreams.fromFileName(elfFileName))
     val elfTokens = CommonTokenStream(elfLexer)
     val elfParser = SymsParser(elfTokens)
     elfParser.setBuildParseTree(true)
-
+    println("[!] Parsing .relf")
     val (externalFunctions, globals, globalOffsets) = ElfLoader.visitSyms(elfParser.syms())
 
     //println(globalOffsets)
@@ -57,6 +58,7 @@ object RunUtils {
 
     val externalNames = externalFunctions.map(e => e.name)
 
+    println("[!] Translating from BAP to IR")
     val IRTranslator = BAPToIR(program)
     var IRProgram = IRTranslator.translate
 
@@ -74,7 +76,10 @@ object RunUtils {
       Interpret(IRProgram)
     }
 
+    println("[!] Removing external function calls")
+    // Remove external function references (e.g. @printf)
     val externalRemover = ExternalRemover(externalNames)
+    // Removes BAP naming artefacts (e.g. # preceding variable names)
     val renamer = Renamer(reserved)
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
@@ -85,7 +90,9 @@ object RunUtils {
 
     IRProgram.stripUnreachableFunctions()
 
+    println("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
+    println("[!] Done! Exiting...")
     boogieTranslator.translate
   }
 
@@ -114,7 +121,7 @@ object RunUtils {
     //    print(res.keys)
     //    Output.output(OtherOutput(OutputKindE.cfg), an.cfg.toDot(Output.labeler(res, an.stateAfterNode), Output.dotIder))
 
-    val cfg = IntraproceduralProgramCfg.generateFromProgram(IRProgram)
+    val cfg = ProgramCfg.fromIR(IRProgram, inlineLimit = 0)
     //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
     //      x.toString
     //    }, Output.dotIder))

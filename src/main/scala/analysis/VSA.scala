@@ -44,7 +44,7 @@ trait MemoryRegionValueSetAnalysis:
    */
   val lattice: MapLattice[CfgNode, MapLattice[Expr, PowersetLattice[Value]]] = MapLattice(powersetLattice)
 
-  val domain: Set[CfgNode] = cfg.nodes
+  val domain: Set[CfgNode] = cfg.nodes.toSet
 
   private val stackPointer = Variable("R31", BitVecType(64))
   private val linkRegister = Variable("R30", BitVecType(64))
@@ -71,7 +71,7 @@ trait MemoryRegionValueSetAnalysis:
     if (variable.name.contains("#")) {
       return decls
     }
-    for (pred <- n.pred) {
+    for (pred <- n.pred(intra = false)) {
       if (loopEscape(pred)) {
         return mutable.ListBuffer.empty
       }
@@ -281,10 +281,6 @@ trait MemoryRegionValueSetAnalysis:
           case memLoad: MemoryLoad =>
             memLoad.index match
               case binOp: BinaryExpr =>
-                binOp.arg1 match {
-                  case v: Variable if v.name.equals("R21") => println()
-                  case _ =>
-                }
                 evaluateExpression(binOp.arg2, n) match {
                   case rhs: BitVecLiteral =>
                     val lhs = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
@@ -384,7 +380,7 @@ abstract class ValueSetAnalysis(val cfg: ProgramCfg,
  */
 abstract class IntraprocValueSetAnalysisWorklistSolver[L <: MapLattice[Expr, PowersetLattice[Value]]]
 (
-  cfg: InterproceduralProgramCfg,
+  cfg: ProgramCfg,
   globals: Map[BigInt, String],
   externalFunctions: Map[BigInt, String],
   globalOffsets: Map[BigInt, BigInt],
@@ -400,7 +396,7 @@ object ValueSetAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
    */
-  class WorklistSolver(cfg: InterproceduralProgramCfg,
+  class WorklistSolver(cfg: ProgramCfg,
                        globals: Map[BigInt, String],
                        externalFunctions: Map[BigInt, String],
                        globalOffsets: Map[BigInt, BigInt],

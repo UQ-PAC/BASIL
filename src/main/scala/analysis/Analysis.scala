@@ -17,7 +17,7 @@ trait Analysis[+R]:
 
   /** Performs the analysis and returns the result.
     */
-  def analyze(): R
+  def analyze(intra: Boolean): R
 
 /** A flow-sensitive analysis.
   * @param stateAfterNode
@@ -116,7 +116,7 @@ abstract class SimpleValueAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAna
     */
   val lattice: MapLattice[CfgNode, statelattice.type] = MapLattice(statelattice)
 
-  val domain: Set[CfgNode] = cfg.nodes
+  val domain: Set[CfgNode] = cfg.nodes.toSet
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
@@ -124,8 +124,8 @@ abstract class SimpleValueAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAna
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
   */
-abstract class IntraprocValueAnalysisWorklistSolver[L <: LatticeWithOps](
-    cfg: IntraproceduralProgramCfg,
+abstract class ValueAnalysisWorklistSolver[L <: LatticeWithOps](
+    cfg: ProgramCfg,
     val valuelattice: L
 ) extends SimpleValueAnalysis(cfg)
     with SimpleWorklistFixpointSolver[CfgNode]
@@ -135,8 +135,8 @@ object ConstantPropagationAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
     */
-  class WorklistSolver(cfg: IntraproceduralProgramCfg)
-      extends IntraprocValueAnalysisWorklistSolver(cfg, ConstantPropagationLattice)
+  class WorklistSolver(cfg: ProgramCfg)
+      extends ValueAnalysisWorklistSolver(cfg, ConstantPropagationLattice)
 
 
 ///** Base class for value analysis with simple (non-lifted) lattice.
@@ -202,7 +202,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   /**
    * @inheritdoc
    */
-  def analyze(): Unit =
+  def analyze(intra: Boolean): Unit =
   // generate the constraints by traversing the AST and solve them on-the-fly
     visit(program, ())
 
@@ -489,7 +489,7 @@ trait MemoryRegionAnalysisMisc:
    */
   val lattice: MapLattice[CfgNode, PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
 
-  val domain: Set[CfgNode] = cfg.nodes
+  val domain: Set[CfgNode] = cfg.nodes.toSet
 
   private val stackPointer = Variable("R31", BitVecType(64))
   private val linkRegister = Variable("R30", BitVecType(64))
@@ -516,7 +516,7 @@ trait MemoryRegionAnalysisMisc:
     if (variable.name.contains("#")) {
       return decls
     }
-    for (pred <- n.pred) {
+    for (pred <- n.pred(intra = false)) {
       if (loopEscape(pred)) {
         return mutable.ListBuffer.empty
       }
@@ -690,7 +690,7 @@ abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Map[BigInt
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: IntraproceduralProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String], val powersetLattice: L)
+abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: ProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String], val powersetLattice: L)
   extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines)
   with SimpleMonotonicSolver[CfgNode]
   with ForwardDependencies
@@ -699,5 +699,5 @@ object MemoryRegionAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
    */
-  class WorklistSolver(cfg: IntraproceduralProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String])
+  class WorklistSolver(cfg: ProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String])
     extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, globalOffsets, subroutines, PowersetLattice[MemoryRegion])

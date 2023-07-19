@@ -96,8 +96,8 @@ object Output {
       case real: CfgCommandNode => s"real${real.data}_${uniqueId}"
       case entry: CfgFunctionEntryNode => s"entry${entry.data}_${uniqueId}"
       case exit: CfgFunctionExitNode => s"exit${exit.data}_${uniqueId}"
-      case blockExit: CfgBlockExitNode => s"blockExit${blockExit.data}_${uniqueId}"
-      case blockEntry: CfgBlockEntryNode => s"blockEntry${blockEntry.data}_${uniqueId}"
+      case ret: CfgProcedureReturnNode => s"return_${uniqueId}"
+      case noRet: CfgProcedureNoReturnNode => s"noreturn_${uniqueId}"
       case _ => ???
     }
 }

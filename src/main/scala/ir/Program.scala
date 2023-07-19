@@ -6,6 +6,7 @@ import boogie._
 
 class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBuffer[MemorySection] /* var memories: ArrayBuffer[Memory], var memoryOffsets: ArrayBuffer[Offset] */) {
 
+  // This shouldn't be run before indirect calls are resolved?
   def stripUnreachableFunctions(): Unit = {
     val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
@@ -48,6 +49,13 @@ class Block(var label: String, var address: Option[Int], var statements: ArrayBu
     val jumpsString = jumps.map(_.toString).mkString("\n")
     s"Block $label with $statementsString\n$jumpsString"
   }
+
+  override def equals(obj: scala.Any): Boolean = 
+    obj match 
+      case b: Block => b.label == this.label
+      case _ => false
+
+  override def hashCode(): Int = label.hashCode()
 }
 
 // not used yet, will use when specification is added to this stage rather than at the later boogie translation stage
