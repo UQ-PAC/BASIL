@@ -94,7 +94,7 @@ class UnionFindSolver[A] {
   /**
     * Produces a string representation of the solution.
     */
-  override def toString =
+  override def toString: String =
     solution().map(p => s"${p._1} = ${p._2}").mkString("\n")
 }
 

@@ -1,9 +1,7 @@
 package analysis
 
-import ir.{DirectCall, *}
-import analysis.solvers.*
-import boogie.BExpr
-import specification.SpecGlobal
+import ir._
+import analysis.solvers._
 
 import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
@@ -53,44 +51,47 @@ trait ValueAnalysisMisc:
       case bin: BinaryExpr =>
         val left = eval(bin.arg1, env)
         val right = eval(bin.arg2, env)
-
-        bin.op match
-          case BVAND => bvadd(left, right)
-          case BVOR => bvor(left, right)
-          case BVADD => bvand(left, right)
+        bin.op match 
+          case BVADD => bvadd(left, right)
+          case BVSUB => bvsub(left, right)
           case BVMUL => bvmul(left, right)
           case BVUDIV => bvudiv(left, right)
-          case BVUREM => bvurem(left, right)
-          case BVSHL => bvshl(left, right)
-          case BVLSHR => bvlshr(left, right)
-          case BVULT => bvult(left, right)
-          case BVNAND => ???
-          case BVNOR => ???
-          case BVXOR => ???
-          case BVXNOR => ???
-          case BVCOMP => bvcomp(left, right)
-          case BVSUB => bvsub(left, right)
           case BVSDIV => bvsdiv(left, right)
           case BVSREM => bvsrem(left, right)
-          case BVSMOD => ???
+          case BVUREM => bvurem(left, right)
+          case BVSMOD => ??? // Signed modulus. NOTE: this is used.
+          case BVAND => bvand(left, right)
+          case BVOR => bvor(left, right)
+          case BVXOR => bvxor(left, right)
+          case BVNAND => bvnand(left, right)
+          case BVNOR => bvnor(left, right)
+          case BVXNOR => bvxnor(left, right)
+          case BVSHL => bvshl(left, right)
+          case BVLSHR => bvlshr(left, right)
           case BVASHR => bvashr(left, right)
-          case BVULE => bvule(left, right)
-          case BVUGT => ???
-          case BVUGE => ???
-          case BVSLT => bvslt(left, right)
-          case BVSLE => bvsle(left, right)
-          case BVSGT => ???
-          case BVSGE => ???
-          case BVEQ => bvneq(left, right)
-          case BVNEQ => bvneq(left, right)
-          case BVCONCAT => concat(left, right)
+          case BVCOMP => bvcomp(left, right)
 
+          case BVULE => bvule(left, right)
+          case BVUGE => bvuge(left, right)
+          case BVULT => bvult(left, right)
+          case BVUGT => bvugt(left, right)
+
+          case BVSLE => bvsle(left, right)
+          case BVSGE => bvsge(left, right)
+          case BVSLT => bvslt(left, right)
+          case BVSGT => bvsgt(left, right)
+          
+          case BVCONCAT => concat(left, right)
+          case BVNEQ => bvneq(left, right)
+          case BVEQ => bveq(left, right)
+
+          
       case un: UnaryExpr =>
         val arg = eval(un.arg, env)
 
         un.op match
-          case BVNEG => bvneg(arg)
           case BVNOT => bvnot(arg)
+          case BVNEG => bvneg(arg)
 
       case _ => valuelattice.top
 
@@ -101,8 +102,8 @@ trait ValueAnalysisMisc:
       case r: CfgCommandNode =>
         r.data match
           // assignments
-          case la: LocalAssign => s + (la.lhs -> eval(la.rhs, s))
-
+          case la: LocalAssign => 
+            s + (la.lhs -> eval(la.rhs, s))
           // all others: like no-ops
           case _ => s
       case _ => s
@@ -454,7 +455,7 @@ trait MemoryRegionAnalysisMisc:
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
-  var stackPool = mutable.HashMap[Expr, StackRegion]()
+  var stackPool: mutable.Map[Expr, StackRegion] = mutable.HashMap()
   private def getNextMallocCount(): String = {
     mallocCount += 1
     s"malloc_$mallocCount"
@@ -466,19 +467,19 @@ trait MemoryRegionAnalysisMisc:
   }
 
   def poolMaster(expr: Expr): StackRegion = {
-    stackPool.contains(expr) match {
-      case true => stackPool(expr)
-      case false =>
-        val newRegion = StackRegion(getNextStackCount(), expr)
-        stackPool += (expr -> newRegion)
-        newRegion
+    if (stackPool.contains(expr)) {
+      stackPool(expr)
+    } else {
+      val newRegion = StackRegion(getNextStackCount(), expr)
+      stackPool += (expr -> newRegion)
+      newRegion
     }
   }
 
-
-
   val cfg: ProgramCfg
-  val globals: Set[SpecGlobal]
+  val globals: Map[BigInt, String]
+  val globalOffsets: Map[BigInt, BigInt]
+  val subroutines: Map[BigInt, String]
 
   /** The lattice of abstract values.
    */
@@ -513,7 +514,7 @@ trait MemoryRegionAnalysisMisc:
     val decls: mutable.ListBuffer[CfgNode] = mutable.ListBuffer.empty
     // if we have a temporary variable then ignore it
     if (variable.name.contains("#")) {
-        return decls
+      return decls
     }
     for (pred <- n.pred) {
       if (loopEscape(pred)) {
@@ -536,24 +537,6 @@ trait MemoryRegionAnalysisMisc:
     decls
   }
 
-  def is_global(bigInt: BigInt): Boolean = {
-      for (global <- globals) {
-          if (global.address == bigInt) {
-          return true
-          }
-      }
-      false
-  }
-
-  def get_global_name(bigInt: BigInt): String = {
-      for (global <- globals) {
-          if (global.address == bigInt) {
-          return global.name
-          }
-      }
-      ""
-  }
-
   /**
    * Evaluate an expression in a hope of finding a global variable.
    * @param exp: The expression to evaluate (e.g. R1 + 0x1234)
@@ -571,6 +554,9 @@ trait MemoryRegionAnalysisMisc:
                   case Some(value) =>
                     value match
                       case bitVecLiteral: BitVecLiteral =>
+                        if (!binOp.arg2.isInstanceOf[BitVecLiteral]) {
+                          return exp
+                        }
                         val calculated: BigInt = bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value)
                         return BitVecLiteral(calculated, bitVecLiteral.size)
                       case _ => evaluateExpression(value, pred)
@@ -611,10 +597,16 @@ trait MemoryRegionAnalysisMisc:
             val rhs: Expr = evaluateExpression(binOp.arg2, n)
             lhs match {
               case bitVecLiteral: BitVecLiteral =>
-                if (is_global(bitVecLiteral.value)) {
+                if (globals.contains(bitVecLiteral.value)) {
                   var tempLattice: lattice.sublattice.Element = env
-                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(get_global_name(bitVecLiteral.value), bitVecLiteral)))
-                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(get_global_name(bitVecLiteral.value), binOp.arg2)))
+                  val globalName = globals(bitVecLiteral.value)
+                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(globalName, bitVecLiteral)))
+                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(globalName, binOp.arg2)))
+                } else if (subroutines.contains(bitVecLiteral.value)) {
+                  var tempLattice: lattice.sublattice.Element = env
+                  val subroutineName = subroutines(bitVecLiteral.value)
+                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(subroutineName, bitVecLiteral)))
+                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(subroutineName, binOp.arg2)))
                 }
               case binOp2: BinaryExpr =>
                   // special case: we do not want to get a unique stack name so we try to find it in the pool
@@ -635,8 +627,10 @@ trait MemoryRegionAnalysisMisc:
           val eval = evaluateExpression(variable, n)
           eval match {
             case literal: BitVecLiteral =>
-              if (is_global(literal.value)) {
-                return Set(DataRegion(get_global_name(literal.value), literal))
+              if (globals.contains(literal.value)) {
+                return Set(DataRegion(globals(literal.value), literal))
+              } else if (subroutines.contains(literal.value)) {
+                return Set(DataRegion(subroutines(literal.value), literal))
               }
               lattice.sublattice.bottom
             case _ =>
@@ -688,7 +682,7 @@ trait MemoryRegionAnalysisMisc:
 
 /** Base class for memory region analysis (non-lifted) lattice.
  */
-abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGlobal]) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
+abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Map[BigInt, String], val globalOffsets: Map[BigInt, BigInt], val subroutines: Map[BigInt, String]) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
    */
@@ -696,8 +690,8 @@ abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Set[SpecGl
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal], val powersetLattice: L)
-  extends MemoryRegionAnalysis(cfg, globals)
+abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: IntraproceduralProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String], val powersetLattice: L)
+  extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines)
   with SimpleMonotonicSolver[CfgNode]
   with ForwardDependencies
 
@@ -705,5 +699,5 @@ object MemoryRegionAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
    */
-  class WorklistSolver(cfg: IntraproceduralProgramCfg, globals: Set[SpecGlobal])
-    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, PowersetLattice[MemoryRegion])
+  class WorklistSolver(cfg: IntraproceduralProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String])
+    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, globalOffsets, subroutines, PowersetLattice[MemoryRegion])

@@ -80,21 +80,21 @@ class SSA(cfg: Cfg) {
           checkExpr(binExpr.arg1)
           checkExpr(binExpr.arg2)
         case unExpr: UnaryExpr =>
-            checkExpr(unExpr.arg)
+          checkExpr(unExpr.arg)
         case zeroExtend: ZeroExtend =>
           checkExpr(zeroExtend.body)
         case memoryLoad: MemoryLoad =>
           checkExpr(memoryLoad.index)
           checkExpr(memoryLoad.mem)
         case variable: Variable =>
-          variable.asInstanceOf[Expr].ssa_id = checkUse(variable.toString)
+          variable.ssa_id = checkUse(variable.toString)
         case extract: Extract =>
           checkExpr(extract.body)
         case signExtend: SignExtend =>
           checkExpr(signExtend.body)
         case memory: Memory =>
         case bitVecLiteral: BitVecLiteral =>
-        case _ => print(s"WARNING: Unhandled expression type in SSA: ${expr.getClass}\n")
+        case _ => println(s"WARNING: Unhandled expression type in SSA: ${expr.getClass}")
       }
     }
 
