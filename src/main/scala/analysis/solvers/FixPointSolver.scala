@@ -95,7 +95,7 @@ trait ListSetWorklist[N] extends Worklist[N]:
       process(n)
 
   def monotonic_run(first: Set[N]) =
-    worklist = new ListSet[N] ++ first.collect{ case n: CfgFunctionEntryNode => n }
+    worklist = new ListSet[N] ++ first.collect{ case n: CfgFunctionEntryNode if n.pred.isEmpty => n } // no inlined functions
     while (worklist.nonEmpty) do
       val n = worklist.head;
       worklist = worklist.tail
