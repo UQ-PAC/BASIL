@@ -108,93 +108,27 @@ object RunUtils {
     println(externalAddresses)
     println("Subroutine Addresses:")
     println(subroutines)
-    //    val wcfg = IntraproceduralProgramCfg.generateFromProgram(program)
-    //
-    ////    //print(wcfg.nodes)
-    ////    Output.output(OtherOutput(OutputKindE.cfg), wcfg.toDot({ x =>
-    ////      x.toString
-    ////    }, Output.dotIder))
-    //
-    //
-    //    val an = ConstantPropagationAnalysis.WorklistSolver(wcfg)
-    //    val res = an.analyze().asInstanceOf[Map[CfgNode, _]]
-    //    print(res.keys)
-    //    Output.output(OtherOutput(OutputKindE.cfg), an.cfg.toDot(Output.labeler(res, an.stateAfterNode), Output.dotIder))
 
     val cfg = ProgramCfg.fromIR(IRProgram, inlineLimit = 0)
-    //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
-    //      x.toString
-    //    }, Output.dotIder))
-    //Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(x => x.toString, Output.dotIder), "intra_cfg")
 
-//    println("==Generating Constant Prop Analysis")
-//    val solver = new ConstantPropagationAnalysis.WorklistSolver(cfg)
-//    val result = solver.analyze()
-//
-//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder), "constant_prop")
-//
-//    dump_file(cfg.getEdges.toString(), "result")
-//
-//    print(s"\n Constant prop results\n ****************\n  ${result.values}  \n *****************\n")
-
-
-    //    val solver2 = new SteensgaardAnalysis(translator.program, result)
-    //    val result2 = solver2.analyze()
-    //    print(solver2.pointsTo())
-
-//    val ssa = new SSA(cfg)
-//    ssa.analyze()
-
-
-    /*
-    TODO - solveMemory parameters not set
-    val solver3 = new MemoryRegionAnalysis(cfg)
-    val result3 = solver3.analyze()
-    print(solver3.solveMemory())
-    val stringBuilder: StringBuilder = new StringBuilder()
-    stringBuilder.append("digraph G {\n")
-    for ((k, v) <- solver3.solveMemory()) {
-      v.foreach(x => stringBuilder.append(s"\"${k}\" -> \"${x}\";\n"))
-    }
-    stringBuilder.append("}")
-    dump_plot(stringBuilder.toString(), "result")
-    */
-
-//    val solver2 = new MemoryRegionAnalysis(cfg)
-//    val result2 = solver2.analyze()
-//    print(s"\n Mem region results\n ****************\n  ${solver2.getMapping}  \n *****************\n")
-//    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(solver2.getMapping, solver.stateAfterNode), Output.dotIder))
 
     val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, subroutines)
-    val result2 = solver2.analyze().asInstanceOf[Map[CfgNode, MemoryRegion]]
+    val result2 = solver2.analyze(true).asInstanceOf[Map[CfgNode, MemoryRegion]]
     memoryRegionAnalysisResults = Some(result2)
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder), "mra")
 
     val mmm = MemoryModelMap()
     mmm.convertMemoryRegions(result2, externalAddresses)
-    //print("Memory Model Map: \n")
-    //print(mmm)
-    val interprocCfg = InterproceduralProgramCfg.generateFromProgram(IRProgram)
-    Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot(x => x.toString, Output.dotIder), "inter_cfg")
 
-    val solver3 = ValueSetAnalysis.WorklistSolver(interprocCfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm)
-    val result3 = solver3.analyze()
-    Output.output(OtherOutput(OutputKindE.cfg), interprocCfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
-
-    val newCFG = InterproceduralProgramCfg.generateFromProgram(resolveCFG(interprocCfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram))
+    val solver3 = ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm)
+    val result3 = solver3.analyze(false)
+    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
+    val newCFG = ProgramCfg.fromIR(resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram), inlineLimit = 0)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
   }
 
-  def resolveCFG(interproceduralProgramCfg: InterproceduralProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): Program = {
-    // print the count of the value sets of the exit nodes
-//    for (comdNode <- interproceduralProgramCfg.nodes.filter(_.isInstanceOf[CfgCommandNode])) {
-////      if (comdNode.asInstanceOf[CfgCommandNode].data.isInstanceOf[IndirectCall]) {
-////        //println(s"Node: ${comdNode}")
-////        println(s"${valueSets(comdNode).size}")
-////      }
-//      println(s"${valueSets(comdNode).size}")
-//    }
-    interproceduralProgramCfg.entries.foreach(n => process(n))
+  def resolveCFG(cfg: ProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): Program = {
+    cfg.entries.foreach(n => process(n))
 
     def process(n: CfgNode): Unit = n match {
       case commandNode: CfgCommandNode =>
@@ -203,14 +137,14 @@ object RunUtils {
             val valueSet: Map[Expr, Set[Value]] = valueSets(n)
             val functionNames = resolveAddresses(valueSet(indirectCall.target))
             if (functionNames.size == 1) {
-              interproceduralProgramCfg.nodeToBlock.get(n) match
+              cfg.nodeToBlock.get(n) match
                 case Some(block) =>
                   block.jumps = block.jumps.filter(!_.equals(indirectCall))
                   block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head.name)).head, indirectCall.condition, indirectCall.returnTarget)
                 case _ => throw new Exception("Node not found in nodeToBlock map")
             } else {
               functionNames.foreach(addressValue =>
-                interproceduralProgramCfg.nodeToBlock.get(n) match
+                cfg.nodeToBlock.get(n) match
                   case Some(block) =>
                     block.jumps = block.jumps.filter(!_.equals(indirectCall))
                     if (indirectCall.condition.isDefined) {
