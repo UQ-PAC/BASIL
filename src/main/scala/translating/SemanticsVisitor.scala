@@ -11,8 +11,11 @@ import BilParser.BilAdtParser._
 import ir._
 import scala.collection.mutable._
 import ir.Variable._
+import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 
 class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extends BilAdtBaseVisitor[Any]{
+
+    var cseMap : Map[String, IRType] = Map[String, IRType]()
 
     def ChrisUUIDToByteString(uuid: String) : ByteString = { // This probably needs a better name, but :/
         return ByteString.copyFrom(Base64.getDecoder().decode(uuid))
@@ -29,6 +32,18 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
             }
         }
         return statements
+    }
+
+    def getCondition(): Any = {
+        // this is just boilerplate for now, but may be useful for retriving conditions
+        val basicBlks = context.basic_blk().asScala
+        for (BasicBlk <- basicBlks) {
+            val Blkuuid = ChrisUUIDToByteString(BasicBlk.uuid().getText())
+            if (Blkuuid.equals(targetuuid)) {
+                visitBasic_blk(BasicBlk)
+            }
+        }
+
     }
     
     override def visitBasic_blk(ctx: Basic_blkContext): ArrayBuffer[Statement] = {
@@ -73,9 +88,11 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
     }
 
     override def visitCall_stmt(ctx: Call_stmtContext): MemoryAssign = {
-        // TODO: probably memory store, but run into the same issue as mem load 
-        val mem = Memory(???, ???, ???)
-        val memstore = MemoryStore(mem, ???, ???, ???, ???)
+        val mem = Memory("mem", 64, 8) // yanked from BAP
+        val addr = visitExpr(ctx.expr(0))
+        val value = visitExpr(ctx.expr(1))
+        val size = visitExpr(ctx.expr(3)).asInstanceOf[IntLiteral].value.toInt
+        val memstore = MemoryStore(mem, addr, value, Endian.LittleEndian, size)
         return MemoryAssign(mem, memstore)
     }
 
@@ -97,6 +114,11 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
     override def visitConstDecl(ctx: ConstDeclContext): LocalAssign  = {
         val ty = visitType(ctx.`type`())
         val name = ctx.METHOD().getText()
+
+        if (name.substring(0, 3).equals("cse")) {
+            cseMap += (name -> ty)
+        }
+
         val expr = visitExpr(ctx.expr())
         if (expr != null) {
             return LocalAssign(Variable(name,ty), expr)
@@ -130,8 +152,10 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
         return value
     }
 
-    override def visitExprVar(ctx: ExprVarContext): Expr = ??? 
-    // TODO: figure out how to turn this into expr type, since usually its just something like Expr_Var(Cse0__5)                                                           
+    override def visitExprVar(ctx: ExprVarContext): Expr = {
+        return createExprVar(getExprVarText(ctx))
+    }
+                                                               
 
     def getExprVarText(ctx: ExprVarContext) : String = {
         if (ctx.SSYMBOL() != null) {
@@ -147,9 +171,10 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
 
         str match 
             case "Mem.read" => 
-                // TODO: all signs point to this being a load instruction, but there's no indication of the size of the memory :/
-                val mem = Memory(???, ???, ???)
-                return MemoryLoad(mem, ???, ???, ???)
+                val mem = Memory("mem", 64, 8) // yanked from BAP, hope this never changes
+                val addr = visitExpr(ctx.expr(0))
+                val size = visitExpr(ctx.expr(1)).asInstanceOf[IntLiteral].value.toInt
+                return MemoryLoad(mem, addr, Endian.LittleEndian, size)
             case "not_bool" => return UnaryExpr(BoolNOT, visitExpr(ctx.expr(0)))
             case "cvt_bool_bv" => 
                 // in ocaml, takes bool and turns to bitvector -> since this is usually tied to a BinaryExpr, and 
@@ -158,7 +183,10 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
             case "eq_enum" => return BinaryExpr(BVXNOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
             case "or_bool" => return BinaryExpr(BoolOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
             case "and_bool" => return BinaryExpr(BoolAND, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-            case "replicate_bits" => return ??? // i can't understand the ocaml here, probs just duplicating bitvector though 
+            case "replicate_bits" => 
+                val value = visitExpr(ctx.expr(0)).asInstanceOf[IntLiteral].value // not 100% on this, since it hasn't come up yet
+                val size = visitExpr(ctx.expr(1)).asInstanceOf[IntLiteral].value.toInt
+                return BitVecLiteral(value, size)
             case "not_bits" => return UnaryExpr(BVNOT, visitExpr(ctx.expr(0)))
             case "or_bits" => return BinaryExpr(BVOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
             case "and_bits" => return BinaryExpr(BVAND, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
@@ -238,8 +266,7 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
     }
 
     override def visitLExprVar(ctx: LExprVarContext): Variable = {
-        return createExprVarArray(ArrayBuffer(getLExprVarText(ctx), "0"))  
-        // this is a super janky way to do this, but nothing will ever go wrong from that, right? 
+        return createExprVar(getLExprVarText(ctx)).asInstanceOf[Variable]  
     }
 
     def getLExprVarText(ctx: LExprVarContext) : String = {
@@ -282,6 +309,17 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
         return createExprVarArray(array) 
     }
 
+    def createExprVar(name : String) : Expr = {
+        name match 
+            case n if n.startsWith("cse") => return Variable(name, cseMap.get(name).get)
+            case "TRUE" => return TrueLiteral
+            case "FALSE" => return FalseLiteral
+            case "SP_EL0" => return Variable("R31", BitVecType(64))
+            case "_PC" => null // null elements literally don't exist in IR, so pray we never have to read from them
+            case "__BranchTaken" => null 
+            case "BTypeNext" => null 
+    }
+
     def createExprVarArray(v : ArrayBuffer[String]) : Variable = {
         v(0) match //currently only works for fields & arrays of size 2, but arrays bigger than that don't seem to appear
             case "_R" => 
@@ -289,17 +327,9 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
                 val name = "R" + v(1).asInstanceOf[Int]  
                 return Variable(name, BitVecType(size))
 
-            case "_PC" => null // also doesn't exist, although may be useful when forming jumps
-
-            case "__BranchTaken" => null // literally doesn't exist in IR, so we pray we never have to read from it
-
             case "PSTATE" => 
                 val Rname = v(1).asInstanceOf[String] + "F"
                 return Variable(Rname, BitVecType(1))
-
-            case "BTypeNext" => null // neither does this one
-
-            case "SP_EL0" => return Variable("R31", BitVecType(64))
     }   
 
     def getSizeofRegister(name : String) : Int = {

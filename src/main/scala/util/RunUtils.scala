@@ -52,8 +52,12 @@ object RunUtils {
     val functionBlockDecoder = new MapDecoder(mods.head.auxData.get("functionBlocks").get.data)
     val functionEntries = functionEntryDecoder.decode()
     val functionBlocks = functionBlockDecoder.decode()
+
+    val proxy = mods.map(_.proxies)
+    println(proxy.map(_.toString()))
+    println(proxy.map(_.map(_.unknownFields)).map(_.map(_.getField(0).foreach(f => f.toString()))))
     
-    
+    // function blocks writer
     // val bw = new BufferedWriter(new FileWriter(new File("Function Entries + Function Blocks")))
     // bw.write("Function Entries" + System.lineSeparator())
     // functionEntries.map(_.toString()).foreach(f => f -> bw.write(f))
@@ -62,16 +66,20 @@ object RunUtils {
     // functionBlocks.map(_.toString()).foreach(f => f -> bw.write(f))
     // bw.close()
 
+    // cfg + symbol writer
     // val bw = new BufferedWriter(new FileWriter(new File("output")))
     // symbols.head.map(_.toProtoString).foreach(f => f -> bw.write(f))
     // bw.write(cfg.head.toProtoString)
     // bw.close()
 
     //println(keys.toString())
-    println(mods.head.entryPoint)
+    // println(mods.head.entryPoint)
 
-    val tl = new TalkingListener()
-    ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
+    // val tl = new TalkingListener()
+    // ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
+
+
+
 
     // val program = AdtStatementLoader.visitProject(parser.project())
 
