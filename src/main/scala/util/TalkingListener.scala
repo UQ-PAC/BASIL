@@ -2,12 +2,17 @@ package util
 // import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.tree.TerminalNode;
 
-import BilParser.BilAdtBaseListener;
-import BilParser.BilAdtParser.UuidContext
+import BilParser._
+import BilParser.SemanticsParser.UuidContext
 import com.google.protobuf.ByteString
 import java.util.Base64
 
-class TalkingListener extends BilAdtBaseListener {
+/**
+  * 
+  * This is a test + debugging class, can delete if neccessary
+  * 
+  */
+class TalkingListener extends SemanticsBaseListener {
 
     // @Override public void enterEveryRule(ParserRuleContext ctx) { 
 

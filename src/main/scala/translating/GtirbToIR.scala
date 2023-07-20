@@ -3,7 +3,7 @@ import com.google.protobuf.ByteString
 import scala.collection.mutable
 import com.grammatech.gtirb.proto
 import com.grammatech.gtirb.proto.CFG.CFG
-import BilParser.BilAdtParser
+import BilParser.SemanticsParser
 import ir._
 import scala.collection.mutable.ArrayBuffer
 import java.awt.Taskbar.State
@@ -16,7 +16,7 @@ import com.grammatech.gtirb.proto.CFG.Edge._
   *
   */
 class GtirbToIR(entrypoint: ByteString, functionEntries: mutable.Map[ByteString, mutable.Set[ByteString]], 
-                functionBlocks: mutable.Map[ByteString, mutable.Set[ByteString]], cfg: CFG, parser: BilAdtParser) {
+                functionBlocks: mutable.Map[ByteString, mutable.Set[ByteString]], cfg: CFG, parser: SemanticsParser) {
 
     def createIR() : Program = {
 

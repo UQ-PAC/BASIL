@@ -1,23 +1,19 @@
 package translating
-import BilParser.BilAdtBaseVisitor
-import BilParser.BilAdtParser.Basic_blkContext
-import BilParser.BilAdtParser.SemanticsContext
+import BilParser._
+import BilParser.SemanticsParser._
 import com.google.protobuf.ByteString
 import java.util.Base64
 import scala.collection.JavaConverters._
-import BilParser.BilAdtParser.InstructionContext
-import BilParser.BilAdtParser.StmtContext
-import BilParser.BilAdtParser._
 import ir._
 import scala.collection.mutable._
 import ir.Variable._
 import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 
-class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extends BilAdtBaseVisitor[Any]{
+class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extends SemanticsBaseVisitor[Any]{
 
     var cseMap : Map[String, IRType] = Map[String, IRType]()
 
-    def ChrisUUIDToByteString(uuid: String) : ByteString = { // This probably needs a better name, but :/
+    def unChrisifyUUID(uuid: String) : ByteString = { // This probably needs a better name, but :/
         return ByteString.copyFrom(Base64.getDecoder().decode(uuid))
     }
 
@@ -26,7 +22,7 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
         var statements : ArrayBuffer[Statement] = null 
 
         for (BasicBlk <- basicBlks) {
-            val Blkuuid = ChrisUUIDToByteString(BasicBlk.uuid().getText())
+            val Blkuuid = unChrisifyUUID(BasicBlk.uuid().getText())
             if (Blkuuid.equals(targetuuid)) {
                 statements = visitBasic_blk(BasicBlk)
             }
@@ -38,7 +34,7 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
         // this is just boilerplate for now, but may be useful for retriving conditions
         val basicBlks = context.basic_blk().asScala
         for (BasicBlk <- basicBlks) {
-            val Blkuuid = ChrisUUIDToByteString(BasicBlk.uuid().getText())
+            val Blkuuid = unChrisifyUUID(BasicBlk.uuid().getText())
             if (Blkuuid.equals(targetuuid)) {
                 visitBasic_blk(BasicBlk)
             }
@@ -72,7 +68,7 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
                 statements.addOne(statement)
 
             } else if (stmt.conditional_stmt() != null) {
-                visitConditional_stmt(stmt.conditional_stmt()) //  probably do nothing here, but again ask about jumps
+                visitConditional_stmt(stmt.conditional_stmt()) //  may be useful for retriving conditions, but does nothing for now
 
             }
         } 
@@ -97,8 +93,7 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
     }
 
     override def visitConditional_stmt(ctx: Conditional_stmtContext): Any = {
-        return ???
-        // may be useful for discovering the condition within jumps
+        return ??? // see above comment in conditional statements
     }
 
     override def visitAssign(ctx: AssignContext): LocalAssign = {
@@ -178,13 +173,15 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
             case "not_bool" => return UnaryExpr(BoolNOT, visitExpr(ctx.expr(0)))
             case "cvt_bool_bv" => 
                 // in ocaml, takes bool and turns to bitvector -> since this is usually tied to a BinaryExpr, and 
-                // BinaryExpr's don't have any "evaluate" method, i have just returned the binary expr that will evaluate to a bool
+                // BinaryExpr's don't have any "evaluate" method, i have just returned the binary expr that will 
+                //evaluate to a bool
                 return visitExpr(ctx.expr(0))       
             case "eq_enum" => return BinaryExpr(BVXNOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
             case "or_bool" => return BinaryExpr(BoolOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
             case "and_bool" => return BinaryExpr(BoolAND, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
             case "replicate_bits" => 
-                val value = visitExpr(ctx.expr(0)).asInstanceOf[IntLiteral].value // not 100% on this, since it hasn't come up yet
+                val value = visitExpr(ctx.expr(0)).asInstanceOf[IntLiteral].value 
+                // not 100% on this, since it hasn't come up yet
                 val size = visitExpr(ctx.expr(1)).asInstanceOf[IntLiteral].value.toInt
                 return BitVecLiteral(value, size)
             case "not_bits" => return UnaryExpr(BVNOT, visitExpr(ctx.expr(0)))

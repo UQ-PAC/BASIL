@@ -6,7 +6,8 @@ import scala.collection.mutable
 import java.nio.charset.StandardCharsets
 
 class StringDecoder(bytes: ByteString) {
-
+    // literally can't figure out what's wrong, might be something to do with java/scala treating all bits as signed, 
+    // when api is unsigned
     val bytesArr: Array[Byte] = bytes.toByteArray()
     val byteStream = new ByteArrayInputStream(bytesArr)
 
@@ -32,9 +33,9 @@ class StringDecoder(bytes: ByteString) {
     def bytesToInt(bytes: Array[Byte], littleEndian: Boolean): Long = {
         val buffer = java.nio.ByteBuffer.wrap(bytes)
         if (littleEndian) {
-            return buffer.order(java.nio.ByteOrder.LITTLE_ENDIAN).getLong
+            return buffer.order(java.nio.ByteOrder.LITTLE_ENDIAN).getLong()
         } else {
-            return buffer.getLong
+            return buffer.getLong()
         }
     }
 }

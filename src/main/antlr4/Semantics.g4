@@ -1,7 +1,7 @@
-grammar BilAdt; 
-// See aslp/libASL/asl.ott for reference grammar 
-// This is really the aslp semantics grammar, should be renamed
+grammar Semantics; 
 
+// See aslp/libASL/asl.ott for reference grammar 
+// Bap-ali-plugin/asli_lifer.ml may also be useful for visitors
 semantics : OPEN_CURLY (basic_blk (COMMA basic_blk)*)? CLOSE_CURLY EOF;
 
 basic_blk : QUOTE uuid QUOTE COLON OPEN_BRACKET (instruction (COMMA instruction)*)? CLOSE_BRACKET; 

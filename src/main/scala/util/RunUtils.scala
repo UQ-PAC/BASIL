@@ -41,9 +41,9 @@ object RunUtils {
     val keys    = mods.head.auxData.keySet
   
 
-    val adtLexer = BilAdtLexer(CharStreams.fromString(semantics.head.prettyPrint))
-    val tokens = CommonTokenStream(adtLexer)
-    val parser = BilAdtParser(tokens)
+    val semanticsLexer = SemanticsLexer(CharStreams.fromString(semantics.head.prettyPrint))
+    val tokens = CommonTokenStream(semanticsLexer)
+    val parser = SemanticsParser(tokens)
 
     parser.setBuildParseTree(true)
 
@@ -53,11 +53,13 @@ object RunUtils {
     val functionEntries = functionEntryDecoder.decode()
     val functionBlocks = functionBlockDecoder.decode()
 
-    val proxy = mods.map(_.proxies)
-    println(proxy.map(_.toString()))
-    println(proxy.map(_.map(_.unknownFields)).map(_.map(_.getField(0).foreach(f => f.toString()))))
+    // val proxy = mods.map(_.proxies)
+
+    // println(proxy.map(_.toString()))
+    // println(proxy.map(_.map(_.unknownFields)).map(_.map(_.getField(0).foreach(f => f.toString()))))
+
     
-    // function blocks writer
+    // FUNCTION BLOCKS WRITER
     // val bw = new BufferedWriter(new FileWriter(new File("Function Entries + Function Blocks")))
     // bw.write("Function Entries" + System.lineSeparator())
     // functionEntries.map(_.toString()).foreach(f => f -> bw.write(f))
@@ -66,17 +68,18 @@ object RunUtils {
     // functionBlocks.map(_.toString()).foreach(f => f -> bw.write(f))
     // bw.close()
 
-    // cfg + symbol writer
+    // CFG + SYMBOL WRITER
     // val bw = new BufferedWriter(new FileWriter(new File("output")))
     // symbols.head.map(_.toProtoString).foreach(f => f -> bw.write(f))
     // bw.write(cfg.head.toProtoString)
     // bw.close()
 
+    //AUXDATA KEYS + ENTRYPOINT TO CFG
     //println(keys.toString())
     // println(mods.head.entryPoint)
 
-    // val tl = new TalkingListener()
-    // ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
+    val tl = new TalkingListener()
+    ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
 
 
 
