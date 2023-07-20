@@ -48,7 +48,7 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
         val stmts = ctx.stmt_string().asScala.map(_.stmt())
 
         for (stmt <- stmts) {
-            if (stmt.assignment_stmt() != null) { //check if there's a better way to do this, i.e. match on type
+            if (stmt.assignment_stmt() != null) { // match on type would be helpful, but i can't figure out how to gat antlr to co-operate
                 val statement = visitAssignment_stmt(stmt.assignment_stmt())
                 statements.addOne(statement)
 
@@ -80,7 +80,8 @@ class SemanticsVisitor(targetuuid: ByteString, context: SemanticsContext) extend
     }
 
     override def visitConditional_stmt(ctx: Conditional_stmtContext): Any = {
-        // probably useless -> will ask since this is a jump and i do jumps elsewhere
+        return ???
+        // may be useful for discovering the condition within jumps
     }
 
     override def visitAssign(ctx: AssignContext): LocalAssign = {

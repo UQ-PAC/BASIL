@@ -12,9 +12,15 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
 import java.io.{File, PrintWriter}
 
-import java.io.{BufferedWriter, FileWriter, IOException}
+import java.io.{File, PrintWriter, FileInputStream, BufferedWriter, FileWriter, IOException}
+import com.grammatech.gtirb.proto.IR.IR
+import com.grammatech.gtirb.proto.Module.Module
+import com.grammatech.gtirb.proto.Section.Section
+import spray.json._
 import scala.jdk.CollectionConverters._
 import analysis.solvers._
+import scala.collection.mutable.ArrayBuffer
+
 object RunUtils {
   var memoryRegionAnalysisResults: Option[Map[CfgNode, _]] = None
 
@@ -40,6 +46,32 @@ object RunUtils {
     val parser = BilAdtParser(tokens)
 
     parser.setBuildParseTree(true)
+
+    
+    val functionEntryDecoder = new MapDecoder(mods.head.auxData.get("functionEntries").get.data)
+    val functionBlockDecoder = new MapDecoder(mods.head.auxData.get("functionBlocks").get.data)
+    val functionEntries = functionEntryDecoder.decode()
+    val functionBlocks = functionBlockDecoder.decode()
+    
+    
+    // val bw = new BufferedWriter(new FileWriter(new File("Function Entries + Function Blocks")))
+    // bw.write("Function Entries" + System.lineSeparator())
+    // functionEntries.map(_.toString()).foreach(f => f -> bw.write(f))
+    // bw.write(System.lineSeparator() + System.lineSeparator())
+    // bw.write("Function Blocks" + System.lineSeparator())
+    // functionBlocks.map(_.toString()).foreach(f => f -> bw.write(f))
+    // bw.close()
+
+    // val bw = new BufferedWriter(new FileWriter(new File("output")))
+    // symbols.head.map(_.toProtoString).foreach(f => f -> bw.write(f))
+    // bw.write(cfg.head.toProtoString)
+    // bw.close()
+
+    //println(keys.toString())
+    println(mods.head.entryPoint)
+
+    val tl = new TalkingListener()
+    ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
 
     // val program = AdtStatementLoader.visitProject(parser.project())
 
@@ -84,14 +116,13 @@ object RunUtils {
     //   Interpret(IRProgram)
     // }
 
-    val externalRemover = ExternalRemover(externalNames)
-    val renamer = Renamer(reserved)
-    IRProgram = externalRemover.visitProgram(IRProgram)
-    IRProgram = renamer.visitProgram(IRProgram)
-
-    IRProgram.stripUnreachableFunctions()
+    // val externalRemover = ExternalRemover(externalNames)
+    // val renamer = Renamer(reserved)
+    // IRProgram = externalRemover.visitProgram(IRProgram)
+    // IRProgram = renamer.visitProgram(IRProgram)
 
     // IRProgram.stripUnreachableFunctions()
+
 
     // val boogieTranslator = IRToBoogie(IRProgram, specification)
     // boogieTranslator.translate
