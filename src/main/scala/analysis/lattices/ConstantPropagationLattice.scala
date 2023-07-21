@@ -7,7 +7,7 @@ import analysis.util._
   */
 object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWithDefaultOps:
 
-  private def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element = try {
+  override def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element = try {
       (a, b) match
         case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => 
           FlatElement.FlatEl(op(x, y))
@@ -21,7 +21,7 @@ object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWit
       throw e
   }
 
-  private def apply(op: Literal => Literal, a: Element): Element = a match
+  override def apply(op: Literal => Literal, a: Element): Element = a match
     case FlatElement.FlatEl(x) => FlatElement.FlatEl(op(x))
     case FlatElement.Top       => FlatElement.Top
     case FlatElement.Bot       => FlatElement.Bot

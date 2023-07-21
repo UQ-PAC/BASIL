@@ -7,8 +7,8 @@ import analysis.util._
   */
 trait LatticeWithOps extends Lattice:
 
-    def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element
-    def apply(op: Literal => Literal, a: Element): Element
+    protected def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element
+    protected def apply(op: Literal => Literal, a: Element): Element
 
     def literal(l: Literal): Element
     def bvadd(a: Element, b: Element): Element

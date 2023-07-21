@@ -1,9 +1,40 @@
 package analysis
 
 import analysis._
-import ir.BitVecLiteral
+import ir._
 
 import scala.collection.mutable
+
+abstract class MemoryRegion
+
+/**
+ * Represents a memory region. The region is defined by a base pointer and a size.
+ * There can exist two regions with the same size (offset) but have a different base pointer. As such the base pointer
+ * is tracked but not printed in the toString method.
+ * @param start 0x1234 in case of mem[R1 + 0x1234] <- ...
+ * @param regionType The type of the region. This is used to distinguish between stack, heap, data and code regions.
+ */
+case class StackRegion(regionIdentifier: String, start: Expr) extends MemoryRegion:
+  override def toString: String = s"Stack(${regionIdentifier}, ${start})"
+  override def hashCode(): Int = start.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case StackRegion(_, start2) => start == start2
+    case _ => false
+  }
+
+case class HeapRegion(regionIdentifier: String, start: Expr) extends MemoryRegion:
+  override def toString: String = s"Heap(${regionIdentifier}, ${start})"
+  override def hashCode(): Int = start.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case HeapRegion(_, start2) => start == start2
+    case _ => false
+  }
+
+case class DataRegion(regionIdentifier: String, start: Expr) extends MemoryRegion:
+  override def toString: String = s"Data(${regionIdentifier}, ${start})"
+
+case class RegionAccess(regionBase: String, start: Expr) extends MemoryRegion:
+  override def toString: String = s"RegionAccess(${regionBase}, ${start})"
 
 // Define a case class to represent a range
 case class RangeKey(var start: BigInt, var end: BigInt)
