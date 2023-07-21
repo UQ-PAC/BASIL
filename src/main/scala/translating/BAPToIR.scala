@@ -3,13 +3,14 @@ package translating
 import bap._
 import ir._
 import specification._
+import scala.collection.mutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 
 class BAPToIR(var program: BAPProgram) {
 
-  private val nameToProcedure: Map[String, Procedure] = Map()
-  private val labelToBlock: Map[String, Block] = Map()
+  private val nameToProcedure: mutable.Map[String, Procedure] = mutable.Map()
+  private val labelToBlock: mutable.Map[String, Block] = mutable.Map()
 
   def translate: Program = {
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
@@ -28,7 +29,7 @@ class BAPToIR(var program: BAPProgram) {
       for (p <- s.out) {
         out.append(p.toIR)
       }
-      val procedure = Procedure(s.name, s.address, blocks, in, out)
+      val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
       procedures.append(procedure)
       nameToProcedure.addOne(s.name, procedure)
     }

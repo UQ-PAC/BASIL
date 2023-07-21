@@ -833,8 +833,8 @@ object ProgramCfg:
                   cfg.addEdge(jmpNode, noReturn)
                   cfg.addEdge(noReturn, funcExitNode)
               }
-
-            case iCall: IndirectCall =>
+            case iCall: IndirectCall => {
+              println(s"Indirect call found: $iCall in ${proc.name}")
 
               // Branch to this call
               cfg.addEdge(precNode, jmpNode, cond)
@@ -843,7 +843,7 @@ object ProgramCfg:
               procToCalls(proc) += jmpNode
               callToNodes(funcEntryNode) += jmpNode
 
-              // R30 is the link register - this stores the address to return to. 
+              // R30 is the link register - this stores the address to return to.
               //  For now just add a node expressing that we are to return to the previous context.
               if (iCall.target.isRegister("R30")) {
                 val returnNode = CfgProcedureReturnNode()
@@ -854,8 +854,7 @@ object ProgramCfg:
 
               // Jump to return location
               iCall.returnTarget match {
-                case Some(retBlock) =>
-                  // Add intermediary return node (split call into call and return)
+                case Some(retBlock) => // Add intermediary return node (split call into call and return)
                   val callRet = CfgCallReturnNode()
                   cfg.addEdge(jmpNode, callRet)
 
@@ -865,11 +864,11 @@ object ProgramCfg:
                   } else {
                     visitBlock(retBlock, callRet, TrueLiteral)
                   }
-                case None => 
-                  val noReturn = CfgCallNoReturnNode()
+                case None => val noReturn = CfgCallNoReturnNode()
                   cfg.addEdge(jmpNode, noReturn)
                   cfg.addEdge(noReturn, funcExitNode)
               }
+            }
             case _ => assert(false, s"unexpected jump encountered, jumps: ${jmps}")
           } // `jmps.head` match
         } // `visitJumps` function

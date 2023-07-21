@@ -49,15 +49,16 @@ class SystemTests extends AnyFunSuite {
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
     val failureMsg = if shouldVerify then "Expected verification success, but got failure."
     else "Expected verification failure, but got success."
-    if (verified != shouldVerify) fail(failureMsg)
-    // finally check that the actual output boogie file matches the expected output boogie file
 
     val expectedOutPath = variationPath + ".expected"
     if (File(expectedOutPath).exists) {
       if (!compareFiles(expectedOutPath, outPath)) {
         info("Warning: Boogie file differs from expected")
       }
+    } else {
+      info("Note: this test has not previously succeeded")
     }
+    if (verified != shouldVerify) fail(failureMsg)
   }
 
   def compareFiles(path1: String, path2: String): Boolean = {

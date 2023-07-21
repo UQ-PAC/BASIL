@@ -22,6 +22,13 @@ for dir in */; do
     if [ ! -f "clang_O2/$name.out" ]; then
         rm -r -d clang_O2
     fi
+    mkdir -p clang_pic
+    clang-15 -fPIC "$name.c" -o "clang_pic/$name.out" -target aarch64-linux-gnu
+    bap "clang_pic/$name.out" -d adt:"clang_pic/$name.adt" -d bir:"clang_pic/$name.bir" --primus-lisp-semantics=disable
+    readelf -s -r -W "clang_pic/$name.out" > "clang_pic/$name.relf"
+    if [ ! -f "clang_pic/$name.out" ]; then
+        rm -r -d clang_pic
+    fi
     mkdir -p gcc
     aarch64-linux-gnu-gcc "$name.c" -o "gcc/$name.out"
     bap "gcc/$name.out" -d adt:"gcc/$name.adt" -d bir:"gcc/$name.bir" --primus-lisp-semantics=disable
@@ -42,6 +49,13 @@ for dir in */; do
     readelf -s -r -W "gcc_O2/$name.out" > "gcc_O2/$name.relf"
     if [ ! -f "gcc_O2/$name.out" ]; then
         rm -r -d gcc_O2
+    fi
+    mkdir -p gcc_pic
+    aarch64-linux-gnu-gcc -fPIC "$name.c" -o "gcc_pic/$name.out"
+    bap "gcc_pic/$name.out" -d adt:"gcc_pic/$name.adt" -d bir:"gcc_pic/$name.bir" --primus-lisp-semantics=disable
+    readelf -s -r -W "gcc_pic/$name.out" > "gcc_pic/$name.relf"
+    if [ ! -f "gcc_pic/$name.out" ]; then
+        rm -r -d gcc_pic
     fi
     echo "done $name"
     cd ../
