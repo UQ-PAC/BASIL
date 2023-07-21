@@ -1,7 +1,8 @@
 package analysis
 
-import ir.{DirectCall, *}
-import analysis.solvers.*
+import ir._
+import analysis.solvers._
+import analysis.lattices._
 import boogie.BExpr
 import specification.SpecGlobal
 

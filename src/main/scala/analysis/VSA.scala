@@ -1,7 +1,8 @@
 package analysis
 
-import ir.{DirectCall, UnaryExpr, *}
-import analysis.solvers.*
+import ir._
+import analysis.solvers._
+import analysis.lattices._
 import boogie.BExpr
 import specification.{InternalFunction, SpecGlobal}
 
@@ -11,7 +12,6 @@ import scala.collection.mutable
 import scala.collection.immutable
 
 /** ValueSets are PowerSet of possible values */
-
 abstract class Value
 class AddressValue(var _expr: Expr, var _name: String) extends Value:
   override def toString: String = {
