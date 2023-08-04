@@ -1,3 +1,4 @@
+set -e
 if [ $# -lt 1 ]; then
   echo "Usage: ./run_c.sh *.out [output.bpl]"
   exit 1

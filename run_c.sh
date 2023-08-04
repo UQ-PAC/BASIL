@@ -1,9 +1,10 @@
+set -e
 if [ $# -lt 1 ]
 then
   echo "Usage: ./run_c.sh *.c [output.bpl]"
   exit 1
 fi
-aarch64-linux-gnu-gcc -fno-plt -fno-pic "$1" -o "$1.out"
+aarch64-linux-gnu-gcc -fno-plt -fno-pic -fno-stack-protector "$1" -o "$1.out"
 bap "$1".out -d adt:"$1.adt"
 readelf "$1".out -r -s -W > "$1.relf"
 
