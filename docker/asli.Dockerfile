@@ -32,15 +32,38 @@ WORKDIR /home/opam
 RUN opam depext --update --install bap.2.5.0 --yes -j 1
 RUN opam install bap.2.5.0 --yes -j 1 \
  && opam clean -acrs 
+USER root
 
 # ====================
 # Bap with ASLi plugin
 # ====================
-FROM bap-upstream.2.5 AS asli-bap
+FROM bap-upstream.2.5 AS aslp-bap
 USER opam
 RUN git clone https://github.com/UQ-PAC/bap-asli-plugin.git
 RUN cd /home/opam/bap-asli-plugin && eval $(opam env) && make
 ENV ASLI_PATH=/home/opam/aslp
+USER root 
+
+# ==================
+# Transplant bap: 
+# ------------------
+# COPY --from=aslp-bap /home/opam/.opam/4.14/bin /home/opam/.opam/4.14/bin
+# COPY --from=aslp-bap /home/opam/.opam/4.14/lib  /home/opam/.opam/4.14/lib
+# COPY --from=aslp-bap /home/opam/.opam/4.14/share /home/opam/.opam/4.14/share
+# COPY --from=aslp-bap /home/opam/aslp/mra_tools /aslp/mra_tools
+# COPY --from=aslp-bap /home/opam/aslp/tests /aslp/tests
+# COPY --from=aslp-bap /home/opam/aslp/asli /aslp/asli 
+# COPY --from=aslp-bap /home/opam/aslp/prelude.asl /aslp/prelude.asl
+# COPY --from=aslp-bap /home/opam/.opam/4.14/lib/z3 /usr/local/lib/z3
+# # opam env
+# ENV CAML_LD_LIBRARY_PATH='/home/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.14/lib/ocaml/stublibs:/home/opam/.opam/4.14/lib/ocaml'
+# ENV OPAM_SWITCH_PREFIX='/home/opam/.opam/4.14'
+# ENV OCAML_TOPLEVEL_PATH='/home/opam/.opam/4.14/lib/toplevel'
+# ENV ASLI_PATH=/aslp/
+# ENV PATH=$PATH:/home/opam/.opam/4.14/bin
+# ------------------
+# Transplanted BAP 
+# ==================
 
 
 # =======================
@@ -62,36 +85,58 @@ RUN cd /basil && sbt assembly
 # ===============
 # BASIL Dev Image 
 # ===============
-FROM scala as basil:dev
-ADD . /basil
-RUN apt-get install --yes clang-14 gcc-aarch64-linux-gnu 
-RUN cd /basil && sbt assembly
-# basil
-COPY --from=basil /basil/target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar /basil/
+FROM basil as basil:dev 
+# use the basil image so sbt cache is full
+RUN rm -rf /basil
+RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-dev yasm m4 \
+  libcurl4-gnutls-dev pkg-config zlib1g-dev cmake ninja-build g++-10 \
+  radare2 z3 libz3-dev llvm-14-dev \
+  re2c \
+  libpcre3-dev \
+  clang-14 gcc-aarch64-linux-gnu \
+  && apt-get clean
 # asli
-COPY --from=asli-bap /home/opam/.opam/4.14/bin /home/opam/.opam/4.14/bin
-COPY --from=asli-bap /home/opam/.opam/4.14/lib  /home/opam/.opam/4.14/lib
-COPY --from=asli-bap /home/opam/aslp/mra_tools /aslp/mra_tools
-COPY --from=asli-bap /home/opam/aslp/tests /aslp/tests
-COPY --from=asli-bap /home/opam/aslp/asli /aslp/asli 
-COPY --from=asli-bap /home/opam/aslp/prelude.asl /aslp/prelude.asl
-COPY --from=asli-bap /home/opam/.opam/4.14/lib/z3 /usr/local/lib/z3
-ENV CAML_LD_LIBRARY_PATH='/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.14/lib/ocaml/stublibs:/home/opam/.opam/4.14/lib/ocaml'
+
+# ==================
+# Transplant bap: 
+# ------------------
+ COPY --from=aslp-bap /home/opam/.opam/4.14/bin /home/opam/.opam/4.14/bin
+ COPY --from=aslp-bap /home/opam/.opam/4.14/lib  /home/opam/.opam/4.14/lib
+ COPY --from=aslp-bap /home/opam/.opam/4.14/share /home/opam/.opam/4.14/share
+ COPY --from=aslp-bap /home/opam/aslp/mra_tools /aslp/mra_tools
+ COPY --from=aslp-bap /home/opam/aslp/tests /aslp/tests
+ COPY --from=aslp-bap /home/opam/aslp/asli /aslp/asli 
+ COPY --from=aslp-bap /home/opam/aslp/prelude.asl /aslp/prelude.asl
+ COPY --from=aslp-bap /home/opam/.opam/4.14/lib/z3 /usr/local/lib/z3
+ # opam env
+ ENV CAML_LD_LIBRARY_PATH='/home/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.14/lib/ocaml/stublibs:/home/opam/.opam/4.14/lib/ocaml'
+ ENV OPAM_SWITCH_PREFIX='/home/opam/.opam/4.14'
+ ENV OCAML_TOPLEVEL_PATH='/home/opam/.opam/4.14/lib/toplevel'
+ ENV ASLI_PATH=/aslp/
+ ENV PATH=$PATH:/home/opam/.opam/4.14/bin
+# ------------------
+# Transplanted BAP 
+# ==================
+
+WORKDIR /basil
+ENV CAML_LD_LIBRARY_PATH='/home/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.14/lib/ocaml/stublibs:/home/opam/.opam/4.14/lib/ocaml'
 ENV ASLI_PATH=/aslp/
 ENV PATH=$PATH:/home/opam/.opam/4.14/bin
-ENTRYPOINT bash 
+ADD scripts/docker/* /bin
 
 # =========
 # BASIL Jar 
 # =========
-FROM ubuntu:23.04 as basil-jar
+FROM ubuntu:23.04 as basil:jar
 RUN apt-get update && apt-get install default-jre-headless curl --yes 
 COPY --from=basil /basil/target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar /basil/
+ADD scripts/docker/* /bin
 ENTRYPOINT java -jar /basil/wptool-boogie-assembly-0.0.1.jar
 
-# ===========================
-# Minimal image for execution 
-# ===========================
+
+# =============
+# Minimal image
+# =============
 FROM ubuntu:23.04 as minified-all 
 RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-dev yasm m4 \
   libcurl4-gnutls-dev pkg-config zlib1g-dev cmake ninja-build g++-10 \
@@ -100,17 +145,25 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
   libpcre3-dev \
   clang-14 gcc-aarch64-linux-gnu \
   && apt-get clean
-COPY --from=basil /basil/target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar /basil/
-COPY --from=asli-bap /home/opam/.opam/4.14/bin /home/opam/.opam/4.14/bin
-COPY --from=asli-bap /home/opam/.opam/4.14/lib  /home/opam/.opam/4.14/lib
-COPY --from=asli-bap /home/opam/aslp/mra_tools /aslp/mra_tools
-COPY --from=asli-bap /home/opam/aslp/tests /aslp/tests
-COPY --from=asli-bap /home/opam/aslp/asli /aslp/asli 
-COPY --from=asli-bap /home/opam/aslp/prelude.asl /aslp/prelude.asl
-
-COPY --from=asli-bap /home/opam/.opam/4.14/lib/z3 /usr/local/lib/z3
-ENV CAML_LD_LIBRARY_PATH='/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.14/lib/ocaml/stublibs:/home/opam/.opam/4.14/lib/ocaml'
-#ENV LD_LIBRARY_PATH="/usr/local/lib/z3:$LD_LIBRARY_PATH"
-ENV ASLI_PATH=/aslp/
-ENV PATH=$PATH:/home/opam/.opam/4.14/bin
-ENTRYPOINT bash 
+# ==================
+# Transplant bap: 
+# ------------------
+ COPY --from=aslp-bap /home/opam/.opam/4.14/bin /home/opam/.opam/4.14/bin
+ COPY --from=aslp-bap /home/opam/.opam/4.14/lib  /home/opam/.opam/4.14/lib
+ COPY --from=aslp-bap /home/opam/.opam/4.14/share /home/opam/.opam/4.14/share
+ COPY --from=aslp-bap /home/opam/aslp/mra_tools /aslp/mra_tools
+ COPY --from=aslp-bap /home/opam/aslp/tests /aslp/tests
+ COPY --from=aslp-bap /home/opam/aslp/asli /aslp/asli 
+ COPY --from=aslp-bap /home/opam/aslp/prelude.asl /aslp/prelude.asl
+ COPY --from=aslp-bap /home/opam/.opam/4.14/lib/z3 /usr/local/lib/z3
+ # opam env
+ ENV CAML_LD_LIBRARY_PATH='/home/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.14/lib/ocaml/stublibs:/home/opam/.opam/4.14/lib/ocaml'
+ ENV OPAM_SWITCH_PREFIX='/home/opam/.opam/4.14'
+ ENV OCAML_TOPLEVEL_PATH='/home/opam/.opam/4.14/lib/toplevel'
+ ENV ASLI_PATH=/aslp/
+ ENV PATH=$PATH:/home/opam/.opam/4.14/bin
+# ------------------
+# Transplanted BAP 
+# ==================
+COPY --from=basil /basil/target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar /target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar
+ADD scripts/docker/* /bin
