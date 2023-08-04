@@ -1,0 +1,28 @@
+services:
+  basil-build:
+    image: basil:build
+    build:
+      context: ..
+      dockerfile: docker/asli.Dockerfile 
+      target: basil
+    volumes:
+      - ../:/host :z
+    working_dir: /host
+  basil-dev:
+    image: basil:dev
+    build:
+      context: ..
+      dockerfile: docker/asli.Dockerfile 
+      target: basil:dev
+    volumes:
+      - ../:/host :z
+    working_dir: /host
+  basil-run:
+    image: basil:mini
+    build:
+      context: ..
+      dockerfile: docker/asli.Dockerfile 
+      target: minified-all
+    volumes:
+      - ../:/host :z
+    working_dir: /host
