@@ -4,6 +4,45 @@
 The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
 
 ## Installation and use
+
+### Using Containers 
+
+The docker config can be used to provide bap with the asli-plugin as well as compile the tool itself.
+
+Requirements:
+
+- podman, podman-compose
+
+Note it is recommended to use `podman` rather than docker.
+
+1. To build the images, from the root of the respository run
+
+```
+podman-compose build
+```
+
+Individual services can be built with `podman compose build $servicename` from the root of the repo. 
+
+The services provided are:
+- `bap`
+   - To invoke bap on its own: `podman-compose run bap`
+- `basil-dev` dev environment containng scala build environment, bap and cross-compilers
+   - To compile basil into the current directory using the sbt and scala provided by the docker image: 
+      - `podman compose run basil-dev sbt assembly`
+   - To enter a shell inside the container
+      - `podman compose run basil-build`
+- `basil-build`
+   - The same as above however containg only the scala build environment and compiled basil
+   - To recompile with the currently checked-out repo run `podman-compose build basil-build`
+   - To enter a shell inside the container
+      - `podman compose run basil-build`
+- `basil` precompiled jar file
+   - To run the jar inside the docker image `podman-compose run basil $arguments...`
+- 
+
+
+### Native
+
 The tool is OS-independent, but producing input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. On Windows, WSL2 can be used to run any Linux-specific tasks.
 
 Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 17](https://openjdk.org/install/) (or higher) is required.
