@@ -26,6 +26,10 @@ ENV PATH=/home/opam/aslp:$PATH
 # ============
 # Bap Upstream 
 # ============
+# It would be more convenient to use the dpkg package, however 
+# it requires old versions of libffi and libtinfo and generally 
+# doesn't support ubuntu well.
+# Opam install is the most reliable way.
 FROM aslp AS bap-upstream.2.5
 USER opam
 WORKDIR /home/opam
@@ -122,7 +126,6 @@ WORKDIR /basil
 ENV CAML_LD_LIBRARY_PATH='/home/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.14/lib/ocaml/stublibs:/home/opam/.opam/4.14/lib/ocaml'
 ENV ASLI_PATH=/aslp/
 ENV PATH=$PATH:/home/opam/.opam/4.14/bin
-ADD scripts/docker/* /bin
 
 # =========
 # BASIL Jar 
@@ -130,7 +133,6 @@ ADD scripts/docker/* /bin
 FROM ubuntu:23.04 as basil:jar
 RUN apt-get update && apt-get install default-jre-headless curl --yes 
 COPY --from=basil /basil/target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar /basil/
-ADD scripts/docker/* /bin
 ENTRYPOINT java -jar /basil/wptool-boogie-assembly-0.0.1.jar
 
 
@@ -166,4 +168,4 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
 # Transplanted BAP 
 # ==================
 COPY --from=basil /basil/target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar /target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar
-ADD scripts/docker/* /bin
+WORKDIR /app

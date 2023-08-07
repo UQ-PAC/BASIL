@@ -24,6 +24,7 @@ podman-compose build
 Individual services can be built with `podman compose build $servicename` from the root of the repo. 
 
 The services provided are:
+
 - `bap`
    - To invoke bap on its own: `podman-compose run bap`
 - `basil-dev` dev environment containng scala build environment, bap and cross-compilers
@@ -38,8 +39,29 @@ The services provided are:
       - `podman compose run basil-build`
 - `basil` precompiled jar file
    - To run the jar inside the docker image `podman-compose run basil $arguments...`
-- 
 
+---
+
+#### Publishing container images to github registry:
+
+- This only needs to be done when the docker images are modified or you wish to 
+make a new version of basil available. Only the dev environment is used 
+by the github actions.
+
+1. Create a github access token with the priviledge to write to packages
+2. Login to repository with podman
+
+```
+$ podman login ghcr.io -u $username
+Password: <enter github acccess token>
+```
+
+3. Push the container
+
+```
+$ podman-compose push basil
+$ podman-compose push basil-dev
+```
 
 ### Native
 

@@ -16,7 +16,7 @@ services:
       - ./:/host:rw
     working_dir: /host
   basil-dev:
-    image: basil:dev
+    image: ghcr.io/uq-pac/basil-dev:latest
     build:
       dockerfile: docker/asli.Dockerfile 
       target: basil:dev
@@ -24,7 +24,7 @@ services:
       - ./:/host:rw
     working_dir: /host
   basil:
-    image: basil:mini
+    image: ghcr.io/uq-pac/basil:latest
     build:
       dockerfile: docker/asli.Dockerfile 
       target: minified-all

@@ -1,20 +1,14 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and support
-# documentation.
-
-name: Scala CI
+name: Scala Compile and Test 
 
 on:
-  push
-  pull_request
+  - push
+  - pull_request
 
 permissions:
   contents: read
 
 jobs:
-  build:
-
+  basil-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -28,4 +22,5 @@ jobs:
     - name: Compile Jar
       run: sbt assembly
     - name: Run tests
+      timeout-minutes: 10
       run: sbt test

@@ -1,0 +1,29 @@
+name: Run Examples 
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      # Requires repo to have action access in package settings
+      # 
+      image: ghcr.io/uq-pac/basil-dev:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.github_token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Test Lift Aslp
+        run: ./liftasli.sh examples/arrays/arrays.c /test.adt /test.relf
+
+      - name: Test Lift 
+        run: ./lift.sh examples/arrays/arrays.c /test.adt /test.relf
+
+      - name: Compile BASIL 
+        run: sbt assembly
+
+      - name: Test run
+        run: ./run_c.sh examples/arrays/arrays.c test.bpl
+
+
