@@ -111,8 +111,13 @@ object RunUtils {
 
     val cfg = ProgramCfg.fromIR(IRProgram, inlineLimit = 0)
 
+    println("[!] Running Constant Propagation")
+    val solver = ConstantPropagationAnalysis.WorklistSolver(cfg)
+    val result = solver.analyze(true).asInstanceOf[Map[CfgNode, Map[Variable, Any]]]
+    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder), "cpa")
+
     println("[!] Running MRA")
-    val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, subroutines)
+    val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, subroutines, result)
     val result2 = solver2.analyze(true).asInstanceOf[Map[CfgNode, MemoryRegion]]
     memoryRegionAnalysisResults = Some(result2)
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder), "mra")
@@ -145,7 +150,7 @@ object RunUtils {
                 case block: Block =>
                   block.jumps = block.jumps.filter(!_.equals(indirectCall))
                   block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head.name)).head, indirectCall.condition, indirectCall.returnTarget)
-                case _ => throw new Exception("Node not found in nodeToBlock map")
+                case null => throw new Exception("Node not found in nodeToBlock map")
             } else {
               functionNames.foreach(addressValue =>
                 commandNode.block match
@@ -156,7 +161,7 @@ object RunUtils {
                     } else {
                       block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(addressValue.name)).head, Option(BinaryExpr(BVEQ, indirectCall.target, addressValue.expr)), indirectCall.returnTarget)
                     }
-                  case _ => throw new Exception("Node not found in nodeToBlock map")
+                  case null => throw new Exception("Node not found in nodeToBlock map")
               )
             }
           case _ =>

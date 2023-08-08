@@ -1,12 +1,14 @@
 package analysis
 
-import ir._
-import analysis.solvers._
+import ir.*
+import analysis.solvers.*
 
 import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
+// import bitVector
+import analysis.util.*
 
 /** Trait for program analyses.
   *
@@ -480,6 +482,7 @@ trait MemoryRegionAnalysisMisc:
   val globals: Map[BigInt, String]
   val globalOffsets: Map[BigInt, BigInt]
   val subroutines: Map[BigInt, String]
+  val constantProp: Map[CfgNode, Map[Variable, Any]]
 
   /** The lattice of abstract values.
    */
@@ -546,41 +549,26 @@ trait MemoryRegionAnalysisMisc:
   def evaluateExpression(exp: Expr, n: CfgNode): Expr = {
       exp match {
         case binOp: BinaryExpr =>
-          binOp.arg1 match {
-            case variable: Variable =>
-              loopEscapeSet.clear()
-              for (pred <- findDecl(variable, n)) {
-                assigmentsMap.get(variable, pred) match
-                  case Some(value) =>
-                    value match
-                      case bitVecLiteral: BitVecLiteral =>
-                        if (!binOp.arg2.isInstanceOf[BitVecLiteral]) {
-                          return exp
-                        }
-                        val calculated: BigInt = bitVecLiteral.value.+(binOp.arg2.asInstanceOf[BitVecLiteral].value)
-                        return BitVecLiteral(calculated, bitVecLiteral.size)
-                      case _ => evaluateExpression(value, pred)
-                  case _ =>
-                    print("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(variable, pred) + " FOR " + binOp + "\n")
-            }
-            case _ => return exp
+          val lhs = evaluateExpression(binOp.arg1, n)
+          val rhs = evaluateExpression(binOp.arg2, n)
+          if (!lhs.isInstanceOf[BitVecLiteral] || !rhs.isInstanceOf[BitVecLiteral]) {
+            return exp
           }
-          exp
-        case memLoad: MemoryLoad =>
-          evaluateExpression(memLoad.index, n)
-        case bitVecLiteral: BitVecLiteral =>
-          bitVecLiteral
+          smt_bvadd(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
         case extend: ZeroExtend =>
-          evaluateExpression(extend.body, n)
-        case variable: Variable =>
-          loopEscapeSet.clear()
-          for (pred <- findDecl(variable, n)) {
-            assigmentsMap(variable, pred) match
-              case bitVecLiteral: BitVecLiteral =>
-                return bitVecLiteral
-              case any:Expr => return evaluateExpression(any, n)
+          evaluateExpression(extend.body, n) match {
+            case literal: Literal =>
+              smt_zero_extend(extend.extension, literal)
+            case _ =>
+              exp
           }
-          exp
+        case variable: Variable =>
+            val nodeResult = constantProp(n).asInstanceOf[Map[Variable, ConstantPropagationLattice.type]]
+            nodeResult(variable).asInstanceOf[ConstantPropagationLattice.Element] match {
+                case ConstantPropagationLattice.FlatElement.FlatEl(value) => value.asInstanceOf[BitVecLiteral]
+                case ConstantPropagationLattice.FlatElement.Top => variable
+                case ConstantPropagationLattice.FlatElement.Bot => variable
+              }
         case _ =>
           //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
           exp
@@ -616,12 +604,12 @@ trait MemoryRegionAnalysisMisc:
                   return lattice.sublattice.lub(tempLattice, Set(RegionAccess(poolMaster(binOp2.arg2).regionIdentifier, rhs)))
               case _ =>
             }
-          Set(StackRegion(getNextStackCount(), binOp.arg2))
-
-        case zeroExtend: ZeroExtend =>
-          eval(zeroExtend.body, env, n)
+            if (rhs.isInstanceOf[Literal]) {
+              Set(StackRegion(getNextStackCount(), rhs))
+            } else {
+              env
+            }
         case memoryLoad: MemoryLoad => // TODO: Pointer access here
-          //eval(memoryLoad.index, memType, env)
           lattice.sublattice.bottom
         case variable: Variable =>
           val eval = evaluateExpression(variable, n)
@@ -636,15 +624,6 @@ trait MemoryRegionAnalysisMisc:
             case _ =>
               lattice.sublattice.bottom
           }
-        case extract: Extract =>
-          eval(extract.body, env, n)
-        case unaryExpr: UnaryExpr =>
-          lattice.sublattice.bottom
-        case signExtend: SignExtend =>
-          eval(signExtend.body, env, n)
-        case bitVecLiteral: BitVecLiteral =>
-          print(s"Saw a bit vector literal ${bitVecLiteral}\n")
-          lattice.sublattice.bottom
         case _ =>
           print(s"type: ${exp.getClass} $exp\n")
           throw new Exception("Unknown type")
@@ -682,7 +661,7 @@ trait MemoryRegionAnalysisMisc:
 
 /** Base class for memory region analysis (non-lifted) lattice.
  */
-abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Map[BigInt, String], val globalOffsets: Map[BigInt, BigInt], val subroutines: Map[BigInt, String]) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
+abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Map[BigInt, String], val globalOffsets: Map[BigInt, BigInt], val subroutines: Map[BigInt, String], val constantProp: Map[CfgNode, Map[Variable, Any]]) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
    */
@@ -690,8 +669,8 @@ abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Map[BigInt
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: ProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String], val powersetLattice: L)
-  extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines)
+abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: ProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String], constantProp: Map[CfgNode, Map[Variable, Any]], val powersetLattice: L)
+  extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
   with SimpleMonotonicSolver[CfgNode]
   with ForwardDependencies
 
@@ -699,5 +678,5 @@ object MemoryRegionAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
    */
-  class WorklistSolver(cfg: ProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String])
-    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, globalOffsets, subroutines, PowersetLattice[MemoryRegion])
+  class WorklistSolver(cfg: ProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String], constantProp: Map[CfgNode, Map[Variable, Any]])
+    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, globalOffsets, subroutines, constantProp, PowersetLattice[MemoryRegion])
