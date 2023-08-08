@@ -453,8 +453,6 @@ case class RegionAccess(regionBase: String, start: Expr) extends MemoryRegion:
 
 trait MemoryRegionAnalysisMisc:
 
-  val assigmentsMap: mutable.HashMap[(Expr, CfgNode), Expr] = mutable.HashMap.empty
-
   var mallocCount: Int = 0
   var stackCount: Int = 0
   var stackPool: mutable.Map[Expr, StackRegion] = mutable.HashMap()
@@ -501,44 +499,6 @@ trait MemoryRegionAnalysisMisc:
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
 
   private val mallocVariable = Variable("R0", BitVecType(64))
-
-  private val loopEscapeSet: mutable.Set[CfgNode] = mutable.Set.empty
-
-  def loopEscape(n: CfgNode): Boolean = {
-    if (loopEscapeSet.contains(n)) {
-      return true
-    }
-    loopEscapeSet.add(n)
-    false
-  }
-
-  /** Find decl of variables from node predecessors */
-  def findDecl(variable: Variable, n: CfgNode): mutable.ListBuffer[CfgNode] = {
-    val decls: mutable.ListBuffer[CfgNode] = mutable.ListBuffer.empty
-    // if we have a temporary variable then ignore it
-    if (variable.name.contains("#")) {
-      return decls
-    }
-    for (pred <- n.pred(intra = false)) {
-      if (loopEscape(pred)) {
-        return mutable.ListBuffer.empty
-      }
-      pred match {
-        case cmd: CfgCommandNode =>
-          cmd.data match {
-            case localAssign: LocalAssign =>
-              if (localAssign.lhs == variable) {
-                decls.addOne(pred)
-              } else {
-                decls.addAll(findDecl(variable, pred))
-              }
-            case _ =>
-          }
-        case _ =>
-      }
-    }
-    decls
-  }
 
   /**
    * Evaluate an expression in a hope of finding a global variable.
@@ -638,9 +598,7 @@ trait MemoryRegionAnalysisMisc:
         cmd.data match {
           case directCall: DirectCall =>
             if (directCall.target.name == "malloc") {
-              val decl = findDecl(mallocVariable, n).headOption
-              val recentMallocSize = assigmentsMap.get(mallocVariable, decl.get).get
-              return lattice.sublattice.lub(s, Set(HeapRegion(getNextMallocCount(), recentMallocSize)))
+              return lattice.sublattice.lub(s, Set(HeapRegion(getNextMallocCount(), evaluateExpression(mallocVariable, n))))
             }
             s
           case memAssign: MemoryAssign =>
@@ -648,11 +606,6 @@ trait MemoryRegionAnalysisMisc:
               return s
             }
             lattice.sublattice.lub(s, eval(memAssign.rhs.index, s, n))
-          // local assign is just lhs assigned to rhs we only need this information to track a prior register operation
-          // AKA: R1 <- R1 + 8; mem(R1) <- 0x1234
-          case localAssign: LocalAssign =>
-            assigmentsMap.addOne((localAssign.lhs, n) -> evaluateExpression(localAssign.rhs, n))
-              s
           case _ => s
         }
       case _ => s // ignore other kinds of nodes
