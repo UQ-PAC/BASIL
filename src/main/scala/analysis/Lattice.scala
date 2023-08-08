@@ -85,10 +85,20 @@ class PowersetLattice[A] extends Lattice {
   */
 class FlatLattice[X] extends Lattice:
 
-  enum FlatElement:
-    case FlatEl(el: X)
-    case Top
-    case Bot
+  sealed trait FlatElement
+
+  object FlatElement:
+    case class FlatEl(el: X) extends FlatElement
+
+    case object Top extends FlatElement
+
+    case object Bot extends FlatElement
+
+    // Factory method to create FlatEl
+    def apply(x: X): FlatEl = FlatEl(x)
+
+    // Extraction/unapply method for pattern matching
+    def unapply(arg: FlatEl): Option[X] = Some(arg.el)
 
   type Element = FlatElement
 
