@@ -98,6 +98,7 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
   re2c \
   libpcre3-dev \
   clang-14 gcc-aarch64-linux-gnu \
+  boogie \
   && apt-get clean
 # asli
 
@@ -146,6 +147,7 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
   re2c \
   libpcre3-dev \
   clang-14 gcc-aarch64-linux-gnu \
+  boogie \
   && apt-get clean
 # ==================
 # Transplant bap: 
