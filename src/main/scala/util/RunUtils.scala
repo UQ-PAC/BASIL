@@ -23,57 +23,51 @@ object RunUtils {
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
 
-  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
-
-    val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
+  def loadBAP(filename: String): BAPProgram = {
+    val adtLexer = BilAdtLexer(CharStreams.fromFileName(filename))
     val tokens = CommonTokenStream(adtLexer)
     val parser = BilAdtParser(tokens)
 
     parser.setBuildParseTree(true)
 
-    val program = AdtStatementLoader.visitProject(parser.project())
+    AdtStatementLoader.visitProject(parser.project())
+  }
 
-    val elfLexer = SymsLexer(CharStreams.fromFileName(elfFileName))
+  def loadReadELF(filename: String): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt]) = {
+    val elfLexer = SymsLexer(CharStreams.fromFileName(filename))
     val elfTokens = CommonTokenStream(elfLexer)
     val elfParser = SymsParser(elfTokens)
     elfParser.setBuildParseTree(true)
+    ElfLoader.visitSyms(elfParser.syms())
+  }
 
-    val (externalFunctions, globals, globalOffsets) = ElfLoader.visitSyms(elfParser.syms())
-
-    //println(globalOffsets)
-    //val procmap = program.subroutines.map(s => (s.name, s.address)).toMap
-    //println(procmap)
-    //println(globals)
-    /*
-    TODO analyses/transformations
-    -type checking
-    -make sure there's no sneaky stack accesses
-    -constant propagation to properly analyse control flow and replace all indirect calls
-    -identify external calls
-    -check for use of uninitialised registers in procedures to pass them in
-    -points to/alias analysis to split memory into separate maps as much as possible? do we want this?
-    -make memory reads better?
-     */
-
-    val externalNames = externalFunctions.map(e => e.name)
-
-    val IRTranslator = BAPToIR(program)
-    var IRProgram = IRTranslator.translate
-
-    val specification = specFileName match {
+  def loadSpecification(filename: Option[String], program: Program, globals: Set[SpecGlobal]): Specification = {
+    filename match {
       case Some(s) => val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
         val specTokens = CommonTokenStream(specLexer)
         val specParser = SpecificationsParser(specTokens)
         specParser.setBuildParseTree(true)
-        val specLoader = SpecificationLoader(globals, IRProgram)
+        val specLoader = SpecificationLoader(globals, program)
         specLoader.visitSpecification(specParser.specification())
       case None => Specification(globals, Map(), List(), List(), List())
     }
+  }
+
+  def loadAndTranslate(BAPFileName: String, readELFFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
+    val bapProgram = loadBAP(BAPFileName)
+
+    val (externalFunctions, globals, globalOffsets) = loadReadELF(readELFFileName)
+
+    val IRTranslator = BAPToIR(bapProgram)
+    var IRProgram = IRTranslator.translate
+
+    val specification = loadSpecification(specFileName, IRProgram, globals)
 
     if (performInterpret) {
       Interpret(IRProgram)
     }
 
+    val externalNames = externalFunctions.map(e => e.name)
     val externalRemover = ExternalRemover(externalNames)
     val renamer = Renamer(reserved)
     IRProgram = externalRemover.visitProgram(IRProgram)

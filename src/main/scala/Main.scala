@@ -31,6 +31,6 @@ import scala.sys.process._
   }
   val performAnalysis = options.nonEmpty && options.contains("-analyse")
   val performInterpret = options.nonEmpty && options.contains("-interpret")
-  val program: BProgram = RunUtils.generateVCsAdt(fileName, elfFileName, specFileName, performAnalysis, performInterpret)
+  val program: BProgram = RunUtils.loadAndTranslate(fileName, elfFileName, specFileName, performAnalysis, performInterpret)
   RunUtils.writeToFile(program, outFileName)
 }
