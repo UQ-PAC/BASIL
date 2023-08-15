@@ -12,7 +12,7 @@ import analysis.*
  * @return: The evaluated expression (e.g. 0x69632) */
 def evaluateExpression(exp: Expr, n: CfgNode, constantProp: Map[CfgNode, Map[Variable, Any]]): Expr = {
   exp match {
-    case binOp: BinaryExpr => 
+    case binOp: BinaryExpr =>
       val lhs = evaluateExpression(binOp.arg1, n, constantProp)
       val rhs = evaluateExpression(binOp.arg2, n, constantProp)
       if (!lhs.isInstanceOf[BitVecLiteral] || !rhs.isInstanceOf[BitVecLiteral]) {
@@ -21,6 +21,8 @@ def evaluateExpression(exp: Expr, n: CfgNode, constantProp: Map[CfgNode, Map[Var
       binOp.op match
         case BVADD => smt_bvadd(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
         case BVSUB => smt_bvsub(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
+        case BVASHR => smt_bvashr(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
+        case BVCOMP => smt_bvcomp(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
         case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
     case extend: ZeroExtend => evaluateExpression(extend.body, n, constantProp) match {
       case literal: Literal => smt_zero_extend(extend.extension, literal)

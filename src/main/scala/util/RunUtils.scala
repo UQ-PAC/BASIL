@@ -127,7 +127,7 @@ object RunUtils {
     mmm.convertMemoryRegions(result2, externalAddresses)
 
     println("[!] Running VSA")
-    val solver3 = ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm)
+    val solver3 = ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, result)
     val result3 = solver3.analyze(false)
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
 
