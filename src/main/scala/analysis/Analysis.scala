@@ -500,95 +500,104 @@ trait MemoryRegionAnalysisMisc:
 
   private val mallocVariable = Variable("R0", BitVecType(64))
 
-  /**
-   * Evaluate an expression in a hope of finding a global variable.
-   * @param exp: The expression to evaluate (e.g. R1 + 0x1234)
-   * @param n: The node where the expression is evaluated (e.g. mem[R1 + 0x1234] <- ...)
-   * @return: The evaluated expression (e.g. 0x69632)
-   */
-  def evaluateExpression(exp: Expr, n: CfgNode): Expr = {
-      exp match {
-        case binOp: BinaryExpr =>
-          val lhs = evaluateExpression(binOp.arg1, n)
-          val rhs = evaluateExpression(binOp.arg2, n)
-          if (!lhs.isInstanceOf[BitVecLiteral] || !rhs.isInstanceOf[BitVecLiteral]) {
-            return exp
-          }
-          smt_bvadd(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
-        case extend: ZeroExtend =>
-          evaluateExpression(extend.body, n) match {
-            case literal: Literal =>
-              smt_zero_extend(extend.extension, literal)
-            case _ =>
-              exp
-          }
-        case variable: Variable =>
-            val nodeResult = constantProp(n).asInstanceOf[Map[Variable, ConstantPropagationLattice.type]]
-            nodeResult(variable).asInstanceOf[ConstantPropagationLattice.Element] match {
-                case ConstantPropagationLattice.FlatElement.FlatEl(value) => value.asInstanceOf[BitVecLiteral]
-                case ConstantPropagationLattice.FlatElement.Top => variable
-                case ConstantPropagationLattice.FlatElement.Bot => variable
-              }
-        case _ =>
-          //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
-          exp
-      }
-  }
 
-
-  /** Default implementation of eval.
+    /** Default implementation of eval.
    */
   def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
+    println(s"evaluating $exp")
+    println(s"env: $env")
+    println(s"n: $n")
       exp match {
         case binOp: BinaryExpr =>
-            val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
-            val rhs: Expr = evaluateExpression(binOp.arg2, n)
-            lhs match {
-              case bitVecLiteral: BitVecLiteral =>
-                if (globals.contains(bitVecLiteral.value)) {
-                  var tempLattice: lattice.sublattice.Element = env
-                  val globalName = globals(bitVecLiteral.value)
-                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(globalName, bitVecLiteral)))
-                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(globalName, binOp.arg2)))
-                } else if (subroutines.contains(bitVecLiteral.value)) {
-                  var tempLattice: lattice.sublattice.Element = env
-                  val subroutineName = subroutines(bitVecLiteral.value)
-                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(subroutineName, bitVecLiteral)))
-                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(subroutineName, binOp.arg2)))
-                }
-              case binOp2: BinaryExpr =>
-                  // special case: we do not want to get a unique stack name so we try to find it in the pool
-                  print("Warning: fragile code! Assumes array by default due to double binary operation\n")
-                  var tempLattice: lattice.sublattice.Element = env
-                  tempLattice = lattice.sublattice.lub(tempLattice, Set(poolMaster(binOp2.arg2)))
-                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(poolMaster(binOp2.arg2).regionIdentifier, rhs)))
-              case _ =>
-            }
-            if (rhs.isInstanceOf[Literal]) {
-              Set(StackRegion(getNextStackCount(), rhs))
+            if (binOp.arg1 == stackPointer) {
+              val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp)
+              Set(StackRegion(getNextStackCount(), binOp.arg2))
             } else {
-              env
-            }
-        case memoryLoad: MemoryLoad => // TODO: Pointer access here
-          lattice.sublattice.bottom
-        case variable: Variable =>
-          val eval = evaluateExpression(variable, n)
-          eval match {
-            case literal: BitVecLiteral =>
-              if (globals.contains(literal.value)) {
-                return Set(DataRegion(globals(literal.value), literal))
-              } else if (subroutines.contains(literal.value)) {
-                return Set(DataRegion(subroutines(literal.value), literal))
+              val evaluation: Expr = evaluateExpression(binOp, n, constantProp)
+              if (evaluation.equals(binOp)) {
+                return env
               }
-              lattice.sublattice.bottom
-            case _ =>
-              lattice.sublattice.bottom
+              eval(evaluation, env, n)
+            }
+        case bitVecLiteral: BitVecLiteral =>
+          if (globals.contains(bitVecLiteral.value)) {
+            val globalName = globals(bitVecLiteral.value)
+            Set(DataRegion(globalName, bitVecLiteral))
+          } else if (subroutines.contains(bitVecLiteral.value)) {
+            val subroutineName = subroutines(bitVecLiteral.value)
+            Set(DataRegion(subroutineName, bitVecLiteral))
+          } else {
+            throw new Exception("Unknown type")
           }
+        case variable: Variable =>
+          if (variable.name.contains("#")) {
+            return env
+          }
+            val evaluation: Expr = evaluateExpression(variable, n, constantProp)
+            evaluation match
+              case bitVecLiteral: BitVecLiteral =>
+                eval(bitVecLiteral, env, n)
+              case _ => throw new Exception("Cannot resolve variable")
         case _ =>
           print(s"type: ${exp.getClass} $exp\n")
           throw new Exception("Unknown type")
       }
   }
+
+//  /** Default implementation of eval.
+//   */
+//  def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
+//      exp match {
+//        case binOp: BinaryExpr =>
+//            val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n, constantProp)
+//            val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp)
+//            val evaluated: Expr = evaluateExpression(binOp, n, constantProp)
+//            lhs match {
+//              case bitVecLiteral: BitVecLiteral =>
+//                if (globals.contains(bitVecLiteral.value)) {
+//                  var tempLattice: lattice.sublattice.Element = env
+//                  val globalName = globals(bitVecLiteral.value)
+//                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(globalName, bitVecLiteral)))
+//                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(globalName, binOp.arg2)))
+//                } else if (subroutines.contains(bitVecLiteral.value)) {
+//                  var tempLattice: lattice.sublattice.Element = env
+//                  val subroutineName = subroutines(bitVecLiteral.value)
+//                  tempLattice = lattice.sublattice.lub(tempLattice, Set(DataRegion(subroutineName, bitVecLiteral)))
+//                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(subroutineName, binOp.arg2)))
+//                }
+//              case binOp2: BinaryExpr =>
+//                  // special case: we do not want to get a unique stack name so we try to find it in the pool
+//                  print("Warning: fragile code! Assumes array by default due to double binary operation\n")
+//                  var tempLattice: lattice.sublattice.Element = env
+//                  tempLattice = lattice.sublattice.lub(tempLattice, Set(poolMaster(binOp2.arg2)))
+//                  return lattice.sublattice.lub(tempLattice, Set(RegionAccess(poolMaster(binOp2.arg2).regionIdentifier, rhs)))
+//              case _ =>
+//            }
+//            if (rhs.isInstanceOf[Literal]) {
+//              Set(StackRegion(getNextStackCount(), rhs))
+//            } else {
+//              env
+//            }
+//        case memoryLoad: MemoryLoad => // TODO: Pointer access here
+//          lattice.sublattice.bottom
+//        case variable: Variable =>
+//          val eval = evaluateExpression(variable, n, constantProp)
+//          eval match {
+//            case literal: BitVecLiteral =>
+//              if (globals.contains(literal.value)) {
+//                return Set(DataRegion(globals(literal.value), literal))
+//              } else if (subroutines.contains(literal.value)) {
+//                return Set(DataRegion(subroutines(literal.value), literal))
+//              }
+//              lattice.sublattice.bottom
+//            case _ =>
+//              lattice.sublattice.bottom
+//          }
+//        case _ =>
+//          print(s"type: ${exp.getClass} $exp\n")
+//          throw new Exception("Unknown type")
+//      }
+//  }
 
   /** Transfer function for state lattice elements.
    */
@@ -598,7 +607,7 @@ trait MemoryRegionAnalysisMisc:
         cmd.data match {
           case directCall: DirectCall =>
             if (directCall.target.name == "malloc") {
-              return lattice.sublattice.lub(s, Set(HeapRegion(getNextMallocCount(), evaluateExpression(mallocVariable, n))))
+              return lattice.sublattice.lub(s, Set(HeapRegion(getNextMallocCount(), evaluateExpression(mallocVariable, n, constantProp))))
             }
             s
           case memAssign: MemoryAssign =>
