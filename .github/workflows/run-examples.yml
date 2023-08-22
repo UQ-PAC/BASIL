@@ -26,4 +26,8 @@ jobs:
       - name: Test run
         run: ./run_c.sh examples/arrays/arrays.c test.bpl
 
+      - name: Bitvec Tests
+        run: sbt "testOnly BitVectorAnalysisTests"
+
+
 
