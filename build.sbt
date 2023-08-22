@@ -42,7 +42,7 @@ updateExpected := {
         val resultPath = v / (name + "_result.txt")
         if (resultPath.exists()) {
           val result = IO.read(resultPath)
-          val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
+          val verified = result.trim().equals("Boogie program verifier finished with 0 errors")
           if (verified == shouldVerify && outPath.exists()) {
             IO.copyFile(outPath, expectedPath)
           }
