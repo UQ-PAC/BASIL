@@ -38,10 +38,36 @@ RUN opam install bap.2.5.0 --yes -j 1 \
  && opam clean -acrs 
 USER root
 
+# ============
+# Bap Pac 
+# ============
+# It would be more convenient to use the dpkg package, however 
+# it requires old versions of libffi and libtinfo and generally 
+# doesn't support ubuntu well.
+# Opam install is the most reliable way.
+FROM ocaml/opam:ubuntu-23.04-ocaml-4.14 AS aslp-bap
+USER root
+# Install system dependencies
+RUN apt-get update && apt-get install -y python3 libgmp-dev yasm m4 \
+  libcurl4-gnutls-dev pkg-config zlib1g-dev cmake ninja-build g++-10 \
+  radare2 z3 libz3-dev llvm-14-dev \
+  re2c \
+  libpcre3-dev
+USER opam
+WORKDIR /home/opam
+RUN git clone https://github.com/UQ-PAC/bap.git 
+RUN cd bap && eval $(opam env) && ./configure --enable-everything \
+    --disable-ghidra --prefix=`opam var prefix` \
+    --with-llvm-version=14 --with-llvm-config=llvm-config-14 \
+    && make && make reinstall \
+ && opam clean -acrs 
+USER root
+
+
 # ====================
 # Bap with ASLi plugin
 # ====================
-FROM bap-upstream.2.5 AS aslp-bap
+FROM bap-upsteam.2.5 AS aslp-bap-upstream
 USER opam
 RUN git clone https://github.com/UQ-PAC/bap-asli-plugin.git
 RUN cd /home/opam/bap-asli-plugin && eval $(opam env) && make
