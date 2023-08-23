@@ -6,7 +6,7 @@ The BAP-to-Boogie Translator generates semantically equivalent Boogie source fil
 ## Installation and use
 The tool is OS-independent, but producing input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. On Windows, WSL2 can be used to run any Linux-specific tasks.
 
-Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 8](https://openjdk.org/install/) (or higher) is required.
+Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 17](https://openjdk.org/install/) (or higher) is required.
 
 The tool takes as inputs a BAP ADT file (here denoted with `.adt`) and a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.
 
