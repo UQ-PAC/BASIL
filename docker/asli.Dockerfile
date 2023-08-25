@@ -55,9 +55,18 @@ RUN apt-get update && apt-get install -y python3 libgmp-dev yasm m4 \
   libpcre3-dev
 USER opam
 WORKDIR /home/opam
+#RUN eval $(opam env) && opam pin add z3 4.8.7 --yes -n   
+RUN eval $(opam env) && opam depext --install z3 -j1  # this is a separate stage since it takes a very long time to build
+RUN eval $(opam env) \
+ && opam pin add bap https://github.com/UQ-PAC/bap.git --yes -n \
+ && opam pin add asli https://github.com/UQ-PAC/asl-interpreter.git --yes -n \ 
+ && opam install --yes --deps-only bap
 RUN git clone https://github.com/UQ-PAC/bap.git 
-RUN cd bap && eval $(opam env) && ./configure --enable-everything \
-    --disable-ghidra --prefix=`opam var prefix` \
+RUN cd bap && eval $(opam env) && opam install oasis \ 
+    &&  opam install ./opam --deps-only  -j1 \
+    && ./configure --enable-everything \
+    --disable-ghidra --disable-radare2 --disable-primus-symbolic-executor \
+    --prefix=`opam var prefix` \
     --with-llvm-version=14 --with-llvm-config=llvm-config-14 \
     && make && make reinstall \
  && opam clean -acrs 
@@ -123,7 +132,7 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
   radare2 z3 libz3-dev llvm-14-dev \
   re2c \
   libpcre3-dev \
-  clang-14 gcc-aarch64-linux-gnu \
+  clang-14 clang-15 gcc-aarch64-linux-gnu \
   boogie \
   && apt-get clean
 # asli
@@ -134,10 +143,6 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
  COPY --from=aslp-bap /home/opam/.opam/4.14/bin /home/opam/.opam/4.14/bin
  COPY --from=aslp-bap /home/opam/.opam/4.14/lib  /home/opam/.opam/4.14/lib
  COPY --from=aslp-bap /home/opam/.opam/4.14/share /home/opam/.opam/4.14/share
- COPY --from=aslp-bap /home/opam/aslp/mra_tools /aslp/mra_tools
- COPY --from=aslp-bap /home/opam/aslp/tests /aslp/tests
- COPY --from=aslp-bap /home/opam/aslp/asli /aslp/asli 
- COPY --from=aslp-bap /home/opam/aslp/prelude.asl /aslp/prelude.asl
  COPY --from=aslp-bap /home/opam/.opam/4.14/lib/z3 /usr/local/lib/z3
  # opam env
  ENV CAML_LD_LIBRARY_PATH='/home/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.14/lib/ocaml/stublibs:/home/opam/.opam/4.14/lib/ocaml'
@@ -154,14 +159,6 @@ ENV CAML_LD_LIBRARY_PATH='/home/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.
 ENV ASLI_PATH=/aslp/
 ENV PATH=$PATH:/home/opam/.opam/4.14/bin
 
-# =========
-# BASIL Jar 
-# =========
-FROM ubuntu:23.04 as basil:jar
-RUN apt-get update && apt-get install default-jre-headless curl --yes 
-COPY --from=basil /basil/target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar /basil/
-ENTRYPOINT java -jar /basil/wptool-boogie-assembly-0.0.1.jar
-
 
 # =============
 # Minimal image
@@ -172,7 +169,7 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
   radare2 z3 libz3-dev llvm-14-dev \
   re2c \
   libpcre3-dev \
-  clang-14 gcc-aarch64-linux-gnu \
+  clang-14 clang-15 gcc-aarch64-linux-gnu \
   boogie \
   && apt-get clean
 # ==================
@@ -181,16 +178,11 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
  COPY --from=aslp-bap /home/opam/.opam/4.14/bin /home/opam/.opam/4.14/bin
  COPY --from=aslp-bap /home/opam/.opam/4.14/lib  /home/opam/.opam/4.14/lib
  COPY --from=aslp-bap /home/opam/.opam/4.14/share /home/opam/.opam/4.14/share
- COPY --from=aslp-bap /home/opam/aslp/mra_tools /aslp/mra_tools
- COPY --from=aslp-bap /home/opam/aslp/tests /aslp/tests
- COPY --from=aslp-bap /home/opam/aslp/asli /aslp/asli 
- COPY --from=aslp-bap /home/opam/aslp/prelude.asl /aslp/prelude.asl
  COPY --from=aslp-bap /home/opam/.opam/4.14/lib/z3 /usr/local/lib/z3
  # opam env
  ENV CAML_LD_LIBRARY_PATH='/home/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.14/lib/ocaml/stublibs:/home/opam/.opam/4.14/lib/ocaml'
  ENV OPAM_SWITCH_PREFIX='/home/opam/.opam/4.14'
  ENV OCAML_TOPLEVEL_PATH='/home/opam/.opam/4.14/lib/toplevel'
- ENV ASLI_PATH=/aslp/
  ENV PATH=$PATH:/home/opam/.opam/4.14/bin
 # ------------------
 # Transplanted BAP 

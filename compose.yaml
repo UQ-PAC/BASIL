@@ -31,11 +31,3 @@ services:
     volumes:
       - ./:/host:rw
     working_dir: /host
-  basil-jar:
-    image: basil:jar
-    build:
-      dockerfile: docker/asli.Dockerfile 
-      target: basil:jar 
-    volumes:
-      - ./:/host:rw
-    working_dir: /host
