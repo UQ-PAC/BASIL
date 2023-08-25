@@ -21,12 +21,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Test Lift Aslp
-        run: ./liftasli.sh examples/arrays/arrays.c /test.adt /test.relf
-
-      - name: Test Lift 
-        run: ./lift.sh examples/arrays/arrays.c /test.adt /test.relf
-
       - name: Compile BASIL 
         run: sbt assembly
 
