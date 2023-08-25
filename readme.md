@@ -37,8 +37,8 @@ The services provided are:
    - To recompile with the currently checked-out repo run `podman-compose build basil-build`
    - To enter a shell inside the container
       - `podman compose run basil-build`
-- `basil` precompiled jar file
-   - To run the jar inside the docker image `podman-compose run basil $arguments...`
+- `basil` precompiled jar file and tools
+   - To run the jar inside the docker image `podman-compose run basil-dev $arguments...`
 
 ---
 

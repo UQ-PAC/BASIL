@@ -15,3 +15,11 @@ The provided compose targets are
 - basil
     - a smaller container containng just the, bap, basil and cross-compiler binaries
 
+---
+
+Compiling godbolt container
+
+```
+podman build -f docker/godbolt.Dockerfile -t ghcr.io/uq-pac/basil-compiler-explorer:latest
+podman push ghcr.io/uq-pac/basil-compiler-explorer:latest
+```
