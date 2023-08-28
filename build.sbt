@@ -8,6 +8,7 @@ val javaTests = "com.novocode" % "junit-interface" % "0.11" % "test"
 val scalaTests = "org.scalatest" %% "scalatest" % "3.2.10" % "test"
 val scalactic = "org.scalactic" %% "scalactic" % "3.2.10"
 val antlrRuntime = "org.antlr" % "antlr4-runtime" % "4.9.3"
+val sourceCode = "com.lihaoyi" %% "sourcecode" % "0.3.0" 
 
 lazy val root = project
   .in(file("."))
@@ -21,7 +22,8 @@ lazy val root = project
     libraryDependencies += javaTests,
     libraryDependencies += antlrRuntime,
     libraryDependencies += scalactic,
-    libraryDependencies += scalaTests
+    libraryDependencies += scalaTests,
+    libraryDependencies += sourceCode
   )
 
 lazy val updateExpected = taskKey[Unit]("updates .expected for test cases")
