@@ -9,8 +9,14 @@ import scala.collection.mutable.{ArrayBuffer, Set}
 import scala.collection.{immutable, mutable}
 import scala.language.postfixOps
 import scala.sys.process._
+import util.*
+import logging.*
 
 @main def main(fileName: String, elfFileName: String, options: String*): Unit = {
+
+  Logger.setLevel(LogLevel.DEBUG)
+
+
   val specFileName: Option[String] = if (options.nonEmpty && options.head.endsWith(".spec")) {
     Some(options.head)
   } else {

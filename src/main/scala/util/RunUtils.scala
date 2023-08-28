@@ -17,6 +17,9 @@ import analysis.solvers._
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
+
+import logging.Logger
+
 object RunUtils {
   var memoryRegionAnalysisResults: Option[Map[CfgNode, _]] = None
 
@@ -87,14 +90,14 @@ object RunUtils {
     val subroutines = IRProgram.procedures.filter(p => p.address.isDefined).map{(p: Procedure) => BigInt(p.address.get) -> p.name}.toMap
     val globalAddresses = globals.map{(s: SpecGlobal) => s.address -> s.name}.toMap
     val externalAddresses = externalFunctions.map{(e: ExternalFunction) => e.offset -> e.name}.toMap
-    println("Globals:" )
-    println(globalAddresses)
-    println("Global Offsets: ")
-    println(globalOffsets)
-    println("External: ")
-    println(externalAddresses)
-    println("Subroutine Addresses:")
-    println(subroutines)
+    Logger.info("Globals:" )
+    Logger.info(globalAddresses)
+    Logger.info("Global Offsets: ")
+    Logger.info(globalOffsets)
+    Logger.info("External: ")
+    Logger.info(externalAddresses)
+    Logger.info("Subroutine Addresses:")
+    Logger.info(subroutines)
     //    val wcfg = IntraproceduralProgramCfg.generateFromProgram(program)
     //
     ////    //print(wcfg.nodes)
@@ -226,20 +229,20 @@ object RunUtils {
         case globalAddress: GlobalAddress =>
           if (nameExists(globalAddress.name)) {
             functionNames += globalAddress
-            println(s"RESOLVED: Call to Global address ${globalAddress.name} resolved.")
+            Logger.info(s"RESOLVED: Call to Global address ${globalAddress.name} resolved.")
           } else {
             addFakeProcedure(globalAddress.name)
             functionNames += globalAddress
-            println(s"Global address ${globalAddress.name} does not exist in the program.  Added a fake function.")
+            Logger.info(s"Global address ${globalAddress.name} does not exist in the program.  Added a fake function.")
           }
         case localAddress: LocalAddress =>
           if (nameExists(localAddress.name)) {
             functionNames += localAddress
-            println(s"RESOLVED: Call to Local address ${localAddress.name}")
+            Logger.info(s"RESOLVED: Call to Local address ${localAddress.name}")
           } else {
             addFakeProcedure(localAddress.name)
             functionNames += localAddress
-            println(s"Local address ${localAddress.name} does not exist in the program. Added a fake function.")
+            Logger.info(s"Local address ${localAddress.name} does not exist in the program. Added a fake function.")
           }
         case _ =>
       }
@@ -255,7 +258,7 @@ object RunUtils {
       writer.flush()
       writer.close()
     } catch {
-      case _: IOException => System.err.println("Error writing to file.")
+      case _: IOException => Logger.error("Error writing to file.")
     }
   }
 

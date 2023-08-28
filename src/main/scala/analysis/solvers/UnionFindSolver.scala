@@ -1,6 +1,7 @@
 package analysis.solvers
 
 import scala.collection.mutable
+import logging.Logger
 
 /**
   * Unification solver based on union-find.
@@ -20,7 +21,7 @@ class UnionFindSolver[A] {
     * When unifying a variable and a non-variable term, the non-variable term has higher priority for becoming the representative.
     */
   def unify(t1: Term[A], t2: Term[A]): Unit = {
-    print(s"Unifying $t1 and $t2")
+    Logger.debug(s"Unifying $t1 and $t2")
 
     mkSet(t1)
     mkSet(t2)
@@ -40,7 +41,7 @@ class UnionFindSolver[A] {
         mkUnion(f1, f2)
         f1.args.zip(f2.args).foreach {
           case (a1, a2) =>
-            print(s"Unifying subterms $a1 and $a2")
+            Logger.debug(s"Unifying subterms $a1 and $a2")
             unify(a1, a2)
         }
       case (x, y) =>

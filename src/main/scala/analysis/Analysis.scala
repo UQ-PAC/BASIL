@@ -7,6 +7,7 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
+import logging.Logger
 
 /** Trait for program analyses.
   *
@@ -196,7 +197,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   val constantPropResult2: Map[CfgNode, _] = constantPropResult
 
   constantPropResult2.values.foreach(v =>
-    print(v)
+    Logger.info(s"${v}")
   )
 
   /**
@@ -310,7 +311,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   }
 
   private def unify(t1: Term[StTerm], t2: Term[StTerm]): Unit = {
-    //print(s"univfying constraint $t1 = $t2\n")
+    //Logger.info(s"univfying constraint $t1 = $t2\n")
     solver.unify(t1, t2) // note that unification cannot fail, because there is only one kind of term constructor and no constants
   }
 
@@ -320,8 +321,8 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   def pointsTo(): Map[Object, Set[Object]] = {
     val solution = solver.solution()
     val unifications = solver.unifications()
-    print(s"Solution: \n${solution.mkString(",\n")}\n")
-    print(s"Sets: \n${unifications.values.map { s =>
+    Logger.debug(s"Solution: \n${solution.mkString(",\n")}\n")
+    Logger.debug(s"Sets: \n${unifications.values.map { s =>
       s"{ ${s.mkString(",")} }"
     }.mkString(", ")}")
 
@@ -335,7 +336,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
           .toSet
         a + (v.id -> pt)
     }
-    print(s"\nPoints-to:\n${pointsto.map(p => s"${p._1} -> { ${p._2.mkString(",")} }").mkString("\n")}\n")
+    Logger.debug(s"\nPoints-to:\n${pointsto.map(p => s"${p._1} -> { ${p._2.mkString(",")} }").mkString("\n")}\n")
     pointsto
   }
 
@@ -561,7 +562,7 @@ trait MemoryRegionAnalysisMisc:
                         return BitVecLiteral(calculated, bitVecLiteral.size)
                       case _ => evaluateExpression(value, pred)
                   case _ =>
-                    print("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(variable, pred) + " FOR " + binOp + "\n")
+                    Logger.error("CASE NOT HANDLED: " + assigmentsMap.get(variable, pred) + " FOR " + binOp + "\n")
             }
             case _ => return exp
           }
@@ -610,7 +611,7 @@ trait MemoryRegionAnalysisMisc:
                 }
               case binOp2: BinaryExpr =>
                   // special case: we do not want to get a unique stack name so we try to find it in the pool
-                  print("Warning: fragile code! Assumes array by default due to double binary operation\n")
+                  Logger.warn("fragile code! Assumes array by default due to double binary operation\n")
                   var tempLattice: lattice.sublattice.Element = env
                   tempLattice = lattice.sublattice.lub(tempLattice, Set(poolMaster(binOp2.arg2)))
                   return lattice.sublattice.lub(tempLattice, Set(RegionAccess(poolMaster(binOp2.arg2).regionIdentifier, rhs)))
@@ -643,10 +644,10 @@ trait MemoryRegionAnalysisMisc:
         case signExtend: SignExtend =>
           eval(signExtend.body, env, n)
         case bitVecLiteral: BitVecLiteral =>
-          print(s"Saw a bit vector literal ${bitVecLiteral}\n")
+          Logger.debug(s"Saw a bit vector literal ${bitVecLiteral}\n")
           lattice.sublattice.bottom
         case _ =>
-          print(s"type: ${exp.getClass} $exp\n")
+          Logger.debug(s"type: ${exp.getClass} $exp\n")
           throw new Exception("Unknown type")
       }
   }

@@ -2,10 +2,11 @@ package specification
 
 import boogie._
 import ir._
+import logging.Logger
 
 trait SpecVar extends BExpr {
   override def getType: BType = {
-    println(this)
+    Logger.debug(this)
     ???
   }
 }
