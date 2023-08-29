@@ -109,7 +109,9 @@ object RunUtils {
     println("Subroutine Addresses:")
     println(subroutines)
 
-    val cfg = ProgramCfg.fromIR(IRProgram, inlineLimit = 0)
+    val mergedSubroutines = subroutines ++ externalAddresses
+
+    val cfg = ProgramCfg.fromIR(IRProgram, true)
 
     println("[!] Running Constant Propagation")
     val solver = ConstantPropagationAnalysis.WorklistSolver(cfg)
@@ -117,14 +119,14 @@ object RunUtils {
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder), "cpa")
 
     println("[!] Running MRA")
-    val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, subroutines, result)
+    val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, result)
     val result2 = solver2.analyze(true).asInstanceOf[Map[CfgNode, MemoryRegion]]
     memoryRegionAnalysisResults = Some(result2)
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder), "mra")
 
     println("[!] Running MMM")
     val mmm = MemoryModelMap()
-    mmm.convertMemoryRegions(result2, externalAddresses)
+    mmm.convertMemoryRegions(result2, mergedSubroutines)
 
     println("[!] Running VSA")
     val solver3 = ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, result)

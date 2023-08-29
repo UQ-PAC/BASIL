@@ -11,6 +11,7 @@ import analysis.*
  * @param n   : The node where the expression is evaluated (e.g. mem[R1 + 0x1234] <- ...)
  * @return: The evaluated expression (e.g. 0x69632) */
 def evaluateExpression(exp: Expr, n: CfgNode, constantProp: Map[CfgNode, Map[Variable, Any]]): Expr = {
+  println(s"evaluateExpression: $exp")
   exp match {
     case binOp: BinaryExpr =>
       val lhs = evaluateExpression(binOp.arg1, n, constantProp)
@@ -26,6 +27,10 @@ def evaluateExpression(exp: Expr, n: CfgNode, constantProp: Map[CfgNode, Map[Var
         case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
     case extend: ZeroExtend => evaluateExpression(extend.body, n, constantProp) match {
       case literal: Literal => smt_zero_extend(extend.extension, literal)
+      case _ => exp
+    }
+    case e: Extract => evaluateExpression(e.body, n, constantProp) match {
+      case literal: Literal => smt_extract(e.end, e.start, literal)
       case _ => exp
     }
     case variable: Variable => val nodeResult = constantProp(n).asInstanceOf[Map[Variable, ConstantPropagationLattice.type]]

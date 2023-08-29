@@ -79,7 +79,7 @@ trait MemoryRegionValueSetAnalysis:
             case _ => None
         } else {
           val evaluation: Expr = evaluateExpression(binOp, n, constantProp)
-          if (evaluation.equals(binOp)) {
+          if (!evaluation.isInstanceOf[BitVecLiteral]) {
             return None
           }
           mmm.findObject(evaluation.asInstanceOf[BitVecLiteral].value, "data") match
@@ -117,7 +117,10 @@ trait MemoryRegionValueSetAnalysis:
             val region: Option[MemoryRegion] = exprToRegion(memoryLoad.index, n)
             region match
               case Some(r: MemoryRegion) =>
-                s + (localAssign.lhs -> regionContentMap.getOrElse(r, mutable.Set.empty[Value]).toSet)
+                evaluateExpression(memoryLoad.index, n, constantProp) match
+                  case bitVecLiteral: BitVecLiteral =>
+                    regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).add(getValueType(bitVecLiteral))
+                s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).toSet)
               case None =>
                 println("Warning: could not find region for " + localAssign)
                 s
@@ -128,7 +131,11 @@ trait MemoryRegionValueSetAnalysis:
             val region: Option[MemoryRegion] = exprToRegion(binOp, n)
             region match
               case Some(r: MemoryRegion) =>
-                regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).add(getValueType(evaluateExpression(memAssign.rhs.value, n, constantProp).asInstanceOf[BitVecLiteral]))
+                evaluateExpression(memAssign.rhs.value, n, constantProp) match
+                  case bitVecLiteral: BitVecLiteral =>
+                    regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).add(getValueType(bitVecLiteral))
+                  case _ =>
+                    println("Warning: could not find region for " + memAssign)
                 s
               case None =>
                 println("Warning: could not find region for " + memAssign)
