@@ -63,6 +63,6 @@ case class Specification(globals: Set[SpecGlobal], LPreds: Map[SpecGlobal, BExpr
   val controlled: Set[SpecGlobal] = controls.values.flatten.toSet
 }
 
-case class SubroutineSpec(name: String, requires: List[BExpr], ensures: List[BExpr])
+case class SubroutineSpec(name: String, requires: List[BExpr], requiresDirect: List[String], ensures: List[BExpr], ensuresDirect: List[String])
 
 case class ExternalFunction(name: String, offset: BigInt)

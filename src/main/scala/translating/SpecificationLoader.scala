@@ -239,8 +239,23 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case Some(p) => p.in.map { (p: Parameter) => p.name -> p }.toMap ++ p.out.map { (p: Parameter) => p.name -> p }.toMap
     }
 
-    val requires = ctx.requires.asScala.map(r => visitExpr(r.expr, nameToGlobals, params)).toList
-    val ensures = ctx.ensures.asScala.map(e => visitExpr(e.expr, nameToGlobals, params)).toList
-    SubroutineSpec(ctx.id.getText, requires, ensures)
+    val requires = ctx.requires.asScala.collect {
+      case r: ParsedRequiresContext => visitExpr(r.expr, nameToGlobals, params)
+    }.toList
+
+    val ensures = ctx.ensures.asScala.collect {
+      case e: ParsedEnsuresContext => visitExpr(e.expr, nameToGlobals, params)
+    }.toList
+
+    val requiresDirect = ctx.requires.asScala.collect {
+      case r: DirectRequiresContext => r.QUOTESTRING.getText.stripPrefix("\"").stripSuffix("\"")
+    }.toList
+
+    val ensuresDirect = ctx.ensures.asScala.collect {
+      case r: DirectEnsuresContext => r.QUOTESTRING.getText.stripPrefix("\"").stripSuffix("\"")
+    }.toList
+
+    SubroutineSpec(ctx.id.getText, requires, requiresDirect, ensures, ensuresDirect)
   }
+
 }

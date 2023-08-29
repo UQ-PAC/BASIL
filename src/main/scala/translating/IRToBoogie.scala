@@ -16,7 +16,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val guaranteeOldVars = spec.guaranteeOldVars
   private val LPreds = spec.LPreds.map((k, v) => k -> v.resolveSpecL)
   private val requires = spec.subroutines.map(s => s.name -> s.requires.map(e => e.resolveSpec)).toMap
+  private val requiresDirect = spec.subroutines.map(s => s.name -> s.requiresDirect).toMap
   private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(e => e.resolveSpec)).toMap
+  private val ensuresDirect = spec.subroutines.map(s => s.name -> s.ensuresDirect).toMap
 
   private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
@@ -33,7 +35,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
     val functionsUsed1: List[BFunction] = procedures.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted.toList
 
-    val guaranteeReflexive = BProcedure("guarantee_reflexive", List(), List(), List(), List(), Seq(mem, Gamma_mem), guaranteesReflexive.map(g => BAssert(g)))
+    val guaranteeReflexive = BProcedure("guarantee_reflexive", List(), List(), List(), List(), List(), List(), Seq(mem, Gamma_mem), guaranteesReflexive.map(g => BAssert(g)))
 
     val rgProcs = genRely(relies) :+ guaranteeReflexive
 
@@ -55,9 +57,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val i = BVariable("i", BitVecBType(64), Scope.Local)
     val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem, i), Old(MapAccess(mem, i))), BinaryBExpr(BVEQ, MapAccess(Gamma_mem, i), Old(MapAccess(Gamma_mem, i)))))
     val relyEnsures = List(rely2) ++ reliesUsed
-    val relyProc = BProcedure("rely", List(), List(), relyEnsures, List(), Seq(mem, Gamma_mem), List())
-    val relyTransitive = BProcedure("rely_transitive", List(), List(), reliesUsed, List(), Seq(mem, Gamma_mem), List(ProcedureCall("rely", List(), List(), List(mem, Gamma_mem)), ProcedureCall("rely", List(), List(), List(mem, Gamma_mem))))
-    val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), Seq(), reliesReflexive.map(r => BAssert(r)))
+    val relyProc = BProcedure("rely", List(), List(), relyEnsures, List(), List(), List(), Seq(mem, Gamma_mem), List())
+    val relyTransitive = BProcedure("rely_transitive", List(), List(), reliesUsed, List(), List(), List(), Seq(mem, Gamma_mem), List(ProcedureCall("rely", List(), List(), List(mem, Gamma_mem)), ProcedureCall("rely", List(), List(), List(mem, Gamma_mem))))
+    val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), List(), List(), Seq(), reliesReflexive.map(r => BAssert(r)))
     List(relyProc, relyTransitive, relyReflexive)
   }
 
@@ -223,6 +225,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }
     val procEnsures: List[BExpr] = ensures.getOrElse(p.name, List())
 
+    val procRequiresDirect: List[String] = requiresDirect.getOrElse(p.name, List())
+    val procEnsuresDirect: List[String] = ensuresDirect.getOrElse(p.name, List())
+
     val inInits = if (body.isEmpty) {
       List()
     } else {
@@ -230,7 +235,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }
 
 
-    BProcedure(p.name, in.toList, out.toList, procEnsures, procRequires, modifies, inInits ++ body.toList)
+    BProcedure(p.name, in.toList, out.toList, procEnsures, procRequires, procEnsuresDirect, procRequiresDirect, modifies, inInits ++ body.toList)
   }
 
   private def initialiseMemory: List[BExpr] = {

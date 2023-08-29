@@ -1,6 +1,6 @@
 grammar Specifications;
 
-specification: globals? lPreds? /* gammaInits? inits? */ relies? guarantees? subroutine*;
+specification: globals? lPreds? relies? guarantees? subroutine*;
 
 globals: 'Globals:' globalDef*;
 globalDef: id COLON typeName arraySize?;
@@ -24,10 +24,15 @@ arraySize: '[' size=nat ']';
 relies: 'Rely:' expr (COMMA expr)*;
 guarantees: 'Guarantee:' expr (COMMA expr)*;
 subroutine: 'Subroutine:' id requires* ensures*;
-requires: 'Requires:' expr;
-ensures: 'Ensures:' expr;
+requires: 'Requires:' expr #parsedRequires
+        | 'Requires DIRECT:' QUOTESTRING #directRequires
+        ;
+ensures: 'Ensures:' expr #parsedEnsures
+       | 'Ensures DIRECT:' QUOTESTRING #directEnsures
+       ;
 
-
+QUOTE : '"';
+QUOTESTRING : QUOTE (~( '"' | '\n' | '\r'))+ QUOTE;
 COMMA : ',';
 
 LPAREN : '(';
