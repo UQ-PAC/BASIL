@@ -1,4 +1,3 @@
-set -e
 if [ $# -lt 3 ]; then
   echo "Usage: ./run.sh *.adt *.relf *.spec [output.bpl]"
   exit 1
