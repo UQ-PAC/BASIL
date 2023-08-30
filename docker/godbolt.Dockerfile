@@ -9,9 +9,13 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         nodejs \
         make \
         git \
+        dotnet6 \
     && apt-get autoremove --purge -y \
     && apt-get autoclean -y \
-    && rm -rf /var/cache/apt/* /tmp/* \
+    && dotnet tool install --global boogie 
+# to force a new clone after a new commit
+ADD https://api.github.com/repos/ailrst/compiler-explorer/branches/main /tmp/head 
+RUN rm -rf /var/cache/apt/* /tmp/* \
     && git clone https://github.com/ailrst/compiler-explorer.git /compiler-explorer \
     && cd /compiler-explorer \
     && echo "Add missing dependencies" \
@@ -25,3 +29,4 @@ from compiler-explorer AS  ghcr.io/uq-pac/basil-compiler-explorer:latest
 ADD basil-tool.py /compiler-explorer/basil-tool.py
 RUN chmod +x /compiler-explorer/basil-tool.py
 ADD basil.local.properties /compiler-explorer/etc/config/c.defaults.properties
+ADD compiler-explorer.local.properties /compiler-explorer/etc/config/compiler-explorer.local.properties

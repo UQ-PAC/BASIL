@@ -133,8 +133,9 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
   re2c \
   libpcre3-dev \
   clang-14 clang-15 gcc-aarch64-linux-gnu \
-  boogie \
-  && apt-get clean
+  dotnet6 \
+  && apt-get clean \
+  && dotnet tool install --global boogie
 # asli
 
 # ==================
@@ -149,7 +150,7 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
  ENV OPAM_SWITCH_PREFIX='/home/opam/.opam/4.14'
  ENV OCAML_TOPLEVEL_PATH='/home/opam/.opam/4.14/lib/toplevel'
  ENV ASLI_PATH=/aslp/
- ENV PATH=$PATH:/home/opam/.opam/4.14/bin
+ ENV PATH=$PATH:/home/opam/.opam/4.14/bin:/root/.dotnet/tools/
 # ------------------
 # Transplanted BAP 
 # ==================
@@ -157,7 +158,7 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
 WORKDIR /basil
 ENV CAML_LD_LIBRARY_PATH='/home/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.14/lib/ocaml/stublibs:/home/opam/.opam/4.14/lib/ocaml'
 ENV ASLI_PATH=/aslp/
-ENV PATH=$PATH:/home/opam/.opam/4.14/bin
+ENV PATH=$PATH:/home/opam/.opam/4.14/bin:/root/.dotnet/tools/
 
 
 # =============
@@ -170,8 +171,9 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
   re2c \
   libpcre3-dev \
   clang-14 clang-15 gcc-aarch64-linux-gnu \
-  boogie \
-  && apt-get clean
+  dotnet6 \
+  && apt-get clean \ 
+  && dotnet tool install --global boogie
 # ==================
 # Transplant bap: 
 # ------------------
@@ -183,7 +185,7 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
  ENV CAML_LD_LIBRARY_PATH='/home/opam/.opam/4.14/lib/stublibs:/home/opam/.opam/4.14/lib/ocaml/stublibs:/home/opam/.opam/4.14/lib/ocaml'
  ENV OPAM_SWITCH_PREFIX='/home/opam/.opam/4.14'
  ENV OCAML_TOPLEVEL_PATH='/home/opam/.opam/4.14/lib/toplevel'
- ENV PATH=$PATH:/home/opam/.opam/4.14/bin
+ ENV PATH=$PATH:/home/opam/.opam/4.14/bin:/root/.dotnet/tools/
 # ------------------
 # Transplanted BAP 
 # ==================
