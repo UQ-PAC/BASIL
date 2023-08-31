@@ -12,7 +12,7 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         dotnet6 \
     && apt-get autoremove --purge -y \
     && apt-get autoclean -y \
-    && dotnet tool install --global boogie 
+    && dotnet tool install --global boogie  || true
 # to force a new clone after a new commit
 ADD https://api.github.com/repos/ailrst/compiler-explorer/branches/main /tmp/head 
 RUN rm -rf /var/cache/apt/* /tmp/* \
@@ -22,6 +22,9 @@ RUN rm -rf /var/cache/apt/* /tmp/* \
     && npm i @sentry/node \
     && npm run webpack
 WORKDIR /compiler-explorer
+RUN DEBIAN_FRONTEND=noninteractive apt-get update \
+    && apt-get install clang gcc gcc-13-aarch64-linux-gnu  binutils-aarch64-linux-gnu gcc-13-cross-base libc6-dev-arm64-cross libc6-dev-armel-cross libc6-dev-armhf-cross libc6-dev-i386 -y \
+    && apt-get autoclean -y
 ENTRYPOINT [ "make" ]
 CMD ["run"]
 

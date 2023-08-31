@@ -9,7 +9,9 @@ RUN apt-get update && apt-get install -y python3 libgmp-dev yasm m4 \
   libcurl4-gnutls-dev pkg-config zlib1g-dev cmake ninja-build g++-10 \
   radare2 z3 libz3-dev llvm-14-dev \
   re2c \
-  libpcre3-dev
+  libpcre3-dev \
+  && apt-get autoremove --purge -y \
+  && apt-get autoclean -y \
 
 USER opam
 ENV OPAMROOT=/home/opam/.opam
@@ -52,7 +54,9 @@ RUN apt-get update && apt-get install -y python3 libgmp-dev yasm m4 \
   libcurl4-gnutls-dev pkg-config zlib1g-dev cmake ninja-build g++-10 \
   radare2 z3 libz3-dev llvm-14-dev \
   re2c \
-  libpcre3-dev
+  libpcre3-dev \
+  && apt-get autoremove --purge -y \
+  && apt-get autoclean -y \
 USER opam
 WORKDIR /home/opam
 #RUN eval $(opam env) && opam pin add z3 4.8.7 --yes -n   
@@ -108,25 +112,26 @@ USER root
 # =======================
 # BASIL build environment
 # =======================
-FROM ubuntu:23.04 as scala
+FROM ubuntu:23.04 AS scala
 ENV PATH="$PATH:/root/.local/share/coursier/bin"
-RUN apt-get update && apt-get install default-jre-headless curl --yes \ 
+RUN apt-get update && apt-get install default-jre-headless curl git --yes \ 
  && curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup --yes \
- && apt-get remove curl --yes && apt-get autoremove --yes && apt-get clean
+ && apt-get remove curl --yes \
+  && apt-get autoremove --purge -y \
+  && apt-get autoclean -y
 
 # =============
 # Compile BASIL
 # =============
-FROM scala as basil
-ADD . /basil
+FROM scala AS basil
+RUN git clone https://github.com/UQ-PAC/bil-to-boogie-translator.git /basil
 RUN cd /basil && sbt assembly
 
 # ===============
 # BASIL Dev Image 
 # ===============
-FROM basil as basil:dev 
+FROM scala AS basil:dev 
 # use the basil image so sbt cache is full
-RUN rm -rf /basil
 RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-dev yasm m4 \
   libcurl4-gnutls-dev pkg-config zlib1g-dev cmake ninja-build g++-10 \
   radare2 z3 libz3-dev llvm-14-dev \
@@ -134,7 +139,8 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
   libpcre3-dev \
   clang-14 clang-15 gcc-aarch64-linux-gnu \
   dotnet6 \
-  && apt-get clean \
+  && apt-get autoremove --purge -y \
+  && apt-get autoclean -y \
   && dotnet tool install --global boogie
 # asli
 
@@ -172,7 +178,8 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
   libpcre3-dev \
   clang-14 clang-15 gcc-aarch64-linux-gnu \
   dotnet6 \
-  && apt-get clean \ 
+  && apt-get autoremove --purge -y \
+  && apt-get autoclean -y \
   && dotnet tool install --global boogie
 # ==================
 # Transplant bap: 

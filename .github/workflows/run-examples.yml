@@ -24,11 +24,12 @@ jobs:
       - name: Compile BASIL 
         run: sbt assembly
 
-      - name: Test run
-        run: ./run_c.sh examples/arrays/arrays.c test.bpl
-
       - name: Bitvec Tests
         run: sbt "testOnly BitVectorAnalysisTests"
+
+      - name: System Tests
+        run: sbt "testOnly *SystemTests -- -z basic_assign_increment -z basic_arrays_read -z basic_arrays_write -z secret_write"
+
 
 
 
