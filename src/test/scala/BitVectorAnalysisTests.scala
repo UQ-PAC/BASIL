@@ -1,4 +1,4 @@
-import analysis.util._
+import analysis.BitVectorEval.*
 import ir._
 import org.scalatest.funsuite.AnyFunSuite
 

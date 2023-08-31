@@ -2,7 +2,7 @@ package ir
 
 
 import boogie._
-import logging.Logger
+//import util.Logger
 
 trait Expr {
   var ssa_id: Int = 0
@@ -165,9 +165,9 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            Logger.debug(arg1)
-            Logger.debug(arg2)
-            Logger.debug(this)
+            //Logger.debug(arg1)
+            //Logger.debug(arg2)
+            //Logger.debug(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVCOMP =>
@@ -175,17 +175,17 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
             BitVecType(1)
           } else {
             //BitVecType(1)
-            Logger.debug(arg1)
-            Logger.debug(arg2)
-            Logger.debug(this)
+            //Logger.debug(arg1)
+            //Logger.debug(arg2)
+            //Logger.debug(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolType
           } else {
-            Logger.debug(arg1)
-            Logger.debug(arg2)
+            //Logger.debug(arg1)
+            //Logger.debug(arg2)
             throw new Exception("bitvector size mismatch")
           }
         case BVEQ | BVNEQ =>

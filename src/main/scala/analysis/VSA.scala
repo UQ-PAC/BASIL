@@ -7,7 +7,7 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
-import logging.Logger
+import util.Logger
 
 /** ValueSets are PowerSet of possible values */
 trait Value

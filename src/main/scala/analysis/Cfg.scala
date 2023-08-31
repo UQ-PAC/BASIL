@@ -8,7 +8,7 @@ import scala.collection.mutable.ListBuffer
 
 import scala.util.control.Breaks.break;
 
-import logging.Logger
+import util.Logger
 
 object CfgNode:
 

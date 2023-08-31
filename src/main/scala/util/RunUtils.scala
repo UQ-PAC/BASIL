@@ -18,8 +18,6 @@ import analysis.solvers._
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 
-import logging.Logger
-
 object RunUtils {
   var memoryRegionAnalysisResults: Option[Map[CfgNode, _]] = None
 

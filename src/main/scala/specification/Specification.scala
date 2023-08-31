@@ -2,12 +2,11 @@ package specification
 
 import boogie._
 import ir._
-import logging.Logger
+import util.Logger
 
 trait SpecVar extends BExpr {
   override def getType: BType = {
-    Logger.debug(this)
-    ???
+    throw new Exception("getType called on SpecVar")
   }
 }
 

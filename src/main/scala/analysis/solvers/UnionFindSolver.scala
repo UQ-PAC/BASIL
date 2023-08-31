@@ -1,7 +1,7 @@
 package analysis.solvers
 
 import scala.collection.mutable
-import logging.Logger
+import util.Logger
 
 /**
   * Unification solver based on union-find.

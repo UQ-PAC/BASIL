@@ -1,7 +1,7 @@
 package ir
 
-import analysis.util.*
-import logging.Logger
+import analysis.BitVectorEval
+import util.Logger
 
 import scala.collection.mutable
 
@@ -33,16 +33,16 @@ class Interpret(IRProgram: Program) {
 
       case ze: ZeroExtend =>
         Logger.debug(s"\t$ze")
-        smt_zero_extend(ze.extension, eval(ze.body, env))
+        BitVectorEval.smt_zero_extend(ze.extension, eval(ze.body, env))
 
       case se: SignExtend =>
         Logger.debug(s"\t$se")
-        smt_sign_extend(se.extension, eval(se.body, env))
+        BitVectorEval.smt_sign_extend(se.extension, eval(se.body, env))
 
       case e: Extract =>
         Logger.debug(s"\tExtract($e, ${e.start}, ${e.end})")
-        // TODO: wait for smt_extract return correct result
-//        smt_extract(e.end - 1, e.start + 1, eval(e.body, env))
+        // TODO: wait for BitVectorEval.smt_extract return correct result
+//        BitVectorEval.smt_extract(e.end - 1, e.start + 1, eval(e.body, env))
         // return dummy result
         val body: Literal = eval(e.body, env)
         body match {
@@ -55,7 +55,7 @@ class Interpret(IRProgram: Program) {
         val arg = eval(r.body, env)
         var result = arg
         for (_ <- 1 to r.repeats) {
-          result = smt_concat(result, arg)
+          result = BitVectorEval.smt_concat(result, arg)
         }
         result
 
@@ -64,43 +64,43 @@ class Interpret(IRProgram: Program) {
         val right: Literal = eval(bin.arg2, env)
         Logger.debug(s"\tBinaryExpr($left ${bin.op} $right)")
         bin.op match {
-          case BVAND    => smt_bvand(left, right)
-          case BVOR     => smt_bvor(left, right)
-          case BVADD    => smt_bvadd(left, right)
-          case BVMUL    => smt_bvmul(left, right)
-          case BVUDIV   => smt_bvudiv(left, right)
-          case BVUREM   => smt_bvurem(left, right)
-          case BVSHL    => smt_bvshl(left, right)
-          case BVLSHR   => smt_bvlshr(left, right)
-          case BVULT    => smt_bvult(left, right)
+          case BVAND    => BitVectorEval.smt_bvand(left, right)
+          case BVOR     => BitVectorEval.smt_bvor(left, right)
+          case BVADD    => BitVectorEval.smt_bvadd(left, right)
+          case BVMUL    => BitVectorEval.smt_bvmul(left, right)
+          case BVUDIV   => BitVectorEval.smt_bvudiv(left, right)
+          case BVUREM   => BitVectorEval.smt_bvurem(left, right)
+          case BVSHL    => BitVectorEval.smt_bvshl(left, right)
+          case BVLSHR   => BitVectorEval.smt_bvlshr(left, right)
+          case BVULT    => BitVectorEval.smt_bvult(left, right)
           case BVNAND   => ???
           case BVNOR    => ???
           case BVXOR    => ???
           case BVXNOR   => ???
-          case BVCOMP   => smt_bvcomp(left, right)
-          case BVSUB    => smt_bvsub(left, right)
-          case BVSDIV   => smt_bvsdiv(left, right)
-          case BVSREM   => smt_bvsrem(left, right)
+          case BVCOMP   => BitVectorEval.smt_bvcomp(left, right)
+          case BVSUB    => BitVectorEval.smt_bvsub(left, right)
+          case BVSDIV   => BitVectorEval.smt_bvsdiv(left, right)
+          case BVSREM   => BitVectorEval.smt_bvsrem(left, right)
           case BVSMOD   => ???
-          case BVASHR   => smt_bvashr(left, right)
-          case BVULE    => smt_bvule(left, right)
+          case BVASHR   => BitVectorEval.smt_bvashr(left, right)
+          case BVULE    => BitVectorEval.smt_bvule(left, right)
           case BVUGT    => ???
           case BVUGE    => ???
-          case BVSLT    => smt_bvslt(left, right)
-          case BVSLE    => smt_bvsle(left, right)
+          case BVSLT    => BitVectorEval.smt_bvslt(left, right)
+          case BVSLE    => BitVectorEval.smt_bvsle(left, right)
           case BVSGT    => ???
           case BVSGE    => ???
-          case BVEQ     => smt_bveq(left, right)
-          case BVNEQ    => smt_bvneq(left, right)
-          case BVCONCAT => smt_concat(left, right)
+          case BVEQ     => BitVectorEval.smt_bveq(left, right)
+          case BVNEQ    => BitVectorEval.smt_bvneq(left, right)
+          case BVCONCAT => BitVectorEval.smt_concat(left, right)
         }
 
       case un: UnaryExpr =>
         val arg = eval(un.arg, env)
         Logger.debug(s"\tUnaryExpr($un)")
         un.op match {
-          case BVNEG   => smt_bvneg(arg)
-          case BVNOT   => smt_bvnot(arg)
+          case BVNEG   => BitVectorEval.smt_bvneg(arg)
+          case BVNOT   => BitVectorEval.smt_bvnot(arg)
           case IntNEG  => ???
           case BoolNOT => ???
         }

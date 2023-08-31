@@ -10,7 +10,6 @@ import scala.collection.{immutable, mutable}
 import scala.language.postfixOps
 import scala.sys.process._
 import util.*
-import logging.*
 
 @main def main(fileName: String, elfFileName: String, options: String*): Unit = {
 

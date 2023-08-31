@@ -1,4 +1,4 @@
-package logging 
+package util
 import sourcecode.Line, sourcecode.FileName
 import scala.io.AnsiColor
 import java.io.File as JFile 
@@ -14,7 +14,7 @@ object Logger:
   private var level: LogLevel = LogLevel.DEBUG
   import LogLevel.*
 
-  def write(logLevel: LogLevel, arg: Any, line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name) = {
+  def write(logLevel: LogLevel, arg: Any, line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
 
     val colour = logLevel match
     case DEBUG => AnsiColor.RESET
@@ -23,28 +23,28 @@ object Logger:
     case ERROR => AnsiColor.RED
 
     if (level.id <= logLevel.id) {
-      System.err.println(s"[${colour}${logLevel}${AnsiColor.RESET}]\t ${arg} [${name.value}@${file.value}:${line.value}]")
+      System.err.println(s"[$colour$logLevel${AnsiColor.RESET}]\t $arg [${name.value}@${file.value}:${line.value}]")
     }
   }
 
-  def  warn(arg: Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name) = {
+  def warn(arg: Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
     write(LogLevel.WARN, arg, line, file, name)
   }
 
-  def  error(arg: Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name) = {
+  def error(arg: Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
     write(LogLevel.ERROR, arg, line, file, name)
   }
 
-  def  debug(arg: Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name) = {
+  def debug(arg: Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
     write(LogLevel.DEBUG, arg, line, file, name)
   }
 
-  def info(arg: Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name) = {
+  def info(arg: Any)(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
     write(LogLevel.INFO, arg, line, file, name)
   }
 
-  def setLevel(logLevel: LogLevel) = {
-    level = logLevel;
+  def setLevel(logLevel: LogLevel): Unit = {
+    level = logLevel
   }
 
 
