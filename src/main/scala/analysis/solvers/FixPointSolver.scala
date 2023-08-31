@@ -160,19 +160,37 @@ trait SimpleWorklistFixpointSolver[N] extends WorklistFixpointSolver[N]:
  *
  * @tparam N
  *   type of the elements in the worklist.
+ *
+ *   Better implementation of the same thing
+ *   https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L311
  */
 trait PushDownWorklistFixpointSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[N] with Dependencies[N]:
   /** The current lattice element.
    */
   var x: lattice.Element = _
 
+  /**
+   * Propagates lattice element y to node m.
+   *   https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L286
+   */
+  def propagate(y: lattice.sublattice.Element, m: N) = {
+    val xm = x(m)
+    val t = lattice.sublattice.lub(xm, y)
+    if (t != xm) {
+      add(m)
+      x += m -> t
+    }
+  }
+
   def process(n: N, intra: Boolean) =
+    //val y = funsub(n, x, intra)
     val xn = x(n)
-    val y = funsub(n, x, intra)
-    if (y != xn) then
-      for succ <- outdep(n, intra) do
-        x += succ -> y
-      add(outdep(n, intra))
+    val y = transfer(n, xn)
+
+    val t = lattice.sublattice.lub(xn, y)
+
+    for succ <- outdep(n, intra) do
+      propagate(y, succ)
 
 /** Worklist-based fixpoint solver.
  *

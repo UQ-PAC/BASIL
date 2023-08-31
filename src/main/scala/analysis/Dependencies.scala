@@ -29,4 +29,4 @@ trait ForwardDependencies extends Dependencies[CfgNode]:
   // Also add support for getting edges / conditions here?
   def outdep(n: CfgNode, intra: Boolean = true): Set[CfgNode] = if intra then n.succ(intra).toSet else n.succ(intra).toSet.union(n.succ(!intra).toSet)
 
-  def indep(n: CfgNode, intra: Boolean = true): Set[CfgNode] = if intra then n.succ(intra).toSet else n.succ(intra).toSet.union(n.succ(!intra).toSet)
+  def indep(n: CfgNode, intra: Boolean = true): Set[CfgNode] = if intra then n.pred(intra).toSet else n.pred(intra).toSet.union(n.pred(!intra).toSet)

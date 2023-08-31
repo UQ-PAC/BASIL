@@ -542,7 +542,7 @@ trait MemoryRegionAnalysisMisc:
             evaluation match
               case bitVecLiteral: BitVecLiteral =>
                 eval(bitVecLiteral, env, n)
-              case _ => throw new Exception("Cannot resolve variable")
+              case x => throw new Exception("Cannot resolve variable")
         case _ =>
           print(s"type: ${exp.getClass} $exp\n")
           throw new Exception("Unknown type")
