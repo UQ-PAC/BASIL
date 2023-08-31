@@ -38,7 +38,54 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     }
 
     val subroutines = ctx.subroutine.asScala.map(s => visitSubroutine(s, nameToGlobals)).toList
-    Specification(globals, lPreds, relies, guarantees, subroutines)
+
+    val directFunctions = Option(ctx.directFunctions) match {
+      case Some(_) => visitDirectFunctions(ctx.directFunctions)
+      case None => Set()
+    }
+    Specification(globals, lPreds, relies, guarantees, subroutines, directFunctions)
+  }
+
+  def visitDirectFunctions(ctx: DirectFunctionsContext): Set[FunctionOp] = {
+    ctx.directFunction.asScala.map(d => visitDirectFunction(d)).toSet
+  }
+
+  def visitDirectFunction(ctx: DirectFunctionContext): FunctionOp = ctx match {
+    case m: MemoryLoadContext => MemoryLoadOp(64, 8, visitEndian(m.endian), Integer.parseInt(m.size.getText))
+    case m: MemoryStoreContext => MemoryStoreOp(64, 8, visitEndian(m.endian), Integer.parseInt(m.size.getText))
+    case g: GammaLoadContext =>
+      val size = Integer.parseInt(g.size.getText)
+      GammaLoadOp(64, size, size / 8)
+    case g: GammaStoreContext =>
+      val size = Integer.parseInt(g.size.getText)
+      GammaStoreOp(64, size, size / 8)
+    case z: ZeroExtendContext =>
+      val extension = Integer.parseInt(z.size1.getText)
+      val bodySize = Integer.parseInt(z.size2.getText)
+      BVFunctionOp(s"zero_extend${extension}_$bodySize", s"zero_extend $extension", List(BParam(BitVecBType(bodySize))), BParam(BitVecBType(bodySize + extension)))
+    case s: SignExtendContext =>
+      val extension = Integer.parseInt(s.size1.getText)
+      val bodySize = Integer.parseInt(s.size2.getText)
+      BVFunctionOp(s"sign_extend${extension}_$bodySize", s"sign_extend $extension", List(BParam(BitVecBType(bodySize))), BParam(BitVecBType(bodySize + extension)))
+    case b: BvOpContext =>
+      val size = Integer.parseInt(b.size.getText)
+      val op = b.OPNAME.getText
+      val outType = op match {
+        case "and" | "or" | "add" | "mul" | "udiv" | "urem" | "shl" | "lshr" | "nand" | "nor" | "xor" | "xnor" | "sub" | "srem" | "sdiv" | "smod" | "ashr" =>
+          BitVecBType(size)
+        case "comp" =>
+          BitVecBType(1)
+        case "ult" | "ule" | "ugt" | "uge" | "slt" | "sle" | "sgt" | "sge" =>
+          BoolBType
+        case _ =>
+          throw new Exception("parsing error")
+      }
+      BVFunctionOp(s"bv$op$size", s"bv$op", List(BParam(BitVecBType(size)), BParam(BitVecBType(size))), BParam(outType))
+  }
+
+  def visitEndian(ctx: EndianContext): Endian = ctx.getText match {
+    case "_le" => Endian.LittleEndian
+    case "_be" => Endian.BigEndian
   }
 
   def visitGlobals(ctx: GlobalsContext): Set[SpecGlobal] = {

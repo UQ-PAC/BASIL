@@ -1,6 +1,6 @@
 grammar Specifications;
 
-specification: globals? lPreds? relies? guarantees? subroutine*;
+specification: globals? lPreds? relies? guarantees? directFunctions? subroutine*;
 
 globals: 'Globals:' globalDef*;
 globalDef: id COLON typeName arraySize?;
@@ -23,6 +23,35 @@ arraySize: '[' size=nat ']';
 
 relies: 'Rely:' expr (COMMA expr)*;
 guarantees: 'Guarantee:' expr (COMMA expr)*;
+
+directFunctions: 'DIRECT functions:' directFunction (COMMA directFunction)*;
+directFunction: 'memory_load' size=nat endian #memoryLoad
+              | 'memory_store' size=nat endian #memoryStore
+              | 'gamma_load' size=nat #gammaLoad
+              | 'gamma_store' size=nat #gammaStore
+              | 'zero_extend' size1=nat '_' size2=nat #zeroExtend
+              | 'sign_extend' size1=nat '_' size2=nat #signExtend
+              | 'bv' OPNAME size=nat #bvOp
+              ;
+
+/*
+directFunction: memoryLoad
+              | memoryStore
+              | gammaLoad
+              | gammaStore
+              | zeroExtend
+              | signExtend
+              | bvOp
+              ;
+memoryLoad: 'memory_load' size=nat endian;
+memoryStore: 'memory_store' size=nat endian;
+gammaLoad: 'gamma_load' size=nat;
+gammaStore: 'gamma_store' size=nat;
+zeroExtend: 'zero_extend' size1=nat '_' size2=nat;
+signExtend: 'sign_extend' size1=nat '_' size2=nat;
+bvOp: 'bv' OPNAME size=nat;
+*/
+
 subroutine: 'Subroutine:' id requires* ensures*;
 requires: 'Requires:' expr #parsedRequires
         | 'Requires DIRECT:' QUOTESTRING #directRequires
@@ -71,6 +100,66 @@ SHORT: 'short';
 INT: 'int';
 CHAR: 'char';
 COLON: ':';
+
+endian: LE | BE;
+
+LE: '_le';
+BE: '_be';
+
+OPNAME : AND
+       | OR
+       | ADD
+       | MUL
+       | UDIV
+       | UREM
+       | SHL
+       | LSHR
+       | ULT
+       | NAND
+       | NOR
+       | XOR
+       | XNOR
+       | SUB
+       | SREM
+       | SDIV
+       | SMOD
+       | ASHR
+       | ULE
+       | UGT
+       | UGE
+       | SLT
+       | SLE
+       | SGT
+       | SGE
+       | COMP
+       ;
+
+AND : 'and';
+OR : 'or';
+ADD : 'add';
+MUL : 'mul';
+UDIV : 'udiv';
+UREM : 'urem';
+SHL : 'shl';
+LSHR : 'lshr';
+ULT : 'ult';
+NAND : 'nand';
+NOR : 'nor';
+XOR : 'xor';
+XNOR : 'xnor';
+SUB : 'sub';
+SREM : 'srem';
+SDIV : 'sdiv';
+SMOD : 'smod';
+ASHR : 'ashr';
+ULE : 'ule';
+UGT : 'ugt';
+UGE : 'uge';
+SLT : 'slt';
+SLE : 'sle';
+SGT : 'sgt';
+SGE : 'sge';
+COMP : 'comp';
 
 // based upon boogie grammar: https://boogie-docs.readthedocs.io/en/latest/LangRef.html#grammar
 expr : impliesExpr ( EQUIV_OP impliesExpr )* ;

@@ -442,8 +442,31 @@ case class MapUpdate(map: BExpr, index: BExpr, value: BExpr) extends BExpr {
 sealed trait FunctionOp
 
 case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BVar) extends FunctionOp
+case class MemoryLoadOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int) extends FunctionOp {
+  val accesses: Int = bits / valueSize
 
-case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int) extends BExpr with FunctionOp {
+  val fnName: String = endian match {
+    case Endian.LittleEndian => s"memory_load${bits}_le"
+    case Endian.BigEndian => s"memory_load${bits}_be"
+  }
+}
+case class MemoryStoreOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int) extends FunctionOp {
+  val accesses: Int = bits / valueSize
+
+  val fnName: String = endian match {
+    case Endian.LittleEndian => s"memory_store${bits}_le"
+    case Endian.BigEndian => s"memory_store${bits}_be"
+  }
+}
+case class GammaLoadOp(addressSize: Int, bits: Int, accesses: Int) extends FunctionOp {
+  val fnName: String = s"gamma_load$bits"
+}
+case class GammaStoreOp(addressSize: Int, bits: Int, accesses: Int) extends FunctionOp {
+  val fnName: String = s"gamma_store$bits"
+}
+case class LOp(memoryType: BType, indexType: BType) extends FunctionOp
+
+case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int) extends BExpr {
   override def toString: String = s"$fnName($memory, $index)"
 
   val fnName: String = endian match {
@@ -461,17 +484,13 @@ case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int)
     case _         => throw new Exception(s"MemoryLoad does not have Bitvector type: $this")
   }
 
-  val accesses: Int = bits / valueSize
-
   override val getType: BType = BitVecBType(bits)
-  override def functionOps: Set[FunctionOp] = memory.functionOps ++ index.functionOps + this
+  override def functionOps: Set[FunctionOp] = memory.functionOps ++ index.functionOps + MemoryLoadOp(addressSize, valueSize, endian, bits)
   override def locals: Set[BVar] = memory.locals ++ index.locals
   override def globals: Set[BVar] = index.globals ++ memory.globals
 }
 
-case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: Endian, bits: Int)
-    extends BExpr
-    with FunctionOp {
+case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: Endian, bits: Int) extends BExpr {
   override def toString: String = s"$fnName($memory, $index, $value)"
 
   val fnName: String = endian match {
@@ -489,15 +508,13 @@ case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: End
     case _         => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
   }
 
-  val accesses: Int = bits / valueSize
-
   override val getType: BType = memory.getType
-  override def functionOps: Set[FunctionOp] = memory.functionOps ++ index.functionOps ++ value.functionOps + this
+  override def functionOps: Set[FunctionOp] = memory.functionOps ++ index.functionOps ++ value.functionOps + MemoryStoreOp(addressSize, valueSize, endian, bits)
   override def locals: Set[BVar] = memory.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ memory.globals ++ value.globals
 }
 
-case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) extends BExpr with FunctionOp {
+case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) extends BExpr {
   override def toString: String = s"$fnName($gammaMap, $index)"
   val fnName: String = s"gamma_load$bits"
 
@@ -509,15 +526,13 @@ case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) 
   val valueSize: Int = bits / accesses
 
   override val getType: BType = BoolBType
-  override def functionOps: Set[FunctionOp] = gammaMap.functionOps ++ index.functionOps + this
+  override def functionOps: Set[FunctionOp] = gammaMap.functionOps ++ index.functionOps + GammaLoadOp(addressSize, bits, accesses)
   override def locals: Set[BVar] = gammaMap.locals ++ index.locals
   override def globals: Set[BVar] = index.globals ++ gammaMap.globals
 
 }
 
-case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int)
-    extends BExpr
-    with FunctionOp {
+case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int) extends BExpr {
   override def toString: String = s"$fnName($gammaMap, $index, $value)"
   val fnName: String = s"gamma_store$bits"
 
@@ -529,15 +544,15 @@ case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, 
   val valueSize: Int = bits / accesses
 
   override val getType: BType = gammaMap.getType
-  override def functionOps: Set[FunctionOp] = gammaMap.functionOps ++ index.functionOps ++ value.functionOps + this
+  override def functionOps: Set[FunctionOp] = gammaMap.functionOps ++ index.functionOps ++ value.functionOps + GammaStoreOp(addressSize, bits, accesses)
   override def locals: Set[BVar] = gammaMap.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ gammaMap.globals ++ value.globals
 }
 
-case class L(memory: BMapVar, index: BExpr) extends BExpr with FunctionOp {
+case class L(memory: BMapVar, index: BExpr) extends BExpr {
   override def toString: String = s"L($memory, $index)"
   override val getType: BType = BoolBType
-  override def functionOps: Set[FunctionOp] = index.functionOps + this
+  override def functionOps: Set[FunctionOp] = index.functionOps + LOp(memory.getType, index.getType)
   override def locals: Set[BVar] = index.locals
   override def globals: Set[BVar] = index.globals
 }

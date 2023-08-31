@@ -19,6 +19,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val requiresDirect = spec.subroutines.map(s => s.name -> s.requiresDirect).toMap
   private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(e => e.resolveSpec)).toMap
   private val ensuresDirect = spec.subroutines.map(s => s.name -> s.ensuresDirect).toMap
+  private val directFunctions = spec.directFunctions
 
   private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
@@ -33,15 +34,15 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
     val globalConsts: List[BConstAxiomPair] = globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar), g.toAxiom)).toList.sorted
 
-    val functionsUsed1: List[BFunction] = procedures.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted.toList
 
     val guaranteeReflexive = BProcedure("guarantee_reflexive", List(), List(), List(), List(), List(), List(), Seq(mem, Gamma_mem), guaranteesReflexive.map(g => BAssert(g)))
 
     val rgProcs = genRely(relies) :+ guaranteeReflexive
 
-    val functionsUsed2 = rgProcs.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted
-    val functionsUsed3 = functionsUsed1.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p)).distinct.sorted
-    val functionsUsed = (functionsUsed1 ++ functionsUsed2 ++ functionsUsed3).distinct.sorted
+    val functionsUsed1 = procedures.flatMap(p => p.functionOps).toSet ++ rgProcs.flatMap(p => p.functionOps).toSet ++ directFunctions
+    val functionsUsed2 = functionsUsed1.map(p => functionOpToDefinition(p))
+    val functionsUsed3 = functionsUsed2.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
+    val functionsUsed = (functionsUsed2 ++ functionsUsed3).toList.sorted
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgProcs ++ procedures
     BProgram(declarations)
@@ -66,9 +67,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   def functionOpToDefinition(f: FunctionOp): BFunction = {
     f match {
       case b: BVFunctionOp => BFunction(b.name, b.bvbuiltin, b.in, b.out, None)
-      case m: BMemoryLoad =>
-        val memVar = BMapVar("memory", m.memory.getType, Scope.Parameter)
-        val indexVar = BParam("index", m.memory.getType.param)
+      case m: MemoryLoadOp =>
+        val memVar = BMapVar("memory", MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize)), Scope.Parameter)
+        val indexVar = BParam("index", BitVecBType(m.addressSize))
         val in = List(memVar, indexVar)
         val out = BParam(BitVecBType(m.bits))
         val accesses: Seq[MapAccess] = for (i <- 0 until m.accesses) yield {
@@ -88,9 +89,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         }
 
         BFunction(m.fnName, "", in, out, Some(body))
-      case g: GammaLoad =>
-        val gammaMapVar = BMapVar("gammaMap", g.gammaMap.getType, Scope.Parameter)
-        val indexVar = BParam("index", g.gammaMap.getType.param)
+      case g: GammaLoadOp =>
+        val gammaMapVar = BMapVar("gammaMap", MapBType(BitVecBType(g.addressSize), BoolBType), Scope.Parameter)
+        val indexVar = BParam("index", BitVecBType(g.addressSize))
         val in = List(gammaMapVar, indexVar)
         val out = BParam(BoolBType)
         val accesses: Seq[MapAccess] = for (i <- 0 until g.accesses) yield {
@@ -106,12 +107,13 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         }
 
         BFunction(g.fnName, "", in, out, Some(body))
-      case m: BMemoryStore =>
-        val memVar = BMapVar("memory", m.memory.getType, Scope.Parameter)
-        val indexVar = BParam("index", m.memory.getType.param)
+      case m: MemoryStoreOp =>
+        val memType = MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize))
+        val memVar = BMapVar("memory", memType, Scope.Parameter)
+        val indexVar = BParam("index", BitVecBType(m.addressSize))
         val valueVar = BParam("value", BitVecBType(m.bits))
         val in = List(memVar, indexVar, valueVar)
-        val out = BParam(m.memory.getType)
+        val out = BParam(memType)
         val indices: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
           if (i == 0) {
             indexVar
@@ -135,12 +137,13 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         }
 
         BFunction(m.fnName, "", in, out, Some(body))
-      case g: GammaStore =>
-        val gammaMapVar = BMapVar("gammaMap", g.gammaMap.getType, Scope.Parameter)
-        val indexVar = BParam("index", g.gammaMap.getType.param)
+      case g: GammaStoreOp =>
+        val gammaMapType = MapBType(BitVecBType(g.addressSize), BoolBType)
+        val gammaMapVar = BMapVar("gammaMap", gammaMapType, Scope.Parameter)
+        val indexVar = BParam("index", BitVecBType(g.addressSize))
         val valueVar = BParam("value", BoolBType)
         val in = List(gammaMapVar, indexVar, valueVar)
-        val out = BParam(g.gammaMap.getType)
+        val out = BParam(gammaMapType)
 
         val indices: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
           if (i == 0) {
@@ -161,9 +164,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         }
 
         BFunction(g.fnName, "", in, out, Some(body))
-      case l: L =>
-        val memoryVar = BParam("memory", l.memory.getType)
-        val indexVar = BParam("index", l.index.getType)
+      case l: LOp =>
+        val memoryVar = BParam("memory", l.memoryType)
+        val indexVar = BParam("index", l.indexType)
         val body: BExpr = LPreds.keys.foldLeft(FalseBLiteral) {
           (ite: BExpr, next: SpecGlobal) => {
             val guard = next.arraySize match {

@@ -53,7 +53,7 @@ case class ArrayAccess(global: SpecGlobal, index: Int) extends SpecGlobalOrAcces
   override def resolveSpecL: BMemoryLoad = BMemoryLoad(BMapVar("memory", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter), toAddrVar, Endian.LittleEndian, global.size)
 }
 
-case class Specification(globals: Set[SpecGlobal], LPreds: Map[SpecGlobal, BExpr], relies: List[BExpr], guarantees: List[BExpr], subroutines: List[SubroutineSpec]) {
+case class Specification(globals: Set[SpecGlobal], LPreds: Map[SpecGlobal, BExpr], relies: List[BExpr], guarantees: List[BExpr], subroutines: List[SubroutineSpec], directFunctions: Set[FunctionOp]) {
   val guaranteeOldVars: List[SpecGlobalOrAccess] = guarantees.flatMap(g => g.oldSpecGlobals)
 
   val controls: Map[SpecGlobalOrAccess, Set[SpecGlobal]] = {
