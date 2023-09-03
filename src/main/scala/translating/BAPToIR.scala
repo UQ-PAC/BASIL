@@ -59,26 +59,53 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     Program(procedures, memorySections, mainProcedure.get)
   }
 
-  private def translate(s: BAPStatement) = {
-    s match {
-      case b: BAPMemAssign => MemoryAssign(b.lhs.toIR, b.rhs.toIR)
-      case b: BAPLocalAssign => LocalAssign(b.lhs.toIR, b.rhs.toIR)
-      case _ => throw new Exception("unsupported statement: " + s)
-    }
+  private def translate(s: BAPStatement) = s match {
+    case b: BAPMemAssign => MemoryAssign(b.lhs.toIR, b.rhs.toIR)
+    case b: BAPLocalAssign => LocalAssign(b.lhs.toIR, b.rhs.toIR)
+    case _ => throw new Exception("unsupported statement: " + s)
   }
 
-  private def translate(j: BAPJump) = {
-    j match {
-      case b: BAPDirectCall =>
-        DirectCall(nameToProcedure(b.target), coerceToBool(b.condition), b.returnTarget.map {(t: String) => labelToBlock(t)})
-      case b: BAPIndirectCall =>
-        IndirectCall(b.target.toIR, coerceToBool(b.condition), b.returnTarget.map {(t: String) => labelToBlock(t)})
-      case b: BAPGoTo =>
-        GoTo(labelToBlock(b.target), coerceToBool(b.condition))
-      case _ =>
-        throw new Exception("unsupported jump: " + j)
-    }
+  private def translate(j: BAPJump) = j match {
+    case b: BAPDirectCall =>
+      DirectCall(nameToProcedure(b.target), coerceToBool(b.condition), b.returnTarget.map {(t: String) => labelToBlock(t)})
+    case b: BAPIndirectCall =>
+      IndirectCall(b.target.toIR, coerceToBool(b.condition), b.returnTarget.map {(t: String) => labelToBlock(t)})
+    case b: BAPGoTo =>
+      GoTo(labelToBlock(b.target), coerceToBool(b.condition))
+    case _ =>
+      throw new Exception("unsupported jump: " + j)
   }
+
+  /*
+  private def translate(e: BAPExpr) = e match {
+    case b: BAPConcat => BinaryExpr(BVCONCAT, left.toIR, right.toIR)
+    case b: BAPSignedExtend =>
+      if (width > body.size) {
+        SignExtend(width - body.size, body.toIR)
+      } else {
+        BAPExtract(width - 1, 0, body).toIR
+      }
+    case b: BAPUnsignedExtend =>
+      if (width > body.size) {
+        ZeroExtend(width - body.size, body.toIR)
+      } else {
+        BAPExtract(width - 1, 0, body).toIR
+      }
+    case b: BAPExtract =>
+      val bodySize = body.size
+      if (size > bodySize) {
+        if (low == 0) {
+          ZeroExtend(size - bodySize, body.toIR)
+        } else {
+          Extract(high + 1, low, ZeroExtend(size - bodySize, body.toIR))
+        }
+      } else {
+        Extract(high + 1, low, body.toIR)
+      }
+    case b: BAPLiteral =>
+      
+  }
+  */
 
   private def coerceToBool(condition: BAPExpr): Option[Expr] = condition match {
     case l: BAPLiteral if l.value > BigInt(0) =>

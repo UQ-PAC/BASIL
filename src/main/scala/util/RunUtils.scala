@@ -5,7 +5,7 @@ import bap._
 import ir._
 import boogie._
 import specification._
-import BilParser._
+import Parsers._
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
@@ -25,20 +25,20 @@ object RunUtils {
 
   def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
 
-    val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
-    val tokens = CommonTokenStream(adtLexer)
-    val parser = BilAdtParser(tokens)
+    val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
+    val tokens = CommonTokenStream(ADTLexer)
+    val parser = BAP_ADTParser(tokens)
 
     parser.setBuildParseTree(true)
 
-    val program = AdtStatementLoader.visitProject(parser.project())
+    val program = BAPLoader.visitProject(parser.project())
 
-    val elfLexer = SymsLexer(CharStreams.fromFileName(elfFileName))
-    val elfTokens = CommonTokenStream(elfLexer)
-    val elfParser = SymsParser(elfTokens)
-    elfParser.setBuildParseTree(true)
+    val readELFLexer = ReadELFLexer(CharStreams.fromFileName(elfFileName))
+    val readELFTokens = CommonTokenStream(readELFLexer)
+    val readELFParser = ReadELFParser(readELFTokens)
+    readELFParser.setBuildParseTree(true)
 
-    val (externalFunctions, globals, globalOffsets, mainAddress) = ElfLoader.visitSyms(elfParser.syms())
+    val (externalFunctions, globals, globalOffsets, mainAddress) = ReadELFLoader.visitSyms(readELFParser.syms())
 
     //println(globalOffsets)
     //val procmap = program.subroutines.map(s => (s.name, s.address)).toMap
@@ -84,6 +84,8 @@ object RunUtils {
     }
 
     IRProgram.stripUnreachableFunctions()
+    IRProgram.stackIdentification()
+    IRProgram.setModifies()
 
     val boogieTranslator = IRToBoogie(IRProgram, specification)
     boogieTranslator.translate

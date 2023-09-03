@@ -43,6 +43,7 @@ class SystemTests extends AnyFunSuite {
     } else {
       main(ADTPath, RELFPath, outPath)
     }
+    println(outPath)
     val boogieResult = Seq("boogie", "/printVerifiedProceduresCount:0", outPath).!!
     val resultPath = variationPath + "_result.txt"
     log(boogieResult, resultPath)

@@ -26,9 +26,6 @@ trait BAPExpr {
    * Note: for binary operators in some cases the input and output sizes will not match.
    */
   val size: Int
-  //def gammas: Set[BAPVariable]
-
-  def locals: Set[BAPLocalVar]
 }
 
 /** Concatenation of two bitvectors
@@ -37,15 +34,12 @@ case class BAPConcat(left: BAPExpr, right: BAPExpr) extends BAPExpr {
   def toIR: BinaryExpr = BinaryExpr(BVCONCAT, left.toIR, right.toIR)
 
   override val size: Int = left.size + right.size
-  //override def gammas: Set[BAPVariable] = left.gammas ++ right.gammas
-  override def locals: Set[BAPLocalVar] = left.locals ++ right.locals
 }
 
 /** Signed extend - extend in BIL
   */
 
 case class BAPSignedExtend(width: Int, body: BAPExpr) extends BAPExpr {
-  override def locals: Set[BAPLocalVar] = body.locals
   override val size: Int = width
 
   override def toIR: Expr = {
@@ -55,15 +49,12 @@ case class BAPSignedExtend(width: Int, body: BAPExpr) extends BAPExpr {
       BAPExtract(width - 1, 0, body).toIR
     }
   }
-  //override def gammas: Set[BAPVariable] = body.gammas
 }
 
 /** Unsigned extend - pad in BIL
   */
 
 case class BAPUnsignedExtend(width: Int, body: BAPExpr) extends BAPExpr {
-  override def locals: Set[BAPLocalVar] = body.locals
-
   override val size: Int = width
   
   override def toIR: Expr = {
@@ -74,14 +65,12 @@ case class BAPUnsignedExtend(width: Int, body: BAPExpr) extends BAPExpr {
     }
 
   }
-  //override def gammas: Set[BAPVariable] = body.gammas
 }
 
 /** Extracts the bits from firstInt to secondInt (inclusive) from variable.
   */
 case class BAPExtract(high: Int, low: Int, body: BAPExpr) extends BAPExpr {
   override def toString: String = String.format("%s[%d:%d]", body, high, low)
-  override def locals: Set[BAPLocalVar] = body.locals
 
   // + 1 as extracts are inclusive (e.g. [31:0] has 32 bits)
   override val size: Int = high - low + 1
@@ -98,7 +87,6 @@ case class BAPExtract(high: Int, low: Int, body: BAPExpr) extends BAPExpr {
       Extract(high + 1, low, body.toIR)
     }
   }
-  //override def gammas: Set[BAPVariable] = body.gammas
 }
 
 case object BAPHighCast {
@@ -116,22 +104,18 @@ case class BAPLiteral(value: BigInt, size: Int) extends BAPExpr {
   /** Value of literal */
   override def toString: String = s"${value}bv$size"
 
-  override def locals: Set[BAPLocalVar] = Set()
   override def toIR: BitVecLiteral = BitVecLiteral(value, size)
-  //override def gammas: Set[BAPVariable] = Set()
 }
 
 /** Unary operator
   */
 case class BAPUnOp(operator: BAPUnOperator, exp: BAPExpr) extends BAPExpr {
-  override def locals: Set[BAPLocalVar] = exp.locals
   override val size: Int = exp.size
   
   override def toIR: UnaryExpr = operator match {
     case NOT => UnaryExpr(BVNOT, exp.toIR)
     case NEG => UnaryExpr(BVNEG, exp.toIR)
   }
-  //override def gammas: Set[BAPVariable] = exp.gammas
 }
 
 sealed trait BAPUnOperator(op: String) {
@@ -151,9 +135,6 @@ object BAPUnOperator {
 /** Binary operation of two expressions
   */
 case class BAPBinOp(operator: BAPBinOperator, lhs: BAPExpr, rhs: BAPExpr) extends BAPExpr {
-  override def locals: Set[BAPLocalVar] = lhs.locals ++ rhs.locals
-  //override def gammas: Set[BAPVariable] = lhs.gammas ++ rhs.gammas
-
   override val size: Int = operator match {
     case EQ | NEQ | LT | LE | SLT | SLE => 1
     case _                              => lhs.size
@@ -250,39 +231,29 @@ case object SLE extends BAPBinOperator("SLE")
 
 trait BAPVariable extends BAPExpr
 
-case class BAPLocalVar(name: String, override val size: Int) extends BAPVariable {
+trait BAPVar extends BAPVariable {
+  val name: String
+  override val size: Int
   override def toString: String = name
-  override def toIR: Variable = Variable(s"$name", BitVecType(size))
+  override def toIR: Variable
+}
 
-  override def locals: Set[BAPLocalVar] = Set(this)
-  /*
-override def gammas: Set[BAPVariable] = Set(this)
-override def toGamma: BVar = BVariable(s"Gamma_$name", BoolType, Scope.Local)
-override def toIR: BVar = BVariable(s"$name", BitVecType(size), Scope.Local)
-*/
+case class BAPRegister(override val name: String, override val size: Int) extends BAPVar {
+  override def toIR: Register = Register(s"$name", BitVecType(size))
+}
+
+case class BAPLocalVar(override val name: String, override val size: Int) extends BAPVar {
+  override def toIR: LocalVar = LocalVar(s"$name", BitVecType(size))
 }
 
 /** A load from memory at location exp
   */
 case class BAPMemAccess(memory: BAPMemory, index: BAPExpr, endian: Endian, override val size: Int) extends BAPVariable {
   override def toString: String = s"${memory.name}[$index]"
-  override def locals: Set[BAPLocalVar] = index.locals
   override def toIR: MemoryLoad = MemoryLoad(memory.toIR, index.toIR, endian, size)
-  /*
-
-override def gammas: Set[BAPVariable] = Set(this)
-override def toGamma: Expr = if (memory.name == "stack") {
-  GammaLoad(memory.toGamma, index.toIR, size, size / memory.valueSize)
-} else {
-  BinaryExpr(
-    BoolOR,
-    GammaLoad(memory.toGamma, index.toIR, size, size / memory.valueSize),
-    L(memory.toIR, index.toIR)
-  )
-}
-*/
 }
 
+/*
 object BAPMemAccess {
   // initialise to replace stack references
   def init(memory: BAPMemory, index: BAPExpr, endian: Endian, size: Int): BAPMemAccess = {
@@ -293,30 +264,19 @@ object BAPMemAccess {
     }
   }
 }
+*/
 
 case class BAPMemory(name: String, addressSize: Int, valueSize: Int) extends BAPVariable {
   override val size: Int = valueSize // should reconsider
   override def toIR: Memory = Memory(name, addressSize, valueSize)
-  override def locals: Set[BAPLocalVar] = Set()
-  /*
-override def gammas: Set[BAPVariable] = Set()
-override def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapType(BitVec(addressSize), BoolType), Scope.Global)
-*/
 }
 
 case class BAPStore(memory: BAPMemory, index: BAPExpr, value: BAPExpr, endian: Endian, size: Int) extends BAPExpr {
-  override def locals: Set[BAPLocalVar] = index.locals ++ value.locals
   override def toIR: MemoryStore = MemoryStore(memory.toIR, index.toIR, value.toIR, endian, size)
-  /*
-  override def gammas: Set[BAPVariable] = Set()
-  override def toIR: BMemoryStore = BMemoryStore(memory.toIR, index.toIR, value.toIR, endian, size)
-  override def toGamma: GammaStore =
-    GammaStore(memory.toGamma, index.toIR, value.toGamma, size, size / memory.valueSize)
-  */
-
   override def toString: String = s"${memory.name}[$index] := $value"
 }
 
+/*
 object BAPStore {
   // initialise to replace stack references
   def init(memory: BAPMemory, index: BAPExpr, value: BAPExpr, endian: Endian, size: Int): BAPStore = {
@@ -327,3 +287,4 @@ object BAPStore {
     }
   }
 }
+*/

@@ -1,6 +1,6 @@
 package translating
 
-import BilParser.SpecificationsParser._
+import Parsers.SpecificationsParser._
 import boogie._
 import specification._
 import ir._

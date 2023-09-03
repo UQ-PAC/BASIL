@@ -46,13 +46,13 @@ trait MemoryRegionValueSetAnalysis:
 
   val domain: Set[CfgNode] = cfg.nodes
 
-  private val stackPointer = Variable("R31", BitVecType(64))
-  private val linkRegister = Variable("R30", BitVecType(64))
-  private val framePointer = Variable("R29", BitVecType(64))
+  private val stackPointer = Register("R31", BitVecType(64))
+  private val linkRegister = Register("R30", BitVecType(64))
+  private val framePointer = Register("R29", BitVecType(64))
 
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
 
-  private val mallocVariable = Variable("R0", BitVecType(64))
+  private val mallocVariable = Register("R0", BitVecType(64))
 
   private val loopEscapeSet: mutable.Set[CfgNode] = mutable.Set.empty
 
@@ -67,29 +67,29 @@ trait MemoryRegionValueSetAnalysis:
   /** Find decl of variables from node predecessors */
   def findDecl(variable: Variable, n: CfgNode): mutable.ListBuffer[CfgNode] = {
     val decls: mutable.ListBuffer[CfgNode] = mutable.ListBuffer.empty
-    // if we have a temporary variable then ignore it
-    if (variable.name.contains("#")) {
-      return decls
-    }
-    for (pred <- n.pred) {
-      if (loopEscape(pred)) {
-        return mutable.ListBuffer.empty
-      }
-      pred match {
-        case cmd: CfgCommandNode =>
-          cmd.data match {
-            case localAssign: LocalAssign =>
-              if (localAssign.lhs == variable) {
-                decls.addOne(pred)
-              } else {
-                decls.addAll(findDecl(variable, pred))
+    variable match {
+      case r: Register =>
+        for (pred <- n.pred) {
+          if (loopEscape(pred)) {
+            return mutable.ListBuffer.empty
+          }
+          pred match {
+            case cmd: CfgCommandNode =>
+              cmd.data match {
+                case localAssign: LocalAssign =>
+                  if (localAssign.lhs == variable) {
+                    decls.addOne(pred)
+                  } else {
+                    decls.addAll(findDecl(variable, pred))
+                  }
+                case _ => decls.addAll(findDecl(variable, pred))
               }
             case _ => decls.addAll(findDecl(variable, pred))
           }
-        case _ => decls.addAll(findDecl(variable, pred))
-      }
+        }
+        decls
+      case _: LocalVar => decls
     }
-    decls
   }
 
   def resolveGlobalOffset(address: BigInt): String = {
@@ -282,14 +282,14 @@ trait MemoryRegionValueSetAnalysis:
             memLoad.index match
               case binOp: BinaryExpr =>
                 binOp.arg1 match {
-                  case v: Variable if v.name.equals("R21") => println()
+                  case v: Register if v.name.equals("R21") => println()
                   case _ =>
                 }
                 evaluateExpression(binOp.arg2, n) match {
                   case rhs: BitVecLiteral =>
                     val lhs = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
                     lhs match {
-                      case lhs: Variable if lhs.equals(stackPointer) =>
+                      case lhs: Register if lhs.equals(stackPointer) =>
                         mmm.findObject(rhs.value, "stack") match
                           case Some(obj: MemoryRegion) =>
                             s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).toSet)

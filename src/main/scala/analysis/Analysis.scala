@@ -491,13 +491,13 @@ trait MemoryRegionAnalysisMisc:
 
   val domain: Set[CfgNode] = cfg.nodes
 
-  private val stackPointer = Variable("R31", BitVecType(64))
-  private val linkRegister = Variable("R30", BitVecType(64))
-  private val framePointer = Variable("R29", BitVecType(64))
+  private val stackPointer = Register("R31", BitVecType(64))
+  private val linkRegister = Register("R30", BitVecType(64))
+  private val framePointer = Register("R29", BitVecType(64))
 
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
 
-  private val mallocVariable = Variable("R0", BitVecType(64))
+  private val mallocVariable = Register("R0", BitVecType(64))
 
   private val loopEscapeSet: mutable.Set[CfgNode] = mutable.Set.empty
 
@@ -513,28 +513,29 @@ trait MemoryRegionAnalysisMisc:
   def findDecl(variable: Variable, n: CfgNode): mutable.ListBuffer[CfgNode] = {
     val decls: mutable.ListBuffer[CfgNode] = mutable.ListBuffer.empty
     // if we have a temporary variable then ignore it
-    if (variable.name.contains("#")) {
-      return decls
-    }
-    for (pred <- n.pred) {
-      if (loopEscape(pred)) {
-        return mutable.ListBuffer.empty
-      }
-      pred match {
-        case cmd: CfgCommandNode =>
-          cmd.data match {
-            case localAssign: LocalAssign =>
-              if (localAssign.lhs == variable) {
-                decls.addOne(pred)
-              } else {
-                decls.addAll(findDecl(variable, pred))
+    variable match {
+      case r: Register =>
+        for (pred <- n.pred) {
+          if (loopEscape(pred)) {
+            return mutable.ListBuffer.empty
+          }
+          pred match {
+            case cmd: CfgCommandNode =>
+              cmd.data match {
+                case localAssign: LocalAssign =>
+                  if (localAssign.lhs == variable) {
+                    decls.addOne(pred)
+                  } else {
+                    decls.addAll(findDecl(variable, pred))
+                  }
+                case _ =>
               }
             case _ =>
           }
-        case _ =>
-      }
+        }
+        decls
+      case _: LocalVar => decls
     }
-    decls
   }
 
   /**
