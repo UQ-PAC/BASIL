@@ -20,7 +20,7 @@ jobs:
         password: ${{ secrets.github_token }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Compile BASIL 
         run: sbt assembly
