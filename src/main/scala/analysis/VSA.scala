@@ -117,9 +117,11 @@ trait MemoryRegionValueSetAnalysis:
             val region: Option[MemoryRegion] = exprToRegion(memoryLoad.index, n)
             region match
               case Some(r: MemoryRegion) =>
+                // this is an exception to the rule and only applies to data regions
                 evaluateExpression(memoryLoad.index, n, constantProp) match
                   case bitVecLiteral: BitVecLiteral =>
                     regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).add(getValueType(bitVecLiteral))
+                  case _ =>
                 s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).toSet)
               case None =>
                 println("Warning: could not find region for " + localAssign)
@@ -134,8 +136,8 @@ trait MemoryRegionValueSetAnalysis:
                 evaluateExpression(memAssign.rhs.value, n, constantProp) match
                   case bitVecLiteral: BitVecLiteral =>
                     regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).add(getValueType(bitVecLiteral))
-                  case _ =>
-                    println("Warning: could not find region for " + memAssign)
+                  case variable: Variable => // constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
+                    regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).addAll(s(variable))
                 s
               case None =>
                 println("Warning: could not find region for " + memAssign)
