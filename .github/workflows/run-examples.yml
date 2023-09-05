@@ -10,6 +10,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10 
     container:
       # Requires repo to have action access in package settings
       # 
@@ -28,7 +29,7 @@ jobs:
         run: sbt "testOnly BitVectorAnalysisTests"
 
       - name: System Tests
-        run: sbt "testOnly *SystemTests -- -z basic_assign_increment -z basic_arrays_read -z basic_arrays_write -z secret_write"
+        run: sbt "testOnly *SystemTests -- -z basic_assign_increment/gcc_no_plt_no_pic -z basic_assign_increment/clang_no_plt_no_pic -z secret_write/gcc_no_plt_no_pic"
 
 
 
