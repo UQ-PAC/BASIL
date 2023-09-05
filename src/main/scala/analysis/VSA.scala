@@ -15,17 +15,16 @@ trait Value
 trait AddressValue(val expr: Expr, val name: String) extends Value
 
 case class GlobalAddress(override val expr: Expr, override val name: String) extends AddressValue(expr, name) {
-  override def toString: String = "GlobalAddress(" + expr + ")"
+  override def toString: String = "GlobalAddress(" + expr + ", " + name + ")"
 }
 
 case class LocalAddress(override val expr: Expr, override val name: String) extends AddressValue(expr, name) {
-  override def toString: String = "LocalAddress(" + expr + ")"
+  override def toString: String = "LocalAddress(" + expr + ", " + name + ")"
 }
 
 case class LiteralValue(expr: BitVecLiteral) extends Value {
   override def toString: String = "Literal(" + expr + ")"
 }
-
 
 trait MemoryRegionValueSetAnalysis:
   val regionContentMap: mutable.HashMap[MemoryRegion, mutable.Set[Value]] = mutable.HashMap.empty
@@ -40,11 +39,11 @@ trait MemoryRegionValueSetAnalysis:
 
   /** The lattice of abstract values.
    */
-  val powersetLattice: MapLattice[Expr, PowersetLattice[Value]]
+  val powersetLattice: MapLattice[Any, PowersetLattice[Value]]
 
   /** The lattice of abstract states.
    */
-  val lattice: MapLattice[CfgNode, MapLattice[Expr, PowersetLattice[Value]]] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CfgNode, MapLattice[Any, PowersetLattice[Value]]] = MapLattice(powersetLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -120,9 +119,9 @@ trait MemoryRegionValueSetAnalysis:
                 // this is an exception to the rule and only applies to data regions
                 evaluateExpression(memoryLoad.index, n, constantProp) match
                   case bitVecLiteral: BitVecLiteral =>
-                    regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).add(getValueType(bitVecLiteral))
+                    return s + (r -> Set(getValueType(bitVecLiteral)))
                   case _ =>
-                s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).toSet)
+                return s + (localAssign.lhs -> s(r))
               case None =>
                 println("Warning: could not find region for " + localAssign)
                 s
@@ -135,9 +134,11 @@ trait MemoryRegionValueSetAnalysis:
               case Some(r: MemoryRegion) =>
                 evaluateExpression(memAssign.rhs.value, n, constantProp) match
                   case bitVecLiteral: BitVecLiteral =>
-                    regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).add(getValueType(bitVecLiteral))
+                    return s + (r -> Set(getValueType(bitVecLiteral)))
                   case variable: Variable => // constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
-                    regionContentMap.getOrElseUpdate(r, mutable.Set.empty[Value]).addAll(s(variable))
+                    return s + (r -> s(variable))
+
+                  case _ => println("Too Complex or Wrapped i.e. Extract(Variable)") // do nothing
                 s
               case None =>
                 println("Warning: could not find region for " + memAssign)
@@ -323,7 +324,7 @@ abstract class ValueSetAnalysis(val cfg: ProgramCfg,
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntraprocValueSetAnalysisWorklistSolver[L <: MapLattice[Expr, PowersetLattice[Value]]]
+abstract class IntraprocValueSetAnalysisWorklistSolver[L <: MapLattice[Any, PowersetLattice[Value]]]
 (
   cfg: ProgramCfg,
   globals: Map[BigInt, String],
@@ -357,5 +358,5 @@ object ValueSetAnalysis:
       subroutines,
       mmm,
       constantProp,
-      MapLattice[Expr, PowersetLattice[Value]](PowersetLattice[Value])
+      MapLattice[Any, PowersetLattice[Value]](PowersetLattice[Value])
     )

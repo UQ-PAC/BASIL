@@ -527,8 +527,13 @@ trait MemoryRegionAnalysisMisc:
             val subroutineName = subroutines(bitVecLiteral.value)
             Set(DataRegion(subroutineName, bitVecLiteral))
           } else if (globalOffsets.contains(bitVecLiteral.value)) {
-            val globalName = subroutines(globalOffsets(bitVecLiteral.value))
-            Set(DataRegion(globalName, bitVecLiteral))
+            val val1 = globalOffsets(bitVecLiteral.value)
+            if (subroutines.contains(val1)) {
+              val globalName = subroutines(val1)
+              Set(DataRegion(globalName, bitVecLiteral))
+            } else {
+              Set(DataRegion(s"Unknown_${bitVecLiteral}", bitVecLiteral))
+            }
           } else {
             //throw new Exception(s"Unknown type for $bitVecLiteral")
             // unknown region here
@@ -542,7 +547,7 @@ trait MemoryRegionAnalysisMisc:
             evaluation match
               case bitVecLiteral: BitVecLiteral =>
                 eval(bitVecLiteral, env, n)
-              case x => throw new Exception("Cannot resolve variable")
+              case _ => env // we cannot evaluate this to a concrete value, we need VSA for this
         case _ =>
           print(s"type: ${exp.getClass} $exp\n")
           throw new Exception("Unknown type")
