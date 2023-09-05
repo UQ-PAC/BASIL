@@ -40,6 +40,12 @@ The services provided are:
 - `basil` precompiled jar file and tools
    - To run the jar inside the docker image `podman-compose run basil-dev $arguments...`
 
+#### Compiler Explorer Container
+
+```
+podman run -p 10240:10240 ghcr.io/uq-pac/basil-compiler-explorer:latest
+```
+
 ---
 
 #### Publishing container images to github registry:
