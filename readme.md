@@ -4,6 +4,7 @@
 The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
 
 ## Installation and use
+
 The tool is OS-independent, but producing input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. On Windows, WSL2 can be used to run any Linux-specific tasks.
 
 Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 17](https://openjdk.org/install/) (or higher) is required.
@@ -12,9 +13,22 @@ The tool takes as inputs a BAP ADT file (here denoted with `.adt`) and a file co
 
 To build and run the tool using sbt, use the following command:
 
-`sbt "run file.adt file.relf [file.spec] [output.bpl] [-analyse]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
+`sbt "run --adt file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
 
-The `-analyse` flag is optional and enables the static analysis functionality.
+The `--analyse` flag is optional and enables the static analysis functionality.
+
+
+```
+BASIL
+  -a --adt <str>     BAP ADT file name.
+  -r --relf <str>    Output of 'readelf -s -r -W'.
+  -s --spec <str>    BASIL specification file.
+  -o --output <str>  Boogie output destination file.
+  -v --verbose       Show extra debugging logs.
+  --analyse          Run static analysis pass.
+  --interpret        Run BASIL IL interpreter.
+  -h --help          Show this help message.
+```
 
 The sbt shell can also be used for multiple tasks with less overhead by executing `sbt` and then the relevant sbt commands.
 
@@ -22,13 +36,11 @@ To build a standalone `.jar` file, use the following command:
 
 `sbt assembly`
 
+This is located at `target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar`.
+
 To compile the source without running it - this helps IntelliJ highlight things properly:
 
 `sbt compile`
-
-The standalone `.jar` can then be executed with the following command:
-
-`./run.sh file.adt file.relf [file.spec] [output.bpl] [-analyse]`
 
 ## Generating inputs
 The tool takes a `.adt` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.

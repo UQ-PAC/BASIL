@@ -10,32 +10,47 @@ import scala.collection.{immutable, mutable}
 import scala.language.postfixOps
 import scala.sys.process._
 import util.*
+import mainargs.{main, arg, ParserForClass, Flag}
 
-@main def main(fileName: String, elfFileName: String, options: String*): Unit = {
+object Main {
 
-  Logger.setLevel(LogLevel.DEBUG)
+  @main(name= "BASIL")
+  case class Config(
+    @arg(name="adt", short='a', doc="BAP ADT file name.")
+      adtFileName: String, 
+    @arg(name="relf", short='r', doc="Output of 'readelf -s -r -W'.")
+      relfFileName: String,
+    @arg(name="spec", short='s', doc="BASIL specification file.")
+      specFileName: Option[String], 
+    @arg(name="output", short='o', doc="Boogie output destination file.")
+      outFileName: String = "boogie_out.bpl", 
+    @arg(name="verbose", short='v', doc="Show extra debugging logs.")
+      verbose: Flag,
+    @arg(name="analyse", doc="Run static analysis pass.")  
+      analyse: Flag,
+    @arg(name="interpret", doc="Run BASIL IL interpreter.")
+      interpret: Flag,
+    @arg(name="help", short='h', doc="Show this help message.")
+      help: Flag 
+    )
 
+  def main(args: Array[String]): Unit = {
+    val parser = ParserForClass[Config]
+    val conf = parser.constructOrExit(args)
 
-  val specFileName: Option[String] = if (options.nonEmpty && options.head.endsWith(".spec")) {
-    Some(options.head)
-  } else {
-    None
-  }
-  val outFileName = if (specFileName.isEmpty) {
-    if (options.isEmpty) {
-      "boogie_out.bpl"
-    } else {
-      options.head
+    if (conf.help.value) {
+      println(parser.helpText(sorted=false));
+      System.exit(0);
     }
-  } else {
-    if (options.tail.isEmpty) {
-      "boogie_out.bpl"
-    } else {
-      options.tail.head
+
+
+    Logger.setLevel(LogLevel.WARN)
+    if (conf.verbose.value) {
+      Logger.setLevel(LogLevel.DEBUG)
     }
-  }
-  val performAnalysis = options.nonEmpty && options.contains("-analyse")
-  val performInterpret = options.nonEmpty && options.contains("-interpret")
-  val program: BProgram = RunUtils.loadAndTranslate(fileName, elfFileName, specFileName, performAnalysis, performInterpret)
-  RunUtils.writeToFile(program, outFileName)
+
+    val program: BProgram = RunUtils.loadAndTranslate(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.analyse.value, conf.interpret.value)
+    RunUtils.writeToFile(program, conf.outFileName)
+  } 
+
 }
