@@ -1,7 +1,6 @@
 package analysis
 import ir._
 
-
 import scala.math.pow
 
 object BitVectorEval {
