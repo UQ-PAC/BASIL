@@ -1,11 +1,43 @@
 # BAP-to-Boogie Translator
 
 ## About
-The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
+
+The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
+binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
+
+This repository contains a program which takes BAP adt files and readelf output as input, and produces a boogie program.
+
+### Example
+
+```sh
+$ sbt "run --adt src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write.relf --s
+pec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl"
+[info] welcome to sbt 1.8.2 (Private Build Java 17.0.8)
+...
+[info] running Main --adt src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write
+.relf --spec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl
+[success] Total time: 1 s, completed Sep 11, 2023, 7:24:11 AM
+$ tail boogie_out.bpl 
+    mem, Gamma_mem := memory_store32_le(mem, bvadd64(R9, 52bv64), R8[32:0]), gamma_store32(Gamma_mem, bvadd64(R9, 52bv64), Gamma_R8);
+    assert ((bvadd64(R9, 52bv64) == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
+    assert bvsge32(memory_load32_le(mem, $z_addr), z_old);
+    main_argv_out, Gamma_main_argv_out := R1, Gamma_R1;
+    main_result, Gamma_main_result := R0[32:0], Gamma_R0;
+    FP_out, Gamma_FP_out := R29, Gamma_R29;
+    LR_out, Gamma_LR_out := R30, Gamma_R30;
+    SP_out, Gamma_SP_out := R31, Gamma_R31;
+    return;
+}
+$ boogie boogie_out.bpl 
+
+Boogie program verifier finished with 4 verified, 0 errors
+```
 
 ## Installation and use
 
 ### Using Containers 
+
+(This method has only been tested on linux)
 
 The docker config can be used to provide bap with the asli-plugin as well as compile the tool itself.
 
@@ -55,17 +87,20 @@ Or enter the dev container manually, mounting the current directory (the same as
 
 ##### Compiler Explorer Container
 
-```
+```sh
 podman pull ghcr.io/uq-pac/basil-compiler-explorer:latest
 ```
 
 
 ```sh
 podman-compose run compiler-explorer
-# OR
-podman run -p 10240:10240 ghcr.io/uq-pac/basil-compiler-explorer:latest
 ```
 
+OR
+
+```
+podman run -p 10240:10240 ghcr.io/uq-pac/basil-compiler-explorer:latest
+```
 
 ##### Development/Testing Container
 
@@ -76,11 +111,14 @@ podman pull ghcr.io/uq-pac/basil-dev /bin/bash
 podman run -v .:/host -w /host -it ghcr.io/uq-pac/basil-dev /bin/bash
 ```
 
----
+### Local Development 
 
-### Native
+See: [Wiki Development Page](https://github.com/UQ-PAC/bil-to-boogie-translator/wiki/Development).
 
-The tool is OS-independent, but only tested under linux, furthermore, lifting input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. On Windows, WSL2 can be used to run any Linux-specific tasks.
+The tool is a Scala project, and is therefore OS-independent, but is only tested under linux. 
+
+Furthermore, lifting input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. 
+On Windows, WSL2 may be used to run any Linux-specific tasks, but it is less thoroughly tested.
 
 Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 17](https://openjdk.org/install/) is required.
 
@@ -89,6 +127,8 @@ The tool takes as inputs a BAP ADT file (here denoted with `.adt`) and a file co
 To build and run the tool using sbt, use the following command:
 
 `sbt "run --adt file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
+
+#### Usage
 
 The `--analyse` flag is optional and enables the static analysis functionality.
 
@@ -118,6 +158,9 @@ To compile the source without running it - this helps IntelliJ highlight things 
 `sbt compile`
 
 ## Generating inputs (Lifting)
+
+Many lifted examples are already profied in the tests directory: [src/test/correct](src/test/correct), these instructions
+are for if you want to lift new compiled binaries.
 
 The tool takes a `.adt` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.
 
@@ -154,30 +197,33 @@ The binary (i.e `*.out`) can then be generated from a C source file using:
 See [src/test/correct/liftone.sh](https://github.com/UQ-PAC/bil-to-boogie-translator/blob/main/src/test/correct/liftone.sh) for more examples
 for flag combinations that work. 
 
-## Running Boogie on output .bpl
+## Verifying the generated boogie (the programming language), by running boogie (the progam) on the boogie (the program)
 
 [Boogie](https://github.com/boogie-org/boogie#installation) can be installed by following the instructions in the given link.
 
-Boogie can be run on the output `.bpl` file with the command `boogie *.bpl`. At present, there are no verification conditions, so this is just a syntax check.
+Boogie can be run on the output `*.bpl` file with the command `boogie *.bpl`. 
 
 A recent boogie version is needed, for example `Boogie program verifier version 2.4.1.10503, Copyright (c) 2003-2014, Microsoft.`. 
 
 With older versions and recent versions of z3 (e.g. `Z3 version 4.8.12 - 64 bit`), Z3 emits warnings about `model_compress`, since the 
 parameter name was changed. This does not prevent it from working however. 
 
-Boogie can be installed through dotnet and requires dotnet 16.
+Boogie can be installed through dotnet and requires dotnet 6.
 
 ```
-sudo apt-get install dotnet16 z3
+sudo apt-get install dotnet-sdk-6.0
 dotnet install boogie
 ```
 
 ### Note about using sbt with IntelliJ
 
+[See Also](https://github.com/UQ-PAC/bil-to-boogie-translator/wiki/Development)
+
 The project uses sbt to build the project. For the most part this should *just work*, and there are IntelliJ run files (located in the .run folder) which automatically compile and run the project.
 However, to prevent some issues in IntelliJ, it is necessary to unmark `target/scala-3.1.0/src_managed/` as a sources root folder, in the `File > Project Structure > Modules` dialog.
 
 ## Other useful commands 
+
 To compile a C file without the global offset table being used in address calculation, use the following command:
 
 `aarch64-linux-gnu-gcc -fno-plt -fno-pic *.c -o *.out`
