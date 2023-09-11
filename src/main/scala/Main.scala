@@ -42,16 +42,13 @@ object Main {
       case  Right(r) => r
       case Left(l) => {
         println(l)
+        return
       }
     }
-
-
-
 
     if (conf.help.value) {
       println(parser.helpText(sorted=false));
     }
-
 
     Logger.setLevel(LogLevel.WARN)
     if (conf.verbose.value) {
