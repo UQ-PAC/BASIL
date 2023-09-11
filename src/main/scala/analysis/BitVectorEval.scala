@@ -35,9 +35,17 @@ object BitVectorEval {
    *
    * [[(bvadd s t)]] := nat2bv[m](bv2nat([[s]]) + bv2nat([[t]]))
    */
-  def smt_bvadd(s: Literal, t: Literal): BitVecLiteral =
-      require(s.asInstanceOf[BitVecLiteral].size == t.asInstanceOf[BitVecLiteral].size)
-      nat2bv(s.asInstanceOf[BitVecLiteral].size, bv2nat(s) + bv2nat(t))
+  def smt_bvadd(s: Literal, t: Literal): BitVecLiteral = {
+    require(s.isInstanceOf[BitVecLiteral])
+    require(t.isInstanceOf[BitVecLiteral])
+
+    val sb = s.asInstanceOf[BitVecLiteral]
+    val tb = t.asInstanceOf[BitVecLiteral]
+
+    require(sb.size == tb.size)
+
+    nat2bv(sb.size, bv2nat(s) + bv2nat(tb))
+  }
 
   /**
     */
@@ -50,7 +58,11 @@ object BitVectorEval {
    */
   def smt_bvmul(s: Literal, t: Literal): BitVecLiteral = {
     require(s.isInstanceOf[BitVecLiteral])
-    nat2bv(s.asInstanceOf[BitVecLiteral].size, bv2nat(s) * bv2nat(t))
+
+    val sb = s.asInstanceOf[BitVecLiteral]
+    val tb = t.asInstanceOf[BitVecLiteral]
+
+    nat2bv(sb.size, bv2nat(sb) * bv2nat(tb))
   }
 
   /**
@@ -61,7 +73,10 @@ object BitVectorEval {
    */
   def smt_bvneg(s: Literal): BitVecLiteral = {
     require(s.isInstanceOf[BitVecLiteral])
-    nat2bv(s.asInstanceOf[BitVecLiteral].size, BigInt(2).pow(s.asInstanceOf[BitVecLiteral].size) - bv2nat(s))
+
+    val sb = s.asInstanceOf[BitVecLiteral]
+
+    nat2bv(sb.size, BigInt(2).pow(sb.size) - bv2nat(sb))
   }
 
   /**
@@ -77,9 +92,13 @@ object BitVectorEval {
   def smt_bvand(s: Literal, t: Literal): BitVecLiteral = {
     require(s.isInstanceOf[BitVecLiteral])
     require(t.isInstanceOf[BitVecLiteral])
-    require(s.asInstanceOf[BitVecLiteral].size == t.asInstanceOf[BitVecLiteral].size, "bitvector sizes must be the same")
 
-    BitVecLiteral(s.asInstanceOf[BitVecLiteral].value & t.asInstanceOf[BitVecLiteral].value, s.asInstanceOf[BitVecLiteral].size)
+    val sb = s.asInstanceOf[BitVecLiteral]
+    val tb = t.asInstanceOf[BitVecLiteral]
+
+    require(sb.size == tb.size, "bitvector sizes must be the same")
+
+    BitVecLiteral(sb.value & tb.value, sb.size)
   }
 
   /** [[(bvor s t)]] := λx:[0, m). if [[s]](x) = 1 then 1 else [[t]](x)
@@ -94,9 +113,13 @@ object BitVectorEval {
   def smt_bvor(s: Literal, t: Literal): BitVecLiteral = {
     require(s.isInstanceOf[BitVecLiteral])
     require(t.isInstanceOf[BitVecLiteral])
-    require(s.asInstanceOf[BitVecLiteral].size == t.asInstanceOf[BitVecLiteral].size, "bitvector sizes must be the same")
 
-    BitVecLiteral(s.asInstanceOf[BitVecLiteral].value | t.asInstanceOf[BitVecLiteral].value, s.asInstanceOf[BitVecLiteral].size)
+    val sb = s.asInstanceOf[BitVecLiteral]
+    val tb = t.asInstanceOf[BitVecLiteral]
+
+    require(sb.size == tb.size, "bitvector sizes must be the same")
+
+    BitVecLiteral(sb.value | tb.value, sb.size)
   }
 
   /**
@@ -108,7 +131,9 @@ object BitVectorEval {
   def smt_bvnot(s: Literal): BitVecLiteral = {
     require(s.isInstanceOf[BitVecLiteral])
 
-    BitVecLiteral(BigInt(2).pow(s.asInstanceOf[BitVecLiteral].size) - (s.asInstanceOf[BitVecLiteral].value + 1), s.asInstanceOf[BitVecLiteral].size)
+    val sb = s.asInstanceOf[BitVecLiteral]
+
+    BitVecLiteral(BigInt(2).pow(sb.size) - (sb.value + 1), sb.size)
   }
 
   /**
@@ -120,12 +145,16 @@ object BitVectorEval {
   def smt_bvudiv(s: Literal, t: Literal): BitVecLiteral = {
     require(s.isInstanceOf[BitVecLiteral])
     require(t.isInstanceOf[BitVecLiteral])
-    require(s.asInstanceOf[BitVecLiteral].size == t.asInstanceOf[BitVecLiteral].size, "bitvector sizes must be the same")
 
-    if bv2nat(t) == 0 then
-      BitVecLiteral(BigInt(2).pow(s.asInstanceOf[BitVecLiteral].size) - 1, s.asInstanceOf[BitVecLiteral].size)
+    val sb = s.asInstanceOf[BitVecLiteral]
+    val tb = t.asInstanceOf[BitVecLiteral]
+
+    require(sb.size == tb.size, "bitvector sizes must be the same")
+
+    if bv2nat(tb) == 0 then
+      BitVecLiteral(BigInt(2).pow(sb.size) - 1, sb.size)
     else
-      nat2bv(s.asInstanceOf[BitVecLiteral].size, bv2nat(s) / bv2nat(t))
+      nat2bv(sb.size, bv2nat(s) / bv2nat(t))
   }
 
   /**
@@ -163,8 +192,9 @@ object BitVectorEval {
   def smt_extract(i: Int, j: Int, s: Literal): BitVecLiteral = {
     require(s.isInstanceOf[BitVecLiteral])
     require(i >= j)
+    val sb = s.asInstanceOf[BitVecLiteral]
 
-    BitVecLiteral((s.asInstanceOf[BitVecLiteral].value >> j) & ((BigInt(1) << (i - j + 1)) - 1), i - j + 1)
+    BitVecLiteral((sb.value >> j) & ((BigInt(1) << (i - j + 1)) - 1), i - j + 1)
   }
 
   /**
@@ -181,9 +211,12 @@ object BitVectorEval {
    */
   def smt_zero_extend(i: Int, s: Literal): BitVecLiteral = {
     require(s.isInstanceOf[BitVecLiteral])
+
+    val sb = s.asInstanceOf[BitVecLiteral]
+
     require(i >= 0, "bits to be extended must be non-negative")
 
-    BitVecLiteral(s.asInstanceOf[BitVecLiteral].value, s.asInstanceOf[BitVecLiteral].size + i)
+    BitVecLiteral(sb.value, sb.size + i)
   }
 
   /**
@@ -204,6 +237,7 @@ object BitVectorEval {
   def smt_bveq(s: Literal, t: Literal): BoolLit = {
     require(s.isInstanceOf[BitVecLiteral])
     require(t.isInstanceOf[BitVecLiteral])
+
     bool2BoolLit(s == t)
   }
 
@@ -215,6 +249,7 @@ object BitVectorEval {
   def smt_bvneq(s: Literal, t: Literal): BoolLit = {
     require(s.isInstanceOf[BitVecLiteral])
     require(t.isInstanceOf[BitVecLiteral])
+
     bool2BoolLit(s != t)
   }
 
@@ -229,8 +264,12 @@ object BitVectorEval {
     require(s.isInstanceOf[BitVecLiteral])
     require(t.isInstanceOf[BitVecLiteral])
 
-    require(s.asInstanceOf[BitVecLiteral].size == t.asInstanceOf[BitVecLiteral].size, "bitvector sizes must be the same")
-    nat2bv(s.asInstanceOf[BitVecLiteral].size, bv2nat(s) * BigInt(2).pow(bv2nat(t).toInt))
+    val sb = s.asInstanceOf[BitVecLiteral]
+    val tb = t.asInstanceOf[BitVecLiteral]
+
+    require(sb.size == tb.size, "bitvector sizes must be the same")
+
+    nat2bv(sb.size, bv2nat(s) * BigInt(2).pow(bv2nat(t).toInt))
   }
 
   /**
@@ -243,14 +282,20 @@ object BitVectorEval {
     require(s.isInstanceOf[BitVecLiteral])
     require(t.isInstanceOf[BitVecLiteral])
 
-    require(s.asInstanceOf[BitVecLiteral].size == t.asInstanceOf[BitVecLiteral].size, "bitvector sizes must be the same")
-    nat2bv(s.asInstanceOf[BitVecLiteral].size, bv2nat(s) / BigInt(2).pow(bv2nat(t).toInt))
+    val sb = s.asInstanceOf[BitVecLiteral]
+    val tb = t.asInstanceOf[BitVecLiteral]
+
+    require(sb.size == tb.size, "bitvector sizes must be the same")
+
+    nat2bv(sb.size, bv2nat(s) / BigInt(2).pow(bv2nat(t).toInt))
   }
 
   def isNegative(s: Literal): Boolean = {
     require(s.isInstanceOf[BitVecLiteral])
 
-    s.asInstanceOf[BitVecLiteral].value >= BigInt(2).pow(s.asInstanceOf[BitVecLiteral].size - 1)
+    val sb = s.asInstanceOf[BitVecLiteral]
+
+    sb.value >= BigInt(2).pow(sb.size - 1)
   }
 
   /**
@@ -283,12 +328,16 @@ object BitVectorEval {
   def smt_bvurem(s: Literal, t: Literal): BitVecLiteral = {
     require(s.isInstanceOf[BitVecLiteral])
     require(t.isInstanceOf[BitVecLiteral])
-    require(s.asInstanceOf[BitVecLiteral].size == t.asInstanceOf[BitVecLiteral].size, "bitvector sizes must be the same")
+
+    val sb = s.asInstanceOf[BitVecLiteral]
+    val tb = t.asInstanceOf[BitVecLiteral]
+
+    require(sb.size == tb.size, "bitvector sizes must be the same")
 
     if (bv2nat(t) == BigInt(0)) {
-      s.asInstanceOf[BitVecLiteral]
+      sb
     } else {
-      nat2bv(s.asInstanceOf[BitVecLiteral].size, bv2nat(s) % bv2nat(t))
+      nat2bv(sb.size, bv2nat(s) % bv2nat(t))
     }
   }
 
@@ -400,16 +449,21 @@ object BitVectorEval {
     require(s.isInstanceOf[BitVecLiteral])
     require(t.isInstanceOf[BitVecLiteral])
 
-    BitVecLiteral((s.asInstanceOf[BitVecLiteral].value << t.asInstanceOf[BitVecLiteral].size) + t.asInstanceOf[BitVecLiteral].value, s.asInstanceOf[BitVecLiteral].size + t.asInstanceOf[BitVecLiteral].size)
+    val sb = s.asInstanceOf[BitVecLiteral]
+    val tb = t.asInstanceOf[BitVecLiteral]
+
+    BitVecLiteral((sb.value << tb.size) + tb.value, sb.size + tb.size)
   }
 
   def smt_sign_extend(i: Int, s: Literal): BitVecLiteral = {
     require(s.isInstanceOf[BitVecLiteral])
 
+    val sb = s.asInstanceOf[BitVecLiteral]
+
     if (isNegative(s)) {
-      BitVecLiteral((BigInt(2).pow(s.asInstanceOf[BitVecLiteral].size + i) - 1) - smt_bvneg(s).value + 1, s.asInstanceOf[BitVecLiteral].size + i)
+      BitVecLiteral((BigInt(2).pow(sb.size + i) - 1) - smt_bvneg(sb).value + 1, sb.size + i)
     } else {
-      smt_zero_extend(i, s)
+      smt_zero_extend(i, sb)
     }
   }
 
