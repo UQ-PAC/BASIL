@@ -39,9 +39,9 @@ class SystemTests extends AnyFunSuite {
     val ADTPath = variationPath + ".adt"
     val RELFPath = variationPath + ".relf"
     if (File(specPath).exists) {
-      main(ADTPath, RELFPath, specPath, outPath)
+      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--spec", specPath, "--output", outPath))
     } else {
-      main(ADTPath, RELFPath, outPath)
+      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--output", outPath))
     }
     val boogieResult = Seq("boogie", "/printVerifiedProceduresCount:0", outPath).!!
     val resultPath = variationPath + "_result.txt"
