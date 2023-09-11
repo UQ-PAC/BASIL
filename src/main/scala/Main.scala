@@ -18,7 +18,7 @@ object Main {
   case class Config(
     @arg(name="adt", short='a', doc="BAP ADT file name.")
       adtFileName: String, 
-    @arg(name="relf", short='r', doc="Output of 'readelf -s -r -W'.")
+    @arg(name="relf", short='r', doc="Name of the file containing the output of 'readelf -s -r -W'.")
       relfFileName: String,
     @arg(name="spec", short='s', doc="BASIL specification file.")
       specFileName: Option[String], 
