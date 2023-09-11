@@ -80,7 +80,7 @@ podman run -v .:/host -w /host -it ghcr.io/uq-pac/basil-dev /bin/bash
 
 ### Native
 
-The tool is OS-independent, but producing input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. On Windows, WSL2 can be used to run any Linux-specific tasks.
+The tool is OS-independent, but only tested under linux, furthermore, lifting input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. On Windows, WSL2 can be used to run any Linux-specific tasks.
 
 Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 17](https://openjdk.org/install/) is required.
 
@@ -117,10 +117,21 @@ To compile the source without running it - this helps IntelliJ highlight things 
 
 `sbt compile`
 
-## Generating inputs
+## Generating inputs (Lifting)
+
 The tool takes a `.adt` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.
 
+### Requirements
+
+- `bap` with the ASLp plugin
+- `readelf`
+- cross-compiliation toolchains:
+    - `gcc-13-aarch64-linux-gnu`
+    - `clang`
+
 [BAP](https://github.com/BinaryAnalysisPlatform/bap) can be installed by following the instructions in the link given.
+
+This can also be installed using the [nix package](https://github.com/katrinafyi/pac-nix).
 
 Given a AArch64/ARM64 binary file (`*.out`), the `.adt` file can be produced by running
 
@@ -140,23 +151,26 @@ The binary (i.e `*.out`) can then be generated from a C source file using:
 
 `aarch64-linux-gnu-gcc *.c -o *.out`
 
-To compile a binary from a C source and immediately generate the required .adt and .relf files, the following command can be used:
-
-`./lift.sh *.c *.adt *.relf` where `*.adt` and `*.relf` are the output file names.
-
-To compile a C source and then run the tool on it, generating the required files first, the following command can be used:
-
-`./run_c.sh *.c [output.bpl]` where the output filename is optional (requires `sbt assembly` first)
-
-To generate the required files from a AArch64 binary and then run the tool on it, the following command can be used:
-
-`./run_binary.sh *.c [output.bpl]` where the output filename is optional (requires `sbt assembly` first)
+See [src/test/correct/liftone.sh](https://github.com/UQ-PAC/bil-to-boogie-translator/blob/main/src/test/correct/liftone.sh) for more examples
+for flag combinations that work. 
 
 ## Running Boogie on output .bpl
 
 [Boogie](https://github.com/boogie-org/boogie#installation) can be installed by following the instructions in the given link.
 
 Boogie can be run on the output `.bpl` file with the command `boogie *.bpl`. At present, there are no verification conditions, so this is just a syntax check.
+
+A recent boogie version is needed, for example `Boogie program verifier version 2.4.1.10503, Copyright (c) 2003-2014, Microsoft.`. 
+
+With older versions and recent versions of z3 (e.g. `Z3 version 4.8.12 - 64 bit`), Z3 emits warnings about `model_compress`, since the 
+parameter name was changed. This does not prevent it from working however. 
+
+Boogie can be installed through dotnet and requires dotnet 16.
+
+```
+sudo apt-get install dotnet16 z3
+dotnet install boogie
+```
 
 ### Note about using sbt with IntelliJ
 
