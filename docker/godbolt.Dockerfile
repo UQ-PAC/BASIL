@@ -28,8 +28,8 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
 ENTRYPOINT [ "make" ]
 CMD ["run"]
 
-from compiler-explorer AS  ghcr.io/uq-pac/basil-compiler-explorer:latest
-ADD basil-tool.py /compiler-explorer/basil-tool.py
+FROM compiler-explorer AS  ghcr.io/uq-pac/basil-compiler-explorer:latest
+ADD docker/godbolt/basil-tool.py /compiler-explorer/basil-tool.py
 RUN chmod +x /compiler-explorer/basil-tool.py
-ADD basil.local.properties /compiler-explorer/etc/config/c.defaults.properties
-ADD compiler-explorer.local.properties /compiler-explorer/etc/config/compiler-explorer.local.properties
+ADD docker/godbolt/basil.local.properties /compiler-explorer/etc/config/c.defaults.properties
+ADD docker/godbolt/compiler-explorer.local.properties /compiler-explorer/etc/config/compiler-explorer.local.properties

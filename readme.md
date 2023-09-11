@@ -13,20 +13,26 @@ Requirements:
 
 - podman, podman-compose
 
-Note it is recommended to use `podman` rather than docker.
+#### 1. Obtain the image image
 
-1. To build the images, from the root of the respository run
+##### From github 
+
+`podman pull ghcr.io/uq-pac/basil-dev:latest`
+
+##### Build the images
+
+To build the images, from the root of the respository run
 
 ```
 podman-compose build
 ```
 
+#### 2. Use the images with compose 
+
 Individual services can be built with `podman compose build $servicename` from the root of the repo. 
 
 The services provided are:
 
-- `bap`
-   - To invoke bap on its own: `podman-compose run bap`
 - `basil-dev` dev environment containng scala build environment, bap and cross-compilers
    - To compile basil into the current directory using the sbt and scala provided by the docker image: 
       - `podman compose run basil-dev sbt assembly`
@@ -39,35 +45,38 @@ The services provided are:
       - `podman compose run basil-build`
 - `basil` precompiled jar file and tools
    - To run the jar inside the docker image `podman-compose run basil-dev $arguments...`
+- `compiler-explorer`
+    - instance of [godbolt.org](godbolt.org) with the tools installed. 
 
-#### Compiler Explorer Container
+Or enter the dev container manually, mounting the current directory (the same as podman-compose basil-dev).
+
+
+#### 2. Use the images manually  
+
+##### Compiler Explorer Container
 
 ```
+podman pull ghcr.io/uq-pac/basil-compiler-explorer:latest
+```
+
+
+```sh
+podman-compose run compiler-explorer
+# OR
 podman run -p 10240:10240 ghcr.io/uq-pac/basil-compiler-explorer:latest
 ```
 
+
+##### Development/Testing Container
+
+This mounts the current directory as the working directory of the container.
+
+```
+podman pull ghcr.io/uq-pac/basil-dev /bin/bash
+podman run -v .:/host -w /host -it ghcr.io/uq-pac/basil-dev /bin/bash
+```
+
 ---
-
-#### Publishing container images to github registry:
-
-- This only needs to be done when the docker images are modified or you wish to 
-make a new version of basil available. Only the dev environment is used 
-by the github actions.
-
-1. Create a github access token with the priviledge to write to packages
-2. Login to repository with podman
-
-```
-$ podman login ghcr.io -u $username
-Password: <enter github acccess token>
-```
-
-3. Push the container
-
-```
-$ podman-compose push basil
-$ podman-compose push basil-dev
-```
 
 ### Native
 
