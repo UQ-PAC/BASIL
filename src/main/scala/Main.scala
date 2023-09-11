@@ -36,11 +36,20 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val parser = ParserForClass[Config]
-    val conf = parser.constructOrExit(args)
+    val parsed = parser.constructEither(args)
+
+    val conf = parsed match {
+      case  Right(r) => r
+      case Left(l) => {
+        println(l)
+      }
+    }
+
+
+
 
     if (conf.help.value) {
       println(parser.helpText(sorted=false));
-      System.exit(0);
     }
 
 
