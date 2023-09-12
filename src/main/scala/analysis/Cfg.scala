@@ -784,7 +784,7 @@ object ProgramCfg:
               }
 
               /* If the first GoTo's condition is not `True`, then we know there must be a second conditional jump.
-               *  We could equivalently check if `jmps` has 2 jumps, though this emphasises why we check for 
+               *  We could equivalently check if `jmps` has 2 jumps, though this emphasises why we check for
                *  a second jump. We can assume we have a maximum of 2 jumps, as that's what the IR (as of writing)
                *  intends.
                */
@@ -808,29 +808,39 @@ object ProgramCfg:
               val targetProc: Procedure = dCall.target
 
               // Branch to this call
-              cfg.addEdge(precNode, jmpNode, cond)
+              val calls = jmps.filter(_.isInstanceOf[DirectCall]).map(x => CfgJumpNode(data = x,block = block))
+
+              calls.foreach(node => {
+                cfg.addEdge(precNode, node, node.data.asInstanceOf[DirectCall].condition.getOrElse(TrueLiteral))
+
+                procToCalls(proc) += node
+                procToCallers(targetProc) += node
+                callToNodes(funcEntryNode) += node
+              })
 
               // Record call association
-              procToCalls(proc) += jmpNode
-              procToCallers(targetProc) += jmpNode
-              callToNodes(funcEntryNode) += jmpNode
+
 
               // Jump to return location
               dCall.returnTarget match {
                 case Some(retBlock) =>
                   // Add intermediary return node (split call into call and return)
                   val callRet = CfgCallReturnNode()
-                  cfg.addEdge(jmpNode, callRet)
-                  
+
+                  calls.foreach(node => {
+                    cfg.addEdge(node, callRet)
+                  })
                   if (visitedBlocks.contains(retBlock)) {
                     val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
                     cfg.addEdge(callRet, retBlockEntry)
                   } else {
                     visitBlock(retBlock, callRet, TrueLiteral)
                   }
-                case None => 
+                case None =>
                   val noReturn = CfgCallNoReturnNode()
-                  cfg.addEdge(jmpNode, noReturn)
+                  calls.foreach(node => {
+                    cfg.addEdge(node, noReturn)
+                  })
                   cfg.addEdge(noReturn, funcExitNode)
               }
             case iCall: IndirectCall => {
