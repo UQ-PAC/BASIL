@@ -113,9 +113,9 @@ def run_basil(tmp_dir: str, spec: str | None =None):
     readelf_file = outputs['relf']
     os.chdir(tmp_dir) # so  the output file is in the right dir
     command = f"java -jar /target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar".split(" ")
-    files = [adtfile, readelf_file]
+    files = ["-a", adtfile, "-r", readelf_file, "-o", boogie_file]
     if spec:
-        files = [adtfile, readelf_file, spec]
+        files += ["-s", spec]
         outputs["spec"] = spec 
     command += files
     logging.info(command)

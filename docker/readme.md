@@ -1,25 +1,25 @@
 
-- asli is compiled from a git checkout of the default branch
-- bap 2.5 is compiled from opam 
-- basil is compiled from the current staet of this checkout 
-
-The provided compose targets are 
-
-- bap
-    - bap with the asli plugin
-- basil-build
-    - build basil inside a docker container, run this to enter a bash prompt inside the container with the repo mounted
-- basil-dev
-    - the basil build environment with bap and the asli plugin transplanted into it, used for building into the host 
-    environment using the toolchain provided by the container
-- basil
-    - a smaller container containng just the, bap, basil and cross-compiler binaries
 
 ---
 
-Compiling godbolt container
+#### Publishing container images to github registry:
+
+- This only needs to be done when the docker images are modified or you wish to 
+make a new version of basil available. Only the dev environment is used 
+by the github actions.
+
+1. Create a github access token with the priviledge to write to packages
+2. Login to repository with podman
 
 ```
-podman build -f docker/godbolt.Dockerfile -t ghcr.io/uq-pac/basil-compiler-explorer:latest
-podman push ghcr.io/uq-pac/basil-compiler-explorer:latest
+$ podman login ghcr.io -u $username
+Password: <enter github acccess token>
 ```
+
+3. Push the container
+
+```
+$ podman-compose push basil
+$ podman-compose push basil-dev
+```
+
