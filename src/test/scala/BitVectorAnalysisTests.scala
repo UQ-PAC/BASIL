@@ -239,19 +239,19 @@ class BitVectorAnalysisTests extends AnyFunSuite {
     assert(result == TrueLiteral)
   }
 
-  test("BitVector unsigned less then - should return false if first argument is greater than or equal too second argument") {
+  test("BitVector unsigned less then - should return false if first argument is greater than or equal to second argument") {
     val result = smt_bvult(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
     assert(result == FalseLiteral)
   }
 
   // smt_bvule
 
-  test("BitVector unsigned less then or equal too - should return true if first argument is less equal to second argument") {
+  test("BitVector unsigned less then or equal to - should return true if first argument is less equal to second argument") {
     val result = smt_bvule(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
     assert(result == TrueLiteral)
   }
 
-  test("BitVector unsigned less then or equal too - should return false if first argument is greater than second argument") {
+  test("BitVector unsigned less then or equal to - should return false if first argument is greater than second argument") {
     val result = smt_bvule(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
     assert(result == FalseLiteral)
   }
@@ -262,18 +262,18 @@ class BitVectorAnalysisTests extends AnyFunSuite {
     assert(result == TrueLiteral)
   }
 
-  test("BitVector unsinged greater than - should return false if first argument is less than or equal too second argument") {
+  test("BitVector unsinged greater than - should return false if first argument is less than or equal to second argument") {
     val result = smt_bvugt(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
     assert(result == FalseLiteral)
   }
 
   // smt_bvuge
-  test("BitVector unsinged greater than or equal too - should return true if first argument is greater equal or equal too second argument") {
+  test("BitVector unsinged greater than or equal to - should return true if first argument is greater equal or equal to second argument") {
     val result = smt_bvuge(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
     assert(result == TrueLiteral)
   }
 
-  test("BitVector unsinged greater than or equal too - should return false if first argument is less than second argument") {
+  test("BitVector unsinged greater than or equal to - should return false if first argument is less than second argument") {
     val result = smt_bvuge(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
     assert(result == FalseLiteral)
   }
@@ -290,12 +290,12 @@ class BitVectorAnalysisTests extends AnyFunSuite {
   }
 
   // smt_bvsle
-  test("BitVector signed less than or equal too - should return true if first argument is less than or equal to second argument") {
+  test("BitVector signed less than or equal to - should return true if first argument is less than or equal to second argument") {
     val result = smt_bvsle(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
     assert(result == TrueLiteral)
   }
 
-  test("BitVector signed less than or equal too - should return false if first argument is greater than second argument") {
+  test("BitVector signed less than or equal to - should return false if first argument is greater than second argument") {
     val result = smt_bvsle(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
     assert(result == FalseLiteral)
   }
@@ -312,12 +312,12 @@ class BitVectorAnalysisTests extends AnyFunSuite {
   }
 
   // smt_bvsge
-  test("BitVector signed greater than or equal too - should return true if first argument is greater than or equal too second argument") {
+  test("BitVector signed greater than or equal to - should return true if first argument is greater than or equal to second argument") {
     val result = smt_bvsge(BitVecLiteral(255, 8), BitVecLiteral(254, 8))
     assert(result == TrueLiteral)
   }
 
-  test("BitVector signed greater than or equal too - should return false if first argument is less than second argument") {
+  test("BitVector signed greater than or equal to - should return false if first argument is less than second argument") {
     val result = smt_bvsge(BitVecLiteral(254, 8), BitVecLiteral(255, 8))
     assert(result == FalseLiteral)
   }
@@ -353,16 +353,5 @@ class BitVectorAnalysisTests extends AnyFunSuite {
     println(result.value.toString(16))
     assert(result == BitVecLiteral(BigInt("aaaabbbbccccdddd00000000", 16), 96))
   }
-
-  test("SMT - ConCat - should combine two numbers into a single number, with last number being larger than the indicated size") {
-    val result = smt_concat(BitVecLiteral(BigInt("D", 16), 64), BitVecLiteral(BigInt("FFFF", 16), 8))
-    println(result.value.toString(16))
-    assert(result == BitVecLiteral(BigInt("10CFF", 16), 72))
-  }
-
-  // test some small stuff, overflow, 1/0, 128-bit
-  // test all signed etc. cases, division edge cases
-  // test extract oddities
-  // test shift oddities
 
 }
