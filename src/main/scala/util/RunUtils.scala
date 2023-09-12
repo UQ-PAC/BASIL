@@ -23,6 +23,9 @@ object RunUtils {
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
 
+  // constants
+  private val exitRegister: Variable = Variable("R30", BitVecType(64))
+
   def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
 
     val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
@@ -85,7 +88,7 @@ object RunUtils {
     IRProgram = renamer.visitProgram(IRProgram)
 
     if (performAnalysis) {
-      analyse(IRProgram, externalFunctions, globals, globalOffsets)
+      IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
     }
 
     IRProgram.stripUnreachableFunctions()
@@ -96,7 +99,7 @@ object RunUtils {
     boogieTranslator.translate
   }
 
-  def analyse(IRProgram: Program, externalFunctions: Set[ExternalFunction], globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt]): Unit = {
+  def analyse(IRProgram: Program, externalFunctions: Set[ExternalFunction], globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt]): Program = {
     val subroutines = IRProgram.procedures.filter(p => p.address.isDefined).map{(p: Procedure) => BigInt(p.address.get) -> p.name}.toMap
     val globalAddresses = globals.map{(s: SpecGlobal) => s.address -> s.name}.toMap
     val externalAddresses = externalFunctions.map{(e: ExternalFunction) => e.offset -> e.name}.toMap
@@ -111,7 +114,7 @@ object RunUtils {
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
-    val cfg = ProgramCfg.fromIR(IRProgram, true)
+    val cfg = ProgramCfg.fromIR(IRProgram, false, 1000)
 
     println("[!] Running Constant Propagation")
     val solver = ConstantPropagationAnalysis.WorklistSolver(cfg)
@@ -134,12 +137,31 @@ object RunUtils {
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
 
     println("[!] Resolving CFG")
-    val newCFG = ProgramCfg.fromIR(resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram), inlineLimit = 0)
+    val (newIR, modified) = resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram)
+    if (modified) {
+      println("[!] Analysing again")
+      return analyse(newIR, externalFunctions, globals, globalOffsets)
+    }
+    val newCFG = ProgramCfg.fromIR(newIR, inlineLimit = 1000)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
+    newIR
   }
 
-  def resolveCFG(cfg: ProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): Program = {
-    cfg.nodes.foreach(n => process(n))
+  def resolveCFG(cfg: ProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): (Program, Boolean) = {
+    var modified: Boolean = false
+    val worklist = ListBuffer[CfgNode]()
+    // find the main function
+    cfg.nodes.foreach {
+      case main: CfgFunctionEntryNode if main.data.name == "main"=>
+        main.succ(true).toSet.union(main.succ(false).toSet).foreach(node => worklist.addOne(node))
+      case _ =>
+    }
+
+    while (worklist.nonEmpty) {
+      val node = worklist.remove(0)
+      process(node)
+      node.succ(true).toSet.union(node.succ(false).toSet).foreach(node => worklist.addOne(node))
+    }
 
     def process(n: CfgNode): Unit = n match {
       case commandNode: CfgCommandNode =>
@@ -148,12 +170,14 @@ object RunUtils {
             val valueSet: Map[Expr, Set[Value]] = valueSets(n)
             val functionNames = resolveAddresses(valueSet(indirectCall.target))
             if (functionNames.size == 1) {
+              modified = true
               commandNode.block match
                 case block: Block =>
                   block.jumps = block.jumps.filter(!_.equals(indirectCall))
                   block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head.name)).head, indirectCall.condition, indirectCall.returnTarget)
                 case null => throw new Exception("Node not found in nodeToBlock map")
-            } else {
+            } else if (functionNames.size > 1) {
+              modified = true
               functionNames.foreach(addressValue =>
                 commandNode.block match
                   case block: Block =>
@@ -165,6 +189,11 @@ object RunUtils {
                     }
                   case null => throw new Exception("Node not found in nodeToBlock map")
               )
+            } else {
+              // must be a call to R30
+              if (!indirectCall.target.equals(exitRegister)) {
+                throw new Exception(s"Indirect call ${indirectCall} has no possible targets. Value set: ${valueSet(indirectCall.target)}")
+              }
             }
           case _ =>
       case _ =>
@@ -203,7 +232,7 @@ object RunUtils {
       }
       functionNames
     }
-    IRProgram
+    (IRProgram, modified)
   }
 
   def writeToFile(program: BProgram, outputFileName: String): Unit = {
