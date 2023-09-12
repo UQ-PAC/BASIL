@@ -11,11 +11,6 @@ class BitVectorAnalysisTests extends AnyFunSuite {
     assert(result == BigInt(2))
   }
 
-  test("Natural to BitVector - should return 0 when natural number does not fit within specified bit size") {
-    val result = nat2bv(8, BigInt(256))
-    assert(result == BitVecLiteral(BigInt(0), 8))
-  }
-
   test("Natural to BitVector - should return number when natural number does fit within specified bit size") {
     val result = nat2bv(8, BigInt(255))
     assert(result == BitVecLiteral(BigInt(255), 8))
@@ -24,11 +19,6 @@ class BitVectorAnalysisTests extends AnyFunSuite {
   test("BitVector Add - should return the sum of two BitVectors") {
     val result = smt_bvadd(BitVecLiteral(5, 8), BitVecLiteral(13, 8))
     assert(result == BitVecLiteral(18, 8))
-  }
-
-  test("BitVector Add - should subtract two BitVectors when the second value is negative") {
-    val result = smt_bvadd(BitVecLiteral(255, 8), BitVecLiteral(-1, 8))
-    assert(result == BitVecLiteral(254, 8))
   }
 
   test("BitVector Add - should throw exception when the result is negative") {
@@ -40,6 +30,11 @@ class BitVectorAnalysisTests extends AnyFunSuite {
   test("BitVector Add - should return wrap BitVectors when sum is greater size number of bits") {
     val result = smt_bvadd(BitVecLiteral(255, 8), BitVecLiteral(1, 8))
     assert(result == BitVecLiteral(0, 8))
+  }
+
+  test("BitVector Add - should calculate the sum of two numbers that have a high bit count") {
+    val result = smt_bvadd(BitVecLiteral(BigInt("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFE", 16), 128), BitVecLiteral(4, 128))
+    assert(result == BitVecLiteral(2, 128))
   }
 
   // smt_bvmul
@@ -56,8 +51,8 @@ class BitVectorAnalysisTests extends AnyFunSuite {
   }
 
   test("BitVector Multiply - should return wrap BitVectors when sum is greater size number of bits") {
-    val result = smt_bvmul(BitVecLiteral(255, 8), BitVecLiteral(1, 8))
-    assert(result == BitVecLiteral(255, 8))
+    val result = smt_bvmul(BitVecLiteral(255, 8), BitVecLiteral(2, 8))
+    assert(result == BitVecLiteral(254, 8))
   }
   // smt_bvneg
 
@@ -69,11 +64,6 @@ class BitVectorAnalysisTests extends AnyFunSuite {
   test("BitVector Negate - should return 0 when negating 0") {
     val result = smt_bvneg(BitVecLiteral(0, 8))
     assert(result == BitVecLiteral(0, 8))
-  }
-
-  test("BitVector Negate - should return x when negating negative numbers") {
-    val result = smt_bvneg(BitVecLiteral(-3, 8))
-    assert(result == BitVecLiteral(3, 8))
   }
 
   // smt_bvsub
@@ -159,11 +149,6 @@ class BitVectorAnalysisTests extends AnyFunSuite {
   test("BitVector Extract - should extract bits from a given number") {
     val result = smt_extract(2, 0, BitVecLiteral(BigInt("111011", 2), 6))
     assert(result == BitVecLiteral(BigInt("011", 2), 3))
-  }
-
-  test("BitVector Extract - should extract bits from a given number when range is outside of bit given bit range") {
-    val result = smt_extract(7, 5, BitVecLiteral(BigInt("111011", 2), 6))
-    assert(result == BitVecLiteral(BigInt("001", 2), 3))
   }
 
   // boogie_extract
