@@ -27,7 +27,6 @@ case class LiteralValue(expr: BitVecLiteral) extends Value {
 }
 
 trait MemoryRegionValueSetAnalysis:
-  val regionContentMap: mutable.HashMap[MemoryRegion, mutable.Set[Value]] = mutable.HashMap.empty
 
   val cfg: ProgramCfg
   val globals: Map[BigInt, String]
@@ -149,136 +148,6 @@ trait MemoryRegionValueSetAnalysis:
         s
   }
 
-
-//  /** Default implementation of eval.
-//   */
-//  def eval(stmt: Statement, s: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
-//    stmt match {
-//      case memAssign: MemoryAssign =>
-//        if (ignoreRegions.contains(memAssign.rhs.value)) {
-//          return s
-//        }
-//        memAssign.rhs.index match
-//          case binOp: BinaryExpr =>
-//            val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
-//            val rhs: Expr = evaluateExpression(binOp.arg2, n)
-//            rhs match {
-//              case rhs: BitVecLiteral =>
-//                lhs match {
-//                  case lhs: Variable if lhs.equals(stackPointer) =>
-//                    mmm.findObject(rhs.value, "stack") match {
-//                      case Some(obj: MemoryRegion) =>
-//                        evaluateExpression(memAssign.rhs.value, n) match {
-//                          case bitVecLiteral: BitVecLiteral =>
-//                            val map = regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value])
-//                            if (externalFunctions.contains(bitVecLiteral.value)) {
-//                              map.add(LocalAddress(bitVecLiteral, externalFunctions(bitVecLiteral.value)))
-//                            } else if (globals.contains(bitVecLiteral.value)) {
-//                              map.add(GlobalAddress(bitVecLiteral, globals(bitVecLiteral.value)))
-//                            } else if (globalOffsets.contains(bitVecLiteral.value)) {
-//                              map.add(GlobalAddress(bitVecLiteral, resolveGlobalOffset(bitVecLiteral.value)))
-//                            } else if (subroutines.contains(bitVecLiteral.value)) {
-//                              map.add(GlobalAddress(bitVecLiteral, subroutines(bitVecLiteral.value)))
-//                            } else {
-//                              map.add(LiteralValue(bitVecLiteral))
-//                            }
-//                            s
-//                          case _ => s
-//                        }
-//                      case _ => s
-//                    }
-//                  case lhs: BitVecLiteral =>
-//                    binOp.op match {
-//                      case BVADD =>
-//                        // should do something here
-//                        val summation = lhs.value + rhs.value
-//                        mmm.findObject(summation, "data") match {
-//                          case Some(obj: MemoryRegion) =>
-//                            evaluateExpression(memAssign.rhs.value, n) match {
-//                              case bitVecLiteral: BitVecLiteral =>
-//                                val map = regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value])
-//                                if (externalFunctions.contains(bitVecLiteral.value)) {
-//                                  map.add(LocalAddress(bitVecLiteral, externalFunctions(bitVecLiteral.value)))
-//                                } else if (globals.contains(bitVecLiteral.value)) {
-//                                  map.add(GlobalAddress(bitVecLiteral, globals(bitVecLiteral.value)))
-//                                } else if (globalOffsets.contains(bitVecLiteral.value)) {
-//                                  map.add(GlobalAddress(bitVecLiteral, resolveGlobalOffset(bitVecLiteral.value)))
-//                                } else if (subroutines.contains(bitVecLiteral.value)) {
-//                                  map.add(GlobalAddress(bitVecLiteral, subroutines(bitVecLiteral.value)))
-//                                } else {
-//                                  map.add(LiteralValue(bitVecLiteral))
-//                                }
-//                                s
-//                              case _ => s
-//                            }
-//                          case _ => s
-//                        }
-//                      case _ =>
-//                        println("ERROR: tried to eval operator: " + binOp.op + " in " + binOp)
-//                        s
-//                    }
-//                  case _ => s
-//                }
-//              case _ =>
-//                println("WARNING: RHS is not BitVecLiteral and is skipped " + rhs)
-//                s
-//            }
-//          case _ => s
-//      case localAssign: LocalAssign =>
-//        localAssign.rhs match
-//          case memLoad: MemoryLoad =>
-//            memLoad.index match
-//              case binOp: BinaryExpr =>
-//                evaluateExpression(binOp.arg2, n) match {
-//                  case rhs: BitVecLiteral =>
-//                    val lhs = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
-//                    lhs match {
-//                      case lhs: Variable if lhs.equals(stackPointer) =>
-//                        mmm.findObject(rhs.value, "stack") match
-//                          case Some(obj: MemoryRegion) =>
-//                            s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).toSet)
-//                          case _ => s
-//                      case lhs: BitVecLiteral =>
-//                        binOp.op match {
-//                          case BVADD =>
-//                            val summation = lhs.value + rhs.value
-//                            mmm.findObject(summation, "data") match {
-//                              case Some(obj: MemoryRegion) =>
-//                                val setToAdd = mutable.Set.empty[Value]
-//                                if (globals.contains(summation)) {
-//                                  setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), globals(summation)))
-//                                } else if (globalOffsets.contains(summation)) {
-//                                  setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), resolveGlobalOffset(summation)))
-//                                } else if (subroutines.contains(summation)) {
-//                                  setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), subroutines(summation)))
-//                                } else if (externalFunctions.contains(summation)) {
-//                                  setToAdd.add(LocalAddress(BitVecLiteral(summation, lhs.size), externalFunctions(summation)))
-//                                } else {
-//                                  setToAdd.add(LiteralValue(BitVecLiteral(summation, lhs.size)))
-//                                }
-//                                s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, setToAdd).toSet)
-//                              case _ => s
-//                            }
-//                          case _ =>
-//                            println("ERROR: tried to eval operator: " + binOp.op + " in " + binOp)
-//                            s
-//                        }
-//                      case _ => s
-//                    }
-//                  case rhs: _ =>
-//                    println("WARNING: RHS is not BitVecLiteral and is skipped " + rhs)
-//                    s
-//                }
-//              case _ => s
-//          case variable: Variable =>
-//            s + (localAssign.lhs -> s.getOrElse(variable, Set.empty))
-//          case _ => s
-//      case _ =>
-//        println(s"type: ${stmt.getClass} $stmt")
-//        throw new Exception("Unknown type")
-//    }
-//  }
-
   /** Transfer function for state lattice elements.
    */
   def localTransfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element =
@@ -291,15 +160,6 @@ trait MemoryRegionValueSetAnalysis:
         s
       case cmd: CfgCommandNode =>
         eval(cmd.data, s, n)
-//        cmd.data match {
-//          case memAssign: MemoryAssign =>
-//            eval(memAssign, s, n)
-//          // local assign is just lhs assigned to rhs we only need this information to track a prior register operation
-//          // AKA: R1 <- R1 + 8; mem(R1) <- 0x1234
-//          case localAssign: LocalAssign =>
-//            eval(localAssign, s, n)
-//          case _ => s
-//        }
       case _ => s // ignore other kinds of nodes
     }
 
