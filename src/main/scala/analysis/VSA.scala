@@ -118,9 +118,10 @@ trait MemoryRegionValueSetAnalysis:
                 // this is an exception to the rule and only applies to data regions
                 evaluateExpression(memoryLoad.index, n, constantProp) match
                   case bitVecLiteral: BitVecLiteral =>
-                    return s + (r -> Set(getValueType(bitVecLiteral)))
+                    val m = s + (r -> Set(getValueType(bitVecLiteral)))
+                    m + (localAssign.lhs -> m(r))
                   case _ =>
-                return s + (localAssign.lhs -> s(r))
+                    s + (localAssign.lhs -> s(r))
               case None =>
                 println("Warning: could not find region for " + localAssign)
                 s
