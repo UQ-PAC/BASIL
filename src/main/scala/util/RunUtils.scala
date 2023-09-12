@@ -157,10 +157,14 @@ object RunUtils {
       case _ =>
     }
 
+    val visited = scala.collection.mutable.Set[CfgNode]()
     while (worklist.nonEmpty) {
       val node = worklist.remove(0)
-      process(node)
-      node.succ(true).toSet.union(node.succ(false).toSet).foreach(node => worklist.addOne(node))
+        if (!visited.contains(node)) {
+          process (node)
+          node.succ(true).toSet.union(node.succ(false).toSet).foreach(node => worklist.addOne(node))
+          visited.add(node)
+        }
     }
 
     def process(n: CfgNode): Unit = n match {
