@@ -422,6 +422,8 @@ case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
 abstract class MemoryRegion
 
 /**
+ * TODO: fix MRA docs
+ *
  * Represents a memory region. The region is defined by a base pointer and a size.
  * There can exist two regions with the same size (offset) but have a different base pointer. As such the base pointer
  * is tracked but not printed in the toString method.
