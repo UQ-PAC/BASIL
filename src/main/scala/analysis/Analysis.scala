@@ -7,8 +7,8 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
-// import bitVector
-import analysis.util.*
+import analysis.eval.*
+import util.Logger
 
 /** Trait for program analyses.
   *
@@ -198,7 +198,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   val constantPropResult2: Map[CfgNode, _] = constantPropResult
 
   constantPropResult2.values.foreach(v =>
-    print(v)
+    Logger.info(s"${v}")
   )
 
   /**
@@ -312,7 +312,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   }
 
   private def unify(t1: Term[StTerm], t2: Term[StTerm]): Unit = {
-    //print(s"univfying constraint $t1 = $t2\n")
+    //Logger.info(s"univfying constraint $t1 = $t2\n")
     solver.unify(t1, t2) // note that unification cannot fail, because there is only one kind of term constructor and no constants
   }
 
@@ -322,8 +322,8 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   def pointsTo(): Map[Object, Set[Object]] = {
     val solution = solver.solution()
     val unifications = solver.unifications()
-    print(s"Solution: \n${solution.mkString(",\n")}\n")
-    print(s"Sets: \n${unifications.values.map { s =>
+    Logger.debug(s"Solution: \n${solution.mkString(",\n")}\n")
+    Logger.debug(s"Sets: \n${unifications.values.map { s =>
       s"{ ${s.mkString(",")} }"
     }.mkString(", ")}")
 
@@ -337,7 +337,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
           .toSet
         a + (v.id -> pt)
     }
-    print(s"\nPoints-to:\n${pointsto.map(p => s"${p._1} -> { ${p._2.mkString(",")} }").mkString("\n")}\n")
+    Logger.debug(s"\nPoints-to:\n${pointsto.map(p => s"${p._1} -> { ${p._2.mkString(",")} }").mkString("\n")}\n")
     pointsto
   }
 
@@ -503,7 +503,7 @@ trait MemoryRegionAnalysisMisc:
   private val mallocVariable = Variable("R0", BitVecType(64))
 
 
-    /** Default implementation of eval.
+  /** Default implementation of eval.
    */
   def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
     println(s"evaluating $exp")
@@ -551,7 +551,7 @@ trait MemoryRegionAnalysisMisc:
                 eval(bitVecLiteral, env, n)
               case _ => env // we cannot evaluate this to a concrete value, we need VSA for this
         case _ =>
-          print(s"type: ${exp.getClass} $exp\n")
+          Logger.debug(s"type: ${exp.getClass} $exp\n")
           throw new Exception("Unknown type")
       }
   }

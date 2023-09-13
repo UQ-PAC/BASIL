@@ -1,0 +1,33 @@
+services:
+  bap:
+    image: bap-2.5-aslp
+    build:
+      dockerfile: docker/asli.Dockerfile 
+      target: aslp-bap 
+    volumes:
+      - ./:/host:rw
+    working_dir: /host
+  basil-build:
+    image: basil:build
+    build:
+      dockerfile: docker/asli.Dockerfile 
+      target: basil
+    volumes:
+      - ./:/host:rw
+    working_dir: /host
+  basil-dev:
+    image: ghcr.io/uq-pac/basil-dev:latest
+    build:
+      dockerfile: docker/asli.Dockerfile 
+      target: basil:dev
+    volumes:
+      - ./:/host:rw
+    working_dir: /host
+  basil:
+    image: ghcr.io/uq-pac/basil:latest
+    build:
+      dockerfile: docker/asli.Dockerfile 
+      target: minified-all
+    volumes:
+      - ./:/host:rw
+    working_dir: /host

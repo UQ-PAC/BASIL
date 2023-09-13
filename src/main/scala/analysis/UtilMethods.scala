@@ -1,4 +1,4 @@
-package analysis.util
+package analysis.eval
 import ir.*
 import analysis.solvers.*
 import analysis.Lattice
@@ -20,17 +20,17 @@ def evaluateExpression(exp: Expr, n: CfgNode, constantProp: Map[CfgNode, Map[Var
         return exp
       }
       binOp.op match
-        case BVADD => smt_bvadd(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
-        case BVSUB => smt_bvsub(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
-        case BVASHR => smt_bvashr(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
-        case BVCOMP => smt_bvcomp(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
+        case BVADD => BitVectorEval.smt_bvadd(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
+        case BVSUB => BitVectorEval.smt_bvsub(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
+        case BVASHR => BitVectorEval.smt_bvashr(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
+        case BVCOMP => BitVectorEval.smt_bvcomp(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
         case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
     case extend: ZeroExtend => evaluateExpression(extend.body, n, constantProp) match {
-      case literal: Literal => smt_zero_extend(extend.extension, literal)
+      case literal: Literal => BitVectorEval.smt_zero_extend(extend.extension, literal)
       case _ => exp
     }
     case e: Extract => evaluateExpression(e.body, n, constantProp) match {
-      case literal: Literal => smt_extract(e.end, e.start, literal)
+      case literal: Literal => BitVectorEval.smt_extract(e.end, e.start, literal)
       case _ => exp
     }
     case variable: Variable => val nodeResult = constantProp(n).asInstanceOf[Map[Variable, ConstantPropagationLattice.type]]

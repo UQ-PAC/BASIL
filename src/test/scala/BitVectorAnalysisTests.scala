@@ -1,4 +1,4 @@
-import analysis.util._
+import analysis.BitVectorEval.*
 import ir._
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -26,6 +26,26 @@ class BitVectorAnalysisTests extends AnyFunSuite {
   test("concat1") {
     val result = smt_concat(BitVecLiteral(BigInt("AAAABBBBCCCCDDDD", 16), 64), BitVecLiteral(BigInt("EEEEFFFF", 16), 32))
     assert(result == BitVecLiteral(BigInt("AAAABBBBCCCCDDDDEEEEFFFF", 16), 96))
+  }
+
+  test("extract") {
+    val result = boogie_extract(8, 4, BitVecLiteral(993, 64))
+    assert(result == BitVecLiteral(BigInt(14), 4))
+  }
+
+  test("extract2") {
+    val result = boogie_extract(32, 0, BitVecLiteral(5, 64))
+    assert(result == BitVecLiteral(BigInt(5), 32))
+  }
+
+  test("extract3") {
+    val result = boogie_extract(4, 0, BitVecLiteral(102, 64))
+    assert(result == BitVecLiteral(BigInt(6), 4))
+  }
+
+  test("extract4") {
+    val result = boogie_extract(4, 0, BitVecLiteral(103, 64))
+    assert(result == BitVecLiteral(BigInt(7), 4))
   }
 
   // test some small stuff, overflow, 1/0, 128-bit

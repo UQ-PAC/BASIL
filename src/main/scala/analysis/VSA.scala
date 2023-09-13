@@ -7,8 +7,8 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
-// import bitVector
-import analysis.util.*
+import analysis.eval.*
+import util.Logger as Logger
 
 /** ValueSets are PowerSet of possible values */
 trait Value
@@ -65,7 +65,6 @@ trait MemoryRegionValueSetAnalysis:
       "@ERROR"
     }
   }
-
 
   def exprToRegion(expr: Expr, n: CfgNode): Option[MemoryRegion] = {
     expr match

@@ -4,17 +4,97 @@
 The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
 
 ## Installation and use
+
+### Using Containers 
+
+The docker config can be used to provide bap with the asli-plugin as well as compile the tool itself.
+
+Requirements:
+
+- podman, podman-compose
+
+Note it is recommended to use `podman` rather than docker.
+
+1. To build the images, from the root of the respository run
+
+```
+podman-compose build
+```
+
+Individual services can be built with `podman compose build $servicename` from the root of the repo. 
+
+The services provided are:
+
+- `bap`
+   - To invoke bap on its own: `podman-compose run bap`
+- `basil-dev` dev environment containng scala build environment, bap and cross-compilers
+   - To compile basil into the current directory using the sbt and scala provided by the docker image: 
+      - `podman compose run basil-dev sbt assembly`
+   - To enter a shell inside the container
+      - `podman compose run basil-build`
+- `basil-build`
+   - The same as above however containg only the scala build environment and compiled basil
+   - To recompile with the currently checked-out repo run `podman-compose build basil-build`
+   - To enter a shell inside the container
+      - `podman compose run basil-build`
+- `basil` precompiled jar file and tools
+   - To run the jar inside the docker image `podman-compose run basil-dev $arguments...`
+
+#### Compiler Explorer Container
+
+```
+podman run -p 10240:10240 ghcr.io/uq-pac/basil-compiler-explorer:latest
+```
+
+---
+
+#### Publishing container images to github registry:
+
+- This only needs to be done when the docker images are modified or you wish to 
+make a new version of basil available. Only the dev environment is used 
+by the github actions.
+
+1. Create a github access token with the priviledge to write to packages
+2. Login to repository with podman
+
+```
+$ podman login ghcr.io -u $username
+Password: <enter github acccess token>
+```
+
+3. Push the container
+
+```
+$ podman-compose push basil
+$ podman-compose push basil-dev
+```
+
+### Native
+
 The tool is OS-independent, but producing input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. On Windows, WSL2 can be used to run any Linux-specific tasks.
 
-Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 8](https://openjdk.org/install/) (or higher) is required.
+Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 17](https://openjdk.org/install/) (or higher) is required.
 
 The tool takes as inputs a BAP ADT file (here denoted with `.adt`) and a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.
 
 To build and run the tool using sbt, use the following command:
 
-`sbt "run file.adt file.relf [file.spec] [output.bpl] [-analyse]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
+`sbt "run --adt file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
 
-The `-analyse` flag is optional and enables the static analysis functionality.
+The `--analyse` flag is optional and enables the static analysis functionality.
+
+
+```
+BASIL
+  -a --adt <str>     BAP ADT file name.
+  -r --relf <str>    Output of 'readelf -s -r -W'.
+  -s --spec <str>    BASIL specification file.
+  -o --output <str>  Boogie output destination file.
+  -v --verbose       Show extra debugging logs.
+  --analyse          Run static analysis pass.
+  --interpret        Run BASIL IL interpreter.
+  -h --help          Show this help message.
+```
 
 The sbt shell can also be used for multiple tasks with less overhead by executing `sbt` and then the relevant sbt commands.
 
@@ -22,13 +102,11 @@ To build a standalone `.jar` file, use the following command:
 
 `sbt assembly`
 
+This is located at `target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar`.
+
 To compile the source without running it - this helps IntelliJ highlight things properly:
 
 `sbt compile`
-
-The standalone `.jar` can then be executed with the following command:
-
-`./run.sh file.adt file.relf [file.spec] [output.bpl] [-analyse]`
 
 ## Generating inputs
 The tool takes a `.adt` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.
