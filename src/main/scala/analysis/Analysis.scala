@@ -506,9 +506,9 @@ trait MemoryRegionAnalysisMisc:
   /** Default implementation of eval.
    */
   def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
-    println(s"evaluating $exp")
-    println(s"env: $env")
-    println(s"n: $n")
+    Logger.debug(s"evaluating $exp")
+    Logger.debug(s"env: $env")
+    Logger.debug(s"n: $n")
       exp match {
         case binOp: BinaryExpr =>
             if (binOp.arg1 == stackPointer) {

@@ -580,7 +580,7 @@ class ProgramCfgFactory:
   def fromIR(program: Program, unify: Boolean = false, inlineLimit: Int = 0): ProgramCfg = {
     CfgNode.id = 0
     require(inlineLimit >= 0, "Can't inline procedures to negative depth...")
-    println("[+] Generating CFG...")
+    Logger.info("[+] Generating CFG...")
 
     // Have to initialise the map entries manually. Scala maps have a `.withDefaulValue`, but this is buggy and doesn't
     //  behave as you would expect: https://github.com/scala/bug/issues/8099 - thus the manual approach.
@@ -846,7 +846,7 @@ class ProgramCfgFactory:
                   cfg.addEdge(noReturn, funcExitNode)
               }
             case iCall: IndirectCall => {
-              println(s"Indirect call found: $iCall in ${proc.name}")
+              Logger.info(s"Indirect call found: $iCall in ${proc.name}")
 
               // Branch to this call
               cfg.addEdge(precNode, jmpNode, cond)
@@ -948,7 +948,7 @@ class ProgramCfgFactory:
     */
   private def inlineProcedureCalls(procNodes: Set[CfgCommandNode], inlineAmount: Int): Set[CfgCommandNode] = {
     assert(inlineAmount >= 0)
-    println(s"[+] Inlining ${procNodes.size} leaf call nodes with ${inlineAmount} level(s) left")
+    Logger.info(s"[+] Inlining ${procNodes.size} leaf call nodes with ${inlineAmount} level(s) left")
 
     if (inlineAmount == 0 || procNodes.isEmpty) {
       return procNodes;
@@ -987,7 +987,7 @@ class ProgramCfgFactory:
   }
 
   private def unifyProcedureCalls(procNodes: Set[CfgCommandNode]): Set[CfgCommandNode] = {
-    println(s"[+] Unifyig ${procNodes.size} leaf call nodest")
+    Logger.info(s"[+] Unifyig ${procNodes.size} leaf call nodest")
 
     if (procNodes.isEmpty) {
       return procNodes;

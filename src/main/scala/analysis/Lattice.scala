@@ -2,6 +2,7 @@ package analysis
 
 import ir._
 import analysis.BitVectorEval
+import util.Logger
 
 /** Basic lattice
   */
@@ -147,7 +148,7 @@ object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWit
         case (FlatElement.Top, _) => FlatElement.Top
   } catch {
     case e: Exception =>
-      println(s"Failed on op $op with $a and $b")
+      Logger.error(s"Failed on op $op with $a and $b")
       throw e
   }
 

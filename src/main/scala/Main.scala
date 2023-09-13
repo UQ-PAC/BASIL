@@ -50,7 +50,7 @@ object Main {
       println(parser.helpText(sorted=false));
     }
 
-    Logger.setLevel(LogLevel.WARN)
+    Logger.setLevel(LogLevel.INFO)
     if (conf.verbose.value) {
       Logger.setLevel(LogLevel.DEBUG)
     }

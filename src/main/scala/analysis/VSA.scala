@@ -8,7 +8,7 @@ import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
 import analysis.eval.*
-import util.Logger as Logger
+import util.Logger
 
 /** ValueSets are PowerSet of possible values */
 trait Value
@@ -104,9 +104,9 @@ trait MemoryRegionValueSetAnalysis:
   /** Default implementation of eval.
    */
   def eval(cmd: Command, s: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
-    println(s"eval: $cmd")
-    println(s"state: $s")
-    println(s"node: $n")
+    Logger.debug(s"eval: $cmd")
+    Logger.debug(s"state: $s")
+    Logger.debug(s"node: $n")
     cmd match
       case localAssign: LocalAssign =>
         localAssign.rhs match
@@ -122,7 +122,7 @@ trait MemoryRegionValueSetAnalysis:
                   case _ =>
                     s + (localAssign.lhs -> s(r))
               case None =>
-                println("Warning: could not find region for " + localAssign)
+                Logger.warn("could not find region for " + localAssign)
                 s
           case _ => s
       case memAssign: MemoryAssign =>
@@ -137,10 +137,10 @@ trait MemoryRegionValueSetAnalysis:
                   case variable: Variable => // constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
                     return s + (r -> s(variable))
 
-                  case _ => println("Too Complex or Wrapped i.e. Extract(Variable)") // do nothing
+                  case _ => Logger.warn("Too Complex or Wrapped i.e. Extract(Variable)") // do nothing
                 s
               case None =>
-                println("Warning: could not find region for " + memAssign)
+                Logger.warn("could not find region for " + memAssign)
                 s
           case _ =>
             s

@@ -3,6 +3,7 @@ import ir.*
 import analysis.solvers.*
 import analysis.Lattice
 import analysis.*
+import util.Logger
 
 /**
  * Evaluate an expression in a hope of finding a global variable.
@@ -11,7 +12,7 @@ import analysis.*
  * @param n   : The node where the expression is evaluated (e.g. mem[R1 + 0x1234] <- ...)
  * @return: The evaluated expression (e.g. 0x69632) */
 def evaluateExpression(exp: Expr, n: CfgNode, constantProp: Map[CfgNode, Map[Variable, Any]]): Expr = {
-  println(s"evaluateExpression: $exp")
+  Logger.debug(s"evaluateExpression: $exp")
   exp match {
     case binOp: BinaryExpr =>
       val lhs = evaluateExpression(binOp.arg1, n, constantProp)

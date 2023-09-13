@@ -1,4 +1,12 @@
 package util
+
+import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.ArrayBuffer
+import java.io.{File, PrintWriter}
+import java.io.{BufferedWriter, FileWriter, IOException}
+import scala.jdk.CollectionConverters._
+import analysis.solvers._
+
 import analysis._
 import cfg_visualiser.{OtherOutput, Output, OutputKindE}
 import bap._
@@ -9,14 +17,7 @@ import BilParser._
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
-
-import java.io.{File, PrintWriter}
-import java.io.{BufferedWriter, FileWriter, IOException}
-import scala.jdk.CollectionConverters._
-import analysis.solvers._
-
-import scala.collection.mutable.ListBuffer
-import scala.collection.mutable.ArrayBuffer
+import util.Logger
 
 
 object RunUtils {
@@ -73,7 +74,7 @@ object RunUtils {
       Interpret(IRProgram)
     }
 
-    println("[!] Removing external function calls")
+    Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
     val externalNames = externalFunctions.map(e => e.name)
     val externalRemover = ExternalRemover(externalNames)
@@ -89,9 +90,9 @@ object RunUtils {
 
     IRProgram.stripUnreachableFunctions()
 
-    println("[!] Translating to Boogie")
+    Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
-    println("[!] Done! Exiting...")
+    Logger.info("[!] Done! Exiting...")
     boogieTranslator.translate
   }
 
@@ -125,36 +126,36 @@ object RunUtils {
 
     val cfg = ProgramCfgFactory().fromIR(IRProgram, false, 1000)
 
-    println("[!] Running Constant Propagation")
+    Logger.info("[!] Running Constant Propagation")
     val solver = ConstantPropagationAnalysis.WorklistSolver(cfg)
     val result = solver.analyze(true).asInstanceOf[Map[CfgNode, Map[Variable, Any]]]
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder), "cpa")
 
-    println("[!] Running MRA")
+    Logger.info("[!] Running MRA")
     val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, result)
     val result2 = solver2.analyze(true).asInstanceOf[Map[CfgNode, MemoryRegion]]
     memoryRegionAnalysisResults = Some(result2)
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder), "mra")
 
-    println("[!] Running MMM")
+    Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
     mmm.convertMemoryRegions(result2, mergedSubroutines)
 
-    println("[!] Running VSA")
+    Logger.info("[!] Running VSA")
     val solver3 = ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, result)
     val result3 = solver3.analyze(false)
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
 
-    println("[!] Resolving CFG")
+    Logger.info("[!] Resolving CFG")
     val (newIR, modified) = resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram)
     if (modified) {
-      println("[!] Analysing again")
+      Logger.info(s"[!] Analysing again (iter $iterations)")
       return analyse(newIR, externalFunctions, globals, globalOffsets)
     }
     val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 1000)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
 
-    println(s"[!] Finished indirect call resolution after $iterations iterations")
+    Logger.info(s"[!] Finished indirect call resolution after $iterations iterations")
 
     newIR
   }

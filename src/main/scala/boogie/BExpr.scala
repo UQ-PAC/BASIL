@@ -254,9 +254,6 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            //println(arg1)
-            //println(arg2)
-            //println(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVCOMP =>
@@ -270,8 +267,6 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
           if (bv1.size == bv2.size) {
             BoolBType
           } else {
-            //println(arg1)
-            //println(arg2)
             throw new Exception("bitvector size mismatch")
           }
         case BVEQ | BVNEQ =>
