@@ -99,7 +99,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case None => throw new Exception(s"unresolvable reference to '$id' in specification")
     }
     val size = ctx.typeName match {
-      case b: BvTypeContext => Integer.parseInt(b.size.getText)
+      case b: BvTypeContext => Integer.parseInt(b.BVSIZE.getText.stripPrefix("bv"))
       case _: LongTypeContext => 64
       case _: ShortTypeContext => 16
       case _: IntTypeContext => 32
@@ -120,24 +120,6 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     (nameToGlobals(ctx.id.getText), visitExpr(ctx.expr, nameToGlobals))
   }
 
-  /*
-  def visitGamma(ctx: GammaContext): (SpecGlobal, BoolLit) = {
-    (idToGlobals(ctx.id.getText), visitBoolLit(ctx.boolLit))
-  }
-
-  def visitGammaInits(ctx: GammaInitsContext): Map[SpecGlobal, BoolLit] = {
-    ctx.gamma.asScala.map(g => visitGamma(g)).toMap
-  }
-
-  def visitInit(ctx: InitContext): (SpecGlobal, IntLiteral) = {
-    (idToGlobals(ctx.id.getText), visitNat(ctx.nat))
-  }
-
-  def visitInits(ctx: InitsContext): Map[SpecGlobal, IntLiteral] = {
-    ctx.init.asScala.map(i => visitInit(i)).toMap
-  }
-
-   */
   def visitLPreds(ctx: LPredsContext, nameToGlobals: Map[String, SpecGlobal]): Map[SpecGlobal, BExpr] = {
     ctx.lPred.asScala.map(l => visitLPred(l, nameToGlobals)).toMap
   }
@@ -201,7 +183,6 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitAtomExpr(ctx: AtomExprContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Parameter] = Map()): BExpr = ctx match {
     case b: BoolLitExprContext => visitBoolLit(b.boolLit)
     case i: IdExprContext => visitId(i.id, nameToGlobals, params)
-    case g: GammaIdExprContext => visitGammaId(g.gammaId, nameToGlobals, params)
     case o: OldExprContext => visitOldExpr(o, nameToGlobals, params)
     case p: ParenExprContext => visitExpr(p.expr, nameToGlobals, params)
     case i: IfThenElseExprContext => visitIfThenElseExpr(i, nameToGlobals, params)
@@ -218,7 +199,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   }
 
   def visitBv(ctx: BvContext): BitVecBLiteral = {
-    BitVecBLiteral(BigInt(ctx.value.getText), Integer.parseInt(ctx.size.getText))
+    BitVecBLiteral(BigInt(ctx.value.getText), Integer.parseInt(ctx.BVSIZE.getText.stripPrefix("bv")))
   }
 
   def visitOldExpr(ctx: OldExprContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Parameter] = Map()): Old = Old(visitExpr(ctx.expr, nameToGlobals, params))
@@ -234,24 +215,33 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     case "false" => FalseBLiteral
   }
 
-  def visitGammaId(ctx: GammaIdContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Parameter] = Map()): BExpr = {
-    val id = ctx.id.getText
-    params.get(id) match {
-      case Some(p: Parameter) => p.toGamma
-      case None => nameToGlobals.get(id) match {
-        case Some(g: SpecGlobal) => SpecGamma(g)
-        case None => throw new Exception(s"unresolvable reference to 'Gamma_$id' in specification")
-      }
-    }
-  }
-
   def visitId(ctx: IdContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Parameter] = Map()): BExpr = {
     val id = ctx.getText
-    params.get(id) match {
-      case Some(p: Parameter) => p.toBoogie
-      case None => nameToGlobals.get(ctx.getText) match {
-        case Some(g: SpecGlobal) => g
-        case None => throw new Exception(s"unresolvable reference to '$id' in specification")
+    if (id.startsWith("Gamma_")) {
+      val gamma_id = id.stripPrefix("Gamma_")
+      params.get(gamma_id) match {
+        case Some(p: Parameter) => p.value.toGamma
+        case None => nameToGlobals.get(gamma_id) match {
+          case Some(g: SpecGlobal) => SpecGamma(g)
+          case None => throw new Exception(s"unresolvable reference to 'Gamma_$id' in specification")
+        }
+      }
+    } else {
+      params.get(id) match {
+        case Some(p: Parameter) =>
+          val registerSize = p.value.size
+          val paramSize = p.size
+          if (paramSize == registerSize) {
+            p.value.toBoogie
+          } else if (registerSize > paramSize) {
+            BVExtract(registerSize - p.size, 0, p.value.toBoogie)
+          } else {
+            throw Exception(s"parameter $p doesn't fit in register ${p.value} for ID $id")
+          }
+        case None => nameToGlobals.get(ctx.getText) match {
+          case Some(g: SpecGlobal) => g
+          case None => throw new Exception(s"unresolvable reference to '$id' in specification")
+        }
       }
     }
   }
