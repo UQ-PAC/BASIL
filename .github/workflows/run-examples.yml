@@ -1,0 +1,36 @@
+name: Run Examples 
+on: 
+  push:
+    branches: 
+      - main
+  pull_request:
+    branches: 
+      - main
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10 
+    container:
+      # Requires repo to have action access in package settings
+      # 
+      image: ghcr.io/uq-pac/basil-dev:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.github_token }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile BASIL 
+        run: sbt assembly
+
+      - name: Bitvec Tests
+        run: sbt "testOnly BitVectorAnalysisTests"
+
+      - name: System Tests
+        run: sbt "testOnly *SystemTests -- -z basic_assign_increment/gcc_no_plt_no_pic -z basic_assign_increment/clang_no_plt_no_pic -z secret_write/gcc_no_plt_no_pic"
+
+
+
+

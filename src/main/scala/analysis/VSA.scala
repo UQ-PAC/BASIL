@@ -7,6 +7,7 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
+import util.Logger
 
 /** ValueSets are PowerSet of possible values */
 trait Value
@@ -130,13 +131,13 @@ trait MemoryRegionValueSetAnalysis:
                             case _ => return exp
                           }
                         case _ =>
-                          println("ERROR: OPERATOR " + binOp.op + " NOT HANDLED: " + binOp)
+                          Logger.error("OPERATOR " + binOp.op + " NOT HANDLED: " + binOp)
                           return exp
                       }
                     case _ => return exp
                   }
                 case _ =>
-                  println("ERROR: CASE NOT HANDLED: " + assigmentsMap.get(variable, pred) + " FOR " + binOp)
+                  Logger.error("CASE NOT HANDLED: " + assigmentsMap.get(variable, pred) + " FOR " + binOp)
                   return exp
               }
             }
@@ -266,13 +267,13 @@ trait MemoryRegionValueSetAnalysis:
                           case _ => s
                         }
                       case _ =>
-                        println("ERROR: tried to eval operator: " + binOp.op + " in " + binOp)
+                        Logger.error("tried to eval operator: " + binOp.op + " in " + binOp)
                         s
                     }
                   case _ => s
                 }
               case _ =>
-                println("WARNING: RHS is not BitVecLiteral and is skipped " + rhs)
+                Logger.warn("RHS is not BitVecLiteral and is skipped " + rhs)
                 s
             }
           case _ => s
@@ -282,7 +283,7 @@ trait MemoryRegionValueSetAnalysis:
             memLoad.index match
               case binOp: BinaryExpr =>
                 binOp.arg1 match {
-                  case v: Register if v.name.equals("R21") => println()
+                  case v: Register if v.name.equals("R21") => Logger.info("")
                   case _ =>
                 }
                 evaluateExpression(binOp.arg2, n) match {
@@ -316,13 +317,13 @@ trait MemoryRegionValueSetAnalysis:
                               case _ => s
                             }
                           case _ =>
-                            println("ERROR: tried to eval operator: " + binOp.op + " in " + binOp)
+                            Logger.error("tried to eval operator: " + binOp.op + " in " + binOp)
                             s
                         }
                       case _ => s
                     }
                   case rhs: _ =>
-                    println("WARNING: RHS is not BitVecLiteral and is skipped " + rhs)
+                    Logger.warn("RHS is not BitVecLiteral and is skipped " + rhs)
                     s
                 }
               case _ => s
@@ -330,8 +331,8 @@ trait MemoryRegionValueSetAnalysis:
             s + (localAssign.lhs -> s.getOrElse(variable, Set.empty))
           case _ => s
       case _ =>
-        println(s"type: ${stmt.getClass} $stmt")
-        throw new Exception("Unknown type")
+        Logger.error(s"type: ${stmt.getClass} $stmt")
+        throw new Exception("Unknown type " + s"type: ${stmt.getClass} $stmt")
     }
   }
 

@@ -8,6 +8,8 @@ import scala.collection.mutable.ListBuffer
 
 import scala.util.control.Breaks.break;
 
+import util.Logger
+
 object CfgNode:
 
   var id: Int = 0
@@ -170,8 +172,7 @@ object Cfg:
   /** Generate the cfg for each function of the program.
    */
   def generateCfgProgram(program: Program, interProc: Boolean): Cfg = {
-    println()
-    println("Generating CFG...")
+    Logger.info("\nGenerating CFG...")
     cfg = Cfg()
     latestAdded = None
 
@@ -299,7 +300,7 @@ object Cfg:
               if (i.target.name.equals("R30")) {
                 cfg.addEdge(latestAdded.get, functionExitNode)
               } else {
-                println(s"Cannot resolve indirect call ${i} ${func.name}")
+                Logger.info(s"Cannot resolve indirect call ${i} ${func.name}")
               }
               if (i.returnTarget.isDefined) {
                 if (processedBlocks.contains(i.returnTarget.get.label)) {
@@ -341,7 +342,7 @@ object Cfg:
               cfg.addEdge(lastAdded, call)
               latestAdded = Some(call)
               //            cfg.addEdge(call, functionExitNode)
-              println(s"Indirect call not supported yet ${i}")
+              Logger.warn(s"Indirect call not supported yet ${i}")
 
 
               if (i.returnTarget.isDefined) {

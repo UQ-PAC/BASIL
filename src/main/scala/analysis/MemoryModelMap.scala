@@ -1,6 +1,6 @@
 package analysis
 
-import analysis._
+import analysis.*
 import ir.BitVecLiteral
 
 import scala.collection.mutable

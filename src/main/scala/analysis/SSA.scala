@@ -1,12 +1,10 @@
-package analysis.util
+package analysis
 
-import analysis._
-import ir._
-import analysis.solvers._
+import analysis.solvers.*
+import ir.*
 
 import scala.collection.mutable
-import scala.collection.mutable.HashMap
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.{HashMap, ListBuffer}
 
 //Static Single Assignment (SSA) form
 //Takes a program and normalises it based on that from

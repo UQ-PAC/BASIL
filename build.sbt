@@ -8,6 +8,8 @@ val javaTests = "com.novocode" % "junit-interface" % "0.11" % "test"
 val scalaTests = "org.scalatest" %% "scalatest" % "3.2.10" % "test"
 val scalactic = "org.scalactic" %% "scalactic" % "3.2.10"
 val antlrRuntime = "org.antlr" % "antlr4-runtime" % "4.9.3"
+val sourceCode = "com.lihaoyi" %% "sourcecode" % "0.3.0"
+val mainArgs = "com.lihaoyi" %% "mainargs" % "0.5.1"
 
 lazy val root = project
   .in(file("."))
@@ -17,11 +19,13 @@ lazy val root = project
     Antlr4 / antlr4Version := "4.9.3",
     Antlr4 / antlr4GenVisitor := true,
     Antlr4 / antlr4PackageName := Some("Parsers"),
-    Compile / run / mainClass := Some("main"),
+    Compile / run / mainClass := Some("Main"),
     libraryDependencies += javaTests,
     libraryDependencies += antlrRuntime,
     libraryDependencies += scalactic,
-    libraryDependencies += scalaTests
+    libraryDependencies += scalaTests,
+    libraryDependencies += sourceCode,
+    libraryDependencies += mainArgs
   )
 
 lazy val updateExpected = taskKey[Unit]("updates .expected for test cases")
@@ -81,3 +85,4 @@ updateExpected := {
   expectedUpdate(correctPath, true)
   expectedUpdate(incorrectPath, false)
 }
+

@@ -17,63 +17,58 @@ import analysis.solvers._
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
+
 object RunUtils {
   var memoryRegionAnalysisResults: Option[Map[CfgNode, _]] = None
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
 
-  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
-
+  def loadBAP(fileName: String): BAPProgram = {
     val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(ADTLexer)
     val parser = BAP_ADTParser(tokens)
 
     parser.setBuildParseTree(true)
 
-    val program = BAPLoader.visitProject(parser.project())
+    BAPLoader.visitProject(parser.project())
+  }
 
-    val readELFLexer = ReadELFLexer(CharStreams.fromFileName(elfFileName))
-    val readELFTokens = CommonTokenStream(readELFLexer)
-    val readELFParser = ReadELFParser(readELFTokens)
-    readELFParser.setBuildParseTree(true)
+  def loadReadELF(fileName: String): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
+    val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
+    val tokens = CommonTokenStream(lexer)
+    val parser = ReadELFParser(tokens)
+    parser.setBuildParseTree(true)
+    ReadELFLoader.visitSyms(parser.syms())
+  }
 
-    val (externalFunctions, globals, globalOffsets, mainAddress) = ReadELFLoader.visitSyms(readELFParser.syms())
-
-    //println(globalOffsets)
-    //val procmap = program.subroutines.map(s => (s.name, s.address)).toMap
-    //println(procmap)
-    //println(globals)
-    /*
-    TODO analyses/transformations
-    -type checking
-    -make sure there's no sneaky stack accesses
-    -constant propagation to properly analyse control flow and replace all indirect calls
-    -identify external calls
-    -check for use of uninitialised registers in procedures to pass them in
-    -points to/alias analysis to split memory into separate maps as much as possible? do we want this?
-    -make memory reads better?
-     */
-
-    val externalNames = externalFunctions.map(e => e.name)
-
-    val IRTranslator = BAPToIR(program, mainAddress)
-    var IRProgram = IRTranslator.translate
-
-    val specification = specFileName match {
+  def loadSpecification(filename: Option[String], program: Program, globals: Set[SpecGlobal]): Specification = {
+    filename match {
       case Some(s) => val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
         val specTokens = CommonTokenStream(specLexer)
         val specParser = SpecificationsParser(specTokens)
         specParser.setBuildParseTree(true)
-        val specLoader = SpecificationLoader(globals, IRProgram)
+        val specLoader = SpecificationLoader(globals, program)
         specLoader.visitSpecification(specParser.specification())
       case None => Specification(globals, Map(), List(), List(), List(), Set())
     }
+  }
+
+  def loadAndTranslate(BAPFileName: String, readELFFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
+    val bapProgram = loadBAP(BAPFileName)
+
+    val (externalFunctions, globals, globalOffsets) = loadReadELF(readELFFileName)
+
+    val IRTranslator = BAPToIR(bapProgram, mainAddress)
+    var IRProgram = IRTranslator.translate
+
+    val specification = loadSpecification(specFileName, IRProgram, globals)
 
     if (performInterpret) {
       Interpret(IRProgram)
     }
 
+    val externalNames = externalFunctions.map(e => e.name)
     val externalRemover = ExternalRemover(externalNames)
     val renamer = Renamer(reserved)
     IRProgram = externalRemover.visitProgram(IRProgram)
@@ -95,14 +90,14 @@ object RunUtils {
     val subroutines = IRProgram.procedures.filter(p => p.address.isDefined).map{(p: Procedure) => BigInt(p.address.get) -> p.name}.toMap
     val globalAddresses = globals.map{(s: SpecGlobal) => s.address -> s.name}.toMap
     val externalAddresses = externalFunctions.map{(e: ExternalFunction) => e.offset -> e.name}.toMap
-    println("Globals:" )
-    println(globalAddresses)
-    println("Global Offsets: ")
-    println(globalOffsets)
-    println("External: ")
-    println(externalAddresses)
-    println("Subroutine Addresses:")
-    println(subroutines)
+    Logger.info("Globals:" )
+    Logger.info(globalAddresses)
+    Logger.info("Global Offsets: ")
+    Logger.info(globalOffsets)
+    Logger.info("External: ")
+    Logger.info(externalAddresses)
+    Logger.info("Subroutine Addresses:")
+    Logger.info(subroutines)
     //    val wcfg = IntraproceduralProgramCfg.generateFromProgram(program)
     //
     ////    //print(wcfg.nodes)
@@ -234,20 +229,20 @@ object RunUtils {
         case globalAddress: GlobalAddress =>
           if (nameExists(globalAddress.name)) {
             functionNames += globalAddress
-            println(s"RESOLVED: Call to Global address ${globalAddress.name} resolved.")
+            Logger.info(s"RESOLVED: Call to Global address ${globalAddress.name} resolved.")
           } else {
             addFakeProcedure(globalAddress.name)
             functionNames += globalAddress
-            println(s"Global address ${globalAddress.name} does not exist in the program.  Added a fake function.")
+            Logger.info(s"Global address ${globalAddress.name} does not exist in the program.  Added a fake function.")
           }
         case localAddress: LocalAddress =>
           if (nameExists(localAddress.name)) {
             functionNames += localAddress
-            println(s"RESOLVED: Call to Local address ${localAddress.name}")
+            Logger.info(s"RESOLVED: Call to Local address ${localAddress.name}")
           } else {
             addFakeProcedure(localAddress.name)
             functionNames += localAddress
-            println(s"Local address ${localAddress.name} does not exist in the program. Added a fake function.")
+            Logger.info(s"Local address ${localAddress.name} does not exist in the program. Added a fake function.")
           }
         case _ =>
       }
@@ -263,7 +258,7 @@ object RunUtils {
       writer.flush()
       writer.close()
     } catch {
-      case _: IOException => System.err.println("Error writing to file.")
+      case _: IOException => Logger.error("Error writing to file.")
     }
   }
 

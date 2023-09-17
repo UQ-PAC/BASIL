@@ -170,33 +170,18 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            /*
-            println(arg1)
-            println(arg2)
-            println(this)
-            */
             throw new Exception("bitvector size mismatch")
           }
         case BVCOMP =>
           if (bv1.size == bv2.size) {
             BitVecType(1)
           } else {
-            //BitVecType(1)
-            /*
-            println(arg1)
-            println(arg2)
-            println(this)
-            */
             throw new Exception("bitvector size mismatch")
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolType
           } else {
-            /*
-            println(arg1)
-            println(arg2)
-            */
             throw new Exception("bitvector size mismatch")
           }
         case BVEQ | BVNEQ =>
