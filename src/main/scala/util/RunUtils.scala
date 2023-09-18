@@ -57,7 +57,7 @@ object RunUtils {
   def loadAndTranslate(BAPFileName: String, readELFFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
     val bapProgram = loadBAP(BAPFileName)
 
-    val (externalFunctions, globals, globalOffsets) = loadReadELF(readELFFileName)
+    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(readELFFileName)
 
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
