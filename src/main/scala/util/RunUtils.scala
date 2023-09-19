@@ -20,6 +20,8 @@ import scala.collection.mutable.ArrayBuffer
 object RunUtils {
   var memoryRegionAnalysisResults: Option[Map[CfgNode, _]] = None
 
+  var iterations = 0;
+
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
 
@@ -88,6 +90,7 @@ object RunUtils {
     IRProgram = renamer.visitProgram(IRProgram)
 
     if (performAnalysis) {
+      iterations = 0;
       IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
     }
 
@@ -100,6 +103,7 @@ object RunUtils {
   }
 
   def analyse(IRProgram: Program, externalFunctions: Set[ExternalFunction], globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt]): Program = {
+    iterations += 1
     val subroutines = IRProgram.procedures.filter(p => p.address.isDefined).map{(p: Procedure) => BigInt(p.address.get) -> p.name}.toMap
     val globalAddresses = globals.map{(s: SpecGlobal) => s.address -> s.name}.toMap
     val externalAddresses = externalFunctions.map{(e: ExternalFunction) => e.offset -> e.name}.toMap
@@ -114,7 +118,7 @@ object RunUtils {
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
-    val cfg = ProgramCfg.fromIR(IRProgram, false, 1000)
+    val cfg = ProgramCfgFactory().fromIR(IRProgram, false, 1000)
 
     println("[!] Running Constant Propagation")
     val solver = ConstantPropagationAnalysis.WorklistSolver(cfg)
@@ -142,8 +146,11 @@ object RunUtils {
       println("[!] Analysing again")
       return analyse(newIR, externalFunctions, globals, globalOffsets)
     }
-    val newCFG = ProgramCfg.fromIR(newIR, inlineLimit = 1000)
+    val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 1000)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
+
+    println(s"[!] Finished indirect call resolution after $iterations iterations")
+
     newIR
   }
 
@@ -171,6 +178,13 @@ object RunUtils {
       case commandNode: CfgCommandNode =>
         commandNode.data match
           case indirectCall: IndirectCall =>
+            if (!commandNode.block.jumps.contains(indirectCall)) {
+              // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data
+              // Hence if we have already processed this CFG node there will be no corresponding IndirectCall in the IR
+              // to replace.
+              // We want to replace all possible indirect calls based on this CFG, before regenerating it from the IR
+              return
+            }
             val valueSet: Map[Expr, Set[Value]] = valueSets(n)
             val functionNames = resolveAddresses(valueSet(indirectCall.target))
             if (functionNames.size == 1) {

@@ -550,7 +550,7 @@ class ProgramCfg:
  * Control-flow graph for an entire program. We have a more granular approach, 
  *  storing commands as nodes instead of basic blocks.
  */
-object ProgramCfg:
+class ProgramCfgFactory:
   val cfg: ProgramCfg = ProgramCfg()
   
   // Mapping from procedures to the start of their individual (intra) cfgs
