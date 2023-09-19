@@ -13,7 +13,7 @@ class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBu
     var next = "main"
     var reachableNames: Set[String] = Set("main")
     var toVisit: List[String] = List()
-    var reachableFound = true;
+    var reachableFound = true
     while (reachableFound) {
       val children = functionToChildren(next) -- reachableNames -- toVisit - next
       reachableNames = reachableNames ++ children
@@ -64,7 +64,11 @@ class Offset(var name: String, var memory: Memory, var size: Int, var value: Big
 class Parameter(var name: String, var size: Int, var value: Variable) {
   def toBoogie: BVariable = BParam(name, BitVecBType(size))
   def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
+
+  override def toString: String = name + " " + value
 }
 
 case class MemorySection(name: String, address: Int, size: Int, bytes: Seq[Literal])
+
+case class Thread(procedures: List[Procedure] = null, startingPoint: Procedure = null)
 

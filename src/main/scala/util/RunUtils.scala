@@ -1,19 +1,19 @@
 package util
-import analysis._
-import cfg_visualiser.{OtherOutput, Output, OutputKindE}
-import bap._
-import ir._
-import boogie._
-import specification._
-import BilParser._
+import analysis.{CfgNode, *}
+import cfg_visualiser.{OtherOutput, Output, OutputKindE, ThreadOutput}
+import bap.*
+import ir.{Variable, *}
+import boogie.*
+import specification.*
+import BilParser.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating._
+import translating.*
 
 import java.io.{File, PrintWriter}
 import java.io.{BufferedWriter, FileWriter, IOException}
-import scala.jdk.CollectionConverters._
-import analysis.solvers._
+import scala.jdk.CollectionConverters.*
+import analysis.solvers.*
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
@@ -22,6 +22,8 @@ object RunUtils {
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
+
+  val threadInfo: ThreadOutput = ThreadOutput(OutputKindE.cfg);
 
   // constants
   private val exitRegister: Variable = Variable("R30", BitVecType(64))
@@ -137,7 +139,7 @@ object RunUtils {
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
 
     println("[!] Resolving CFG")
-    val (newIR, modified) = resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram)
+    val (newIR, modified) = resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram, result)
     if (modified) {
       println("[!] Analysing again")
       return analyse(newIR, externalFunctions, globals, globalOffsets)
@@ -147,7 +149,7 @@ object RunUtils {
     newIR
   }
 
-  def resolveCFG(cfg: ProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): (Program, Boolean) = {
+  def resolveCFG(cfg: ProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program, constantPropagationResult: Map[CfgNode, Map[Variable, Any]]): (Program, Boolean) = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
     // find the main function
@@ -161,7 +163,7 @@ object RunUtils {
     while (worklist.nonEmpty) {
       val node = worklist.remove(0)
         if (!visited.contains(node)) {
-          process (node)
+          process(node)
           node.succ(true).toSet.union(node.succ(false).toSet).foreach(node => worklist.addOne(node))
           visited.add(node)
         }
@@ -199,6 +201,8 @@ object RunUtils {
                 throw new Exception(s"Indirect call ${indirectCall} has no possible targets. Value set: ${valueSet(indirectCall.target)}")
               }
             }
+          case directCall: DirectCall =>
+            DirectCallAnalysis.processCall(directCall, threadInfo, n, constantPropagationResult, IRProgram)
           case _ =>
       case _ =>
     }

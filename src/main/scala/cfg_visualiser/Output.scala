@@ -1,7 +1,11 @@
 package cfg_visualiser
 
 import java.io.{File, PrintWriter}
-import analysis._
+import analysis.*
+import ir.Variable
+
+import scala.collection.mutable.ArrayBuffer
+
 
 
 /**
@@ -116,5 +120,11 @@ sealed trait OutputKind
   * Other output kinds (for other processing phases than the actual analysis).
   */
 case class OtherOutput(kind: OutputKindE.Value) extends OutputKind {
+  override def toString: String = kind.toString
+}
+
+case class ThreadOutput(kind: OutputKindE.Value)  extends OutputKind {
+  var nodes: ArrayBuffer[Thread]
+
   override def toString: String = kind.toString
 }

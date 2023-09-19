@@ -831,6 +831,7 @@ object ProgramCfg:
                   calls.foreach(node => {
                     cfg.addEdge(node, callRet)
                   })
+
                   if (visitedBlocks.contains(retBlock)) {
                     val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
                     cfg.addEdge(callRet, retBlockEntry)
