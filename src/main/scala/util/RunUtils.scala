@@ -125,7 +125,7 @@ object RunUtils {
     val result = solver.analyze(true).asInstanceOf[Map[CfgNode, Map[Variable, Any]]]
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder), "cpa")
 
-    println("[!] Running MRA")
+    println("[!] Running MRA") // resolves memory loads from full mem to stack/mem
     val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, result)
     val result2 = solver2.analyze(true).asInstanceOf[Map[CfgNode, MemoryRegion]]
     memoryRegionAnalysisResults = Some(result2)
@@ -177,6 +177,26 @@ object RunUtils {
     def process(n: CfgNode): Unit = n match {
       case commandNode: CfgCommandNode =>
         commandNode.data match
+          case localAssign: LocalAssign =>
+            localAssign.rhs match
+              case _: MemoryLoad =>
+                if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).size == 1) {
+                  println(valueSets(n).get(localAssign.lhs).head)
+                  if (valueSets(n).get(localAssign.lhs).head.nonEmpty) {
+                    valueSets(n).get(localAssign.lhs).head.head match
+                      case localAddress: LocalAddress =>
+                        localAssign.rhs = localAddress.expr
+                        println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${localAddress.expr}")
+                      case globalAddress: GlobalAddress =>
+                        localAssign.rhs = globalAddress.expr
+                        println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${globalAddress.expr}")
+                      case literalValue: LiteralValue =>
+                        localAssign.rhs = literalValue.expr
+                        println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${literalValue.expr}")
+                      case _ => throw new Exception("Memory load resolved to unexpected value")
+                  }
+                }
+              case _ =>
           case indirectCall: IndirectCall =>
             if (!commandNode.block.jumps.contains(indirectCall)) {
               // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data
