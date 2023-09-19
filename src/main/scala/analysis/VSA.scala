@@ -26,6 +26,9 @@ case class LiteralValue(expr: BitVecLiteral) extends Value {
   override def toString: String = "Literal(" + expr + ")"
 }
 
+type VSALatticeElem = MapLattice[Variable | MemoryRegion, PowersetLattice[Value]]
+
+
 trait MemoryRegionValueSetAnalysis:
 
   val cfg: ProgramCfg
@@ -38,11 +41,11 @@ trait MemoryRegionValueSetAnalysis:
 
   /** The lattice of abstract values.
    */
-  val powersetLattice: MapLattice[Any, PowersetLattice[Value]]
+  val powersetLattice: VSALatticeElem 
 
   /** The lattice of abstract states.
    */
-  val lattice: MapLattice[CfgNode, MapLattice[Any, PowersetLattice[Value]]] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CfgNode, VSALatticeElem] = MapLattice(powersetLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -72,7 +75,7 @@ trait MemoryRegionValueSetAnalysis:
       case binOp: BinaryExpr =>
         if (binOp.arg1 == stackPointer) {
           val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp)
-          mmm.findObject(rhs.asInstanceOf[BitVecLiteral].value, "stack") match
+          mmm.findStackObject(rhs.asInstanceOf[BitVecLiteral].value) match
             case Some(obj: MemoryRegion) => Some(obj)
             case _ => None
         } else {
@@ -80,7 +83,7 @@ trait MemoryRegionValueSetAnalysis:
           if (!evaluation.isInstanceOf[BitVecLiteral]) {
             return None
           }
-          mmm.findObject(evaluation.asInstanceOf[BitVecLiteral].value, "data") match
+          mmm.findDataObject(evaluation.asInstanceOf[BitVecLiteral].value) match
             case Some(obj: MemoryRegion) => Some(obj)
             case _ => None
         }
@@ -185,7 +188,7 @@ abstract class ValueSetAnalysis(val cfg: ProgramCfg,
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
  */
-abstract class IntraprocValueSetAnalysisWorklistSolver[L <: MapLattice[Any, PowersetLattice[Value]]]
+abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem]
 (
   cfg: ProgramCfg,
   globals: Map[BigInt, String],
@@ -219,5 +222,5 @@ object ValueSetAnalysis:
       subroutines,
       mmm,
       constantProp,
-      MapLattice[Any, PowersetLattice[Value]](PowersetLattice[Value])
+      MapLattice[Variable | MemoryRegion, PowersetLattice[Value]](PowersetLattice[Value])
     )
