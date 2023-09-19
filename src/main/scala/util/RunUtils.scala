@@ -191,6 +191,13 @@ object RunUtils {
                   val extractedValue = extractExprFromValue(valueSets(n).get(localAssign.lhs).head.head)
                   localAssign.rhs = extractedValue
                   println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${extractedValue}")
+                } else if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size > 1) {
+                  // must merge into a single memory variable to represent the possible values
+                  // Make a binary OR of all the possible values takes two at a time (probably incorrect to do BVOR)
+                  val values = valueSets(n).get(localAssign.lhs).head
+                  val exprValues = values.map(extractExprFromValue)
+                  val result = exprValues.reduce((a, b) => BinaryExpr(BVOR, a, b))
+                  localAssign.rhs = result
                 }
               case _ =>
           case indirectCall: IndirectCall =>
