@@ -583,7 +583,13 @@ trait MemoryRegionAnalysisMisc:
           case localAssign: LocalAssign =>
             localAssign.rhs match
               case memoryLoad: MemoryLoad =>
-                lattice.sublattice.lub(s, eval(memoryLoad.index, s, n))
+                val result = eval(memoryLoad.index, s, n)
+                result.collectFirst({
+                  case StackRegion(_, _, _) =>
+                    memoryLoad.mem = Memory("stack", memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
+                  case _ =>
+                })
+                lattice.sublattice.lub(s, result)
               case _ => s
           case _ => s
         }
