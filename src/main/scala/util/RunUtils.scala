@@ -174,27 +174,23 @@ object RunUtils {
         }
     }
 
+    def extractExprFromValue(v: Value): Expr = v match {
+      case LiteralValue(expr) => expr
+      case localAddress: LocalAddress => localAddress.expr
+      case globalAddress: GlobalAddress => globalAddress.expr
+      case _ => throw new Exception("Expected a Value with an Expr")
+    }
+
     def process(n: CfgNode): Unit = n match {
       case commandNode: CfgCommandNode =>
         commandNode.data match
           case localAssign: LocalAssign =>
             localAssign.rhs match
               case _: MemoryLoad =>
-                if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).size == 1) {
-                  println(valueSets(n).get(localAssign.lhs).head)
-                  if (valueSets(n).get(localAssign.lhs).head.nonEmpty) {
-                    valueSets(n).get(localAssign.lhs).head.head match
-                      case localAddress: LocalAddress =>
-                        localAssign.rhs = localAddress.expr
-                        println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${localAddress.expr}")
-                      case globalAddress: GlobalAddress =>
-                        localAssign.rhs = globalAddress.expr
-                        println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${globalAddress.expr}")
-                      case literalValue: LiteralValue =>
-                        localAssign.rhs = literalValue.expr
-                        println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${literalValue.expr}")
-                      case _ => throw new Exception("Memory load resolved to unexpected value")
-                  }
+                if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size == 1) {
+                  val extractedValue = extractExprFromValue(valueSets(n).get(localAssign.lhs).head.head)
+                  localAssign.rhs = extractedValue
+                  println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${extractedValue}")
                 }
               case _ =>
           case indirectCall: IndirectCall =>
