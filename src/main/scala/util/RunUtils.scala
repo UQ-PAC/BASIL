@@ -5,7 +5,7 @@ import bap._
 import ir._
 import boogie._
 import specification._
-import BilParser._
+import Parsers._
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
@@ -24,22 +24,22 @@ object RunUtils {
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
 
-  def loadBAP(filename: String): BAPProgram = {
-    val adtLexer = BilAdtLexer(CharStreams.fromFileName(filename))
-    val tokens = CommonTokenStream(adtLexer)
-    val parser = BilAdtParser(tokens)
+  def loadBAP(fileName: String): BAPProgram = {
+    val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
+    val tokens = CommonTokenStream(ADTLexer)
+    val parser = BAP_ADTParser(tokens)
 
     parser.setBuildParseTree(true)
 
-    AdtStatementLoader.visitProject(parser.project())
+    BAPLoader.visitProject(parser.project())
   }
 
-  def loadReadELF(filename: String): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt]) = {
-    val elfLexer = SymsLexer(CharStreams.fromFileName(filename))
-    val elfTokens = CommonTokenStream(elfLexer)
-    val elfParser = SymsParser(elfTokens)
-    elfParser.setBuildParseTree(true)
-    ElfLoader.visitSyms(elfParser.syms())
+  def loadReadELF(fileName: String): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
+    val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
+    val tokens = CommonTokenStream(lexer)
+    val parser = ReadELFParser(tokens)
+    parser.setBuildParseTree(true)
+    ReadELFLoader.visitSyms(parser.syms())
   }
 
   def loadSpecification(filename: Option[String], program: Program, globals: Set[SpecGlobal]): Specification = {
@@ -50,16 +50,16 @@ object RunUtils {
         specParser.setBuildParseTree(true)
         val specLoader = SpecificationLoader(globals, program)
         specLoader.visitSpecification(specParser.specification())
-      case None => Specification(globals, Map(), List(), List(), List())
+      case None => Specification(globals, Map(), List(), List(), List(), Set())
     }
   }
 
   def loadAndTranslate(BAPFileName: String, readELFFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
     val bapProgram = loadBAP(BAPFileName)
 
-    val (externalFunctions, globals, globalOffsets) = loadReadELF(readELFFileName)
+    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(readELFFileName)
 
-    val IRTranslator = BAPToIR(bapProgram)
+    val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
 
     val specification = loadSpecification(specFileName, IRProgram, globals)
@@ -79,6 +79,8 @@ object RunUtils {
     }
 
     IRProgram.stripUnreachableFunctions()
+    IRProgram.stackIdentification()
+    IRProgram.setModifies()
 
     val boogieTranslator = IRToBoogie(IRProgram, specification)
     boogieTranslator.translate

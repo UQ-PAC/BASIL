@@ -204,13 +204,13 @@ class SSA(cfg: Cfg) {
           case stmtNode: CfgCommandNode =>
             stmtNode.data match
               case memAssign: MemoryAssign =>
-                memAssign.rhs.value.locals.foreach(l => {
+                memAssign.rhs.value.variables.foreach(l => {
                   e.getFrom match {
                     case fromStmtNode: CfgCommandNode =>
                       fromStmtNode.data match
                         case memAssign2: MemoryAssign =>
-                          if (memAssign2.rhs.index.locals.contains(l)) {
-                            memAssign2.rhs.index.locals.foreach(l2 => {
+                          if (memAssign2.rhs.index.variables.contains(l)) {
+                            memAssign2.rhs.index.variables.foreach(l2 => {
                               if (l2.equals(l)) {
                                 add_map(incomingMatches, l, l2)
                                 add_map(incomingMatches2, memAssign.rhs.value, memAssign2.rhs.index)
@@ -218,8 +218,8 @@ class SSA(cfg: Cfg) {
                             })
                           }
                         case localAssign: LocalAssign =>
-                          if (localAssign.lhs.locals.contains(l)) {
-                            localAssign.lhs.locals.foreach(l2 => {
+                          if (localAssign.lhs.variables.contains(l)) {
+                            localAssign.lhs.variables.foreach(l2 => {
                               if (l2.equals(l)) {
                                 add_map(incomingMatches, l, l2)
                                 add_map(incomingMatches2, memAssign.rhs.value, localAssign.lhs)
@@ -231,13 +231,13 @@ class SSA(cfg: Cfg) {
                   }
                 })
               case localAssign: LocalAssign =>
-                localAssign.rhs.locals.foreach(l => {
+                localAssign.rhs.variables.foreach(l => {
                   e.getFrom match {
                     case fromStmtNode: CfgCommandNode =>
                       fromStmtNode.data match
                         case memAssign: MemoryAssign =>
-                          if (memAssign.rhs.index.locals.contains(l)) {
-                            memAssign.rhs.index.locals.foreach(l2 => {
+                          if (memAssign.rhs.index.variables.contains(l)) {
+                            memAssign.rhs.index.variables.foreach(l2 => {
                               if (l2.equals(l)) {
                                 add_map(incomingMatches, l, l2)
                                 add_map(incomingMatches2, localAssign.rhs, memAssign.rhs.index)
@@ -245,8 +245,8 @@ class SSA(cfg: Cfg) {
                             })
                           }
                         case localAssign2: LocalAssign =>
-                          if (localAssign2.lhs.locals.contains(l)) {
-                            localAssign2.lhs.locals.foreach(l2 => {
+                          if (localAssign2.lhs.variables.contains(l)) {
+                            localAssign2.lhs.variables.foreach(l2 => {
                               if (l2.equals(l)) {
                                 add_map(incomingMatches, l, l2)
                                 add_map(incomingMatches2, localAssign.rhs, localAssign2.lhs)

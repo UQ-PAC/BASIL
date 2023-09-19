@@ -1,6 +1,6 @@
 package translating
 
-import BilParser.SpecificationsParser._
+import Parsers.SpecificationsParser._
 import boogie._
 import specification._
 import ir._
@@ -38,7 +38,54 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     }
 
     val subroutines = ctx.subroutine.asScala.map(s => visitSubroutine(s, nameToGlobals)).toList
-    Specification(globals, lPreds, relies, guarantees, subroutines)
+
+    val directFunctions = Option(ctx.directFunctions) match {
+      case Some(_) => visitDirectFunctions(ctx.directFunctions)
+      case None => Set()
+    }
+    Specification(globals, lPreds, relies, guarantees, subroutines, directFunctions)
+  }
+
+  def visitDirectFunctions(ctx: DirectFunctionsContext): Set[FunctionOp] = {
+    ctx.directFunction.asScala.map(d => visitDirectFunction(d)).toSet
+  }
+
+  def visitDirectFunction(ctx: DirectFunctionContext): FunctionOp = ctx match {
+    case m: MemoryLoadContext => MemoryLoadOp(64, 8, visitEndian(m.endian), Integer.parseInt(m.size.getText))
+    case m: MemoryStoreContext => MemoryStoreOp(64, 8, visitEndian(m.endian), Integer.parseInt(m.size.getText))
+    case g: GammaLoadContext =>
+      val size = Integer.parseInt(g.size.getText)
+      GammaLoadOp(64, size, size / 8)
+    case g: GammaStoreContext =>
+      val size = Integer.parseInt(g.size.getText)
+      GammaStoreOp(64, size, size / 8)
+    case z: ZeroExtendContext =>
+      val extension = Integer.parseInt(z.size1.getText)
+      val bodySize = Integer.parseInt(z.size2.getText)
+      BVFunctionOp(s"zero_extend${extension}_$bodySize", s"zero_extend $extension", List(BParam(BitVecBType(bodySize))), BParam(BitVecBType(bodySize + extension)))
+    case s: SignExtendContext =>
+      val extension = Integer.parseInt(s.size1.getText)
+      val bodySize = Integer.parseInt(s.size2.getText)
+      BVFunctionOp(s"sign_extend${extension}_$bodySize", s"sign_extend $extension", List(BParam(BitVecBType(bodySize))), BParam(BitVecBType(bodySize + extension)))
+    case b: BvOpContext =>
+      val size = Integer.parseInt(b.size.getText)
+      val op = b.OPNAME.getText
+      val outType = op match {
+        case "and" | "or" | "add" | "mul" | "udiv" | "urem" | "shl" | "lshr" | "nand" | "nor" | "xor" | "xnor" | "sub" | "srem" | "sdiv" | "smod" | "ashr" =>
+          BitVecBType(size)
+        case "comp" =>
+          BitVecBType(1)
+        case "ult" | "ule" | "ugt" | "uge" | "slt" | "sle" | "sgt" | "sge" =>
+          BoolBType
+        case _ =>
+          throw new Exception("parsing error")
+      }
+      BVFunctionOp(s"bv$op$size", s"bv$op", List(BParam(BitVecBType(size)), BParam(BitVecBType(size))), BParam(outType))
+  }
+
+  def visitEndian(ctx: EndianContext): Endian = ctx.getText match {
+    case "_le" => Endian.LittleEndian
+    case "_be" => Endian.BigEndian
   }
 
   def visitGlobals(ctx: GlobalsContext): Set[SpecGlobal] = {
@@ -52,7 +99,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case None => throw new Exception(s"unresolvable reference to '$id' in specification")
     }
     val size = ctx.typeName match {
-      case b: BvTypeContext => Integer.parseInt(b.size.getText)
+      case b: BvTypeContext => Integer.parseInt(b.BVSIZE.getText.stripPrefix("bv"))
       case _: LongTypeContext => 64
       case _: ShortTypeContext => 16
       case _: IntTypeContext => 32
@@ -70,27 +117,9 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   }
 
   def visitLPred(ctx: LPredContext, nameToGlobals: Map[String, SpecGlobal]): (SpecGlobal, BExpr) = {
-    (idToSymbol(ctx.id.getText), visitExpr(ctx.expr, nameToGlobals))
+    (nameToGlobals(ctx.id.getText), visitExpr(ctx.expr, nameToGlobals))
   }
 
-  /*
-  def visitGamma(ctx: GammaContext): (SpecGlobal, BoolLit) = {
-    (idToGlobals(ctx.id.getText), visitBoolLit(ctx.boolLit))
-  }
-
-  def visitGammaInits(ctx: GammaInitsContext): Map[SpecGlobal, BoolLit] = {
-    ctx.gamma.asScala.map(g => visitGamma(g)).toMap
-  }
-
-  def visitInit(ctx: InitContext): (SpecGlobal, IntLiteral) = {
-    (idToGlobals(ctx.id.getText), visitNat(ctx.nat))
-  }
-
-  def visitInits(ctx: InitsContext): Map[SpecGlobal, IntLiteral] = {
-    ctx.init.asScala.map(i => visitInit(i)).toMap
-  }
-
-   */
   def visitLPreds(ctx: LPredsContext, nameToGlobals: Map[String, SpecGlobal]): Map[SpecGlobal, BExpr] = {
     ctx.lPred.asScala.map(l => visitLPred(l, nameToGlobals)).toMap
   }
@@ -154,7 +183,6 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitAtomExpr(ctx: AtomExprContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Parameter] = Map()): BExpr = ctx match {
     case b: BoolLitExprContext => visitBoolLit(b.boolLit)
     case i: IdExprContext => visitId(i.id, nameToGlobals, params)
-    case g: GammaIdExprContext => visitGammaId(g.gammaId, nameToGlobals, params)
     case o: OldExprContext => visitOldExpr(o, nameToGlobals, params)
     case p: ParenExprContext => visitExpr(p.expr, nameToGlobals, params)
     case i: IfThenElseExprContext => visitIfThenElseExpr(i, nameToGlobals, params)
@@ -171,7 +199,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   }
 
   def visitBv(ctx: BvContext): BitVecBLiteral = {
-    BitVecBLiteral(BigInt(ctx.value.getText), Integer.parseInt(ctx.size.getText))
+    BitVecBLiteral(BigInt(ctx.value.getText), Integer.parseInt(ctx.BVSIZE.getText.stripPrefix("bv")))
   }
 
   def visitOldExpr(ctx: OldExprContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Parameter] = Map()): Old = Old(visitExpr(ctx.expr, nameToGlobals, params))
@@ -187,24 +215,33 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     case "false" => FalseBLiteral
   }
 
-  def visitGammaId(ctx: GammaIdContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Parameter] = Map()): BExpr = {
-    val id = ctx.id.getText
-    params.get(id) match {
-      case Some(p: Parameter) => p.toGamma
-      case None => nameToGlobals.get(id) match {
-        case Some(g: SpecGlobal) => SpecGamma(g)
-        case None => throw new Exception(s"unresolvable reference to 'Gamma_$id' in specification")
-      }
-    }
-  }
-
   def visitId(ctx: IdContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Parameter] = Map()): BExpr = {
     val id = ctx.getText
-    params.get(id) match {
-      case Some(p: Parameter) => p.toBoogie
-      case None => nameToGlobals.get(ctx.getText) match {
-        case Some(g: SpecGlobal) => g
-        case None => throw new Exception(s"unresolvable reference to '$id' in specification")
+    if (id.startsWith("Gamma_")) {
+      val gamma_id = id.stripPrefix("Gamma_")
+      params.get(gamma_id) match {
+        case Some(p: Parameter) => p.value.toGamma
+        case None => nameToGlobals.get(gamma_id) match {
+          case Some(g: SpecGlobal) => SpecGamma(g)
+          case None => throw new Exception(s"unresolvable reference to 'Gamma_$id' in specification")
+        }
+      }
+    } else {
+      params.get(id) match {
+        case Some(p: Parameter) =>
+          val registerSize = p.value.size
+          val paramSize = p.size
+          if (paramSize == registerSize) {
+            p.value.toBoogie
+          } else if (registerSize > paramSize) {
+            BVExtract(registerSize - p.size, 0, p.value.toBoogie)
+          } else {
+            throw Exception(s"parameter $p doesn't fit in register ${p.value} for ID $id")
+          }
+        case None => nameToGlobals.get(ctx.getText) match {
+          case Some(g: SpecGlobal) => g
+          case None => throw new Exception(s"unresolvable reference to '$id' in specification")
+        }
       }
     }
   }
@@ -239,8 +276,23 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case Some(p) => p.in.map { (p: Parameter) => p.name -> p }.toMap ++ p.out.map { (p: Parameter) => p.name -> p }.toMap
     }
 
-    val requires = ctx.requires.asScala.map(r => visitExpr(r.expr, nameToGlobals, params)).toList
-    val ensures = ctx.ensures.asScala.map(e => visitExpr(e.expr, nameToGlobals, params)).toList
-    SubroutineSpec(ctx.id.getText, requires, ensures)
+    val requires = ctx.requires.asScala.collect {
+      case r: ParsedRequiresContext => visitExpr(r.expr, nameToGlobals, params)
+    }.toList
+
+    val ensures = ctx.ensures.asScala.collect {
+      case e: ParsedEnsuresContext => visitExpr(e.expr, nameToGlobals, params)
+    }.toList
+
+    val requiresDirect = ctx.requires.asScala.collect {
+      case r: DirectRequiresContext => r.QUOTESTRING.getText.stripPrefix("\"").stripSuffix("\"")
+    }.toList
+
+    val ensuresDirect = ctx.ensures.asScala.collect {
+      case r: DirectEnsuresContext => r.QUOTESTRING.getText.stripPrefix("\"").stripSuffix("\"")
+    }.toList
+
+    SubroutineSpec(ctx.id.getText, requires, requiresDirect, ensures, ensuresDirect)
   }
+
 }

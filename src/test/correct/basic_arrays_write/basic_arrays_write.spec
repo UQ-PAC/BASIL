@@ -1,7 +1,7 @@
 Globals:
 arr: int[2]
 
-L: arr[0] -> false, arr[1] -> false
+L: arr -> false
 Rely: true
 Guarantee: old(arr[0]) == arr[0]
 
