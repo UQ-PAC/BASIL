@@ -1,12 +1,4 @@
 services:
-  bap:
-    image: bap-2.5-aslp
-    build:
-      dockerfile: docker/asli.Dockerfile 
-      target: aslp-bap 
-    volumes:
-      - ./:/host:rw
-    working_dir: /host
   basil-build:
     image: basil:build
     build:
@@ -31,3 +23,11 @@ services:
     volumes:
       - ./:/host:rw
     working_dir: /host
+  compiler-explorer:
+    image: ghcr.io/uq-pac/basil-compiler-explorer:latest
+    build:
+      dockerfile: docker/godbolt.Dockerfile 
+    network_mode: host
+    ports: 
+      - "10240:10240"
+
