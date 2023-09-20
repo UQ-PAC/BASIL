@@ -118,7 +118,7 @@ object RunUtils {
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
-    val cfg = ProgramCfgFactory().fromIR(IRProgram, false, 1000)
+    val cfg = ProgramCfgFactory().fromIR(IRProgram, false, 0)
 
     println("[!] Running Constant Propagation")
     val solver = ConstantPropagationAnalysis.WorklistSolver(cfg)
@@ -146,7 +146,7 @@ object RunUtils {
       println("[!] Analysing again")
       return analyse(newIR, externalFunctions, globals, globalOffsets)
     }
-    val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 1000)
+    val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 0)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
 
     println(s"[!] Finished indirect call resolution after $iterations iterations")
