@@ -11,8 +11,14 @@ abstract class CallAnalysisInterface {
                    threadInfo: ThreadOutput,
                    cfgNode: CfgNode,
                    constantPropagationResult: Map[CfgNode, Map[Variable, Any]],
-                   program: Program
+                   program: Program,
+                   subroutines: Map[BigInt, String]
                  ): Unit
+  def processCFGDirectCall(
+                            programCfgFactory: ProgramCfgFactory,
+                            node: CfgJumpNode,
+                            directCall: DirectCall
+                          ): Unit
 }
 object DirectCallAnalysis {
   val functionMap: Map[String,  CallAnalysisInterface] = Map("pthread_create" -> ThreadAnalysis());
@@ -22,8 +28,14 @@ object DirectCallAnalysis {
                    threadInfo: ThreadOutput,
                    cfgNode: CfgNode,
                    constantPropagationResult: Map[CfgNode, Map[Variable, Any]],
-                   program: Program): Unit = {
+                   program: Program,
+                   subroutines: Map[BigInt, String]): Unit = {
       if (functionMap.contains(call.target.name))
-        functionMap(call.target.name).processNode(call, threadInfo, cfgNode, constantPropagationResult, program);
+        functionMap(call.target.name).processNode(call, threadInfo, cfgNode, constantPropagationResult, program, subroutines);
+  }
+
+  def processCFGDirectCall(programCfgFactory: ProgramCfgFactory, node: CfgJumpNode, directCall: DirectCall): Unit = {
+    if (functionMap.contains(directCall.target.name))
+      functionMap(directCall.target.name).processCFGDirectCall(programCfgFactory, node, directCall);
   }
 }

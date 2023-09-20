@@ -143,20 +143,20 @@ object RunUtils {
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
 
     println("[!] Resolving CFG")
-    val (newIR, modified) = resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram, result)
+    val (newIR, modified) = resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram, result, subroutines)
     if (modified) {
       println("[!] Analysing again")
       return analyse(newIR, externalFunctions, globals, globalOffsets)
     }
     val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 1000)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
-
+    println(subroutines)
     println(s"[!] Finished indirect call resolution after $iterations iterations")
 
     newIR
   }
 
-  def resolveCFG(cfg: ProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program, constantPropagationResult: Map[CfgNode, Map[Variable, Any]]): (Program, Boolean) = {
+  def resolveCFG(cfg: ProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program, constantPropagationResult: Map[CfgNode, Map[Variable, Any]], subroutines: Map[BigInt, String]): (Program, Boolean) = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
     // find the main function
@@ -216,7 +216,7 @@ object RunUtils {
               }
             }
           case directCall: DirectCall =>
-            DirectCallAnalysis.processCall(directCall, threadInfo, n, constantPropagationResult, IRProgram)
+            DirectCallAnalysis.processCall(directCall, threadInfo, n, constantPropagationResult, IRProgram, subroutines)
           case _ =>
       case _ =>
     }

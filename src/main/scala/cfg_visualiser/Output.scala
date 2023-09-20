@@ -2,7 +2,7 @@ package cfg_visualiser
 
 import java.io.{File, PrintWriter}
 import analysis.*
-import ir.Variable
+import ir.{Variable, Thread}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -124,7 +124,7 @@ case class OtherOutput(kind: OutputKindE.Value) extends OutputKind {
 }
 
 case class ThreadOutput(kind: OutputKindE.Value)  extends OutputKind {
-  var nodes: ArrayBuffer[Thread]
+  var nodes: ArrayBuffer[Thread] = ArrayBuffer()
 
   override def toString: String = kind.toString
 }

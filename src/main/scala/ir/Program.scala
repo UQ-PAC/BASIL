@@ -70,5 +70,5 @@ class Parameter(var name: String, var size: Int, var value: Variable) {
 
 case class MemorySection(name: String, address: Int, size: Int, bytes: Seq[Literal])
 
-case class Thread(procedures: List[Procedure] = null, startingPoint: Procedure = null)
+case class Thread(startingPoint: Procedure = null)
 

@@ -618,7 +618,7 @@ class ProgramCfgFactory:
     * @param proc
     *   Procedure for which to generate the intraprocedural cfg
     */
-  private def cfgForProcedure(proc: Procedure): Unit = {
+  def cfgForProcedure(proc: Procedure): Unit = {
     val funcEntryNode: CfgFunctionEntryNode = CfgFunctionEntryNode(data = proc)
     val funcExitNode: CfgFunctionExitNode   = CfgFunctionExitNode(data = proc)
     cfg.addNode(funcEntryNode)
@@ -817,6 +817,7 @@ class ProgramCfgFactory:
                 procToCalls(proc) += node
                 procToCallers(targetProc) += node
                 callToNodes(funcEntryNode) += node
+                DirectCallAnalysis.processCFGDirectCall(this, node, dCall)
               })
 
               // Record call association
