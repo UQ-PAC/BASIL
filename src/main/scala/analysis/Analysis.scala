@@ -433,9 +433,9 @@ abstract class MemoryRegion
  */
 case class StackRegion(regionIdentifier: String, start: Expr, var extent: Option[RangeKey]) extends MemoryRegion:
   override def toString: String = s"Stack(${regionIdentifier}, ${start})"
-  override def hashCode(): Int = regionIdentifier.hashCode()
+  override def hashCode(): Int = start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case StackRegion(ri, _, _) => regionIdentifier == ri  
+    case StackRegion(ri, st, _) => st == start
     case _ => false
   }
 
@@ -449,7 +449,7 @@ case class HeapRegion(regionIdentifier: String, start: Expr, var extent: Option[
   override def toString: String = s"Heap(${regionIdentifier}, ${start})"
   override def hashCode(): Int = regionIdentifier.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case r : HeapRegion => regionIdentifier == r.regionIdentifier
+    case r : HeapRegion => regionIdentifier.equals(r.regionIdentifier)
     case _ => false
   }
 
