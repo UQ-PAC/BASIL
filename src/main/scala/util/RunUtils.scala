@@ -122,7 +122,7 @@ object RunUtils {
 
     val cfg = IntraproceduralProgramCfg.generateFromProgram(IRProgram)
     //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
-    //      x.toStrin
+    //      x.toString
     //    }, Output.dotIder))
     //Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(x => x.toString, Output.dotIder), "intra_cfg")
 

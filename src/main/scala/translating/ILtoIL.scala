@@ -8,7 +8,7 @@ private class ILSerialiser extends Visitor {
   var indentLevel = 0
 
   def getIndent(): String = {
-    "    " * indentLevel
+    "  " * indentLevel
   }
 
   def blockIdentifier(block: Block) : String = {
@@ -93,7 +93,7 @@ private class ILSerialiser extends Visitor {
     program ++= "IndirectCall("
     node.target = visitVariable(node.target)
     program ++= ", "
-    program ++= "Condition("
+    program ++= "condition("
     node.condition = node.condition.map(visitExpr)
     program ++= ")" // Condition
     program ++= ")" // IndirectCall 
@@ -152,7 +152,7 @@ private class ILSerialiser extends Visitor {
     for (i <- node.blocks.indices) {
       node.blocks(i) = visitBlock(node.blocks(i))
     }
-    program ++= "))\n"
+    program ++= ")),\n"
     indentLevel -= 1
     node
   }
@@ -250,7 +250,6 @@ private class ILSerialiser extends Visitor {
   override def visitVariable(node: Variable): Variable = {
     program ++= node.toString()
     node
-    //node.acceptVisit(this)
   }
 
   override def visitRegister(node: Register): Register = {
