@@ -192,12 +192,17 @@ object RunUtils {
                   localAssign.rhs = extractedValue
                   println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${extractedValue}")
                 } else if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size > 1) {
+                  println(s"RESOLVED: WARN Memory load ${localAssign.lhs} resolved to multiple values, cannot replace")
+
+                   /*
                   // must merge into a single memory variable to represent the possible values
-                  // Make a binary OR of all the possible values takes two at a time (probably incorrect to do BVOR)
+                  // Make a binary OR of all the possible values takes two at a time (incorrect to do BVOR)
                   val values = valueSets(n).get(localAssign.lhs).head
                   val exprValues = values.map(extractExprFromValue)
-                  val result = exprValues.reduce((a, b) => BinaryExpr(BVOR, a, b))
+                  val result = exprValues.reduce((a, b) => BinaryExpr(BVOR, a, b)) // need to express nondeterministic 
+                                                                                   // choice between these specific options
                   localAssign.rhs = result
+                  */
                 }
               case _ =>
           case indirectCall: IndirectCall =>
