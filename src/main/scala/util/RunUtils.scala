@@ -20,7 +20,6 @@ import scala.collection.mutable.ArrayBuffer
 object RunUtils {
   var memoryRegionAnalysisResults: Option[Map[CfgNode, _]] = None
 
-  var iterations = 0;
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
@@ -92,8 +91,7 @@ object RunUtils {
     IRProgram = renamer.visitProgram(IRProgram)
 
     if (performAnalysis) {
-      iterations = 0;
-      IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
+      IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets, 0)
     }
 
     IRProgram.stripUnreachableFunctions()
@@ -104,8 +102,8 @@ object RunUtils {
     boogieTranslator.translate
   }
 
-  def analyse(IRProgram: Program, externalFunctions: Set[ExternalFunction], globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt]): Program = {
-    iterations += 1
+  def analyse(IRProgram: Program, externalFunctions: Set[ExternalFunction], globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt], iterations: Int): Program = {
+
     val subroutines = IRProgram.procedures.filter(p => p.address.isDefined).map{(p: Procedure) => BigInt(p.address.get) -> p.name}.toMap
     val globalAddresses = globals.map{(s: SpecGlobal) => s.address -> s.name}.toMap
     val externalAddresses = externalFunctions.map{(e: ExternalFunction) => e.offset -> e.name}.toMap
@@ -146,7 +144,7 @@ object RunUtils {
     val (newIR, modified) = resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram, result, subroutines)
     if (modified) {
       println("[!] Analysing again")
-      return analyse(newIR, externalFunctions, globals, globalOffsets)
+      return analyse(newIR, externalFunctions, globals, globalOffsets, iterations+1)
     }
     val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 1000)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
