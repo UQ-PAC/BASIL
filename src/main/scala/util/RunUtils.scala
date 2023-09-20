@@ -124,7 +124,7 @@ object RunUtils {
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
-    val cfg = ProgramCfgFactory().fromIR(IRProgram, false, 1000)
+    val cfg = ProgramCfgFactory().fromIR(IRProgram, false, 0)
 
     Logger.info("[!] Running Constant Propagation")
     val solver = ConstantPropagationAnalysis.WorklistSolver(cfg)
@@ -152,7 +152,7 @@ object RunUtils {
       Logger.info(s"[!] Analysing again (iter $iterations)")
       return analyse(newIR, externalFunctions, globals, globalOffsets)
     }
-    val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 1000)
+    val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 0)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
 
     Logger.info(s"[!] Finished indirect call resolution after $iterations iterations")
@@ -180,9 +180,37 @@ object RunUtils {
         }
     }
 
+    def extractExprFromValue(v: Value): Expr = v match {
+      case LiteralValue(expr) => expr
+      case localAddress: LocalAddress => localAddress.expr
+      case globalAddress: GlobalAddress => globalAddress.expr
+      case _ => throw new Exception("Expected a Value with an Expr")
+    }
+
     def process(n: CfgNode): Unit = n match {
       case commandNode: CfgCommandNode =>
         commandNode.data match
+          case localAssign: LocalAssign =>
+            localAssign.rhs match
+              case _: MemoryLoad =>
+                if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size == 1) {
+                  val extractedValue = extractExprFromValue(valueSets(n).get(localAssign.lhs).head.head)
+                  localAssign.rhs = extractedValue
+                  println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${extractedValue}")
+                } else if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size > 1) {
+                  println(s"RESOLVED: WARN Memory load ${localAssign.lhs} resolved to multiple values, cannot replace")
+
+                   /*
+                  // must merge into a single memory variable to represent the possible values
+                  // Make a binary OR of all the possible values takes two at a time (incorrect to do BVOR)
+                  val values = valueSets(n).get(localAssign.lhs).head
+                  val exprValues = values.map(extractExprFromValue)
+                  val result = exprValues.reduce((a, b) => BinaryExpr(BVOR, a, b)) // need to express nondeterministic 
+                                                                                   // choice between these specific options
+                  localAssign.rhs = result
+                  */
+                }
+              case _ =>
           case indirectCall: IndirectCall =>
             if (!commandNode.block.jumps.contains(indirectCall)) {
               // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data

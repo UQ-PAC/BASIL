@@ -434,7 +434,7 @@ case class StackRegion(regionIdentifier: String, start: Expr, var extent: Option
   override def toString: String = s"Stack(${regionIdentifier}, ${start})"
   override def hashCode(): Int = regionIdentifier.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case StackRegion(ri, _, _) => regionIdentifier == ri  
+    case StackRegion(ri, st, _) => st == start
     case _ => false
   }
 
@@ -448,7 +448,7 @@ case class HeapRegion(regionIdentifier: String, start: Expr, var extent: Option[
   override def toString: String = s"Heap(${regionIdentifier}, ${start})"
   override def hashCode(): Int = regionIdentifier.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case r : HeapRegion => regionIdentifier == r.regionIdentifier
+    case r : HeapRegion => regionIdentifier.equals(r.regionIdentifier)
     case _ => false
   }
 
@@ -578,11 +578,23 @@ trait MemoryRegionAnalysisMisc:
             if (ignoreRegions.contains(memAssign.rhs.value)) {
               return s
             }
-            lattice.sublattice.lub(s, eval(memAssign.rhs.index, s, n))
+            val result = eval(memAssign.rhs.index, s, n)
+            result.collectFirst({
+              case StackRegion(_, _, _) =>
+                memAssign.rhs = MemoryStore(Memory("stack", memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize), memAssign.rhs.index, memAssign.rhs.value, memAssign.rhs.endian, memAssign.rhs.size)
+              case _ =>
+            })
+            lattice.sublattice.lub(s, result)
           case localAssign: LocalAssign =>
             localAssign.rhs match
               case memoryLoad: MemoryLoad =>
-                lattice.sublattice.lub(s, eval(memoryLoad.index, s, n))
+                val result = eval(memoryLoad.index, s, n)
+                result.collectFirst({
+                  case StackRegion(_, _, _) =>
+                    memoryLoad.mem = Memory("stack", memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
+                  case _ =>
+                })
+                lattice.sublattice.lub(s, result)
               case _ => s
           case _ => s
         }
