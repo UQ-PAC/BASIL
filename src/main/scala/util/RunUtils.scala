@@ -54,7 +54,7 @@ object RunUtils {
     }
   }
 
-  def loadAndTranslate(BAPFileName: String, readELFFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
+  def loadAndTranslate(BAPFileName: String, readELFFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean, dumpIL: Boolean): BProgram = {
     val bapProgram = loadBAP(BAPFileName)
 
     val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(readELFFileName)
@@ -74,9 +74,18 @@ object RunUtils {
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
 
+    if (dumpIL) {
+      dump_file(serialiseIL(IRProgram), "before-analysis.il")
+    }
+
     if (performAnalysis) {
       analyse(IRProgram, externalFunctions, globals, globalOffsets)
+      if (dumpIL) {
+        dump_file(serialiseIL(IRProgram), "after-analysis.il")
+      }
     }
+
+
 
     IRProgram.stripUnreachableFunctions()
     IRProgram.stackIdentification()
@@ -113,7 +122,7 @@ object RunUtils {
 
     val cfg = IntraproceduralProgramCfg.generateFromProgram(IRProgram)
     //    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot({ x =>
-    //      x.toString
+    //      x.toStrin
     //    }, Output.dotIder))
     //Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(x => x.toString, Output.dotIder), "intra_cfg")
 

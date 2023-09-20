@@ -356,6 +356,9 @@ sealed trait Variable extends Expr {
     case b: BitVecType => b.size
     case _ => throw new Exception("tried to get size of non-bitvector")
   }
+
+  override def toString: String = s"Variable($name, $irType)"
+
   override def acceptVisit(visitor: Visitor): Variable =
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }

@@ -30,6 +30,8 @@ object Main {
       analyse: Flag,
     @arg(name="interpret", doc="Run BASIL IL interpreter.")
       interpret: Flag,
+    @arg(name="dump-il", doc="Dump the Intermediate Language to text.")
+      dumpIL: Flag,
     @arg(name="help", short='h', doc="Show this help message.")
       help: Flag 
     )
@@ -55,7 +57,8 @@ object Main {
       Logger.setLevel(LogLevel.DEBUG)
     }
 
-    val program: BProgram = RunUtils.loadAndTranslate(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.analyse.value, conf.interpret.value)
+
+    val program: BProgram = RunUtils.loadAndTranslate(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.analyse.value, conf.interpret.value, conf.dumpIL.value)
     RunUtils.writeToFile(program, conf.outFileName)
   } 
 
