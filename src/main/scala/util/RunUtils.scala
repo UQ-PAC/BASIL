@@ -125,7 +125,7 @@ object RunUtils {
     val result = solver.analyze(true).asInstanceOf[Map[CfgNode, Map[Variable, Any]]]
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder), "cpa")
 
-    println("[!] Running MRA")
+    println("[!] Running MRA") // resolves memory loads from full mem to stack/mem
     val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, result)
     val result2 = solver2.analyze(true).asInstanceOf[Map[CfgNode, MemoryRegion]]
     memoryRegionAnalysisResults = Some(result2)
@@ -174,9 +174,37 @@ object RunUtils {
         }
     }
 
+    def extractExprFromValue(v: Value): Expr = v match {
+      case LiteralValue(expr) => expr
+      case localAddress: LocalAddress => localAddress.expr
+      case globalAddress: GlobalAddress => globalAddress.expr
+      case _ => throw new Exception("Expected a Value with an Expr")
+    }
+
     def process(n: CfgNode): Unit = n match {
       case commandNode: CfgCommandNode =>
         commandNode.data match
+          case localAssign: LocalAssign =>
+            localAssign.rhs match
+              case _: MemoryLoad =>
+                if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size == 1) {
+                  val extractedValue = extractExprFromValue(valueSets(n).get(localAssign.lhs).head.head)
+                  localAssign.rhs = extractedValue
+                  println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${extractedValue}")
+                } else if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size > 1) {
+                  println(s"RESOLVED: WARN Memory load ${localAssign.lhs} resolved to multiple values, cannot replace")
+
+                   /*
+                  // must merge into a single memory variable to represent the possible values
+                  // Make a binary OR of all the possible values takes two at a time (incorrect to do BVOR)
+                  val values = valueSets(n).get(localAssign.lhs).head
+                  val exprValues = values.map(extractExprFromValue)
+                  val result = exprValues.reduce((a, b) => BinaryExpr(BVOR, a, b)) // need to express nondeterministic 
+                                                                                   // choice between these specific options
+                  localAssign.rhs = result
+                  */
+                }
+              case _ =>
           case indirectCall: IndirectCall =>
             if (!commandNode.block.jumps.contains(indirectCall)) {
               // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data

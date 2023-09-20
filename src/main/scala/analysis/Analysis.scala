@@ -579,11 +579,23 @@ trait MemoryRegionAnalysisMisc:
             if (ignoreRegions.contains(memAssign.rhs.value)) {
               return s
             }
-            lattice.sublattice.lub(s, eval(memAssign.rhs.index, s, n))
+            val result = eval(memAssign.rhs.index, s, n)
+            result.collectFirst({
+              case StackRegion(_, _, _) =>
+                memAssign.rhs = MemoryStore(Memory("stack", memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize), memAssign.rhs.index, memAssign.rhs.value, memAssign.rhs.endian, memAssign.rhs.size)
+              case _ =>
+            })
+            lattice.sublattice.lub(s, result)
           case localAssign: LocalAssign =>
             localAssign.rhs match
               case memoryLoad: MemoryLoad =>
-                lattice.sublattice.lub(s, eval(memoryLoad.index, s, n))
+                val result = eval(memoryLoad.index, s, n)
+                result.collectFirst({
+                  case StackRegion(_, _, _) =>
+                    memoryLoad.mem = Memory("stack", memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
+                  case _ =>
+                })
+                lattice.sublattice.lub(s, result)
               case _ => s
           case _ => s
         }
