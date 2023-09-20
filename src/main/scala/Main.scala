@@ -18,19 +18,19 @@ import scala.sys.process._
   }
   val outFileName = if (specFileName.isEmpty) {
     if (options.isEmpty) {
-      "boogie_out.bpl"
+      "boogie_out"
     } else {
       options.head
     }
   } else {
     if (options.tail.isEmpty) {
-      "boogie_out.bpl"
+      "boogie_out"
     } else {
       options.tail.head
     }
   }
   val performAnalysis = options.nonEmpty && options.contains("-analyse")
   val performInterpret = options.nonEmpty && options.contains("-interpret")
-  val program: BProgram = RunUtils.generateVCsAdt(fileName, elfFileName, specFileName, performAnalysis, performInterpret)
-  RunUtils.writeToFile(program, outFileName)
+  val program: List[BProgram] = RunUtils.generateVCsAdt(fileName, elfFileName, specFileName, performAnalysis, performInterpret)
+  program.foreach(prog => RunUtils.writeToFile(prog, outFileName + "_" + prog.entryProcedure + ".bpl"))
 }

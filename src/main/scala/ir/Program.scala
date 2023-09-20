@@ -7,11 +7,11 @@ import boogie._
 class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBuffer[MemorySection] /* var memories: ArrayBuffer[Memory], var memoryOffsets: ArrayBuffer[Offset] */) {
 
   // This shouldn't be run before indirect calls are resolved?
-  def stripUnreachableFunctions(): Unit = {
+  def stripUnreachableFunctions(entry: String):  ArrayBuffer[Procedure] = {
     val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
-    var next = "main"
-    var reachableNames: Set[String] = Set("main")
+    var next = entry
+    var reachableNames: Set[String] = Set(entry)
     var toVisit: List[String] = List()
     var reachableFound = true
     while (reachableFound) {
@@ -26,7 +26,7 @@ class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBu
       }
     }
 
-    procedures = procedures.filter(f => reachableNames.contains(f.name))
+    procedures.filter(f => reachableNames.contains(f.name))
   }
 }
 

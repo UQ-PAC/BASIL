@@ -23,8 +23,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val stack = BMapVar("stack", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val Gamma_stack = BMapVar("Gamma_stack", MapBType(BitVecBType(64), BoolBType), Scope.Global)
 
-  def translate: BProgram = {
-    val procedures = program.procedures.map(f => translateProcedure(f))
+  def translate(cfgProcedures: ArrayBuffer[Procedure], entryProcedure: String): BProgram = {
+    val procedures = cfgProcedures.map(f => translateProcedure(f))
     // TODO remove this once proper analysis for modifies is done
     val defaultGlobals = List(BVarDecl(mem), BVarDecl(Gamma_mem), BVarDecl(stack), BVarDecl(Gamma_stack))
     val globalDecls = (procedures.flatMap(p => p.globals).map(b => BVarDecl(b)) ++ defaultGlobals).distinct.sorted.toList
@@ -42,7 +42,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val functionsUsed = (functionsUsed1 ++ functionsUsed2 ++ functionsUsed3).distinct.sorted
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgProcs ++ procedures
-    BProgram(declarations)
+    BProgram(declarations, entryProcedure)
   }
 
   def genRely(relies: List[BExpr]): List[BProcedure] = {

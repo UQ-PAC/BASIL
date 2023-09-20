@@ -817,7 +817,6 @@ class ProgramCfgFactory:
                 procToCalls(proc) += node
                 procToCallers(targetProc) += node
                 callToNodes(funcEntryNode) += node
-                DirectCallAnalysis.processCFGDirectCall(this, node, dCall)
               })
 
               // Record call association

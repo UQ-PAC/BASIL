@@ -15,6 +15,7 @@ import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters.*
 import analysis.solvers.*
 
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 object RunUtils {
@@ -29,7 +30,7 @@ object RunUtils {
   // constants
   private val exitRegister: Variable = Variable("R30", BitVecType(64))
 
-  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): BProgram = {
+  def generateVCsAdt(fileName: String, elfFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean): List[BProgram] = {
 
     val adtLexer = BilAdtLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(adtLexer)
@@ -43,6 +44,7 @@ object RunUtils {
     val elfLexer = SymsLexer(CharStreams.fromFileName(elfFileName))
     val elfTokens = CommonTokenStream(elfLexer)
     val elfParser = SymsParser(elfTokens)
+    val directCallAnalysis = DirectCallAnalysis()
     elfParser.setBuildParseTree(true)
     println("[!] Parsing .relf")
     val (externalFunctions, globals, globalOffsets) = ElfLoader.visitSyms(elfParser.syms())
@@ -90,19 +92,27 @@ object RunUtils {
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
 
+
     if (performAnalysis) {
-      IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets, 0)
+      IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets, directCallAnalysis, 0)
     }
 
-    IRProgram.stripUnreachableFunctions()
+
 
     println("[!] Translating to Boogie")
-    val boogieTranslator = IRToBoogie(IRProgram, specification)
+
     println("[!] Done! Exiting...")
-    boogieTranslator.translate
+    directCallAnalysis.threadAnalysis.threadProcedures.map(thread => {
+      entryPointToBoogie(IRProgram, thread._2.startingPoint.name, specification)
+    }).toList.appended(entryPointToBoogie(IRProgram, "main", specification))
   }
 
-  def analyse(IRProgram: Program, externalFunctions: Set[ExternalFunction], globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt], iterations: Int): Program = {
+  def entryPointToBoogie(IRProgram: Program, startingPoint: String, spec: Specification) = {
+    val procedures = IRProgram.stripUnreachableFunctions(startingPoint)
+    val boogieTranslator = IRToBoogie(IRProgram, spec)
+    boogieTranslator.translate(procedures, startingPoint)
+  }
+  def analyse(IRProgram: Program, externalFunctions: Set[ExternalFunction], globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt], directCallAnalysis: DirectCallAnalysis, iterations: Int): Program = {
 
     val subroutines = IRProgram.procedures.filter(p => p.address.isDefined).map{(p: Procedure) => BigInt(p.address.get) -> p.name}.toMap
     val globalAddresses = globals.map{(s: SpecGlobal) => s.address -> s.name}.toMap
@@ -141,20 +151,20 @@ object RunUtils {
     Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
 
     println("[!] Resolving CFG")
-    val (newIR, modified) = resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram, result, subroutines)
+    val (newIR, modified) = resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram, result, directCallAnalysis, subroutines)
     if (modified) {
       println("[!] Analysing again")
-      return analyse(newIR, externalFunctions, globals, globalOffsets, iterations+1)
+      return analyse(newIR, externalFunctions, globals, globalOffsets,directCallAnalysis,  iterations+1)
     }
     val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 1000)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
-    println(subroutines)
+
     println(s"[!] Finished indirect call resolution after $iterations iterations")
 
     newIR
   }
 
-  def resolveCFG(cfg: ProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program, constantPropagationResult: Map[CfgNode, Map[Variable, Any]], subroutines: Map[BigInt, String]): (Program, Boolean) = {
+  def resolveCFG(cfg: ProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program, constantPropagationResult: Map[CfgNode, Map[Variable, Any]], directCallAnalysis: DirectCallAnalysis, subroutines: Map[BigInt, String]): (Program, Boolean) = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
     // find the main function
@@ -214,7 +224,7 @@ object RunUtils {
               }
             }
           case directCall: DirectCall =>
-            DirectCallAnalysis.processCall(directCall, threadInfo, n, constantPropagationResult, IRProgram, subroutines)
+            directCallAnalysis.processCall(directCall, threadInfo, n, constantPropagationResult, IRProgram, subroutines)
           case _ =>
       case _ =>
     }

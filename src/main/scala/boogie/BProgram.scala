@@ -1,6 +1,6 @@
 package boogie
 
-case class BProgram(declarations: List[BDeclaration]) {
+case class BProgram(declarations: List[BDeclaration], entryProcedure: String) {
   override def toString: String = declarations.flatMap(x => x.toBoogie).mkString("\n")
 }
 
