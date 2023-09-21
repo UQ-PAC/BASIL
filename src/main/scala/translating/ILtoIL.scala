@@ -2,7 +2,7 @@ package translating
 import ir._
 
 
-private class ILSerialiser extends Visitor {
+private class ILSerialiser extends ReadOnlyVisitor {
   var program: StringBuilder = StringBuilder()
 
   var indentLevel = 0
@@ -30,40 +30,39 @@ private class ILSerialiser extends Visitor {
 
   override def visitExpr(node: Expr): Expr = {
     program ++= "Expr("
-    val r = node.acceptVisit(this)
+    node.acceptVisit(this)
     program ++= ")"
-    r
+    node
   }
 
   override def visitStatement(node: Statement): Statement = node.acceptVisit(this)
 
   override def visitLocalAssign(node: LocalAssign): Statement = {
     program ++= "LocalAssign("
-    node.lhs = visitVariable(node.lhs)
+    visitVariable(node.lhs)
     program ++= " := "
-    node.rhs = visitExpr(node.rhs)
+    visitExpr(node.rhs)
     program ++= ")"
     node
   }
 
   override def visitMemoryAssign(node: MemoryAssign): Statement = {
     program ++= "MemoryAssign("
-    node.lhs = node.lhs
-    node.rhs = visitMemoryStore(node.rhs)
+    visitMemoryStore(node.rhs)
     program ++= ")"
     node
   }
 
   override def visitAssert(node: Assert): Statement = {
     program ++= "Assert("
-    node.body = visitExpr(node.body)
+    visitExpr(node.body)
     program ++= ")"
     node
   }
 
   override def visitJump(node: Jump): Jump = {
-    val n = node.acceptVisit(this)
-    n
+    node.acceptVisit(this)
+    node
   }
 
   override def visitGoTo(node: GoTo): Jump = {
@@ -71,8 +70,8 @@ private class ILSerialiser extends Visitor {
     // TODO 
     program ++= blockIdentifier(node.target)
     program ++= ", "
-    program ++= "Condition("
-    node.condition = node.condition.map(visitExpr)
+    program ++= "condition("
+    node.condition.map(visitExpr)
     program ++= ")" // Condition
     program ++= ")" // GoTo
     node
@@ -82,8 +81,8 @@ private class ILSerialiser extends Visitor {
     program ++= "DirectCall("
     program ++= procedureIdentifier(node.target)
     program ++= ", "
-    program ++= "Condition("
-    node.condition = node.condition.map(visitExpr)
+    program ++= "condition("
+    node.condition.map(visitExpr)
     program ++= ")" // Condition
     program ++= ")" // DirectCall 
     node
@@ -91,10 +90,10 @@ private class ILSerialiser extends Visitor {
 
   override def visitIndirectCall(node: IndirectCall): Jump = {
     program ++= "IndirectCall("
-    node.target = visitVariable(node.target)
+    visitVariable(node.target)
     program ++= ", "
     program ++= "condition("
-    node.condition = node.condition.map(visitExpr)
+    node.condition.map(visitExpr)
     program ++= ")" // Condition
     program ++= ")" // IndirectCall 
     node
@@ -110,16 +109,16 @@ private class ILSerialiser extends Visitor {
 
     for (i <- node.statements.indices) {
       program ++= getIndent()
-      node.statements(i) = visitStatement(node.statements(i))
+      visitStatement(node.statements(i))
       program ++= "\n"
     }
     indentLevel -= 1
     program ++= getIndent() + "),\n"
     program ++= getIndent() + "jumps(\n"
     indentLevel += 1
-    for (i <- node.jumps.indices) {
+    for (j <- node.jumps) {
       program ++= getIndent()
-      node.jumps(i) = visitJump(node.jumps(i))
+      visitJump(j)
       program ++= "\n"
     }
     indentLevel -= 1
@@ -136,21 +135,22 @@ private class ILSerialiser extends Visitor {
   
       program ++= "in("
     for (i <- node.in.indices) {
-      node.in(i) = visitParameter(node.in(i))
-      if (i != node.in.size - 1)
+      visitParameter(node.in(i))
+      if (i != node.in.size - 1) {
         program ++= ", "
+      }
     }
     program ++= "), "
     program ++= "out("
     for (i <- node.out.indices) {
-      node.out(i) = visitParameter(node.out(i))
+      visitParameter(node.out(i))
       if (i != node.out.size - 1)
         program ++= ", "
     }
     program ++= "), "
     program ++= "blocks(\n"
     for (i <- node.blocks.indices) {
-      node.blocks(i) = visitBlock(node.blocks(i))
+      visitBlock(node.blocks(i))
     }
     program ++= ")),\n"
     indentLevel -= 1
@@ -159,63 +159,64 @@ private class ILSerialiser extends Visitor {
 
   override def visitParameter(node: Parameter): Parameter = {
     program ++= "Parameter("
-    node.value = visitRegister(node.value)
+    visitRegister(node.value)
     program ++= ")"
     node
   }
 
   override def visitProgram(node: Program): Program = {
-    for (i <- node.procedures.indices) {
-      val updatedProcedure = visitProcedure(node.procedures(i))
-      val targetProcedure = node.procedures(i)
-      if (targetProcedure == node.mainProcedure) {
-        node.mainProcedure = updatedProcedure
-      }
-      node.procedures(i) = updatedProcedure
+    for (i <- node.procedures) {
+      visitProcedure(i)
     }
     node
   }
 
   override def visitExtract(node: Extract): Expr = {
     program ++= "Extract("
-    node.body = visitExpr(node.body)
+    visitExpr(node.body)
+    program ++= f"[${node.end}:${node.start}]"
     program ++= ")"
     node
   }
 
   override def visitRepeat(node: Repeat): Expr = {
     program ++= "Repeat("
-    node.body = visitExpr(node.body)
+    visitExpr(node.body)
+    program ++= f", ${node.repeats}"
     program ++= ")"
     node
   }
 
   override def visitZeroExtend(node: ZeroExtend): Expr = {
     program ++= "ZeroExtend("
-    node.body = visitExpr(node.body)
+    visitExpr(node.body)
+    program ++= f", ${node.extension}"
     program ++= ")"
     node
   }
 
   override def visitSignExtend(node: SignExtend): Expr = {
     program ++= "SignExtend("
-    node.body = visitExpr(node.body)
+    visitExpr(node.body)
+    program ++= f", ${node.extension}"
     program ++= ")"
     node
   }
 
   override def visitUnaryExpr(node: UnaryExpr): Expr = {
     program ++= "UnaryExpr("
-    node.arg = visitExpr(node.arg)
+    program ++= '"' + f"${node.op}" + '"' + ", "
+    visitExpr(node.arg)
     program ++= ")"
     node
   }
 
   override def visitBinaryExpr(node: BinaryExpr): Expr = {
     program ++= "BinaryExpr("
-    node.arg1 = visitExpr(node.arg1)
+    program ++= "\"" + node.op + '"' + ", "
+    visitExpr(node.arg1)
     program ++= ", "
-    node.arg2 = visitExpr(node.arg2)
+    visitExpr(node.arg2)
     program ++= ")"
     node
   }
@@ -224,26 +225,26 @@ private class ILSerialiser extends Visitor {
     program ++= "MemoryStore("
     visitMemory(node.mem)
     program ++= "["
-    node.index = visitExpr(node.index)
+    visitExpr(node.index)
     program ++= "] := "
-    node.value = visitExpr(node.value)
+    visitExpr(node.value)
     program ++= ")"
     node
   }
 
   override def visitMemoryLoad(node: MemoryLoad): Expr = {
     program ++= "MemoryLoad("
-    node.mem = visitMemory(node.mem)
+    visitMemory(node.mem)
     program ++= ", ["
-    node.index = visitExpr(node.index)
+    visitExpr(node.index)
     program ++= "])"
     node
   }
 
   override def visitMemory(node: Memory): Memory = {
-    program ++= "Memory("
-    program ++= node.toString()
-    program ++= ")"
+    program ++= "Memory(" 
+    program ++= '"' + node.name + '"'
+    program ++= f", ${node.addressSize}, ${node.valueSize})"
     node
   }
 
