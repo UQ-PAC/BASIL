@@ -29,10 +29,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
 
   override def visitExpr(node: Expr): Expr = {
-    program ++= "Expr("
     node.acceptVisit(this)
-    program ++= ")"
-    node
   }
 
   override def visitStatement(node: Statement): Statement = node.acceptVisit(this)
