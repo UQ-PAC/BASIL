@@ -1,0 +1,18 @@
+[
+  {
+    "arguments": [
+      "/usr/bin/g++",
+      "-c",
+      "-g",
+      "-std=c++20",
+      "-I",
+      "lib",
+      "-o",
+      "bin/main",
+      "source/main.cpp"
+    ],
+    "directory": "/home/alistair/Documents/programming/2023/bil-to-boogie-translator/scripts/libclang-type-info",
+    "file": "/home/alistair/Documents/programming/2023/bil-to-boogie-translator/scripts/libclang-type-info/source/main.cpp",
+    "output": "/home/alistair/Documents/programming/2023/bil-to-boogie-translator/scripts/libclang-type-info/bin/main"
+  }
+]
