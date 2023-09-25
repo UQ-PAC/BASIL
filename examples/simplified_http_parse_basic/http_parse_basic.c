@@ -52,7 +52,7 @@ char *hlist_get(hlist_t list, const char *key) {
 	hlist_t t = list;
 
 	while (t) {
-		if (!strcasecmp(t->key, key))
+		if (!strstr(t->key, key))
 			break;
 		t = t->next;
 	}
