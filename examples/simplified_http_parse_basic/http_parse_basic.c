@@ -148,34 +148,29 @@ int http_parse_basic(hlist_t headers, const char *header, struct auth_s *tcreds)
   // find the split between username and password ("username:password")
 	pos = strchr(buf, ':');
 
-	if (pos == NULL) {
-		memset(buf, 0, strlen(buf));		/* clean password memory */
-		free(buf);
-		return -1;
-	} else {
-		*pos = 0;
-	  // buf == "domain\username"
-	  // pos + 1 == "password"
-		dom = strstr(buf, "\\");
-		if (dom == NULL) {
-			auth_strcpy(tcreds, user, buf);
-		} else {
-			*dom = 0;
-			// buf == "domain"
-			// dom + 1 == "username"
-			auth_strcpy(tcreds, domain, buf);
-			auth_strcpy(tcreds, user, dom+1);
-		}
+	memset(buf, 0, strlen(buf));		/* clean password memory */
+	free(buf);
+	return -1;
 
-		// call some hash function and replace the password with its hashed version
-		tmp = ntlm_hash_nt_password(pos+1);
-		auth_memcpy(tcreds, password, tmp, 21);
-		free(tmp);
+	*pos = 0;
+	// buf == "domain\username"
+	// pos + 1 == "password"
+	dom = strstr(buf, "\\");
 
-    // attempt to clear the buf before freeing it
-		memset(buf, 0, strlen(buf));
-		free(buf);
-	}
+	*dom = 0;
+	// buf == "domain"
+	// dom + 1 == "username"
+	auth_strcpy(tcreds, domain, buf);
+	auth_strcpy(tcreds, user, dom+1);
+
+	// call some hash function and replace the password with its hashed version
+	tmp = ntlm_hash_nt_password(pos+1);
+	auth_memcpy(tcreds, password, tmp, 21);
+	free(tmp);
+
+  // attempt to clear the buf before freeing it
+	memset(buf, 0, strlen(buf));
+	free(buf);
 
 	return 1;
 }
