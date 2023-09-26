@@ -309,11 +309,12 @@ case class CfgStatementNode (
                               override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                               override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
                               data: Statement,
-                              block: Block
+                              block: Block,
+                              parent: CfgFunctionEntryNode
                             ) extends CfgCommandNode:
   override def toString: String = s"[Stmt] $data"
   /** Copy this node, but give unique ID and reset edges */
-  override def copyNode(): CfgStatementNode = CfgStatementNode(data = this.data, block = this.block)
+  override def copyNode(): CfgStatementNode = CfgStatementNode(data = this.data, block = this.block, parent = this.parent)
 
 /** CFG's representation of a jump. This is used as a general jump node, for both indirect 
   *   and direct calls.  
@@ -697,7 +698,7 @@ class ProgramCfgFactory:
           */
         def visitStmts(stmts: List[Statement], prevNode: CfgNode, cond: Expr): CfgCommandNode = {
 
-          val firstNode: CfgStatementNode = CfgStatementNode(data = stmts.head, block = block)
+          val firstNode: CfgStatementNode = CfgStatementNode(data = stmts.head, block = block, parent = funcEntryNode)
           cfg.addEdge(prevNode, firstNode, cond)
           visitedBlocks += (block -> firstNode) // This is guaranteed to be entrance to block if we are here
 
@@ -711,7 +712,7 @@ class ProgramCfgFactory:
           // `tail` takes everything after the first element of the iterable
           stmts.tail.foreach(
             stmt =>
-              val stmtNode: CfgStatementNode = CfgStatementNode(data = stmt, block = block)
+              val stmtNode: CfgStatementNode = CfgStatementNode(data = stmt, block = block, parent = funcEntryNode)
               cfg.addEdge(prevStmtNode, stmtNode)
               prevStmtNode = stmtNode
           )
