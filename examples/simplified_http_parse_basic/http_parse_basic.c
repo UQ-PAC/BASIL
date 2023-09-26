@@ -1,9 +1,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include <stddef.h>
 #include <ctype.h>
+#include <string.h>
 
 #define MINIBUF_SIZE		50
 
@@ -49,16 +49,79 @@ char *ntlm_hash_nt_password(char *password) {
  * Get a header on the list using the key
  */
 char *hlist_get(hlist_t list, const char *key) {
-	hlist_t t = list;
-
-	while (t) {
-		if (!strstr(t->key, key))
-			break;
-		t = t->next;
-	}
-
-	return (t == NULL ? NULL : t->value);
+	return list->value;
 }
+
+
+int unrolled_strnotchr(const char *tmp, char chr, int start, int bound) {
+	// assert(bound > start && bound - start < 50);
+
+	int i = start - 1;
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+	if (i < bound && tmp[++i] != chr) { return i; }
+
+	return -1;
+}
+
 
 /*
  * Parse headers for BASIC auth credentials
@@ -77,12 +140,13 @@ int http_parse_basic(hlist_t headers, const char *header, struct auth_s *tcreds)
 	tmp = hlist_get(headers, header);
 	buf = malloc(strlen(tmp) + 1);
 	memset(buf, 0, strlen(tmp) + 1);
-	i = 5;
-	while (i < strlen(tmp) && tmp[++i] == ' ');
+	//while (i < strlen(tmp) && tmp[++i] == ' ');
+	i = unrolled_strnotchr(tmp, ' ', 5, strlen(tmp));
+
 	memcpy(buf, tmp + i, strlen(tmp + i));
 
   // find the split between username and password ("username:password")
-	pos = strstr(buf, ":");
+	pos = strchr(buf, ':');
 
 	if (pos == NULL) {
 		memset(buf, 0, strlen(buf));		/* clean password memory */
