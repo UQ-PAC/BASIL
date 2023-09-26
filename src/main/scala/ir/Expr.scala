@@ -331,7 +331,7 @@ class MemoryLoad(var mem: Memory, var index: Expr, var endian: Endian, var size:
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemoryLoad(this)
 }
 
-// name == stack or mem
+// name == stack or mem or data
 case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr {
   override def toBoogie: BMapVar = BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
   override def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapBType(BitVecBType(addressSize), BoolBType), Scope.Global)

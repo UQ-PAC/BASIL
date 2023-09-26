@@ -1,6 +1,6 @@
 package analysis
 
-import ir.*
+import ir.{Extract, *}
 import analysis.solvers.*
 
 import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
@@ -464,7 +464,7 @@ trait MemoryRegionAnalysisMisc:
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
-  var stackPool: mutable.Map[Expr, StackRegion] = mutable.HashMap()
+  val stackMap: mutable.Map[CfgFunctionEntryNode, mutable.Map[Expr, StackRegion]] = mutable.HashMap()
   private def getNextMallocCount(): String = {
     mallocCount += 1
     s"malloc_$mallocCount"
@@ -475,7 +475,15 @@ trait MemoryRegionAnalysisMisc:
     s"stack_$stackCount"
   }
 
-  def poolMaster(expr: Expr): StackRegion = {
+  /**
+   * Controls the pool of stack regions. Each pool is unique to a function.
+   * If the offset has already been defined in the context of the function, then the same region is returned.
+   * @param expr: the offset
+   * @param parent: the function entry node
+   * @return the stack region corresponding to the offset
+   */
+  def poolMaster(expr: Expr, parent: CfgFunctionEntryNode): StackRegion = {
+    val stackPool = stackMap.getOrElseUpdate(parent, mutable.HashMap())
     if (stackPool.contains(expr)) {
       stackPool(expr)
     } else {
@@ -483,6 +491,25 @@ trait MemoryRegionAnalysisMisc:
       stackPool += (expr -> newRegion)
       newRegion
     }
+  }
+
+  def unwrapExpr(expr: Expr) : ListBuffer[Expr] = {
+    val buffers = ListBuffer[Expr]()
+    expr match {
+      case e: Extract => unwrapExpr(e.body)
+      case e: SignExtend => unwrapExpr(e.body)
+      case e: ZeroExtend => unwrapExpr(e.body)
+      case repeat: Repeat => unwrapExpr(repeat.body)
+      case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
+      case binaryExpr: BinaryExpr =>
+          unwrapExpr(binaryExpr.arg1)
+          unwrapExpr(binaryExpr.arg2)
+      case memoryLoad: MemoryLoad =>
+        buffers.addOne(memoryLoad)
+        unwrapExpr(memoryLoad.index)
+      case _ =>
+    }
+    buffers
   }
 
   val cfg: ProgramCfg
@@ -520,7 +547,7 @@ trait MemoryRegionAnalysisMisc:
         case binOp: BinaryExpr =>
             if (binOp.arg1 == stackPointer) {
               val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp)
-              Set(StackRegion(getNextStackCount(), binOp.arg2, None))
+              Set(poolMaster(binOp.arg2, n.asInstanceOf[CfgStatementNode].parent))
             } else {
               val evaluation: Expr = evaluateExpression(binOp, n, constantProp)
               if (evaluation.equals(binOp)) {
@@ -581,22 +608,28 @@ trait MemoryRegionAnalysisMisc:
             }
             val result = eval(memAssign.rhs.index, s, n)
             result.collectFirst({
-              case StackRegion(_, _, _) =>
-                memAssign.rhs = MemoryStore(Memory("stack", memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize), memAssign.rhs.index, memAssign.rhs.value, memAssign.rhs.endian, memAssign.rhs.size)
+              case StackRegion(name, _, _) =>
+                memAssign.rhs = MemoryStore(Memory(name, memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize), memAssign.rhs.index, memAssign.rhs.value, memAssign.rhs.endian, memAssign.rhs.size)
+              case DataRegion(name, _, _) =>
+                memAssign.rhs = MemoryStore(Memory(name, memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize), memAssign.rhs.index, memAssign.rhs.value, memAssign.rhs.endian, memAssign.rhs.size)
               case _ =>
             })
             lattice.sublattice.lub(s, result)
           case localAssign: LocalAssign =>
-            localAssign.rhs match
+            var m = s
+            unwrapExpr(localAssign.rhs).foreach {
               case memoryLoad: MemoryLoad =>
                 val result = eval(memoryLoad.index, s, n)
                 result.collectFirst({
-                  case StackRegion(_, _, _) =>
-                    memoryLoad.mem = Memory("stack", memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
+                  case StackRegion(name, _, _) =>
+                    memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
+                  case DataRegion(name, _, _) =>
+                    memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
                   case _ =>
                 })
-                lattice.sublattice.lub(s, result)
-              case _ => s
+                m = lattice.sublattice.lub(m, result)
+            } 
+            m
           case _ => s
         }
       case _ => s // ignore other kinds of nodes
