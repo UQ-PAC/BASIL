@@ -1,9 +1,8 @@
-Globals:
-arr: int[10]
-
-L: arr -> true
+Subroutine: main 
 
 Subroutine: get_secret
-Ensures: Gamma_get_secret_result == false
+
+
+Subroutine: myfree
 
 

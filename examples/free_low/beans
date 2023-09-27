@@ -1,0 +1,53 @@
+
+
+procedure memset();
+  // plus some more
+  modifies R29, R31, mem, Gamma_mem;
+  free ensures (R29 == old(R29));
+  free ensures (R31 == old(R31));
+  free ensures (Gamma_mem[R0] == true); // memory is low
+
+
+procedure #free();
+  modifies R29, R31, mem, Gamma_mem;
+  requires (Gamma_mem[R0] == true); // memory is low
+  free ensures (R29 == old(R29));
+  free ensures (R31 == old(R31));
+  free ensures (Gamma_R0 == true);
+
+procedure get_secret();
+  modifies Gamma_R0, R29, R31, R0, mem, Gamma_mem;
+  free ensures (R29 == old(R29));
+  free ensures (R31 == old(R31));
+  free ensures (Gamma_mem[R0] == false);  // buffer high
+  free ensures (Gamma_R0 == true);        // address low
+
+
+/// working good
+
+procedure memset();
+  modifies R29, R31, mem, Gamma_mem;
+  free ensures (R29 == old(R29));
+  free ensures (R31 == old(R31));
+  free ensures (memory_load64_le(mem, bvadd64(131072bv64, 80bv64)) == memory_load64_le(old(mem), bvadd64(131072bv64, 80bv64))); // preserves GOT
+  free ensures (Gamma_mem[R0] == Gamma_R1); // gamma is same as value set
+
+
+procedure #free();
+  modifies R29, R31, mem, Gamma_mem;
+  requires (Gamma_mem[R0] == true); // memory is low
+  free ensures (R29 == old(R29));
+  free ensures (R31 == old(R31));
+  free ensures (Gamma_R0 == true);
+
+
+
+procedure get_secret()
+  modifies Gamma_R0, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_stack, R0, R29, R30, R31, stack;
+  free ensures (Gamma_R29 == old(Gamma_R29));
+  free ensures (Gamma_R31 == old(Gamma_R31));
+  free ensures (R29 == old(R29));
+  free ensures (R31 == old(R31));
+  free ensures (Gamma_mem[R0] == false);  // buffer high
+  free ensures (Gamma_R0 == true);        // address low
+
