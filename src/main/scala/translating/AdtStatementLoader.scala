@@ -10,6 +10,8 @@ import scala.jdk.CollectionConverters._
 
 object AdtStatementLoader {
 
+  private val knownNonReturningFunctions = List("exit", "_exit", "abort", "__stack_chk_fail", "__assert_fail", "longjump")
+
   def visitProject(ctx: ProjectContext): BAPProgram = {
     val memorySections = visitSections(ctx.sections)
     val subroutines = visitProgram(ctx.program)
@@ -116,7 +118,11 @@ object AdtStatementLoader {
     }
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    BAPDirectCall(parseAllowed(visitQuoteString(ctx.callee.tid.name).stripPrefix("@")), visitExp(ctx.cond), returnTarget, line, insn)
+    val function = visitQuoteString(ctx.callee.tid.name).stripPrefix("@")
+    if (knownNonReturningFunctions.contains(function))
+      BAPDirectCall(parseAllowed(function), visitExp(ctx.cond), None, line, insn)
+    else
+      BAPDirectCall(parseAllowed(function), visitExp(ctx.cond), returnTarget, line, insn)
   }
 
   def visitGotoJmp(ctx: GotoJmpContext): BAPGoTo = {

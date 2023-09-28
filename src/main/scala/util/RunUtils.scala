@@ -250,7 +250,7 @@ object RunUtils {
     }
 
     def addFakeProcedure(name: String): Unit = {
-      IRProgram.procedures += Procedure(name, None, ArrayBuffer(), ArrayBuffer(), ArrayBuffer())
+      IRProgram.procedures += Procedure(name, None, ArrayBuffer(), ArrayBuffer(), ArrayBuffer(), true)
     }
 
     def resolveAddresses(valueSet: Set[Value]): Set[AddressValue] = {

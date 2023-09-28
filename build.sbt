@@ -9,6 +9,8 @@ val scalaTests = "org.scalatest" %% "scalatest" % "3.2.10" % "test"
 val scalactic = "org.scalactic" %% "scalactic" % "3.2.10"
 val antlrRuntime = "org.antlr" % "antlr4-runtime" % "4.9.3"
 
+libraryDependencies += "org.scala-lang.modules" %% "scala-parallel-collections" % "1.0.4"
+
 lazy val root = project
   .in(file("."))
   .enablePlugins(Antlr4Plugin)

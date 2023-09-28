@@ -4,6 +4,7 @@ import bap._
 import ir._
 import specification._
 import scala.collection.mutable
+import scala.collection.parallel.CollectionConverters._
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 
@@ -29,20 +30,34 @@ class BAPToIR(var program: BAPProgram) {
       for (p <- s.out) {
         out.append(p.toIR)
       }
-      val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
+      val procedure = Procedure(s.name, Some(s.address), blocks, in, out, s.name == "non_returning_function")
       procedures.append(procedure)
       nameToProcedure.addOne(s.name, procedure)
     }
 
-    for (s <- program.subroutines) {
+    for (s <- program.subroutines.par) {
+
+      var isReturning = false
       for (b <- s.blocks) {
         val block = labelToBlock(b.label)
         for (st <- b.statements) {
           block.statements.append(translate(st))
         }
         for (j <- b.jumps) {
-          block.jumps.append(translate(j))
+          val translated = translate(j)
+          if (translated.isInstanceOf[DirectCall] && translated.asInstanceOf[DirectCall].target.nonReturning) {
+            translated.asInstanceOf[DirectCall].returnTarget = None
+          }
+          if (j.isInstanceOf[BAPIndirectCall] && j.asInstanceOf[BAPIndirectCall].target.name == "R30") {
+            isReturning = true
+          }
+
+          block.jumps.append(translated)
+
         }
+      }
+      if (!isReturning) {
+        nameToProcedure(s.name).nonReturning = true
       }
     }
 
@@ -51,7 +66,6 @@ class BAPToIR(var program: BAPProgram) {
       val bytes = m.bytes.map(_.toIR)
       memorySections.append(MemorySection(m.name, m.address, m.size, bytes))
     }
-
     Program(procedures, memorySections)
   }
 
@@ -66,7 +80,12 @@ class BAPToIR(var program: BAPProgram) {
   private def translate(j: BAPJump) = {
     j match {
       case b: BAPDirectCall =>
-        DirectCall(nameToProcedure(b.target), coerceToBool(b.condition), b.returnTarget.map {(t: String) => labelToBlock(t)})
+        DirectCall(nameToProcedure(b.target), coerceToBool(b.condition),
+          if (nameToProcedure(b.target).nonReturning)
+            Option.empty
+          else
+            b.returnTarget.map {(t: String) => labelToBlock(t)}
+        )
       case b: BAPIndirectCall =>
         IndirectCall(b.target.toIR, coerceToBool(b.condition), b.returnTarget.map {(t: String) => labelToBlock(t)})
       case b: BAPGoTo =>

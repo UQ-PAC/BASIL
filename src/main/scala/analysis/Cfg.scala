@@ -826,11 +826,16 @@ class ProgramCfgFactory:
               dCall.returnTarget match {
                 case Some(retBlock) =>
                   // Add intermediary return node (split call into call and return)
-                  val callRet = CfgCallReturnNode()
+                  println(targetProc.name + " is " + targetProc.nonReturning)
+                  val callRet = if (targetProc.nonReturning)
+                    CfgCallNoReturnNode()
+                  else
+                    CfgCallReturnNode()
 
                   calls.foreach(node => {
                     cfg.addEdge(node, callRet)
                   })
+
                   if (visitedBlocks.contains(retBlock)) {
                     val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
                     cfg.addEdge(callRet, retBlockEntry)
