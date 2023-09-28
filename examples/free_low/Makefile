@@ -1,19 +1,16 @@
 
 
 .PHONY=lift
-lift: free_low.adt free_low.bir free_low.relf
+lift: free-low-bad free-low-good
 
-a.out: free_low.c 
-	aarch64-linux-gnu-gcc -g -Wall -fno-pic -fno-stack-protector -Wextra free_low.c -O3
-	bap-aslp a.out > free_low.bir
+free-low-good: free_low.c 
+	aarch64-linux-gnu-gcc -O3 -g -Wall -fno-pic -fno-stack-protector -Wextra free_low.c -o free-low-good 
+	bap-aslp free-low-good -d adt:free-low-good.adt	
+	bap-aslp free-low-good > free-low-good.bir
+	aarch64-linux-gnu-readelf -s -r -W free-low-good > free-low-good.relf
 
-free_low.adt: a.out
-	bap-aslp a.out -d adt:free_low.adt	
-
-free_low.bir: a.out
-	bap-aslp a.out -d > free_low.bir
-
-free_low.relf: a.out
-	aarch64-linux-gnu-readelf -s -r -W a.out > free_low.relf
-
-
+free-low-bad: free_low.c 
+	aarch64-linux-gnu-gcc -g -Wall -fno-pic -fno-stack-protector -Wextra free_low.c  -o free-low-bad
+	bap-aslp free-low-bad -d adt:free-low-bad.adt	
+	bap-aslp free-low-bad > free-low-bad.bir
+	aarch64-linux-gnu-readelf -s -r -W free-low-bad > free-low-bad.relf
