@@ -68,7 +68,10 @@ object BAPLoader {
 
   def visitImmVar(ctx: ImmVarContext): BAPVar = {
     val name = parseAllowed(visitQuoteString(ctx.name))
-    if ((name.startsWith("R") || name.startsWith("V")) && (name.length == 2 || name.length == 3) && name.substring(1).forall(_.isDigit)) {
+    if (
+      (name.startsWith("R") || name
+        .startsWith("V")) && (name.length == 2 || name.length == 3) && name.substring(1).forall(_.isDigit)
+    ) {
       BAPRegister(name, parseInt(ctx.size))
     } else {
       BAPLocalVar(name, parseInt(ctx.size))
@@ -121,7 +124,13 @@ object BAPLoader {
     }
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    BAPDirectCall(parseAllowed(visitQuoteString(ctx.callee.tid.name).stripPrefix("@")), visitExp(ctx.cond), returnTarget, line, insn)
+    BAPDirectCall(
+      parseAllowed(visitQuoteString(ctx.callee.tid.name).stripPrefix("@")),
+      visitExp(ctx.cond),
+      returnTarget,
+      line,
+      insn
+    )
   }
 
   def visitGotoJmp(ctx: GotoJmpContext): BAPGoTo = {
@@ -141,10 +150,11 @@ object BAPLoader {
         }
     }
     ctx.intent.getText match {
-      case "In()"   => (Some(BAPParameter(lhs.name, lhs.size, rhs)), None)
-      case "Out()"  => (None, Some(BAPParameter(lhs.name, lhs.size, rhs)))
-      case "Both()" => (Some(BAPParameter(lhs.name, lhs.size, rhs)), Some(BAPParameter(lhs.name + "_out", lhs.size, rhs)))
-      case _        => (None, None)
+      case "In()"  => (Some(BAPParameter(lhs.name, lhs.size, rhs)), None)
+      case "Out()" => (None, Some(BAPParameter(lhs.name, lhs.size, rhs)))
+      case "Both()" =>
+        (Some(BAPParameter(lhs.name, lhs.size, rhs)), Some(BAPParameter(lhs.name + "_out", lhs.size, rhs)))
+      case _ => (None, None)
     }
   }
 
@@ -163,7 +173,7 @@ object BAPLoader {
       BAPParameter("LR_out", 64, BAPLocalVar("R30", 64)),
       BAPParameter("SP_out", 64, BAPLocalVar("R31", 64))
     )
-    */
+     */
 
     val address = parseFromAttrs(ctx.attrs, "address") match {
       case Some(x: String) => Integer.parseInt(x.stripPrefix("0x"), 16)
@@ -198,7 +208,7 @@ object BAPLoader {
         case None => Vector(Instruction(instruction, List(statement)))
       }
     }
-    */
+     */
 
     val label = parseLabel(ctx.tid.name)
     val address = parseFromAttrs(ctx.attrs, "address") match {
@@ -235,7 +245,8 @@ object BAPLoader {
 
   def parseAllowed(s: String): String = s.map(c => if allowedChars.contains(c) then c else '$')
 
-  def parseLabel(ctx: QuoteStringContext): String = "l" + parseAllowed(visitQuoteString(ctx).stripPrefix("@").stripPrefix("%"))
+  def parseLabel(ctx: QuoteStringContext): String =
+    "l" + parseAllowed(visitQuoteString(ctx).stripPrefix("@").stripPrefix("%"))
 
   def parseFromAttrs(ctx: AttrsContext, field: String): Option[String] = {
     ctx.attr.asScala.map(visitAttr).collectFirst {
@@ -255,6 +266,7 @@ object BAPLoader {
 
   def visitAttr(ctx: AttrContext): (String, String) = (visitQuoteString(ctx.lhs), visitQuoteString(ctx.rhs))
 
-  val allowedChars: Set[Char] = Set('_', '\'', '~', '#', '$', '^', '_', '.', '?', '`') ++ ('A' to 'Z') ++ ('a' to 'z') ++ ('0' to '9')
+  val allowedChars: Set[Char] =
+    Set('_', '\'', '~', '#', '$', '^', '_', '.', '?', '`') ++ ('A' to 'Z') ++ ('a' to 'z') ++ ('0' to '9')
 
 }

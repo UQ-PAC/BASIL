@@ -68,10 +68,8 @@ trait LatticeWithOps extends Lattice:
   def bveq(a: Element, b: Element): Element
   def concat(a: Element, b: Element): Element
 
-
-/**
- * The powerset lattice of a set of elements of type `A` with subset ordering.
- */
+/** The powerset lattice of a set of elements of type `A` with subset ordering.
+  */
 class PowersetLattice[A] extends Lattice {
 
   type Element = Set[A]
@@ -139,13 +137,13 @@ class MapLattice[A, +L <: Lattice](val sublattice: L) extends Lattice:
 object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWithOps:
 
   private def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element = try {
-      (a, b) match
-        case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => 
-          FlatElement.FlatEl(op(x, y))
-        case (FlatElement.Bot, _) => FlatElement.Bot
-        case (_, FlatElement.Bot) => FlatElement.Bot
-        case (_, FlatElement.Top) => FlatElement.Top
-        case (FlatElement.Top, _) => FlatElement.Top
+    (a, b) match
+      case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) =>
+        FlatElement.FlatEl(op(x, y))
+      case (FlatElement.Bot, _) => FlatElement.Bot
+      case (_, FlatElement.Bot) => FlatElement.Bot
+      case (_, FlatElement.Top) => FlatElement.Top
+      case (FlatElement.Top, _) => FlatElement.Top
   } catch {
     case e: Exception =>
       Logger.error(s"Failed on op $op with $a and $b")
@@ -168,8 +166,8 @@ object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWit
   override def bvand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvand, a, b)
   override def bvor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvor, a, b)
   override def bvxor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvxor, a, b)
-  override def bvnand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvnand, a, b) 
-  override def bvnor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvnor, a, b) 
+  override def bvnand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvnand, a, b)
+  override def bvnor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvnor, a, b)
   override def bvxnor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvxnor, a, b)
   override def bvnot(a: Element): Element = apply(BitVectorEval.smt_bvnot, a)
   override def bvneg(a: Element): Element = apply(BitVectorEval.smt_bvneg, a)
@@ -187,28 +185,28 @@ object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWit
   override def bvsgt(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsgt, a, b)
   override def zero_extend(width: Int, a: Element): Element = apply(BitVectorEval.smt_zero_extend(width, _: Literal), a)
   override def sign_extend(width: Int, a: Element): Element = apply(BitVectorEval.smt_sign_extend(width, _: Literal), a)
-  override def extract(high: Int, low: Int, a: Element): Element = apply(BitVectorEval.boogie_extract(high, low, _: Literal), a)
+  override def extract(high: Int, low: Int, a: Element): Element =
+    apply(BitVectorEval.boogie_extract(high, low, _: Literal), a)
   override def concat(a: Element, b: Element): Element = apply(BitVectorEval.smt_concat, a, b)
   override def bvneq(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvneq, a, b)
   override def bveq(a: Element, b: Element): Element = apply(BitVectorEval.smt_bveq, a, b)
 
-
 // value-set lattice
 /** Constant propagation lattice.
- */
+  */
 object ValueSetLattice extends FlatLattice[Literal]() with LatticeWithOps:
 
   private def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element = (a, b) match
     case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => FlatElement.FlatEl(op(x, y))
-    case (FlatElement.Bot, _) => FlatElement.Bot
-    case (_, FlatElement.Bot) => FlatElement.Bot
-    case (_, FlatElement.Top) => FlatElement.Top
-    case (FlatElement.Top, _) => FlatElement.Top
+    case (FlatElement.Bot, _)                           => FlatElement.Bot
+    case (_, FlatElement.Bot)                           => FlatElement.Bot
+    case (_, FlatElement.Top)                           => FlatElement.Top
+    case (FlatElement.Top, _)                           => FlatElement.Top
 
   private def apply(op: Literal => Literal, a: Element): Element = a match
     case FlatElement.FlatEl(x) => FlatElement.FlatEl(op(x))
-    case FlatElement.Top => FlatElement.Top
-    case FlatElement.Bot => FlatElement.Bot
+    case FlatElement.Top       => FlatElement.Top
+    case FlatElement.Bot       => FlatElement.Bot
 
   override def literal(l: Literal): Element = FlatElement.FlatEl(l)
   override def bvadd(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvadd, a, b)
@@ -220,8 +218,8 @@ object ValueSetLattice extends FlatLattice[Literal]() with LatticeWithOps:
   override def bvurem(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvurem, a, b)
   override def bvand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvand, a, b)
   override def bvor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvor, a, b)
-  override def bvnand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvnand, a, b) 
-  override def bvnor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvnor, a, b) 
+  override def bvnand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvnand, a, b)
+  override def bvnor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvnor, a, b)
   override def bvxnor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvxnor, a, b)
   override def bvxor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvxor, a, b)
   override def bvnot(a: Element): Element = apply(BitVectorEval.smt_bvnot, a)
@@ -240,7 +238,8 @@ object ValueSetLattice extends FlatLattice[Literal]() with LatticeWithOps:
   override def bvsgt(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsgt, a, b)
   override def zero_extend(width: Int, a: Element): Element = apply(BitVectorEval.smt_zero_extend(width, _: Literal), a)
   override def sign_extend(width: Int, a: Element): Element = apply(BitVectorEval.smt_sign_extend(width, _: Literal), a)
-  override def extract(high: Int, low: Int, a: Element): Element = apply(BitVectorEval.boogie_extract(high, low, _: Literal), a)
+  override def extract(high: Int, low: Int, a: Element): Element =
+    apply(BitVectorEval.boogie_extract(high, low, _: Literal), a)
   override def concat(a: Element, b: Element): Element = apply(BitVectorEval.smt_concat, a, b)
   override def bvneq(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvneq, a, b)
   override def bveq(a: Element, b: Element): Element = apply(BitVectorEval.smt_bveq, a, b)

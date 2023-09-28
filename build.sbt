@@ -85,4 +85,3 @@ updateExpected := {
   expectedUpdate(correctPath, true)
   expectedUpdate(incorrectPath, false)
 }
-

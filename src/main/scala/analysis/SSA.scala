@@ -1,6 +1,5 @@
 // TODO: This doesn't seem to be used currently, should it be kept?
 
-
 // package analysis.util
 
 // import analysis._
@@ -144,7 +143,6 @@
 // //      }
 // //    }
 
-
 // //    def visitChildren(node: Object, arg: Unit): Unit = {
 // //        node match {
 // //            case cfg: Cfg =>
@@ -267,7 +265,6 @@
 //         }
 //       }
 
-
 // //      // for whole expression
 // //      for (e <- incomingEdges) {
 // //        node match {
@@ -340,7 +337,6 @@
 // //        println()
 // //      )
 
-
 //         //TODO: print this if required
 // //      incomingMatches.foreach((key, value) =>
 // //        print(s"key: ($key, ${key.ssa_id}), value: ")
@@ -348,7 +344,6 @@
 // //        println()
 // //      )
 //     }
-
 
 // //    def resolve_phi_rec(node: CfgNode, cfg: Cfg): mutable.Map[Expr, ListBuffer[Expr]] = {
 // //

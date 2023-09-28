@@ -4,7 +4,11 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
 import boogie._
 
-class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBuffer[MemorySection], var mainProcedure: Procedure) {
+class Program(
+    var procedures: ArrayBuffer[Procedure],
+    var initialMemory: ArrayBuffer[MemorySection],
+    var mainProcedure: Procedure
+) {
 
   // This shouldn't be run before indirect calls are resolved?
   def stripUnreachableFunctions(): Unit = {
@@ -55,9 +59,6 @@ class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBu
       }
     }
 
-
-
-
     /*
     val visited: mutable.Set[Procedure] = mutable.Set()
     val waiting: mutable.Set[Procedure] = mutable.Set()
@@ -89,7 +90,7 @@ class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBu
       visited.add(p)
       path :+ p
     }
-    */
+     */
   }
 
   def stackIdentification(): Unit = {
@@ -98,10 +99,15 @@ class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBu
     }
   }
 
-
 }
 
-class Procedure(var name: String, var address: Option[Int], var blocks: ArrayBuffer[Block], var in: ArrayBuffer[Parameter], var out: ArrayBuffer[Parameter]) {
+class Procedure(
+    var name: String,
+    var address: Option[Int],
+    var blocks: ArrayBuffer[Block],
+    var in: ArrayBuffer[Parameter],
+    var out: ArrayBuffer[Parameter]
+) {
   def calls: Set[Procedure] = blocks.flatMap(_.calls).toSet
   override def toString: String = {
     s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
@@ -154,7 +160,7 @@ class Procedure(var name: String, var address: Option[Int], var blocks: ArrayBuf
       for (j <- b.jumps) {
         j match {
           case g: GoTo => visitBlock(g.target)
-          case _ =>
+          case _       =>
         }
       }
     }
@@ -162,7 +168,12 @@ class Procedure(var name: String, var address: Option[Int], var blocks: ArrayBuf
 
 }
 
-class Block(var label: String, var address: Option[Int], var statements: ArrayBuffer[Statement], var jumps: ArrayBuffer[Jump]) {
+class Block(
+    var label: String,
+    var address: Option[Int],
+    var statements: ArrayBuffer[Statement],
+    var jumps: ArrayBuffer[Jump]
+) {
   def calls: Set[Procedure] = jumps.flatMap(_.calls).toSet
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet
   //def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
@@ -174,10 +185,10 @@ class Block(var label: String, var address: Option[Int], var statements: ArrayBu
     s"Block $label with $statementsString\n$jumpsString"
   }
 
-  override def equals(obj: scala.Any): Boolean = 
-    obj match 
+  override def equals(obj: scala.Any): Boolean =
+    obj match
       case b: Block => b.label == this.label
-      case _ => false
+      case _        => false
 
   override def hashCode(): Int = label.hashCode()
 }

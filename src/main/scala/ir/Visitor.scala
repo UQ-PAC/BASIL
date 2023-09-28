@@ -258,12 +258,12 @@ abstract class ReadOnlyVisitor extends Visitor {
 class Substituter(variables: Map[Variable, Variable] = Map(), memories: Map[Memory, Memory] = Map()) extends Visitor {
   override def visitVariable(node: Variable): Variable = variables.get(node) match {
     case Some(v: Variable) => v
-    case None => node
+    case None              => node
   }
 
   override def visitMemory(node: Memory): Memory = memories.get(node) match {
     case Some(m: Memory) => m
-    case None => node
+    case None            => node
   }
 }
 
@@ -308,4 +308,3 @@ class ExternalRemover(external: Set[String]) extends Visitor {
     super.visitProcedure(node)
   }
 }
-

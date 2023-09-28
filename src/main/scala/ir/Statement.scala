@@ -5,14 +5,16 @@ trait Command
 trait Statement extends Command {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
-  def acceptVisit(visitor: Visitor): Statement = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
+  def acceptVisit(visitor: Visitor): Statement = throw new Exception(
+    "visitor " + visitor + " unimplemented for: " + this
+  )
 }
 
 class LocalAssign(var lhs: Variable, var rhs: Expr) extends Statement {
   //override def locals: Set[Variable] = rhs.locals + lhs
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
-    case _ => Set()
+    case _           => Set()
   }
   override def toString: String = s"$lhs := $rhs"
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitLocalAssign(this)

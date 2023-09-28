@@ -51,18 +51,16 @@ class MemoryModelMap {
       val node = memoryRegions(exitNode).asInstanceOf[Set[Any]]
       // for each function exit node we get the memory region
       // and add it to the mapping
-      val stackRgns = node.collect{ case r: StackRegion => r }.toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
-      val dataRgns = node.collect{ case r: DataRegion => r }.toList
-      val heapRgns = node.collect{ case r: HeapRegion => r }.toList
-      val accessRgns = node.collect{ case r: RegionAccess => r }.toList
+      val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
+      val dataRgns = node.collect { case r: DataRegion => r }.toList
+      val heapRgns = node.collect { case r: HeapRegion => r }.toList
+      val accessRgns = node.collect { case r: RegionAccess => r }.toList
       // map externalFunctions name, value to DataRegion(name, value) and then sort by value
-      val externalFunctionRgns = externalFunctions.map(
-        (offset, name) => DataRegion(name, BitVecLiteral(offset, 64), None)
-      ).toList
+      val externalFunctionRgns =
+        externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64), None)).toList
 
       // add externalFunctionRgn to dataRgns and sort by value
       val allDataRgns = (dataRgns ++ externalFunctionRgns).sortBy(_.start.asInstanceOf[BitVecLiteral].value)
-
 
       allStacks(exitNode.data.name) = stackRgns
 
@@ -73,7 +71,6 @@ class MemoryModelMap {
       for (dataRgn <- allDataRgns) {
         add(dataRgn.start.asInstanceOf[BitVecLiteral].value, dataRgn)
       }
-
     )
   }
 
@@ -106,7 +103,7 @@ class MemoryModelMap {
 //  }
 
   // Find an object for a given value within a range
-  
+
   def findStackObject(value: BigInt): Option[StackRegion] = {
     for ((range, obj: StackRegion) <- rangeMap.stackMap) {
       if (range.start <= value && value <= range.end) {
@@ -117,20 +114,17 @@ class MemoryModelMap {
     None
   }
 
-
   def findDataObject(value: BigInt): Option[DataRegion] = {
-      for ((range, obj) <- rangeMap.dataMap) {
-        if (range.start <= value && value <= range.end) {
-          obj.extent = Some(range);
-          return Some(obj)
-        }
+    for ((range, obj) <- rangeMap.dataMap) {
+      if (range.start <= value && value <= range.end) {
+        obj.extent = Some(range);
+        return Some(obj)
       }
-      None
+    }
+    None
   }
 
   override def toString: String =
     s"Stack: ${rangeMap.stackMap}\n Heap: ${rangeMap.heapMap}\n Data: ${rangeMap.dataMap}\n"
 
 }
-
-

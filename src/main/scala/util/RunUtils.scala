@@ -19,7 +19,6 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating._
 import util.Logger
 
-
 object RunUtils {
   var memoryRegionAnalysisResults: Option[Map[CfgNode, _]] = None
 
@@ -51,7 +50,8 @@ object RunUtils {
 
   def loadSpecification(filename: Option[String], program: Program, globals: Set[SpecGlobal]): Specification = {
     filename match {
-      case Some(s) => val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
+      case Some(s) =>
+        val specLexer = SpecificationsLexer(CharStreams.fromFileName(s))
         val specTokens = CommonTokenStream(specLexer)
         val specParser = SpecificationsParser(specTokens)
         specParser.setBuildParseTree(true)
@@ -61,7 +61,14 @@ object RunUtils {
     }
   }
 
-  def loadAndTranslate(BAPFileName: String, readELFFileName: String, specFileName: Option[String], performAnalysis: Boolean, performInterpret: Boolean, dumpIL: Boolean): BProgram = {
+  def loadAndTranslate(
+      BAPFileName: String,
+      readELFFileName: String,
+      specFileName: Option[String],
+      performAnalysis: Boolean,
+      performInterpret: Boolean,
+      dumpIL: Boolean
+  ): BProgram = {
     val bapProgram = loadBAP(BAPFileName)
 
     val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(readELFFileName)
@@ -103,12 +110,20 @@ object RunUtils {
     boogieTranslator.translate
   }
 
-  def analyse(IRProgram: Program, externalFunctions: Set[ExternalFunction], globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt]): Program = {
+  def analyse(
+      IRProgram: Program,
+      externalFunctions: Set[ExternalFunction],
+      globals: Set[SpecGlobal],
+      globalOffsets: Map[BigInt, BigInt]
+  ): Program = {
     iterations += 1
-    val subroutines = IRProgram.procedures.filter(p => p.address.isDefined).map{(p: Procedure) => BigInt(p.address.get) -> p.name}.toMap
-    val globalAddresses = globals.map{(s: SpecGlobal) => s.address -> s.name}.toMap
-    val externalAddresses = externalFunctions.map{(e: ExternalFunction) => e.offset -> e.name}.toMap
-    Logger.info("Globals:" )
+    val subroutines = IRProgram.procedures
+      .filter(p => p.address.isDefined)
+      .map { (p: Procedure) => BigInt(p.address.get) -> p.name }
+      .toMap
+    val globalAddresses = globals.map { (s: SpecGlobal) => s.address -> s.name }.toMap
+    val externalAddresses = externalFunctions.map { (e: ExternalFunction) => e.offset -> e.name }.toMap
+    Logger.info("Globals:")
     Logger.info(globalAddresses)
     Logger.info("Global Offsets: ")
     Logger.info(globalOffsets)
@@ -136,22 +151,35 @@ object RunUtils {
     Logger.info("[!] Running Constant Propagation")
     val solver = ConstantPropagationAnalysis.WorklistSolver(cfg)
     val result = solver.analyze(true).asInstanceOf[Map[CfgNode, Map[Variable, Any]]]
-    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder), "cpa")
+    Output.output(
+      OtherOutput(OutputKindE.cfg),
+      cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder),
+      "cpa"
+    )
 
     Logger.info("[!] Running MRA")
     val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, result)
     val result2 = solver2.analyze(true).asInstanceOf[Map[CfgNode, MemoryRegion]]
     memoryRegionAnalysisResults = Some(result2)
-    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder), "mra")
+    Output.output(
+      OtherOutput(OutputKindE.cfg),
+      cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder),
+      "mra"
+    )
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
     mmm.convertMemoryRegions(result2, mergedSubroutines)
 
     Logger.info("[!] Running VSA")
-    val solver3 = ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, result)
+    val solver3 =
+      ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, result)
     val result3 = solver3.analyze(false)
-    Output.output(OtherOutput(OutputKindE.cfg), cfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder), "vsa")
+    Output.output(
+      OtherOutput(OutputKindE.cfg),
+      cfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder),
+      "vsa"
+    )
 
     Logger.info("[!] Resolving CFG")
     val (newIR, modified) = resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram)
@@ -167,12 +195,16 @@ object RunUtils {
     newIR
   }
 
-  def resolveCFG(cfg: ProgramCfg, valueSets: Map[CfgNode, Map[Expr, Set[Value]]], IRProgram: Program): (Program, Boolean) = {
+  def resolveCFG(
+      cfg: ProgramCfg,
+      valueSets: Map[CfgNode, Map[Expr, Set[Value]]],
+      IRProgram: Program
+  ): (Program, Boolean) = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
     // find the main function
     cfg.nodes.foreach {
-      case main: CfgFunctionEntryNode if main.data.name == "main"=>
+      case main: CfgFunctionEntryNode if main.data.name == "main" =>
         main.succ(true).toSet.union(main.succ(false).toSet).foreach(node => worklist.addOne(node))
       case _ =>
     }
@@ -180,18 +212,18 @@ object RunUtils {
     val visited = scala.collection.mutable.Set[CfgNode]()
     while (worklist.nonEmpty) {
       val node = worklist.remove(0)
-        if (!visited.contains(node)) {
-          process (node)
-          node.succ(true).toSet.union(node.succ(false).toSet).foreach(node => worklist.addOne(node))
-          visited.add(node)
-        }
+      if (!visited.contains(node)) {
+        process(node)
+        node.succ(true).toSet.union(node.succ(false).toSet).foreach(node => worklist.addOne(node))
+        visited.add(node)
+      }
     }
 
     def extractExprFromValue(v: Value): Expr = v match {
-      case LiteralValue(expr) => expr
-      case localAddress: LocalAddress => localAddress.expr
+      case LiteralValue(expr)           => expr
+      case localAddress: LocalAddress   => localAddress.expr
       case globalAddress: GlobalAddress => globalAddress.expr
-      case _ => throw new Exception("Expected a Value with an Expr")
+      case _                            => throw new Exception("Expected a Value with an Expr")
     }
 
     def process(n: CfgNode): Unit = n match {
@@ -207,15 +239,15 @@ object RunUtils {
                 } else if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size > 1) {
                   println(s"RESOLVED: WARN Memory load ${localAssign.lhs} resolved to multiple values, cannot replace")
 
-                   /*
+                  /*
                   // must merge into a single memory variable to represent the possible values
                   // Make a binary OR of all the possible values takes two at a time (incorrect to do BVOR)
                   val values = valueSets(n).get(localAssign.lhs).head
                   val exprValues = values.map(extractExprFromValue)
-                  val result = exprValues.reduce((a, b) => BinaryExpr(BVOR, a, b)) // need to express nondeterministic 
+                  val result = exprValues.reduce((a, b) => BinaryExpr(BVOR, a, b)) // need to express nondeterministic
                                                                                    // choice between these specific options
                   localAssign.rhs = result
-                  */
+                   */
                 }
               case _ =>
           case indirectCall: IndirectCall =>
@@ -233,7 +265,11 @@ object RunUtils {
               commandNode.block match
                 case block: Block =>
                   block.jumps = block.jumps.filter(!_.equals(indirectCall))
-                  block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(functionNames.head.name)).head, indirectCall.condition, indirectCall.returnTarget)
+                  block.jumps += DirectCall(
+                    IRProgram.procedures.filter(_.name.equals(functionNames.head.name)).head,
+                    indirectCall.condition,
+                    indirectCall.returnTarget
+                  )
                 case null => throw new Exception("Node not found in nodeToBlock map")
             } else if (functionNames.size > 1) {
               modified = true
@@ -242,16 +278,32 @@ object RunUtils {
                   case block: Block =>
                     block.jumps = block.jumps.filter(!_.equals(indirectCall))
                     if (indirectCall.condition.isDefined) {
-                      block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(addressValue.name)).head, Option(BinaryExpr(BVAND, indirectCall.condition.get, BinaryExpr(BVEQ, indirectCall.target, addressValue.expr))), indirectCall.returnTarget)
+                      block.jumps += DirectCall(
+                        IRProgram.procedures.filter(_.name.equals(addressValue.name)).head,
+                        Option(
+                          BinaryExpr(
+                            BVAND,
+                            indirectCall.condition.get,
+                            BinaryExpr(BVEQ, indirectCall.target, addressValue.expr)
+                          )
+                        ),
+                        indirectCall.returnTarget
+                      )
                     } else {
-                      block.jumps += DirectCall(IRProgram.procedures.filter(_.name.equals(addressValue.name)).head, Option(BinaryExpr(BVEQ, indirectCall.target, addressValue.expr)), indirectCall.returnTarget)
+                      block.jumps += DirectCall(
+                        IRProgram.procedures.filter(_.name.equals(addressValue.name)).head,
+                        Option(BinaryExpr(BVEQ, indirectCall.target, addressValue.expr)),
+                        indirectCall.returnTarget
+                      )
                     }
                   case null => throw new Exception("Node not found in nodeToBlock map")
               )
             } else {
               // must be a call to R30
               if (!indirectCall.target.equals(exitRegister)) {
-                throw new Exception(s"Indirect call ${indirectCall} has no possible targets. Value set: ${valueSet(indirectCall.target)}")
+                throw new Exception(
+                  s"Indirect call ${indirectCall} has no possible targets. Value set: ${valueSet(indirectCall.target)}"
+                )
               }
             }
           case _ =>
@@ -322,7 +374,7 @@ object RunUtils {
 }
 
 class AnalysisTypeException(message: String)
-  extends Exception("Tried to operate on two analyses of different types: " + message) {
+    extends Exception("Tried to operate on two analyses of different types: " + message) {
 
   def this(message: String, cause: Throwable) = {
     this(message)

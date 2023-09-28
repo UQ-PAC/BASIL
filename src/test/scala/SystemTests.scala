@@ -4,9 +4,8 @@ import java.io.{BufferedWriter, File, FileWriter}
 import scala.io.Source
 import scala.sys.process._
 
-/**
-  * Add more tests by simply adding them to the programs directory.
-  * Refer to the existing tests for the expected directory structure and file-name patterns.
+/** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
+  * directory structure and file-name patterns.
   */
 class SystemTests extends AnyFunSuite {
   val correctPath = "./src/test/correct"
@@ -18,17 +17,21 @@ class SystemTests extends AnyFunSuite {
   for (p <- correctPrograms) {
     val path = correctPath + "/" + p
     val variations = getSubdirectories(path)
-    variations.foreach(t => test(p + "/" + t) {
-      runTest(correctPath, p, t, true)
-    })
+    variations.foreach(t =>
+      test(p + "/" + t) {
+        runTest(correctPath, p, t, true)
+      }
+    )
   }
 
   for (p <- incorrectPrograms) {
     val path = incorrectPath + "/" + p
     val variations = getSubdirectories(path)
-    variations.foreach(t => test(p + "/" + t) {
-      runTest(incorrectPath, p, t, false)
-    })
+    variations.foreach(t =>
+      test(p + "/" + t) {
+        runTest(incorrectPath, p, t, false)
+      }
+    )
   }
 
   def runTest(path: String, name: String, variation: String, shouldVerify: Boolean): Unit = {
@@ -48,8 +51,9 @@ class SystemTests extends AnyFunSuite {
     val resultPath = variationPath + "_result.txt"
     log(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
-    val failureMsg = if shouldVerify then "Expected verification success, but got failure."
-    else "Expected verification failure, but got success."
+    val failureMsg =
+      if shouldVerify then "Expected verification success, but got failure."
+      else "Expected verification failure, but got success."
 
     val expectedOutPath = variationPath + ".expected"
     if (File(expectedOutPath).exists) {
@@ -87,9 +91,10 @@ class SystemTests extends AnyFunSuite {
     true
   }
 
-  /**
-    * @param directoryName of the parent directory
-    * @return the names all subdirectories of the given parent directory
+  /** @param directoryName
+    *   of the parent directory
+    * @return
+    *   the names all subdirectories of the given parent directory
     */
   def getSubdirectories(directoryName: String): Array[String] = {
     File(directoryName).listFiles.filter(_.isDirectory).map(_.getName)
