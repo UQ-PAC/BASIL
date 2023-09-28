@@ -4,7 +4,7 @@ import bap._
 import ir._
 import specification._
 import scala.collection.mutable
-import scala.collection.parallel.CollectionConverters.par
+import scala.collection.parallel.CollectionConverters._
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 
