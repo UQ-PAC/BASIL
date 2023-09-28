@@ -4,6 +4,7 @@ import bap._
 import ir._
 import specification._
 import scala.collection.mutable
+import collection.parallel.CollectionConverters.seqIsParallelizable
 import scala.collection.parallel.CollectionConverters._
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
