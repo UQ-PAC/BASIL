@@ -21,6 +21,11 @@ abstract class Visitor {
     node
   }
 
+  def visitAssert(node: Assert): Statement = {
+    node.body = visitExpr(node.body)
+    node
+  }
+
   def visitJump(node: Jump): Jump = node.acceptVisit(this)
 
   def visitGoTo(node: GoTo): Jump = {
@@ -63,13 +68,18 @@ abstract class Visitor {
   }
 
   def visitParameter(node: Parameter): Parameter = {
-    node.value = visitVariable(node.value)
+    node.value = visitRegister(node.value)
     node
   }
 
   def visitProgram(node: Program): Program = {
     for (i <- node.procedures.indices) {
-      node.procedures(i) = visitProcedure(node.procedures(i))
+      val updatedProcedure = visitProcedure(node.procedures(i))
+      val targetProcedure = node.procedures(i)
+      if (targetProcedure == node.mainProcedure) {
+        node.mainProcedure = updatedProcedure
+      }
+      node.procedures(i) = updatedProcedure
     }
     node
   }
@@ -120,7 +130,11 @@ abstract class Visitor {
 
   def visitMemory(node: Memory): Memory = node
 
-  def visitVariable(node: Variable): Variable = node
+  def visitVariable(node: Variable): Variable = node.acceptVisit(this)
+
+  def visitRegister(node: Register): Register = node
+
+  def visitLocalVar(node: LocalVar): LocalVar = node
 
   def visitLiteral(node: Literal): Literal = node
 
@@ -183,6 +197,11 @@ abstract class ReadOnlyVisitor extends Visitor {
     node
   }
 
+  override def visitAssert(node: Assert): Statement = {
+    visitExpr(node.body)
+    node
+  }
+
   override def visitGoTo(node: GoTo): Jump = {
     node.condition.map(visitExpr)
     node
@@ -223,7 +242,7 @@ abstract class ReadOnlyVisitor extends Visitor {
   }
 
   override def visitParameter(node: Parameter): Parameter = {
-    visitVariable(node.value)
+    visitRegister(node.value)
     node
   }
 
@@ -236,38 +255,20 @@ abstract class ReadOnlyVisitor extends Visitor {
 
 }
 
-abstract class ControlFlowInterproceduralVisitor extends Visitor {
-  val visited: mutable.Set[Procedure] = mutable.Set()
-
-  override def visitProcedure(node: Procedure): Procedure = {
-    for (i <- node.blocks.indices) {
-      node.blocks(i) = visitBlock(node.blocks(i))
-    }
-    for (i <- node.in.indices) {
-      node.in(i) = visitParameter(node.in(i))
-    }
-    for (i <- node.out.indices) {
-      node.out(i) = visitParameter(node.out(i))
-    }
-    node
-  }
-
-}
-
 class Substituter(variables: Map[Variable, Variable] = Map(), memories: Map[Memory, Memory] = Map()) extends Visitor {
   override def visitVariable(node: Variable): Variable = variables.get(node) match {
     case Some(v: Variable) => v
-    case None => node
+    case None              => node
   }
 
   override def visitMemory(node: Memory): Memory = memories.get(node) match {
     case Some(m: Memory) => m
-    case None => node
+    case None            => node
   }
 }
 
 class Renamer(reserved: Set[String]) extends Visitor {
-  override def visitVariable(node: Variable): Variable = {
+  override def visitLocalVar(node: LocalVar): LocalVar = {
     if (reserved.contains(node.name)) {
       node.copy(name = '#' + node.name)
     } else {
@@ -307,8 +308,3 @@ class ExternalRemover(external: Set[String]) extends Visitor {
     super.visitProcedure(node)
   }
 }
-
-class TypeChecker extends Visitor {
-
-}
-

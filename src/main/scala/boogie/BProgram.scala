@@ -14,9 +14,14 @@ case class BProcedure(
     out: List[BVar],
     ensures: List[BExpr],
     requires: List[BExpr],
+    ensuresDirect: List[String],
+    requiresDirect: List[String],
+    freeEnsures: List[BExpr],
+    freeRequires: List[BExpr],
     modifies: Seq[BVar],
     body: List[BCmdOrBlock]
-) extends BDeclaration with Ordered[BProcedure] {
+) extends BDeclaration
+    with Ordered[BProcedure] {
   override def compare(that: BProcedure): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
     val header = s"procedure $name(${in.map(_.withType).mkString(", ")})"
@@ -31,8 +36,10 @@ case class BProcedure(
     } else {
       List()
     }
-    val requiresStrs = requires.map(r => s"  requires $r;")
-    val ensuresStrs = ensures.map(e => s"  ensures $e;")
+    val requiresStrs = requires.map(r => s"  requires $r;") ++ requiresDirect.map(r => s"  requires $r;")
+    val ensuresStrs = ensures.map(e => s"  ensures $e;") ++ ensuresDirect.map(e => s"  ensures $e;")
+    val freeRequiresStrs = freeRequires.map(r => s"  free requires $r;")
+    val freeEnsuresStrs = freeEnsures.map(e => s"  free ensures $e;")
     val locals = body.flatMap(l => l.locals).distinct.sorted
     val localDefs = locals.map(l => "  " + BVarDecl(l).toString)
     val bodyStr = if (body.nonEmpty) {
@@ -40,10 +47,15 @@ case class BProcedure(
     } else {
       List()
     }
-    List(header + returns + semicolon) ++ modifiesStr ++ requiresStrs ++ ensuresStrs ++ bodyStr ++ List("")
+    List(
+      header + returns + semicolon
+    ) ++ modifiesStr ++ requiresStrs ++ freeRequiresStrs ++ ensuresStrs ++ freeEnsuresStrs ++ bodyStr ++ List("")
   }
   override def toString: String = toBoogie.mkString("\n")
-  def functionOps: Set[FunctionOp] = body.flatMap(c => c.functionOps).toSet ++ ensures.flatMap(c => c.functionOps).toSet ++ requires.flatMap(c => c.functionOps).toSet
+  def functionOps: Set[FunctionOp] =
+    body.flatMap(c => c.functionOps).toSet ++ ensures.flatMap(c => c.functionOps).toSet ++ requires
+      .flatMap(c => c.functionOps)
+      .toSet ++ freeEnsures.flatMap(c => c.functionOps).toSet ++ freeRequires.flatMap(c => c.functionOps).toSet
   def globals: Set[BVar] = body.flatMap(c => c.globals).toSet
 }
 
@@ -52,7 +64,8 @@ case class BAxiom(body: BExpr) extends BDeclaration {
 }
 
 case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar, body: Option[BExpr])
-    extends BDeclaration with Ordered[BFunction] {
+    extends BDeclaration
+    with Ordered[BFunction] {
   override def compare(that: BFunction): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
     val bvbuiltinString = if (bvbuiltin.isEmpty) {
