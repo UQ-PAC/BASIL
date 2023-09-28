@@ -4,14 +4,18 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
 import boogie._
 
-class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBuffer[MemorySection] /* var memories: ArrayBuffer[Memory], var memoryOffsets: ArrayBuffer[Offset] */) {
+class Program(
+    var procedures: ArrayBuffer[Procedure],
+    var initialMemory: ArrayBuffer[MemorySection],
+    var mainProcedure: Procedure
+) {
 
   // This shouldn't be run before indirect calls are resolved?
   def stripUnreachableFunctions(): Unit = {
     val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
-    var next = "main"
-    var reachableNames: Set[String] = Set("main")
+    var next = mainProcedure.name
+    var reachableNames: Set[String] = Set(next)
     var toVisit: List[String] = List()
     var reachableFound = true;
     while (reachableFound) {
@@ -25,23 +29,156 @@ class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBu
         toVisit = toVisit.tail
       }
     }
-
     procedures = procedures.filter(f => reachableNames.contains(f.name))
   }
+
+  def setModifies(): Unit = {
+    //val procToModifies: mutable.Map[Procedure, mutable.Set[Global]] = mutable.Map()
+    val procToCalls: mutable.Map[Procedure, Set[Procedure]] = mutable.Map()
+    for (p <- procedures) {
+      //procToModifies(p) = mutable.Set()
+      //procToModifies(p).addAll(p.blocks.flatMap(_.modifies))
+      p.modifies.addAll(p.blocks.flatMap(_.modifies))
+      procToCalls(p) = p.calls
+    }
+
+    // very naive implementation but will work for now
+    var hasChanged: Boolean = true
+    while (hasChanged) {
+      hasChanged = false
+      for (p <- procedures) {
+        val children = procToCalls(p)
+        val childrenModifies: mutable.Set[Global] = mutable.Set()
+        for (c <- children) {
+          childrenModifies.addAll(c.modifies)
+        }
+        if (!childrenModifies.subsetOf(p.modifies)) {
+          hasChanged = true
+          p.modifies.addAll(childrenModifies)
+        }
+      }
+    }
+
+    /*
+    val visited: mutable.Set[Procedure] = mutable.Set()
+    val waiting: mutable.Set[Procedure] = mutable.Set()
+    val loops: mutable.Set[Set[Procedure]] = mutable.Set()
+    // need to add support for back edges - do a fixed point on them so all procedures in a loop have the same modifies
+    DFSVisit(mainProcedure, Vector(mainProcedure))
+    def DFSVisit(p: Procedure, path: Vector[Procedure]): Vector[Procedure] = {
+      val children = procToCalls(p)
+      if (visited.contains(p)) {
+        return path
+      }
+      if (waiting.contains(p)) {
+        val loopPath = path.slice(path.indexOf(p), path.size)
+        loops.add(loopPath.toSet)
+        return path
+        //throw new Exception("back edge in intraprocedural control flow graph, not currently supported")
+      }
+      waiting.add(p)
+      p.modifies.addAll(procToModifies(p))
+      for (child <- children) {
+        if (child != p) {
+          DFSVisit(child, path :+ p)
+        }
+      }
+      for (child <- children) {
+        p.modifies.addAll(child.modifies)
+      }
+      waiting.remove(p)
+      visited.add(p)
+      path :+ p
+    }
+     */
+  }
+
+  def stackIdentification(): Unit = {
+    for (p <- procedures) {
+      p.stackIdentification()
+    }
+  }
+
 }
 
-class Procedure(var name: String, var address: Option[Int], var blocks: ArrayBuffer[Block], var in: ArrayBuffer[Parameter], var out: ArrayBuffer[Parameter], var nonReturning: Boolean) {
+class Procedure(
+    var name: String,
+    var address: Option[Int],
+    var blocks: ArrayBuffer[Block],
+    var in: ArrayBuffer[Parameter],
+    var out: ArrayBuffer[Parameter],
+    var nonReturning: Boolean
+) {
+
   def calls: Set[Procedure] = blocks.flatMap(_.calls).toSet
   override def toString: String = {
     s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters" + (if (nonReturning) " Non-Returning" else "")
   }
-  val modifies: mutable.Set[Memory] = mutable.Set()
+  var modifies: mutable.Set[Global] = mutable.Set()
+
+  def stackIdentification(): Unit = {
+    val stackPointer = Register("R31", BitVecType(64))
+    val stackRefs: mutable.Set[Variable] = mutable.Set(stackPointer)
+    val visitedBlocks: mutable.Set[Block] = mutable.Set()
+    val stackMemory = Memory("stack", 64, 8)
+    val firstBlock = blocks.headOption
+    firstBlock.foreach(visitBlock)
+
+    // does not handle loops but we do not currently support loops in block CFG so this should do for now anyway
+    def visitBlock(b: Block): Unit = {
+      if (visitedBlocks.contains(b)) {
+        return
+      }
+      for (s <- b.statements) {
+        s match {
+          case l: LocalAssign =>
+            // replace mem with stack in loads if index contains stack references
+            val loads = l.rhs.loads
+            for (load <- loads) {
+              val loadStackRefs = load.index.variables.intersect(stackRefs)
+              if (loadStackRefs.nonEmpty) {
+                load.mem = stackMemory
+              }
+            }
+
+            // update stack references
+            val rhsStackRefs = l.rhs.variables.intersect(stackRefs)
+            if (rhsStackRefs.nonEmpty) {
+              stackRefs.add(l.lhs)
+            } else if (stackRefs.contains(l.lhs) && l.lhs != stackPointer) {
+              stackRefs.remove(l.lhs)
+            }
+          case m: MemoryAssign =>
+            // replace mem with stack if index contains stack reference
+            val indexStackRefs = m.rhs.index.variables.intersect(stackRefs)
+            if (indexStackRefs.nonEmpty) {
+              m.lhs = stackMemory
+              m.rhs.mem = stackMemory
+            }
+          case _ =>
+        }
+      }
+      visitedBlocks.add(b)
+      for (j <- b.jumps) {
+        j match {
+          case g: GoTo => visitBlock(g.target)
+          case _       =>
+        }
+      }
+    }
+  }
+
 }
 
-class Block(var label: String, var address: Option[Int], var statements: ArrayBuffer[Statement], var jumps: ArrayBuffer[Jump]) {
+class Block(
+    var label: String,
+    var address: Option[Int],
+    var statements: ArrayBuffer[Statement],
+    var jumps: ArrayBuffer[Jump]
+) {
   def calls: Set[Procedure] = jumps.flatMap(_.calls).toSet
-  def modifies: Set[Memory] = statements.flatMap(_.modifies).toSet
-  def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
+  def modifies: Set[Global] = statements.flatMap(_.modifies).toSet
+  //def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
 
   override def toString: String = {
     // display all statements and jumps
@@ -50,21 +187,17 @@ class Block(var label: String, var address: Option[Int], var statements: ArrayBu
     s"Block $label with $statementsString\n$jumpsString"
   }
 
-  override def equals(obj: scala.Any): Boolean = 
-    obj match 
+  override def equals(obj: scala.Any): Boolean =
+    obj match
       case b: Block => b.label == this.label
-      case _ => false
+      case _        => false
 
   override def hashCode(): Int = label.hashCode()
 }
 
-// not used yet, will use when specification is added to this stage rather than at the later boogie translation stage
-class Offset(var name: String, var memory: Memory, var size: Int, var value: BigInt)
-
-class Parameter(var name: String, var size: Int, var value: Variable) {
+class Parameter(var name: String, var size: Int, var value: Register) {
   def toBoogie: BVariable = BParam(name, BitVecBType(size))
   def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
 }
 
 case class MemorySection(name: String, address: Int, size: Int, bytes: Seq[Literal])
-

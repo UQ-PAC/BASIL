@@ -2,9 +2,21 @@ package bap
 
 trait BAPJump
 
-case class BAPDirectCall(target: String, condition: BAPExpr, returnTarget: Option[String], line: String, instruction: String) extends BAPJump
+case class BAPDirectCall(
+    target: String,
+    condition: BAPExpr,
+    returnTarget: Option[String],
+    line: String,
+    instruction: String
+) extends BAPJump
 
-case class BAPIndirectCall(target: BAPLocalVar, condition: BAPExpr, returnTarget: Option[String], line: String, instruction: String) extends BAPJump
+case class BAPIndirectCall(
+    target: BAPVar,
+    condition: BAPExpr,
+    returnTarget: Option[String],
+    line: String,
+    instruction: String
+) extends BAPJump
 
 case class BAPGoTo(target: String, condition: BAPExpr, line: String, instruction: String) extends BAPJump
 
@@ -20,8 +32,10 @@ trait BAPAssign(lhs: BAPVariable, rhs: BAPExpr, line: String, instruction: Strin
 
 /** Memory store
   */
-case class BAPMemAssign(lhs: BAPMemory, rhs: BAPStore, line: String, instruction: String) extends BAPAssign(lhs, rhs, line, instruction)
+case class BAPMemAssign(lhs: BAPMemory, rhs: BAPStore, line: String, instruction: String)
+    extends BAPAssign(lhs, rhs, line, instruction)
 
+/*
 case object BAPMemAssign {
   def init(lhs: BAPMemory, rhs: BAPStore, line: String, instruction: String): BAPMemAssign = {
     if (rhs.memory.name == "stack") {
@@ -31,5 +45,7 @@ case object BAPMemAssign {
     }
   }
 }
+ */
 
-case class BAPLocalAssign(lhs: BAPLocalVar, rhs: BAPExpr, line: String, instruction: String) extends BAPAssign(lhs, rhs, line, instruction)
+case class BAPLocalAssign(lhs: BAPVar, rhs: BAPExpr, line: String, instruction: String)
+    extends BAPAssign(lhs, rhs, line, instruction)
