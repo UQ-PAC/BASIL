@@ -127,7 +127,14 @@ trait MemoryRegionValueSetAnalysis:
               case None =>
                 Logger.warn("could not find region for " + localAssign)
                 s
-          case _ => s
+          case e: Expr => {
+            val evaled = evaluateExpression(e, n, constantProp)
+            evaled match 
+              case bv: BitVecLiteral => s + (localAssign.lhs -> Set(getValueType(evaled.asInstanceOf[BitVecLiteral])))
+              case _ => 
+                println("Warning: could not evaluate expression" + e)
+                s
+          }
       case memAssign: MemoryAssign =>
         memAssign.rhs.index match
           case binOp: BinaryExpr =>
