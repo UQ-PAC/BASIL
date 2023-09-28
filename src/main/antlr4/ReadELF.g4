@@ -1,4 +1,4 @@
-grammar Syms;
+grammar ReadELF;
 
 syms : NEWLINE* relocationTable+ symbolTable+ ;
 

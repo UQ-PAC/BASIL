@@ -20,24 +20,28 @@ case class BBlock(label: String, body: List[BCmd]) extends BCmdOrBlock {
 }
 
 sealed trait BCmd extends BCmdOrBlock {
-  override def toBoogie: List[String] = List(toString)
+  def comment: Option[String]
+  override def toBoogie: List[String] = {
+    val commentOut = comment.map(" //" + _).getOrElse("")
+    List(toString + commentOut)
+  }
 }
 
-case class Assert(body: BExpr) extends BCmd {
+case class BAssert(body: BExpr, comment: Option[String] = None) extends BCmd {
   override def toString: String = s"assert $body;"
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
 }
 
-case class Assume(body: BExpr) extends BCmd {
+case class BAssume(body: BExpr, comment: Option[String] = None) extends BCmd {
   override def toString: String = s"assume $body;"
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
 }
 
-case class ProcedureCall(name: String, lhss: Seq[BVar], params: Seq[BExpr], modify: Seq[BVar]) extends BCmd {
+case class ProcedureCall(name: String, lhss: Seq[BVar], params: Seq[BExpr], modify: Seq[BVar], comment: Option[String] = None) extends BCmd {
   override def toString: String = {
     if (lhss.isEmpty) {
       s"call $name();"
@@ -51,7 +55,7 @@ case class ProcedureCall(name: String, lhss: Seq[BVar], params: Seq[BExpr], modi
   override def globals: Set[BVar] = params.flatMap(p => p.globals).toSet
 }
 
-case class AssignCmd(lhss: Seq[BVar], rhss: Seq[BExpr]) extends BCmd {
+case class AssignCmd(lhss: Seq[BVar], rhss: Seq[BExpr], comment: Option[String] = None) extends BCmd {
   override def toString: String = s"${lhss.mkString(", ")} := ${rhss.mkString(", ")};"
   override def modifies: Set[BVar] = lhss.collect { case l if l.scope == Scope.Global => l }.toSet
   override def functionOps: Set[FunctionOp] = rhss.flatMap(r => r.functionOps).toSet
@@ -63,7 +67,7 @@ object AssignCmd {
   def apply(lhs: BVar, rhs: BExpr): AssignCmd = AssignCmd(Seq(lhs), Seq(rhs))
 }
 
-case class MapAssignCmd(lhs: MapAccess, rhs: BExpr) extends BCmd {
+case class MapAssignCmd(lhs: MapAccess, rhs: BExpr, comment: Option[String] = None) extends BCmd {
   override def toString: String = s"$lhs := $rhs;"
   override def modifies: Set[BVar] = Set(lhs.mapVar)
   override def functionOps: Set[FunctionOp] = lhs.functionOps ++ rhs.functionOps
@@ -71,7 +75,7 @@ case class MapAssignCmd(lhs: MapAccess, rhs: BExpr) extends BCmd {
   override def globals: Set[BVar] = lhs.globals ++ rhs.globals
 }
 
-case class Havoc(vars: Set[BVar]) extends BCmd {
+case class Havoc(vars: Set[BVar], comment: Option[String] = None) extends BCmd {
   override def toString: String = {
     if (vars.isEmpty) {
       "havoc;"
@@ -84,7 +88,7 @@ case class Havoc(vars: Set[BVar]) extends BCmd {
   override def globals: Set[BVar] = vars.flatMap(v => v.globals)
 }
 
-case class IfCmd(guard: BExpr, thenCmds: List[BCmd]) extends BCmd {
+case class IfCmd(guard: BExpr, thenCmds: List[BCmd], comment: Option[String] = None) extends BCmd {
   override def toBoogie: List[String] = {
     val thenList = thenCmds.flatMap(x => x.toBoogie).map(s => "  " + s)
     List(s"if ($guard) {") ++ thenList ++ List("}")
@@ -96,14 +100,16 @@ case class IfCmd(guard: BExpr, thenCmds: List[BCmd]) extends BCmd {
   override def globals: Set[BVar] = guard.globals ++ thenCmds.flatMap(c => c.globals).toSet
 }
 
-case class GoToCmd(destination: String) extends BCmd {
+case class GoToCmd(destination: String, comment: Option[String] = None) extends BCmd {
   override def toString: String = s"goto $destination;"
 }
 
 case object ReturnCmd extends BCmd {
+  override def comment: Option[String] = None
   override def toString: String = "return;"
 }
 
-case class Comment(comment: String) extends BCmd {
-  override def toBoogie: List[String] = List(s"// $comment")
+case class Comment(actualComment: String) extends BCmd {
+  override def comment: Option[String] = Some(actualComment)
+  override def toBoogie: List[String] = List(s"//$actualComment")
 }

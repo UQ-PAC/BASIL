@@ -14,7 +14,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
     var expected = ""
     var actual = ""
     var output: Option[Map[analysis.CfgNode, ?]] = None
-    RunUtils.loadAndTranslate(examplesPath + s"${name}/${name}.adt", examplesPath + s"${name}/${name}.relf", None, true, false)
+    RunUtils.loadAndTranslate(examplesPath + s"${name}/${name}.adt", examplesPath + s"${name}/${name}.relf", None, true, false, false)
     try {
       // create dump folder if it does not exist
       val dumpFolder = File(tempPath)

@@ -1,6 +1,6 @@
 package translating
 
-import BilParser.BilAdtParser._
+import Parsers.BAP_ADTParser._
 import bap._
 import ir.Endian
 import util.AssumptionViolationException
@@ -8,7 +8,7 @@ import util.AssumptionViolationException
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters._
 
-object AdtStatementLoader {
+object BAPLoader {
 
   def visitProject(ctx: ProjectContext): BAPProgram = {
     val memorySections = visitSections(ctx.sections)
@@ -45,11 +45,11 @@ object AdtStatementLoader {
   }
 
   def visitLoad(ctx: LoadContext): BAPMemAccess = {
-    BAPMemAccess.init(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitEndian(ctx.endian), parseInt(ctx.num))
+    BAPMemAccess(visitMemVar(ctx.memVar), visitExp(ctx.idx), visitEndian(ctx.endian), parseInt(ctx.num))
   }
 
   def visitStore(ctx: StoreContext): BAPStore = {
-    BAPStore.init(
+    BAPStore(
       visitMemVar(ctx.memVar),
       visitExp(ctx.idx),
       visitExp(ctx.value),
@@ -66,8 +66,13 @@ object AdtStatementLoader {
     BAPUnOp(BAPUnOperator(ctx.op.getText), visitExp(ctx.exp))
   }
 
-  def visitImmVar(ctx: ImmVarContext): BAPLocalVar = {
-    BAPLocalVar(parseAllowed(visitQuoteString(ctx.name)), parseInt(ctx.size))
+  def visitImmVar(ctx: ImmVarContext): BAPVar = {
+    val name = parseAllowed(visitQuoteString(ctx.name))
+    if ((name.startsWith("R") || name.startsWith("V")) && (name.length == 2 || name.length == 3) && name.substring(1).forall(_.isDigit)) {
+      BAPRegister(name, parseInt(ctx.size))
+    } else {
+      BAPLocalVar(name, parseInt(ctx.size))
+    }
   }
 
   def visitMemVar(ctx: MemVarContext): BAPMemory = {
@@ -147,6 +152,7 @@ object AdtStatementLoader {
     val inOut = ctx.args.arg.asScala.map { arg => visitArg(arg) }.unzip
     val in = inOut._1.flatten
     val out = inOut._2.flatten
+    /*
     val alwaysIn = List(
       BAPParameter("FP", 64, BAPLocalVar("R29", 64)),
       BAPParameter("LR", 64, BAPLocalVar("R30", 64)),
@@ -157,6 +163,7 @@ object AdtStatementLoader {
       BAPParameter("LR_out", 64, BAPLocalVar("R30", 64)),
       BAPParameter("SP_out", 64, BAPLocalVar("R31", 64))
     )
+    */
 
     val address = parseFromAttrs(ctx.attrs, "address") match {
       case Some(x: String) => Integer.parseInt(x.stripPrefix("0x"), 16)
@@ -167,8 +174,8 @@ object AdtStatementLoader {
       parseAllowed(visitQuoteString(ctx.name)),
       address,
       ctx.blks.blk.asScala.map(visitBlk).toList,
-      in.toList ++ alwaysIn,
-      out.toList ++ alwaysOut
+      in.toList,
+      out.toList
     )
   }
 
@@ -221,7 +228,7 @@ object AdtStatementLoader {
   def visitMemDef(ctx: MemDefContext): BAPMemAssign = {
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    BAPMemAssign.init(visitMemVar(ctx.lhs), visitStore(ctx.rhs), line, insn)
+    BAPMemAssign(visitMemVar(ctx.lhs), visitStore(ctx.rhs), line, insn)
   }
 
   def visitQuoteString(ctx: QuoteStringContext): String = ctx.getText.stripPrefix("\"").stripSuffix("\"")

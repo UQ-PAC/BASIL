@@ -500,13 +500,13 @@ trait MemoryRegionAnalysisMisc:
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
-  private val stackPointer = Variable("R31", BitVecType(64))
-  private val linkRegister = Variable("R30", BitVecType(64))
-  private val framePointer = Variable("R29", BitVecType(64))
+  private val stackPointer = Register("R31", BitVecType(64))
+  private val linkRegister = Register("R30", BitVecType(64))
+  private val framePointer = Register("R29", BitVecType(64))
 
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
 
-  private val mallocVariable = Variable("R0", BitVecType(64))
+  private val mallocVariable = Register("R0", BitVecType(64))
 
 
   /** Default implementation of eval.
