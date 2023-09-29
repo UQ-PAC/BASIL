@@ -24,10 +24,13 @@ services:
       - ./:/host:rw
     working_dir: /host
   compiler-explorer:
-    image: ghcr.io/uq-pac/basil-compiler-explorer:latest
+    image: ghcr.io/uq-pac/basil-compiler-explorer:testing
     build:
       dockerfile: docker/godbolt.Dockerfile 
     network_mode: host
+    volumes:
+      - ./target/scala-3.1.0/:/target/scala-3.1.0/
+      # - ./docker/compiler-explorer:/compiler-explorer
     ports: 
       - "10240:10240"
 
