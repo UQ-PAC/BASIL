@@ -10,26 +10,20 @@ RUN DEBIAN_FRONTEND=noninteractive apt-get update \
         make \
         git \
         dotnet6 \
+    && dotnet tool install --global boogie  || true \
+    && apt-get install clang gcc gcc-13-aarch64-linux-gnu  binutils-aarch64-linux-gnu gcc-13-cross-base libc6-dev-arm64-cross libc6-dev-armel-cross libc6-dev-armhf-cross libc6-dev-i386 -y \
     && apt-get autoremove --purge -y \
     && apt-get autoclean -y \
-    && dotnet tool install --global boogie  || true
+    && rm -rf /var/cache/apt/* /tmp/* 
 # to force a new clone after a new commit
+WORKDIR /compiler-explorer
 ADD https://api.github.com/repos/ailrst/compiler-explorer/branches/main /tmp/head 
-RUN rm -rf /var/cache/apt/* /tmp/* \
-    && git clone https://github.com/ailrst/compiler-explorer.git /compiler-explorer \
+RUN  \
+    git clone https://github.com/ailrst/compiler-explorer.git /compiler-explorer \
     && cd /compiler-explorer \
-    && echo "Add missing dependencies" \
     && npm i @sentry/node \
     && npm run webpack
-WORKDIR /compiler-explorer
-RUN DEBIAN_FRONTEND=noninteractive apt-get update \
-    && apt-get install clang gcc gcc-13-aarch64-linux-gnu  binutils-aarch64-linux-gnu gcc-13-cross-base libc6-dev-arm64-cross libc6-dev-armel-cross libc6-dev-armhf-cross libc6-dev-i386 -y \
-    && apt-get autoclean -y
 ENTRYPOINT [ "make" ]
 CMD ["run"]
 
 FROM compiler-explorer AS  ghcr.io/uq-pac/basil-compiler-explorer:latest
-ADD docker/godbolt/basil-tool.py /compiler-explorer/basil-tool.py
-RUN chmod +x /compiler-explorer/basil-tool.py
-ADD docker/godbolt/basil.local.properties /compiler-explorer/etc/config/c.defaults.properties
-ADD docker/godbolt/compiler-explorer.local.properties /compiler-explorer/etc/config/compiler-explorer.local.properties
