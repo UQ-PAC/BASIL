@@ -2,7 +2,7 @@ FROM ghcr.io/uq-pac/basil:latest as compiler-explorer
 # https://github.com/madduci/docker-compiler-explorer/tree/master
 RUN DEBIAN_FRONTEND=noninteractive apt-get update \
     && apt-get install -y curl \
-    && curl -sL https://deb.nodesource.com/setup_18.x | bash - \
+    && curl -sL https://deb.nodesource.com/setup_18.x | bash - \ # TODO: update install method
     && apt-get install -y \
         wget \
         ca-certificates \
