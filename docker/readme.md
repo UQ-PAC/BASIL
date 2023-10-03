@@ -23,3 +23,7 @@ $ podman-compose push basil
 $ podman-compose push basil-dev
 ```
 
+# Compiler-Explorer
+
+The configuration used to run add the tool to compiler explorer lives here: https://github.com/ailrst/compiler-explorer
+
