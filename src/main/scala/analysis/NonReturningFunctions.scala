@@ -18,7 +18,9 @@ class NonReturningFunctions {
     val mapBlocksToProcedure: Map[String, (Procedure, Integer)] = Map()
 
 
-
+    // Check if the goto is part of a endless loop by checking to see if the index its jumping to is earlier on in the method,
+    // and that any jumps between the index its jumping to, and the index of the instruction, don't jump outside of that range.
+    // This method checks for both continue (which jumps back to the while loop, and break (which jumps outside of loops).
     def isEndlessLoop(proc: Procedure, goTo: GoTo, index: Integer): Boolean = {
 
       if (goTo.condition.isEmpty && mapBlocksToProcedure.contains(goTo.target.label) && mapBlocksToProcedure(goTo.target.label)._2 < index) {
@@ -46,8 +48,11 @@ class NonReturningFunctions {
       false
     }
 
+    // look into each procedure, and calculate the number of return statements in each block
+    // and create maps between jumps and blocks, and blocks and procedures.
+    // this also looks at endless loops, and removes unreachable code after endless blocks
     for (proc <- procedures) {
-      var numberOfReturns = 0
+
       for ((block, index) <- proc.blocks.zipWithIndex) {
 
         mapBlocksToProcedure.addOne(block.label, (proc, index))
@@ -57,7 +62,6 @@ class NonReturningFunctions {
             case call: IndirectCall =>
               if (call.target.name == "R30") {
                 block.countOfReturnStatements += 1
-                numberOfReturns += 1
               }
             case directCall: DirectCall =>
               mapJumpsToBlocks.put(directCall.target.name, mapJumpsToBlocks.getOrElse(directCall.target.name, ArrayBuffer()).addOne((directCall, block)))
@@ -72,10 +76,13 @@ class NonReturningFunctions {
         }
       }
     }
-    var blocksDeleted = true;
 
+    var blocksDeleted = true
     while (blocksDeleted) {
       blocksDeleted = false
+
+      // find all direct calls that are non-returning, not an external function and currently have a return target.
+      // add the return targets to the queue for removal, and mark the function as non-returning
       for (proc <- procedures) {
         if (!proc.externalFunction && proc.calculateReturnCount() == 0) {
           mapJumpsToBlocks.get(proc.name) match {
@@ -100,6 +107,8 @@ class NonReturningFunctions {
         }
       }
 
+      // For each block in the queue, attempt to remove the block if there are no links to the block from other parts of
+      // the program, and add to queue any jumps that the removed blocks reference
       while (blocksToRemove.nonEmpty) {
         val label = blocksToRemove.dequeue()
         val (procedure, _) = mapBlocksToProcedure(label)
