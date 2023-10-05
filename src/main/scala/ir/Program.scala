@@ -106,7 +106,8 @@ class Procedure(
     var address: Option[Int],
     var blocks: ArrayBuffer[Block],
     var in: ArrayBuffer[Parameter],
-    var out: ArrayBuffer[Parameter]
+    var out: ArrayBuffer[Parameter],
+    val externalFunction: Boolean
 ) {
 
   def calls: Set[Procedure] = blocks.flatMap(_.calls).toSet

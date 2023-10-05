@@ -2,9 +2,11 @@ package analysis
 
 import bap.{BAPJump, BAPSubroutine}
 import ir.{Block, DirectCall, GoTo, IndirectCall, Jump, Procedure, Statement}
+import specification.ExternalFunction
 
 import scala.collection.mutable.{Map, Queue}
 import collection.parallel.CollectionConverters.seqIsParallelizable
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.parallel.CollectionConverters.*
 
@@ -14,6 +16,8 @@ class NonReturningFunctions {
     val blocksToRemove: Queue[String] = Queue()
     val mapJumpsToBlocks: Map[String, ArrayBuffer[(Jump, Block)]] = Map()
     val mapBlocksToProcedure: Map[String, (Procedure, Integer)] = Map()
+
+
 
     def isEndlessLoop(proc: Procedure, goTo: GoTo, index: Integer): Boolean = {
 
@@ -45,6 +49,7 @@ class NonReturningFunctions {
     for (proc <- procedures) {
       var numberOfReturns = 0
       for ((block, index) <- proc.blocks.zipWithIndex) {
+
         mapBlocksToProcedure.addOne(block.label, (proc, index))
         for (jump <- block.jumps) {
 
@@ -59,7 +64,7 @@ class NonReturningFunctions {
             case goTo: GoTo =>
               mapJumpsToBlocks.put(goTo.target.label, mapJumpsToBlocks.getOrElse(goTo.target.label, ArrayBuffer()).addOne((goTo, block)))
               if (proc.blocks.length > index && isEndlessLoop(proc, goTo, index)) {
-                blocksToRemove.enqueue(proc.blocks(index+1).label)
+                blocksToRemove.enqueue(proc.blocks(index + 1).label)
               }
             case _ =>
           }
@@ -72,8 +77,7 @@ class NonReturningFunctions {
     while (blocksDeleted) {
       blocksDeleted = false
       for (proc <- procedures) {
-
-        if (proc.calculateReturnCount() == 0) {
+        if (!proc.externalFunction && proc.calculateReturnCount() == 0) {
           mapJumpsToBlocks.get(proc.name) match {
             case Some(v) => for (block <- v) {
               val (_, containingBlock) = block
