@@ -106,16 +106,18 @@ class Procedure(
     var address: Option[Int],
     var blocks: ArrayBuffer[Block],
     var in: ArrayBuffer[Parameter],
-    var out: ArrayBuffer[Parameter],
-    var nonReturning: Boolean
+    var out: ArrayBuffer[Parameter]
 ) {
 
   def calls: Set[Procedure] = blocks.flatMap(_.calls).toSet
   override def toString: String = {
-    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters" + (if (nonReturning) " Non-Returning" else "")
+    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters")
   }
   var modifies: mutable.Set[Global] = mutable.Set()
 
+  def calculateReturnCount(): Int = {
+    return blocks.foldLeft(0)(_ + _.countOfReturnStatements)
+  }
   def stackIdentification(): Unit = {
     val stackPointer = Register("R31", BitVecType(64))
     val stackRefs: mutable.Set[Variable] = mutable.Set(stackPointer)
@@ -174,7 +176,8 @@ class Block(
     var label: String,
     var address: Option[Int],
     var statements: ArrayBuffer[Statement],
-    var jumps: ArrayBuffer[Jump]
+    var jumps: ArrayBuffer[Jump],
+    var countOfReturnStatements: Int
 ) {
   def calls: Set[Procedure] = jumps.flatMap(_.calls).toSet
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet

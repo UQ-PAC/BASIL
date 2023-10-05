@@ -1,11 +1,11 @@
 package translating
 
-import bap._
-import ir._
-import specification._
+import analysis.NonReturningFunctions
+import bap.*
+import ir.*
+import specification.*
+
 import scala.collection.mutable
-import collection.parallel.CollectionConverters.seqIsParallelizable
-import scala.collection.parallel.CollectionConverters._
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 
@@ -20,7 +20,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     for (s <- program.subroutines) {
       val blocks: ArrayBuffer[Block] = ArrayBuffer()
       for (b <- s.blocks) {
-        val block = Block(b.label, b.address, ArrayBuffer(), ArrayBuffer())
+        val block = Block(b.label, b.address, ArrayBuffer(), ArrayBuffer(), 0)
         blocks.append(block)
         labelToBlock.addOne(b.label, block)
       }
@@ -32,7 +32,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       for (p <- s.out) {
         out.append(p.toIR)
       }
-      val procedure = Procedure(s.name, Some(s.address), blocks, in, out, BAPLoader.isNonReturning(s.name))
+      val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
       if (s.address == mainAddress) {
         mainProcedure = Some(procedure)
       }
@@ -40,29 +40,18 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       nameToProcedure.addOne(s.name, procedure)
     }
 
-    for (s <- program.subroutines.par) {
-
-      var isReturning = false
+    for (s <- program.subroutines) {
       for (b <- s.blocks) {
         val block = labelToBlock(b.label)
+
         for (st <- b.statements) {
           block.statements.append(translate(st))
         }
+
         for (j <- b.jumps) {
           val translated = translate(j)
-          if (translated.isInstanceOf[DirectCall] && translated.asInstanceOf[DirectCall].target.nonReturning) {
-            translated.asInstanceOf[DirectCall].returnTarget = None
-          }
-          if (j.isInstanceOf[BAPIndirectCall] && j.asInstanceOf[BAPIndirectCall].target.name == "R30") {
-            isReturning = true
-          }
-
           block.jumps.append(translated)
-
         }
-      }
-      if (!isReturning) {
-        nameToProcedure(s.name).nonReturning = true
       }
     }
 
@@ -87,10 +76,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       DirectCall(
         nameToProcedure(b.target),
         coerceToBool(b.condition),
-        if (nameToProcedure(b.target).nonReturning)
-          Option.empty
-        else
-          b.returnTarget.map { (t: String) => labelToBlock(t) }
+        b.returnTarget.map { (t: String) => labelToBlock(t) }
       )
     case b: BAPIndirectCall =>
       IndirectCall(b.target.toIR, coerceToBool(b.condition), b.returnTarget.map { (t: String) => labelToBlock(t) })
