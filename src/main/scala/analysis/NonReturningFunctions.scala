@@ -86,6 +86,7 @@ class NonReturningFunctions {
                   case directCall: DirectCall =>
                     directCall.returnTarget match {
                       case Some(t) =>
+
                         blocksToRemove.enqueue(t.label)
                       case _ =>
                     }
