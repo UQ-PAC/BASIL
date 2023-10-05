@@ -58,8 +58,8 @@ class NonReturningFunctions {
               mapJumpsToBlocks.put(directCall.target.name, mapJumpsToBlocks.getOrElse(directCall.target.name, ArrayBuffer()).addOne((directCall, block)))
             case goTo: GoTo =>
               mapJumpsToBlocks.put(goTo.target.label, mapJumpsToBlocks.getOrElse(goTo.target.label, ArrayBuffer()).addOne((goTo, block)))
-              if (isEndlessLoop(proc, goTo, index)) {
-
+              if (proc.blocks.length > index && isEndlessLoop(proc, goTo, index)) {
+                blocksToRemove.enqueue(proc.blocks(index+1).label)
               }
             case _ =>
           }

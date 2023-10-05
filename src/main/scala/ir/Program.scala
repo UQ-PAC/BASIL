@@ -111,7 +111,7 @@ class Procedure(
 
   def calls: Set[Procedure] = blocks.flatMap(_.calls).toSet
   override def toString: String = {
-    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters")
+    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
   }
   var modifies: mutable.Set[Global] = mutable.Set()
 
