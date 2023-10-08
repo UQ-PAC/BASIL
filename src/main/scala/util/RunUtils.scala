@@ -85,8 +85,7 @@ object RunUtils {
       }
     }
 
-
-
+    IRProgram.determineRelevantMemory(globalOffsets)
     IRProgram.stripUnreachableFunctions()
     IRProgram.stackIdentification()
     IRProgram.setModifies()

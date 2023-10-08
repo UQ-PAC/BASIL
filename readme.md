@@ -197,16 +197,15 @@ The binary (i.e `*.out`) can then be generated from a C source file using:
 See [src/test/correct/liftone.sh](https://github.com/UQ-PAC/bil-to-boogie-translator/blob/main/src/test/correct/liftone.sh) for more examples
 for flag combinations that work. 
 
-## Verifying the generated boogie (the programming language), by running boogie (the progam) on the boogie (the program)
+## Verifying the generated Boogie file
 
 [Boogie](https://github.com/boogie-org/boogie#installation) can be installed by following the instructions in the given link.
 
-Boogie can be run on the output `*.bpl` file with the command `boogie *.bpl`. 
+Boogie can be run on the output `*.bpl` file with the command `boogie \useArrayAxioms *.bpl`. 
 
-A recent boogie version is needed, for example `Boogie program verifier version 2.4.1.10503, Copyright (c) 2003-2014, Microsoft.`. 
+It is recommended to use Boogie version 3.0.4 and Z3 version 4.8.8 (which is recommended by Boogie). Other versions and combinations may not have been tested.
 
-With older versions and recent versions of z3 (e.g. `Z3 version 4.8.12 - 64 bit`), Z3 emits warnings about `model_compress`, since the 
-parameter name was changed. This does not prevent it from working however. 
+The `\useArrayAxioms` flag is necessary for Boogie versions 2.16.8 and greater; for earlier versions it can be removed.
 
 Boogie can be installed through dotnet and requires dotnet 6.
 

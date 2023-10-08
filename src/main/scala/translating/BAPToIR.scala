@@ -56,7 +56,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       memorySections.append(MemorySection(m.name, m.address, m.size, bytes))
     }
 
-    Program(procedures, memorySections, mainProcedure.get)
+    Program(procedures, mainProcedure.get, memorySections, ArrayBuffer())
   }
 
   private def translate(s: BAPStatement) = s match {

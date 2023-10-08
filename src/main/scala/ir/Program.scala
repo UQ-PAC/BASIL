@@ -2,9 +2,10 @@ package ir
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
-import boogie._
+import boogie.*
+import analysis.BitVectorEval
 
-class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBuffer[MemorySection], var mainProcedure: Procedure) {
+class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure, var initialMemory: ArrayBuffer[MemorySection], var readOnlyMemory: ArrayBuffer[MemorySection]) {
 
   def stripUnreachableFunctions(): Unit = {
     val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
@@ -53,48 +54,35 @@ class Program(var procedures: ArrayBuffer[Procedure], var initialMemory: ArrayBu
         }
       }
     }
-
-
-
-
-    /*
-    val visited: mutable.Set[Procedure] = mutable.Set()
-    val waiting: mutable.Set[Procedure] = mutable.Set()
-    val loops: mutable.Set[Set[Procedure]] = mutable.Set()
-    // need to add support for back edges - do a fixed point on them so all procedures in a loop have the same modifies
-    DFSVisit(mainProcedure, Vector(mainProcedure))
-    def DFSVisit(p: Procedure, path: Vector[Procedure]): Vector[Procedure] = {
-      val children = procToCalls(p)
-      if (visited.contains(p)) {
-        return path
-      }
-      if (waiting.contains(p)) {
-        val loopPath = path.slice(path.indexOf(p), path.size)
-        loops.add(loopPath.toSet)
-        return path
-        //throw new Exception("back edge in intraprocedural control flow graph, not currently supported")
-      }
-      waiting.add(p)
-      p.modifies.addAll(procToModifies(p))
-      for (child <- children) {
-        if (child != p) {
-          DFSVisit(child, path :+ p)
-        }
-      }
-      for (child <- children) {
-        p.modifies.addAll(child.modifies)
-      }
-      waiting.remove(p)
-      visited.add(p)
-      path :+ p
-    }
-    */
   }
 
   def stackIdentification(): Unit = {
     for (p <- procedures) {
       p.stackIdentification()
     }
+  }
+
+  def determineRelevantMemory(rela_dyn: Map[BigInt, BigInt]): Unit = {
+    val initialMemoryNew = ArrayBuffer[MemorySection]()
+
+    val rodata = initialMemory.collect { case s if s.name == ".rodata" => s }
+    readOnlyMemory.addAll(rodata)
+
+    val data = initialMemory.collect { case s if s.name == ".data" => s }
+    initialMemoryNew.addAll(data)
+
+    // assuming little endian, adding the rela_dyn offset/address pairs like this is crude but is simplest for now
+    for ((offset, address) <- rela_dyn) {
+      val addressBV = BitVecLiteral(address, 64)
+      val bytes = for (i <- 0 to 7) yield {
+        val low = i * 8
+        val high = low + 8
+        BitVectorEval.boogie_extract(high, low, addressBV)
+      }
+      readOnlyMemory.append(MemorySection(s".got_$offset", offset.intValue, 8, bytes))
+    }
+
+    initialMemory = initialMemoryNew
   }
 
 
@@ -181,4 +169,10 @@ class Parameter(var name: String, var size: Int, var value: Register) {
   def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
 }
 
-case class MemorySection(name: String, address: Int, size: Int, bytes: Seq[Literal])
+/**
+  * @param name name
+  * @param address initial offset of memory section
+  * @param size number of bytes
+  * @param bytes sequence of bytes represented by BitVecLiterals of size 8
+  */
+case class MemorySection(name: String, address: Int, size: Int, bytes: Seq[BitVecLiteral])
