@@ -18,13 +18,13 @@ relies: 'Rely:' expr (COMMA expr)*;
 guarantees: 'Guarantee:' expr (COMMA expr)*;
 
 directFunctions: 'DIRECT functions:' directFunction (COMMA directFunction)*;
-directFunction: 'memory_load' size=nat endian #memoryLoad
-              | 'memory_store' size=nat endian #memoryStore
-              | 'gamma_load' size=nat #gammaLoad
-              | 'gamma_store' size=nat #gammaStore
-              | 'zero_extend' size1=nat UNDERSCORE size2=nat #zeroExtend
-              | 'sign_extend' size1=nat UNDERSCORE size2=nat #signExtend
-              | BV OPNAME size=nat #bvOp
+directFunction: MEMORY_LOAD_DIRECT #memoryLoad
+              | MEMORY_STORE_DIRECT #memoryStore
+              | GAMMA_LOAD_DIRECT #gammaLoad
+              | GAMMA_STORE_DIRECT #gammaStore
+              | ZERO_EXTEND_DIRECT #zeroExtend
+              | SIGN_EXTEND_DIRECT #signExtend
+              | BVOP_DIRECT #bvOp
               ;
 
 subroutine: 'Subroutine:' id modifies? requires* ensures*;
@@ -42,7 +42,6 @@ arrayAccess: id '[' nat ']';
 id : ID;
 nat: (DIGIT)+ ;
 bv: value=nat BVSIZE;
-endian: LE | BE;
 
 // based upon boogie grammar: https://boogie-docs.readthedocs.io/en/latest/LangRef.html#grammar
 expr : impliesExpr ( EQUIV_OP impliesExpr )* ;
@@ -71,7 +70,25 @@ atomExpr : boolLit #boolLitExpr
 QUOTE : '"';
 QUOTESTRING : QUOTE (~( '"' | '\n' | '\r'))+ QUOTE;
 
-BV: 'bv';
+BVOP_DIRECT: BV OPNAME DIGIT+;
+
+MEMORY_LOAD_DIRECT: MEMORY_LOAD DIGIT+ ENDIAN;
+MEMORY_STORE_DIRECT: MEMORY_STORE DIGIT+ ENDIAN;
+GAMMA_LOAD_DIRECT: GAMMA_LOAD DIGIT+;
+GAMMA_STORE_DIRECT: GAMMA_STORE DIGIT+;
+ZERO_EXTEND_DIRECT: ZERO_EXTEND DIGIT+ UNDERSCORE DIGIT+;
+SIGN_EXTEND_DIRECT: SIGN_EXTEND DIGIT+ UNDERSCORE DIGIT+;
+
+fragment MEMORY_LOAD: 'memory_load';
+fragment MEMORY_STORE: 'memory_store';
+fragment GAMMA_LOAD: 'gamma_load';
+fragment GAMMA_STORE: 'gamma_store';
+fragment ZERO_EXTEND: 'zero_extend';
+fragment SIGN_EXTEND: 'sign_extend';
+
+ENDIAN: LE | BE;
+
+fragment BV: 'bv';
 
 LONG: 'long';
 SHORT: 'short';
@@ -89,7 +106,7 @@ ELSE: 'else';
 DIV_OP : 'div';
 MOD_OP : 'mod';
 
-BVSIZE: BV DIGIT DIGIT?;
+BVSIZE: BV DIGIT+;
 
 ID : NON_DIGIT ( NON_DIGIT | DIGIT )* ;
 NON_DIGIT : ( [A-Z] | [a-z] | '\'' | '~' | '#' | '$' | '^' | '_' | '.' | '?' | '`') ;
@@ -116,13 +133,11 @@ SUB_OP : '-';
 MUL_OP : '*';
 
 COLON: ':';
-UNDERSCORE: '_';
-LE: '_le';
-BE: '_be';
+fragment UNDERSCORE: '_';
+fragment LE: '_le';
+fragment BE: '_be';
 
-
-
-OPNAME : AND
+fragment OPNAME : AND
        | OR
        | ADD
        | MUL
@@ -150,32 +165,32 @@ OPNAME : AND
        | COMP
        ;
 
-AND : 'and';
-OR : 'or';
-ADD : 'add';
-MUL : 'mul';
-UDIV : 'udiv';
-UREM : 'urem';
-SHL : 'shl';
-LSHR : 'lshr';
-ULT : 'ult';
-NAND : 'nand';
-NOR : 'nor';
-XOR : 'xor';
-XNOR : 'xnor';
-SUB : 'sub';
-SREM : 'srem';
-SDIV : 'sdiv';
-SMOD : 'smod';
-ASHR : 'ashr';
-ULE : 'ule';
-UGT : 'ugt';
-UGE : 'uge';
-SLT : 'slt';
-SLE : 'sle';
-SGT : 'sgt';
-SGE : 'sge';
-COMP : 'comp';
+fragment AND : 'and';
+fragment OR : 'or';
+fragment ADD : 'add';
+fragment MUL : 'mul';
+fragment UDIV : 'udiv';
+fragment UREM : 'urem';
+fragment SHL : 'shl';
+fragment LSHR : 'lshr';
+fragment ULT : 'ult';
+fragment NAND : 'nand';
+fragment NOR : 'nor';
+fragment XOR : 'xor';
+fragment XNOR : 'xnor';
+fragment SUB : 'sub';
+fragment SREM : 'srem';
+fragment SDIV : 'sdiv';
+fragment SMOD : 'smod';
+fragment ASHR : 'ashr';
+fragment ULE : 'ule';
+fragment UGT : 'ugt';
+fragment UGE : 'uge';
+fragment SLT : 'slt';
+fragment SLE : 'sle';
+fragment SGT : 'sgt';
+fragment SGE : 'sge';
+fragment COMP : 'comp';
 
 // Ignored
 NEWLINE : '\r'? '\n' -> skip;
