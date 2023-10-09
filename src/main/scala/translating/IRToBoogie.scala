@@ -57,9 +57,13 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       // default case where no rely is given - rely on no external changes
       List(BinaryBExpr(BVEQ, mem, Old(mem)), BinaryBExpr(BVEQ, Gamma_mem, Old(Gamma_mem)))
     }
-    val i = BVariable("i", BitVecBType(64), Scope.Local)
-    val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem, i), Old(MapAccess(mem, i))), BinaryBExpr(BVEQ, MapAccess(Gamma_mem, i), Old(MapAccess(Gamma_mem, i)))))
-    val relyEnsures = List(rely2) ++ reliesUsed
+    val relyEnsures = if (relies.nonEmpty) {
+      val i = BVariable("i", BitVecBType(64), Scope.Local)
+      val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem, i), Old(MapAccess(mem, i))), BinaryBExpr(BVEQ, MapAccess(Gamma_mem, i), Old(MapAccess(Gamma_mem, i)))))
+      List(rely2) ++ reliesUsed
+    } else {
+      reliesUsed
+    }
     val relyProc = BProcedure("rely", List(), List(), relyEnsures, List(), List(), List(), readOnlyMemory, List(), Seq(mem, Gamma_mem), List())
     val relyTransitive = BProcedure("rely_transitive", List(), List(), reliesUsed, List(), List(), List(), List(), List(), Seq(mem, Gamma_mem), List(ProcedureCall("rely", List(), List(), List(mem, Gamma_mem)), ProcedureCall("rely", List(), List(), List(mem, Gamma_mem))))
     val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), List(), List(), List(), List(), Seq(), reliesReflexive.map(r => BAssert(r)))
