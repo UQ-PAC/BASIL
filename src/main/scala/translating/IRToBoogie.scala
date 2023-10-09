@@ -32,7 +32,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   def translate: BProgram = {
     val procedures = program.procedures.map(f => translateProcedure(f))
     val defaultGlobals = List(BVarDecl(mem), BVarDecl(Gamma_mem))
-    val globalDecls = (procedures.flatMap(p => p.globals).map(b => BVarDecl(b)) ++ defaultGlobals).distinct.sorted.toList
+    val globalVars = procedures.flatMap(p => p.globals ++ p.freeRequires.flatMap(_.globals) ++ p.freeEnsures.flatMap(_.globals) ++ p.ensures.flatMap(_.globals) ++ p.requires.flatMap(_.globals))
+    val globalDecls = (globalVars.map(b => BVarDecl(b)) ++ defaultGlobals).distinct.sorted.toList
 
     val globalConsts: List[BConstAxiomPair] = globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar), g.toAxiom)).toList.sorted
 
