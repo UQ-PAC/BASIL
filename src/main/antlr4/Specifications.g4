@@ -27,7 +27,8 @@ directFunction: 'memory_load' size=nat endian #memoryLoad
               | BV OPNAME size=nat #bvOp
               ;
 
-subroutine: 'Subroutine:' id requires* ensures*;
+subroutine: 'Subroutine:' id modifies? requires* ensures*;
+modifies: 'Modifies:' id (COMMA id)*;
 requires: 'Requires:' expr #parsedRequires
         | 'Requires DIRECT:' QUOTESTRING #directRequires
         ;

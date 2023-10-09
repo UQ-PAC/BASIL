@@ -85,11 +85,11 @@ object RunUtils {
       }
     }
 
-
-
     IRProgram.stripUnreachableFunctions()
     IRProgram.stackIdentification()
-    IRProgram.setModifies()
+
+    val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
+    IRProgram.setModifies(specModifies)
 
     val boogieTranslator = IRToBoogie(IRProgram, specification)
     boogieTranslator.translate

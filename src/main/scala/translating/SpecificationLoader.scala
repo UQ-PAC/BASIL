@@ -280,6 +280,11 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case r: ParsedRequiresContext => visitExpr(r.expr, nameToGlobals, params)
     }.toList
 
+    val modifies = Option(ctx.modifies) match {
+      case Some(_) => visitModifies(ctx.modifies)
+      case None => List()
+    }
+
     val ensures = ctx.ensures.asScala.collect {
       case e: ParsedEnsuresContext => visitExpr(e.expr, nameToGlobals, params)
     }.toList
@@ -292,7 +297,11 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case r: DirectEnsuresContext => r.QUOTESTRING.getText.stripPrefix("\"").stripSuffix("\"")
     }.toList
 
-    SubroutineSpec(ctx.id.getText, requires, requiresDirect, ensures, ensuresDirect)
+    SubroutineSpec(ctx.id.getText, requires, requiresDirect, ensures, ensuresDirect, modifies)
+  }
+
+  def visitModifies(ctx: ModifiesContext): List[String] = {
+    ctx.id.asScala.map(_.getText).toList
   }
 
 }
