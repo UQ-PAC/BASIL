@@ -64,10 +64,6 @@ object RunUtils {
 
     val specification = loadSpecification(specFileName, IRProgram, globals)
 
-    if (performInterpret) {
-      Interpret(IRProgram)
-    }
-
     val externalNames = externalFunctions.map(e => e.name)
     val externalRemover = ExternalRemover(externalNames)
     val renamer = Renamer(reserved)
@@ -90,6 +86,10 @@ object RunUtils {
     IRProgram.stripUnreachableFunctions()
     IRProgram.stackIdentification()
     IRProgram.setModifies()
+
+    if (performInterpret) {
+      Interpret(IRProgram)
+    }
 
     val boogieTranslator = IRToBoogie(IRProgram, specification)
     boogieTranslator.translate
