@@ -431,11 +431,11 @@ abstract class MemoryRegion
  * @param regionType The type of the region. This is used to distinguish between stack, heap, data and code regions.
  * @param extent the start and end of the region 
  */
-case class StackRegion(regionIdentifier: String, start: Expr, var extent: Option[RangeKey]) extends MemoryRegion:
-  override def toString: String = s"Stack(${regionIdentifier}, ${start})"
+case class StackRegion(regionIdentifier: String, start: Expr, var extent: Option[RangeKey], var modifiable: Boolean = false) extends MemoryRegion:
+  override def toString: String = s"Stack(${regionIdentifier}, ${start}, ${if modifiable then "modifiable" else "non-modifiable"})"
   override def hashCode(): Int = start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case StackRegion(ri, st, _) => st == start
+    case StackRegion(ri, st, _, _) => st == start
     case _ => false
   }
 
@@ -445,16 +445,16 @@ case class StackRegion(regionIdentifier: String, start: Expr, var extent: Option
  * @param start the start address 
  * @param extent the start and end of the region 
  */
-case class HeapRegion(regionIdentifier: String, start: Expr, var extent: Option[RangeKey]) extends MemoryRegion:
-  override def toString: String = s"Heap(${regionIdentifier}, ${start})"
+case class HeapRegion(regionIdentifier: String, start: Expr, var extent: Option[RangeKey], var modifiable: Boolean = false) extends MemoryRegion:
+  override def toString: String = s"Heap(${regionIdentifier}, ${start}, ${if modifiable then "modifiable" else "non-modifiable"})"
   override def hashCode(): Int = regionIdentifier.hashCode()
   override def equals(obj: Any): Boolean = obj match {
     case r : HeapRegion => regionIdentifier.equals(r.regionIdentifier)
     case _ => false
   }
 
-case class DataRegion(regionIdentifier: String, start: Expr, var extent: Option[RangeKey]) extends MemoryRegion:
-  override def toString: String = s"Data(${regionIdentifier}, ${start})"
+case class DataRegion(regionIdentifier: String, start: Expr, var extent: Option[RangeKey], var modifiable: Boolean = false) extends MemoryRegion:
+  override def toString: String = s"Data(${regionIdentifier}, ${start}, ${if modifiable then "modifiable" else "non-modifiable"})"
 
 case class RegionAccess(regionBase: String, start: Expr) extends MemoryRegion:
   override def toString: String = s"RegionAccess(${regionBase}, ${start})"
@@ -482,12 +482,13 @@ trait MemoryRegionAnalysisMisc:
    * @param parent: the function entry node
    * @return the stack region corresponding to the offset
    */
-  def poolMaster(expr: Expr, parent: CfgFunctionEntryNode): StackRegion = {
+  def poolMaster(expr: Expr, parent: CfgFunctionEntryNode, modified: Boolean): StackRegion = {
     val stackPool = stackMap.getOrElseUpdate(parent, mutable.HashMap())
     if (stackPool.contains(expr)) {
+      stackPool(expr).modifiable = modified
       stackPool(expr)
     } else {
-      val newRegion = StackRegion(getNextStackCount(), expr, None)
+      val newRegion = StackRegion(getNextStackCount(), expr, None, modified)
       stackPool += (expr -> newRegion)
       newRegion
     }
@@ -539,7 +540,7 @@ trait MemoryRegionAnalysisMisc:
 
     /** Default implementation of eval.
    */
-  def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
+  def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgNode, modified: Boolean = false): lattice.sublattice.Element = {
     println(s"evaluating $exp")
     println(s"env: $env")
     println(s"n: $n")
@@ -547,7 +548,7 @@ trait MemoryRegionAnalysisMisc:
         case binOp: BinaryExpr =>
             if (binOp.arg1 == stackPointer) {
               val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp)
-              Set(poolMaster(binOp.arg2, n.asInstanceOf[CfgStatementNode].parent))
+              Set(poolMaster(binOp.arg2, n.asInstanceOf[CfgStatementNode].parent, modified))
             } else {
               val evaluation: Expr = evaluateExpression(binOp, n, constantProp)
               if (evaluation.equals(binOp)) {
@@ -558,22 +559,22 @@ trait MemoryRegionAnalysisMisc:
         case bitVecLiteral: BitVecLiteral =>
           if (globals.contains(bitVecLiteral.value)) {
             val globalName = globals(bitVecLiteral.value)
-            Set(DataRegion(globalName, bitVecLiteral, None))
+            Set(DataRegion(globalName, bitVecLiteral, None, modified))
           } else if (subroutines.contains(bitVecLiteral.value)) {
             val subroutineName = subroutines(bitVecLiteral.value)
-            Set(DataRegion(subroutineName, bitVecLiteral, None))
+            Set(DataRegion(subroutineName, bitVecLiteral, None, modified))
           } else if (globalOffsets.contains(bitVecLiteral.value)) {
             val val1 = globalOffsets(bitVecLiteral.value)
             if (subroutines.contains(val1)) {
               val globalName = subroutines(val1)
-              Set(DataRegion(globalName, bitVecLiteral, None))
+              Set(DataRegion(globalName, bitVecLiteral, None, modified))
             } else {
-              Set(DataRegion(s"Unknown_${bitVecLiteral}", bitVecLiteral, None))
+              Set(DataRegion(s"Unknown_${bitVecLiteral}", bitVecLiteral, None, modified))
             }
           } else {
             //throw new Exception(s"Unknown type for $bitVecLiteral")
             // unknown region here
-            Set(DataRegion(s"Unknown_${bitVecLiteral}", bitVecLiteral, None))
+            Set(DataRegion(s"Unknown_${bitVecLiteral}", bitVecLiteral, None, modified))
           }
         case variable: Variable =>
           if (variable.name.contains("#") || variable.equals(stackPointer)) {
@@ -606,11 +607,11 @@ trait MemoryRegionAnalysisMisc:
             if (ignoreRegions.contains(memAssign.rhs.value)) {
               return s
             }
-            val result = eval(memAssign.rhs.index, s, n)
+            val result = eval(memAssign.rhs.index, s, n, true)
             result.collectFirst({
-              case StackRegion(name, _, _) =>
+              case StackRegion(name, _, _, _) =>
                 memAssign.rhs = MemoryStore(Memory(name, memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize), memAssign.rhs.index, memAssign.rhs.value, memAssign.rhs.endian, memAssign.rhs.size)
-              case DataRegion(name, _, _) =>
+              case DataRegion(name, _, _, _) =>
                 memAssign.rhs = MemoryStore(Memory(name, memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize), memAssign.rhs.index, memAssign.rhs.value, memAssign.rhs.endian, memAssign.rhs.size)
               case _ =>
             })
@@ -621,9 +622,9 @@ trait MemoryRegionAnalysisMisc:
               case memoryLoad: MemoryLoad =>
                 val result = eval(memoryLoad.index, s, n)
                 result.collectFirst({
-                  case StackRegion(name, _, _) =>
+                  case StackRegion(name, _, _, _) =>
                     memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
-                  case DataRegion(name, _, _) =>
+                  case DataRegion(name, _, _, _) =>
                     memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
                   case _ =>
                 })
