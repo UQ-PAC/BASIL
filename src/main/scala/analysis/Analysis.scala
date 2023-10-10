@@ -7,7 +7,6 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
-import analysis.eval.*
 import util.Logger
 
 /** Trait for program analyses.
@@ -504,10 +503,10 @@ trait MemoryRegionAnalysisMisc:
     exp match {
       case binOp: BinaryExpr =>
         if (binOp.arg1 == stackPointer) {
-          val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp)
+          val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp(n))
           Set(StackRegion(getNextStackCount(), rhs, None))
         } else {
-          val evaluation: Expr = evaluateExpression(binOp, n, constantProp)
+          val evaluation: Expr = evaluateExpression(binOp, n, constantProp(n))
           if (evaluation.equals(binOp)) {
             return env
           }
@@ -542,7 +541,7 @@ trait MemoryRegionAnalysisMisc:
           case _ =>
         }
 
-        val evaluation: Expr = evaluateExpression(variable, n, constantProp)
+        val evaluation: Expr = evaluateExpression(variable, n, constantProp(n))
         evaluation match
           case bitVecLiteral: BitVecLiteral =>
             eval(bitVecLiteral, env, n)
@@ -563,7 +562,7 @@ trait MemoryRegionAnalysisMisc:
             if (directCall.target.name == "malloc") {
               return lattice.sublattice.lub(
                 s,
-                Set(HeapRegion(getNextMallocCount(), evaluateExpression(mallocVariable, n, constantProp), None))
+                Set(HeapRegion(getNextMallocCount(), evaluateExpression(mallocVariable, n, constantProp(n)), None))
               )
             }
             s

@@ -1,8 +1,5 @@
-package analysis.eval
+package analysis
 import ir.*
-import analysis.solvers.*
-import analysis.Lattice
-import analysis.*
 import util.Logger
 
 /** Evaluate an expression in a hope of finding a global variable.
@@ -14,12 +11,12 @@ import util.Logger
   * @return:
   *   The evaluated expression (e.g. 0x69632)
   */
-def evaluateExpression(exp: Expr, n: CfgNode, constantProp: Map[CfgNode, Map[Variable, Any]]): Expr = {
+def evaluateExpression(exp: Expr, n: CfgNode, constantPropResult: Map[Variable, Any]): Expr = {
   Logger.debug(s"evaluateExpression: $exp")
   exp match {
     case binOp: BinaryExpr =>
-      val lhs = evaluateExpression(binOp.arg1, n, constantProp)
-      val rhs = evaluateExpression(binOp.arg2, n, constantProp)
+      val lhs = evaluateExpression(binOp.arg1, n, constantPropResult)
+      val rhs = evaluateExpression(binOp.arg2, n, constantPropResult)
 
       (lhs, rhs) match {
         case (l: BitVecLiteral, r: BitVecLiteral) =>
@@ -33,17 +30,17 @@ def evaluateExpression(exp: Expr, n: CfgNode, constantProp: Map[CfgNode, Map[Var
         case _ => exp
       }
     case extend: ZeroExtend =>
-      evaluateExpression(extend.body, n, constantProp) match {
+      evaluateExpression(extend.body, n, constantPropResult) match {
         case literal: Literal => BitVectorEval.smt_zero_extend(extend.extension, literal)
         case _                => exp
       }
     case e: Extract =>
-      evaluateExpression(e.body, n, constantProp) match {
+      evaluateExpression(e.body, n, constantPropResult) match {
         case literal: Literal => BitVectorEval.smt_extract(e.end, e.start, literal)
         case _                => exp
       }
     case variable: Variable =>
-      val nodeResult = constantProp(n).asInstanceOf[Map[Variable, ConstantPropagationLattice.type]]
+      val nodeResult = constantPropResult.asInstanceOf[Map[Variable, ConstantPropagationLattice.type]]
       nodeResult(variable).asInstanceOf[ConstantPropagationLattice.Element] match {
         case ConstantPropagationLattice.FlatElement.FlatEl(value) => value.asInstanceOf[BitVecLiteral]
         case ConstantPropagationLattice.FlatElement.Top           => variable

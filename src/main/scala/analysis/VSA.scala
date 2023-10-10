@@ -7,7 +7,6 @@ import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
-import analysis.eval.*
 import util.Logger
 
 /** ValueSets are PowerSet of possible values */
@@ -72,10 +71,10 @@ trait MemoryRegionValueSetAnalysis:
     expr match
       case binOp: BinaryExpr =>
         if (binOp.arg1 == stackPointer) {
-          val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp)
+          val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp(n))
           mmm.findStackObject(rhs.asInstanceOf[BitVecLiteral].value)
         } else {
-          val evaluation: Expr = evaluateExpression(binOp, n, constantProp)
+          val evaluation: Expr = evaluateExpression(binOp, n, constantProp(n))
           if (!evaluation.isInstanceOf[BitVecLiteral]) {
             return None
           }
@@ -113,7 +112,7 @@ trait MemoryRegionValueSetAnalysis:
             region match
               case Some(r: MemoryRegion) =>
                 // this is an exception to the rule and only applies to data regions
-                evaluateExpression(memoryLoad.index, n, constantProp) match
+                evaluateExpression(memoryLoad.index, n, constantProp(n)) match
                   case bitVecLiteral: BitVecLiteral =>
                     val m = s + (r -> Set(getValueType(bitVecLiteral)))
                     m + (localAssign.lhs -> m(r))
@@ -123,7 +122,7 @@ trait MemoryRegionValueSetAnalysis:
                 Logger.warn("could not find region for " + localAssign)
                 s
           case e: Expr => {
-            val evaled = evaluateExpression(e, n, constantProp)
+            val evaled = evaluateExpression(e, n, constantProp(n))
             evaled match
               case bv: BitVecLiteral => s + (localAssign.lhs -> Set(getValueType(bv)))
               case _ =>
@@ -136,7 +135,7 @@ trait MemoryRegionValueSetAnalysis:
             val region: Option[MemoryRegion] = exprToRegion(binOp, n)
             region match
               case Some(r: MemoryRegion) =>
-                evaluateExpression(memAssign.rhs.value, n, constantProp) match
+                evaluateExpression(memAssign.rhs.value, n, constantProp(n)) match
                   case bitVecLiteral: BitVecLiteral =>
                     return s + (r -> Set(getValueType(bitVecLiteral)))
                   case variable: Variable => // constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
