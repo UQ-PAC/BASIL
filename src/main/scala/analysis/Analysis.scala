@@ -533,7 +533,7 @@ trait MemoryRegionAnalysisMisc:
       case binOp: BinaryExpr =>
         if (binOp.arg1 == stackPointer) {
           val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp)
-          Set(poolMaster(binOp.arg2, n.asInstanceOf[CfgStatementNode].parent, modified))
+          Set(poolMaster(rhs, n.asInstanceOf[CfgStatementNode].parent, modified))
         } else {
           val evaluation: Expr = evaluateExpression(binOp, n, constantProp)
           if (evaluation.equals(binOp)) {
@@ -562,9 +562,14 @@ trait MemoryRegionAnalysisMisc:
           Set(DataRegion(s"Unknown_${bitVecLiteral}", bitVecLiteral, None, modified))
         }
       case variable: Variable =>
-        if (variable.name.contains("#") || variable.equals(stackPointer)) {
-          return env
+        variable match {
+          case _: LocalVar =>
+            return env
+          case reg: Register if reg == stackPointer =>
+            return env
+          case _ =>
         }
+
         val evaluation: Expr = evaluateExpression(variable, n, constantProp)
         evaluation match
           case bitVecLiteral: BitVecLiteral =>

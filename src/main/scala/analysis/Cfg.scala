@@ -1063,34 +1063,39 @@ class ProgramCfgFactory:
 
       if (node == exitNode) {
         cfg.addEdge(prevNewNode, newExit, cond)
-        return;
+        return
       }
 
-      // Link this node with predecessor in the new cfg
-      val newNode = node.copyNode()
-      cfg.addEdge(prevNewNode, newNode, cond)
-
-      // Update cfg information
       node match {
         case n: CfgCommandNode =>
+          val newNode: CfgCommandNode = n.copyNode().asInstanceOf[CfgCommandNode]
+
+          // Link this node with predecessor in the new cfg
+          cfg.addEdge(prevNewNode, newNode, cond)
+
           n.data match {
             case d: DirectCall =>
               procToCalls(proc) += newNode
-                .asInstanceOf[CfgCommandNode] // This procedure (general) is calling another procedure
               callToNodes(newEntry) += newNode
-                .asInstanceOf[CfgCommandNode] // This procedure (specfic) is calling another procedure
-              procToCallers(d.target) += newNode.asInstanceOf[CfgCommandNode] // Target of this call has a new caller
+              procToCallers(d.target) += newNode
             case i: IndirectCall =>
-              procToCalls(proc) += newNode.asInstanceOf[CfgCommandNode]
-              callToNodes(newEntry) += newNode.asInstanceOf[CfgCommandNode]
+              procToCalls(proc) += newNode
+              callToNodes(newEntry) += newNode
             case _ =>
           }
-        case _ =>
-      }
 
-      // Get intra-cfg succesors
-      val outEdges: mutable.Set[CfgEdge] = node.succEdges(intra = true)
-      outEdges.foreach(edge => visitNode(edge.getTo, newNode, edge.getCond))
+          // Get intra-cfg successors
+          val outEdges: mutable.Set[CfgEdge] = node.succEdges(intra = true)
+          outEdges.foreach(edge => visitNode(edge.getTo, newNode, edge.getCond))
+
+        // For other node types, link with predecessor and continue traversal
+        case _ =>
+          val newNode = node.copyNode()
+          cfg.addEdge(prevNewNode, newNode, cond)
+
+          val outEdges: mutable.Set[CfgEdge] = node.succEdges(intra = true)
+          outEdges.foreach(edge => visitNode(edge.getTo, newNode, edge.getCond))
+      }
     }
 
     (newEntry, newExit)

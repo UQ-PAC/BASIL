@@ -28,18 +28,18 @@ class MemoryModelMap {
       case s: StackRegion =>
         val stackMap = rangeMap.stackMap
         if (stackMap.isEmpty) {
-          stackMap(RangeKey(offset, MAX_BIGINT)) = region.asInstanceOf[StackRegion]
+          stackMap(RangeKey(offset, MAX_BIGINT)) = s
         } else {
           stackMap.keys.maxBy(_.end).end = offset - 1
-          stackMap(RangeKey(offset, MAX_BIGINT)) = region.asInstanceOf[StackRegion]
+          stackMap(RangeKey(offset, MAX_BIGINT)) = s
         }
       case d: DataRegion =>
         val dataMap = rangeMap.dataMap
         if (dataMap.isEmpty) {
-          dataMap(RangeKey(offset, MAX_BIGINT)) = region.asInstanceOf[DataRegion]
+          dataMap(RangeKey(offset, MAX_BIGINT)) = d
         } else {
           dataMap.keys.maxBy(_.end).end = offset - 1
-          dataMap(RangeKey(offset, MAX_BIGINT)) = region.asInstanceOf[DataRegion]
+          dataMap(RangeKey(offset, MAX_BIGINT)) = d
         }
     }
   }

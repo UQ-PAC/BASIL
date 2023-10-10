@@ -129,9 +129,9 @@ trait MemoryRegionValueSetAnalysis:
           case e: Expr => {
             val evaled = evaluateExpression(e, n, constantProp)
             evaled match
-              case bv: BitVecLiteral => s + (localAssign.lhs -> Set(getValueType(evaled.asInstanceOf[BitVecLiteral])))
+              case bv: BitVecLiteral => s + (localAssign.lhs -> Set(getValueType(bv)))
               case _ =>
-                println("Warning: could not evaluate expression" + e)
+                Logger.warn("could not evaluate expression" + e)
                 s
           }
       case memAssign: MemoryAssign =>
