@@ -850,7 +850,7 @@ class ProgramCfgFactory:
 
             // R30 is the link register - this stores the address to return to.
             //  For now just add a node expressing that we are to return to the previous context.
-            if (iCall.target.isRegister("R30")) {
+            if (iCall.target == Register("R30", BitVecType(64))) {
               val returnNode = CfgProcedureReturnNode()
               cfg.addEdge(jmpNode, returnNode)
               cfg.addEdge(returnNode, funcExitNode)

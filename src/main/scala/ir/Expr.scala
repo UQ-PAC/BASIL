@@ -358,10 +358,6 @@ sealed trait Variable extends Expr {
     case _             => throw new Exception("tried to get size of non-bitvector")
   }
 
-  val isRegister: Boolean = name.startsWith("R") || name.startsWith("V") && name != "VF"
-
-  // `rName` : e.g. "R20"
-  def isRegister(rName: String): Boolean = isRegister && rName.equals(name)
   override def toString: String = s"Variable($name, $irType)"
 
   override def acceptVisit(visitor: Visitor): Variable =
