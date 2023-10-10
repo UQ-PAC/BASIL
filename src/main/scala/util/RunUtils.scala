@@ -235,9 +235,9 @@ object RunUtils {
                 if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size == 1) {
                   val extractedValue = extractExprFromValue(valueSets(n).get(localAssign.lhs).head.head)
                   localAssign.rhs = extractedValue
-                  println(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${extractedValue}")
+                  Logger.info(s"RESOLVED: Memory load ${localAssign.lhs} resolved to ${extractedValue}")
                 } else if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size > 1) {
-                  println(s"RESOLVED: WARN Memory load ${localAssign.lhs} resolved to multiple values, cannot replace")
+                  Logger.info(s"RESOLVED: WARN Memory load ${localAssign.lhs} resolved to multiple values, cannot replace")
 
                   /*
                   // must merge into a single memory variable to represent the possible values
