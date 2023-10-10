@@ -261,41 +261,37 @@ object RunUtils {
             val functionNames = resolveAddresses(valueSet(indirectCall.target))
             if (functionNames.size == 1) {
               modified = true
-              commandNode.block match
-                case block: Block =>
-                  block.jumps = block.jumps.filter(!_.equals(indirectCall))
-                  block.jumps += DirectCall(
-                    IRProgram.procedures.filter(_.name.equals(functionNames.head.name)).head,
-                    indirectCall.condition,
-                    indirectCall.returnTarget
-                  )
-                case null => throw new Exception("Node not found in nodeToBlock map")
+              val block = commandNode.block match
+              block.jumps = block.jumps.filter(!_.equals(indirectCall))
+              block.jumps += DirectCall(
+                IRProgram.procedures.filter(_.name.equals(functionNames.head.name)).head,
+                indirectCall.condition,
+                indirectCall.returnTarget
+              )
             } else if (functionNames.size > 1) {
               modified = true
               functionNames.foreach(addressValue =>
-                commandNode.block match
-                  case block: Block =>
-                    block.jumps = block.jumps.filter(!_.equals(indirectCall))
-                    if (indirectCall.condition.isDefined) {
-                      block.jumps += DirectCall(
-                        IRProgram.procedures.filter(_.name.equals(addressValue.name)).head,
-                        Option(
-                          BinaryExpr(
-                            BVAND,
-                            indirectCall.condition.get,
-                            BinaryExpr(BVEQ, indirectCall.target, addressValue.expr)
-                          )
-                        ),
-                        indirectCall.returnTarget
+                val block = commandNode.block
+                block.jumps = block.jumps.filter(!_.equals(indirectCall))
+                if (indirectCall.condition.isDefined) {
+                  block.jumps += DirectCall(
+                    IRProgram.procedures.filter(_.name.equals(addressValue.name)).head,
+                    Option(
+                      BinaryExpr(
+                        BVAND,
+                        indirectCall.condition.get,
+                        BinaryExpr(BVEQ, indirectCall.target, addressValue.expr)
                       )
-                    } else {
-                      block.jumps += DirectCall(
-                        IRProgram.procedures.filter(_.name.equals(addressValue.name)).head,
-                        Option(BinaryExpr(BVEQ, indirectCall.target, addressValue.expr)),
-                        indirectCall.returnTarget
-                      )
-                    }
-                  case null => throw new Exception("Node not found in nodeToBlock map")
+                    ),
+                    indirectCall.returnTarget
+                  )
+                } else {
+                  block.jumps += DirectCall(
+                    IRProgram.procedures.filter(_.name.equals(addressValue.name)).head,
+                    Option(BinaryExpr(BVEQ, indirectCall.target, addressValue.expr)),
+                    indirectCall.returnTarget
+                  )
+                }
               )
             } else {
               // must be a call to R30
