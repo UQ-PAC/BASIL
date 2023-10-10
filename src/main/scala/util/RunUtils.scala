@@ -201,12 +201,9 @@ object RunUtils {
   ): (Program, Boolean) = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
-    // find the main function
-    cfg.nodes.foreach {
-      case main: CfgFunctionEntryNode if main.data.name == "main" =>
-        main.succ(true).toSet.union(main.succ(false).toSet).foreach(node => worklist.addOne(node))
-      case _ =>
-    }
+    // find the main function, TODO have a variable in ProgramCfg class to aid with this
+    val main = cfg.nodes.collectFirst { case n: CfgFunctionEntryNode if n.data.name == IRProgram.mainProcedure.name => n }.get
+    main.succ(true).toSet.union(main.succ(false).toSet).foreach(node => worklist.addOne(node))
 
     val visited = scala.collection.mutable.Set[CfgNode]()
     while (worklist.nonEmpty) {
