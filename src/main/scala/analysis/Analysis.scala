@@ -61,7 +61,7 @@ trait ValueAnalysisMisc:
           case BVSDIV => bvsdiv(left, right)
           case BVSREM => bvsrem(left, right)
           case BVUREM => bvurem(left, right)
-          case BVSMOD => ??? // Signed modulus. NOTE: this is used.
+          case BVSMOD => bvsmod(left, right)
           case BVAND  => bvand(left, right)
           case BVOR   => bvor(left, right)
           case BVXOR  => bvxor(left, right)
