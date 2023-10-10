@@ -1,12 +1,11 @@
 package analysis
 
 import scala.collection.mutable
-import ir._
-import cfg_visualiser.{DotArrow, DotRegularArrow, DotInterArrow, DotInlineArrow, DotIntraArrow, DotGraph, DotNode}
+import ir.*
+import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
 
-import scala.collection.mutable.ListBuffer
-
-import scala.util.control.Breaks.break;
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.util.control.Breaks.break
 import analysis.Fresh.next
 import util.Logger
 
@@ -676,11 +675,11 @@ class ProgramCfgFactory:
       block.statements.size match {
         case i if i > 0 =>
           // Block contains some statements
-          val endStmt: CfgCommandNode = visitStmts(block.statements.toList, prevBlockEnd, cond)
-          visitJumps(block.jumps.toList, endStmt, TrueLiteral, solitary = false)
+          val endStmt: CfgCommandNode = visitStmts(block.statements, prevBlockEnd, cond)
+          visitJumps(block.jumps, endStmt, TrueLiteral, solitary = false)
         case _ =>
           // Only jumps in this block
-          visitJumps(block.jumps.toList, prevBlockEnd, cond, solitary = true)
+          visitJumps(block.jumps, prevBlockEnd, cond, solitary = true)
       }
 
       /** If a block has statements, we add them to the CFG. Blocks in this case are basic blocks, so we know
@@ -695,7 +694,7 @@ class ProgramCfgFactory:
         * @return
         *   The last statement's CFG node
         */
-      def visitStmts(stmts: List[Statement], prevNode: CfgNode, cond: Expr): CfgCommandNode = {
+      def visitStmts(stmts: ArrayBuffer[Statement], prevNode: CfgNode, cond: Expr): CfgCommandNode = {
 
         val firstNode: CfgStatementNode = CfgStatementNode(data = stmts.head, block = block)
         cfg.addEdge(prevNode, firstNode, cond)
@@ -732,7 +731,7 @@ class ProgramCfgFactory:
         * @param solitary
         *   `True` if this block contains no statements, `False` otherwise
         */
-      def visitJumps(jmps: List[Jump], prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
+      def visitJumps(jmps: ArrayBuffer[Jump], prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
 
         val jmpNode: CfgJumpNode = CfgJumpNode(data = jmps.head, block = block)
         var precNode: CfgNode = prevNode
@@ -759,12 +758,8 @@ class ProgramCfgFactory:
           }
         }
 
-        /* Possible `jmp` combinations:
-              1. DirectCall
-              2. IndirectCall
-              3. GoTo
-              4. GoTo + GoTo
-         */
+        // TODO this is not a robust approach
+
         jmps.head match {
           case goto: GoTo =>
             // Process first jump
@@ -782,10 +777,7 @@ class ProgramCfgFactory:
               visitBlock(targetBlock, precNode, targetCond)
             }
 
-            /* If the first GoTo's condition is not `True`, then we know there must be a second conditional jump.
-             *  We could equivalently check if `jmps` has 2 jumps, though this emphasises why we check for
-             *  a second jump. We can assume we have a maximum of 2 jumps, as that's what the IR (as of writing)
-             *  intends.
+            /* TODO it is not a safe assumption that there are a maximum of two jumps, or that a GoTo will follow a GoTo
              */
             if (targetCond != TrueLiteral) {
               val secondGoto: GoTo = jmps.tail.head.asInstanceOf[GoTo]
