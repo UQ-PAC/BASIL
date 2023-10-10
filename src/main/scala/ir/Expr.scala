@@ -333,7 +333,6 @@ class MemoryLoad(var mem: Memory, var index: Expr, var endian: Endian, var size:
 
 sealed trait Global
 
-// name == stack or mem
 case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr with Global {
   override def toBoogie: BMapVar =
     BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)

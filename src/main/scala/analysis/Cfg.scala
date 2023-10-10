@@ -303,7 +303,9 @@ case class CfgCallReturnNode(
 
 /** Control-flow graph node for a command (statement or jump).
   */
-trait CfgCommandNode extends CfgNodeWithData[Command]
+trait CfgCommandNode extends CfgNodeWithData[Command] {
+  override def copyNode(): CfgCommandNode
+}
 
 /** CFG's representation of a single statement.
   */
@@ -1067,7 +1069,7 @@ class ProgramCfgFactory:
 
       node match {
         case n: CfgCommandNode =>
-          val newNode: CfgCommandNode = n.copyNode().asInstanceOf[CfgCommandNode]
+          val newNode: CfgCommandNode = n.copyNode()
 
           // Link this node with predecessor in the new cfg
           cfg.addEdge(prevNewNode, newNode, cond)
