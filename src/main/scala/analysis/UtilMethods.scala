@@ -20,15 +20,18 @@ def evaluateExpression(exp: Expr, n: CfgNode, constantProp: Map[CfgNode, Map[Var
     case binOp: BinaryExpr =>
       val lhs = evaluateExpression(binOp.arg1, n, constantProp)
       val rhs = evaluateExpression(binOp.arg2, n, constantProp)
-      if (!lhs.isInstanceOf[BitVecLiteral] || !rhs.isInstanceOf[BitVecLiteral]) {
-        return exp
+
+      (lhs, rhs) match {
+        case (l: BitVecLiteral, r: BitVecLiteral) =>
+          binOp.op match {
+            case BVADD => BitVectorEval.smt_bvadd(l, r)
+            case BVSUB => BitVectorEval.smt_bvsub(l, r)
+            case BVASHR => BitVectorEval.smt_bvashr(l, r)
+            case BVCOMP => BitVectorEval.smt_bvcomp(l, r)
+            case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
+          }
+        case _ => exp
       }
-      binOp.op match
-        case BVADD  => BitVectorEval.smt_bvadd(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
-        case BVSUB  => BitVectorEval.smt_bvsub(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
-        case BVASHR => BitVectorEval.smt_bvashr(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
-        case BVCOMP => BitVectorEval.smt_bvcomp(lhs.asInstanceOf[BitVecLiteral], rhs.asInstanceOf[BitVecLiteral])
-        case _      => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
     case extend: ZeroExtend =>
       evaluateExpression(extend.body, n, constantProp) match {
         case literal: Literal => BitVectorEval.smt_zero_extend(extend.extension, literal)
