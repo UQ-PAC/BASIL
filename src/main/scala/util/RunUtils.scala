@@ -149,7 +149,7 @@ object RunUtils {
 
     Logger.info("[!] Running Constant Propagation")
     val solver = ConstantPropagationAnalysis.WorklistSolver(cfg)
-    val result = solver.analyze(true).asInstanceOf[Map[CfgNode, Map[Variable, Any]]]
+    val result = solver.analyze(true).asInstanceOf[Map[CfgNode, Map[Variable, ConstantPropagationLattice.type]]]
     Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder),

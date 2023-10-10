@@ -474,7 +474,7 @@ trait MemoryRegionAnalysisMisc:
   val globals: Map[BigInt, String]
   val globalOffsets: Map[BigInt, BigInt]
   val subroutines: Map[BigInt, String]
-  val constantProp: Map[CfgNode, Map[Variable, Any]]
+  val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.type]]
 
   /** The lattice of abstract values.
     */
@@ -606,7 +606,7 @@ abstract class MemoryRegionAnalysis(
     val globals: Map[BigInt, String],
     val globalOffsets: Map[BigInt, BigInt],
     val subroutines: Map[BigInt, String],
-    val constantProp: Map[CfgNode, Map[Variable, Any]]
+    val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.type]]
 ) extends FlowSensitiveAnalysis(true)
     with MemoryRegionAnalysisMisc:
 
@@ -621,7 +621,7 @@ abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[
     globals: Map[BigInt, String],
     globalOffsets: Map[BigInt, BigInt],
     subroutines: Map[BigInt, String],
-    constantProp: Map[CfgNode, Map[Variable, Any]],
+    constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.type]],
     val powersetLattice: L
 ) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
     with SimpleMonotonicSolver[CfgNode]
@@ -636,7 +636,7 @@ object MemoryRegionAnalysis:
       globals: Map[BigInt, String],
       globalOffsets: Map[BigInt, BigInt],
       subroutines: Map[BigInt, String],
-      constantProp: Map[CfgNode, Map[Variable, Any]]
+      constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.type]]
   ) extends IntraprocMemoryRegionAnalysisWorklistSolver(
         cfg,
         globals,
