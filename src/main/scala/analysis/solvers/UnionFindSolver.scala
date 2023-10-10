@@ -93,4 +93,11 @@ class UnionFindSolver[A] {
 
 /** Exception thrown in case of unification failure.
   */
-class UnificationFailure(message: String = null) extends RuntimeException(message)
+class UnificationFailure(message: String)
+  extends Exception(message) {
+
+  def this(message: String, cause: Throwable) = {
+    this(message)
+    initCause(cause)
+  }
+}
