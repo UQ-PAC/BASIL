@@ -98,18 +98,24 @@ trait ListSetWorklist[N] extends Worklist[N]:
 
   def monotonic_run(first: Set[N], intra: Boolean) =
     if (!intra) {
-      worklist = new ListSet[N] ++ first.collect { case n: CfgFunctionEntryNode if n.data.name == "main" => n } // no inlined functions
+      worklist =
+        new ListSet[N] ++ first.collect {
+          case n: CfgFunctionEntryNode if n.data.name == "main" => n
+        } // no inlined functions
       while (worklist.nonEmpty) do
         val n = worklist.head;
         worklist = worklist.tail
         process(n, intra)
     } else {
-      worklist = new ListSet[N] ++ first.collect{ case n: CfgFunctionEntryNode if n.pred(intra).isEmpty => n } // no inlined functions
+      worklist =
+        new ListSet[N] ++ first.collect {
+          case n: CfgFunctionEntryNode if n.pred(intra).isEmpty => n
+        } // no inlined functions
       while (worklist.nonEmpty) do
         val n = worklist.head;
         worklist = worklist.tail
         process(n, intra)
-      }
+    }
 
 /** Base trait for worklist-based fixpoint solvers.
   *
@@ -139,40 +145,37 @@ trait SimpleWorklistFixpointSolver[N] extends WorklistFixpointSolver[N]:
     */
   val domain: Set[N]
 
-  /**
-   * Push the results of the analysis one node down. This is used to have the results of the pre node in the current node.
-   * @param the current lattice
-   * @return the new lattice element
-   */
+  /** Push the results of the analysis one node down. This is used to have the results of the pre node in the current
+    * node.
+    * @param the
+    *   current lattice
+    * @return
+    *   the new lattice element
+    */
 
   def analyze(intra: Boolean): lattice.Element =
     x = lattice.bottom
     run(domain, intra)
     x
 
-/** A pushDown worklist-based fixpoint solvers.
- * Pushes the results of the analysis one node down. This is used to have the results of the pred node in the current node.
- * ie.
- * NODE 1:    R0 = 69551bv64               RESULT LATTICE = {}
- * NODE 2:    R0 = MemLoad[R0 + 54bv64]    RESULT LATTICE = {R0 = 69551bv64}
- * NODE 3:    R1 = 0bv64                   RESULT LATTICE = {R0 = TOP}
- * ...
- *
- * @tparam N
- *   type of the elements in the worklist.
- *
- *   Better implementation of the same thing
- *   https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L311
- */
+/** A pushDown worklist-based fixpoint solvers. Pushes the results of the analysis one node down. This is used to have
+  * the results of the pred node in the current node. ie. NODE 1: R0 = 69551bv64 RESULT LATTICE = {} NODE 2: R0 =
+  * MemLoad[R0 + 54bv64] RESULT LATTICE = {R0 = 69551bv64} NODE 3: R1 = 0bv64 RESULT LATTICE = {R0 = TOP} ...
+  *
+  * @tparam N
+  *   type of the elements in the worklist.
+  *
+  * Better implementation of the same thing
+  * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L311
+  */
 trait PushDownWorklistFixpointSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[N] with Dependencies[N]:
   /** The current lattice element.
-   */
+    */
   var x: lattice.Element = _
 
-  /**
-   * Propagates lattice element y to node m.
-   *   https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L286
-   */
+  /** Propagates lattice element y to node m.
+    * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L286
+    */
   def propagate(y: lattice.sublattice.Element, m: N) = {
     val xm = x(m)
     val t = lattice.sublattice.lub(xm, y)
@@ -189,25 +192,26 @@ trait PushDownWorklistFixpointSolver[N] extends MapLatticeSolver[N] with ListSet
 
     val t = lattice.sublattice.lub(xn, y)
 
-    for succ <- outdep(n, intra) do
-      propagate(y, succ)
+    for succ <- outdep(n, intra) do propagate(y, succ)
 
 /** Worklist-based fixpoint solver.
- *
- * @tparam N
- *   type of the elements in the worklist.
- */
+  *
+  * @tparam N
+  *   type of the elements in the worklist.
+  */
 trait SimplePushDownWorklistFixpointSolver[N] extends PushDownWorklistFixpointSolver[N]:
 
   /** The map domain.
-   */
+    */
   val domain: Set[N]
 
-  /**
-   * Push the results of the analysis one node down. This is used to have the results of the pre node in the current node.
-   * @param the current lattice
-   * @return the new lattice element
-   */
+  /** Push the results of the analysis one node down. This is used to have the results of the pre node in the current
+    * node.
+    * @param the
+    *   current lattice
+    * @return
+    *   the new lattice element
+    */
 
   def analyze(intra: Boolean): lattice.Element =
     x = lattice.bottom

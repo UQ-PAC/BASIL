@@ -1,14 +1,14 @@
 package analysis
 
-import ir.{Extract, *}
+import ir.*
 import analysis.solvers.*
 
 import scala.collection.mutable.{ArrayBuffer, HashMap, ListBuffer}
 import java.io.{File, PrintWriter}
 import scala.collection.mutable
 import scala.collection.immutable
-// import bitVector
-import analysis.util.*
+import analysis.eval.*
+import util.Logger
 
 /** Trait for program analyses.
   *
@@ -45,30 +45,30 @@ trait ValueAnalysisMisc:
   def eval(exp: Expr, env: statelattice.Element): valuelattice.Element =
     import valuelattice._
     exp match
-      case id: Variable        => env(id)
-      case n: Literal          => literal(n)
+      case id: Variable   => env(id)
+      case n: Literal     => literal(n)
       case ze: ZeroExtend => zero_extend(ze.extension, eval(ze.body, env))
       case se: SignExtend => sign_extend(se.extension, eval(se.body, env))
-      case e: Extract          => extract(e.end, e.start, eval(e.body, env))
+      case e: Extract     => extract(e.end, e.start, eval(e.body, env))
       case bin: BinaryExpr =>
         val left = eval(bin.arg1, env)
         val right = eval(bin.arg2, env)
-        bin.op match 
-          case BVADD => bvadd(left, right)
-          case BVSUB => bvsub(left, right)
-          case BVMUL => bvmul(left, right)
+        bin.op match
+          case BVADD  => bvadd(left, right)
+          case BVSUB  => bvsub(left, right)
+          case BVMUL  => bvmul(left, right)
           case BVUDIV => bvudiv(left, right)
           case BVSDIV => bvsdiv(left, right)
           case BVSREM => bvsrem(left, right)
           case BVUREM => bvurem(left, right)
           case BVSMOD => ??? // Signed modulus. NOTE: this is used.
-          case BVAND => bvand(left, right)
-          case BVOR => bvor(left, right)
-          case BVXOR => bvxor(left, right)
+          case BVAND  => bvand(left, right)
+          case BVOR   => bvor(left, right)
+          case BVXOR  => bvxor(left, right)
           case BVNAND => bvnand(left, right)
-          case BVNOR => bvnor(left, right)
+          case BVNOR  => bvnor(left, right)
           case BVXNOR => bvxnor(left, right)
-          case BVSHL => bvshl(left, right)
+          case BVSHL  => bvshl(left, right)
           case BVLSHR => bvlshr(left, right)
           case BVASHR => bvashr(left, right)
           case BVCOMP => bvcomp(left, right)
@@ -82,12 +82,11 @@ trait ValueAnalysisMisc:
           case BVSGE => bvsge(left, right)
           case BVSLT => bvslt(left, right)
           case BVSGT => bvsgt(left, right)
-          
-          case BVCONCAT => concat(left, right)
-          case BVNEQ => bvneq(left, right)
-          case BVEQ => bveq(left, right)
 
-          
+          case BVCONCAT => concat(left, right)
+          case BVNEQ    => bvneq(left, right)
+          case BVEQ     => bveq(left, right)
+
       case un: UnaryExpr =>
         val arg = eval(un.arg, env)
 
@@ -104,7 +103,7 @@ trait ValueAnalysisMisc:
       case r: CfgCommandNode =>
         r.data match
           // assignments
-          case la: LocalAssign => 
+          case la: LocalAssign =>
             s + (la.lhs -> eval(la.rhs, s))
           // all others: like no-ops
           case _ => s
@@ -137,9 +136,7 @@ object ConstantPropagationAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
     */
-  class WorklistSolver(cfg: ProgramCfg)
-      extends ValueAnalysisWorklistSolver(cfg, ConstantPropagationLattice)
-
+  class WorklistSolver(cfg: ProgramCfg) extends ValueAnalysisWorklistSolver(cfg, ConstantPropagationLattice)
 
 ///** Base class for value analysis with simple (non-lifted) lattice.
 // */
@@ -182,11 +179,9 @@ object ConstantPropagationAnalysis:
 //  class WorklistSolver(cfg: IntraproceduralProgramCfg)
 //    extends IntraprocValueAnalysisWorklistSolver(cfg, ValueSetLattice)
 
-/**
- * Steensgaard-style pointer analysis.
- * The analysis associates an [[StTerm]] with each variable declaration and expression node in the AST.
- * It is implemented using [[tip.solvers.UnionFindSolver]].
- */
+/** Steensgaard-style pointer analysis. The analysis associates an [[StTerm]] with each variable declaration and
+  * expression node in the AST. It is implemented using [[tip.solvers.UnionFindSolver]].
+  */
 class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _]) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
@@ -197,15 +192,12 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
 
   val constantPropResult2: Map[CfgNode, _] = constantPropResult
 
-  constantPropResult2.values.foreach(v =>
-    print(v)
-  )
+  constantPropResult2.values.foreach(v => Logger.info(s"${v}"))
 
-  /**
-   * @inheritdoc
-   */
+  /** @inheritdoc
+    */
   def analyze(intra: Boolean): Unit =
-  // generate the constraints by traversing the AST and solve them on-the-fly
+    // generate the constraints by traversing the AST and solve them on-the-fly
     visit(program, ())
 
   def dump_file(content: ArrayBuffer[String], name: String): Unit = {
@@ -215,17 +207,17 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
     pw.close()
   }
 
-  /**
-   * Generates the constraints for the given sub-AST.
-   * @param node the node for which it generates the constraints
-   * @param arg unused for this visitor
-   */
+  /** Generates the constraints for the given sub-AST.
+    * @param node
+    *   the node for which it generates the constraints
+    * @param arg
+    *   unused for this visitor
+    */
   def visit(node: Object, arg: Unit): Unit = {
 
     def varToStTerm(vari: Variable): Term[StTerm] = IdentifierVariable(vari)
     def exprToStTerm(expr: Expr): Term[StTerm] = ExpressionVariable(expr)
     def allocToTerm(alloc: AAlloc): Term[StTerm] = AllocVariable(alloc)
-
 
     //print(s"Visiting ${node.getClass.getSimpleName}\n")
     node match {
@@ -235,7 +227,6 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
 //      case AAssignStmt(id1: AIdentifier, AUnaryOp(DerefOp, id2: AIdentifier, _), _) => ??? //<--- Complete here
 //      case AAssignStmt(ADerefWrite(id1: AIdentifier, _), id2: AIdentifier, _) => ??? //<--- Complete here
 
-
       case localAssign: LocalAssign =>
         localAssign.rhs match {
           case variable: Variable =>
@@ -243,13 +234,13 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
               case variable2: Variable =>
                 // X1 = X2
                 unify(varToStTerm(variable2), varToStTerm(variable))
-                // *X1 = X2: [[X1]] = α ∧ [[X2]] = α where α is a fresh term variable
-                /*
+          // *X1 = X2: [[X1]] = α ∧ [[X2]] = α where α is a fresh term variable
+          /*
               case _ =>
                 val alpha = FreshVariable()
                 unify(varToStTerm(localAssign.lhs), PointerRef(alpha))
                 unify(varToStTerm(variable), alpha)
-                */
+           */
           case _ =>
             // X1 = *X2: [[X2]] = α ∧ [[X1]] = α where α is a fresh term variable
             val alpha = FreshVariable()
@@ -257,9 +248,8 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
             unify(varToStTerm(localAssign.lhs), alpha)
         }
       case memAssign: MemoryAssign =>
-
         ???
-        /*
+      /*
         // X = alloc P
         // TODO not a good way to do this, cannot rely on the line number of a statement like this
         if (memAssign.line.matches(mallocCallTarget)) {
@@ -272,7 +262,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
           // TODO this is not what a memory assign is
           unify(varToStTerm((memAssign.lhs), PointerRef(exprToStTerm(memAssign.rhs.value)))
         }
-        */
+       */
 
       case call: DirectCall =>
         if (call.target.name.contains("malloc")) {
@@ -293,7 +283,6 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   // Static Single Assignment (SSA) form
   // Takes a program and normalises it based on that from
 
-
   def visitChildren(node: Object, arg: Unit): Unit = {
     node match {
       case program: Program =>
@@ -312,38 +301,41 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   }
 
   private def unify(t1: Term[StTerm], t2: Term[StTerm]): Unit = {
-    //print(s"univfying constraint $t1 = $t2\n")
-    solver.unify(t1, t2) // note that unification cannot fail, because there is only one kind of term constructor and no constants
+    //Logger.info(s"univfying constraint $t1 = $t2\n")
+    solver.unify(
+      t1,
+      t2
+    ) // note that unification cannot fail, because there is only one kind of term constructor and no constants
   }
 
-  /**
-   * @inheritdoc
-   */
+  /** @inheritdoc
+    */
   def pointsTo(): Map[Object, Set[Object]] = {
     val solution = solver.solution()
     val unifications = solver.unifications()
-    print(s"Solution: \n${solution.mkString(",\n")}\n")
-    print(s"Sets: \n${unifications.values.map { s =>
-      s"{ ${s.mkString(",")} }"
-    }.mkString(", ")}")
+    Logger.debug(s"Solution: \n${solution.mkString(",\n")}\n")
+    Logger.debug(s"Sets: \n${unifications.values
+      .map { s =>
+        s"{ ${s.mkString(",")} }"
+      }
+      .mkString(", ")}")
 
     val vars = solution.keys.collect { case id: IdentifierVariable => id }
-    val pointsto = vars.foldLeft(Map[Object, Set[Object]]()) {
-      case (a, v: IdentifierVariable) =>
-        val pt = unifications(solution(v))
-          .collect({
-            case PointerRef(IdentifierVariable(id)) => id
-            case PointerRef(AllocVariable(alloc)) => alloc })
-          .toSet
-        a + (v.id -> pt)
+    val pointsto = vars.foldLeft(Map[Object, Set[Object]]()) { case (a, v: IdentifierVariable) =>
+      val pt = unifications(solution(v))
+        .collect({
+          case PointerRef(IdentifierVariable(id)) => id
+          case PointerRef(AllocVariable(alloc))   => alloc
+        })
+        .toSet
+      a + (v.id -> pt)
     }
-    print(s"\nPoints-to:\n${pointsto.map(p => s"${p._1} -> { ${p._2.mkString(",")} }").mkString("\n")}\n")
+    Logger.debug(s"\nPoints-to:\n${pointsto.map(p => s"${p._1} -> { ${p._2.mkString(",")} }").mkString("\n")}\n")
     pointsto
   }
 
-  /**
-   * @inheritdoc
-   */
+  /** @inheritdoc
+    */
   def mayAlias(): (Variable, Variable) => Boolean = {
     val solution = solver.solution()
     (id1: Variable, id2: Variable) =>
@@ -353,9 +345,8 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, _])
   }
 }
 
-/**
- * Counter for producing fresh IDs.
- */
+/** Counter for producing fresh IDs.
+  */
 object Fresh {
 
   var n = 0
@@ -368,38 +359,33 @@ object Fresh {
 
 case class AAlloc(exp: Expr)
 
-/**
- * Terms used in unification.
- */
+/** Terms used in unification.
+  */
 sealed trait StTerm
 
-/**
- * A term variable that represents an alloc in the program.
- */
+/** A term variable that represents an alloc in the program.
+  */
 case class AllocVariable(alloc: AAlloc) extends StTerm with Var[StTerm] {
 
   override def toString: String = s"alloc{${alloc.exp}}"
 }
 
-/**
- * A term variable that represents an identifier in the program.
- */
+/** A term variable that represents an identifier in the program.
+  */
 case class IdentifierVariable(id: Variable) extends StTerm with Var[StTerm] {
 
   override def toString: String = s"$id"
 }
 
-/**
- * A term variable that represents an expression in the program.
- */
+/** A term variable that represents an expression in the program.
+  */
 case class ExpressionVariable(expr: Expr) extends StTerm with Var[StTerm] {
 
   override def toString: String = s"$expr"
 }
 
-/**
- * A fresh term variable.
- */
+/** A fresh term variable.
+  */
 case class FreshVariable(var id: Int = 0) extends StTerm with Var[StTerm] {
 
   id = Fresh.next()
@@ -407,9 +393,8 @@ case class FreshVariable(var id: Int = 0) extends StTerm with Var[StTerm] {
   override def toString: String = s"x$id"
 }
 
-/**
- * A constructor term that represents a pointer to another term.
- */
+/** A constructor term that represents a pointer to another term.
+  */
 case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
 
   val args: List[Term[StTerm]] = List(of)
@@ -421,36 +406,38 @@ case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
 
 abstract class MemoryRegion
 
-/**
- * TODO: fix MRA docs
- *
- * Represents a memory region. The region is defined by a base pointer and a size.
- * There can exist two regions with the same size (offset) but have a different base pointer. As such the base pointer
- * is tracked but not printed in the toString method.
- * @param start 0x1234 in case of mem[R1 + 0x1234] <- ...
- * @param regionType The type of the region. This is used to distinguish between stack, heap, data and code regions.
- * @param extent the start and end of the region 
- */
+/** Represents a stack region. The region is defined by a region Identifier identifying the assignment location. There
+  * can exist two regions with the same size (offset) but have a different base pointer. As such the base pointer is
+  * tracked but not printed in the toString method.
+  * @param start
+  *   0x1234 in case of mem[R1 + 0x1234] <- ...
+  * @param regionType
+  *   The type of the region. This is used to distinguish between stack, heap, data and code regions.
+  * @param extent
+  *   the start and end of the region
+  */
 case class StackRegion(regionIdentifier: String, start: Expr, var extent: Option[RangeKey], var modifiable: Boolean = false) extends MemoryRegion:
   override def toString: String = s"Stack(${regionIdentifier}, ${start}, ${if modifiable then "modifiable" else "non-modifiable"})"
-  override def hashCode(): Int = start.hashCode()
+  override def hashCode(): Int = regionIdentifier.hashCode()
   override def equals(obj: Any): Boolean = obj match {
     case StackRegion(ri, st, _, _) => st == start
-    case _ => false
+    case _                         => false
   }
 
-/**
- * Represents a Heap region. The region is defined by its identifier which is defined by the allocation site.  
- * @param regionIdentifier region id identifying the call-site
- * @param start the start address 
- * @param extent the start and end of the region 
- */
+/** Represents a Heap region. The region is defined by its identifier which is defined by the allocation site.
+  * @param regionIdentifier
+  *   region id identifying the call-site
+  * @param start
+  *   the start address
+  * @param extent
+  *   the start and end of the region
+  */
 case class HeapRegion(regionIdentifier: String, start: Expr, var extent: Option[RangeKey], var modifiable: Boolean = false) extends MemoryRegion:
   override def toString: String = s"Heap(${regionIdentifier}, ${start}, ${if modifiable then "modifiable" else "non-modifiable"})"
   override def hashCode(): Int = regionIdentifier.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case r : HeapRegion => regionIdentifier.equals(r.regionIdentifier)
-    case _ => false
+    case r: HeapRegion => regionIdentifier.equals(r.regionIdentifier)
+    case _             => false
   }
 
 case class DataRegion(regionIdentifier: String, start: Expr, var extent: Option[RangeKey], var modifiable: Boolean = false) extends MemoryRegion:
@@ -458,7 +445,6 @@ case class DataRegion(regionIdentifier: String, start: Expr, var extent: Option[
 
 case class RegionAccess(regionBase: String, start: Expr) extends MemoryRegion:
   override def toString: String = s"RegionAccess(${regionBase}, ${start})"
-
 
 trait MemoryRegionAnalysisMisc:
 
@@ -520,87 +506,88 @@ trait MemoryRegionAnalysisMisc:
   val constantProp: Map[CfgNode, Map[Variable, Any]]
 
   /** The lattice of abstract values.
-   */
+    */
   val powersetLattice: PowersetLattice[MemoryRegion]
 
   /** The lattice of abstract states.
-   */
+    */
   val lattice: MapLattice[CfgNode, PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
-  private val stackPointer = Variable("R31", BitVecType(64))
-  private val linkRegister = Variable("R30", BitVecType(64))
-  private val framePointer = Variable("R29", BitVecType(64))
+  private val stackPointer = Register("R31", BitVecType(64))
+  private val linkRegister = Register("R30", BitVecType(64))
+  private val framePointer = Register("R29", BitVecType(64))
 
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
 
-  private val mallocVariable = Variable("R0", BitVecType(64))
+  private val mallocVariable = Register("R0", BitVecType(64))
 
-
-    /** Default implementation of eval.
-   */
+  /** Default implementation of eval.
+    */
   def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgNode, modified: Boolean = false): lattice.sublattice.Element = {
-    println(s"evaluating $exp")
-    println(s"env: $env")
-    println(s"n: $n")
-      exp match {
-        case binOp: BinaryExpr =>
-            if (binOp.arg1 == stackPointer) {
-              val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp)
-              Set(poolMaster(binOp.arg2, n.asInstanceOf[CfgStatementNode].parent, modified))
-            } else {
-              val evaluation: Expr = evaluateExpression(binOp, n, constantProp)
-              if (evaluation.equals(binOp)) {
-                return env
-              }
-              eval(evaluation, env, n)
-            }
-        case bitVecLiteral: BitVecLiteral =>
-          if (globals.contains(bitVecLiteral.value)) {
-            val globalName = globals(bitVecLiteral.value)
-            Set(DataRegion(globalName, bitVecLiteral, None, modified))
-          } else if (subroutines.contains(bitVecLiteral.value)) {
-            val subroutineName = subroutines(bitVecLiteral.value)
-            Set(DataRegion(subroutineName, bitVecLiteral, None, modified))
-          } else if (globalOffsets.contains(bitVecLiteral.value)) {
-            val val1 = globalOffsets(bitVecLiteral.value)
-            if (subroutines.contains(val1)) {
-              val globalName = subroutines(val1)
-              Set(DataRegion(globalName, bitVecLiteral, None, modified))
-            } else {
-              Set(DataRegion(s"Unknown_${bitVecLiteral}", bitVecLiteral, None, modified))
-            }
-          } else {
-            //throw new Exception(s"Unknown type for $bitVecLiteral")
-            // unknown region here
-            Set(DataRegion(s"Unknown_${bitVecLiteral}", bitVecLiteral, None, modified))
-          }
-        case variable: Variable =>
-          if (variable.name.contains("#") || variable.equals(stackPointer)) {
+    Logger.debug(s"evaluating $exp")
+    Logger.debug(s"env: $env")
+    Logger.debug(s"n: $n")
+    exp match {
+      case binOp: BinaryExpr =>
+        if (binOp.arg1 == stackPointer) {
+          val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp)
+          Set(poolMaster(binOp.arg2, n.asInstanceOf[CfgStatementNode].parent, modified))
+        } else {
+          val evaluation: Expr = evaluateExpression(binOp, n, constantProp)
+          if (evaluation.equals(binOp)) {
             return env
           }
-            val evaluation: Expr = evaluateExpression(variable, n, constantProp)
-            evaluation match
-              case bitVecLiteral: BitVecLiteral =>
-                eval(bitVecLiteral, env, n)
-              case _ => env // we cannot evaluate this to a concrete value, we need VSA for this
-        case _ =>
-          print(s"type: ${exp.getClass} $exp\n")
-          throw new Exception("Unknown type")
-      }
+          eval(evaluation, env, n)
+        }
+      case bitVecLiteral: BitVecLiteral =>
+        if (globals.contains(bitVecLiteral.value)) {
+          val globalName = globals(bitVecLiteral.value)
+          Set(DataRegion(globalName, bitVecLiteral, None, modified))
+        } else if (subroutines.contains(bitVecLiteral.value)) {
+          val subroutineName = subroutines(bitVecLiteral.value)
+          Set(DataRegion(subroutineName, bitVecLiteral, None, modified))
+        } else if (globalOffsets.contains(bitVecLiteral.value)) {
+          val val1 = globalOffsets(bitVecLiteral.value)
+          if (subroutines.contains(val1)) {
+            val globalName = subroutines(val1)
+            Set(DataRegion(globalName, bitVecLiteral, None, modified))
+          } else {
+            Set(DataRegion(s"Unknown_${bitVecLiteral}", bitVecLiteral, None, modified))
+          }
+        } else {
+          //throw new Exception(s"Unknown type for $bitVecLiteral")
+          // unknown region here
+          Set(DataRegion(s"Unknown_${bitVecLiteral}", bitVecLiteral, None, modified))
+        }
+      case variable: Variable =>
+        if (variable.name.contains("#") || variable.equals(stackPointer)) {
+          return env
+        }
+        val evaluation: Expr = evaluateExpression(variable, n, constantProp)
+        evaluation match
+          case bitVecLiteral: BitVecLiteral =>
+            eval(bitVecLiteral, env, n)
+          case _ => env // we cannot evaluate this to a concrete value, we need VSA for this
+      case _ =>
+        Logger.debug(s"type: ${exp.getClass} $exp\n")
+        throw new Exception("Unknown type")
+    }
   }
 
-
   /** Transfer function for state lattice elements.
-   */
+    */
   def localTransfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element =
     n match {
       case cmd: CfgCommandNode =>
         cmd.data match {
           case directCall: DirectCall =>
             if (directCall.target.name == "malloc") {
-              return lattice.sublattice.lub(s, Set(HeapRegion(getNextMallocCount(), evaluateExpression(mallocVariable, n, constantProp), None)))
+              return lattice.sublattice.lub(
+                s,
+                Set(HeapRegion(getNextMallocCount(), evaluateExpression(mallocVariable, n, constantProp), None))
+              )
             }
             s
           case memAssign: MemoryAssign =>
@@ -610,9 +597,22 @@ trait MemoryRegionAnalysisMisc:
             val result = eval(memAssign.rhs.index, s, n, true)
             result.collectFirst({
               case StackRegion(name, _, _, _) =>
-                memAssign.rhs = MemoryStore(Memory(name, memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize), memAssign.rhs.index, memAssign.rhs.value, memAssign.rhs.endian, memAssign.rhs.size)
+                memAssign.rhs = MemoryStore(
+                  Memory(name,
+                    memAssign.rhs.mem.addressSize,
+                    memAssign.rhs.mem.valueSize),
+                  memAssign.rhs.index,
+                  memAssign.rhs.value, memAssign.rhs.endian,
+                  memAssign.rhs.size
+                )
               case DataRegion(name, _, _, _) =>
-                memAssign.rhs = MemoryStore(Memory(name, memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize), memAssign.rhs.index, memAssign.rhs.value, memAssign.rhs.endian, memAssign.rhs.size)
+                memAssign.rhs = MemoryStore(
+                  Memory(name, memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize),
+                  memAssign.rhs.index,
+                  memAssign.rhs.value,
+                  memAssign.rhs.endian,
+                  memAssign.rhs.size
+                )
               case _ =>
             })
             lattice.sublattice.lub(s, result)
@@ -629,32 +629,56 @@ trait MemoryRegionAnalysisMisc:
                   case _ =>
                 })
                 m = lattice.sublattice.lub(m, result)
-            } 
+            }
             m
           case _ => s
         }
       case _ => s // ignore other kinds of nodes
     }
 
-
 /** Base class for memory region analysis (non-lifted) lattice.
- */
-abstract class MemoryRegionAnalysis(val cfg: ProgramCfg, val globals: Map[BigInt, String], val globalOffsets: Map[BigInt, BigInt], val subroutines: Map[BigInt, String], val constantProp: Map[CfgNode, Map[Variable, Any]]) extends FlowSensitiveAnalysis(true) with MemoryRegionAnalysisMisc:
+  */
+abstract class MemoryRegionAnalysis(
+    val cfg: ProgramCfg,
+    val globals: Map[BigInt, String],
+    val globalOffsets: Map[BigInt, BigInt],
+    val subroutines: Map[BigInt, String],
+    val constantProp: Map[CfgNode, Map[Variable, Any]]
+) extends FlowSensitiveAnalysis(true)
+    with MemoryRegionAnalysisMisc:
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
-   */
+    */
   def transfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = localTransfer(n, s)
 
 /** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
- */
-abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](cfg: ProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String], constantProp: Map[CfgNode, Map[Variable, Any]], val powersetLattice: L)
-  extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
-  with SimpleMonotonicSolver[CfgNode]
-  with ForwardDependencies
+  */
+abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](
+    cfg: ProgramCfg,
+    globals: Map[BigInt, String],
+    globalOffsets: Map[BigInt, BigInt],
+    subroutines: Map[BigInt, String],
+    constantProp: Map[CfgNode, Map[Variable, Any]],
+    val powersetLattice: L
+) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
+    with SimpleMonotonicSolver[CfgNode]
+    with ForwardDependencies
 
 object MemoryRegionAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
-   */
-  class WorklistSolver(cfg: ProgramCfg, globals: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], subroutines: Map[BigInt, String], constantProp: Map[CfgNode, Map[Variable, Any]])
-    extends IntraprocMemoryRegionAnalysisWorklistSolver(cfg, globals, globalOffsets, subroutines, constantProp, PowersetLattice[MemoryRegion])
+    */
+  class WorklistSolver(
+      cfg: ProgramCfg,
+      globals: Map[BigInt, String],
+      globalOffsets: Map[BigInt, BigInt],
+      subroutines: Map[BigInt, String],
+      constantProp: Map[CfgNode, Map[Variable, Any]]
+  ) extends IntraprocMemoryRegionAnalysisWorklistSolver(
+        cfg,
+        globals,
+        globalOffsets,
+        subroutines,
+        constantProp,
+        PowersetLattice[MemoryRegion]
+      )

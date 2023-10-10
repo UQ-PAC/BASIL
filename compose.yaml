@@ -1,0 +1,33 @@
+services:
+  basil-build:
+    image: basil:build
+    build:
+      dockerfile: docker/asli.Dockerfile 
+      target: basil
+    volumes:
+      - ./:/host:rw
+    working_dir: /host
+  basil-dev:
+    image: ghcr.io/uq-pac/basil-dev:latest
+    build:
+      dockerfile: docker/asli.Dockerfile 
+      target: basil:dev
+    volumes:
+      - ./:/host:rw
+    working_dir: /host
+  basil:
+    image: ghcr.io/uq-pac/basil:latest
+    build:
+      dockerfile: docker/asli.Dockerfile 
+      target: minified-all
+    volumes:
+      - ./:/host:rw
+    working_dir: /host
+  compiler-explorer:
+    image: ghcr.io/uq-pac/basil-compiler-explorer:latest
+    build:
+      dockerfile: docker/godbolt.Dockerfile 
+    network_mode: host
+    ports: 
+      - "10240:10240"
+
