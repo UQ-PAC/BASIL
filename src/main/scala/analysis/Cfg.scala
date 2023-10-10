@@ -349,9 +349,9 @@ case class CfgGhostNode(
     override val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
-    data: NOP = NOP(),
     block: Block
 ) extends CfgCommandNode:
+  override val data: Statement = NOP
   override def toString: String = s"[NOP]"
 
   /** Copy this node, but give unique ID and reset edges */

@@ -27,7 +27,7 @@ class MemoryAssign(var lhs: Memory, var rhs: MemoryStore) extends Statement {
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitMemoryAssign(this)
 }
 
-class NOP() extends Statement {
+case object NOP extends Statement {
   override def toString: String = "<NOP>"
   override def acceptVisit(visitor: Visitor): Statement = this
 }
