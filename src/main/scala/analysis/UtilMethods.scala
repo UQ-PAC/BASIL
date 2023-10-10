@@ -11,7 +11,7 @@ import util.Logger
   * @return:
   *   The evaluated expression (e.g. 0x69632)
   */
-def evaluateExpression(exp: Expr, n: CfgNode, constantPropResult: Map[Variable, ConstantPropagationLattice.type]): Expr = {
+def evaluateExpression(exp: Expr, n: CfgNode, constantPropResult: Map[Variable, ConstantPropagationLattice.Element]): Expr = {
   Logger.debug(s"evaluateExpression: $exp")
   exp match {
     case binOp: BinaryExpr =>
@@ -41,7 +41,7 @@ def evaluateExpression(exp: Expr, n: CfgNode, constantPropResult: Map[Variable, 
       }
     case variable: Variable =>
       val nodeResult = constantPropResult
-      nodeResult(variable).asInstanceOf[ConstantPropagationLattice.Element] match {
+      nodeResult(variable) match {
         case ConstantPropagationLattice.FlatElement.FlatEl(value) => value.asInstanceOf[BitVecLiteral]
         case ConstantPropagationLattice.FlatElement.Top           => variable
         case ConstantPropagationLattice.FlatElement.Bot           => variable
