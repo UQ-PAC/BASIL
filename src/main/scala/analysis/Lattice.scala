@@ -40,7 +40,7 @@ trait LatticeWithOps extends Lattice:
   def bvsdiv(a: Element, b: Element): Element
   def bvsrem(a: Element, b: Element): Element
   def bvurem(a: Element, b: Element): Element
-  // smod
+  def bvsmod(a: Element, b: Element): Element
   def bvshl(a: Element, b: Element): Element
   def bvlshr(a: Element, b: Element): Element
   def bvashr(a: Element, b: Element): Element
@@ -163,6 +163,7 @@ object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWit
   override def bvsdiv(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsdiv, a, b)
   override def bvsrem(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsrem, a, b)
   override def bvurem(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvurem, a, b)
+  override def bvsmod(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsmod, a, b)
   override def bvand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvand, a, b)
   override def bvor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvor, a, b)
   override def bvxor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvxor, a, b)
@@ -215,6 +216,7 @@ object ValueSetLattice extends FlatLattice[Literal]() with LatticeWithOps:
   override def bvudiv(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvudiv, a, b)
   override def bvsdiv(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsdiv, a, b)
   override def bvsrem(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsrem, a, b)
+  override def bvsmod(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsmod, a, b)
   override def bvurem(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvurem, a, b)
   override def bvand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvand, a, b)
   override def bvor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvor, a, b)

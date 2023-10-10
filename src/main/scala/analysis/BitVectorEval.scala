@@ -320,6 +320,27 @@ object BitVectorEval {
     }
   }
 
+  def smt_bvsmod(s: Literal, t: Literal): BitVecLiteral = {
+    require(s.isInstanceOf[BitVecLiteral])
+    require(t.isInstanceOf[BitVecLiteral])
+    val msb_s = isNegative(s)
+    val msb_t = isNegative(t)
+    val abs_s = if msb_s then smt_bvneg(s) else s
+    val abs_t = if msb_t then smt_bvneg(t) else t
+    val u = smt_bvurem(abs_s, abs_t)
+    if (u.value == 0) {
+      u
+    } else if (!msb_s && !msb_t) {
+      u
+    } else if (msb_s && !msb_t) {
+      smt_bvadd(smt_bvneg(u), t)
+    } else if (!msb_s && msb_t) {
+      smt_bvadd(u, t)
+    } else {
+      smt_bvneg(u)
+    }
+  }
+
   /** (bvult (_ BitVec m) (_ BitVec m) Bool)
     *   - binary predicate for unsigned less-than
     */
@@ -408,63 +429,4 @@ object BitVectorEval {
     }
   }
 
-  /*
-  def extract(i: Int, j: Int, s: Literal): BitVecLiteral = {
-    val size = i - j + 1
-    if (size > s.size) {
-      if (j == 0) {
-        smt_zero_extend(size - s.size, s)
-      } else {
-        smt_extract(i + 1, j, smt_zero_extend(size - s.size, s))
-      }
-    } else {
-      smt_extract(i + 1, j, s)
-    }
-  }
-
-  def sign_extend(i: Int, s: Literal): BitVecLiteral = {
-    if (i > s.size) {
-      smt_sign_extend(i - s.size, s)
-    } else {
-      smt_extract(i - 1, 0, s)
-    }
-  }
-
-  def zero_extend(i: Int, s: Literal): BitVecLiteral = {
-    if (i > s.size) {
-      smt_zero_extend(i - s.size, s)
-    } else {
-      smt_extract(i - 1, 0, s)
-    }
-  }
-   */
-
-  /*
-  def bvshl(s: Literal, t: Literal): BitVecLiteral = (s, t) match
-    case (s: BitVecLiteral, t: BitVecLiteral) =>
-      if (s.size == t.size) {
-        smt_bvshl(s, t)
-      } else {
-        smt_bvshl(s, smt_zero_extend(s.size - t.size, t))
-      }
-    case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
-
-  def bvlshr(s: Literal, t: Literal): BitVecLiteral = (s, t) match
-    case (s: BitVecLiteral, t: BitVecLiteral) =>
-      if (s.size == t.size) {
-        smt_bvlshr(s, t)
-      } else {
-        smt_bvlshr(s, smt_zero_extend(s.size - t.size, t))
-      }
-    case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
-
-  def bvashr(s: Literal, t: Literal): BitVecLiteral = (s, t) match
-    case (s: BitVecLiteral, t: BitVecLiteral) =>
-      if (s.size == t.size) {
-        smt_bvashr(s, t)
-      } else {
-        smt_bvashr(s, smt_zero_extend(s.size - t.size, t))
-      }
-    case _ => throw new Exception("cannot apply bitvector operator to non-bitvectors")
-   */
 }
