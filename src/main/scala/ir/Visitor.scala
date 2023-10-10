@@ -267,6 +267,10 @@ class Substituter(variables: Map[Variable, Variable] = Map(), memories: Map[Memo
   }
 }
 
+/**
+  * Prevents strings in 'reserved' from being used as the name of anything by adding a '#' to the start.
+  * Useful for avoiding Boogie's reserved keywords.
+  */
 class Renamer(reserved: Set[String]) extends Visitor {
   override def visitLocalVar(node: LocalVar): LocalVar = {
     if (reserved.contains(node.name)) {

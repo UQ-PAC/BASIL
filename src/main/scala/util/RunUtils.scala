@@ -86,7 +86,6 @@ object RunUtils {
     // Remove external function references (e.g. @printf)
     val externalNames = externalFunctions.map(e => e.name)
     val externalRemover = ExternalRemover(externalNames)
-    // Removes BAP naming artefacts (e.g. # preceding variable names)
     val renamer = Renamer(reserved)
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
