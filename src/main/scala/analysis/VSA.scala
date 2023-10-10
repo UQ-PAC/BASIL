@@ -81,9 +81,7 @@ trait MemoryRegionValueSetAnalysis:
           if (!evaluation.isInstanceOf[BitVecLiteral]) {
             return None
           }
-          mmm.findDataObject(evaluation.asInstanceOf[BitVecLiteral].value) match
-            case Some(obj: MemoryRegion) => Some(obj)
-            case _                       => None
+          mmm.findDataObject(evaluation.asInstanceOf[BitVecLiteral].value)
         }
       case _ =>
         None
