@@ -261,7 +261,7 @@ object RunUtils {
             val functionNames = resolveAddresses(valueSet(indirectCall.target))
             if (functionNames.size == 1) {
               modified = true
-              val block = commandNode.block match
+              val block = commandNode.block
               block.jumps = block.jumps.filter(!_.equals(indirectCall))
               block.jumps += DirectCall(
                 IRProgram.procedures.filter(_.name.equals(functionNames.head.name)).head,
