@@ -73,9 +73,7 @@ trait MemoryRegionValueSetAnalysis:
       case binOp: BinaryExpr =>
         if (binOp.arg1 == stackPointer) {
           val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp)
-          mmm.findStackObject(rhs.asInstanceOf[BitVecLiteral].value) match
-            case Some(obj: MemoryRegion) => Some(obj)
-            case _                       => None
+          mmm.findStackObject(rhs.asInstanceOf[BitVecLiteral].value)
         } else {
           val evaluation: Expr = evaluateExpression(binOp, n, constantProp)
           if (!evaluation.isInstanceOf[BitVecLiteral]) {
