@@ -162,7 +162,7 @@ object RunUtils {
     Logger.info("[!] Running VSA")
     val vsaSolver =
       ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
-    val vsaResult = vsaSolver.analyze(false).asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]]
+    val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]  = vsaSolver.analyze(false)
     Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder),
@@ -170,7 +170,7 @@ object RunUtils {
     )
 
     Logger.info("[!] Resolving CFG")
-    val (newIR, modified) = resolveCFG(cfg, vsaResult, IRProgram)
+    val (newIR, modified) = resolveCFG(cfg, vsaResult.asInstanceOf[Map[CfgNode, Map[Variable, Set[Value]]]], IRProgram)
     if (modified) {
       Logger.info(s"[!] Analysing again (iter $iterations)")
       return analyse(newIR, externalFunctions, globals, globalOffsets)
@@ -185,7 +185,7 @@ object RunUtils {
 
   def resolveCFG(
       cfg: ProgramCfg,
-      valueSets: Map[CfgNode, Map[Expr, Set[Value]]],
+      valueSets: Map[CfgNode, Map[Variable, Set[Value]]],
       IRProgram: Program
   ): (Program, Boolean) = {
     var modified: Boolean = false
@@ -241,7 +241,7 @@ object RunUtils {
               // We want to replace all possible indirect calls based on this CFG, before regenerating it from the IR
               return
             }
-            val valueSet: Map[Expr, Set[Value]] = valueSets(n)
+            val valueSet: Map[Variable, Set[Value]] = valueSets(n)
             val functionNames = resolveAddresses(valueSet(indirectCall.target))
             if (functionNames.size == 1) {
               modified = true
