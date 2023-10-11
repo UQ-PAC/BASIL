@@ -36,7 +36,7 @@ def evaluateExpression(exp: Expr, n: CfgNode, constantPropResult: Map[Variable, 
       }
     case e: Extract =>
       evaluateExpression(e.body, n, constantPropResult) match {
-        case literal: Literal => BitVectorEval.smt_extract(e.end, e.start, literal)
+        case literal: Literal => BitVectorEval.boogie_extract(e.end, e.start, literal)
         case _                => exp
       }
     case variable: Variable =>
