@@ -20,7 +20,7 @@ import translating._
 import util.Logger
 
 object RunUtils {
-  var memoryRegionAnalysisResults: Option[Map[CfgNode, _]] = None
+  var memoryRegionAnalysisResults: Map[CfgNode, Set[MemoryRegion]] = Map()
 
   var iterations = 0;
 
@@ -149,7 +149,7 @@ object RunUtils {
 
     Logger.info("[!] Running Constant Propagation")
     val solver = ConstantPropagationAnalysis.WorklistSolver(cfg)
-    val result = solver.analyze(true).asInstanceOf[Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]]
+    val result: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = solver.analyze(true)
     Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder),
@@ -158,8 +158,8 @@ object RunUtils {
 
     Logger.info("[!] Running MRA")
     val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, result)
-    val result2 = solver2.analyze(true).asInstanceOf[Map[CfgNode, MemoryRegion]]
-    memoryRegionAnalysisResults = Some(result2)
+    val result2: Map[CfgNode, Set[MemoryRegion]] = solver2.analyze(true)
+    memoryRegionAnalysisResults = result2
     Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder),

@@ -44,29 +44,23 @@ class MemoryModelMap {
     }
   }
 
-  def convertMemoryRegions(memoryRegions: Map[CfgNode, MemoryRegion], externalFunctions: Map[BigInt, String]): Unit = {
+  def convertMemoryRegions(memoryRegions: Map[CfgNode, Set[MemoryRegion]], externalFunctions: Map[BigInt, String]): Unit = {
+    // map externalFunctions name, value to DataRegion(name, value) and then sort by value
+    val externalFunctionRgns = externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64), None))
+
     // get all function exit node
-    val exitNodes = memoryRegions.keys.collect { case e: CfgFunctionExitNode => e }.toList
+    val exitNodes = memoryRegions.keys.collect { case e: CfgFunctionExitNode => e }
     exitNodes.foreach(exitNode =>
-      val node = memoryRegions(exitNode).asInstanceOf[Set[Any]]
-      // for each function exit node we get the memory region
-      // and add it to the mapping
+      val node = memoryRegions(exitNode)
+
+      // for each function exit node we get the memory region and add it to the mapping
       val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
-      val dataRgns = node.collect { case r: DataRegion => r }.toList
-      val heapRgns = node.collect { case r: HeapRegion => r }.toList
-      val accessRgns = node.collect { case r: RegionAccess => r }.toList
-      // map externalFunctions name, value to DataRegion(name, value) and then sort by value
-      val externalFunctionRgns =
-        externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64), None)).toList
+      val dataRgns = node.collect { case r: DataRegion => r }
 
       // add externalFunctionRgn to dataRgns and sort by value
-      val allDataRgns = (dataRgns ++ externalFunctionRgns).sortBy(_.start.asInstanceOf[BitVecLiteral].value)
+      val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
 
       allStacks(exitNode.data.name) = stackRgns
-
-//      for (stackRgn <- stackRgns) {
-//        add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
-//      }
 
       for (dataRgn <- allDataRgns) {
         add(dataRgn.start.asInstanceOf[BitVecLiteral].value, dataRgn)
