@@ -186,8 +186,6 @@ abstract class ValueSetAnalysis(
 
 }
 
-/** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
-  */
 abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
     cfg: ProgramCfg,
     globals: Map[BigInt, String],
