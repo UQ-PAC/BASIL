@@ -361,6 +361,8 @@ case class CfgGhostNode(
   */
 class ProgramCfg:
 
+  var startNode: CfgFunctionEntryNode = _
+
   var edges: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
   var nodes: mutable.Set[CfgNode] = mutable.Set[CfgNode]()
 
@@ -610,6 +612,8 @@ class ProgramCfgFactory:
     if (leafCallNodes.nonEmpty) {
       addInterprocEdges(leafCallNodes)
     }
+
+    cfg.startNode = procToCfg(program.mainProcedure)._1
 
     cfg
   }
