@@ -96,27 +96,6 @@ trait ListSetWorklist[N] extends Worklist[N]:
       worklist = worklist.tail
       process(n, intra)
 
-  def monotonic_run(first: Set[N], intra: Boolean) =
-    if (!intra) {
-      worklist =
-        new ListSet[N] ++ first.collect {
-          case n: CfgFunctionEntryNode if n.data.name == "main" => n
-        } // no inlined functions
-      while (worklist.nonEmpty) do
-        val n = worklist.head;
-        worklist = worklist.tail
-        process(n, intra)
-    } else {
-      worklist =
-        new ListSet[N] ++ first.collect {
-          case n: CfgFunctionEntryNode if n.pred(intra).isEmpty => n
-        } // no inlined functions
-      while (worklist.nonEmpty) do
-        val n = worklist.head;
-        worklist = worklist.tail
-        process(n, intra)
-    }
-
 /** Base trait for worklist-based fixpoint solvers.
   *
   * @tparam N
