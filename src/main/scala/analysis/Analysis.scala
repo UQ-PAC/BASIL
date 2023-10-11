@@ -315,6 +315,8 @@ trait MemoryRegionAnalysisMisc:
               return s
             }
             val result = eval(memAssign.rhs.index, s, n)
+            /*
+            don't modify the IR in the middle of the analysis like this, also this produces a lot of incorrect results
             result.collectFirst({
               case StackRegion(_, _, _) =>
                 memAssign.rhs = MemoryStore(
@@ -326,16 +328,20 @@ trait MemoryRegionAnalysisMisc:
                 )
               case _ =>
             })
+            */
             lattice.sublattice.lub(s, result)
           case localAssign: LocalAssign =>
             localAssign.rhs match
               case memoryLoad: MemoryLoad =>
                 val result = eval(memoryLoad.index, s, n)
+                /*
+                don't modify the IR in the middle of the analysis like this, this also produces incorrect results
                 result.collectFirst({
                   case StackRegion(_, _, _) =>
                     memoryLoad.mem = Memory("stack", memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
                   case _ =>
                 })
+                */
                 lattice.sublattice.lub(s, result)
               case _ => s
           case _ => s
