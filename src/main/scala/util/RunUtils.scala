@@ -212,6 +212,8 @@ object RunUtils {
     def process(n: CfgNode): Unit = n match {
       case commandNode: CfgCommandNode =>
         commandNode.data match
+          /*
+          We do not want to insert the VSA results into the IR like this
           case localAssign: LocalAssign =>
             localAssign.rhs match
               case _: MemoryLoad =>
@@ -233,6 +235,7 @@ object RunUtils {
                    */
                 }
               case _ =>
+          */
           case indirectCall: IndirectCall =>
             if (!commandNode.block.jumps.contains(indirectCall)) {
               // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data
