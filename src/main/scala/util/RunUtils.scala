@@ -2,6 +2,7 @@ package util
 
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.Set as MutableSet
 import java.io.{File, PrintWriter}
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters._
@@ -130,63 +131,51 @@ object RunUtils {
     Logger.info(externalAddresses)
     Logger.info("Subroutine Addresses:")
     Logger.info(subroutines)
-    //    val wcfg = IntraproceduralProgramCfg.generateFromProgram(program)
-    //
-    ////    //print(wcfg.nodes)
-    ////    Output.output(OtherOutput(OutputKindE.cfg), wcfg.toDot({ x =>
-    ////      x.toString
-    ////    }, Output.dotIder))
-    //
-    //
-    //    val an = ConstantPropagationAnalysis.WorklistSolver(wcfg)
-    //    val res = an.analyze().asInstanceOf[Map[CfgNode, _]]
-    //    print(res.keys)
-    //    Output.output(OtherOutput(OutputKindE.cfg), an.cfg.toDot(Output.labeler(res, an.stateAfterNode), Output.dotIder))
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
     val cfg = ProgramCfgFactory().fromIR(IRProgram, false, 0)
 
     Logger.info("[!] Running Constant Propagation")
-    val solver = ConstantPropagationAnalysis.WorklistSolver(cfg)
-    val result: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = solver.analyze(true)
+    val constPropSolver = ConstantPropagationAnalysis.WorklistSolver(cfg)
+    val constPropResult: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = constPropSolver.analyze(true)
     Output.output(
       OtherOutput(OutputKindE.cfg),
-      cfg.toDot(Output.labeler(result, solver.stateAfterNode), Output.dotIder),
+      cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder),
       "cpa"
     )
 
     Logger.info("[!] Running MRA")
-    val solver2 = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, result)
-    val result2: Map[CfgNode, Set[MemoryRegion]] = solver2.analyze(true)
-    memoryRegionAnalysisResults = result2
+    val mraSolver = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
+    val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.analyze(true)
+    memoryRegionAnalysisResults = mraResult
     Output.output(
       OtherOutput(OutputKindE.cfg),
-      cfg.toDot(Output.labeler(result2, solver2.stateAfterNode), Output.dotIder),
+      cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder),
       "mra"
     )
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
-    mmm.convertMemoryRegions(result2, mergedSubroutines)
+    mmm.convertMemoryRegions(mraResult, mergedSubroutines)
 
     Logger.info("[!] Running VSA")
-    val solver3 =
-      ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, result)
-    val result3 = solver3.analyze(false)
+    val vsaSolver =
+      ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
+    val vsaResult = vsaSolver.analyze(false).asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]]
     Output.output(
       OtherOutput(OutputKindE.cfg),
-      cfg.toDot(Output.labeler(result3, solver3.stateAfterNode), Output.dotIder),
+      cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder),
       "vsa"
     )
 
     Logger.info("[!] Resolving CFG")
-    val (newIR, modified) = resolveCFG(cfg, result3.asInstanceOf[Map[CfgNode, Map[Expr, Set[Value]]]], IRProgram)
+    val (newIR, modified) = resolveCFG(cfg, vsaResult, IRProgram)
     if (modified) {
       Logger.info(s"[!] Analysing again (iter $iterations)")
       return analyse(newIR, externalFunctions, globals, globalOffsets)
     }
-    val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 0)
+    val newCFG = ProgramCfgFactory().fromIR(newIR)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
 
     Logger.info(s"[!] Finished indirect call resolution after $iterations iterations")
@@ -201,16 +190,14 @@ object RunUtils {
   ): (Program, Boolean) = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
-    // find the main function, TODO have a variable in ProgramCfg class to aid with this
-    val main = cfg.nodes.collectFirst { case n: CfgFunctionEntryNode if n.data.name == IRProgram.mainProcedure.name => n }.get
-    main.succ(true).toSet.union(main.succ(false).toSet).foreach(node => worklist.addOne(node))
+    cfg.startNode.succ(true).union(cfg.startNode.succ(false)).foreach(node => worklist.addOne(node))
 
-    val visited = scala.collection.mutable.Set[CfgNode]()
+    val visited = MutableSet[CfgNode]()
     while (worklist.nonEmpty) {
       val node = worklist.remove(0)
       if (!visited.contains(node)) {
         process(node)
-        node.succ(true).toSet.union(node.succ(false).toSet).foreach(node => worklist.addOne(node))
+        node.succ(true).union(node.succ(false)).foreach(node => worklist.addOne(node))
         visited.add(node)
       }
     }
@@ -363,39 +350,4 @@ object RunUtils {
     pw.close()
   }
 
-}
-
-class AnalysisTypeException(message: String)
-    extends Exception("Tried to operate on two analyses of different types: " + message) {
-
-  def this(message: String, cause: Throwable) = {
-    this(message)
-    initCause(cause)
-  }
-}
-
-class AssumptionViolationException(message: String) extends Exception("Assumption Violation: " + message) {
-
-  def this(message: String, cause: Throwable) = {
-    this(message)
-    initCause(cause)
-  }
-}
-
-class LatticeViolationException(message: String)
-    extends Exception("A lattice transfer function broke monotonicity: " + message) {
-
-  def this(message: String, cause: Throwable) = {
-    this(message)
-    initCause(cause)
-  }
-}
-
-class SegmentationViolationException(message: String)
-    extends Exception("The code attempts to dereference a pointer we don't know about: " + message) {
-
-  def this(message: String, cause: Throwable) = {
-    this(message)
-    initCause(cause)
-  }
 }

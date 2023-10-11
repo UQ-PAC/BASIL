@@ -3,7 +3,6 @@ package translating
 import Parsers.BAP_ADTParser._
 import bap._
 import ir.Endian
-import util.AssumptionViolationException
 
 import scala.annotation.tailrec
 import scala.jdk.CollectionConverters._

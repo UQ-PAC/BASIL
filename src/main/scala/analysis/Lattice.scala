@@ -74,9 +74,9 @@ class PowersetLattice[A] extends Lattice {
 
   type Element = Set[A]
 
-  val bottom: Element = Set.empty //<--- Complete here
+  val bottom: Element = Set.empty
 
-  def lub(x: Element, y: Element): Element = x.union(y) //<--- Complete here
+  def lub(x: Element, y: Element): Element = x.union(y)
 }
 
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
