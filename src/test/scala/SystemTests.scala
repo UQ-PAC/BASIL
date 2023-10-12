@@ -44,9 +44,9 @@ class SystemTests extends AnyFunSuite {
     val RELFPath = variationPath + ".relf"
     Logger.info(outPath)
     if (File(specPath).exists) {
-      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--spec", specPath, "--output", outPath, "--analyse"))
+      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--spec", specPath, "--output", outPath))
     } else {
-      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--output", outPath, "--analyse"))
+      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--output", outPath))
     }
     Logger.info(outPath + " done")
     val boogieResult = Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath).!!
