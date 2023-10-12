@@ -1,8 +1,9 @@
 import org.scalatest.funsuite.AnyFunSuite
+import util.Logger
 
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.io.Source
-import scala.sys.process._
+import scala.sys.process.*
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
@@ -41,12 +42,13 @@ class SystemTests extends AnyFunSuite {
     val outPath = variationPath + ".bpl"
     val ADTPath = variationPath + ".adt"
     val RELFPath = variationPath + ".relf"
+    Logger.info(outPath)
     if (File(specPath).exists) {
-      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--spec", specPath, "--output", outPath))
+      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--spec", specPath, "--output", outPath, "--analyse"))
     } else {
-      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--output", outPath))
+      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--output", outPath, "--analyse"))
     }
-    println(outPath)
+    Logger.info(outPath + " done")
     val boogieResult = Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath).!!
     val resultPath = variationPath + "_result.txt"
     log(boogieResult, resultPath)
