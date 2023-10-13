@@ -204,9 +204,9 @@ procedure main()
     goto l000003db;
   l000003db:
     R0, Gamma_R0 := 0bv64, true;
-    R19, Gamma_R19 := memory_load64_le(mem, bvadd64(R31, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 16bv64)) || L(mem, bvadd64(R31, 16bv64)));
-    R29, Gamma_R29 := memory_load64_le(mem, R31), (gamma_load64(Gamma_mem, R31) || L(mem, R31));
-    R30, Gamma_R30 := memory_load64_le(mem, bvadd64(R31, 8bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 8bv64)) || L(mem, bvadd64(R31, 8bv64)));
+    R19, Gamma_R19 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
+    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
     return;
 }

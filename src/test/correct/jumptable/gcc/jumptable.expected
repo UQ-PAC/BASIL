@@ -306,13 +306,13 @@ procedure main()
     assume false;
     goto l000004d7;
   l000004d7:
-    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R31, 40bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 40bv64)) || L(mem, bvadd64(R31, 40bv64)));
+    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 40bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 40bv64));
     R30, Gamma_R30 := 2324bv64, true;
     //UNRESOLVED: call R0
     assume false;
     goto l000004e6;
   l000004e6:
-    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R31, 48bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 48bv64)) || L(mem, bvadd64(R31, 48bv64)));
+    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 48bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 48bv64));
     R30, Gamma_R30 := 2332bv64, true;
     //UNRESOLVED: call R0
     assume false;
@@ -322,7 +322,7 @@ procedure main()
     R1, Gamma_R1 := zero_extend32_32(R0[32:0]), Gamma_R0;
     R0, Gamma_R0 := 65536bv64, true;
     R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4072bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4072bv64)) || L(mem, bvadd64(R0, 4072bv64)));
-    R3, Gamma_R3 := memory_load64_le(mem, bvadd64(R31, 56bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 56bv64)) || L(mem, bvadd64(R31, 56bv64)));
+    R3, Gamma_R3 := memory_load64_le(stack, bvadd64(R31, 56bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 56bv64));
     R2, Gamma_R2 := memory_load64_le(mem, R0), (gamma_load64(Gamma_mem, R0) || L(mem, R0));
     #5, Gamma_#5 := bvnot64(R2), Gamma_R2;
     #6, Gamma_#6 := bvadd64(R3, bvnot64(R2)), (Gamma_R2 && Gamma_R3);
@@ -343,8 +343,8 @@ procedure main()
     goto l00000544;
   l00000544:
     R0, Gamma_R0 := zero_extend32_32(R1[32:0]), Gamma_R1;
-    R29, Gamma_R29 := memory_load64_le(mem, R31), (gamma_load64(Gamma_mem, R31) || L(mem, R31));
-    R30, Gamma_R30 := memory_load64_le(mem, bvadd64(R31, 8bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 8bv64)) || L(mem, bvadd64(R31, 8bv64)));
+    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 64bv64), Gamma_R31;
     return;
 }

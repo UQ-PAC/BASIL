@@ -314,3 +314,27 @@ class ExternalRemover(external: Set[String]) extends Visitor {
     super.visitProcedure(node)
   }
 }
+
+/** Gives variables that are not contained within a MemoryStore or MemoryLoad
+  * */
+class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
+  val variables: mutable.Set[Variable] = mutable.Set()
+
+  override def visitRegister(node: Register): Register = {
+    variables.add(node)
+    node
+  }
+  override def visitLocalVar(node: LocalVar): LocalVar = {
+    variables.add(node)
+    node
+  }
+
+  override def visitMemoryStore(node: MemoryStore): MemoryStore = {
+    node
+  }
+
+  override def visitMemoryLoad(node: MemoryLoad): MemoryLoad = {
+    node
+  }
+
+}
