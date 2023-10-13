@@ -140,7 +140,10 @@ class Procedure(
             }
 
             // update stack references
-            val rhsStackRefs = l.rhs.variables.intersect(stackRefs)
+            val variableVisitor = VariablesWithoutStoresLoads()
+            variableVisitor.visitExpr(l.rhs)
+
+            val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackRefs)
             if (rhsStackRefs.nonEmpty) {
               stackRefs.add(l.lhs)
             } else if (stackRefs.contains(l.lhs) && l.lhs != stackPointer) {
@@ -160,7 +163,8 @@ class Procedure(
       for (j <- b.jumps) {
         j match {
           case g: GoTo => visitBlock(g.target)
-          case _       =>
+          case d: DirectCall => d.returnTarget.foreach(visitBlock)
+          case i: IndirectCall => i.returnTarget.foreach(visitBlock)
         }
       }
     }
