@@ -18,41 +18,10 @@ class NonReturningFunctions {
     val mapBlocksToProcedure: Map[String, (Procedure, Integer)] = Map()
 
     val externalFunctionNames = externalFunctions.map(func => func.name)
-    // Check if the goto is part of a endless loop by checking to see if the index its jumping to is earlier on in the method,
-    // and that any jumps between the index its jumping to, and the index of the instruction, don't jump outside of that range.
-    // This method checks for both continue (which jumps back to the while loop, and break (which jumps outside of loops).
-    def isEndlessLoop(proc: Procedure, goTo: GoTo, index: Integer): Boolean = {
-
-      if (goTo.condition.isEmpty && mapBlocksToProcedure.contains(goTo.target.label) && mapBlocksToProcedure(goTo.target.label)._2 < index) {
-
-        val (_, idx) = mapBlocksToProcedure(goTo.target.label)
-
-        for (loopIndex <- idx.toInt to index.toInt) {
-          val blockAtLoopIndex = proc.blocks(loopIndex)
-          for (loopJump <- blockAtLoopIndex.jumps) {
-            loopJump match {
-              case loopGoTo: GoTo =>
-                if (!mapBlocksToProcedure.contains(loopGoTo.target.label) || mapBlocksToProcedure(loopGoTo.target.label)._2 >= index)
-                  return false
-              case call: IndirectCall =>
-                if (call.target.name == "R30") {
-                  return false
-                }
-              case _ =>
-            }
-          }
-
-        }
-        return true
-      }
-      false
-    }
 
     // look into each procedure, and calculate the number of return statements in each block
     // and create maps between jumps and blocks, and blocks and procedures.
     // this also looks at endless loops, and removes unreachable code after endless blocks
-
-
     for (proc <- procedures) {
 
       for ((block, index) <- proc.blocks.zipWithIndex) {
@@ -74,9 +43,7 @@ class NonReturningFunctions {
 
             case goTo: GoTo =>
               mapJumpsToBlocks.put(goTo.target.label, mapJumpsToBlocks.getOrElse(goTo.target.label, ArrayBuffer()).addOne((goTo, block)))
-              if (proc.blocks.length > index+1 && isEndlessLoop(proc, goTo, index)) {
-                blocksToRemove.enqueue(proc.blocks(index + 1).label)
-              }
+
             case _ =>
           }
 
@@ -93,22 +60,24 @@ class NonReturningFunctions {
       for (proc <- procedures) {
         if (!externalFunctionNames.contains(proc.name) && proc.calculateReturnCount() == 0) {
           mapJumpsToBlocks.get(proc.name) match {
-            case Some(v) => for (block <- v) {
-              val (_, containingBlock) = block
-              for (jump <- containingBlock.jumps) {
-                jump match {
-                  case directCall: DirectCall =>
-                    directCall.returnTarget match {
-                      case Some(t) =>
+            case Some(v) =>
+              for (block <- v) {
+                val (_, containingBlock) = block
+                for (jump <- containingBlock.jumps) {
+                  jump match {
+                    case directCall: DirectCall =>
+                      directCall.returnTarget match {
+                        case Some(t) =>
 
-                        blocksToRemove.enqueue(t.label)
-                      case _ =>
-                    }
-                    directCall.returnTarget = None
-                  case _ =>
+                          blocksToRemove.enqueue(t.label)
+                        case _ =>
+                      }
+                      directCall.returnTarget = None
+                    case _ =>
+                  }
                 }
               }
-            }
+
             case _ =>
           }
         }
@@ -122,7 +91,7 @@ class NonReturningFunctions {
         if (!mapJumpsToBlocks.contains(label) || mapJumpsToBlocks(label).length <= 1) {
 
           var procedureBlock: Option[Integer] = None
-          for ((block, index) <- procedure.blocks.zipWithIndex) {
+          for ((block, index) <- procedure.blocks.filter(!_.deleted).zipWithIndex) {
             if (block.label == label) {
               procedureBlock = Some(index)
               for (jump <- block.jumps) {
@@ -134,9 +103,10 @@ class NonReturningFunctions {
               }
             }
           }
+
           procedureBlock match {
             case Some(x) =>
-              procedure.blocks.remove(procedureBlock.get)
+              procedure.blocks(x).deleted = true
               blocksDeleted = true
             case _ =>
           }

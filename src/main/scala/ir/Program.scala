@@ -115,7 +115,7 @@ class Procedure(
   var modifies: mutable.Set[Global] = mutable.Set()
 
   def calculateReturnCount(): Int = {
-    return blocks.foldLeft(0)(_ + _.countOfReturnStatements)
+    blocks.filter(!_.deleted).foldLeft(0)(_ + _.countOfReturnStatements)
   }
   def stackIdentification(): Unit = {
     val stackPointer = Register("R31", BitVecType(64))
@@ -178,6 +178,7 @@ class Block(
     var jumps: ArrayBuffer[Jump]
 ) {
   var countOfReturnStatements: Int = 0
+  var deleted: Boolean = false
   def calls: Set[Procedure] = jumps.flatMap(_.calls).toSet
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet
   //def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
