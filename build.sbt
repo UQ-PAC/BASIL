@@ -1,7 +1,7 @@
 import scala.io.Source
 
+import scala.sys.process.*
 ThisBuild / scalaVersion := "3.1.0"
-ThisBuild / version := "0.0.1"
 ThisBuild / organization := "uq.pac"
 
 val javaTests = "com.novocode" % "junit-interface" % "0.11" % "test"
@@ -13,9 +13,10 @@ val mainArgs = "com.lihaoyi" %% "mainargs" % "0.5.1"
 
 lazy val root = project
   .in(file("."))
-  .enablePlugins(Antlr4Plugin)
+  .enablePlugins(Antlr4Plugin, BuildInfoPlugin)
   .settings(
     name := "wptool-boogie",
+    buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion),
     Antlr4 / antlr4Version := "4.9.3",
     Antlr4 / antlr4GenVisitor := true,
     Antlr4 / antlr4PackageName := Some("Parsers"),

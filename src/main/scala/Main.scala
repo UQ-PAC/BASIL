@@ -4,6 +4,7 @@ import bap._
 import boogie._
 import translating._
 import util.RunUtils
+import buildinfo.* 
 
 import scala.collection.mutable.{ArrayBuffer, Set}
 import scala.collection.{immutable, mutable}
@@ -14,18 +15,20 @@ import mainargs.{main, arg, ParserForClass, Flag}
 
 object Main {
 
-  @main(name = "BASIL")
+  @main(name = f"${BuildInfo.name} ${BuildInfo.version}")
   case class Config(
       @arg(name = "adt", short = 'a', doc = "BAP ADT file name.")
-      adtFileName: String,
+      adtFileName: String = "",
       @arg(name = "relf", short = 'r', doc = "Name of the file containing the output of 'readelf -s -r -W'.")
-      relfFileName: String,
+      relfFileName: String = "",
       @arg(name = "spec", short = 's', doc = "BASIL specification file.")
       specFileName: Option[String],
       @arg(name = "output", short = 'o', doc = "Boogie output destination file.")
       outFileName: String = "boogie_out.bpl",
       @arg(name = "verbose", short = 'v', doc = "Show extra debugging logs.")
       verbose: Flag,
+      @arg(name = "version", doc = "Show version.")
+      version: Flag,
       @arg(name = "analyse", doc = "Run static analysis pass.")
       analyse: Flag,
       @arg(name = "interpret", doc = "Run BASIL IL interpreter.")
@@ -48,13 +51,27 @@ object Main {
       }
     }
 
+
     if (conf.help.value) {
       println(parser.helpText(sorted = false));
+      return;
     }
+
+    if (conf.version.value) {
+      println(f"${BuildInfo.name} ${BuildInfo.version}")
+      return;
+    }
+
 
     Logger.setLevel(LogLevel.INFO)
     if (conf.verbose.value) {
       Logger.setLevel(LogLevel.DEBUG)
+    }
+
+    if (conf.adtFileName == "" || conf.relfFileName == "") {
+      println("Must specify adt and relf.")
+      println(parser.helpText(sorted = false));
+      return;
     }
 
     val program: BProgram = RunUtils.loadAndTranslate(
