@@ -16,10 +16,6 @@ var mem: [bv64]bv8;
 var stack: [bv64]bv8;
 const $_IO_stdin_used_addr: bv64;
 axiom ($_IO_stdin_used_addr == 2024bv64);
-function L(memory: [bv64]bv8, index: bv64) returns (bool) {
-  false
-}
-
 function {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
 function gamma_load64(gammaMap: [bv64]bool, index: bv64) returns (bool) {
   (gammaMap[bvadd64(index, 7bv64)] && (gammaMap[bvadd64(index, 6bv64)] && (gammaMap[bvadd64(index, 5bv64)] && (gammaMap[bvadd64(index, 4bv64)] && (gammaMap[bvadd64(index, 3bv64)] && (gammaMap[bvadd64(index, 2bv64)] && (gammaMap[bvadd64(index, 1bv64)] && gammaMap[index])))))))
@@ -271,8 +267,8 @@ procedure main()
     goto l000001fd;
   l000001fd:
     R0, Gamma_R0 := 0bv64, true;
-    R29, Gamma_R29 := memory_load64_le(mem, R31), (gamma_load64(Gamma_mem, R31) || L(mem, R31));
-    R30, Gamma_R30 := memory_load64_le(mem, bvadd64(R31, 8bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 8bv64)) || L(mem, bvadd64(R31, 8bv64)));
+    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     return;
 }
