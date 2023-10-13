@@ -2,6 +2,8 @@ var Gamma_R0: bool;
 var Gamma_R1: bool;
 var Gamma_R10: bool;
 var Gamma_R11: bool;
+var Gamma_R16: bool;
+var Gamma_R17: bool;
 var Gamma_R29: bool;
 var Gamma_R30: bool;
 var Gamma_R31: bool;
@@ -13,6 +15,8 @@ var R0: bv64;
 var R1: bv64;
 var R10: bv64;
 var R11: bv64;
+var R16: bv64;
+var R17: bv64;
 var R29: bv64;
 var R30: bv64;
 var R31: bv64;
@@ -81,7 +85,7 @@ procedure guarantee_reflexive();
   modifies mem, Gamma_mem;
 
 procedure main()
-  modifies Gamma_R0, Gamma_R1, Gamma_R10, Gamma_R11, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_R8, Gamma_R9, Gamma_mem, Gamma_stack, R0, R1, R10, R11, R29, R30, R31, R8, R9, mem, stack;
+  modifies Gamma_R0, Gamma_R1, Gamma_R10, Gamma_R11, Gamma_R16, Gamma_R17, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_R8, Gamma_R9, Gamma_mem, Gamma_stack, R0, R1, R10, R11, R16, R17, R29, R30, R31, R8, R9, mem, stack;
   free requires (memory_load8_le(mem, 1976bv64) == 1bv8);
   free requires (memory_load8_le(mem, 1977bv64) == 0bv8);
   free requires (memory_load8_le(mem, 1978bv64) == 2bv8);
@@ -194,3 +198,4 @@ procedure main()
 }
 
 procedure printf();
+  modifies Gamma_R16, Gamma_R17, R16, R17;
