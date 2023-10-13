@@ -1,5 +1,6 @@
 package analysis
 
+import scala.util.boundary
 import analysis.*
 import ir.BitVecLiteral
 
@@ -77,13 +78,12 @@ class MemoryModelMap {
   }
 
   def popContext(): Unit = {
-    if (contextStack.size <= 1) {
-      return
-    }
-    contextStack.pop()
-    rangeMap.stackMap.clear()
-    for (stackRgn <- contextStack.top) {
-      add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
+    if (contextStack.size > 1) {
+      contextStack.pop()
+      rangeMap.stackMap.clear()
+      for (stackRgn <- contextStack.top) {
+        add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
+      }
     }
   }
 
@@ -98,25 +98,12 @@ class MemoryModelMap {
 
   // Find an object for a given value within a range
 
-  def findStackObject(value: BigInt): Option[StackRegion] = {
-    for ((range, obj: StackRegion) <- rangeMap.stackMap) {
-      if (range.start <= value && value <= range.end) {
-        obj.extent = Some(range);
-        return Some(obj)
-      }
-    }
-    None
-  }
 
-  def findDataObject(value: BigInt): Option[DataRegion] = {
-    for ((range, obj) <- rangeMap.dataMap) {
-      if (range.start <= value && value <= range.end) {
-        obj.extent = Some(range);
-        return Some(obj)
-      }
-    }
-    None
-  }
+  def findStackObject(value: BigInt): Option[StackRegion] = 
+    rangeMap.stackMap.find((range, _) => (range.start <= value && value <= range.end)).map((range, obj) => {obj.extent = Some(range); obj});
+
+  def findDataObject(value: BigInt): Option[DataRegion] = 
+    rangeMap.dataMap.find((range, _) => (range.start <= value && value <= range.end)).map((range, obj) => {obj.extent = Some(range); obj});
 
   override def toString: String =
     s"Stack: ${rangeMap.stackMap}\n Heap: ${rangeMap.heapMap}\n Data: ${rangeMap.dataMap}\n"
