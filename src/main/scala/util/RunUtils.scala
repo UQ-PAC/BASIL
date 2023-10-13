@@ -73,9 +73,9 @@ object RunUtils {
 
     val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(readELFFileName)
 
-    val IRTranslator = BAPToIR(bapProgram, mainAddress, externalFunctions)
+    val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
-    NonReturningFunctions().transform(IRProgram.procedures)
+    NonReturningFunctions().transform(IRProgram.procedures, externalFunctions)
 
     val specification = loadSpecification(specFileName, IRProgram, globals)
 
@@ -316,7 +316,7 @@ object RunUtils {
     }
 
     def addFakeProcedure(name: String): Unit = {
-      IRProgram.procedures += Procedure(name, None, ArrayBuffer(), ArrayBuffer(), ArrayBuffer(), true)
+      IRProgram.procedures += Procedure(name, None, ArrayBuffer(), ArrayBuffer(), ArrayBuffer())
     }
 
     def resolveAddresses(valueSet: Set[Value]): Set[AddressValue] = {

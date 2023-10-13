@@ -10,9 +10,6 @@ import scala.jdk.CollectionConverters._
 
 object BAPLoader {
 
-  private val knownNonReturningFunctions = List("exit", "_exit", "abort", "__stack_chk_fail", "__assert_fail", "longjump")
-
-  def isNonReturning(s: String): Boolean = knownNonReturningFunctions.contains(s)
 
   def visitProject(ctx: ProjectContext): BAPProgram = {
     val memorySections = visitSections(ctx.sections)
@@ -129,9 +126,6 @@ object BAPLoader {
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
     val function = visitQuoteString(ctx.callee.tid.name).stripPrefix("@")
-    if (knownNonReturningFunctions.contains(function))
-      BAPDirectCall(parseAllowed(function), visitExp(ctx.cond), None, line, insn)
-    else
       BAPDirectCall(parseAllowed(function), visitExp(ctx.cond), returnTarget, line, insn)
   }
 

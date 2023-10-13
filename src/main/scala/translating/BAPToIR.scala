@@ -9,7 +9,7 @@ import scala.collection.mutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 
-class BAPToIR(var program: BAPProgram, mainAddress: Int, externalFunctions: Set[ExternalFunction]) {
+class BAPToIR(var program: BAPProgram, mainAddress: Int) {
 
   private val nameToProcedure: mutable.Map[String, Procedure] = mutable.Map()
   private val labelToBlock: mutable.Map[String, Block] = mutable.Map()
@@ -17,11 +17,10 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int, externalFunctions: Set[
   def translate: Program = {
     var mainProcedure: Option[Procedure] = None
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
-    val externalFunctionNames = externalFunctions.map(func => func.name)
     for (s <- program.subroutines) {
       val blocks: ArrayBuffer[Block] = ArrayBuffer()
       for (b <- s.blocks) {
-        val block = Block(b.label, b.address, ArrayBuffer(), ArrayBuffer(), 0)
+        val block = Block(b.label, b.address, ArrayBuffer(), ArrayBuffer())
         blocks.append(block)
         labelToBlock.addOne(b.label, block)
       }
@@ -33,7 +32,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int, externalFunctions: Set[
       for (p <- s.out) {
         out.append(p.toIR)
       }
-      val procedure = Procedure(s.name, Some(s.address), blocks, in, out, externalFunctionNames.contains(s.name))
+      val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
       if (s.address == mainAddress) {
         mainProcedure = Some(procedure)
       }

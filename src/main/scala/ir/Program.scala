@@ -106,10 +106,8 @@ class Procedure(
     var address: Option[Int],
     var blocks: ArrayBuffer[Block],
     var in: ArrayBuffer[Parameter],
-    var out: ArrayBuffer[Parameter],
-    val externalFunction: Boolean
+    var out: ArrayBuffer[Parameter]
 ) {
-
   def calls: Set[Procedure] = blocks.flatMap(_.calls).toSet
   override def toString: String = {
     s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
@@ -177,9 +175,9 @@ class Block(
     var label: String,
     var address: Option[Int],
     var statements: ArrayBuffer[Statement],
-    var jumps: ArrayBuffer[Jump],
-    var countOfReturnStatements: Int
+    var jumps: ArrayBuffer[Jump]
 ) {
+  var countOfReturnStatements: Int = 0
   def calls: Set[Procedure] = jumps.flatMap(_.calls).toSet
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet
   //def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
