@@ -115,4 +115,10 @@ class NonReturningFunctions {
     }
 
   }
+
+  def trimDeletedBlocks(procedures: ArrayBuffer[Procedure]): Unit = {
+    for (proc <- procedures) {
+      proc.blocks = proc.blocks.filter(!_.deleted)
+    }
+  }
 }
