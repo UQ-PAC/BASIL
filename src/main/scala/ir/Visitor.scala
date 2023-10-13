@@ -274,7 +274,7 @@ class Substituter(variables: Map[Variable, Variable] = Map(), memories: Map[Memo
 class Renamer(reserved: Set[String]) extends Visitor {
   override def visitLocalVar(node: LocalVar): LocalVar = {
     if (reserved.contains(node.name)) {
-      node.copy(name = '#' + node.name)
+      node.copy(name = s"#${node.name}")
     } else {
       node
     }
@@ -282,7 +282,7 @@ class Renamer(reserved: Set[String]) extends Visitor {
 
   override def visitMemory(node: Memory): Memory = {
     if (reserved.contains(node.name)) {
-      node.copy(name = '#' + node.name)
+      node.copy(name = s"#${node.name}")
     } else {
       node
     }
@@ -290,14 +290,14 @@ class Renamer(reserved: Set[String]) extends Visitor {
 
   override def visitParameter(node: Parameter): Parameter = {
     if (reserved.contains(node.name)) {
-      node.name = '#' + node.name
+      node.name = s"#${node.name}"
     }
     super.visitParameter(node)
   }
 
   override def visitProcedure(node: Procedure): Procedure = {
     if (reserved.contains(node.name)) {
-      node.name = '#' + node.name
+      node.name = s"#${node.name}"
     }
     super.visitProcedure(node)
   }
