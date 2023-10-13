@@ -56,7 +56,8 @@ case class BProcedure(
     body.flatMap(c => c.functionOps).toSet ++ ensures.flatMap(c => c.functionOps).toSet ++ requires
       .flatMap(c => c.functionOps)
       .toSet ++ freeEnsures.flatMap(c => c.functionOps).toSet ++ freeRequires.flatMap(c => c.functionOps).toSet
-  def globals: Set[BVar] = body.flatMap(c => c.globals).toSet
+
+  def globals: Set[BVar] = body.flatMap(c => c.globals).toSet ++ modifies
 }
 
 case class BAxiom(body: BExpr) extends BDeclaration {

@@ -91,18 +91,23 @@ object RunUtils {
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
 
-    if (performAnalysis) {
-      iterations += 1;
-      IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
-    }
-
     if (dumpIL) {
       dump_file(serialiseIL(IRProgram), "before-analysis.il")
     }
 
+
+    if (performAnalysis) {
+      iterations += 1;
+      IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
+      if (dumpIL) {
+        dump_file(serialiseIL(IRProgram), "after-analysis.il")
+      }
+    }
     IRProgram.stripUnreachableFunctions()
     IRProgram.stackIdentification()
-    IRProgram.setModifies()
+
+    val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
+    IRProgram.setModifies(specModifies)
 
     Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
