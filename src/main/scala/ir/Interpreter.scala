@@ -6,7 +6,7 @@ import util.{LogLevel, Logger}
 import scala.collection.mutable
 import scala.util.control.Breaks.{breakable, break}
 
-class Interpret() {
+class Interpreter() {
   val regs: mutable.Map[Variable, BitVecLiteral] = mutable.Map()
   val mems: mutable.Map[Int, BitVecLiteral] = mutable.Map()
   private val SP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)

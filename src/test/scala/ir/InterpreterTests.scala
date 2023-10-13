@@ -11,9 +11,9 @@ import util.RunUtils.{loadBAP, loadReadELF}
 
 import scala.collection.mutable
 
-class InterpretTests extends AnyFunSuite with BeforeAndAfter {
+class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
-  var i: Interpret = Interpret()
+  var i: Interpreter = Interpreter()
 
   def getProgram(name: String): (Program, Set[SpecGlobal]) = {
     val bapProgram = loadBAP(s"examples/$name/$name.adt")
@@ -32,7 +32,7 @@ class InterpretTests extends AnyFunSuite with BeforeAndAfter {
 
   def runInterpret(name: String): Unit = {
     val (program, globals) = getProgram(name)
-    val i = Interpret()
+    val i = Interpreter()
     val regs = i.interpret(program)
     regs.foreach { (key, value) =>
       Logger.info(s"$key := $value")
@@ -44,7 +44,7 @@ class InterpretTests extends AnyFunSuite with BeforeAndAfter {
   }
 
   before {
-    i = Interpret()
+    i = Interpreter()
   }
 
   test("basic_assign_assign") {

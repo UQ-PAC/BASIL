@@ -88,7 +88,7 @@ object RunUtils {
     IRProgram.setModifies()
 
     if (performInterpret) {
-      Interpret().interpret(IRProgram)
+      Interpreter().interpret(IRProgram)
     }
 
     val boogieTranslator = IRToBoogie(IRProgram, specification)
