@@ -141,7 +141,7 @@ BASIL
   -o --output <str>  Boogie output destination file.
   -v --verbose       Show extra debugging logs.
   --analyse          Run static analysis pass.
-  --interpret        Run BASIL IL interpreter.
+  --interpret        Run BASIL IR interpreter.
   -h --help          Show this help message.
 ```
 
