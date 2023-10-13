@@ -41,7 +41,13 @@ case class BAssume(body: BExpr, comment: Option[String] = None) extends BCmd {
   override def globals: Set[BVar] = body.globals
 }
 
-case class ProcedureCall(name: String, lhss: Seq[BVar], params: Seq[BExpr], modify: Seq[BVar], comment: Option[String] = None) extends BCmd {
+case class ProcedureCall(
+    name: String,
+    lhss: Seq[BVar],
+    params: Seq[BExpr],
+    modify: Seq[BVar],
+    comment: Option[String] = None
+) extends BCmd {
   override def toString: String = {
     if (lhss.isEmpty) {
       s"call $name();"

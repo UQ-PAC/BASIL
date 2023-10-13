@@ -112,21 +112,21 @@ class UnaryExpr(var op: UnOp, var arg: Expr) extends Expr {
   override def variables: Set[Variable] = arg.variables
   override def loads: Set[MemoryLoad] = arg.loads
   override def getType: IRType = (op, arg.getType) match {
-    case (_: BoolUnOp, BoolType) => BoolType
+    case (_: BoolUnOp, BoolType)     => BoolType
     case (_: BVUnOp, bv: BitVecType) => bv
-    case (_: IntUnOp, IntType) => IntType
+    case (_: IntUnOp, IntType)       => IntType
     case _ => throw new Exception("type mismatch, operator " + op + " type doesn't match arg: " + arg)
   }
 
   private def inSize = arg.getType match {
     case bv: BitVecType => bv.size
-    case _ => throw new Exception("type mismatch")
+    case _              => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
     case uOp: BoolUnOp => s"($uOp$arg)"
-    case uOp: BVUnOp => s"bv$uOp$inSize($arg)"
-    case uOp: IntUnOp => s"($uOp$arg)"
+    case uOp: BVUnOp   => s"bv$uOp$inSize($arg)"
+    case uOp: IntUnOp  => s"($uOp$arg)"
   }
 
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUnaryExpr(this)
@@ -166,7 +166,7 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
         case BVCONCAT =>
           BitVecType(bv1.size + bv2.size)
         case BVAND | BVOR | BVADD | BVMUL | BVUDIV | BVUREM | BVSHL | BVLSHR | BVNAND | BVNOR | BVXOR | BVXNOR | BVSUB |
-             BVSREM | BVSDIV | BVSMOD | BVASHR =>
+            BVSREM | BVSDIV | BVSMOD | BVASHR =>
           if (bv1.size == bv2.size) {
             bv1
           } else {
@@ -189,7 +189,7 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
       }
     case (intOp: IntBinOp, IntType, IntType) =>
       intOp match {
-        case IntADD | IntSUB | IntMUL | IntDIV | IntMOD => IntType
+        case IntADD | IntSUB | IntMUL | IntDIV | IntMOD     => IntType
         case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => BoolType
       }
     case _ =>
@@ -198,7 +198,7 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
 
   private def inSize = arg1.getType match {
     case bv: BitVecType => bv.size
-    case _ => throw new Exception("type mismatch")
+    case _              => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
@@ -333,9 +333,9 @@ class MemoryLoad(var mem: Memory, var index: Expr, var endian: Endian, var size:
 
 sealed trait Global
 
-// name == stack or mem
 case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr with Global {
-  override def toBoogie: BMapVar = BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
+  override def toBoogie: BMapVar =
+    BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
   override def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapBType(BitVecBType(addressSize), BoolBType), Scope.Global)
   override val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
   override def toString: String = s"Memory($name, $addressSize, $valueSize)"
@@ -354,7 +354,7 @@ sealed trait Variable extends Expr {
 
   def size: Int = irType match {
     case b: BitVecType => b.size
-    case _ => throw new Exception("tried to get size of non-bitvector")
+    case _             => throw new Exception("tried to get size of non-bitvector")
   }
 
   override def toString: String = s"Variable($name, $irType)"

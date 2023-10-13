@@ -14,21 +14,20 @@ trait Value
 trait AddressValue(val expr: Expr, val name: String) extends Value
 
 case class GlobalAddress(override val expr: Expr, override val name: String) extends AddressValue(expr, name) {
-  override def toString: String = "GlobalAddress(" + expr + ")"
+  override def toString: String = "GlobalAddress(" + expr + ", " + name + ")"
 }
 
 case class LocalAddress(override val expr: Expr, override val name: String) extends AddressValue(expr, name) {
-  override def toString: String = "LocalAddress(" + expr + ")"
+  override def toString: String = "LocalAddress(" + expr + ", " + name + ")"
 }
 
 case class LiteralValue(expr: BitVecLiteral) extends Value {
   override def toString: String = "Literal(" + expr + ")"
 }
 
+type VSALatticeElem = MapLattice[Variable | MemoryRegion, PowersetLattice[Value]]
 
 trait MemoryRegionValueSetAnalysis:
-  val assigmentsMap: mutable.HashMap[(Expr, CfgNode), Expr] = mutable.HashMap.empty
-  val regionContentMap: mutable.HashMap[MemoryRegion, mutable.Set[Value]] = mutable.HashMap.empty
 
   val cfg: ProgramCfg
   val globals: Map[BigInt, String]
@@ -36,16 +35,17 @@ trait MemoryRegionValueSetAnalysis:
   val globalOffsets: Map[BigInt, BigInt]
   val subroutines: Map[BigInt, String]
   val mmm: MemoryModelMap
+  val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
 
   /** The lattice of abstract values.
-   */
-  val powersetLattice: MapLattice[Expr, PowersetLattice[Value]]
+    */
+  val powersetLattice: VSALatticeElem
 
   /** The lattice of abstract states.
-   */
-  val lattice: MapLattice[CfgNode, MapLattice[Expr, PowersetLattice[Value]]] = MapLattice(powersetLattice)
+    */
+  val lattice: MapLattice[CfgNode, VSALatticeElem] = MapLattice(powersetLattice)
 
-  val domain: Set[CfgNode] = cfg.nodes
+  val domain: Set[CfgNode] = cfg.nodes.toSet
 
   private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
@@ -55,48 +55,10 @@ trait MemoryRegionValueSetAnalysis:
 
   private val mallocVariable = Register("R0", BitVecType(64))
 
-  private val loopEscapeSet: mutable.Set[CfgNode] = mutable.Set.empty
-
-  def loopEscape(n: CfgNode): Boolean = {
-    if (loopEscapeSet.contains(n)) {
-      return true
-    }
-    loopEscapeSet.add(n)
-    false
-  }
-
-  /** Find decl of variables from node predecessors */
-  def findDecl(variable: Variable, n: CfgNode): mutable.ListBuffer[CfgNode] = {
-    val decls: mutable.ListBuffer[CfgNode] = mutable.ListBuffer.empty
-    variable match {
-      case r: Register =>
-        for (pred <- n.pred) {
-          if (loopEscape(pred)) {
-            return mutable.ListBuffer.empty
-          }
-          pred match {
-            case cmd: CfgCommandNode =>
-              cmd.data match {
-                case localAssign: LocalAssign =>
-                  if (localAssign.lhs == variable) {
-                    decls.addOne(pred)
-                  } else {
-                    decls.addAll(findDecl(variable, pred))
-                  }
-                case _ => decls.addAll(findDecl(variable, pred))
-              }
-            case _ => decls.addAll(findDecl(variable, pred))
-          }
-        }
-        decls
-      case _: LocalVar => decls
-    }
-  }
-
   def resolveGlobalOffset(address: BigInt): String = {
     val tableAddress = globalOffsets(address)
     if (globals.contains(tableAddress)) {
-      globals(tableAddress )
+      globals(tableAddress)
     } else if (subroutines.contains(tableAddress)) {
       subroutines(tableAddress)
     } else {
@@ -105,239 +67,93 @@ trait MemoryRegionValueSetAnalysis:
     }
   }
 
-  /**
-   * Evaluate an expression in a hope of finding a global variable.
-   *
-   * @param exp : The expression to evaluate (e.g. R1 + 0x1234)
-   * @param n   : The node where the expression is evaluated (e.g. mem[R1 + 0x1234] <- ...)
-   * @return: The evaluated expression (e.g. 0x69632)
-   */
-  def evaluateExpression(exp: Expr, n: CfgNode): Expr = {
-    exp match {
-      case binOp: BinaryExpr =>
-        binOp.arg1 match {
-          case variable: Variable =>
-            loopEscapeSet.clear()
-            for (pred <- findDecl(variable, n)) {
-              assigmentsMap.get(variable, pred) match {
-                case Some(value) =>
-                  value match {
-                    case bitVecLiteral: BitVecLiteral =>
-                      binOp.op match {
-                        case BVADD =>
-                          binOp.arg2 match {
-                            case arg2: BitVecLiteral =>
-                              return BitVecLiteral(bitVecLiteral.value + arg2.value, bitVecLiteral.size)
-                            case _ => return exp
-                          }
-                        case _ =>
-                          Logger.error("OPERATOR " + binOp.op + " NOT HANDLED: " + binOp)
-                          return exp
-                      }
-                    case _ => return exp
-                  }
-                case _ =>
-                  Logger.error("CASE NOT HANDLED: " + assigmentsMap.get(variable, pred) + " FOR " + binOp)
-                  return exp
-              }
-            }
-          case _ => return evaluateExpression(binOp.arg1, n)
-        }
-        exp
-      case memLoad: MemoryLoad =>
-        evaluateExpression(memLoad.index, n)
-      case bitVecLiteral: BitVecLiteral =>
-        bitVecLiteral
-      case extend: ZeroExtend =>
-        evaluateExpression(extend.body, n)
-      case variable: Variable =>
-        loopEscapeSet.clear()
-        val ssss = findDecl(variable, n)
-        loopEscapeSet.clear()
-        for (pred <- findDecl(variable, n)) {
-          if (!assigmentsMap.contains((variable, pred))) {
-            pred match
-              case cmd: CfgCommandNode =>
-                cmd.data match
-                  case localAssign: LocalAssign =>
-                    assigmentsMap.addOne((localAssign.lhs, pred) -> evaluateExpression(localAssign.rhs, pred))
-                    return evaluateExpression(localAssign.rhs, pred)
-          } else {
-            assigmentsMap(variable, pred) match
-              case bitVecLiteral: BitVecLiteral =>
-                return bitVecLiteral
-              case any: Expr => return exp
-          }
-        }
-        exp
-      case extract: Extract =>
-        evaluateExpression(extract.body, n)
-      case _ =>
-        //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
-        exp
-    }
-  }
-
-
   def exprToRegion(expr: Expr, n: CfgNode): Option[MemoryRegion] = {
     expr match
       case binOp: BinaryExpr =>
-        val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
-        val rhs: Expr = evaluateExpression(binOp.arg2, n)
-        if (lhs.equals(stackPointer)) {
-          mmm.findObject(rhs.asInstanceOf[BitVecLiteral].value, "stack") match
-            case Some(obj: MemoryRegion) =>
-              return Some(obj)
-            case _ =>
-              return None
+        if (binOp.arg1 == stackPointer) {
+          val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp(n))
+          mmm.findStackObject(rhs.asInstanceOf[BitVecLiteral].value)
         } else {
-            mmm.findObject(lhs.asInstanceOf[BitVecLiteral].value, "data") match
-                case Some(obj: MemoryRegion) =>
-                  return Some(obj)
-                case _ =>
-                return None
-            }
-        None
+          val evaluation: Expr = evaluateExpression(binOp, n, constantProp(n))
+          if (!evaluation.isInstanceOf[BitVecLiteral]) {
+            return None
+          }
+          mmm.findDataObject(evaluation.asInstanceOf[BitVecLiteral].value)
+        }
       case _ =>
         None
   }
 
-
-  /** Default implementation of eval.
-   */
-  def eval(stmt: Statement, s: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
-    stmt match {
-      case memAssign: MemoryAssign =>
-        if (ignoreRegions.contains(memAssign.rhs.value)) {
-          return s
-        }
-        memAssign.rhs.index match
-          case binOp: BinaryExpr =>
-            val lhs: Expr = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
-            val rhs: Expr = evaluateExpression(binOp.arg2, n)
-            rhs match {
-              case rhs: BitVecLiteral =>
-                lhs match {
-                  case lhs: Variable if lhs.equals(stackPointer) =>
-                    mmm.findObject(rhs.value, "stack") match {
-                      case Some(obj: MemoryRegion) =>
-                        evaluateExpression(memAssign.rhs.value, n) match {
-                          case bitVecLiteral: BitVecLiteral =>
-                            val map = regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value])
-                            if (externalFunctions.contains(bitVecLiteral.value)) {
-                              map.add(LocalAddress(bitVecLiteral, externalFunctions(bitVecLiteral.value)))
-                            } else if (globals.contains(bitVecLiteral.value)) {
-                              map.add(GlobalAddress(bitVecLiteral, globals(bitVecLiteral.value)))
-                            } else if (globalOffsets.contains(bitVecLiteral.value)) {
-                              map.add(GlobalAddress(bitVecLiteral, resolveGlobalOffset(bitVecLiteral.value)))
-                            } else if (subroutines.contains(bitVecLiteral.value)) {
-                              map.add(GlobalAddress(bitVecLiteral, subroutines(bitVecLiteral.value)))
-                            } else {
-                              map.add(LiteralValue(bitVecLiteral))
-                            }
-                            s
-                          case _ => s
-                        }
-                      case _ => s
-                    }
-                  case lhs: BitVecLiteral =>
-                    binOp.op match {
-                      case BVADD =>
-                        // should do something here
-                        val summation = lhs.value + rhs.value
-                        mmm.findObject(summation, "data") match {
-                          case Some(obj: MemoryRegion) =>
-                            evaluateExpression(memAssign.rhs.value, n) match {
-                              case bitVecLiteral: BitVecLiteral =>
-                                val map = regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value])
-                                if (externalFunctions.contains(bitVecLiteral.value)) {
-                                  map.add(LocalAddress(bitVecLiteral, externalFunctions(bitVecLiteral.value)))
-                                } else if (globals.contains(bitVecLiteral.value)) {
-                                  map.add(GlobalAddress(bitVecLiteral, globals(bitVecLiteral.value)))
-                                } else if (globalOffsets.contains(bitVecLiteral.value)) {
-                                  map.add(GlobalAddress(bitVecLiteral, resolveGlobalOffset(bitVecLiteral.value)))
-                                } else if (subroutines.contains(bitVecLiteral.value)) {
-                                  map.add(GlobalAddress(bitVecLiteral, subroutines(bitVecLiteral.value)))
-                                } else {
-                                  map.add(LiteralValue(bitVecLiteral))
-                                }
-                                s
-                              case _ => s
-                            }
-                          case _ => s
-                        }
-                      case _ =>
-                        Logger.error("tried to eval operator: " + binOp.op + " in " + binOp)
-                        s
-                    }
-                  case _ => s
-                }
-              case _ =>
-                Logger.warn("RHS is not BitVecLiteral and is skipped " + rhs)
-                s
-            }
-          case _ => s
-      case localAssign: LocalAssign =>
-        localAssign.rhs match
-          case memLoad: MemoryLoad =>
-            memLoad.index match
-              case binOp: BinaryExpr =>
-                binOp.arg1 match {
-                  case v: Register if v.name.equals("R21") => Logger.info("")
-                  case _ =>
-                }
-                evaluateExpression(binOp.arg2, n) match {
-                  case rhs: BitVecLiteral =>
-                    val lhs = if binOp.arg1.equals(stackPointer) then binOp.arg1 else evaluateExpression(binOp.arg1, n)
-                    lhs match {
-                      case lhs: Register if lhs.equals(stackPointer) =>
-                        mmm.findObject(rhs.value, "stack") match
-                          case Some(obj: MemoryRegion) =>
-                            s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, mutable.Set.empty[Value]).toSet)
-                          case _ => s
-                      case lhs: BitVecLiteral =>
-                        binOp.op match {
-                          case BVADD =>
-                            val summation = lhs.value + rhs.value
-                            mmm.findObject(summation, "data") match {
-                              case Some(obj: MemoryRegion) =>
-                                val setToAdd = mutable.Set.empty[Value]
-                                if (globals.contains(summation)) {
-                                  setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), globals(summation)))
-                                } else if (globalOffsets.contains(summation)) {
-                                  setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), resolveGlobalOffset(summation)))
-                                } else if (subroutines.contains(summation)) {
-                                  setToAdd.add(GlobalAddress(BitVecLiteral(summation, lhs.size), subroutines(summation)))
-                                } else if (externalFunctions.contains(summation)) {
-                                  setToAdd.add(LocalAddress(BitVecLiteral(summation, lhs.size), externalFunctions(summation)))
-                                } else {
-                                  setToAdd.add(LiteralValue(BitVecLiteral(summation, lhs.size)))
-                                }
-                                s + (localAssign.lhs -> regionContentMap.getOrElseUpdate(obj, setToAdd).toSet)
-                              case _ => s
-                            }
-                          case _ =>
-                            Logger.error("tried to eval operator: " + binOp.op + " in " + binOp)
-                            s
-                        }
-                      case _ => s
-                    }
-                  case rhs: _ =>
-                    Logger.warn("RHS is not BitVecLiteral and is skipped " + rhs)
-                    s
-                }
-              case _ => s
-          case variable: Variable =>
-            s + (localAssign.lhs -> s.getOrElse(variable, Set.empty))
-          case _ => s
-      case _ =>
-        Logger.error(s"type: ${stmt.getClass} $stmt")
-        throw new Exception("Unknown type " + s"type: ${stmt.getClass} $stmt")
+  def getValueType(bitVecLiteral: BitVecLiteral): Value = {
+    if (externalFunctions.contains(bitVecLiteral.value)) {
+      LocalAddress(bitVecLiteral, externalFunctions(bitVecLiteral.value))
+    } else if (globals.contains(bitVecLiteral.value)) {
+      GlobalAddress(bitVecLiteral, globals(bitVecLiteral.value))
+    } else if (globalOffsets.contains(bitVecLiteral.value)) {
+      GlobalAddress(bitVecLiteral, resolveGlobalOffset(bitVecLiteral.value))
+    } else if (subroutines.contains(bitVecLiteral.value)) {
+      GlobalAddress(bitVecLiteral, subroutines(bitVecLiteral.value))
+    } else {
+      LiteralValue(bitVecLiteral)
     }
   }
 
+  /** Default implementation of eval.
+    */
+  def eval(cmd: Command, s: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
+    Logger.debug(s"eval: $cmd")
+    Logger.debug(s"state: $s")
+    Logger.debug(s"node: $n")
+    cmd match
+      case localAssign: LocalAssign =>
+        localAssign.rhs match
+          case memoryLoad: MemoryLoad =>
+            val region: Option[MemoryRegion] = exprToRegion(memoryLoad.index, n)
+            region match
+              case Some(r: MemoryRegion) =>
+                // this is an exception to the rule and only applies to data regions
+                evaluateExpression(memoryLoad.index, n, constantProp(n)) match
+                  case bitVecLiteral: BitVecLiteral =>
+                    val m = s + (r -> Set(getValueType(bitVecLiteral)))
+                    m + (localAssign.lhs -> m(r))
+                  case _ =>
+                    s + (localAssign.lhs -> s(r))
+              case None =>
+                Logger.warn("could not find region for " + localAssign)
+                s
+          case e: Expr => {
+            val evaled = evaluateExpression(e, n, constantProp(n))
+            evaled match
+              case bv: BitVecLiteral => s + (localAssign.lhs -> Set(getValueType(bv)))
+              case _ =>
+                Logger.warn("could not evaluate expression" + e)
+                s
+          }
+      case memAssign: MemoryAssign =>
+        memAssign.rhs.index match
+          case binOp: BinaryExpr =>
+            val region: Option[MemoryRegion] = exprToRegion(binOp, n)
+            region match
+              case Some(r: MemoryRegion) =>
+                evaluateExpression(memAssign.rhs.value, n, constantProp(n)) match
+                  case bitVecLiteral: BitVecLiteral =>
+                    return s + (r -> Set(getValueType(bitVecLiteral)))
+                  case variable: Variable => // constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
+                    return s + (r -> s(variable))
+
+                  case _ => Logger.warn("Too Complex or Wrapped i.e. Extract(Variable)") // do nothing
+                s
+              case None =>
+                Logger.warn("could not find region for " + memAssign)
+                s
+          case _ =>
+            s
+      case _ =>
+        s
+  }
+
   /** Transfer function for state lattice elements.
-   */
+    */
   def localTransfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element =
     n match {
       case entry: CfgFunctionEntryNode =>
@@ -347,32 +163,22 @@ trait MemoryRegionValueSetAnalysis:
         mmm.popContext()
         s
       case cmd: CfgCommandNode =>
-        cmd.data match {
-//          case directCall: DirectCall =>
-//            throw new RuntimeException("ERROR: CASE NOT HANDLED: " + directCall + "\n")
-          case memAssign: MemoryAssign =>
-            lattice.sublattice.lub(s, eval(memAssign, s, n))
-
-          // local assign is just lhs assigned to rhs we only need this information to track a prior register operation
-          // AKA: R1 <- R1 + 8; mem(R1) <- 0x1234
-          case localAssign: LocalAssign =>
-            assigmentsMap.addOne((localAssign.lhs, n) -> evaluateExpression(localAssign.rhs, n))
-            lattice.sublattice.lub(s, eval(localAssign, s, n))
-          case _ => s
-        }
+        eval(cmd.data, s, n)
       case _ => s // ignore other kinds of nodes
     }
 
-
 /** Base class for memory region analysis (non-lifted) lattice.
- */
-abstract class ValueSetAnalysis(val cfg: ProgramCfg,
-                                val globals: Map[BigInt, String],
-                                val externalFunctions: Map[BigInt, String],
-                                val globalOffsets: Map[BigInt, BigInt],
-                                val subroutines: Map[BigInt, String],
-                                val mmm: MemoryModelMap)
-  extends FlowSensitiveAnalysis(true) with MemoryRegionValueSetAnalysis {
+  */
+abstract class ValueSetAnalysis(
+    val cfg: ProgramCfg,
+    val globals: Map[BigInt, String],
+    val externalFunctions: Map[BigInt, String],
+    val globalOffsets: Map[BigInt, BigInt],
+    val subroutines: Map[BigInt, String],
+    val mmm: MemoryModelMap,
+    val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+) extends FlowSensitiveAnalysis(true)
+    with MemoryRegionValueSetAnalysis {
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
@@ -380,39 +186,38 @@ abstract class ValueSetAnalysis(val cfg: ProgramCfg,
 
 }
 
-
-/** Intraprocedural value analysis that uses [[SimpleWorklistFixpointSolver]].
- */
-abstract class IntraprocValueSetAnalysisWorklistSolver[L <: MapLattice[Expr, PowersetLattice[Value]]]
-(
-  cfg: InterproceduralProgramCfg,
-  globals: Map[BigInt, String],
-  externalFunctions: Map[BigInt, String],
-  globalOffsets: Map[BigInt, BigInt],
-  subroutines: Map[BigInt, String],
-  mmm: MemoryModelMap,
-  val powersetLattice: L
-)
-  extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm)
+abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
+    cfg: ProgramCfg,
+    globals: Map[BigInt, String],
+    externalFunctions: Map[BigInt, String],
+    globalOffsets: Map[BigInt, BigInt],
+    subroutines: Map[BigInt, String],
+    mmm: MemoryModelMap,
+    constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
+    val powersetLattice: L
+) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
     with SimpleMonotonicSolver[CfgNode]
     with ForwardDependencies
 
 object ValueSetAnalysis:
 
   /** Intraprocedural analysis that uses the worklist solver.
-   */
-  class WorklistSolver(cfg: InterproceduralProgramCfg,
-                       globals: Map[BigInt, String],
-                       externalFunctions: Map[BigInt, String],
-                       globalOffsets: Map[BigInt, BigInt],
-                       subroutines: Map[BigInt, String],
-                       mmm: MemoryModelMap)
-    extends IntraprocValueSetAnalysisWorklistSolver(
-      cfg,
-      globals,
-      externalFunctions,
-      globalOffsets,
-      subroutines,
-      mmm,
-      MapLattice[Expr, PowersetLattice[Value]](PowersetLattice[Value])
-    )
+    */
+  class WorklistSolver(
+      cfg: ProgramCfg,
+      globals: Map[BigInt, String],
+      externalFunctions: Map[BigInt, String],
+      globalOffsets: Map[BigInt, BigInt],
+      subroutines: Map[BigInt, String],
+      mmm: MemoryModelMap,
+      constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+  ) extends IntraprocValueSetAnalysisWorklistSolver(
+        cfg,
+        globals,
+        externalFunctions,
+        globalOffsets,
+        subroutines,
+        mmm,
+        constantProp,
+        MapLattice[Variable | MemoryRegion, PowersetLattice[Value]](PowersetLattice[Value])
+      )
