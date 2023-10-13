@@ -63,7 +63,7 @@ procedure strlen();
   ensures (bvule64(old(R0), bvadd64(old(R0), R0)));
 ```
 
-But **does not** work when we do the address calculation in the load. 
+But **does not** work when we do the address calculation in the memory access rather than the quantification bound. 
 
 ```bpl
 procedure strlen();
