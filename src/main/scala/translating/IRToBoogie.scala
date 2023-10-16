@@ -465,11 +465,11 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val lhsGamma = l.lhs.toGamma
       val rhsGamma = l.rhs.toGamma
       val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
-      val loads = rhs.functionOps.collect { case m: BMemoryLoad => m }
+      val loads = rhs.loads.collect { case m: BMemoryLoad => m }
       if (loads.isEmpty || loads.forall(_.memory == stack)) {
         List(assign)
       } else {
-        val gammas = rhsGamma.functionOps.collect { case g: GammaLoad => g.gammaMap }.toSeq.sorted
+        val gammas = rhsGamma.loads.collect { case g: GammaLoad => g.gammaMap }.toSeq.sorted
         val memories = loads.map(m => m.memory).toSeq.sorted
         List(ProcedureCall("rely", Seq(), Seq(), memories ++ gammas), assign)
       }
