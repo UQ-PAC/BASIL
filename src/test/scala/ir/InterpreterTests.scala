@@ -18,14 +18,14 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   def getProgram(name: String): (Program, Set[SpecGlobal]) = {
     val bapProgram = loadBAP(s"examples/$name/$name.adt")
     val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(s"examples/$name/$name.relf")
-
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
     IRProgram = ExternalRemover(externalFunctions.map(e => e.name)).visitProgram(IRProgram)
     IRProgram = Renamer(Set("free")).visitProgram(IRProgram)
     IRProgram.stripUnreachableFunctions()
     IRProgram.stackIdentification()
-    IRProgram.setModifies()
+    IRProgram.setModifies(Map())
+
 
     (IRProgram, globals)
   }

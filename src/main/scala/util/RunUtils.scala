@@ -105,7 +105,8 @@ object RunUtils {
     IRProgram.setModifies(specModifies)
 
     if (performInterpret) {
-      Interpreter().interpret(IRProgram)
+      val interpreter = Interpreter()
+      interpreter.interpret(IRProgram)
     }
 
     Logger.info("[!] Translating to Boogie")
