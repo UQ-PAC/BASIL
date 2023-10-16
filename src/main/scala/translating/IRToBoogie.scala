@@ -109,8 +109,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       List(),
       Seq(mem, Gamma_mem),
       List(
-        ProcedureCall("rely", List(), List(), List(mem, Gamma_mem)),
-        ProcedureCall("rely", List(), List(), List(mem, Gamma_mem))
+        ProcedureCall("rely", List(), List()),
+        ProcedureCall("rely", List(), List())
       )
     )
     val relyReflexive = BProcedure(
@@ -383,7 +383,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translate(j: Jump): List[BCmd] = j match {
     case d: DirectCall =>
-      val call = List(ProcedureCall(d.target.name, List(), List(), List()))
+      val call = List(ProcedureCall(d.target.name, List(), List()))
       val returnTarget = d.returnTarget match {
         case Some(r) => List(GoToCmd(r.label))
         case None    => List(Comment("no return target"), BAssume(FalseBLiteral))
@@ -436,7 +436,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       if (lhs == stack) {
         List(store)
       } else {
-        val rely = ProcedureCall("rely", List(), List(), List(rhs.memory, rhsGamma.gammaMap))
+        val rely = ProcedureCall("rely", List(), List())
         val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.rhs.value.toGamma))
         val oldAssigns =
           guaranteeOldVars.map(g => AssignCmd(g.toOldVar, BMemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size)))
@@ -469,9 +469,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       if (loads.isEmpty || loads.forall(_.memory == stack)) {
         List(assign)
       } else {
-        val gammas = rhsGamma.loads.collect { case g: GammaLoad => g.gammaMap }.toSeq.sorted
         val memories = loads.map(m => m.memory).toSeq.sorted
-        List(ProcedureCall("rely", Seq(), Seq(), memories ++ gammas), assign)
+        List(ProcedureCall("rely", Seq(), Seq()), assign)
       }
     case a: Assert =>
       val body = a.body.toBoogie
@@ -529,7 +528,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         List(outTemp(o), outTempGamma(o))
       }
     }
-    List(ProcedureCall(target.name, returned.flatten.toList, params.flatten.toList, List())) ++ outAssigned
+    List(ProcedureCall(target.name, returned.flatten.toList, params.flatten.toList)) ++ outAssigned
   }
 
   /*
