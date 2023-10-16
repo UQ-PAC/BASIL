@@ -1,7 +1,6 @@
 package translating
 import ir._
 
-
 private class ILSerialiser extends ReadOnlyVisitor {
   var program: StringBuilder = StringBuilder()
 
@@ -11,22 +10,21 @@ private class ILSerialiser extends ReadOnlyVisitor {
     "  " * indentLevel
   }
 
-  def blockIdentifier(block: Block) : String = {
+  def blockIdentifier(block: Block): String = {
     val i = block.address match {
-      case Some(addr) =>  f"${addr}:${block.label}"
-      case None => f"?:${block.label}"
+      case Some(addr) => f"${addr}:${block.label}"
+      case None       => f"?:${block.label}"
     }
-    '"' + i + '"'
+    s"\"$i\""
   }
 
   def procedureIdentifier(proc: Procedure): String = {
     val i = proc.address match {
-      case Some(addr) =>  f"${addr}:${proc.name}"
-      case None => f"?:${proc.name}"
+      case Some(addr) => f"${addr}:${proc.name}"
+      case None       => f"?:${proc.name}"
     }
-    '"' + i + '"'
+    s"\"$i\""
   }
-
 
   override def visitExpr(node: Expr): Expr = {
     node.acceptVisit(this)
@@ -63,8 +61,8 @@ private class ILSerialiser extends ReadOnlyVisitor {
   }
 
   override def visitGoTo(node: GoTo): Jump = {
-    program ++= "GoTo(" 
-    // TODO 
+    program ++= "GoTo("
+    // TODO
     program ++= blockIdentifier(node.target)
     program ++= ", "
     program ++= "condition("
@@ -81,7 +79,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
     program ++= "condition("
     node.condition.map(visitExpr)
     program ++= ")" // Condition
-    program ++= ")" // DirectCall 
+    program ++= ")" // DirectCall
     node
   }
 
@@ -92,7 +90,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
     program ++= "condition("
     node.condition.map(visitExpr)
     program ++= ")" // Condition
-    program ++= ")" // IndirectCall 
+    program ++= ")" // IndirectCall
     node
   }
 
@@ -129,8 +127,8 @@ private class ILSerialiser extends ReadOnlyVisitor {
   override def visitProcedure(node: Procedure): Procedure = {
     program ++= "Procedure(" + procedureIdentifier(node) + ", "
     indentLevel += 1
-  
-      program ++= "in("
+
+    program ++= "in("
     for (i <- node.in.indices) {
       visitParameter(node.in(i))
       if (i != node.in.size - 1) {
@@ -202,7 +200,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   override def visitUnaryExpr(node: UnaryExpr): Expr = {
     program ++= "UnaryExpr("
-    program ++= '"' + f"${node.op}" + '"' + ", "
+    program ++= "\"" + f"${node.op}" + "\"" + ", "
     visitExpr(node.arg)
     program ++= ")"
     node
@@ -239,9 +237,8 @@ private class ILSerialiser extends ReadOnlyVisitor {
   }
 
   override def visitMemory(node: Memory): Memory = {
-    program ++= "Memory(" 
-    program ++= '"' + node.name + '"'
-    program ++= f", ${node.addressSize}, ${node.valueSize})"
+    program ++= "Memory("
+    program ++= s"\"${node.name}\", ${node.addressSize}, ${node.valueSize})"
     node
   }
 
@@ -265,7 +262,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node
   }
 
-
 }
 
 def serialiseIL(p: Program): String = {
@@ -273,4 +269,3 @@ def serialiseIL(p: Program): String = {
   s.visitProgram(p)
   s.program.toString()
 }
-

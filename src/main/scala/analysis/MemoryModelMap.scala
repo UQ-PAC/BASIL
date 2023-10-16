@@ -6,11 +6,13 @@ import ir.BitVecLiteral
 import scala.collection.mutable
 
 // Define a case class to represent a range
-case class RangeKey(var start: BigInt, var end: BigInt)
+case class RangeKey(var start: BigInt, var end: BigInt):
+  def size(): BigInt = end - start
+
 case class RegionToRangesMap():
-  val stackMap: mutable.Map[RangeKey, MemoryRegion] = mutable.Map()
-  val heapMap: mutable.Map[RangeKey, MemoryRegion] = mutable.Map()
-  val dataMap: mutable.Map[RangeKey, MemoryRegion] = mutable.Map()
+  val stackMap: mutable.Map[RangeKey, StackRegion] = mutable.Map()
+  val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.Map()
+  val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.Map()
 
 // Custom data structure for storing range-to-object mappings
 class MemoryModelMap {
@@ -21,57 +23,48 @@ class MemoryModelMap {
   private val allStacks = mutable.Map[String, List[StackRegion]]()
 
   // Add a range and object to the mapping
-  def add(offset: BigInt, regionType: MemoryRegion): Unit = {
-    regionType match {
+  def add(offset: BigInt, region: MemoryRegion): Unit = {
+    region match {
       case s: StackRegion =>
         val stackMap = rangeMap.stackMap
         if (stackMap.isEmpty) {
-          stackMap(RangeKey(offset, MAX_BIGINT)) = regionType
+          stackMap(RangeKey(offset, MAX_BIGINT)) = s
         } else {
           stackMap.keys.maxBy(_.end).end = offset - 1
-          stackMap(RangeKey(offset, MAX_BIGINT)) = regionType
+          stackMap(RangeKey(offset, MAX_BIGINT)) = s
         }
       case d: DataRegion =>
         val dataMap = rangeMap.dataMap
         if (dataMap.isEmpty) {
-          dataMap(RangeKey(offset, MAX_BIGINT)) = regionType
+          dataMap(RangeKey(offset, MAX_BIGINT)) = d
         } else {
           dataMap.keys.maxBy(_.end).end = offset - 1
-          dataMap(RangeKey(offset, MAX_BIGINT)) = regionType
+          dataMap(RangeKey(offset, MAX_BIGINT)) = d
         }
     }
   }
 
-  def convertMemoryRegions(memoryRegions: Map[CfgNode, MemoryRegion], externalFunctions: Map[BigInt, String]): Unit = {
+  def convertMemoryRegions(memoryRegions: Map[CfgNode, Set[MemoryRegion]], externalFunctions: Map[BigInt, String]): Unit = {
+    // map externalFunctions name, value to DataRegion(name, value) and then sort by value
+    val externalFunctionRgns = externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64), None))
+
     // get all function exit node
-    val exitNodes = memoryRegions.keys.collect { case e: CfgFunctionExitNode => e }.toList
+    val exitNodes = memoryRegions.keys.collect { case e: CfgFunctionExitNode => e }
     exitNodes.foreach(exitNode =>
-      val node = memoryRegions(exitNode).asInstanceOf[Set[Any]]
-      // for each function exit node we get the memory region
-      // and add it to the mapping
-      val stackRgns = node.collect{ case r: StackRegion => r }.toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
-      val dataRgns = node.collect{ case r: DataRegion => r }.toList
-      val heapRgns = node.collect{ case r: HeapRegion => r }.toList
-      val accessRgns = node.collect{ case r: RegionAccess => r }.toList
-      // map externalFunctions name, value to DataRegion(name, value) and then sort by value
-      val externalFunctionRgns = externalFunctions.map(
-        (offset, name) => DataRegion(name, BitVecLiteral(offset, 64))
-      ).toList
+      val node = memoryRegions(exitNode)
+
+      // for each function exit node we get the memory region and add it to the mapping
+      val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
+      val dataRgns = node.collect { case r: DataRegion => r }
 
       // add externalFunctionRgn to dataRgns and sort by value
-      val allDataRgns = (dataRgns ++ externalFunctionRgns).sortBy(_.start.asInstanceOf[BitVecLiteral].value)
-
+      val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
 
       allStacks(exitNode.data.name) = stackRgns
-
-//      for (stackRgn <- stackRgns) {
-//        add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
-//      }
 
       for (dataRgn <- allDataRgns) {
         add(dataRgn.start.asInstanceOf[BitVecLiteral].value, dataRgn)
       }
-
     )
   }
 
@@ -84,13 +77,12 @@ class MemoryModelMap {
   }
 
   def popContext(): Unit = {
-    if (contextStack.size <= 1) {
-      return
-    }
-    contextStack.pop()
-    rangeMap.stackMap.clear()
-    for (stackRgn <- contextStack.top) {
-      add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
+    if (contextStack.size > 1) {
+      contextStack.pop()
+      rangeMap.stackMap.clear()
+      for (stackRgn <- contextStack.top) {
+        add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
+      }
     }
   }
 
@@ -104,27 +96,15 @@ class MemoryModelMap {
 //  }
 
   // Find an object for a given value within a range
-  def findObject(value: BigInt, regionType: String): Option[MemoryRegion] = {
-    regionType match
-      case "stack" =>
-        for ((range, obj) <- rangeMap.stackMap) {
-          if (range.start <= value && value <= range.end) {
-            return Some(obj)
-          }
-        }
-        None
-      case "data" =>
-        for ((range, obj) <- rangeMap.dataMap) {
-          if (range.start <= value && value <= range.end) {
-            return Some(obj)
-          }
-        }
-        None
-  }
+
+
+  def findStackObject(value: BigInt): Option[StackRegion] = 
+    rangeMap.stackMap.find((range, _) => (range.start <= value && value <= range.end)).map((range, obj) => {obj.extent = Some(range); obj});
+
+  def findDataObject(value: BigInt): Option[DataRegion] = 
+    rangeMap.dataMap.find((range, _) => (range.start <= value && value <= range.end)).map((range, obj) => {obj.extent = Some(range); obj});
 
   override def toString: String =
     s"Stack: ${rangeMap.stackMap}\n Heap: ${rangeMap.heapMap}\n Data: ${rangeMap.dataMap}\n"
 
 }
-
-

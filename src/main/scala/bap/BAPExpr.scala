@@ -19,7 +19,7 @@ trait BAPExpr {
       }
     }
   }
-  */
+   */
   /*
    * The size of output of the given expression.
    *
@@ -56,7 +56,7 @@ case class BAPSignedExtend(width: Int, body: BAPExpr) extends BAPExpr {
 
 case class BAPUnsignedExtend(width: Int, body: BAPExpr) extends BAPExpr {
   override val size: Int = width
-  
+
   override def toIR: Expr = {
     if (width > body.size) {
       ZeroExtend(width - body.size, body.toIR)
@@ -74,7 +74,7 @@ case class BAPExtract(high: Int, low: Int, body: BAPExpr) extends BAPExpr {
 
   // + 1 as extracts are inclusive (e.g. [31:0] has 32 bits)
   override val size: Int = high - low + 1
-  
+
   override def toIR: Expr = {
     val bodySize = body.size
     if (size > bodySize) {
@@ -111,7 +111,7 @@ case class BAPLiteral(value: BigInt, size: Int) extends BAPExpr {
   */
 case class BAPUnOp(operator: BAPUnOperator, exp: BAPExpr) extends BAPExpr {
   override val size: Int = exp.size
-  
+
   override def toIR: UnaryExpr = operator match {
     case NOT => UnaryExpr(BVNOT, exp.toIR)
     case NEG => UnaryExpr(BVNEG, exp.toIR)
@@ -139,7 +139,7 @@ case class BAPBinOp(operator: BAPBinOperator, lhs: BAPExpr, rhs: BAPExpr) extend
     case EQ | NEQ | LT | LE | SLT | SLE => 1
     case _                              => lhs.size
   }
-  
+
   override def toIR: Expr = operator match {
     case PLUS    => BinaryExpr(BVADD, lhs.toIR, rhs.toIR)
     case MINUS   => BinaryExpr(BVSUB, lhs.toIR, rhs.toIR)
@@ -178,7 +178,7 @@ case class BAPBinOp(operator: BAPBinOperator, lhs: BAPExpr, rhs: BAPExpr) extend
     case SLT => BinaryExpr(BVSLT, lhs.toIR, rhs.toIR)
     case SLE => BinaryExpr(BVSLE, lhs.toIR, rhs.toIR)
   }
-  
+
 }
 
 sealed trait BAPBinOperator(op: String) {
@@ -264,7 +264,7 @@ object BAPMemAccess {
     }
   }
 }
-*/
+ */
 
 case class BAPMemory(name: String, addressSize: Int, valueSize: Int) extends BAPVariable {
   override val size: Int = valueSize // should reconsider
@@ -287,4 +287,4 @@ object BAPStore {
     }
   }
 }
-*/
+ */
