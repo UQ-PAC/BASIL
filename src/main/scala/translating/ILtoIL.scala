@@ -15,7 +15,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
       case Some(addr) => f"${addr}:${block.label}"
       case None       => f"?:${block.label}"
     }
-    '"' + i + '"'
+    s"\"$i\""
   }
 
   def procedureIdentifier(proc: Procedure): String = {
@@ -23,7 +23,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
       case Some(addr) => f"${addr}:${proc.name}"
       case None       => f"?:${proc.name}"
     }
-    '"' + i + '"'
+    s"\"$i\""
   }
 
   override def visitExpr(node: Expr): Expr = {
@@ -200,7 +200,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   override def visitUnaryExpr(node: UnaryExpr): Expr = {
     program ++= "UnaryExpr("
-    program ++= '"' + f"${node.op}" + '"' + ", "
+    program ++= "\"" + f"${node.op}" + "\"" + ", "
     visitExpr(node.arg)
     program ++= ")"
     node
@@ -238,8 +238,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   override def visitMemory(node: Memory): Memory = {
     program ++= "Memory("
-    program ++= '"' + node.name + '"'
-    program ++= f", ${node.addressSize}, ${node.valueSize})"
+    program ++= s"\"${node.name}\", ${node.addressSize}, ${node.valueSize})"
     node
   }
 
