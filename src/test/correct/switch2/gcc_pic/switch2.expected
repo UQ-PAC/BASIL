@@ -12,10 +12,6 @@ var R30: bv64;
 var R31: bv64;
 var mem: [bv64]bv8;
 var stack: [bv64]bv8;
-function L(memory: [bv64]bv8, index: bv64) returns (bool) {
-  false
-}
-
 function {:bvbuiltin "bvadd"} bvadd32(bv32, bv32) returns (bv32);
 function {:bvbuiltin "bvadd"} bvadd33(bv33, bv33) returns (bv33);
 function {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
@@ -84,7 +80,7 @@ procedure guarantee_reflexive();
   modifies mem, Gamma_mem;
 
 procedure main()
-  modifies Gamma_R0, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_mem, Gamma_stack, R0, R29, R30, R31, mem, stack;
+  modifies Gamma_R0, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_stack, R0, R29, R30, R31, stack;
   requires (Gamma_R0 == true);
   free requires (memory_load8_le(mem, 2032bv64) == 1bv8);
   free requires (memory_load8_le(mem, 2033bv64) == 0bv8);
@@ -318,9 +314,7 @@ procedure main()
     call r();
     goto l00000d1b;
   l00000d1b:
-    call rely();
-    assert (L(mem, bvadd64(R31, 44bv64)) ==> Gamma_R0);
-    mem, Gamma_mem := memory_store32_le(mem, bvadd64(R31, 44bv64), R0[32:0]), gamma_store32(Gamma_mem, bvadd64(R31, 44bv64), Gamma_R0);
+    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 44bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 44bv64), Gamma_R0);
     goto l00000d23;
   l00000d41:
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));

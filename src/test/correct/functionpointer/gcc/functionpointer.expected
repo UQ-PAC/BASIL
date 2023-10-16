@@ -1,12 +1,10 @@
 var Gamma_R0: bool;
-var Gamma_R1: bool;
 var Gamma_R29: bool;
 var Gamma_R30: bool;
 var Gamma_R31: bool;
 var Gamma_mem: [bv64]bool;
 var Gamma_stack: [bv64]bool;
 var R0: bv64;
-var R1: bv64;
 var R29: bv64;
 var R30: bv64;
 var R31: bv64;
@@ -82,10 +80,10 @@ procedure guarantee_reflexive();
 procedure main()
   modifies Gamma_R0, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_stack, R0, R29, R30, R31, stack;
   requires (Gamma_R0 == true);
-  free requires (memory_load8_le(mem, 2032bv64) == 1bv8);
-  free requires (memory_load8_le(mem, 2033bv64) == 0bv8);
-  free requires (memory_load8_le(mem, 2034bv64) == 2bv8);
-  free requires (memory_load8_le(mem, 2035bv64) == 0bv8);
+  free requires (memory_load8_le(mem, 2052bv64) == 1bv8);
+  free requires (memory_load8_le(mem, 2053bv64) == 0bv8);
+  free requires (memory_load8_le(mem, 2054bv64) == 2bv8);
+  free requires (memory_load8_le(mem, 2055bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69528bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69529bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69530bv64) == 0bv8);
@@ -174,7 +172,7 @@ procedure main()
   free requires (memory_load8_le(mem, 69613bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69614bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69615bv64) == 0bv8);
-  free requires (memory_load8_le(mem, 69616bv64) == 28bv8);
+  free requires (memory_load8_le(mem, 69616bv64) == 92bv8);
   free requires (memory_load8_le(mem, 69617bv64) == 7bv8);
   free requires (memory_load8_le(mem, 69618bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69619bv64) == 0bv8);
@@ -211,25 +209,17 @@ procedure main()
   free ensures (R29 == old(R29));
   free ensures (R31 == old(R31));
 {
-  var #10: bv32;
-  var #11: bv32;
-  var #12: bv32;
   var #4: bv64;
   var #5: bv32;
   var #6: bv32;
   var #7: bv32;
   var #8: bv32;
-  var #9: bv32;
   var CF: bv1;
-  var Gamma_#10: bool;
-  var Gamma_#11: bool;
-  var Gamma_#12: bool;
   var Gamma_#4: bool;
   var Gamma_#5: bool;
   var Gamma_#6: bool;
   var Gamma_#7: bool;
   var Gamma_#8: bool;
-  var Gamma_#9: bool;
   var Gamma_CF: bool;
   var Gamma_NF: bool;
   var Gamma_VF: bool;
@@ -244,143 +234,85 @@ procedure main()
     R31, Gamma_R31 := #4, Gamma_#4;
     R29, Gamma_R29 := R31, Gamma_R31;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 28bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 28bv64), Gamma_R0);
-    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 16bv64), R1), gamma_store64(Gamma_stack, bvadd64(R31, 16bv64), Gamma_R1);
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 44bv64), 0bv32), gamma_store32(Gamma_stack, bvadd64(R31, 44bv64), true);
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
-    #5, Gamma_#5 := bvadd32(R0[32:0], 4294967290bv32), Gamma_R0;
-    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#5, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934587bv33))), (Gamma_R0 && Gamma_#5);
-    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#5, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967291bv33))), (Gamma_R0 && Gamma_#5);
+    #5, Gamma_#5 := bvadd32(R0[32:0], 4294967293bv32), Gamma_R0;
+    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#5, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934590bv33))), (Gamma_R0 && Gamma_#5);
+    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#5, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967294bv33))), (Gamma_R0 && Gamma_#5);
     ZF, Gamma_ZF := bvcomp32(bvadd32(#5, 1bv32), 0bv32), Gamma_#5;
     NF, Gamma_NF := bvadd32(#5, 1bv32)[32:31], Gamma_#5;
     assert Gamma_ZF;
     if ((bvcomp1(ZF, 1bv1) != 0bv1)) {
-      goto l000003d0;
+      goto l00000428;
     }
-    goto l00000408;
-  l000003d0:
-    R0, Gamma_R0 := 4bv64, true;
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 44bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 44bv64), Gamma_R0);
-    goto l000003e2;
-  l00000408:
+    goto l00000482;
+  l00000428:
+    R0, Gamma_R0 := 0bv64, true;
+    R0, Gamma_R0 := bvadd64(R0, 1860bv64), Gamma_R0;
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 40bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 40bv64), Gamma_R0);
+    goto l00000441;
+  l00000482:
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
-    #6, Gamma_#6 := bvadd32(R0[32:0], 4294967290bv32), Gamma_R0;
-    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#6, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934587bv33))), (Gamma_R0 && Gamma_#6);
-    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#6, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967291bv33))), (Gamma_R0 && Gamma_#6);
+    #6, Gamma_#6 := bvadd32(R0[32:0], 4294967293bv32), Gamma_R0;
+    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#6, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934590bv33))), (Gamma_R0 && Gamma_#6);
+    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#6, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967294bv33))), (Gamma_R0 && Gamma_#6);
     ZF, Gamma_ZF := bvcomp32(bvadd32(#6, 1bv32), 0bv32), Gamma_#6;
     NF, Gamma_NF := bvadd32(#6, 1bv32)[32:31], Gamma_#6;
     assert (Gamma_ZF && (Gamma_VF && Gamma_NF));
     if ((bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1)) {
-      goto l000003e2;
+      goto l0000046d;
     }
-    goto l00000430;
-  l00000430:
+    goto l000004aa;
+  l000004aa:
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
-    #7, Gamma_#7 := bvadd32(R0[32:0], 4294967291bv32), Gamma_R0;
-    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#7, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934588bv33))), (Gamma_R0 && Gamma_#7);
-    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#7, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967292bv33))), (Gamma_R0 && Gamma_#7);
+    #7, Gamma_#7 := bvadd32(R0[32:0], 4294967295bv32), Gamma_R0;
+    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#7, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 0bv33))), (Gamma_R0 && Gamma_#7);
+    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#7, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967296bv33))), (Gamma_R0 && Gamma_#7);
     ZF, Gamma_ZF := bvcomp32(bvadd32(#7, 1bv32), 0bv32), Gamma_#7;
     NF, Gamma_NF := bvadd32(#7, 1bv32)[32:31], Gamma_#7;
     assert Gamma_ZF;
     if ((bvcomp1(ZF, 1bv1) != 0bv1)) {
-      goto l00000451;
+      goto l000004cb;
     }
-    goto l00000467;
-  l00000467:
+    goto l000004fe;
+  l000004cb:
+    R0, Gamma_R0 := 0bv64, true;
+    R0, Gamma_R0 := bvadd64(R0, 1812bv64), Gamma_R0;
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 40bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 40bv64), Gamma_R0);
+    goto l00000441;
+  l000004fe:
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
-    #8, Gamma_#8 := bvadd32(R0[32:0], 4294967291bv32), Gamma_R0;
-    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#8, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934588bv33))), (Gamma_R0 && Gamma_#8);
-    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#8, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967292bv33))), (Gamma_R0 && Gamma_#8);
+    #8, Gamma_#8 := bvadd32(R0[32:0], 4294967294bv32), Gamma_R0;
+    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#8, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934591bv33))), (Gamma_R0 && Gamma_#8);
+    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#8, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967295bv33))), (Gamma_R0 && Gamma_#8);
     ZF, Gamma_ZF := bvcomp32(bvadd32(#8, 1bv32), 0bv32), Gamma_#8;
     NF, Gamma_NF := bvadd32(#8, 1bv32)[32:31], Gamma_#8;
-    assert (Gamma_ZF && (Gamma_VF && Gamma_NF));
-    if ((bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1)) {
-      goto l000003e2;
-    }
-    goto l0000048f;
-  l0000048f:
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
-    #9, Gamma_#9 := bvadd32(R0[32:0], 4294967292bv32), Gamma_R0;
-    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#9, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934589bv33))), (Gamma_R0 && Gamma_#9);
-    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#9, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967293bv33))), (Gamma_R0 && Gamma_#9);
-    ZF, Gamma_ZF := bvcomp32(bvadd32(#9, 1bv32), 0bv32), Gamma_#9;
-    NF, Gamma_NF := bvadd32(#9, 1bv32)[32:31], Gamma_#9;
     assert Gamma_ZF;
     if ((bvcomp1(ZF, 1bv1) != 0bv1)) {
-      goto l000004b0;
+      goto l000004e7;
     }
-    goto l000004e2;
-  l000004b0:
-    R30, Gamma_R30 := 1944bv64, true;
-    call r();
-    goto l000004bc;
-  l000004bc:
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 44bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 44bv64), Gamma_R0);
-    goto l000004c4;
-  l000004e2:
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
-    #10, Gamma_#10 := bvadd32(R0[32:0], 4294967292bv32), Gamma_R0;
-    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#10, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934589bv33))), (Gamma_R0 && Gamma_#10);
-    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#10, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967293bv33))), (Gamma_R0 && Gamma_#10);
-    ZF, Gamma_ZF := bvcomp32(bvadd32(#10, 1bv32), 0bv32), Gamma_#10;
-    NF, Gamma_NF := bvadd32(#10, 1bv32)[32:31], Gamma_#10;
-    assert (Gamma_ZF && (Gamma_VF && Gamma_NF));
-    if ((bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1)) {
-      goto l000003e2;
-    }
-    goto l0000050a;
-  l0000050a:
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
-    #11, Gamma_#11 := bvadd32(R0[32:0], 4294967294bv32), Gamma_R0;
-    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#11, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934591bv33))), (Gamma_R0 && Gamma_#11);
-    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#11, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967295bv33))), (Gamma_R0 && Gamma_#11);
-    ZF, Gamma_ZF := bvcomp32(bvadd32(#11, 1bv32), 0bv32), Gamma_#11;
-    NF, Gamma_NF := bvadd32(#11, 1bv32)[32:31], Gamma_#11;
-    assert Gamma_ZF;
-    if ((bvcomp1(ZF, 1bv1) != 0bv1)) {
-      goto l000004c4;
-    }
-    goto l00000530;
-  l000004c4:
-    R0, Gamma_R0 := 1bv64, true;
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 44bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 44bv64), Gamma_R0);
-    goto l000003f1;
-  l00000530:
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
-    #12, Gamma_#12 := bvadd32(R0[32:0], 4294967293bv32), Gamma_R0;
-    VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#12, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934590bv33))), (Gamma_R0 && Gamma_#12);
-    CF, Gamma_CF := bvnot1(bvcomp33(zero_extend1_32(bvadd32(#12, 1bv32)), bvadd33(zero_extend1_32(R0[32:0]), 4294967294bv33))), (Gamma_R0 && Gamma_#12);
-    ZF, Gamma_ZF := bvcomp32(bvadd32(#12, 1bv32), 0bv32), Gamma_#12;
-    NF, Gamma_NF := bvadd32(#12, 1bv32)[32:31], Gamma_#12;
-    assert Gamma_ZF;
-    if ((bvcomp1(ZF, 1bv1) != 0bv1)) {
-      goto l000004d5;
-    }
-    goto l00000556;
-  l000004d5:
-    R0, Gamma_R0 := 2bv64, true;
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 44bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 44bv64), Gamma_R0);
-    goto l00000451;
-  l00000451:
-    R0, Gamma_R0 := 3bv64, true;
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 44bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 44bv64), Gamma_R0);
-    goto l000003f1;
-  l00000556:
-    goto l000003e2;
-  l000003e2:
-    R0, Gamma_R0 := 5bv64, true;
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 44bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 44bv64), Gamma_R0);
-    goto l000003f1;
-  l000003f1:
+    goto l00000524;
+  l000004e7:
+    R0, Gamma_R0 := 0bv64, true;
+    R0, Gamma_R0 := bvadd64(R0, 1836bv64), Gamma_R0;
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 40bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 40bv64), Gamma_R0);
+    goto l00000441;
+  l00000524:
+    goto l0000046d;
+  l0000046d:
+    R0, Gamma_R0 := 0bv64, true;
+    R0, Gamma_R0 := bvadd64(R0, 1812bv64), Gamma_R0;
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 40bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 40bv64), Gamma_R0);
+    goto l00000441;
+  l00000441:
+    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 40bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 40bv64));
+    R30, Gamma_R30 := 2020bv64, true;
+    //UNRESOLVED: call R0
+    assume false;
+    goto l00000453;
+  l00000453:
+    R0, Gamma_R0 := 0bv64, true;
     R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
     R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 48bv64), Gamma_R31;
-    return;
-}
-
-procedure r()
-  modifies Gamma_R0, R0;
-{
-  lr:
-    R0, Gamma_R0 := 1bv64, true;
     return;
 }
