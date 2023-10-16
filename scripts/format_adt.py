@@ -17,8 +17,17 @@ import pprint
 import typing
 import argparse
 
-# grep -E '[A-Z][a-ZA-Z]+\\(' *.adt --only-matching | sort | uniq | tr -d '(' | xargs -n1 printf "'%s', "
-heads = ['Annotation', 'Arg', 'Args', 'ARSHIFT', 'Attr', 'Attrs', 'Blk', 'Blks', 'Both', 'Call', 'Concat', 'Def', 'Defs', 'Direct', 'EQ', 'Extract', 'Goto', 'Imm', 'In', 'Indirect', 'Int', 'Jmps', 'LittleEndian', 'Load', 'LOW', 'Mem', 'Memmap', 'NEQ', 'NOT', 'Out', 'Phis', 'PLUS', 'Program', 'Project', 'Region', 'Section', 'Sections', 'SIGNED', 'Store', 'Sub', 'Subs', 'Tid', 'UNSIGNED', 'Var']
+# cd examples
+# grep -E '[A-Z][a-ZA-Z]+\\(' **/*.adt --no-filename --only-matching | sort | uniq | tr -d '(' | xargs -n1 printf "'%s', " | fold -w80 -s
+heads = [
+  'AND', 'Annotation', 'Arg', 'Args', 'ARSHIFT', 'Attr', 'Attrs', 'Blk', 'Blks', 
+  'Both', 'Call', 'Concat', 'Def', 'Defs', 'Direct', 'EQ', 'Extract', 'Goto', 
+  'Imm', 'In', 'Indirect', 'Int', 'Jmps', 'LittleEndian', 'Load', 'LOW', 
+  'LSHIFT', 'Mem', 'Memmap', 'MINUS', 'NEQ', 'NOT', 'OR', 'Out', 'Phis', 'PLUS', 
+  'Program', 'Project', 'Region', 'RSHIFT', 'SDIVIDE', 'Section', 'Sections', 
+  'SIGNED', 'SLT', 'Store', 'Sub', 'Subs', 'Tid', 'TIMES', 'UNSIGNED', 'Var', 
+  'XOR',
+]
 heads_joined = '|'.join(heads)
 
 def preprocess(data: str) -> str:
