@@ -17,16 +17,16 @@ import pprint
 import typing
 import argparse
 
-# cd examples
-# grep -E '[A-Z][a-ZA-Z]+\\(' **/*.adt --no-filename --only-matching | sort | uniq | tr -d '(' | xargs -n1 printf "'%s', " | fold -w80 -s
+# grep -E "'([A-Z][a-zA-Z]+)'" src/main/antlr4/BAP_ADT.g4 --only-matching --no-filename | sort | uniq | xargs printf "'%s', " | fold -w80 -s
 heads = [
-  'AND', 'Annotation', 'Arg', 'Args', 'ARSHIFT', 'Attr', 'Attrs', 'Blk', 'Blks', 
-  'Both', 'Call', 'Concat', 'Def', 'Defs', 'Direct', 'EQ', 'Extract', 'Goto', 
-  'Imm', 'In', 'Indirect', 'Int', 'Jmps', 'LittleEndian', 'Load', 'LOW', 
-  'LSHIFT', 'Mem', 'Memmap', 'MINUS', 'NEQ', 'NOT', 'OR', 'Out', 'Phis', 'PLUS', 
-  'Program', 'Project', 'Region', 'RSHIFT', 'SDIVIDE', 'Section', 'Sections', 
-  'SIGNED', 'SLT', 'Store', 'Sub', 'Subs', 'Tid', 'TIMES', 'UNSIGNED', 'Var', 
-  'XOR',
+  'AND', 'Annotation', 'Arg', 'Args', 'ARSHIFT', 'Attr', 'Attrs', 'BigEndian', 
+  'Blk', 'Blks', 'Both', 'Call', 'Concat', 'Def', 'Defs', 'Direct', 'DIVIDE', 
+  'EQ', 'Extract', 'Goto', 'HIGH', 'Imm', 'In', 'Indirect', 'Int', 'Jmp', 'Jmps', 
+  'LE', 'LittleEndian', 'Load', 'LOW', 'LSHIFT', 'LT', 'Mem', 'Memmap', 'MINUS', 
+  'MOD', 'NEG', 'NEQ', 'NOT', 'OR', 'Out', 'Phi', 'Phis', 'PLUS', 'Program', 
+  'Project', 'Region', 'RSHIFT', 'SDIVIDE', 'Section', 'Sections', 'SIGNED', 
+  'SLE', 'SLT', 'SMOD', 'Store', 'Sub', 'Subs', 'Tid', 'TIMES', 'UNSIGNED', 
+  'Var', 'XOR',
 ]
 heads_joined = '|'.join(heads)
 
