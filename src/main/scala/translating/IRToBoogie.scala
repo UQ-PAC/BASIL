@@ -283,14 +283,12 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }).flatten.toList
 
     val body = p.blocks.map(b => translateBlock(b))
-    val modifies: Seq[BVar] = p.modifies
+    // TODO don't hardcode Seq(mem, Gamma_mem) but this is necessary to work with adding rely() calls for now
+    val modifies: Seq[BVar] = {Seq(mem, Gamma_mem) ++ p.modifies
       .flatMap {
         case m: Memory   => Seq(m.toBoogie, m.toGamma)
         case r: Register => Seq(r.toBoogie, r.toGamma)
-      }
-      .toSeq
-      .sorted
-    //val modifies = Seq(mem, Gamma_mem, stack, Gamma_stack) // TODO placeholder until proper modifies analysis
+      }}.distinct.sorted
 
     val modifiedPreserve = modifies.collect { case m: BVar if modifiedCheck.contains(m) => m }
     val modifiedPreserveEnsures: List[BExpr] = modifiedPreserve.map(m => BinaryBExpr(BoolEQ, m, Old(m))).toList
