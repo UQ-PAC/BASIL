@@ -274,7 +274,7 @@ class Substituter(variables: Map[Variable, Variable] = Map(), memories: Map[Memo
 class Renamer(reserved: Set[String]) extends Visitor {
   override def visitLocalVar(node: LocalVar): LocalVar = {
     if (reserved.contains(node.name)) {
-      node.copy(name = '#' + node.name)
+      node.copy(name = s"#${node.name}")
     } else {
       node
     }
@@ -282,7 +282,7 @@ class Renamer(reserved: Set[String]) extends Visitor {
 
   override def visitMemory(node: Memory): Memory = {
     if (reserved.contains(node.name)) {
-      node.copy(name = '#' + node.name)
+      node.copy(name = s"#${node.name}")
     } else {
       node
     }
@@ -290,14 +290,14 @@ class Renamer(reserved: Set[String]) extends Visitor {
 
   override def visitParameter(node: Parameter): Parameter = {
     if (reserved.contains(node.name)) {
-      node.name = '#' + node.name
+      node.name = s"#${node.name}"
     }
     super.visitParameter(node)
   }
 
   override def visitProcedure(node: Procedure): Procedure = {
     if (reserved.contains(node.name)) {
-      node.name = '#' + node.name
+      node.name = s"#${node.name}"
     }
     super.visitProcedure(node)
   }
@@ -307,8 +307,34 @@ class Renamer(reserved: Set[String]) extends Visitor {
 class ExternalRemover(external: Set[String]) extends Visitor {
   override def visitProcedure(node: Procedure): Procedure = {
     if (external.contains(node.name)) {
+      // update the modifies set before removing the body
+      node.modifies.addAll(node.blocks.flatMap(_.modifies))
       node.blocks = ArrayBuffer()
     }
     super.visitProcedure(node)
   }
+}
+
+/** Gives variables that are not contained within a MemoryStore or MemoryLoad
+  * */
+class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
+  val variables: mutable.Set[Variable] = mutable.Set()
+
+  override def visitRegister(node: Register): Register = {
+    variables.add(node)
+    node
+  }
+  override def visitLocalVar(node: LocalVar): LocalVar = {
+    variables.add(node)
+    node
+  }
+
+  override def visitMemoryStore(node: MemoryStore): MemoryStore = {
+    node
+  }
+
+  override def visitMemoryLoad(node: MemoryLoad): MemoryLoad = {
+    node
+  }
+
 }

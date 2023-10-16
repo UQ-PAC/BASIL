@@ -138,7 +138,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, Map
 
   /** @inheritdoc
     */
-  def pointsTo(): Map[Object, Set[Object]] = {
+  def pointsTo(): Map[Object, Set[Variable | AAlloc]] = {
     val solution = solver.solution()
     val unifications = solver.unifications()
     Logger.debug(s"Solution: \n${solution.mkString(",\n")}\n")
@@ -149,7 +149,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, Map
       .mkString(", ")}")
 
     val vars = solution.keys.collect { case id: IdentifierVariable => id }
-    val pointsto = vars.foldLeft(Map[Object, Set[Object]]()) { case (a, v: IdentifierVariable) =>
+    val pointsto = vars.foldLeft(Map[Object, Set[Variable | AAlloc]]()) { case (a, v: IdentifierVariable) =>
       val pt = unifications(solution(v))
         .collect({
           case PointerRef(IdentifierVariable(id)) => id

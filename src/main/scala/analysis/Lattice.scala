@@ -101,16 +101,6 @@ class FlatLattice[X] extends Lattice:
 
   type Element = FlatElement
 
-  /** Wrap an element of `X` into an element of the flat lattice.
-    */
-  implicit def wrap(a: X): Element = FlatElement.FlatEl(a)
-
-  /** Unwrap an element of the lattice to an element of `X`. If the element is Top or Bot then IllegalArgumentException
-    * is thrown. Note that this method is declared as implicit, so the conversion can be done automatically.
-    */
-  implicit def unwrap(a: Element): X = a match
-    case FlatElement.FlatEl(n) => n
-    case _                     => throw new IllegalArgumentException(s"Cannot unlift $a")
 
   val bottom: Element = FlatElement.Bot
 
