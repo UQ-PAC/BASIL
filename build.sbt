@@ -1,6 +1,6 @@
 import scala.io.Source
 
-ThisBuild / scalaVersion := "3.1.0"
+ThisBuild / scalaVersion := "3.3.1"
 ThisBuild / version := "0.0.1"
 ThisBuild / organization := "uq.pac"
 
@@ -8,6 +8,8 @@ val javaTests = "com.novocode" % "junit-interface" % "0.11" % "test"
 val scalaTests = "org.scalatest" %% "scalatest" % "3.2.10" % "test"
 val scalactic = "org.scalactic" %% "scalactic" % "3.2.10"
 val antlrRuntime = "org.antlr" % "antlr4-runtime" % "4.9.3"
+val sourceCode = "com.lihaoyi" %% "sourcecode" % "0.3.0"
+val mainArgs = "com.lihaoyi" %% "mainargs" % "0.5.1"
 
 lazy val root = project
   .in(file("."))
@@ -16,13 +18,17 @@ lazy val root = project
     name := "wptool-boogie",
     Antlr4 / antlr4Version := "4.9.3",
     Antlr4 / antlr4GenVisitor := true,
-    Antlr4 / antlr4PackageName := Some("BilParser"),
-    Compile / run / mainClass := Some("main"),
+    Antlr4 / antlr4PackageName := Some("Parsers"),
+    Compile / run / mainClass := Some("Main"),
     libraryDependencies += javaTests,
     libraryDependencies += antlrRuntime,
     libraryDependencies += scalactic,
-    libraryDependencies += scalaTests
+    libraryDependencies += scalaTests,
+    libraryDependencies += sourceCode,
+    libraryDependencies += mainArgs
   )
+
+scalacOptions ++= Seq("-deprecation", "-feature")
 
 lazy val updateExpected = taskKey[Unit]("updates .expected for test cases")
 
@@ -43,8 +49,10 @@ updateExpected := {
         if (resultPath.exists()) {
           val result = IO.read(resultPath)
           val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
-          if (verified == shouldVerify && outPath.exists() && !compareFiles(outPath, expectedPath)) {
-            IO.copyFile(outPath, expectedPath)
+          if (verified == shouldVerify && outPath.exists()) {
+            if (!expectedPath.exists() || !compareFiles(outPath, expectedPath)) {
+              IO.copyFile(outPath, expectedPath)
+            }
           }
         }
       }
