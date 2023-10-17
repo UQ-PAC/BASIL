@@ -27,21 +27,39 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val Gamma_stack = BMapVar("Gamma_stack", MapBType(BitVecBType(64), BoolBType), Scope.Global)
   private val modifiedCheck: Set[BVar] = (for (i <- 19 to 29) yield {
     Set(BVariable("R" + i, BitVecBType(64), Scope.Global), BVariable("Gamma_R" + i, BoolBType, Scope.Global))
-  }).flatten.toSet ++ Set(BVariable("R" + 31, BitVecBType(64), Scope.Global), BVariable("Gamma_R" + 31, BoolBType, Scope.Global))
+  }).flatten.toSet ++ Set(
+    BVariable("R" + 31, BitVecBType(64), Scope.Global),
+    BVariable("Gamma_R" + 31, BoolBType, Scope.Global)
+  )
 
   def translate: BProgram = {
     val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
     val procedures = program.procedures.map(f => translateProcedure(f, readOnlyMemory))
     val defaultGlobals = List(BVarDecl(mem), BVarDecl(Gamma_mem))
-    val globalDecls = (procedures.flatMap(p => p.globals).map(b => BVarDecl(b)) ++ defaultGlobals).distinct.sorted.toList
+    val globalVars = procedures.flatMap(p => p.globals ++ p.freeRequires.flatMap(_.globals) ++ p.freeEnsures.flatMap(_.globals) ++ p.ensures.flatMap(_.globals) ++ p.requires.flatMap(_.globals))
+    val globalDecls = (globalVars.map(b => BVarDecl(b)) ++ defaultGlobals).distinct.sorted.toList
 
-    val globalConsts: List[BConstAxiomPair] = globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar), g.toAxiom)).toList.sorted
+    val globalConsts: List[BConstAxiomPair] =
+      globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar), g.toAxiom)).toList.sorted
 
-    val guaranteeReflexive = BProcedure("guarantee_reflexive", List(), List(), List(), List(), List(), List(), List(), List(), Seq(mem, Gamma_mem), guaranteesReflexive.map(g => BAssert(g)))
+    val guaranteeReflexive = BProcedure(
+      "guarantee_reflexive",
+      List(),
+      List(),
+      List(),
+      List(),
+      List(),
+      List(),
+      List(),
+      List(),
+      Seq(mem, Gamma_mem),
+      guaranteesReflexive.map(g => BAssert(g))
+    )
 
     val rgProcs = genRely(relies, readOnlyMemory) :+ guaranteeReflexive
 
-    val functionsUsed1 = procedures.flatMap(p => p.functionOps).toSet ++ rgProcs.flatMap(p => p.functionOps).toSet ++ directFunctions
+    val functionsUsed1 =
+      procedures.flatMap(p => p.functionOps).toSet ++ rgProcs.flatMap(p => p.functionOps).toSet ++ directFunctions
     val functionsUsed2 = functionsUsed1.map(p => functionOpToDefinition(p))
     val functionsUsed3 = functionsUsed2.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed = (functionsUsed2 ++ functionsUsed3).toList.sorted
@@ -86,12 +104,12 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           }
         }
         val accessesEndian = m.endian match {
-          case Endian.BigEndian => accesses.reverse
+          case Endian.BigEndian    => accesses.reverse
           case Endian.LittleEndian => accesses
         }
 
-        val body: BExpr = accessesEndian.tail.foldLeft(accessesEndian.head) {
-          (concat: BExpr, next: MapAccess) => BinaryBExpr(BVCONCAT, next, concat)
+        val body: BExpr = accessesEndian.tail.foldLeft(accessesEndian.head) { (concat: BExpr, next: MapAccess) =>
+          BinaryBExpr(BVCONCAT, next, concat)
         }
 
         BFunction(m.fnName, "", in, out, Some(body))
@@ -108,8 +126,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           }
         }
 
-        val body: BExpr = accesses.tail.foldLeft(accesses.head) {
-          (and: BExpr, next: MapAccess) => BinaryBExpr(BoolAND, next, and)
+        val body: BExpr = accesses.tail.foldLeft(accesses.head) { (and: BExpr, next: MapAccess) =>
+          BinaryBExpr(BoolAND, next, and)
         }
 
         BFunction(g.fnName, "", in, out, Some(body))
@@ -131,7 +149,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           BVExtract((i + 1) * m.valueSize, i * m.valueSize, valueVar)
         }
         val valuesEndian = m.endian match {
-          case Endian.BigEndian => values.reverse
+          case Endian.BigEndian    => values.reverse
           case Endian.LittleEndian => values
         }
         val indiceValues = for (i <- 0 until m.accesses) yield {
@@ -173,14 +191,14 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       case l: LOp =>
         val memoryVar = BParam("memory", l.memoryType)
         val indexVar = BParam("index", l.indexType)
-        val body: BExpr = LPreds.keys.foldLeft(FalseBLiteral) {
-          (ite: BExpr, next: SpecGlobal) => {
+        val body: BExpr = LPreds.keys.foldLeft(FalseBLiteral) { (ite: BExpr, next: SpecGlobal) =>
+          {
             val guard = next.arraySize match {
               case Some(size: Int) =>
                 val initial: BExpr = BinaryBExpr(BoolEQ, indexVar, ArrayAccess(next, 0).toAddrVar)
                 val indices = 1 until size
-                indices.foldLeft(initial) {
-                  (or: BExpr, i: Int) => {
+                indices.foldLeft(initial) { (or: BExpr, i: Int) =>
+                  {
                     BinaryBExpr(BoolOR, BinaryBExpr(BoolEQ, indexVar, ArrayAccess(next, i).toAddrVar), or)
                   }
                 }
@@ -223,13 +241,29 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
     val freeEnsures = modifiedPreserveEnsures ++ readOnlyMemory
 
-    BProcedure(p.name, List(), List(), procEnsures, procRequires, procEnsuresDirect, procRequiresDirect, freeEnsures, freeRequires, modifies, body.toList)
+    BProcedure(
+      p.name,
+      List(),
+      List(),
+      procEnsures,
+      procRequires,
+      procEnsuresDirect,
+      procRequiresDirect,
+      freeEnsures,
+      freeRequires,
+      modifies,
+      body.toList
+    )
   }
 
   private def memoryToCondition(memory: ArrayBuffer[MemorySection]): List[BExpr] = {
     val sections = memory.flatMap { s =>
       for (b <- s.bytes.indices) yield {
-        BinaryBExpr(BVEQ, BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8), s.bytes(b).toBoogie)
+        BinaryBExpr(
+          BVEQ,
+          BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+          s.bytes(b).toBoogie
+        )
       }
     }
     sections.toList
@@ -245,7 +279,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val call = List(ProcedureCall(d.target.name, List(), List(), List()))
       val returnTarget = d.returnTarget match {
         case Some(r) => List(GoToCmd(r.label))
-        case None => List(Comment("no return target"), BAssume(FalseBLiteral))
+        case None    => List(Comment("no return target"), BAssume(FalseBLiteral))
       }
       d.condition match {
         case Some(c) =>
@@ -263,7 +297,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         val unresolved: List[BCmd] = List(Comment(s"UNRESOLVED: call ${i.target.name}"), BAssume(FalseBLiteral))
         i.returnTarget match {
           case Some(r) => unresolved :+ GoToCmd(r.label)
-          case None => unresolved ++ List(Comment("no return target"), BAssume(FalseBLiteral))
+          case None    => unresolved ++ List(Comment("no return target"), BAssume(FalseBLiteral))
         }
       }
       i.condition match {
@@ -297,8 +331,14 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       } else {
         val rely = ProcedureCall("rely", List(), List(), List(rhs.memory, rhsGamma.gammaMap))
         val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.rhs.value.toGamma))
-        val oldAssigns = guaranteeOldVars.map(g => AssignCmd(g.toOldVar, BMemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size)))
-        val oldGammaAssigns = controlled.map(g => AssignCmd(g.toOldGamma, BinaryBExpr(BoolOR, GammaLoad(lhsGamma, g.toAddrVar, g.size, g.size / m.lhs.valueSize), L(lhs, g.toAddrVar))))
+        val oldAssigns =
+          guaranteeOldVars.map(g => AssignCmd(g.toOldVar, BMemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size)))
+        val oldGammaAssigns = controlled.map(g =>
+          AssignCmd(
+            g.toOldGamma,
+            BinaryBExpr(BoolOR, GammaLoad(lhsGamma, g.toAddrVar, g.size, g.size / m.lhs.valueSize), L(lhs, g.toAddrVar))
+          )
+        )
         val secureUpdate = for (c <- controls.keys) yield {
           val addrCheck = BinaryBExpr(BVEQ, rhs.index, c.toAddrVar)
           val checks = controls(c).map(v => BinaryBExpr(BoolIMPLIES, L(lhs, v.toAddrVar), v.toOldGamma)).toList

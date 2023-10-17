@@ -343,24 +343,24 @@ procedure main()
     assume false;
     goto l00000b79;
   l00000b79:
-    R8, Gamma_R8 := memory_load64_le(mem, R31), (gamma_load64(Gamma_mem, R31) || L(mem, R31));
+    R8, Gamma_R8 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
     R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 8bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 8bv64)) || L(mem, bvadd64(R8, 8bv64)));
     R30, Gamma_R30 := 2004bv64, true;
     //UNRESOLVED: call R8
     assume false;
     goto l00000b8f;
   l00000b8f:
-    R8, Gamma_R8 := memory_load64_le(mem, R31), (gamma_load64(Gamma_mem, R31) || L(mem, R31));
+    R8, Gamma_R8 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
     R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 16bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 16bv64)) || L(mem, bvadd64(R8, 16bv64)));
     R30, Gamma_R30 := 2016bv64, true;
     //UNRESOLVED: call R8
     assume false;
     goto l00000ba5;
   l00000ba5:
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, bvadd64(R31, 12bv64))), (gamma_load32(Gamma_mem, bvadd64(R31, 12bv64)) || L(mem, bvadd64(R31, 12bv64)));
+    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
     #6, Gamma_#6 := bvadd64(R31, 32bv64), Gamma_R31;
-    R29, Gamma_R29 := memory_load64_le(mem, #6), (gamma_load64(Gamma_mem, #6) || L(mem, #6));
-    R30, Gamma_R30 := memory_load64_le(mem, bvadd64(#6, 8bv64)), (gamma_load64(Gamma_mem, bvadd64(#6, 8bv64)) || L(mem, bvadd64(#6, 8bv64)));
+    R29, Gamma_R29 := memory_load64_le(stack, #6), gamma_load64(Gamma_stack, #6);
+    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(#6, 8bv64)), gamma_load64(Gamma_stack, bvadd64(#6, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 48bv64), Gamma_R31;
     return;
 }

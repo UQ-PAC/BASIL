@@ -60,16 +60,20 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
   }
 
   private def translate(s: BAPStatement) = s match {
-    case b: BAPMemAssign => MemoryAssign(b.lhs.toIR, b.rhs.toIR)
+    case b: BAPMemAssign   => MemoryAssign(b.lhs.toIR, b.rhs.toIR)
     case b: BAPLocalAssign => LocalAssign(b.lhs.toIR, b.rhs.toIR)
-    case _ => throw new Exception("unsupported statement: " + s)
+    case _                 => throw new Exception("unsupported statement: " + s)
   }
 
   private def translate(j: BAPJump) = j match {
     case b: BAPDirectCall =>
-      DirectCall(nameToProcedure(b.target), coerceToBool(b.condition), b.returnTarget.map {(t: String) => labelToBlock(t)})
+      DirectCall(
+        nameToProcedure(b.target),
+        coerceToBool(b.condition),
+        b.returnTarget.map { (t: String) => labelToBlock(t) }
+      )
     case b: BAPIndirectCall =>
-      IndirectCall(b.target.toIR, coerceToBool(b.condition), b.returnTarget.map {(t: String) => labelToBlock(t)})
+      IndirectCall(b.target.toIR, coerceToBool(b.condition), b.returnTarget.map { (t: String) => labelToBlock(t) })
     case b: BAPGoTo =>
       GoTo(labelToBlock(b.target), coerceToBool(b.condition))
     case _ =>
@@ -103,9 +107,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
         Extract(high + 1, low, body.toIR)
       }
     case b: BAPLiteral =>
-      
+
   }
-  */
+   */
 
   private def coerceToBool(condition: BAPExpr): Option[Expr] = condition match {
     case l: BAPLiteral if l.value > BigInt(0) =>
@@ -113,9 +117,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     case _ =>
       val c = condition.toIR
       c.getType match {
-        case BoolType => Some(c)
+        case BoolType       => Some(c)
         case bv: BitVecType => Some(BinaryExpr(BVNEQ, c, BitVecLiteral(0, bv.size)))
-        case _ => ???
+        case _              => ???
       }
   }
 }

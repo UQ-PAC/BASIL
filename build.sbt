@@ -1,6 +1,6 @@
 import scala.io.Source
 
-ThisBuild / scalaVersion := "3.1.0"
+ThisBuild / scalaVersion := "3.3.1"
 ThisBuild / version := "0.0.1"
 ThisBuild / organization := "uq.pac"
 
@@ -27,6 +27,8 @@ lazy val root = project
     libraryDependencies += sourceCode,
     libraryDependencies += mainArgs
   )
+
+scalacOptions ++= Seq("-deprecation", "-feature")
 
 lazy val updateExpected = taskKey[Unit]("updates .expected for test cases")
 
@@ -85,4 +87,3 @@ updateExpected := {
   expectedUpdate(correctPath, true)
   expectedUpdate(incorrectPath, false)
 }
-
