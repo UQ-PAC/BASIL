@@ -111,7 +111,7 @@ procedure guarantee_reflexive()
 }
 
 procedure main()
-  modifies Gamma_R0, Gamma_R31, Gamma_R8, Gamma_stack, R0, R31, R8, stack;
+  modifies Gamma_R0, Gamma_R31, Gamma_R8, Gamma_mem, Gamma_stack, R0, R31, R8, mem, stack;
   free requires (memory_load8_le(mem, 69664bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69665bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69666bv64) == 0bv8);
@@ -217,9 +217,11 @@ procedure main()
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), 0bv32), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), true);
     R8, Gamma_R8 := 69632bv64, true;
+    call rely();
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(mem, bvadd64(R8, 52bv64))), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 8bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 8bv64), Gamma_R8);
     R8, Gamma_R8 := 69632bv64, true;
+    call rely();
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(mem, bvadd64(R8, 56bv64))), (gamma_load32(Gamma_mem, bvadd64(R8, 56bv64)) || L(mem, bvadd64(R8, 56bv64)));
     #4, Gamma_#4 := bvadd32(R8[32:0], 4294967295bv32), Gamma_R8;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#4, 1bv32)), bvadd33(sign_extend1_32(R8[32:0]), 0bv33))), (Gamma_R8 && Gamma_#4);

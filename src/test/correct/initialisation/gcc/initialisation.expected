@@ -244,6 +244,7 @@ procedure main()
   lmain:
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 16bv64), Gamma_R0;
+    call rely();
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
     R1, Gamma_R1 := zero_extend32_32(bvadd32(R0[32:0], 1bv32)), Gamma_R0;
     R0, Gamma_R0 := 69632bv64, true;
@@ -253,6 +254,7 @@ procedure main()
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 24bv64), Gamma_R0;
+    call rely();
     R0, Gamma_R0 := memory_load64_le(mem, R0), (gamma_load64(Gamma_mem, R0) || L(mem, R0));
     R1, Gamma_R1 := bvadd64(R0, 18446744073709551615bv64), Gamma_R0;
     R0, Gamma_R0 := 69632bv64, true;
@@ -262,6 +264,7 @@ procedure main()
     mem, Gamma_mem := memory_store64_le(mem, R0, R1), gamma_store64(Gamma_mem, R0, Gamma_R1);
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 32bv64), Gamma_R0;
+    call rely();
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
     R1, Gamma_R1 := zero_extend32_32(bvadd32(R0[32:0], 3bv32)), Gamma_R0;
     R0, Gamma_R0 := 69632bv64, true;
@@ -271,6 +274,7 @@ procedure main()
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R0, 4bv64), R1[32:0]), gamma_store32(Gamma_mem, bvadd64(R0, 4bv64), Gamma_R1);
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 20bv64), Gamma_R0;
+    call rely();
     R0, Gamma_R0 := zero_extend56_8(memory_load8_le(mem, R0)), (gamma_load8(Gamma_mem, R0) || L(mem, R0));
     R0, Gamma_R0 := zero_extend32_32(bvadd32(R0[32:0], 1bv32)), Gamma_R0;
     R1, Gamma_R1 := zero_extend32_32((0bv24 ++ R0[8:0])), Gamma_R0;

@@ -286,6 +286,7 @@ procedure main()
     goto l00000329;
   l00000329:
     R8, Gamma_R8 := 65536bv64, true;
+    call rely();
     R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 4032bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 4032bv64)) || L(mem, bvadd64(R8, 4032bv64)));
     call rely();
     assert (L(mem, R8) ==> Gamma_R0);
@@ -297,6 +298,7 @@ procedure main()
     assert (Gamma_y_old ==> ((memory_load32_le(mem, $x_addr) == 0bv32) || gamma_load32(Gamma_mem, $y_addr)));
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(stack, bvadd64(R29, 18446744073709551612bv64))), gamma_load32(Gamma_stack, bvadd64(R29, 18446744073709551612bv64));
     R9, Gamma_R9 := 65536bv64, true;
+    call rely();
     R9, Gamma_R9 := memory_load64_le(mem, bvadd64(R9, 4048bv64)), (gamma_load64(Gamma_mem, bvadd64(R9, 4048bv64)) || L(mem, bvadd64(R9, 4048bv64)));
     call rely();
     assert (L(mem, R9) ==> Gamma_R8);
@@ -315,7 +317,7 @@ procedure main()
 }
 
 procedure zero()
-  modifies Gamma_R0, R0;
+  modifies Gamma_R0, Gamma_mem, R0, mem;
   free requires (memory_load8_le(mem, 1968bv64) == 1bv8);
   free requires (memory_load8_le(mem, 1969bv64) == 0bv8);
   free requires (memory_load8_le(mem, 1970bv64) == 2bv8);

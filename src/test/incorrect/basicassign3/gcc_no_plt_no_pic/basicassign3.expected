@@ -186,6 +186,7 @@ procedure main()
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 18bv64), Gamma_R0;
+    call rely();
     R0, Gamma_R0 := zero_extend56_8(memory_load8_le(mem, R0)), (gamma_load8(Gamma_mem, R0) || L(mem, R0));
     stack, Gamma_stack := memory_store8_le(stack, bvadd64(R31, 15bv64), R0[8:0]), gamma_store8(Gamma_stack, bvadd64(R31, 15bv64), Gamma_R0);
     stack, Gamma_stack := memory_store8_le(stack, bvadd64(R31, 15bv64), 0bv8), gamma_store8(Gamma_stack, bvadd64(R31, 15bv64), true);
@@ -197,6 +198,7 @@ procedure main()
     mem, Gamma_mem := memory_store8_le(mem, R0, R1[8:0]), gamma_store8(Gamma_mem, R0, Gamma_R1);
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 18bv64), Gamma_R0;
+    call rely();
     R0, Gamma_R0 := zero_extend56_8(memory_load8_le(mem, R0)), (gamma_load8(Gamma_mem, R0) || L(mem, R0));
     stack, Gamma_stack := memory_store8_le(stack, bvadd64(R31, 15bv64), R0[8:0]), gamma_store8(Gamma_stack, bvadd64(R31, 15bv64), Gamma_R0);
     R0, Gamma_R0 := 69632bv64, true;

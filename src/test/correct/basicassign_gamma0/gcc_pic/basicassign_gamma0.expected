@@ -241,9 +241,12 @@ procedure main()
 {
   lmain:
     R0, Gamma_R0 := 65536bv64, true;
+    call rely();
     R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4072bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4072bv64)) || L(mem, bvadd64(R0, 4072bv64)));
+    call rely();
     R1, Gamma_R1 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
     R0, Gamma_R0 := 65536bv64, true;
+    call rely();
     R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4056bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4056bv64)) || L(mem, bvadd64(R0, 4056bv64)));
     call rely();
     assert (L(mem, R0) ==> Gamma_R1);
