@@ -37,6 +37,43 @@ case class FlatEl[T](el: T) extends FlatElement[T]
 case object Top extends FlatElement[Nothing]
 case object Bottom extends FlatElement[Nothing]
 
+trait LiftedElement[+T]
+case class Lift[T](el: T) extends LiftedElement[T]
+case object LiftedBottom extends LiftedElement[Nothing] {
+  override def toString = "LiftBot"
+}
+/**
+ * The lift lattice for `sublattice`.
+ * Supports implicit lifting and unlifting.
+ */
+class LiftLattice[T, +L <: Lattice[T]](val sublattice: L) extends Lattice[LiftedElement[T]] {
+
+  val bottom: LiftedElement[T] = LiftedBottom
+
+  def lub(x: LiftedElement[T], y: LiftedElement[T]): LiftedElement[T] =
+    (x, y) match {
+      case (LiftedBottom, t) => t
+      case (t, LiftedBottom) => t
+      case (Lift(a), Lift(b)) => Lift(sublattice.lub(a, b))
+    }
+
+  /**
+   * Lift elements of the sublattice to this lattice.
+   * Note that this method is declared as implicit, so the conversion can be done automatically.
+   */
+  def lift(x: T): LiftedElement[T] = Lift(x)
+
+  /**
+   * Un-lift elements of this lattice to the sublattice.
+   * Throws an IllegalArgumentException if trying to unlift the bottom element
+   * Note that this method is declared as implicit, so the conversion can be done automatically.
+   */
+  def unlift(x: LiftedElement[T]): T = x match {
+    case Lift(s) => s
+    case LiftedBottom => throw new IllegalArgumentException("Cannot unlift bottom")
+  }
+}
+
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
   * other element. No additional ordering is defined.
   */

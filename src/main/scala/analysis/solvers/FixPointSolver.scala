@@ -48,6 +48,28 @@ trait MapLatticeSolver[N, T, L <: Lattice[T]] extends LatticeSolver[Map[N, T]] w
     val states = indep(n).map(o(_))
     states.foldLeft(lattice.sublattice.bottom)((acc, pred) => lattice.sublattice.lub(acc, pred))
 
+/**
+ * Base trait for solvers for map lattices with lifted co-domains.
+ * @tparam N type of the elements in the map domain.
+ */
+trait MapLiftLatticeSolver[N] extends MapLatticeSolver[N] with Dependencies[N] {
+
+  val lattice: MapLattice[N, LiftLattice[Lattice]]
+
+  /**
+   * The transfer function for the sub-sub-lattice.
+   */
+  def transferUnlifted(n: N, s: lattice.sublattice.sublattice.Element): lattice.sublattice.sublattice.Element
+
+  def transfer(n: N, s: lattice.sublattice.Element): lattice.sublattice.Element = {
+    import lattice.sublattice._
+    s match {
+      case Bottom => Bottom // unreachable as input implied unreachable at output
+      case Lift(a) => lift(transferUnlifted(n, a))
+    }
+  }
+}
+
 /** An abstract worklist algorithm.
   *
   * @tparam N

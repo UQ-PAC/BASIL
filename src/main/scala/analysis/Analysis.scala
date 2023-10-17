@@ -167,7 +167,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
 
   /** The lattice of abstract states.
     */
-  val lattice: MapLattice[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
+  val stateLattice: MapLattice[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -247,7 +247,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
           if (directCall.target.name == "malloc") {
             evaluateExpression(mallocVariable, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
-                lattice.sublattice.lub(s, Set(HeapRegion(nextMallocCount())))
+                lattice.sublattice.lub(s, Set(HeapRegion(nextMallocCount(), b)))
               case None => s
             }
           } else {
@@ -281,7 +281,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
             case _ =>
           })
           */
-          lattice.sublattice.lub(s, result)
+          stateLattice.sublattice.lub(s, result)
         case localAssign: LocalAssign =>
           var m = s
           unwrapExpr(localAssign.rhs).foreach {
@@ -297,7 +297,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                 case _ =>
               })
               */
-              m = lattice.sublattice.lub(m, result)
+              m = stateLattice.sublattice.lub(m, result)
             case _ => m
           }
           m
@@ -310,6 +310,50 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     */
   def transfer(n: CfgNode, s: Set[MemoryRegion]): Set[MemoryRegion] = localTransfer(n, s)
 
+/**
+ * Base class for memory region analysis with lifted lattice, where the extra bottom element represents "unreachable".
+ */
+abstract class LiftedMemoryRegionAnalysis[P <: ProgramCfg](
+    val cfg: ProgramCfg,
+    val globals: Map[BigInt, String],
+    val globalOffsets: Map[BigInt, BigInt],
+    val subroutines: Map[BigInt, String],
+    val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
+) extends FlowSensitiveAnalysis(false)
+    with MapLatticeSolver[CfgNode]
+    with MemoryRegionAnalysisMisc {
+
+  /**
+   * Lifted state lattice, with new bottom element representing "unreachable".
+   */
+  val liftedstatelattice: LiftLattice[stateLattice.type] = new LiftLattice(stateLattice)
+
+  /**
+   * The analysis lattice.
+   */
+  val lattice: MapLattice[CfgNode, liftedstatelattice.type] = new MapLattice(liftedstatelattice)
+
+  val domain: Set[CfgNode] = cfg.nodes.toSet
+
+  /**
+   * The worklist is initialized with all function entry nodes.
+   */
+  val first: Set[CfgNode] = cfg.funEntries.toSet[CfgNode]
+
+  /**
+   * Overrides `funsub` from [[tip.solvers.MapLatticeSolver]], treating function entry nodes as reachable.
+   */
+  override def funsub(n: CfgNode, x: lattice.Element, intra: Boolean): liftedstatelattice.Element = {
+    import liftedstatelattice._
+    n match {
+      // function entry nodes are always reachable (if intra-procedural analysis)
+      case _: CfgFunctionEntryNode => lift(stateLattice.bottom)
+      // all other nodes are processed with join+transfer
+      case _ => super.funsub(n, x, intra)
+    }
+  }
+}
+
 }
 
 class MemoryRegionAnalysisSolver(
@@ -318,6 +362,6 @@ class MemoryRegionAnalysisSolver(
     globalOffsets: Map[BigInt, BigInt],
     subroutines: Map[BigInt, String],
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
-) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
+) extends LiftedMemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
     with IntraproceduralForwardDependencies
     with SimpleMonotonicSolver[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]
