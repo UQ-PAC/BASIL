@@ -294,7 +294,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val call: List[BCmd] = if (i.target.name == "R30") {
         List(ReturnCmd)
       } else {
-        val unresolved: List[BCmd] = List(Comment(s"UNRESOLVED: call ${i.target.name}"), BAssume(FalseBLiteral))
+        val unresolved: List[BCmd] = List(Comment(s"UNRESOLVED: call ${i.target.name}"), BAssert(FalseBLiteral))
         i.returnTarget match {
           case Some(r) => unresolved :+ GoToCmd(r.label)
           case None    => unresolved ++ List(Comment("no return target"), BAssume(FalseBLiteral))
