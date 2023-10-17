@@ -33,6 +33,15 @@ trait SimpleMonotonicSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[
       add(outdep(n, intra))
 
   def analyze(intra: Boolean): lattice.Element =
+    // TODO this sort of type-dependent code should not be in the generic solver
+    // should probably base it upon WorklistFixpointSolverWithReachability from TIP instead?
+    val first: Set[N] = if (intra) {
+      domain.collect { case n: CfgFunctionEntryNode if n.pred(intra).isEmpty => n }
+    } else {
+      // TODO this is not the correct way to do things, we should set Cfg.startNode but don't have visibility here
+      domain.collect { case n: CfgFunctionEntryNode if n.data.name == "main" => n }
+    }
+
     x = lattice.bottom
-    monotonic_run(domain, intra)
+    run(first, intra)
     x

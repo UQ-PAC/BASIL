@@ -40,7 +40,7 @@ trait LatticeWithOps extends Lattice:
   def bvsdiv(a: Element, b: Element): Element
   def bvsrem(a: Element, b: Element): Element
   def bvurem(a: Element, b: Element): Element
-  // smod
+  def bvsmod(a: Element, b: Element): Element
   def bvshl(a: Element, b: Element): Element
   def bvlshr(a: Element, b: Element): Element
   def bvashr(a: Element, b: Element): Element
@@ -74,9 +74,9 @@ class PowersetLattice[A] extends Lattice {
 
   type Element = Set[A]
 
-  val bottom: Element = Set.empty //<--- Complete here
+  val bottom: Element = Set.empty
 
-  def lub(x: Element, y: Element): Element = x.union(y) //<--- Complete here
+  def lub(x: Element, y: Element): Element = x.union(y)
 }
 
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
@@ -101,16 +101,6 @@ class FlatLattice[X] extends Lattice:
 
   type Element = FlatElement
 
-  /** Wrap an element of `X` into an element of the flat lattice.
-    */
-  implicit def wrap(a: X): Element = FlatElement.FlatEl(a)
-
-  /** Unwrap an element of the lattice to an element of `X`. If the element is Top or Bot then IllegalArgumentException
-    * is thrown. Note that this method is declared as implicit, so the conversion can be done automatically.
-    */
-  implicit def unwrap(a: Element): X = a match
-    case FlatElement.FlatEl(n) => n
-    case _                     => throw new IllegalArgumentException(s"Cannot unlift $a")
 
   val bottom: Element = FlatElement.Bot
 
@@ -163,6 +153,7 @@ object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWit
   override def bvsdiv(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsdiv, a, b)
   override def bvsrem(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsrem, a, b)
   override def bvurem(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvurem, a, b)
+  override def bvsmod(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsmod, a, b)
   override def bvand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvand, a, b)
   override def bvor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvor, a, b)
   override def bvxor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvxor, a, b)
@@ -215,6 +206,7 @@ object ValueSetLattice extends FlatLattice[Literal]() with LatticeWithOps:
   override def bvudiv(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvudiv, a, b)
   override def bvsdiv(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsdiv, a, b)
   override def bvsrem(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsrem, a, b)
+  override def bvsmod(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsmod, a, b)
   override def bvurem(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvurem, a, b)
   override def bvand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvand, a, b)
   override def bvor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvor, a, b)

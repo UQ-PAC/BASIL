@@ -1,3 +1,4 @@
+import analysis.{CfgNode, MemoryRegion}
 import org.scalatest.Inside.inside
 import org.scalatest.*
 import org.scalatest.funsuite.*
@@ -13,7 +14,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
   def runMain(name: String, dump: Boolean = false): Unit = {
     var expected = ""
     var actual = ""
-    var output: Option[Map[analysis.CfgNode, ?]] = None
+    var output: Map[CfgNode, Set[MemoryRegion]] = Map()
     RunUtils.loadAndTranslate(
       examplesPath + s"${name}/${name}.adt",
       examplesPath + s"${name}/${name}.relf",
@@ -32,7 +33,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
       output = RunUtils.memoryRegionAnalysisResults
       val outFile = new File(tempPath + s"${name}")
       val pw = new PrintWriter(outFile, "UTF-8")
-      output.get.foreach { case (k, v) =>
+      output.foreach { case (k, v) =>
         pw.write(s"${k} -> ${v}")
         pw.write("\n")
       }
@@ -48,7 +49,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
         if (dump) {
           val outFile = new File(expectedPath + s"${name}")
           val pw = new PrintWriter(outFile, "UTF-8")
-          output.get.foreach { case (k, v) =>
+          output.foreach { case (k, v) =>
             pw.write(s"${k} -> ${v}")
             pw.write("\n")
           }

@@ -101,7 +101,8 @@ case class SubroutineSpec(
     requires: List[BExpr],
     requiresDirect: List[String],
     ensures: List[BExpr],
-    ensuresDirect: List[String]
+    ensuresDirect: List[String],
+    modifies: List[String]
 )
 
 case class ExternalFunction(name: String, offset: BigInt)

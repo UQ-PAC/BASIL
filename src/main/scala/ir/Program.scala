@@ -32,14 +32,18 @@ class Program(
     procedures = procedures.filter(f => reachableNames.contains(f.name))
   }
 
-  def setModifies(): Unit = {
-    //val procToModifies: mutable.Map[Procedure, mutable.Set[Global]] = mutable.Map()
+  def setModifies(specModifies: Map[String, List[String]]): Unit = {
+
     val procToCalls: mutable.Map[Procedure, Set[Procedure]] = mutable.Map()
     for (p <- procedures) {
-      //procToModifies(p) = mutable.Set()
-      //procToModifies(p).addAll(p.blocks.flatMap(_.modifies))
       p.modifies.addAll(p.blocks.flatMap(_.modifies))
       procToCalls(p) = p.calls
+    }
+
+    for (p <- procedures) {
+      if (specModifies.contains(p.name)) {
+        p.modifies.addAll(specModifies(p.name).map(nameToGlobal))
+      }
     }
 
     // very naive implementation but will work for now
@@ -58,39 +62,19 @@ class Program(
         }
       }
     }
+  }
 
-    /*
-    val visited: mutable.Set[Procedure] = mutable.Set()
-    val waiting: mutable.Set[Procedure] = mutable.Set()
-    val loops: mutable.Set[Set[Procedure]] = mutable.Set()
-    // need to add support for back edges - do a fixed point on them so all procedures in a loop have the same modifies
-    DFSVisit(mainProcedure, Vector(mainProcedure))
-    def DFSVisit(p: Procedure, path: Vector[Procedure]): Vector[Procedure] = {
-      val children = procToCalls(p)
-      if (visited.contains(p)) {
-        return path
+  // this is very crude but the simplest thing for now until we have a more sophisticated specification system that can relate to the IR instead of the Boogie
+  def nameToGlobal(name: String): Global = {
+    if ((name.startsWith("R") || name.startsWith("V")) && (name.length == 2 || name.length == 3) && name.substring(1).forall(_.isDigit)) {
+      if (name.startsWith("R")) {
+        Register(name, BitVecType(64))
+      } else {
+        Register(name, BitVecType(128))
       }
-      if (waiting.contains(p)) {
-        val loopPath = path.slice(path.indexOf(p), path.size)
-        loops.add(loopPath.toSet)
-        return path
-        //throw new Exception("back edge in intraprocedural control flow graph, not currently supported")
-      }
-      waiting.add(p)
-      p.modifies.addAll(procToModifies(p))
-      for (child <- children) {
-        if (child != p) {
-          DFSVisit(child, path :+ p)
-        }
-      }
-      for (child <- children) {
-        p.modifies.addAll(child.modifies)
-      }
-      waiting.remove(p)
-      visited.add(p)
-      path :+ p
+    } else {
+      Memory(name, 64, 8)
     }
-     */
   }
 
   def stackIdentification(): Unit = {
@@ -140,7 +124,10 @@ class Procedure(
             }
 
             // update stack references
-            val rhsStackRefs = l.rhs.variables.intersect(stackRefs)
+            val variableVisitor = VariablesWithoutStoresLoads()
+            variableVisitor.visitExpr(l.rhs)
+
+            val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackRefs)
             if (rhsStackRefs.nonEmpty) {
               stackRefs.add(l.lhs)
             } else if (stackRefs.contains(l.lhs) && l.lhs != stackPointer) {
@@ -160,7 +147,8 @@ class Procedure(
       for (j <- b.jumps) {
         j match {
           case g: GoTo => visitBlock(g.target)
-          case _       =>
+          case d: DirectCall => d.returnTarget.foreach(visitBlock)
+          case i: IndirectCall => i.returnTarget.foreach(visitBlock)
         }
       }
     }

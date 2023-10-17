@@ -333,7 +333,6 @@ class MemoryLoad(var mem: Memory, var index: Expr, var endian: Endian, var size:
 
 sealed trait Global
 
-// name == stack or mem or data
 case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr with Global {
   override def toBoogie: BMapVar =
     BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
@@ -358,10 +357,6 @@ sealed trait Variable extends Expr {
     case _             => throw new Exception("tried to get size of non-bitvector")
   }
 
-  val isRegister: Boolean = name.startsWith("R") || name.startsWith("V") && name != "VF"
-
-  // `rName` : e.g. "R20"
-  def isRegister(rName: String): Boolean = isRegister && rName.equals(name)
   override def toString: String = s"Variable($name, $irType)"
 
   override def acceptVisit(visitor: Visitor): Variable =

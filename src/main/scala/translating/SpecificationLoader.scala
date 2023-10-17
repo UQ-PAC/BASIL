@@ -51,35 +51,41 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   }
 
   def visitDirectFunction(ctx: DirectFunctionContext): FunctionOp = ctx match {
-    case m: MemoryLoadContext  => MemoryLoadOp(64, 8, visitEndian(m.endian), Integer.parseInt(m.size.getText))
-    case m: MemoryStoreContext => MemoryStoreOp(64, 8, visitEndian(m.endian), Integer.parseInt(m.size.getText))
+    case m: MemoryLoadContext =>
+      val suffix = m.getText.stripPrefix("memory_load")
+      val size = suffix.stripSuffix("_le").stripSuffix("_be")
+      val endian = suffix.stripPrefix(size)
+      MemoryLoadOp(64, 8, parseEndian(endian), Integer.parseInt(size))
+    case m: MemoryStoreContext =>
+      val suffix = m.getText.stripPrefix("memory_store")
+      val size = suffix.stripSuffix("_le").stripSuffix("_be")
+      val endian = suffix.stripPrefix(size)
+      MemoryStoreOp(64, 8, parseEndian(endian), Integer.parseInt(size))
     case g: GammaLoadContext =>
-      val size = Integer.parseInt(g.size.getText)
+      val sizeText = g.getText.stripPrefix("gamma_load")
+      val size = Integer.parseInt(sizeText)
       GammaLoadOp(64, size, size / 8)
     case g: GammaStoreContext =>
-      val size = Integer.parseInt(g.size.getText)
+      val sizeText = g.getText.stripPrefix("gamma_store")
+      val size = Integer.parseInt(sizeText)
       GammaStoreOp(64, size, size / 8)
     case z: ZeroExtendContext =>
-      val extension = Integer.parseInt(z.size1.getText)
-      val bodySize = Integer.parseInt(z.size2.getText)
-      BVFunctionOp(
-        s"zero_extend${extension}_$bodySize",
-        s"zero_extend $extension",
-        List(BParam(BitVecBType(bodySize))),
-        BParam(BitVecBType(bodySize + extension))
-      )
+      val suffix = z.getText.stripPrefix("zero_extend")
+      val sizes = suffix.split("_")
+      val extension = Integer.parseInt(sizes(0))
+      val bodySize = Integer.parseInt(sizes(1))
+      BVFunctionOp(s"zero_extend${extension}_$bodySize", s"zero_extend $extension", List(BParam(BitVecBType(bodySize))), BParam(BitVecBType(bodySize + extension)))
     case s: SignExtendContext =>
-      val extension = Integer.parseInt(s.size1.getText)
-      val bodySize = Integer.parseInt(s.size2.getText)
-      BVFunctionOp(
-        s"sign_extend${extension}_$bodySize",
-        s"sign_extend $extension",
-        List(BParam(BitVecBType(bodySize))),
-        BParam(BitVecBType(bodySize + extension))
-      )
+      val suffix = s.getText.stripPrefix("sign_extend")
+      val sizes = suffix.split("_")
+      val extension = Integer.parseInt(sizes(0))
+      val bodySize = Integer.parseInt(sizes(1))
+      BVFunctionOp(s"sign_extend${extension}_$bodySize", s"sign_extend $extension", List(BParam(BitVecBType(bodySize))), BParam(BitVecBType(bodySize + extension)))
     case b: BvOpContext =>
-      val size = Integer.parseInt(b.size.getText)
-      val op = b.OPNAME.getText
+      val body = b.getText.stripPrefix("bv")
+      val sizeText = body.replaceAll("\\D+","")
+      val size = Integer.parseInt(sizeText)
+      val op = body.stripSuffix(sizeText)
       val outType = op match {
         case "and" | "or" | "add" | "mul" | "udiv" | "urem" | "shl" | "lshr" | "nand" | "nor" | "xor" | "xnor" | "sub" |
             "srem" | "sdiv" | "smod" | "ashr" =>
@@ -94,7 +100,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       BVFunctionOp(s"bv$op$size", s"bv$op", List(BParam(BitVecBType(size)), BParam(BitVecBType(size))), BParam(outType))
   }
 
-  def visitEndian(ctx: EndianContext): Endian = ctx.getText match {
+  def parseEndian(endian: String): Endian = endian match {
     case "_le" => Endian.LittleEndian
     case "_be" => Endian.BigEndian
   }
@@ -362,8 +368,13 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       visitExpr(r.expr, nameToGlobals, params)
     }.toList
 
-    val ensures = ctx.ensures.asScala.collect { case e: ParsedEnsuresContext =>
-      visitExpr(e.expr, nameToGlobals, params)
+    val modifies = Option(ctx.modifies) match {
+      case Some(_) => visitModifies(ctx.modifies)
+      case None => List()
+    }
+
+    val ensures = ctx.ensures.asScala.collect {
+      case e: ParsedEnsuresContext => visitExpr(e.expr, nameToGlobals, params)
     }.toList
 
     val requiresDirect = ctx.requires.asScala.collect { case r: DirectRequiresContext =>
@@ -374,7 +385,11 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       r.QUOTESTRING.getText.stripPrefix("\"").stripSuffix("\"")
     }.toList
 
-    SubroutineSpec(ctx.id.getText, requires, requiresDirect, ensures, ensuresDirect)
+    SubroutineSpec(ctx.id.getText, requires, requiresDirect, ensures, ensuresDirect, modifies)
+  }
+
+  def visitModifies(ctx: ModifiesContext): List[String] = {
+    ctx.id.asScala.map(_.getText).toList
   }
 
 }

@@ -1,12 +1,11 @@
 package analysis
 
 import scala.collection.mutable
-import ir._
-import cfg_visualiser.{DotArrow, DotRegularArrow, DotInterArrow, DotInlineArrow, DotIntraArrow, DotGraph, DotNode}
+import ir.*
+import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
 
-import scala.collection.mutable.ListBuffer
-
-import scala.util.control.Breaks.break;
+import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.util.control.Breaks.break
 import analysis.Fresh.next
 import util.Logger
 
@@ -303,7 +302,9 @@ case class CfgCallReturnNode(
 
 /** Control-flow graph node for a command (statement or jump).
   */
-trait CfgCommandNode extends CfgNodeWithData[Command]
+trait CfgCommandNode extends CfgNodeWithData[Command] {
+  override def copyNode(): CfgCommandNode
+}
 
 /** CFG's representation of a single statement.
   */
@@ -314,13 +315,12 @@ case class CfgStatementNode(
     override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     data: Statement,
-    block: Block,
-    parent: CfgFunctionEntryNode
+    block: Block
 ) extends CfgCommandNode:
   override def toString: String = s"[Stmt] $data"
 
   /** Copy this node, but give unique ID and reset edges */
-  override def copyNode(): CfgStatementNode = CfgStatementNode(data = this.data, block = this.block, parent = this.parent)
+  override def copyNode(): CfgStatementNode = CfgStatementNode(data = this.data, block = this.block)
 
 /** CFG's representation of a jump. This is used as a general jump node, for both indirect and direct calls.
   */
@@ -349,9 +349,9 @@ case class CfgGhostNode(
     override val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
-    data: NOP = NOP(),
     block: Block
 ) extends CfgCommandNode:
+  override val data: Statement = NOP
   override def toString: String = s"[NOP]"
 
   /** Copy this node, but give unique ID and reset edges */
@@ -360,6 +360,8 @@ case class CfgGhostNode(
 /** A control-flow graph. Nodes provide the ability to walk it as both an intra and inter procedural CFG.
   */
 class ProgramCfg:
+
+  var startNode: CfgFunctionEntryNode = _
 
   var edges: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
   var nodes: mutable.Set[CfgNode] = mutable.Set[CfgNode]()
@@ -535,7 +537,7 @@ class ProgramCfg:
       }
     }
     dotArrows = dotArrows.sortBy(arr => arr.fromNode.id + "-" + arr.toNode.id)
-    val allNodes = dotNodes.values.seq.toList.sortBy(n => n.id)
+    val allNodes = dotNodes.values.toList.sortBy(n => n.id)
     new DotGraph("CFG", allNodes, dotArrows).toDotString
   }
 
@@ -611,6 +613,8 @@ class ProgramCfgFactory:
       addInterprocEdges(leafCallNodes)
     }
 
+    cfg.startNode = procToCfg(program.mainProcedure)._1
+
     cfg
   }
 
@@ -675,11 +679,11 @@ class ProgramCfgFactory:
       block.statements.size match {
         case i if i > 0 =>
           // Block contains some statements
-          val endStmt: CfgCommandNode = visitStmts(block.statements.toList, prevBlockEnd, cond)
-          visitJumps(block.jumps.toList, endStmt, TrueLiteral, solitary = false)
+          val endStmt: CfgCommandNode = visitStmts(block.statements, prevBlockEnd, cond)
+          visitJumps(block.jumps, endStmt, TrueLiteral, solitary = false)
         case _ =>
           // Only jumps in this block
-          visitJumps(block.jumps.toList, prevBlockEnd, cond, solitary = true)
+          visitJumps(block.jumps, prevBlockEnd, cond, solitary = true)
       }
 
       /** If a block has statements, we add them to the CFG. Blocks in this case are basic blocks, so we know
@@ -694,9 +698,9 @@ class ProgramCfgFactory:
         * @return
         *   The last statement's CFG node
         */
-      def visitStmts(stmts: List[Statement], prevNode: CfgNode, cond: Expr): CfgCommandNode = {
+      def visitStmts(stmts: ArrayBuffer[Statement], prevNode: CfgNode, cond: Expr): CfgCommandNode = {
 
-        val firstNode: CfgStatementNode = CfgStatementNode(data = stmts.head, block = block, parent = funcEntryNode)
+        val firstNode: CfgStatementNode = CfgStatementNode(data = stmts.head, block = block)
         cfg.addEdge(prevNode, firstNode, cond)
         visitedBlocks += (block -> firstNode) // This is guaranteed to be entrance to block if we are here
 
@@ -709,7 +713,7 @@ class ProgramCfgFactory:
 
         // `tail` takes everything after the first element of the iterable
         stmts.tail.foreach(stmt =>
-          val stmtNode: CfgStatementNode = CfgStatementNode(data = stmt, block = block, parent = funcEntryNode)
+          val stmtNode: CfgStatementNode = CfgStatementNode(data = stmt, block = block)
           cfg.addEdge(prevStmtNode, stmtNode)
           prevStmtNode = stmtNode
         )
@@ -731,7 +735,7 @@ class ProgramCfgFactory:
         * @param solitary
         *   `True` if this block contains no statements, `False` otherwise
         */
-      def visitJumps(jmps: List[Jump], prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
+      def visitJumps(jmps: ArrayBuffer[Jump], prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
 
         val jmpNode: CfgJumpNode = CfgJumpNode(data = jmps.head, block = block)
         var precNode: CfgNode = prevNode
@@ -758,12 +762,8 @@ class ProgramCfgFactory:
           }
         }
 
-        /* Possible `jmp` combinations:
-              1. DirectCall
-              2. IndirectCall
-              3. GoTo
-              4. GoTo + GoTo
-         */
+        // TODO this is not a robust approach
+
         jmps.head match {
           case goto: GoTo =>
             // Process first jump
@@ -781,10 +781,7 @@ class ProgramCfgFactory:
               visitBlock(targetBlock, precNode, targetCond)
             }
 
-            /* If the first GoTo's condition is not `True`, then we know there must be a second conditional jump.
-             *  We could equivalently check if `jmps` has 2 jumps, though this emphasises why we check for
-             *  a second jump. We can assume we have a maximum of 2 jumps, as that's what the IR (as of writing)
-             *  intends.
+            /* TODO it is not a safe assumption that there are a maximum of two jumps, or that a GoTo will follow a GoTo
              */
             if (targetCond != TrueLiteral) {
               val secondGoto: GoTo = jmps.tail.head.asInstanceOf[GoTo]
@@ -851,7 +848,7 @@ class ProgramCfgFactory:
 
             // R30 is the link register - this stores the address to return to.
             //  For now just add a node expressing that we are to return to the previous context.
-            if (iCall.target.isRegister("R30")) {
+            if (iCall.target == Register("R30", BitVecType(64))) {
               val returnNode = CfgProcedureReturnNode()
               cfg.addEdge(jmpNode, returnNode)
               cfg.addEdge(returnNode, funcExitNode)
@@ -1068,7 +1065,7 @@ class ProgramCfgFactory:
 
       node match {
         case n: CfgCommandNode =>
-          val newNode: CfgCommandNode = n.copyNode().asInstanceOf[CfgCommandNode]
+          val newNode: CfgCommandNode = n.copyNode()
 
           // Link this node with predecessor in the new cfg
           cfg.addEdge(prevNewNode, newNode, cond)

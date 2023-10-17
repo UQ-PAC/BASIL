@@ -1,5 +1,7 @@
 var Gamma_R0: bool;
 var Gamma_R1: bool;
+var Gamma_R16: bool;
+var Gamma_R17: bool;
 var Gamma_R29: bool;
 var Gamma_R30: bool;
 var Gamma_R31: bool;
@@ -7,6 +9,8 @@ var Gamma_mem: [bv64]bool;
 var Gamma_stack: [bv64]bool;
 var R0: bv64;
 var R1: bv64;
+var R16: bv64;
+var R17: bv64;
 var R29: bv64;
 var R30: bv64;
 var R31: bv64;
@@ -90,9 +94,10 @@ procedure guarantee_reflexive();
   modifies mem, Gamma_mem;
 
 procedure #free();
+  modifies Gamma_R16, Gamma_R17, R16, R17;
 
 procedure main()
-  modifies Gamma_R0, Gamma_R1, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_mem, Gamma_stack, R0, R1, R29, R30, R31, mem, stack;
+  modifies Gamma_R0, Gamma_R1, Gamma_R16, Gamma_R17, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_mem, Gamma_stack, R0, R1, R16, R17, R29, R30, R31, mem, stack;
   free requires (memory_load8_le(mem, 2272bv64) == 1bv8);
   free requires (memory_load8_le(mem, 2273bv64) == 0bv8);
   free requires (memory_load8_le(mem, 2274bv64) == 2bv8);
@@ -330,48 +335,36 @@ procedure main()
     call malloc();
     goto l00000b2d;
   l00000b2d:
-    call rely();
-    assert (L(mem, bvadd64(R31, 40bv64)) ==> Gamma_R0);
-    mem, Gamma_mem := memory_store64_le(mem, bvadd64(R31, 40bv64), R0), gamma_store64(Gamma_mem, bvadd64(R31, 40bv64), Gamma_R0);
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 40bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 40bv64), Gamma_R0);
     R0, Gamma_R0 := 11bv64, true;
-    call rely();
-    assert (L(mem, bvadd64(R31, 28bv64)) ==> Gamma_R0);
-    mem, Gamma_mem := memory_store32_le(mem, bvadd64(R31, 28bv64), R0[32:0]), gamma_store32(Gamma_mem, bvadd64(R31, 28bv64), Gamma_R0);
+    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 28bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 28bv64), Gamma_R0);
     R0, Gamma_R0 := 4bv64, true;
     R30, Gamma_R30 := 2104bv64, true;
     call malloc();
     goto l00000b4e;
   l00000b4e:
-    call rely();
-    assert (L(mem, bvadd64(R31, 48bv64)) ==> Gamma_R0);
-    mem, Gamma_mem := memory_store64_le(mem, bvadd64(R31, 48bv64), R0), gamma_store64(Gamma_mem, bvadd64(R31, 48bv64), Gamma_R0);
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 48bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 48bv64), Gamma_R0);
     R0, Gamma_R0 := 10bv64, true;
-    call rely();
-    assert (L(mem, bvadd64(R31, 32bv64)) ==> Gamma_R0);
-    mem, Gamma_mem := memory_store32_le(mem, bvadd64(R31, 32bv64), R0[32:0]), gamma_store32(Gamma_mem, bvadd64(R31, 32bv64), Gamma_R0);
+    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 32bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 32bv64), Gamma_R0);
     R0, Gamma_R0 := 4bv64, true;
     R30, Gamma_R30 := 2124bv64, true;
     call malloc();
     goto l00000b6f;
   l00000b6f:
-    call rely();
-    assert (L(mem, bvadd64(R31, 56bv64)) ==> Gamma_R0);
-    mem, Gamma_mem := memory_store64_le(mem, bvadd64(R31, 56bv64), R0), gamma_store64(Gamma_mem, bvadd64(R31, 56bv64), Gamma_R0);
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 56bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 56bv64), Gamma_R0);
     R0, Gamma_R0 := 9bv64, true;
-    call rely();
-    assert (L(mem, bvadd64(R31, 36bv64)) ==> Gamma_R0);
-    mem, Gamma_mem := memory_store32_le(mem, bvadd64(R31, 36bv64), R0[32:0]), gamma_store32(Gamma_mem, bvadd64(R31, 36bv64), Gamma_R0);
-    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R31, 40bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 40bv64)) || L(mem, bvadd64(R31, 40bv64)));
+    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 36bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 36bv64), Gamma_R0);
+    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 40bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 40bv64));
     R1, Gamma_R1 := 65bv64, true;
     call rely();
     assert (L(mem, R0) ==> Gamma_R1);
     mem, Gamma_mem := memory_store8_le(mem, R0, R1[8:0]), gamma_store8(Gamma_mem, R0, Gamma_R1);
-    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R31, 48bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 48bv64)) || L(mem, bvadd64(R31, 48bv64)));
+    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 48bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 48bv64));
     R1, Gamma_R1 := 42bv64, true;
     call rely();
     assert (L(mem, R0) ==> Gamma_R1);
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
-    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R31, 40bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 40bv64)) || L(mem, bvadd64(R31, 40bv64)));
+    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 40bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 40bv64));
     R0, Gamma_R0 := zero_extend56_8(memory_load8_le(mem, R0)), (gamma_load8(Gamma_mem, R0) || L(mem, R0));
     R1, Gamma_R1 := zero_extend32_32(R0[32:0]), Gamma_R0;
     R0, Gamma_R0 := 0bv64, true;
@@ -380,7 +373,7 @@ procedure main()
     call printf();
     goto l00000bd3;
   l00000bd3:
-    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R31, 48bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 48bv64)) || L(mem, bvadd64(R31, 48bv64)));
+    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 48bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 48bv64));
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
     R1, Gamma_R1 := zero_extend32_32(R0[32:0]), Gamma_R0;
     R0, Gamma_R0 := 0bv64, true;
@@ -389,30 +382,32 @@ procedure main()
     call printf();
     goto l00000bf9;
   l00000bf9:
-    R1, Gamma_R1 := zero_extend32_32(memory_load32_le(mem, bvadd64(R31, 32bv64))), (gamma_load32(Gamma_mem, bvadd64(R31, 32bv64)) || L(mem, bvadd64(R31, 32bv64)));
+    R1, Gamma_R1 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 32bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 32bv64));
     R0, Gamma_R0 := 0bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 2320bv64), Gamma_R0;
     R30, Gamma_R30 := 2224bv64, true;
     call printf();
     goto l00000c12;
   l00000c12:
-    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R31, 40bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 40bv64)) || L(mem, bvadd64(R31, 40bv64)));
+    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 40bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 40bv64));
     R30, Gamma_R30 := 2232bv64, true;
     call #free();
     goto l00000c21;
   l00000c21:
-    R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R31, 48bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 48bv64)) || L(mem, bvadd64(R31, 48bv64)));
+    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 48bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 48bv64));
     R30, Gamma_R30 := 2240bv64, true;
     call #free();
     goto l00000c2f;
   l00000c2f:
     R0, Gamma_R0 := 0bv64, true;
-    R29, Gamma_R29 := memory_load64_le(mem, R31), (gamma_load64(Gamma_mem, R31) || L(mem, R31));
-    R30, Gamma_R30 := memory_load64_le(mem, bvadd64(R31, 8bv64)), (gamma_load64(Gamma_mem, bvadd64(R31, 8bv64)) || L(mem, bvadd64(R31, 8bv64)));
+    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 64bv64), Gamma_R31;
     return;
 }
 
 procedure malloc();
+  modifies Gamma_R16, Gamma_R17, R16, R17;
 
 procedure printf();
+  modifies Gamma_R16, Gamma_R17, R16, R17;
