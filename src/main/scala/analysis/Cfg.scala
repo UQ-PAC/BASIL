@@ -366,6 +366,7 @@ class ProgramCfg:
 
   var edges: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()
   var nodes: mutable.Set[CfgNode] = mutable.Set[CfgNode]()
+  var funEntries: mutable.Set[CfgFunctionEntryNode] = mutable.Set[CfgFunctionEntryNode]()
 
   /** Inline edges are for connecting an intraprocedural cfg with a copy of another procedure's intraprocedural cfg
     * which is placed inside this one. They are considered interprocedural edges, and will not be followed if the caller
@@ -480,6 +481,11 @@ class ProgramCfg:
     */
   def addNode(node: CfgNode): Unit =
     nodes += node
+
+  /** Add a function entry node to the CFG.
+    */
+  def addFunEntryNode(node: CfgFunctionEntryNode): Unit =
+    funEntries += node
 
   /** Returns a Graphviz dot representation of the CFG. Each node is labeled using the given function labeler.
     */
@@ -630,6 +636,7 @@ class ProgramCfgFactory:
     val funcExitNode: CfgFunctionExitNode = CfgFunctionExitNode(data = proc)
     cfg.addNode(funcEntryNode)
     cfg.addNode(funcExitNode)
+    cfg.addFunEntryNode(funcEntryNode)
 
     procToCfg += (proc -> (funcEntryNode, funcExitNode))
     callToNodes += (funcEntryNode -> mutable.Set[CfgCommandNode]())

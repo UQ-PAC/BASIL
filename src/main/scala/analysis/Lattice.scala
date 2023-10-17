@@ -1,8 +1,10 @@
 package analysis
 
-import ir._
+import ir.*
 import analysis.BitVectorEval
 import util.Logger
+
+import scala.language.implicitConversions
 
 /** Basic lattice
   */
@@ -77,6 +79,48 @@ class PowersetLattice[A] extends Lattice {
   val bottom: Element = Set.empty
 
   def lub(x: Element, y: Element): Element = x.union(y)
+}
+
+/**
+ * The lift lattice for `sublattice`.
+ * Supports implicit lifting and unlifting.
+ */
+class LiftLattice[+L <: Lattice](val sublattice: L) extends Lattice {
+
+  type Element = Lifted
+
+  sealed trait Lifted
+
+  case object Bottom extends Lifted {
+    override def toString = "LiftBot"
+  }
+
+  case class Lift(n: sublattice.Element) extends Lifted
+
+  val bottom: Element = Bottom
+
+  def lub(x: Element, y: Element): Element =
+    (x, y) match {
+      case (Bottom, t) => t
+      case (t, Bottom) => t
+      case (Lift(a), Lift(b)) => Lift(sublattice.lub(a, b))
+    }
+
+  /**
+   * Lift elements of the sublattice to this lattice.
+   * Note that this method is declared as implicit, so the conversion can be done automatically.
+   */
+  implicit def lift(x: sublattice.Element): Element = Lift(x)
+
+  /**
+   * Un-lift elements of this lattice to the sublattice.
+   * Throws an IllegalArgumentException if trying to unlift the bottom element
+   * Note that this method is declared as implicit, so the conversion can be done automatically.
+   */
+  implicit def unlift(x: Element): sublattice.Element = x match {
+    case Lift(s) => s
+    case Bottom => throw new IllegalArgumentException("Cannot unlift bottom")
+  }
 }
 
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
