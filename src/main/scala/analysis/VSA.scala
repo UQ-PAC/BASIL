@@ -13,11 +13,11 @@ import util.Logger
 trait Value
 trait AddressValue(val expr: Expr, val name: String) extends Value
 
-case class GlobalAddress(override val expr: Expr, override val name: String) extends AddressValue(expr, name) {
+case class GlobalAddress(val e: Expr, val n: String) extends AddressValue(e, n) {
   override def toString: String = "GlobalAddress(" + expr + ", " + name + ")"
 }
 
-case class LocalAddress(override val expr: Expr, override val name: String) extends AddressValue(expr, name) {
+case class LocalAddress(val e: Expr, val n: String) extends AddressValue(e, n) {
   override def toString: String = "LocalAddress(" + expr + ", " + name + ")"
 }
 

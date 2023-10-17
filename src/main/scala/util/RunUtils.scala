@@ -79,10 +79,6 @@ object RunUtils {
 
     val specification = loadSpecification(specFileName, IRProgram, globals)
 
-    if (performInterpret) {
-      Interpret(IRProgram)
-    }
-
     Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
     val externalNames = externalFunctions.map(e => e.name)
@@ -95,7 +91,6 @@ object RunUtils {
       dump_file(serialiseIL(IRProgram), "before-analysis.il")
     }
 
-
     if (performAnalysis) {
       iterations += 1;
       IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
@@ -103,11 +98,18 @@ object RunUtils {
         dump_file(serialiseIL(IRProgram), "after-analysis.il")
       }
     }
+
+    IRProgram.determineRelevantMemory(globalOffsets)
     IRProgram.stripUnreachableFunctions()
     IRProgram.stackIdentification()
 
     val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
     IRProgram.setModifies(specModifies)
+
+    if (performInterpret) {
+      val interpreter = Interpreter()
+      interpreter.interpret(IRProgram)
+    }
 
     Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)

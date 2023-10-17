@@ -38,7 +38,7 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     val parser = ParserForClass[Config]
-    val parsed = parser.constructEither(args)
+    val parsed = parser.constructEither(args.toSeq)
 
     val conf = parsed match {
       case Right(r) => r

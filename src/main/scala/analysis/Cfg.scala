@@ -537,7 +537,7 @@ class ProgramCfg:
       }
     }
     dotArrows = dotArrows.sortBy(arr => arr.fromNode.id + "-" + arr.toNode.id)
-    val allNodes = dotNodes.values.seq.toList.sortBy(n => n.id)
+    val allNodes = dotNodes.values.toList.sortBy(n => n.id)
     new DotGraph("CFG", allNodes, dotArrows).toDotString
   }
 
