@@ -200,7 +200,7 @@ procedure guarantee_reflexive();
   modifies mem, Gamma_mem;
 
 procedure #free();
-  modifies Gamma_R16, Gamma_R17, R16, R17;
+  modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
   free requires (memory_load8_le(mem, 2272bv64) == 1bv8);
   free requires (memory_load8_le(mem, 2273bv64) == 0bv8);
   free requires (memory_load8_le(mem, 2274bv64) == 2bv8);
@@ -696,6 +696,7 @@ procedure main()
     assert (L(mem, R0) ==> Gamma_R1);
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
     R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 40bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 40bv64));
+    call rely();
     R0, Gamma_R0 := zero_extend56_8(memory_load8_le(mem, R0)), (gamma_load8(Gamma_mem, R0) || L(mem, R0));
     R1, Gamma_R1 := zero_extend32_32(R0[32:0]), Gamma_R0;
     R0, Gamma_R0 := 0bv64, true;
@@ -705,6 +706,7 @@ procedure main()
     goto l00000bd3;
   l00000bd3:
     R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 48bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 48bv64));
+    call rely();
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
     R1, Gamma_R1 := zero_extend32_32(R0[32:0]), Gamma_R0;
     R0, Gamma_R0 := 0bv64, true;
@@ -738,7 +740,7 @@ procedure main()
 }
 
 procedure malloc();
-  modifies Gamma_R16, Gamma_R17, R16, R17;
+  modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
   free requires (memory_load8_le(mem, 2272bv64) == 1bv8);
   free requires (memory_load8_le(mem, 2273bv64) == 0bv8);
   free requires (memory_load8_le(mem, 2274bv64) == 2bv8);
@@ -955,7 +957,7 @@ procedure malloc();
   free ensures (memory_load8_le(mem, 69647bv64) == 0bv8);
 
 procedure printf();
-  modifies Gamma_R16, Gamma_R17, R16, R17;
+  modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
   free requires (memory_load8_le(mem, 2272bv64) == 1bv8);
   free requires (memory_load8_le(mem, 2273bv64) == 0bv8);
   free requires (memory_load8_le(mem, 2274bv64) == 2bv8);

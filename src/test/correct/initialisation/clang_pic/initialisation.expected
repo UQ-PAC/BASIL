@@ -359,16 +359,21 @@ procedure main()
   var ZF: bv1;
   lmain:
     R9, Gamma_R9 := 65536bv64, true;
+    call rely();
     R9, Gamma_R9 := memory_load64_le(mem, bvadd64(R9, 4040bv64)), (gamma_load64(Gamma_mem, bvadd64(R9, 4040bv64)) || L(mem, bvadd64(R9, 4040bv64)));
     R10, Gamma_R10 := 65536bv64, true;
+    call rely();
     R10, Gamma_R10 := memory_load64_le(mem, bvadd64(R10, 4024bv64)), (gamma_load64(Gamma_mem, bvadd64(R10, 4024bv64)) || L(mem, bvadd64(R10, 4024bv64)));
+    call rely();
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(mem, R10)), (gamma_load32(Gamma_mem, R10) || L(mem, R10));
     R8, Gamma_R8 := zero_extend32_32(bvadd32(R8[32:0], 1bv32)), Gamma_R8;
     call rely();
     assert (L(mem, R10) ==> Gamma_R8);
     mem, Gamma_mem := memory_store32_le(mem, R10, R8[32:0]), gamma_store32(Gamma_mem, R10, Gamma_R8);
     R10, Gamma_R10 := 65536bv64, true;
+    call rely();
     R10, Gamma_R10 := memory_load64_le(mem, bvadd64(R10, 4016bv64)), (gamma_load64(Gamma_mem, bvadd64(R10, 4016bv64)) || L(mem, bvadd64(R10, 4016bv64)));
+    call rely();
     R8, Gamma_R8 := memory_load64_le(mem, R10), (gamma_load64(Gamma_mem, R10) || L(mem, R10));
     #4, Gamma_#4 := bvadd64(R8, 18446744073709551614bv64), Gamma_R8;
     VF, Gamma_VF := bvnot1(bvcomp65(sign_extend1_64(bvadd64(#4, 1bv64)), bvadd65(sign_extend1_64(R8), 36893488147419103231bv65))), (Gamma_R8 && Gamma_#4);
@@ -379,13 +384,16 @@ procedure main()
     call rely();
     assert (L(mem, R10) ==> Gamma_R8);
     mem, Gamma_mem := memory_store64_le(mem, R10, R8), gamma_store64(Gamma_mem, R10, Gamma_R8);
+    call rely();
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(mem, R9)), (gamma_load32(Gamma_mem, R9) || L(mem, R9));
     R8, Gamma_R8 := zero_extend32_32(bvadd32(R8[32:0], 3bv32)), Gamma_R8;
     call rely();
     assert (L(mem, bvadd64(R9, 4bv64)) ==> Gamma_R8);
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R9, 4bv64), R8[32:0]), gamma_store32(Gamma_mem, bvadd64(R9, 4bv64), Gamma_R8);
     R9, Gamma_R9 := 65536bv64, true;
+    call rely();
     R9, Gamma_R9 := memory_load64_le(mem, bvadd64(R9, 4048bv64)), (gamma_load64(Gamma_mem, bvadd64(R9, 4048bv64)) || L(mem, bvadd64(R9, 4048bv64)));
+    call rely();
     R8, Gamma_R8 := zero_extend56_8(memory_load8_le(mem, R9)), (gamma_load8(Gamma_mem, R9) || L(mem, R9));
     R8, Gamma_R8 := zero_extend32_32(bvadd32(R8[32:0], 1bv32)), Gamma_R8;
     call rely();

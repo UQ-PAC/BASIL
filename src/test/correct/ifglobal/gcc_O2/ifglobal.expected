@@ -182,6 +182,7 @@ procedure main()
 {
   lmain:
     R0, Gamma_R0 := 69632bv64, true;
+    call rely();
     R1, Gamma_R1 := zero_extend32_32(memory_load32_le(mem, bvadd64(R0, 20bv64))), (gamma_load32(Gamma_mem, bvadd64(R0, 20bv64)) || L(mem, bvadd64(R0, 20bv64)));
     assert Gamma_R1;
     if ((bvnot1(bvcomp32(R1[32:0], 0bv32)) != 0bv1)) {

@@ -241,6 +241,7 @@ procedure main()
   var z_old: bv32;
   lmain:
     R0, Gamma_R0 := 65536bv64, true;
+    call rely();
     R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4064bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4064bv64)) || L(mem, bvadd64(R0, 4064bv64)));
     R1, Gamma_R1 := 1bv64, true;
     call rely();
@@ -250,6 +251,7 @@ procedure main()
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
     assert ((z_old == 0bv32) ==> ((memory_load32_le(mem, $x_addr) == x_old) && (memory_load32_le(mem, $z_addr) == z_old)));
     R0, Gamma_R0 := 65536bv64, true;
+    call rely();
     R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4056bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4056bv64)) || L(mem, bvadd64(R0, 4056bv64)));
     call rely();
     assert (L(mem, R0) ==> true);

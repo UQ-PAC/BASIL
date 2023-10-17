@@ -168,7 +168,7 @@ procedure guarantee_reflexive();
   modifies mem, Gamma_mem;
 
 procedure __printf_chk();
-  modifies Gamma_R16, Gamma_R17, R16, R17;
+  modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
   free requires (memory_load8_le(mem, 2088bv64) == 1bv8);
   free requires (memory_load8_le(mem, 2089bv64) == 0bv8);
   free requires (memory_load8_le(mem, 2090bv64) == 2bv8);
@@ -385,7 +385,7 @@ procedure __printf_chk();
   free ensures (memory_load8_le(mem, 69647bv64) == 0bv8);
 
 procedure main()
-  modifies Gamma_R0, Gamma_R1, Gamma_R16, Gamma_R17, Gamma_R2, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_stack, R0, R1, R16, R17, R2, R29, R30, R31, stack;
+  modifies Gamma_R0, Gamma_R1, Gamma_R16, Gamma_R17, Gamma_R2, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_mem, Gamma_stack, R0, R1, R16, R17, R2, R29, R30, R31, mem, stack;
   free requires (memory_load8_le(mem, 69632bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69633bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69634bv64) == 0bv8);

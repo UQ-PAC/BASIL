@@ -83,7 +83,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       reliesUsed
     }
     val relyProc = BProcedure("rely", List(), List(), relyEnsures, List(), List(), List(), readOnlyMemory, List(), Seq(mem, Gamma_mem), List())
-    val relyTransitive = BProcedure("rely_transitive", List(), List(), reliesUsed, List(), List(), List(), List(), List(), Seq(mem, Gamma_mem), List(ProcedureCall("rely", List(), List(), List(mem, Gamma_mem)), ProcedureCall("rely", List(), List(), List(mem, Gamma_mem))))
+    val relyTransitive = BProcedure("rely_transitive", List(), List(), reliesUsed, List(), List(), List(), List(), List(), Seq(mem, Gamma_mem), List(ProcedureCall("rely", List(), List()), ProcedureCall("rely", List(), List())))
     val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), List(), List(), List(), List(), Seq(), reliesReflexive.map(r => BAssert(r)))
     List(relyProc, relyTransitive, relyReflexive)
   }
@@ -219,10 +219,12 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr]): BProcedure = {
     val body = p.blocks.map(b => translateBlock(b))
-    val modifies: Seq[BVar] = p.modifies.flatMap {
-      case m: Memory => Seq(m.toBoogie, m.toGamma)
-      case r: Register => Seq(r.toBoogie, r.toGamma)
-    }.toSeq.sorted
+    // TODO don't hardcode Seq(mem, Gamma_mem) but this is necessary to work with adding rely() calls for now
+    val modifies: Seq[BVar] = {Seq(mem, Gamma_mem) ++ p.modifies
+      .flatMap {
+        case m: Memory   => Seq(m.toBoogie, m.toGamma)
+        case r: Register => Seq(r.toBoogie, r.toGamma)
+      }}.distinct.sorted
 
     val modifiedPreserve = modifies.collect { case m: BVar if modifiedCheck.contains(m) => m }
     val modifiedPreserveEnsures: List[BExpr] = modifiedPreserve.map(m => BinaryBExpr(BoolEQ, m, Old(m))).toList
@@ -276,7 +278,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translate(j: Jump): List[BCmd] = j match {
     case d: DirectCall =>
-      val call = List(ProcedureCall(d.target.name, List(), List(), List()))
+      val call = List(ProcedureCall(d.target.name, List(), List()))
       val returnTarget = d.returnTarget match {
         case Some(r) => List(GoToCmd(r.label))
         case None    => List(Comment("no return target"), BAssume(FalseBLiteral))
@@ -329,7 +331,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       if (lhs == stack) {
         List(store)
       } else {
-        val rely = ProcedureCall("rely", List(), List(), List(rhs.memory, rhsGamma.gammaMap))
+        val rely = ProcedureCall("rely", List(), List())
         val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.rhs.value.toGamma))
         val oldAssigns =
           guaranteeOldVars.map(g => AssignCmd(g.toOldVar, BMemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size)))
@@ -358,13 +360,12 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val lhsGamma = l.lhs.toGamma
       val rhsGamma = l.rhs.toGamma
       val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
-      val loads = rhs.functionOps.collect { case m: BMemoryLoad => m }
+      val loads = rhs.loads.collect { case m: BMemoryLoad => m }
       if (loads.isEmpty || loads.forall(_.memory == stack)) {
         List(assign)
       } else {
-        val gammas = rhsGamma.functionOps.collect { case g: GammaLoad => g.gammaMap }.toSeq.sorted
         val memories = loads.map(m => m.memory).toSeq.sorted
-        List(ProcedureCall("rely", Seq(), Seq(), memories ++ gammas), assign)
+        List(ProcedureCall("rely", Seq(), Seq()), assign)
       }
     case a: Assert =>
       val body = a.body.toBoogie

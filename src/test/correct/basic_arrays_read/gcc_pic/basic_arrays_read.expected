@@ -215,13 +215,16 @@ procedure main()
 {
   lmain:
     R0, Gamma_R0 := 65536bv64, true;
+    call rely();
     R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4080bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4080bv64)) || L(mem, bvadd64(R0, 4080bv64)));
     call rely();
     assert (L(mem, R0) ==> true);
     mem, Gamma_mem := memory_store32_le(mem, R0, 0bv32), gamma_store32(Gamma_mem, R0, true);
     assert true;
     R0, Gamma_R0 := 65536bv64, true;
+    call rely();
     R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4080bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4080bv64)) || L(mem, bvadd64(R0, 4080bv64)));
+    call rely();
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
     return;
 }

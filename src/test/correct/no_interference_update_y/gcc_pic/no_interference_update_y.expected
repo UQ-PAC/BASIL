@@ -216,6 +216,7 @@ procedure main()
   var x_old: bv32;
   lmain:
     R0, Gamma_R0 := 65536bv64, true;
+    call rely();
     R0, Gamma_R0 := memory_load64_le(mem, bvadd64(R0, 4072bv64)), (gamma_load64(Gamma_mem, bvadd64(R0, 4072bv64)) || L(mem, bvadd64(R0, 4072bv64)));
     R1, Gamma_R1 := 1bv64, true;
     call rely();

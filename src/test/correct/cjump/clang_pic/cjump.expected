@@ -268,11 +268,13 @@ procedure main()
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), 0bv32), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), true);
     R8, Gamma_R8 := 65536bv64, true;
+    call rely();
     R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 4032bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 4032bv64)) || L(mem, bvadd64(R8, 4032bv64)));
     R9, Gamma_R9 := 1bv64, true;
     call rely();
     assert (L(mem, R8) ==> Gamma_R9);
     mem, Gamma_mem := memory_store32_le(mem, R8, R9[32:0]), gamma_store32(Gamma_mem, R8, Gamma_R9);
+    call rely();
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(mem, R8)), (gamma_load32(Gamma_mem, R8) || L(mem, R8));
     #4, Gamma_#4 := bvadd32(R8[32:0], 4294967295bv32), Gamma_R8;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#4, 1bv32)), bvadd33(sign_extend1_32(R8[32:0]), 0bv33))), (Gamma_R8 && Gamma_#4);
@@ -299,6 +301,7 @@ procedure main()
     goto l00000398;
   l00000364:
     R9, Gamma_R9 := 65536bv64, true;
+    call rely();
     R9, Gamma_R9 := memory_load64_le(mem, bvadd64(R9, 4048bv64)), (gamma_load64(Gamma_mem, bvadd64(R9, 4048bv64)) || L(mem, bvadd64(R9, 4048bv64)));
     R8, Gamma_R8 := 2bv64, true;
     call rely();
@@ -310,6 +313,7 @@ procedure main()
   l00000399:
     R8, Gamma_R8 := 3bv64, true;
     R9, Gamma_R9 := 65536bv64, true;
+    call rely();
     R9, Gamma_R9 := memory_load64_le(mem, bvadd64(R9, 4048bv64)), (gamma_load64(Gamma_mem, bvadd64(R9, 4048bv64)) || L(mem, bvadd64(R9, 4048bv64)));
     call rely();
     assert (L(mem, R9) ==> Gamma_R8);
