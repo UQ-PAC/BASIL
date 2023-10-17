@@ -175,7 +175,7 @@ object RunUtils {
     )
 
     Logger.info("[!] Resolving CFG")
-    val (newIR, modified) = resolveCFG(cfg, vsaResult.asInstanceOf[Map[CfgNode, Map[Variable, Set[Value]]]], IRProgram)
+    val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult.asInstanceOf[Map[CfgNode, Map[Variable, Set[Value]]]], IRProgram)
     if (modified) {
       Logger.info(s"[!] Analysing again (iter $iterations)")
       return analyse(newIR, externalFunctions, globals, globalOffsets)
@@ -208,7 +208,7 @@ object RunUtils {
     }
 
     def extractExprFromValue(v: Value): Expr = v match {
-      case LiteralValue(expr)           => expr
+      case literalValue: LiteralValue          => literalValue.expr
       case localAddress: LocalAddress   => localAddress.expr
       case globalAddress: GlobalAddress => globalAddress.expr
       case _                            => throw new Exception("Expected a Value with an Expr")

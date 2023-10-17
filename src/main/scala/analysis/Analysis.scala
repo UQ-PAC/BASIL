@@ -367,6 +367,7 @@ trait MemoryRegionAnalysisMisc:
             */
             lattice.sublattice.lub(s, result)
           case localAssign: LocalAssign =>
+            var m = s
             unwrapExpr(localAssign.rhs).foreach {
               case memoryLoad: MemoryLoad =>
                 val result = eval(memoryLoad.index, s, n)
@@ -380,9 +381,10 @@ trait MemoryRegionAnalysisMisc:
                   case _ =>
                 })
                 */
-                lattice.sublattice.lub(m, result)
-              case _ => s
+                m = lattice.sublattice.lub(m, result)
+              case _ => m
             }
+            m
           case _ => s
         }
       case _ => s // ignore other kinds of nodes
