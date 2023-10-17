@@ -62,6 +62,12 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     }
   }
 
+  /**
+    * Takes all the memory sections we get from the ADT (previously in initialMemory) and restricts initialMemory to
+    * just the .data section (which contains things such as global variables which are mutable) and puts the .rodata
+    * section in readOnlyMemory. It also takes the .rela.dyn entries taken from the readelf output and adds them to the
+    * .rodata section, as they are the global offset table entries that we can assume are constant.
+    */
   def determineRelevantMemory(rela_dyn: Map[BigInt, BigInt]): Unit = {
     val initialMemoryNew = ArrayBuffer[MemorySection]()
 
