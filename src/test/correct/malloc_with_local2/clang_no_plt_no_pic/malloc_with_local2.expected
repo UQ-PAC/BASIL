@@ -78,7 +78,7 @@ function memory_store8_le(memory: [bv64]bv8, index: bv64, value: bv8) returns ([
 function {:bvbuiltin "zero_extend 32"} zero_extend32_32(bv32) returns (bv64);
 function {:bvbuiltin "zero_extend 56"} zero_extend56_8(bv8) returns (bv64);
 procedure rely();
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
   free ensures (memory_load8_le(mem, 2292bv64) == 1bv8);
@@ -179,7 +179,7 @@ procedure rely();
   free ensures (memory_load8_le(mem, 69703bv64) == 0bv8);
 
 procedure rely_transitive()
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
 {
@@ -190,7 +190,7 @@ procedure rely_transitive()
 procedure rely_reflexive();
 
 procedure guarantee_reflexive();
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
 
 procedure #free();
   modifies Gamma_R16, Gamma_R17, R16, R17;

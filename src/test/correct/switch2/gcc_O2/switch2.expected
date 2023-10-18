@@ -6,7 +6,7 @@ function memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
 }
 
 procedure rely();
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
   free ensures (memory_load8_le(mem, 1916bv64) == 1bv8);
@@ -47,7 +47,7 @@ procedure rely();
   free ensures (memory_load8_le(mem, 69647bv64) == 0bv8);
 
 procedure rely_transitive()
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
 {
@@ -58,7 +58,7 @@ procedure rely_transitive()
 procedure rely_reflexive();
 
 procedure guarantee_reflexive();
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
 
 procedure main()
   requires (Gamma_R0 == true);
