@@ -93,7 +93,7 @@ procedure guarantee_reflexive()
 }
 
 procedure main()
-  modifies Gamma_R0, Gamma_mem, R0, mem;
+  modifies Gamma_R0, R0, mem, Gamma_mem;
   requires (gamma_load32(Gamma_mem, $x_addr) == true);
   free requires (memory_load8_le(mem, 69632bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69633bv64) == 0bv8);

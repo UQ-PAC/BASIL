@@ -261,7 +261,7 @@ procedure main()
 }
 
 procedure printf();
-  modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
+  modifies Gamma_R16, Gamma_R17, R16, R17;
   free requires (memory_load8_le(mem, 1976bv64) == 1bv8);
   free requires (memory_load8_le(mem, 1977bv64) == 0bv8);
   free requires (memory_load8_le(mem, 1978bv64) == 2bv8);

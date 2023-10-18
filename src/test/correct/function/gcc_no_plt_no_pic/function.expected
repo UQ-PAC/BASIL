@@ -110,7 +110,7 @@ procedure guarantee_reflexive();
   modifies mem, Gamma_mem;
 
 procedure get_two()
-  modifies Gamma_R0, Gamma_mem, R0, mem;
+  modifies Gamma_R0, R0;
   free requires (memory_load8_le(mem, 1896bv64) == 1bv8);
   free requires (memory_load8_le(mem, 1897bv64) == 0bv8);
   free requires (memory_load8_le(mem, 1898bv64) == 2bv8);

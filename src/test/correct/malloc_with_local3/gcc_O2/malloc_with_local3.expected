@@ -191,7 +191,7 @@ procedure guarantee_reflexive();
   modifies mem, Gamma_mem;
 
 procedure __printf_chk();
-  modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
+  modifies Gamma_R16, Gamma_R17, R16, R17;
   free requires (memory_load8_le(mem, 2264bv64) == 1bv8);
   free requires (memory_load8_le(mem, 2265bv64) == 0bv8);
   free requires (memory_load8_le(mem, 2266bv64) == 2bv8);
@@ -408,7 +408,7 @@ procedure __printf_chk();
   free ensures (memory_load8_le(mem, 69647bv64) == 0bv8);
 
 procedure #free();
-  modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
+  modifies Gamma_R16, Gamma_R17, R16, R17;
   free requires (memory_load8_le(mem, 2264bv64) == 1bv8);
   free requires (memory_load8_le(mem, 2265bv64) == 0bv8);
   free requires (memory_load8_le(mem, 2266bv64) == 2bv8);
@@ -916,7 +916,7 @@ procedure main()
 }
 
 procedure malloc();
-  modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
+  modifies Gamma_R16, Gamma_R17, R16, R17;
   free requires (memory_load8_le(mem, 2264bv64) == 1bv8);
   free requires (memory_load8_le(mem, 2265bv64) == 0bv8);
   free requires (memory_load8_le(mem, 2266bv64) == 2bv8);

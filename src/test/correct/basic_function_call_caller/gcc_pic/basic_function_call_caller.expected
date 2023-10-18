@@ -313,7 +313,7 @@ procedure main()
 }
 
 procedure zero()
-  modifies Gamma_R0, Gamma_mem, R0, mem;
+  modifies Gamma_R0, R0;
   free requires (memory_load8_le(mem, 1964bv64) == 1bv8);
   free requires (memory_load8_le(mem, 1965bv64) == 0bv8);
   free requires (memory_load8_le(mem, 1966bv64) == 2bv8);
