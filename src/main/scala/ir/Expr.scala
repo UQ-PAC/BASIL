@@ -17,8 +17,8 @@ trait Expr {
       }
     }
   }
-  def loads: Set[MemoryLoad] = Set()
   def getType: IRType
+  def loads: Set[MemoryLoad] = Set()
   def gammas: Set[Expr] = Set()
   def variables: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)

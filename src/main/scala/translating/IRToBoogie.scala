@@ -328,8 +328,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val lhsGamma = m.lhs.toGamma
       val rhsGamma = m.rhs.toGamma
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
+      val indexCheck = BAssert(m.rhs.index.toGamma)
       if (lhs == stack) {
-        List(store)
+        List(indexCheck, store)
       } else {
         val rely = ProcedureCall("rely", List(), List())
         val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.rhs.value.toGamma))
@@ -352,7 +353,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           BAssert(BinaryBExpr(BoolIMPLIES, addrCheck, checksAnd))
         }
         val guaranteeChecks = guarantees.map(v => BAssert(v))
-        (List(rely, gammaValueCheck) ++ oldAssigns ++ oldGammaAssigns :+ store) ++ secureUpdate ++ guaranteeChecks
+        (List(rely, gammaValueCheck, indexCheck) ++ oldAssigns ++ oldGammaAssigns :+ store) ++ secureUpdate ++ guaranteeChecks
       }
     case l: LocalAssign =>
       val lhs = l.lhs.toBoogie
@@ -360,12 +361,26 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val lhsGamma = l.lhs.toGamma
       val rhsGamma = l.rhs.toGamma
       val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
-      val loads = rhs.loads.collect { case m: BMemoryLoad => m }
-      if (loads.isEmpty || loads.forall(_.memory == stack)) {
+      val loads = l.rhs.loads
+      val loadsBoogie = loads.map(_.toBoogie)
+      val loadIndicesGamma = loads.map(_.index.toGamma)
+      if (loadsBoogie.isEmpty) {
         List(assign)
       } else {
-        val memories = loads.map(m => m.memory).toSeq.sorted
+        val memories = loadsBoogie.map(m => m.memory).toSeq.sorted
         List(ProcedureCall("rely", Seq(), Seq()), assign)
+        val indexGammas = if (loadIndicesGamma.size > 1) {
+          loadIndicesGamma.tail.foldLeft(loadIndicesGamma.head)((next: BExpr, ands: BExpr) => BinaryBExpr(BoolAND, next, ands))
+        } else {
+          loadIndicesGamma.head
+        }
+        val indexCheck = BAssert(indexGammas)
+        if (loadsBoogie.forall(_.memory == stack)) {
+          List(indexCheck, assign)
+        } else {
+          val memories = loadsBoogie.map(m => m.memory).toSeq.sorted
+          List(ProcedureCall("rely", Seq(), Seq()), indexCheck, assign)
+        }
       }
     case a: Assert =>
       val body = a.body.toBoogie
