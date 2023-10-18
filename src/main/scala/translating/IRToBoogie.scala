@@ -52,7 +52,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       List(),
       List(),
       List(),
-      Seq(mem, Gamma_mem),
+      Set(mem, Gamma_mem),
       guaranteesReflexive.map(g => BAssert(g))
     )
 
@@ -82,9 +82,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     } else {
       reliesUsed
     }
-    val relyProc = BProcedure("rely", List(), List(), relyEnsures, List(), List(), List(), readOnlyMemory, List(), Seq(mem, Gamma_mem), List())
-    val relyTransitive = BProcedure("rely_transitive", List(), List(), reliesUsed, List(), List(), List(), List(), List(), Seq(mem, Gamma_mem), List(BProcedureCall("rely", List(), List()), BProcedureCall("rely", List(), List())))
-    val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), List(), List(), List(), List(), Seq(), reliesReflexive.map(r => BAssert(r)))
+    val relyProc = BProcedure("rely", List(), List(), relyEnsures, List(), List(), List(), readOnlyMemory, List(), Set(mem, Gamma_mem), List())
+    val relyTransitive = BProcedure("rely_transitive", List(), List(), reliesUsed, List(), List(), List(), List(), List(), Set(mem, Gamma_mem), List(BProcedureCall("rely", List(), List()), BProcedureCall("rely", List(), List())))
+    val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), List(), List(), List(), List(), Set(), reliesReflexive.map(r => BAssert(r)))
     List(relyProc, relyTransitive, relyReflexive)
   }
 
@@ -234,8 +234,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           case c: BCmd => Seq(c)
         }
 
-        val modifies: Seq[BVar] = (procedure.modifies ++ (cmds.collect{ case x: BProcedureCall => (procedures.find(_.name == x.name))})
-          .flatten.flatMap(_.modifies)).distinct
+        val modifies: Set[BVar] = procedure.modifies ++ cmds.collect{ case x: BProcedureCall => procedures.find(_.name == x.name)}
+          .flatten.flatMap(_.modifies)
 
         if (procedure.modifies != procedure.modifies)
           changed = true
@@ -287,7 +287,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       procRequiresDirect,
       freeEnsures,
       freeRequires,
-      modifies,
+      modifies.toSet,
       body.toList
     )
   }
