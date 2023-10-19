@@ -18,7 +18,7 @@ case class BProcedure(
     requiresDirect: List[String],
     freeEnsures: List[BExpr],
     freeRequires: List[BExpr],
-    modifies: Seq[BVar],
+    modifies: Set[BVar],
     body: List[BCmdOrBlock]
 ) extends BDeclaration
     with Ordered[BProcedure] {
@@ -32,7 +32,7 @@ case class BProcedure(
     }
     val semicolon = if body.nonEmpty then "" else ";"
     val modifiesStr = if (modifies.nonEmpty) {
-      List(s"  modifies ${modifies.mkString(", ")};")
+      List(s"  modifies ${modifies.toSeq.sorted.mkString(", ")};")
     } else {
       List()
     }

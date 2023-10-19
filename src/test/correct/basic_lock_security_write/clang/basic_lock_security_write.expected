@@ -43,7 +43,7 @@ function memory_store32_le(memory: [bv64]bv8, index: bv64, value: bv32) returns 
 
 function {:bvbuiltin "zero_extend 32"} zero_extend32_32(bv32) returns (bv64);
 procedure rely();
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
   ensures (forall i: bv64 :: (((mem[i] == old(mem[i])) ==> (Gamma_mem[i] == old(Gamma_mem[i])))));
   ensures ((memory_load32_le(mem, $z_addr) == old(memory_load32_le(mem, $z_addr))) && (memory_load32_le(mem, $x_addr) == old(memory_load32_le(mem, $x_addr))));
   free ensures (memory_load8_le(mem, 1884bv64) == 1bv8);
@@ -84,7 +84,7 @@ procedure rely();
   free ensures (memory_load8_le(mem, 69679bv64) == 0bv8);
 
 procedure rely_transitive()
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
   ensures ((memory_load32_le(mem, $z_addr) == old(memory_load32_le(mem, $z_addr))) && (memory_load32_le(mem, $x_addr) == old(memory_load32_le(mem, $x_addr))));
 {
   call rely();
@@ -97,7 +97,7 @@ procedure rely_reflexive()
 }
 
 procedure guarantee_reflexive()
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
 {
   assert ((memory_load32_le(mem, $z_addr) == 0bv32) ==> ((memory_load32_le(mem, $x_addr) == memory_load32_le(mem, $x_addr)) && (memory_load32_le(mem, $z_addr) == memory_load32_le(mem, $z_addr))));
 }

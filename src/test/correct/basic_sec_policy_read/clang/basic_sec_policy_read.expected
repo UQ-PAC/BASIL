@@ -47,7 +47,7 @@ function {:bvbuiltin "sign_extend 1"} sign_extend1_32(bv32) returns (bv33);
 function {:bvbuiltin "zero_extend 1"} zero_extend1_32(bv32) returns (bv33);
 function {:bvbuiltin "zero_extend 32"} zero_extend32_32(bv32) returns (bv64);
 procedure rely();
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
   ensures (forall i: bv64 :: (((mem[i] == old(mem[i])) ==> (Gamma_mem[i] == old(Gamma_mem[i])))));
   ensures ((old(memory_load32_le(mem, $z_addr)) != 0bv32) ==> (memory_load32_le(mem, $z_addr) != 0bv32));
   free ensures (memory_load8_le(mem, 1896bv64) == 1bv8);
@@ -88,7 +88,7 @@ procedure rely();
   free ensures (memory_load8_le(mem, 69679bv64) == 0bv8);
 
 procedure rely_transitive()
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
   ensures ((old(memory_load32_le(mem, $z_addr)) != 0bv32) ==> (memory_load32_le(mem, $z_addr) != 0bv32));
 {
   call rely();
@@ -101,7 +101,7 @@ procedure rely_reflexive()
 }
 
 procedure guarantee_reflexive()
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
 {
   assert (memory_load32_le(mem, $z_addr) == memory_load32_le(mem, $z_addr));
 }

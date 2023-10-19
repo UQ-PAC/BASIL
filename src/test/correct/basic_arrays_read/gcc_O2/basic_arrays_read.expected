@@ -28,7 +28,7 @@ function memory_store32_le(memory: [bv64]bv8, index: bv64, value: bv32) returns 
 }
 
 procedure rely();
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
   ensures (forall i: bv64 :: (((mem[i] == old(mem[i])) ==> (Gamma_mem[i] == old(Gamma_mem[i])))));
   ensures (old(memory_load32_le(mem, bvadd64($arr_addr, 0bv64))) == memory_load32_le(mem, bvadd64($arr_addr, 0bv64)));
   free ensures (memory_load8_le(mem, 1896bv64) == 1bv8);
@@ -69,7 +69,7 @@ procedure rely();
   free ensures (memory_load8_le(mem, 69647bv64) == 0bv8);
 
 procedure rely_transitive()
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
   ensures (old(memory_load32_le(mem, bvadd64($arr_addr, 0bv64))) == memory_load32_le(mem, bvadd64($arr_addr, 0bv64)));
 {
   call rely();
@@ -82,7 +82,7 @@ procedure rely_reflexive()
 }
 
 procedure guarantee_reflexive()
-  modifies mem, Gamma_mem;
+  modifies Gamma_mem, mem;
 {
   assert true;
 }

@@ -8,11 +8,11 @@ DIRECT functions: gamma_load64, gamma_load8, memory_load8_le, bvult64, bvule64, 
 
   
 Subroutine: #free
-  Requires DIRECT: "gamma_load8(Gamma_mem, bvadd64(R0, 0bv64)) == true";
-  Requires DIRECT: "gamma_load8(Gamma_mem, bvadd64(R0, 1bv64)) == true";
-  Requires DIRECT: "gamma_load8(Gamma_mem, bvadd64(R0, 2bv64)) == true";
-  Requires DIRECT: "gamma_load8(Gamma_mem, bvadd64(R0, 3bv64)) == true";
-Ensures DIRECT: "Gamma_R0 == true"
+  Requires DIRECT: "gamma_load8(Gamma_mem, bvadd64(R0, 0bv64)) == true"
+  Requires DIRECT: "gamma_load8(Gamma_mem, bvadd64(R0, 1bv64)) == true"
+  Requires DIRECT: "gamma_load8(Gamma_mem, bvadd64(R0, 2bv64)) == true"
+  Requires DIRECT: "gamma_load8(Gamma_mem, bvadd64(R0, 3bv64)) == true"
+  Ensures DIRECT: "Gamma_R0 == true"
 
 
 Subroutine: main
