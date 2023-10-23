@@ -62,23 +62,29 @@ object RunUtils {
     }
   }
 
-  def loadAndTranslate(
-      BAPFileName: String,
-      readELFFileName: String,
-      specFileName: Option[String],
-      performAnalysis: Boolean,
-      performInterpret: Boolean,
-      dumpIL: Boolean
-  ): BProgram = {
-    val bapProgram = loadBAP(BAPFileName)
+  def run(q: BASILConfig): Unit = {
+    Logger.info("[!] Writing file...")
+    val boogieProgram = loadAndTranslate(q)
+    RunUtils.writeToFile(boogieProgram, q.outputPrefix + ".bpl")
+  }
 
-    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(readELFFileName)
+  def loadAndTranslate(
+                      q: BASILConfig
+  ): BProgram = {
+    /**
+     *  Loading phase
+     */
+    val bapProgram = loadBAP(q.loading.adtFile)
+    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile)
 
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
 
-    val specification = loadSpecification(specFileName, IRProgram, globals)
+    val specification = loadSpecification(q.loading.specFile, IRProgram, globals)
 
+    /**
+     * Analysis Phase
+     */
     Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
     val externalNames = externalFunctions.map(e => e.name)
@@ -87,16 +93,18 @@ object RunUtils {
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
 
-    if (dumpIL) {
-      dump_file(serialiseIL(IRProgram), "before-analysis.il")
+    if (q.loading.dumpIL) {
+      dump_file(serialiseIL(IRProgram), q.outputPrefix +  "-before-analysis.il")
     }
 
-    if (performAnalysis) {
-      iterations += 1;
-      IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
-      if (dumpIL) {
-        dump_file(serialiseIL(IRProgram), "after-analysis.il")
+    q.staticAnalysis match {
+      case Some(analysisConfig) => {
+        IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
+        if (analysisConfig.dumpILEveryPhase) {
+          dump_file(serialiseIL(IRProgram), q.outputPrefix +  "-after-analysis.il")
+        }
       }
+      case None => {}
     }
 
     IRProgram.determineRelevantMemory(globalOffsets)
@@ -106,7 +114,7 @@ object RunUtils {
     val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
     IRProgram.setModifies(specModifies)
 
-    if (performInterpret) {
+    if (q.runInterpret) {
       val interpreter = Interpreter()
       interpreter.interpret(IRProgram)
     }
@@ -114,7 +122,9 @@ object RunUtils {
     Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
     Logger.info("[!] Done! Exiting...")
-    boogieTranslator.translate
+    val boogieProgram = boogieTranslator.translate(q.boogieTranslation)
+    boogieProgram
+
   }
 
   def analyse(
@@ -347,7 +357,7 @@ object RunUtils {
   }
 
   def dump_file(content: String, name: String): Unit = {
-    val outFile = new File(s"${name}.txt")
+    val outFile = new File(name)
     val pw = new PrintWriter(outFile, "UTF-8")
     pw.write(content)
     pw.close()

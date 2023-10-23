@@ -1,7 +1,8 @@
 package translating
-import ir._
-import boogie._
-import specification._
+import ir.*
+import boogie.*
+import specification.*
+import util.BoogieGeneratorConfig
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -32,7 +33,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     BVariable("Gamma_R" + 31, BoolBType, Scope.Global)
   )
 
-  def translate: BProgram = {
+  def translate(boogieGeneratorQuirks: BoogieGeneratorConfig): BProgram = {
     val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
     val procedures = program.procedures.map(f => translateProcedure(f, readOnlyMemory))
     val defaultGlobals = List(BVarDecl(mem), BVarDecl(Gamma_mem))
