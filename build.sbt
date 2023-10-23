@@ -45,14 +45,20 @@ updateExpected := {
         val name = e.getName
         val outPath = v / (name + ".bpl")
         val expectedPath = v / (name + ".expected")
+        val ILOutPath = v / (name + "-before-analysis.il")
+        val ILExpectedPath = v / (name + "-before-analysis.il.expected")
         val resultPath = v / (name + "_result.txt")
         if (resultPath.exists()) {
           val result = IO.read(resultPath)
           val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
-          if (verified == shouldVerify && outPath.exists()) {
-            if (!expectedPath.exists() || !compareFiles(outPath, expectedPath)) {
+          if (verified == shouldVerify) {
+            if (outPath.exists() && !(expectedPath.exists() || compareFiles(outPath, expectedPath))) {
               IO.copyFile(outPath, expectedPath)
             }
+            if (ILOutPath.exists() && !(ILExpectedPath.exists() || compareFiles(ILExpectedPath, ILOutPath))) {
+              IO.copyFile(ILOutPath, ILExpectedPath)
+            }
+          }
           }
         }
       }

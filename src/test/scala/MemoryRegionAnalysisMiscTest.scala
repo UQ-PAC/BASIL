@@ -22,7 +22,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
           adtFile = examplesPath + s"${name}/${name}.adt",
           relfFile = examplesPath + s"${name}/${name}.relf",
           specFile = None,
-          dumpIL = false
+          dumpIL = None,
         ),
         runInterpret = false,
         staticAnalysis =  Some(StaticAnalysisConfig()),

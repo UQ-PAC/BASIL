@@ -31,7 +31,7 @@ object Main {
       @arg(name = "interpret", doc = "Run BASIL IL interpreter.")
       interpret: Flag,
       @arg(name = "dump-il", doc = "Dump the Intermediate Language to text.")
-      dumpIL: Flag,
+      dumpIL: Option[String],
       @arg(name = "help", short = 'h', doc = "Show this help message.")
       help: Flag
   )
@@ -58,14 +58,14 @@ object Main {
     }
 
     val q = BASILConfig(
-      loading = ILLoadingConfig(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.dumpIL.value),
+      loading = ILLoadingConfig(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.dumpIL),
       runInterpret = conf.interpret.value,
-      staticAnalysis =  if (conf.analyse.value) then Some(StaticAnalysisConfig(conf.dumpIL.value)) else None,
+      staticAnalysis =  if (conf.analyse.value) then Some(StaticAnalysisConfig(conf.dumpIL)) else None,
       boogieTranslation = BoogieGeneratorConfig(),
       outputPrefix = conf.outFileName
     )
 
-    val program: BProgram = RunUtils.loadAndTranslate(q);
+    RunUtils.run(q);
   }
 
 }

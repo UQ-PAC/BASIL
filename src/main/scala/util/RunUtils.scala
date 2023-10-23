@@ -65,7 +65,7 @@ object RunUtils {
   def run(q: BASILConfig): Unit = {
     Logger.info("[!] Writing file...")
     val boogieProgram = loadAndTranslate(q)
-    RunUtils.writeToFile(boogieProgram, q.outputPrefix + ".bpl")
+    RunUtils.writeToFile(boogieProgram.toString, (q.outputPrefix))
   }
 
   def loadAndTranslate(
@@ -93,15 +93,18 @@ object RunUtils {
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
 
-    if (q.loading.dumpIL) {
-      dump_file(serialiseIL(IRProgram), q.outputPrefix +  "-before-analysis.il")
+    q.loading.dumpIL match  {
+      case Some(s) => writeToFile(serialiseIL(IRProgram), s + "-before-analysis.il")
+      case _ =>
     }
 
     q.staticAnalysis match {
       case Some(analysisConfig) => {
         IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
-        if (analysisConfig.dumpILEveryPhase) {
-          dump_file(serialiseIL(IRProgram), q.outputPrefix +  "-after-analysis.il")
+
+        analysisConfig.dumpILToPath match {
+          case Some(s) => writeToFile(serialiseIL(IRProgram), s +  "-after-analysis.il")
+          case _ =>
         }
       }
       case None => {}
@@ -124,7 +127,6 @@ object RunUtils {
     Logger.info("[!] Done! Exiting...")
     val boogieProgram = boogieTranslator.translate(q.boogieTranslation)
     boogieProgram
-
   }
 
   def analyse(
@@ -345,29 +347,10 @@ object RunUtils {
     (IRProgram, modified)
   }
 
-  def writeToFile(program: BProgram, outputFileName: String): Unit = {
-    try {
-      val writer = BufferedWriter(FileWriter(outputFileName, false))
-      writer.write(program.toString)
-      writer.flush()
-      writer.close()
-    } catch {
-      case _: IOException => Logger.error("Error writing to file.")
-    }
-  }
-
-  def dump_file(content: String, name: String): Unit = {
+  def writeToFile(content: String, name: String): Unit = {
     val outFile = new File(name)
     val pw = new PrintWriter(outFile, "UTF-8")
     pw.write(content)
     pw.close()
   }
-
-  def dump_plot(content: String, name: String): Unit = {
-    val outFile = new File(s"${name}.dot")
-    val pw = new PrintWriter(outFile, "UTF-8")
-    pw.write(content)
-    pw.close()
-  }
-
 }
