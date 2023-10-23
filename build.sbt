@@ -52,20 +52,19 @@ updateExpected := {
           val result = IO.read(resultPath)
           val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
           if (verified == shouldVerify) {
-            if (outPath.exists() && !(expectedPath.exists() || compareFiles(outPath, expectedPath))) {
+            if (outPath.exists() && !(expectedPath.exists() && filesContentEqual(outPath, expectedPath))) {
               IO.copyFile(outPath, expectedPath)
             }
-            if (ILOutPath.exists() && !(ILExpectedPath.exists() || compareFiles(ILExpectedPath, ILOutPath))) {
+            if (ILOutPath.exists() && !(ILExpectedPath.exists() && filesContentEqual(ILExpectedPath, ILOutPath))) {
               IO.copyFile(ILOutPath, ILExpectedPath)
             }
-          }
           }
         }
       }
     }
   }
 
-  def compareFiles(path1: File, path2: File): Boolean = {
+  def filesContentEqual(path1: File, path2: File): Boolean = {
     val source1 = Source.fromFile(path1)
     val source2 = Source.fromFile(path2)
     val lines1 = source1.getLines
