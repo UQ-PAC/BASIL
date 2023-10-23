@@ -1,0 +1,893 @@
+Procedure("1488:__cxa_finalize", in(), out(Parameter(Register(R0, bv64))), blocks(
+)),
+Procedure("1728:__do_global_dtors_aux", in(), out(Parameter(Register(R0, bv64))), blocks(
+  Block("1728:l__do_global_dtors_aux",
+    statements(
+      LocalAssign(LocalVar(#3, bv64) := BinaryExpr("add", Register(R31, bv64), 18446744073709551584bv64))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[LocalVar(#3, bv64)] := Register(R29, bv64)))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[BinaryExpr("add", LocalVar(#3, bv64), 8bv64)] := Register(R30, bv64)))
+      LocalAssign(Register(R31, bv64) := LocalVar(#3, bv64))
+      LocalAssign(Register(R29, bv64) := Register(R31, bv64))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[BinaryExpr("add", Register(R31, bv64), 16bv64)] := Register(R19, bv64)))
+      LocalAssign(Register(R19, bv64) := 69632bv64)
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R19, bv64), 20bv64)]), 56))
+    ),
+    jumps(
+      GoTo("1788:l0000048d", condition(BinaryExpr("!=", UnaryExpr("not", BinaryExpr("comp", Extract(Register(R0, bv64)[32:0]), 0bv32)), 0bv1)))
+      GoTo("1752:l000009a5", condition())
+    )
+  )
+  Block("1752:l000009a5",
+    statements(
+      LocalAssign(Register(R0, bv64) := 65536bv64)
+      LocalAssign(Register(R0, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R0, bv64), 4064bv64)]))
+    ),
+    jumps(
+      GoTo("1776:l000009b3", condition(BinaryExpr("!=", BinaryExpr("comp", Register(R0, bv64), 0bv64), 0bv1)))
+      GoTo("1764:l000009cc", condition())
+    )
+  )
+  Block("1764:l000009cc",
+    statements(
+      LocalAssign(Register(R0, bv64) := 69632bv64)
+      LocalAssign(Register(R0, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R0, bv64), 8bv64)]))
+      LocalAssign(Register(R30, bv64) := 1776bv64)
+    ),
+    jumps(
+      DirectCall("1488:__cxa_finalize", condition())
+    )
+  )
+  Block("1776:l000009b3",
+    statements(
+      LocalAssign(Register(R30, bv64) := 1780bv64)
+    ),
+    jumps(
+      DirectCall("1616:deregister_tm_clones", condition())
+    )
+  )
+  Block("1780:l000009bf",
+    statements(
+      LocalAssign(Register(R0, bv64) := 1bv64)
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[BinaryExpr("add", Register(R19, bv64), 20bv64)] := Extract(Register(R0, bv64)[8:0])))
+    ),
+    jumps(
+      GoTo("1788:l0000048d", condition())
+    )
+  )
+  Block("1788:l0000048d",
+    statements(
+      LocalAssign(Register(R19, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 16bv64)]))
+      LocalAssign(Register(R29, bv64) := MemoryLoad(Memory("mem", 64, 8), [Register(R31, bv64)]))
+      LocalAssign(Register(R30, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 8bv64)]))
+      LocalAssign(Register(R31, bv64) := BinaryExpr("add", Register(R31, bv64), 32bv64))
+    ),
+    jumps(
+      IndirectCall(Register(R30, bv64), condition())
+    )
+  )
+)),
+Procedure("1472:__libc_start_main", in(Parameter(Register(R0, bv64)), Parameter(Register(R1, bv64)), Parameter(Register(R2, bv64)), Parameter(Register(R3, bv64))), out(Parameter(Register(R2, bv64)), Parameter(Register(R3, bv64)), Parameter(Register(R0, bv64))), blocks(
+  Block("1472:l__libc_start_main",
+    statements(
+      LocalAssign(Register(R16, bv64) := 65536bv64)
+      LocalAssign(Register(R17, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R16, bv64), 4016bv64)]))
+      LocalAssign(Register(R16, bv64) := BinaryExpr("add", Register(R16, bv64), 4016bv64))
+    ),
+    jumps(
+      IndirectCall(Register(R17, bv64), condition())
+    )
+  )
+)),
+Procedure("2336:_fini", in(), out(Parameter(Register(R0, bv64))), blocks(
+  Block("2336:l_fini",
+    statements(
+      LocalAssign(LocalVar(#0, bv64) := BinaryExpr("add", Register(R31, bv64), 18446744073709551600bv64))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[LocalVar(#0, bv64)] := Register(R29, bv64)))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[BinaryExpr("add", LocalVar(#0, bv64), 8bv64)] := Register(R30, bv64)))
+      LocalAssign(Register(R31, bv64) := LocalVar(#0, bv64))
+      LocalAssign(Register(R29, bv64) := Register(R31, bv64))
+      LocalAssign(Register(R29, bv64) := MemoryLoad(Memory("mem", 64, 8), [Register(R31, bv64)]))
+      LocalAssign(Register(R30, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 8bv64)]))
+      LocalAssign(Register(R31, bv64) := BinaryExpr("add", Register(R31, bv64), 16bv64))
+    ),
+    jumps(
+      IndirectCall(Register(R30, bv64), condition())
+    )
+  )
+)),
+Procedure("1408:_init", in(), out(Parameter(Register(R0, bv64))), blocks(
+  Block("1408:l_init",
+    statements(
+      LocalAssign(LocalVar(#28, bv64) := BinaryExpr("add", Register(R31, bv64), 18446744073709551600bv64))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[LocalVar(#28, bv64)] := Register(R29, bv64)))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[BinaryExpr("add", LocalVar(#28, bv64), 8bv64)] := Register(R30, bv64)))
+      LocalAssign(Register(R31, bv64) := LocalVar(#28, bv64))
+      LocalAssign(Register(R29, bv64) := Register(R31, bv64))
+      LocalAssign(Register(R30, bv64) := 1424bv64)
+    ),
+    jumps(
+      DirectCall("1588:call_weak_fn", condition())
+    )
+  )
+  Block("1424:l00000c22",
+    statements(
+      LocalAssign(Register(R29, bv64) := MemoryLoad(Memory("mem", 64, 8), [Register(R31, bv64)]))
+      LocalAssign(Register(R30, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 8bv64)]))
+      LocalAssign(Register(R31, bv64) := BinaryExpr("add", Register(R31, bv64), 16bv64))
+    ),
+    jumps(
+      IndirectCall(Register(R30, bv64), condition())
+    )
+  )
+)),
+Procedure("1536:_start", in(), out(Parameter(Register(R0, bv64))), blocks(
+  Block("1536:l_start",
+    statements(
+      LocalAssign(Register(R29, bv64) := 0bv64)
+      LocalAssign(Register(R30, bv64) := 0bv64)
+      LocalAssign(Register(R5, bv64) := Register(R0, bv64))
+      LocalAssign(Register(R1, bv64) := MemoryLoad(Memory("mem", 64, 8), [Register(R31, bv64)]))
+      LocalAssign(Register(R2, bv64) := BinaryExpr("add", Register(R31, bv64), 8bv64))
+      LocalAssign(Register(R6, bv64) := Register(R31, bv64))
+      LocalAssign(Register(R0, bv64) := 65536bv64)
+      LocalAssign(Register(R0, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R0, bv64), 4080bv64)]))
+      LocalAssign(Register(R3, bv64) := 0bv64)
+      LocalAssign(Register(R4, bv64) := 0bv64)
+      LocalAssign(Register(R30, bv64) := 1584bv64)
+    ),
+    jumps(
+      DirectCall("1472:__libc_start_main", condition())
+    )
+  )
+  Block("1584:l000003b7",
+    statements(
+      LocalAssign(Register(R30, bv64) := 1588bv64)
+    ),
+    jumps(
+      DirectCall("1520:abort", condition())
+    )
+  )
+  Block("?:l00000d66",
+    statements(
+    ),
+    jumps(
+      DirectCall("1588:call_weak_fn", condition())
+    )
+  )
+)),
+Procedure("1520:abort", in(), out(), blocks(
+)),
+Procedure("1848:add_six", in(), out(Parameter(Register(R0, bv64))), blocks(
+  Block("1848:ladd_six",
+    statements(
+      LocalAssign(Register(R0, bv64) := 69632bv64)
+      LocalAssign(Register(R0, bv64) := BinaryExpr("add", Register(R0, bv64), 16bv64))
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [Register(R0, bv64)]), 32))
+      LocalAssign(Register(R1, bv64) := ZeroExtend(BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 6bv32), 32))
+      LocalAssign(Register(R0, bv64) := 69632bv64)
+      LocalAssign(Register(R0, bv64) := BinaryExpr("add", Register(R0, bv64), 16bv64))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[Register(R0, bv64)] := Extract(Register(R1, bv64)[32:0])))
+    ),
+    jumps(
+      IndirectCall(Register(R30, bv64), condition())
+    )
+  )
+)),
+Procedure("1812:add_two", in(), out(Parameter(Register(R0, bv64))), blocks(
+  Block("1812:ladd_two",
+    statements(
+      LocalAssign(Register(R0, bv64) := 69632bv64)
+      LocalAssign(Register(R0, bv64) := BinaryExpr("add", Register(R0, bv64), 16bv64))
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [Register(R0, bv64)]), 32))
+      LocalAssign(Register(R1, bv64) := ZeroExtend(BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 2bv32), 32))
+      LocalAssign(Register(R0, bv64) := 69632bv64)
+      LocalAssign(Register(R0, bv64) := BinaryExpr("add", Register(R0, bv64), 16bv64))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[Register(R0, bv64)] := Extract(Register(R1, bv64)[32:0])))
+    ),
+    jumps(
+      IndirectCall(Register(R30, bv64), condition())
+    )
+  )
+)),
+Procedure("1588:call_weak_fn", in(), out(Parameter(Register(R0, bv64))), blocks(
+  Block("1588:lcall_weak_fn",
+    statements(
+      LocalAssign(Register(R0, bv64) := 65536bv64)
+      LocalAssign(Register(R0, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R0, bv64), 4072bv64)]))
+    ),
+    jumps(
+      GoTo("1604:l000003cd", condition(BinaryExpr("!=", BinaryExpr("comp", Register(R0, bv64), 0bv64), 0bv1)))
+      GoTo("1600:l00000a1c", condition())
+    )
+  )
+  Block("1604:l000003cd",
+    statements(
+    ),
+    jumps(
+      IndirectCall(Register(R30, bv64), condition())
+    )
+  )
+  Block("1600:l00000a1c",
+    statements(
+    ),
+    jumps(
+      GoTo("1504:l__gmon_start__", condition())
+    )
+  )
+  Block("1504:l__gmon_start__",
+    statements(
+      LocalAssign(Register(R16, bv64) := 65536bv64)
+      LocalAssign(Register(R17, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R16, bv64), 4032bv64)]))
+      LocalAssign(Register(R16, bv64) := BinaryExpr("add", Register(R16, bv64), 4032bv64))
+    ),
+    jumps(
+      IndirectCall(Register(R17, bv64), condition())
+    )
+  )
+)),
+Procedure("1616:deregister_tm_clones", in(), out(Parameter(Register(R0, bv64))), blocks(
+  Block("1616:lderegister_tm_clones",
+    statements(
+      LocalAssign(Register(R0, bv64) := 69632bv64)
+      LocalAssign(Register(R0, bv64) := BinaryExpr("add", Register(R0, bv64), 24bv64))
+      LocalAssign(Register(R1, bv64) := 69632bv64)
+      LocalAssign(Register(R1, bv64) := BinaryExpr("add", Register(R1, bv64), 24bv64))
+      LocalAssign(LocalVar(#1, bv64) := UnaryExpr("not", Register(R0, bv64)))
+      LocalAssign(LocalVar(#2, bv64) := BinaryExpr("add", Register(R1, bv64), UnaryExpr("not", Register(R0, bv64))))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#2, bv64), 1bv64), 1), BinaryExpr("add", BinaryExpr("add", SignExtend(Register(R1, bv64), 1), SignExtend(LocalVar(#1, bv64), 1)), 1bv65))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#2, bv64), 1bv64), 1), BinaryExpr("add", BinaryExpr("add", ZeroExtend(Register(R1, bv64), 1), ZeroExtend(LocalVar(#1, bv64), 1)), 1bv65))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#2, bv64), 1bv64), 0bv64))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#2, bv64), 1bv64)[64:63]))
+    ),
+    jumps(
+      GoTo("1660:l00000412", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("1640:l000009fe", condition())
+    )
+  )
+  Block("1640:l000009fe",
+    statements(
+      LocalAssign(Register(R1, bv64) := 65536bv64)
+      LocalAssign(Register(R1, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R1, bv64), 4056bv64)]))
+    ),
+    jumps(
+      GoTo("1660:l00000412", condition(BinaryExpr("!=", BinaryExpr("comp", Register(R1, bv64), 0bv64), 0bv1)))
+      GoTo("1652:l00000a11", condition())
+    )
+  )
+  Block("1660:l00000412",
+    statements(
+    ),
+    jumps(
+      IndirectCall(Register(R30, bv64), condition())
+    )
+  )
+  Block("1652:l00000a11",
+    statements(
+      LocalAssign(Register(R16, bv64) := Register(R1, bv64))
+    ),
+    jumps(
+      IndirectCall(Register(R16, bv64), condition())
+    )
+  )
+)),
+Procedure("1808:frame_dummy", in(), out(Parameter(Register(R0, bv64))), blocks(
+  Block("1808:lframe_dummy",
+    statements(
+    ),
+    jumps(
+      DirectCall("1664:register_tm_clones", condition())
+    )
+  )
+)),
+Procedure("1920:main", in(Parameter(Register(R0, bv64)), Parameter(Register(R1, bv64))), out(Parameter(Register(R1, bv64)), Parameter(Register(R0, bv64))), blocks(
+  Block("1920:lmain",
+    statements(
+      LocalAssign(LocalVar(#4, bv64) := BinaryExpr("add", Register(R31, bv64), 18446744073709551584bv64))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[LocalVar(#4, bv64)] := Register(R29, bv64)))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[BinaryExpr("add", LocalVar(#4, bv64), 8bv64)] := Register(R30, bv64)))
+      LocalAssign(Register(R31, bv64) := LocalVar(#4, bv64))
+      LocalAssign(Register(R29, bv64) := Register(R31, bv64))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[BinaryExpr("add", Register(R31, bv64), 28bv64)] := Extract(Register(R0, bv64)[32:0])))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[BinaryExpr("add", Register(R31, bv64), 16bv64)] := Register(R1, bv64)))
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#5, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967284bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#5, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934581bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#5, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967285bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#5, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#5, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2296:l00000599", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("1948:l000005e0", condition())
+    )
+  )
+  Block("1948:l000005e0",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#6, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967284bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#6, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934581bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#6, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967285bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#6, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#6, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2308:l000005d7", condition(BinaryExpr("!=", BinaryExpr("and", BinaryExpr("comp", LocalVar(NF, bv1), LocalVar(VF, bv1)), BinaryExpr("comp", LocalVar(ZF, bv1), 0bv1)), 0bv1)))
+      GoTo("1960:l00000608", condition())
+    )
+  )
+  Block("1960:l00000608",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#7, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967285bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#7, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934582bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#7, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967286bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#7, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#7, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2284:l00000629", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("1972:l00000643", condition())
+    )
+  )
+  Block("2284:l00000629",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2288bv64)
+    ),
+    jumps(
+      DirectCall("1884:sub_seven", condition())
+    )
+  )
+  Block("2288:l00000635",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2292bv64)
+    ),
+    jumps(
+      DirectCall("1812:add_two", condition())
+    )
+  )
+  Block("2292:l0000063c",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2296bv64)
+    ),
+    jumps(
+      DirectCall("1848:add_six", condition())
+    )
+  )
+  Block("2296:l00000599",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2300bv64)
+    ),
+    jumps(
+      DirectCall("1884:sub_seven", condition())
+    )
+  )
+  Block("2300:l000005a5",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2304bv64)
+    ),
+    jumps(
+      DirectCall("1812:add_two", condition())
+    )
+  )
+  Block("2304:l000005ac",
+    statements(
+    ),
+    jumps(
+      GoTo("2316:l000005ad", condition())
+    )
+  )
+  Block("1972:l00000643",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#8, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967285bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#8, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934582bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#8, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967286bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#8, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#8, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2308:l000005d7", condition(BinaryExpr("!=", BinaryExpr("and", BinaryExpr("comp", LocalVar(NF, bv1), LocalVar(VF, bv1)), BinaryExpr("comp", LocalVar(ZF, bv1), 0bv1)), 0bv1)))
+      GoTo("1984:l0000066b", condition())
+    )
+  )
+  Block("1984:l0000066b",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#9, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967286bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#9, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934583bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#9, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967287bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#9, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#9, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2272:l0000068c", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("1996:l000006a3", condition())
+    )
+  )
+  Block("2272:l0000068c",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2276bv64)
+    ),
+    jumps(
+      DirectCall("1812:add_two", condition())
+    )
+  )
+  Block("2276:l00000698",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2280bv64)
+    ),
+    jumps(
+      DirectCall("1848:add_six", condition())
+    )
+  )
+  Block("2280:l0000069f",
+    statements(
+    ),
+    jumps(
+      GoTo("2316:l000005ad", condition())
+    )
+  )
+  Block("1996:l000006a3",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#10, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967286bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#10, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934583bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#10, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967287bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#10, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#10, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2308:l000005d7", condition(BinaryExpr("!=", BinaryExpr("and", BinaryExpr("comp", LocalVar(NF, bv1), LocalVar(VF, bv1)), BinaryExpr("comp", LocalVar(ZF, bv1), 0bv1)), 0bv1)))
+      GoTo("2008:l000006cb", condition())
+    )
+  )
+  Block("2008:l000006cb",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#11, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967287bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#11, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934584bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#11, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967288bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#11, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#11, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2260:l000006ec", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("2020:l00000703", condition())
+    )
+  )
+  Block("2020:l00000703",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#12, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967287bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#12, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934584bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#12, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967288bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#12, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#12, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2308:l000005d7", condition(BinaryExpr("!=", BinaryExpr("and", BinaryExpr("comp", LocalVar(NF, bv1), LocalVar(VF, bv1)), BinaryExpr("comp", LocalVar(ZF, bv1), 0bv1)), 0bv1)))
+      GoTo("2032:l0000072b", condition())
+    )
+  )
+  Block("2032:l0000072b",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#13, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967288bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#13, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934585bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#13, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967289bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#13, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#13, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2256:l0000074c", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("2044:l00000758", condition())
+    )
+  )
+  Block("2044:l00000758",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#14, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967288bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#14, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934585bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#14, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967289bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#14, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#14, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2308:l000005d7", condition(BinaryExpr("!=", BinaryExpr("and", BinaryExpr("comp", LocalVar(NF, bv1), LocalVar(VF, bv1)), BinaryExpr("comp", LocalVar(ZF, bv1), 0bv1)), 0bv1)))
+      GoTo("2056:l00000780", condition())
+    )
+  )
+  Block("2056:l00000780",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#15, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967289bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#15, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934586bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#15, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967290bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#15, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#15, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2252:l000007a1", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("2068:l000007ad", condition())
+    )
+  )
+  Block("2068:l000007ad",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#16, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967289bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#16, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934586bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#16, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967290bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#16, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#16, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2308:l000005d7", condition(BinaryExpr("!=", BinaryExpr("and", BinaryExpr("comp", LocalVar(NF, bv1), LocalVar(VF, bv1)), BinaryExpr("comp", LocalVar(ZF, bv1), 0bv1)), 0bv1)))
+      GoTo("2080:l000007d5", condition())
+    )
+  )
+  Block("2080:l000007d5",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#17, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967290bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#17, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934587bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#17, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967291bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#17, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#17, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2244:l000007f6", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("2092:l00000809", condition())
+    )
+  )
+  Block("2244:l000007f6",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2248bv64)
+    ),
+    jumps(
+      DirectCall("1848:add_six", condition())
+    )
+  )
+  Block("2248:l00000802",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2252bv64)
+    ),
+    jumps(
+      DirectCall("1812:add_two", condition())
+    )
+  )
+  Block("2252:l000007a1",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2256bv64)
+    ),
+    jumps(
+      DirectCall("1848:add_six", condition())
+    )
+  )
+  Block("2256:l0000074c",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2260bv64)
+    ),
+    jumps(
+      DirectCall("1884:sub_seven", condition())
+    )
+  )
+  Block("2260:l000006ec",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2264bv64)
+    ),
+    jumps(
+      DirectCall("1884:sub_seven", condition())
+    )
+  )
+  Block("2264:l000006f8",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2268bv64)
+    ),
+    jumps(
+      DirectCall("1848:add_six", condition())
+    )
+  )
+  Block("2268:l000006ff",
+    statements(
+    ),
+    jumps(
+      GoTo("2316:l000005ad", condition())
+    )
+  )
+  Block("2092:l00000809",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#18, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967290bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#18, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934587bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#18, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967291bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#18, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#18, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2308:l000005d7", condition(BinaryExpr("!=", BinaryExpr("and", BinaryExpr("comp", LocalVar(NF, bv1), LocalVar(VF, bv1)), BinaryExpr("comp", LocalVar(ZF, bv1), 0bv1)), 0bv1)))
+      GoTo("2104:l00000831", condition())
+    )
+  )
+  Block("2104:l00000831",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#19, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967291bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#19, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934588bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#19, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967292bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#19, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#19, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2236:l00000852", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("2116:l00000862", condition())
+    )
+  )
+  Block("2236:l00000852",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2240bv64)
+    ),
+    jumps(
+      DirectCall("1848:add_six", condition())
+    )
+  )
+  Block("2240:l0000085e",
+    statements(
+    ),
+    jumps(
+      GoTo("2316:l000005ad", condition())
+    )
+  )
+  Block("2116:l00000862",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#20, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967291bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#20, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934588bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#20, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967292bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#20, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#20, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2308:l000005d7", condition(BinaryExpr("!=", BinaryExpr("and", BinaryExpr("comp", LocalVar(NF, bv1), LocalVar(VF, bv1)), BinaryExpr("comp", LocalVar(ZF, bv1), 0bv1)), 0bv1)))
+      GoTo("2128:l0000088a", condition())
+    )
+  )
+  Block("2128:l0000088a",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#21, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967292bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#21, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934589bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#21, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967293bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#21, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#21, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2224:l000008ab", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("2140:l000008c2", condition())
+    )
+  )
+  Block("2224:l000008ab",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2228bv64)
+    ),
+    jumps(
+      DirectCall("1812:add_two", condition())
+    )
+  )
+  Block("2228:l000008b7",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2232bv64)
+    ),
+    jumps(
+      DirectCall("1884:sub_seven", condition())
+    )
+  )
+  Block("2232:l000008be",
+    statements(
+    ),
+    jumps(
+      GoTo("2316:l000005ad", condition())
+    )
+  )
+  Block("2140:l000008c2",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#22, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967292bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#22, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934589bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#22, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967293bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#22, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#22, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2308:l000005d7", condition(BinaryExpr("!=", BinaryExpr("and", BinaryExpr("comp", LocalVar(NF, bv1), LocalVar(VF, bv1)), BinaryExpr("comp", LocalVar(ZF, bv1), 0bv1)), 0bv1)))
+      GoTo("2152:l000008ea", condition())
+    )
+  )
+  Block("2152:l000008ea",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#23, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967293bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#23, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934590bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#23, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967294bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#23, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#23, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2216:l0000090b", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("2164:l0000091b", condition())
+    )
+  )
+  Block("2164:l0000091b",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#24, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967293bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#24, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934590bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#24, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967294bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#24, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#24, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2308:l000005d7", condition(BinaryExpr("!=", BinaryExpr("and", BinaryExpr("comp", LocalVar(NF, bv1), LocalVar(VF, bv1)), BinaryExpr("comp", LocalVar(ZF, bv1), 0bv1)), 0bv1)))
+      GoTo("2176:l00000943", condition())
+    )
+  )
+  Block("2176:l00000943",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#25, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967295bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#25, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 0bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#25, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967296bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#25, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#25, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2204:l00000964", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("2188:l0000097b", condition())
+    )
+  )
+  Block("2204:l00000964",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2208bv64)
+    ),
+    jumps(
+      DirectCall("1812:add_two", condition())
+    )
+  )
+  Block("2208:l00000970",
+    statements(
+    ),
+    jumps(
+      GoTo("2316:l000005ad", condition())
+    )
+  )
+  Block("2188:l0000097b",
+    statements(
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 28bv64)]), 32))
+      LocalAssign(LocalVar(#26, bv32) := BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967294bv32))
+      LocalAssign(LocalVar(VF, bv1) := UnaryExpr("not", BinaryExpr("comp", SignExtend(BinaryExpr("add", LocalVar(#26, bv32), 1bv32), 1), BinaryExpr("add", SignExtend(Extract(Register(R0, bv64)[32:0]), 1), 8589934591bv33))))
+      LocalAssign(LocalVar(CF, bv1) := UnaryExpr("not", BinaryExpr("comp", ZeroExtend(BinaryExpr("add", LocalVar(#26, bv32), 1bv32), 1), BinaryExpr("add", ZeroExtend(Extract(Register(R0, bv64)[32:0]), 1), 4294967295bv33))))
+      LocalAssign(LocalVar(ZF, bv1) := BinaryExpr("comp", BinaryExpr("add", LocalVar(#26, bv32), 1bv32), 0bv32))
+      LocalAssign(LocalVar(NF, bv1) := Extract(BinaryExpr("add", LocalVar(#26, bv32), 1bv32)[32:31]))
+    ),
+    jumps(
+      GoTo("2212:l00000974", condition(BinaryExpr("!=", BinaryExpr("comp", LocalVar(ZF, bv1), 1bv1), 0bv1)))
+      GoTo("2200:l000009a1", condition())
+    )
+  )
+  Block("2212:l00000974",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2216bv64)
+    ),
+    jumps(
+      DirectCall("1848:add_six", condition())
+    )
+  )
+  Block("2216:l0000090b",
+    statements(
+      LocalAssign(Register(R30, bv64) := 2220bv64)
+    ),
+    jumps(
+      DirectCall("1884:sub_seven", condition())
+    )
+  )
+  Block("2220:l00000917",
+    statements(
+    ),
+    jumps(
+      GoTo("2316:l000005ad", condition())
+    )
+  )
+  Block("2316:l000005ad",
+    statements(
+      LocalAssign(Register(R0, bv64) := 69632bv64)
+      LocalAssign(Register(R0, bv64) := BinaryExpr("add", Register(R0, bv64), 16bv64))
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [Register(R0, bv64)]), 32))
+    ),
+    jumps(
+      GoTo("2328:l000005c2", condition())
+    )
+  )
+  Block("2200:l000009a1",
+    statements(
+    ),
+    jumps(
+      GoTo("2308:l000005d7", condition())
+    )
+  )
+  Block("2308:l000005d7",
+    statements(
+      LocalAssign(Register(R0, bv64) := 1bv64)
+    ),
+    jumps(
+      GoTo("2328:l000005c2", condition())
+    )
+  )
+  Block("2328:l000005c2",
+    statements(
+      LocalAssign(Register(R29, bv64) := MemoryLoad(Memory("mem", 64, 8), [Register(R31, bv64)]))
+      LocalAssign(Register(R30, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R31, bv64), 8bv64)]))
+      LocalAssign(Register(R31, bv64) := BinaryExpr("add", Register(R31, bv64), 32bv64))
+    ),
+    jumps(
+      IndirectCall(Register(R30, bv64), condition())
+    )
+  )
+)),
+Procedure("1664:register_tm_clones", in(), out(Parameter(Register(R0, bv64))), blocks(
+  Block("1664:lregister_tm_clones",
+    statements(
+      LocalAssign(Register(R0, bv64) := 69632bv64)
+      LocalAssign(Register(R0, bv64) := BinaryExpr("add", Register(R0, bv64), 24bv64))
+      LocalAssign(Register(R1, bv64) := 69632bv64)
+      LocalAssign(Register(R1, bv64) := BinaryExpr("add", Register(R1, bv64), 24bv64))
+      LocalAssign(Register(R1, bv64) := BinaryExpr("add", BinaryExpr("add", Register(R1, bv64), UnaryExpr("not", Register(R0, bv64))), 1bv64))
+      LocalAssign(Register(R2, bv64) := BinaryExpr("++", 0bv63, Extract(Register(R1, bv64)[64:63])))
+      LocalAssign(Register(R1, bv64) := BinaryExpr("add", Register(R2, bv64), BinaryExpr("ashr", Register(R1, bv64), ZeroExtend(3bv3, 61))))
+      LocalAssign(Register(R1, bv64) := SignExtend(Extract(Register(R1, bv64)[64:1]), 1))
+    ),
+    jumps(
+      GoTo("1720:l0000044e", condition(BinaryExpr("!=", BinaryExpr("comp", Register(R1, bv64), 0bv64), 0bv1)))
+      GoTo("1700:l000009e0", condition())
+    )
+  )
+  Block("1700:l000009e0",
+    statements(
+      LocalAssign(Register(R2, bv64) := 65536bv64)
+      LocalAssign(Register(R2, bv64) := MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Register(R2, bv64), 4088bv64)]))
+    ),
+    jumps(
+      GoTo("1720:l0000044e", condition(BinaryExpr("!=", BinaryExpr("comp", Register(R2, bv64), 0bv64), 0bv1)))
+      GoTo("1712:l000009f3", condition())
+    )
+  )
+  Block("1720:l0000044e",
+    statements(
+    ),
+    jumps(
+      IndirectCall(Register(R30, bv64), condition())
+    )
+  )
+  Block("1712:l000009f3",
+    statements(
+      LocalAssign(Register(R16, bv64) := Register(R2, bv64))
+    ),
+    jumps(
+      IndirectCall(Register(R16, bv64), condition())
+    )
+  )
+)),
+Procedure("1884:sub_seven", in(), out(Parameter(Register(R0, bv64))), blocks(
+  Block("1884:lsub_seven",
+    statements(
+      LocalAssign(Register(R0, bv64) := 69632bv64)
+      LocalAssign(Register(R0, bv64) := BinaryExpr("add", Register(R0, bv64), 16bv64))
+      LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [Register(R0, bv64)]), 32))
+      LocalAssign(Register(R1, bv64) := ZeroExtend(BinaryExpr("add", Extract(Register(R0, bv64)[32:0]), 4294967289bv32), 32))
+      LocalAssign(Register(R0, bv64) := 69632bv64)
+      LocalAssign(Register(R0, bv64) := BinaryExpr("add", Register(R0, bv64), 16bv64))
+      MemoryAssign(MemoryStore(Memory("mem", 64, 8)[Register(R0, bv64)] := Extract(Register(R1, bv64)[32:0])))
+    ),
+    jumps(
+      IndirectCall(Register(R30, bv64), condition())
+    )
+  )
+)),
