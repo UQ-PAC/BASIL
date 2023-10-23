@@ -1,7 +1,9 @@
 import org.scalatest.funsuite.AnyFunSuite
-import util.Logger
+import util.{Logger, PerformanceTimer}
+
 
 import java.io.{BufferedWriter, File, FileWriter}
+import scala.collection.mutable
 import scala.io.Source
 import scala.sys.process.*
 
@@ -9,10 +11,18 @@ import scala.sys.process.*
   * directory structure and file-name patterns.
   */
 class SystemTests extends AnyFunSuite {
+  val testPath = "./src/test/"
   val correctPath = "./src/test/correct"
   val correctPrograms: Array[String] = getSubdirectories(correctPath)
   val incorrectPath = "./src/test/incorrect"
   val incorrectPrograms: Array[String] = getSubdirectories(incorrectPath)
+
+  case class TestResult(passed: Boolean, verified: Boolean, shouldVerify: Boolean, hasExpected: Boolean, matchesExpected: Boolean, translateTime: Long, verifyTime: Long) {
+    final val csvHeader = "passed,verified,shouldVerify,hasExpected,matchesExpected,translateTime,verifyTime"
+    val toCsv = s"$passed,$verified,$shouldVerify,$hasExpected,$matchesExpected,$translateTime,$verifyTime"
+  }
+
+  val testResults: mutable.Map[String, TestResult] = mutable.HashMap()
 
   // get all variations of each program
   for (p <- correctPrograms) {
@@ -35,7 +45,8 @@ class SystemTests extends AnyFunSuite {
     )
   }
 
-  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean): Unit = {
+
+  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean): Unit= {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
@@ -44,13 +55,16 @@ class SystemTests extends AnyFunSuite {
     val ADTPath = variationPath + ".adt"
     val RELFPath = variationPath + ".relf"
     Logger.info(outPath)
+    val timer = PerformanceTimer(s"test $name/$variation")
     if (File(specPath).exists) {
       Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--spec", specPath, "--output", outPath, "--dump-il", ilPath))
     } else {
       Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--output", outPath, "--dump-il", ilPath))
     }
+    val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(outPath + " done")
     val boogieResult = Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath).!!
+    val verifyTime = timer.checkPoint("verify")
     val resultPath = variationPath + "_result.txt"
     log(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
@@ -59,14 +73,22 @@ class SystemTests extends AnyFunSuite {
       else "Expected verification failure, but got success."
 
     val expectedOutPath = variationPath + ".expected"
-    if (File(expectedOutPath).exists) {
+    val hasExpected = File(expectedOutPath).exists
+    var matchesExpected = true
+    if (hasExpected) {
       if (!compareFiles(expectedOutPath, outPath)) {
+        matchesExpected = false
         info("Warning: Boogie file differs from expected")
       }
     } else {
       info("Note: this test has not previously succeeded")
     }
-    if (verified != shouldVerify) fail(failureMsg)
+    val passed = verified == shouldVerify
+    val result = TestResult(passed, verified, shouldVerify, hasExpected, matchesExpected, translateTime, verifyTime)
+    testResults.put(s"$name/$variation", result)
+    val csv: String = "testCase," + result.csvHeader + System.lineSeparator() + testResults.map(r => s"${r._1},${r._2.toCsv}").mkString(System.lineSeparator())
+    log(csv, testPath + "summary.csv")
+    if (!passed) fail(failureMsg)
   }
 
   def compareFiles(path1: String, path2: String): Boolean = {
