@@ -2,7 +2,7 @@ package translating
 import ir.*
 import boogie.*
 import specification.*
-import util.BoogieGeneratorConfig
+import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -26,6 +26,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
   private val stack = BMapVar("stack", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val Gamma_stack = BMapVar("Gamma_stack", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+
+  private var config: BoogieGeneratorConfig = BoogieGeneratorConfig()
   private val modifiedCheck: Set[BVar] = (for (i <- 19 to 29) yield {
     Set(BVariable("R" + i, BitVecBType(64), Scope.Global), BVariable("Gamma_R" + i, BoolBType, Scope.Global))
   }).flatten.toSet ++ Set(
@@ -33,7 +35,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     BVariable("Gamma_R" + 31, BoolBType, Scope.Global)
   )
 
-  def translate(boogieGeneratorQuirks: BoogieGeneratorConfig): BProgram = {
+  def translate(boogieGeneratorConfig: BoogieGeneratorConfig): BProgram = {
+    config = boogieGeneratorConfig
     val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
     val procedures = program.procedures.map(f => translateProcedure(f, readOnlyMemory))
     val defaultGlobals = List(BVarDecl(mem), BVarDecl(Gamma_mem))
@@ -157,9 +160,14 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           (indices(i), valuesEndian(i))
         }
 
-        val body: MapUpdate = indiceValues.tail.foldLeft(MapUpdate(memVar, indices.head, valuesEndian.head)) {
-          (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+        val body: BExpr =
+        config.memoryFunctionType match {
+          case BoogieMemoryAccessMode.SuccessiveStoreSelect  => indiceValues.tail.foldLeft(MapUpdate(memVar, indices.head, valuesEndian.head)) {
+              (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+            }
+          case BoogieMemoryAccessMode.LambdaStoreSelect => ???
         }
+
 
         BFunction(m.fnName, "", in, out, Some(body))
       case g: GammaStoreOp =>
@@ -184,9 +192,14 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           (indices(i), values(i))
         }
 
-        val body: MapUpdate = indiceValues.tail.foldLeft(MapUpdate(gammaMapVar, indices.head, values.head)) {
-          (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+        val body: BExpr = config.memoryFunctionType match {
+          case BoogieMemoryAccessMode.SuccessiveStoreSelect =>
+            indiceValues.tail.foldLeft(MapUpdate(gammaMapVar, indices.head, values.head)) {
+              (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+            }
+          case BoogieMemoryAccessMode.LambdaStoreSelect => ???
         }
+
 
         BFunction(g.fnName, "", in, out, Some(body))
       case l: LOp =>
