@@ -163,7 +163,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
 
   /** The lattice of abstract values.
     */
-  val powersetLattice: PowersetLattice[MemoryRegion] = PowersetLattice()
+  val regionLattice: PowersetLattice[MemoryRegion] = PowersetLattice()
 
   /** The lattice of abstract states.
     */
@@ -232,6 +232,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                 env // we cannot evaluate this to a concrete value, we need VSA for this
             }
         }
+        // we cannot evaluate this to a concrete value, we need VSA for this
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")
         throw new Exception("Unknown type")
@@ -310,11 +311,17 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     */
   def transfer(n: CfgNode, s: Set[MemoryRegion]): Set[MemoryRegion] = localTransfer(n, s)
 
+trait IntraprocMemoryRegionAnalysisMisc[N] extends MemoryRegionAnalysisMisc {
+  val liftedstatelattice: LiftLattice[stateLattice.type]
+  val cfg: ProgramCfg
+  val lattice: MapLattice[N, liftedstatelattice.type]
+}
+
 /**
  * Base class for memory region analysis with lifted lattice, where the extra bottom element represents "unreachable".
  */
 abstract class LiftedMemoryRegionAnalysis[P <: ProgramCfg](
-    val cfg: ProgramCfg,
+    val cfg: P,
     val globals: Map[BigInt, String],
     val globalOffsets: Map[BigInt, BigInt],
     val subroutines: Map[BigInt, String],
@@ -333,7 +340,7 @@ abstract class LiftedMemoryRegionAnalysis[P <: ProgramCfg](
    */
   val lattice: MapLattice[CfgNode, liftedstatelattice.type] = new MapLattice(liftedstatelattice)
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
+  override val domain: Set[CfgNode] = cfg.nodes.toSet
 
   /**
    * The worklist is initialized with all function entry nodes.
@@ -349,7 +356,7 @@ abstract class LiftedMemoryRegionAnalysis[P <: ProgramCfg](
       // function entry nodes are always reachable (if intra-procedural analysis)
       case _: CfgFunctionEntryNode => lift(stateLattice.bottom)
       // all other nodes are processed with join+transfer
-      case _ => super.funsub(n, x, intra)
+      case _ => super.funsub(n, x, intra = true)
     }
   }
 }
@@ -365,3 +372,56 @@ class MemoryRegionAnalysisSolver(
 ) extends LiftedMemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
     with IntraproceduralForwardDependencies
     with SimpleMonotonicSolver[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]
+
+
+
+
+///**
+// * Functionality for basic analyses with lifted state lattice.
+// */
+//trait LiftedMemoryRegionAnalysisMisc extends MemoryRegionAnalysisMisc {
+//
+//  /**
+//   * Transfer function for state lattice elements.
+//   * (Same as `localTransfer` for basic analyses with lifted state lattice.)
+//   */
+//  def transferUnlifted(n: CfgNode, s: stateLattice.Element): stateLattice.Element = localTransfer(n, s)
+//}
+//
+///**
+// * Intraprocedural value analysis that uses [[tip.solvers.WorklistFixpointSolverWithReachability]],
+// * with all function entries as start nodes.
+// */
+//abstract class IntraprocValueAnalysisWorklistSolverWithReachability[L](
+//  cfg: ProgramCfg,
+//  globals: Map[BigInt, String],
+//  globalOffsets: Map[BigInt, BigInt],
+//  subroutines: Map[BigInt, String],
+//  constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+//  )
+//  extends LiftedMemoryRegionAnalysis(
+//    cfg,
+//    globals,
+//    globalOffsets,
+//    subroutines,
+//    constantProp,
+//    true)
+//  with LiftedMemoryRegionAnalysisMisc
+//  with WorklistFixpointSolverWithReachability[CfgNode]
+//  with ForwardDependencies
+//
+//object MemoryRegionAnalysis:
+//
+//  class WorklistSolver(
+//      cfg: ProgramCfg,
+//      globals: Map[BigInt, String],
+//      globalOffsets: Map[BigInt, BigInt],
+//      subroutines: Map[BigInt, String],
+//      constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+//  ) extends IntraprocValueAnalysisWorklistSolverWithReachability(
+//        cfg,
+//        globals,
+//        globalOffsets,
+//        subroutines,
+//        constantProp
+//      )

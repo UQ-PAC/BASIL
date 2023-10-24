@@ -185,6 +185,25 @@ trait SimpleWorklistFixpointSolver[N, T, L <: Lattice[T]] extends WorklistFixpoi
     run(domain)
     x
 
+/**
+ * The worklist-based fixpoint solver with reachability.
+ *
+ * This solver works for map lattices with lifted co-domains, where the extra bottom element typically represents "unreachable".
+ */
+trait WorklistFixpointSolverWithReachability[N] extends WorklistFixpointSolver[N] with MapLiftLatticeSolver[N] {
+
+  /**
+   * The start locations, used as the initial contents of the worklist.
+   */
+  val first: Set[N]
+
+  def analyze(intra: Boolean): lattice.Element = {
+    x = lattice.bottom
+    run(first, intra)
+    x
+  }
+}
+
 /** A pushDown worklist-based fixpoint solvers. Pushes the results of the analysis one node down. This is used to have
   * the results of the pred node in the current node. ie. NODE 1: R0 = 69551bv64 RESULT LATTICE = {} NODE 2: R0 =
   * MemLoad[R0 + 54bv64] RESULT LATTICE = {R0 = 69551bv64} NODE 3: R1 = 0bv64 RESULT LATTICE = {R0 = TOP} ...

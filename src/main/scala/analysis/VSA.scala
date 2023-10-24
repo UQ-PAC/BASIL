@@ -187,3 +187,40 @@ class ValueSetAnalysisSolver(
 ) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
     with InterproceduralForwardDependencies
     with SimpleMonotonicSolver[CfgNode, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]]
+
+
+//abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
+//    cfg: ProgramCfg,
+//    globals: Map[BigInt, String],
+//    externalFunctions: Map[BigInt, String],
+//    globalOffsets: Map[BigInt, BigInt],
+//    subroutines: Map[BigInt, String],
+//    mmm: MemoryModelMap,
+//    constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
+//    val powersetLattice: L
+//) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
+//    with SimpleWorklistFixpointSolver[CfgNode]
+//    with ForwardDependencies
+//
+//object ValueSetAnalysis:
+//
+//  /** Intraprocedural analysis that uses the worklist solver.
+//    */
+//  class WorklistSolver(
+//      cfg: ProgramCfg,
+//      globals: Map[BigInt, String],
+//      externalFunctions: Map[BigInt, String],
+//      globalOffsets: Map[BigInt, BigInt],
+//      subroutines: Map[BigInt, String],
+//      mmm: MemoryModelMap,
+//      constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+//  ) extends IntraprocValueSetAnalysisWorklistSolver(
+//        cfg,
+//        globals,
+//        externalFunctions,
+//        globalOffsets,
+//        subroutines,
+//        mmm,
+//        constantProp,
+//        MapLattice[Variable | MemoryRegion, PowersetLattice[Value]](PowersetLattice[Value])
+//      )
