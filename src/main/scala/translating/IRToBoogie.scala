@@ -62,7 +62,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
     val rgProcs = genRely(relies, readOnlyMemory) :+ guaranteeReflexive
 
-    // TODO: Fixed point
     val functionsUsed1 =
       procedures.flatMap(p => p.functionOps).toSet ++
       rgProcs.flatMap(p => p.functionOps).toSet ++
@@ -176,7 +175,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
             else {
               val i = BVariable("i", BitVecBType(m.addressSize), Scope.Local)
               Lambda(List(i), IfThenElse(
-                BInBounds(indexVar, BitVecBLiteral(m.accesses, m.addressSize), i),
+                BInBounds(indexVar, BitVecBLiteral(m.accesses, m.addressSize), m.endian, i),
                 BByteExtract(valueVar, BinaryBExpr(BVSUB, i, indexVar)),
                 MapAccess(memVar, i)))
             }
@@ -199,7 +198,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
             else {
               val i = BVariable("i", BitVecBType(g.addressSize), Scope.Local)
               Lambda(List(i), IfThenElse(
-                BInBounds(indexVar, BitVecBLiteral(g.accesses, g.addressSize), i),
+                BInBounds(indexVar, BitVecBLiteral(g.accesses, g.addressSize), Endian.LittleEndian, i),
                 valueVar,
                 MapAccess(gammaMapVar, i)))
             }
@@ -270,8 +269,16 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         val iVar = BParam("i", BitVecBType(b.bits))
         val in = List(baseVar, lenVar, iVar)
         val out = BParam(BoolBType)
-        val end = BinaryBExpr(BVADD, baseVar, lenVar)
-        val above = BinaryBExpr(BVULE, baseVar, iVar)
+        val begin = b.endian match {
+          case Endian.LittleEndian => baseVar
+          case Endian.BigEndian => BinaryBExpr(BVSUB, baseVar, lenVar)
+        }
+        val end = b.endian match {
+          case Endian.LittleEndian => BinaryBExpr(BVADD, baseVar, lenVar)
+          case Endian.BigEndian => baseVar
+        }
+
+        val above = BinaryBExpr(BVULE, begin, iVar)
         val below = BinaryBExpr(BVULT, iVar, end)
         val wrap = BinaryBExpr(BVULE, baseVar, end)
         val body = IfThenElse(wrap, BinaryBExpr(BoolAND, above, below), BinaryBExpr(BoolOR, above, below))

@@ -508,11 +508,14 @@ case class BByteExtract(value: BExpr, offset: BExpr) extends BExpr {
  *
  * Assumes all inputs are of the same bitvector width.
  */
-case class InBounds(bits: Int) extends FunctionOp {
-  val fnName: String = s"in_bounds$bits"
+case class InBounds(bits: Int, endian: Endian) extends FunctionOp {
+  val fnName: String = endian match {
+    case Endian.LittleEndian => s"in_bounds${bits}_le"
+    case Endian.BigEndian=> s"in_bounds${bits}_be"
+  }
 }
 
-case class BInBounds(base: BExpr, len: BExpr, i: BExpr) extends BExpr {
+case class BInBounds(base: BExpr, len: BExpr, endian: Endian, i: BExpr) extends BExpr {
   override def toString: String = s"$fnName($base, $len, $i)"
 
   val baseSize: Int = base.getType match {
@@ -524,7 +527,7 @@ case class BInBounds(base: BExpr, len: BExpr, i: BExpr) extends BExpr {
 
   override val getType: BType = BoolBType
   override def functionOps: Set[FunctionOp] =
-    base.functionOps ++ len.functionOps ++ i.functionOps + InBounds(baseSize)
+    base.functionOps ++ len.functionOps ++ i.functionOps + InBounds(baseSize, endian)
   override def locals: Set[BVar]  = base.locals ++ len.locals ++ i.locals
   override def globals: Set[BVar] = base.globals ++ len.globals ++ i.globals 
   override def loads: Set[BExpr]  = base.loads ++ len.loads ++ i.loads 
