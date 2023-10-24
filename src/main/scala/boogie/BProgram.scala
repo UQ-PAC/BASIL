@@ -64,7 +64,7 @@ case class BAxiom(body: BExpr) extends BDeclaration {
   override def toString: String = s"axiom $body;"
 }
 
-case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar, body: Option[BExpr])
+case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar, body: Option[BExpr], inline: Boolean =false)
     extends BDeclaration
     with Ordered[BFunction] {
   override def compare(that: BFunction): Int = name.compare(that.name)
@@ -74,8 +74,13 @@ case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar,
     } else {
       s" {:bvbuiltin \"$bvbuiltin\"}"
     }
+    val inlineString = if (inline) {
+      s" {:inline}"
+    } else {
+      ""
+    }
     val inString = in.map(_.withType).mkString(", ")
-    val declString = s"function$bvbuiltinString $name($inString) returns (${out.withType})"
+    val declString = s"function$bvbuiltinString$inlineString $name($inString) returns (${out.withType})"
     body match {
       case Some(b) => List(declString + " {", "  " + b.toString, "}", "")
       case None    => List(declString + ";")
