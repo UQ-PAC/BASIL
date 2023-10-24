@@ -82,13 +82,13 @@ class SystemTests extends AnyFunSuite {
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")
     if (File(specPath).exists) {
-      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--spec", specPath, "--output", outPath, "--dump-il", ilPath, "--boogie-use-lambda-stores"))
+      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--spec", specPath, "--output", outPath, "--dump-il", ilPath))
     } else {
-      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--output", outPath, "--dump-il", ilPath, "--boogie-use-lambda-stores"))
+      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--output", outPath, "--dump-il", ilPath))
     }
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(outPath + " done")
-    val boogieResult = Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", outPath).!!
+    val boogieResult = Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath).!!
     val verifyTime = timer.checkPoint("verify")
     val resultPath = variationPath + "_result.txt"
     log(boogieResult, resultPath)
