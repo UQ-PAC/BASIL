@@ -110,14 +110,14 @@ class LiftLattice[+L <: Lattice](val sublattice: L) extends Lattice {
    * Lift elements of the sublattice to this lattice.
    * Note that this method is declared as implicit, so the conversion can be done automatically.
    */
-  implicit def lift(x: sublattice.Element): Element = Lift(x)
+  def lift(x: sublattice.Element): Element = Lift(x)
 
   /**
    * Un-lift elements of this lattice to the sublattice.
    * Throws an IllegalArgumentException if trying to unlift the bottom element
    * Note that this method is declared as implicit, so the conversion can be done automatically.
    */
-  implicit def unlift(x: Element): sublattice.Element = x match {
+  def unlift(x: Element): sublattice.Element = x match {
     case Lift(s) => s
     case Bottom => throw new IllegalArgumentException("Cannot unlift bottom")
   }

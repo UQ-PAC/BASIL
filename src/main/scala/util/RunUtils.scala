@@ -5,19 +5,18 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Set as MutableSet
 import java.io.{File, PrintWriter}
 import java.io.{BufferedWriter, FileWriter, IOException}
-import scala.jdk.CollectionConverters._
-import analysis.solvers._
-
-import analysis._
+import scala.jdk.CollectionConverters.*
+import analysis.solvers.*
+import analysis.*
 import cfg_visualiser.{OtherOutput, Output, OutputKindE}
-import bap._
-import ir._
-import boogie._
-import specification._
-import Parsers._
+import bap.*
+import ir.*
+import boogie.*
+import specification.*
+import Parsers.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating._
+import translating.*
 import util.Logger
 
 object RunUtils {
@@ -152,13 +151,15 @@ object RunUtils {
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
-    val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.analyze(true)
+    val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.analyze(true).asInstanceOf[Map[CfgNode, Set[MemoryRegion]]]
     memoryRegionAnalysisResults = mraResult
     Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder),
       "mra"
     )
+    println(mraResult.keys)
+    println(mraResult.values)
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()

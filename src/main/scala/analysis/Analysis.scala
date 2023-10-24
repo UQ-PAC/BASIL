@@ -247,13 +247,11 @@ trait MemoryRegionAnalysisMisc:
   val subroutines: Map[BigInt, String]
   val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
 
-  /** The lattice of abstract values.
-    */
-  val powersetLattice: PowersetLattice[MemoryRegion]
+  val regionLattice: PowersetLattice[MemoryRegion] = PowersetLattice[MemoryRegion]
 
   /** The lattice of abstract states.
     */
-  val stateLattice: MapLattice[CfgNode, PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
+  val stateLattice: MapLattice[CfgNode, regionLattice.type] = MapLattice(regionLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -267,7 +265,8 @@ trait MemoryRegionAnalysisMisc:
 
   /** Default implementation of eval.
     */
-  def eval(exp: Expr, env: stateLattice.sublattice.Element, n: CfgNode): stateLattice.sublattice.Element = {
+  def eval(exp: Expr, env: stateLattice.Element, n: CfgNode): regionLattice.Element = {
+    import regionLattice._
     Logger.debug(s"evaluating $exp")
     Logger.debug(s"env: $env")
     Logger.debug(s"n: $n")
@@ -279,7 +278,7 @@ trait MemoryRegionAnalysisMisc:
         } else {
           val evaluation: Expr = evaluateExpression(binOp, n, constantProp(n))
           if (evaluation.equals(binOp)) {
-            return env
+            return Set()
           }
           eval(evaluation, env, n)
         }
@@ -306,9 +305,9 @@ trait MemoryRegionAnalysisMisc:
       case variable: Variable =>
         variable match {
           case _: LocalVar =>
-            return env
+            return Set()
           case reg: Register if reg == stackPointer =>
-            return env
+            return Set()
           case _ =>
         }
 
@@ -316,7 +315,7 @@ trait MemoryRegionAnalysisMisc:
         evaluation match
           case bitVecLiteral: BitVecLiteral =>
             eval(bitVecLiteral, env, n)
-          case _ => env // we cannot evaluate this to a concrete value, we need VSA for this
+          case _ => Set() // we cannot evaluate this to a concrete value, we need VSA for this
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")
         throw new Exception("Unknown type")
@@ -325,16 +324,14 @@ trait MemoryRegionAnalysisMisc:
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: stateLattice.sublattice.Element): stateLattice.sublattice.Element =
+  def localTransfer(n: CfgNode, s: stateLattice.Element): stateLattice.Element =
     n match {
       case cmd: CfgCommandNode =>
         cmd.data match {
           case directCall: DirectCall =>
             if (directCall.target.name == "malloc") {
-              return stateLattice.sublattice.lub(
-                s,
-                Set(HeapRegion(getNextMallocCount(), evaluateExpression(mallocVariable, n, constantProp(n)), None))
-              )
+              return s ++ Set((n, Set(HeapRegion(getNextMallocCount(), evaluateExpression(mallocVariable, n, constantProp(n)), None))))
+
             }
             s
           case memAssign: MemoryAssign =>
@@ -365,7 +362,7 @@ trait MemoryRegionAnalysisMisc:
               case _ =>
             })
             */
-            stateLattice.sublattice.lub(s, result)
+            s ++ Set((n, result))
           case localAssign: LocalAssign =>
             var m = s
             unwrapExpr(localAssign.rhs).foreach {
@@ -381,7 +378,7 @@ trait MemoryRegionAnalysisMisc:
                   case _ =>
                 })
                 */
-                m = stateLattice.sublattice.lub(m, result)
+                m ++ Set((n, result))
               case _ => m
             }
             m
@@ -403,18 +400,27 @@ abstract class MemoryRegionAnalysis(
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transfer(n: CfgNode, s: stateLattice.sublattice.Element): stateLattice.sublattice.Element = localTransfer(n, s)
+  def transfer(n: CfgNode, s: stateLattice.Element): stateLattice.Element = localTransfer(n, s)
+
+
+trait IntraprocMemoryRegionAnalysisMisc[N] extends MemoryRegionAnalysisMisc {
+  val liftedstatelattice: LiftLattice[stateLattice.type]
+  val cfg: ProgramCfg
+  val lattice: MapLattice[N, liftedstatelattice.type]
+}
 
 /**
- * Base class for memory region analysis with lifted lattice, where the extra bottom element represents "unreachable".
+ * Base class for value analysis with lifted lattice, where the extra bottom element represents "unreachable".
  */
 abstract class LiftedMemoryRegionAnalysis[P <: ProgramCfg](
-    val cfg: ProgramCfg,
-    val globals: Map[BigInt, String],
-    val globalOffsets: Map[BigInt, BigInt],
-    val subroutines: Map[BigInt, String],
-    val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-) extends FlowSensitiveAnalysis(false)
+  val cfg: P,
+  val globals: Map[BigInt, String],
+  val globalOffsets: Map[BigInt, BigInt],
+  val subroutines: Map[BigInt, String],
+  val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+
+  , stateAfterNode: Boolean)
+  extends FlowSensitiveAnalysis(stateAfterNode)
     with MapLatticeSolver[CfgNode]
     with MemoryRegionAnalysisMisc {
 
@@ -428,7 +434,7 @@ abstract class LiftedMemoryRegionAnalysis[P <: ProgramCfg](
    */
   val lattice: MapLattice[CfgNode, liftedstatelattice.type] = new MapLattice(liftedstatelattice)
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
+  override val domain: Set[CfgNode] = cfg.nodes.toSet
 
   /**
    * The worklist is initialized with all function entry nodes.
@@ -444,21 +450,44 @@ abstract class LiftedMemoryRegionAnalysis[P <: ProgramCfg](
       // function entry nodes are always reachable (if intra-procedural analysis)
       case _: CfgFunctionEntryNode => lift(stateLattice.bottom)
       // all other nodes are processed with join+transfer
-      case _ => super.funsub(n, x, intra)
+      case _ => super.funsub(n, x, intra = true)
     }
   }
 }
 
-abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](
-    cfg: ProgramCfg,
-    globals: Map[BigInt, String],
-    globalOffsets: Map[BigInt, BigInt],
-    subroutines: Map[BigInt, String],
-    constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
-    val powersetLattice: L
-) extends LiftedMemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
-    with SimpleMonotonicSolver[CfgNode]
-    with ForwardDependencies
+/**
+ * Functionality for basic analyses with lifted state lattice.
+ */
+trait LiftedMemoryRegionAnalysisMisc extends MemoryRegionAnalysisMisc {
+
+  /**
+   * Transfer function for state lattice elements.
+   * (Same as `localTransfer` for basic analyses with lifted state lattice.)
+   */
+  def transferUnlifted(n: CfgNode, s: stateLattice.Element): stateLattice.Element = localTransfer(n, s)
+}
+
+/**
+ * Intraprocedural value analysis that uses [[tip.solvers.WorklistFixpointSolverWithReachability]],
+ * with all function entries as start nodes.
+ */
+abstract class IntraprocValueAnalysisWorklistSolverWithReachability[L](
+  cfg: ProgramCfg,
+  globals: Map[BigInt, String],
+  globalOffsets: Map[BigInt, BigInt],
+  subroutines: Map[BigInt, String],
+  constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+  )
+  extends LiftedMemoryRegionAnalysis(
+    cfg,
+    globals,
+    globalOffsets,
+    subroutines,
+    constantProp,
+    true)
+  with LiftedMemoryRegionAnalysisMisc
+  with WorklistFixpointSolverWithReachability[CfgNode]
+  with ForwardDependencies
 
 object MemoryRegionAnalysis:
 
@@ -468,11 +497,10 @@ object MemoryRegionAnalysis:
       globalOffsets: Map[BigInt, BigInt],
       subroutines: Map[BigInt, String],
       constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-  ) extends IntraprocMemoryRegionAnalysisWorklistSolver(
+  ) extends IntraprocValueAnalysisWorklistSolverWithReachability(
         cfg,
         globals,
         globalOffsets,
         subroutines,
-        constantProp,
-        PowersetLattice[MemoryRegion]
+        constantProp
       )

@@ -196,7 +196,7 @@ abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
     constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
     val powersetLattice: L
 ) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
-    with SimpleMonotonicSolver[CfgNode]
+    with SimpleWorklistFixpointSolver[CfgNode]
     with ForwardDependencies
 
 object ValueSetAnalysis:
