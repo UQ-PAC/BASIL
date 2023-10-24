@@ -24,6 +24,8 @@ object Main {
       specFileName: Option[String],
       @arg(name = "output", short = 'o', doc = "Boogie output destination file.")
       outFileName: String = "basil-out",
+      @arg(name = "boogie-use-lambda-stores", doc = "Use lambda representation of store operations.")
+      lambdaStores: Flag,
       @arg(name = "verbose", short = 'v', doc = "Show extra debugging logs.")
       verbose: Flag,
       @arg(name = "analyse", doc = "Run static analysis pass.")
@@ -61,7 +63,7 @@ object Main {
       loading = ILLoadingConfig(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.dumpIL),
       runInterpret = conf.interpret.value,
       staticAnalysis =  if (conf.analyse.value) then Some(StaticAnalysisConfig(conf.dumpIL)) else None,
-      boogieTranslation = BoogieGeneratorConfig(),
+      boogieTranslation = BoogieGeneratorConfig(if (conf.lambdaStores.value) then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect),
       outputPrefix = conf.outFileName
     )
 
