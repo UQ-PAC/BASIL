@@ -1,23 +1,23 @@
-var Gamma_R0: bool;
-var Gamma_R8: bool;
-var Gamma_mem: [bv64]bool;
-var R0: bv64;
-var R8: bv64;
-var mem: [bv64]bv8;
-function {:bvbuiltin "bvadd"} bvadd32(bv32, bv32) returns (bv32);
-function {:bvbuiltin "bvadd"} bvadd33(bv33, bv33) returns (bv33);
-function {:bvbuiltin "bvcomp"} bvcomp1(bv1, bv1) returns (bv1);
-function {:bvbuiltin "bvcomp"} bvcomp32(bv32, bv32) returns (bv1);
-function {:bvbuiltin "bvcomp"} bvcomp33(bv33, bv33) returns (bv1);
-function {:bvbuiltin "bvnot"} bvnot1(bv1) returns (bv1);
-function memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
+var {:extern} Gamma_R0: bool;
+var {:extern} Gamma_R8: bool;
+var {:extern} Gamma_mem: [bv64]bool;
+var {:extern} R0: bv64;
+var {:extern} R8: bv64;
+var {:extern} mem: [bv64]bv8;
+function {:extern} {:bvbuiltin "bvadd"} bvadd32(bv32, bv32) returns (bv32);
+function {:extern} {:bvbuiltin "bvadd"} bvadd33(bv33, bv33) returns (bv33);
+function {:extern} {:bvbuiltin "bvcomp"} bvcomp1(bv1, bv1) returns (bv1);
+function {:extern} {:bvbuiltin "bvcomp"} bvcomp32(bv32, bv32) returns (bv1);
+function {:extern} {:bvbuiltin "bvcomp"} bvcomp33(bv33, bv33) returns (bv1);
+function {:extern} {:bvbuiltin "bvnot"} bvnot1(bv1) returns (bv1);
+function {:extern} memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
   memory[index]
 }
 
-function {:bvbuiltin "sign_extend 1"} sign_extend1_32(bv32) returns (bv33);
-function {:bvbuiltin "zero_extend 1"} zero_extend1_32(bv32) returns (bv33);
-function {:bvbuiltin "zero_extend 32"} zero_extend32_32(bv32) returns (bv64);
-procedure rely();
+function {:extern} {:bvbuiltin "sign_extend 1"} sign_extend1_32(bv32) returns (bv33);
+function {:extern} {:bvbuiltin "zero_extend 1"} zero_extend1_32(bv32) returns (bv33);
+function {:extern} {:bvbuiltin "zero_extend 32"} zero_extend32_32(bv32) returns (bv64);
+procedure {:extern} rely();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
@@ -58,7 +58,7 @@ procedure rely();
   free ensures (memory_load8_le(mem, 69678bv64) == 0bv8);
   free ensures (memory_load8_le(mem, 69679bv64) == 0bv8);
 
-procedure rely_transitive()
+procedure {:extern} rely_transitive()
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
@@ -67,9 +67,9 @@ procedure rely_transitive()
   call rely();
 }
 
-procedure rely_reflexive();
+procedure {:extern} rely_reflexive();
 
-procedure guarantee_reflexive();
+procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
 procedure main()

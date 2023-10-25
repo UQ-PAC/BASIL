@@ -1,11 +1,11 @@
-var Gamma_R0: bool;
-var Gamma_mem: [bv64]bool;
-var mem: [bv64]bv8;
-function memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
+var {:extern} Gamma_R0: bool;
+var {:extern} Gamma_mem: [bv64]bool;
+var {:extern} mem: [bv64]bv8;
+function {:extern} memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
   memory[index]
 }
 
-procedure rely();
+procedure {:extern} rely();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
@@ -46,7 +46,7 @@ procedure rely();
   free ensures (memory_load8_le(mem, 69678bv64) == 0bv8);
   free ensures (memory_load8_le(mem, 69679bv64) == 0bv8);
 
-procedure rely_transitive()
+procedure {:extern} rely_transitive()
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
@@ -55,9 +55,9 @@ procedure rely_transitive()
   call rely();
 }
 
-procedure rely_reflexive();
+procedure {:extern} rely_reflexive();
 
-procedure guarantee_reflexive();
+procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
 procedure main()
