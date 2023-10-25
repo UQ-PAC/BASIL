@@ -6,6 +6,12 @@ case class BProgram(declarations: List[BDeclaration]) {
 
 trait BDeclaration {
   def toBoogie: List[String] = List(toString)
+  val extern: Boolean
+  val externString: String = if (extern) {
+    " {:extern}"
+  } else {
+    ""
+  }
 }
 
 case class BProcedure(
@@ -19,12 +25,13 @@ case class BProcedure(
     freeEnsures: List[BExpr],
     freeRequires: List[BExpr],
     modifies: Set[BVar],
-    body: List[BCmdOrBlock]
+    body: List[BCmdOrBlock],
+    override val extern: Boolean,
 ) extends BDeclaration
     with Ordered[BProcedure] {
   override def compare(that: BProcedure): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
-    val header = s"procedure $name(${in.map(_.withType).mkString(", ")})"
+    val header = s"procedure$externString $name(${in.map(_.withType).mkString(", ")})"
     val returns = if (out.nonEmpty) {
       s" returns (${out.map(_.withType).mkString(", ")})"
     } else {
@@ -41,7 +48,7 @@ case class BProcedure(
     val freeRequiresStrs = freeRequires.map(r => s"  free requires $r;")
     val freeEnsuresStrs = freeEnsures.map(e => s"  free ensures $e;")
     val locals = body.flatMap(l => l.locals).distinct.sorted
-    val localDefs = locals.map(l => "  " + BVarDecl(l).toString)
+    val localDefs = locals.map(l => "  " + BVarDecl(l, false).toString)
     val bodyStr = if (body.nonEmpty) {
       List("{") ++ localDefs ++ body.flatMap(x => x.toBoogie).map(s => "  " + s) ++ List("}")
     } else {
@@ -61,10 +68,11 @@ case class BProcedure(
 }
 
 case class BAxiom(body: BExpr) extends BDeclaration {
+  override val extern: Boolean = false
   override def toString: String = s"axiom $body;"
 }
 
-case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar, body: Option[BExpr])
+case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar, body: Option[BExpr], override val extern: Boolean)
     extends BDeclaration
     with Ordered[BFunction] {
   override def compare(that: BFunction): Int = name.compare(that.name)
@@ -75,7 +83,7 @@ case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar,
       s" {:bvbuiltin \"$bvbuiltin\"}"
     }
     val inString = in.map(_.withType).mkString(", ")
-    val declString = s"function$bvbuiltinString $name($inString) returns (${out.withType})"
+    val declString = s"function$externString$bvbuiltinString $name($inString) returns (${out.withType})"
     body match {
       case Some(b) => List(declString + " {", "  " + b.toString, "}", "")
       case None    => List(declString + ";")
@@ -88,16 +96,17 @@ case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar,
   }
 }
 
-case class BVarDecl(variable: BVar) extends BDeclaration with Ordered[BVarDecl] {
+case class BVarDecl(variable: BVar, override val extern: Boolean) extends BDeclaration with Ordered[BVarDecl] {
   def compare(that: BVarDecl): Int = variable.compare(that.variable)
   override def toString: String = if (variable.scope == Scope.Const) {
-    s"const $variable: ${variable.getType};"
+    s"const$externString $variable: ${variable.getType};"
   } else {
-    s"var $variable: ${variable.getType};"
+    s"var$externString $variable: ${variable.getType};"
   }
 }
 
 case class BConstAxiomPair(const: BVarDecl, axiom: BAxiom) extends BDeclaration with Ordered[BConstAxiomPair] {
+  override val extern = false
   override def compare(that: BConstAxiomPair): Int = const.compare(that.const)
   override def toString: String = const.toString + "\n" + axiom.toString
 }

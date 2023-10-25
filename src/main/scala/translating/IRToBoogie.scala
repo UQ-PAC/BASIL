@@ -35,12 +35,12 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   def translate: BProgram = {
     val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
     val procedures = program.procedures.map(f => translateProcedure(f, readOnlyMemory))
-    val defaultGlobals = List(BVarDecl(mem), BVarDecl(Gamma_mem))
+    val defaultGlobals = List(BVarDecl(mem, true), BVarDecl(Gamma_mem, true))
     val globalVars = procedures.flatMap(p => p.globals ++ p.freeRequires.flatMap(_.globals) ++ p.freeEnsures.flatMap(_.globals) ++ p.ensures.flatMap(_.globals) ++ p.requires.flatMap(_.globals))
-    val globalDecls = (globalVars.map(b => BVarDecl(b)) ++ defaultGlobals).distinct.sorted.toList
+    val globalDecls = (globalVars.map(b => BVarDecl(b, true)) ++ defaultGlobals).distinct.sorted.toList
 
     val globalConsts: List[BConstAxiomPair] =
-      globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar), g.toAxiom)).toList.sorted
+      globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar, true), g.toAxiom)).toList.sorted
 
     val guaranteeReflexive = BProcedure(
       "guarantee_reflexive",
@@ -53,7 +53,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       List(),
       List(),
       Set(mem, Gamma_mem),
-      guaranteesReflexive.map(g => BAssert(g))
+      guaranteesReflexive.map(g => BAssert(g)),
+      true
     )
 
     val rgProcs = genRely(relies, readOnlyMemory) :+ guaranteeReflexive
@@ -82,15 +83,15 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     } else {
       reliesUsed
     }
-    val relyProc = BProcedure("rely", List(), List(), relyEnsures, List(), List(), List(), readOnlyMemory, List(), Set(mem, Gamma_mem), List())
-    val relyTransitive = BProcedure("rely_transitive", List(), List(), reliesUsed, List(), List(), List(), List(), List(), Set(mem, Gamma_mem), List(BProcedureCall("rely", List(), List()), BProcedureCall("rely", List(), List())))
-    val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), List(), List(), List(), List(), Set(), reliesReflexive.map(r => BAssert(r)))
+    val relyProc = BProcedure("rely", List(), List(), relyEnsures, List(), List(), List(), readOnlyMemory, List(), Set(mem, Gamma_mem), List(), true)
+    val relyTransitive = BProcedure("rely_transitive", List(), List(), reliesUsed, List(), List(), List(), List(), List(), Set(mem, Gamma_mem), List(BProcedureCall("rely", List(), List()), BProcedureCall("rely", List(), List())), true)
+    val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), List(), List(), List(), List(), Set(), reliesReflexive.map(r => BAssert(r)), true)
     List(relyProc, relyTransitive, relyReflexive)
   }
 
   def functionOpToDefinition(f: FunctionOp): BFunction = {
     f match {
-      case b: BVFunctionOp => BFunction(b.name, b.bvbuiltin, b.in, b.out, None)
+      case b: BVFunctionOp => BFunction(b.name, b.bvbuiltin, b.in, b.out, None, true)
       case m: MemoryLoadOp =>
         val memVar = BMapVar("memory", MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize)), Scope.Parameter)
         val indexVar = BParam("index", BitVecBType(m.addressSize))
@@ -112,7 +113,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           BinaryBExpr(BVCONCAT, next, concat)
         }
 
-        BFunction(m.fnName, "", in, out, Some(body))
+        BFunction(m.fnName, "", in, out, Some(body), true)
       case g: GammaLoadOp =>
         val gammaMapVar = BMapVar("gammaMap", MapBType(BitVecBType(g.addressSize), BoolBType), Scope.Parameter)
         val indexVar = BParam("index", BitVecBType(g.addressSize))
@@ -130,7 +131,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           BinaryBExpr(BoolAND, next, and)
         }
 
-        BFunction(g.fnName, "", in, out, Some(body))
+        BFunction(g.fnName, "", in, out, Some(body), true)
       case m: MemoryStoreOp =>
         val memType = MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize))
         val memVar = BMapVar("memory", memType, Scope.Parameter)
@@ -160,7 +161,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
         }
 
-        BFunction(m.fnName, "", in, out, Some(body))
+        BFunction(m.fnName, "", in, out, Some(body), true)
       case g: GammaStoreOp =>
         val gammaMapType = MapBType(BitVecBType(g.addressSize), BoolBType)
         val gammaMapVar = BMapVar("gammaMap", gammaMapType, Scope.Parameter)
@@ -187,7 +188,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
         }
 
-        BFunction(g.fnName, "", in, out, Some(body))
+        BFunction(g.fnName, "", in, out, Some(body), true)
       case l: LOp =>
         val memoryVar = BParam("memory", l.memoryType)
         val indexVar = BParam("index", l.indexType)
@@ -213,7 +214,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
             IfThenElse(guard, LPred, ite)
           }
         }
-        BFunction("L", "", List(memoryVar, indexVar), BParam(BoolBType), Some(body))
+        BFunction("L", "", List(memoryVar, indexVar), BParam(BoolBType), Some(body), true)
     }
   }
 
@@ -288,7 +289,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       freeEnsures,
       freeRequires,
       modifies.toSet,
-      body.toList
+      body.toList,
+      false
     )
   }
 
