@@ -94,9 +94,13 @@ class SystemTests extends AnyFunSuite {
     log(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
     val timedOut = boogieResult.strip() contains "timed out"
-    val failureMsg =
-      if shouldVerify then "Expected verification success, but got failure."
-      else "Expected verification failure, but got success."
+
+    val failureMsg = (verified, shouldVerify, timedOut) match {
+      case (_, _, true) => "SMT solver timed out: unknown result"
+      case (true, false, false) => "Expected verification failure, but got success."
+      case (false, true, false) => "Expected verification success, but got failure."
+      case (_, _, false) => "Test passed"
+    }
 
     val expectedOutPath = variationPath + ".expected"
     val hasExpected = File(expectedOutPath).exists
@@ -109,7 +113,7 @@ class SystemTests extends AnyFunSuite {
     } else {
       info("Note: this test has not previously succeeded")
     }
-    val passed = verified == shouldVerify
+    val passed = !timedOut && (verified == shouldVerify)
     val result = TestResult(passed, verified, shouldVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
     testResults.put(s"$name/$variation", result)
     if (!passed) fail(failureMsg)
