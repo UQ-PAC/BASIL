@@ -15,36 +15,48 @@ case class BBlock(label: String, body: List[BCmd]) extends BCmdOrBlock {
   override def functionOps: Set[FunctionOp] = body.flatMap(c => c.functionOps).toSet
   override def locals: Set[BVar] = body.flatMap(c => c.locals).toSet
   override def globals: Set[BVar] = body.flatMap(c => c.globals).toSet
+
+
 }
 
-sealed trait BCmd extends BCmdOrBlock {
+sealed trait BCmd() extends BCmdOrBlock {
   def comment: Option[String]
+  def attributes: List[(String, String)]
+
+  val attrString: String = if (attributes.nonEmpty) then {
+    attributes.map(a => s"{${a._1} ${a._2}}").mkString(" ")
+  } else {
+    ""
+  }
+
   override def toBoogie: List[String] = {
     val commentOut = comment.map(" //" + _).getOrElse("")
     List(toString + commentOut)
   }
 }
 
-case class BAssert(body: BExpr, comment: Option[String] = None) extends BCmd {
-  override def toString: String = s"assert $body;"
+case class BAssert(body: BExpr, comment: Option[String] = None, attributes: List[(String, String)] = List.empty) extends BCmd {
+  override def toString: String = s"assert $attrString $body;"
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
 }
 
-case class BAssume(body: BExpr, comment: Option[String] = None) extends BCmd {
-  override def toString: String = s"assume $body;"
+case class BAssume(body: BExpr, comment: Option[String] = None, attributes: List[(String, String)] = List.empty) extends BCmd {
+  override def toString: String = s"assume $attrString $body;"
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
 }
 
 case class BProcedureCall(name: String, lhss: Seq[BVar], params: Seq[BExpr], comment: Option[String] = None) extends BCmd {
+
+  override def attributes: List[(String, String)] = List.empty
   override def toString: String = {
     if (lhss.isEmpty) {
-      s"call $name();"
+      s"call $attrString $name();"
     } else {
-      s"call ${lhss.mkString(", ")} := $name(${params.mkString(", ")});"
+      s"call $attrString ${lhss.mkString(", ")} := $name(${params.mkString(", ")});"
     }
   }
   override def functionOps: Set[FunctionOp] = params.flatMap(p => p.functionOps).toSet
@@ -53,6 +65,7 @@ case class BProcedureCall(name: String, lhss: Seq[BVar], params: Seq[BExpr], com
 }
 
 case class AssignCmd(lhss: Seq[BVar], rhss: Seq[BExpr], comment: Option[String] = None) extends BCmd {
+  override def attributes: List[(String, String)] = List.empty
   override def toString: String = s"${lhss.mkString(", ")} := ${rhss.mkString(", ")};"
   override def functionOps: Set[FunctionOp] = rhss.flatMap(r => r.functionOps).toSet
   override def locals: Set[BVar] = lhss.flatMap(l => l.locals).toSet ++ rhss.flatMap(r => r.locals).toSet
@@ -64,6 +77,7 @@ object AssignCmd {
 }
 
 case class MapAssignCmd(lhs: MapAccess, rhs: BExpr, comment: Option[String] = None) extends BCmd {
+  override def attributes: List[(String, String)] = List.empty
   override def toString: String = s"$lhs := $rhs;"
   override def functionOps: Set[FunctionOp] = lhs.functionOps ++ rhs.functionOps
   override def locals: Set[BVar] = lhs.locals ++ rhs.locals
@@ -71,6 +85,7 @@ case class MapAssignCmd(lhs: MapAccess, rhs: BExpr, comment: Option[String] = No
 }
 
 case class Havoc(vars: Set[BVar], comment: Option[String] = None) extends BCmd {
+  override def attributes: List[(String, String)] = List.empty
   override def toString: String = {
     if (vars.isEmpty) {
       "havoc;"
@@ -87,6 +102,7 @@ case class IfCmd(guard: BExpr, thenCmds: List[BCmd], comment: Option[String] = N
     val thenList = thenCmds.flatMap(x => x.toBoogie).map(s => "  " + s)
     List(s"if ($guard) {") ++ thenList ++ List("}")
   }
+  override def attributes: List[(String, String)] = List.empty
   override def toString: String = toBoogie.mkString("\n")
   override def functionOps: Set[FunctionOp] = guard.functionOps ++ thenCmds.flatMap(c => c.functionOps).toSet
   override def locals: Set[BVar] = guard.locals ++ thenCmds.flatMap(c => c.locals).toSet
@@ -94,15 +110,19 @@ case class IfCmd(guard: BExpr, thenCmds: List[BCmd], comment: Option[String] = N
 }
 
 case class GoToCmd(destination: String, comment: Option[String] = None) extends BCmd {
+  override def attributes: List[(String, String)] = List.empty
   override def toString: String = s"goto $destination;"
 }
 
 case object ReturnCmd extends BCmd {
+  override def attributes: List[(String, String)] = List.empty
   override def comment: Option[String] = None
   override def toString: String = "return;"
 }
 
 case class Comment(actualComment: String) extends BCmd {
+
+  override def attributes: List[(String, String)] = List.empty
   override def comment: Option[String] = Some(actualComment)
   override def toBoogie: List[String] = List(s"//$actualComment")
 }

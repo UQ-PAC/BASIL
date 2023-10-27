@@ -312,8 +312,17 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     sections.toList
   }
 
+
+  def getCaptureStateStatement(stateName: String): BAssume = {
+    BAssume(TrueBLiteral, None, List((":captureState", s"\"$stateName\"")))
+  }
+
   def translateBlock(b: Block): BBlock = {
-    val cmds = b.statements.flatMap(s => translate(s)) ++ b.jumps.flatMap(j => translate(j))
+    val cmds = (b.address match {
+      case Some(addr) => List(getCaptureStateStatement(s"addr:0x${addr.toHexString}"))
+      case _ => List.empty
+    }) ++ (b.statements.flatMap(s => translate(s)) ++ b.jumps.flatMap(j => translate(j)))
+
     BBlock(b.label, cmds.toList)
   }
 
@@ -369,8 +378,13 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val lhsGamma = m.lhs.toGamma
       val rhsGamma = m.rhs.toGamma
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
+      val stateSplit = s match {
+        case MemoryAssign (_,_, Some(addr)) => List(getCaptureStateStatement(s"addr:0x${addr.toHexString}"))
+        case LocalAssign(_,_, Some(addr)) => List(getCaptureStateStatement(s"addr:0x${addr.toHexString}"))
+        case _ => List.empty
+      }
       if (lhs == stack) {
-        List(store)
+        List(store) ++ stateSplit
       } else {
         val rely = BProcedureCall("rely", List(), List())
         val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.rhs.value.toGamma))
@@ -393,7 +407,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           BAssert(BinaryBExpr(BoolIMPLIES, addrCheck, checksAnd))
         }
         val guaranteeChecks = guarantees.map(v => BAssert(v))
-        (List(rely, gammaValueCheck) ++ oldAssigns ++ oldGammaAssigns :+ store) ++ secureUpdate ++ guaranteeChecks
+        (List(rely, gammaValueCheck) ++ oldAssigns ++ oldGammaAssigns :+ store) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
       }
     case l: LocalAssign =>
       val lhs = l.lhs.toBoogie

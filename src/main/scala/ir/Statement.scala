@@ -10,7 +10,7 @@ trait Statement extends Command {
   )
 }
 
-class LocalAssign(var lhs: Variable, var rhs: Expr) extends Statement {
+case class LocalAssign(var lhs: Variable, var rhs: Expr, val address: Option[Int] = None) extends Statement {
   //override def locals: Set[Variable] = rhs.locals + lhs
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
@@ -20,7 +20,7 @@ class LocalAssign(var lhs: Variable, var rhs: Expr) extends Statement {
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitLocalAssign(this)
 }
 
-class MemoryAssign(var lhs: Memory, var rhs: MemoryStore) extends Statement {
+case class MemoryAssign(var lhs: Memory, var rhs: MemoryStore, val address: Option[Int] = None) extends Statement {
   override def modifies: Set[Global] = Set(lhs)
   //override def locals: Set[Variable] = rhs.locals
   override def toString: String = s"$lhs := $rhs"
@@ -32,7 +32,12 @@ case object NOP extends Statement {
   override def acceptVisit(visitor: Visitor): Statement = this
 }
 
-class Assert(var body: Expr, var comment: Option[String]) extends Statement {
+case class Assume(var body: Expr, var comment: Option[String]) extends Statement {
+  override def toString: String = s"assume $body" + comment.map(" //" + _)
+  override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssume(this)
+}
+
+case class Assert(var body: Expr, var comment: Option[String]) extends Statement {
   override def toString: String = s"assert $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssert(this)
 }
@@ -44,7 +49,7 @@ trait Jump extends Command {
   def acceptVisit(visitor: Visitor): Jump = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
-class GoTo(var target: Block, var condition: Option[Expr]) extends Jump {
+case class GoTo(var target: Block, var condition: Option[Expr]) extends Jump {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
@@ -54,7 +59,7 @@ class GoTo(var target: Block, var condition: Option[Expr]) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitGoTo(this)
 }
 
-class DirectCall(var target: Procedure, var condition: Option[Expr], var returnTarget: Option[Block]) extends Jump {
+case class DirectCall(var target: Procedure, var condition: Option[Expr], var returnTarget: Option[Block], val address: Option[Int] = None) extends Jump {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
@@ -64,7 +69,8 @@ class DirectCall(var target: Procedure, var condition: Option[Expr], var returnT
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitDirectCall(this)
 }
 
-class IndirectCall(var target: Variable, var condition: Option[Expr], var returnTarget: Option[Block]) extends Jump {
+case class IndirectCall(var target: Variable, var condition: Option[Expr], var returnTarget: Option[Block],
+                   val address: Option[Int] = None) extends Jump {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)
