@@ -1,12 +1,12 @@
-var Gamma_mem: [bv64]bool;
-var mem: [bv64]bv8;
-const $_IO_stdin_used_addr: bv64;
-axiom ($_IO_stdin_used_addr == 1896bv64);
-function memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
+var {:extern } Gamma_mem: [bv64]bool;
+var {:extern } mem: [bv64]bv8;
+const {:extern } $_IO_stdin_used_addr: bv64;
+axiom {:extern } ($_IO_stdin_used_addr == 1896bv64);
+function {:extern } memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
   memory[index]
 }
 
-procedure rely();
+procedure {:extern } rely();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
@@ -47,7 +47,7 @@ procedure rely();
   free ensures (memory_load8_le(mem, 69646bv64) == 0bv8);
   free ensures (memory_load8_le(mem, 69647bv64) == 0bv8);
 
-procedure rely_transitive()
+procedure {:extern } rely_transitive()
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
@@ -56,12 +56,12 @@ procedure rely_transitive()
   call rely();
 }
 
-procedure rely_reflexive();
+procedure {:extern } rely_reflexive();
 
-procedure guarantee_reflexive();
+procedure {:extern } guarantee_reflexive();
   modifies Gamma_mem, mem;
 
-procedure main()
+procedure  main()
   free requires (memory_load8_le(mem, 69632bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69633bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69634bv64) == 0bv8);
