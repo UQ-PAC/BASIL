@@ -36,14 +36,14 @@ sealed trait BCmd() extends BCmdOrBlock {
 }
 
 case class BAssert(body: BExpr, comment: Option[String] = None, attributes: List[(String, String)] = List.empty) extends BCmd {
-  override def toString: String = s"assert $attrString $body;"
+  override def toString: String = s"assert $attrString$body;"
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
 }
 
 case class BAssume(body: BExpr, comment: Option[String] = None, attributes: List[(String, String)] = List.empty) extends BCmd {
-  override def toString: String = s"assume $attrString $body;"
+  override def toString: String = s"assume $attrString$body;"
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
@@ -54,9 +54,9 @@ case class BProcedureCall(name: String, lhss: Seq[BVar], params: Seq[BExpr], com
   override def attributes: List[(String, String)] = List.empty
   override def toString: String = {
     if (lhss.isEmpty) {
-      s"call $attrString $name();"
+      s"call $attrString$name();"
     } else {
-      s"call $attrString ${lhss.mkString(", ")} := $name(${params.mkString(", ")});"
+      s"call $attrString${lhss.mkString(", ")} := $name(${params.mkString(", ")});"
     }
   }
   override def functionOps: Set[FunctionOp] = params.flatMap(p => p.functionOps).toSet
