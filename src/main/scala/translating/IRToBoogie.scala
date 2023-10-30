@@ -319,7 +319,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translateBlock(b: Block): BBlock = {
     val cmds = (b.address match {
-      case Some(addr) => List(getCaptureStateStatement(s"addr:0x${addr.toHexString}"))
+      case Some(addr) => List(getCaptureStateStatement(s"addr:${b.label}"))
       case _ => List.empty
     }) ++ (b.statements.flatMap(s => translate(s)) ++ b.jumps.flatMap(j => translate(j)))
 
@@ -379,8 +379,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val rhsGamma = m.rhs.toGamma
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val stateSplit = s match {
-        case MemoryAssign (_,_, Some(addr)) => List(getCaptureStateStatement(s"addr:0x${addr.toHexString}"))
-        case LocalAssign(_,_, Some(addr)) => List(getCaptureStateStatement(s"addr:0x${addr.toHexString}"))
+        case MemoryAssign (_,_, Some(label)) => List(getCaptureStateStatement(s"${label}"))
+        case LocalAssign(_,_, Some(label)) => List(getCaptureStateStatement(s"${label}"))
         case _ => List.empty
       }
       if (lhs == stack) {

@@ -10,7 +10,7 @@ trait Statement extends Command {
   )
 }
 
-case class LocalAssign(var lhs: Variable, var rhs: Expr, val address: Option[Int] = None) extends Statement {
+case class LocalAssign(var lhs: Variable, var rhs: Expr, val label: Option[String] = None) extends Statement {
   //override def locals: Set[Variable] = rhs.locals + lhs
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
@@ -20,7 +20,7 @@ case class LocalAssign(var lhs: Variable, var rhs: Expr, val address: Option[Int
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitLocalAssign(this)
 }
 
-case class MemoryAssign(var lhs: Memory, var rhs: MemoryStore, val address: Option[Int] = None) extends Statement {
+case class MemoryAssign(var lhs: Memory, var rhs: MemoryStore, val label: Option[String] = None) extends Statement {
   override def modifies: Set[Global] = Set(lhs)
   //override def locals: Set[Variable] = rhs.locals
   override def toString: String = s"$lhs := $rhs"
