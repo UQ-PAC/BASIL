@@ -75,14 +75,15 @@ trait MemoryRegionValueSetAnalysis:
     expr match
       case binOp: BinaryExpr =>
         if (binOp.arg1 == stackPointer) {
-          val rhs: Expr = evaluateExpression(binOp.arg2, n, constantProp(n))
-          mmm.findStackObject(rhs.asInstanceOf[BitVecLiteral].value)
-        } else {
-          val evaluation: Expr = evaluateExpression(binOp, n, constantProp(n))
-          if (!evaluation.isInstanceOf[BitVecLiteral]) {
-            return None
+          evaluateExpression(binOp.arg2, constantProp(n)) match {
+            case Some(b: BitVecLiteral) => mmm.findStackObject(b.value)
+            case None => None
           }
-          mmm.findDataObject(evaluation.asInstanceOf[BitVecLiteral].value)
+        } else {
+          evaluateExpression(binOp, constantProp(n)) match {
+            case Some(b: BitVecLiteral) => mmm.findDataObject(b.value)
+            case None => None
+          }
         }
       case _ =>
         None
@@ -112,41 +113,48 @@ trait MemoryRegionValueSetAnalysis:
       case localAssign: LocalAssign =>
         localAssign.rhs match
           case memoryLoad: MemoryLoad =>
-            val region: Option[MemoryRegion] = exprToRegion(memoryLoad.index, n)
-            region match
+            exprToRegion(memoryLoad.index, n) match
               case Some(r: MemoryRegion) =>
                 // this is an exception to the rule and only applies to data regions
-                evaluateExpression(memoryLoad.index, n, constantProp(n)) match
-                  case bitVecLiteral: BitVecLiteral =>
+                evaluateExpression(memoryLoad.index, constantProp(n)) match
+                  case Some(bitVecLiteral: BitVecLiteral) =>
                     val m = s + (r -> Set(getValueType(bitVecLiteral)))
                     m + (localAssign.lhs -> m(r))
-                  case _ =>
+                  case None =>
                     s + (localAssign.lhs -> s(r))
               case None =>
                 Logger.warn("could not find region for " + localAssign)
                 s
-          case e: Expr => {
-            val evaled = evaluateExpression(e, n, constantProp(n))
-            evaled match
-              case bv: BitVecLiteral => s + (localAssign.lhs -> Set(getValueType(bv)))
-              case _ =>
+          case e: Expr =>
+            evaluateExpression(e, constantProp(n)) match {
+              case Some(bv: BitVecLiteral) => s + (localAssign.lhs -> Set(getValueType(bv)))
+              case None =>
                 Logger.warn("could not evaluate expression" + e)
                 s
-          }
+            }
       case memAssign: MemoryAssign =>
         memAssign.rhs.index match
           case binOp: BinaryExpr =>
             val region: Option[MemoryRegion] = exprToRegion(binOp, n)
             region match
               case Some(r: MemoryRegion) =>
-                evaluateExpression(memAssign.rhs.value, n, constantProp(n)) match
-                  case bitVecLiteral: BitVecLiteral =>
-                    return s + (r -> Set(getValueType(bitVecLiteral)))
-                  case variable: Variable => // constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
-                    return s + (r -> s(variable))
-
-                  case _ => Logger.warn("Too Complex or Wrapped i.e. Extract(Variable)") // do nothing
-                s
+                val storeValue = memAssign.rhs.value
+                evaluateExpression(storeValue, constantProp(n)) match
+                  case Some(bitVecLiteral: BitVecLiteral) =>
+                    s + (r -> Set(getValueType(bitVecLiteral)))
+                    /*
+                  // TODO constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
+                  case variable: Variable =>
+                    s + (r -> s(variable))
+                    */
+                  case None =>
+                    storeValue.match {
+                      case v: Variable =>
+                        s + (r -> s(v))
+                      case _ =>
+                        Logger.warn(s"Too Complex: $storeValue") // do nothing
+                        s
+                    }
               case None =>
                 Logger.warn("could not find region for " + memAssign)
                 s

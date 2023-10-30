@@ -54,16 +54,16 @@ class MemoryModelMap {
       val node = memoryRegions(exitNode)
 
       // for each function exit node we get the memory region and add it to the mapping
-      val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
+      val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
       val dataRgns = node.collect { case r: DataRegion => r }
 
       // add externalFunctionRgn to dataRgns and sort by value
-      val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
+      val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.value)
 
       allStacks(exitNode.data.name) = stackRgns
 
       for (dataRgn <- allDataRgns) {
-        add(dataRgn.start.asInstanceOf[BitVecLiteral].value, dataRgn)
+        add(dataRgn.start.value, dataRgn)
       }
     )
   }
