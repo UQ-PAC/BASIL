@@ -304,6 +304,8 @@ case class CfgCallReturnNode(
   */
 trait CfgCommandNode extends CfgNodeWithData[Command] {
   override def copyNode(): CfgCommandNode
+  val block: Block
+  val parent: CfgFunctionEntryNode
 }
 
 /** CFG's representation of a single statement.
@@ -315,8 +317,8 @@ case class CfgStatementNode(
     override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     data: Statement,
-    block: Block,
-    parent: CfgFunctionEntryNode
+    override val block: Block,
+    override val parent: CfgFunctionEntryNode
 ) extends CfgCommandNode:
   override def toString: String = s"[Stmt] $data"
 
@@ -332,12 +334,13 @@ case class CfgJumpNode(
     override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     data: Jump,
-    block: Block
+    override val block: Block,
+    override val parent: CfgFunctionEntryNode
 ) extends CfgCommandNode:
   override def toString: String = s"[Jmp] $data"
 
   /** Copy this node, but give unique ID and reset edges */
-  override def copyNode(): CfgJumpNode = CfgJumpNode(data = this.data, block = this.block)
+  override def copyNode(): CfgJumpNode = CfgJumpNode(data = this.data, block = this.block, parent = this.parent)
 
 /** A general purpose node which in terms of the IR has no functionality, but can have purpose in the CFG. As example,
   * this is used as a "block" start node for the case that a block contains no statements, but has a `GoTo` as its jump.
@@ -350,13 +353,14 @@ case class CfgGhostNode(
     override val predInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
-    block: Block
+    override val block: Block,
+    override val parent: CfgFunctionEntryNode
 ) extends CfgCommandNode:
   override val data: Statement = NOP
   override def toString: String = s"[NOP]"
 
   /** Copy this node, but give unique ID and reset edges */
-  override def copyNode(): CfgGhostNode = CfgGhostNode(block = this.block)
+  override def copyNode(): CfgGhostNode = CfgGhostNode(block = this.block, parent = this.parent)
 
 /** A control-flow graph. Nodes provide the ability to walk it as both an intra and inter procedural CFG.
   */
@@ -738,7 +742,7 @@ class ProgramCfgFactory:
         */
       def visitJumps(jmps: ArrayBuffer[Jump], prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
 
-        val jmpNode: CfgJumpNode = CfgJumpNode(data = jmps.head, block = block)
+        val jmpNode: CfgJumpNode = CfgJumpNode(data = jmps.head, block = block, parent = funcEntryNode)
         var precNode: CfgNode = prevNode
 
         if (solitary) {
@@ -753,7 +757,7 @@ class ProgramCfgFactory:
           jmps.head match {
             case jmp: GoTo =>
               // `GoTo`s are just edges, so introduce a fake `start of block` that can be jmp'd to
-              val ghostNode = CfgGhostNode(block = block)
+              val ghostNode = CfgGhostNode(block = block, parent = funcEntryNode)
               cfg.addEdge(prevNode, ghostNode, cond)
               precNode = ghostNode
               visitedBlocks += (block -> ghostNode)
@@ -798,12 +802,20 @@ class ProgramCfgFactory:
                 visitBlock(targetBlock, precNode, targetCond)
               }
             }
-
+          case n: NonDetGoTo =>
+            for (targetBlock <- n.targets) {
+              if (visitedBlocks.contains(targetBlock)) {
+                val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
+                cfg.addEdge(precNode, targetBlockEntry)
+              } else {
+                visitBlock(targetBlock, precNode, TrueLiteral)
+              }
+            }
           case dCall: DirectCall =>
             val targetProc: Procedure = dCall.target
 
             // Branch to this call
-            val calls = jmps.filter(_.isInstanceOf[DirectCall]).map(x => CfgJumpNode(data = x, block = block))
+            val calls = jmps.filter(_.isInstanceOf[DirectCall]).map(x => CfgJumpNode(data = x, block = block, parent = funcEntryNode))
 
             calls.foreach(node => {
               cfg.addEdge(precNode, node, node.data.asInstanceOf[DirectCall].condition.getOrElse(TrueLiteral))

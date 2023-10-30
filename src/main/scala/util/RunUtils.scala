@@ -92,7 +92,6 @@ object RunUtils {
     }
 
     if (performAnalysis) {
-      iterations += 1;
       IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
       if (dumpIL) {
         dump_file(serialiseIL(IRProgram), "after-analysis.il")
@@ -207,18 +206,12 @@ object RunUtils {
       }
     }
 
-    def extractExprFromValue(v: Value): Expr = v match {
-      case literalValue: LiteralValue          => literalValue.expr
-      case localAddress: LocalAddress   => localAddress.expr
-      case globalAddress: GlobalAddress => globalAddress.expr
-      case _                            => throw new Exception("Expected a Value with an Expr")
-    }
-
     def process(n: CfgNode): Unit = n match {
-      case commandNode: CfgCommandNode =>
-        commandNode.data match
-          /*
-          We do not want to insert the VSA results into the IR like this
+      /*
+      case c: CfgStatementNode =>
+        c.data match
+
+        //We do not want to insert the VSA results into the IR like this
           case localAssign: LocalAssign =>
             localAssign.rhs match
               case _: MemoryLoad =>
@@ -240,9 +233,12 @@ object RunUtils {
                    */
                 }
               case _ =>
-          */
+      */
+      case c: CfgJumpNode =>
+        val block = c.block
+        c.data match
           case indirectCall: IndirectCall =>
-            if (!commandNode.block.jumps.contains(indirectCall)) {
+            if (!block.jumps.contains(indirectCall)) {
               // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data
               // Hence if we have already processed this CFG node there will be no corresponding IndirectCall in the IR
               // to replace.
@@ -250,47 +246,30 @@ object RunUtils {
               return
             }
             val valueSet: Map[Variable, Set[Value]] = valueSets(n)
-            val functionNames = resolveAddresses(valueSet(indirectCall.target))
-            if (functionNames.size == 1) {
+            val targetNames = resolveAddresses(valueSet(indirectCall.target)).map(_.name).toList.sorted
+            val targets = targetNames.map(name => IRProgram.procedures.filter(_.name.equals(name)).head)
+            if (targets.size == 1) {
               modified = true
-              val block = commandNode.block
-              block.jumps = block.jumps.filter(!_.equals(indirectCall))
-              block.jumps += DirectCall(
-                IRProgram.procedures.filter(_.name.equals(functionNames.head.name)).head,
-                indirectCall.condition,
-                indirectCall.returnTarget
-              )
-            } else if (functionNames.size > 1) {
+              val newCall = DirectCall(targets.head, indirectCall.condition, indirectCall.returnTarget)
+              block.jumps.remove(block.jumps.indexOf(indirectCall))
+              block.jumps.append(newCall)
+            } else if (targets.size > 1) {
               modified = true
-              functionNames.foreach(addressValue =>
-                val block = commandNode.block
-                block.jumps = block.jumps.filter(!_.equals(indirectCall))
-                if (indirectCall.condition.isDefined) {
-                  block.jumps += DirectCall(
-                    IRProgram.procedures.filter(_.name.equals(addressValue.name)).head,
-                    Option(
-                      BinaryExpr(
-                        BVAND,
-                        indirectCall.condition.get,
-                        BinaryExpr(BVEQ, indirectCall.target, addressValue.expr)
-                      )
-                    ),
-                    indirectCall.returnTarget
-                  )
-                } else {
-                  block.jumps += DirectCall(
-                    IRProgram.procedures.filter(_.name.equals(addressValue.name)).head,
-                    Option(BinaryExpr(BVEQ, indirectCall.target, addressValue.expr)),
-                    indirectCall.returnTarget
-                  )
-                }
-              )
-            } else {
-              // must be a call to R30
-              if (!indirectCall.target.equals(exitRegister)) {
-                throw new Exception(
-                  s"Indirect call ${indirectCall} has no possible targets. Value set: ${valueSet(indirectCall.target)}"
-                )
+              val procedure = c.parent.data
+              indirectCall.condition match {
+                // it doesn't seem like calls can actually have conditions in the ARM64 instruction set
+                case Some(_) => throw Exception("indirect call has a condition")
+                case None =>
+                  val newBlocks = for (t <- targets) yield {
+                    val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
+                    val newLabel: String = block.label + t.name
+                    val directCall = DirectCall(t, None, indirectCall.returnTarget)
+                    Block(newLabel, None, ArrayBuffer(assume), ArrayBuffer(directCall))
+                  }
+                  procedure.blocks.addAll(newBlocks)
+                  block.jumps.remove(block.jumps.indexOf(indirectCall))
+                  val newCall = NonDetGoTo(newBlocks)
+                  block.jumps.append(newCall)
               }
             }
           case _ =>

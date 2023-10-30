@@ -26,10 +26,19 @@ abstract class Visitor {
     node
   }
 
+  def visitAssume(node: Assume): Statement = {
+    node.body = visitExpr(node.body)
+    node
+  }
+
   def visitJump(node: Jump): Jump = node.acceptVisit(this)
 
   def visitGoTo(node: GoTo): Jump = {
     node.condition = node.condition.map(visitExpr)
+    node
+  }
+
+  def visitNonDetGoTo(node: NonDetGoTo): Jump = {
     node
   }
 
@@ -198,6 +207,11 @@ abstract class ReadOnlyVisitor extends Visitor {
   }
 
   override def visitAssert(node: Assert): Statement = {
+    visitExpr(node.body)
+    node
+  }
+
+  override def visitAssume(node: Assume): Statement = {
     visitExpr(node.body)
     node
   }

@@ -32,9 +32,14 @@ case object NOP extends Statement {
   override def acceptVisit(visitor: Visitor): Statement = this
 }
 
-class Assert(var body: Expr, var comment: Option[String]) extends Statement {
+class Assert(var body: Expr, var comment: Option[String] = None) extends Statement {
   override def toString: String = s"assert $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssert(this)
+}
+
+class Assume(var body: Expr, var comment: Option[String] = None) extends Statement {
+  override def toString: String = s"assume $body" + comment.map(" //" + _)
+  override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssume(this)
 }
 
 trait Jump extends Command {
@@ -52,6 +57,11 @@ class GoTo(var target: Block, var condition: Option[Expr]) extends Jump {
   override def toString: String = s"GoTo(${target.label}, $condition)"
 
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitGoTo(this)
+}
+
+class NonDetGoTo(var targets: Seq[Block]) extends Jump {
+  override def toString: String = s"NonDetGoTo(${targets.map(_.label).mkString(", ")})"
+  override def acceptVisit(visitor: Visitor): Jump = visitor.visitNonDetGoTo(this)
 }
 
 class DirectCall(var target: Procedure, var condition: Option[Expr], var returnTarget: Option[Block]) extends Jump {

@@ -106,8 +106,8 @@ case class IfCmd(guard: BExpr, thenCmds: List[BCmd], comment: Option[String] = N
   override def globals: Set[BVar] = guard.globals ++ thenCmds.flatMap(c => c.globals).toSet
 }
 
-case class GoToCmd(destination: String, comment: Option[String] = None) extends BCmd {
-  override def toString: String = s"goto $destination;"
+case class GoToCmd(destinations: Seq[String], comment: Option[String] = None) extends BCmd {
+  override def toString: String = s"goto ${destinations.mkString(", ")};"
 }
 
 case object ReturnCmd extends BCmd {

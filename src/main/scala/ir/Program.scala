@@ -149,6 +149,7 @@ class Procedure(
           case g: GoTo => visitBlock(g.target)
           case d: DirectCall => d.returnTarget.foreach(visitBlock)
           case i: IndirectCall => i.returnTarget.foreach(visitBlock)
+          case n: NonDetGoTo => n.targets.foreach(visitBlock)
         }
       }
     }

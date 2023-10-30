@@ -385,7 +385,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     case d: DirectCall =>
       val call = List(ProcedureCall(d.target.name, List(), List(), List()))
       val returnTarget = d.returnTarget match {
-        case Some(r) => List(GoToCmd(r.label))
+        case Some(r) => List(GoToCmd(Seq(r.label)))
         case None    => List(Comment("no return target"), BAssume(FalseBLiteral))
       }
       d.condition match {
@@ -403,7 +403,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       } else {
         val unresolved: List[BCmd] = List(Comment(s"UNRESOLVED: call ${i.target.name}"), BAssume(FalseBLiteral))
         i.returnTarget match {
-          case Some(r) => unresolved :+ GoToCmd(r.label)
+          case Some(r) => unresolved :+ GoToCmd(Seq(r.label))
           case None    => unresolved ++ List(Comment("no return target"), BAssume(FalseBLiteral))
         }
       }
@@ -420,10 +420,12 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         case Some(c) =>
           val guard = c.toBoogie
           val guardGamma = c.toGamma
-          List(BAssert(guardGamma), IfCmd(guard, List(GoToCmd(g.target.label))))
+          List(BAssert(guardGamma), IfCmd(guard, List(GoToCmd(Seq(g.target.label)))))
         case None =>
-          List(GoToCmd(g.target.label))
+          List(GoToCmd(Seq(g.target.label)))
       }
+    case n: NonDetGoTo =>
+      List(GoToCmd(n.targets.map(_.label)))
   }
 
   def translate(s: Statement): List[BCmd] = s match {
@@ -476,6 +478,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     case a: Assert =>
       val body = a.body.toBoogie
       List(BAssert(body, a.comment))
+    case a: Assume =>
+      val body = a.body.toBoogie
+      List(BAssume(body, a.comment))
   }
 
   def coerceProcedureCall(target: Procedure): List[BCmd] = {

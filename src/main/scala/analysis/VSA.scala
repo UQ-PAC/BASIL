@@ -10,14 +10,18 @@ import scala.collection.immutable
 import util.Logger
 
 /** ValueSets are PowerSet of possible values */
-trait Value
-trait AddressValue(val expr: Expr, val name: String) extends Value
+trait Value {
+  val expr: BitVecLiteral
+}
+trait AddressValue extends Value {
+  val name: String
+}
 
-case class GlobalAddress(val e: Expr, val n: String) extends AddressValue(e, n) {
+case class GlobalAddress(override val expr: BitVecLiteral, override val name: String) extends AddressValue {
   override def toString: String = "GlobalAddress(" + expr + ", " + name + ")"
 }
 
-case class LocalAddress(val e: Expr, val n: String) extends AddressValue(e, n) {
+case class LocalAddress(override val expr: BitVecLiteral, override val name: String) extends AddressValue {
   override def toString: String = "LocalAddress(" + expr + ", " + name + ")"
 }
 
