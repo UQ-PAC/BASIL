@@ -109,9 +109,10 @@ trait CfgNode:
     *   Set of predecessor nodes
     */
   def pred(intra: Boolean): mutable.Set[CfgNode] = {
-    intra match
-      case true  => predIntra.map(edge => edge.getFrom)
-      case false => predInter.map(edge => edge.getFrom)
+    if intra then
+      predIntra.map(edge => edge.getFrom)
+    else
+      predInter.map(edge => edge.getFrom)
   }
 
   /** Retrieve predecessor edges to this node.
@@ -131,9 +132,10 @@ trait CfgNode:
     *   (Node, EdgeCondition)
     */
   def predConds(intra: Boolean): mutable.Set[(CfgNode, Expr)] = {
-    intra match
-      case true  => predIntra.map(edge => (edge.getFrom, edge.getCond))
-      case false => predInter.map(edge => (edge.getFrom, edge.getCond))
+    if intra then
+      predIntra.map(edge => (edge.getFrom, edge.getCond))
+    else
+      predInter.map(edge => (edge.getFrom, edge.getCond))
   }
 
   /** Edges to successor nodes, either regular or ignored procedure calls
@@ -156,9 +158,10 @@ trait CfgNode:
     *   Set of successor nodes
     */
   def succ(intra: Boolean): mutable.Set[CfgNode] = {
-    intra match
-      case true  => succIntra.map(edge => edge.getTo)
-      case false => succInter.map(edge => edge.getTo)
+    if intra then
+      succIntra.map(edge => edge.getTo)
+    else
+      succInter.map(edge => edge.getTo)
   }
 
   /** Retrieve successor edges from this node.
@@ -178,9 +181,10 @@ trait CfgNode:
     *   (Node, EdgeCondition)
     */
   def succConds(intra: Boolean): mutable.Set[(CfgNode, Expr)] = {
-    intra match
-      case true  => succIntra.map(edge => (edge.getTo, edge.getCond))
-      case false => succInter.map(edge => (edge.getTo, edge.getCond))
+    if intra then
+      succIntra.map(edge => (edge.getTo, edge.getCond))
+    else
+      succInter.map(edge => (edge.getTo, edge.getCond))
   }
 
   /** Unique identifier. */
@@ -354,13 +358,13 @@ case class CfgGhostNode(
     override val succIntra: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     override val block: Block,
-    override val parent: CfgFunctionEntryNode
+    override val parent: CfgFunctionEntryNode,
+    override val data: NOP
 ) extends CfgCommandNode:
-  override val data: Statement = NOP
-  override def toString: String = s"[NOP]"
+  override def toString: String = s"[NOP] $data"
 
   /** Copy this node, but give unique ID and reset edges */
-  override def copyNode(): CfgGhostNode = CfgGhostNode(block = this.block, parent = this.parent)
+  override def copyNode(): CfgGhostNode = CfgGhostNode(block = this.block, parent = this.parent, data = this.data)
 
 /** A control-flow graph. Nodes provide the ability to walk it as both an intra and inter procedural CFG.
   */
@@ -757,7 +761,7 @@ class ProgramCfgFactory:
           jmps.head match {
             case jmp: GoTo =>
               // `GoTo`s are just edges, so introduce a fake `start of block` that can be jmp'd to
-              val ghostNode = CfgGhostNode(block = block, parent = funcEntryNode)
+              val ghostNode = CfgGhostNode(block = block, parent = funcEntryNode, data = NOP(jmp.label))
               cfg.addEdge(prevNode, ghostNode, cond)
               precNode = ghostNode
               visitedBlocks += (block -> ghostNode)

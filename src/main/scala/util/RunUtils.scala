@@ -5,20 +5,21 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Set as MutableSet
 import java.io.{File, PrintWriter}
 import java.io.{BufferedWriter, FileWriter, IOException}
-import scala.jdk.CollectionConverters._
-import analysis.solvers._
-
-import analysis._
+import scala.jdk.CollectionConverters.*
+import analysis.solvers.*
+import analysis.*
 import cfg_visualiser.{OtherOutput, Output, OutputKindE}
-import bap._
-import ir._
-import boogie._
-import specification._
-import Parsers._
+import bap.*
+import ir.*
+import boogie.*
+import specification.*
+import Parsers.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
-import translating._
+import translating.*
 import util.Logger
+
+import scala.collection.mutable
 
 object RunUtils {
   var memoryRegionAnalysisResults: Map[CfgNode, Set[MemoryRegion]] = Map()
@@ -145,21 +146,25 @@ object RunUtils {
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationAnalysis.WorklistSolver(cfg)
     val constPropResult: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = constPropSolver.analyze(true)
+    /*
     Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder),
       "cpa"
     )
+    */
+    dump_file(printAnalysisResults(cfg, constPropResult), "cpa")
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
     val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.analyze(true)
     memoryRegionAnalysisResults = mraResult
-    Output.output(
+    /* Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder),
       "mra"
-    )
+    )*/
+    dump_file(printAnalysisResults(cfg, mraResult), "mra")
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
@@ -169,24 +174,89 @@ object RunUtils {
     val vsaSolver =
       ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
     val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]  = vsaSolver.analyze(false)
+    /*
     Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder),
       "vsa"
     )
+    */
+    dump_file(printAnalysisResults(cfg, vsaResult), "vsa")
 
     Logger.info("[!] Resolving CFG")
     val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult.asInstanceOf[Map[CfgNode, Map[Variable, Set[Value]]]], IRProgram)
+    /*
     if (modified) {
       Logger.info(s"[!] Analysing again (iter $iterations)")
       return analyse(newIR, externalFunctions, globals, globalOffsets)
     }
+    */
     val newCFG = ProgramCfgFactory().fromIR(newIR)
     Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
 
     Logger.info(s"[!] Finished indirect call resolution after $iterations iterations")
 
     newIR
+  }
+
+  def printAnalysisResults(cfg: ProgramCfg, result: Map[CfgNode, _]): String = {
+    val functionEntries = cfg.nodes.collect { case n: CfgFunctionEntryNode => n }.toSeq.sortBy(_.data.name)
+    val s = StringBuilder()
+
+    for (f <- functionEntries) {
+      val stack: mutable.Stack[CfgNode] = mutable.Stack()
+      val visited: mutable.Set[CfgNode] = mutable.Set()
+      stack.push(f)
+      while (stack.nonEmpty) {
+        val next = stack.pop()
+        if (!visited.contains(next)) {
+          visited.add(next)
+          next.match {
+            case c: CfgCommandNode => printNode(c)
+            case c: CfgFunctionEntryNode => printNode(c)
+            case c: CfgCallNoReturnNode => s.append(System.lineSeparator())
+            case _ =>
+          }
+          val successors = next.succ(true)
+          if (successors.size > 1) {
+            val successorsCmd = successors.collect { case c: CfgCommandNode => c }.toSeq.sortBy(_.data.label)
+            printGoTo(successorsCmd)
+            for (s <- successorsCmd) {
+              if (!visited.contains(s)) {
+                stack.push(s)
+              }
+            }
+          } else if (successors.size == 1) {
+            val successor = successors.head
+            if (!visited.contains(successor)) {
+              stack.push(successor)
+            } else {
+              successor.match {
+                case c: CfgCommandNode => printGoTo(Seq(c))
+                case _ =>
+              }
+            }
+          }
+        }
+      }
+      s.append(System.lineSeparator())
+    }
+
+    def printNode(node: CfgNode): Unit = {
+      s.append(node)
+      s.append(" :: ")
+      s.append(result(node))
+      s.append(System.lineSeparator())
+    }
+
+    def printGoTo(nodes: Seq[CfgCommandNode]): Unit = {
+      s.append("[GoTo] ")
+      s.append(nodes.map(_.data.labelStr).mkString(", "))
+      s.append(System.lineSeparator())
+      s.append(System.lineSeparator())
+    }
+
+    s.toString
   }
 
   def resolveCFG(
