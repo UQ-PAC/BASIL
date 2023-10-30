@@ -33,7 +33,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   )
 
   def translate: BProgram = {
-    val procedures = program.procedures.map(f => translateProcedure(f))
+    val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
+    val procedures = program.procedures.map(f => translateProcedure(f, readOnlyMemory))
     val defaultGlobals = List(BVarDecl(mem), BVarDecl(Gamma_mem))
     val globalVars = procedures.flatMap(p => p.globals ++ p.freeRequires.flatMap(_.globals) ++ p.freeEnsures.flatMap(_.globals) ++ p.ensures.flatMap(_.globals) ++ p.requires.flatMap(_.globals))
     val globalDecls = (globalVars.map(b => BVarDecl(b)) ++ defaultGlobals).distinct.sorted.toList
@@ -51,11 +52,11 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       List(),
       List(),
       List(),
-      Seq(mem, Gamma_mem),
+      Set(mem, Gamma_mem),
       guaranteesReflexive.map(g => BAssert(g))
     )
 
-    val rgProcs = genRely(relies) :+ guaranteeReflexive
+    val rgProcs = genRely(relies, readOnlyMemory) :+ guaranteeReflexive
 
     val functionsUsed1 =
       procedures.flatMap(p => p.functionOps).toSet ++ rgProcs.flatMap(p => p.functionOps).toSet ++ directFunctions
@@ -63,69 +64,27 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val functionsUsed3 = functionsUsed2.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed = (functionsUsed2 ++ functionsUsed3).toList.sorted
 
-    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgProcs ++ procedures
+    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
     BProgram(declarations)
   }
 
-  def genRely(relies: List[BExpr]): List[BProcedure] = {
+  def genRely(relies: List[BExpr], readOnlyMemory: List[BExpr]): List[BProcedure] = {
     val reliesUsed = if (relies.nonEmpty) {
       relies
     } else {
       // default case where no rely is given - rely on no external changes
       List(BinaryBExpr(BVEQ, mem, Old(mem)), BinaryBExpr(BVEQ, Gamma_mem, Old(Gamma_mem)))
     }
-    val i = BVariable("i", BitVecBType(64), Scope.Local)
-    val rely2 = ForAll(
-      List(i),
-      BinaryBExpr(
-        BoolIMPLIES,
-        BinaryBExpr(BVEQ, MapAccess(mem, i), Old(MapAccess(mem, i))),
-        BinaryBExpr(BVEQ, MapAccess(Gamma_mem, i), Old(MapAccess(Gamma_mem, i)))
-      )
-    )
-    val relyEnsures = List(rely2) ++ reliesUsed
-    val relyProc = BProcedure(
-      "rely",
-      List(),
-      List(),
-      relyEnsures,
-      List(),
-      List(),
-      List(),
-      List(),
-      List(),
-      Seq(mem, Gamma_mem),
-      List()
-    )
-    val relyTransitive = BProcedure(
-      "rely_transitive",
-      List(),
-      List(),
-      reliesUsed,
-      List(),
-      List(),
-      List(),
-      List(),
-      List(),
-      Seq(mem, Gamma_mem),
-      List(
-        ProcedureCall("rely", List(), List(), List(mem, Gamma_mem)),
-        ProcedureCall("rely", List(), List(), List(mem, Gamma_mem))
-      )
-    )
-    val relyReflexive = BProcedure(
-      "rely_reflexive",
-      List(),
-      List(),
-      List(),
-      List(),
-      List(),
-      List(),
-      List(),
-      List(),
-      Seq(),
-      reliesReflexive.map(r => BAssert(r))
-    )
+    val relyEnsures = if (relies.nonEmpty) {
+      val i = BVariable("i", BitVecBType(64), Scope.Local)
+      val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem, i), Old(MapAccess(mem, i))), BinaryBExpr(BVEQ, MapAccess(Gamma_mem, i), Old(MapAccess(Gamma_mem, i)))))
+      List(rely2) ++ reliesUsed
+    } else {
+      reliesUsed
+    }
+    val relyProc = BProcedure("rely", List(), List(), relyEnsures, List(), List(), List(), readOnlyMemory, List(), Set(mem, Gamma_mem), List())
+    val relyTransitive = BProcedure("rely_transitive", List(), List(), reliesUsed, List(), List(), List(), List(), List(), Set(mem, Gamma_mem), List(BProcedureCall("rely", List(), List()), BProcedureCall("rely", List(), List())))
+    val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), List(), List(), List(), List(), Set(), reliesReflexive.map(r => BAssert(r)))
     List(relyProc, relyTransitive, relyReflexive)
   }
 
@@ -258,39 +217,48 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     }
   }
 
-  def translateProcedure(p: Procedure): BProcedure = {
-    val in = p.in.flatMap(i => List(i.toBoogie, i.toGamma))
+  def pushUpModifiesFixedPoint(procedures: List[BProcedure]): List[BProcedure] = {
+    pushUpModifies(procedures) match {
+      case (true, proc) => pushUpModifiesFixedPoint(proc)
+      case (false, proc) => proc
+    }
+  }
 
-    var outRegisters: Set[Variable] = Set()
+  def pushUpModifies(procedures: List[BProcedure]): (Boolean, List[BProcedure]) = {
+    var changed = false
 
-    val out = (for (o <- p.out) yield {
-      if (outRegisters.contains(o.value)) {
-        List()
-      } else {
-        outRegisters = outRegisters + o.value
-        List(o.toBoogie, o.toGamma)
+    val procs: List[BProcedure] = procedures.map(
+      procedure => {
+        val cmds: List[BCmd] = procedure.body.flatten {
+          case b: BBlock => b.body
+          case c: BCmd => Seq(c)
+        }
+
+        val modifies: Set[BVar] = procedure.modifies ++ cmds.collect{ case x: BProcedureCall => procedures.find(_.name == x.name)}
+          .flatten.flatMap(_.modifies)
+
+        if (procedure.modifies != procedure.modifies)
+          changed = true
+
+        procedure.copy(modifies = modifies)
       }
-    }).flatten
+    )
+    (changed, procs)
+  }
 
-    outRegisters = Set()
-    val returns = (for (o <- p.out) yield {
-      if (outRegisters.contains(o.value)) {
-        List()
-      } else {
-        outRegisters = outRegisters + o.value
-        List(outParamToAssign(o))
-      }
-    }).flatten.toList
 
+  def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr]): BProcedure = {
     val body = p.blocks.map(b => translateBlock(b))
-    val modifies: Seq[BVar] = p.modifies
+
+    val callsRely: Boolean = body.flatten(_.body).exists(_ match
+      case BProcedureCall("rely", lhs, params, comment) => true
+      case _ => false)
+
+    val modifies: Seq[BVar] = p.modifies.toSeq
       .flatMap {
         case m: Memory   => Seq(m.toBoogie, m.toGamma)
         case r: Register => Seq(r.toBoogie, r.toGamma)
-      }
-      .toSeq
-      .sorted
-    //val modifies = Seq(mem, Gamma_mem, stack, Gamma_stack) // TODO placeholder until proper modifies analysis
+      }.distinct.sorted
 
     val modifiedPreserve = modifies.collect { case m: BVar if modifiedCheck.contains(m) => m }
     val modifiedPreserveEnsures: List[BExpr] = modifiedPreserve.map(m => BinaryBExpr(BoolEQ, m, Old(m))).toList
@@ -302,18 +270,12 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val procEnsuresDirect: List[String] = ensuresDirect.getOrElse(p.name, List())
 
     val freeRequires: List[BExpr] = if (p == program.mainProcedure) {
-      initialiseMemory
+      memoryToCondition(program.initialMemory) ++ readOnlyMemory
     } else {
-      List()
+      readOnlyMemory
     }
 
-    val freeEnsures = modifiedPreserveEnsures
-
-    val inInits = if (body.isEmpty) {
-      List()
-    } else {
-      p.in.map(i => inParamToAssign(i)).toList
-    }
+    val freeEnsures = modifiedPreserveEnsures ++ readOnlyMemory
 
     BProcedure(
       p.name,
@@ -325,16 +287,13 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       procRequiresDirect,
       freeEnsures,
       freeRequires,
-      modifies,
+      modifies.toSet,
       body.toList
     )
   }
 
-  private def initialiseMemory: List[BExpr] = {
-    val dataSections = program.initialMemory.collect {
-      case s if s.name == ".data" || s.name == ".rodata" || s.name == ".got" => s
-    }
-    val sections = dataSections.flatMap { s =>
+  private def memoryToCondition(memory: ArrayBuffer[MemorySection]): List[BExpr] = {
+    val sections = memory.flatMap { s =>
       for (b <- s.bytes.indices) yield {
         BinaryBExpr(
           BVEQ,
@@ -346,36 +305,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     sections.toList
   }
 
-  private def outParamToAssign(p: Parameter): AssignCmd = {
-    val param = BParam(p.name, BitVecBType(p.size))
-    val register = p.value.toBoogie
-    val paramGamma = BParam(s"Gamma_${p.name}", BoolBType)
-    val registerGamma = p.value.toGamma
-    val assigned = if (p.size > p.value.size) {
-      BVZeroExtend(p.size - p.value.size, register)
-    } else if (p.size < p.value.size) {
-      BVExtract(p.size, 0, register)
-    } else {
-      register
-    }
-    AssignCmd(List(param, paramGamma), List(assigned, registerGamma))
-  }
-
-  private def inParamToAssign(p: Parameter): AssignCmd = {
-    val param = BParam(p.name, BitVecBType(p.size))
-    val register = p.value.toBoogie
-    val paramGamma = BParam(s"Gamma_${p.name}", BoolBType)
-    val registerGamma = p.value.toGamma
-    val assigned = if (p.size > p.value.size) {
-      BVExtract(p.value.size, 0, param)
-    } else if (p.size < p.value.size) {
-      BVZeroExtend(p.value.size - p.size, param)
-    } else {
-      param
-    }
-    AssignCmd(List(register, registerGamma), List(assigned, paramGamma))
-  }
-
   def translateBlock(b: Block): BBlock = {
     val cmds = b.statements.flatMap(s => translate(s)) ++ b.jumps.flatMap(j => translate(j))
     BBlock(b.label, cmds.toList)
@@ -383,7 +312,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translate(j: Jump): List[BCmd] = j match {
     case d: DirectCall =>
-      val call = List(ProcedureCall(d.target.name, List(), List(), List()))
+      val call = List(BProcedureCall(d.target.name, List(), List()))
       val returnTarget = d.returnTarget match {
         case Some(r) => List(GoToCmd(Seq(r.label)))
         case None    => List(Comment("no return target"), BAssume(FalseBLiteral))
@@ -401,7 +330,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val call: List[BCmd] = if (i.target.name == "R30") {
         List(ReturnCmd)
       } else {
-        val unresolved: List[BCmd] = List(Comment(s"UNRESOLVED: call ${i.target.name}"), BAssume(FalseBLiteral))
+        val unresolved: List[BCmd] = List(Comment(s"UNRESOLVED: call ${i.target.name}"), BAssert(FalseBLiteral))
         i.returnTarget match {
           case Some(r) => unresolved :+ GoToCmd(Seq(r.label))
           case None    => unresolved ++ List(Comment("no return target"), BAssume(FalseBLiteral))
@@ -438,7 +367,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       if (lhs == stack) {
         List(store)
       } else {
-        val rely = ProcedureCall("rely", List(), List(), List(rhs.memory, rhsGamma.gammaMap))
+        val rely = BProcedureCall("rely", List(), List())
         val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.rhs.value.toGamma))
         val oldAssigns =
           guaranteeOldVars.map(g => AssignCmd(g.toOldVar, BMemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size)))
@@ -467,13 +396,12 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val lhsGamma = l.lhs.toGamma
       val rhsGamma = l.rhs.toGamma
       val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
-      val loads = rhs.functionOps.collect { case m: BMemoryLoad => m }
+      val loads = rhs.loads.collect { case m: BMemoryLoad => m }
       if (loads.isEmpty || loads.forall(_.memory == stack)) {
         List(assign)
       } else {
-        val gammas = rhsGamma.functionOps.collect { case g: GammaLoad => g.gammaMap }.toSeq.sorted
         val memories = loads.map(m => m.memory).toSeq.sorted
-        List(ProcedureCall("rely", Seq(), Seq(), memories ++ gammas), assign)
+        List(BProcedureCall("rely", Seq(), Seq()), assign)
       }
     case a: Assert =>
       val body = a.body.toBoogie
@@ -482,67 +410,4 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val body = a.body.toBoogie
       List(BAssume(body, a.comment))
   }
-
-  def coerceProcedureCall(target: Procedure): List[BCmd] = {
-    val params = for (i <- target.in) yield {
-      val register = i.value.toBoogie
-      val registerGamma = i.value.toGamma
-      if (i.value.size > i.size) {
-        List(BVExtract(i.size, 0, register), registerGamma)
-      } else if (i.value.size < i.size) {
-        List(BVZeroExtend(i.size - i.value.size, register), registerGamma)
-      } else {
-        List(register, registerGamma)
-      }
-    }
-    var outUsedRegisters: Set[Variable] = Set()
-    var outIndices: Set[Int] = Set()
-    for (o <- target.out.indices) {
-      if (!outUsedRegisters.contains(target.out(o).value)) {
-        outIndices = outIndices + o
-        outUsedRegisters = outUsedRegisters + target.out(o).value
-      }
-    }
-
-    val outTemp = for (o <- target.out.indices) yield {
-      BVariable(s"#temp$o", BitVecBType(target.out(o).size), Scope.Local)
-    }
-    val outTempGamma = for (o <- target.out.indices) yield {
-      BVariable(s"Gamma_#temp$o", BoolBType, Scope.Local)
-    }
-    val outRegisters = target.out.map(o => o.value.toBoogie)
-    val outRegisterGammas = target.out.map(o => o.value.toGamma)
-    val outAssigned = for (
-      o <- target.out.indices if target.out(o).value.size != target.out(o).size && outIndices.contains(o)
-    ) yield {
-      val regSize = target.out(o).value.size
-      val paramSize = target.out(o).size
-      if (regSize > paramSize) {
-        AssignCmd(
-          List(outRegisters(o), outRegisterGammas(o)),
-          List(BVZeroExtend(regSize - paramSize, outTemp(o)), outTempGamma(o))
-        )
-      } else {
-        AssignCmd(List(outRegisters(o), outRegisterGammas(o)), List(BVExtract(regSize, 0, outTemp(o)), outTempGamma(o)))
-      }
-    }
-
-    val returned = for (o <- target.out.indices if outIndices.contains(o)) yield {
-      if (target.out(o).value.size == target.out(o).size) {
-        List(outRegisters(o), outRegisterGammas(o))
-      } else {
-        List(outTemp(o), outTempGamma(o))
-      }
-    }
-    List(ProcedureCall(target.name, returned.flatten.toList, params.flatten.toList, List())) ++ outAssigned
-  }
-
-  /*
-  private val reserved = Set("free")
-
-  def avoidReserved(program: BProgram): BProgram = {
-    program.replaceReserved(reserved)
-  }
-   */
-
 }

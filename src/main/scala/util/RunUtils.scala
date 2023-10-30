@@ -97,6 +97,8 @@ object RunUtils {
         dump_file(serialiseIL(IRProgram), "after-analysis.il")
       }
     }
+
+    IRProgram.determineRelevantMemory(globalOffsets)
     IRProgram.stripUnreachableFunctions()
     IRProgram.stackIdentification()
 
