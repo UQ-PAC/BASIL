@@ -374,6 +374,19 @@ class MemoryRegionAnalysisSolver(
     with SimpleMonotonicSolver[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]
 
 
+  class WorklistSolver(
+      cfg: ProgramCfg,
+      globals: Map[BigInt, String],
+      globalOffsets: Map[BigInt, BigInt],
+      subroutines: Map[BigInt, String],
+      constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+  ) extends IntraprocMemoryRegionAnalysisWorklistSolverWithReachability(
+        cfg,
+        globals,
+        globalOffsets,
+        subroutines,
+        constantProp
+      )
 
 
 ///**
@@ -392,13 +405,13 @@ class MemoryRegionAnalysisSolver(
 // * Intraprocedural value analysis that uses [[tip.solvers.WorklistFixpointSolverWithReachability]],
 // * with all function entries as start nodes.
 // */
-//abstract class IntraprocValueAnalysisWorklistSolverWithReachability[L](
-//  cfg: ProgramCfg,
-//  globals: Map[BigInt, String],
-//  globalOffsets: Map[BigInt, BigInt],
-//  subroutines: Map[BigInt, String],
-//  constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-//  )
+//abstract class IntraprocMemoryRegionAnalysisWorklistSolverWithReachability[L](
+//    cfg: ProgramCfg,
+//    globals: Map[BigInt, String],
+//    globalOffsets: Map[BigInt, BigInt],
+//    subroutines: Map[BigInt, String],
+//    constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+//    )
 //  extends LiftedMemoryRegionAnalysis(
 //    cfg,
 //    globals,

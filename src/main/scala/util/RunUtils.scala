@@ -166,7 +166,11 @@ object RunUtils {
 
     Logger.info("[!] Running VSA")
     val vsaSolver = ValueSetAnalysisSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
-    val vsaResult = vsaSolver.analyze()
+    // TODO: replace ? with the right type
+    val vsaResult = vsaSolver.unliftedAnalyze(true).asInstanceOf[Map[CfgNode, ?]]
+    ].map {
+      case (k, v) => k -> v.values.flatten.toSet
+    }
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, true), Output.dotIder), s"${s}_vsa$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, vsaResult, iteration), s"${s}_vsa$iteration.txt"))

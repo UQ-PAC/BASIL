@@ -198,8 +198,16 @@ class ValueSetAnalysisSolver(
 //    mmm: MemoryModelMap,
 //    constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
 //    val powersetLattice: L
-//) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
-//    with SimpleWorklistFixpointSolver[CfgNode]
+//) extends LiftedValueSetAnalysis(
+//    cfg,
+//    globals,
+//    externalFunctions,
+//    globalOffsets, subroutines,
+//    mmm,
+//    constantProp,
+//    true)
+//    with LiftedValueSetAnalysisMisc
+//    with WorklistFixpointSolverWithReachability[CfgNode]
 //    with ForwardDependencies
 //
 //object ValueSetAnalysis:
