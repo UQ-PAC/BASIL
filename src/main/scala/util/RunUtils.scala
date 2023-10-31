@@ -207,15 +207,27 @@ object RunUtils {
       val stack: mutable.Stack[CfgNode] = mutable.Stack()
       val visited: mutable.Set[CfgNode] = mutable.Set()
       stack.push(f)
+      var previousBlock: String = ""
+      var isEntryNode = false
       while (stack.nonEmpty) {
         val next = stack.pop()
         if (!visited.contains(next)) {
           visited.add(next)
           next.match {
-            case c: CfgCommandNode => printNode(c)
-            case c: CfgFunctionEntryNode => printNode(c)
-            case c: CfgCallNoReturnNode => s.append(System.lineSeparator())
-            case _ =>
+            case c: CfgCommandNode =>
+              if (c.block.label != previousBlock) {
+                printBlock(c)
+              }
+              printNode(c)
+              previousBlock = c.block.label
+              isEntryNode = false
+            case c: CfgFunctionEntryNode =>
+              printNode(c)
+              isEntryNode = true
+            case c:
+              CfgCallNoReturnNode => s.append(System.lineSeparator())
+              isEntryNode = false
+            case _ => isEntryNode = false
           }
           val successors = next.succ(true)
           if (successors.size > 1) {
@@ -230,11 +242,10 @@ object RunUtils {
             val successor = successors.head
             if (!visited.contains(successor)) {
               stack.push(successor)
-            } else {
-              successor.match {
-                case c: CfgCommandNode => printGoTo(Seq(c))
-                case _ =>
-              }
+            }
+            successor.match {
+              case c: CfgCommandNode if (c.block.label != previousBlock) && (!isEntryNode) => printGoTo(Seq(c))
+              case _ =>
             }
           }
         }
@@ -251,8 +262,14 @@ object RunUtils {
 
     def printGoTo(nodes: Seq[CfgCommandNode]): Unit = {
       s.append("[GoTo] ")
-      s.append(nodes.map(_.data.labelStr).mkString(", "))
+      s.append(nodes.map(_.block.label).mkString(", "))
       s.append(System.lineSeparator())
+      s.append(System.lineSeparator())
+    }
+
+    def printBlock(node: CfgCommandNode): Unit = {
+      s.append("[Block] ")
+      s.append(node.block.label)
       s.append(System.lineSeparator())
     }
 
