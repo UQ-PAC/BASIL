@@ -173,7 +173,10 @@ object RunUtils {
     Logger.info("[!] Running VSA")
     val vsaSolver =
       ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
-    val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]  = vsaSolver.analyze(false)
+      // TODO: replace ? with the right type
+    val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]  = vsaSolver.unliftedAnalyze(true).asInstanceOf[Map[CfgNode, ?]]].map {
+      case (k, v) => k -> v.values.flatten.toSet
+    }
     Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder),

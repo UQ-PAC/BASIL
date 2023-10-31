@@ -364,7 +364,7 @@ trait MemoryRegionAnalysisMisc:
             */
             s ++ Set((n, result))
           case localAssign: LocalAssign =>
-            var m = s
+            val m = s
             unwrapExpr(localAssign.rhs).foreach {
               case memoryLoad: MemoryLoad =>
                 val result = eval(memoryLoad.index, s, n)
@@ -417,9 +417,8 @@ abstract class LiftedMemoryRegionAnalysis[P <: ProgramCfg](
   val globals: Map[BigInt, String],
   val globalOffsets: Map[BigInt, BigInt],
   val subroutines: Map[BigInt, String],
-  val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-
-  , stateAfterNode: Boolean)
+  val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
+  stateAfterNode: Boolean)
   extends FlowSensitiveAnalysis(stateAfterNode)
     with MapLatticeSolver[CfgNode]
     with MemoryRegionAnalysisMisc {
@@ -471,13 +470,13 @@ trait LiftedMemoryRegionAnalysisMisc extends MemoryRegionAnalysisMisc {
  * Intraprocedural value analysis that uses [[tip.solvers.WorklistFixpointSolverWithReachability]],
  * with all function entries as start nodes.
  */
-abstract class IntraprocValueAnalysisWorklistSolverWithReachability[L](
-  cfg: ProgramCfg,
-  globals: Map[BigInt, String],
-  globalOffsets: Map[BigInt, BigInt],
-  subroutines: Map[BigInt, String],
-  constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-  )
+abstract class IntraprocMemoryRegionAnalysisWorklistSolverWithReachability[L](
+    cfg: ProgramCfg,
+    globals: Map[BigInt, String],
+    globalOffsets: Map[BigInt, BigInt],
+    subroutines: Map[BigInt, String],
+    constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+    )
   extends LiftedMemoryRegionAnalysis(
     cfg,
     globals,
@@ -497,7 +496,7 @@ object MemoryRegionAnalysis:
       globalOffsets: Map[BigInt, BigInt],
       subroutines: Map[BigInt, String],
       constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-  ) extends IntraprocValueAnalysisWorklistSolverWithReachability(
+  ) extends IntraprocMemoryRegionAnalysisWorklistSolverWithReachability(
         cfg,
         globals,
         globalOffsets,

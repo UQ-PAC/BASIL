@@ -27,7 +27,7 @@ case class LiteralValue(expr: BitVecLiteral) extends Value {
 
 type VSALatticeElem = MapLattice[Variable | MemoryRegion, PowersetLattice[Value]]
 
-trait MemoryRegionValueSetAnalysis:
+trait ValueSetAnalysisMisc:
 
   val cfg: ProgramCfg
   val globals: Map[BigInt, String]
@@ -43,7 +43,7 @@ trait MemoryRegionValueSetAnalysis:
 
   /** The lattice of abstract states.
     */
-  val lattice: MapLattice[CfgNode, VSALatticeElem] = MapLattice(powersetLattice)
+  val stateLattice: MapLattice[CfgNode, VSALatticeElem] = MapLattice(powersetLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -100,7 +100,7 @@ trait MemoryRegionValueSetAnalysis:
 
   /** Default implementation of eval.
     */
-  def eval(cmd: Command, s: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
+  def eval(cmd: Command, s: stateLattice.Element, n: CfgNode): stateLattice.Element = {
     Logger.debug(s"eval: $cmd")
     Logger.debug(s"state: $s")
     Logger.debug(s"node: $n")
@@ -114,17 +114,17 @@ trait MemoryRegionValueSetAnalysis:
                 // this is an exception to the rule and only applies to data regions
                 evaluateExpression(memoryLoad.index, n, constantProp(n)) match
                   case bitVecLiteral: BitVecLiteral =>
-                    val m = s + (r -> Set(getValueType(bitVecLiteral)))
-                    m + (localAssign.lhs -> m(r))
+                    s//TODO: val m = s + Set((n, Map(r -> Set(getValueType(bitVecLiteral)))))
+                    //m + (n, localAssign.lhs -> m(r))
                   case _ =>
-                    s + (localAssign.lhs -> s(r))
+                    s//TODO: s + (localAssign.lhs -> s(r))
               case None =>
                 Logger.warn("could not find region for " + localAssign)
                 s
           case e: Expr => {
             val evaled = evaluateExpression(e, n, constantProp(n))
             evaled match
-              case bv: BitVecLiteral => s + (localAssign.lhs -> Set(getValueType(bv)))
+              case bv: BitVecLiteral => s//TODO: s + (localAssign.lhs -> Set(getValueType(bv)))
               case _ =>
                 Logger.warn("could not evaluate expression" + e)
                 s
@@ -137,9 +137,9 @@ trait MemoryRegionValueSetAnalysis:
               case Some(r: MemoryRegion) =>
                 evaluateExpression(memAssign.rhs.value, n, constantProp(n)) match
                   case bitVecLiteral: BitVecLiteral =>
-                    return s + (r -> Set(getValueType(bitVecLiteral)))
+                    return s//TODO: return s + (r -> Set(getValueType(bitVecLiteral)))
                   case variable: Variable => // constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
-                    return s + (r -> s(variable))
+                    return s//TODO: return s + (r -> s(variable))
 
                   case _ => Logger.warn("Too Complex or Wrapped i.e. Extract(Variable)") // do nothing
                 s
@@ -154,7 +154,7 @@ trait MemoryRegionValueSetAnalysis:
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element =
+  def localTransfer(n: CfgNode, s: stateLattice.Element): stateLattice.Element =
     n match {
       case entry: CfgFunctionEntryNode =>
         mmm.pushContext(entry.data.name)
@@ -167,24 +167,84 @@ trait MemoryRegionValueSetAnalysis:
       case _ => s // ignore other kinds of nodes
     }
 
-/** Base class for memory region analysis (non-lifted) lattice.
-  */
-abstract class ValueSetAnalysis(
-    val cfg: ProgramCfg,
+///** Base class for memory region analysis (non-lifted) lattice.
+//  */
+//abstract class ValueSetAnalysis(
+//    val cfg: ProgramCfg,
+//    val globals: Map[BigInt, String],
+//    val externalFunctions: Map[BigInt, String],
+//    val globalOffsets: Map[BigInt, BigInt],
+//    val subroutines: Map[BigInt, String],
+//    val mmm: MemoryModelMap,
+//    val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+//) extends FlowSensitiveAnalysis(true)
+//    with MemoryRegionValueSetAnalysis {
+//
+//  /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
+//    */
+//  def transfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = localTransfer(n, s)
+//
+//}
+
+/**
+ * Base class for value analysis with lifted lattice, where the extra bottom element represents "unreachable".
+ */
+abstract class LiftedValueSetAnalysis[P <: ProgramCfg] (
+    val cfg: P,
     val globals: Map[BigInt, String],
     val externalFunctions: Map[BigInt, String],
     val globalOffsets: Map[BigInt, BigInt],
     val subroutines: Map[BigInt, String],
     val mmm: MemoryModelMap,
-    val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-) extends FlowSensitiveAnalysis(true)
-    with MemoryRegionValueSetAnalysis {
+    val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
+    stateAfterNode: Boolean)
+  extends FlowSensitiveAnalysis(stateAfterNode)
+    with MapLatticeSolver[CfgNode]
+    with ValueSetAnalysisMisc {
 
-  /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
-    */
-  def transfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = localTransfer(n, s)
+  /**
+   * Lifted state lattice, with new bottom element representing "unreachable".
+   */
+  val liftedstatelattice: LiftLattice[stateLattice.type] = new LiftLattice(stateLattice)
 
+  /**
+   * The analysis lattice.
+   */
+  val lattice: MapLattice[CfgNode, liftedstatelattice.type] = new MapLattice(liftedstatelattice)
+
+  override val domain: Set[CfgNode] = cfg.nodes.toSet
+
+  /**
+   * The worklist is initialized with all function entry nodes.
+   */
+  val first: Set[CfgNode] = cfg.funEntries.toSet[CfgNode]
+
+  /**
+   * Overrides `funsub` from [[tip.solvers.MapLatticeSolver]], treating function entry nodes as reachable.
+   */
+  override def funsub(n: CfgNode, x: lattice.Element, intra: Boolean): liftedstatelattice.Element = {
+    import liftedstatelattice._
+    n match {
+      // function entry nodes are always reachable (if intra-procedural analysis)
+      case _: CfgFunctionEntryNode => lift(stateLattice.bottom)
+      // all other nodes are processed with join+transfer
+      case _ => super.funsub(n, x, intra = true)
+    }
+  }
 }
+
+/**
+ * Functionality for basic analyses with lifted state lattice.
+ */
+trait LiftedValueSetAnalysisMisc extends ValueSetAnalysisMisc {
+
+  /**
+   * Transfer function for state lattice elements.
+   * (Same as `localTransfer` for basic analyses with lifted state lattice.)
+   */
+  def transferUnlifted(n: CfgNode, s: stateLattice.Element): stateLattice.Element = localTransfer(n, s)
+}
+
 
 abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
     cfg: ProgramCfg,
@@ -195,8 +255,16 @@ abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
     mmm: MemoryModelMap,
     constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
     val powersetLattice: L
-) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
-    with SimpleWorklistFixpointSolver[CfgNode]
+) extends LiftedValueSetAnalysis(
+    cfg,
+    globals,
+    externalFunctions,
+    globalOffsets, subroutines,
+    mmm,
+    constantProp,
+    true)
+    with LiftedValueSetAnalysisMisc
+    with WorklistFixpointSolverWithReachability[CfgNode]
     with ForwardDependencies
 
 object ValueSetAnalysis:
