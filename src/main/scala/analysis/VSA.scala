@@ -72,21 +72,18 @@ trait MemoryRegionValueSetAnalysis:
   }
 
   def exprToRegion(expr: Expr, n: CfgNode): Option[MemoryRegion] = {
-    expr match
-      case binOp: BinaryExpr =>
-        if (binOp.arg1 == stackPointer) {
-          evaluateExpression(binOp.arg2, constantProp(n)) match {
-            case Some(b: BitVecLiteral) => mmm.findStackObject(b.value)
-            case None => None
-          }
-        } else {
-          evaluateExpression(binOp, constantProp(n)) match {
-            case Some(b: BitVecLiteral) => mmm.findDataObject(b.value)
-            case None => None
-          }
+    expr match {
+      case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
+        evaluateExpression(binOp.arg2, constantProp(n)) match {
+          case Some(b: BitVecLiteral) => mmm.findStackObject(b.value)
+          case None => None
         }
       case _ =>
-        None
+        evaluateExpression(expr, constantProp(n)) match {
+          case Some(b: BitVecLiteral) => mmm.findDataObject(b.value)
+          case None => None
+        }
+    }
   }
 
   def getValueType(bitVecLiteral: BitVecLiteral): Value = {
