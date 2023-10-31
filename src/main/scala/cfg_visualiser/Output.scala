@@ -23,7 +23,7 @@ object Output {
 //        s"_$k.dot"
       case _ => ???
     }
-    val outFile = new File(s"${fileName}.dot")
+    val outFile = new File(s"$fileName.dot")
     val pw = new PrintWriter(outFile, "UTF-8")
     pw.write(content)
     pw.close()
@@ -91,12 +91,12 @@ object Output {
     */
   def dotIder(n: CfgNode, uniqueId: Int): String =
     n match {
-      case real: CfgCommandNode           => s"real${real.data}_${uniqueId}"
-      case entry: CfgFunctionEntryNode    => s"entry${entry.data}_${uniqueId}"
-      case exit: CfgFunctionExitNode      => s"exit${exit.data}_${uniqueId}"
-      case ret: CfgProcedureReturnNode    => s"return_${uniqueId}"
-      case noCallRet: CfgCallNoReturnNode => s"callnoreturn_${uniqueId}"
-      case callRet: CfgCallReturnNode     => s"callreturn_${uniqueId}"
+      case real: CfgCommandNode           => s"real${real.data}_$uniqueId"
+      case entry: CfgFunctionEntryNode    => s"entry${entry.data}_$uniqueId"
+      case exit: CfgFunctionExitNode      => s"exit${exit.data}_$uniqueId"
+      case ret: CfgProcedureReturnNode    => s"return_$uniqueId"
+      case noCallRet: CfgCallNoReturnNode => s"callnoreturn_$uniqueId"
+      case callRet: CfgCallReturnNode     => s"callreturn_$uniqueId"
       case _                              => ???
     }
 }

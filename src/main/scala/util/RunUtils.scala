@@ -24,7 +24,7 @@ import scala.collection.mutable
 object RunUtils {
   var memoryRegionAnalysisResults: Map[CfgNode, Set[MemoryRegion]] = Map()
 
-  var iterations = 0;
+  var iterations = 0
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
@@ -141,7 +141,7 @@ object RunUtils {
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
-    val cfg = ProgramCfgFactory().fromIR(IRProgram, false, 0)
+    val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationAnalysis.WorklistSolver(cfg)
@@ -396,14 +396,14 @@ object RunUtils {
   }
 
   def dump_file(content: String, name: String): Unit = {
-    val outFile = new File(s"${name}.txt")
+    val outFile = new File(s"$name.txt")
     val pw = new PrintWriter(outFile, "UTF-8")
     pw.write(content)
     pw.close()
   }
 
   def dump_plot(content: String, name: String): Unit = {
-    val outFile = new File(s"${name}.dot")
+    val outFile = new File(s"$name.dot")
     val pw = new PrintWriter(outFile, "UTF-8")
     pw.write(content)
     pw.close()

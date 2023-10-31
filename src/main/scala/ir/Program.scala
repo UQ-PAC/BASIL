@@ -14,7 +14,7 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     var next = mainProcedure.name
     var reachableNames: Set[String] = Set(next)
     var toVisit: List[String] = List()
-    var reachableFound = true;
+    var reachableFound = true
     while (reachableFound) {
       val children = functionToChildren(next) -- reachableNames -- toVisit - next
       reachableNames = reachableNames ++ children

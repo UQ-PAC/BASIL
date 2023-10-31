@@ -72,7 +72,7 @@ class MemoryModelMap {
     contextStack.push(allStacks(funName))
     rangeMap.stackMap.clear()
     for (stackRgn <- contextStack.top) {
-      add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
+      add(stackRgn.start.value, stackRgn)
     }
   }
 
@@ -81,7 +81,7 @@ class MemoryModelMap {
       contextStack.pop()
       rangeMap.stackMap.clear()
       for (stackRgn <- contextStack.top) {
-        add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
+        add(stackRgn.start.value, stackRgn)
       }
     }
   }
@@ -99,10 +99,10 @@ class MemoryModelMap {
 
 
   def findStackObject(value: BigInt): Option[StackRegion] = 
-    rangeMap.stackMap.find((range, _) => (range.start <= value && value <= range.end)).map((range, obj) => {obj.extent = Some(range); obj});
+    rangeMap.stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
 
   def findDataObject(value: BigInt): Option[DataRegion] = 
-    rangeMap.dataMap.find((range, _) => (range.start <= value && value <= range.end)).map((range, obj) => {obj.extent = Some(range); obj});
+    rangeMap.dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
 
   override def toString: String =
     s"Stack: ${rangeMap.stackMap}\n Heap: ${rangeMap.heapMap}\n Data: ${rangeMap.dataMap}\n"

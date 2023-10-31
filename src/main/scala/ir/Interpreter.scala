@@ -259,7 +259,7 @@ class Interpreter() {
           val start = im.address.max(currentAddress)
           val data = if (im.address < currentAddress) im.bytes.slice(currentAddress - im.address, im.size) else im.bytes
           data.zipWithIndex.foreach { (byte, index) =>
-            mems(start + index) = byte.asInstanceOf[BitVecLiteral]
+            mems(start + index) = byte
           }
           currentAddress = im.address + im.size
         }

@@ -33,7 +33,7 @@ class DotNode(val id: String, val label: String) extends DotElement {
   override def toString: String = toDotString
 
   def toDotString: String =
-    s"\"${id}\"" + "[label=\"" + label + "\"]"
+    s"\"$id\"" + "[label=\"" + label + "\"]"
 
 }
 
@@ -51,7 +51,7 @@ class DotArrow(
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
 
   def toDotString: String =
-    s"\"${fromNode.id}\" ${arrow} \"${toNode.id}\"[label=\"${label}\", style=\"${style}\", color=\"${colour}\"]"
+    s"\"${fromNode.id}\" $arrow \"${toNode.id}\"[label=\"$label\", style=\"$style\", color=\"$colour\"]"
 }
 
 /** Represents a directed edge between two regular cfg nodes in a Graphviz dot file.

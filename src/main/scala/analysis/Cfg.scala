@@ -216,7 +216,7 @@ case class CfgFunctionEntryNode(
     override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     data: Procedure
 ) extends CfgNodeWithData[Procedure]:
-  override def block = data.blocks.head
+  override def block: Block = data.blocks.head
   override def toString: String = s"[FunctionEntry] $data"
 
   /** Copy this node, but give unique ID and reset edges */
@@ -232,7 +232,7 @@ case class CfgFunctionExitNode(
     override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     data: Procedure
 ) extends CfgNodeWithData[Procedure]:
-  override def block = data.blocks.head
+  override def block: Block = data.blocks.head
   override def toString: String = s"[FunctionExit] $data"
 
   /** Copy this node, but give unique ID and reset edges */
@@ -476,7 +476,7 @@ class ProgramCfg:
       case (from: CfgCallReturnNode, to: CfgCommandNode) => addRegularEdge(from, to, cond)
       // Regular flow of instructions
       case (from: CfgCommandNode, to: (CfgCommandNode | CfgFunctionExitNode)) => addRegularEdge(from, to, cond)
-      case _ => throw new Exception(s"[!] Unexpected edge combination when adding cfg edge between ${from} -> ${to}.")
+      case _ => throw new Exception(s"[!] Unexpected edge combination when adding cfg edge between $from -> $to.")
     }
 
     edges += newEdge
@@ -645,7 +645,7 @@ class ProgramCfgFactory:
     // Procedure has no content (in our case this probably means it's an ignored procedure, e.g., an external function such as @printf)
     if (proc.blocks.isEmpty) {
       cfg.addEdge(funcEntryNode, funcExitNode)
-      return;
+      return
     }
 
     // Track blocks we've already processed so we don't double up
@@ -853,7 +853,7 @@ class ProgramCfgFactory:
                 })
                 cfg.addEdge(noReturn, funcExitNode)
             }
-          case iCall: IndirectCall => {
+          case iCall: IndirectCall =>
             Logger.info(s"Indirect call found: $iCall in ${proc.name}")
 
             // Branch to this call
@@ -869,7 +869,7 @@ class ProgramCfgFactory:
               val returnNode = CfgProcedureReturnNode()
               cfg.addEdge(jmpNode, returnNode)
               cfg.addEdge(returnNode, funcExitNode)
-              return;
+              return
             }
 
             // Jump to return location
@@ -889,8 +889,7 @@ class ProgramCfgFactory:
                 cfg.addEdge(jmpNode, noReturn)
                 cfg.addEdge(noReturn, funcExitNode)
             }
-          }
-          case _ => assert(false, s"unexpected jump encountered, jumps: ${jmps}")
+          case _ => assert(false, s"unexpected jump encountered, jumps: $jmps")
         } // `jmps.head` match
       } // `visitJumps` function
     } // `visitBlocks` function
@@ -960,10 +959,10 @@ class ProgramCfgFactory:
     */
   private def inlineProcedureCalls(procNodes: Set[CfgCommandNode], inlineAmount: Int): Set[CfgCommandNode] = {
     assert(inlineAmount >= 0)
-    Logger.info(s"[+] Inlining ${procNodes.size} leaf call nodes with ${inlineAmount} level(s) left")
+    Logger.info(s"[+] Inlining ${procNodes.size} leaf call nodes with $inlineAmount level(s) left")
 
     if (inlineAmount == 0 || procNodes.isEmpty) {
-      return procNodes;
+      return procNodes
     }
 
     // Set of procedure calls to be discovered by inlining the ones in `procNodes`
@@ -987,7 +986,7 @@ class ProgramCfgFactory:
           // Link the procedure's `Exit` to the return point. There should only be one.
           assert(
             procNode.succ(intra = true).size == 1,
-            s"More than 1 return node... ${procNode} has ${procNode.succ(intra = true)}"
+            s"More than 1 return node... $procNode has ${procNode.succ(intra = true)}"
           )
           val returnNode = procNode.succ(intra = true).head
           cfg.addInlineEdge(procExit, returnNode)
@@ -1005,7 +1004,7 @@ class ProgramCfgFactory:
     Logger.info(s"[+] Unifyig ${procNodes.size} leaf call nodest")
 
     if (procNodes.isEmpty) {
-      return procNodes;
+      return procNodes
     }
 
     // Set of procedure calls to be discovered by unifying the ones in `procNodes`
@@ -1028,7 +1027,7 @@ class ProgramCfgFactory:
           // Link the procedure's `Exit` to the return point. There should only be one.
           assert(
             procNode.succ(intra = true).size == 1,
-            s"More than 1 return node... ${procNode} has ${procNode.succ(intra = true)}"
+            s"More than 1 return node... $procNode has ${procNode.succ(intra = true)}"
           )
           val returnNode = procNode.succ(intra = true).head
           cfg.addInlineEdge(procExit, returnNode)
@@ -1058,7 +1057,7 @@ class ProgramCfgFactory:
     callToNodes += (newEntry -> mutable.Set[CfgCommandNode]())
 
     // Entry is guaranteed to only have one successor (by our cfg design)
-    var currNode: CfgNode = entryNode.succ(intra = true).head
+    val currNode: CfgNode = entryNode.succ(intra = true).head
     visitNode(currNode, newEntry, TrueLiteral)
 
     /** Walk this proc's cfg until we reach the exit node on each branch. We do this recursively, tracking the previous
