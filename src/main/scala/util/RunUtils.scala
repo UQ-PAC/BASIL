@@ -184,7 +184,7 @@ object RunUtils {
     dump_file(printAnalysisResults(cfg, vsaResult), "vsa")
 
     Logger.info("[!] Resolving CFG")
-    val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult.asInstanceOf[Map[CfgNode, Map[Variable, Set[Value]]]], IRProgram)
+    val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult, IRProgram)
     /*
     if (modified) {
       Logger.info(s"[!] Analysing again (iter $iterations)")
@@ -261,7 +261,7 @@ object RunUtils {
 
   def resolveCFG(
       cfg: ProgramCfg,
-      valueSets: Map[CfgNode, Map[Variable, Set[Value]]],
+      valueSets: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]],
       IRProgram: Program
   ): (Program, Boolean) = {
     var modified: Boolean = false
@@ -317,7 +317,7 @@ object RunUtils {
               // We want to replace all possible indirect calls based on this CFG, before regenerating it from the IR
               return
             }
-            val valueSet: Map[Variable, Set[Value]] = valueSets(n)
+            val valueSet = valueSets(n)
             val targetNames = resolveAddresses(valueSet(indirectCall.target)).map(_.name).toList.sorted
             val targets = targetNames.map(name => IRProgram.procedures.filter(_.name.equals(name)).head)
             if (targets.size == 1) {
