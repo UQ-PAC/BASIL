@@ -413,15 +413,15 @@ object RunUtils {
   }
 
   def dump_file(content: String, name: String): Unit = {
-    val outFile = new File(s"$name.txt")
-    val pw = new PrintWriter(outFile, "UTF-8")
+    val outFile = File(s"$name.txt")
+    val pw = PrintWriter(outFile, "UTF-8")
     pw.write(content)
     pw.close()
   }
 
   def dump_plot(content: String, name: String): Unit = {
-    val outFile = new File(s"$name.dot")
-    val pw = new PrintWriter(outFile, "UTF-8")
+    val outFile = File(s"$name.dot")
+    val pw = PrintWriter(outFile, "UTF-8")
     pw.write(content)
     pw.close()
   }
