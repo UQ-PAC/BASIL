@@ -154,7 +154,7 @@ object RunUtils {
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
-    val mraResult = mraSolver.analyze()
+    val mraResult = mraSolver.unliftedAnalyze()
     memoryRegionAnalysisResults = mraResult
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(mraResult, true), Output.dotIder), s"${s}_mra$iteration.dot"))

@@ -202,6 +202,21 @@ trait WorklistFixpointSolverWithReachability[N] extends WorklistFixpointSolver[N
     run(first, intra)
     x
   }
+
+  /**
+   * The transfer function for the sub-sub-lattice. Unlifts the resulting MapLattice[N, LiftLattice[Lattice.sublattice]]
+   * to MapLattice[N, Lattice.sublattice.sublattice].
+   *
+   * @param intra
+   * @return the sub-sub-lattice
+   */
+  def unliftedAnalyze(intra: Boolean): lattice.sublattice.sublattice.Element = {
+    val res: lattice.Element = analyze(intra)
+    // Convert liftedResult to unlifted
+    res.map {
+      case (key, value) => (key, lattice.sublattice.unlift(value))
+    }.asInstanceOf[lattice.sublattice.sublattice.Element]
+  }
 }
 
 /** A pushDown worklist-based fixpoint solvers. Pushes the results of the analysis one node down. This is used to have
