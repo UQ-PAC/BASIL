@@ -153,13 +153,16 @@ object RunUtils {
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
-    val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.analyze(true).asInstanceOf[Map[CfgNode, Set[MemoryRegion]]]
+    val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.unliftedAnalyze(true).asInstanceOf[Map[CfgNode, Map[CfgNode, Set[MemoryRegion]]]].map {
+      case (k, v) => k -> v.values.flatten.toSet
+    }
     memoryRegionAnalysisResults = mraResult
     Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder),
       "mra"
     )
+    println(mraResult)
     println(mraResult.keys)
     println(mraResult.values)
 
