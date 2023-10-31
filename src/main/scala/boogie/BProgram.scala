@@ -9,7 +9,7 @@ trait BDeclaration() {
   def toBoogie: List[String] = List(toString)
 
   val attrString: String = if (attributes.nonEmpty) then {
-    attributes.map(a => s"{${a._1} ${a._2}}").mkString(" ")
+    attributes.map(a => s"{${a._1} ${a._2}}").mkString(" ") + " "
   } else {
     ""
   }

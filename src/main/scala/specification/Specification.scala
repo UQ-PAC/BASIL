@@ -23,7 +23,7 @@ case class SpecGlobal(name: String, override val size: Int, arraySize: Option[In
   override val toAddrVar: BVar = BVariable("$" + s"${name}_addr", BitVecBType(64), Scope.Const)
   override val toOldVar: BVar = BVariable(s"${name}_old", BitVecBType(size), Scope.Local)
   override val toOldGamma: BVar = BVariable(s"Gamma_${name}_old", BoolBType, Scope.Local)
-  val toAxiom: BAxiom = BAxiom(BinaryBExpr(BoolEQ, toAddrVar, BitVecBLiteral(address, 64)), List((":extern", "")))
+  val toAxiom: BAxiom = BAxiom(BinaryBExpr(BoolEQ, toAddrVar, BitVecBLiteral(address, 64)), List.empty)
   override def resolveSpec: BMemoryLoad = BMemoryLoad(
     BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global),
     toAddrVar,
