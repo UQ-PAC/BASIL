@@ -53,20 +53,22 @@ class SystemTests extends AnyFunSuite {
     val csv: String = "testCase," + TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r._1},${r._2.toCsv}").mkString(System.lineSeparator())
     log(csv, testPath + "testResults.csv")
 
+    val numVerified = testResults.count(_._2.verified)
+    val numCounterexample = testResults.count(x => !x._2.verified && !x._2.timedOut)
     val numSuccess = testResults.count(_._2.passed)
     val numFail = testResults.count(!_._2.passed)
     val numTimeout = testResults.count(_._2.timedOut)
     val verifying = testResults.filter(x => !x._2.timedOut && x._2.verified).map(_._2.verifyTime)
     val counterExamples = testResults.filter(x => !x._2.timedOut && !x._2.verified).map(_._2.verifyTime)
 
-    info(s"Test summary: $numSuccess succeeded, $numFail failed (including $numTimeout timeouts).")
+    info(s"Test summary: $numSuccess succeeded, $numFail failed: $numVerified verified, $numCounterexample did not verify (including $numTimeout timeouts).")
     if (verifying.nonEmpty)
       info(s"Average time to verify: ${verifying.sum / verifying.size}")
     if (counterExamples.nonEmpty)
       info(s"Average time to counterexample: ${counterExamples.sum/ counterExamples.size}")
 
-    val summaryHeader = "verifiedCount,counterexampleCount,timeoutCount,verifyTotalTime,counterexampleTotalTime"
-    val summaryRow = s"$numSuccess,${counterExamples.size},$numTimeout,${verifying.sum},${counterExamples.sum}"
+    val summaryHeader = "passedCount,failedCount,verifiedCount,counterexampleCount,timeoutCount,verifyTotalTime,counterexampleTotalTime"
+    val summaryRow = s"$numSuccess,$numFail,$numVerified,${counterExamples.size},$numTimeout,${verifying.sum},${counterExamples.sum}"
     log(summaryHeader + System.lineSeparator() + summaryRow, testPath + "summary.csv")
   }
 
