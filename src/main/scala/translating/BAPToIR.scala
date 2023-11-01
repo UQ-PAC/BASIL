@@ -60,9 +60,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
   }
 
   private def translate(s: BAPStatement) = s match {
-    case b: BAPMemAssign => MemoryAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
+    case b: BAPMemAssign   => MemoryAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
     case b: BAPLocalAssign => LocalAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
-    case _ => throw new Exception("unsupported statement: " + s)
+    case _                 => throw new Exception("unsupported statement: " + s)
   }
 
   private def translate(j: BAPJump) = j match {

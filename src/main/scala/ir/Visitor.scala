@@ -21,12 +21,12 @@ abstract class Visitor {
     node
   }
 
-  def visitAssert(node: Assert): Statement = {
+  def visitAssume(node: Assume): Statement = {
     node.body = visitExpr(node.body)
     node
   }
 
-  def visitAssume(node: Assume): Statement = {
+  def visitAssert(node: Assert): Statement = {
     node.body = visitExpr(node.body)
     node
   }
@@ -206,12 +206,12 @@ abstract class ReadOnlyVisitor extends Visitor {
     node
   }
 
-  override def visitAssert(node: Assert): Statement = {
+  override def visitAssume(node: Assume): Statement = {
     visitExpr(node.body)
     node
   }
 
-  override def visitAssume(node: Assume): Statement = {
+  override def visitAssert(node: Assert): Statement = {
     visitExpr(node.body)
     node
   }

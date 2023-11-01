@@ -231,13 +231,15 @@ object BAPLoader {
   def visitImmDef(ctx: ImmDefContext): BAPLocalAssign = {
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    BAPLocalAssign(visitImmVar(ctx.lhs), visitExp(ctx.rhs), line, insn)
+    val addr = parseFromAttrs(ctx.attrs, "address").map(x => Integer.parseInt(x.stripPrefix("0x"), 16));
+    BAPLocalAssign(visitImmVar(ctx.lhs), visitExp(ctx.rhs), line, insn, addr)
   }
 
   def visitMemDef(ctx: MemDefContext): BAPMemAssign = {
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    BAPMemAssign(visitMemVar(ctx.lhs), visitStore(ctx.rhs), line, insn)
+    val addr = parseFromAttrs(ctx.attrs, "address").map(x => Integer.parseInt(x.stripPrefix("0x"), 16));
+    BAPMemAssign(visitMemVar(ctx.lhs), visitStore(ctx.rhs), line, insn, addr)
   }
 
   def visitQuoteString(ctx: QuoteStringContext): String = ctx.getText.stripPrefix("\"").stripSuffix("\"")
