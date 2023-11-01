@@ -26,7 +26,7 @@ class SystemTests extends AnyFunSuite {
     val csvHeader = "passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"
   }
 
-  val testResults: mutable.Map[String, TestResult] = mutable.HashMap()
+  val testResults: mutable.ArrayBuffer[(String, TestResult)] = mutable.ArrayBuffer()
 
   // get all variations of each program
   for (p <- correctPrograms) {
@@ -115,7 +115,7 @@ class SystemTests extends AnyFunSuite {
     }
     val passed = !timedOut && (verified == shouldVerify)
     val result = TestResult(passed, verified, shouldVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
-    testResults.put(s"$name/$variation", result)
+    testResults.append((s"$name/$variation", result))
     if (!passed) fail(failureMsg)
   }
 
