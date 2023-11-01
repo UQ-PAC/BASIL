@@ -1,44 +1,44 @@
-var {:extern } Gamma_R0: bool;
-var {:extern } Gamma_R10: bool;
-var {:extern } Gamma_R31: bool;
-var {:extern } Gamma_R8: bool;
-var {:extern } Gamma_R9: bool;
-var {:extern } Gamma_mem: [bv64]bool;
-var {:extern } Gamma_stack: [bv64]bool;
-var {:extern } R0: bv64;
-var {:extern } R10: bv64;
-var {:extern } R31: bv64;
-var {:extern } R8: bv64;
-var {:extern } R9: bv64;
-var {:extern } mem: [bv64]bv8;
-var {:extern } stack: [bv64]bv8;
-const {:extern } $secret_addr: bv64;
+var {:extern} Gamma_R0: bool;
+var {:extern} Gamma_R10: bool;
+var {:extern} Gamma_R31: bool;
+var {:extern} Gamma_R8: bool;
+var {:extern} Gamma_R9: bool;
+var {:extern} Gamma_mem: [bv64]bool;
+var {:extern} Gamma_stack: [bv64]bool;
+var {:extern} R0: bv64;
+var {:extern} R10: bv64;
+var {:extern} R31: bv64;
+var {:extern} R8: bv64;
+var {:extern} R9: bv64;
+var {:extern} mem: [bv64]bv8;
+var {:extern} stack: [bv64]bv8;
+const {:extern} $secret_addr: bv64;
 axiom ($secret_addr == 69681bv64);
-const {:extern } $z_addr: bv64;
+const {:extern} $z_addr: bv64;
 axiom ($z_addr == 69682bv64);
-function {:extern } L(memory: [bv64]bv8, index: bv64) returns (bool) {
+function {:extern} L(memory: [bv64]bv8, index: bv64) returns (bool) {
   (if (index == $secret_addr) then false else (if (index == $z_addr) then true else false))
 }
 
-function {:extern } {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
-function {:extern } gamma_load8(gammaMap: [bv64]bool, index: bv64) returns (bool) {
+function {:extern} {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
+function {:extern} gamma_load8(gammaMap: [bv64]bool, index: bv64) returns (bool) {
   gammaMap[index]
 }
 
-function {:extern } gamma_store8(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
+function {:extern} gamma_store8(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
   gammaMap[index := value]
 }
 
-function {:extern } memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
+function {:extern} memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
   memory[index]
 }
 
-function {:extern } memory_store8_le(memory: [bv64]bv8, index: bv64, value: bv8) returns ([bv64]bv8) {
+function {:extern} memory_store8_le(memory: [bv64]bv8, index: bv64, value: bv8) returns ([bv64]bv8) {
   memory[index := value[8:0]]
 }
 
-function {:extern } {:bvbuiltin "zero_extend 56"} zero_extend56_8(bv8) returns (bv64);
-procedure {:extern } rely();
+function {:extern} {:bvbuiltin "zero_extend 56"} zero_extend56_8(bv8) returns (bv64);
+procedure {:extern} rely();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
@@ -79,7 +79,7 @@ procedure {:extern } rely();
   free ensures (memory_load8_le(mem, 69678bv64) == 0bv8);
   free ensures (memory_load8_le(mem, 69679bv64) == 0bv8);
 
-procedure {:extern } rely_transitive()
+procedure {:extern} rely_transitive()
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
@@ -88,9 +88,9 @@ procedure {:extern } rely_transitive()
   call rely();
 }
 
-procedure {:extern } rely_reflexive();
+procedure {:extern} rely_reflexive();
 
-procedure {:extern } guarantee_reflexive();
+procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
 procedure main()
@@ -187,7 +187,7 @@ procedure main()
   free ensures (memory_load8_le(mem, 69679bv64) == 0bv8);
 {
   lmain:
-    assume {:captureState "addr:lmain"} true;
+    assume {:captureState "lmain"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551600bv64), Gamma_R31;
     R8, Gamma_R8 := 69632bv64, true;
     call rely();
