@@ -443,7 +443,10 @@ case class MapUpdate(map: BExpr, index: BExpr, value: BExpr) extends BExpr {
 
 sealed trait FunctionOp
 
-case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BVar) extends FunctionOp
+case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BVar) extends FunctionOp {
+  def attribute: BAttribute = BAttribute("bvbuiltin", Some(s"\"$bvbuiltin\""))
+}
+
 case class MemoryLoadOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int) extends FunctionOp {
   val accesses: Int = bits / valueSize
 

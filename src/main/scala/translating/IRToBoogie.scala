@@ -6,7 +6,7 @@ import specification._
 import scala.collection.mutable.ArrayBuffer
 
 class IRToBoogie(var program: Program, var spec: Specification) {
-  private val externAttr = (":extern", "")
+  private val externAttr = BAttribute("extern")
   private val globals = spec.globals
   private val controls = spec.controls
   private val controlled = spec.controlled
@@ -96,7 +96,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def functionOpToDefinition(f: FunctionOp): BFunction = {
     f match {
-      case b: BVFunctionOp => BFunction(b.name, b.in, b.out, None, List(externAttr, (":bvbuiltin", s"\"${b.bvbuiltin}\"")))
+      case b: BVFunctionOp => BFunction(b.name, b.in, b.out, None, List(externAttr, b.attribute))
       case m: MemoryLoadOp =>
         val memVar = BMapVar("memory", MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize)), Scope.Parameter)
         val indexVar = BParam("index", BitVecBType(m.addressSize))
@@ -313,17 +313,16 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   }
 
 
-  def getCaptureStateStatement(stateName: String): BAssume = {
-    BAssume(TrueBLiteral, None, List((":captureState", s"\"$stateName\"")))
+  def captureStateStatement(stateName: String): BAssume = {
+    BAssume(TrueBLiteral, None, List(BAttribute("captureState", Some(s"\"$stateName\""))))
   }
 
   def translateBlock(b: Block): BBlock = {
-    val cmds = (b.address match {
-      case Some(addr) => List(getCaptureStateStatement(s"addr:${b.label}"))
-      case _ => List.empty
-    }) ++ (b.statements.flatMap(s => translate(s)) ++ b.jumps.flatMap(j => translate(j)))
+    val captureState = captureStateStatement(s"${b.label}")
+    val cmds = List(captureState)
+    ++ (b.statements.flatMap(s => translate(s)) ++ b.jumps.flatMap(j => translate(j)))
 
-    BBlock(b.label, cmds.toList)
+    BBlock(b.label, cmds)
   }
 
   def translate(j: Jump): List[BCmd] = j match {
@@ -379,8 +378,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val rhsGamma = m.rhs.toGamma
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val stateSplit = s match {
-        case MemoryAssign (_,_, Some(label)) => List(getCaptureStateStatement(s"${label}"))
-        case LocalAssign(_,_, Some(label)) => List(getCaptureStateStatement(s"${label}"))
+        case MemoryAssign(_,_, Some(label)) => List(captureStateStatement(s"$label"))
+        case LocalAssign(_,_, Some(label)) => List(captureStateStatement(s"$label"))
         case _ => List.empty
       }
       if (lhs == stack) {
