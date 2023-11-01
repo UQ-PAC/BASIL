@@ -1,69 +1,69 @@
-var {:extern }Gamma_R0: bool;
-var {:extern }Gamma_R1: bool;
-var {:extern }Gamma_R29: bool;
-var {:extern }Gamma_R30: bool;
-var {:extern }Gamma_R31: bool;
-var {:extern }Gamma_mem: [bv64]bool;
-var {:extern }Gamma_stack: [bv64]bool;
-var {:extern }R0: bv64;
-var {:extern }R1: bv64;
-var {:extern }R29: bv64;
-var {:extern }R30: bv64;
-var {:extern }R31: bv64;
-var {:extern }mem: [bv64]bv8;
-var {:extern }stack: [bv64]bv8;
-function {:extern }L(memory: [bv64]bv8, index: bv64) returns (bool) {
+var {:extern } Gamma_R0: bool;
+var {:extern } Gamma_R1: bool;
+var {:extern } Gamma_R29: bool;
+var {:extern } Gamma_R30: bool;
+var {:extern } Gamma_R31: bool;
+var {:extern } Gamma_mem: [bv64]bool;
+var {:extern } Gamma_stack: [bv64]bool;
+var {:extern } R0: bv64;
+var {:extern } R1: bv64;
+var {:extern } R29: bv64;
+var {:extern } R30: bv64;
+var {:extern } R31: bv64;
+var {:extern } mem: [bv64]bv8;
+var {:extern } stack: [bv64]bv8;
+function {:extern } L(memory: [bv64]bv8, index: bv64) returns (bool) {
   false
 }
 
-function {:extern } {:bvbuiltin "bvadd"}bvadd32(bv32, bv32) returns (bv32);
-function {:extern } {:bvbuiltin "bvadd"}bvadd33(bv33, bv33) returns (bv33);
-function {:extern } {:bvbuiltin "bvadd"}bvadd64(bv64, bv64) returns (bv64);
-function {:extern } {:bvbuiltin "bvand"}bvand1(bv1, bv1) returns (bv1);
-function {:extern } {:bvbuiltin "bvcomp"}bvcomp1(bv1, bv1) returns (bv1);
-function {:extern } {:bvbuiltin "bvcomp"}bvcomp32(bv32, bv32) returns (bv1);
-function {:extern } {:bvbuiltin "bvcomp"}bvcomp33(bv33, bv33) returns (bv1);
-function {:extern } {:bvbuiltin "bvnot"}bvnot1(bv1) returns (bv1);
-function {:extern }gamma_load32(gammaMap: [bv64]bool, index: bv64) returns (bool) {
+function {:extern } {:bvbuiltin "bvadd"} bvadd32(bv32, bv32) returns (bv32);
+function {:extern } {:bvbuiltin "bvadd"} bvadd33(bv33, bv33) returns (bv33);
+function {:extern } {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
+function {:extern } {:bvbuiltin "bvand"} bvand1(bv1, bv1) returns (bv1);
+function {:extern } {:bvbuiltin "bvcomp"} bvcomp1(bv1, bv1) returns (bv1);
+function {:extern } {:bvbuiltin "bvcomp"} bvcomp32(bv32, bv32) returns (bv1);
+function {:extern } {:bvbuiltin "bvcomp"} bvcomp33(bv33, bv33) returns (bv1);
+function {:extern } {:bvbuiltin "bvnot"} bvnot1(bv1) returns (bv1);
+function {:extern } gamma_load32(gammaMap: [bv64]bool, index: bv64) returns (bool) {
   (gammaMap[bvadd64(index, 3bv64)] && (gammaMap[bvadd64(index, 2bv64)] && (gammaMap[bvadd64(index, 1bv64)] && gammaMap[index])))
 }
 
-function {:extern }gamma_load64(gammaMap: [bv64]bool, index: bv64) returns (bool) {
+function {:extern } gamma_load64(gammaMap: [bv64]bool, index: bv64) returns (bool) {
   (gammaMap[bvadd64(index, 7bv64)] && (gammaMap[bvadd64(index, 6bv64)] && (gammaMap[bvadd64(index, 5bv64)] && (gammaMap[bvadd64(index, 4bv64)] && (gammaMap[bvadd64(index, 3bv64)] && (gammaMap[bvadd64(index, 2bv64)] && (gammaMap[bvadd64(index, 1bv64)] && gammaMap[index])))))))
 }
 
-function {:extern }gamma_store32(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
+function {:extern } gamma_store32(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
   gammaMap[index := value][bvadd64(index, 1bv64) := value][bvadd64(index, 2bv64) := value][bvadd64(index, 3bv64) := value]
 }
 
-function {:extern }gamma_store64(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
+function {:extern } gamma_store64(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
   gammaMap[index := value][bvadd64(index, 1bv64) := value][bvadd64(index, 2bv64) := value][bvadd64(index, 3bv64) := value][bvadd64(index, 4bv64) := value][bvadd64(index, 5bv64) := value][bvadd64(index, 6bv64) := value][bvadd64(index, 7bv64) := value]
 }
 
-function {:extern }memory_load32_le(memory: [bv64]bv8, index: bv64) returns (bv32) {
+function {:extern } memory_load32_le(memory: [bv64]bv8, index: bv64) returns (bv32) {
   (memory[bvadd64(index, 3bv64)] ++ (memory[bvadd64(index, 2bv64)] ++ (memory[bvadd64(index, 1bv64)] ++ memory[index])))
 }
 
-function {:extern }memory_load64_le(memory: [bv64]bv8, index: bv64) returns (bv64) {
+function {:extern } memory_load64_le(memory: [bv64]bv8, index: bv64) returns (bv64) {
   (memory[bvadd64(index, 7bv64)] ++ (memory[bvadd64(index, 6bv64)] ++ (memory[bvadd64(index, 5bv64)] ++ (memory[bvadd64(index, 4bv64)] ++ (memory[bvadd64(index, 3bv64)] ++ (memory[bvadd64(index, 2bv64)] ++ (memory[bvadd64(index, 1bv64)] ++ memory[index])))))))
 }
 
-function {:extern }memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
+function {:extern } memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
   memory[index]
 }
 
-function {:extern }memory_store32_le(memory: [bv64]bv8, index: bv64, value: bv32) returns ([bv64]bv8) {
+function {:extern } memory_store32_le(memory: [bv64]bv8, index: bv64, value: bv32) returns ([bv64]bv8) {
   memory[index := value[8:0]][bvadd64(index, 1bv64) := value[16:8]][bvadd64(index, 2bv64) := value[24:16]][bvadd64(index, 3bv64) := value[32:24]]
 }
 
-function {:extern }memory_store64_le(memory: [bv64]bv8, index: bv64, value: bv64) returns ([bv64]bv8) {
+function {:extern } memory_store64_le(memory: [bv64]bv8, index: bv64, value: bv64) returns ([bv64]bv8) {
   memory[index := value[8:0]][bvadd64(index, 1bv64) := value[16:8]][bvadd64(index, 2bv64) := value[24:16]][bvadd64(index, 3bv64) := value[32:24]][bvadd64(index, 4bv64) := value[40:32]][bvadd64(index, 5bv64) := value[48:40]][bvadd64(index, 6bv64) := value[56:48]][bvadd64(index, 7bv64) := value[64:56]]
 }
 
-function {:extern } {:bvbuiltin "sign_extend 1"}sign_extend1_32(bv32) returns (bv33);
-function {:extern } {:bvbuiltin "zero_extend 1"}zero_extend1_32(bv32) returns (bv33);
-function {:extern } {:bvbuiltin "zero_extend 32"}zero_extend32_32(bv32) returns (bv64);
-procedure {:extern }rely();
+function {:extern } {:bvbuiltin "sign_extend 1"} sign_extend1_32(bv32) returns (bv33);
+function {:extern } {:bvbuiltin "zero_extend 1"} zero_extend1_32(bv32) returns (bv33);
+function {:extern } {:bvbuiltin "zero_extend 32"} zero_extend32_32(bv32) returns (bv64);
+procedure {:extern } rely();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
@@ -104,7 +104,7 @@ procedure {:extern }rely();
   free ensures (memory_load8_le(mem, 69646bv64) == 0bv8);
   free ensures (memory_load8_le(mem, 69647bv64) == 0bv8);
 
-procedure {:extern }rely_transitive()
+procedure {:extern } rely_transitive()
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
@@ -113,9 +113,9 @@ procedure {:extern }rely_transitive()
   call rely();
 }
 
-procedure {:extern }rely_reflexive();
+procedure {:extern } rely_reflexive();
 
-procedure {:extern }guarantee_reflexive();
+procedure {:extern } guarantee_reflexive();
   modifies Gamma_mem, mem;
 
 procedure add_six()
@@ -194,7 +194,7 @@ procedure add_six()
   free ensures (memory_load8_le(mem, 69647bv64) == 0bv8);
 {
   ladd_six:
-    assume {:captureState "addr:0x738"}true;
+    assume {:captureState "addr:ladd_six"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 16bv64), Gamma_R0;
     call rely();
@@ -205,7 +205,7 @@ procedure add_six()
     call rely();
     assert (L(mem, R0) ==> Gamma_R1);
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
-    assume {:captureState "addr:0x750"}true;
+    assume {:captureState "%0000126c"} true;
     return;
 }
 
@@ -285,7 +285,7 @@ procedure add_two()
   free ensures (memory_load8_le(mem, 69647bv64) == 0bv8);
 {
   ladd_two:
-    assume {:captureState "addr:0x714"}true;
+    assume {:captureState "addr:ladd_two"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 16bv64), Gamma_R0;
     call rely();
@@ -296,7 +296,7 @@ procedure add_two()
     call rely();
     assert (L(mem, R0) ==> Gamma_R1);
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
-    assume {:captureState "addr:0x72c"}true;
+    assume {:captureState "%0000123a"} true;
     return;
 }
 
@@ -455,18 +455,18 @@ procedure main()
   var VF: bv1;
   var ZF: bv1;
   lmain:
-    assume {:captureState "addr:0x780"}true;
+    assume {:captureState "addr:lmain"} true;
     #4, Gamma_#4 := bvadd64(R31, 18446744073709551584bv64), Gamma_R31;
     stack, Gamma_stack := memory_store64_le(stack, #4, R29), gamma_store64(Gamma_stack, #4, Gamma_R29);
-    assume {:captureState "addr:0x780"}true;
+    assume {:captureState "%000012b1"} true;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(#4, 8bv64), R30), gamma_store64(Gamma_stack, bvadd64(#4, 8bv64), Gamma_R30);
-    assume {:captureState "addr:0x780"}true;
+    assume {:captureState "%000012b7"} true;
     R31, Gamma_R31 := #4, Gamma_#4;
     R29, Gamma_R29 := R31, Gamma_R31;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 28bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 28bv64), Gamma_R0);
-    assume {:captureState "addr:0x788"}true;
+    assume {:captureState "%000012c9"} true;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 16bv64), R1), gamma_store64(Gamma_stack, bvadd64(R31, 16bv64), Gamma_R1);
-    assume {:captureState "addr:0x78c"}true;
+    assume {:captureState "%000012d1"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #5, Gamma_#5 := bvadd32(R0[32:0], 4294967284bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#5, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934581bv33))), (Gamma_R0 && Gamma_#5);
@@ -479,7 +479,7 @@ procedure main()
     }
     goto l0000133b;
   l0000133b:
-    assume {:captureState "addr:0x79c"}true;
+    assume {:captureState "addr:l0000133b"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #6, Gamma_#6 := bvadd32(R0[32:0], 4294967284bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#6, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934581bv33))), (Gamma_R0 && Gamma_#6);
@@ -492,7 +492,7 @@ procedure main()
     }
     goto l00001363;
   l00001363:
-    assume {:captureState "addr:0x7a8"}true;
+    assume {:captureState "addr:l00001363"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #7, Gamma_#7 := bvadd32(R0[32:0], 4294967285bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#7, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934582bv33))), (Gamma_R0 && Gamma_#7);
@@ -505,35 +505,35 @@ procedure main()
     }
     goto l0000139e;
   l00001384:
-    assume {:captureState "addr:0x8ec"}true;
+    assume {:captureState "addr:l00001384"} true;
     R30, Gamma_R30 := 2288bv64, true;
     call sub_seven();
     goto l00001390;
   l00001390:
-    assume {:captureState "addr:0x8f0"}true;
+    assume {:captureState "addr:l00001390"} true;
     R30, Gamma_R30 := 2292bv64, true;
     call add_two();
     goto l00001397;
   l00001397:
-    assume {:captureState "addr:0x8f4"}true;
+    assume {:captureState "addr:l00001397"} true;
     R30, Gamma_R30 := 2296bv64, true;
     call add_six();
     goto l000012f4;
   l000012f4:
-    assume {:captureState "addr:0x8f8"}true;
+    assume {:captureState "addr:l000012f4"} true;
     R30, Gamma_R30 := 2300bv64, true;
     call sub_seven();
     goto l00001300;
   l00001300:
-    assume {:captureState "addr:0x8fc"}true;
+    assume {:captureState "addr:l00001300"} true;
     R30, Gamma_R30 := 2304bv64, true;
     call add_two();
     goto l00001307;
   l00001307:
-    assume {:captureState "addr:0x900"}true;
+    assume {:captureState "addr:l00001307"} true;
     goto l00001308;
   l0000139e:
-    assume {:captureState "addr:0x7b4"}true;
+    assume {:captureState "addr:l0000139e"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #8, Gamma_#8 := bvadd32(R0[32:0], 4294967285bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#8, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934582bv33))), (Gamma_R0 && Gamma_#8);
@@ -546,7 +546,7 @@ procedure main()
     }
     goto l000013c6;
   l000013c6:
-    assume {:captureState "addr:0x7c0"}true;
+    assume {:captureState "addr:l000013c6"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #9, Gamma_#9 := bvadd32(R0[32:0], 4294967286bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#9, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934583bv33))), (Gamma_R0 && Gamma_#9);
@@ -559,20 +559,20 @@ procedure main()
     }
     goto l000013fe;
   l000013e7:
-    assume {:captureState "addr:0x8e0"}true;
+    assume {:captureState "addr:l000013e7"} true;
     R30, Gamma_R30 := 2276bv64, true;
     call add_two();
     goto l000013f3;
   l000013f3:
-    assume {:captureState "addr:0x8e4"}true;
+    assume {:captureState "addr:l000013f3"} true;
     R30, Gamma_R30 := 2280bv64, true;
     call add_six();
     goto l000013fa;
   l000013fa:
-    assume {:captureState "addr:0x8e8"}true;
+    assume {:captureState "addr:l000013fa"} true;
     goto l00001308;
   l000013fe:
-    assume {:captureState "addr:0x7cc"}true;
+    assume {:captureState "addr:l000013fe"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #10, Gamma_#10 := bvadd32(R0[32:0], 4294967286bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#10, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934583bv33))), (Gamma_R0 && Gamma_#10);
@@ -585,7 +585,7 @@ procedure main()
     }
     goto l00001426;
   l00001426:
-    assume {:captureState "addr:0x7d8"}true;
+    assume {:captureState "addr:l00001426"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #11, Gamma_#11 := bvadd32(R0[32:0], 4294967287bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#11, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934584bv33))), (Gamma_R0 && Gamma_#11);
@@ -598,7 +598,7 @@ procedure main()
     }
     goto l0000145e;
   l0000145e:
-    assume {:captureState "addr:0x7e4"}true;
+    assume {:captureState "addr:l0000145e"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #12, Gamma_#12 := bvadd32(R0[32:0], 4294967287bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#12, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934584bv33))), (Gamma_R0 && Gamma_#12);
@@ -611,7 +611,7 @@ procedure main()
     }
     goto l00001486;
   l00001486:
-    assume {:captureState "addr:0x7f0"}true;
+    assume {:captureState "addr:l00001486"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #13, Gamma_#13 := bvadd32(R0[32:0], 4294967288bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#13, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934585bv33))), (Gamma_R0 && Gamma_#13);
@@ -624,7 +624,7 @@ procedure main()
     }
     goto l000014b3;
   l000014b3:
-    assume {:captureState "addr:0x7fc"}true;
+    assume {:captureState "addr:l000014b3"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #14, Gamma_#14 := bvadd32(R0[32:0], 4294967288bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#14, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934585bv33))), (Gamma_R0 && Gamma_#14);
@@ -637,7 +637,7 @@ procedure main()
     }
     goto l000014db;
   l000014db:
-    assume {:captureState "addr:0x808"}true;
+    assume {:captureState "addr:l000014db"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #15, Gamma_#15 := bvadd32(R0[32:0], 4294967289bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#15, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934586bv33))), (Gamma_R0 && Gamma_#15);
@@ -650,7 +650,7 @@ procedure main()
     }
     goto l00001508;
   l00001508:
-    assume {:captureState "addr:0x814"}true;
+    assume {:captureState "addr:l00001508"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #16, Gamma_#16 := bvadd32(R0[32:0], 4294967289bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#16, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934586bv33))), (Gamma_R0 && Gamma_#16);
@@ -663,7 +663,7 @@ procedure main()
     }
     goto l00001530;
   l00001530:
-    assume {:captureState "addr:0x820"}true;
+    assume {:captureState "addr:l00001530"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #17, Gamma_#17 := bvadd32(R0[32:0], 4294967290bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#17, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934587bv33))), (Gamma_R0 && Gamma_#17);
@@ -676,40 +676,40 @@ procedure main()
     }
     goto l00001564;
   l00001551:
-    assume {:captureState "addr:0x8c4"}true;
+    assume {:captureState "addr:l00001551"} true;
     R30, Gamma_R30 := 2248bv64, true;
     call add_six();
     goto l0000155d;
   l0000155d:
-    assume {:captureState "addr:0x8c8"}true;
+    assume {:captureState "addr:l0000155d"} true;
     R30, Gamma_R30 := 2252bv64, true;
     call add_two();
     goto l000014fc;
   l000014fc:
-    assume {:captureState "addr:0x8cc"}true;
+    assume {:captureState "addr:l000014fc"} true;
     R30, Gamma_R30 := 2256bv64, true;
     call add_six();
     goto l000014a7;
   l000014a7:
-    assume {:captureState "addr:0x8d0"}true;
+    assume {:captureState "addr:l000014a7"} true;
     R30, Gamma_R30 := 2260bv64, true;
     call sub_seven();
     goto l00001447;
   l00001447:
-    assume {:captureState "addr:0x8d4"}true;
+    assume {:captureState "addr:l00001447"} true;
     R30, Gamma_R30 := 2264bv64, true;
     call sub_seven();
     goto l00001453;
   l00001453:
-    assume {:captureState "addr:0x8d8"}true;
+    assume {:captureState "addr:l00001453"} true;
     R30, Gamma_R30 := 2268bv64, true;
     call add_six();
     goto l0000145a;
   l0000145a:
-    assume {:captureState "addr:0x8dc"}true;
+    assume {:captureState "addr:l0000145a"} true;
     goto l00001308;
   l00001564:
-    assume {:captureState "addr:0x82c"}true;
+    assume {:captureState "addr:l00001564"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #18, Gamma_#18 := bvadd32(R0[32:0], 4294967290bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#18, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934587bv33))), (Gamma_R0 && Gamma_#18);
@@ -722,7 +722,7 @@ procedure main()
     }
     goto l0000158c;
   l0000158c:
-    assume {:captureState "addr:0x838"}true;
+    assume {:captureState "addr:l0000158c"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #19, Gamma_#19 := bvadd32(R0[32:0], 4294967291bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#19, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934588bv33))), (Gamma_R0 && Gamma_#19);
@@ -735,15 +735,15 @@ procedure main()
     }
     goto l000015bd;
   l000015ad:
-    assume {:captureState "addr:0x8bc"}true;
+    assume {:captureState "addr:l000015ad"} true;
     R30, Gamma_R30 := 2240bv64, true;
     call add_six();
     goto l000015b9;
   l000015b9:
-    assume {:captureState "addr:0x8c0"}true;
+    assume {:captureState "addr:l000015b9"} true;
     goto l00001308;
   l000015bd:
-    assume {:captureState "addr:0x844"}true;
+    assume {:captureState "addr:l000015bd"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #20, Gamma_#20 := bvadd32(R0[32:0], 4294967291bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#20, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934588bv33))), (Gamma_R0 && Gamma_#20);
@@ -756,7 +756,7 @@ procedure main()
     }
     goto l000015e5;
   l000015e5:
-    assume {:captureState "addr:0x850"}true;
+    assume {:captureState "addr:l000015e5"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #21, Gamma_#21 := bvadd32(R0[32:0], 4294967292bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#21, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934589bv33))), (Gamma_R0 && Gamma_#21);
@@ -769,20 +769,20 @@ procedure main()
     }
     goto l0000161d;
   l00001606:
-    assume {:captureState "addr:0x8b0"}true;
+    assume {:captureState "addr:l00001606"} true;
     R30, Gamma_R30 := 2228bv64, true;
     call add_two();
     goto l00001612;
   l00001612:
-    assume {:captureState "addr:0x8b4"}true;
+    assume {:captureState "addr:l00001612"} true;
     R30, Gamma_R30 := 2232bv64, true;
     call sub_seven();
     goto l00001619;
   l00001619:
-    assume {:captureState "addr:0x8b8"}true;
+    assume {:captureState "addr:l00001619"} true;
     goto l00001308;
   l0000161d:
-    assume {:captureState "addr:0x85c"}true;
+    assume {:captureState "addr:l0000161d"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #22, Gamma_#22 := bvadd32(R0[32:0], 4294967292bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#22, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934589bv33))), (Gamma_R0 && Gamma_#22);
@@ -795,7 +795,7 @@ procedure main()
     }
     goto l00001645;
   l00001645:
-    assume {:captureState "addr:0x868"}true;
+    assume {:captureState "addr:l00001645"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #23, Gamma_#23 := bvadd32(R0[32:0], 4294967293bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#23, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934590bv33))), (Gamma_R0 && Gamma_#23);
@@ -808,7 +808,7 @@ procedure main()
     }
     goto l00001676;
   l00001676:
-    assume {:captureState "addr:0x874"}true;
+    assume {:captureState "addr:l00001676"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #24, Gamma_#24 := bvadd32(R0[32:0], 4294967293bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#24, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934590bv33))), (Gamma_R0 && Gamma_#24);
@@ -821,7 +821,7 @@ procedure main()
     }
     goto l0000169e;
   l0000169e:
-    assume {:captureState "addr:0x880"}true;
+    assume {:captureState "addr:l0000169e"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #25, Gamma_#25 := bvadd32(R0[32:0], 4294967295bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#25, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 0bv33))), (Gamma_R0 && Gamma_#25);
@@ -834,15 +834,15 @@ procedure main()
     }
     goto l000016d6;
   l000016bf:
-    assume {:captureState "addr:0x89c"}true;
+    assume {:captureState "addr:l000016bf"} true;
     R30, Gamma_R30 := 2208bv64, true;
     call add_two();
     goto l000016cb;
   l000016cb:
-    assume {:captureState "addr:0x8a0"}true;
+    assume {:captureState "addr:l000016cb"} true;
     goto l00001308;
   l000016d6:
-    assume {:captureState "addr:0x88c"}true;
+    assume {:captureState "addr:l000016d6"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
     #26, Gamma_#26 := bvadd32(R0[32:0], 4294967294bv32), Gamma_R0;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#26, 1bv32)), bvadd33(sign_extend1_32(R0[32:0]), 8589934591bv33))), (Gamma_R0 && Gamma_#26);
@@ -855,34 +855,34 @@ procedure main()
     }
     goto l000016fc;
   l000016cf:
-    assume {:captureState "addr:0x8a4"}true;
+    assume {:captureState "addr:l000016cf"} true;
     R30, Gamma_R30 := 2216bv64, true;
     call add_six();
     goto l00001666;
   l00001666:
-    assume {:captureState "addr:0x8a8"}true;
+    assume {:captureState "addr:l00001666"} true;
     R30, Gamma_R30 := 2220bv64, true;
     call sub_seven();
     goto l00001672;
   l00001672:
-    assume {:captureState "addr:0x8ac"}true;
+    assume {:captureState "addr:l00001672"} true;
     goto l00001308;
   l00001308:
-    assume {:captureState "addr:0x90c"}true;
+    assume {:captureState "addr:l00001308"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 16bv64), Gamma_R0;
     call rely();
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
     goto l0000131d;
   l000016fc:
-    assume {:captureState "addr:0x898"}true;
+    assume {:captureState "addr:l000016fc"} true;
     goto l00001332;
   l00001332:
-    assume {:captureState "addr:0x904"}true;
+    assume {:captureState "addr:l00001332"} true;
     R0, Gamma_R0 := 1bv64, true;
     goto l0000131d;
   l0000131d:
-    assume {:captureState "addr:0x918"}true;
+    assume {:captureState "addr:l0000131d"} true;
     R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
     R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
@@ -965,7 +965,7 @@ procedure sub_seven()
   free ensures (memory_load8_le(mem, 69647bv64) == 0bv8);
 {
   lsub_seven:
-    assume {:captureState "addr:0x75c"}true;
+    assume {:captureState "addr:lsub_seven"} true;
     R0, Gamma_R0 := 69632bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 16bv64), Gamma_R0;
     call rely();
@@ -976,6 +976,6 @@ procedure sub_seven()
     call rely();
     assert (L(mem, R0) ==> Gamma_R1);
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
-    assume {:captureState "addr:0x774"}true;
+    assume {:captureState "%0000129e"} true;
     return;
 }
