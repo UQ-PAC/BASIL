@@ -32,7 +32,7 @@ trait BAPAssign(lhs: BAPVariable, rhs: BAPExpr, line: String, instruction: Strin
 
 /** Memory store
   */
-case class BAPMemAssign(lhs: BAPMemory, rhs: BAPStore, line: String, instruction: String)
+case class BAPMemAssign(lhs: BAPMemory, rhs: BAPStore, line: String, instruction: String, address: Option[Int] = None)
     extends BAPAssign(lhs, rhs, line, instruction)
 
 /*
@@ -47,5 +47,5 @@ case object BAPMemAssign {
 }
  */
 
-case class BAPLocalAssign(lhs: BAPVar, rhs: BAPExpr, line: String, instruction: String)
+case class BAPLocalAssign(lhs: BAPVar, rhs: BAPExpr, line: String, instruction: String, address: Option[Int] = None)
     extends BAPAssign(lhs, rhs, line, instruction)
