@@ -45,8 +45,6 @@ updateExpected := {
         val name = e.getName
         val outPath = v / (name + ".bpl")
         val expectedPath = v / (name + ".expected")
-        val ILOutPath = v / (name + "-before-analysis.il")
-        val ILExpectedPath = v / (name + "-before-analysis.il.expected")
         val resultPath = v / (name + "_result.txt")
         if (resultPath.exists()) {
           val result = IO.read(resultPath)
@@ -54,9 +52,6 @@ updateExpected := {
           if (verified == shouldVerify) {
             if (outPath.exists() && !(expectedPath.exists() && filesContentEqual(outPath, expectedPath))) {
               IO.copyFile(outPath, expectedPath)
-            }
-            if (ILOutPath.exists() && !(ILExpectedPath.exists() && filesContentEqual(ILExpectedPath, ILOutPath))) {
-              IO.copyFile(ILOutPath, ILExpectedPath)
             }
           }
         }
