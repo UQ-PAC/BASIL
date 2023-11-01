@@ -23,7 +23,9 @@ object Main {
       @arg(name = "spec", short = 's', doc = "BASIL specification file.")
       specFileName: Option[String],
       @arg(name = "output", short = 'o', doc = "Boogie output destination file.")
-      outFileName: String = "boogie_out.bpl",
+      outFileName: String = "basil-out",
+      @arg(name = "boogie-use-lambda-stores", doc = "Use lambda representation of store operations.")
+      lambdaStores: Flag,
       @arg(name = "verbose", short = 'v', doc = "Show extra debugging logs.")
       verbose: Flag,
       @arg(name = "analyse", doc = "Run static analysis pass.")
@@ -31,7 +33,7 @@ object Main {
       @arg(name = "interpret", doc = "Run BASIL IL interpreter.")
       interpret: Flag,
       @arg(name = "dump-il", doc = "Dump the Intermediate Language to text.")
-      dumpIL: Flag,
+      dumpIL: Option[String],
       @arg(name = "help", short = 'h', doc = "Show this help message.")
       help: Flag
   )
@@ -57,15 +59,15 @@ object Main {
       Logger.setLevel(LogLevel.DEBUG)
     }
 
-    val program: BProgram = RunUtils.loadAndTranslate(
-      conf.adtFileName,
-      conf.relfFileName,
-      conf.specFileName,
-      conf.analyse.value,
-      conf.interpret.value,
-      conf.dumpIL.value
+    val q = BASILConfig(
+      loading = ILLoadingConfig(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.dumpIL),
+      runInterpret = conf.interpret.value,
+      staticAnalysis =  if (conf.analyse.value) then Some(StaticAnalysisConfig(conf.dumpIL)) else None,
+      boogieTranslation = BoogieGeneratorConfig(if (conf.lambdaStores.value) then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect),
+      outputPrefix = conf.outFileName
     )
-    RunUtils.writeToFile(program, conf.outFileName)
+
+    RunUtils.run(q);
   }
 
 }
