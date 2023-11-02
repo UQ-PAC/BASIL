@@ -146,24 +146,22 @@ object RunUtils {
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationAnalysis.WorklistSolver(cfg)
     val constPropResult: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = constPropSolver.analyze(true)
-    /*
     Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder),
       "cpa"
     )
-    */
     dump_file(printAnalysisResults(cfg, constPropResult), "cpa")
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
     val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.analyze(true)
     memoryRegionAnalysisResults = mraResult
-    /* Output.output(
+    Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder),
       "mra"
-    )*/
+    )
     dump_file(printAnalysisResults(cfg, mraResult), "mra")
 
     Logger.info("[!] Running MMM")
@@ -174,13 +172,11 @@ object RunUtils {
     val vsaSolver =
       ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
     val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]  = vsaSolver.analyze(false)
-    /*
     Output.output(
       OtherOutput(OutputKindE.cfg),
       cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder),
       "vsa"
     )
-    */
     dump_file(printAnalysisResults(cfg, vsaResult), "vsa")
 
     Logger.info("[!] Resolving CFG")
