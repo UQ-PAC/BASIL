@@ -822,7 +822,7 @@ class ProgramCfgFactory:
             val calls = jmps.filter(_.isInstanceOf[DirectCall]).map(x => CfgJumpNode(data = x, block = block, parent = funcEntryNode))
 
             calls.foreach(node => {
-              cfg.addEdge(precNode, node, node.data.asInstanceOf[DirectCall].condition.getOrElse(TrueLiteral))
+              cfg.addEdge(precNode, node)
 
               procToCalls(proc) += node
               procToCallers(targetProc) += node
@@ -973,15 +973,10 @@ class ProgramCfgFactory:
         case targetCall: DirectCall =>
           // Retrieve information about the call to the target procedure
           val targetProc: Procedure = targetCall.target
-          val targetCond: Expr = targetCall.condition match {
-            case Some(c) => c
-            case None    => TrueLiteral
-          }
-
           val (procEntry, procExit) = cloneProcedureCFG(targetProc)
 
           // Add link between call node and the procedure's `Entry`.
-          cfg.addInlineEdge(procNode, procEntry, targetCond)
+          cfg.addInlineEdge(procNode, procEntry)
 
           // Link the procedure's `Exit` to the return point. There should only be one.
           assert(
@@ -1014,15 +1009,11 @@ class ProgramCfgFactory:
       procNode.data match {
         case targetCall: DirectCall => // Retrieve information about the call to the target procedure
           val targetProc: Procedure = targetCall.target
-          val targetCond: Expr = targetCall.condition match {
-            case Some(c) => c
-            case None    => TrueLiteral
-          }
 
           val (procEntry, procExit) = procToCfg(targetProc)
 
           // Add link between call node and the procedure's `Entry`.
-          cfg.addInlineEdge(procNode, procEntry, targetCond)
+          cfg.addInlineEdge(procNode, procEntry)
 
           // Link the procedure's `Exit` to the return point. There should only be one.
           assert(
@@ -1127,17 +1118,12 @@ class ProgramCfgFactory:
       callNode.data match {
         case targetCall: DirectCall =>
           val targetProc: Procedure = targetCall.target
-          val targetCond: Expr = targetCall.condition match {
-            case Some(c) => c
-            case None    => TrueLiteral
-          }
-
           // We don't care about returns, as this is context dependent. It is up to the caller
           //  (in our case, the analyses) to keep track of context so that it knows where to return to
           //  at the exit of the target procedure
           val (targetEntry: CfgFunctionEntryNode, _) = procToCfg(targetProc)
 
-          cfg.addInterprocCallEdge(callNode, targetEntry, targetCond)
+          cfg.addInterprocCallEdge(callNode, targetEntry)
         case _ =>
       }
     }

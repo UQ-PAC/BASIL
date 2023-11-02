@@ -339,27 +339,22 @@ object RunUtils {
             val targets = targetNames.map(name => IRProgram.procedures.filter(_.name.equals(name)).head)
             if (targets.size == 1) {
               modified = true
-              val newCall = DirectCall(targets.head, indirectCall.condition, indirectCall.returnTarget)
+              val newCall = DirectCall(targets.head, indirectCall.returnTarget)
               block.jumps.remove(block.jumps.indexOf(indirectCall))
               block.jumps.append(newCall)
             } else if (targets.size > 1) {
               modified = true
               val procedure = c.parent.data
-              indirectCall.condition match {
-                // it doesn't seem like calls can actually have conditions in the ARM64 instruction set
-                case Some(_) => throw Exception("indirect call has a condition")
-                case None =>
-                  val newBlocks = for (t <- targets) yield {
-                    val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
-                    val newLabel: String = block.label + t.name
-                    val directCall = DirectCall(t, None, indirectCall.returnTarget)
-                    Block(newLabel, None, ArrayBuffer(assume), ArrayBuffer(directCall))
-                  }
-                  procedure.blocks.addAll(newBlocks)
-                  block.jumps.remove(block.jumps.indexOf(indirectCall))
-                  val newCall = NonDetGoTo(newBlocks)
-                  block.jumps.append(newCall)
+              val newBlocks = for (t <- targets) yield {
+                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
+                val newLabel: String = block.label + t.name
+                val directCall = DirectCall(t, indirectCall.returnTarget)
+                Block(newLabel, None, ArrayBuffer(assume), ArrayBuffer(directCall))
               }
+              procedure.blocks.addAll(newBlocks)
+              block.jumps.remove(block.jumps.indexOf(indirectCall))
+              val newCall = NonDetGoTo(newBlocks)
+              block.jumps.append(newCall)
             }
           case _ =>
       case _ =>

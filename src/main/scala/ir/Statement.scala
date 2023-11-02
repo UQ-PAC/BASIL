@@ -85,27 +85,27 @@ class NonDetGoTo(var targets: Seq[Block], override val label: Option[String] = N
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitNonDetGoTo(this)
 }
 
-class DirectCall(var target: Procedure, var condition: Option[Expr], var returnTarget: Option[Block], override val label: Option[String] = None) extends Jump {
+class DirectCall(var target: Procedure, var returnTarget: Option[Block], override val label: Option[String] = None) extends Jump {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
   } */
   override def calls: Set[Procedure] = Set(target)
-  override def toString: String = s"${labelStr}DirectCall(${target.name}, $condition, ${returnTarget.map(_.label)})"
+  override def toString: String = s"${labelStr}DirectCall(${target.name}, ${returnTarget.map(_.label)})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitDirectCall(this)
 }
 
 object DirectCall:
-  def unapply(i: DirectCall): Option[(Procedure, Option[Expr], Option[Block], Option[String])] = Some(i.target, i.condition, i.returnTarget, i.label)
+  def unapply(i: DirectCall): Option[(Procedure, Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
 
-class IndirectCall(var target: Variable, var condition: Option[Expr], var returnTarget: Option[Block], override val label: Option[String] = None) extends Jump {
+class IndirectCall(var target: Variable, var returnTarget: Option[Block], override val label: Option[String] = None) extends Jump {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)
   } */
-  override def toString: String = s"${labelStr}IndirectCall($target, $condition, ${returnTarget.map(_.label)})"
+  override def toString: String = s"${labelStr}IndirectCall($target, ${returnTarget.map(_.label)})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitIndirectCall(this)
 }
 
 object IndirectCall:
-  def unapply(i: IndirectCall): Option[(Variable, Option[Expr], Option[Block], Option[String])] = Some(i.target, i.condition, i.returnTarget, i.label)
+  def unapply(i: IndirectCall): Option[(Variable, Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)

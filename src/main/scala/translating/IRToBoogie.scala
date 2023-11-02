@@ -332,17 +332,10 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         case Some(r) => List(GoToCmd(Seq(r.label)))
         case None    => List(Comment("no return target"), BAssume(FalseBLiteral))
       }
-      d.condition match {
-        case Some(c) =>
-          val guard = c.toBoogie
-          val guardGamma = c.toGamma
-          List(BAssert(guardGamma), IfCmd(guard, call ++ returnTarget))
-        case None =>
-          call ++ returnTarget
-      }
+      call ++ returnTarget
     case i: IndirectCall =>
       // TODO put this elsewhere
-      val call: List[BCmd] = if (i.target.name == "R30") {
+      if (i.target.name == "R30") {
         List(ReturnCmd)
       } else {
         val unresolved: List[BCmd] = List(Comment(s"UNRESOLVED: call ${i.target.name}"), BAssert(FalseBLiteral))
@@ -350,14 +343,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           case Some(r) => unresolved :+ GoToCmd(Seq(r.label))
           case None    => unresolved ++ List(Comment("no return target"), BAssume(FalseBLiteral))
         }
-      }
-      i.condition match {
-        case Some(c) =>
-          val guard = c.toBoogie
-          val guardGamma = c.toGamma
-          List(BAssert(guardGamma), IfCmd(guard, call))
-        case None =>
-          call
       }
     case g: GoTo =>
       g.condition match {

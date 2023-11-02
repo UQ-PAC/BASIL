@@ -76,9 +76,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
     program ++= "DirectCall("
     program ++= procedureIdentifier(node.target)
     program ++= ", "
-    program ++= "condition("
-    node.condition.map(visitExpr)
-    program ++= ")" // Condition
     program ++= ")" // DirectCall
     node
   }
@@ -87,9 +84,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
     program ++= "IndirectCall("
     visitVariable(node.target)
     program ++= ", "
-    program ++= "condition("
-    node.condition.map(visitExpr)
-    program ++= ")" // Condition
     program ++= ")" // IndirectCall
     node
   }

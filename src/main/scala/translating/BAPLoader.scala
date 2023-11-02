@@ -113,7 +113,8 @@ object BAPLoader {
     }
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    BAPIndirectCall(visitImmVar(ctx.callee.immVar), visitExp(ctx.cond), returnTarget, line, insn)
+    checkCondition(ctx.cond, ctx)
+    BAPIndirectCall(visitImmVar(ctx.callee.immVar), returnTarget, line, insn)
   }
 
   def visitDirectCall(ctx: DirectCallContext): BAPDirectCall = {
@@ -123,13 +124,22 @@ object BAPLoader {
     }
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
+    checkCondition(ctx.cond, ctx)
     BAPDirectCall(
       parseAllowed(visitQuoteString(ctx.callee.tid.name).stripPrefix("@")),
-      visitExp(ctx.cond),
       returnTarget,
       line,
       insn
     )
+  }
+
+  def checkCondition(condition: ExpContext, ctx: JmpContext): Unit = {
+    val conditionParsed = visitExp(condition)
+    if (conditionParsed != BAPLiteral(1, 1)) {
+      // If this is thrown then we have will have to actually support BAP giving calls (as opposed to gotos).
+      // This is not something that it seems like the ARM64 instruction set should produce.
+      throw BAPCallConditionParsingException(s"Error parsing BAP at \"${ctx.getText}\": call contains non-true condition: \"${condition.getText}\", parsed as $conditionParsed")
+    }
   }
 
   def visitGotoJmp(ctx: GotoJmpContext): BAPGoTo = {
@@ -269,5 +279,14 @@ object BAPLoader {
 
   val allowedChars: Set[Char] =
     Set('_', '\'', '~', '#', '$', '^', '_', '.', '?', '`') ++ ('A' to 'Z') ++ ('a' to 'z') ++ ('0' to '9')
+
+  class BAPCallConditionParsingException(message: String)
+    extends Exception(message) {
+
+    def this(message: String, cause: Throwable) = {
+      this(message)
+      initCause(cause)
+    }
+  }
 
 }

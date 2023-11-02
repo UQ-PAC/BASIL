@@ -1,10 +1,9 @@
 package bap
 
-trait BAPJump
+sealed trait BAPJump
 
 case class BAPDirectCall(
     target: String,
-    condition: BAPExpr,
     returnTarget: Option[String],
     line: String,
     instruction: String
@@ -12,7 +11,6 @@ case class BAPDirectCall(
 
 case class BAPIndirectCall(
     target: BAPVar,
-    condition: BAPExpr,
     returnTarget: Option[String],
     line: String,
     instruction: String
@@ -20,11 +18,7 @@ case class BAPIndirectCall(
 
 case class BAPGoTo(target: String, condition: BAPExpr, line: String, instruction: String) extends BAPJump
 
-trait BAPStatement
-
-case class BAPSkip(line: String, instruction: String) extends BAPStatement {
-  override def toString: String = "skip;"
-}
+sealed trait BAPStatement
 
 trait BAPAssign(lhs: BAPVariable, rhs: BAPExpr, line: String, instruction: String) extends BAPStatement {
   override def toString: String = String.format("%s := %s;", lhs, rhs)
