@@ -15,6 +15,7 @@ samples/const_prop_tests/
 src/main/antlr4/.antlr
 *.bpl
 *.dot
+*.il
 *.txt
 examplesold/
 src/test/scala/dump/

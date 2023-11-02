@@ -3,6 +3,7 @@ import org.scalatest.Inside.inside
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import util.RunUtils
+import util.{BASILConfig, ILLoadingConfig, BoogieGeneratorConfig, StaticAnalysisConfig, BoogieMemoryAccessMode}
 
 import java.io.{File, OutputStream, PrintStream, PrintWriter}
 class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
@@ -16,12 +17,18 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
     var actual = ""
     var output: Map[CfgNode, Set[MemoryRegion]] = Map()
     RunUtils.loadAndTranslate(
-      examplesPath + s"$name/$name.adt",
-      examplesPath + s"$name/$name.relf",
-      None,
-      true,
-      false,
-      false
+      BASILConfig(
+        loading = ILLoadingConfig(
+          adtFile = examplesPath + s"$name/$name.adt",
+          relfFile = examplesPath + s"$name/$name.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        runInterpret = false,
+        staticAnalysis =  Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
     )
     try {
       // create dump folder if it does not exist

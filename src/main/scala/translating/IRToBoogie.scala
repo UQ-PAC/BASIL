@@ -1,12 +1,14 @@
 package translating
-import ir._
-import boogie._
-import specification._
+import ir.*
+import boogie.*
+import specification.*
+import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode}
 
 import scala.collection.mutable.ArrayBuffer
 
 class IRToBoogie(var program: Program, var spec: Specification) {
   private val externAttr = BAttribute("extern")
+  private val inlineAttr = BAttribute("inline")
   private val globals = spec.globals
   private val controls = spec.controls
   private val controlled = spec.controlled
@@ -26,6 +28,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
   private val stack = BMapVar("stack", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val Gamma_stack = BMapVar("Gamma_stack", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+
+  private var config: BoogieGeneratorConfig = BoogieGeneratorConfig()
   private val modifiedCheck: Set[BVar] = (for (i <- 19 to 29) yield {
     Set(BVariable("R" + i, BitVecBType(64), Scope.Global), BVariable("Gamma_R" + i, BoolBType, Scope.Global))
   }).flatten.toSet ++ Set(
@@ -33,7 +37,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     BVariable("Gamma_R" + 31, BoolBType, Scope.Global)
   )
 
-  def translate: BProgram = {
+  def translate(boogieGeneratorConfig: BoogieGeneratorConfig): BProgram = {
+    config = boogieGeneratorConfig
     val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
     val procedures = program.procedures.map(f => translateProcedure(f, readOnlyMemory))
     val defaultGlobals = List(BVarDecl(mem, List(externAttr)), BVarDecl(Gamma_mem, List(externAttr)))
@@ -61,10 +66,13 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val rgProcs = genRely(relies, readOnlyMemory) :+ guaranteeReflexive
 
     val functionsUsed1 =
-      procedures.flatMap(p => p.functionOps).toSet ++ rgProcs.flatMap(p => p.functionOps).toSet ++ directFunctions
+      procedures.flatMap(p => p.functionOps).toSet ++
+      rgProcs.flatMap(p => p.functionOps).toSet ++
+      directFunctions
     val functionsUsed2 = functionsUsed1.map(p => functionOpToDefinition(p))
     val functionsUsed3 = functionsUsed2.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
-    val functionsUsed = (functionsUsed2 ++ functionsUsed3).toList.sorted
+    val functionsUsed4 = functionsUsed3.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
+    val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4).toList.sorted
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
     BProgram(declarations)
@@ -144,26 +152,41 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         val valueVar = BParam("value", BitVecBType(m.bits))
         val in = List(memVar, indexVar, valueVar)
         val out = BParam(memType)
-        val indices: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
-          if (i == 0) {
-            indexVar
-          } else {
-            BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, m.addressSize))
-          }
-        }
-        val values: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
-          BVExtract((i + 1) * m.valueSize, i * m.valueSize, valueVar)
-        }
-        val valuesEndian = m.endian match {
-          case Endian.BigEndian    => values.reverse
-          case Endian.LittleEndian => values
-        }
-        val indiceValues = for (i <- 0 until m.accesses) yield {
-          (indices(i), valuesEndian(i))
-        }
+        val body: BExpr = config.memoryFunctionType match {
+          case BoogieMemoryAccessMode.SuccessiveStoreSelect => {
+            val indices: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
+              if (i == 0) {
+                indexVar
+              } else {
+                BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, m.addressSize))
+              }
+            }
+            val values: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
+              BVExtract((i + 1) * m.valueSize, i * m.valueSize, valueVar)
+            }
+            val valuesEndian = m.endian match {
+              case Endian.BigEndian => values.reverse
+              case Endian.LittleEndian => values
+            }
+            val indiceValues = for (i <- 0 until m.accesses) yield {
+              (indices(i), valuesEndian(i))
+            }
 
-        val body: MapUpdate = indiceValues.tail.foldLeft(MapUpdate(memVar, indices.head, valuesEndian.head)) {
-          (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+            indiceValues.tail.foldLeft(MapUpdate(memVar, indices.head, valuesEndian.head)) {
+              (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+            }
+          }
+          case BoogieMemoryAccessMode.LambdaStoreSelect => {
+            if m.accesses == 1 then
+              MapUpdate(memVar, indexVar, valueVar)
+            else {
+              val i = BVariable("i", BitVecBType(m.addressSize), Scope.Local)
+              Lambda(List(i), IfThenElse(
+                BInBounds(indexVar, BitVecBLiteral(m.accesses, m.addressSize), m.endian, i),
+                BByteExtract(valueVar, BinaryBExpr(BVSUB, i, indexVar)),
+                MapAccess(memVar, i)))
+            }
+          }
         }
 
         BFunction(m.fnName, in, out, Some(body), List(externAttr))
@@ -175,22 +198,36 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         val in = List(gammaMapVar, indexVar, valueVar)
         val out = BParam(gammaMapType)
 
-        val indices: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
-          if (i == 0) {
-            indexVar
-          } else {
-            BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, g.addressSize))
+        val body : BExpr = config.memoryFunctionType match {
+          case BoogieMemoryAccessMode.LambdaStoreSelect => {
+            if g.accesses == 1 then
+              MapUpdate(gammaMapVar, indexVar, valueVar)
+            else {
+              val i = BVariable("i", BitVecBType(g.addressSize), Scope.Local)
+              Lambda(List(i), IfThenElse(
+                BInBounds(indexVar, BitVecBLiteral(g.accesses, g.addressSize), Endian.LittleEndian, i),
+                valueVar,
+                MapAccess(gammaMapVar, i)))
+            }
           }
-        }
-        val values: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
-          valueVar
-        }
-        val indiceValues = for (i <- 0 until g.accesses) yield {
-          (indices(i), values(i))
-        }
-
-        val body: MapUpdate = indiceValues.tail.foldLeft(MapUpdate(gammaMapVar, indices.head, values.head)) {
-          (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+          case BoogieMemoryAccessMode.SuccessiveStoreSelect => {
+            val indices: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
+              if (i == 0) {
+                indexVar
+              } else {
+                BinaryBExpr(BVADD, indexVar, BitVecBLiteral(i, g.addressSize))
+              }
+            }
+            val values: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
+              valueVar
+            }
+            val indiceValues = for (i <- 0 until g.accesses) yield {
+              (indices(i), values(i))
+            }
+            indiceValues.tail.foldLeft(MapUpdate(gammaMapVar, indices.head, values.head)) {
+              (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+            }
+          }
         }
 
         BFunction(g.fnName, in, out, Some(body), List(externAttr))
@@ -220,6 +257,38 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           }
         }
         BFunction("L", List(memoryVar, indexVar), BParam(BoolBType), Some(body), List(externAttr))
+      case b: ByteExtract =>
+        val valueVar = BParam("value", BitVecBType(b.valueSize))
+        val offsetVar = BParam("offset", BitVecBType(b.offsetSize))
+        val in = List(valueVar, offsetVar)
+        val out = BParam(BitVecBType(8))
+        val shift = BinaryBExpr(BVMUL, offsetVar, BitVecBLiteral(8, b.offsetSize))
+        val eshift =
+          if (b.valueSize < b.offsetSize) BVExtract(b.valueSize, 0, shift)
+          else if (b.valueSize == b.offsetSize) shift
+          else BVZeroExtend(b.valueSize - b.offsetSize, shift)
+        val body = BVExtract(8, 0, BinaryBExpr(BVLSHR, valueVar, eshift))
+        BFunction(b.fnName, in, out, Some(body), List(inlineAttr))
+      case b: InBounds =>
+        val baseVar = BParam("base", BitVecBType(b.bits))
+        val lenVar = BParam("len", BitVecBType(b.bits))
+        val iVar = BParam("i", BitVecBType(b.bits))
+        val in = List(baseVar, lenVar, iVar)
+        val out = BParam(BoolBType)
+        val begin = b.endian match {
+          case Endian.LittleEndian => baseVar
+          case Endian.BigEndian => BinaryBExpr(BVSUB, baseVar, lenVar)
+        }
+        val end = b.endian match {
+          case Endian.LittleEndian => BinaryBExpr(BVADD, baseVar, lenVar)
+          case Endian.BigEndian => baseVar
+        }
+
+        val above = BinaryBExpr(BVULE, begin, iVar)
+        val below = BinaryBExpr(BVULT, iVar, end)
+        val wrap = BinaryBExpr(BVULE, baseVar, end)
+        val body = IfThenElse(wrap, BinaryBExpr(BoolAND, above, below), BinaryBExpr(BoolOR, above, below))
+        BFunction(b.fnName, in, out, Some(body), List(inlineAttr))
     }
   }
 
@@ -294,8 +363,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       freeEnsures,
       freeRequires,
       modifies.toSet,
-      body.toList,
-      List.empty
+      body.toList
     )
   }
 

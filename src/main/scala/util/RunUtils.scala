@@ -63,23 +63,27 @@ object RunUtils {
     }
   }
 
-  def loadAndTranslate(
-      BAPFileName: String,
-      readELFFileName: String,
-      specFileName: Option[String],
-      performAnalysis: Boolean,
-      performInterpret: Boolean,
-      dumpIL: Boolean
-  ): BProgram = {
-    val bapProgram = loadBAP(BAPFileName)
+  def run(q: BASILConfig): Unit = {
+    Logger.info("[!] Writing file...")
+    val boogieProgram = loadAndTranslate(q)
+    writeToFile(boogieProgram.toString, q.outputPrefix)
+  }
 
-    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(readELFFileName)
+  def loadAndTranslate(q: BASILConfig): BProgram = {
+    /**
+     *  Loading phase
+     */
+    val bapProgram = loadBAP(q.loading.adtFile)
+    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile)
 
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
 
-    val specification = loadSpecification(specFileName, IRProgram, globals)
+    val specification = loadSpecification(q.loading.specFile, IRProgram, globals)
 
+    /**
+     * Analysis Phase
+     */
     Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
     val externalNames = externalFunctions.map(e => e.name)
@@ -88,15 +92,20 @@ object RunUtils {
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
 
-    if (dumpIL) {
-      dump_file(serialiseIL(IRProgram), "before-analysis.il")
+    q.loading.dumpIL match  {
+      case Some(s) => writeToFile(serialiseIL(IRProgram), s + "-before-analysis.il")
+      case _ =>
     }
 
-    if (performAnalysis) {
-      IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
-      if (dumpIL) {
-        dump_file(serialiseIL(IRProgram), "after-analysis.il")
-      }
+    q.staticAnalysis match {
+      case Some(analysisConfig) =>
+        IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
+
+        analysisConfig.dumpILToPath match {
+          case Some(s) => writeToFile(serialiseIL(IRProgram), s +  "-after-analysis.il")
+          case _ =>
+        }
+      case None =>
     }
 
     IRProgram.determineRelevantMemory(globalOffsets)
@@ -106,7 +115,7 @@ object RunUtils {
     val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
     IRProgram.setModifies(specModifies)
 
-    if (performInterpret) {
+    if (q.runInterpret) {
       val interpreter = Interpreter()
       interpreter.interpret(IRProgram)
     }
@@ -114,7 +123,8 @@ object RunUtils {
     Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
     Logger.info("[!] Done! Exiting...")
-    boogieTranslator.translate
+    val boogieProgram = boogieTranslator.translate(q.boogieTranslation)
+    boogieProgram
   }
 
   def analyse(
@@ -153,7 +163,7 @@ object RunUtils {
       "cpa"
     )
     */
-    dump_file(printAnalysisResults(cfg, constPropResult), "cpa")
+    writeToFile(printAnalysisResults(cfg, constPropResult), "cpa")
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
@@ -164,7 +174,7 @@ object RunUtils {
       cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder),
       "mra"
     )*/
-    dump_file(printAnalysisResults(cfg, mraResult), "mra")
+    writeToFile(printAnalysisResults(cfg, mraResult), "mra")
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
@@ -181,7 +191,7 @@ object RunUtils {
       "vsa"
     )
     */
-    dump_file(printAnalysisResults(cfg, vsaResult), "vsa")
+    writeToFile(printAnalysisResults(cfg, vsaResult), "vsa")
 
     Logger.info("[!] Resolving CFG")
     val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult, IRProgram)
@@ -396,26 +406,8 @@ object RunUtils {
     (IRProgram, modified)
   }
 
-  def writeToFile(program: BProgram, outputFileName: String): Unit = {
-    try {
-      val writer = BufferedWriter(FileWriter(outputFileName, false))
-      writer.write(program.toString)
-      writer.flush()
-      writer.close()
-    } catch {
-      case _: IOException => Logger.error("Error writing to file.")
-    }
-  }
-
-  def dump_file(content: String, name: String): Unit = {
-    val outFile = File(s"$name.txt")
-    val pw = PrintWriter(outFile, "UTF-8")
-    pw.write(content)
-    pw.close()
-  }
-
-  def dump_plot(content: String, name: String): Unit = {
-    val outFile = File(s"$name.dot")
+  def writeToFile(content: String, name: String): Unit = {
+    val outFile = File(name)
     val pw = PrintWriter(outFile, "UTF-8")
     pw.write(content)
     pw.close()
