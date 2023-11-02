@@ -46,7 +46,7 @@ class MemoryModelMap {
 
   def convertMemoryRegions(memoryRegions: Map[CfgNode, Set[MemoryRegion]], externalFunctions: Map[BigInt, String]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
-    val externalFunctionRgns = externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64), None))
+    val externalFunctionRgns = externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64)))
 
     // get all function exit node
     val exitNodes = memoryRegions.keys.collect { case e: CfgFunctionExitNode => e }

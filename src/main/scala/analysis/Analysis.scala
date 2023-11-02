@@ -150,55 +150,47 @@ object Fresh {
 trait MemoryRegion {
   val regionIdentifier: String
   val start: BitVecLiteral
-  override def hashCode(): Int = regionIdentifier.hashCode()
+  var extent: Option[RangeKey] = None
 }
 
-/** Represents a stack region. The region is defined by a region Identifier identifying the assignment location. There
-  * can exist two regions with the same size (offset) but have a different base pointer. As such the base pointer is
-  * tracked but not printed in the toString method.
-  * @param start
-  *   0x1234 in case of mem[R1 + 0x1234] <- ...
-  * @param regionType
-  *   The type of the region. This is used to distinguish between stack, heap, data and code regions.
-  * @param extent
-  *   the start and end of the region
-  */
-case class StackRegion(regionIdentifier: String, start: BitVecLiteral, var extent: Option[RangeKey]) extends MemoryRegion:
+class StackRegion(override val regionIdentifier: String, override val start: BitVecLiteral) extends MemoryRegion {
   override def toString: String = s"Stack($regionIdentifier, $start)"
+  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case s: StackRegion => s.start == start
-    case _                      => false
+    case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier
+    case _ => false
   }
+}
 
-/** Represents a Heap region. The region is defined by its identifier which is defined by the allocation site.
-  * @param regionIdentifier
-  *   region id identifying the call-site
-  * @param start
-  *   the start address
-  * @param extent
-  *   the start and end of the region
-  */
-case class HeapRegion(regionIdentifier: String, start: BitVecLiteral, var extent: Option[RangeKey]) extends MemoryRegion:
+class HeapRegion(override val regionIdentifier: String, override val start: BitVecLiteral) extends MemoryRegion {
   override def toString: String = s"Heap($regionIdentifier, $start)"
+  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case r: HeapRegion => regionIdentifier.equals(r.regionIdentifier)
-    case _             => false
+    case h: HeapRegion => h.start == start && h.regionIdentifier == regionIdentifier
+    case _ => false
   }
+}
 
-case class DataRegion(regionIdentifier: String, start: BitVecLiteral, var extent: Option[RangeKey]) extends MemoryRegion:
+class DataRegion(override val regionIdentifier: String, override val start: BitVecLiteral) extends MemoryRegion {
   override def toString: String = s"Data($regionIdentifier, $start)"
+  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case d: DataRegion => d.start == start && d.regionIdentifier == regionIdentifier
+    case _ => false
+  }
+}
 
 trait MemoryRegionAnalysisMisc:
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
   val stackMap: mutable.Map[CfgFunctionEntryNode, mutable.Map[Expr, StackRegion]] = mutable.HashMap()
-  private def getNextMallocCount(): String = {
+  private def nextMallocCount() = {
     mallocCount += 1
     s"malloc_$mallocCount"
   }
 
-  private def getNextStackCount(): String = {
+  private def nextStackCount() = {
     stackCount += 1
     s"stack_$stackCount"
   }
@@ -215,7 +207,7 @@ trait MemoryRegionAnalysisMisc:
     if (stackPool.contains(expr)) {
       stackPool(expr)
     } else {
-      val newRegion = StackRegion(getNextStackCount(), expr, None)
+      val newRegion = StackRegion(nextStackCount(), expr)
       stackPool += (expr -> newRegion)
       newRegion
     }
@@ -284,22 +276,22 @@ trait MemoryRegionAnalysisMisc:
       case bitVecLiteral: BitVecLiteral =>
         if (globals.contains(bitVecLiteral.value)) {
           val globalName = globals(bitVecLiteral.value)
-          Set(DataRegion(globalName, bitVecLiteral, None))
+          Set(DataRegion(globalName, bitVecLiteral))
         } else if (subroutines.contains(bitVecLiteral.value)) {
           val subroutineName = subroutines(bitVecLiteral.value)
-          Set(DataRegion(subroutineName, bitVecLiteral, None))
+          Set(DataRegion(subroutineName, bitVecLiteral))
         } else if (globalOffsets.contains(bitVecLiteral.value)) {
           val val1 = globalOffsets(bitVecLiteral.value)
           if (subroutines.contains(val1)) {
             val globalName = subroutines(val1)
-            Set(DataRegion(globalName, bitVecLiteral, None))
+            Set(DataRegion(globalName, bitVecLiteral))
           } else {
-            Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral, None))
+            Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
           }
         } else {
           //throw new Exception(s"Unknown type for $bitVecLiteral")
           // unknown region here
-          Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral, None))
+          Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
         }
       case variable: Variable =>
         variable match {
@@ -331,7 +323,7 @@ trait MemoryRegionAnalysisMisc:
             if (directCall.target.name == "malloc") {
               evaluateExpression(mallocVariable, constantProp(n)) match {
                 case Some(b: BitVecLiteral) =>
-                  lattice.sublattice.lub(s, Set(HeapRegion(getNextMallocCount(), b, None)))
+                  lattice.sublattice.lub(s, Set(HeapRegion(nextMallocCount(), b)))
                 case None => s
               }
             } else {
