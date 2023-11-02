@@ -8,7 +8,7 @@ import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters.*
 import analysis.solvers.*
 import analysis.*
-import cfg_visualiser.{OtherOutput, Output, OutputKindE}
+import cfg_visualiser.Output
 import bap.*
 import ir.*
 import boogie.*
@@ -23,8 +23,6 @@ import scala.collection.mutable
 
 object RunUtils {
   var memoryRegionAnalysisResults: Map[CfgNode, Set[MemoryRegion]] = Map()
-
-  var iterations = 0
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
@@ -93,16 +91,16 @@ object RunUtils {
     IRProgram = renamer.visitProgram(IRProgram)
 
     q.loading.dumpIL match  {
-      case Some(s) => writeToFile(serialiseIL(IRProgram), s + "-before-analysis.il")
+      case Some(s: String) => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il")
       case _ =>
     }
 
     q.staticAnalysis match {
       case Some(analysisConfig) =>
-        IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets)
+        IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets, analysisConfig, 1)
 
         analysisConfig.dumpILToPath match {
-          case Some(s) => writeToFile(serialiseIL(IRProgram), s +  "-after-analysis.il")
+          case Some(s: String) => writeToFile(serialiseIL(IRProgram), s"$s-after-analysis.il")
           case _ =>
         }
       case None =>
@@ -131,15 +129,16 @@ object RunUtils {
       IRProgram: Program,
       externalFunctions: Set[ExternalFunction],
       globals: Set[SpecGlobal],
-      globalOffsets: Map[BigInt, BigInt]
+      globalOffsets: Map[BigInt, BigInt],
+      config: StaticAnalysisConfig,
+      iteration: Int
   ): Program = {
-    iterations += 1
     val subroutines = IRProgram.procedures
       .filter(p => p.address.isDefined)
-      .map { (p: Procedure) => BigInt(p.address.get) -> p.name }
+      .map(p => BigInt(p.address.get) -> p.name)
       .toMap
-    val globalAddresses = globals.map { (s: SpecGlobal) => s.address -> s.name }.toMap
-    val externalAddresses = externalFunctions.map { (e: ExternalFunction) => e.offset -> e.name }.toMap
+    val globalAddresses = globals.map(s => s.address -> s.name).toMap
+    val externalAddresses = externalFunctions.map(e => e.offset -> e.name).toMap
     Logger.info("Globals:")
     Logger.info(globalAddresses)
     Logger.info("Global Offsets: ")
@@ -156,25 +155,29 @@ object RunUtils {
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationAnalysis.WorklistSolver(cfg)
     val constPropResult: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = constPropSolver.analyze(true)
-    /*
-    Output.output(
-      OtherOutput(OutputKindE.cfg),
-      cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder),
-      "cpa"
-    )
-    */
-    writeToFile(printAnalysisResults(cfg, constPropResult), "cpa")
+
+    config.analysisDotPath match {
+      case Some(s) => writeToFile(cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder), s"${s}_constprop$iteration.dot")
+      case None =>
+    }
+    config.analysisResultsPath match {
+      case Some(s) =>  writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt")
+      case None =>
+    }
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
     val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.analyze(true)
     memoryRegionAnalysisResults = mraResult
-    /* Output.output(
-      OtherOutput(OutputKindE.cfg),
-      cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder),
-      "mra"
-    )*/
-    writeToFile(printAnalysisResults(cfg, mraResult), "mra")
+
+    config.analysisDotPath match {
+      case Some(s) => writeToFile(cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder), s"${s}_mra$iteration.dot")
+      case None =>
+    }
+    config.analysisResultsPath match {
+      case Some(s) => writeToFile(printAnalysisResults(cfg, mraResult, iteration), s"${s}_mra$iteration.txt")
+      case None =>
+    }
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
@@ -184,35 +187,39 @@ object RunUtils {
     val vsaSolver =
       ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
     val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]  = vsaSolver.analyze(false)
-    /*
-    Output.output(
-      OtherOutput(OutputKindE.cfg),
-      cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder),
-      "vsa"
-    )
-    */
-    writeToFile(printAnalysisResults(cfg, vsaResult), "vsa")
+
+    config.analysisDotPath match {
+      case Some(s) => writeToFile(cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder), s"${s}_vsa$iteration.dot")
+      case None =>
+    }
+    config.analysisResultsPath match {
+      case Some(s) =>     writeToFile(printAnalysisResults(cfg, vsaResult, iteration), s"${s}_vsa$iteration.txt")
+      case None =>
+    }
 
     Logger.info("[!] Resolving CFG")
     val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult, IRProgram)
-    /*
     if (modified) {
-      Logger.info(s"[!] Analysing again (iter $iterations)")
-      return analyse(newIR, externalFunctions, globals, globalOffsets)
+      Logger.info(s"[!] Analysing again (iter $iteration)")
+      return analyse(newIR, externalFunctions, globals, globalOffsets, config, iteration + 1)
     }
-    */
-    val newCFG = ProgramCfgFactory().fromIR(newIR)
-    Output.output(OtherOutput(OutputKindE.cfg), newCFG.toDot(x => x.toString, Output.dotIder), "resolvedCFG")
 
-    Logger.info(s"[!] Finished indirect call resolution after $iterations iterations")
+    config.analysisDotPath match {
+      case Some(s) =>
+        val newCFG = ProgramCfgFactory().fromIR(newIR)
+        writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
+      case None =>
+    }
+
+    Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
 
     newIR
   }
 
-  def printAnalysisResults(cfg: ProgramCfg, result: Map[CfgNode, _]): String = {
+  def printAnalysisResults(cfg: ProgramCfg, result: Map[CfgNode, _], iteration: Int): String = {
     val functionEntries = cfg.nodes.collect { case n: CfgFunctionEntryNode => n }.toSeq.sortBy(_.data.name)
     val s = StringBuilder()
-
+    s.append(System.lineSeparator())
     for (f <- functionEntries) {
       val stack: mutable.Stack[CfgNode] = mutable.Stack()
       val visited: mutable.Set[CfgNode] = mutable.Set()
@@ -406,8 +413,8 @@ object RunUtils {
     (IRProgram, modified)
   }
 
-  def writeToFile(content: String, name: String): Unit = {
-    val outFile = File(name)
+  def writeToFile(content: String, fileName: String): Unit = {
+    val outFile = File(fileName)
     val pw = PrintWriter(outFile, "UTF-8")
     pw.write(content)
     pw.close()
