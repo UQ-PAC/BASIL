@@ -75,6 +75,7 @@ object RunUtils {
 
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
+    TailCallOptimization().transform(IRProgram.procedures, externalFunctions)
     NonReturningFunctions().transform(IRProgram.procedures, externalFunctions)
     NonReturningFunctions().trimDeletedBlocks(IRProgram.procedures)
     val specification = loadSpecification(specFileName, IRProgram, globals)
