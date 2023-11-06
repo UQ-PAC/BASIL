@@ -397,45 +397,32 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     case d: DirectCall =>
       val call = List(BProcedureCall(d.target.name, List(), List()))
       val returnTarget = d.returnTarget match {
-        case Some(r) => List(GoToCmd(r.label))
+        case Some(r) => List(GoToCmd(Seq(r.label)))
         case None    => List(Comment("no return target"), BAssume(FalseBLiteral))
       }
-      d.condition match {
-        case Some(c) =>
-          val guard = c.toBoogie
-          val guardGamma = c.toGamma
-          List(BAssert(guardGamma), IfCmd(guard, call ++ returnTarget))
-        case None =>
-          call ++ returnTarget
-      }
+      call ++ returnTarget
     case i: IndirectCall =>
       // TODO put this elsewhere
-      val call: List[BCmd] = if (i.target.name == "R30") {
+      if (i.target.name == "R30") {
         List(ReturnCmd)
       } else {
         val unresolved: List[BCmd] = List(Comment(s"UNRESOLVED: call ${i.target.name}"), BAssert(FalseBLiteral))
         i.returnTarget match {
-          case Some(r) => unresolved :+ GoToCmd(r.label)
+          case Some(r) => unresolved :+ GoToCmd(Seq(r.label))
           case None    => unresolved ++ List(Comment("no return target"), BAssume(FalseBLiteral))
         }
-      }
-      i.condition match {
-        case Some(c) =>
-          val guard = c.toBoogie
-          val guardGamma = c.toGamma
-          List(BAssert(guardGamma), IfCmd(guard, call))
-        case None =>
-          call
       }
     case g: GoTo =>
       g.condition match {
         case Some(c) =>
           val guard = c.toBoogie
           val guardGamma = c.toGamma
-          List(BAssert(guardGamma), IfCmd(guard, List(GoToCmd(g.target.label))))
+          List(BAssert(guardGamma), IfCmd(guard, List(GoToCmd(Seq(g.target.label)))))
         case None =>
-          List(GoToCmd(g.target.label))
+          List(GoToCmd(Seq(g.target.label)))
       }
+    case n: NonDetGoTo =>
+      List(GoToCmd(n.targets.map(_.label)))
   }
 
   def translate(s: Statement): List[BCmd] = s match {
@@ -492,5 +479,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     case a: Assert =>
       val body = a.body.toBoogie
       List(BAssert(body, a.comment))
+    case a: Assume =>
+      val body = a.body.toBoogie
+      List(BAssume(body, a.comment))
   }
 }

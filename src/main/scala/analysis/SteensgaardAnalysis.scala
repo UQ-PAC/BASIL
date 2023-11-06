@@ -20,7 +20,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, Map
 
   val constantPropResult2: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = constantPropResult
 
-  constantPropResult2.values.foreach(v => Logger.info(s"${v}"))
+  constantPropResult2.values.foreach(v => Logger.info(s"$v"))
 
   /** @inheritdoc
     */
@@ -29,7 +29,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, Map
     visit(program, ())
 
   def dump_file(content: ArrayBuffer[String], name: String): Unit = {
-    val outFile = File(s"${name}")
+    val outFile = File(s"$name")
     val pw = PrintWriter(outFile, "UTF-8")
     for (s <- content) { pw.append(s + "\n") }
     pw.close()

@@ -11,42 +11,42 @@ import util.Logger
   * @return:
   *   The evaluated expression (e.g. 0x69632)
   */
-def evaluateExpression(exp: Expr, n: CfgNode, constantPropResult: Map[Variable, ConstantPropagationLattice.Element]): Expr = {
+def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, ConstantPropagationLattice.FlatElement]): Option[BitVecLiteral] = {
   Logger.debug(s"evaluateExpression: $exp")
   exp match {
     case binOp: BinaryExpr =>
-      val lhs = evaluateExpression(binOp.arg1, n, constantPropResult)
-      val rhs = evaluateExpression(binOp.arg2, n, constantPropResult)
+      val lhs = evaluateExpression(binOp.arg1, constantPropResult)
+      val rhs = evaluateExpression(binOp.arg2, constantPropResult)
 
       (lhs, rhs) match {
-        case (l: BitVecLiteral, r: BitVecLiteral) =>
+        case (Some(l: BitVecLiteral), Some(r: BitVecLiteral)) =>
           binOp.op match {
-            case BVADD => BitVectorEval.smt_bvadd(l, r)
-            case BVSUB => BitVectorEval.smt_bvsub(l, r)
-            case BVASHR => BitVectorEval.smt_bvashr(l, r)
-            case BVCOMP => BitVectorEval.smt_bvcomp(l, r)
+            case BVADD => Some(BitVectorEval.smt_bvadd(l, r))
+            case BVSUB => Some(BitVectorEval.smt_bvsub(l, r))
+            case BVASHR => Some(BitVectorEval.smt_bvashr(l, r))
+            case BVCOMP => Some(BitVectorEval.smt_bvcomp(l, r))
             case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
           }
-        case _ => exp
+        case _ => None
       }
     case extend: ZeroExtend =>
-      evaluateExpression(extend.body, n, constantPropResult) match {
-        case literal: Literal => BitVectorEval.smt_zero_extend(extend.extension, literal)
-        case _                => exp
+      evaluateExpression(extend.body, constantPropResult) match {
+        case Some(b: BitVecLiteral) => Some(BitVectorEval.smt_zero_extend(extend.extension, b))
+        case None                => None
       }
     case e: Extract =>
-      evaluateExpression(e.body, n, constantPropResult) match {
-        case literal: Literal => BitVectorEval.boogie_extract(e.end, e.start, literal)
-        case _                => exp
+      evaluateExpression(e.body, constantPropResult) match {
+        case Some(b: BitVecLiteral) => Some(BitVectorEval.boogie_extract(e.end, e.start, b))
+        case None               => None
       }
     case variable: Variable =>
-      val nodeResult = constantPropResult
-      nodeResult(variable) match {
-        case ConstantPropagationLattice.FlatElement.FlatEl(value) => value.asInstanceOf[BitVecLiteral]
-        case ConstantPropagationLattice.FlatElement.Top           => variable
-        case ConstantPropagationLattice.FlatElement.Bot           => variable
+      constantPropResult(variable) match {
+        case ConstantPropagationLattice.FlatElement.FlatEl(value) => Some(value.asInstanceOf[BitVecLiteral])
+        case ConstantPropagationLattice.FlatElement.Top           => None
+        case ConstantPropagationLattice.FlatElement.Bot           => None
       }
+    case b: BitVecLiteral => Some(b)
     case _ => //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
-      exp
+      None
   }
 }

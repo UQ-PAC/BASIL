@@ -8,10 +8,7 @@
 gen/
 out/
 target/
-boogie_out.txt
-boogie_out.bpl
 metals.sbt
-password.txt
 *.iml
 *.out
 samples/const_prop_tests/
@@ -19,7 +16,7 @@ src/main/antlr4/.antlr
 *.bpl
 *.dot
 *.il
-result.txt
+*.txt
 examplesold/
 src/test/scala/dump/
 src/test/analysis/dump/

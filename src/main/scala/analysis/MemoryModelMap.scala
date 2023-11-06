@@ -46,7 +46,7 @@ class MemoryModelMap {
 
   def convertMemoryRegions(memoryRegions: Map[CfgNode, Set[MemoryRegion]], externalFunctions: Map[BigInt, String]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
-    val externalFunctionRgns = externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64), None))
+    val externalFunctionRgns = externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64)))
 
     // get all function exit node
     val exitNodes = memoryRegions.keys.collect { case e: CfgFunctionExitNode => e }
@@ -54,16 +54,16 @@ class MemoryModelMap {
       val node = memoryRegions(exitNode)
 
       // for each function exit node we get the memory region and add it to the mapping
-      val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
+      val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
       val dataRgns = node.collect { case r: DataRegion => r }
 
       // add externalFunctionRgn to dataRgns and sort by value
-      val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
+      val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.value)
 
       allStacks(exitNode.data.name) = stackRgns
 
       for (dataRgn <- allDataRgns) {
-        add(dataRgn.start.asInstanceOf[BitVecLiteral].value, dataRgn)
+        add(dataRgn.start.value, dataRgn)
       }
     )
   }
@@ -72,7 +72,7 @@ class MemoryModelMap {
     contextStack.push(allStacks(funName))
     rangeMap.stackMap.clear()
     for (stackRgn <- contextStack.top) {
-      add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
+      add(stackRgn.start.value, stackRgn)
     }
   }
 
@@ -81,7 +81,7 @@ class MemoryModelMap {
       contextStack.pop()
       rangeMap.stackMap.clear()
       for (stackRgn <- contextStack.top) {
-        add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
+        add(stackRgn.start.value, stackRgn)
       }
     }
   }
@@ -99,10 +99,10 @@ class MemoryModelMap {
 
 
   def findStackObject(value: BigInt): Option[StackRegion] = 
-    rangeMap.stackMap.find((range, _) => (range.start <= value && value <= range.end)).map((range, obj) => {obj.extent = Some(range); obj});
+    rangeMap.stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
 
   def findDataObject(value: BigInt): Option[DataRegion] = 
-    rangeMap.dataMap.find((range, _) => (range.start <= value && value <= range.end)).map((range, obj) => {obj.extent = Some(range); obj});
+    rangeMap.dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
 
   override def toString: String =
     s"Stack: ${rangeMap.stackMap}\n Heap: ${rangeMap.heapMap}\n Data: ${rangeMap.dataMap}\n"

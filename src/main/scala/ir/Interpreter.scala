@@ -195,21 +195,11 @@ class Interpreter() {
             }
           case dc: DirectCall =>
             Logger.debug(s"$dc")
-            dc.condition match {
-              case Some(value) =>
-                eval(value, regs) match {
-                  case TrueLiteral =>
-                    interpretProcedure(dc.target)
-                    break
-                  case FalseLiteral =>
-                }
-              case None =>
-                interpretProcedure(dc.target)
-                break
-            }
+            interpretProcedure(dc.target)
+            break
           case ic: IndirectCall =>
             Logger.debug(s"$ic")
-            if (ic.target == Register("R30", BitVecType(64)) & ic.condition.isEmpty & ic.returnTarget.isEmpty) {
+            if (ic.target == Register("R30", BitVecType(64)) & ic.returnTarget.isEmpty) {
               nextBlock = None
               break
             } else {
@@ -259,7 +249,7 @@ class Interpreter() {
           val start = im.address.max(currentAddress)
           val data = if (im.address < currentAddress) im.bytes.slice(currentAddress - im.address, im.size) else im.bytes
           data.zipWithIndex.foreach { (byte, index) =>
-            mems(start + index) = byte.asInstanceOf[BitVecLiteral]
+            mems(start + index) = byte
           }
           currentAddress = im.address + im.size
         }

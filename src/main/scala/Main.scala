@@ -8,7 +8,7 @@ import util.RunUtils
 import scala.collection.mutable.{ArrayBuffer, Set}
 import scala.collection.{immutable, mutable}
 import scala.language.postfixOps
-import scala.sys.process._
+import scala.sys.process.*
 import util.*
 import mainargs.{main, arg, ParserForClass, Flag}
 
@@ -35,7 +35,11 @@ object Main {
       @arg(name = "dump-il", doc = "Dump the Intermediate Language to text.")
       dumpIL: Option[String],
       @arg(name = "help", short = 'h', doc = "Show this help message.")
-      help: Flag
+      help: Flag,
+      @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
+      analysisResults: Option[String],
+      @arg(name = "analysis-results-dot", doc = "Log analysis results in .dot form at specified path.")
+      analysisResultsDot: Option[String]
   )
 
   def main(args: Array[String]): Unit = {
@@ -44,14 +48,13 @@ object Main {
 
     val conf = parsed match {
       case Right(r) => r
-      case Left(l) => {
+      case Left(l) => 
         println(l)
         return
-      }
     }
 
     if (conf.help.value) {
-      println(parser.helpText(sorted = false));
+      println(parser.helpText(sorted = false))
     }
 
     Logger.setLevel(LogLevel.INFO)
@@ -62,12 +65,12 @@ object Main {
     val q = BASILConfig(
       loading = ILLoadingConfig(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.dumpIL),
       runInterpret = conf.interpret.value,
-      staticAnalysis =  if (conf.analyse.value) then Some(StaticAnalysisConfig(conf.dumpIL)) else None,
-      boogieTranslation = BoogieGeneratorConfig(if (conf.lambdaStores.value) then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect),
-      outputPrefix = conf.outFileName
+      staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot)) else None,
+      boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect),
+      outputPrefix = conf.outFileName,
     )
 
-    RunUtils.run(q);
+    RunUtils.run(q)
   }
 
 }
