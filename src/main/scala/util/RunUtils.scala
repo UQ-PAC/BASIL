@@ -90,20 +90,11 @@ object RunUtils {
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
 
-    q.loading.dumpIL match  {
-      case Some(s: String) => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il")
-      case _ =>
-    }
+    q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il"))
 
-    q.staticAnalysis match {
-      case Some(analysisConfig) =>
-        IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets, analysisConfig, 1)
-
-        analysisConfig.dumpILToPath match {
-          case Some(s: String) => writeToFile(serialiseIL(IRProgram), s"$s-after-analysis.il")
-          case _ =>
-        }
-      case None =>
+    q.staticAnalysis.foreach { analysisConfig =>
+      IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets, analysisConfig, 1)
+      analysisConfig.dumpILToPath.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-after-analysis.il"))
     }
 
     IRProgram.determineRelevantMemory(globalOffsets)
@@ -156,28 +147,16 @@ object RunUtils {
     val constPropSolver = ConstantPropagationAnalysis.WorklistSolver(cfg)
     val constPropResult: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = constPropSolver.analyze(true)
 
-    config.analysisDotPath match {
-      case Some(s) => writeToFile(cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder), s"${s}_constprop$iteration.dot")
-      case None =>
-    }
-    config.analysisResultsPath match {
-      case Some(s) =>  writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt")
-      case None =>
-    }
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder), s"${s}_constprop$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt"))
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
     val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.analyze(true)
     memoryRegionAnalysisResults = mraResult
 
-    config.analysisDotPath match {
-      case Some(s) => writeToFile(cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder), s"${s}_mra$iteration.dot")
-      case None =>
-    }
-    config.analysisResultsPath match {
-      case Some(s) => writeToFile(printAnalysisResults(cfg, mraResult, iteration), s"${s}_mra$iteration.txt")
-      case None =>
-    }
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder), s"${s}_mra$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, mraResult, iteration), s"${s}_mra$iteration.txt"))
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
@@ -188,14 +167,8 @@ object RunUtils {
       ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
     val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]  = vsaSolver.analyze(false)
 
-    config.analysisDotPath match {
-      case Some(s) => writeToFile(cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder), s"${s}_vsa$iteration.dot")
-      case None =>
-    }
-    config.analysisResultsPath match {
-      case Some(s) =>     writeToFile(printAnalysisResults(cfg, vsaResult, iteration), s"${s}_vsa$iteration.txt")
-      case None =>
-    }
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder), s"${s}_vsa$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, vsaResult, iteration), s"${s}_vsa$iteration.txt"))
 
     Logger.info("[!] Resolving CFG")
     val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult, IRProgram)
@@ -204,11 +177,9 @@ object RunUtils {
       return analyse(newIR, externalFunctions, globals, globalOffsets, config, iteration + 1)
     }
 
-    config.analysisDotPath match {
-      case Some(s) =>
-        val newCFG = ProgramCfgFactory().fromIR(newIR)
-        writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
-      case None =>
+    config.analysisDotPath.foreach { s =>
+      val newCFG = ProgramCfgFactory().fromIR(newIR)
+      writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")

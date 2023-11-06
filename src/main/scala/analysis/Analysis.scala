@@ -149,11 +149,10 @@ object Fresh {
 
 trait MemoryRegion {
   val regionIdentifier: String
-  val start: BitVecLiteral
   var extent: Option[RangeKey] = None
 }
 
-class StackRegion(override val regionIdentifier: String, override val start: BitVecLiteral) extends MemoryRegion {
+class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral) extends MemoryRegion {
   override def toString: String = s"Stack($regionIdentifier, $start)"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
@@ -162,16 +161,16 @@ class StackRegion(override val regionIdentifier: String, override val start: Bit
   }
 }
 
-class HeapRegion(override val regionIdentifier: String, override val start: BitVecLiteral) extends MemoryRegion {
-  override def toString: String = s"Heap($regionIdentifier, $start)"
-  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
+class HeapRegion(override val regionIdentifier: String) extends MemoryRegion {
+  override def toString: String = s"Heap($regionIdentifier)"
+  override def hashCode(): Int = regionIdentifier.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case h: HeapRegion => h.start == start && h.regionIdentifier == regionIdentifier
+    case h: HeapRegion => h.regionIdentifier == regionIdentifier
     case _ => false
   }
 }
 
-class DataRegion(override val regionIdentifier: String, override val start: BitVecLiteral) extends MemoryRegion {
+class DataRegion(override val regionIdentifier: String, val start: BitVecLiteral) extends MemoryRegion {
   override def toString: String = s"Data($regionIdentifier, $start)"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
@@ -323,7 +322,7 @@ trait MemoryRegionAnalysisMisc:
             if (directCall.target.name == "malloc") {
               evaluateExpression(mallocVariable, constantProp(n)) match {
                 case Some(b: BitVecLiteral) =>
-                  lattice.sublattice.lub(s, Set(HeapRegion(nextMallocCount(), b)))
+                  lattice.sublattice.lub(s, Set(HeapRegion(nextMallocCount())))
                 case None => s
               }
             } else {
