@@ -197,8 +197,6 @@ trait PushDownWorklistFixpointSolver[N] extends MapLatticeSolver[N] with LinkedH
     val xn = x(n)
     val y = transfer(n, xn)
 
-    val t = lattice.sublattice.lub(xn, y)
-
     for succ <- outdep(n, intra) do propagate(y, succ)
 
 /** Worklist-based fixpoint solver.
