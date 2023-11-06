@@ -11,6 +11,24 @@ object IDGenerator {
   }
 }
 
+def wrap(input: String, width: Integer = 20): String =
+  if (input.length() <= width) {
+    input
+  } else {
+    var splitPoint = width;
+    while (input.charAt(splitPoint).isLetterOrDigit && splitPoint > width / 2) {
+      // search backwards for a non alphanumeric charcter to split on
+      splitPoint -= 1
+    }
+    if (input.charAt(splitPoint).isLetterOrDigit) {
+      // didn't find a character to split on
+      splitPoint = width;
+    }
+    val line = input.substring(0, splitPoint)
+    line + "\\l" + wrap(input.substring(splitPoint), width)
+  }
+
+
 /** Super-class for elements of a Graphviz dot file.
   */
 abstract class DotElement {
@@ -33,7 +51,7 @@ class DotNode(val id: String, val label: String) extends DotElement {
   override def toString: String = toDotString
 
   def toDotString: String =
-    s"\"${id}\"" + "[label=\"" + label + "\"]"
+    s"\"$id\"" + "[label=\"" + wrap(label, 80) + "\"]"
 
 }
 
@@ -51,7 +69,7 @@ class DotArrow(
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
 
   def toDotString: String =
-    s"\"${fromNode.id}\" ${arrow} \"${toNode.id}\"[label=\"${label}\", style=\"${style}\", color=\"${colour}\"]"
+    s"\"${fromNode.id}\" $arrow \"${toNode.id}\"[label=\"$label\", style=\"$style\", color=\"$colour\"]"
 }
 
 /** Represents a directed edge between two regular cfg nodes in a Graphviz dot file.
@@ -116,6 +134,5 @@ class DotGraph(val title: String, val nodes: Iterable[DotNode], val edges: Itera
 
   override def toString: String = toDotString
 
-  def toDotString: String =
-    "digraph " + title + "{" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
+  def toDotString: String = "digraph " + title + " {\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
 }

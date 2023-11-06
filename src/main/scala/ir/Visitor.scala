@@ -38,13 +38,15 @@ abstract class Visitor {
     node
   }
 
+  def visitNonDetGoTo(node: NonDetGoTo): Jump = {
+    node
+  }
+
   def visitDirectCall(node: DirectCall): Jump = {
-    node.condition = node.condition.map(visitExpr)
     node
   }
 
   def visitIndirectCall(node: IndirectCall): Jump = {
-    node.condition = node.condition.map(visitExpr)
     node.target = visitVariable(node.target)
     node
   }
@@ -213,17 +215,14 @@ abstract class ReadOnlyVisitor extends Visitor {
   }
 
   override def visitGoTo(node: GoTo): Jump = {
-    node.condition.map(visitExpr)
     node
   }
 
   override def visitDirectCall(node: DirectCall): Jump = {
-    node.condition.map(visitExpr)
     node
   }
 
   override def visitIndirectCall(node: IndirectCall): Jump = {
-    node.condition.map(visitExpr)
     visitVariable(node.target)
     node
   }

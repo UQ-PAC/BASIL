@@ -9,9 +9,9 @@ import java.io.{File, OutputStream, PrintStream, PrintWriter}
 class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
 
   //C:\workdir\bil-to-boogie-translator\examples
-  private val examplesPath = System.getProperty("user.dir") + "/examples/";
-  private val expectedPath = System.getProperty("user.dir") + "/src/test/analysis/dotExpected/";
-  private val tempPath = System.getProperty("user.dir") + "/src/test/analysis/dump/";
+  private val examplesPath = System.getProperty("user.dir") + "/examples/"
+  private val expectedPath = System.getProperty("user.dir") + "/src/test/analysis/dotExpected/"
+  private val tempPath = System.getProperty("user.dir") + "/src/test/analysis/dump/"
   def runMain(name: String, dump: Boolean = false): Unit = {
     var expected = ""
     var actual = ""
@@ -19,8 +19,8 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          adtFile = examplesPath + s"${name}/${name}.adt",
-          relfFile = examplesPath + s"${name}/${name}.relf",
+          adtFile = examplesPath + s"$name/$name.adt",
+          relfFile = examplesPath + s"$name/$name.relf",
           specFile = None,
           dumpIL = None,
         ),
@@ -38,33 +38,33 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
       }
 
       output = RunUtils.memoryRegionAnalysisResults
-      val outFile = new File(tempPath + s"${name}")
+      val outFile = new File(tempPath + s"$name")
       val pw = new PrintWriter(outFile, "UTF-8")
       output.foreach { case (k, v) =>
-        pw.write(s"${k} -> ${v}")
+        pw.write(s"$k -> $v")
         pw.write("\n")
       }
       pw.close()
-      val actualFile = scala.io.Source.fromFile(tempPath + s"${name}")
+      val actualFile = scala.io.Source.fromFile(tempPath + s"$name")
       actual = actualFile.mkString
       actualFile.close()
-      val expectedFile = scala.io.Source.fromFile(expectedPath + s"${name}")
+      val expectedFile = scala.io.Source.fromFile(expectedPath + s"$name")
       expected = expectedFile.mkString
       expectedFile.close()
     } catch {
       case e: Exception =>
         if (dump) {
-          val outFile = new File(expectedPath + s"${name}")
+          val outFile = new File(expectedPath + s"$name")
           val pw = new PrintWriter(outFile, "UTF-8")
           output.foreach { case (k, v) =>
-            pw.write(s"${k} -> ${v}")
+            pw.write(s"$k -> $v")
             pw.write("\n")
           }
           pw.close()
           assert(true)
           return
         }
-        throw new Exception("TEST NOT SUPPORTED: Expected file not found " + expectedPath + s"${name}")
+        throw new Exception("TEST NOT SUPPORTED: Expected file not found " + expectedPath + s"$name")
     }
     assert(actual.split("\n").toList.sorted.map(_.trim) == expected.split("\n").toList.sorted.map(_.trim))
   }
@@ -82,31 +82,31 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
 //  }
 
   test("ifglobal") {
-    runMain("ifglobal");
+    runMain("ifglobal")
   }
 
   test("iflocal") {
-    runMain("iflocal");
+    runMain("iflocal")
   }
 
   test("secret_write") {
-    runMain("secret_write");
+    runMain("secret_write")
   }
 
   test("basic_arrays_read") {
-    runMain("basic_arrays_read");
+    runMain("basic_arrays_read")
   }
 
   test("basic_arrays_write") {
-    runMain("basic_arrays_write");
+    runMain("basic_arrays_write")
   }
 
   test("basicfree") {
-    runMain("basicfree");
+    runMain("basicfree")
   }
 
   test("arrays") {
-    runMain("arrays");
+    runMain("arrays")
   }
 
   // used to generate the expected files (DO NOT RUN)

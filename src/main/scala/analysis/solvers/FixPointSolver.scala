@@ -97,8 +97,8 @@ trait ListSetWorklist[N] extends Worklist[N]:
 
   def run(first: Set[N], intra: Boolean) =
     worklist = new ListSet[N] ++ first
-    while (worklist.nonEmpty) do
-      val n = worklist.head;
+    while worklist.nonEmpty do
+      val n = worklist.head
       worklist = worklist.tail
       process(n, intra)
 
@@ -137,7 +137,7 @@ trait WorklistFixpointSolver[N] extends MapLatticeSolver[N] with LinkedHashSetWo
   def process(n: N, intra: Boolean) =
     val xn = x(n)
     val y = funsub(n, x, intra)
-    if (y != xn) then
+    if y != xn then
       x += n -> y
       add(outdep(n, intra))
 

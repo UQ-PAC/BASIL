@@ -12,7 +12,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   def blockIdentifier(block: Block): String = {
     val i = block.address match {
-      case Some(addr) => f"${addr}:${block.label}"
+      case Some(addr) => f"$addr:${block.label}"
       case None       => f"?:${block.label}"
     }
     s"\"$i\""
@@ -20,7 +20,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   def procedureIdentifier(proc: Procedure): String = {
     val i = proc.address match {
-      case Some(addr) => f"${addr}:${proc.name}"
+      case Some(addr) => f"$addr:${proc.name}"
       case None       => f"?:${proc.name}"
     }
     s"\"$i\""
@@ -76,9 +76,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
     program ++= "DirectCall("
     program ++= procedureIdentifier(node.target)
     program ++= ", "
-    program ++= "condition("
-    node.condition.map(visitExpr)
-    program ++= ")" // Condition
     program ++= ")" // DirectCall
     node
   }
@@ -87,9 +84,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
     program ++= "IndirectCall("
     visitVariable(node.target)
     program ++= ", "
-    program ++= "condition("
-    node.condition.map(visitExpr)
-    program ++= ")" // Condition
     program ++= ")" // IndirectCall
     node
   }
