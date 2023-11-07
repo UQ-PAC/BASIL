@@ -321,7 +321,7 @@ trait MemoryRegionAnalysisMisc:
             if (directCall.target.name == "malloc") {
               evaluateExpression(mallocVariable, constantProp(n)) match {
                 case Some(b: BitVecLiteral) =>
-                  s ++ Set((s, Set(HeapRegion(nextMallocCount(), b))))
+                  s ++ Set((n, Set(HeapRegion(nextMallocCount(), b))))
                 case None => s
               }
             } else {

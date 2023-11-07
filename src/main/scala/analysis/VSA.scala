@@ -115,16 +115,17 @@ trait ValueSetAnalysisMisc:
                 // this is an exception to the rule and only applies to data regions
                 evaluateExpression(memoryLoad.index, constantProp(n)) match
                   case Some(bitVecLiteral: BitVecLiteral) =>
-                    val m = s + (r -> Set(getValueType(bitVecLiteral)))
-                    m + (localAssign.lhs -> m(r))
+                    val m = s + (n -> (s.getOrElse(n, Map.empty) + (r -> Set(getValueType(bitVecLiteral)))))
+                    m + (n -> (m.getOrElse(n, Map.empty) + (localAssign.lhs -> m(n)(r))))
                   case None =>
-                    s + (localAssign.lhs -> s(r))
+                    s + (n -> (s.getOrElse(n, Map.empty) + (localAssign.lhs -> s(n)(r))))
               case None =>
                 Logger.warn("could not find region for " + localAssign)
                 s
           case e: Expr =>
             evaluateExpression(e, constantProp(n)) match {
-              case Some(bv: BitVecLiteral) => s + (localAssign.lhs -> Set(getValueType(bv)))
+              case Some(bv: BitVecLiteral) =>
+                s + (n -> (s.getOrElse(n, Map.empty) + (localAssign.lhs -> Set(getValueType(bv)))))
               case None =>
                 Logger.warn("could not evaluate expression" + e)
                 s
@@ -138,7 +139,7 @@ trait ValueSetAnalysisMisc:
                 val storeValue = memAssign.rhs.value
                 evaluateExpression(storeValue, constantProp(n)) match
                   case Some(bitVecLiteral: BitVecLiteral) =>
-                    s + (r -> Set(getValueType(bitVecLiteral)))
+                    s + (n -> (s.getOrElse(n, Map.empty) + (r -> Set(getValueType(bitVecLiteral)))))
                     /*
                   // TODO constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
                   case variable: Variable =>
@@ -147,7 +148,7 @@ trait ValueSetAnalysisMisc:
                   case None =>
                     storeValue.match {
                       case v: Variable =>
-                        s + (r -> s(v))
+                        s + (n -> (s.getOrElse(n, Map.empty) + (r -> s(n)(v))))
                       case _ =>
                         Logger.warn(s"Too Complex: $storeValue") // do nothing
                         s
@@ -218,7 +219,7 @@ abstract class LiftedValueSetAnalysis[P <: ProgramCfg] (
       // function entry nodes are always reachable (if intra-procedural analysis)
       case _: CfgFunctionEntryNode => lift(stateLattice.bottom)
       // all other nodes are processed with join+transfer
-      case _ => super.funsub(n, x, intra = true)
+      case _ => super.funsub(n, x, intra = false)
     }
   }
 }
@@ -235,7 +236,7 @@ trait LiftedValueSetAnalysisMisc extends ValueSetAnalysisMisc {
   def transferUnlifted(n: CfgNode, s: stateLattice.Element): stateLattice.Element = localTransfer(n, s)
 }
 
-abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
+abstract class InterprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
     cfg: ProgramCfg,
     globals: Map[BigInt, String],
     externalFunctions: Map[BigInt, String],
@@ -258,7 +259,7 @@ abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
 
 object ValueSetAnalysis:
 
-  /** Intraprocedural analysis that uses the worklist solver.
+  /** Interprocedural analysis that uses the worklist solver.
     */
   class WorklistSolver(
       cfg: ProgramCfg,
@@ -268,7 +269,7 @@ object ValueSetAnalysis:
       subroutines: Map[BigInt, String],
       mmm: MemoryModelMap,
       constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-  ) extends IntraprocValueSetAnalysisWorklistSolver(
+  ) extends InterprocValueSetAnalysisWorklistSolver(
         cfg,
         globals,
         externalFunctions,
