@@ -6,7 +6,8 @@ class Block(
              var label: String,
              var address: Option[Int],
              var statements: ArrayBuffer[Statement],
-             var jumps: ArrayBuffer[Jump]
+             var jumps: ArrayBuffer[Jump],
+             var procedure: Procedure
            ) {
   def calls: Set[Procedure] = jumps.flatMap(_.calls).toSet
 

@@ -17,20 +17,21 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
     for (s <- program.subroutines) {
       val blocks: ArrayBuffer[Block] = ArrayBuffer()
+      val in: ArrayBuffer[Parameter] = ArrayBuffer()
+      val out: ArrayBuffer[Parameter] = ArrayBuffer()
+      val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
+
       for (b <- s.blocks) {
-        val block = Block(b.label, b.address, ArrayBuffer(), ArrayBuffer())
+        val block = Block(b.label, b.address, ArrayBuffer(), ArrayBuffer(), procedure)
         blocks.append(block)
         labelToBlock.addOne(b.label, block)
       }
-      val in: ArrayBuffer[Parameter] = ArrayBuffer()
       for (p <- s.in) {
         in.append(p.toIR)
       }
-      val out: ArrayBuffer[Parameter] = ArrayBuffer()
       for (p <- s.out) {
         out.append(p.toIR)
       }
-      val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
       if (s.address == mainAddress) {
         mainProcedure = Some(procedure)
       }
@@ -42,10 +43,10 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       for (b <- s.blocks) {
         val block = labelToBlock(b.label)
         for (st <- b.statements) {
-          block.statements.append(translate(st))
+          block.statements.append(translate(st, block))
         }
         for (j <- b.jumps) {
-          block.jumps.append(translate(j))
+          block.jumps.append(translate(j, block))
         }
       }
     }
@@ -59,22 +60,23 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     Program(procedures, mainProcedure.get, memorySections, ArrayBuffer())
   }
 
-  private def translate(s: BAPStatement) = s match {
-    case b: BAPMemAssign   => MemoryAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
-    case b: BAPLocalAssign => LocalAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
+  private def translate(s: BAPStatement, parent: Block) = s match {
+    case b: BAPMemAssign   => MemoryAssign(b.lhs.toIR, b.rhs.toIR, parent, Some(b.line))
+    case b: BAPLocalAssign => LocalAssign(b.lhs.toIR, b.rhs.toIR, parent, Some(b.line))
   }
 
-  private def translate(j: BAPJump) = j match {
+  private def translate(j: BAPJump, parent: Block) = j match {
     case b: BAPDirectCall =>
       DirectCall(
         nameToProcedure(b.target),
         b.returnTarget.map(t => labelToBlock(t)),
-        Some(b.line)
+        parent,
+        Some(b.line),
       )
     case b: BAPIndirectCall =>
-      IndirectCall(b.target.toIR, b.returnTarget.map(t => labelToBlock(t)), Some(b.line))
+      IndirectCall(b.target.toIR, parent, b.returnTarget.map(t => labelToBlock(t)), Some(b.line))
     case b: BAPGoTo =>
-      GoTo(labelToBlock(b.target), coerceToBool(b.condition), Some(b.line))
+      GoTo(labelToBlock(b.target), parent, coerceToBool(b.condition), Some(b.line))
   }
 
   /*

@@ -761,7 +761,7 @@ class ProgramCfgFactory:
           jmps.head match {
             case jmp: GoTo =>
               // `GoTo`s are just edges, so introduce a fake `start of block` that can be jmp'd to
-              val ghostNode = CfgGhostNode(block = block, parent = funcEntryNode, data = NOP(jmp.label))
+              val ghostNode = CfgGhostNode(block = block, parent = funcEntryNode, data = NOP(jmp.label, block))
               cfg.addEdge(prevNode, ghostNode, cond)
               precNode = ghostNode
               visitedBlocks += (block -> ghostNode)

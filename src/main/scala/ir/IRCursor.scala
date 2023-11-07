@@ -1,5 +1,2 @@
 package ir
 
-class IRCursor {
-
-}
