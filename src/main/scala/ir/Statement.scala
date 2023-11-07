@@ -1,6 +1,6 @@
 package ir
 
-trait Command {
+sealed trait Command {
   val label: Option[String]
   def labelStr: String = label match {
     case Some(s) => s"$s: "
@@ -8,7 +8,7 @@ trait Command {
   }
 }
 
-trait Statement extends Command {
+sealed trait Statement extends Command {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Statement = throw new Exception(
