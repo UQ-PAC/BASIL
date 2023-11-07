@@ -273,7 +273,6 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
             BitVecBType(1)
           } else {
             throw new Exception("bitvector size mismatch")
-            BitVecBType(1)
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
@@ -403,11 +402,14 @@ trait QuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends B
 enum Quantifier {
   case forall
   case exists
+  case lambda
 }
 
 case class ForAll(bound: List[BVar], body: BExpr) extends QuantifierExpr(Quantifier.forall, bound, body)
 
 case class Exists(bound: List[BVar], body: BExpr) extends QuantifierExpr(Quantifier.exists, bound, body)
+
+case class Lambda(bound: List[BVar], body: BExpr) extends QuantifierExpr(Quantifier.lambda, bound, body)
 
 case class Old(body: BExpr) extends BExpr {
   override def toString: String = s"old($body)"
@@ -443,7 +445,10 @@ case class MapUpdate(map: BExpr, index: BExpr, value: BExpr) extends BExpr {
 
 sealed trait FunctionOp
 
-case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BVar) extends FunctionOp
+case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BVar) extends FunctionOp {
+  def attribute: BAttribute = BAttribute("bvbuiltin", Some(s"\"$bvbuiltin\""))
+}
+
 case class MemoryLoadOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int) extends FunctionOp {
   val accesses: Int = bits / valueSize
 
@@ -467,6 +472,68 @@ case class GammaStoreOp(addressSize: Int, bits: Int, accesses: Int) extends Func
   val fnName: String = s"gamma_store$bits"
 }
 case class LOp(memoryType: BType, indexType: BType) extends FunctionOp
+
+/**
+ * Utility to extract a particular byte from a bitvector.
+ */
+case class ByteExtract(valueSize: Int, offsetSize: Int) extends FunctionOp {
+  val fnName: String = s"byte_extract${valueSize}_${offsetSize}"
+}
+
+case class BByteExtract(value: BExpr, offset: BExpr) extends BExpr {
+  override def toString: String = s"$fnName($value, $offset)"
+
+  val valueSize: Int = value.getType match {
+    case b: BitVecBType => b.size
+    case _              => throw new Exception(s"ByteExtract does not have Bitvector type: $this")
+  }
+
+  val offsetSize: Int = offset.getType match {
+    case b: BitVecBType => b.size
+    case _              => throw new Exception(s"ByteExtract does not have Bitvector type: $this")
+  }
+
+  val fnName: String = s"byte_extract${valueSize}_${offsetSize}"
+
+  override val getType: BType = BitVecBType(8)
+  override def functionOps: Set[FunctionOp] =
+    value.functionOps ++ offset.functionOps + ByteExtract(valueSize, offsetSize)
+  override def locals: Set[BVar] = value.locals ++ offset.locals
+  override def globals: Set[BVar] = value.globals ++ offset.globals
+  override def loads: Set[BExpr] = value.loads ++ offset.loads
+}
+
+/**
+ * Utility to test if a particular value i is within the bounds of a base variable
+ * and some length. Factors in the problem of wrap around, given the base + length
+ * exceeds the bitvector size.
+ *
+ * Assumes all inputs are of the same bitvector width.
+ */
+case class InBounds(bits: Int, endian: Endian) extends FunctionOp {
+  val fnName: String = endian match {
+    case Endian.LittleEndian => s"in_bounds${bits}_le"
+    case Endian.BigEndian=> s"in_bounds${bits}_be"
+  }
+}
+
+case class BInBounds(base: BExpr, len: BExpr, endian: Endian, i: BExpr) extends BExpr {
+  override def toString: String = s"$fnName($base, $len, $i)"
+
+  val baseSize: Int = base.getType match {
+    case b: BitVecBType => b.size
+    case _              => throw new Exception(s"InBounds does not have Bitvector type: $this")
+  }
+
+  val fnName: String = s"in_bounds${baseSize}"
+
+  override val getType: BType = BoolBType
+  override def functionOps: Set[FunctionOp] =
+    base.functionOps ++ len.functionOps ++ i.functionOps + InBounds(baseSize, endian)
+  override def locals: Set[BVar]  = base.locals ++ len.locals ++ i.locals
+  override def globals: Set[BVar] = base.globals ++ len.globals ++ i.globals 
+  override def loads: Set[BExpr]  = base.loads ++ len.loads ++ i.loads 
+}
 
 case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int) extends BExpr {
   override def toString: String = s"$fnName($memory, $index)"

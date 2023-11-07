@@ -1,10 +1,10 @@
 package ir
 
 import analysis.BitVectorEval.*
-import util.{LogLevel, Logger}
+import util.Logger
 
 import scala.collection.mutable
-import scala.util.control.Breaks.{breakable, break}
+import scala.util.control.Breaks.{break, breakable}
 
 class Interpreter() {
   val regs: mutable.Map[Variable, BitVecLiteral] = mutable.Map()
@@ -13,7 +13,7 @@ class Interpreter() {
   private val FP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
   private val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
   private var nextBlock: Option[Block] = None
-  private val logLevel: LogLevel = LogLevel.DEBUG
+  private val returnBlock: mutable.Stack[Block] = mutable.Stack()
 
   def eval(exp: Expr, env: mutable.Map[Variable, BitVecLiteral]): Literal = {
     exp match {
@@ -57,7 +57,9 @@ class Interpreter() {
       case bin: BinaryExpr =>
         val left: BitVecLiteral = eval(bin.arg1, env).asInstanceOf[BitVecLiteral]
         val right: BitVecLiteral = eval(bin.arg2, env).asInstanceOf[BitVecLiteral]
-        Logger.debug(s"\tBinaryExpr(0x${left.value.toString(16)}[u${left.size}] ${bin.op} 0x${right.value.toString(16)}[u${right.size}])")
+        Logger.debug(
+          s"\tBinaryExpr(0x${left.value.toString(16)}[u${left.size}] ${bin.op} 0x${right.value.toString(16)}[u${right.size}])"
+        )
         bin.op match {
           case BVAND    => smt_bvand(left, right)
           case BVOR     => smt_bvor(left, right)
@@ -112,7 +114,8 @@ class Interpreter() {
       case ms: MemoryStore =>
         val index: Int = eval(ms.index, env).asInstanceOf[BitVecLiteral].value.toInt
         val value: BitVecLiteral = eval(ms.value, env).asInstanceOf[BitVecLiteral]
-        Logger.debug(s"\tMemoryStore(mem:${ms.mem}, index:0x${index.toHexString}, value:0x${value.value.toString(16)}[u${value.size}], size:${ms.size})")
+        Logger.debug(s"\tMemoryStore(mem:${ms.mem}, index:0x${index.toHexString}, value:0x${value.value
+          .toString(16)}[u${value.size}], size:${ms.size})")
         setMemory(index, ms.size, ms.endian, value, mems)
     }
   }
@@ -132,7 +135,13 @@ class Interpreter() {
     BitVecLiteral(BigInt(newValue, 2), newSize)
   }
 
-  def setMemory(index: Int, size: Int, endian: Endian, value: BitVecLiteral, env: mutable.Map[Int, BitVecLiteral]): BitVecLiteral = {
+  def setMemory(
+      index: Int,
+      size: Int,
+      endian: Endian,
+      value: BitVecLiteral,
+      env: mutable.Map[Int, BitVecLiteral]
+  ): BitVecLiteral = {
     val binaryString: String = value.value.toString(2).reverse.padTo(size, '0').reverse
 
     val data: List[BitVecLiteral] = endian match {
@@ -163,7 +172,10 @@ class Interpreter() {
     }
 
     // Procedure.Block
-    nextBlock = Some(p.blocks.head)
+    p.blocks.headOption match {
+      case Some(block) => nextBlock = Some(block)
+      case None        => nextBlock = Some(returnBlock.pop())
+    }
   }
 
   private def interpretBlock(b: Block): Unit = {
@@ -195,22 +207,20 @@ class Interpreter() {
             }
           case dc: DirectCall =>
             Logger.debug(s"$dc")
-            dc.condition match {
-              case Some(value) =>
-                eval(value, regs) match {
-                  case TrueLiteral =>
-                    interpretProcedure(dc.target)
-                    break
-                  case FalseLiteral =>
-                }
-              case None =>
-                interpretProcedure(dc.target)
-                break
+            if (dc.returnTarget.isDefined) {
+              returnBlock.push(dc.returnTarget.get)
             }
+            interpretProcedure(dc.target)
+            break
           case ic: IndirectCall =>
             Logger.debug(s"$ic")
-            if (ic.target == Register("R30", BitVecType(64)) & ic.condition.isEmpty & ic.returnTarget.isEmpty) {
-              nextBlock = None
+            if (ic.target == Register("R30", BitVecType(64)) && ic.returnTarget.isEmpty) {
+              if (returnBlock.nonEmpty) {
+                nextBlock = Some(returnBlock.pop())
+              } else {
+                //Exit Interpreter
+                nextBlock = None
+              }
               break
             } else {
               ???
@@ -236,11 +246,11 @@ class Interpreter() {
         Logger.debug(s"MemoryAssign ${assign.lhs} = ${assign.rhs}")
         val evalRight = eval(assign.rhs, regs)
         evalRight match {
-          case BitVecLiteral(value, size) => Logger.debug(s"MemoryAssign ${assign.lhs} := 0x${value.toString(16)}[u$size]\n")
-          case _                   => throw new Exception("cannot register non-bitvectors")
+          case BitVecLiteral(value, size) =>
+            Logger.debug(s"MemoryAssign ${assign.lhs} := 0x${value.toString(16)}[u$size]\n")
+          case _ => throw new Exception("cannot register non-bitvectors")
         }
 
-      //TODO: ASSERT
       case assert: Assert =>
         Logger.debug(assert)
         ???
@@ -248,8 +258,6 @@ class Interpreter() {
   }
 
   def interpret(IRProgram: Program): mutable.Map[Variable, BitVecLiteral] = {
-    Logger.setLevel(logLevel)
-
     // initialize memory array from IRProgram
     var currentAddress = 0
     IRProgram.initialMemory
@@ -259,7 +267,7 @@ class Interpreter() {
           val start = im.address.max(currentAddress)
           val data = if (im.address < currentAddress) im.bytes.slice(currentAddress - im.address, im.size) else im.bytes
           data.zipWithIndex.foreach { (byte, index) =>
-            mems(start + index) = byte.asInstanceOf[BitVecLiteral]
+            mems(start + index) = byte
           }
           currentAddress = im.address + im.size
         }

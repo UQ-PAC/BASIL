@@ -17,23 +17,25 @@ case class BBlock(label: String, body: List[BCmd]) extends BCmdOrBlock {
   override def globals: Set[BVar] = body.flatMap(c => c.globals).toSet
 }
 
-sealed trait BCmd extends BCmdOrBlock {
+sealed trait BCmd() extends BCmdOrBlock with HasAttributes {
+  override def attributes: List[BAttribute] = List()
   def comment: Option[String]
+
   override def toBoogie: List[String] = {
     val commentOut = comment.map(" //" + _).getOrElse("")
     List(toString + commentOut)
   }
 }
 
-case class BAssert(body: BExpr, comment: Option[String] = None) extends BCmd {
-  override def toString: String = s"assert $body;"
+case class BAssert(body: BExpr, comment: Option[String] = None, override val attributes: List[BAttribute] = List.empty) extends BCmd {
+  override def toString: String = s"assert $attrString$body;"
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
 }
 
-case class BAssume(body: BExpr, comment: Option[String] = None) extends BCmd {
-  override def toString: String = s"assume $body;"
+case class BAssume(body: BExpr, comment: Option[String] = None, override val attributes: List[BAttribute] = List.empty) extends BCmd {
+  override def toString: String = s"assume $attrString$body;"
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
@@ -42,9 +44,9 @@ case class BAssume(body: BExpr, comment: Option[String] = None) extends BCmd {
 case class BProcedureCall(name: String, lhss: Seq[BVar], params: Seq[BExpr], comment: Option[String] = None) extends BCmd {
   override def toString: String = {
     if (lhss.isEmpty) {
-      s"call $name();"
+      s"call $attrString$name();"
     } else {
-      s"call ${lhss.mkString(", ")} := $name(${params.mkString(", ")});"
+      s"call $attrString${lhss.mkString(", ")} := $name(${params.mkString(", ")});"
     }
   }
   override def functionOps: Set[FunctionOp] = params.flatMap(p => p.functionOps).toSet
@@ -93,8 +95,8 @@ case class IfCmd(guard: BExpr, thenCmds: List[BCmd], comment: Option[String] = N
   override def globals: Set[BVar] = guard.globals ++ thenCmds.flatMap(c => c.globals).toSet
 }
 
-case class GoToCmd(destination: String, comment: Option[String] = None) extends BCmd {
-  override def toString: String = s"goto $destination;"
+case class GoToCmd(destinations: Seq[String], comment: Option[String] = None) extends BCmd {
+  override def toString: String = s"goto ${destinations.mkString(", ")};"
 }
 
 case object ReturnCmd extends BCmd {

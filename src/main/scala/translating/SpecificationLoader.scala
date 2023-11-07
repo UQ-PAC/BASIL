@@ -361,7 +361,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     val params: Map[String, Parameter] = irProc match {
       case None => Map()
       case Some(p) =>
-        p.in.map { (p: Parameter) => p.name -> p }.toMap ++ p.out.map { (p: Parameter) => p.name -> p }.toMap
+        p.in.map(p => p.name -> p).toMap ++ p.out.map(p => p.name -> p).toMap
     }
 
     val requires = ctx.requires.asScala.collect { case r: ParsedRequiresContext =>

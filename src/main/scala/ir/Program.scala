@@ -14,7 +14,7 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     var next = mainProcedure.name
     var reachableNames: Set[String] = Set(next)
     var toVisit: List[String] = List()
-    var reachableFound = true;
+    var reachableFound = true
     while (reachableFound) {
       val children = functionToChildren(next) -- reachableNames -- toVisit - next
       reachableNames = reachableNames ++ children
@@ -175,6 +175,7 @@ class Procedure(
           case g: GoTo => visitBlock(g.target)
           case d: DirectCall => d.returnTarget.foreach(visitBlock)
           case i: IndirectCall => i.returnTarget.foreach(visitBlock)
+          case n: NonDetGoTo => n.targets.foreach(visitBlock)
         }
       }
     }
