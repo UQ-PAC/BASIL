@@ -212,7 +212,7 @@ class ValueSetAnalysisSolver(
 //
 //object ValueSetAnalysis:
 //
-//  /** Intraprocedural analysis that uses the worklist solver.
+//  /** Interprocedural analysis that uses the worklist solver.
 //    */
 //  class WorklistSolver(
 //      cfg: ProgramCfg,
@@ -222,7 +222,7 @@ class ValueSetAnalysisSolver(
 //      subroutines: Map[BigInt, String],
 //      mmm: MemoryModelMap,
 //      constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-//  ) extends IntraprocValueSetAnalysisWorklistSolver(
+//  ) extends InterprocValueSetAnalysisWorklistSolver(
 //        cfg,
 //        globals,
 //        externalFunctions,
