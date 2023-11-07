@@ -9,6 +9,13 @@ class Block(
              var jumps: ArrayBuffer[Jump],
              var procedure: Procedure
            ) {
+
+  //def addStatementAfter(statement: Statement, newStatement: Statement): Statement = {
+  //  val i = statements.indexOf(statement)
+  //  statements.insert(i, newStatement)
+  //}
+
+
   def calls: Set[Procedure] = jumps.flatMap(_.calls).toSet
 
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet

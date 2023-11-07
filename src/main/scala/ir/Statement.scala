@@ -8,6 +8,7 @@ sealed trait Command {
     case Some(s) => s"$s: "
     case None => ""
   }
+  
 }
 
 sealed trait Statement extends Command {
