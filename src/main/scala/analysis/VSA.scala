@@ -229,4 +229,6 @@ object ValueSetAnalysis:
         mmm,
         constantProp,
         MapLattice[Variable | MemoryRegion, PowersetLattice[Value]](PowersetLattice[Value])
-      )
+  ) {
+    def analyzeAndUnpack(intra: Boolean) = super.analyze(intra).map(_.toMap)
+  }

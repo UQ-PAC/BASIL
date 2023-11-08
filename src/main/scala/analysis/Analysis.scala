@@ -131,7 +131,9 @@ abstract class ValueAnalysisWorklistSolver[L <: LatticeWithOps](
 
 object ConstantPropagationAnalysis:
 
-  class WorklistSolver(cfg: ProgramCfg) extends ValueAnalysisWorklistSolver(cfg, ConstantPropagationLattice)
+  class WorklistSolver(cfg: ProgramCfg) extends ValueAnalysisWorklistSolver(cfg, ConstantPropagationLattice) {
+    def analyzeAndUnpack(intra: Boolean) = super.analyze(intra).map(_.toMap)
+  }
 
 
 
@@ -422,4 +424,6 @@ object MemoryRegionAnalysis:
         subroutines,
         constantProp,
         PowersetLattice[MemoryRegion]
-      )
+  ) {
+    def analyzeAndUnpack(intra: Boolean) = super.analyze(intra).toMap
+  }

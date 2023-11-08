@@ -3,6 +3,7 @@ package analysis
 import ir._
 import analysis.BitVectorEval
 import util.Logger
+import scala.collection.immutable.HashMap
 
 /** Basic lattice
   */
@@ -115,12 +116,37 @@ class FlatLattice[X] extends Lattice:
   */
 class MapLattice[A, +L <: Lattice](val sublattice: L) extends Lattice:
 
-  type Element = Map[A, sublattice.Element]
+  /** Specialised map to optimise for:
+    * - All elements map to sublattice.bottom
+    * - Efficient merge operations
+    */
+  sealed trait ML:
+    def apply(x: A): sublattice.Element
+    def +(kv: (A,sublattice.Element)): ML
+    def toMap: Map[A,sublattice.Element]
+    def merge(x: ML): ML
+    def map[B](f: sublattice.Element => B): Map[A,B]
+  case class Elem(m: HashMap[A, sublattice.Element]) extends ML:
+    def apply(x: A) = m.getOrElse(x, sublattice.bottom)
+    def +(kv: (A,sublattice.Element)) =
+      if kv._2 == sublattice.bottom then Elem(m - kv._1) else Elem(m + kv)
+    def toMap = m.toMap.withDefaultValue(sublattice.bottom)
+    def merge(x: ML) = x match {
+      case Elem(n) => Elem(m.merged(n)( (p,q) => (p._1,sublattice.lub(p._2,q._2)) ))
+      case _ => Elem(m)
+    }
+    def map[B](f: sublattice.Element => B) = m.map((k,v) => (k,f(v))).withDefaultValue(f(sublattice.bottom))
+  case class Bottom() extends ML:
+    def apply(x: A) = sublattice.bottom
+    def +(kv: (A,sublattice.Element)) =
+      if kv._2 == sublattice.bottom then Bottom() else Elem(HashMap(kv))
+    def toMap = Map().withDefaultValue(sublattice.bottom)
+    def merge(x: ML) = x
+    def map[B](f: sublattice.Element => B) = Map().withDefaultValue(f(sublattice.bottom))
 
-  val bottom: Element = Map().withDefaultValue(sublattice.bottom)
-
-  def lub(x: Element, y: Element): Element =
-    x.keys.foldLeft(y)((m, a) => m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
+  type Element = ML
+  val bottom: Element = Bottom()
+  def lub(x: Element, y: Element): Element = x.merge(y)
 
 /** Constant propagation lattice.
   */
