@@ -67,7 +67,7 @@ trait Worklist[N]:
 
   /** Adds a set of items to the worklist.
     */
-  def add(ns: Set[N]): Unit
+  def add(ns: Iterable[N]): Unit
 
   /** Iterates until there is no more work to do.
     *
@@ -93,7 +93,7 @@ trait ListSetWorklist[N] extends Worklist[N]:
   def add(n: N) =
     worklist += n
 
-  def add(ns: Set[N]) = worklist ++= ns
+  def add(ns: Iterable[N]) = worklist ++= ns
 
   def run(first: Set[N], intra: Boolean) =
     worklist = new ListSet[N] ++ first
@@ -114,7 +114,7 @@ trait LinkedHashSetWorklist[N] extends Worklist[N]:
   def add(n: N) =
     worklist += n
 
-  def add(ns: Set[N]) = worklist ++= ns
+  def add(ns: Iterable[N]) = worklist ++= ns
 
   def run(first: Set[N], intra: Boolean) =
     worklist.addAll(first);
