@@ -3,6 +3,7 @@ package analysis.solvers
 import analysis._
 import scala.collection.immutable.ListSet
 import scala.collection.mutable.LinkedHashSet
+import scala.collection.mutable.PriorityQueue
 
 /** Base trait for lattice solvers.
   */
@@ -124,6 +125,42 @@ trait LinkedHashSetWorklist[N] extends Worklist[N]:
       process(n, intra)
 
 
+/** Priority Queue Worklist
+  *
+  * Assumes nodes have unique priorities and
+  * will only process a node once, regardless of the
+  * number of times it is queued. Will process the
+  * node again if it is queued AFTER its been processed.
+  *
+  * Single processing is generally desirable in a worklist
+  * solver, as repeated processing of a node without intermediate
+  * modifications to its incoming state will be redundant.
+  *
+  * @tparam N
+  *   type of the elements in the worklist.
+  */
+trait PriorityQueueWorklist[N] extends Worklist[N] with Priorities[N]:
+  //implicit val ord: Ordering[N] = Ordering.by( e => e.asInstanceOf[CfgNode].rpo )
+  private val worklist = new PriorityQueue[N]()
+  def add(n: N) = worklist += n
+  def add(ns: Iterable[N]) = worklist ++= ns
+
+  def run(first: Set[N], intra: Boolean) = {
+    worklist ++= first
+    while (worklist.nonEmpty) do {
+      val n = worklist.dequeue()
+      /** Drop all items in the queue with the same priority.
+        * n is already the greatest, so head >= n implies n == head.
+        */
+      while (worklist.nonEmpty && !ord.lt(worklist.head,n)) do {
+        val m = worklist.dequeue()
+        assert(m == n, s"Different nodes with same priority, violates PriorityQueueWorklist assumption: $n and $m")
+      }
+      process(n, intra)
+    }
+  }
+
+
 /** Base trait for worklist-based fixpoint solvers.
   *
   * @tparam N
@@ -175,7 +212,7 @@ trait SimpleWorklistFixpointSolver[N] extends WorklistFixpointSolver[N]:
   * Better implementation of the same thing
   * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L311
   */
-trait PushDownWorklistFixpointSolver[N] extends MapLatticeSolver[N] with LinkedHashSetWorklist[N] with Dependencies[N]:
+trait PushDownWorklistFixpointSolver[N] extends MapLatticeSolver[N] with PriorityQueueWorklist[N] with Dependencies[N]:
   /** The current lattice element.
     */
   var x: lattice.Element = _

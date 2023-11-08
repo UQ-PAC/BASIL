@@ -116,7 +116,9 @@ abstract class SimpleValueAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAna
     */
   val lattice: MapLattice[CfgNode, statelattice.type] = MapLattice(statelattice)
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
+  /* Setup initial analysis domain with all reachable nodes.
+   */
+  val domain: Set[CfgNode] = cfg.nodes.toSet.collect{ case n: CfgNode if n.rpo != -1 => n }
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
@@ -126,6 +128,7 @@ abstract class ValueAnalysisWorklistSolver[L <: LatticeWithOps](
     cfg: ProgramCfg,
     val valuelattice: L
 ) extends SimpleValueAnalysis(cfg)
+    with ReversePostOrder
     with SimplePushDownWorklistFixpointSolver[CfgNode]
     with ForwardDependencies
 

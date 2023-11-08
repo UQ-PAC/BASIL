@@ -32,3 +32,9 @@ trait ForwardDependencies extends Dependencies[CfgNode]:
 
   def indep(n: CfgNode, intra: Boolean = true) =
     if intra then n.pred(intra) else n.pred(intra).union(n.pred(!intra))
+
+trait Priorities[N]:
+  implicit val ord: Ordering[N]
+
+trait ReversePostOrder extends Priorities[CfgNode]:
+  implicit val ord = Ordering.by(e => e.rpo)

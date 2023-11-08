@@ -191,6 +191,9 @@ trait CfgNode:
   val id: Int = CfgNode.nextId()
   def copyNode(): CfgNode
 
+  /** Annotate nodes with their reverse postorder priority */
+  var rpo: Int = -1
+
   override def equals(obj: scala.Any): Boolean =
     obj match
       case o: CfgNode => o.id == this.id
@@ -627,6 +630,20 @@ class ProgramCfgFactory:
     cfg
   }
 
+  /** Global reverse post-order walk for the control flow graph. */
+  var rpoVisitCount = 0;
+  var seen: Set[CfgNode] = Set()
+  def rpoWalk(node: CfgNode): Unit = {
+    seen += node
+    for (succ <- node.succ(true)) {
+      if (!seen.contains(succ)) {
+        rpoWalk(succ)
+      }
+    }
+    node.rpo = rpoVisitCount
+    rpoVisitCount += 1
+  }
+
   /** Create an intraprocedural CFG for the given IR procedure. The start of the CFG for a procedure is identified by
     * its `CfgFunctionEntryNode`, and its closure is identified by the `CfgFunctionExitNode`.
     *
@@ -653,6 +670,9 @@ class ProgramCfgFactory:
 
     // Recurse through blocks
     visitBlock(proc.blocks.head, funcEntryNode, TrueLiteral)
+
+    // Introduce the reverse postorder priorities
+    rpoWalk(funcEntryNode)
 
     /** Add a block to the CFG. A block in this case is a basic block, so it contains a list of consecutive statements
       * followed by a jump at the end to another block. We process statements in this block (if they exist), and then
