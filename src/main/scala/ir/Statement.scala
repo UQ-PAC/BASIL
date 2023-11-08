@@ -1,4 +1,5 @@
 package ir
+import intrusiveList.IntrusiveListElement
 
 sealed trait Command {
   val label: Option[String]
@@ -11,7 +12,7 @@ sealed trait Command {
   
 }
 
-sealed trait Statement extends Command {
+sealed trait Statement extends Command with IntrusiveListElement {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Statement = throw new Exception(

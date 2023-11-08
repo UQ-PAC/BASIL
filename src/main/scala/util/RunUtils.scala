@@ -18,6 +18,7 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
+import intrusiveList.IntrusiveList
 
 import scala.collection.mutable
 
@@ -336,7 +337,7 @@ object RunUtils {
 
               val newBlocks = for (t <- targets) yield {
                 val newLabel: String = block.label + t.name
-                val newBlock = Block(newLabel, None, ArrayBuffer(), ArrayBuffer(), procedure)
+                val newBlock = Block(newLabel, None, IntrusiveList(), ArrayBuffer(), procedure)
                 val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)), newBlock)
                 val directCall = DirectCall(t, indirectCall.returnTarget, newBlock)
                 newBlock.statements.addOne(assume)
@@ -357,7 +358,7 @@ object RunUtils {
     }
 
     def addFakeProcedure(name: String): Unit = {
-      IRProgram.procedures += Procedure(name, None, ArrayBuffer(), ArrayBuffer(), ArrayBuffer())
+      IRProgram.procedures += Procedure(name, None, IntrusiveList(), ArrayBuffer(), ArrayBuffer())
     }
 
     def resolveAddresses(valueSet: Set[Value]): Set[AddressValue] = {

@@ -2,6 +2,7 @@ package ir
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
+import intrusiveList.IntrusiveList
 
 abstract class Visitor {
 
@@ -52,8 +53,8 @@ abstract class Visitor {
   }
 
   def visitBlock(node: Block): Block = {
-    for (i <- node.statements.indices) {
-      node.statements(i) = visitStatement(node.statements(i))
+    for (s <- node.statements) {
+      node.statements.replace(s, visitStatement(s))
     }
     for (i <- node.jumps.indices) {
       node.jumps(i) = visitJump(node.jumps(i))
@@ -62,8 +63,8 @@ abstract class Visitor {
   }
 
   def visitProcedure(node: Procedure): Procedure = {
-    for (i <- node.blocks.indices) {
-      node.blocks(i) = visitBlock(node.blocks(i))
+    for (b <- node.blocks) {
+      node.blocks.replace(b, visitBlock(b))
     }
     for (i <- node.in.indices) {
       node.in(i) = visitParameter(node.in(i))
@@ -318,7 +319,7 @@ class ExternalRemover(external: Set[String]) extends Visitor {
     if (external.contains(node.name)) {
       // update the modifies set before removing the body
       node.modifies.addAll(node.blocks.flatMap(_.modifies))
-      node.blocks = ArrayBuffer()
+      node.blocks = IntrusiveList()
     }
     super.visitProcedure(node)
   }

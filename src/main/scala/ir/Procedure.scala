@@ -4,11 +4,13 @@ import boogie.{BParam, BVariable, BitVecBType, BoolBType}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+import intrusiveList.IntrusiveList
+import intrusiveList.IntrusiveListElement
 
 class Procedure(
                  var name: String,
                  var address: Option[Int],
-                 var blocks: ArrayBuffer[Block],
+                 var blocks: IntrusiveList[Block],
                  var in: ArrayBuffer[Parameter],
                  var out: ArrayBuffer[Parameter]
                ) {

@@ -1,14 +1,17 @@
 package ir
 
+import intrusiveList.IntrusiveList
+import intrusiveList.IntrusiveListElement
+
 import scala.collection.mutable.ArrayBuffer
 
 class Block(
              var label: String,
              var address: Option[Int],
-             var statements: ArrayBuffer[Statement],
+             var statements: IntrusiveList[Statement],
              var jumps: ArrayBuffer[Jump],
              var procedure: Procedure
-           ) {
+           ) extends IntrusiveListElement {
 
   //def addStatementAfter(statement: Statement, newStatement: Statement): Statement = {
   //  val i = statements.indexOf(statement)

@@ -688,7 +688,7 @@ class ProgramCfgFactory:
       block.statements.size match {
         case i if i > 0 =>
           // Block contains some statements
-          val endStmt: CfgCommandNode = visitStmts(block.statements, prevBlockEnd, cond)
+          val endStmt: CfgCommandNode = visitStmts(ArrayBuffer.from(block.statements), prevBlockEnd, cond)
           visitJumps(block.jumps, endStmt, TrueLiteral, solitary = false)
         case _ =>
           // Only jumps in this block

@@ -6,6 +6,7 @@ import specification._
 import scala.collection.mutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
+import intrusiveList.IntrusiveList
 
 class BAPToIR(var program: BAPProgram, mainAddress: Int) {
 
@@ -16,13 +17,13 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     var mainProcedure: Option[Procedure] = None
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
     for (s <- program.subroutines) {
-      val blocks: ArrayBuffer[Block] = ArrayBuffer()
+      val blocks: IntrusiveList[Block] = IntrusiveList[Block]()
       val in: ArrayBuffer[Parameter] = ArrayBuffer()
       val out: ArrayBuffer[Parameter] = ArrayBuffer()
       val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
 
       for (b <- s.blocks) {
-        val block = Block(b.label, b.address, ArrayBuffer(), ArrayBuffer(), procedure)
+        val block = Block(b.label, b.address, IntrusiveList(), ArrayBuffer(), procedure)
         blocks.append(block)
         labelToBlock.addOne(b.label, block)
       }
