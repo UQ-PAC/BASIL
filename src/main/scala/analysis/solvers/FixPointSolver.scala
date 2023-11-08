@@ -183,9 +183,10 @@ trait PushDownWorklistFixpointSolver[N] extends MapLatticeSolver[N] with LinkedH
   /** Propagates lattice element y to node m.
     * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L286
     */
-  def propagate(y: lattice.sublattice.Element, m: N) = {
+  def propagate(y: lattice.sublattice.Element, m: N, intra: Boolean): Unit = {
     val xm = x(m)
-    val t = lattice.sublattice.lub(xm, y)
+    /* If we are the successors only predecessor, simply overwrite */
+    val t = if indep(m, intra).size > 1 then lattice.sublattice.lub(xm, y) else y
     if (t != xm) {
       add(m)
       x += m -> t
@@ -193,11 +194,31 @@ trait PushDownWorklistFixpointSolver[N] extends MapLatticeSolver[N] with LinkedH
   }
 
   def process(n: N, intra: Boolean) =
-    //val y = funsub(n, x, intra)
     val xn = x(n)
-    val y = transfer(n, xn)
+    var y = transfer(n, xn)
+    var next = outdep(n, intra)
 
-    for succ <- outdep(n, intra) do propagate(y, succ)
+    /** Process all nodes that are trivially linked to the current
+      * such that the next node is the current's only successor and
+      * the current is the next node's only predecessor.
+      * Effectively emulating a basic block.
+      */
+    while (next.size == 1 && indep(next.head, intra).size <= 1) {
+      val succ = next.head
+      val xm = x(succ)
+      if (y == xm) {
+        /* Reached a fixed point, no need to progress */
+        return
+      } else {
+        /* Stash the state and continue */
+        x += succ -> y
+        y = transfer(succ, y)
+        next = outdep(succ, intra)
+      }
+    }
+
+    /* End of the block, propagate onwards */
+    for succ <- next do propagate(y, succ, intra)
 
 /** Worklist-based fixpoint solver.
   *
