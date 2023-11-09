@@ -194,6 +194,16 @@ trait CfgNode:
   /** Annotate nodes with their reverse postorder priority */
   var rpo: Int = -1
 
+  /** A trivial node can be considered part of its
+   *  predecessor's basic block.
+   *  Has a single predecessor and is its predecessors only
+   *  successor.
+   */
+  def trivial() = {
+    val p = pred(true)
+    if p.size == 1 then p.head.succ(true).size == 1 else false
+  }
+
   override def equals(obj: scala.Any): Boolean =
     obj match
       case o: CfgNode => o.id == this.id

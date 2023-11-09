@@ -116,9 +116,14 @@ abstract class SimpleValueAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAna
     */
   val lattice: MapLattice[CfgNode, statelattice.type] = MapLattice(statelattice)
 
-  /* Setup initial analysis domain with all reachable nodes.
-   */
-  val domain: Set[CfgNode] = cfg.nodes.toSet.collect{ case n: CfgNode if n.rpo != -1 => n }
+  /** Setup initial analysis domain with:
+    *  - All function entry nodes with a priority, filtering out those without a body
+    *  - All nodes that can't be trivially attributed to their predecessors (not part of a basic block)
+    */
+  val domain: Set[CfgNode] = cfg.nodes.toSet.collect{
+    case n: CfgFunctionEntryNode if n.rpo != -1 => n
+    case n: CfgNode if n.rpo != -1 && !n.trivial() => n
+  }
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
