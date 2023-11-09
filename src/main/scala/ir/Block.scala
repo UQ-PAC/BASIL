@@ -17,28 +17,27 @@ class Block private
              val incomingJumps: mutable.HashSet[Block],
              val parent: Procedure
            ) extends IntrusiveListElement {
+  def this(label: String, address: Option[Int], statements: IterableOnce[Statement], jumps: IterableOnce[Jump], parent: Procedure) = {
+    this(label, address, IntrusiveList.from(statements), IntrusiveList.from(jumps), mutable.HashSet.empty, parent)
+  }
 
+  def jumps: immutable.List[Jump] = _jumps to immutable.List
+  
+  def addJump(j: Jump): Unit = {
+    j.parent = this
+    _jumps.append(j)
+  }
 
- def this(label: String, address: Option[Int], statements: IterableOnce[Statement], jumps: IterableOnce[Jump], parent: Procedure) = {
-   this(label, address, IntrusiveList.from(statements), IntrusiveList.from(jumps), mutable.HashSet.empty, parent)
- }
-
- def jumps: immutable.List[Jump] = _jumps to immutable.List
+  def predecessors: immutable.Set[Block] = incomingJumps to immutable.Set
  
-
- def addJump(j: Jump): Unit = {
-   j.parent = this
-   _jumps.append(j)
- }
-
- def removeJump(j: Jump) : Unit = {
-   assert(j.parent == this)
-   j match 
-     case g: GoTo => g.deParent()
-     case _ => ()
-
-   _jumps.remove(j)
- }
+  def removeJump(j: Jump) : Unit = {
+    assert(j.parent == this)
+    j match 
+      case g: GoTo => g.deParent()
+      case _ => ()
+ 
+    _jumps.remove(j)
+  }
 
   def replaceJump(j: Jump, newJ: Jump) : Unit = {
     assert((j.parent == this) && (newJ.parent == this))

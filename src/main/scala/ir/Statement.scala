@@ -147,7 +147,8 @@ class NonDetGoTo private (private var _targets: mutable.Set[Block], var parent: 
 
 sealed trait Call extends Jump 
 
-class DirectCall(var target: Procedure, var returnTarget: Option[Block], var parent: Block, override val label: Option[String] = None) extends Call {
+class DirectCall(val target: Procedure, var returnTarget: Option[Block], var parent: Block, override val label: Option[String] = None) extends Call {
+  target.addCaller(this)
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()

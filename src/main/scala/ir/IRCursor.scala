@@ -15,7 +15,6 @@ case class ProcedureUnknownJump(pos: CFGPosition)
 case class ProcedureReturn(procedure: Procedure, pos: CFGPosition)
 
 case class IntraProcIRCursor(pos: CFGPosition) {
-
   def succ(): Set[CFGPosition] = {
     pos match {
       case s: Statement =>
@@ -25,7 +24,8 @@ case class IntraProcIRCursor(pos: CFGPosition) {
           s.parent.jumps.toSet
         }
       case j: Jump => j match {
-        /* TODO jumps are ordered so prior jumps mask later jumps; assuming the union of the conditions is total */
+        /* TODO jumps are ordered so prior jumps mask later jumps; assuming the union of the conditions is total 
+         * This will not be the case once we make all jumps nondeterministic. */
         case g: DetGoTo => Set[CFGPosition](g.target)
         case n: NonDetGoTo => n.targets.toSet
         case c: DirectCall => c.returnTarget match
@@ -48,7 +48,6 @@ case class IntraProcIRCursor(pos: CFGPosition) {
     }
   }
 
-
   def pred(): Set[CFGPosition] = {
     pos match {
       case s: Statement =>
@@ -57,8 +56,8 @@ case class IntraProcIRCursor(pos: CFGPosition) {
         } else {
           Set(s.parent) // predecessor blocks
         }
-      case j: Jump => Set(j.parent.statements.last)
-      case b: Block => ??? // predecessor edges
+      case j: Jump => if j.parent.statements.isEmpty then Set(j.parent) else Set(j.parent.statements.last)
+      case b: Block => b.predecessors.asInstanceOf[Set[CFGPosition]]
       case proc: Procedure => Set()
       case r: ProcedureUnknownJump => Set(r.pos)
       case r: ProcedureReturn => Set(r.pos)

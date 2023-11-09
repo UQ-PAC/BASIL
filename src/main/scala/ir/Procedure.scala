@@ -6,18 +6,34 @@ import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 import intrusiveList.IntrusiveList
 
-class Procedure(
+class Procedure (
                  var name: String,
                  var address: Option[Int],
                  var blocks: IntrusiveList[Block],
                  var in: ArrayBuffer[Parameter],
                  var out: ArrayBuffer[Parameter]
                ) {
+
+
+  private var _callers = new mutable.HashMap[Procedure, mutable.Set[Call]] with mutable.MultiMap[Procedure, Call]
+
   def calls: Set[Procedure] = blocks.flatMap(_.calls).toSet
   override def toString: String = {
     s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
   }
+
+  def removeCaller(c: Call): Unit = {
+    _callers.removeBinding(c.parent.parent, c)
+  }
+
+  def addCaller(c: Call): Unit = {
+    _callers.addBinding(c.parent.parent, c)
+  }
+
+  def callers(): Iterable[Procedure] = _callers.keySet
+
   var modifies: mutable.Set[Global] = mutable.Set()
+
 
   def stackIdentification(): Unit = {
     val stackPointer = Register("R31", BitVecType(64))
