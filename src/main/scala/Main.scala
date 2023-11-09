@@ -43,6 +43,9 @@ object Main {
   )
 
   def main(args: Array[String]): Unit = {
+
+    println(ProgramGenerator.generateProgram())
+    return;
     val parser = ParserForClass[Config]
     val parsed = parser.constructEither(args.toSeq)
 
