@@ -23,7 +23,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
 
       for (b <- s.blocks) {
-        val block = Block(b.label, b.address, IntrusiveList(), ArrayBuffer(), procedure)
+        val block = Block(b.label, b.address, IntrusiveList(), Seq(), Seq(), procedure)
         blocks.append(block)
         labelToBlock.addOne(b.label, block)
       }
@@ -47,7 +47,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
           block.statements.append(translate(st, block))
         }
         for (j <- b.jumps) {
-          block.jumps.append(translate(j, block))
+          block.addJump(translate(j, block))
         }
       }
     }
@@ -66,7 +66,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     case b: BAPLocalAssign => LocalAssign(b.lhs.toIR, b.rhs.toIR, parent, Some(b.line))
   }
 
-  private def translate(j: BAPJump, parent: Block) = j match {
+  private def translate(j: BAPJump, parent: Block) : Jump = j match {
     case b: BAPDirectCall =>
       DirectCall(
         nameToProcedure(b.target),
@@ -77,7 +77,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     case b: BAPIndirectCall =>
       IndirectCall(b.target.toIR, parent, b.returnTarget.map(t => labelToBlock(t)), Some(b.line))
     case b: BAPGoTo =>
-      GoTo(labelToBlock(b.target), parent, coerceToBool(b.condition), Some(b.line))
+      DetGoTo(labelToBlock(b.target), parent, coerceToBool(b.condition), Some(b.line))
   }
 
   /*

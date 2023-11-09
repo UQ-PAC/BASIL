@@ -412,7 +412,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           case None    => unresolved ++ List(Comment("no return target"), BAssume(FalseBLiteral))
         }
       }
-    case g: GoTo =>
+    case g: DetGoTo =>
       g.condition match {
         case Some(c) =>
           val guard = c.toBoogie
@@ -422,10 +422,11 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           List(GoToCmd(Seq(g.target.label)))
       }
     case n: NonDetGoTo =>
-      List(GoToCmd(n.targets.map(_.label)))
+      List(GoToCmd(n.targets.map(_.label).toSeq))
   }
 
   def translate(s: Statement): List[BCmd] = s match {
+    case m: NOP => List.empty
     case m: MemoryAssign =>
       val lhs = m.lhs.toBoogie
       val rhs = m.rhs.toBoogie
@@ -433,8 +434,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val rhsGamma = m.rhs.toGamma
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val stateSplit = s match {
-        case MemoryAssign(_,_, Some(label)) => List(captureStateStatement(s"$label"))
-        case LocalAssign(_,_, Some(label)) => List(captureStateStatement(s"$label"))
+        case MemoryAssign(_,_, parent, Some(label)) => List(captureStateStatement(s"$label"))
+        case LocalAssign(_,_, parent, Some(label)) => List(captureStateStatement(s"$label"))
         case _ => List.empty
       }
       if (lhs == stack) {

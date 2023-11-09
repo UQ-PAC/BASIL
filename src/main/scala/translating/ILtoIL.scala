@@ -60,7 +60,16 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node
   }
 
-  override def visitGoTo(node: GoTo): Jump = {
+
+  override def visitNonDetGoTo(node: NonDetGoTo): Jump = {
+    program ++= "NonDetGoTo({"
+    // TODO
+    program ++= node.targets.map(blockIdentifier(_)).mkString(", ")
+    program ++= "})" // GoTo
+    node
+  }
+
+  override def visitGoTo(node: DetGoTo): Jump = {
     program ++= "GoTo("
     // TODO
     program ++= blockIdentifier(node.target)

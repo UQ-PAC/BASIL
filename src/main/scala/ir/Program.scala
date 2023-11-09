@@ -5,7 +5,9 @@ import scala.collection.mutable
 import boogie.*
 import analysis.BitVectorEval
 
-class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure, var initialMemory: ArrayBuffer[MemorySection], var readOnlyMemory: ArrayBuffer[MemorySection]) {
+class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure,
+              var initialMemory: ArrayBuffer[MemorySection],
+              var readOnlyMemory: ArrayBuffer[MemorySection]) {
 
   // This shouldn't be run before indirect calls are resolved?
   def stripUnreachableFunctions(): Unit = {

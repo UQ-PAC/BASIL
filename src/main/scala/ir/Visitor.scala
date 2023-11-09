@@ -34,7 +34,7 @@ abstract class Visitor {
 
   def visitJump(node: Jump): Jump = node.acceptVisit(this)
 
-  def visitGoTo(node: GoTo): Jump = {
+  def visitGoTo(node: DetGoTo): Jump = {
     node.condition = node.condition.map(visitExpr)
     node
   }
@@ -56,8 +56,9 @@ abstract class Visitor {
     for (s <- node.statements) {
       node.statements.replace(s, visitStatement(s))
     }
-    for (i <- node.jumps.indices) {
-      node.jumps(i) = visitJump(node.jumps(i))
+    for (j <- node.jumps) {
+      node.replaceJump(j, visitJump(j))
+      //node.jumps(i) = visitJump(j)
     }
     node
   }
@@ -215,7 +216,7 @@ abstract class ReadOnlyVisitor extends Visitor {
     node
   }
 
-  override def visitGoTo(node: GoTo): Jump = {
+  override def visitGoTo(node: DetGoTo): Jump = {
     node
   }
 

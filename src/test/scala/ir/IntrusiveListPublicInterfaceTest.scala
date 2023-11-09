@@ -151,5 +151,15 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
     assert(it.length == 7)
   }
 
+  test("addAll") {
+    val l = getSequentialList(3)
+    val toAdd = List(Elem(3),Elem(4),Elem(5))
+    l.addAll(toAdd)
+
+    for (i <- 0 until 6) {
+      assert(l(i).t == i)
+    }
+  }
+
 
 }

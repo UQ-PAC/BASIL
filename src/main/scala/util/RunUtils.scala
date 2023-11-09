@@ -329,25 +329,24 @@ object RunUtils {
             if (targets.size == 1) {
               modified = true
               val newCall = DirectCall(targets.head, indirectCall.returnTarget, block)
-              block.jumps.remove(block.jumps.indexOf(indirectCall))
-              block.jumps.append(newCall)
+              block.replaceJump(indirectCall, newCall)
             } else if (targets.size > 1) {
               modified = true
               val procedure: Procedure = c.parent.data
 
               val newBlocks = for (t <- targets) yield {
                 val newLabel: String = block.label + t.name
-                val newBlock = Block(newLabel, None, IntrusiveList(), ArrayBuffer(), procedure)
+                val newBlock = Block(newLabel, None, IntrusiveList(), Seq(), Seq(), procedure)
                 val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)), newBlock)
                 val directCall = DirectCall(t, indirectCall.returnTarget, newBlock)
                 newBlock.statements.addOne(assume)
-                newBlock.jumps.addOne(directCall)
+                newBlock.addJump(directCall)
                 newBlock
               }
               procedure.blocks.addAll(newBlocks)
-              block.jumps.remove(block.jumps.indexOf(indirectCall))
-              val newCall = NonDetGoTo(newBlocks, block)
-              block.jumps.append(newCall)
+              //block.jumps.remove(block.jumps.indexOf(indirectCall))
+              block.removeJump(indirectCall)
+              block.addJump(NonDetGoTo(newBlocks, block))
             }
           case _ =>
       case _ =>

@@ -191,7 +191,8 @@ class Interpreter() {
       for ((jump, index) <- b.jumps.zipWithIndex) {
         Logger.debug(s"jump[$index]:")
         jump match {
-          case gt: GoTo =>
+          case gt: NonDetGoTo => ???
+          case gt: DetGoTo =>
             Logger.debug(s"$gt")
             gt.condition match {
               case Some(value) =>
@@ -250,7 +251,8 @@ class Interpreter() {
             Logger.debug(s"MemoryAssign ${assign.lhs} := 0x${value.toString(16)}[u$size]\n")
           case _ => throw new Exception("cannot register non-bitvectors")
         }
-
+      case _ : NOP => ()
+      case _ : Assume => ()
       case assert: Assert =>
         Logger.debug(assert)
         ???

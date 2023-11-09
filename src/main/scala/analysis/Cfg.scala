@@ -744,7 +744,7 @@ class ProgramCfgFactory:
         * @param solitary
         *   `True` if this block contains no statements, `False` otherwise
         */
-      def visitJumps(jmps: ArrayBuffer[Jump], prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
+      def visitJumps(jmps: Iterable[Jump], prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
 
         val jmpNode: CfgJumpNode = CfgJumpNode(data = jmps.head, block = block, parent = funcEntryNode)
         var precNode: CfgNode = prevNode
@@ -759,8 +759,8 @@ class ProgramCfgFactory:
                 Currently we display these nodes in the DOT view of the CFG, however these could be hidden if desired.
            */
           jmps.head match {
-            case jmp: GoTo =>
-              // `GoTo`s are just edges, so introduce a fake `start of block` that can be jmp'd to
+            case jmp: DetGoTo =>
+              // `DetGoTo`s are just edges, so introduce a fake `start of block` that can be jmp'd to
               val ghostNode = CfgGhostNode(block = block, parent = funcEntryNode, data = NOP(jmp.label, block))
               cfg.addEdge(prevNode, ghostNode, cond)
               precNode = ghostNode
@@ -774,7 +774,7 @@ class ProgramCfgFactory:
         // TODO this is not a robust approach
 
         jmps.head match {
-          case goto: GoTo =>
+          case goto: DetGoTo =>
             // Process first jump
             var targetBlock: Block = goto.target
             var targetCond: Expr = goto.condition match {
@@ -793,7 +793,7 @@ class ProgramCfgFactory:
             /* TODO it is not a safe assumption that there are a maximum of two jumps, or that a GoTo will follow a GoTo
              */
             if (targetCond != TrueLiteral) {
-              val secondGoto: GoTo = jmps.tail.head.asInstanceOf[GoTo]
+              val secondGoto: DetGoTo = jmps.tail.head.asInstanceOf[DetGoTo]
               targetBlock = secondGoto.target
               // IR doesn't store negation of condition, so we must do it manually
               targetCond = negateConditional(targetCond)
@@ -889,7 +889,6 @@ class ProgramCfgFactory:
                 cfg.addEdge(jmpNode, noReturn)
                 cfg.addEdge(noReturn, funcExitNode)
             }
-          case _ => assert(false, s"unexpected jump encountered, jumps: $jmps")
         } // `jmps.head` match
       } // `visitJumps` function
     } // `visitBlocks` function
