@@ -66,7 +66,7 @@ class Assume(var body: Expr,  var parent: Block, var comment: Option[String] = N
 object Assume:
   def unapply(a: Assume): Option[(Expr, Block, Option[String], Option[String])] = Some(a.body, a.parent, a.comment, a.label)
 
-sealed trait Jump extends Command {
+sealed trait Jump extends Command, IntrusiveListElement {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
   def calls: Set[Procedure] = Set()
@@ -74,24 +74,32 @@ sealed trait Jump extends Command {
 }
 
 
-sealed trait GoTo extends Jump
+sealed trait GoTo extends Jump {
+  /* ONLY remove backwards control flow edge */
+  def deParent() : Unit 
+}
 
 sealed class DetGoTo (private var _target: Block, var parent: Block, var condition: Option[Expr], override val label: Option[String] = None) extends GoTo {
- _target.incomingJumps.add(parent)
+  _target.incomingJumps.add(parent)
+ 
+   /* override def locals: Set[Variable] = condition match {
+     case Some(c) => c.locals
+     case None => Set()
+   } */
+ 
+  def target: Block = _target
 
-  /* override def locals: Set[Variable] = condition match {
-    case Some(c) => c.locals
-    case None => Set()
-  } */
-
- def target: Block = _target
-
- def replaceTarget(newTarget: Block): Block = {
-   _target.incomingJumps.remove(parent)
-   newTarget.incomingJumps.add(parent)
-   _target = newTarget
-   _target
- }
+  override def deParent() : Unit = {
+   // assume you do not have two jumps to the same block from this block; would'nt make sense
+    target.incomingJumps.remove(parent)
+  }
+ 
+  def replaceTarget(newTarget: Block): Block = {
+    _target.incomingJumps.remove(parent)
+    newTarget.incomingJumps.add(parent)
+    _target = newTarget
+    _target
+  }
 
   override def toString: String = s"${labelStr}GoTo(${_target.label}, $condition)"
 
@@ -117,6 +125,10 @@ class NonDetGoTo private (private var _targets: mutable.Set[Block], var parent: 
     if (_targets.add(t)) {
       t.incomingJumps.add(parent)
     }
+  }
+
+  override def deParent() :  Unit = {
+    targets.foreach(_.incomingJumps.remove(parent))
   }
 
   def removeTarget(t: Block): Unit = {

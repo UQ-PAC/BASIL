@@ -387,8 +387,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translateBlock(b: Block): BBlock = {
     val captureState = captureStateStatement(s"${b.label}")
-    val cmds = List(captureState)
-    ++ (b.statements.flatMap(s => translate(s)) ++ b.jumps.flatMap(j => translate(j)))
+    val cmds = (List(captureState) ++ (b.statements.flatMap(s => translate(s))) ++ b.jumps.flatMap(j => translate(j)))
 
     BBlock(b.label, cmds)
   }

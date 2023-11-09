@@ -336,7 +336,7 @@ object RunUtils {
 
               val newBlocks = for (t <- targets) yield {
                 val newLabel: String = block.label + t.name
-                val newBlock = Block(newLabel, None, IntrusiveList(), Seq(), Seq(), procedure)
+                val newBlock = Block(newLabel, None, Seq(), Seq(), procedure)
                 val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)), newBlock)
                 val directCall = DirectCall(t, indirectCall.returnTarget, newBlock)
                 newBlock.statements.addOne(assume)

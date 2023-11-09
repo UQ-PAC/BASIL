@@ -25,6 +25,7 @@ case class IntraProcIRCursor(pos: CFGPosition) {
           s.parent.jumps.toSet
         }
       case j: Jump => j match {
+        /* TODO jumps are ordered so prior jumps mask later jumps; assuming the union of the conditions is total */
         case g: DetGoTo => Set[CFGPosition](g.target)
         case n: NonDetGoTo => n.targets.toSet
         case c: DirectCall => c.returnTarget match

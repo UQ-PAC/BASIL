@@ -23,7 +23,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
 
       for (b <- s.blocks) {
-        val block = Block(b.label, b.address, IntrusiveList(), Seq(), Seq(), procedure)
+        val block = Block(b.label, b.address, Seq(), Seq(), procedure)
         blocks.append(block)
         labelToBlock.addOne(b.label, block)
       }
