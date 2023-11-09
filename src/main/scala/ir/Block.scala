@@ -27,6 +27,7 @@ class Block private
  
 
  def addJump(j: Jump): Boolean = {
+   assert(j.parent == this)
    j match {
     case g: GoTo => _jumps.add(g)
     case c: Call => _calls.add(c)
@@ -34,6 +35,7 @@ class Block private
  }
 
  def removeJump(j: Jump) = {
+   assert(j.parent == this)
    // assume you do not have two jumps to the same block from this block; would'nt make sense
    j match {
      case g: DetGoTo =>  {
@@ -49,6 +51,7 @@ class Block private
  }
 
   def replaceJump(j: Jump, newJ: Jump) : Unit = {
+    assert((j.parent == this) && (newJ.parent == this))
     if (j eq newJ) {
      // GoTo/Call is responsible for maintaining the CFG if it is modified in-place
       return
