@@ -5,7 +5,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.BeforeAndAfter
 import specification.SpecGlobal
 import translating.BAPToIR
-import util.{LogLevel, Logger}
+import util.{LogLevel, Logger, ProgramGenerator}
 import util.RunUtils.{loadBAP, loadReadELF}
 
 class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
@@ -26,7 +26,9 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
     (IRProgram, globals)
   }
-
+  def generateProgram(): String = {
+    ProgramGenerator.generateProgram()
+  }
   def testInterpret(name: String, expected: Map[String, Int]): Unit = {
     val (program, globals) = getProgram(name)
     val regs = i.interpret(program)
@@ -57,6 +59,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   before {
     i = Interpreter()
   }
+
 
   test("getMemory in LittleEndian") {
     i.mems(0) = BitVecLiteral(BigInt("0D", 16), 8)
@@ -189,5 +192,9 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       "y" -> 1
     )
     testInterpret("no_interference_update_y", expected)
+  }
+
+  test("Generate Test Program") {
+    assert(generateProgram().nonEmpty)
   }
 }
