@@ -34,8 +34,8 @@ class Block private
     assert(j.parent == this)
     j match 
       case g: GoTo => g.deParent()
-      case _ => ()
- 
+      case c: Call => // TODO: maintain Procedure graph
+
     _jumps.remove(j)
   }
 
@@ -50,8 +50,11 @@ class Block private
          removeJump(j)
          addJump(newJ)
        }
-       case (g: Call, f: Call) => replaceJump(g,f)
-       case (_, _) => throw Exception("Programmer error: must replace with same type")
+       case (g: Call, f: Call) => {
+         removeJump(g)
+         addJump(f)
+       }
+       case (_, _) => throw Exception("Programmer error: can not replace jump with call or vice versa")
     }
   } 
 

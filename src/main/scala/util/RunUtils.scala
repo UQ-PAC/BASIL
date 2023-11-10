@@ -144,9 +144,27 @@ object RunUtils {
 
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
+    val domain = computeDomain(IRProgram)
+
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationAnalysis.WorklistSolver(cfg)
     val constPropResult: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = constPropSolver.analyze()
+
+    val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram, ConstantPropagationLattice)
+    val newCPResult: ilcpsolver.lattice.Element  = ilcpsolver.analyze()
+
+    val newRes = newCPResult.flatMap((x, y) => y.flatMap {
+      case (_, ilcpsolver.lattice.sublattice.sublattice.FlatElement.Top) => None
+      case (_, ilcpsolver.lattice.sublattice.sublattice.FlatElement.Bot) => None
+      case z => Some(z)
+    })
+    val oldRes = constPropResult.flatMap((x, y) => y.flatMap {
+      case (_, constPropSolver.lattice.sublattice.sublattice.FlatElement.Top) => None
+      case (_, constPropSolver.lattice.sublattice.sublattice.FlatElement.Bot) => None
+      case z => Some(z)
+    })
+    // newRes and oldRes should have value equality
+
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder), s"${s}_constprop$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt"))

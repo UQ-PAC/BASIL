@@ -72,28 +72,31 @@ trait ILValueAnalysisMisc:
         s + (la.lhs -> eval(la.rhs, s))
       case _ => s
 
-///** Base class for value analysis with simple (non-lifted) lattice.
-//  */
-//abstract class SimpleValueAnalysis(val cfg: ICFG) extends FlowSensitiveAnalysis(true) with ValueAnalysisMisc:
-//
-//  /** The analysis lattice.
-//    */
-//  val lattice: MapLattice[CfgNode, statelattice.type] = MapLattice(statelattice)
-//
-//  //  val domain: Set[CfgNode] = cfg.nodes.toSet
-//
-//  /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
-//    */
-//  def transfer(n: CfgNode, s: statelattice.Element): statelattice.Element = localTransfer(n, s)
-//
-//abstract class ValueAnalysisWorklistSolver[L <: LatticeWithOps](
-//    cfg: ICFG,
-//    val valuelattice: L
-//) extends SimpleValueAnalysis(cfg)
-//    with SimplePushDownWorklistFixpointSolver[CfgNode]
-//    with ForwardDependencies
 
+type IRNode = IntraProcIRCursor.Node
 
+//abstract class ilvalueanalysis(
+//                val prog: program,
+//              ) extends flowsensitiveanalysis(true)
+//  with ilvalueanalysismisc:
+//
+//  override val lattice: maplattice[irnode, statelattice.type]
+//
+//  override val domain : set[irnode] = prog.procedures.toset
+//  override def transfer(n: irnode, s: statelattice.element): statelattice.element = localtransfer(n, s)
+
+object IRSimpleValueAnalysis:
+  class Solver[+L <: LatticeWithOps](prog: Program, val valuelattice: L) extends FlowSensitiveAnalysis(true)
+    with IntraProcDependencies
+    with Dependencies[IRNode](true)
+    with ILValueAnalysisMisc
+    with SimplePushDownWorklistFixpointSolver[IRNode]
+    :
+      /* Worklist initial set */
+      override val lattice: MapLattice[IRNode, statelattice.type] = MapLattice(statelattice)
+
+      override val domain : Set[IRNode] = computeDomain(prog).toSet
+      def transfer(n: IRNode, s: statelattice.Element): statelattice.Element = localTransfer(n, s)
 
 
 //trait WorklistFixPointSolver[NodeType, L <: Lattice, +W <: Worklist[NodeType]]() {

@@ -1,4 +1,5 @@
 package ir
+import collection.mutable
 
 enum PositionType {
   case Before, After, On
@@ -6,13 +7,14 @@ enum PositionType {
 
 // intra-procedural
 type ILPosition = Procedure | Block | Command
-type CFGPosition = Procedure | Block | Command | ProcedureUnknownJump  | ProcedureReturn
+type CFGPosition = Procedure | Block | Command | ProcedureUnknownJump  | ProcedureReturn | ProcedureExit
 
 // Interprocedural
 //  position = (call string) + Position
 
 case class ProcedureUnknownJump(pos: CFGPosition)
 case class ProcedureReturn(procedure: Procedure, pos: CFGPosition)
+case class ProcedureExit(procedure: Procedure)
 
 object IntraProcIRCursor {
   type Node = CFGPosition
@@ -43,10 +45,11 @@ object IntraProcIRCursor {
                 case None => Set(ProcedureUnknownJump(pos))
             }
       }
-      case b: Block => Set[CFGPosition](b.statements.head())
-      case proc: Procedure => Set(proc.blocks.head())
+      case b: Block => if b.statements.isEmpty then Set(b.jumps.head) else Set[CFGPosition](b.statements.head())
+      case proc: Procedure => if proc.blocks.isEmpty then Set(ProcedureExit(proc)) else Set(proc.blocks.head())
       case _: ProcedureUnknownJump => Set()
-      case _: ProcedureReturn => Set()
+      case b: ProcedureReturn => Set(ProcedureExit(b.procedure))
+      case e: ProcedureExit => Set()
     }
   }
 
@@ -76,4 +79,19 @@ object IntraProcIRCursor {
   //  }
 }
 
+
+def computeDomain(prog: Program): mutable.Set[CFGPosition] = {
+  val domain : mutable.Set[CFGPosition] = mutable.Set.from(prog.procedures)
+
+  var sizeBefore = 0
+  var sizeAfter = domain.size
+  while (sizeBefore != sizeAfter) {
+    for (i <- domain) {
+      domain.addAll(IntraProcIRCursor.succ(i))
+    }
+    sizeBefore = sizeAfter
+    sizeAfter = domain.size
+  }
+  domain
+} 
 

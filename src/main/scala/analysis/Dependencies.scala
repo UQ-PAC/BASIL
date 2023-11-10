@@ -36,8 +36,12 @@ trait ForwardDependencies extends Dependencies[CfgNode]:
 
 
 
+trait IntraProcDependencies extends Dependencies[IntraProcIRCursor.Node]:
+  override def outdep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcDependencies.outdep(n)
+  override def indep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcDependencies.indep(n)
+
 /** Dependency methods for forward analyses.
   */
 object IntraProcDependencies extends Dependencies[IntraProcIRCursor.Node](true):
-  override def outdep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcIRCursor.succ(n).toSet
+  override def outdep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcIRCursor.succ(n)
   override def indep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcIRCursor.pred(n)
