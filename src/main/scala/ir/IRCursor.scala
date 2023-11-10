@@ -14,8 +14,10 @@ type CFGPosition = Procedure | Block | Command | ProcedureUnknownJump  | Procedu
 case class ProcedureUnknownJump(pos: CFGPosition)
 case class ProcedureReturn(procedure: Procedure, pos: CFGPosition)
 
-case class IntraProcIRCursor(pos: CFGPosition) {
-  def succ(): Set[CFGPosition] = {
+object IntraProcIRCursor {
+  type Node = CFGPosition
+
+  def succ(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
       case s: Statement =>
         if (s.parent.statements.hasNext(s)) {
@@ -48,7 +50,7 @@ case class IntraProcIRCursor(pos: CFGPosition) {
     }
   }
 
-  def pred(): Set[CFGPosition] = {
+  def pred(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
       case s: Statement =>
         if (s.parent.statements.hasPrev(s)) {
@@ -75,5 +77,3 @@ case class IntraProcIRCursor(pos: CFGPosition) {
 }
 
 
-object IRCursor {
-}

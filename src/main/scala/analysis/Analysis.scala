@@ -18,7 +18,7 @@ trait Analysis[+R]:
 
   /** Performs the analysis and returns the result.
     */
-  def analyze(intra: Boolean): R
+  def analyze(): R
 
 /** A flow-sensitive analysis.
   * @param stateAfterNode
@@ -128,9 +128,9 @@ abstract class ValueAnalysisWorklistSolver[L <: LatticeWithOps](
 ) extends SimpleValueAnalysis(cfg)
     with SimplePushDownWorklistFixpointSolver[CfgNode]
     with ForwardDependencies
+    with Dependencies[CfgNode](true)
 
 object ConstantPropagationAnalysis:
-
   class WorklistSolver(cfg: ProgramCfg) extends ValueAnalysisWorklistSolver(cfg, ConstantPropagationLattice)
 
 
@@ -406,9 +406,9 @@ abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[
 ) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
     with SimpleMonotonicSolver[CfgNode]
     with ForwardDependencies
+    with Dependencies[CfgNode](true)
 
 object MemoryRegionAnalysis:
-
   class WorklistSolver(
       cfg: ProgramCfg,
       globals: Map[BigInt, String],

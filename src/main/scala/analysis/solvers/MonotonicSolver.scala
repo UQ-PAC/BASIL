@@ -24,15 +24,15 @@ trait SimpleMonotonicSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[
 
   private val loopEscape: mutable.Set[N] = mutable.Set.empty
 
-  def process(n: N, intra: Boolean): Unit =
+  override def process(n: N): Unit =
     val xn = x(n)
-    val y = funsub(n, x, intra)
+    val y = funsub(n, x)
     if y != xn || !loopEscape.contains(n) then
       loopEscape.add(n)
       x += n -> y
-      add(outdep(n, intra))
+      add(outdep(n))
 
-  def analyze(intra: Boolean): lattice.Element =
+  override def analyze(): lattice.Element =
     // TODO this sort of type-dependent code should not be in the generic solver
     // should probably base it upon WorklistFixpointSolverWithReachability from TIP instead?
     val first: Set[N] = if (intra) {
@@ -43,5 +43,5 @@ trait SimpleMonotonicSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[
     }
 
     x = lattice.bottom
-    run(first, intra)
+    run(first)
     x

@@ -24,7 +24,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, Map
 
   /** @inheritdoc
     */
-  def analyze(intra: Boolean): Unit =
+  def analyze(): Unit =
   // generate the constraints by traversing the AST and solve them on-the-fly
     visit(program, ())
 
