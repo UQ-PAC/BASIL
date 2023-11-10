@@ -49,7 +49,7 @@ A list of sequential statements belonging to a block
     Statement(id, block, index)
 
 A list of jumps (either Calls or GoTos) belonging to a block, which occur after the statements. GoTos form the 
-intraprocedural edges, and Calls form the interprocedural edges. 
+intra-procedural edges, and Calls form the inter-procedural edges. 
 
     GoTo(id, block, index, destinationBlock) 
     Call(id, block, index, destination) 
@@ -97,7 +97,10 @@ Successors are easily derived but predecessors are not stored with their success
 and `CallReturn` are not inherently present in the IL. 
 
 In code we have a set of Calls, and Gotos present in the IL; these form the edges. Then all vertices in the CFG 
-store a list of references to their set of incoming and outgoing edges. Specifically this means
+store a list of references to their set of incoming and outgoing edges. In a sense the 'id's in the formulation above 
+become the JVM object IDs.
+
+Specifically this means we store
 
     Statement:
         - reference to parent block
@@ -106,7 +109,7 @@ store a list of references to their set of incoming and outgoing edges. Specific
     Block
         - reference to parent procedure
         - list of incoming GoTos
-        - list of Jumps 
+        - list of Jumps including
             - Outgoing Calls
             - Outgoing GoTos
         
@@ -114,10 +117,10 @@ store a list of references to their set of incoming and outgoing edges. Specific
         - list of incoming Calls
         - subroutine to compute the set of all outgoing calls in all contained blocks
 
-To maintain this superimposed graph it is neccessary to make the actual call lists private, and only allow 
+To maintain this superimposed graph it is necessary to make the actual call lists private, and only allow 
 modification of through interfaces which maintain the graph.  
 
-Maintenence of the graph is the responsibility of the Block class: adding or removing jumps must ensure the edge 
+Maintenance of the graph is the responsibility of the Block class: adding or removing jumps must ensure the edge 
     references are maintained.
 
 Jumps:
@@ -127,7 +130,5 @@ Jumps:
 Blocks and Procedures:
 - Implement an interface for adding and removing edge references 
 
-
 Furthermore;
 - Reparenting Blocks and Commands in the IL must preserve the parent field, this is not really implemented yet
-
