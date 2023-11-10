@@ -37,7 +37,8 @@ We need to derive the predecessor/successor relation on CFG nodes IL .
     - A statement command within a block
     - A jump or call command within a block
 
-For example we define the language as horn clauses;
+For example we define the language as statements for horn clauses. (`A :- B` means B produces A, with `,` indicating 
+conjunction and `;` indicating disjunction)
 
 First we have basic blocks belonging to a procedure. 
 
@@ -52,22 +53,23 @@ A list of jumps (either Calls or GoTos) belonging to a block, which occur after 
 intra-procedural edges, and Calls form the inter-procedural edges. 
 
     GoTo(id, block, index, destinationBlock) 
-    Call(id, block, index, destination) 
+    Call(id, block, index, destinationProcedure) 
+    Jump(id, block) :- GoTo(id, block, _) ; Call(id, block, _)
+
+Statements and Jumps are both considered commands. All IL terms, commands, blocks, and procedures, have a unique
+identifier. All of the above are considered IL terms.
+
+    Command(id) :- Statement(id, _, _) ; Jump(id, _)
+    ILTerm(id) :- Procedure(id); Block(id, _); Command(id) 
 
 The CFG extends this language with the following nodes:
 
-    ProcedureExit(id, procedure, fromJump)
+    ProcedureExit(id, fromProcedure, fromJump)
     CallReturn(id, fromCall)
 
-A statement and jump is both considered a command. All IL terms, commands, blocks, and procedures, have a unique 
-identifier. 
+    CFGNode(id) :- ProcedureExit(id,_,_) ; CallReturn(id,_) ; ILTerm(id)
 
-    Jump(id, block) :- GoTo(id, block, _) 
-    Jump(id, block) :- Call(id, block, _) 
-    Command(id) :- Statement(id, _, _)
-    Command(id) :- Jump(id, _)
-
-The predecessor/successor relation is defined as a function of the CFG node.
+The predecessor/successor relates CFGNodes to CFGNodes, and is simply defined in terms of the nodes 
 
     pred(i, j) :- succ(j, i)
 
@@ -75,7 +77,7 @@ The predecessor/successor relation is defined as a function of the CFG node.
     succ(statement1, statement2) :- Statement(statement1, block, i), Statement(statement2, block, i + 1)
     succ(statement, goto) :- Statement(block, _last), Jump(block, goto), _last = max i forall Statement(block, i)
 
-    succ(goto, block) :- GoTo(goto, _, _, block) 
+    succ(goto, targetBlock) :- GoTo(goto, _, _, targetBlock) 
 
     // We always insert nodes for calls to return to
     CallReturn(i, call) :- Call(call, _, _, _)
@@ -84,10 +86,14 @@ The predecessor/successor relation is defined as a function of the CFG node.
     // a 'return' from the procedure is an indirect call to register R30
     succ(call, exit) :- Call(call, block, _, "R30"), ProcedureExit(exit, procedure, call), Block(block, procedure)
 
-For an interprocedural CFG we also have:
+For an inter-procedural CFG we also have:
 
-    succ(call, procedure) :- Call(call, _, _, procedure) 
+    succ(call, targetProcedure) :- Call(call, _, _, targetProcedure) 
     succ(exit, returnNode) :- ProcedureExit(exit, procedure, call), CallReturn(returnNode, call)
+
+So a sequential application of `succ` might look like
+
+    ProcedureA -> {Block0} -> {Statement1} -> {Statement2} -> {Jump0, Jump1} ->  {Block1} | {Block2} -> ...
 
 Implementation
 --------------
@@ -96,15 +102,20 @@ We want it to be possible to define `succ(term, _)` and `pred(term, _)` for any 
 Successors are easily derived but predecessors are not stored with their successors. Furthermore `ProcedureExit`, 
 and `CallReturn` are not inherently present in the IL. 
 
-In code we have a set of Calls, and Gotos present in the IL; these form the edges. Then all vertices in the CFG 
-store a list of references to their set of incoming and outgoing edges. In a sense the 'id's in the formulation above 
-become the JVM object IDs.
+In code we have a set of Calls, and Gotos present in the IL: these define the edges from themselves to their target. 
+
+Then all vertices in the CFG---that is all Commands, Blocks, and Procedures in the IL---store a list of references to 
+their set of incoming and outgoing edges. In a sense the 'id's in the formulation above  become the JVM object IDs.
+
+For Blocks and Procedures this means a `Set` of call statements. For Commands this means they are 
+stored in their block in an intrusive linked list. 
 
 Specifically this means we store
 
-    Statement:
+    Command:
         - reference to parent block
         - procedure to find the next or previous statement in the block
+        - IntrusiveListElement trait inserts a next() and previous() method forming the linked list
 
     Block
         - reference to parent procedure
