@@ -71,13 +71,13 @@ sealed trait Jump extends Command, IntrusiveListElement {
   //def locals: Set[Variable] = Set()
   def calls: Set[Procedure] = Set()
   def acceptVisit(visitor: Visitor): Jump = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
+
+  /* Remove backwards control flow records from IL */
+  def deParent(): Unit
 }
 
 
-sealed trait GoTo extends Jump {
-  /* ONLY remove backwards control flow edge */
-  def deParent() : Unit 
-}
+sealed trait GoTo extends Jump
 
 sealed class DetGoTo (private var _target: Block, var parent: Block, var condition: Option[Expr], override val label: Option[String] = None) extends GoTo {
   _target.incomingJumps.add(parent)
@@ -156,6 +156,10 @@ class DirectCall(val target: Procedure, var returnTarget: Option[Block], var par
   override def calls: Set[Procedure] = Set(target)
   override def toString: String = s"${labelStr}DirectCall(${target.name}, ${returnTarget.map(_.label)})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitDirectCall(this)
+
+  override def deParent(): Unit = {
+    target.removeCaller(this)
+  }
 }
 
 object DirectCall:
@@ -168,6 +172,8 @@ class IndirectCall(var target: Variable, var parent: Block, var returnTarget: Op
   } */
   override def toString: String = s"${labelStr}IndirectCall($target, ${returnTarget.map(_.label)})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitIndirectCall(this)
+
+  override def deParent(): Unit = {}
 }
 
 object IndirectCall:

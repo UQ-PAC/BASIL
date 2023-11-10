@@ -1,20 +1,27 @@
 package ir
 import collection.mutable
 
-enum PositionType {
-  case Before, After, On
-}
+/*
+ * Defines a position in the IL / CFG; this becomes the lhs of the state map lattice in a static analysis.
+ */
+type CFGPosition = Procedure | Block | Command | ProcedureUnknownJump  | ProcedureExit
 
-// intra-procedural
-type ILPosition = Procedure | Block | Command
-type CFGPosition = Procedure | Block | Command | ProcedureUnknownJump  | ProcedureReturn | ProcedureExit
 
 // Interprocedural
 //  position = (call string) + Position
 
-case class ProcedureUnknownJump(pos: CFGPosition)
-case class ProcedureReturn(procedure: Procedure, pos: CFGPosition)
-case class ProcedureExit(procedure: Procedure)
+
+/*
+    An additional CFG node which implicitly follows the node at `pos`
+    A call to an unknown procedure without a return to here
+ */
+case class ProcedureUnknownJump(fromProcedure: Procedure, pos: CFGPosition)
+
+/*
+ *  An additional CFG node which implicitly follows the node at `pos`
+ *  The exit from a procedure from pos (the last command/jump in the procedure).
+ */
+case class ProcedureExit(fromProcedure: Procedure, pos: CFGPosition)
 
 object IntraProcIRCursor {
   type Node = CFGPosition
@@ -34,21 +41,20 @@ object IntraProcIRCursor {
         case n: NonDetGoTo => n.targets.toSet
         case c: DirectCall => c.returnTarget match
           case Some(b) => Set(b)
-          case None => Set(ProcedureUnknownJump(c))
+          case None => Set(ProcedureUnknownJump(c.parent.parent, c))
         case i: IndirectCall => i match 
           case IndirectCall(v, parent, ret, label) =>
             if (v.name == "R30") {
-              Set(ProcedureReturn(parent.parent, pos))
+              Set(ProcedureExit(parent.parent, pos))
             } else {
               ret match
                 case Some(block) => Set(block)
-                case None => Set(ProcedureUnknownJump(pos))
+                case None => Set(ProcedureUnknownJump(i.parent.parent, pos))
             }
       }
       case b: Block => if b.statements.isEmpty then Set(b.jumps.head) else Set[CFGPosition](b.statements.head())
-      case proc: Procedure => if proc.blocks.isEmpty then Set(ProcedureExit(proc)) else Set(proc.blocks.head())
-      case _: ProcedureUnknownJump => Set()
-      case b: ProcedureReturn => Set(ProcedureExit(b.procedure))
+      case proc: Procedure => if proc.blocks.isEmpty then Set(ProcedureExit(proc, proc)) else Set(proc.blocks.head())
+      case j: ProcedureUnknownJump => Set(ProcedureExit(j.fromProcedure, j))
       case e: ProcedureExit => Set()
     }
   }
@@ -63,20 +69,11 @@ object IntraProcIRCursor {
         }
       case j: Jump => if j.parent.statements.isEmpty then Set(j.parent) else Set(j.parent.statements.last)
       case b: Block => b.predecessors.asInstanceOf[Set[CFGPosition]]
-      case proc: Procedure => Set()
+      case proc: Procedure => Set() // intraproc
       case r: ProcedureUnknownJump => Set(r.pos)
-      case r: ProcedureReturn => Set(r.pos)
+      case r: ProcedureExit => Set(r.pos)
     }
   }
-
-
-  //def succ() : Seq(IRCursor) = {
-  //  position match {
-  //    case p: Procedure => Seq(IRCursor(p.blocks.head))
-  //    case b: Block => Seq(IRCursor(b.statements.head))
-  //    case s: Statement => Seq(s.parent.statements.ne())
-
-  //  }
 }
 
 

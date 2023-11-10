@@ -32,15 +32,12 @@ class Block private
  
   def removeJump(j: Jump) : Unit = {
     assert(j.parent == this)
-    j match 
-      case g: GoTo => g.deParent()
-      case c: Call => // TODO: maintain Procedure graph
-
+    j.deParent()
     _jumps.remove(j)
   }
 
   def replaceJump(j: Jump, newJ: Jump) : Unit = {
-    assert((j.parent == this) && (newJ.parent == this))
+    assert((j.parent == this))
     if (j eq newJ) {
      // GoTo/Call is responsible for maintaining the CFG if it is modified in-place
       return

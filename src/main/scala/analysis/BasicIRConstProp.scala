@@ -3,7 +3,6 @@ import ir.*
 
 import analysis.solvers.*
 
-
 trait ILValueAnalysisMisc:
   val valuelattice: LatticeWithOps
   val statelattice: MapLattice[Variable, valuelattice.type] = new MapLattice(valuelattice)
@@ -63,7 +62,6 @@ trait ILValueAnalysisMisc:
       case _ => valuelattice.top
 
 
-
   /** Transfer function for state lattice elements.
     */
   def localTransfer(n: IntraProcIRCursor.Node, s: statelattice.Element): statelattice.Element =
@@ -74,16 +72,6 @@ trait ILValueAnalysisMisc:
 
 
 type IRNode = IntraProcIRCursor.Node
-
-//abstract class ilvalueanalysis(
-//                val prog: program,
-//              ) extends flowsensitiveanalysis(true)
-//  with ilvalueanalysismisc:
-//
-//  override val lattice: maplattice[irnode, statelattice.type]
-//
-//  override val domain : set[irnode] = prog.procedures.toset
-//  override def transfer(n: irnode, s: statelattice.element): statelattice.element = localtransfer(n, s)
 
 object IRSimpleValueAnalysis:
   class Solver[+L <: LatticeWithOps](prog: Program, val valuelattice: L) extends FlowSensitiveAnalysis(true)
@@ -97,27 +85,3 @@ object IRSimpleValueAnalysis:
 
       override val domain : Set[IRNode] = computeDomain(prog).toSet
       def transfer(n: IRNode, s: statelattice.Element): statelattice.Element = localTransfer(n, s)
-
-
-//trait WorklistFixPointSolver[NodeType, L <: Lattice, +W <: Worklist[NodeType]]() {
-//  val worklist: W
-//  val lattice: MapLattice[NodeType, L]
-//  val dependencies: Dependencies[NodeType]
-//
-//  def transfer(n: NodeType, s: lattice.sublattice.Element): lattice.sublattice.Element
-//
-//  def funsub(n: NodeType, x: lattice.Element): lattice.sublattice.Element =
-//    transfer(n, join(n, x))
-//
-//
-//  def join(n: NodeType, o: lattice.Element): lattice.sublattice.Element =
-//    val states = dependencies.indep(n).map(o(_))
-//    states.foldLeft(lattice.sublattice.bottom)((acc, pred) => lattice.sublattice.lub(acc, pred))
-//}
-//
-//object constprop extends WorklistFixPointSolver[IntraProcIRCursor.Node, ConstantPropagationLattice, ListSetWorklist[IntraProcIRCursor.Node]] {
-//
-//
-//}
-
-
