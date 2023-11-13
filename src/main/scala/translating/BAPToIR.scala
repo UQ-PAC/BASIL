@@ -79,40 +79,36 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
           case b: BAPGoTo =>
             val target = labelToBlock(b.target)
             b.condition match {
+              // condition is true
               case l: BAPLiteral if l.value > BigInt(0) =>
+                // condition is true and no previous conditions means no assume block needed
                 if (conditions.isEmpty) {
                   targets.append(target)
                 } else {
-                  // && together all negated previous conditions
-                  val conditionsIR = conditions.map { (c: BAPExpr) => BinaryExpr(BVEQ, c.toIR, BitVecLiteral(0, c.size)) }
+                  // condition is true and previous conditions existing means this condition
+                  // is actually that all previous conditions are false
+                  val conditionsIR = conditions.map(c => boolCondition(c, true))
                   val condition = conditionsIR.tail.foldLeft(conditionsIR.head)((ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands))
-                  val newLabel = s"${block.label}_goto_${target.label}"
-                  val assume = Assume(condition, checkSecurity = true)
-                  val newBlock = Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target), None))
+                  val newBlock = newBlockCondition(block, target, condition)
                   newBlocks.append(newBlock)
                   targets.append(newBlock)
                 }
+              // non-true condition
               case _ =>
-                if (conditions.isEmpty) {
-                  val condition = BinaryExpr(BVNEQ, b.condition.toIR, BitVecLiteral(0, b.condition.size))
-                  val newLabel = s"${block.label}_goto_${target.label}"
-                  val assume = Assume(condition, checkSecurity = true)
-                  val newBlock = Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target), None))
-                  newBlocks.append(newBlock)
-                  targets.append(newBlock)
-                  conditions.append(b.condition)
+                val currentCondition = boolCondition(b.condition, false)
+                val condition = if (conditions.isEmpty) {
+                  // if this is the first condition then it is the only relevant part of the condition
+                  currentCondition
                 } else {
-                  // && together this condition with all negated previous conditions
-                  val conditionsIR = conditions.map { (c: BAPExpr) => BinaryExpr(BVEQ, c.toIR, BitVecLiteral(0, c.size)) }
-                  val negatedConditions = conditionsIR.tail.foldLeft(conditionsIR.head)((ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands))
-                  val condition = BinaryExpr(BoolAND, BinaryExpr(BVNEQ, b.condition.toIR, BitVecLiteral(0, b.condition.size)), negatedConditions)
-                  val newLabel = s"${block.label}_goto_${target.label}"
-                  val assume = Assume(condition, checkSecurity = true)
-                  val newBlock = Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target), None))
-                  newBlocks.append(newBlock)
-                  targets.append(newBlock)
-                  conditions.append(b.condition)
+                  // if this is not the first condition, then we need to need to add
+                  // that all previous conditions are false
+                  val conditionsIR = conditions.map(c => boolCondition(c, true))
+                  conditionsIR.tail.foldLeft(currentCondition)((ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands))
                 }
+                val newBlock = newBlockCondition(block, target, currentCondition)
+                newBlocks.append(newBlock)
+                targets.append(newBlock)
+                conditions.append(b.condition)
             }
           case _ => throw Exception("translation error, call where not expected: " + jumps.mkString(", "))
         }
@@ -121,37 +117,36 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     } else {
       jumps.head match {
         case b: BAPDirectCall =>
-          (DirectCall(
-            nameToProcedure(b.target),
-            b.returnTarget.map(t => labelToBlock(t)),
-            Some(b.line)
-          ), ArrayBuffer())
+          val call = DirectCall(nameToProcedure(b.target), b.returnTarget.map(t => labelToBlock(t)), Some(b.line))
+          (call, ArrayBuffer())
         case b: BAPIndirectCall =>
-          (IndirectCall(b.target.toIR, b.returnTarget.map(t => labelToBlock(t)), Some(b.line)), ArrayBuffer())
+          val call = IndirectCall(b.target.toIR, b.returnTarget.map(t => labelToBlock(t)), Some(b.line))
+          (call, ArrayBuffer())
         case b: BAPGoTo =>
           val target = labelToBlock(b.target)
-          coerceToBool(b.condition) match {
-            case Some(c) =>
-              val newLabel = s"${block.label}_goto_${target.label}"
-              val assume = Assume(c, checkSecurity = true)
-              val newBlock = Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target), None))
-              (GoTo(ArrayBuffer(newBlock), Some(b.line)), ArrayBuffer(newBlock))
-            case None =>
+          b.condition match {
+            // condition is true
+            case l: BAPLiteral if l.value > BigInt(0) =>
               (GoTo(ArrayBuffer(target), Some(b.line)), ArrayBuffer())
+            // non-true condition
+            case _ =>
+              val condition = boolCondition(b.condition, false)
+              val newBlock = newBlockCondition(block, target, condition)
+              (GoTo(ArrayBuffer(newBlock), Some(b.line)), ArrayBuffer(newBlock))
           }
       }
     }
   }
 
-  private def coerceToBool(condition: BAPExpr): Option[Expr] = condition match {
-    case l: BAPLiteral if l.value > BigInt(0) =>
-      None
-    case _ =>
-      val c = condition.toIR
-      c.getType match {
-        case BoolType       => Some(c)
-        case bv: BitVecType => Some(BinaryExpr(BVNEQ, c, BitVecLiteral(0, bv.size)))
-        case _              => ???
-      }
+  private def boolCondition(expr: BAPExpr, negative: Boolean): Expr = {
+    val op = if negative then BVEQ else BVNEQ
+    BinaryExpr(op, expr.toIR, BitVecLiteral(0, expr.size))
   }
+
+  private def newBlockCondition(block: Block, target: Block, condition: Expr): Block = {
+    val newLabel = s"${block.label}_goto_${target.label}"
+    val assume = Assume(condition, checkSecurity = true)
+    Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target), None))
+  }
+
 }

@@ -427,16 +427,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       }
       val jump = GoToCmd(g.targets.map(_.label).toSeq)
       conditionAssert :+ jump
-      /*
-      g.condition match {
-        case Some(c) =>
-          val guard = c.toBoogie
-          val guardGamma = c.toGamma
-          List(BAssert(guardGamma), IfCmd(guard, List(GoToCmd(Seq(g.target.label)))))
-        case None =>
-          List(GoToCmd(Seq(g.target.label)))
-      }
-      */
   }
 
   def translate(s: Statement): List[BCmd] = s match {
