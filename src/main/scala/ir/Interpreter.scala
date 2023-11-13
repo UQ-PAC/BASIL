@@ -186,51 +186,48 @@ class Interpreter() {
       interpretStatement(statement)
     }
 
-    /*
-    TODO
     // Block.Jump
     breakable {
-      for ((jump, index) <- b.jumps.zipWithIndex) {
-        Logger.debug(s"jump[$index]:")
-        jump match {
-          case gt: GoTo =>
-            Logger.debug(s"$gt")
-            gt.condition match {
-              case Some(value) =>
-                eval(value, regs) match {
-                  case TrueLiteral =>
-                    nextBlock = Some(gt.target)
-                    break
-                  case FalseLiteral =>
-                }
+      Logger.debug(s"jump:")
+      b.jump match {
+        case gt: GoTo =>
+          Logger.debug(s"$gt")
+          for (g <- gt.targets) {
+            val condition: Option[Expr] = g.statements.headOption.collect { case a: Assume => a.body }
+            condition match {
+              case Some(e) => eval(e, regs) match {
+                case TrueLiteral =>
+                  nextBlock = Some(g)
+                  break
+                case _ =>
+              }
               case None =>
-                nextBlock = Some(gt.target)
+                nextBlock = Some(g)
                 break
             }
-          case dc: DirectCall =>
-            Logger.debug(s"$dc")
-            if (dc.returnTarget.isDefined) {
-              returnBlock.push(dc.returnTarget.get)
-            }
-            interpretProcedure(dc.target)
-            break
-          case ic: IndirectCall =>
-            Logger.debug(s"$ic")
-            if (ic.target == Register("R30", BitVecType(64)) && ic.returnTarget.isEmpty) {
-              if (returnBlock.nonEmpty) {
-                nextBlock = Some(returnBlock.pop())
-              } else {
-                //Exit Interpreter
-                nextBlock = None
-              }
-              break
+          }
+        case dc: DirectCall =>
+          Logger.debug(s"$dc")
+          if (dc.returnTarget.isDefined) {
+            returnBlock.push(dc.returnTarget.get)
+          }
+          interpretProcedure(dc.target)
+          break
+        case ic: IndirectCall =>
+          Logger.debug(s"$ic")
+          if (ic.target == Register("R30", BitVecType(64)) && ic.returnTarget.isEmpty) {
+            if (returnBlock.nonEmpty) {
+              nextBlock = Some(returnBlock.pop())
             } else {
-              ???
+              //Exit Interpreter
+              nextBlock = None
             }
-        }
+            break
+          } else {
+            ???
+          }
       }
     }
-    */
   }
 
   private def interpretStatement(s: Statement): Unit = {
@@ -256,7 +253,11 @@ class Interpreter() {
 
       case assert: Assert =>
         Logger.debug(assert)
-        ???
+        // TODO
+
+      case assume: Assume =>
+        Logger.debug(assume)
+        // TODO, but already taken into effect if it is a branch condition
     }
   }
 
