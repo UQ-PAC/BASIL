@@ -187,10 +187,7 @@ procedure main()
     call rely();
     R9, Gamma_R9 := zero_extend32_32(memory_load32_le(mem, bvadd64(R8, 52bv64))), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
     assert Gamma_R9;
-    if ((bvcomp32(R9[32:0], 0bv32) != 0bv1)) {
-      goto l000002dc;
-    }
-    goto l000002f8;
+    goto lmain_goto_l000002dc, lmain_goto_l000002f8;
   l000002dc:
     assume {:captureState "l000002dc"} true;
     R9, Gamma_R9 := 1bv64, true;
@@ -204,4 +201,12 @@ procedure main()
     assume {:captureState "l000002f8"} true;
     R0, Gamma_R0 := 0bv64, true;
     return;
+  lmain_goto_l000002dc:
+    assume {:captureState "lmain_goto_l000002dc"} true;
+    assume (bvcomp32(R9[32:0], 0bv32) != 0bv1);
+    goto l000002dc;
+  lmain_goto_l000002f8:
+    assume {:captureState "lmain_goto_l000002f8"} true;
+    assume (bvcomp32(R9[32:0], 0bv32) == 0bv1);
+    goto l000002f8;
 }
