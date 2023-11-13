@@ -163,10 +163,21 @@ object RunUtils {
       case (_, constPropSolver.lattice.sublattice.sublattice.FlatElement.Bot) => None
       case z => Some(z)
     })
+    val both = newRes.toSet.intersect(oldRes.toSet)
+    val notnew = (newRes.toSet).filter(x => !both.contains(x))
+    val notOld = (oldRes.toSet).filter(x => !both.contains(x))
     // newRes and oldRes should have value equality
 
 
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult, iteration), s"${s}_newconstprop$iteration.txt"))
+
+    config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram), s"program.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram, newCPResult.map((k,v) => (k, v.toString))), s"program-constprop.dot"))
+
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder), s"${s}_constprop$iteration.dot"))
+
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder), s"${s}_constprop$iteration.dot"))
+
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt"))
 
     Logger.info("[!] Running MRA")
@@ -206,7 +217,94 @@ object RunUtils {
     newIR
   }
 
-  def printAnalysisResults(cfg: ProgramCfg, result: Map[CfgNode, _], iteration: Int): String = {
+  def printAnalysisResults(cfg: Program, result: Map[IntraProcIRCursor.Node, _], iteration: Int): String = {
+    val functionEntries = cfg.procedures
+    val s = StringBuilder()
+    s.append(System.lineSeparator())
+    for (f <- functionEntries) {
+      val stack: mutable.Stack[IntraProcIRCursor.Node] = mutable.Stack()
+      val visited: mutable.Set[IntraProcIRCursor.Node] = mutable.Set()
+      stack.push(f)
+      var previousBlock: String = ""
+      var isEntryNode = false
+      while (stack.nonEmpty) {
+        val next = stack.pop()
+        if (!visited.contains(next)) {
+          visited.add(next)
+          next.match {
+            case c: Block => printBlock(c)
+            case c: Call => s.append(System.lineSeparator())
+              isEntryNode = false
+              printNode(c)
+            case c: Command =>
+              //if (c.parent.label != previousBlock) {
+              //  printBlock(c.parent)
+              //}
+              printNode(c)
+              previousBlock = c.parent.label
+              isEntryNode = false
+            case c: Procedure =>
+              printNode(c)
+              isEntryNode = true
+            case _ => isEntryNode = false
+          }
+          val successors = IntraProcIRCursor.succ(next)
+          if (successors.size > 1) {
+            val successorsCmd = successors.collect { case c: Command => c }.toSeq.sortBy(_.label)
+            printGoTo(successorsCmd)
+            for (s <- successorsCmd) {
+              if (!visited.contains(s)) {
+                stack.push(s)
+              }
+            }
+          } else if (successors.size == 1) {
+            val successor = successors.head
+            if (!visited.contains(successor)) {
+              stack.push(successor)
+            }
+            successor.match {
+              case c: Command if (c.parent.label != previousBlock) && (!isEntryNode) => printGoTo(Seq(c))
+              case _ =>
+            }
+          }
+        }
+      }
+      s.append(System.lineSeparator())
+    }
+
+    def printNode(node: IntraProcIRCursor.Node): Unit = {
+      node match {
+        case _: Statement => s.append("[Stmt] ")
+        case _: Procedure => s.append("[FunctionEntry] ")
+        case _: Call => s.append("[Jmp] ")
+        case _ => ()
+      }
+
+      s.append(node)
+      s.append(" :: ")
+      s.append(result(node))
+      s.append(System.lineSeparator())
+    }
+
+    def printGoTo(nodes: Seq[Command]): Unit = {
+      s.append("[GoTo] ")
+      s.append(nodes.map(_.label).mkString(", "))
+      s.append(System.lineSeparator())
+      s.append(System.lineSeparator())
+    }
+
+    def printBlock(node: Block): Unit = {
+      s.append("[Block] ")
+      s.append(node.label)
+      s.append(System.lineSeparator())
+    }
+
+
+    s.toString()
+  }
+
+
+    def printAnalysisResults(cfg: ProgramCfg, result: Map[CfgNode, _], iteration: Int): String = {
     val functionEntries = cfg.nodes.collect { case n: CfgFunctionEntryNode => n }.toSeq.sortBy(_.data.name)
     val s = StringBuilder()
     s.append(System.lineSeparator())

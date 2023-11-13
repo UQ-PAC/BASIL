@@ -1,4 +1,7 @@
 package ir
+import cfg_visualiser.DotElement
+import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
+
 import collection.mutable
 
 /*
@@ -92,3 +95,53 @@ def computeDomain(prog: Program): mutable.Set[CFGPosition] = {
   domain
 } 
 
+
+def toDot(prog: Program, labels: Map[CFGPosition, String] = Map.empty) : String = {
+  val visited : mutable.Set[CFGPosition] = mutable.Set.from(prog.procedures)
+  var labelcounter = 0
+
+  def label(l: Option[String]) = {
+    l match {
+      case Some(s) => s
+      case None =>
+        labelcounter += 1
+        s"node$labelcounter"
+    }
+  }
+
+  val dotNodes = mutable.Map[CFGPosition, DotNode]()
+  var dotArrows = mutable.ListBuffer[DotArrow]()
+
+  val domain = computeDomain(prog)
+
+  def nodeText(node: CFGPosition): String = {
+    var text = node match {
+      case s: Block => f"[Block] ${s.label}"
+      case s => s.toString
+    }
+    if (labels.contains(node)) {
+      text += "\n" ++ labels(node)
+    }
+    text
+  }
+
+  for (node <- domain) {
+    node match
+      case s: Command => dotNodes.addOne(s -> DotNode(label(s.label), nodeText(s)))
+      case s: Block => dotNodes.addOne(s -> DotNode(label(None), nodeText(s)))
+      case s => dotNodes.addOne(s -> DotNode(label(None), nodeText(s)))
+  }
+
+  for (node <- domain) {
+    node match {
+      case s : Call =>
+        IntraProcIRCursor.succ(s).foreach(n => dotArrows.addOne(DotInterArrow(dotNodes(s), dotNodes(n))))
+      case s =>
+        IntraProcIRCursor.succ(s).foreach(n => dotArrows.addOne(DotIntraArrow(dotNodes(s), dotNodes(n))))
+      case _ => ()
+    }
+  }
+
+  val allNodes = dotNodes.values.toList.sortBy(n => n.id)
+  new DotGraph("CursorCFG", allNodes, dotArrows).toDotString
+}
