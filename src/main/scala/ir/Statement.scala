@@ -1,5 +1,7 @@
 package ir
 
+import scala.collection.mutable.ArrayBuffer
+
 trait Command {
   val label: Option[String]
   def labelStr: String = label match {
@@ -52,13 +54,16 @@ class Assert(var body: Expr, var comment: Option[String] = None, override val la
 object Assert:
   def unapply(a: Assert): Option[(Expr, Option[String], Option[String])] = Some(a.body, a.comment, a.label)
 
-class Assume(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None) extends Statement {
+/**
+  * checkSecurity is true if this is a branch condition that we want to assert has a security level of low before branching
+  * */
+class Assume(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None, var checkSecurity: Boolean = false) extends Statement {
   override def toString: String = s"${labelStr}assume $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssume(this)
 }
 
 object Assume:
-  def unapply(a: Assume): Option[(Expr, Option[String], Option[String])] = Some(a.body, a.comment, a.label)
+  def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] = Some(a.body, a.comment, a.label, a.checkSecurity)
 
 trait Jump extends Command {
   def modifies: Set[Global] = Set()
@@ -67,23 +72,18 @@ trait Jump extends Command {
   def acceptVisit(visitor: Visitor): Jump = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
-class GoTo(var target: Block, var condition: Option[Expr], override val label: Option[String] = None) extends Jump {
+class GoTo(var targets: ArrayBuffer[Block], override val label: Option[String] = None) extends Jump {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
   } */
-  override def toString: String = s"${labelStr}GoTo(${target.label}, $condition)"
+  override def toString: String = s"${labelStr}GoTo(${targets.map(_.label).mkString(", ")})"
 
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitGoTo(this)
 }
 
 object GoTo:
-  def unapply(g: GoTo): Option[(Block, Option[Expr], Option[String])] = Some(g.target, g.condition, g.label)
-
-class NonDetGoTo(var targets: Seq[Block], override val label: Option[String] = None) extends Jump {
-  override def toString: String = s"${labelStr}NonDetGoTo(${targets.map(_.label).mkString(", ")})"
-  override def acceptVisit(visitor: Visitor): Jump = visitor.visitNonDetGoTo(this)
-}
+  def unapply(g: GoTo): Option[(ArrayBuffer[Block], Option[String])] = Some(g.targets, g.label)
 
 class DirectCall(var target: Procedure, var returnTarget: Option[Block], override val label: Option[String] = None) extends Jump {
   /* override def locals: Set[Variable] = condition match {

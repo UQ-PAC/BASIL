@@ -174,40 +174,41 @@ class Interpreter() {
       interpretStatement(statement)
     }
 
+    /*
+    TODO
     // Block.Jump
     breakable {
-      for ((jump, index) <- b.jumps.zipWithIndex) {
-        Logger.debug(s"jump[$index]:")
-        jump match {
-          case gt: GoTo =>
-            Logger.debug(s"$gt")
-            gt.condition match {
-              case Some(value) =>
-                eval(value, regs) match {
-                  case TrueLiteral =>
-                    nextBlock = Some(gt.target)
-                    break
-                  case FalseLiteral =>
-                }
-              case None =>
-                nextBlock = Some(gt.target)
-                break
-            }
-          case dc: DirectCall =>
-            Logger.debug(s"$dc")
-            interpretProcedure(dc.target)
-            break
-          case ic: IndirectCall =>
-            Logger.debug(s"$ic")
-            if (ic.target == Register("R30", BitVecType(64)) & ic.returnTarget.isEmpty) {
-              nextBlock = None
+      //Logger.debug(s"jump[$index]:")
+      b.jump match {
+        case gt: GoTo =>
+          Logger.debug(s"$gt")
+          gt.condition match {
+            case Some(value) =>
+              eval(value, regs) match {
+                case TrueLiteral =>
+                  nextBlock = Some(gt.target)
+                  break
+                case FalseLiteral =>
+              }
+            case None =>
+              nextBlock = Some(gt.target)
               break
-            } else {
-              ???
-            }
-        }
+          }
+        case dc: DirectCall =>
+          Logger.debug(s"$dc")
+          interpretProcedure(dc.target)
+          break
+        case ic: IndirectCall =>
+          Logger.debug(s"$ic")
+          if (ic.target == Register("R30", BitVecType(64)) & ic.returnTarget.isEmpty) {
+            nextBlock = None
+            break
+          } else {
+            ???
+          }
       }
     }
+    */
   }
 
   private def interpretStatement(s: Statement): Unit = {

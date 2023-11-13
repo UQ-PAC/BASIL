@@ -63,11 +63,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
   override def visitGoTo(node: GoTo): Jump = {
     program ++= "GoTo("
     // TODO
-    program ++= blockIdentifier(node.target)
-    program ++= ", "
-    program ++= "condition("
-    node.condition.map(visitExpr)
-    program ++= ")" // Condition
+    program ++= node.targets.map(blockIdentifier).mkString(", ")
     program ++= ")" // GoTo
     node
   }
@@ -104,14 +100,9 @@ private class ILSerialiser extends ReadOnlyVisitor {
     indentLevel -= 1
     program ++= getIndent() + "),\n"
     program ++= getIndent() + "jumps(\n"
-    indentLevel += 1
-    for (j <- node.jumps) {
-      program ++= getIndent()
-      visitJump(j)
-      program ++= "\n"
-    }
-    indentLevel -= 1
-    program ++= getIndent() + ")\n"
+    program ++= getIndent()
+    visitJump(node.jump)
+    program ++= ")\n"
     indentLevel -= 1
     program ++= getIndent()
     program ++= ")\n"

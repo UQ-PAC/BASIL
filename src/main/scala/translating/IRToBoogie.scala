@@ -387,8 +387,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translateBlock(b: Block): BBlock = {
     val captureState = captureStateStatement(s"${b.label}")
-    val cmds = List(captureState)
-    ++ (b.statements.flatMap(s => translate(s)) ++ b.jumps.flatMap(j => translate(j)))
+    val cmds = List(captureState) ++ (b.statements.flatMap(s => translate(s)) ++ translate(b.jump))
 
     BBlock(b.label, cmds)
   }
@@ -413,6 +412,22 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         }
       }
     case g: GoTo =>
+      // collects all targets of the goto with a branch condition that we need to check the security level for
+      // and collects the variables for that
+      val conditions = g.targets.flatMap(_.statements.headOption).collect { case a: Assume if a.checkSecurity => a }
+      val conditionVariables = conditions.flatMap(_.body.variables).distinct
+      val gammas = conditionVariables.map(_.toGamma).sorted
+      val conditionAssert: List[BCmd] = if (gammas.size > 1) {
+        val andedConditions = gammas.tail.foldLeft(gammas.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
+        List(BAssert(andedConditions))
+      } else if (gammas.size == 1) {
+        List(BAssert(gammas.head))
+      } else {
+        Nil
+      }
+      val jump = GoToCmd(g.targets.map(_.label).toSeq)
+      conditionAssert :+ jump
+      /*
       g.condition match {
         case Some(c) =>
           val guard = c.toBoogie
@@ -421,8 +436,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         case None =>
           List(GoToCmd(Seq(g.target.label)))
       }
-    case n: NonDetGoTo =>
-      List(GoToCmd(n.targets.map(_.label)))
+      */
   }
 
   def translate(s: Statement): List[BCmd] = s match {
