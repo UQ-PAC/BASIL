@@ -38,7 +38,9 @@ case object Top extends FlatElement[Nothing]
 case object Bottom extends FlatElement[Nothing]
 
 trait LiftedElement[+T]
-case class Lift[T](el: T) extends LiftedElement[T]
+case class Lift[T](el: T) extends LiftedElement[T] {
+  override def toString = s"Lift($n)"
+}
 case object LiftedBottom extends LiftedElement[Nothing] {
   override def toString = "LiftBot"
 }

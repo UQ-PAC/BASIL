@@ -213,9 +213,7 @@ trait WorklistFixpointSolverWithReachability[N] extends WorklistFixpointSolver[N
   def unliftedAnalyze(intra: Boolean): lattice.sublattice.sublattice.Element = {
     val res: lattice.Element = analyze(intra)
     // Convert liftedResult to unlifted
-    res.map {
-      case (key, value) => (key, lattice.sublattice.unlift(value))
-    }.asInstanceOf[lattice.sublattice.sublattice.Element]
+    res.foldLeft(lattice.sublattice.sublattice.bottom)((acc, pred) => lattice.sublattice.sublattice.lub(acc, lattice.sublattice.unlift(pred._2)))
   }
 }
 
