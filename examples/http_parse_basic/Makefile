@@ -1,6 +1,6 @@
 
 result: example.bpl extraspec.bpl
-	boogie example.bpl extraspec.bpl /smoke | tee result
+	boogie example.bpl extraspec.bpl /mv example.model /smoke | tee result
 
 a.out: example.c
 	aarch64-linux-gnu-gcc example.c

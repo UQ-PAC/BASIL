@@ -1,0 +1,6 @@
+example.bpl(416,5): Error: a precondition for this call could not be proved
+example.bpl(146,3): Related location: this is the precondition that could not be proved
+Execution trace:
+    example.bpl(340,3): lmain
+
+Boogie program verifier finished with 1 verified, 1 error
