@@ -68,6 +68,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     case b: BAPLocalAssign => LocalAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
   }
 
+
+  /**
+    * Translates a list of jumps from BAP into a single Jump at the IR level by moving any conditions on jumps to
+    * Assume statements in new blocks
+    * */
   private def translate(jumps: List[BAPJump], block: Block): (Jump, ArrayBuffer[Block]) = {
     if (jumps.size > 1) {
       val targets = ArrayBuffer[Block]()
@@ -87,7 +92,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
                 } else {
                   // condition is true and previous conditions existing means this condition
                   // is actually that all previous conditions are false
-                  val conditionsIR = conditions.map(c => boolCondition(c, true))
+                  val conditionsIR = conditions.map(c => convertConditionBool(c, true))
                   val condition = conditionsIR.tail.foldLeft(conditionsIR.head)((ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands))
                   val newBlock = newBlockCondition(block, target, condition)
                   newBlocks.append(newBlock)
@@ -95,14 +100,14 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
                 }
               // non-true condition
               case _ =>
-                val currentCondition = boolCondition(b.condition, false)
+                val currentCondition = convertConditionBool(b.condition, false)
                 val condition = if (conditions.isEmpty) {
                   // if this is the first condition then it is the only relevant part of the condition
                   currentCondition
                 } else {
                   // if this is not the first condition, then we need to need to add
                   // that all previous conditions are false
-                  val conditionsIR = conditions.map(c => boolCondition(c, true))
+                  val conditionsIR = conditions.map(c => convertConditionBool(c, true))
                   conditionsIR.tail.foldLeft(currentCondition)((ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands))
                 }
                 val newBlock = newBlockCondition(block, target, currentCondition)
@@ -130,7 +135,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
               (GoTo(ArrayBuffer(target), Some(b.line)), ArrayBuffer())
             // non-true condition
             case _ =>
-              val condition = boolCondition(b.condition, false)
+              val condition = convertConditionBool(b.condition, false)
               val newBlock = newBlockCondition(block, target, condition)
               (GoTo(ArrayBuffer(newBlock), Some(b.line)), ArrayBuffer(newBlock))
           }
@@ -138,7 +143,12 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     }
   }
 
-  private def boolCondition(expr: BAPExpr, negative: Boolean): Expr = {
+  /**
+    * Converts a BAPExpr condition that returns a bitvector of size 1 to an Expr condition that returns a Boolean
+    *
+    * If negative is true then the negation of the condition is returned
+    * */
+  private def convertConditionBool(expr: BAPExpr, negative: Boolean): Expr = {
     val op = if negative then BVEQ else BVNEQ
     BinaryExpr(op, expr.toIR, BitVecLiteral(0, expr.size))
   }
