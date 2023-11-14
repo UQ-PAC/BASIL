@@ -85,47 +85,35 @@ abstract class Visitor {
   }
 
   def visitExtract(node: Extract): Expr = {
-    node.body = visitExpr(node.body)
-    node
+    node.copy(body = visitExpr(node.body))
   }
 
   def visitRepeat(node: Repeat): Expr = {
-    node.body = visitExpr(node.body)
-    node
+    node.copy(body = visitExpr(node.body))
   }
 
   def visitZeroExtend(node: ZeroExtend): Expr = {
-    node.body = visitExpr(node.body)
-    node
+    node.copy(body = visitExpr(node.body))
   }
 
   def visitSignExtend(node: SignExtend): Expr = {
-    node.body = visitExpr(node.body)
-    node
+    node.copy(body = visitExpr(node.body))
   }
 
   def visitUnaryExpr(node: UnaryExpr): Expr = {
-    node.arg = visitExpr(node.arg)
-    node
+    node.copy(arg = visitExpr(node.arg))
   }
 
   def visitBinaryExpr(node: BinaryExpr): Expr = {
-    node.arg1 = visitExpr(node.arg1)
-    node.arg2 = visitExpr(node.arg2)
-    node
+    node.copy(arg1 = visitExpr(node.arg1), arg2 = visitExpr(node.arg2))
   }
 
   def visitMemoryStore(node: MemoryStore): MemoryStore = {
-    node.mem = visitMemory(node.mem)
-    node.index = visitExpr(node.index)
-    node.value = visitExpr(node.value)
-    node
+    node.copy(mem = visitMemory(node.mem), index = visitExpr(node.index), value = visitExpr(node.value))
   }
 
   def visitMemoryLoad(node: MemoryLoad): Expr = {
-    node.mem = visitMemory(node.mem)
-    node.index = visitExpr(node.index)
-    node
+    node.copy(mem = visitMemory(node.mem), index = visitExpr(node.index))
   }
 
   def visitMemory(node: Memory): Memory = node
@@ -251,6 +239,21 @@ abstract class ReadOnlyVisitor extends Visitor {
       visitProcedure(i)
     }
     node
+  }
+
+}
+
+class StackSubstituter extends Visitor {
+  val stackRefs: mutable.Set[Variable] = mutable.Set()
+  val stackMemory: Memory = Memory("stack", 64, 8)
+
+  override def visitMemoryLoad(node: MemoryLoad): MemoryLoad = {
+    val loadStackRefs = node.index.variables.intersect(stackRefs)
+    if (loadStackRefs.nonEmpty) {
+      node.copy(mem = stackMemory)
+    } else {
+      node
+    }
   }
 
 }

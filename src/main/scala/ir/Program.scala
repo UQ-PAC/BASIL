@@ -126,7 +126,8 @@ class Procedure(
 
   def stackIdentification(): Unit = {
     val stackPointer = Register("R31", BitVecType(64))
-    val stackRefs: mutable.Set[Variable] = mutable.Set(stackPointer)
+    val stackSubstituter = StackSubstituter()
+    stackSubstituter.stackRefs.add(stackPointer)
     val visitedBlocks: mutable.Set[Block] = mutable.Set()
     val stackMemory = Memory("stack", 64, 8)
     val firstBlock = blocks.headOption
@@ -141,30 +142,24 @@ class Procedure(
         s match {
           case l: LocalAssign =>
             // replace mem with stack in loads if index contains stack references
-            val loads = l.rhs.loads
-            for (load <- loads) {
-              val loadStackRefs = load.index.variables.intersect(stackRefs)
-              if (loadStackRefs.nonEmpty) {
-                load.mem = stackMemory
-              }
-            }
+            stackSubstituter.visitLocalAssign(l)
 
             // update stack references
             val variableVisitor = VariablesWithoutStoresLoads()
             variableVisitor.visitExpr(l.rhs)
 
-            val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackRefs)
+            val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackSubstituter.stackRefs)
             if (rhsStackRefs.nonEmpty) {
-              stackRefs.add(l.lhs)
-            } else if (stackRefs.contains(l.lhs) && l.lhs != stackPointer) {
-              stackRefs.remove(l.lhs)
+              stackSubstituter.stackRefs.add(l.lhs)
+            } else if (stackSubstituter.stackRefs.contains(l.lhs) && l.lhs != stackPointer) {
+              stackSubstituter.stackRefs.remove(l.lhs)
             }
           case m: MemoryAssign =>
             // replace mem with stack if index contains stack reference
-            val indexStackRefs = m.rhs.index.variables.intersect(stackRefs)
+            val indexStackRefs = m.rhs.index.variables.intersect(stackSubstituter.stackRefs)
             if (indexStackRefs.nonEmpty) {
               m.lhs = stackMemory
-              m.rhs.mem = stackMemory
+              m.rhs = m.rhs.copy(mem = stackMemory)
             }
           case _ =>
         }
