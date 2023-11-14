@@ -95,7 +95,9 @@ class LiftLattice[+L <: Lattice](val sublattice: L) extends Lattice {
     override def toString = "LiftBot"
   }
 
-  case class Lift(n: sublattice.Element) extends Lifted
+  case class Lift(n: sublattice.Element) extends Lifted {
+    override def toString = s"Lift($n)"
+  }
 
   val bottom: Element = Bottom
 

@@ -152,9 +152,7 @@ object RunUtils {
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
-    val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.unliftedAnalyze(true).asInstanceOf[Map[CfgNode, Map[CfgNode, Set[MemoryRegion]]]].map {
-      case (k, v) => k -> v.values.flatten.toSet
-    }
+    val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.unliftedAnalyze(true).asInstanceOf[Map[CfgNode, Set[MemoryRegion]]]
     memoryRegionAnalysisResults = mraResult
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder), s"${s}_mra$iteration.dot"))
@@ -168,7 +166,7 @@ object RunUtils {
     val vsaSolver =
       ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
 
-    val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]] = vsaSolver.unliftedAnalyze(true).asInstanceOf[Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]]
+    val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]] = vsaSolver.unliftedAnalyze(false).asInstanceOf[Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]]
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder), s"${s}_vsa$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, vsaResult, iteration), s"${s}_vsa$iteration.txt"))
