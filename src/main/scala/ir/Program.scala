@@ -7,7 +7,7 @@ import analysis.BitVectorEval
 
 class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure, var initialMemory: ArrayBuffer[MemorySection], var readOnlyMemory: ArrayBuffer[MemorySection]) {
 
-  // This shouldn't be run before indirect calls are resolved?
+  // This shouldn't be run before indirect calls are resolved
   def stripUnreachableFunctions(): Unit = {
     val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
@@ -170,13 +170,10 @@ class Procedure(
         }
       }
       visitedBlocks.add(b)
-      for (j <- b.jumps) {
-        j match {
-          case g: GoTo => visitBlock(g.target)
-          case d: DirectCall => d.returnTarget.foreach(visitBlock)
-          case i: IndirectCall => i.returnTarget.foreach(visitBlock)
-          case n: NonDetGoTo => n.targets.foreach(visitBlock)
-        }
+      b.jump match {
+        case g: GoTo => g.targets.foreach(visitBlock)
+        case d: DirectCall => d.returnTarget.foreach(visitBlock)
+        case i: IndirectCall => i.returnTarget.foreach(visitBlock)
       }
     }
   }
@@ -187,17 +184,16 @@ class Block(
     var label: String,
     var address: Option[Int],
     var statements: ArrayBuffer[Statement],
-    var jumps: ArrayBuffer[Jump]
+    var jump: Jump
 ) {
-  def calls: Set[Procedure] = jumps.flatMap(_.calls).toSet
+  def calls: Set[Procedure] = jump.calls
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet
   //def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
 
   override def toString: String = {
     // display all statements and jumps
     val statementsString = statements.map(_.toString).mkString("\n")
-    val jumpsString = jumps.map(_.toString).mkString("\n")
-    s"Block $label with $statementsString\n$jumpsString"
+    s"Block $label with $statementsString\n$jump"
   }
 
   override def equals(obj: scala.Any): Boolean =

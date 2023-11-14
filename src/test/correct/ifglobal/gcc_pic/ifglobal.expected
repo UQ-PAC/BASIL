@@ -241,10 +241,7 @@ procedure main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#4, 1bv32), 0bv32), Gamma_#4;
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     assert Gamma_ZF;
-    if ((bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1)) {
-      goto l00000303;
-    }
-    goto l00000312;
+    goto lmain_goto_l00000303, lmain_goto_l00000312;
   l00000312:
     assume {:captureState "l00000312"} true;
     R0, Gamma_R0 := 65536bv64, true;
@@ -260,4 +257,12 @@ procedure main()
     assume {:captureState "l00000303"} true;
     R0, Gamma_R0 := 0bv64, true;
     return;
+  lmain_goto_l00000303:
+    assume {:captureState "lmain_goto_l00000303"} true;
+    assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);
+    goto l00000303;
+  lmain_goto_l00000312:
+    assume {:captureState "lmain_goto_l00000312"} true;
+    assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);
+    goto l00000312;
 }

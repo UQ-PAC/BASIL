@@ -696,10 +696,10 @@ class ProgramCfgFactory:
         case i if i > 0 =>
           // Block contains some statements
           val endStmt: CfgCommandNode = visitStmts(block.statements, prevBlockEnd, cond)
-          visitJumps(block.jumps, endStmt, TrueLiteral, solitary = false)
+          visitJump(block.jump, endStmt, TrueLiteral, solitary = false)
         case _ =>
           // Only jumps in this block
-          visitJumps(block.jumps, prevBlockEnd, cond, solitary = true)
+          visitJump(block.jump, prevBlockEnd, cond, solitary = true)
       }
 
       /** If a block has statements, we add them to the CFG. Blocks in this case are basic blocks, so we know
@@ -751,9 +751,9 @@ class ProgramCfgFactory:
         * @param solitary
         *   `True` if this block contains no statements, `False` otherwise
         */
-      def visitJumps(jmps: ArrayBuffer[Jump], prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
+      def visitJump(jmp: Jump, prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
 
-        val jmpNode: CfgJumpNode = CfgJumpNode(data = jmps.head, block = block, parent = funcEntryNode)
+        val jmpNode: CfgJumpNode = CfgJumpNode(data = jmp, block = block, parent = funcEntryNode)
         var precNode: CfgNode = prevNode
 
         if (solitary) {
@@ -765,7 +765,7 @@ class ProgramCfgFactory:
 
                 Currently we display these nodes in the DOT view of the CFG, however these could be hidden if desired.
            */
-          jmps.head match {
+          jmp match {
             case jmp: GoTo =>
               // `GoTo`s are just edges, so introduce a fake `start of block` that can be jmp'd to
               val ghostNode = CfgGhostNode(block = block, parent = funcEntryNode, data = NOP(jmp.label))
@@ -780,40 +780,8 @@ class ProgramCfgFactory:
 
         // TODO this is not a robust approach
 
-        jmps.head match {
-          case goto: GoTo =>
-            // Process first jump
-            var targetBlock: Block = goto.target
-            var targetCond: Expr = goto.condition match {
-              case Some(c) => c
-              case None    => TrueLiteral
-            }
-
-            // Jump to target block
-            if (visitedBlocks.contains(targetBlock)) {
-              val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
-              cfg.addEdge(precNode, targetBlockEntry, targetCond)
-            } else {
-              visitBlock(targetBlock, precNode, targetCond)
-            }
-
-            /* TODO it is not a safe assumption that there are a maximum of two jumps, or that a GoTo will follow a GoTo
-             */
-            if (targetCond != TrueLiteral) {
-              val secondGoto: GoTo = jmps.tail.head.asInstanceOf[GoTo]
-              targetBlock = secondGoto.target
-              // IR doesn't store negation of condition, so we must do it manually
-              targetCond = negateConditional(targetCond)
-
-              // Jump to target block
-              if (visitedBlocks.contains(targetBlock)) {
-                val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
-                cfg.addEdge(precNode, targetBlockEntry, targetCond)
-              } else {
-                visitBlock(targetBlock, precNode, targetCond)
-              }
-            }
-          case n: NonDetGoTo =>
+        jmp match {
+          case n: GoTo =>
             for (targetBlock <- n.targets) {
               if (visitedBlocks.contains(targetBlock)) {
                 val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
@@ -825,16 +793,14 @@ class ProgramCfgFactory:
           case dCall: DirectCall =>
             val targetProc: Procedure = dCall.target
 
+            val callNode = CfgJumpNode(data = dCall, block = block, parent = funcEntryNode)
+
             // Branch to this call
-            val calls = jmps.filter(_.isInstanceOf[DirectCall]).map(x => CfgJumpNode(data = x, block = block, parent = funcEntryNode))
+            cfg.addEdge(precNode, callNode)
 
-            calls.foreach(node => {
-              cfg.addEdge(precNode, node)
-
-              procToCalls(proc) += node
-              procToCallers(targetProc) += node
-              callToNodes(funcEntryNode) += node
-            })
+            procToCalls(proc) += callNode
+            procToCallers(targetProc) += callNode
+            callToNodes(funcEntryNode) += callNode
 
             // Record call association
 
@@ -844,9 +810,7 @@ class ProgramCfgFactory:
                 // Add intermediary return node (split call into call and return)
                 val callRet = CfgCallReturnNode()
 
-                calls.foreach(node => {
-                  cfg.addEdge(node, callRet)
-                })
+                cfg.addEdge(callNode, callRet)
                 if (visitedBlocks.contains(retBlock)) {
                   val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
                   cfg.addEdge(callRet, retBlockEntry)
@@ -855,9 +819,7 @@ class ProgramCfgFactory:
                 }
               case None =>
                 val noReturn = CfgCallNoReturnNode()
-                calls.foreach(node => {
-                  cfg.addEdge(node, noReturn)
-                })
+                cfg.addEdge(callNode, noReturn)
                 cfg.addEdge(noReturn, funcExitNode)
             }
           case iCall: IndirectCall =>
@@ -896,7 +858,7 @@ class ProgramCfgFactory:
                 cfg.addEdge(jmpNode, noReturn)
                 cfg.addEdge(noReturn, funcExitNode)
             }
-          case _ => assert(false, s"unexpected jump encountered, jumps: $jmps")
+          case _ => assert(false, s"unexpected jump encountered, jump: $jmp")
         } // `jmps.head` match
       } // `visitJumps` function
     } // `visitBlocks` function
