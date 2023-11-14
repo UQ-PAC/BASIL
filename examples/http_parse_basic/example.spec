@@ -47,6 +47,7 @@ Subroutine: memset
 
 Subroutine: strlen
   Modifies: R0
+  // doesn't work with the below line removed
   Requires DIRECT: "(memory_load8_le(mem, R0) == 0bv8) || (memory_load8_le(mem, bvadd64(R0, 1bv64)) == 0bv8)|| (memory_load8_le(mem, bvadd64(R0, 2bv64)) == 0bv8)|| (memory_load8_le(mem, bvadd64(R0, 3bv64)) == 0bv8)"
   Ensures: buf == old(buf) && password == old(password) && stext==old(stext)
   Ensures DIRECT: "Gamma_R0 == true"
