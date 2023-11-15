@@ -39,7 +39,7 @@ trait IntraproceduralMonotonicSolver[T, L <: Lattice[T]] extends SimpleMonotonic
   def analyze(): Map[CfgNode, T] = {
     // TODO this sort of type-dependent code should not be in the generic solver
     // should probably base it upon WorklistFixpointSolverWithReachability from TIP instead?
-    val first: Set[CfgNode] = domain.collect { case n: CfgFunctionEntryNode if n.pred(true).isEmpty => n }
+    val first: Set[CfgNode] = domain.collect { case n: CfgFunctionEntryNode if n.predIntra.isEmpty => n }
     x = lattice.bottom
     run(first)
     x

@@ -218,7 +218,7 @@ object RunUtils {
               isEntryNode = false
             case _ => isEntryNode = false
           }
-          val successors = next.succ(true)
+          val successors = next.succIntra
           if (successors.size > 1) {
             val successorsCmd = successors.collect { case c: CfgCommandNode => c }.toSeq.sortBy(_.data.label)
             printGoTo(successorsCmd)
@@ -272,14 +272,14 @@ object RunUtils {
   ): (Program, Boolean) = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
-    cfg.startNode.succ(true).union(cfg.startNode.succ(false)).foreach(node => worklist.addOne(node))
+    cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
 
     val visited = MutableSet[CfgNode]()
     while (worklist.nonEmpty) {
       val node = worklist.remove(0)
       if (!visited.contains(node)) {
         process(node)
-        node.succ(true).union(node.succ(false)).foreach(node => worklist.addOne(node))
+        node.succIntra.union(node.succInter).foreach(node => worklist.addOne(node))
         visited.add(node)
       }
     }
