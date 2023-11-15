@@ -18,7 +18,7 @@ trait Analysis[+R]:
 
   /** Performs the analysis and returns the result.
     */
-  def analyze(intra: Boolean): R
+  def analyze(): R
 
 /** Base class for value analysis with simple (non-lifted) lattice.
   */
@@ -98,7 +98,7 @@ trait ConstantPropagation(val cfg: ProgramCfg) {
 
 class ConstantPropagationSolver(cfg: ProgramCfg) extends ConstantPropagation(cfg)
     with SimplePushDownWorklistFixpointSolver[CfgNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
-    with ForwardDependencies
+    with IntraproceduralForwardDependencies
     with Analysis[Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]]
 
 
@@ -316,5 +316,4 @@ class MemoryRegionAnalysisSolver(
     subroutines: Map[BigInt, String],
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
 ) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
-    with SimpleMonotonicSolver[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]
-    with ForwardDependencies
+    with IntraproceduralMonotonicSolver[Set[MemoryRegion], PowersetLattice[MemoryRegion]]

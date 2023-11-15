@@ -13,7 +13,7 @@ trait LatticeSolver[T]:
 
   /** The analyze function.
     */
-  def analyze(intra: Boolean): T
+  def analyze(): T
 
 /** Base trait for map lattice solvers.
   * @tparam N
@@ -35,18 +35,16 @@ trait MapLatticeSolver[N, T, L <: Lattice[T]] extends LatticeSolver[Map[N, T]] w
     *   the current location in the map domain
     * @param x
     *   the current lattice element for all locations
-    * @param intra
-    *   true if the cfg is treated as intraprocedural, else interprocedural
     * @return
     *   the output sublattice element
     */
-  def funsub(n: N, x: lattice.Element, intra: Boolean): lattice.sublattice.Element =
-    transfer(n, join(n, x, intra))
+  def funsub(n: N, x: lattice.Element): lattice.sublattice.Element =
+    transfer(n, join(n, x))
 
   /** Computes the least upper bound of the incoming elements.
     */
-  def join(n: N, o: lattice.Element, intra: Boolean): lattice.sublattice.Element =
-    val states = indep(n, intra).map(o(_))
+  def join(n: N, o: lattice.Element): lattice.sublattice.Element =
+    val states = indep(n).map(o(_))
     states.foldLeft(lattice.sublattice.bottom)((acc, pred) => lattice.sublattice.lub(acc, pred))
 
 /** An abstract worklist algorithm.
@@ -58,7 +56,7 @@ trait Worklist[N]:
 
   /** Called by [[run]] to process an item from the worklist.
     */
-  def process(n: N, intra: Boolean): Unit
+  def process(n: N): Unit
 
   /** Adds an item to the worklist.
     */
@@ -73,7 +71,7 @@ trait Worklist[N]:
     * @param first
     *   the initial contents of the worklist
     */
-  def run(first: Set[N], intra: Boolean): Unit
+  def run(first: Set[N]): Unit
 
 /** A simple worklist algorithm based on `scala.collection.immutable.ListSet`.
   *
@@ -89,12 +87,12 @@ trait ListSetWorklist[N] extends Worklist[N]:
 
   def add(ns: Set[N]) = worklist ++= ns
 
-  def run(first: Set[N], intra: Boolean) =
+  def run(first: Set[N]) =
     worklist = new ListSet[N] ++ first
     while worklist.nonEmpty do
       val n = worklist.head
       worklist = worklist.tail
-      process(n, intra)
+      process(n)
 
 /** Base trait for worklist-based fixpoint solvers.
   *
@@ -106,12 +104,12 @@ trait WorklistFixpointSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, 
     */
   var x: lattice.Element = _
 
-  def process(n: N, intra: Boolean) =
+  def process(n: N) =
     val xn = x(n)
-    val y = funsub(n, x, intra)
+    val y = funsub(n, x)
     if y != xn then
       x = x + (n -> y)
-      add(outdep(n, intra))
+      add(outdep(n))
 
 /** Worklist-based fixpoint solver.
   *
@@ -132,9 +130,9 @@ trait SimpleWorklistFixpointSolver[N, T, L <: Lattice[T]] extends WorklistFixpoi
     *   the new lattice element
     */
 
-  def analyze(intra: Boolean): lattice.Element =
+  def analyze(): lattice.Element =
     x = lattice.bottom
-    run(domain, intra)
+    run(domain)
     x
 
 /** A pushDown worklist-based fixpoint solvers. Pushes the results of the analysis one node down. This is used to have
@@ -164,14 +162,14 @@ trait PushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends MapLatticeSo
     }
   }
 
-  def process(n: N, intra: Boolean) =
+  def process(n: N) =
     //val y = funsub(n, x, intra)
     val xn = x(n)
     val y = transfer(n, xn)
 
     val t = lattice.sublattice.lub(xn, y)
 
-    for succ <- outdep(n, intra) do propagate(y, succ)
+    for succ <- outdep(n) do propagate(y, succ)
 
 /** Worklist-based fixpoint solver.
   *
@@ -192,7 +190,7 @@ trait SimplePushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends PushDo
     *   the new lattice element
     */
 
-  def analyze(intra: Boolean): lattice.Element =
+  def analyze(): lattice.Element =
     x = lattice.bottom
-    run(domain, intra)
+    run(domain)
     x

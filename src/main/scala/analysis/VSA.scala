@@ -183,6 +183,4 @@ class ValueSetAnalysisSolver(
     mmm: MemoryModelMap,
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
 ) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
-    with SimpleMonotonicSolver[CfgNode, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]]
-    with ForwardDependencies
-
+    with InterproceduralMonotonicSolver[Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]]
