@@ -3,7 +3,6 @@ password: char
 buf: long
 stext: char[11]
 
-
 L: buf -> true, password -> false, stext -> true
 
 DIRECT functions: gamma_load64, gamma_load8, memory_load8_le, bvult64, bvule64, bvsub64, gamma_load32
@@ -22,7 +21,7 @@ Subroutine: malloc
 Modifies: R0, malloc_base, malloc_count, malloc_end
 Requires DIRECT: "bvugt64(R0, 0bv64)"
 Requires DIRECT: "Gamma_R0 == true"
-Ensures: buf == old(buf) && password == old(password) && stext==old(stext)
+Ensures: buf == old(buf) && password == old(password) 
 Ensures DIRECT: "Gamma_R0 == true"
 Ensures DIRECT: "malloc_count == old(malloc_count) + 1"
 Ensures DIRECT: "bvugt64(malloc_end[malloc_count], malloc_base[malloc_count])"
@@ -41,19 +40,19 @@ Subroutine: memcpy
   Requries DIRECT: "bvugt64(R0, bvadd64(R1, R2)) || bvugt64(R1, bvadd64(R0, R2))"
   // don't wrap around
   Requries DIRECT: "bvugt64(bvadd64(R0, R2), R0) && bvugt64(bvadd64(R1, R2), R1)"
-  Ensures: buf == old(buf) && password == old(password) && stext==old(stext)
+  Ensures: buf == old(buf) && password == old(password)
 //  Ensures DIRECT: "(forall i: bv64 :: (Gamma_mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then old(Gamma_mem)[bvadd64(bvsub64(i, R0), R1)] else old(Gamma_mem[i])))"
 //  Ensures DIRECT: "(forall i: bv64 :: (mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then old(mem)[bvadd64(bvsub64(i, R0), R1)] else old(mem[i])))"
-Ensures DIRECT: "(forall i: bv64 :: (Gamma_mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then gamma_load8(old(Gamma_mem), bvadd64(bvsub64(i, R0), R1)) else old(gamma_load8(Gamma_mem, i))))"
-Ensures DIRECT: "(forall i: bv64 :: (mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then memory_load8_le(old(mem), bvadd64(bvsub64(i, R0), R1)) else old(memory_load8_le(mem, i))))"
-Ensures DIRECT: "(forall i: bv64 :: (Gamma_mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then gamma_load8((Gamma_mem), bvadd64(bvsub64(i, R0), R1)) else old(gamma_load8(Gamma_mem, i))))"
-Ensures DIRECT: "(forall i: bv64 :: (mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then memory_load8_le((mem), bvadd64(bvsub64(i, R0), R1)) else old(memory_load8_le(mem, i))))"
-
+  Ensures DIRECT: "(forall i: bv64 :: (Gamma_mem[i] == if (bvule64(R0, i) && bvult64(i, bvadd64(R0, R2))) then gamma_load8((Gamma_mem), bvadd64(bvsub64(i, R0), R1)) else old(gamma_load8(Gamma_mem, i))))"
+  Ensures DIRECT: "(forall i: bv64 :: (mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then memory_load8_le((mem), bvadd64(bvsub64(i, R0), R1)) else old(memory_load8_le(mem, i))))"
+  Ensures DIRECT: "(forall i: bv64 :: ((bvule64(R1, i) && bvult64(i,bvadd64(R1, R2))) ==> (mem[i] == old(memory_load8_le(mem, i)) && Gamma_mem[i] == old(gamma_Load8(Gamma_mem, i)))))"
+  Ensures DIRECT: "(forall i: bv64 :: ((bvule64(R1, i) && bvult64(i,bvadd64(R1, R2))) ==> mem[i] == old(memory_load8_le(mem, i))))"
+  
 // forall i <= n, Gamma_mem[R0] low
 Subroutine: memset
   Modifies: mem
   Requires DIRECT: "Gamma_R1"
-  Ensures: buf == old(buf) && password == old(password) && stext==old(stext)
+  Ensures: buf == old(buf) && password == old(password)
   Ensures DIRECT: "(forall i: bv64 :: (Gamma_mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then Gamma_R1 else old(gamma_load8(Gamma_mem, i))))"
 //  Ensures DIRECT: "(forall i: bv64 :: (mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then R1[8:0] else old(mem[i])))"
   Ensures DIRECT: "(forall i: bv64 :: (mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then R1[8:0] else old(memory_load8_le(mem, i))))"
