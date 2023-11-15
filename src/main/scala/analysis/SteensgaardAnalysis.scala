@@ -219,3 +219,15 @@ case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
 
   override def toString: String = s"$of"
 }
+
+/** Counter for producing fresh IDs.
+  */
+object Fresh {
+
+  var n = 0
+
+  def next(): Int = {
+    n += 1
+    n
+  }
+}

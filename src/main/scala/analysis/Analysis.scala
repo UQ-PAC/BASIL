@@ -22,7 +22,7 @@ trait Analysis[+R]:
 
 /** Base class for value analysis with simple (non-lifted) lattice.
   */
-abstract class ConstantPropagation(val cfg: ProgramCfg) {
+trait ConstantPropagation(val cfg: ProgramCfg) {
   /** The lattice of abstract states.
     */
   val valuelattice: ConstantPropagationLattice = ConstantPropagationLattice()
@@ -101,55 +101,17 @@ class ConstantPropagationSolver(cfg: ProgramCfg) extends ConstantPropagation(cfg
     with ForwardDependencies
     with Analysis[Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]]
 
-/** Counter for producing fresh IDs.
-  */
-object Fresh {
 
-  var n = 0
-
-  def next(): Int = {
-    n += 1
-    n
-  }
-}
-
-trait MemoryRegion {
-  val regionIdentifier: String
-  var extent: Option[RangeKey] = None
-}
-
-class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral) extends MemoryRegion {
-  override def toString: String = s"Stack($regionIdentifier, $start)"
-  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
-  override def equals(obj: Any): Boolean = obj match {
-    case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier
-    case _ => false
-  }
-}
-
-class HeapRegion(override val regionIdentifier: String) extends MemoryRegion {
-  override def toString: String = s"Heap($regionIdentifier)"
-  override def hashCode(): Int = regionIdentifier.hashCode()
-  override def equals(obj: Any): Boolean = obj match {
-    case h: HeapRegion => h.regionIdentifier == regionIdentifier
-    case _ => false
-  }
-}
-
-class DataRegion(override val regionIdentifier: String, val start: BitVecLiteral) extends MemoryRegion {
-  override def toString: String = s"Data($regionIdentifier, $start)"
-  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
-  override def equals(obj: Any): Boolean = obj match {
-    case d: DataRegion => d.start == start && d.regionIdentifier == regionIdentifier
-    case _ => false
-  }
-}
-
-trait MemoryRegionAnalysisMisc:
+trait MemoryRegionAnalysis(val cfg: ProgramCfg,
+                           val globals: Map[BigInt, String],
+                           val globalOffsets: Map[BigInt, BigInt],
+                           val subroutines: Map[BigInt, String],
+                           val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]) {
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
   val stackMap: mutable.Map[CfgFunctionEntryNode, mutable.Map[Expr, StackRegion]] = mutable.HashMap()
+
   private def nextMallocCount() = {
     mallocCount += 1
     s"malloc_$mallocCount"
@@ -161,12 +123,13 @@ trait MemoryRegionAnalysisMisc:
   }
 
   /**
-   * Controls the pool of stack regions. Each pool is unique to a function.
-   * If the offset has already been defined in the context of the function, then the same region is returned.
-   * @param expr: the offset
-   * @param parent: the function entry node
-   * @return the stack region corresponding to the offset
-   */
+    * Controls the pool of stack regions. Each pool is unique to a function.
+    * If the offset has already been defined in the context of the function, then the same region is returned.
+    *
+    * @param expr   : the offset
+    * @param parent : the function entry node
+    * @return the stack region corresponding to the offset
+    */
   def poolMaster(expr: BitVecLiteral, parent: CfgFunctionEntryNode): StackRegion = {
     val stackPool = stackMap.getOrElseUpdate(parent, mutable.HashMap())
     if (stackPool.contains(expr)) {
@@ -178,7 +141,7 @@ trait MemoryRegionAnalysisMisc:
     }
   }
 
-  def unwrapExpr(expr: Expr) : ListBuffer[Expr] = {
+  def unwrapExpr(expr: Expr): ListBuffer[Expr] = {
     val buffers = ListBuffer[Expr]()
     expr match {
       case e: Extract => unwrapExpr(e.body)
@@ -187,8 +150,8 @@ trait MemoryRegionAnalysisMisc:
       case repeat: Repeat => unwrapExpr(repeat.body)
       case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
       case binaryExpr: BinaryExpr =>
-          unwrapExpr(binaryExpr.arg1)
-          unwrapExpr(binaryExpr.arg2)
+        unwrapExpr(binaryExpr.arg1)
+        unwrapExpr(binaryExpr.arg2)
       case memoryLoad: MemoryLoad =>
         buffers.addOne(memoryLoad)
         unwrapExpr(memoryLoad.index)
@@ -196,12 +159,6 @@ trait MemoryRegionAnalysisMisc:
     }
     buffers
   }
-
-  val cfg: ProgramCfg
-  val globals: Map[BigInt, String]
-  val globalOffsets: Map[BigInt, BigInt]
-  val subroutines: Map[BigInt, String]
-  val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
 
   /** The lattice of abstract values.
     */
@@ -270,7 +227,7 @@ trait MemoryRegionAnalysisMisc:
                 eval(b, env, n)
               case _ =>
                 env // we cannot evaluate this to a concrete value, we need VSA for this
-          }
+            }
         }
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")
@@ -280,88 +237,79 @@ trait MemoryRegionAnalysisMisc:
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element =
-    n match {
-      case cmd: CfgCommandNode =>
-        cmd.data match {
-          case directCall: DirectCall =>
-            if (directCall.target.name == "malloc") {
-              evaluateExpression(mallocVariable, constantProp(n)) match {
-                case Some(b: BitVecLiteral) =>
-                  lattice.sublattice.lub(s, Set(HeapRegion(nextMallocCount())))
-                case None => s
-              }
-            } else {
-              s
+  def localTransfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = n match {
+    case cmd: CfgCommandNode =>
+      cmd.data match {
+        case directCall: DirectCall =>
+          if (directCall.target.name == "malloc") {
+            evaluateExpression(mallocVariable, constantProp(n)) match {
+              case Some(b: BitVecLiteral) =>
+                lattice.sublattice.lub(s, Set(HeapRegion(nextMallocCount())))
+              case None => s
             }
-          case memAssign: MemoryAssign =>
-            if (ignoreRegions.contains(memAssign.rhs.value)) {
-              return s
-            }
-            val result = eval(memAssign.rhs.index, s, cmd)
-            /*
-            don't modify the IR in the middle of the analysis like this, also this produces a lot of incorrect results
-            result.collectFirst({
-              case StackRegion(name, _, _, _) =>
-                memAssign.rhs = MemoryStore(
-                  Memory(name,
-                    memAssign.rhs.mem.addressSize,
-                    memAssign.rhs.mem.valueSize),
-                  memAssign.rhs.index,
-                  memAssign.rhs.value, memAssign.rhs.endian,
-                  memAssign.rhs.size
-                )
-              case DataRegion(name, _, _, _) =>
-                memAssign.rhs = MemoryStore(
-                  Memory(name, memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize),
-                  memAssign.rhs.index,
-                  memAssign.rhs.value,
-                  memAssign.rhs.endian,
-                  memAssign.rhs.size
-                )
-              case _ =>
-            })
-            */
-            lattice.sublattice.lub(s, result)
-          case localAssign: LocalAssign =>
-            var m = s
-            unwrapExpr(localAssign.rhs).foreach {
-              case memoryLoad: MemoryLoad =>
-                val result = eval(memoryLoad.index, s, cmd)
-                /*
-                don't modify the IR in the middle of the analysis like this, this also produces incorrect results
-                result.collectFirst({
-                  case StackRegion(name, _, _, _) =>
-                    memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
-                  case DataRegion(name, _, _, _) =>
-                    memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
-                  case _ =>
-                })
-                */
-                m = lattice.sublattice.lub(m, result)
-              case _ => m
-            }
-            m
-          case _ => s
-        }
-      case _ => s // ignore other kinds of nodes
-    }
-
-/** Base class for memory region analysis (non-lifted) lattice.
-  */
-abstract class MemoryRegionAnalysis(
-    val cfg: ProgramCfg,
-    val globals: Map[BigInt, String],
-    val globalOffsets: Map[BigInt, BigInt],
-    val subroutines: Map[BigInt, String],
-    val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
-) extends MemoryRegionAnalysisMisc:
+          } else {
+            s
+          }
+        case memAssign: MemoryAssign =>
+          if (ignoreRegions.contains(memAssign.rhs.value)) {
+            return s
+          }
+          val result = eval(memAssign.rhs.index, s, cmd)
+          /*
+          don't modify the IR in the middle of the analysis like this, also this produces a lot of incorrect results
+          result.collectFirst({
+            case StackRegion(name, _, _, _) =>
+              memAssign.rhs = MemoryStore(
+                Memory(name,
+                  memAssign.rhs.mem.addressSize,
+                  memAssign.rhs.mem.valueSize),
+                memAssign.rhs.index,
+                memAssign.rhs.value, memAssign.rhs.endian,
+                memAssign.rhs.size
+              )
+            case DataRegion(name, _, _, _) =>
+              memAssign.rhs = MemoryStore(
+                Memory(name, memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize),
+                memAssign.rhs.index,
+                memAssign.rhs.value,
+                memAssign.rhs.endian,
+                memAssign.rhs.size
+              )
+            case _ =>
+          })
+          */
+          lattice.sublattice.lub(s, result)
+        case localAssign: LocalAssign =>
+          var m = s
+          unwrapExpr(localAssign.rhs).foreach {
+            case memoryLoad: MemoryLoad =>
+              val result = eval(memoryLoad.index, s, cmd)
+              /*
+              don't modify the IR in the middle of the analysis like this, this also produces incorrect results
+              result.collectFirst({
+                case StackRegion(name, _, _, _) =>
+                  memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
+                case DataRegion(name, _, _, _) =>
+                  memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
+                case _ =>
+              })
+              */
+              m = lattice.sublattice.lub(m, result)
+            case _ => m
+          }
+          m
+        case _ => s
+      }
+    case _ => s // ignore other kinds of nodes
+  }
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
   def transfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = localTransfer(n, s)
 
-abstract class MemoryRegionAnalysisWorklistSolver(
+}
+
+class MemoryRegionAnalysisSolver(
     cfg: ProgramCfg,
     globals: Map[BigInt, String],
     globalOffsets: Map[BigInt, BigInt],
@@ -370,19 +318,3 @@ abstract class MemoryRegionAnalysisWorklistSolver(
 ) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
     with SimpleMonotonicSolver[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]
     with ForwardDependencies
-
-object MemoryRegionAnalysis:
-
-  class WorklistSolver(
-      cfg: ProgramCfg,
-      globals: Map[BigInt, String],
-      globalOffsets: Map[BigInt, BigInt],
-      subroutines: Map[BigInt, String],
-      constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
-  ) extends MemoryRegionAnalysisWorklistSolver(
-        cfg,
-        globals,
-        globalOffsets,
-        subroutines,
-        constantProp
-      )

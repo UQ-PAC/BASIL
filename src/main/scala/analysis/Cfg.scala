@@ -6,7 +6,6 @@ import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotInt
 
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
 import scala.util.control.Breaks.break
-import analysis.Fresh.next
 import util.Logger
 
 /** Node in the control-flow graph.
