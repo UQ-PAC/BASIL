@@ -1,5 +1,5 @@
-package ir
-
+//package ir
+/*
 import analysis.BitVectorEval.*
 import util.Logger
 
@@ -291,3 +291,4 @@ class Interpreter() {
     regs
   }
 }
+*/

@@ -5,25 +5,25 @@ import scala.collection.immutable.ListSet
 
 /** Base trait for lattice solvers.
   */
-trait LatticeSolver:
+trait LatticeSolver[T]:
 
   /** The lattice used by the solver.
     */
-  val lattice: Lattice
+  val lattice: Lattice[T]
 
   /** The analyze function.
     */
-  def analyze(intra: Boolean): lattice.Element
+  def analyze(intra: Boolean): T
 
 /** Base trait for map lattice solvers.
   * @tparam N
   *   type of the elements in the map domain.
   */
-trait MapLatticeSolver[N] extends LatticeSolver with Dependencies[N]:
+trait MapLatticeSolver[N, T, L <: Lattice[T]] extends LatticeSolver[Map[N, T]] with Dependencies[N]:
 
   /** Must be a map lattice.
     */
-  val lattice: MapLattice[N, Lattice]
+  val lattice: MapLattice[N, T, L]
 
   /** The transfer function.
     */
@@ -101,7 +101,7 @@ trait ListSetWorklist[N] extends Worklist[N]:
   * @tparam N
   *   type of the elements in the worklist.
   */
-trait WorklistFixpointSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[N] with Dependencies[N]:
+trait WorklistFixpointSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, T, L] with ListSetWorklist[N] with Dependencies[N]:
   /** The current lattice element.
     */
   var x: lattice.Element = _
@@ -110,7 +110,7 @@ trait WorklistFixpointSolver[N] extends MapLatticeSolver[N] with ListSetWorklist
     val xn = x(n)
     val y = funsub(n, x, intra)
     if y != xn then
-      x += n -> y
+      x = x + (n -> y)
       add(outdep(n, intra))
 
 /** Worklist-based fixpoint solver.
@@ -118,7 +118,7 @@ trait WorklistFixpointSolver[N] extends MapLatticeSolver[N] with ListSetWorklist
   * @tparam N
   *   type of the elements in the worklist.
   */
-trait SimpleWorklistFixpointSolver[N] extends WorklistFixpointSolver[N]:
+trait SimpleWorklistFixpointSolver[N, T, L <: Lattice[T]] extends WorklistFixpointSolver[N, T, L]:
 
   /** The map domain.
     */
@@ -147,7 +147,7 @@ trait SimpleWorklistFixpointSolver[N] extends WorklistFixpointSolver[N]:
   * Better implementation of the same thing
   * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L311
   */
-trait PushDownWorklistFixpointSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[N] with Dependencies[N]:
+trait PushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, T, L] with ListSetWorklist[N] with Dependencies[N]:
   /** The current lattice element.
     */
   var x: lattice.Element = _
@@ -178,7 +178,7 @@ trait PushDownWorklistFixpointSolver[N] extends MapLatticeSolver[N] with ListSet
   * @tparam N
   *   type of the elements in the worklist.
   */
-trait SimplePushDownWorklistFixpointSolver[N] extends PushDownWorklistFixpointSolver[N]:
+trait SimplePushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends PushDownWorklistFixpointSolver[N, T, L]:
 
   /** The map domain.
     */

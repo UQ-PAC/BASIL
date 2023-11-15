@@ -13,10 +13,10 @@ import scala.collection.mutable
   * TODO: investigate how to visit all reachable nodes at least once, then remove loopEscape. TODO: in longer term, add
   * a worklist to avoid processing nodes twice.
   */
-trait SimpleMonotonicSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[N] with Dependencies[N]:
+trait SimpleMonotonicSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, T, L] with ListSetWorklist[N] with Dependencies[N]:
   /** The current lattice element.
     */
-  var x: lattice.Element = _
+  var x: Map[N, T] = _
 
   /** The map domain.
     */
@@ -32,7 +32,7 @@ trait SimpleMonotonicSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[
       x += n -> y
       add(outdep(n, intra))
 
-  def analyze(intra: Boolean): lattice.Element =
+  def analyze(intra: Boolean): Map[N, T] =
     // TODO this sort of type-dependent code should not be in the generic solver
     // should probably base it upon WorklistFixpointSolverWithReachability from TIP instead?
     val first: Set[N] = if (intra) {

@@ -20,71 +20,48 @@ trait Analysis[+R]:
     */
   def analyze(intra: Boolean): R
 
-/** A flow-sensitive analysis.
-  * @param stateAfterNode
-  *   true if the abstract state of a CFG node represents the program point <em>after</em> the node, false if represents
-  *   the program point <em>before</em> the node (used when outputting analysis results)
+/** Base class for value analysis with simple (non-lifted) lattice.
   */
-abstract class FlowSensitiveAnalysis(val stateAfterNode: Boolean) extends Analysis[Any]
-
-trait ValueAnalysisMisc:
-
-  val cfg: ProgramCfg
-
-  /** The lattice of abstract values.
-    */
-  val valuelattice: LatticeWithOps
-
+abstract class ConstantPropagation(val cfg: ProgramCfg) {
   /** The lattice of abstract states.
     */
-  val statelattice: MapLattice[Variable, valuelattice.type] = new MapLattice(valuelattice)
+  val valuelattice: ConstantPropagationLattice = ConstantPropagationLattice()
+
+  val statelattice: MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice] = MapLattice(valuelattice)
 
   /** Default implementation of eval.
     */
-  def eval(exp: Expr, env: statelattice.Element): valuelattice.Element =
+  def eval(exp: Expr, env: Map[Variable, FlatElement[BitVecLiteral]]): valuelattice.Element =
     import valuelattice._
     exp match
-      case id: Variable   => env(id)
-      case n: Literal     => literal(n)
+      case id: Variable => env(id)
+      case n: BitVecLiteral => bv(n)
       case ze: ZeroExtend => zero_extend(ze.extension, eval(ze.body, env))
       case se: SignExtend => sign_extend(se.extension, eval(se.body, env))
-      case e: Extract     => extract(e.end, e.start, eval(e.body, env))
+      case e: Extract => extract(e.end, e.start, eval(e.body, env))
       case bin: BinaryExpr =>
         val left = eval(bin.arg1, env)
         val right = eval(bin.arg2, env)
         bin.op match
-          case BVADD  => bvadd(left, right)
-          case BVSUB  => bvsub(left, right)
-          case BVMUL  => bvmul(left, right)
+          case BVADD => bvadd(left, right)
+          case BVSUB => bvsub(left, right)
+          case BVMUL => bvmul(left, right)
           case BVUDIV => bvudiv(left, right)
           case BVSDIV => bvsdiv(left, right)
           case BVSREM => bvsrem(left, right)
           case BVUREM => bvurem(left, right)
           case BVSMOD => bvsmod(left, right)
-          case BVAND  => bvand(left, right)
-          case BVOR   => bvor(left, right)
-          case BVXOR  => bvxor(left, right)
+          case BVAND => bvand(left, right)
+          case BVOR => bvor(left, right)
+          case BVXOR => bvxor(left, right)
           case BVNAND => bvnand(left, right)
-          case BVNOR  => bvnor(left, right)
+          case BVNOR => bvnor(left, right)
           case BVXNOR => bvxnor(left, right)
-          case BVSHL  => bvshl(left, right)
+          case BVSHL => bvshl(left, right)
           case BVLSHR => bvlshr(left, right)
           case BVASHR => bvashr(left, right)
           case BVCOMP => bvcomp(left, right)
-
-          case BVULE => bvule(left, right)
-          case BVUGE => bvuge(left, right)
-          case BVULT => bvult(left, right)
-          case BVUGT => bvugt(left, right)
-
-          case BVSLE => bvsle(left, right)
-          case BVSGE => bvsge(left, right)
-          case BVSLT => bvslt(left, right)
-          case BVSGT => bvsgt(left, right)
-
           case BVCONCAT => concat(left, right)
-          case BVNEQ    => bvneq(left, right)
-          case BVEQ     => bveq(left, right)
 
       case un: UnaryExpr =>
         val arg = eval(un.arg, env)
@@ -108,32 +85,21 @@ trait ValueAnalysisMisc:
           case _ => s
       case _ => s
 
-/** Base class for value analysis with simple (non-lifted) lattice.
-  */
-abstract class SimpleValueAnalysis(val cfg: ProgramCfg) extends FlowSensitiveAnalysis(true) with ValueAnalysisMisc:
-
   /** The analysis lattice.
     */
-  val lattice: MapLattice[CfgNode, statelattice.type] = MapLattice(statelattice)
+  val lattice: MapLattice[CfgNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]] = MapLattice(statelattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
   def transfer(n: CfgNode, s: statelattice.Element): statelattice.Element = localTransfer(n, s)
+}
 
-abstract class ValueAnalysisWorklistSolver[L <: LatticeWithOps](
-    cfg: ProgramCfg,
-    val valuelattice: L
-) extends SimpleValueAnalysis(cfg)
-    with SimplePushDownWorklistFixpointSolver[CfgNode]
+class ConstantPropagationSolver(cfg: ProgramCfg) extends ConstantPropagation(cfg)
+    with SimplePushDownWorklistFixpointSolver[CfgNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
     with ForwardDependencies
-
-object ConstantPropagationAnalysis:
-
-  class WorklistSolver(cfg: ProgramCfg) extends ValueAnalysisWorklistSolver(cfg, ConstantPropagationLattice)
-
-
+    with Analysis[Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]]
 
 /** Counter for producing fresh IDs.
   */
@@ -235,15 +201,15 @@ trait MemoryRegionAnalysisMisc:
   val globals: Map[BigInt, String]
   val globalOffsets: Map[BigInt, BigInt]
   val subroutines: Map[BigInt, String]
-  val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+  val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
 
   /** The lattice of abstract values.
     */
-  val powersetLattice: PowersetLattice[MemoryRegion]
+  val powersetLattice: PowersetLattice[MemoryRegion] = PowersetLattice()
 
   /** The lattice of abstract states.
     */
-  val lattice: MapLattice[CfgNode, PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CfgNode, powersetLattice.Element, powersetLattice.type] = MapLattice(powersetLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -388,23 +354,21 @@ abstract class MemoryRegionAnalysis(
     val globals: Map[BigInt, String],
     val globalOffsets: Map[BigInt, BigInt],
     val subroutines: Map[BigInt, String],
-    val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-) extends FlowSensitiveAnalysis(true)
-    with MemoryRegionAnalysisMisc:
+    val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
+) extends MemoryRegionAnalysisMisc:
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
   def transfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = localTransfer(n, s)
 
-abstract class IntraprocMemoryRegionAnalysisWorklistSolver[L <: PowersetLattice[MemoryRegion]](
+abstract class MemoryRegionAnalysisWorklistSolver(
     cfg: ProgramCfg,
     globals: Map[BigInt, String],
     globalOffsets: Map[BigInt, BigInt],
     subroutines: Map[BigInt, String],
-    constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
-    val powersetLattice: L
+    constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
 ) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
-    with SimpleMonotonicSolver[CfgNode]
+    with SimpleMonotonicSolver[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]
     with ForwardDependencies
 
 object MemoryRegionAnalysis:
@@ -414,12 +378,11 @@ object MemoryRegionAnalysis:
       globals: Map[BigInt, String],
       globalOffsets: Map[BigInt, BigInt],
       subroutines: Map[BigInt, String],
-      constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-  ) extends IntraprocMemoryRegionAnalysisWorklistSolver(
+      constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
+  ) extends MemoryRegionAnalysisWorklistSolver(
         cfg,
         globals,
         globalOffsets,
         subroutines,
-        constantProp,
-        PowersetLattice[MemoryRegion]
+        constantProp
       )

@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
-import ir.{Block, DirectCall, Expr, LocalAssign, MemoryAssign, Procedure, Program, Variable}
+import ir.{Block, DirectCall, Expr, LocalAssign, MemoryAssign, Procedure, Program, Variable, BitVecLiteral}
 import util.Logger
 
 import java.io.{File, PrintWriter}
@@ -10,7 +10,7 @@ import scala.collection.mutable.ArrayBuffer
 /** Steensgaard-style pointer analysis. The analysis associates an [[StTerm]] with each variable declaration and
   * expression node in the AST. It is implemented using [[tip.solvers.UnionFindSolver]].
   */
-class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]) extends Analysis[Any] {
+class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
 
@@ -18,7 +18,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, Map
 
   var mallocCallTarget: Option[Block] = None
 
-  val constantPropResult2: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = constantPropResult
+  val constantPropResult2: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]] = constantPropResult
 
   constantPropResult2.values.foreach(v => Logger.info(s"$v"))
 

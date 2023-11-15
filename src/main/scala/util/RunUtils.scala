@@ -104,10 +104,12 @@ object RunUtils {
     val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
     IRProgram.setModifies(specModifies)
 
+    /*
     if (q.runInterpret) {
       val interpreter = Interpreter()
       interpreter.interpret(IRProgram)
     }
+    */
 
     Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
@@ -144,10 +146,10 @@ object RunUtils {
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
     Logger.info("[!] Running Constant Propagation")
-    val constPropSolver = ConstantPropagationAnalysis.WorklistSolver(cfg)
-    val constPropResult: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = constPropSolver.analyze(true)
+    val constPropSolver = ConstantPropagationSolver(cfg)
+    val constPropResult = constPropSolver.analyze(true)
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder), s"${s}_constprop$iteration.dot"))
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt"))
 
     Logger.info("[!] Running MRA")
@@ -155,7 +157,7 @@ object RunUtils {
     val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.analyze(true)
     memoryRegionAnalysisResults = mraResult
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder), s"${s}_mra$iteration.dot"))
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(mraResult, true), Output.dotIder), s"${s}_mra$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, mraResult, iteration), s"${s}_mra$iteration.txt"))
 
     Logger.info("[!] Running MMM")
@@ -167,7 +169,7 @@ object RunUtils {
       ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
     val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]  = vsaSolver.analyze(false)
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder), s"${s}_vsa$iteration.dot"))
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, true), Output.dotIder), s"${s}_vsa$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, vsaResult, iteration), s"${s}_vsa$iteration.txt"))
 
     Logger.info("[!] Resolving CFG")

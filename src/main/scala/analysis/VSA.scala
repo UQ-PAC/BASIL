@@ -29,8 +29,6 @@ case class LiteralValue(expr: BitVecLiteral) extends Value {
   override def toString: String = "Literal(" + expr + ")"
 }
 
-type VSALatticeElem = MapLattice[Variable | MemoryRegion, PowersetLattice[Value]]
-
 trait MemoryRegionValueSetAnalysis:
 
   val cfg: ProgramCfg
@@ -39,15 +37,13 @@ trait MemoryRegionValueSetAnalysis:
   val globalOffsets: Map[BigInt, BigInt]
   val subroutines: Map[BigInt, String]
   val mmm: MemoryModelMap
-  val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+  val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
 
-  /** The lattice of abstract values.
-    */
-  val powersetLattice: VSALatticeElem
+  val powersetLattice: PowersetLattice[Value] = PowersetLattice()
 
-  /** The lattice of abstract states.
-    */
-  val lattice: MapLattice[CfgNode, VSALatticeElem] = MapLattice(powersetLattice)
+  val mapLattice: MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]] = MapLattice(powersetLattice)
+
+  val lattice: MapLattice[CfgNode, mapLattice.Element, mapLattice.type] = MapLattice(mapLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -185,9 +181,8 @@ abstract class ValueSetAnalysis(
     val globalOffsets: Map[BigInt, BigInt],
     val subroutines: Map[BigInt, String],
     val mmm: MemoryModelMap,
-    val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-) extends FlowSensitiveAnalysis(true)
-    with MemoryRegionValueSetAnalysis {
+    val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
+) extends MemoryRegionValueSetAnalysis {
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
@@ -195,17 +190,16 @@ abstract class ValueSetAnalysis(
 
 }
 
-abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
+abstract class ValueSetAnalysisWorklistSolver(
     cfg: ProgramCfg,
     globals: Map[BigInt, String],
     externalFunctions: Map[BigInt, String],
     globalOffsets: Map[BigInt, BigInt],
     subroutines: Map[BigInt, String],
     mmm: MemoryModelMap,
-    constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
-    val powersetLattice: L
+    constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
 ) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
-    with SimpleMonotonicSolver[CfgNode]
+    with SimpleMonotonicSolver[CfgNode, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]]
     with ForwardDependencies
 
 object ValueSetAnalysis:
@@ -219,14 +213,13 @@ object ValueSetAnalysis:
       globalOffsets: Map[BigInt, BigInt],
       subroutines: Map[BigInt, String],
       mmm: MemoryModelMap,
-      constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-  ) extends IntraprocValueSetAnalysisWorklistSolver(
+      constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
+  ) extends ValueSetAnalysisWorklistSolver(
         cfg,
         globals,
         externalFunctions,
         globalOffsets,
         subroutines,
         mmm,
-        constantProp,
-        MapLattice[Variable | MemoryRegion, PowersetLattice[Value]](PowersetLattice[Value])
+        constantProp
       )
