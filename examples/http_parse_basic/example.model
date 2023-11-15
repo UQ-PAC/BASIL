@@ -1,9 +1,9 @@
 *** MODEL
 #4 -> 
-#4@0 -> 68bv64
-$buf_addr -> 131192bv64
-$password_addr -> 131160bv64
-$stext_addr -> 131168bv64
+#4@0 -> 52bv64
+$buf_addr -> 131200bv64
+$password_addr -> 131168bv64
+$stext_addr -> 131176bv64
 Gamma_#4 -> 
 Gamma_malloc_base -> 
 Gamma_malloc_base@0 -> 
@@ -12,227 +12,233 @@ Gamma_malloc_count@0 ->
 Gamma_malloc_end -> 
 Gamma_malloc_end@0 -> 
 Gamma_malloc_id -> 
-Gamma_mem -> (store (store (store (_ (as (const) (Array (bv64) (Bool))) true) (_ 17592186044416 64) false) (_ 9223372036854775808 64) false) (_ 131160 64) false)
-Gamma_mem@0 -> (store (store (store (_ (as (const) (Array (bv64) (Bool))) true) (_ 17592186044416 64) false) (_ 9223372036854775808 64) false) (_ 131160 64) false)
-Gamma_mem@1 -> (store (store (store (_ (as (const) (Array (bv64) (Bool))) true) (_ 17592186044416 64) false) (_ 9223372036854775808 64) false) (_ 131160 64) false)
-Gamma_mem@2 -> (store (store (store (_ (as (const) (Array (bv64) (Bool))) true) (_ 17592186044416 64) false) (_ 9223372036854775808 64) false) (_ 131160 64) false)
-Gamma_mem@3 -> (lambda (_ (x!1 (bv64))) (or (= (x!1) (_ (bv0) 64)) (= (x!1) (_ 17592186044416 64))))
-Gamma_mem@4 -> (lambda (_ (x!1 (bv64))) (or (= (x!1) (_ (bv0) 64)) (= (x!1) (_ 17592186044416 64))))
-Gamma_mem@5 -> (lambda (_ (x!1 (bv64))) (or (= (x!1) (_ (bv0) 64)) (= (x!1) (_ 17592186044416 64))))
-Gamma_mem@6 -> (lambda (_ (x!1 (bv64))) (or (= (x!1) (_ (bv0) 64)) (= (x!1) (_ 17592186044416 64))))
-Gamma_mem@7 -> (store (store (_ (as (const) (Array (bv64) (Bool))) true) 8192bv64 false) (_ 9567696 64) false)
-Gamma_mem@8 -> (store (store (_ (as (const) (Array (bv64) (Bool))) true) 8192bv64 false) (_ 9567696 64) false)
+Gamma_mem -> (_ (as-array) (k!6))
+Gamma_mem@0 -> (_ (as-array) (k!6))
+Gamma_mem@1 -> (_ (as-array) (k!6))
+Gamma_mem@2 -> (_ (as-array) (k!11))
+Gamma_mem@3 -> (_ (as-array) (k!11))
+Gamma_mem@4 -> (_ (as-array) (k!11))
+Gamma_mem@5 -> (_ (as-array) (k!11))
 Gamma_R0 -> 
 Gamma_R0@0 -> true
 Gamma_R0@1 -> true
-Gamma_R0@2 -> true
-Gamma_R0@3 -> true
-Gamma_R0@4 -> true
 Gamma_R1 -> 
+Gamma_R1@0 -> false
 Gamma_R16 -> 
 Gamma_R16@0 -> 
 Gamma_R16@1 -> 
-Gamma_R16@2 -> 
-Gamma_R16@3 -> 
 Gamma_R17 -> 
 Gamma_R17@0 -> 
 Gamma_R17@1 -> 
-Gamma_R17@2 -> 
-Gamma_R17@3 -> 
+Gamma_R19 -> false
+Gamma_R19@0 -> true
 Gamma_R2 -> 
 Gamma_R29 -> false
-Gamma_R3 -> 
-Gamma_R3@0 -> true
 Gamma_R30 -> false
 Gamma_R31 -> 
-Gamma_stack -> (store (store (_ (as (const) (Array (bv64) (Bool))) true) 8bv64 false) (_ (bv0) 64) false)
-Gamma_stack@0 -> (lambda (_ (x!1 (bv64))) (or (= (x!1) (_ 9223372036854775808 64)) (= (x!1) (_ (bv80) 64)) (= (x!1) (_ (bv64) 64))))
-Gamma_stack@1 -> (lambda (_ (x!1 (bv64))) (= (x!1) 9223372036854775808bv64))
-Gamma_stack@2 -> (lambda (_ (x!1 (bv64))) (= (x!1) 9223372036854775808bv64))
-Gamma_stack@3 -> (lambda (_ (x!1 (bv64))) (= (x!1) 9223372036854775808bv64))
-Gamma_stack@4 -> (lambda (_ (x!1 (bv64))) (= (x!1) 9223372036854775808bv64))
-malloc_base -> (store (store (_ (as (const) (Array (Int) (bv64))) 21165330399264bv64) 3 (_ 1179088 64)) 1 (_ 7024419012608 64))
-malloc_base@0 -> (store (store (_ (as (const) (Array (Int) (bv64))) 21165330399264bv64) 3 (_ 1179088 64)) 1 (_ 8795824586752 64))
+Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+Gamma_stack@0 -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+Gamma_stack@1 -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+Gamma_stack@2 -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+Gamma_stack@3 -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+Gamma_stack@4 -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+malloc_base -> 
+malloc_base@0 -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 297238743713058944 64))
 malloc_count -> 0
 malloc_count@0 -> 1
-malloc_end -> (store (store (_ (as (const) (Array (Int) (bv64))) 3333431492608bv64) 3 (_ 9567697 64)) 1 (_ 6433324138507 64))
-malloc_end@0 -> (store (store (_ (as (const) (Array (Int) (bv64))) 3333431492608bv64) 3 (_ 9567697 64)) 1 (_ 8795824586763 64))
+malloc_end -> 
+malloc_end@0 -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 297238743713058955 64))
 malloc_id -> 
-mem -> (_ (as-array) (k!12))
-mem@0 -> (_ (as-array) (k!12))
-mem@1 -> (_ (as-array) (k!12))
-mem@2 -> (_ (as-array) (k!12))
-mem@3 -> (_ (as-array) (k!14))
-mem@4 -> (_ (as-array) (k!14))
-mem@5 -> (_ (as-array) (k!14))
-mem@6 -> (_ (as-array) (k!14))
-mem@7 -> (_ (as-array) (k!14))
-mem@8 -> (_ (as-array) (k!14))
+mem -> (_ (as-array) (k!5))
+mem@0 -> (_ (as-array) (k!5))
+mem@1 -> (_ (as-array) (k!5))
+mem@2 -> (_ (as-array) (k!7))
+mem@3 -> (_ (as-array) (k!7))
+mem@4 -> (_ (as-array) (k!10))
+mem@5 -> (_ (as-array) (k!10))
 R0 -> 
-R0@0 -> 8795824586752bv64
-R0@1 -> 131192bv64
-R0@10 -> 131192bv64
-R0@11 -> 1179088bv64
-R0@2 -> 131192bv64
-R0@3 -> 131192bv64
-R0@4 -> 1179088bv64
-R0@5 -> 131192bv64
-R0@6 -> 1179088bv64
-R0@7 -> 1179089bv64
-R0@8 -> 131192bv64
-R0@9 -> 1179088bv64
+R0@0 -> 131168bv64
+R0@1 -> 131176bv64
+R0@2 -> 297238743713058944bv64
+R0@3 -> 131200bv64
+R0@4 -> 131200bv64
+R0@5 -> 131176bv64
+R0@6 -> 6098498511519612930bv64
 R1 -> 
-R1@0 -> 131168bv64
+R1@0 -> 7bv64
+R1@1 -> 131176bv64
 R16 -> 
 R16@0 -> 
 R16@1 -> 
-R16@2 -> 
-R16@3 -> 
 R17 -> 
 R17@0 -> 
 R17@1 -> 
-R17@2 -> 
-R17@3 -> 
+R19 -> 32bv64
+R19@0 -> 297238743713058944bv64
 R2 -> 
-R29 -> 0bv64
-R3 -> 
-R3@0 -> 8795824586752bv64
+R29 -> 9007199254740992bv64
 R30 -> 0bv64
 R31 -> 100bv64
-stack -> (let (_ (a!1 (store (store (store (_ (as (const) (Array (bv64) (bv8))) (_ (bv4) 8)) (_ (bv77) 64) (_ 128 8)) (_ (bv88) 64) (_ (bv1) 8)) (_ 16384 64) (_ (bv64) 8)))) (store (store (a!1) (_ (bv68) 64) (_ (bv16) 8)) (_ (bv0) 64) (_ (bv8) 8)))
-stack@0 -> (let (_ (a!1 (store (store (store (_ (as (const) (Array (bv64) (bv8))) (_ (bv4) 8)) (_ (bv77) 64) (_ 128 8)) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv68) 64) (_ (bv0) 8)))) (store (a!1) (_ (bv0) 64) (_ (bv8) 8)))
-stack@1 -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv96) 64) (_ (bv4) 8)) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv0) 64) (_ (bv8) 8))
-stack@2 -> (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv0) 64) (_ (bv8) 8))
-stack@3 -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv0) 64) (_ (bv8) 8))
-stack@4 -> (_ (as (const) (Array (bv64) (bv8))) 106bv8)
+stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+stack@0 -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+stack@1 -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+stack@2 -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+stack@3 -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+stack@4 -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
 ControlFlow -> {
-  0 2 -> (- 1)
-  0 7 -> 2
-  else -> 7
+  0 11 -> 2
+  0 2 -> (- 6)
+  else -> 11
 }
 gamma_load32 -> {
   else -> true
 }
+gamma_load64 -> {
+  else -> true
+}
 gamma_load8 -> {
-  else -> (let (_ (a!1 (= (:var 0) (lambda (_ (x!1 (_ (BitVec) 64))) (or (= (x!1) (_ (bv0) 64)) (= (x!1) (_ 17592186044416 64))))))) (or (and (a!1) (= (:var 1) (_ 17592186044416 64))) (and (a!1) (= (:var 1) (_ (bv0) 64)))))
+  else -> false
 }
 gamma_store64 -> {
-  (_ (as-array) (k!13)) 131192bv64 true -> (store (store (store (_ (as (const) (Array (bv64) (Bool))) true) (_ 17592186044416 64) false) (_ 9223372036854775808 64) false) (_ 131160 64) false)
-  (_ (as-array) (k!4)) 68bv64 false -> (lambda (_ (x!1 (bv64))) (or (= (x!1) (_ 9223372036854775808 64)) (= (x!1) (_ (bv80) 64)) (= (x!1) (_ (bv64) 64))))
-  else -> (lambda (_ (x!1 (bv64))) (= (x!1) 9223372036854775808bv64))
+  (_ (as-array) (k!11)) 131200bv64 true -> (_ (as-array) (k!11))
+  else -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
 }
-k!12 -> {
-  0bv64 -> 72bv8
-  130504bv64 -> 144bv8
+gamma_store8 -> {
+  else -> (_ (as-array) (k!11))
+}
+k!10 -> {
+  0bv64 -> 128bv8
+  130504bv64 -> 208bv8
   130505bv64 -> 8bv8
-  130512bv64 -> 64bv8
+  130512bv64 -> 128bv8
   130513bv64 -> 8bv8
-  131032bv64 -> 148bv8
+  131032bv64 -> 212bv8
   131033bv64 -> 8bv8
-  131152bv64 -> 80bv8
-  131154bv64 -> 2bv8
-  131160bv64 -> 7bv8
-  131168bv64 -> 108bv8
-  131169bv64 -> 107bv8
-  131170bv64 -> 97bv8
-  131171bv64 -> 106bv8
-  131172bv64 -> 100bv8
-  131173bv64 -> 108bv8
-  131174bv64 -> 107bv8
-  131175bv64 -> 97bv8
-  131176bv64 -> 106bv8
-  131177bv64 -> 100bv8
-  131178bv64 -> 97bv8
-  131195bv64 -> 240bv8
-  131196bv64 -> 255bv8
-  131197bv64 -> 7bv8
-  2376bv64 -> 1bv8
-  2378bv64 -> 2bv8
-  32768bv64 -> 1bv8
+  131160bv64 -> 88bv8
+  131162bv64 -> 2bv8
+  131200bv64 -> 128bv8
+  131201bv64 -> 16bv8
+  131202bv64 -> 128bv8
+  131203bv64 -> 4bv8
+  131204bv64 -> 16bv8
+  131205bv64 -> 1bv8
+  131206bv64 -> 32bv8
+  131207bv64 -> 4bv8
+  2512bv64 -> 1bv8
+  2514bv64 -> 2bv8
   else -> 0bv8
 }
-k!14 -> {
-  130504bv64 -> 144bv8
+k!11 -> {
+  else -> (or (= (:var 0) 122524351096171bv64) (= (:var 0) (_ 122524351096168 64)) (= (:var 0) (_ (bv0) 64)) (= (:var 0) (_ 131205 64)) (= (:var 0) (_ 131204 64)) (= (:var 0) (_ 131202 64)) (= (:var 0) (_ 122524351096169 64)) (= (:var 0) (_ 131206 64)) (= (:var 0) (_ 131200 64)) (= (:var 0) (_ 131207 64)) (= (:var 0) (_ 131203 64)) (= (:var 0) (_ 122524351096170 64)) (= (:var 0) (_ 131201 64)))
+}
+k!5 -> {
+  0bv64 -> 128bv8
+  130504bv64 -> 208bv8
   130505bv64 -> 8bv8
-  130512bv64 -> 64bv8
+  130512bv64 -> 128bv8
   130513bv64 -> 8bv8
-  131032bv64 -> 148bv8
+  131032bv64 -> 212bv8
   131033bv64 -> 8bv8
-  131152bv64 -> 80bv8
-  131154bv64 -> 2bv8
-  131192bv64 -> 208bv8
-  131193bv64 -> 253bv8
-  131194bv64 -> 17bv8
-  2376bv64 -> 1bv8
-  2378bv64 -> 2bv8
+  131160bv64 -> 88bv8
+  131162bv64 -> 2bv8
+  131168bv64 -> 7bv8
+  131176bv64 -> 104bv8
+  131177bv64 -> 101bv8
+  131178bv64 -> 108bv8
+  131179bv64 -> 108bv8
+  131180bv64 -> 111bv8
+  131181bv64 -> 111bv8
+  2512bv64 -> 1bv8
+  2514bv64 -> 2bv8
+  else -> 0bv8
+}
+k!6 -> {
+  else -> (or (= (:var 0) 122524351096171bv64) (= (:var 0) (_ 122524351096168 64)) (= (:var 0) (_ (bv0) 64)) (= (:var 0) (_ 131205 64)) (= (:var 0) (_ 131204 64)) (= (:var 0) (_ 131202 64)) (= (:var 0) (_ 131181 64)) (= (:var 0) (_ 122524351096169 64)) (= (:var 0) (_ 131206 64)) (= (:var 0) (_ 131200 64)) (= (:var 0) (_ 131207 64)) (= (:var 0) (_ 131203 64)) (= (:var 0) (_ 131201 64)) (= (:var 0) (_ 122524351096170 64)))
+}
+k!7 -> {
+  0bv64 -> 128bv8
+  130504bv64 -> 208bv8
+  130505bv64 -> 8bv8
+  130512bv64 -> 128bv8
+  130513bv64 -> 8bv8
+  131032bv64 -> 212bv8
+  131033bv64 -> 8bv8
+  131160bv64 -> 88bv8
+  131162bv64 -> 2bv8
+  131168bv64 -> 7bv8
+  131176bv64 -> 104bv8
+  131177bv64 -> 101bv8
+  131178bv64 -> 108bv8
+  131179bv64 -> 108bv8
+  131180bv64 -> 111bv8
+  131181bv64 -> 7bv8
+  2512bv64 -> 1bv8
+  2514bv64 -> 2bv8
   else -> 0bv8
 }
 L -> {
-  else -> true
+  else -> false
 }
 lambda#0 -> {
-  131192bv64 8bv64 true (_ (as-array) (k!13)) -> (store (store (store (_ (as (const) (Array (bv64) (Bool))) true) (_ 17592186044416 64) false) (_ 9223372036854775808 64) false) (_ 131160 64) false)
-  68bv64 8bv64 false (_ (as-array) (k!4)) -> (lambda (_ (x!1 (bv64))) (or (= (x!1) (_ 9223372036854775808 64)) (= (x!1) (_ (bv80) 64)) (= (x!1) (_ (bv64) 64))))
-  else -> (lambda (_ (x!1 (bv64))) (= (x!1) 9223372036854775808bv64))
+  131200bv64 8bv64 true (_ (as-array) (k!11)) -> (_ (as-array) (k!11))
+  else -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
 }
 lambda#1 -> {
-  131192bv64 8bv64 8795824586752bv64 131192bv64 (_ (as-array) (k!12)) -> (_ (as-array) (k!12))
-  76bv64 8bv64 0bv64 76bv64 (_ (as-array) (k!3)) -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv96) 64) (_ (bv4) 8)) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv0) 64) (_ (bv8) 8))
-  84bv64 8bv64 0bv64 84bv64 (_ (as-array) (k!8)) -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv0) 64) (_ (bv8) 8))
-  92bv64 8bv64 0bv64 92bv64 (_ (as-array) (k!6)) -> (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv0) 64) (_ (bv8) 8))
-  92bv64 8bv64 1179089bv64 92bv64 (_ (as-array) (k!9)) -> (_ (as (const) (Array (bv64) (bv8))) 106bv8)
-  else -> (let (_ (a!1 (store (store (store (_ (as (const) (Array (bv64) (bv8))) (_ (bv4) 8)) (_ (bv77) 64) (_ 128 8)) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv68) 64) (_ (bv0) 8)))) (store (a!1) (_ (bv0) 64) (_ (bv8) 8)))
+  131200bv64 8bv64 297238743713058944bv64 131200bv64 (_ (as-array) (k!7)) -> (_ (as-array) (k!10))
+  84bv64 8bv64 0bv64 84bv64 (_ (as-array) (k!2)) -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
+  else -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
 }
 memory_load64_le -> {
-  (_ (as-array) (k!12)) 131192bv64 -> 8795824586752bv64
-  (_ (as-array) (k!14)) 131192bv64 -> 1179088bv64
-  else -> 7019823622724348780bv64
+  (_ (as-array) (k!10)) 131200bv64 -> 297238743713058944bv64
+  else -> 122524351096168bv64
 }
 memory_load8_le -> {
-  (_ (as-array) (k!12)) 130504bv64 -> 144bv8
-  (_ (as-array) (k!12)) 130505bv64 -> 8bv8
-  (_ (as-array) (k!12)) 130512bv64 -> 64bv8
-  (_ (as-array) (k!12)) 130513bv64 -> 8bv8
-  (_ (as-array) (k!12)) 131032bv64 -> 148bv8
-  (_ (as-array) (k!12)) 131033bv64 -> 8bv8
-  (_ (as-array) (k!12)) 131152bv64 -> 80bv8
-  (_ (as-array) (k!12)) 131154bv64 -> 2bv8
-  (_ (as-array) (k!12)) 131160bv64 -> 7bv8
-  (_ (as-array) (k!12)) 131168bv64 -> 108bv8
-  (_ (as-array) (k!12)) 131169bv64 -> 107bv8
-  (_ (as-array) (k!12)) 131170bv64 -> 97bv8
-  (_ (as-array) (k!12)) 131171bv64 -> 106bv8
-  (_ (as-array) (k!12)) 131172bv64 -> 100bv8
-  (_ (as-array) (k!12)) 131173bv64 -> 108bv8
-  (_ (as-array) (k!12)) 131174bv64 -> 107bv8
-  (_ (as-array) (k!12)) 131175bv64 -> 97bv8
-  (_ (as-array) (k!12)) 131176bv64 -> 106bv8
-  (_ (as-array) (k!12)) 131177bv64 -> 100bv8
-  (_ (as-array) (k!12)) 131178bv64 -> 97bv8
-  (_ (as-array) (k!12)) 2376bv64 -> 1bv8
-  (_ (as-array) (k!12)) 2378bv64 -> 2bv8
-  (_ (as-array) (k!14)) 130504bv64 -> 144bv8
-  (_ (as-array) (k!14)) 130505bv64 -> 8bv8
-  (_ (as-array) (k!14)) 130512bv64 -> 64bv8
-  (_ (as-array) (k!14)) 130513bv64 -> 8bv8
-  (_ (as-array) (k!14)) 131032bv64 -> 148bv8
-  (_ (as-array) (k!14)) 131033bv64 -> 8bv8
-  (_ (as-array) (k!14)) 131152bv64 -> 80bv8
-  (_ (as-array) (k!14)) 131154bv64 -> 2bv8
-  (_ (as-array) (k!14)) 131192bv64 -> 208bv8
-  (_ (as-array) (k!14)) 131193bv64 -> 253bv8
-  (_ (as-array) (k!14)) 131194bv64 -> 17bv8
-  (_ (as-array) (k!14)) 2376bv64 -> 1bv8
-  (_ (as-array) (k!14)) 2378bv64 -> 2bv8
+  (_ (as-array) (k!10)) 130504bv64 -> 208bv8
+  (_ (as-array) (k!10)) 130505bv64 -> 8bv8
+  (_ (as-array) (k!10)) 130512bv64 -> 128bv8
+  (_ (as-array) (k!10)) 130513bv64 -> 8bv8
+  (_ (as-array) (k!10)) 131032bv64 -> 212bv8
+  (_ (as-array) (k!10)) 131033bv64 -> 8bv8
+  (_ (as-array) (k!10)) 131160bv64 -> 88bv8
+  (_ (as-array) (k!10)) 131162bv64 -> 2bv8
+  (_ (as-array) (k!10)) 2512bv64 -> 1bv8
+  (_ (as-array) (k!10)) 2514bv64 -> 2bv8
+  (_ (as-array) (k!5)) 130504bv64 -> 208bv8
+  (_ (as-array) (k!5)) 130505bv64 -> 8bv8
+  (_ (as-array) (k!5)) 130512bv64 -> 128bv8
+  (_ (as-array) (k!5)) 130513bv64 -> 8bv8
+  (_ (as-array) (k!5)) 131032bv64 -> 212bv8
+  (_ (as-array) (k!5)) 131033bv64 -> 8bv8
+  (_ (as-array) (k!5)) 131160bv64 -> 88bv8
+  (_ (as-array) (k!5)) 131162bv64 -> 2bv8
+  (_ (as-array) (k!5)) 131168bv64 -> 7bv8
+  (_ (as-array) (k!5)) 131176bv64 -> 104bv8
+  (_ (as-array) (k!5)) 131177bv64 -> 101bv8
+  (_ (as-array) (k!5)) 131178bv64 -> 108bv8
+  (_ (as-array) (k!5)) 131179bv64 -> 108bv8
+  (_ (as-array) (k!5)) 131180bv64 -> 111bv8
+  (_ (as-array) (k!5)) 131181bv64 -> 111bv8
+  (_ (as-array) (k!5)) 2512bv64 -> 1bv8
+  (_ (as-array) (k!5)) 2514bv64 -> 2bv8
+  (_ (as-array) (k!7)) 130504bv64 -> 208bv8
+  (_ (as-array) (k!7)) 130505bv64 -> 8bv8
+  (_ (as-array) (k!7)) 130512bv64 -> 128bv8
+  (_ (as-array) (k!7)) 130513bv64 -> 8bv8
+  (_ (as-array) (k!7)) 131032bv64 -> 212bv8
+  (_ (as-array) (k!7)) 131033bv64 -> 8bv8
+  (_ (as-array) (k!7)) 131160bv64 -> 88bv8
+  (_ (as-array) (k!7)) 131162bv64 -> 2bv8
+  (_ (as-array) (k!7)) 2512bv64 -> 1bv8
+  (_ (as-array) (k!7)) 2514bv64 -> 2bv8
   else -> 0bv8
 }
 memory_store64_le -> {
-  (_ (as-array) (k!12)) 131192bv64 8795824586752bv64 -> (_ (as-array) (k!12))
-  (_ (as-array) (k!3)) 76bv64 0bv64 -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv96) 64) (_ (bv4) 8)) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv0) 64) (_ (bv8) 8))
-  (_ (as-array) (k!6)) 92bv64 0bv64 -> (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv0) 64) (_ (bv8) 8))
-  (_ (as-array) (k!8)) 84bv64 0bv64 -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv0) 64) (_ (bv8) 8))
-  (_ (as-array) (k!9)) 92bv64 1179089bv64 -> (_ (as (const) (Array (bv64) (bv8))) 106bv8)
-  else -> (let (_ (a!1 (store (store (store (_ (as (const) (Array (bv64) (bv8))) (_ (bv4) 8)) (_ (bv77) 64) (_ 128 8)) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv68) 64) (_ (bv0) 8)))) (store (a!1) (_ (bv0) 64) (_ (bv8) 8)))
+  (_ (as-array) (k!2)) 84bv64 0bv64 -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
+  (_ (as-array) (k!7)) 131200bv64 297238743713058944bv64 -> (_ (as-array) (k!10))
+  else -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+}
+memory_store8_le -> {
+  else -> (_ (as-array) (k!7))
 }
 tickleBool -> {
   else -> true
@@ -244,58 +250,70 @@ tickleBool -> {
   Gamma_malloc_count -> 
   Gamma_malloc_end -> 
   Gamma_malloc_id -> 
-  Gamma_mem -> (store (store (store (_ (as (const) (Array (bv64) (Bool))) true) (_ 17592186044416 64) false) (_ 9223372036854775808 64) false) (_ 131160 64) false)
+  Gamma_mem -> (_ (as-array) (k!6))
   Gamma_R0 -> 
   Gamma_R1 -> 
   Gamma_R16 -> 
   Gamma_R17 -> 
+  Gamma_R19 -> false
   Gamma_R2 -> 
   Gamma_R29 -> false
-  Gamma_R3 -> 
   Gamma_R30 -> false
   Gamma_R31 -> 
-  Gamma_stack -> (store (store (_ (as (const) (Array (bv64) (Bool))) true) 8bv64 false) (_ (bv0) 64) false)
-  malloc_base -> (store (store (_ (as (const) (Array (Int) (bv64))) 21165330399264bv64) 3 (_ 1179088 64)) 1 (_ 7024419012608 64))
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  malloc_base -> 
   malloc_count -> 0
-  malloc_end -> (store (store (_ (as (const) (Array (Int) (bv64))) 3333431492608bv64) 3 (_ 9567697 64)) 1 (_ 6433324138507 64))
+  malloc_end -> 
   malloc_id -> 
-  mem -> (_ (as-array) (k!12))
+  mem -> (_ (as-array) (k!5))
   R0 -> 
   R1 -> 
   R16 -> 
   R17 -> 
+  R19 -> 32bv64
   R2 -> 
-  R29 -> 0bv64
-  R3 -> 
+  R29 -> 9007199254740992bv64
   R30 -> 0bv64
   R31 -> 100bv64
-  stack -> (let (_ (a!1 (store (store (store (_ (as (const) (Array (bv64) (bv8))) (_ (bv4) 8)) (_ (bv77) 64) (_ 128 8)) (_ (bv88) 64) (_ (bv1) 8)) (_ 16384 64) (_ (bv64) 8)))) (store (store (a!1) (_ (bv68) 64) (_ (bv16) 8)) (_ (bv0) 64) (_ (bv8) 8)))
+  stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
 *** END_STATE
 *** STATE lmain
 *** END_STATE
-*** STATE %00000354
-  #4 -> 68bv64
+*** STATE %0000039c
+  #4 -> 52bv64
   Gamma_#4 -> 
-  Gamma_stack -> (lambda (_ (x!1 (bv64))) (or (= (x!1) (_ 9223372036854775808 64)) (= (x!1) (_ (bv80) 64)) (= (x!1) (_ (bv64) 64))))
-  stack -> (let (_ (a!1 (store (store (store (_ (as (const) (Array (bv64) (bv8))) (_ (bv4) 8)) (_ (bv77) 64) (_ 128 8)) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv68) 64) (_ (bv0) 8)))) (store (a!1) (_ (bv0) 64) (_ (bv8) 8)))
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
 *** END_STATE
-*** STATE %0000035a
-  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 9223372036854775808bv64))
-  stack -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv96) 64) (_ (bv4) 8)) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv0) 64) (_ (bv8) 8))
+*** STATE %000003a2
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
 *** END_STATE
-*** STATE %0000036b
+*** STATE %000003b4
   Gamma_R29 -> 
   Gamma_R31 -> 
-  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 9223372036854775808bv64))
-  R29 -> 68bv64
-  R31 -> 68bv64
-  stack -> (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv88) 64) (_ (bv1) 8)) (_ (bv0) 64) (_ (bv8) 8))
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  R29 -> 52bv64
+  R31 -> 52bv64
+  stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
 *** END_STATE
-*** STATE %00000372
-  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 9223372036854775808bv64))
-  stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv0) 64) (_ (bv8) 8))
+*** STATE %000003bb
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
 *** END_STATE
-*** STATE l00000381
+*** STATE %000003c2
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  stack -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
+*** END_STATE
+*** STATE %000003e7
+  Gamma_mem -> (_ (as-array) (k!11))
+  Gamma_R0 -> true
+  Gamma_R1 -> false
+  mem -> (_ (as-array) (k!7))
+  R0 -> 131176bv64
+  R1 -> 7bv64
+*** END_STATE
+*** STATE l000003f6
   Gamma_malloc_base -> 
   Gamma_malloc_count -> 
   Gamma_malloc_end -> 
@@ -303,74 +321,976 @@ tickleBool -> {
   Gamma_R16 -> 
   Gamma_R17 -> 
   Gamma_R30 -> true
-  malloc_base -> (store (store (_ (as (const) (Array (Int) (bv64))) 21165330399264bv64) 3 (_ 1179088 64)) 1 (_ 8795824586752 64))
+  malloc_base -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 297238743713058944 64))
   malloc_count -> 1
-  malloc_end -> (store (store (_ (as (const) (Array (Int) (bv64))) 3333431492608bv64) 3 (_ 9567697 64)) 1 (_ 8795824586763 64))
-  R0 -> 8795824586752bv64
+  malloc_end -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 297238743713058955 64))
+  R0 -> 297238743713058944bv64
   R16 -> 
   R17 -> 
-  R30 -> 2220bv64
+  R30 -> 2312bv64
 *** END_STATE
-*** STATE %00000398
-  Gamma_mem -> (store (store (store (_ (as (const) (Array (bv64) (Bool))) true) (_ 17592186044416 64) false) (_ 9223372036854775808 64) false) (_ 131160 64) false)
+*** STATE %0000040d
+  Gamma_mem -> (_ (as-array) (k!11))
   Gamma_R0 -> true
   Gamma_R1 -> true
-  mem -> (_ (as-array) (k!12))
-  R0 -> 131192bv64
-  R1 -> 8795824586752bv64
+  mem -> (_ (as-array) (k!10))
+  R0 -> 131200bv64
+  R1 -> 297238743713058944bv64
 *** END_STATE
-*** STATE l000003ca
-  Gamma_mem -> (lambda (_ (x!1 (bv64))) (or (= (x!1) (_ (bv0) 64)) (= (x!1) (_ 17592186044416 64))))
+*** STATE l00000434
+  Gamma_mem -> (_ (as-array) (k!11))
+  Gamma_R0 -> true
+  Gamma_R16 -> 
+  Gamma_R17 -> 
+  Gamma_R19 -> true
+  Gamma_R30 -> true
+  mem -> (_ (as-array) (k!10))
+  R0 -> 6098498511519612930bv64
+  R16 -> 
+  R17 -> 
+  R19 -> 297238743713058944bv64
+  R30 -> 2352bv64
+*** END_STATE
+*** END_MODEL
+*** MODEL
+#4 -> 
+#4@0 -> 52bv64
+$buf_addr -> 131200bv64
+$password_addr -> 131168bv64
+$stext_addr -> 131176bv64
+Gamma_#4 -> 
+Gamma_malloc_base -> 
+Gamma_malloc_base@0 -> 
+Gamma_malloc_count -> 
+Gamma_malloc_count@0 -> 
+Gamma_malloc_end -> 
+Gamma_malloc_end@0 -> 
+Gamma_malloc_id -> 
+Gamma_mem -> (_ (as-array) (k!16))
+Gamma_mem@0 -> (_ (as-array) (k!16))
+Gamma_mem@1 -> (_ (as-array) (k!16))
+Gamma_mem@2 -> (_ (as-array) (k!21))
+Gamma_mem@3 -> (_ (as-array) (k!21))
+Gamma_mem@4 -> (_ (as-array) (k!21))
+Gamma_mem@5 -> (_ (as-array) (k!21))
+Gamma_R0 -> 
+Gamma_R0@0 -> true
+Gamma_R0@1 -> true
+Gamma_R1 -> 
+Gamma_R1@0 -> false
+Gamma_R16 -> 
+Gamma_R16@0 -> 
+Gamma_R16@1 -> 
+Gamma_R17 -> 
+Gamma_R17@0 -> 
+Gamma_R17@1 -> 
+Gamma_R19 -> false
+Gamma_R19@0 -> true
+Gamma_R2 -> 
+Gamma_R29 -> false
+Gamma_R30 -> false
+Gamma_R31 -> 
+Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+Gamma_stack@0 -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+Gamma_stack@1 -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+Gamma_stack@2 -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+Gamma_stack@3 -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+Gamma_stack@4 -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+malloc_base -> 
+malloc_base@0 -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 14132296798995222656 64))
+malloc_count -> 0
+malloc_count@0 -> 1
+malloc_end -> 
+malloc_end@0 -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 14132296798995222667 64))
+malloc_id -> 
+mem -> (_ (as-array) (k!15))
+mem@0 -> (_ (as-array) (k!15))
+mem@1 -> (_ (as-array) (k!15))
+mem@2 -> (_ (as-array) (k!17))
+mem@3 -> (_ (as-array) (k!17))
+mem@4 -> (_ (as-array) (k!20))
+mem@5 -> (_ (as-array) (k!20))
+R0 -> 
+R0@0 -> 131168bv64
+R0@1 -> 131176bv64
+R0@2 -> 14132296798995222656bv64
+R0@3 -> 131200bv64
+R0@4 -> 131200bv64
+R0@5 -> 131176bv64
+R0@6 -> 12817312733953261570bv64
+R1 -> 
+R1@0 -> 7bv64
+R1@1 -> 131176bv64
+R16 -> 
+R16@0 -> 
+R16@1 -> 
+R17 -> 
+R17@0 -> 
+R17@1 -> 
+R19 -> 32bv64
+R19@0 -> 14132296798995222656bv64
+R2 -> 
+R29 -> 9007199254740992bv64
+R30 -> 0bv64
+R31 -> 100bv64
+stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+stack@0 -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+stack@1 -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+stack@2 -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+stack@3 -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+stack@4 -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
+ControlFlow -> {
+  0 11 -> 2
+  0 2 -> (- 5)
+  else -> 11
+}
+gamma_load32 -> {
+  else -> true
+}
+gamma_load64 -> {
+  else -> true
+}
+gamma_load8 -> {
+  else -> false
+}
+gamma_store64 -> {
+  (_ (as-array) (k!21)) 131200bv64 true -> (_ (as-array) (k!21))
+  else -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+}
+gamma_store8 -> {
+  else -> (_ (as-array) (k!21))
+}
+k!15 -> {
+  0bv64 -> 8bv8
+  130504bv64 -> 208bv8
+  130505bv64 -> 8bv8
+  130512bv64 -> 128bv8
+  130513bv64 -> 8bv8
+  131032bv64 -> 212bv8
+  131033bv64 -> 8bv8
+  131160bv64 -> 88bv8
+  131162bv64 -> 2bv8
+  131168bv64 -> 7bv8
+  131176bv64 -> 104bv8
+  131177bv64 -> 101bv8
+  131178bv64 -> 108bv8
+  131179bv64 -> 108bv8
+  131180bv64 -> 111bv8
+  131181bv64 -> 111bv8
+  2512bv64 -> 1bv8
+  2514bv64 -> 2bv8
+  else -> 0bv8
+}
+k!16 -> {
+  else -> (or (= (:var 0) 122524351096171bv64) (= (:var 0) (_ 122524351096168 64)) (= (:var 0) (_ 131205 64)) (= (:var 0) (_ 131204 64)) (= (:var 0) (_ 131202 64)) (= (:var 0) (_ (bv56) 64)) (= (:var 0) (_ 131181 64)) (= (:var 0) (_ 122524351096169 64)) (= (:var 0) (_ 131206 64)) (= (:var 0) (_ 131200 64)) (= (:var 0) (_ 131207 64)) (= (:var 0) (_ 131203 64)) (= (:var 0) (_ 131201 64)) (= (:var 0) (_ 122524351096170 64)))
+}
+k!17 -> {
+  0bv64 -> 8bv8
+  130504bv64 -> 208bv8
+  130505bv64 -> 8bv8
+  130512bv64 -> 128bv8
+  130513bv64 -> 8bv8
+  131032bv64 -> 212bv8
+  131033bv64 -> 8bv8
+  131160bv64 -> 88bv8
+  131162bv64 -> 2bv8
+  131168bv64 -> 7bv8
+  131176bv64 -> 104bv8
+  131177bv64 -> 101bv8
+  131178bv64 -> 108bv8
+  131179bv64 -> 108bv8
+  131180bv64 -> 111bv8
+  131181bv64 -> 7bv8
+  2512bv64 -> 1bv8
+  2514bv64 -> 2bv8
+  else -> 0bv8
+}
+k!20 -> {
+  0bv64 -> 8bv8
+  130504bv64 -> 208bv8
+  130505bv64 -> 8bv8
+  130512bv64 -> 128bv8
+  130513bv64 -> 8bv8
+  131032bv64 -> 212bv8
+  131033bv64 -> 8bv8
+  131160bv64 -> 88bv8
+  131162bv64 -> 2bv8
+  131200bv64 -> 128bv8
+  131201bv64 -> 16bv8
+  131202bv64 -> 128bv8
+  131203bv64 -> 4bv8
+  131204bv64 -> 16bv8
+  131205bv64 -> 1bv8
+  131206bv64 -> 32bv8
+  131207bv64 -> 196bv8
+  2512bv64 -> 1bv8
+  2514bv64 -> 2bv8
+  else -> 0bv8
+}
+k!21 -> {
+  else -> (or (= (:var 0) 122524351096171bv64) (= (:var 0) (_ 122524351096168 64)) (= (:var 0) (_ 131205 64)) (= (:var 0) (_ 131204 64)) (= (:var 0) (_ 131202 64)) (= (:var 0) (_ (bv56) 64)) (= (:var 0) (_ 122524351096169 64)) (= (:var 0) (_ 131206 64)) (= (:var 0) (_ 131200 64)) (= (:var 0) (_ 131207 64)) (= (:var 0) (_ 131203 64)) (= (:var 0) (_ 122524351096170 64)) (= (:var 0) (_ 131201 64)))
+}
+L -> {
+  else -> false
+}
+lambda#0 -> {
+  131200bv64 8bv64 true (_ (as-array) (k!21)) -> (_ (as-array) (k!21))
+  else -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+}
+lambda#1 -> {
+  131200bv64 8bv64 14132296798995222656bv64 131200bv64 (_ (as-array) (k!17)) -> (_ (as-array) (k!20))
+  84bv64 8bv64 0bv64 84bv64 (_ (as-array) (k!13)) -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
+  else -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+}
+memory_load64_le -> {
+  (_ (as-array) (k!20)) 131200bv64 -> 14132296798995222656bv64
+  else -> 122524351096168bv64
+}
+memory_load8_le -> {
+  (_ (as-array) (k!15)) 130504bv64 -> 208bv8
+  (_ (as-array) (k!15)) 130505bv64 -> 8bv8
+  (_ (as-array) (k!15)) 130512bv64 -> 128bv8
+  (_ (as-array) (k!15)) 130513bv64 -> 8bv8
+  (_ (as-array) (k!15)) 131032bv64 -> 212bv8
+  (_ (as-array) (k!15)) 131033bv64 -> 8bv8
+  (_ (as-array) (k!15)) 131160bv64 -> 88bv8
+  (_ (as-array) (k!15)) 131162bv64 -> 2bv8
+  (_ (as-array) (k!15)) 131168bv64 -> 7bv8
+  (_ (as-array) (k!15)) 131176bv64 -> 104bv8
+  (_ (as-array) (k!15)) 131177bv64 -> 101bv8
+  (_ (as-array) (k!15)) 131178bv64 -> 108bv8
+  (_ (as-array) (k!15)) 131179bv64 -> 108bv8
+  (_ (as-array) (k!15)) 131180bv64 -> 111bv8
+  (_ (as-array) (k!15)) 131181bv64 -> 111bv8
+  (_ (as-array) (k!15)) 2512bv64 -> 1bv8
+  (_ (as-array) (k!15)) 2514bv64 -> 2bv8
+  (_ (as-array) (k!17)) 130504bv64 -> 208bv8
+  (_ (as-array) (k!17)) 130505bv64 -> 8bv8
+  (_ (as-array) (k!17)) 130512bv64 -> 128bv8
+  (_ (as-array) (k!17)) 130513bv64 -> 8bv8
+  (_ (as-array) (k!17)) 131032bv64 -> 212bv8
+  (_ (as-array) (k!17)) 131033bv64 -> 8bv8
+  (_ (as-array) (k!17)) 131160bv64 -> 88bv8
+  (_ (as-array) (k!17)) 131162bv64 -> 2bv8
+  (_ (as-array) (k!17)) 2512bv64 -> 1bv8
+  (_ (as-array) (k!17)) 2514bv64 -> 2bv8
+  (_ (as-array) (k!20)) 130504bv64 -> 208bv8
+  (_ (as-array) (k!20)) 130505bv64 -> 8bv8
+  (_ (as-array) (k!20)) 130512bv64 -> 128bv8
+  (_ (as-array) (k!20)) 130513bv64 -> 8bv8
+  (_ (as-array) (k!20)) 131032bv64 -> 212bv8
+  (_ (as-array) (k!20)) 131033bv64 -> 8bv8
+  (_ (as-array) (k!20)) 131160bv64 -> 88bv8
+  (_ (as-array) (k!20)) 131162bv64 -> 2bv8
+  (_ (as-array) (k!20)) 2512bv64 -> 1bv8
+  (_ (as-array) (k!20)) 2514bv64 -> 2bv8
+  else -> 0bv8
+}
+memory_store64_le -> {
+  (_ (as-array) (k!13)) 84bv64 0bv64 -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
+  (_ (as-array) (k!17)) 131200bv64 14132296798995222656bv64 -> (_ (as-array) (k!20))
+  else -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+}
+memory_store8_le -> {
+  else -> (_ (as-array) (k!17))
+}
+tickleBool -> {
+  else -> true
+}
+*** STATE <initial>
+  #4 -> 
+  Gamma_#4 -> 
+  Gamma_malloc_base -> 
+  Gamma_malloc_count -> 
+  Gamma_malloc_end -> 
+  Gamma_malloc_id -> 
+  Gamma_mem -> (_ (as-array) (k!16))
+  Gamma_R0 -> 
+  Gamma_R1 -> 
+  Gamma_R16 -> 
+  Gamma_R17 -> 
+  Gamma_R19 -> false
+  Gamma_R2 -> 
+  Gamma_R29 -> false
+  Gamma_R30 -> false
+  Gamma_R31 -> 
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  malloc_base -> 
+  malloc_count -> 0
+  malloc_end -> 
+  malloc_id -> 
+  mem -> (_ (as-array) (k!15))
+  R0 -> 
+  R1 -> 
+  R16 -> 
+  R17 -> 
+  R19 -> 32bv64
+  R2 -> 
+  R29 -> 9007199254740992bv64
+  R30 -> 0bv64
+  R31 -> 100bv64
+  stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+*** END_STATE
+*** STATE lmain
+*** END_STATE
+*** STATE %0000039c
+  #4 -> 52bv64
+  Gamma_#4 -> 
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+*** END_STATE
+*** STATE %000003a2
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+*** END_STATE
+*** STATE %000003b4
+  Gamma_R29 -> 
+  Gamma_R31 -> 
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  R29 -> 52bv64
+  R31 -> 52bv64
+  stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+*** END_STATE
+*** STATE %000003bb
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  stack -> (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv1) 8))
+*** END_STATE
+*** STATE %000003c2
+  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 16bv64))
+  stack -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
+*** END_STATE
+*** STATE %000003e7
+  Gamma_mem -> (_ (as-array) (k!21))
+  Gamma_R0 -> true
+  Gamma_R1 -> false
+  mem -> (_ (as-array) (k!17))
+  R0 -> 131176bv64
+  R1 -> 7bv64
+*** END_STATE
+*** STATE l000003f6
+  Gamma_malloc_base -> 
+  Gamma_malloc_count -> 
+  Gamma_malloc_end -> 
+  Gamma_R0 -> true
+  Gamma_R16 -> 
+  Gamma_R17 -> 
+  Gamma_R30 -> true
+  malloc_base -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 14132296798995222656 64))
+  malloc_count -> 1
+  malloc_end -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 14132296798995222667 64))
+  R0 -> 14132296798995222656bv64
+  R16 -> 
+  R17 -> 
+  R30 -> 2312bv64
+*** END_STATE
+*** STATE %0000040d
+  Gamma_mem -> (_ (as-array) (k!21))
+  Gamma_R0 -> true
+  Gamma_R1 -> true
+  mem -> (_ (as-array) (k!20))
+  R0 -> 131200bv64
+  R1 -> 14132296798995222656bv64
+*** END_STATE
+*** STATE l00000434
+  Gamma_mem -> (_ (as-array) (k!21))
+  Gamma_R0 -> true
+  Gamma_R16 -> 
+  Gamma_R17 -> 
+  Gamma_R19 -> true
+  Gamma_R30 -> true
+  mem -> (_ (as-array) (k!20))
+  R0 -> 12817312733953261570bv64
+  R16 -> 
+  R17 -> 
+  R19 -> 14132296798995222656bv64
+  R30 -> 2352bv64
+*** END_STATE
+*** END_MODEL
+*** MODEL
+#4 -> 
+#4@0 -> 52bv64
+$buf_addr -> 131200bv64
+$password_addr -> 131168bv64
+$stext_addr -> 131176bv64
+Gamma_#4 -> 
+Gamma_malloc_base -> 
+Gamma_malloc_base@0 -> 
+Gamma_malloc_count -> 
+Gamma_malloc_count@0 -> 
+Gamma_malloc_end -> 
+Gamma_malloc_end@0 -> 
+Gamma_malloc_id -> 
+Gamma_mem -> (_ (as-array) (k!28))
+Gamma_mem@0 -> (_ (as-array) (k!28))
+Gamma_mem@1 -> (_ (as-array) (k!28))
+Gamma_mem@10 -> (_ (as-array) (k!37))
+Gamma_mem@11 -> (_ (as-array) (k!37))
+Gamma_mem@12 -> (_ (as-array) (k!37))
+Gamma_mem@13 -> (_ (as-array) (k!37))
+Gamma_mem@14 -> (_ (as-array) (k!37))
+Gamma_mem@2 -> (_ (as-array) (k!30))
+Gamma_mem@3 -> (_ (as-array) (k!30))
+Gamma_mem@4 -> (_ (as-array) (k!34))
+Gamma_mem@5 -> (_ (as-array) (k!34))
+Gamma_mem@6 -> (_ (as-array) (k!37))
+Gamma_mem@7 -> (_ (as-array) (k!37))
+Gamma_mem@8 -> (_ (as-array) (k!37))
+Gamma_mem@9 -> (_ (as-array) (k!37))
+Gamma_R0 -> 
+Gamma_R0@0 -> true
+Gamma_R0@1 -> true
+Gamma_R0@2 -> true
+Gamma_R0@3 -> true
+Gamma_R0@4 -> true
+Gamma_R0@5 -> true
+Gamma_R0@6 -> true
+Gamma_R0@7 -> true
+Gamma_R1 -> 
+Gamma_R1@0 -> false
+Gamma_R16 -> 
+Gamma_R16@0 -> 
+Gamma_R16@1 -> 
+Gamma_R16@2 -> 
+Gamma_R16@3 -> 
+Gamma_R16@4 -> 
+Gamma_R16@5 -> 
+Gamma_R17 -> 
+Gamma_R17@0 -> 
+Gamma_R17@1 -> 
+Gamma_R17@2 -> 
+Gamma_R17@3 -> 
+Gamma_R17@4 -> 
+Gamma_R17@5 -> 
+Gamma_R19 -> true
+Gamma_R19@0 -> true
+Gamma_R19@1 -> true
+Gamma_R2 -> 
+Gamma_R29 -> false
+Gamma_R30 -> false
+Gamma_R31 -> 
+Gamma_stack -> (_ (as-array) (k!23))
+Gamma_stack@0 -> (_ (as-array) (k!23))
+Gamma_stack@1 -> (_ (as-array) (k!25))
+Gamma_stack@2 -> (_ (as-array) (k!25))
+Gamma_stack@3 -> (_ (as-array) (k!25))
+Gamma_stack@4 -> (_ (as-array) (k!25))
+Gamma_stack@5 -> (_ (as-array) (k!25))
+malloc_base -> 
+malloc_base@0 -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 2452350734591590398 64))
+malloc_count -> 0
+malloc_count@0 -> 1
+malloc_end -> 
+malloc_end@0 -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 2452350734591590409 64))
+malloc_id -> 
+mem -> (_ (as-array) (k!27))
+mem@0 -> (_ (as-array) (k!27))
+mem@1 -> (_ (as-array) (k!27))
+mem@10 -> (_ (as-array) (k!33))
+mem@11 -> (_ (as-array) (k!33))
+mem@12 -> (_ (as-array) (k!33))
+mem@13 -> (_ (as-array) (k!33))
+mem@14 -> (_ (as-array) (k!33))
+mem@2 -> (_ (as-array) (k!29))
+mem@3 -> (_ (as-array) (k!29))
+mem@4 -> (_ (as-array) (k!33))
+mem@5 -> (_ (as-array) (k!33))
+mem@6 -> (_ (as-array) (k!35))
+mem@7 -> (_ (as-array) (k!35))
+mem@8 -> (_ (as-array) (k!35))
+mem@9 -> (_ (as-array) (k!35))
+R0 -> 
+R0@0 -> 131168bv64
+R0@1 -> 131176bv64
+R0@10 -> 2452350734591590398bv64
+R0@11 -> 2452350734591590400bv64
+R0@12 -> 2452350734591590400bv64
+R0@13 -> 131200bv64
+R0@14 -> 131200bv64
+R0@15 -> 2452350734591590398bv64
+R0@16 -> 2bv64
+R0@17 -> 131200bv64
+R0@18 -> 2452350734591590398bv64
+R0@2 -> 2452350734591590398bv64
+R0@3 -> 131200bv64
+R0@4 -> 131200bv64
+R0@5 -> 131176bv64
+R0@6 -> 2362138004555825409bv64
+R0@7 -> 131200bv64
+R0@8 -> 2452350734591590398bv64
+R0@9 -> 131200bv64
+R1 -> 
+R1@0 -> 7bv64
+R1@1 -> 131176bv64
+R16 -> 
+R16@0 -> 
+R16@1 -> 
+R16@2 -> 
+R16@3 -> 
+R16@4 -> 
+R16@5 -> 
+R17 -> 
+R17@0 -> 
+R17@1 -> 
+R17@2 -> 
+R17@3 -> 
+R17@4 -> 
+R17@5 -> 
+R19 -> 70644695826432bv64
+R19@0 -> 2452350734591590398bv64
+R19@1 -> 2452350734591590398bv64
+R2 -> 
+R29 -> 16bv64
+R30 -> 4096bv64
+R31 -> 100bv64
+stack -> (let (_ (a!1 (store (store (store (_ (as (const) (Array (bv64) (bv8))) (_ (bv0) 8)) (_ (bv56) 64) (_ (bv64) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv84) 64) (_ (bv4) 8)))) (store (a!1) (_ (bv61) 64) (_ (bv16) 8)))
+stack@0 -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv4) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv61) 64) (_ (bv16) 8))
+stack@1 -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv4) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv61) 64) (_ (bv16) 8))
+stack@2 -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv4) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv61) 64) (_ (bv16) 8))
+stack@3 -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv4) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv61) 64) (_ (bv16) 8))
+stack@4 -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
+stack@5 -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv99) 64) (_ (bv34) 8)) (_ (bv97) 64) (_ 128 8)) (_ (bv98) 64) (_ (bv8) 8))
+ControlFlow -> {
+  0 11 -> 2
+  0 2 -> (- 1)
+  else -> 11
+}
+gamma_load32 -> {
+  else -> true
+}
+gamma_load64 -> {
+  else -> true
+}
+gamma_load8 -> {
+  (_ (as-array) (k!28)) 131168bv64 -> false
+  (_ (as-array) (k!34)) 131186bv64 -> false
+  (_ (as-array) (k!34)) 2147483648bv64 -> false
+  (_ (as-array) (k!34)) 64bv64 -> false
+  (_ (as-array) (k!34)) 68719476736bv64 -> false
+  (_ (as-array) (k!37)) 131186bv64 -> false
+  (_ (as-array) (k!37)) 2147483648bv64 -> false
+  (_ (as-array) (k!37)) 2452350734591590408bv64 -> false
+  (_ (as-array) (k!37)) 64bv64 -> false
+  (_ (as-array) (k!37)) 68719476736bv64 -> false
+  else -> true
+}
+gamma_store64 -> {
+  (_ (as-array) (k!23)) 52bv64 false -> (_ (as-array) (k!23))
+  (_ (as-array) (k!30)) 131200bv64 true -> (_ (as-array) (k!34))
+  else -> (_ (as-array) (k!25))
+}
+gamma_store8 -> {
+  (_ (as-array) (k!37)) 2452350734591590400bv64 true -> (_ (as-array) (k!37))
+  else -> (_ (as-array) (k!30))
+}
+k!23 -> {
+  else -> (or (= (:var 0) 94bv64) (= (:var 0) (_ 68719476736 64)) (= (:var 0) (_ 144115188075855872 64)) (= (:var 0) (_ (bv64) 64)) (= (:var 0) (_ (bv93) 64)) (= (:var 0) (_ (bv96) 64)) (= (:var 0) (_ 2305843009213693952 64)) (= (:var 0) (_ 2147483648 64)) (= (:var 0) (_ (bv98) 64)) (= (:var 0) (_ (bv97) 64)) (= (:var 0) (_ 288230376151711744 64)) (= (:var 0) (_ (bv99) 64)) (= (:var 0) (_ (bv92) 64)) (= (:var 0) (_ (bv95) 64)))
+}
+k!25 -> {
+  else -> (or (= (:var 0) 94bv64) (= (:var 0) (_ 68719476736 64)) (= (:var 0) (_ (bv93) 64)) (= (:var 0) (_ (bv96) 64)) (= (:var 0) (_ 2305843009213693952 64)) (= (:var 0) (_ 2147483648 64)) (= (:var 0) (_ (bv98) 64)) (= (:var 0) (_ (bv97) 64)) (= (:var 0) (_ (bv99) 64)) (= (:var 0) (_ (bv92) 64)) (= (:var 0) (_ (bv95) 64)))
+}
+k!27 -> {
+  0bv64 -> 2bv8
+  104bv64 -> 2bv8
+  128bv64 -> 4bv8
+  130504bv64 -> 208bv8
+  130505bv64 -> 8bv8
+  130512bv64 -> 128bv8
+  130513bv64 -> 8bv8
+  131032bv64 -> 212bv8
+  131033bv64 -> 8bv8
+  131160bv64 -> 88bv8
+  131162bv64 -> 2bv8
+  131168bv64 -> 7bv8
+  131176bv64 -> 104bv8
+  131177bv64 -> 101bv8
+  131178bv64 -> 108bv8
+  131179bv64 -> 108bv8
+  131180bv64 -> 111bv8
+  131181bv64 -> 111bv8
+  2512bv64 -> 1bv8
+  2514bv64 -> 2bv8
+  576531121047601152bv64 -> 32bv8
+  else -> 0bv8
+}
+k!28 -> {
+  else -> (or (= (:var 0) 288230376151711812bv64) (= (:var 0) (_ 122524351096171 64)) (= (:var 0) (_ 150729850028687466 64)) (= (:var 0) (_ 122524351096168 64)) (= (:var 0) (_ (bv0) 64)) (= (:var 0) (_ 2159335283835928686 64)) (= (:var 0) (_ 131181 64)) (= (:var 0) (_ 122524351096169 64)) (= (:var 0) (_ 146296653505233022 64)) (= (:var 0) (_ 131178 64)) (= (:var 0) (_ 122524351096170 64)))
+}
+k!29 -> {
+  0bv64 -> 2bv8
+  104bv64 -> 2bv8
+  128bv64 -> 4bv8
+  130504bv64 -> 208bv8
+  130505bv64 -> 8bv8
+  130512bv64 -> 128bv8
+  130513bv64 -> 8bv8
+  131032bv64 -> 212bv8
+  131033bv64 -> 8bv8
+  131160bv64 -> 88bv8
+  131162bv64 -> 2bv8
+  131168bv64 -> 7bv8
+  131176bv64 -> 104bv8
+  131177bv64 -> 101bv8
+  131178bv64 -> 108bv8
+  131179bv64 -> 108bv8
+  131180bv64 -> 111bv8
+  131181bv64 -> 7bv8
+  2512bv64 -> 1bv8
+  2514bv64 -> 2bv8
+  576531121047601152bv64 -> 32bv8
+  else -> 0bv8
+}
+k!30 -> {
+  else -> (or (= (:var 0) 288230376151711812bv64) (= (:var 0) (_ 122524351096171 64)) (= (:var 0) (_ 122524351096168 64)) (= (:var 0) (_ 150729850028687466 64)) (= (:var 0) (_ (bv0) 64)) (= (:var 0) (_ 2159335283835928686 64)) (= (:var 0) (_ 122524351096169 64)) (= (:var 0) (_ 146296653505233022 64)) (= (:var 0) (_ 131178 64)) (= (:var 0) (_ 122524351096170 64)))
+}
+k!33 -> {
+  0bv64 -> 2bv8
+  104bv64 -> 2bv8
+  128bv64 -> 4bv8
+  130504bv64 -> 208bv8
+  130505bv64 -> 8bv8
+  130512bv64 -> 128bv8
+  130513bv64 -> 8bv8
+  131032bv64 -> 212bv8
+  131033bv64 -> 8bv8
+  131160bv64 -> 88bv8
+  131162bv64 -> 2bv8
+  131168bv64 -> 7bv8
+  131176bv64 -> 104bv8
+  131177bv64 -> 101bv8
+  131178bv64 -> 108bv8
+  131181bv64 -> 7bv8
+  131200bv64 -> 254bv8
+  131201bv64 -> 255bv8
+  131202bv64 -> 255bv8
+  131203bv64 -> 255bv8
+  131204bv64 -> 255bv8
+  131205bv64 -> 127bv8
+  131206bv64 -> 8bv8
+  131207bv64 -> 34bv8
+  2512bv64 -> 1bv8
+  2514bv64 -> 2bv8
+  576531121047601152bv64 -> 32bv8
+  else -> 0bv8
+}
+k!34 -> {
+  else -> (or (= (:var 0) 150729850028687466bv64) (= (:var 0) (_ (bv0) 64)) (= (:var 0) (_ 131205 64)) (= (:var 0) (_ 131204 64)) (= (:var 0) (_ 131202 64)) (= (:var 0) (_ 2159335283835928686 64)) (= (:var 0) (_ 146296653505233022 64)) (= (:var 0) (_ 131206 64)) (= (:var 0) (_ 131178 64)) (= (:var 0) (_ 131200 64)) (= (:var 0) (_ 131207 64)) (= (:var 0) (_ 131203 64)) (= (:var 0) (_ 131201 64)))
+}
+k!35 -> {
+  0bv64 -> 2bv8
+  104bv64 -> 2bv8
+  128bv64 -> 4bv8
+  130504bv64 -> 208bv8
+  130505bv64 -> 8bv8
+  130512bv64 -> 128bv8
+  130513bv64 -> 8bv8
+  131032bv64 -> 212bv8
+  131033bv64 -> 8bv8
+  131160bv64 -> 88bv8
+  131162bv64 -> 2bv8
+  131168bv64 -> 7bv8
+  131176bv64 -> 104bv8
+  131177bv64 -> 101bv8
+  131178bv64 -> 108bv8
+  131181bv64 -> 7bv8
+  131200bv64 -> 254bv8
+  131201bv64 -> 255bv8
+  131202bv64 -> 255bv8
+  131203bv64 -> 255bv8
+  131204bv64 -> 255bv8
+  131205bv64 -> 127bv8
+  131206bv64 -> 8bv8
+  131207bv64 -> 34bv8
+  2452350734591590400bv64 -> 108bv8
+  2512bv64 -> 1bv8
+  2514bv64 -> 2bv8
+  576531121047601152bv64 -> 32bv8
+  else -> 0bv8
+}
+k!37 -> {
+  else -> (or (= (:var 0) 2452350734591590400bv64) (= (:var 0) (_ 150729850028687466 64)) (= (:var 0) (_ (bv0) 64)) (= (:var 0) (_ 131205 64)) (= (:var 0) (_ 4611686018427387908 64)) (= (:var 0) (_ 131204 64)) (= (:var 0) (_ 131202 64)) (= (:var 0) (_ 2603080584620146688 64)) (= (:var 0) (_ 2159335283835928686 64)) (= (:var 0) (_ 146296653505233022 64)) (= (:var 0) (_ 2598647388096692244 64)) (= (:var 0) (_ 131206 64)) (= (:var 0) (_ 131178 64)) (= (:var 0) (_ 131200 64)) (= (:var 0) (_ 131207 64)) (= (:var 0) (_ 131203 64)) (= (:var 0) (_ 131201 64)))
+}
+L -> {
+  else -> false
+}
+lambda#0 -> {
+  131200bv64 8bv64 true (_ (as-array) (k!30)) -> (_ (as-array) (k!34))
+  52bv64 8bv64 false (_ (as-array) (k!23)) -> (_ (as-array) (k!23))
+  84bv64 8bv64 true (_ (as-array) (k!34)) -> (lambda (_ (x!1 (bv64))) (= (x!1) 131201bv64))
+  else -> (_ (as-array) (k!25))
+}
+lambda#1 -> {
+  131200bv64 8bv64 2452350734591590398bv64 131200bv64 (_ (as-array) (k!29)) -> (_ (as-array) (k!33))
+  60bv64 8bv64 0bv64 60bv64 (_ (as-array) (k!24)) -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 88bv8) (_ (bv64) 64) (_ (bv0) 8)) (_ (bv66) 64) (_ (bv0) 8)) (_ (bv61) 64) (_ (bv0) 8))
+  84bv64 8bv64 0bv64 84bv64 (_ (as-array) (k!24)) -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
+  92bv64 8bv64 2452350734591590400bv64 92bv64 (_ (as-array) (k!26)) -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv99) 64) (_ (bv34) 8)) (_ (bv97) 64) (_ 128 8)) (_ (bv98) 64) (_ (bv8) 8))
+  else -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv4) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv61) 64) (_ (bv16) 8))
+}
+memory_load64_le -> {
+  (_ (as-array) (k!27)) 131176bv64 -> 122524351096168bv64
+  (_ (as-array) (k!36)) 92bv64 -> 2452350734591590400bv64
+  else -> 2452350734591590398bv64
+}
+memory_load8_le -> {
+  (_ (as-array) (k!27)) 130504bv64 -> 208bv8
+  (_ (as-array) (k!27)) 130505bv64 -> 8bv8
+  (_ (as-array) (k!27)) 130512bv64 -> 128bv8
+  (_ (as-array) (k!27)) 130513bv64 -> 8bv8
+  (_ (as-array) (k!27)) 131032bv64 -> 212bv8
+  (_ (as-array) (k!27)) 131033bv64 -> 8bv8
+  (_ (as-array) (k!27)) 131160bv64 -> 88bv8
+  (_ (as-array) (k!27)) 131162bv64 -> 2bv8
+  (_ (as-array) (k!27)) 131168bv64 -> 7bv8
+  (_ (as-array) (k!27)) 131176bv64 -> 104bv8
+  (_ (as-array) (k!27)) 131177bv64 -> 101bv8
+  (_ (as-array) (k!27)) 131178bv64 -> 108bv8
+  (_ (as-array) (k!27)) 131179bv64 -> 108bv8
+  (_ (as-array) (k!27)) 131180bv64 -> 111bv8
+  (_ (as-array) (k!27)) 131181bv64 -> 111bv8
+  (_ (as-array) (k!27)) 2512bv64 -> 1bv8
+  (_ (as-array) (k!27)) 2514bv64 -> 2bv8
+  (_ (as-array) (k!29)) 130504bv64 -> 208bv8
+  (_ (as-array) (k!29)) 130505bv64 -> 8bv8
+  (_ (as-array) (k!29)) 130512bv64 -> 128bv8
+  (_ (as-array) (k!29)) 130513bv64 -> 8bv8
+  (_ (as-array) (k!29)) 131032bv64 -> 212bv8
+  (_ (as-array) (k!29)) 131033bv64 -> 8bv8
+  (_ (as-array) (k!29)) 131160bv64 -> 88bv8
+  (_ (as-array) (k!29)) 131162bv64 -> 2bv8
+  (_ (as-array) (k!29)) 2512bv64 -> 1bv8
+  (_ (as-array) (k!29)) 2514bv64 -> 2bv8
+  (_ (as-array) (k!33)) 0bv64 -> 2bv8
+  (_ (as-array) (k!33)) 104bv64 -> 2bv8
+  (_ (as-array) (k!33)) 128bv64 -> 4bv8
+  (_ (as-array) (k!33)) 130504bv64 -> 208bv8
+  (_ (as-array) (k!33)) 130505bv64 -> 8bv8
+  (_ (as-array) (k!33)) 130512bv64 -> 128bv8
+  (_ (as-array) (k!33)) 130513bv64 -> 8bv8
+  (_ (as-array) (k!33)) 131032bv64 -> 212bv8
+  (_ (as-array) (k!33)) 131033bv64 -> 8bv8
+  (_ (as-array) (k!33)) 131160bv64 -> 88bv8
+  (_ (as-array) (k!33)) 131162bv64 -> 2bv8
+  (_ (as-array) (k!33)) 131168bv64 -> 7bv8
+  (_ (as-array) (k!33)) 131176bv64 -> 104bv8
+  (_ (as-array) (k!33)) 131177bv64 -> 101bv8
+  (_ (as-array) (k!33)) 131178bv64 -> 108bv8
+  (_ (as-array) (k!33)) 131181bv64 -> 7bv8
+  (_ (as-array) (k!33)) 131200bv64 -> 254bv8
+  (_ (as-array) (k!33)) 131201bv64 -> 255bv8
+  (_ (as-array) (k!33)) 131202bv64 -> 255bv8
+  (_ (as-array) (k!33)) 131203bv64 -> 255bv8
+  (_ (as-array) (k!33)) 131204bv64 -> 255bv8
+  (_ (as-array) (k!33)) 131205bv64 -> 127bv8
+  (_ (as-array) (k!33)) 131206bv64 -> 8bv8
+  (_ (as-array) (k!33)) 131207bv64 -> 34bv8
+  (_ (as-array) (k!33)) 2512bv64 -> 1bv8
+  (_ (as-array) (k!33)) 2514bv64 -> 2bv8
+  (_ (as-array) (k!33)) 576531121047601152bv64 -> 32bv8
+  (_ (as-array) (k!35)) 130504bv64 -> 208bv8
+  (_ (as-array) (k!35)) 130505bv64 -> 8bv8
+  (_ (as-array) (k!35)) 130512bv64 -> 128bv8
+  (_ (as-array) (k!35)) 130513bv64 -> 8bv8
+  (_ (as-array) (k!35)) 131032bv64 -> 212bv8
+  (_ (as-array) (k!35)) 131033bv64 -> 8bv8
+  (_ (as-array) (k!35)) 131160bv64 -> 88bv8
+  (_ (as-array) (k!35)) 131162bv64 -> 2bv8
+  (_ (as-array) (k!35)) 131168bv64 -> 7bv8
+  (_ (as-array) (k!35)) 131177bv64 -> 101bv8
+  (_ (as-array) (k!35)) 131178bv64 -> 108bv8
+  (_ (as-array) (k!35)) 2512bv64 -> 1bv8
+  (_ (as-array) (k!35)) 2514bv64 -> 2bv8
+  else -> 0bv8
+}
+memory_store64_le -> {
+  (_ (as-array) (k!24)) 84bv64 0bv64 -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
+  (_ (as-array) (k!26)) 92bv64 2452350734591590400bv64 -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv99) 64) (_ (bv34) 8)) (_ (bv97) 64) (_ 128 8)) (_ (bv98) 64) (_ (bv8) 8))
+  (_ (as-array) (k!29)) 131200bv64 2452350734591590398bv64 -> (_ (as-array) (k!33))
+  else -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv4) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv61) 64) (_ (bv16) 8))
+}
+memory_store8_le -> {
+  (_ (as-array) (k!35)) 2452350734591590400bv64 0bv8 -> (_ (as-array) (k!33))
+  else -> (_ (as-array) (k!29))
+}
+tickleBool -> {
+  else -> true
+}
+*** STATE <initial>
+  #4 -> 
+  Gamma_#4 -> 
+  Gamma_malloc_base -> 
+  Gamma_malloc_count -> 
+  Gamma_malloc_end -> 
+  Gamma_malloc_id -> 
+  Gamma_mem -> (_ (as-array) (k!28))
+  Gamma_R0 -> 
+  Gamma_R1 -> 
+  Gamma_R16 -> 
+  Gamma_R17 -> 
+  Gamma_R19 -> true
+  Gamma_R2 -> 
+  Gamma_R29 -> false
+  Gamma_R30 -> false
+  Gamma_R31 -> 
+  Gamma_stack -> (_ (as-array) (k!23))
+  malloc_base -> 
+  malloc_count -> 0
+  malloc_end -> 
+  malloc_id -> 
+  mem -> (_ (as-array) (k!27))
+  R0 -> 
+  R1 -> 
+  R16 -> 
+  R17 -> 
+  R19 -> 70644695826432bv64
+  R2 -> 
+  R29 -> 16bv64
+  R30 -> 4096bv64
+  R31 -> 100bv64
+  stack -> (let (_ (a!1 (store (store (store (_ (as (const) (Array (bv64) (bv8))) (_ (bv0) 8)) (_ (bv56) 64) (_ (bv64) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv84) 64) (_ (bv4) 8)))) (store (a!1) (_ (bv61) 64) (_ (bv16) 8)))
+*** END_STATE
+*** STATE lmain
+*** END_STATE
+*** STATE %0000039c
+  #4 -> 52bv64
+  Gamma_#4 -> 
+  Gamma_stack -> (_ (as-array) (k!23))
+  stack -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv4) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv61) 64) (_ (bv16) 8))
+*** END_STATE
+*** STATE %000003a2
+  Gamma_stack -> (_ (as-array) (k!25))
+  stack -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv4) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv61) 64) (_ (bv16) 8))
+*** END_STATE
+*** STATE %000003b4
+  Gamma_R29 -> 
+  Gamma_R31 -> 
+  Gamma_stack -> (_ (as-array) (k!25))
+  R29 -> 52bv64
+  R31 -> 52bv64
+  stack -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv4) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv61) 64) (_ (bv16) 8))
+*** END_STATE
+*** STATE %000003bb
+  Gamma_stack -> (_ (as-array) (k!25))
+  stack -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv84) 64) (_ (bv4) 8)) (_ (bv1) 64) (_ (bv64) 8)) (_ (bv61) 64) (_ (bv16) 8))
+*** END_STATE
+*** STATE %000003c2
+  Gamma_stack -> (_ (as-array) (k!25))
+  stack -> (_ (as (const) (Array (bv64) (bv8))) 0bv8)
+*** END_STATE
+*** STATE %000003e7
+  Gamma_mem -> (_ (as-array) (k!30))
+  Gamma_R0 -> true
+  Gamma_R1 -> false
+  mem -> (_ (as-array) (k!29))
+  R0 -> 131176bv64
+  R1 -> 7bv64
+*** END_STATE
+*** STATE l000003f6
+  Gamma_malloc_base -> 
+  Gamma_malloc_count -> 
+  Gamma_malloc_end -> 
+  Gamma_R0 -> true
+  Gamma_R16 -> 
+  Gamma_R17 -> 
+  Gamma_R30 -> true
+  malloc_base -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 2452350734591590398 64))
+  malloc_count -> 1
+  malloc_end -> (store (_ (as (const) (Array (Int) (bv64))) 68bv64) 1 (_ 2452350734591590409 64))
+  R0 -> 2452350734591590398bv64
+  R16 -> 
+  R17 -> 
+  R30 -> 2312bv64
+*** END_STATE
+*** STATE %0000040d
+  Gamma_mem -> (_ (as-array) (k!34))
+  Gamma_R0 -> true
+  Gamma_R1 -> true
+  mem -> (_ (as-array) (k!33))
+  R0 -> 131200bv64
+  R1 -> 2452350734591590398bv64
+*** END_STATE
+*** STATE l00000434
+  Gamma_mem -> (_ (as-array) (k!34))
+  Gamma_R0 -> true
+  Gamma_R16 -> 
+  Gamma_R17 -> 
+  Gamma_R19 -> true
+  Gamma_R30 -> true
+  mem -> (_ (as-array) (k!33))
+  R0 -> 2362138004555825409bv64
+  R16 -> 
+  R17 -> 
+  R19 -> 2452350734591590398bv64
+  R30 -> 2352bv64
+*** END_STATE
+*** STATE l00000453
+  Gamma_mem -> (_ (as-array) (k!37))
   Gamma_R0 -> true
   Gamma_R1 -> true
   Gamma_R16 -> 
   Gamma_R17 -> 
   Gamma_R2 -> true
-  Gamma_R3 -> true
   Gamma_R30 -> true
-  mem -> (_ (as-array) (k!14))
-  R0 -> 8795824586752bv64
-  R1 -> 131168bv64
+  mem -> (_ (as-array) (k!35))
+  R0 -> 2452350734591590398bv64
+  R1 -> 131176bv64
   R16 -> 
   R17 -> 
-  R2 -> 5bv64
-  R3 -> 8795824586752bv64
-  R30 -> 2268bv64
+  R2 -> 2362138004555825409bv64
+  R30 -> 2372bv64
 *** END_STATE
-*** STATE l000003e4
-  Gamma_mem -> (lambda (_ (x!1 (bv64))) (or (= (x!1) (_ (bv0) 64)) (= (x!1) (_ 17592186044416 64))))
+*** STATE l0000046d
+  Gamma_mem -> (_ (as-array) (k!37))
   Gamma_R0 -> true
   Gamma_R16 -> 
   Gamma_R17 -> 
   Gamma_R30 -> true
-  mem -> (_ (as-array) (k!14))
-  R0 -> 1179088bv64
+  mem -> (_ (as-array) (k!35))
+  R0 -> 2452350734591590398bv64
   R16 -> 
   R17 -> 
-  R30 -> 2284bv64
+  R30 -> 2388bv64
 *** END_STATE
-*** STATE %00000402
-  Gamma_mem -> (lambda (_ (x!1 (bv64))) (or (= (x!1) (_ (bv0) 64)) (= (x!1) (_ 17592186044416 64))))
+*** STATE %0000048b
+  Gamma_mem -> (_ (as-array) (k!37))
   Gamma_R0 -> true
-  Gamma_stack -> (lambda (_ (x!1 (bv64))) (= (x!1) 9223372036854775808bv64))
-  mem -> (_ (as-array) (k!14))
-  R0 -> 1179089bv64
-  stack -> (_ (as (const) (Array (bv64) (bv8))) 106bv8)
+  Gamma_stack -> (_ (as-array) (k!25))
+  mem -> (_ (as-array) (k!35))
+  R0 -> 2452350734591590400bv64
+  stack -> (store (store (store (_ (as (const) (Array (bv64) (bv8))) 0bv8) (_ (bv99) 64) (_ (bv34) 8)) (_ (bv97) 64) (_ 128 8)) (_ (bv98) 64) (_ (bv8) 8))
 *** END_STATE
-*** STATE l00000428
-  Gamma_mem -> (store (store (_ (as (const) (Array (bv64) (Bool))) true) 8192bv64 false) (_ 9567696 64) false)
+*** STATE %00000499
+  Gamma_mem -> (_ (as-array) (k!37))
+  Gamma_R0 -> true
+  mem -> (_ (as-array) (k!33))
+  R0 -> 2452350734591590400bv64
+*** END_STATE
+*** STATE l000004c6
+  Gamma_mem -> (_ (as-array) (k!37))
+  Gamma_R0 -> true
+  Gamma_R16 -> 
+  Gamma_R17 -> 
+  Gamma_R19 -> true
+  Gamma_R30 -> true
+  mem -> (_ (as-array) (k!33))
+  R0 -> 2bv64
+  R16 -> 
+  R17 -> 
+  R19 -> 2452350734591590398bv64
+  R30 -> 2444bv64
+*** END_STATE
+*** STATE l000004df
+  Gamma_mem -> (_ (as-array) (k!37))
   Gamma_R0 -> true
   Gamma_R1 -> true
   Gamma_R16 -> 
   Gamma_R17 -> 
   Gamma_R2 -> true
   Gamma_R30 -> true
-  mem -> (_ (as-array) (k!14))
-  R0 -> 1179088bv64
+  mem -> (_ (as-array) (k!33))
+  R0 -> 2452350734591590398bv64
   R1 -> 1bv64
   R16 -> 
   R17 -> 
-  R2 -> 11bv64
-  R30 -> 2328bv64
+  R2 -> 2bv64
+  R30 -> 2460bv64
 *** END_STATE
 *** END_MODEL
