@@ -51,27 +51,23 @@ trait CfgNode:
 
   /** Edges to this node from regular statements or ignored procedure calls.
     *
-    * `predIntra` <: Set[RegularEdge | IntraprocEdge]
     */
-  val predIntra: mutable.Set[CfgNode] = mutable.Set[CfgNode]()
+  val predIntra: mutable.Set[CfgNode] = mutable.Set()
 
   /** Edges to this node from procedure calls. Likely empty unless this node is a [[CfgFunctionEntryNode]]
     *
-    * `predInter` <: Set[RegularEdge | InterprocEdge]
     */
-  val predInter: mutable.Set[CfgNode] = mutable.Set[CfgNode]()
+  val predInter: mutable.Set[CfgNode] = mutable.Set()
 
   /** Edges to successor nodes, either regular or ignored procedure calls
     *
-    * `succIntra` <: Set[RegularEdge | IntraprocEdge]
     */
-  val succIntra: mutable.Set[CfgNode] = mutable.Set[CfgNode]()
+  val succIntra: mutable.Set[CfgNode] = mutable.Set()
 
   /** Edges to successor procedure calls. Used when walking inter-proc cfg.
     *
-    * `succInter` <: Set[RegularEdge | InterprocEdge]
     */
-  val succInter: mutable.Set[CfgNode] = mutable.Set[CfgNode]()
+  val succInter: mutable.Set[CfgNode] = mutable.Set()
 
   /** Unique identifier. */
   val id: Int = CfgNode.nextId()
@@ -220,18 +216,15 @@ class ProgramCfg:
   /** Interprocedural call edges connect an intraprocedural cfg with another procedure's intraprocedural cfg that it is
     * calling.
     */
-  def addInterprocCallEdge(from: CfgNode, to: CfgNode, cond: Expr = TrueLiteral): Unit = {
+  def addInterprocCallEdge(from: CfgNode, to: CfgNode): Unit = {
     from.succInter += to
     to.predInter += from
   }
 
   /** Intraprocedural edges are for connecting call nodes to the call's return node, without following the call itself
     * (stepping over the call).
-    *
-    * @return
-    *   The new edge
     */
-  def addIntraprocEdge(from: CfgNode, to: CfgNode, cond: Expr = TrueLiteral): Unit = {
+  def addIntraprocEdge(from: CfgNode, to: CfgNode): Unit = {
     from.succIntra += to
     to.predIntra += from
   }
@@ -296,7 +289,7 @@ class ProgramCfg:
     var dotArrows = mutable.ListBuffer[DotArrow]()
     var uniqueId = 0
     nodes.foreach { n =>
-      dotNodes += (n -> new DotNode(s"${idGen(n, uniqueId)}", labeler(n)))
+      dotNodes += (n -> DotNode(s"${idGen(n, uniqueId)}", labeler(n)))
       uniqueId += 1
     }
     nodes.foreach { n =>
@@ -356,18 +349,14 @@ class ProgramCfgFactory:
   val cfg: ProgramCfg = ProgramCfg()
 
   // Mapping from procedures to the start of their individual (intra) cfgs
-  val procToCfg: mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] =
-    mutable.HashMap[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)]()
+  val procToCfg: mutable.Map[Procedure, (CfgFunctionEntryNode, CfgFunctionExitNode)] = mutable.Map()
   // Mapping from procedures to procedure call nodes (all the calls made within this procedure, including inlined functions)
-  val procToCalls: mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]] =
-    mutable.HashMap[Procedure, mutable.Set[CfgCommandNode]]()
+  val procToCalls: mutable.Map[Procedure, mutable.Set[CfgJumpNode]] = mutable.Map()
   // Mapping from procedure entry instances to procedure call nodes within that procedure's instance (`CfgCommandNode.data <: DirectCall`)
   //    Updated on first creation of a new procedure (e.g. in initial creation, or in cloning of a procedure's cfg)
-  val callToNodes: mutable.Map[CfgFunctionEntryNode, mutable.Set[CfgCommandNode]] =
-    mutable.Map[CfgFunctionEntryNode, mutable.Set[CfgCommandNode]]()
+  val callToNodes: mutable.Map[CfgFunctionEntryNode, mutable.Set[CfgJumpNode]] = mutable.Map()
   // Mapping from procedures to nodes in any node in the cfg which has a call to that procedure
-  val procToCallers: mutable.Map[Procedure, mutable.Set[CfgCommandNode]] =
-    mutable.Map[Procedure, mutable.Set[CfgCommandNode]]()
+  val procToCallers: mutable.Map[Procedure, mutable.Set[CfgJumpNode]] = mutable.Map()
 
   /** Generate the cfg for each function of the program. NOTE: is this functionally different to a constructor? Do we
     * ever expect to generate a CFG from any other data structure? If not then the `class` could probably be absorbed
@@ -389,8 +378,8 @@ class ProgramCfgFactory:
     // We don't initialise `procToCfg` here, because it will never be accessed before `cfgForProcedure`,
     //  and because it relies on the entry/exit nodes be initialised. It is initialised in `cfgForProcedure`.
     program.procedures.foreach(proc =>
-      procToCalls += (proc -> mutable.Set[CfgCommandNode]())
-      procToCallers += (proc -> mutable.Set[CfgCommandNode]())
+      procToCalls += (proc -> mutable.Set())
+      procToCallers += (proc -> mutable.Set())
     )
 
     // Create CFG for individual procedures
@@ -401,8 +390,8 @@ class ProgramCfgFactory:
     //    i.e. we may not want to inline self-recursive functions too much.
     // Of note is whether we want this at all or note. If not, then we can simply remove the below and pass `procCallNodes` to
     //    `addInterprocEdges`.
-    val procCallNodes: Set[CfgCommandNode] = procToCalls.values.flatten.toSet
-    val leafCallNodes: Set[CfgCommandNode] =
+    val procCallNodes: Set[CfgJumpNode] = procToCalls.values.flatten.toSet
+    val leafCallNodes: Set[CfgJumpNode] =
       if !unify then inlineProcedureCalls(procCallNodes, inlineLimit) else unifyProcedureCalls(procCallNodes)
 
     // Add inter-proc edges to leaf call nodes
@@ -425,22 +414,21 @@ class ProgramCfgFactory:
     val funcEntryNode: CfgFunctionEntryNode = CfgFunctionEntryNode(proc)
     val funcExitNode: CfgFunctionExitNode = CfgFunctionExitNode(proc)
     cfg.nodes += funcEntryNode
-    cfg.nodes += funcEntryNode
+    cfg.nodes += funcExitNode
 
     procToCfg += (proc -> (funcEntryNode, funcExitNode))
-    callToNodes += (funcEntryNode -> mutable.Set[CfgCommandNode]())
+    callToNodes += (funcEntryNode -> mutable.Set())
+
+    // Track blocks we've already processed so we don't double up
+    val visitedBlocks: mutable.Map[Block, CfgCommandNode] = mutable.Map()
 
     // Procedure has no content (in our case this probably means it's an ignored procedure, e.g., an external function such as @printf)
     if (proc.blocks.isEmpty) {
       cfg.addEdge(funcEntryNode, funcExitNode)
-      return
+    } else {
+      // Recurse through blocks
+      visitBlock(proc.blocks.head, funcEntryNode)
     }
-
-    // Track blocks we've already processed so we don't double up
-    val visitedBlocks: mutable.HashMap[Block, CfgCommandNode] = mutable.HashMap[Block, CfgCommandNode]()
-
-    // Recurse through blocks
-    visitBlock(proc.blocks.head, funcEntryNode, TrueLiteral)
 
     /** Add a block to the CFG. A block in this case is a basic block, so it contains a list of consecutive statements
       * followed by a jump at the end to another block. We process statements in this block (if they exist), and then
@@ -465,22 +453,15 @@ class ProgramCfgFactory:
       *   The block being added to the CFG.
       * @param prevBlockEnd
       *   Preceding block's end node (jump)
-      * @param cond
-      *   Condition on the jump from `prevNode` to the first statement of this block
       */
-    def visitBlock(block: Block, prevBlockEnd: CfgNode, cond: Expr): Unit = {
+    def visitBlock(block: Block, prevBlockEnd: CfgNode): Unit = {
 
-      // TODO: this can probably be abstracted to single calls to `visitStmts` and `visitJumps` by placing
-      //    the burden of checking statement size on the individual functions (effectively what
-      //    the `solitary` flag currently checks). Perhaps this approach is more readable though?
-      block.statements.size match {
-        case i if i > 0 =>
-          // Block contains some statements
-          val endStmt: CfgCommandNode = visitStmts(block.statements, prevBlockEnd, cond)
-          visitJump(block.jump, endStmt, TrueLiteral, solitary = false)
-        case _ =>
-          // Only jumps in this block
-          visitJump(block.jump, prevBlockEnd, cond, solitary = true)
+      if (block.statements.nonEmpty) {
+        val endStmt = visitStmts(block.statements, prevBlockEnd)
+        visitJump(block.jump, endStmt, false)
+      } else {
+        // Only jumps in this block
+        visitJump(block.jump, prevBlockEnd, true)
       }
 
       /** If a block has statements, we add them to the CFG. Blocks in this case are basic blocks, so we know
@@ -495,22 +476,20 @@ class ProgramCfgFactory:
         * @return
         *   The last statement's CFG node
         */
-      def visitStmts(stmts: ArrayBuffer[Statement], prevNode: CfgNode, cond: Expr): CfgCommandNode = {
+      def visitStmts(stmts: ArrayBuffer[Statement], prevNode: CfgNode): CfgCommandNode = {
 
-        val firstNode: CfgStatementNode = CfgStatementNode(stmts.head, block, funcEntryNode)
+        val firstNode = CfgStatementNode(stmts.head, block, funcEntryNode)
         cfg.addEdge(prevNode, firstNode)
         visitedBlocks += (block -> firstNode) // This is guaranteed to be entrance to block if we are here
 
         if (stmts.size == 1) {
-          // Statements start and end here for this block
           return firstNode
         }
 
         var prevStmtNode: CfgStatementNode = firstNode
 
-        // `tail` takes everything after the first element of the iterable
         stmts.tail.foreach(stmt =>
-          val stmtNode: CfgStatementNode = CfgStatementNode(stmt, block, funcEntryNode)
+          val stmtNode = CfgStatementNode(stmt, block, funcEntryNode)
           cfg.addEdge(prevStmtNode, stmtNode)
           prevStmtNode = stmtNode
         )
@@ -532,10 +511,9 @@ class ProgramCfgFactory:
         * @param solitary
         *   `True` if this block contains no statements, `False` otherwise
         */
-      def visitJump(jmp: Jump, prevNode: CfgNode, cond: Expr, solitary: Boolean): Unit = {
-
-        val jmpNode: CfgJumpNode = CfgJumpNode(jmp, block, funcEntryNode)
-        var precNode: CfgNode = prevNode
+      def visitJump(jmp: Jump, prevNode: CfgNode, solitary: Boolean): Unit = {
+        val jmpNode = CfgJumpNode(jmp, block, funcEntryNode)
+        var precNode = prevNode
 
         if (solitary) {
           /* If the block contains only jumps (no statements), then the "start" of the block is a jump.
@@ -559,8 +537,6 @@ class ProgramCfgFactory:
           }
         }
 
-        // TODO this is not a robust approach
-
         jmp match {
           case n: GoTo =>
             for (targetBlock <- n.targets) {
@@ -568,7 +544,7 @@ class ProgramCfgFactory:
                 val targetBlockEntry: CfgCommandNode = visitedBlocks(targetBlock)
                 cfg.addEdge(precNode, targetBlockEntry)
               } else {
-                visitBlock(targetBlock, precNode, TrueLiteral)
+                visitBlock(targetBlock, precNode)
               }
             }
           case dCall: DirectCall =>
@@ -596,7 +572,7 @@ class ProgramCfgFactory:
                   val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
                   cfg.addEdge(callRet, retBlockEntry)
                 } else {
-                  visitBlock(retBlock, callRet, TrueLiteral)
+                  visitBlock(retBlock, callRet)
                 }
               case None =>
                 val noReturn = CfgCallNoReturnNode()
@@ -629,10 +605,10 @@ class ProgramCfgFactory:
                 cfg.addEdge(jmpNode, callRet)
 
                 if (visitedBlocks.contains(retBlock)) {
-                  val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
+                  val retBlockEntry = visitedBlocks(retBlock)
                   cfg.addEdge(callRet, retBlockEntry)
                 } else {
-                  visitBlock(retBlock, callRet, TrueLiteral)
+                  visitBlock(retBlock, callRet)
                 }
               case None =>
                 val noReturn = CfgCallNoReturnNode()
@@ -708,7 +684,7 @@ class ProgramCfgFactory:
     *   Tthe next leaf call nodes
     */
   @tailrec
-  private def inlineProcedureCalls(procNodes: Set[CfgCommandNode], inlineAmount: Int): Set[CfgCommandNode] = {
+  private def inlineProcedureCalls(procNodes: Set[CfgJumpNode], inlineAmount: Int): Set[CfgJumpNode] = {
     assert(inlineAmount >= 0)
     Logger.info(s"[+] Inlining ${procNodes.size} leaf call nodes with $inlineAmount level(s) left")
 
@@ -717,13 +693,13 @@ class ProgramCfgFactory:
     }
 
     // Set of procedure calls to be discovered by inlining the ones in `procNodes`
-    val nextProcNodes: mutable.Set[CfgCommandNode] = mutable.Set[CfgCommandNode]()
+    val nextProcNodes: mutable.Set[CfgJumpNode] = mutable.Set()
 
     procNodes.foreach { procNode =>
       procNode.data match {
         case targetCall: DirectCall =>
           // Retrieve information about the call to the target procedure
-          val targetProc: Procedure = targetCall.target
+          val targetProc = targetCall.target
           val (procEntry, procExit) = cloneProcedureCFG(targetProc)
 
           // Add link between call node and the procedure's `Entry`.
@@ -747,7 +723,7 @@ class ProgramCfgFactory:
   }
 
   @tailrec
-  private def unifyProcedureCalls(procNodes: Set[CfgCommandNode]): Set[CfgCommandNode] = {
+  private def unifyProcedureCalls(procNodes: Set[CfgJumpNode]): Set[CfgJumpNode] = {
     Logger.info(s"[+] Unifyig ${procNodes.size} leaf call nodest")
 
     if (procNodes.isEmpty) {
@@ -755,7 +731,7 @@ class ProgramCfgFactory:
     }
 
     // Set of procedure calls to be discovered by unifying the ones in `procNodes`
-    val nextProcNodes: mutable.Set[CfgCommandNode] = mutable.Set[CfgCommandNode]()
+    val nextProcNodes: mutable.Set[CfgJumpNode] = mutable.Set()
 
     procNodes.foreach { procNode =>
       procNode.data match {
@@ -797,7 +773,7 @@ class ProgramCfgFactory:
     val (entryNode: CfgFunctionEntryNode, exitNode: CfgFunctionExitNode) = procToCfg(proc)
     val (newEntry: CfgFunctionEntryNode, newExit: CfgFunctionExitNode) = (entryNode.copyNode(), exitNode.copyNode())
 
-    callToNodes += (newEntry -> mutable.Set[CfgCommandNode]())
+    callToNodes += (newEntry -> mutable.Set())
 
     // Entry is guaranteed to only have one successor (by our cfg design)
     val currNode: CfgNode = entryNode.succIntra.head
@@ -812,8 +788,6 @@ class ProgramCfgFactory:
       *   Node in the original procedure's cfg we're up to cloning
       * @param prevNewNode
       *   The originating node in the new clone's cfg
-      * @param cond
-      *   The condition leading to `node` from `prevNewNode`
       */
     def visitNode(node: CfgNode, prevNewNode: CfgNode): Unit = {
 
@@ -823,8 +797,8 @@ class ProgramCfgFactory:
       }
 
       node match {
-        case n: CfgCommandNode =>
-          val newNode: CfgCommandNode = n.copyNode()
+        case n: CfgJumpNode =>
+          val newNode = n.copyNode()
 
           // Link this node with predecessor in the new cfg
           cfg.addEdge(prevNewNode, newNode)
@@ -858,21 +832,20 @@ class ProgramCfgFactory:
   }
 
   /** After inlining has been done, we link all residual direct calls (leaf nodes) to the start of the intraprocedural
-    * that are the target of the call. These links are a special kind of inter-procedural edge, where we don't store a
-    * return edge.
+    * that are the target of the call.
     *
     * @param leaves
     *   The call nodes at edge of intraprocedural cfgs to be linked to their targets
     */
-  private def addInterprocEdges(leaves: Set[CfgCommandNode]): Unit = {
+  private def addInterprocEdges(leaves: Set[CfgJumpNode]): Unit = {
 
     leaves.foreach { callNode =>
       callNode.data match {
         case targetCall: DirectCall =>
           val targetProc: Procedure = targetCall.target
-          // We don't care about returns, as this is context dependent. It is up to the caller
-          //  (in our case, the analyses) to keep track of context so that it knows where to return to
-          //  at the exit of the target procedure
+
+          // this does not add returns for any of the calls, so the interprocedural analysis will not work if any
+          // calls are not in-lined
           val (targetEntry: CfgFunctionEntryNode, _) = procToCfg(targetProc)
 
           cfg.addInterprocCallEdge(callNode, targetEntry)

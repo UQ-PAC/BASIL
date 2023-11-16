@@ -21,8 +21,8 @@ trait Dependencies[N]:
   def indep(n: N): Set[N]
 
 trait InterproceduralForwardDependencies extends Dependencies[CfgNode] {
-  def outdep(n: CfgNode): Set[CfgNode] = n.succInter.toSet.union(n.succIntra.toSet)
-  def indep(n: CfgNode): Set[CfgNode] = n.predInter.toSet.union(n.predIntra.toSet)
+  def outdep(n: CfgNode): Set[CfgNode] = n.succInter.toSet
+  def indep(n: CfgNode): Set[CfgNode] = n.predInter.toSet
 }
 
 trait IntraproceduralForwardDependencies extends Dependencies[CfgNode] {
