@@ -365,10 +365,9 @@ class ProgramCfgFactory:
     * @param program
     *   Basil IR of the program
     * @param inlineLimit
-    *   How many levels deep to inline function calls. By default, don't inline - this is equivalent to an
-    *   intra-procedural CFG.
+    *   How many levels deep to inline function calls. Default is 3
     */
-  def fromIR(program: Program, unify: Boolean = false, inlineLimit: Int = 0): ProgramCfg = {
+  def fromIR(program: Program, unify: Boolean = false, inlineLimit: Int = 3): ProgramCfg = {
     CfgNode.id = 0
     require(inlineLimit >= 0, "Can't inline procedures to negative depth...")
     Logger.info("[+] Generating CFG...")
