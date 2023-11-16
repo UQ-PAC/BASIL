@@ -316,18 +316,21 @@ trait MemoryRegionAnalysisMisc:
   def localTransfer(n: CfgNode, s: stateLattice.Element): stateLattice.Element =
     n match {
       case cmd: CfgCommandNode =>
+        var m = s
         cmd.data match {
           case directCall: DirectCall =>
             if (directCall.target.name == "malloc") {
               evaluateExpression(mallocVariable, constantProp(n)) match {
                 case Some(b: BitVecLiteral) =>
-                  s ++ Set((n, Set(HeapRegion(nextMallocCount(), b))))
-                case None => s
+                  m = m ++ Set((n, Set(HeapRegion(nextMallocCount(), b))))
+                  m
+                case None => m
               }
             } else {
-              s
+              m
             }
           case memAssign: MemoryAssign =>
+            var m = s
             if (ignoreRegions.contains(memAssign.rhs.value)) {
               return s
             }
@@ -355,9 +358,10 @@ trait MemoryRegionAnalysisMisc:
               case _ =>
             })
             */
-            s ++ Set((n, result))
+            m = m ++ Set((n, result))
+            m
           case localAssign: LocalAssign =>
-            val m = s
+            var m = s
             unwrapExpr(localAssign.rhs).foreach {
               case memoryLoad: MemoryLoad =>
                 val result = eval(memoryLoad.index, s, cmd)
@@ -371,7 +375,7 @@ trait MemoryRegionAnalysisMisc:
                   case _ =>
                 })
                 */
-                m ++ Set((n, result))
+                m = m ++ Set((n, result))
               case _ => m
             }
             m
@@ -394,13 +398,6 @@ abstract class MemoryRegionAnalysis(
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
   def transfer(n: CfgNode, s: stateLattice.Element): stateLattice.Element = localTransfer(n, s)
-
-
-trait IntraprocMemoryRegionAnalysisMisc[N] extends MemoryRegionAnalysisMisc {
-  val liftedstatelattice: LiftLattice[stateLattice.type]
-  val cfg: ProgramCfg
-  val lattice: MapLattice[N, liftedstatelattice.type]
-}
 
 /**
  * Base class for value analysis with lifted lattice, where the extra bottom element represents "unreachable".
