@@ -45,6 +45,8 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
+  val first: Set[CfgNode] = Set(cfg.startNode)
+
   private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
   private val framePointer = Register("R29", BitVecType(64))
@@ -183,4 +185,5 @@ class ValueSetAnalysisSolver(
     mmm: MemoryModelMap,
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
 ) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
-    with InterproceduralMonotonicSolver[Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]]
+    with InterproceduralForwardDependencies
+    with SimpleMonotonicSolver[CfgNode, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]]

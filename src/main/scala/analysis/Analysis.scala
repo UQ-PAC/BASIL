@@ -170,6 +170,8 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
+  val first: Set[CfgNode] = domain.collect { case n: CfgFunctionEntryNode if n.predIntra.isEmpty => n }
+
   private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
   private val framePointer = Register("R29", BitVecType(64))
@@ -316,4 +318,5 @@ class MemoryRegionAnalysisSolver(
     subroutines: Map[BigInt, String],
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
 ) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
-    with IntraproceduralMonotonicSolver[Set[MemoryRegion], PowersetLattice[MemoryRegion]]
+    with IntraproceduralForwardDependencies
+    with SimpleMonotonicSolver[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]
