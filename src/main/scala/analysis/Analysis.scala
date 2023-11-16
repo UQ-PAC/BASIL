@@ -25,13 +25,14 @@ trait Analysis[+R]:
 trait ConstantPropagation(val cfg: ProgramCfg) {
   /** The lattice of abstract states.
     */
+
   val valuelattice: ConstantPropagationLattice = ConstantPropagationLattice()
 
   val statelattice: MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice] = MapLattice(valuelattice)
 
   /** Default implementation of eval.
     */
-  def eval(exp: Expr, env: Map[Variable, FlatElement[BitVecLiteral]]): valuelattice.Element =
+  def eval(exp: Expr, env: Map[Variable, FlatElement[BitVecLiteral]]): FlatElement[BitVecLiteral] =
     import valuelattice._
     exp match
       case id: Variable => env(id)
@@ -74,7 +75,7 @@ trait ConstantPropagation(val cfg: ProgramCfg) {
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: statelattice.Element): statelattice.Element =
+  def localTransfer(n: CfgNode, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] =
     n match
       case r: CfgCommandNode =>
         r.data match
@@ -93,7 +94,7 @@ trait ConstantPropagation(val cfg: ProgramCfg) {
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transfer(n: CfgNode, s: statelattice.Element): statelattice.Element = localTransfer(n, s)
+  def transfer(n: CfgNode, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = localTransfer(n, s)
 }
 
 class ConstantPropagationSolver(cfg: ProgramCfg) extends ConstantPropagation(cfg)
@@ -110,7 +111,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
-  val stackMap: mutable.Map[CfgFunctionEntryNode, mutable.Map[Expr, StackRegion]] = mutable.HashMap()
+  val stackMap: mutable.Map[CfgFunctionEntryNode, mutable.Map[Expr, StackRegion]] = mutable.Map()
 
   private def nextMallocCount() = {
     mallocCount += 1
@@ -166,7 +167,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
 
   /** The lattice of abstract states.
     */
-  val lattice: MapLattice[CfgNode, powersetLattice.Element, powersetLattice.type] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -180,7 +181,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
 
   private val mallocVariable = Register("R0", BitVecType(64))
 
-  def eval(exp: Expr, env: lattice.sublattice.Element, n: CfgCommandNode): lattice.sublattice.Element = {
+  def eval(exp: Expr, env: Set[MemoryRegion], n: CfgCommandNode): Set[MemoryRegion] = {
     Logger.debug(s"evaluating $exp")
     Logger.debug(s"env: $env")
     Logger.debug(s"n: $n")
@@ -239,7 +240,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = n match {
+  def localTransfer(n: CfgNode, s: Set[MemoryRegion]): Set[MemoryRegion] = n match {
     case cmd: CfgCommandNode =>
       cmd.data match {
         case directCall: DirectCall =>
@@ -307,7 +308,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = localTransfer(n, s)
+  def transfer(n: CfgNode, s: Set[MemoryRegion]): Set[MemoryRegion] = localTransfer(n, s)
 
 }
 

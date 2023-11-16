@@ -8,31 +8,28 @@ import util.Logger
   */
 trait Lattice[T]:
 
-  /** The type of the elements of this lattice.
-    */
   type Element = T
-
   /** The bottom element of this lattice.
     */
-  val bottom: Element
+  val bottom: T
 
   /** The top element of this lattice. Default: not implemented.
     */
-  def top: Element = ???
+  def top: T = ???
 
   /** The least upper bound of `x` and `y`.
     */
-  def lub(x: Element, y: Element): Element
+  def lub(x: T, y: T): T
 
   /** Returns true whenever `x` <= `y`.
     */
-  def leq(x: Element, y: Element): Boolean = lub(x, y) == y // rarely used, but easy to implement :-)
+  def leq(x: T, y: T): Boolean = lub(x, y) == y // rarely used, but easy to implement :-)
 
 /** The powerset lattice of a set of elements of type `A` with subset ordering.
   */
 class PowersetLattice[A] extends Lattice[Set[A]] {
-  val bottom: Element = Set.empty
-  def lub(x: Element, y: Element): Element = x.union(y)
+  val bottom: Set[A] = Set.empty
+  def lub(x: Set[A], y: Set[A]): Set[A] = x.union(y)
 }
 
 trait FlatElement[+T]
@@ -49,7 +46,7 @@ class FlatLattice[X] extends Lattice[FlatElement[X]] {
 
   override val top: FlatElement[X] = Top
 
-  def lub(x: Element, y: Element): Element = (x, y) match {
+  def lub(x: FlatElement[X], y: FlatElement[X]): FlatElement[X] = (x, y) match {
     case (a, Bottom) => a
     case (Bottom, b) => b
     case (a, b) if a == b => a
@@ -63,7 +60,7 @@ class FlatLattice[X] extends Lattice[FlatElement[X]] {
   */
 class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[A, T]] {
   val bottom: Map[A, T] = Map().withDefaultValue(sublattice.bottom)
-  def lub(x: Element, y: Element): Element =
+  def lub(x: Map[A, T], y: Map[A, T]): Map[A, T] =
     x.keys.foldLeft(y)((m, a) => m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
 }
 
@@ -71,7 +68,7 @@ class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[
   *
   */
 class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
-  private def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Element, b: Element): Element = try {
+  private def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = try {
     (a, b) match
       case (FlatEl(x), FlatEl(y)) => FlatEl(op(x, y))
       case (Bottom, _) => Bottom
@@ -84,35 +81,35 @@ class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
       throw e
   }
 
-  private def apply(op: BitVecLiteral => BitVecLiteral, a: Element): Element = a match
+  private def apply(op: BitVecLiteral => BitVecLiteral, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = a match
     case FlatEl(x) => FlatEl(op(x))
     case Top => Top
     case Bottom => Bottom
 
-  def bv(a: BitVecLiteral): Element = FlatEl(a)
-  def bvadd(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvadd, a, b)
-  def bvsub(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsub, a, b)
-  def bvmul(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvmul, a, b)
-  def bvudiv(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvudiv, a, b)
-  def bvsdiv(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsdiv, a, b)
-  def bvsrem(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsrem, a, b)
-  def bvurem(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvurem, a, b)
-  def bvsmod(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvsmod, a, b)
-  def bvand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvand, a, b)
-  def bvor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvor, a, b)
-  def bvxor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvxor, a, b)
-  def bvnand(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvnand, a, b)
-  def bvnor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvnor, a, b)
-  def bvxnor(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvxnor, a, b)
-  def bvnot(a: Element): Element = apply(BitVectorEval.smt_bvnot, a)
-  def bvneg(a: Element): Element = apply(BitVectorEval.smt_bvneg, a)
-  def bvshl(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvshl, a, b)
-  def bvlshr(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvlshr, a, b)
-  def bvashr(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvashr, a, b)
-  def bvcomp(a: Element, b: Element): Element = apply(BitVectorEval.smt_bvcomp, a, b)
-  def zero_extend(width: Int, a: Element): Element = apply(BitVectorEval.smt_zero_extend(width, _: BitVecLiteral), a)
-  def sign_extend(width: Int, a: Element): Element = apply(BitVectorEval.smt_sign_extend(width, _: BitVecLiteral), a)
-  def extract(high: Int, low: Int, a: Element): Element =
+  def bv(a: BitVecLiteral): FlatElement[BitVecLiteral] = FlatEl(a)
+  def bvadd(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvadd, a, b)
+  def bvsub(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsub, a, b)
+  def bvmul(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvmul, a, b)
+  def bvudiv(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvudiv, a, b)
+  def bvsdiv(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsdiv, a, b)
+  def bvsrem(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsrem, a, b)
+  def bvurem(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvurem, a, b)
+  def bvsmod(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsmod, a, b)
+  def bvand(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvand, a, b)
+  def bvor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvor, a, b)
+  def bvxor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvxor, a, b)
+  def bvnand(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvnand, a, b)
+  def bvnor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvnor, a, b)
+  def bvxnor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvxnor, a, b)
+  def bvnot(a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvnot, a)
+  def bvneg(a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvneg, a)
+  def bvshl(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvshl, a, b)
+  def bvlshr(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvlshr, a, b)
+  def bvashr(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvashr, a, b)
+  def bvcomp(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvcomp, a, b)
+  def zero_extend(width: Int, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_zero_extend(width, _: BitVecLiteral), a)
+  def sign_extend(width: Int, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_sign_extend(width, _: BitVecLiteral), a)
+  def extract(high: Int, low: Int, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
     apply(BitVectorEval.boogie_extract(high, low, _: BitVecLiteral), a)
-  def concat(a: Element, b: Element): Element = apply(BitVectorEval.smt_concat, a, b)
+  def concat(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_concat, a, b)
 }

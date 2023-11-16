@@ -41,7 +41,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   val mapLattice: MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]] = MapLattice(powersetLattice)
 
-  val lattice: MapLattice[CfgNode, mapLattice.Element, mapLattice.type] = MapLattice(mapLattice)
+  val lattice: MapLattice[CfgNode, Map[Variable | MemoryRegion, Set[Value]], mapLattice.type] = MapLattice(mapLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -98,7 +98,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   /** Default implementation of eval.
     */
-  def eval(cmd: Command, s: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
+  def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]], n: CfgNode): Map[Variable | MemoryRegion, Set[Value]] = {
     Logger.debug(s"eval: $cmd")
     Logger.debug(s"state: $s")
     Logger.debug(s"node: $n")
@@ -159,7 +159,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = n match {
+  def localTransfer(n: CfgNode, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = n match {
     case entry: CfgFunctionEntryNode =>
       mmm.pushContext(entry.data.name)
       s
@@ -173,7 +173,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = localTransfer(n, s)
+  def transfer(n: CfgNode, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = localTransfer(n, s)
 }
 
 class ValueSetAnalysisSolver(
