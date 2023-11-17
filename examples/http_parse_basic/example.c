@@ -18,7 +18,7 @@ int main() {
     
 
    //memset(stext, 'h', 10);
-   stext[5] = password;
+  // stext[5] = password;
    buf = malloc(11);
    // it only verifies if memcpy is the WHOLE string
    memcpy(buf, stext, strlen(stext)); // inlined by -O2
