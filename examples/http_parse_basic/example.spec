@@ -8,7 +8,7 @@ DIRECT functions: gamma_load64, gamma_load8, memory_load8_le, bvult64, bvule64, 
 
   
 Subroutine: #free
-  Requires DIRECT: "(forall i : int, j: bv64 :: malloc_base[i] == R0 && (bvuge64(j, R0) && bvult64(j,  malloc_end[i])) ==> Gamma_mem[j])"
+  Requires DIRECT: "(forall i : int, j: bv64 :: (malloc_base[i] == R0 && bvuge64(j, R0) && bvult64(j,  malloc_end[i])) ==> Gamma_mem[j])"
 
 Subroutine: main
 Requires DIRECT: "malloc_count == 0"
@@ -35,10 +35,10 @@ Ensures DIRECT: "(forall i : bv64 :: (bvuge64(i, R0) && bvult64(i, bvadd64(R0, o
 
 Subroutine: memcpy
   Modifies: mem
-  // don't overlap
-  Requires DIRECT: "bvugt64(R0, bvadd64(R1, R2)) || bvugt64(R1, bvadd64(R0, R2))"
-  // don't wrap around
-  Requires DIRECT: "bvugt64(bvadd64(R0, R2), R0) && bvugt64(bvadd64(R1, R2), R1)"
+  // don't overlap (doesnt verify)
+  // Requires DIRECT: "bvugt64(R0, bvadd64(R1, R2)) || bvugt64(R1, bvadd64(R0, R2))"
+  // don't wrap around (doesnt verify)
+  // Requires DIRECT: "bvugt64(bvadd64(R0, R2), R0) && bvugt64(bvadd64(R1, R2), R1)"
   Ensures: buf == old(buf) && password == old(password)
 //  Ensures DIRECT: "(forall i: bv64 :: (Gamma_mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then old(Gamma_mem)[bvadd64(bvsub64(i, R0), R1)] else old(Gamma_mem[i])))"
 //  Ensures DIRECT: "(forall i: bv64 :: (mem[i] == if (bvule64(R0, i) && bvult64(i,bvadd64(R0, R2))) then old(mem)[bvadd64(bvsub64(i, R0), R1)] else old(mem[i])))"

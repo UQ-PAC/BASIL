@@ -145,7 +145,7 @@ procedure {:extern} guarantee_reflexive();
 
 procedure #free();
   modifies Gamma_R16, Gamma_R17, R16, R17;
-  requires (forall i : int, j: bv64 :: malloc_base[i] == R0 && (bvuge64(j, R0) && bvult64(j,  malloc_end[i])) ==> Gamma_mem[j]);
+  requires (forall i : int, j: bv64 :: (malloc_base[i] == R0 && bvuge64(j, R0) && bvult64(j,  malloc_end[i])) ==> Gamma_mem[j]);
   free requires (memory_load8_le(mem, 2488bv64) == 1bv8);
   free requires (memory_load8_le(mem, 2489bv64) == 0bv8);
   free requires (memory_load8_le(mem, 2490bv64) == 2bv8);
@@ -537,8 +537,6 @@ procedure malloc();
 
 procedure memcpy();
   modifies Gamma_R16, Gamma_R17, Gamma_mem, R16, R17, mem;
-  requires bvugt64(R0, bvadd64(R1, R2)) || bvugt64(R1, bvadd64(R0, R2));
-  requires bvugt64(bvadd64(R0, R2), R0) && bvugt64(bvadd64(R1, R2), R1);
   free requires (memory_load8_le(mem, 2488bv64) == 1bv8);
   free requires (memory_load8_le(mem, 2489bv64) == 0bv8);
   free requires (memory_load8_le(mem, 2490bv64) == 2bv8);

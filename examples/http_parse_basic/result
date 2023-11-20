@@ -1,6 +1,0 @@
-example-nolambda.bpl(429,5): Error: a precondition for this call could not be proved
-example-nolambda.bpl(138,3): Related location: this is the precondition that could not be proved
-Execution trace:
-    example-nolambda.bpl(334,3): lmain
-
-Boogie program verifier finished with 1 verified, 1 error

@@ -1,7 +1,8 @@
 
 result: example.bpl extraspec.bpl
-	boogie example.bpl extraspec.bpl /mv example.model /smoke | tee result
-	boogie example-nolambda.bpl extraspec.bpl /mv example.model /smoke | tee result
+	boogie example.bpl extraspec.bpl /mv example.model /proverLog lambdas.smt2 /smoke | tee resultlambdas
+	boogie example-nolambda.bpl extraspec.bpl /useArrayAxioms /mv example.model /smoke | tee resultaxioms
+	boogie example-nolambda.bpl extraspec.bpl /mv example.model | tee result
 
 a.out: example.c
 	aarch64-linux-gnu-gcc example.c
