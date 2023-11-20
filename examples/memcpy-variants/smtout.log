@@ -1,0 +1,688 @@
+(set-option :print-success false)
+(set-info :smt-lib-version 2.6)
+(set-option :smt.mbqi false)
+(set-option :model.compact false)
+(set-option :model.v2 true)
+(set-option :pp.bv_literals false)
+; done setting options
+
+
+(declare-fun tickleBool (Bool) Bool)
+(assert (and (tickleBool true) (tickleBool false)))
+(declare-fun gamma_store64 ((Array (_ BitVec 64) Bool) (_ BitVec 64) Bool) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#0| ((_ BitVec 64) (_ BitVec 64) Bool (Array (_ BitVec 64) Bool)) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#1| ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (Array (_ BitVec 64) (_ BitVec 8))) (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun memory_load64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 64))
+(declare-fun gamma_load64 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load32 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load8 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun $text_addr () (_ BitVec 64))
+(declare-fun $copiedtext_addr () (_ BitVec 64))
+(declare-fun memory_load8_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 8))
+(declare-fun memory_store64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64) (_ BitVec 64)) (Array (_ BitVec 64) (_ BitVec 8)))
+(assert (forall ((gammaMap (Array (_ BitVec 64) Bool)) (index (_ BitVec 64)) (value Bool) ) (! (= (gamma_store64 gammaMap index value) (|lambda#0| index #x0000000000000008 value gammaMap))
+ :qid |examplebpl.49:34|
+ :skolemid |3|
+ :pattern ( (gamma_store64 gammaMap index value))
+)))
+(assert (forall ((|l#0| (_ BitVec 64)) (|l#1| (_ BitVec 64)) (|l#2| (_ BitVec 64)) (|l#3| (_ BitVec 64)) (|l#4| (Array (_ BitVec 64) (_ BitVec 8))) (i (_ BitVec 64)) ) (! (= (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i) (ite (ite (bvule |l#0| (bvadd |l#0| |l#1|))  (and (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))  (or (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))) ((_ extract 7 0) (bvlshr |l#2| (bvmul (bvsub i |l#3|) #x0000000000000008))) (select |l#4| i)))
+ :qid |examplebpl.65:57|
+ :skolemid |11|
+ :pattern ( (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i))
+)))
+(assert (forall ((memory (Array (_ BitVec 64) (_ BitVec 8))) (index@@0 (_ BitVec 64)) ) (! (= (memory_load64_le memory index@@0) (concat (select memory (bvadd index@@0 #x0000000000000007)) (concat (select memory (bvadd index@@0 #x0000000000000006)) (concat (select memory (bvadd index@@0 #x0000000000000005)) (concat (select memory (bvadd index@@0 #x0000000000000004)) (concat (select memory (bvadd index@@0 #x0000000000000003)) (concat (select memory (bvadd index@@0 #x0000000000000002)) (concat (select memory (bvadd index@@0 #x0000000000000001)) (select memory index@@0)))))))))
+ :qid |examplebpl.57:37|
+ :skolemid |4|
+ :pattern ( (memory_load64_le memory index@@0))
+)))
+(assert (forall ((|l#0@@0| (_ BitVec 64)) (|l#1@@0| (_ BitVec 64)) (|l#2@@0| Bool) (|l#3@@0| (Array (_ BitVec 64) Bool)) (i@@0 (_ BitVec 64)) ) (! (= (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0) (ite (ite (bvule |l#0@@0| (bvadd |l#0@@0| |l#1@@0|))  (and (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))  (or (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))) |l#2@@0| (select |l#3@@0| i@@0)))
+ :qid |examplebpl.49:56|
+ :skolemid |10|
+ :pattern ( (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0))
+)))
+(assert (forall ((gammaMap@@0 (Array (_ BitVec 64) Bool)) (index@@1 (_ BitVec 64)) ) (! (= (gamma_load64 gammaMap@@0 index@@1)  (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000007)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000006)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000005)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000004)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000003)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000002)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000001)) (select gammaMap@@0 index@@1)))))))))
+ :qid |examplebpl.41:33|
+ :skolemid |1|
+ :pattern ( (gamma_load64 gammaMap@@0 index@@1))
+)))
+(assert (forall ((gammaMap@@1 (Array (_ BitVec 64) Bool)) (index@@2 (_ BitVec 64)) ) (! (= (gamma_load32 gammaMap@@1 index@@2)  (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000003)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000002)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000001)) (select gammaMap@@1 index@@2)))))
+ :qid |examplebpl.37:33|
+ :skolemid |0|
+ :pattern ( (gamma_load32 gammaMap@@1 index@@2))
+)))
+(assert (forall ((gammaMap@@2 (Array (_ BitVec 64) Bool)) (index@@3 (_ BitVec 64)) ) (! (= (gamma_load8 gammaMap@@2 index@@3) (select gammaMap@@2 index@@3))
+ :qid |examplebpl.45:32|
+ :skolemid |2|
+ :pattern ( (gamma_load8 gammaMap@@2 index@@3))
+)))
+(assert (= $text_addr #x0000000000020048))
+(assert (= $copiedtext_addr #x0000000000020060))
+(assert (forall ((memory@@0 (Array (_ BitVec 64) (_ BitVec 8))) (index@@4 (_ BitVec 64)) ) (! (= (memory_load8_le memory@@0 index@@4) (select memory@@0 index@@4))
+ :qid |examplebpl.61:36|
+ :skolemid |5|
+ :pattern ( (memory_load8_le memory@@0 index@@4))
+)))
+(assert (forall ((memory@@1 (Array (_ BitVec 64) (_ BitVec 8))) (index@@5 (_ BitVec 64)) (value@@0 (_ BitVec 64)) ) (! (= (memory_store64_le memory@@1 index@@5 value@@0) (|lambda#1| index@@5 #x0000000000000008 value@@0 index@@5 memory@@1))
+ :qid |examplebpl.65:38|
+ :skolemid |6|
+ :pattern ( (memory_store64_le memory@@1 index@@5 value@@0))
+)))
+(push 1)
+(declare-fun ControlFlow (Int Int) Int)
+(set-info :boogie-vc-id rely_transitive_split0)
+(set-option :timeout 0)
+(set-option :rlimit 0)
+(assert (not
+ (=> (= (ControlFlow 0 0) 1) true)
+))
+(check-sat)
+(pop 1)
+; Valid
+(get-info :rlimit)
+(reset)
+(set-option :print-success false)
+(set-info :smt-lib-version 2.6)
+(set-option :smt.mbqi false)
+(set-option :model.compact false)
+(set-option :model.v2 true)
+(set-option :pp.bv_literals false)
+; done setting options
+
+
+(declare-fun tickleBool (Bool) Bool)
+(assert (and (tickleBool true) (tickleBool false)))
+(declare-fun gamma_store64 ((Array (_ BitVec 64) Bool) (_ BitVec 64) Bool) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#0| ((_ BitVec 64) (_ BitVec 64) Bool (Array (_ BitVec 64) Bool)) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#1| ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (Array (_ BitVec 64) (_ BitVec 8))) (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun memory_load64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 64))
+(declare-fun gamma_load64 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load32 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load8 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun $text_addr () (_ BitVec 64))
+(declare-fun $copiedtext_addr () (_ BitVec 64))
+(declare-fun memory_load8_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 8))
+(declare-fun memory_store64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64) (_ BitVec 64)) (Array (_ BitVec 64) (_ BitVec 8)))
+(assert (forall ((gammaMap (Array (_ BitVec 64) Bool)) (index (_ BitVec 64)) (value Bool) ) (! (= (gamma_store64 gammaMap index value) (|lambda#0| index #x0000000000000008 value gammaMap))
+ :qid |examplebpl.49:34|
+ :skolemid |3|
+ :pattern ( (gamma_store64 gammaMap index value))
+)))
+(assert (forall ((|l#0| (_ BitVec 64)) (|l#1| (_ BitVec 64)) (|l#2| (_ BitVec 64)) (|l#3| (_ BitVec 64)) (|l#4| (Array (_ BitVec 64) (_ BitVec 8))) (i (_ BitVec 64)) ) (! (= (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i) (ite (ite (bvule |l#0| (bvadd |l#0| |l#1|))  (and (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))  (or (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))) ((_ extract 7 0) (bvlshr |l#2| (bvmul (bvsub i |l#3|) #x0000000000000008))) (select |l#4| i)))
+ :qid |examplebpl.65:57|
+ :skolemid |11|
+ :pattern ( (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i))
+)))
+(assert (forall ((memory (Array (_ BitVec 64) (_ BitVec 8))) (index@@0 (_ BitVec 64)) ) (! (= (memory_load64_le memory index@@0) (concat (select memory (bvadd index@@0 #x0000000000000007)) (concat (select memory (bvadd index@@0 #x0000000000000006)) (concat (select memory (bvadd index@@0 #x0000000000000005)) (concat (select memory (bvadd index@@0 #x0000000000000004)) (concat (select memory (bvadd index@@0 #x0000000000000003)) (concat (select memory (bvadd index@@0 #x0000000000000002)) (concat (select memory (bvadd index@@0 #x0000000000000001)) (select memory index@@0)))))))))
+ :qid |examplebpl.57:37|
+ :skolemid |4|
+ :pattern ( (memory_load64_le memory index@@0))
+)))
+(assert (forall ((|l#0@@0| (_ BitVec 64)) (|l#1@@0| (_ BitVec 64)) (|l#2@@0| Bool) (|l#3@@0| (Array (_ BitVec 64) Bool)) (i@@0 (_ BitVec 64)) ) (! (= (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0) (ite (ite (bvule |l#0@@0| (bvadd |l#0@@0| |l#1@@0|))  (and (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))  (or (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))) |l#2@@0| (select |l#3@@0| i@@0)))
+ :qid |examplebpl.49:56|
+ :skolemid |10|
+ :pattern ( (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0))
+)))
+(assert (forall ((gammaMap@@0 (Array (_ BitVec 64) Bool)) (index@@1 (_ BitVec 64)) ) (! (= (gamma_load64 gammaMap@@0 index@@1)  (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000007)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000006)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000005)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000004)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000003)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000002)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000001)) (select gammaMap@@0 index@@1)))))))))
+ :qid |examplebpl.41:33|
+ :skolemid |1|
+ :pattern ( (gamma_load64 gammaMap@@0 index@@1))
+)))
+(assert (forall ((gammaMap@@1 (Array (_ BitVec 64) Bool)) (index@@2 (_ BitVec 64)) ) (! (= (gamma_load32 gammaMap@@1 index@@2)  (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000003)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000002)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000001)) (select gammaMap@@1 index@@2)))))
+ :qid |examplebpl.37:33|
+ :skolemid |0|
+ :pattern ( (gamma_load32 gammaMap@@1 index@@2))
+)))
+(assert (forall ((gammaMap@@2 (Array (_ BitVec 64) Bool)) (index@@3 (_ BitVec 64)) ) (! (= (gamma_load8 gammaMap@@2 index@@3) (select gammaMap@@2 index@@3))
+ :qid |examplebpl.45:32|
+ :skolemid |2|
+ :pattern ( (gamma_load8 gammaMap@@2 index@@3))
+)))
+(assert (= $text_addr #x0000000000020048))
+(assert (= $copiedtext_addr #x0000000000020060))
+(assert (forall ((memory@@0 (Array (_ BitVec 64) (_ BitVec 8))) (index@@4 (_ BitVec 64)) ) (! (= (memory_load8_le memory@@0 index@@4) (select memory@@0 index@@4))
+ :qid |examplebpl.61:36|
+ :skolemid |5|
+ :pattern ( (memory_load8_le memory@@0 index@@4))
+)))
+(assert (forall ((memory@@1 (Array (_ BitVec 64) (_ BitVec 8))) (index@@5 (_ BitVec 64)) (value@@0 (_ BitVec 64)) ) (! (= (memory_store64_le memory@@1 index@@5 value@@0) (|lambda#1| index@@5 #x0000000000000008 value@@0 index@@5 memory@@1))
+ :qid |examplebpl.65:38|
+ :skolemid |6|
+ :pattern ( (memory_store64_le memory@@1 index@@5 value@@0))
+)))
+; Valid
+
+(push 1)
+(declare-fun ControlFlow (Int Int) Int)
+(declare-fun mem@0 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun mem () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun Gamma_mem@0 () (Array (_ BitVec 64) Bool))
+(declare-fun Gamma_mem () (Array (_ BitVec 64) Bool))
+(declare-fun mem@1 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun Gamma_mem@1 () (Array (_ BitVec 64) Bool))
+(set-info :boogie-vc-id rely_transitive_split1)
+(set-option :timeout 0)
+(set-option :rlimit 0)
+(assert (not
+ (=> (= (ControlFlow 0 0) 3) (let ((anon0_correct  (=> (= mem@0 mem) (=> (and (and (= Gamma_mem@0 Gamma_mem) (= (memory_load8_le mem@0 #x0000000000000884) #x01)) (and (= (memory_load8_le mem@0 #x0000000000000885) #x00) (= (memory_load8_le mem@0 #x0000000000000886) #x02))) (=> (and (and (and (= (memory_load8_le mem@0 #x0000000000000887) #x00) (= (memory_load8_le mem@0 #x000000000001fdc8) #x10)) (and (= (memory_load8_le mem@0 #x000000000001fdc9) #x08) (= (memory_load8_le mem@0 #x000000000001fdca) #x00))) (and (and (= (memory_load8_le mem@0 #x000000000001fdcb) #x00) (= (memory_load8_le mem@0 #x000000000001fdcc) #x00)) (and (= (memory_load8_le mem@0 #x000000000001fdcd) #x00) (= (memory_load8_le mem@0 #x000000000001fdce) #x00)))) (=> (and (and (and (and (and (and (= (memory_load8_le mem@0 #x000000000001fdcf) #x00) (= (memory_load8_le mem@0 #x000000000001fdd0) #xc0)) (and (= (memory_load8_le mem@0 #x000000000001fdd1) #x07) (= (memory_load8_le mem@0 #x000000000001fdd2) #x00))) (and (and (= (memory_load8_le mem@0 #x000000000001fdd3) #x00) (= (memory_load8_le mem@0 #x000000000001fdd4) #x00)) (and (= (memory_load8_le mem@0 #x000000000001fdd5) #x00) (= (memory_load8_le mem@0 #x000000000001fdd6) #x00)))) (and (and (and (= (memory_load8_le mem@0 #x000000000001fdd7) #x00) (= (memory_load8_le mem@0 #x000000000001ffd8) #x14)) (and (= (memory_load8_le mem@0 #x000000000001ffd9) #x08) (= (memory_load8_le mem@0 #x000000000001ffda) #x00))) (and (and (= (memory_load8_le mem@0 #x000000000001ffdb) #x00) (= (memory_load8_le mem@0 #x000000000001ffdc) #x00)) (and (= (memory_load8_le mem@0 #x000000000001ffdd) #x00) (= (memory_load8_le mem@0 #x000000000001ffde) #x00))))) (and (and (and (and (= (memory_load8_le mem@0 #x000000000001ffdf) #x00) (= (memory_load8_le mem@0 #x0000000000020040) #x40)) (and (= (memory_load8_le mem@0 #x0000000000020041) #x00) (= (memory_load8_le mem@0 #x0000000000020042) #x02))) (and (and (= (memory_load8_le mem@0 #x0000000000020043) #x00) (= (memory_load8_le mem@0 #x0000000000020044) #x00)) (and (= (memory_load8_le mem@0 #x0000000000020045) #x00) (= (memory_load8_le mem@0 #x0000000000020046) #x00)))) (and (and (and (= (memory_load8_le mem@0 #x0000000000020047) #x00) (= mem@1 mem@0)) (and (= Gamma_mem@1 Gamma_mem@0) (= (memory_load8_le mem@1 #x0000000000000884) #x01))) (and (and (= (memory_load8_le mem@1 #x0000000000000885) #x00) (= (memory_load8_le mem@1 #x0000000000000886) #x02)) (and (= (memory_load8_le mem@1 #x0000000000000887) #x00) (= (memory_load8_le mem@1 #x000000000001fdc8) #x10)))))) (and (and (and (and (and (= (memory_load8_le mem@1 #x000000000001fdc9) #x08) (= (memory_load8_le mem@1 #x000000000001fdca) #x00)) (and (= (memory_load8_le mem@1 #x000000000001fdcb) #x00) (= (memory_load8_le mem@1 #x000000000001fdcc) #x00))) (and (and (= (memory_load8_le mem@1 #x000000000001fdcd) #x00) (= (memory_load8_le mem@1 #x000000000001fdce) #x00)) (and (= (memory_load8_le mem@1 #x000000000001fdcf) #x00) (= (memory_load8_le mem@1 #x000000000001fdd0) #xc0)))) (and (and (and (= (memory_load8_le mem@1 #x000000000001fdd1) #x07) (= (memory_load8_le mem@1 #x000000000001fdd2) #x00)) (and (= (memory_load8_le mem@1 #x000000000001fdd3) #x00) (= (memory_load8_le mem@1 #x000000000001fdd4) #x00))) (and (and (= (memory_load8_le mem@1 #x000000000001fdd5) #x00) (= (memory_load8_le mem@1 #x000000000001fdd6) #x00)) (and (= (memory_load8_le mem@1 #x000000000001fdd7) #x00) (= (memory_load8_le mem@1 #x000000000001ffd8) #x14))))) (and (and (and (and (= (memory_load8_le mem@1 #x000000000001ffd9) #x08) (= (memory_load8_le mem@1 #x000000000001ffda) #x00)) (and (= (memory_load8_le mem@1 #x000000000001ffdb) #x00) (= (memory_load8_le mem@1 #x000000000001ffdc) #x00))) (and (and (= (memory_load8_le mem@1 #x000000000001ffdd) #x00) (= (memory_load8_le mem@1 #x000000000001ffde) #x00)) (and (= (memory_load8_le mem@1 #x000000000001ffdf) #x00) (= (memory_load8_le mem@1 #x0000000000020040) #x40)))) (and (and (and (= (memory_load8_le mem@1 #x0000000000020041) #x00) (= (memory_load8_le mem@1 #x0000000000020042) #x02)) (and (= (memory_load8_le mem@1 #x0000000000020043) #x00) (= (memory_load8_le mem@1 #x0000000000020044) #x00))) (and (and (= (memory_load8_le mem@1 #x0000000000020045) #x00) (= (memory_load8_le mem@1 #x0000000000020046) #x00)) (and (= (memory_load8_le mem@1 #x0000000000020047) #x00) (= (ControlFlow 0 2) (- 0 1)))))))) (= mem@1 mem)))))))
+(let ((PreconditionGeneratedEntry_correct  (=> (= (ControlFlow 0 3) 2) anon0_correct)))
+PreconditionGeneratedEntry_correct)))
+))
+(check-sat)
+(pop 1)
+; Valid
+(get-info :rlimit)
+(reset)
+(set-option :print-success false)
+(set-info :smt-lib-version 2.6)
+(set-option :smt.mbqi false)
+(set-option :model.compact false)
+(set-option :model.v2 true)
+(set-option :pp.bv_literals false)
+; done setting options
+
+
+(declare-fun tickleBool (Bool) Bool)
+(assert (and (tickleBool true) (tickleBool false)))
+(declare-fun gamma_store64 ((Array (_ BitVec 64) Bool) (_ BitVec 64) Bool) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#0| ((_ BitVec 64) (_ BitVec 64) Bool (Array (_ BitVec 64) Bool)) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#1| ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (Array (_ BitVec 64) (_ BitVec 8))) (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun memory_load64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 64))
+(declare-fun gamma_load64 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load32 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load8 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun $text_addr () (_ BitVec 64))
+(declare-fun $copiedtext_addr () (_ BitVec 64))
+(declare-fun memory_load8_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 8))
+(declare-fun memory_store64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64) (_ BitVec 64)) (Array (_ BitVec 64) (_ BitVec 8)))
+(assert (forall ((gammaMap (Array (_ BitVec 64) Bool)) (index (_ BitVec 64)) (value Bool) ) (! (= (gamma_store64 gammaMap index value) (|lambda#0| index #x0000000000000008 value gammaMap))
+ :qid |examplebpl.49:34|
+ :skolemid |3|
+ :pattern ( (gamma_store64 gammaMap index value))
+)))
+(assert (forall ((|l#0| (_ BitVec 64)) (|l#1| (_ BitVec 64)) (|l#2| (_ BitVec 64)) (|l#3| (_ BitVec 64)) (|l#4| (Array (_ BitVec 64) (_ BitVec 8))) (i (_ BitVec 64)) ) (! (= (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i) (ite (ite (bvule |l#0| (bvadd |l#0| |l#1|))  (and (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))  (or (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))) ((_ extract 7 0) (bvlshr |l#2| (bvmul (bvsub i |l#3|) #x0000000000000008))) (select |l#4| i)))
+ :qid |examplebpl.65:57|
+ :skolemid |11|
+ :pattern ( (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i))
+)))
+(assert (forall ((memory (Array (_ BitVec 64) (_ BitVec 8))) (index@@0 (_ BitVec 64)) ) (! (= (memory_load64_le memory index@@0) (concat (select memory (bvadd index@@0 #x0000000000000007)) (concat (select memory (bvadd index@@0 #x0000000000000006)) (concat (select memory (bvadd index@@0 #x0000000000000005)) (concat (select memory (bvadd index@@0 #x0000000000000004)) (concat (select memory (bvadd index@@0 #x0000000000000003)) (concat (select memory (bvadd index@@0 #x0000000000000002)) (concat (select memory (bvadd index@@0 #x0000000000000001)) (select memory index@@0)))))))))
+ :qid |examplebpl.57:37|
+ :skolemid |4|
+ :pattern ( (memory_load64_le memory index@@0))
+)))
+(assert (forall ((|l#0@@0| (_ BitVec 64)) (|l#1@@0| (_ BitVec 64)) (|l#2@@0| Bool) (|l#3@@0| (Array (_ BitVec 64) Bool)) (i@@0 (_ BitVec 64)) ) (! (= (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0) (ite (ite (bvule |l#0@@0| (bvadd |l#0@@0| |l#1@@0|))  (and (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))  (or (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))) |l#2@@0| (select |l#3@@0| i@@0)))
+ :qid |examplebpl.49:56|
+ :skolemid |10|
+ :pattern ( (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0))
+)))
+(assert (forall ((gammaMap@@0 (Array (_ BitVec 64) Bool)) (index@@1 (_ BitVec 64)) ) (! (= (gamma_load64 gammaMap@@0 index@@1)  (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000007)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000006)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000005)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000004)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000003)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000002)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000001)) (select gammaMap@@0 index@@1)))))))))
+ :qid |examplebpl.41:33|
+ :skolemid |1|
+ :pattern ( (gamma_load64 gammaMap@@0 index@@1))
+)))
+(assert (forall ((gammaMap@@1 (Array (_ BitVec 64) Bool)) (index@@2 (_ BitVec 64)) ) (! (= (gamma_load32 gammaMap@@1 index@@2)  (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000003)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000002)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000001)) (select gammaMap@@1 index@@2)))))
+ :qid |examplebpl.37:33|
+ :skolemid |0|
+ :pattern ( (gamma_load32 gammaMap@@1 index@@2))
+)))
+(assert (forall ((gammaMap@@2 (Array (_ BitVec 64) Bool)) (index@@3 (_ BitVec 64)) ) (! (= (gamma_load8 gammaMap@@2 index@@3) (select gammaMap@@2 index@@3))
+ :qid |examplebpl.45:32|
+ :skolemid |2|
+ :pattern ( (gamma_load8 gammaMap@@2 index@@3))
+)))
+(assert (= $text_addr #x0000000000020048))
+(assert (= $copiedtext_addr #x0000000000020060))
+(assert (forall ((memory@@0 (Array (_ BitVec 64) (_ BitVec 8))) (index@@4 (_ BitVec 64)) ) (! (= (memory_load8_le memory@@0 index@@4) (select memory@@0 index@@4))
+ :qid |examplebpl.61:36|
+ :skolemid |5|
+ :pattern ( (memory_load8_le memory@@0 index@@4))
+)))
+(assert (forall ((memory@@1 (Array (_ BitVec 64) (_ BitVec 8))) (index@@5 (_ BitVec 64)) (value@@0 (_ BitVec 64)) ) (! (= (memory_store64_le memory@@1 index@@5 value@@0) (|lambda#1| index@@5 #x0000000000000008 value@@0 index@@5 memory@@1))
+ :qid |examplebpl.65:38|
+ :skolemid |6|
+ :pattern ( (memory_store64_le memory@@1 index@@5 value@@0))
+)))
+; Valid
+
+(push 1)
+(declare-fun ControlFlow (Int Int) Int)
+(declare-fun mem@0 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun mem () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun Gamma_mem@0 () (Array (_ BitVec 64) Bool))
+(declare-fun Gamma_mem () (Array (_ BitVec 64) Bool))
+(declare-fun mem@1 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun Gamma_mem@1 () (Array (_ BitVec 64) Bool))
+(set-info :boogie-vc-id rely_transitive_split2)
+(set-option :timeout 0)
+(set-option :rlimit 0)
+(assert (not
+ (=> (= (ControlFlow 0 0) 3) (let ((anon0_correct  (=> (and (= mem@0 mem) (= Gamma_mem@0 Gamma_mem)) (=> (and (and (= (memory_load8_le mem@0 #x0000000000000884) #x01) (= (memory_load8_le mem@0 #x0000000000000885) #x00)) (and (= (memory_load8_le mem@0 #x0000000000000886) #x02) (= (memory_load8_le mem@0 #x0000000000000887) #x00))) (=> (and (and (and (= (memory_load8_le mem@0 #x000000000001fdc8) #x10) (= (memory_load8_le mem@0 #x000000000001fdc9) #x08)) (and (= (memory_load8_le mem@0 #x000000000001fdca) #x00) (= (memory_load8_le mem@0 #x000000000001fdcb) #x00))) (and (and (= (memory_load8_le mem@0 #x000000000001fdcc) #x00) (= (memory_load8_le mem@0 #x000000000001fdcd) #x00)) (and (= (memory_load8_le mem@0 #x000000000001fdce) #x00) (= (memory_load8_le mem@0 #x000000000001fdcf) #x00)))) (=> (and (and (and (and (and (and (= (memory_load8_le mem@0 #x000000000001fdd0) #xc0) (= (memory_load8_le mem@0 #x000000000001fdd1) #x07)) (and (= (memory_load8_le mem@0 #x000000000001fdd2) #x00) (= (memory_load8_le mem@0 #x000000000001fdd3) #x00))) (and (and (= (memory_load8_le mem@0 #x000000000001fdd4) #x00) (= (memory_load8_le mem@0 #x000000000001fdd5) #x00)) (and (= (memory_load8_le mem@0 #x000000000001fdd6) #x00) (= (memory_load8_le mem@0 #x000000000001fdd7) #x00)))) (and (and (and (= (memory_load8_le mem@0 #x000000000001ffd8) #x14) (= (memory_load8_le mem@0 #x000000000001ffd9) #x08)) (and (= (memory_load8_le mem@0 #x000000000001ffda) #x00) (= (memory_load8_le mem@0 #x000000000001ffdb) #x00))) (and (and (= (memory_load8_le mem@0 #x000000000001ffdc) #x00) (= (memory_load8_le mem@0 #x000000000001ffdd) #x00)) (and (= (memory_load8_le mem@0 #x000000000001ffde) #x00) (= (memory_load8_le mem@0 #x000000000001ffdf) #x00))))) (and (and (and (and (= (memory_load8_le mem@0 #x0000000000020040) #x40) (= (memory_load8_le mem@0 #x0000000000020041) #x00)) (and (= (memory_load8_le mem@0 #x0000000000020042) #x02) (= (memory_load8_le mem@0 #x0000000000020043) #x00))) (and (and (= (memory_load8_le mem@0 #x0000000000020044) #x00) (= (memory_load8_le mem@0 #x0000000000020045) #x00)) (and (= (memory_load8_le mem@0 #x0000000000020046) #x00) (= (memory_load8_le mem@0 #x0000000000020047) #x00)))) (and (and (and (= mem@1 mem@0) (= Gamma_mem@1 Gamma_mem@0)) (and (= (memory_load8_le mem@1 #x0000000000000884) #x01) (= (memory_load8_le mem@1 #x0000000000000885) #x00))) (and (and (= (memory_load8_le mem@1 #x0000000000000886) #x02) (= (memory_load8_le mem@1 #x0000000000000887) #x00)) (and (= (memory_load8_le mem@1 #x000000000001fdc8) #x10) (= (memory_load8_le mem@1 #x000000000001fdc9) #x08)))))) (and (and (and (and (and (= (memory_load8_le mem@1 #x000000000001fdca) #x00) (= (memory_load8_le mem@1 #x000000000001fdcb) #x00)) (and (= (memory_load8_le mem@1 #x000000000001fdcc) #x00) (= (memory_load8_le mem@1 #x000000000001fdcd) #x00))) (and (and (= (memory_load8_le mem@1 #x000000000001fdce) #x00) (= (memory_load8_le mem@1 #x000000000001fdcf) #x00)) (and (= (memory_load8_le mem@1 #x000000000001fdd0) #xc0) (= (memory_load8_le mem@1 #x000000000001fdd1) #x07)))) (and (and (and (= (memory_load8_le mem@1 #x000000000001fdd2) #x00) (= (memory_load8_le mem@1 #x000000000001fdd3) #x00)) (and (= (memory_load8_le mem@1 #x000000000001fdd4) #x00) (= (memory_load8_le mem@1 #x000000000001fdd5) #x00))) (and (and (= (memory_load8_le mem@1 #x000000000001fdd6) #x00) (= (memory_load8_le mem@1 #x000000000001fdd7) #x00)) (and (= (memory_load8_le mem@1 #x000000000001ffd8) #x14) (= (memory_load8_le mem@1 #x000000000001ffd9) #x08))))) (and (and (and (and (= (memory_load8_le mem@1 #x000000000001ffda) #x00) (= (memory_load8_le mem@1 #x000000000001ffdb) #x00)) (and (= (memory_load8_le mem@1 #x000000000001ffdc) #x00) (= (memory_load8_le mem@1 #x000000000001ffdd) #x00))) (and (and (= (memory_load8_le mem@1 #x000000000001ffde) #x00) (= (memory_load8_le mem@1 #x000000000001ffdf) #x00)) (and (= (memory_load8_le mem@1 #x0000000000020040) #x40) (= (memory_load8_le mem@1 #x0000000000020041) #x00)))) (and (and (and (= (memory_load8_le mem@1 #x0000000000020042) #x02) (= (memory_load8_le mem@1 #x0000000000020043) #x00)) (and (= (memory_load8_le mem@1 #x0000000000020044) #x00) (= (memory_load8_le mem@1 #x0000000000020045) #x00))) (and (and (= (memory_load8_le mem@1 #x0000000000020046) #x00) (= (memory_load8_le mem@1 #x0000000000020047) #x00)) (and (= mem@1 mem) (= (ControlFlow 0 2) (- 0 1)))))))) (= Gamma_mem@1 Gamma_mem)))))))
+(let ((PreconditionGeneratedEntry_correct  (=> (= (ControlFlow 0 3) 2) anon0_correct)))
+PreconditionGeneratedEntry_correct)))
+))
+(check-sat)
+(pop 1)
+; Valid
+(get-info :rlimit)
+(reset)
+(set-option :print-success false)
+(set-info :smt-lib-version 2.6)
+(set-option :smt.mbqi false)
+(set-option :model.compact false)
+(set-option :model.v2 true)
+(set-option :pp.bv_literals false)
+; done setting options
+
+
+(declare-fun tickleBool (Bool) Bool)
+(assert (and (tickleBool true) (tickleBool false)))
+(declare-fun gamma_store64 ((Array (_ BitVec 64) Bool) (_ BitVec 64) Bool) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#0| ((_ BitVec 64) (_ BitVec 64) Bool (Array (_ BitVec 64) Bool)) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#1| ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (Array (_ BitVec 64) (_ BitVec 8))) (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun memory_load64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 64))
+(declare-fun gamma_load64 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load32 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load8 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun $text_addr () (_ BitVec 64))
+(declare-fun $copiedtext_addr () (_ BitVec 64))
+(declare-fun memory_load8_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 8))
+(declare-fun memory_store64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64) (_ BitVec 64)) (Array (_ BitVec 64) (_ BitVec 8)))
+(assert (forall ((gammaMap (Array (_ BitVec 64) Bool)) (index (_ BitVec 64)) (value Bool) ) (! (= (gamma_store64 gammaMap index value) (|lambda#0| index #x0000000000000008 value gammaMap))
+ :qid |examplebpl.49:34|
+ :skolemid |3|
+ :pattern ( (gamma_store64 gammaMap index value))
+)))
+(assert (forall ((|l#0| (_ BitVec 64)) (|l#1| (_ BitVec 64)) (|l#2| (_ BitVec 64)) (|l#3| (_ BitVec 64)) (|l#4| (Array (_ BitVec 64) (_ BitVec 8))) (i (_ BitVec 64)) ) (! (= (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i) (ite (ite (bvule |l#0| (bvadd |l#0| |l#1|))  (and (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))  (or (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))) ((_ extract 7 0) (bvlshr |l#2| (bvmul (bvsub i |l#3|) #x0000000000000008))) (select |l#4| i)))
+ :qid |examplebpl.65:57|
+ :skolemid |11|
+ :pattern ( (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i))
+)))
+(assert (forall ((memory (Array (_ BitVec 64) (_ BitVec 8))) (index@@0 (_ BitVec 64)) ) (! (= (memory_load64_le memory index@@0) (concat (select memory (bvadd index@@0 #x0000000000000007)) (concat (select memory (bvadd index@@0 #x0000000000000006)) (concat (select memory (bvadd index@@0 #x0000000000000005)) (concat (select memory (bvadd index@@0 #x0000000000000004)) (concat (select memory (bvadd index@@0 #x0000000000000003)) (concat (select memory (bvadd index@@0 #x0000000000000002)) (concat (select memory (bvadd index@@0 #x0000000000000001)) (select memory index@@0)))))))))
+ :qid |examplebpl.57:37|
+ :skolemid |4|
+ :pattern ( (memory_load64_le memory index@@0))
+)))
+(assert (forall ((|l#0@@0| (_ BitVec 64)) (|l#1@@0| (_ BitVec 64)) (|l#2@@0| Bool) (|l#3@@0| (Array (_ BitVec 64) Bool)) (i@@0 (_ BitVec 64)) ) (! (= (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0) (ite (ite (bvule |l#0@@0| (bvadd |l#0@@0| |l#1@@0|))  (and (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))  (or (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))) |l#2@@0| (select |l#3@@0| i@@0)))
+ :qid |examplebpl.49:56|
+ :skolemid |10|
+ :pattern ( (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0))
+)))
+(assert (forall ((gammaMap@@0 (Array (_ BitVec 64) Bool)) (index@@1 (_ BitVec 64)) ) (! (= (gamma_load64 gammaMap@@0 index@@1)  (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000007)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000006)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000005)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000004)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000003)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000002)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000001)) (select gammaMap@@0 index@@1)))))))))
+ :qid |examplebpl.41:33|
+ :skolemid |1|
+ :pattern ( (gamma_load64 gammaMap@@0 index@@1))
+)))
+(assert (forall ((gammaMap@@1 (Array (_ BitVec 64) Bool)) (index@@2 (_ BitVec 64)) ) (! (= (gamma_load32 gammaMap@@1 index@@2)  (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000003)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000002)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000001)) (select gammaMap@@1 index@@2)))))
+ :qid |examplebpl.37:33|
+ :skolemid |0|
+ :pattern ( (gamma_load32 gammaMap@@1 index@@2))
+)))
+(assert (forall ((gammaMap@@2 (Array (_ BitVec 64) Bool)) (index@@3 (_ BitVec 64)) ) (! (= (gamma_load8 gammaMap@@2 index@@3) (select gammaMap@@2 index@@3))
+ :qid |examplebpl.45:32|
+ :skolemid |2|
+ :pattern ( (gamma_load8 gammaMap@@2 index@@3))
+)))
+(assert (= $text_addr #x0000000000020048))
+(assert (= $copiedtext_addr #x0000000000020060))
+(assert (forall ((memory@@0 (Array (_ BitVec 64) (_ BitVec 8))) (index@@4 (_ BitVec 64)) ) (! (= (memory_load8_le memory@@0 index@@4) (select memory@@0 index@@4))
+ :qid |examplebpl.61:36|
+ :skolemid |5|
+ :pattern ( (memory_load8_le memory@@0 index@@4))
+)))
+(assert (forall ((memory@@1 (Array (_ BitVec 64) (_ BitVec 8))) (index@@5 (_ BitVec 64)) (value@@0 (_ BitVec 64)) ) (! (= (memory_store64_le memory@@1 index@@5 value@@0) (|lambda#1| index@@5 #x0000000000000008 value@@0 index@@5 memory@@1))
+ :qid |examplebpl.65:38|
+ :skolemid |6|
+ :pattern ( (memory_store64_le memory@@1 index@@5 value@@0))
+)))
+; Valid
+
+(push 1)
+(declare-fun ControlFlow (Int Int) Int)
+(set-info :boogie-vc-id main_split0)
+(set-option :timeout 0)
+(set-option :rlimit 0)
+(assert (not
+ (=> (= (ControlFlow 0 0) 1) true)
+))
+(check-sat)
+(pop 1)
+; Valid
+(get-info :rlimit)
+(reset)
+(set-option :print-success false)
+(set-info :smt-lib-version 2.6)
+(set-option :smt.mbqi false)
+(set-option :model.compact false)
+(set-option :model.v2 true)
+(set-option :pp.bv_literals false)
+; done setting options
+
+
+(declare-fun tickleBool (Bool) Bool)
+(assert (and (tickleBool true) (tickleBool false)))
+(declare-fun gamma_store64 ((Array (_ BitVec 64) Bool) (_ BitVec 64) Bool) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#0| ((_ BitVec 64) (_ BitVec 64) Bool (Array (_ BitVec 64) Bool)) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#1| ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (Array (_ BitVec 64) (_ BitVec 8))) (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun memory_load64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 64))
+(declare-fun gamma_load64 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load32 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load8 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun $text_addr () (_ BitVec 64))
+(declare-fun $copiedtext_addr () (_ BitVec 64))
+(declare-fun memory_load8_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 8))
+(declare-fun memory_store64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64) (_ BitVec 64)) (Array (_ BitVec 64) (_ BitVec 8)))
+(assert (forall ((gammaMap (Array (_ BitVec 64) Bool)) (index (_ BitVec 64)) (value Bool) ) (! (= (gamma_store64 gammaMap index value) (|lambda#0| index #x0000000000000008 value gammaMap))
+ :qid |examplebpl.49:34|
+ :skolemid |3|
+ :pattern ( (gamma_store64 gammaMap index value))
+)))
+(assert (forall ((|l#0| (_ BitVec 64)) (|l#1| (_ BitVec 64)) (|l#2| (_ BitVec 64)) (|l#3| (_ BitVec 64)) (|l#4| (Array (_ BitVec 64) (_ BitVec 8))) (i (_ BitVec 64)) ) (! (= (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i) (ite (ite (bvule |l#0| (bvadd |l#0| |l#1|))  (and (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))  (or (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))) ((_ extract 7 0) (bvlshr |l#2| (bvmul (bvsub i |l#3|) #x0000000000000008))) (select |l#4| i)))
+ :qid |examplebpl.65:57|
+ :skolemid |11|
+ :pattern ( (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i))
+)))
+(assert (forall ((memory (Array (_ BitVec 64) (_ BitVec 8))) (index@@0 (_ BitVec 64)) ) (! (= (memory_load64_le memory index@@0) (concat (select memory (bvadd index@@0 #x0000000000000007)) (concat (select memory (bvadd index@@0 #x0000000000000006)) (concat (select memory (bvadd index@@0 #x0000000000000005)) (concat (select memory (bvadd index@@0 #x0000000000000004)) (concat (select memory (bvadd index@@0 #x0000000000000003)) (concat (select memory (bvadd index@@0 #x0000000000000002)) (concat (select memory (bvadd index@@0 #x0000000000000001)) (select memory index@@0)))))))))
+ :qid |examplebpl.57:37|
+ :skolemid |4|
+ :pattern ( (memory_load64_le memory index@@0))
+)))
+(assert (forall ((|l#0@@0| (_ BitVec 64)) (|l#1@@0| (_ BitVec 64)) (|l#2@@0| Bool) (|l#3@@0| (Array (_ BitVec 64) Bool)) (i@@0 (_ BitVec 64)) ) (! (= (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0) (ite (ite (bvule |l#0@@0| (bvadd |l#0@@0| |l#1@@0|))  (and (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))  (or (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))) |l#2@@0| (select |l#3@@0| i@@0)))
+ :qid |examplebpl.49:56|
+ :skolemid |10|
+ :pattern ( (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0))
+)))
+(assert (forall ((gammaMap@@0 (Array (_ BitVec 64) Bool)) (index@@1 (_ BitVec 64)) ) (! (= (gamma_load64 gammaMap@@0 index@@1)  (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000007)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000006)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000005)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000004)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000003)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000002)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000001)) (select gammaMap@@0 index@@1)))))))))
+ :qid |examplebpl.41:33|
+ :skolemid |1|
+ :pattern ( (gamma_load64 gammaMap@@0 index@@1))
+)))
+(assert (forall ((gammaMap@@1 (Array (_ BitVec 64) Bool)) (index@@2 (_ BitVec 64)) ) (! (= (gamma_load32 gammaMap@@1 index@@2)  (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000003)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000002)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000001)) (select gammaMap@@1 index@@2)))))
+ :qid |examplebpl.37:33|
+ :skolemid |0|
+ :pattern ( (gamma_load32 gammaMap@@1 index@@2))
+)))
+(assert (forall ((gammaMap@@2 (Array (_ BitVec 64) Bool)) (index@@3 (_ BitVec 64)) ) (! (= (gamma_load8 gammaMap@@2 index@@3) (select gammaMap@@2 index@@3))
+ :qid |examplebpl.45:32|
+ :skolemid |2|
+ :pattern ( (gamma_load8 gammaMap@@2 index@@3))
+)))
+(assert (= $text_addr #x0000000000020048))
+(assert (= $copiedtext_addr #x0000000000020060))
+(assert (forall ((memory@@0 (Array (_ BitVec 64) (_ BitVec 8))) (index@@4 (_ BitVec 64)) ) (! (= (memory_load8_le memory@@0 index@@4) (select memory@@0 index@@4))
+ :qid |examplebpl.61:36|
+ :skolemid |5|
+ :pattern ( (memory_load8_le memory@@0 index@@4))
+)))
+(assert (forall ((memory@@1 (Array (_ BitVec 64) (_ BitVec 8))) (index@@5 (_ BitVec 64)) (value@@0 (_ BitVec 64)) ) (! (= (memory_store64_le memory@@1 index@@5 value@@0) (|lambda#1| index@@5 #x0000000000000008 value@@0 index@@5 memory@@1))
+ :qid |examplebpl.65:38|
+ :skolemid |6|
+ :pattern ( (memory_store64_le memory@@1 index@@5 value@@0))
+)))
+; Valid
+
+(push 1)
+(declare-fun ControlFlow (Int Int) Int)
+(declare-fun |#4@0| () (_ BitVec 64))
+(declare-fun R31 () (_ BitVec 64))
+(declare-fun stack@0 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun stack () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun R29 () (_ BitVec 64))
+(declare-fun Gamma_stack@0 () (Array (_ BitVec 64) Bool))
+(declare-fun Gamma_stack () (Array (_ BitVec 64) Bool))
+(declare-fun Gamma_R29 () Bool)
+(declare-fun stack@1 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun R30 () (_ BitVec 64))
+(declare-fun Gamma_stack@1 () (Array (_ BitVec 64) Bool))
+(declare-fun Gamma_R30 () Bool)
+(declare-fun stack@2 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun Gamma_stack@2 () (Array (_ BitVec 64) Bool))
+(declare-fun stack@3 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun Gamma_stack@3 () (Array (_ BitVec 64) Bool))
+(declare-fun R0@0 () (_ BitVec 64))
+(declare-fun Gamma_R0@0 () Bool)
+(declare-fun R0@1 () (_ BitVec 64))
+(declare-fun mem () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun malloc_count () Int)
+(set-info :boogie-vc-id main_split1)
+(set-option :timeout 0)
+(set-option :rlimit 0)
+(assert (not
+ (=> (= (ControlFlow 0 0) 3) (let ((lmain_correct  (=> (= |#4@0| (bvadd R31 #xffffffffffffffe0)) (=> (and (= stack@0 (memory_store64_le stack |#4@0| R29)) (= Gamma_stack@0 (gamma_store64 Gamma_stack |#4@0| Gamma_R29))) (=> (and (and (and (and (= stack@1 (memory_store64_le stack@0 (bvadd |#4@0| #x0000000000000008) R30)) (= Gamma_stack@1 (gamma_store64 Gamma_stack@0 (bvadd |#4@0| #x0000000000000008) Gamma_R30))) (and (= stack@2 (memory_store64_le stack@1 (bvadd |#4@0| #x0000000000000018) #x0000000000000000)) (= Gamma_stack@2 (gamma_store64 Gamma_stack@1 (bvadd |#4@0| #x0000000000000018) true)))) (and (and (= stack@3 (memory_store64_le stack@2 (bvadd |#4@0| #x0000000000000010) #x0000000000000000)) (= Gamma_stack@3 (gamma_store64 Gamma_stack@2 (bvadd |#4@0| #x0000000000000010) true))) (and (= R0@0 (bvadd #x0000000000020000 #x0000000000000048)) (= Gamma_R0@0 true)))) (and (and (and (forall ((i@@1 (_ BitVec 64)) ) (!  (=> (and (bvule R0@0 i@@1) (bvult i@@1 (bvadd R0@0 R0@1))) (not (= (select mem i@@1) #x00)))
+ :qid |examplebpl.483:19|
+ :skolemid |9|
+)) (= (memory_load8_le mem (bvadd R0@0 R0@1)) #x00)) (and (bvult R0@0 (bvadd (bvadd R0@0 R0@1) #x0000000000000001)) (= (memory_load8_le mem #x0000000000000884) #x01))) (and (and (= (memory_load8_le mem #x0000000000000885) #x00) (= (memory_load8_le mem #x0000000000000886) #x02)) (and (= (memory_load8_le mem #x0000000000000887) #x00) (= (memory_load8_le mem #x000000000001fdc8) #x10))))) (=> (and (and (and (and (and (= (memory_load8_le mem #x000000000001fdc9) #x08) (= (memory_load8_le mem #x000000000001fdca) #x00)) (and (= (memory_load8_le mem #x000000000001fdcb) #x00) (= (memory_load8_le mem #x000000000001fdcc) #x00))) (and (and (= (memory_load8_le mem #x000000000001fdcd) #x00) (= (memory_load8_le mem #x000000000001fdce) #x00)) (and (= (memory_load8_le mem #x000000000001fdcf) #x00) (= (memory_load8_le mem #x000000000001fdd0) #xc0)))) (and (and (and (= (memory_load8_le mem #x000000000001fdd1) #x07) (= (memory_load8_le mem #x000000000001fdd2) #x00)) (and (= (memory_load8_le mem #x000000000001fdd3) #x00) (= (memory_load8_le mem #x000000000001fdd4) #x00))) (and (and (= (memory_load8_le mem #x000000000001fdd5) #x00) (= (memory_load8_le mem #x000000000001fdd6) #x00)) (and (= (memory_load8_le mem #x000000000001fdd7) #x00) (= (memory_load8_le mem #x000000000001ffd8) #x14))))) (and (and (and (and (= (memory_load8_le mem #x000000000001ffd9) #x08) (= (memory_load8_le mem #x000000000001ffda) #x00)) (and (= (memory_load8_le mem #x000000000001ffdb) #x00) (= (memory_load8_le mem #x000000000001ffdc) #x00))) (and (and (= (memory_load8_le mem #x000000000001ffdd) #x00) (= (memory_load8_le mem #x000000000001ffde) #x00)) (and (= (memory_load8_le mem #x000000000001ffdf) #x00) (= (memory_load8_le mem #x0000000000020040) #x40)))) (and (and (and (= (memory_load8_le mem #x0000000000020041) #x00) (= (memory_load8_le mem #x0000000000020042) #x02)) (and (= (memory_load8_le mem #x0000000000020043) #x00) (= (memory_load8_le mem #x0000000000020044) #x00))) (and (and (= (memory_load8_le mem #x0000000000020045) #x00) (= (memory_load8_le mem #x0000000000020046) #x00)) (and (= (memory_load8_le mem #x0000000000020047) #x00) (= (ControlFlow 0 2) (- 0 1))))))) (= R0@1 #x000000000000000d)))))))
+(let ((PreconditionGeneratedEntry_correct  (=> (= malloc_count 0) (=> (and (and (= R31 #x0000000000000064) (= (memory_load8_le mem #x0000000000020038) #x00)) (and (= (memory_load8_le mem #x0000000000020039) #x00) (= (memory_load8_le mem #x000000000002003a) #x00))) (=> (and (and (and (and (and (and (= (memory_load8_le mem #x000000000002003b) #x00) (= (memory_load8_le mem #x000000000002003c) #x00)) (and (= (memory_load8_le mem #x000000000002003d) #x00) (= (memory_load8_le mem #x000000000002003e) #x00))) (and (and (= (memory_load8_le mem #x000000000002003f) #x00) (= (memory_load8_le mem #x0000000000020040) #x40)) (and (= (memory_load8_le mem #x0000000000020041) #x00) (= (memory_load8_le mem #x0000000000020042) #x02)))) (and (and (and (= (memory_load8_le mem #x0000000000020043) #x00) (= (memory_load8_le mem #x0000000000020044) #x00)) (and (= (memory_load8_le mem #x0000000000020045) #x00) (= (memory_load8_le mem #x0000000000020046) #x00))) (and (and (= (memory_load8_le mem #x0000000000020047) #x00) (= (memory_load8_le mem #x0000000000020048) #x42)) (and (= (memory_load8_le mem #x0000000000020049) #x41) (= (memory_load8_le mem #x000000000002004a) #x53))))) (and (and (and (and (= (memory_load8_le mem #x000000000002004b) #x49) (= (memory_load8_le mem #x000000000002004c) #x4c)) (and (= (memory_load8_le mem #x000000000002004d) #x20) (= (memory_load8_le mem #x000000000002004e) #x56))) (and (and (= (memory_load8_le mem #x000000000002004f) #x65) (= (memory_load8_le mem #x0000000000020050) #x72)) (and (= (memory_load8_le mem #x0000000000020051) #x69) (= (memory_load8_le mem #x0000000000020052) #x66)))) (and (and (and (= (memory_load8_le mem #x0000000000020053) #x69) (= (memory_load8_le mem #x0000000000020054) #x65)) (and (= (memory_load8_le mem #x0000000000020055) #x72) (= (memory_load8_le mem #x0000000000000884) #x01))) (and (and (= (memory_load8_le mem #x0000000000000885) #x00) (= (memory_load8_le mem #x0000000000000886) #x02)) (and (= (memory_load8_le mem #x0000000000000887) #x00) (= (memory_load8_le mem #x000000000001fdc8) #x10)))))) (and (and (and (and (and (= (memory_load8_le mem #x000000000001fdc9) #x08) (= (memory_load8_le mem #x000000000001fdca) #x00)) (and (= (memory_load8_le mem #x000000000001fdcb) #x00) (= (memory_load8_le mem #x000000000001fdcc) #x00))) (and (and (= (memory_load8_le mem #x000000000001fdcd) #x00) (= (memory_load8_le mem #x000000000001fdce) #x00)) (and (= (memory_load8_le mem #x000000000001fdcf) #x00) (= (memory_load8_le mem #x000000000001fdd0) #xc0)))) (and (and (and (= (memory_load8_le mem #x000000000001fdd1) #x07) (= (memory_load8_le mem #x000000000001fdd2) #x00)) (and (= (memory_load8_le mem #x000000000001fdd3) #x00) (= (memory_load8_le mem #x000000000001fdd4) #x00))) (and (and (= (memory_load8_le mem #x000000000001fdd5) #x00) (= (memory_load8_le mem #x000000000001fdd6) #x00)) (and (= (memory_load8_le mem #x000000000001fdd7) #x00) (= (memory_load8_le mem #x000000000001ffd8) #x14))))) (and (and (and (and (= (memory_load8_le mem #x000000000001ffd9) #x08) (= (memory_load8_le mem #x000000000001ffda) #x00)) (and (= (memory_load8_le mem #x000000000001ffdb) #x00) (= (memory_load8_le mem #x000000000001ffdc) #x00))) (and (and (= (memory_load8_le mem #x000000000001ffdd) #x00) (= (memory_load8_le mem #x000000000001ffde) #x00)) (and (= (memory_load8_le mem #x000000000001ffdf) #x00) (= (memory_load8_le mem #x0000000000020040) #x40)))) (and (and (and (= (memory_load8_le mem #x0000000000020041) #x00) (= (memory_load8_le mem #x0000000000020042) #x02)) (and (= (memory_load8_le mem #x0000000000020043) #x00) (= (memory_load8_le mem #x0000000000020044) #x00))) (and (and (= (memory_load8_le mem #x0000000000020045) #x00) (= (memory_load8_le mem #x0000000000020046) #x00)) (and (= (memory_load8_le mem #x0000000000020047) #x00) (= (ControlFlow 0 3) 2))))))) lmain_correct)))))
+PreconditionGeneratedEntry_correct)))
+))
+(check-sat)
+(get-info :reason-unknown)
+(assert (not (= (ControlFlow 0 2) (- 1))))
+(check-sat)
+(pop 1)
+; Invalid
+(get-info :rlimit)
+(reset)
+(set-option :print-success false)
+(set-info :smt-lib-version 2.6)
+(set-option :smt.mbqi false)
+(set-option :model.compact false)
+(set-option :model.v2 true)
+(set-option :pp.bv_literals false)
+; done setting options
+
+
+(declare-fun tickleBool (Bool) Bool)
+(assert (and (tickleBool true) (tickleBool false)))
+(declare-fun gamma_store64 ((Array (_ BitVec 64) Bool) (_ BitVec 64) Bool) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#0| ((_ BitVec 64) (_ BitVec 64) Bool (Array (_ BitVec 64) Bool)) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#1| ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (Array (_ BitVec 64) (_ BitVec 8))) (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun memory_load64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 64))
+(declare-fun gamma_load64 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load32 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load8 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun $text_addr () (_ BitVec 64))
+(declare-fun $copiedtext_addr () (_ BitVec 64))
+(declare-fun memory_load8_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 8))
+(declare-fun memory_store64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64) (_ BitVec 64)) (Array (_ BitVec 64) (_ BitVec 8)))
+(assert (forall ((gammaMap (Array (_ BitVec 64) Bool)) (index (_ BitVec 64)) (value Bool) ) (! (= (gamma_store64 gammaMap index value) (|lambda#0| index #x0000000000000008 value gammaMap))
+ :qid |examplebpl.49:34|
+ :skolemid |3|
+ :pattern ( (gamma_store64 gammaMap index value))
+)))
+(assert (forall ((|l#0| (_ BitVec 64)) (|l#1| (_ BitVec 64)) (|l#2| (_ BitVec 64)) (|l#3| (_ BitVec 64)) (|l#4| (Array (_ BitVec 64) (_ BitVec 8))) (i (_ BitVec 64)) ) (! (= (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i) (ite (ite (bvule |l#0| (bvadd |l#0| |l#1|))  (and (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))  (or (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))) ((_ extract 7 0) (bvlshr |l#2| (bvmul (bvsub i |l#3|) #x0000000000000008))) (select |l#4| i)))
+ :qid |examplebpl.65:57|
+ :skolemid |11|
+ :pattern ( (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i))
+)))
+(assert (forall ((memory (Array (_ BitVec 64) (_ BitVec 8))) (index@@0 (_ BitVec 64)) ) (! (= (memory_load64_le memory index@@0) (concat (select memory (bvadd index@@0 #x0000000000000007)) (concat (select memory (bvadd index@@0 #x0000000000000006)) (concat (select memory (bvadd index@@0 #x0000000000000005)) (concat (select memory (bvadd index@@0 #x0000000000000004)) (concat (select memory (bvadd index@@0 #x0000000000000003)) (concat (select memory (bvadd index@@0 #x0000000000000002)) (concat (select memory (bvadd index@@0 #x0000000000000001)) (select memory index@@0)))))))))
+ :qid |examplebpl.57:37|
+ :skolemid |4|
+ :pattern ( (memory_load64_le memory index@@0))
+)))
+(assert (forall ((|l#0@@0| (_ BitVec 64)) (|l#1@@0| (_ BitVec 64)) (|l#2@@0| Bool) (|l#3@@0| (Array (_ BitVec 64) Bool)) (i@@0 (_ BitVec 64)) ) (! (= (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0) (ite (ite (bvule |l#0@@0| (bvadd |l#0@@0| |l#1@@0|))  (and (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))  (or (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))) |l#2@@0| (select |l#3@@0| i@@0)))
+ :qid |examplebpl.49:56|
+ :skolemid |10|
+ :pattern ( (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0))
+)))
+(assert (forall ((gammaMap@@0 (Array (_ BitVec 64) Bool)) (index@@1 (_ BitVec 64)) ) (! (= (gamma_load64 gammaMap@@0 index@@1)  (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000007)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000006)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000005)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000004)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000003)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000002)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000001)) (select gammaMap@@0 index@@1)))))))))
+ :qid |examplebpl.41:33|
+ :skolemid |1|
+ :pattern ( (gamma_load64 gammaMap@@0 index@@1))
+)))
+(assert (forall ((gammaMap@@1 (Array (_ BitVec 64) Bool)) (index@@2 (_ BitVec 64)) ) (! (= (gamma_load32 gammaMap@@1 index@@2)  (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000003)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000002)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000001)) (select gammaMap@@1 index@@2)))))
+ :qid |examplebpl.37:33|
+ :skolemid |0|
+ :pattern ( (gamma_load32 gammaMap@@1 index@@2))
+)))
+(assert (forall ((gammaMap@@2 (Array (_ BitVec 64) Bool)) (index@@3 (_ BitVec 64)) ) (! (= (gamma_load8 gammaMap@@2 index@@3) (select gammaMap@@2 index@@3))
+ :qid |examplebpl.45:32|
+ :skolemid |2|
+ :pattern ( (gamma_load8 gammaMap@@2 index@@3))
+)))
+(assert (= $text_addr #x0000000000020048))
+(assert (= $copiedtext_addr #x0000000000020060))
+(assert (forall ((memory@@0 (Array (_ BitVec 64) (_ BitVec 8))) (index@@4 (_ BitVec 64)) ) (! (= (memory_load8_le memory@@0 index@@4) (select memory@@0 index@@4))
+ :qid |examplebpl.61:36|
+ :skolemid |5|
+ :pattern ( (memory_load8_le memory@@0 index@@4))
+)))
+(assert (forall ((memory@@1 (Array (_ BitVec 64) (_ BitVec 8))) (index@@5 (_ BitVec 64)) (value@@0 (_ BitVec 64)) ) (! (= (memory_store64_le memory@@1 index@@5 value@@0) (|lambda#1| index@@5 #x0000000000000008 value@@0 index@@5 memory@@1))
+ :qid |examplebpl.65:38|
+ :skolemid |6|
+ :pattern ( (memory_store64_le memory@@1 index@@5 value@@0))
+)))
+; Invalid
+
+(push 1)
+(declare-fun ControlFlow (Int Int) Int)
+(declare-fun |#4@0| () (_ BitVec 64))
+(declare-fun R31 () (_ BitVec 64))
+(declare-fun stack@0 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun stack () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun R29 () (_ BitVec 64))
+(declare-fun Gamma_stack@0 () (Array (_ BitVec 64) Bool))
+(declare-fun Gamma_stack () (Array (_ BitVec 64) Bool))
+(declare-fun Gamma_R29 () Bool)
+(declare-fun stack@1 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun R30 () (_ BitVec 64))
+(declare-fun Gamma_stack@1 () (Array (_ BitVec 64) Bool))
+(declare-fun Gamma_R30 () Bool)
+(declare-fun stack@2 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun Gamma_stack@2 () (Array (_ BitVec 64) Bool))
+(declare-fun stack@3 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun Gamma_stack@3 () (Array (_ BitVec 64) Bool))
+(declare-fun R0@0 () (_ BitVec 64))
+(declare-fun Gamma_R0@0 () Bool)
+(declare-fun R0@1 () (_ BitVec 64))
+(declare-fun mem () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun R0@2 () (_ BitVec 64))
+(declare-fun R1@0 () (_ BitVec 64))
+(declare-fun R0@3 () (_ BitVec 64))
+(declare-fun malloc_count () Int)
+(set-info :boogie-vc-id main_split2)
+(set-option :timeout 0)
+(set-option :rlimit 0)
+(assert (not
+ (=> (= (ControlFlow 0 0) 3) (let ((lmain_correct  (=> (= |#4@0| (bvadd R31 #xffffffffffffffe0)) (=> (and (= stack@0 (memory_store64_le stack |#4@0| R29)) (= Gamma_stack@0 (gamma_store64 Gamma_stack |#4@0| Gamma_R29))) (=> (and (and (= stack@1 (memory_store64_le stack@0 (bvadd |#4@0| #x0000000000000008) R30)) (= Gamma_stack@1 (gamma_store64 Gamma_stack@0 (bvadd |#4@0| #x0000000000000008) Gamma_R30))) (and (= stack@2 (memory_store64_le stack@1 (bvadd |#4@0| #x0000000000000018) #x0000000000000000)) (= Gamma_stack@2 (gamma_store64 Gamma_stack@1 (bvadd |#4@0| #x0000000000000018) true)))) (=> (and (and (and (and (= stack@3 (memory_store64_le stack@2 (bvadd |#4@0| #x0000000000000010) #x0000000000000000)) (= Gamma_stack@3 (gamma_store64 Gamma_stack@2 (bvadd |#4@0| #x0000000000000010) true))) (and (= R0@0 (bvadd #x0000000000020000 #x0000000000000048)) (= Gamma_R0@0 true))) (and (and (forall ((i@@1 (_ BitVec 64)) ) (!  (=> (and (bvule R0@0 i@@1) (bvult i@@1 (bvadd R0@0 R0@1))) (not (= (select mem i@@1) #x00)))
+ :qid |examplebpl.483:19|
+ :skolemid |9|
+)) (= (memory_load8_le mem (bvadd R0@0 R0@1)) #x00)) (and (bvult R0@0 (bvadd (bvadd R0@0 R0@1) #x0000000000000001)) (= (memory_load8_le mem #x0000000000000884) #x01)))) (and (and (and (= (memory_load8_le mem #x0000000000000885) #x00) (= (memory_load8_le mem #x0000000000000886) #x02)) (and (= (memory_load8_le mem #x0000000000000887) #x00) (= (memory_load8_le mem #x000000000001fdc8) #x10))) (and (and (= (memory_load8_le mem #x000000000001fdc9) #x08) (= (memory_load8_le mem #x000000000001fdca) #x00)) (and (= (memory_load8_le mem #x000000000001fdcb) #x00) (= (memory_load8_le mem #x000000000001fdcc) #x00))))) (=> (and (and (and (and (and (= (memory_load8_le mem #x000000000001fdcd) #x00) (= (memory_load8_le mem #x000000000001fdce) #x00)) (and (= (memory_load8_le mem #x000000000001fdcf) #x00) (= (memory_load8_le mem #x000000000001fdd0) #xc0))) (and (and (= (memory_load8_le mem #x000000000001fdd1) #x07) (= (memory_load8_le mem #x000000000001fdd2) #x00)) (and (= (memory_load8_le mem #x000000000001fdd3) #x00) (= (memory_load8_le mem #x000000000001fdd4) #x00)))) (and (and (and (= (memory_load8_le mem #x000000000001fdd5) #x00) (= (memory_load8_le mem #x000000000001fdd6) #x00)) (and (= (memory_load8_le mem #x000000000001fdd7) #x00) (= (memory_load8_le mem #x000000000001ffd8) #x14))) (and (and (= (memory_load8_le mem #x000000000001ffd9) #x08) (= (memory_load8_le mem #x000000000001ffda) #x00)) (and (= (memory_load8_le mem #x000000000001ffdb) #x00) (= (memory_load8_le mem #x000000000001ffdc) #x00))))) (and (and (and (and (= (memory_load8_le mem #x000000000001ffdd) #x00) (= (memory_load8_le mem #x000000000001ffde) #x00)) (and (= (memory_load8_le mem #x000000000001ffdf) #x00) (= (memory_load8_le mem #x0000000000020040) #x40))) (and (and (= (memory_load8_le mem #x0000000000020041) #x00) (= (memory_load8_le mem #x0000000000020042) #x02)) (and (= (memory_load8_le mem #x0000000000020043) #x00) (= (memory_load8_le mem #x0000000000020044) #x00)))) (and (and (and (= (memory_load8_le mem #x0000000000020045) #x00) (= (memory_load8_le mem #x0000000000020046) #x00)) (and (= (memory_load8_le mem #x0000000000020047) #x00) (= R0@1 #x000000000000000d))) (and (and (= R0@2 (bvadd R0@1 #x0000000000000001)) (= R1@0 (bvadd #x0000000000020000 #x0000000000000048))) (and (= R0@3 (bvadd #x0000000000020000 #x0000000000000060)) (= (ControlFlow 0 2) (- 0 1))))))) (or (bvugt R0@3 (bvadd R1@0 R0@2)) (bvugt R1@0 (bvadd R0@3 R0@2))))))))))
+(let ((PreconditionGeneratedEntry_correct  (=> (= malloc_count 0) (=> (and (and (= R31 #x0000000000000064) (= (memory_load8_le mem #x0000000000020038) #x00)) (and (= (memory_load8_le mem #x0000000000020039) #x00) (= (memory_load8_le mem #x000000000002003a) #x00))) (=> (and (and (and (and (and (and (= (memory_load8_le mem #x000000000002003b) #x00) (= (memory_load8_le mem #x000000000002003c) #x00)) (and (= (memory_load8_le mem #x000000000002003d) #x00) (= (memory_load8_le mem #x000000000002003e) #x00))) (and (and (= (memory_load8_le mem #x000000000002003f) #x00) (= (memory_load8_le mem #x0000000000020040) #x40)) (and (= (memory_load8_le mem #x0000000000020041) #x00) (= (memory_load8_le mem #x0000000000020042) #x02)))) (and (and (and (= (memory_load8_le mem #x0000000000020043) #x00) (= (memory_load8_le mem #x0000000000020044) #x00)) (and (= (memory_load8_le mem #x0000000000020045) #x00) (= (memory_load8_le mem #x0000000000020046) #x00))) (and (and (= (memory_load8_le mem #x0000000000020047) #x00) (= (memory_load8_le mem #x0000000000020048) #x42)) (and (= (memory_load8_le mem #x0000000000020049) #x41) (= (memory_load8_le mem #x000000000002004a) #x53))))) (and (and (and (and (= (memory_load8_le mem #x000000000002004b) #x49) (= (memory_load8_le mem #x000000000002004c) #x4c)) (and (= (memory_load8_le mem #x000000000002004d) #x20) (= (memory_load8_le mem #x000000000002004e) #x56))) (and (and (= (memory_load8_le mem #x000000000002004f) #x65) (= (memory_load8_le mem #x0000000000020050) #x72)) (and (= (memory_load8_le mem #x0000000000020051) #x69) (= (memory_load8_le mem #x0000000000020052) #x66)))) (and (and (and (= (memory_load8_le mem #x0000000000020053) #x69) (= (memory_load8_le mem #x0000000000020054) #x65)) (and (= (memory_load8_le mem #x0000000000020055) #x72) (= (memory_load8_le mem #x0000000000000884) #x01))) (and (and (= (memory_load8_le mem #x0000000000000885) #x00) (= (memory_load8_le mem #x0000000000000886) #x02)) (and (= (memory_load8_le mem #x0000000000000887) #x00) (= (memory_load8_le mem #x000000000001fdc8) #x10)))))) (and (and (and (and (and (= (memory_load8_le mem #x000000000001fdc9) #x08) (= (memory_load8_le mem #x000000000001fdca) #x00)) (and (= (memory_load8_le mem #x000000000001fdcb) #x00) (= (memory_load8_le mem #x000000000001fdcc) #x00))) (and (and (= (memory_load8_le mem #x000000000001fdcd) #x00) (= (memory_load8_le mem #x000000000001fdce) #x00)) (and (= (memory_load8_le mem #x000000000001fdcf) #x00) (= (memory_load8_le mem #x000000000001fdd0) #xc0)))) (and (and (and (= (memory_load8_le mem #x000000000001fdd1) #x07) (= (memory_load8_le mem #x000000000001fdd2) #x00)) (and (= (memory_load8_le mem #x000000000001fdd3) #x00) (= (memory_load8_le mem #x000000000001fdd4) #x00))) (and (and (= (memory_load8_le mem #x000000000001fdd5) #x00) (= (memory_load8_le mem #x000000000001fdd6) #x00)) (and (= (memory_load8_le mem #x000000000001fdd7) #x00) (= (memory_load8_le mem #x000000000001ffd8) #x14))))) (and (and (and (and (= (memory_load8_le mem #x000000000001ffd9) #x08) (= (memory_load8_le mem #x000000000001ffda) #x00)) (and (= (memory_load8_le mem #x000000000001ffdb) #x00) (= (memory_load8_le mem #x000000000001ffdc) #x00))) (and (and (= (memory_load8_le mem #x000000000001ffdd) #x00) (= (memory_load8_le mem #x000000000001ffde) #x00)) (and (= (memory_load8_le mem #x000000000001ffdf) #x00) (= (memory_load8_le mem #x0000000000020040) #x40)))) (and (and (and (= (memory_load8_le mem #x0000000000020041) #x00) (= (memory_load8_le mem #x0000000000020042) #x02)) (and (= (memory_load8_le mem #x0000000000020043) #x00) (= (memory_load8_le mem #x0000000000020044) #x00))) (and (and (= (memory_load8_le mem #x0000000000020045) #x00) (= (memory_load8_le mem #x0000000000020046) #x00)) (and (= (memory_load8_le mem #x0000000000020047) #x00) (= (ControlFlow 0 3) 2))))))) lmain_correct)))))
+PreconditionGeneratedEntry_correct)))
+))
+(check-sat)
+(pop 1)
+; Valid
+(get-info :rlimit)
+(reset)
+(set-option :print-success false)
+(set-info :smt-lib-version 2.6)
+(set-option :smt.mbqi false)
+(set-option :model.compact false)
+(set-option :model.v2 true)
+(set-option :pp.bv_literals false)
+; done setting options
+
+
+(declare-fun tickleBool (Bool) Bool)
+(assert (and (tickleBool true) (tickleBool false)))
+(declare-fun gamma_store64 ((Array (_ BitVec 64) Bool) (_ BitVec 64) Bool) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#0| ((_ BitVec 64) (_ BitVec 64) Bool (Array (_ BitVec 64) Bool)) (Array (_ BitVec 64) Bool))
+(declare-fun |lambda#1| ((_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (_ BitVec 64) (Array (_ BitVec 64) (_ BitVec 8))) (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun memory_load64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 64))
+(declare-fun gamma_load64 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load32 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun gamma_load8 ((Array (_ BitVec 64) Bool) (_ BitVec 64)) Bool)
+(declare-fun $text_addr () (_ BitVec 64))
+(declare-fun $copiedtext_addr () (_ BitVec 64))
+(declare-fun memory_load8_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64)) (_ BitVec 8))
+(declare-fun memory_store64_le ((Array (_ BitVec 64) (_ BitVec 8)) (_ BitVec 64) (_ BitVec 64)) (Array (_ BitVec 64) (_ BitVec 8)))
+(assert (forall ((gammaMap (Array (_ BitVec 64) Bool)) (index (_ BitVec 64)) (value Bool) ) (! (= (gamma_store64 gammaMap index value) (|lambda#0| index #x0000000000000008 value gammaMap))
+ :qid |examplebpl.49:34|
+ :skolemid |3|
+ :pattern ( (gamma_store64 gammaMap index value))
+)))
+(assert (forall ((|l#0| (_ BitVec 64)) (|l#1| (_ BitVec 64)) (|l#2| (_ BitVec 64)) (|l#3| (_ BitVec 64)) (|l#4| (Array (_ BitVec 64) (_ BitVec 8))) (i (_ BitVec 64)) ) (! (= (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i) (ite (ite (bvule |l#0| (bvadd |l#0| |l#1|))  (and (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))  (or (bvule |l#0| i) (bvult i (bvadd |l#0| |l#1|)))) ((_ extract 7 0) (bvlshr |l#2| (bvmul (bvsub i |l#3|) #x0000000000000008))) (select |l#4| i)))
+ :qid |examplebpl.65:57|
+ :skolemid |11|
+ :pattern ( (select (|lambda#1| |l#0| |l#1| |l#2| |l#3| |l#4|) i))
+)))
+(assert (forall ((memory (Array (_ BitVec 64) (_ BitVec 8))) (index@@0 (_ BitVec 64)) ) (! (= (memory_load64_le memory index@@0) (concat (select memory (bvadd index@@0 #x0000000000000007)) (concat (select memory (bvadd index@@0 #x0000000000000006)) (concat (select memory (bvadd index@@0 #x0000000000000005)) (concat (select memory (bvadd index@@0 #x0000000000000004)) (concat (select memory (bvadd index@@0 #x0000000000000003)) (concat (select memory (bvadd index@@0 #x0000000000000002)) (concat (select memory (bvadd index@@0 #x0000000000000001)) (select memory index@@0)))))))))
+ :qid |examplebpl.57:37|
+ :skolemid |4|
+ :pattern ( (memory_load64_le memory index@@0))
+)))
+(assert (forall ((|l#0@@0| (_ BitVec 64)) (|l#1@@0| (_ BitVec 64)) (|l#2@@0| Bool) (|l#3@@0| (Array (_ BitVec 64) Bool)) (i@@0 (_ BitVec 64)) ) (! (= (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0) (ite (ite (bvule |l#0@@0| (bvadd |l#0@@0| |l#1@@0|))  (and (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))  (or (bvule |l#0@@0| i@@0) (bvult i@@0 (bvadd |l#0@@0| |l#1@@0|)))) |l#2@@0| (select |l#3@@0| i@@0)))
+ :qid |examplebpl.49:56|
+ :skolemid |10|
+ :pattern ( (select (|lambda#0| |l#0@@0| |l#1@@0| |l#2@@0| |l#3@@0|) i@@0))
+)))
+(assert (forall ((gammaMap@@0 (Array (_ BitVec 64) Bool)) (index@@1 (_ BitVec 64)) ) (! (= (gamma_load64 gammaMap@@0 index@@1)  (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000007)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000006)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000005)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000004)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000003)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000002)) (and (select gammaMap@@0 (bvadd index@@1 #x0000000000000001)) (select gammaMap@@0 index@@1)))))))))
+ :qid |examplebpl.41:33|
+ :skolemid |1|
+ :pattern ( (gamma_load64 gammaMap@@0 index@@1))
+)))
+(assert (forall ((gammaMap@@1 (Array (_ BitVec 64) Bool)) (index@@2 (_ BitVec 64)) ) (! (= (gamma_load32 gammaMap@@1 index@@2)  (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000003)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000002)) (and (select gammaMap@@1 (bvadd index@@2 #x0000000000000001)) (select gammaMap@@1 index@@2)))))
+ :qid |examplebpl.37:33|
+ :skolemid |0|
+ :pattern ( (gamma_load32 gammaMap@@1 index@@2))
+)))
+(assert (forall ((gammaMap@@2 (Array (_ BitVec 64) Bool)) (index@@3 (_ BitVec 64)) ) (! (= (gamma_load8 gammaMap@@2 index@@3) (select gammaMap@@2 index@@3))
+ :qid |examplebpl.45:32|
+ :skolemid |2|
+ :pattern ( (gamma_load8 gammaMap@@2 index@@3))
+)))
+(assert (= $text_addr #x0000000000020048))
+(assert (= $copiedtext_addr #x0000000000020060))
+(assert (forall ((memory@@0 (Array (_ BitVec 64) (_ BitVec 8))) (index@@4 (_ BitVec 64)) ) (! (= (memory_load8_le memory@@0 index@@4) (select memory@@0 index@@4))
+ :qid |examplebpl.61:36|
+ :skolemid |5|
+ :pattern ( (memory_load8_le memory@@0 index@@4))
+)))
+(assert (forall ((memory@@1 (Array (_ BitVec 64) (_ BitVec 8))) (index@@5 (_ BitVec 64)) (value@@0 (_ BitVec 64)) ) (! (= (memory_store64_le memory@@1 index@@5 value@@0) (|lambda#1| index@@5 #x0000000000000008 value@@0 index@@5 memory@@1))
+ :qid |examplebpl.65:38|
+ :skolemid |6|
+ :pattern ( (memory_store64_le memory@@1 index@@5 value@@0))
+)))
+; Valid
+
+(push 1)
+(declare-fun ControlFlow (Int Int) Int)
+(declare-fun |#4@0| () (_ BitVec 64))
+(declare-fun R31 () (_ BitVec 64))
+(declare-fun stack@0 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun stack () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun R29 () (_ BitVec 64))
+(declare-fun Gamma_stack@0 () (Array (_ BitVec 64) Bool))
+(declare-fun Gamma_stack () (Array (_ BitVec 64) Bool))
+(declare-fun Gamma_R29 () Bool)
+(declare-fun stack@1 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun R30 () (_ BitVec 64))
+(declare-fun Gamma_stack@1 () (Array (_ BitVec 64) Bool))
+(declare-fun Gamma_R30 () Bool)
+(declare-fun stack@2 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun Gamma_stack@2 () (Array (_ BitVec 64) Bool))
+(declare-fun stack@3 () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun Gamma_stack@3 () (Array (_ BitVec 64) Bool))
+(declare-fun R0@0 () (_ BitVec 64))
+(declare-fun Gamma_R0@0 () Bool)
+(declare-fun R0@1 () (_ BitVec 64))
+(declare-fun mem () (Array (_ BitVec 64) (_ BitVec 8)))
+(declare-fun R0@2 () (_ BitVec 64))
+(declare-fun R1@0 () (_ BitVec 64))
+(declare-fun R0@3 () (_ BitVec 64))
+(declare-fun malloc_count () Int)
+(set-info :boogie-vc-id main_split3)
+(set-option :timeout 0)
+(set-option :rlimit 0)
+(assert (not
+ (=> (= (ControlFlow 0 0) 3) (let ((lmain_correct  (=> (= |#4@0| (bvadd R31 #xffffffffffffffe0)) (=> (and (= stack@0 (memory_store64_le stack |#4@0| R29)) (= Gamma_stack@0 (gamma_store64 Gamma_stack |#4@0| Gamma_R29))) (=> (and (and (= stack@1 (memory_store64_le stack@0 (bvadd |#4@0| #x0000000000000008) R30)) (= Gamma_stack@1 (gamma_store64 Gamma_stack@0 (bvadd |#4@0| #x0000000000000008) Gamma_R30))) (and (= stack@2 (memory_store64_le stack@1 (bvadd |#4@0| #x0000000000000018) #x0000000000000000)) (= Gamma_stack@2 (gamma_store64 Gamma_stack@1 (bvadd |#4@0| #x0000000000000018) true)))) (=> (and (and (and (and (and (and (= stack@3 (memory_store64_le stack@2 (bvadd |#4@0| #x0000000000000010) #x0000000000000000)) (= Gamma_stack@3 (gamma_store64 Gamma_stack@2 (bvadd |#4@0| #x0000000000000010) true))) (= R0@0 (bvadd #x0000000000020000 #x0000000000000048))) (and (= Gamma_R0@0 true) (forall ((i@@1 (_ BitVec 64)) ) (!  (=> (and (bvule R0@0 i@@1) (bvult i@@1 (bvadd R0@0 R0@1))) (not (= (select mem i@@1) #x00)))
+ :qid |examplebpl.483:19|
+ :skolemid |9|
+)))) (and (and (= (memory_load8_le mem (bvadd R0@0 R0@1)) #x00) (bvult R0@0 (bvadd (bvadd R0@0 R0@1) #x0000000000000001))) (and (= (memory_load8_le mem #x0000000000000884) #x01) (= (memory_load8_le mem #x0000000000000885) #x00)))) (and (and (and (= (memory_load8_le mem #x0000000000000886) #x02) (= (memory_load8_le mem #x0000000000000887) #x00)) (and (= (memory_load8_le mem #x000000000001fdc8) #x10) (= (memory_load8_le mem #x000000000001fdc9) #x08))) (and (and (= (memory_load8_le mem #x000000000001fdca) #x00) (= (memory_load8_le mem #x000000000001fdcb) #x00)) (and (= (memory_load8_le mem #x000000000001fdcc) #x00) (= (memory_load8_le mem #x000000000001fdcd) #x00))))) (and (and (and (and (and (= (memory_load8_le mem #x000000000001fdce) #x00) (= (memory_load8_le mem #x000000000001fdcf) #x00)) (and (= (memory_load8_le mem #x000000000001fdd0) #xc0) (= (memory_load8_le mem #x000000000001fdd1) #x07))) (and (and (= (memory_load8_le mem #x000000000001fdd2) #x00) (= (memory_load8_le mem #x000000000001fdd3) #x00)) (and (= (memory_load8_le mem #x000000000001fdd4) #x00) (= (memory_load8_le mem #x000000000001fdd5) #x00)))) (and (and (and (= (memory_load8_le mem #x000000000001fdd6) #x00) (= (memory_load8_le mem #x000000000001fdd7) #x00)) (and (= (memory_load8_le mem #x000000000001ffd8) #x14) (= (memory_load8_le mem #x000000000001ffd9) #x08))) (and (and (= (memory_load8_le mem #x000000000001ffda) #x00) (= (memory_load8_le mem #x000000000001ffdb) #x00)) (and (= (memory_load8_le mem #x000000000001ffdc) #x00) (= (memory_load8_le mem #x000000000001ffdd) #x00))))) (and (and (and (and (= (memory_load8_le mem #x000000000001ffde) #x00) (= (memory_load8_le mem #x000000000001ffdf) #x00)) (and (= (memory_load8_le mem #x0000000000020040) #x40) (= (memory_load8_le mem #x0000000000020041) #x00))) (and (and (= (memory_load8_le mem #x0000000000020042) #x02) (= (memory_load8_le mem #x0000000000020043) #x00)) (and (= (memory_load8_le mem #x0000000000020044) #x00) (= (memory_load8_le mem #x0000000000020045) #x00)))) (and (and (and (= (memory_load8_le mem #x0000000000020046) #x00) (= (memory_load8_le mem #x0000000000020047) #x00)) (and (= R0@1 #x000000000000000d) (= R0@2 (bvadd R0@1 #x0000000000000001)))) (and (and (= R1@0 (bvadd #x0000000000020000 #x0000000000000048)) (= R0@3 (bvadd #x0000000000020000 #x0000000000000060))) (and (or (bvugt R0@3 (bvadd R1@0 R0@2)) (bvugt R1@0 (bvadd R0@3 R0@2))) (= (ControlFlow 0 2) (- 0 1)))))))) (and (bvugt (bvadd R0@3 R0@2) R0@3) (bvugt (bvadd R1@0 R0@2) R1@0))))))))
+(let ((PreconditionGeneratedEntry_correct  (=> (= malloc_count 0) (=> (and (and (= R31 #x0000000000000064) (= (memory_load8_le mem #x0000000000020038) #x00)) (and (= (memory_load8_le mem #x0000000000020039) #x00) (= (memory_load8_le mem #x000000000002003a) #x00))) (=> (and (and (and (and (and (and (= (memory_load8_le mem #x000000000002003b) #x00) (= (memory_load8_le mem #x000000000002003c) #x00)) (and (= (memory_load8_le mem #x000000000002003d) #x00) (= (memory_load8_le mem #x000000000002003e) #x00))) (and (and (= (memory_load8_le mem #x000000000002003f) #x00) (= (memory_load8_le mem #x0000000000020040) #x40)) (and (= (memory_load8_le mem #x0000000000020041) #x00) (= (memory_load8_le mem #x0000000000020042) #x02)))) (and (and (and (= (memory_load8_le mem #x0000000000020043) #x00) (= (memory_load8_le mem #x0000000000020044) #x00)) (and (= (memory_load8_le mem #x0000000000020045) #x00) (= (memory_load8_le mem #x0000000000020046) #x00))) (and (and (= (memory_load8_le mem #x0000000000020047) #x00) (= (memory_load8_le mem #x0000000000020048) #x42)) (and (= (memory_load8_le mem #x0000000000020049) #x41) (= (memory_load8_le mem #x000000000002004a) #x53))))) (and (and (and (and (= (memory_load8_le mem #x000000000002004b) #x49) (= (memory_load8_le mem #x000000000002004c) #x4c)) (and (= (memory_load8_le mem #x000000000002004d) #x20) (= (memory_load8_le mem #x000000000002004e) #x56))) (and (and (= (memory_load8_le mem #x000000000002004f) #x65) (= (memory_load8_le mem #x0000000000020050) #x72)) (and (= (memory_load8_le mem #x0000000000020051) #x69) (= (memory_load8_le mem #x0000000000020052) #x66)))) (and (and (and (= (memory_load8_le mem #x0000000000020053) #x69) (= (memory_load8_le mem #x0000000000020054) #x65)) (and (= (memory_load8_le mem #x0000000000020055) #x72) (= (memory_load8_le mem #x0000000000000884) #x01))) (and (and (= (memory_load8_le mem #x0000000000000885) #x00) (= (memory_load8_le mem #x0000000000000886) #x02)) (and (= (memory_load8_le mem #x0000000000000887) #x00) (= (memory_load8_le mem #x000000000001fdc8) #x10)))))) (and (and (and (and (and (= (memory_load8_le mem #x000000000001fdc9) #x08) (= (memory_load8_le mem #x000000000001fdca) #x00)) (and (= (memory_load8_le mem #x000000000001fdcb) #x00) (= (memory_load8_le mem #x000000000001fdcc) #x00))) (and (and (= (memory_load8_le mem #x000000000001fdcd) #x00) (= (memory_load8_le mem #x000000000001fdce) #x00)) (and (= (memory_load8_le mem #x000000000001fdcf) #x00) (= (memory_load8_le mem #x000000000001fdd0) #xc0)))) (and (and (and (= (memory_load8_le mem #x000000000001fdd1) #x07) (= (memory_load8_le mem #x000000000001fdd2) #x00)) (and (= (memory_load8_le mem #x000000000001fdd3) #x00) (= (memory_load8_le mem #x000000000001fdd4) #x00))) (and (and (= (memory_load8_le mem #x000000000001fdd5) #x00) (= (memory_load8_le mem #x000000000001fdd6) #x00)) (and (= (memory_load8_le mem #x000000000001fdd7) #x00) (= (memory_load8_le mem #x000000000001ffd8) #x14))))) (and (and (and (and (= (memory_load8_le mem #x000000000001ffd9) #x08) (= (memory_load8_le mem #x000000000001ffda) #x00)) (and (= (memory_load8_le mem #x000000000001ffdb) #x00) (= (memory_load8_le mem #x000000000001ffdc) #x00))) (and (and (= (memory_load8_le mem #x000000000001ffdd) #x00) (= (memory_load8_le mem #x000000000001ffde) #x00)) (and (= (memory_load8_le mem #x000000000001ffdf) #x00) (= (memory_load8_le mem #x0000000000020040) #x40)))) (and (and (and (= (memory_load8_le mem #x0000000000020041) #x00) (= (memory_load8_le mem #x0000000000020042) #x02)) (and (= (memory_load8_le mem #x0000000000020043) #x00) (= (memory_load8_le mem #x0000000000020044) #x00))) (and (and (= (memory_load8_le mem #x0000000000020045) #x00) (= (memory_load8_le mem #x0000000000020046) #x00)) (and (= (memory_load8_le mem #x0000000000020047) #x00) (= (ControlFlow 0 3) 2))))))) lmain_correct)))))
+PreconditionGeneratedEntry_correct)))
+))
+(check-sat)
+(pop 1)
+; Valid
+(get-info :rlimit)
