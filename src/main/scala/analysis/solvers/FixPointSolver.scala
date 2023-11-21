@@ -1,6 +1,6 @@
 package analysis.solvers
 
-import analysis._
+import analysis.*
 import scala.collection.immutable.ListSet
 import scala.collection.mutable.LinkedHashSet
 
@@ -86,7 +86,7 @@ trait Worklist[N]:
   */
 trait ListSetWorklist[N] extends Worklist[N]:
 
-  private var worklist = new ListSet[N]
+  private var worklist = ListSet[N]()
 
   def add(n: N): Unit =
     worklist += n
@@ -107,19 +107,19 @@ trait ListSetWorklist[N] extends Worklist[N]:
   *   type of the elements in the worklist.
   */
 trait LinkedHashSetWorklist[N] extends Worklist[N]:
-  private val worklist = new LinkedHashSet[N]
+  private val worklist = LinkedHashSet[N]()
 
-  def add(n: N) =
+  def add(n: N): Unit =
     worklist += n
 
-  def add(ns: Set[N]) = worklist ++= ns
+  def add(ns: Set[N]): Unit = worklist ++= ns
 
-  def run(first: Set[N], intra: Boolean) =
-    worklist.addAll(first);
-    while (worklist.nonEmpty) do
-      val n = worklist.head;
+  def run(first: Set[N]): Unit =
+    worklist.addAll(first)
+    while worklist.nonEmpty do
+      val n = worklist.head
       worklist.remove(n)
-      process(n, intra)
+      process(n)
 
 
 /** Base trait for worklist-based fixpoint solvers.
