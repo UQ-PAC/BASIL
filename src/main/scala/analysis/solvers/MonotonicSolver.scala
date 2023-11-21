@@ -2,7 +2,6 @@ package analysis.solvers
 
 import analysis._
 
-import scala.collection.immutable.ListSet
 import scala.collection.mutable
 
 /** Fixpoint solver.
@@ -13,7 +12,7 @@ import scala.collection.mutable
   * TODO: investigate how to visit all reachable nodes at least once, then remove loopEscape. TODO: in longer term, add
   * a worklist to avoid processing nodes twice.
   */
-trait SimpleMonotonicSolver[N] extends MapLiftLatticeSolver[N] with ListSetWorklist[N] with Dependencies[N]:
+trait SimpleMonotonicSolver[N] extends MapLiftLatticeSolver[N] with LinkedHashSetWorklist[N] with Dependencies[N]:
   /** The current lattice element.
     */
   var x: lattice.Element = _
