@@ -112,11 +112,11 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
                 // this is an exception to the rule and only applies to data regions
                 evaluateExpression(memoryLoad.index, constantProp(n)) match
                   case Some(bitVecLiteral: BitVecLiteral) =>
-                    m = m + (n -> (s.getOrElse(n, Map.empty) + (r -> Set(getValueType(bitVecLiteral)))))
-                    m = m + (n -> (m.getOrElse(n, Map.empty) + (localAssign.lhs -> m(n)(r))))
+                    m = m + (r -> Set(getValueType(bitVecLiteral)))
+                    m = m + (localAssign.lhs -> m(r))
                     m
                   case None =>
-                    m = m + (n -> (m.getOrElse(n, Map.empty) + (localAssign.lhs -> m(n)(r))))
+                    m = m + (localAssign.lhs -> m(r))
                     m
               case None =>
                 Logger.warn("could not find region for " + localAssign)
@@ -124,7 +124,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
           case e: Expr =>
             evaluateExpression(e, constantProp(n)) match {
               case Some(bv: BitVecLiteral) =>
-                m = m + (n -> (m.getOrElse(n, Map.empty) + (localAssign.lhs -> Set(getValueType(bv)))))
+                m = m + (localAssign.lhs -> Set(getValueType(bv)))
                 m
               case None =>
                 Logger.warn("could not evaluate expression" + e)
@@ -139,7 +139,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
                 val storeValue = memAssign.rhs.value
                 evaluateExpression(storeValue, constantProp(n)) match
                   case Some(bitVecLiteral: BitVecLiteral) =>
-                    m = m + (n -> (m.getOrElse(n, Map.empty) + (r -> Set(getValueType(bitVecLiteral)))))
+                    m = m + (r -> Set(getValueType(bitVecLiteral)))
                     m
                     /*
                   // TODO constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
@@ -149,7 +149,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
                   case None =>
                     storeValue.match {
                       case v: Variable =>
-                        m = m + (n -> (m.getOrElse(n, Map.empty) + (r -> m(n)(v))))
+                        m = m + (r -> m(v))
                         m
                       case _ =>
                         Logger.warn(s"Too Complex: $storeValue") // do nothing
