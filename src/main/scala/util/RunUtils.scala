@@ -246,7 +246,7 @@ object RunUtils {
     def printNode(node: CfgNode): Unit = {
       s.append(node)
       s.append(" :: ")
-      s.append(result(node))
+      s.append(if result.contains(node) then result(node) else "Unreachable")
       s.append(System.lineSeparator())
     }
 
