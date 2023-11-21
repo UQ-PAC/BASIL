@@ -63,8 +63,7 @@ trait MapLiftLatticeSolver[N] extends MapLatticeSolver[N] with Dependencies[N] {
    */
   def transferUnlifted(n: N, s: lattice.sublattice.sublattice.Element): lattice.sublattice.sublattice.Element
 
-  @Override
-  def transfer(n: N, s: lattice.sublattice.Element): lattice.sublattice.Element = {
+  override def transfer(n: N, s: lattice.sublattice.Element): lattice.sublattice.Element = {
     import lattice.sublattice._
     s match {
       case Bottom => Bottom // unreachable as input implied unreachable at output
