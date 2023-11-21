@@ -1,6 +1,9 @@
 package boogie
-import ir._
-import specification._
+import ir.*
+import specification.*
+import collection.mutable
+
+import java.io.Writer
 
 trait BExpr {
   def getType: BType
@@ -15,6 +18,7 @@ trait BExpr {
   def resolveSpecL: BExpr = this
   def resolveInsideOld: BExpr = this
   def loads: Set[BExpr] = Set()
+  def serialiseBoogie(w: Writer): Unit = w.append(toString)
 }
 
 trait BLiteral extends BExpr {}
@@ -59,10 +63,17 @@ case class BVExtract(end: Int, start: Int, body: BExpr) extends BExpr {
   override def resolveInsideOld: BVExtract = copy(body = body.resolveInsideOld)
   override def removeOld: BVExtract = copy(body = body.removeOld)
   override def loads: Set[BExpr] = body.loads
+
+  override def serialiseBoogie(w: Writer): Unit = {
+    body.serialiseBoogie(w)
+    w.append(s"[$end:$start]")
+  }
+
 }
 
 case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
   override def getType: BitVecBType = BitVecBType(bodySize * repeats)
+
 
   private def bodySize: Int = body.getType match {
     case bv: BitVecBType => bv.size
@@ -71,6 +82,13 @@ case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
   private def fnName: String = s"repeat${repeats}_$bodySize"
 
   override def toString: String = s"$fnName($body)"
+
+  override def serialiseBoogie(w: Writer): Unit = {
+    w.append(fnName)
+    w.append("(")
+    body.serialiseBoogie(w)
+    w.append(")")
+  }
 
   override def functionOps: Set[FunctionOp] = {
     val thisFn = BVFunctionOp(fnName, s"repeat $repeats", List(BParam(BitVecBType(bodySize))), BParam(getType))
@@ -100,6 +118,13 @@ case class BVZeroExtend(extension: Int, body: BExpr) extends BExpr {
 
   override def toString: String = s"$fnName($body)"
 
+  override def serialiseBoogie(w: Writer): Unit = {
+    w.append(fnName)
+    w.append("(")
+    body.serialiseBoogie(w)
+    w.append(")")
+  }
+
   override def functionOps: Set[FunctionOp] = {
     val thisFn = BVFunctionOp(fnName, s"zero_extend $extension", List(BParam(BitVecBType(bodySize))), BParam(getType))
     body.functionOps + thisFn
@@ -127,6 +152,14 @@ case class BVSignExtend(extension: Int, body: BExpr) extends BExpr {
   private def fnName: String = s"sign_extend${extension}_$bodySize"
 
   override def toString: String = s"$fnName($body)"
+
+  override def serialiseBoogie(w: Writer): Unit = {
+    w.append(fnName)
+    w.append("(")
+    body.serialiseBoogie(w)
+    w.append(")")
+  }
+
 
   override def functionOps: Set[FunctionOp] = {
     val thisFn = BVFunctionOp(fnName, s"sign_extend $extension", List(BParam(BitVecBType(bodySize))), BParam(getType))
@@ -297,6 +330,32 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
     case _               => throw new Exception("type mismatch")
   }
 
+  override def serialiseBoogie(w: Writer): Unit = {
+    val traversalQueue = mutable.Stack[BExpr | BinOp | String]()
+    traversalQueue.append(this)
+
+    while (traversalQueue.nonEmpty) {
+      val next = traversalQueue.pop()
+
+      def infix(b: BinaryBExpr): Unit = traversalQueue.pushAll(Seq("(", b.arg1, b.op, b.arg2, ")").reverse)
+      def prefix(b: BinaryBExpr): Unit = traversalQueue.pushAll(Seq(s"bv${b.op}${b.inSize}(", b.arg1, ",", b.arg2, ")").reverse)
+
+      next match
+        case b: BinaryBExpr =>
+          b.op match {
+            case bOp: BoolBinOp => infix(b)
+            case bOp: BVBinOp => bOp match {
+                case BVEQ | BVNEQ | BVCONCAT => infix(b)
+                case _ => prefix(b)
+              }
+            case bOp: IntBinOp => infix(b)
+          }
+        case b: BExpr => b.serialiseBoogie(w)
+        case b: BinOp => w.append(b.toString)
+        case s: String => w.append(s)
+    }
+  }
+
   override def toString: String = op match {
     case bOp: BoolBinOp => s"($arg1 $bOp $arg2)"
     case bOp: BVBinOp =>
@@ -308,6 +367,8 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
       }
     case bOp: IntBinOp => s"($arg1 $bOp $arg2)"
   }
+
+
 
   override def functionOps: Set[FunctionOp] = {
     val thisFn = op match {
@@ -632,4 +693,9 @@ case class L(memory: BMapVar, index: BExpr) extends BExpr {
   override def locals: Set[BVar] = index.locals
   override def globals: Set[BVar] = index.globals
   override def loads: Set[BExpr] = index.loads
+}
+
+
+
+object BinaryBExpr {
 }

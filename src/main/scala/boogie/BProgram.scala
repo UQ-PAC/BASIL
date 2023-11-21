@@ -1,5 +1,5 @@
 package boogie
-import java.io.Writer
+import java.io.{StringWriter, Writer}
 
 case class BProgram(declarations: List[BDeclaration]) {
   override def toString: String = declarations.flatMap(x => x.toBoogie).mkString(System.lineSeparator())
@@ -88,12 +88,21 @@ case class BFunction(name: String, in: List[BVar], out: BVar, body: Option[BExpr
     with Ordered[BFunction] {
   override def compare(that: BFunction): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
+    val s = new StringWriter()
+
     val inString = in.map(_.withType).mkString(", ")
     val declString = s"function $attrString$name($inString) returns (${out.withType})"
-    body match {
-      case Some(b) => List(declString + " {", "  " + b.toString, "}", "")
-      case None    => List(declString + ";")
+    s.append(declString)
+
+    val decl = body match {
+      case Some(b) =>
+        s.append(" {" + System.lineSeparator() + "  ")
+        b.serialiseBoogie(s)
+        s.append(System.lineSeparator())
+        s.append("}" + System.lineSeparator())
+      case None    => s.append(";")
     }
+    List(s.toString)
   }
   override def toString: String = toBoogie.mkString("\n")
   def functionOps: Set[FunctionOp] = body match {
