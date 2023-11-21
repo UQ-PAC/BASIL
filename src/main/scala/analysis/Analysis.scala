@@ -241,7 +241,7 @@ trait MemoryRegionAnalysisMisc:
 
   /** The lattice of abstract states.
     */
-  val stateLattice: MapLattice[CfgNode, regionLattice.type] = MapLattice(regionLattice)
+  val stateLattice: regionLattice.type = regionLattice
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -322,7 +322,7 @@ trait MemoryRegionAnalysisMisc:
             if (directCall.target.name == "malloc") {
               evaluateExpression(mallocVariable, constantProp(n)) match {
                 case Some(b: BitVecLiteral) =>
-                  m = m ++ Set((n, Set(HeapRegion(nextMallocCount(), b))))
+                  m = m ++ Set(HeapRegion(nextMallocCount(), b))
                   m
                 case None => m
               }
@@ -335,47 +335,14 @@ trait MemoryRegionAnalysisMisc:
               return s
             }
             val result = eval(memAssign.rhs.index, s, cmd)
-            /*
-            don't modify the IR in the middle of the analysis like this, also this produces a lot of incorrect results
-            result.collectFirst({
-              case StackRegion(name, _, _, _) =>
-                memAssign.rhs = MemoryStore(
-                  Memory(name,
-                    memAssign.rhs.mem.addressSize,
-                    memAssign.rhs.mem.valueSize),
-                  memAssign.rhs.index,
-                  memAssign.rhs.value, memAssign.rhs.endian,
-                  memAssign.rhs.size
-                )
-              case DataRegion(name, _, _, _) =>
-                memAssign.rhs = MemoryStore(
-                  Memory(name, memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize),
-                  memAssign.rhs.index,
-                  memAssign.rhs.value,
-                  memAssign.rhs.endian,
-                  memAssign.rhs.size
-                )
-              case _ =>
-            })
-            */
-            m = m ++ Set((n, result))
+            m = m ++ result
             m
           case localAssign: LocalAssign =>
             var m = s
             unwrapExpr(localAssign.rhs).foreach {
               case memoryLoad: MemoryLoad =>
                 val result = eval(memoryLoad.index, s, cmd)
-                /*
-                don't modify the IR in the middle of the analysis like this, this also produces incorrect results
-                result.collectFirst({
-                  case StackRegion(name, _, _, _) =>
-                    memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
-                  case DataRegion(name, _, _, _) =>
-                    memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
-                  case _ =>
-                })
-                */
-                m = m ++ Set((n, result))
+                m = m ++ result
               case _ => m
             }
             m
@@ -435,12 +402,14 @@ abstract class LiftedMemoryRegionAnalysis[P <: ProgramCfg](
    */
   override def funsub(n: CfgNode, x: lattice.Element, intra: Boolean): liftedstatelattice.Element = {
     import liftedstatelattice._
-    n match {
-      // function entry nodes are always reachable (if intra-procedural analysis)
-      case _: CfgFunctionEntryNode => lift(stateLattice.bottom)
-      // all other nodes are processed with join+transfer
-      case _ => super.funsub(n, x, intra = true)
-    }
+      n match {
+        // function entry nodes are always reachable (if intra-procedural analysis)
+        case _: CfgFunctionEntryNode => lift(stateLattice.bottom)
+        // all other nodes are processed with join+transfer
+        case _ =>
+          val joinedStates = indep(n, intra).map(x(_)).foldLeft(liftedstatelattice.bottom)((acc, pred) => liftedstatelattice.lub(acc, pred))
+          lift(localTransfer(n, unlift(joinedStates)))
+      }
   }
 }
 
