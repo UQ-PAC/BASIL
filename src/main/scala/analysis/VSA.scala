@@ -47,7 +47,7 @@ trait ValueSetAnalysisMisc:
 
   /** The lattice of abstract states.
     */
-  val stateLattice: MapLattice[CfgNode, VSALatticeElem] = MapLattice(powersetLattice)
+  val stateLattice: VSALatticeElem = powersetLattice
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -116,11 +116,11 @@ trait ValueSetAnalysisMisc:
                 // this is an exception to the rule and only applies to data regions
                 evaluateExpression(memoryLoad.index, constantProp(n)) match
                   case Some(bitVecLiteral: BitVecLiteral) =>
-                    m = m + (n -> (s.getOrElse(n, Map.empty) + (r -> Set(getValueType(bitVecLiteral)))))
-                    m = m + (n -> (m.getOrElse(n, Map.empty) + (localAssign.lhs -> m(n)(r))))
+                    m = m + (r -> Set(getValueType(bitVecLiteral)))
+                    m = m + (localAssign.lhs -> m(r))
                     m
                   case None =>
-                    m = m + (n -> (m.getOrElse(n, Map.empty) + (localAssign.lhs -> m(n)(r))))
+                    m = m + (localAssign.lhs -> m(r))
                     m
               case None =>
                 Logger.warn("could not find region for " + localAssign)
@@ -128,7 +128,7 @@ trait ValueSetAnalysisMisc:
           case e: Expr =>
             evaluateExpression(e, constantProp(n)) match {
               case Some(bv: BitVecLiteral) =>
-                m = m + (n -> (m.getOrElse(n, Map.empty) + (localAssign.lhs -> Set(getValueType(bv)))))
+                m = m + (localAssign.lhs -> Set(getValueType(bv)))
                 m
               case None =>
                 Logger.warn("could not evaluate expression" + e)
@@ -143,7 +143,7 @@ trait ValueSetAnalysisMisc:
                 val storeValue = memAssign.rhs.value
                 evaluateExpression(storeValue, constantProp(n)) match
                   case Some(bitVecLiteral: BitVecLiteral) =>
-                    m = m + (n -> (m.getOrElse(n, Map.empty) + (r -> Set(getValueType(bitVecLiteral)))))
+                    m = m + (r -> Set(getValueType(bitVecLiteral)))
                     m
                     /*
                   // TODO constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
@@ -153,7 +153,7 @@ trait ValueSetAnalysisMisc:
                   case None =>
                     storeValue.match {
                       case v: Variable =>
-                        m = m + (n -> (m.getOrElse(n, Map.empty) + (r -> m(n)(v))))
+                        m = m + (r -> m(v))
                         m
                       case _ =>
                         Logger.warn(s"Too Complex: $storeValue") // do nothing
@@ -221,12 +221,14 @@ abstract class LiftedValueSetAnalysis[P <: ProgramCfg] (
    */
   override def funsub(n: CfgNode, x: lattice.Element, intra: Boolean): liftedstatelattice.Element = {
     import liftedstatelattice._
-    n match {
-      // function entry nodes are always reachable (if intra-procedural analysis)
-      case _: CfgFunctionEntryNode => lift(stateLattice.bottom)
-      // all other nodes are processed with join+transfer
-      case _ => super.funsub(n, x, intra = false)
-    }
+      n match {
+        // function entry nodes are always reachable (if intra-procedural analysis)
+        case entryNode: CfgFunctionEntryNode =>
+          if entryNode.data.name.equals("main") then return lift(stateLattice.bottom)
+        // all other nodes are processed with join+transfer
+        case _ => return super.funsub(n, x, intra)
+      }
+    super.funsub(n, x, intra)
   }
 }
 
