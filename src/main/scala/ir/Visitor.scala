@@ -243,17 +243,96 @@ abstract class ReadOnlyVisitor extends Visitor {
 
 }
 
-class StackSubstituter extends Visitor {
-  val stackRefs: mutable.Set[Variable] = mutable.Set()
-  val stackMemory: Memory = Memory("stack", 64, 8)
+/**
+  * Visits all reachable blocks in a procedure, depth-first, in the order they are reachable from the start of the
+  * procedure.
+  * Does not jump to other procedures.
+  * Only modifies statements and jumps.
+  * */
+abstract class IntraproceduralControlFlowVisitor extends Visitor {
+  private val visitedBlocks: mutable.Set[Block] = mutable.Set()
+
+  override def visitProcedure(node: Procedure): Procedure = {
+    node.blocks.headOption.foreach(visitBlock)
+    node
+  }
+
+  override def visitBlock(node: Block): Block = {
+    if (visitedBlocks.contains(node)) {
+      return node
+    }
+    for (i <- node.statements.indices) {
+      node.statements(i) = visitStatement(node.statements(i))
+    }
+    visitedBlocks.add(node)
+    node.jump = visitJump(node.jump)
+    node
+  }
+
+  override def visitGoTo(node: GoTo): Jump = {
+    node.targets.foreach(visitBlock)
+    node
+  }
+
+  override def visitDirectCall(node: DirectCall): Jump = {
+    node.returnTarget.foreach(visitBlock)
+    node
+  }
+
+  override def visitIndirectCall(node: IndirectCall): Jump = {
+    node.target = visitVariable(node.target)
+    node.returnTarget.foreach(visitBlock)
+    node
+  }
+}
+
+// TODO: does this break for programs with loops? need to calculate a fixed-point?
+class StackSubstituter extends IntraproceduralControlFlowVisitor {
+  private val stackPointer = Register("R31", BitVecType(64))
+  private val stackMemory = Memory("stack", 64, 8)
+  val stackRefs: mutable.Set[Variable] = mutable.Set(stackPointer)
+
+  override def visitProcedure(node: Procedure): Procedure = {
+    // reset for each procedure
+    stackRefs.clear()
+    stackRefs.add(stackPointer)
+    super.visitProcedure(node)
+  }
 
   override def visitMemoryLoad(node: MemoryLoad): MemoryLoad = {
+    // replace mem with stack in load if index contains stack references
     val loadStackRefs = node.index.variables.intersect(stackRefs)
     if (loadStackRefs.nonEmpty) {
       node.copy(mem = stackMemory)
     } else {
       node
     }
+  }
+
+  override def visitLocalAssign(node: LocalAssign): Statement = {
+    node.lhs = visitVariable(node.lhs)
+    node.rhs = visitExpr(node.rhs)
+
+    // update stack references
+    val variableVisitor = VariablesWithoutStoresLoads()
+    variableVisitor.visitExpr(node.rhs)
+
+    val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackRefs)
+    if (rhsStackRefs.nonEmpty) {
+      stackRefs.add(node.lhs)
+    } else if (stackRefs.contains(node.lhs) && node.lhs != stackPointer) {
+      stackRefs.remove(node.lhs)
+    }
+    node
+  }
+
+  override def visitMemoryAssign(node: MemoryAssign): Statement = {
+    val indexStackRefs = node.rhs.index.variables.intersect(stackRefs)
+    if (indexStackRefs.nonEmpty) {
+      node.lhs = stackMemory
+      node.rhs = node.rhs.copy(mem = stackMemory)
+    }
+    node
   }
 
 }
