@@ -34,6 +34,8 @@ object Main {
       interpret: Flag,
       @arg(name = "dump-il", doc = "Dump the Intermediate Language to text.")
       dumpIL: Option[String],
+      @arg(name = "main-procedure-name", short = 'm', doc = "Name of the main procedure to begin analysis at.")
+      mainProcedureName: String = "main",
       @arg(name = "help", short = 'h', doc = "Show this help message.")
       help: Flag,
       @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
@@ -63,7 +65,7 @@ object Main {
     }
 
     val q = BASILConfig(
-      loading = ILLoadingConfig(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.dumpIL),
+      loading = ILLoadingConfig(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName),
       runInterpret = conf.interpret.value,
       staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot)) else None,
       boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect),

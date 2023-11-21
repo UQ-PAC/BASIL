@@ -1,6 +1,6 @@
 package util
 
-case class ILLoadingConfig(adtFile: String, relfFile: String, specFile: Option[String], dumpIL: Option[String])
+case class ILLoadingConfig(adtFile: String, relfFile: String, specFile: Option[String], dumpIL: Option[String], mainProcedureName: String)
 case class BoogieGeneratorConfig(memoryFunctionType: BoogieMemoryAccessMode = BoogieMemoryAccessMode.SuccessiveStoreSelect)
 case class StaticAnalysisConfig(dumpILToPath: Option[String] = None, analysisResultsPath: Option[String] = None, analysisDotPath: Option[String] = None)
 enum BoogieMemoryAccessMode:

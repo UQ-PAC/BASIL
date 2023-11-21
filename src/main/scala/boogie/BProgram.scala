@@ -1,12 +1,28 @@
 package boogie
+import java.io.Writer
 
 case class BProgram(declarations: List[BDeclaration]) {
-  override def toString: String = declarations.flatMap(x => x.toBoogie).mkString("\n")
+  override def toString: String = declarations.flatMap(x => x.toBoogie).mkString(System.lineSeparator())
+
+  def writeToString(w: Writer): Unit = {
+    declarations.foreach(x => {
+      x.writeToString(w)
+      w.append(System.lineSeparator())
+    })
+  }
 }
 
 trait BDeclaration extends HasAttributes {
   override def attributes: List[BAttribute] = List()
   def toBoogie: List[String] = List(toString)
+
+  final def writeToString(w: Writer): Unit = {
+    for (elem <- toBoogie) {
+      w.append(elem)
+      w.append(System.lineSeparator())
+    }
+  }
+
 }
 
 case class BProcedure(
