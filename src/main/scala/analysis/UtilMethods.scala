@@ -11,7 +11,7 @@ import util.Logger
   * @return:
   *   The evaluated expression (e.g. 0x69632)
   */
-def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, ConstantPropagationLattice.FlatElement]): Option[BitVecLiteral] = {
+def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[BitVecLiteral]]): Option[BitVecLiteral] = {
   Logger.debug(s"evaluateExpression: $exp")
   exp match {
     case binOp: BinaryExpr =>
@@ -41,9 +41,9 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, ConstantProp
       }
     case variable: Variable =>
       constantPropResult(variable) match {
-        case ConstantPropagationLattice.FlatElement.FlatEl(value) => Some(value.asInstanceOf[BitVecLiteral])
-        case ConstantPropagationLattice.FlatElement.Top           => None
-        case ConstantPropagationLattice.FlatElement.Bot           => None
+        case FlatEl(value) => Some(value)
+        case Top           => None
+        case Bottom           => None
       }
     case b: BitVecLiteral => Some(b)
     case _ => //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")

@@ -108,3 +108,36 @@ class MemoryModelMap {
     s"Stack: ${rangeMap.stackMap}\n Heap: ${rangeMap.heapMap}\n Data: ${rangeMap.dataMap}\n"
 
 }
+
+trait MemoryRegion {
+  val regionIdentifier: String
+  var extent: Option[RangeKey] = None
+}
+
+class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral) extends MemoryRegion {
+  override def toString: String = s"Stack($regionIdentifier, $start)"
+  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier
+    case _ => false
+  }
+}
+
+class HeapRegion(override val regionIdentifier: String) extends MemoryRegion {
+  override def toString: String = s"Heap($regionIdentifier)"
+  override def hashCode(): Int = regionIdentifier.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case h: HeapRegion => h.regionIdentifier == regionIdentifier
+    case _ => false
+  }
+}
+
+class DataRegion(override val regionIdentifier: String, val start: BitVecLiteral) extends MemoryRegion {
+  override def toString: String = s"Data($regionIdentifier, $start)"
+  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case d: DataRegion => d.start == start && d.regionIdentifier == regionIdentifier
+    case _ => false
+  }
+}
+

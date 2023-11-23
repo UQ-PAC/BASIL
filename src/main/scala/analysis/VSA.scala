@@ -29,27 +29,23 @@ case class LiteralValue(expr: BitVecLiteral) extends Value {
   override def toString: String = "Literal(" + expr + ")"
 }
 
-type VSALatticeElem = MapLattice[Variable | MemoryRegion, PowersetLattice[Value]]
+trait ValueSetAnalysis(cfg: ProgramCfg,
+                        globals: Map[BigInt, String],
+                        externalFunctions: Map[BigInt, String],
+                        globalOffsets: Map[BigInt, BigInt],
+                        subroutines: Map[BigInt, String],
+                        mmm: MemoryModelMap,
+                        constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]) {
 
-trait MemoryRegionValueSetAnalysis:
+  val powersetLattice: PowersetLattice[Value] = PowersetLattice()
 
-  val cfg: ProgramCfg
-  val globals: Map[BigInt, String]
-  val externalFunctions: Map[BigInt, String]
-  val globalOffsets: Map[BigInt, BigInt]
-  val subroutines: Map[BigInt, String]
-  val mmm: MemoryModelMap
-  val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
+  val mapLattice: MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]] = MapLattice(powersetLattice)
 
-  /** The lattice of abstract values.
-    */
-  val powersetLattice: VSALatticeElem
-
-  /** The lattice of abstract states.
-    */
-  val lattice: MapLattice[CfgNode, VSALatticeElem] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CfgNode, Map[Variable | MemoryRegion, Set[Value]], mapLattice.type] = MapLattice(mapLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
+
+  val first: Set[CfgNode] = Set(cfg.startNode)
 
   private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
@@ -102,7 +98,7 @@ trait MemoryRegionValueSetAnalysis:
 
   /** Default implementation of eval.
     */
-  def eval(cmd: Command, s: lattice.sublattice.Element, n: CfgNode): lattice.sublattice.Element = {
+  def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]], n: CfgNode): Map[Variable | MemoryRegion, Set[Value]] = {
     Logger.debug(s"eval: $cmd")
     Logger.debug(s"state: $s")
     Logger.debug(s"node: $n")
@@ -139,11 +135,11 @@ trait MemoryRegionValueSetAnalysis:
                 evaluateExpression(storeValue, constantProp(n)) match
                   case Some(bitVecLiteral: BitVecLiteral) =>
                     s + (r -> Set(getValueType(bitVecLiteral)))
-                    /*
-                  // TODO constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
-                  case variable: Variable =>
-                    s + (r -> s(variable))
-                    */
+                  /*
+                // TODO constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
+                case variable: Variable =>
+                  s + (r -> s(variable))
+                  */
                   case None =>
                     storeValue.match {
                       case v: Variable =>
@@ -163,70 +159,31 @@ trait MemoryRegionValueSetAnalysis:
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element =
-    n match {
-      case entry: CfgFunctionEntryNode =>
-        mmm.pushContext(entry.data.name)
-        s
-      case _: CfgFunctionExitNode =>
-        mmm.popContext()
-        s
-      case cmd: CfgCommandNode =>
-        eval(cmd.data, s, n)
-      case _ => s // ignore other kinds of nodes
-    }
-
-/** Base class for memory region analysis (non-lifted) lattice.
-  */
-abstract class ValueSetAnalysis(
-    val cfg: ProgramCfg,
-    val globals: Map[BigInt, String],
-    val externalFunctions: Map[BigInt, String],
-    val globalOffsets: Map[BigInt, BigInt],
-    val subroutines: Map[BigInt, String],
-    val mmm: MemoryModelMap,
-    val constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-) extends FlowSensitiveAnalysis(true)
-    with MemoryRegionValueSetAnalysis {
+  def localTransfer(n: CfgNode, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = n match {
+    case entry: CfgFunctionEntryNode =>
+      mmm.pushContext(entry.data.name)
+      s
+    case _: CfgFunctionExitNode =>
+      mmm.popContext()
+      s
+    case cmd: CfgCommandNode =>
+      eval(cmd.data, s, n)
+    case _ => s // ignore other kinds of nodes
+  }
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transfer(n: CfgNode, s: lattice.sublattice.Element): lattice.sublattice.Element = localTransfer(n, s)
-
+  def transfer(n: CfgNode, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = localTransfer(n, s)
 }
 
-abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
+class ValueSetAnalysisSolver(
     cfg: ProgramCfg,
     globals: Map[BigInt, String],
     externalFunctions: Map[BigInt, String],
     globalOffsets: Map[BigInt, BigInt],
     subroutines: Map[BigInt, String],
     mmm: MemoryModelMap,
-    constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
-    val powersetLattice: L
+    constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
 ) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
-    with SimpleMonotonicSolver[CfgNode]
-    with ForwardDependencies
-
-object ValueSetAnalysis:
-
-  /** Intraprocedural analysis that uses the worklist solver.
-    */
-  class WorklistSolver(
-      cfg: ProgramCfg,
-      globals: Map[BigInt, String],
-      externalFunctions: Map[BigInt, String],
-      globalOffsets: Map[BigInt, BigInt],
-      subroutines: Map[BigInt, String],
-      mmm: MemoryModelMap,
-      constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-  ) extends IntraprocValueSetAnalysisWorklistSolver(
-        cfg,
-        globals,
-        externalFunctions,
-        globalOffsets,
-        subroutines,
-        mmm,
-        constantProp,
-        MapLattice[Variable | MemoryRegion, PowersetLattice[Value]](PowersetLattice[Value])
-      )
+    with InterproceduralForwardDependencies
+    with SimpleMonotonicSolver[CfgNode, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]]
