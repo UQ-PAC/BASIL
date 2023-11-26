@@ -1,235 +1,115 @@
 package analysis
 
 import ir._
-import analysis.util._
+import analysis.BitVectorEval
+import util.Logger
 
 /** Basic lattice
   */
-trait Lattice:
+trait Lattice[T]:
 
-  /** The type of the elements of this lattice.
-    */
-  type Element
-
+  type Element = T
   /** The bottom element of this lattice.
     */
-  val bottom: Element
+  val bottom: T
 
   /** The top element of this lattice. Default: not implemented.
     */
-  def top: Element = ???
+  def top: T = ???
 
   /** The least upper bound of `x` and `y`.
     */
-  def lub(x: Element, y: Element): Element
+  def lub(x: T, y: T): T
 
   /** Returns true whenever `x` <= `y`.
     */
-  def leq(x: Element, y: Element): Boolean = lub(x, y) == y // rarely used, but easy to implement :-)
+  def leq(x: T, y: T): Boolean = lub(x, y) == y // rarely used, but easy to implement :-)
 
-/** Lattice with abstract operators.
+/** The powerset lattice of a set of elements of type `A` with subset ordering.
   */
-trait LatticeWithOps extends Lattice:
-
-  def literal(l: Literal): Element
-  def bvadd(a: Element, b: Element): Element
-  def bvsub(a: Element, b: Element): Element
-  def bvmul(a: Element, b: Element): Element
-  def bvudiv(a: Element, b: Element): Element
-  def bvsdiv(a: Element, b: Element): Element
-  def bvsrem(a: Element, b: Element): Element
-  def bvurem(a: Element, b: Element): Element
-  // smod
-  def bvshl(a: Element, b: Element): Element
-  def bvlshr(a: Element, b: Element): Element
-  def bvashr(a: Element, b: Element): Element
-  def bvand(a: Element, b: Element): Element
-  def bvor(a: Element, b: Element): Element
-  def bvxor(a: Element, b: Element): Element
-  def bvnand(a: Element, b: Element): Element
-  def bvnor(a: Element, b: Element): Element
-  def bvxnor(a: Element, b: Element): Element
-  def bvule(a: Element, b: Element): Element
-  def bvuge(a: Element, b: Element): Element
-  def bvult(a: Element, b: Element): Element
-  def bvugt(a: Element, b: Element): Element
-  def bvsle(a: Element, b: Element): Element
-  def bvsge(a: Element, b: Element): Element
-  def bvslt(a: Element, b: Element): Element
-  def bvsgt(a: Element, b: Element): Element
-  def bvcomp(a: Element, b: Element): Element
-  def zero_extend(width: Int, a: Element): Element
-  def sign_extend(width: Int, a: Element): Element
-  def extract(high: Int, low: Int, a: Element): Element
-  def bvnot(a: Element): Element
-  def bvneg(a: Element): Element
-  def bvneq(a: Element, b: Element): Element
-  def bveq(a: Element, b: Element): Element
-  def concat(a: Element, b: Element): Element
-
-
-/**
- * The powerset lattice of a set of elements of type `A` with subset ordering.
- */
-class PowersetLattice[A] extends Lattice {
-
-  type Element = Set[A]
-
-  val bottom: Element = Set.empty //<--- Complete here
-
-  def lub(x: Element, y: Element): Element = x.union(y) //<--- Complete here
+class PowersetLattice[A] extends Lattice[Set[A]] {
+  val bottom: Set[A] = Set.empty
+  def lub(x: Set[A], y: Set[A]): Set[A] = x.union(y)
 }
+
+trait FlatElement[+T]
+case class FlatEl[T](el: T) extends FlatElement[T]
+case object Top extends FlatElement[Nothing]
+case object Bottom extends FlatElement[Nothing]
 
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
   * other element. No additional ordering is defined.
   */
-class FlatLattice[X] extends Lattice:
+class FlatLattice[X] extends Lattice[FlatElement[X]] {
 
-  enum FlatElement:
-    case FlatEl(el: X)
-    case Top
-    case Bot
+  val bottom: FlatElement[X] = Bottom
 
-  type Element = FlatElement
+  override val top: FlatElement[X] = Top
 
-  /** Wrap an element of `X` into an element of the flat lattice.
-    */
-  implicit def wrap(a: X): Element = FlatElement.FlatEl(a)
+  def lub(x: FlatElement[X], y: FlatElement[X]): FlatElement[X] = (x, y) match {
+    case (a, Bottom) => a
+    case (Bottom, b) => b
+    case (a, b) if a == b => a
+    case (Top, _) => Top
+    case (_, Top) => Top
+    case _ => Top
+  }
+}
 
-  /** Unwrap an element of the lattice to an element of `X`. If the element is Top or Bot then IllegalArgumentException
-    * is thrown. Note that this method is declared as implicit, so the conversion can be done automatically.
-    */
-  implicit def unwrap(a: Element): X = a match
-    case FlatElement.FlatEl(n) => n
-    case _                     => throw new IllegalArgumentException(s"Cannot unlift $a")
-
-  val bottom: Element = FlatElement.Bot
-
-  override val top: Element = FlatElement.Top
-
-  def lub(x: Element, y: Element): Element =
-    if x == FlatElement.Bot || y == FlatElement.Top || x == y then y
-    else if y == FlatElement.Bot || x == FlatElement.Top then x
-    else FlatElement.Top
-
-/** A lattice of maps from a set of elements of type `A` to the lattice `sublattice`. Bottom is the default value.
+/** A lattice of maps from a set of elements of type `A` to a lattice with element `L'. Bottom is the default value.
   */
-class MapLattice[A, +L <: Lattice](val sublattice: L) extends Lattice:
-
-  type Element = Map[A, sublattice.Element]
-
-  val bottom: Element = Map().withDefaultValue(sublattice.bottom)
-
-  def lub(x: Element, y: Element): Element =
+class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[A, T]] {
+  val bottom: Map[A, T] = Map().withDefaultValue(sublattice.bottom)
+  def lub(x: Map[A, T], y: Map[A, T]): Map[A, T] =
     x.keys.foldLeft(y)((m, a) => m + (a -> sublattice.lub(x(a), y(a)))).withDefaultValue(sublattice.bottom)
+}
 
 /** Constant propagation lattice.
+  *
   */
-object ConstantPropagationLattice extends FlatLattice[Literal]() with LatticeWithOps:
-
-  private def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element = try {
-      (a, b) match
-        case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => 
-          FlatElement.FlatEl(op(x, y))
-        case (FlatElement.Bot, _) => FlatElement.Bot
-        case (_, FlatElement.Bot) => FlatElement.Bot
-        case (_, FlatElement.Top) => FlatElement.Top
-        case (FlatElement.Top, _) => FlatElement.Top
+class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
+  private def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = try {
+    (a, b) match
+      case (FlatEl(x), FlatEl(y)) => FlatEl(op(x, y))
+      case (Bottom, _) => Bottom
+      case (_, Bottom) => Bottom
+      case (_, Top) => Top
+      case (Top, _) => Top
   } catch {
     case e: Exception =>
-      println(s"Failed on op $op with $a and $b")
+      Logger.error(s"Failed on op $op with $a and $b")
       throw e
   }
 
-  private def apply(op: Literal => Literal, a: Element): Element = a match
-    case FlatElement.FlatEl(x) => FlatElement.FlatEl(op(x))
-    case FlatElement.Top       => FlatElement.Top
-    case FlatElement.Bot       => FlatElement.Bot
+  private def apply(op: BitVecLiteral => BitVecLiteral, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = a match
+    case FlatEl(x) => FlatEl(op(x))
+    case Top => Top
+    case Bottom => Bottom
 
-  override def literal(l: Literal): Element = FlatElement.FlatEl(l)
-  override def bvadd(a: Element, b: Element): Element = apply(smt_bvadd, a, b)
-  override def bvsub(a: Element, b: Element): Element = apply(smt_bvsub, a, b)
-  override def bvmul(a: Element, b: Element): Element = apply(smt_bvmul, a, b)
-  override def bvudiv(a: Element, b: Element): Element = apply(smt_bvudiv, a, b)
-  override def bvsdiv(a: Element, b: Element): Element = apply(smt_bvsdiv, a, b)
-  override def bvsrem(a: Element, b: Element): Element = apply(smt_bvsrem, a, b)
-  override def bvurem(a: Element, b: Element): Element = apply(smt_bvurem, a, b)
-  override def bvand(a: Element, b: Element): Element = apply(smt_bvand, a, b)
-  override def bvor(a: Element, b: Element): Element = apply(smt_bvor, a, b)
-  override def bvxor(a: Element, b: Element): Element = apply(smt_bvxor, a, b)
-  override def bvnand(a: Element, b: Element): Element = apply(smt_bvnand, a, b) 
-  override def bvnor(a: Element, b: Element): Element = apply(smt_bvnor, a, b) 
-  override def bvxnor(a: Element, b: Element): Element = apply(smt_bvxnor, a, b)
-  override def bvnot(a: Element): Element = apply(smt_bvnot, a)
-  override def bvneg(a: Element): Element = apply(smt_bvneg, a)
-  override def bvshl(a: Element, b: Element): Element = apply(smt_bvshl, a, b)
-  override def bvlshr(a: Element, b: Element): Element = apply(smt_bvlshr, a, b)
-  override def bvashr(a: Element, b: Element): Element = apply(smt_bvashr, a, b)
-  override def bvcomp(a: Element, b: Element): Element = apply(smt_bvcomp, a, b)
-  override def bvule(a: Element, b: Element): Element = apply(smt_bvule, a, b)
-  override def bvuge(a: Element, b: Element): Element = apply(smt_bvuge, a, b)
-  override def bvult(a: Element, b: Element): Element = apply(smt_bvult, a, b)
-  override def bvugt(a: Element, b: Element): Element = apply(smt_bvugt, a, b)
-  override def bvsle(a: Element, b: Element): Element = apply(smt_bvsle, a, b)
-  override def bvsge(a: Element, b: Element): Element = apply(smt_bvsge, a, b)
-  override def bvslt(a: Element, b: Element): Element = apply(smt_bvslt, a, b)
-  override def bvsgt(a: Element, b: Element): Element = apply(smt_bvsgt, a, b)
-  override def zero_extend(width: Int, a: Element): Element = apply(smt_zero_extend(width, _: Literal), a)
-  override def sign_extend(width: Int, a: Element): Element = apply(smt_sign_extend(width, _: Literal), a)
-  override def extract(high: Int, low: Int, a: Element): Element = apply(boogie_extract(high, low, _: Literal), a)
-  override def concat(a: Element, b: Element): Element = apply(smt_concat, a, b)
-  override def bvneq(a: Element, b: Element): Element = apply(smt_bvneq, a, b)
-  override def bveq(a: Element, b: Element): Element = apply(smt_bveq, a, b)
-
-
-// value-set lattice
-/** Constant propagation lattice.
- */
-object ValueSetLattice extends FlatLattice[Literal]() with LatticeWithOps:
-
-  private def apply(op: (Literal, Literal) => Literal, a: Element, b: Element): Element = (a, b) match
-    case (FlatElement.FlatEl(x), FlatElement.FlatEl(y)) => FlatElement.FlatEl(op(x, y))
-    case (FlatElement.Bot, _) => FlatElement.Bot
-    case (_, FlatElement.Bot) => FlatElement.Bot
-    case (_, FlatElement.Top) => FlatElement.Top
-    case (FlatElement.Top, _) => FlatElement.Top
-
-  private def apply(op: Literal => Literal, a: Element): Element = a match
-    case FlatElement.FlatEl(x) => FlatElement.FlatEl(op(x))
-    case FlatElement.Top => FlatElement.Top
-    case FlatElement.Bot => FlatElement.Bot
-
-  override def literal(l: Literal): Element = FlatElement.FlatEl(l)
-  override def bvadd(a: Element, b: Element): Element = apply(smt_bvadd, a, b)
-  override def bvsub(a: Element, b: Element): Element = apply(smt_bvsub, a, b)
-  override def bvmul(a: Element, b: Element): Element = apply(smt_bvmul, a, b)
-  override def bvudiv(a: Element, b: Element): Element = apply(smt_bvudiv, a, b)
-  override def bvsdiv(a: Element, b: Element): Element = apply(smt_bvsdiv, a, b)
-  override def bvsrem(a: Element, b: Element): Element = apply(smt_bvsrem, a, b)
-  override def bvurem(a: Element, b: Element): Element = apply(smt_bvurem, a, b)
-  override def bvand(a: Element, b: Element): Element = apply(smt_bvand, a, b)
-  override def bvor(a: Element, b: Element): Element = apply(smt_bvor, a, b)
-  override def bvnand(a: Element, b: Element): Element = apply(smt_bvnand, a, b) 
-  override def bvnor(a: Element, b: Element): Element = apply(smt_bvnor, a, b) 
-  override def bvxnor(a: Element, b: Element): Element = apply(smt_bvxnor, a, b)
-  override def bvxor(a: Element, b: Element): Element = apply(smt_bvxor, a, b)
-  override def bvnot(a: Element): Element = apply(smt_bvnot, a)
-  override def bvneg(a: Element): Element = apply(smt_bvneg, a)
-  override def bvshl(a: Element, b: Element): Element = apply(smt_bvshl, a, b)
-  override def bvlshr(a: Element, b: Element): Element = apply(smt_bvlshr, a, b)
-  override def bvashr(a: Element, b: Element): Element = apply(smt_bvashr, a, b)
-  override def bvcomp(a: Element, b: Element): Element = apply(smt_bvcomp, a, b)
-  override def bvule(a: Element, b: Element): Element = apply(smt_bvule, a, b)
-  override def bvuge(a: Element, b: Element): Element = apply(smt_bvuge, a, b)
-  override def bvult(a: Element, b: Element): Element = apply(smt_bvult, a, b)
-  override def bvugt(a: Element, b: Element): Element = apply(smt_bvugt, a, b)
-  override def bvsle(a: Element, b: Element): Element = apply(smt_bvsle, a, b)
-  override def bvsge(a: Element, b: Element): Element = apply(smt_bvsge, a, b)
-  override def bvslt(a: Element, b: Element): Element = apply(smt_bvslt, a, b)
-  override def bvsgt(a: Element, b: Element): Element = apply(smt_bvsgt, a, b)
-  override def zero_extend(width: Int, a: Element): Element = apply(smt_zero_extend(width, _: Literal), a)
-  override def sign_extend(width: Int, a: Element): Element = apply(smt_sign_extend(width, _: Literal), a)
-  override def extract(high: Int, low: Int, a: Element): Element = apply(boogie_extract(high, low, _: Literal), a)
-  override def concat(a: Element, b: Element): Element = apply(smt_concat, a, b)
-  override def bvneq(a: Element, b: Element): Element = apply(smt_bvneq, a, b)
-  override def bveq(a: Element, b: Element): Element = apply(smt_bveq, a, b)
+  def bv(a: BitVecLiteral): FlatElement[BitVecLiteral] = FlatEl(a)
+  def bvadd(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvadd, a, b)
+  def bvsub(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsub, a, b)
+  def bvmul(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvmul, a, b)
+  def bvudiv(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvudiv, a, b)
+  def bvsdiv(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsdiv, a, b)
+  def bvsrem(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsrem, a, b)
+  def bvurem(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvurem, a, b)
+  def bvsmod(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvsmod, a, b)
+  def bvand(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvand, a, b)
+  def bvor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvor, a, b)
+  def bvxor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvxor, a, b)
+  def bvnand(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvnand, a, b)
+  def bvnor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvnor, a, b)
+  def bvxnor(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvxnor, a, b)
+  def bvnot(a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvnot, a)
+  def bvneg(a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvneg, a)
+  def bvshl(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvshl, a, b)
+  def bvlshr(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvlshr, a, b)
+  def bvashr(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvashr, a, b)
+  def bvcomp(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_bvcomp, a, b)
+  def zero_extend(width: Int, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_zero_extend(width, _: BitVecLiteral), a)
+  def sign_extend(width: Int, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_sign_extend(width, _: BitVecLiteral), a)
+  def extract(high: Int, low: Int, a: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] =
+    apply(BitVectorEval.boogie_extract(high, low, _: BitVecLiteral), a)
+  def concat(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_concat, a, b)
+}

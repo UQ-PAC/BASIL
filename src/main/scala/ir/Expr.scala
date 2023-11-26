@@ -17,9 +17,10 @@ trait Expr {
       }
     }
   }
+  def loads: Set[MemoryLoad] = Set()
   def getType: IRType
   def gammas: Set[Expr] = Set()
-  def locals: Set[Variable] = Set()
+  def variables: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
@@ -56,16 +57,17 @@ case class IntLiteral(value: BigInt) extends Literal {
 class Extract(var end: Int, var start: Int, var body: Expr) extends Expr {
   override def toBoogie: BExpr = BVExtract(end, start, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
-  override def locals: Set[Variable] = body.locals
+  override def variables: Set[Variable] = body.variables
   override def getType: BitVecType = BitVecType(end - start)
   override def toString: String = s"$body[$end:$start]"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitExtract(this)
+  override def loads: Set[MemoryLoad] = body.loads
 }
 
 class Repeat(var repeats: Int, var body: Expr) extends Expr {
   override def toBoogie: BExpr = BVRepeat(repeats, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
-  override def locals: Set[Variable] = body.locals
+  override def variables: Set[Variable] = body.variables
   override def getType: BitVecType = BitVecType(bodySize * repeats)
   private def bodySize: Int = body.getType match {
     case bv: BitVecType => bv.size
@@ -73,12 +75,13 @@ class Repeat(var repeats: Int, var body: Expr) extends Expr {
   }
   override def toString: String = s"Repeat($repeats, $body)"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitRepeat(this)
+  override def loads: Set[MemoryLoad] = body.loads
 }
 
 class ZeroExtend(var extension: Int, var body: Expr) extends Expr {
   override def toBoogie: BExpr = BVZeroExtend(extension, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
-  override def locals: Set[Variable] = body.locals
+  override def variables: Set[Variable] = body.variables
   override def getType: BitVecType = BitVecType(bodySize + extension)
   private def bodySize: Int = body.getType match {
     case bv: BitVecType => bv.size
@@ -86,12 +89,13 @@ class ZeroExtend(var extension: Int, var body: Expr) extends Expr {
   }
   override def toString: String = s"ZeroExtend($extension, $body)"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitZeroExtend(this)
+  override def loads: Set[MemoryLoad] = body.loads
 }
 
 class SignExtend(var extension: Int, var body: Expr) extends Expr {
   override def toBoogie: BExpr = BVSignExtend(extension, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
-  override def locals: Set[Variable] = body.locals
+  override def variables: Set[Variable] = body.variables
   override def getType: BitVecType = BitVecType(bodySize + extension)
   private def bodySize: Int = body.getType match {
     case bv: BitVecType => bv.size
@@ -99,28 +103,30 @@ class SignExtend(var extension: Int, var body: Expr) extends Expr {
   }
   override def toString: String = s"SignExtend($extension, $body)"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitSignExtend(this)
+  override def loads: Set[MemoryLoad] = body.loads
 }
 
 class UnaryExpr(var op: UnOp, var arg: Expr) extends Expr {
   override def toBoogie: BExpr = UnaryBExpr(op, arg.toBoogie)
   override def gammas: Set[Expr] = arg.gammas
-  override def locals: Set[Variable] = arg.locals
+  override def variables: Set[Variable] = arg.variables
+  override def loads: Set[MemoryLoad] = arg.loads
   override def getType: IRType = (op, arg.getType) match {
-    case (_: BoolUnOp, BoolType) => BoolType
+    case (_: BoolUnOp, BoolType)     => BoolType
     case (_: BVUnOp, bv: BitVecType) => bv
-    case (_: IntUnOp, IntType) => IntType
+    case (_: IntUnOp, IntType)       => IntType
     case _ => throw new Exception("type mismatch, operator " + op + " type doesn't match arg: " + arg)
   }
 
   private def inSize = arg.getType match {
     case bv: BitVecType => bv.size
-    case _ => throw new Exception("type mismatch")
+    case _              => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
     case uOp: BoolUnOp => s"($uOp$arg)"
-    case uOp: BVUnOp => s"bv$uOp$inSize($arg)"
-    case uOp: IntUnOp => s"($uOp$arg)"
+    case uOp: BVUnOp   => s"bv$uOp$inSize($arg)"
+    case uOp: IntUnOp  => s"($uOp$arg)"
   }
 
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUnaryExpr(this)
@@ -151,7 +157,8 @@ case object BVNEG extends BVUnOp("neg")
 class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
   override def toBoogie: BExpr = BinaryBExpr(op, arg1.toBoogie, arg2.toBoogie)
   override def gammas: Set[Expr] = arg1.gammas ++ arg2.gammas
-  override def locals: Set[Variable] = arg1.locals ++ arg2.locals
+  override def variables: Set[Variable] = arg1.variables ++ arg2.variables
+  override def loads: Set[MemoryLoad] = arg1.loads ++ arg2.loads
   override def getType: IRType = (op, arg1.getType, arg2.getType) match {
     case (_: BoolBinOp, BoolType, BoolType) => BoolType
     case (binOp: BVBinOp, bv1: BitVecType, bv2: BitVecType) =>
@@ -159,31 +166,22 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
         case BVCONCAT =>
           BitVecType(bv1.size + bv2.size)
         case BVAND | BVOR | BVADD | BVMUL | BVUDIV | BVUREM | BVSHL | BVLSHR | BVNAND | BVNOR | BVXOR | BVXNOR | BVSUB |
-             BVSREM | BVSDIV | BVSMOD | BVASHR =>
+            BVSREM | BVSDIV | BVSMOD | BVASHR =>
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            println(arg1)
-            println(arg2)
-            println(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVCOMP =>
           if (bv1.size == bv2.size) {
             BitVecType(1)
           } else {
-            //BitVecType(1)
-            println(arg1)
-            println(arg2)
-            println(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolType
           } else {
-            println(arg1)
-            println(arg2)
             throw new Exception("bitvector size mismatch")
           }
         case BVEQ | BVNEQ =>
@@ -191,7 +189,7 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
       }
     case (intOp: IntBinOp, IntType, IntType) =>
       intOp match {
-        case IntADD | IntSUB | IntMUL | IntDIV | IntMOD => IntType
+        case IntADD | IntSUB | IntMUL | IntDIV | IntMOD     => IntType
         case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => BoolType
       }
     case _ =>
@@ -200,7 +198,7 @@ class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
 
   private def inSize = arg1.getType match {
     case bv: BitVecType => bv.size
-    case _ => throw new Exception("type mismatch")
+    case _              => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
@@ -306,7 +304,8 @@ class MemoryStore(var mem: Memory, var index: Expr, var value: Expr, var endian:
     GammaStore(mem.toGamma, index.toBoogie, value.toGamma, size, size / mem.valueSize)
 
   override def gammas: Set[Expr] = Set()
-  override def locals: Set[Variable] = index.locals ++ value.locals
+  override def loads: Set[MemoryLoad] = index.loads ++ value.loads
+  override def variables: Set[Variable] = index.variables ++ value.variables
 
   override def getType: IRType = BitVecType(size)
   override def toString: String = s"MemoryStore($mem, $index, $value, $endian, $size)"
@@ -324,35 +323,56 @@ class MemoryLoad(var mem: Memory, var index: Expr, var endian: Endian, var size:
       L(mem.toBoogie, index.toBoogie)
     )
   }
-  override def locals: Set[Variable] = index.locals
+  override def variables: Set[Variable] = index.variables
   override def gammas: Set[Expr] = Set(this)
+  override def loads: Set[MemoryLoad] = Set(this)
   override def getType: IRType = BitVecType(size)
   override def toString: String = s"MemoryLoad($mem, $index, $endian, $size)"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemoryLoad(this)
 }
 
-// name == stack or mem
-case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr {
-  override def toBoogie: BMapVar = BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
+sealed trait Global
+
+case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr with Global {
+  override def toBoogie: BMapVar =
+    BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
   override def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapBType(BitVecBType(addressSize), BoolBType), Scope.Global)
   override val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
   override def toString: String = s"Memory($name, $addressSize, $valueSize)"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemory(this)
 }
 
-case class Variable(name: String, irType: IRType) extends Expr {
-  override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
-  override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
+sealed trait Variable extends Expr {
+  val name: String
+  val irType: IRType
   override def getType: IRType = irType
-  override def locals: Set[Variable] = Set(this)
+  override def variables: Set[Variable] = Set(this)
   override def gammas: Set[Expr] = Set(this)
+  override def toBoogie: BVar
+  // placeholder definition not actually used
+  override def toGamma: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
 
   def size: Int = irType match {
     case b: BitVecType => b.size
-    case _ => throw new Exception("tried to get size of non-bitvector")
+    case _             => throw new Exception("tried to get size of non-bitvector")
   }
-  override def toString: String = s"Variable($name, $irType)"
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitVariable(this)
 
-  val isRegister: Boolean = name.startsWith("R") || name.startsWith("V") && name != "VF"
+  override def toString: String = s"Variable($name, $irType)"
+
+  override def acceptVisit(visitor: Visitor): Variable =
+    throw new Exception("visitor " + visitor + " unimplemented for: " + this)
+}
+
+case class Register(override val name: String, override val irType: IRType) extends Variable with Global {
+  override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
+  override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
+  override def toString: String = s"Register($name, $irType)"
+  override def acceptVisit(visitor: Visitor): Variable = visitor.visitRegister(this)
+}
+
+case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
+  override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
+  override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
+  override def toString: String = s"LocalVar($name, $irType)"
+  override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }

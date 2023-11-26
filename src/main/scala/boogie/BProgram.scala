@@ -4,7 +4,8 @@ case class BProgram(declarations: List[BDeclaration]) {
   override def toString: String = declarations.flatMap(x => x.toBoogie).mkString("\n")
 }
 
-trait BDeclaration {
+trait BDeclaration extends HasAttributes {
+  override def attributes: List[BAttribute] = List()
   def toBoogie: List[String] = List(toString)
 }
 
@@ -14,12 +15,18 @@ case class BProcedure(
     out: List[BVar],
     ensures: List[BExpr],
     requires: List[BExpr],
-    modifies: Seq[BVar],
-    body: List[BCmdOrBlock]
-) extends BDeclaration with Ordered[BProcedure] {
+    ensuresDirect: List[String],
+    requiresDirect: List[String],
+    freeEnsures: List[BExpr],
+    freeRequires: List[BExpr],
+    modifies: Set[BVar],
+    body: List[BCmdOrBlock],
+    override val attributes: List[BAttribute] = List()
+) extends BDeclaration
+    with Ordered[BProcedure] {
   override def compare(that: BProcedure): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
-    val header = s"procedure $name(${in.map(_.withType).mkString(", ")})"
+    val header = s"procedure $attrString$name(${in.map(_.withType).mkString(", ")})"
     val returns = if (out.nonEmpty) {
       s" returns (${out.map(_.withType).mkString(", ")})"
     } else {
@@ -27,12 +34,14 @@ case class BProcedure(
     }
     val semicolon = if body.nonEmpty then "" else ";"
     val modifiesStr = if (modifies.nonEmpty) {
-      List(s"  modifies ${modifies.mkString(", ")};")
+      List(s"  modifies ${modifies.toSeq.sorted.mkString(", ")};")
     } else {
       List()
     }
-    val requiresStrs = requires.map(r => s"  requires $r;")
-    val ensuresStrs = ensures.map(e => s"  ensures $e;")
+    val requiresStrs = requires.map(r => s"  requires $r;") ++ requiresDirect.map(r => s"  requires $r;")
+    val ensuresStrs = ensures.map(e => s"  ensures $e;") ++ ensuresDirect.map(e => s"  ensures $e;")
+    val freeRequiresStrs = freeRequires.map(r => s"  free requires $r;")
+    val freeEnsuresStrs = freeEnsures.map(e => s"  free ensures $e;")
     val locals = body.flatMap(l => l.locals).distinct.sorted
     val localDefs = locals.map(l => "  " + BVarDecl(l).toString)
     val bodyStr = if (body.nonEmpty) {
@@ -40,28 +49,31 @@ case class BProcedure(
     } else {
       List()
     }
-    List(header + returns + semicolon) ++ modifiesStr ++ requiresStrs ++ ensuresStrs ++ bodyStr ++ List("")
+    List(
+      header + returns + semicolon
+    ) ++ modifiesStr ++ requiresStrs ++ freeRequiresStrs ++ ensuresStrs ++ freeEnsuresStrs ++ bodyStr ++ List("")
   }
   override def toString: String = toBoogie.mkString("\n")
-  def functionOps: Set[FunctionOp] = body.flatMap(c => c.functionOps).toSet ++ ensures.flatMap(c => c.functionOps).toSet ++ requires.flatMap(c => c.functionOps).toSet
-  def globals: Set[BVar] = body.flatMap(c => c.globals).toSet
+  def functionOps: Set[FunctionOp] =
+    body.flatMap(c => c.functionOps).toSet ++ ensures.flatMap(c => c.functionOps).toSet ++ requires
+      .flatMap(c => c.functionOps)
+      .toSet ++ freeEnsures.flatMap(c => c.functionOps).toSet ++ freeRequires.flatMap(c => c.functionOps).toSet
+
+  def globals: Set[BVar] = body.flatMap(c => c.globals).toSet ++ modifies
 }
 
-case class BAxiom(body: BExpr) extends BDeclaration {
-  override def toString: String = s"axiom $body;"
+case class BAxiom(body: BExpr, override val attributes: List[BAttribute] = List()) extends BDeclaration {
+  override def toString: String = s"axiom $attrString$body;"
 }
 
-case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar, body: Option[BExpr])
-    extends BDeclaration with Ordered[BFunction] {
+case class BFunction(name: String, in: List[BVar], out: BVar, body: Option[BExpr],
+                     override val attributes: List[BAttribute] = List())
+    extends BDeclaration
+    with Ordered[BFunction] {
   override def compare(that: BFunction): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
-    val bvbuiltinString = if (bvbuiltin.isEmpty) {
-      ""
-    } else {
-      s" {:bvbuiltin \"$bvbuiltin\"}"
-    }
     val inString = in.map(_.withType).mkString(", ")
-    val declString = s"function$bvbuiltinString $name($inString) returns (${out.withType})"
+    val declString = s"function $attrString$name($inString) returns (${out.withType})"
     body match {
       case Some(b) => List(declString + " {", "  " + b.toString, "}", "")
       case None    => List(declString + ";")
@@ -74,12 +86,12 @@ case class BFunction(name: String, bvbuiltin: String, in: List[BVar], out: BVar,
   }
 }
 
-case class BVarDecl(variable: BVar) extends BDeclaration with Ordered[BVarDecl] {
+case class BVarDecl(variable: BVar, override val attributes: List[BAttribute] = List()) extends BDeclaration with Ordered[BVarDecl] {
   def compare(that: BVarDecl): Int = variable.compare(that.variable)
   override def toString: String = if (variable.scope == Scope.Const) {
-    s"const $variable: ${variable.getType};"
+    s"const $attrString$variable: ${variable.getType};"
   } else {
-    s"var $variable: ${variable.getType};"
+    s"var $attrString$variable: ${variable.getType};"
   }
 }
 

@@ -1,7 +1,6 @@
 package cfg_visualiser
 
-/**
-  * Generator for fresh node IDs.
+/** Generator for fresh node IDs.
   */
 object IDGenerator {
   private var current: Int = 0
@@ -12,24 +11,38 @@ object IDGenerator {
   }
 }
 
-/**
-  * Super-class for elements of a Graphviz dot file.
+def wrap(input: String, width: Integer = 20): String =
+  if (input.length() <= width) {
+    input
+  } else {
+    var splitPoint = width;
+    while (input.charAt(splitPoint).isLetterOrDigit && splitPoint > width / 2) {
+      // search backwards for a non alphanumeric charcter to split on
+      splitPoint -= 1
+    }
+    if (input.charAt(splitPoint).isLetterOrDigit) {
+      // didn't find a character to split on
+      splitPoint = width;
+    }
+    val line = input.substring(0, splitPoint)
+    line + "\\l" + wrap(input.substring(splitPoint), width)
+  }
+
+
+/** Super-class for elements of a Graphviz dot file.
   */
 abstract class DotElement {
 
-  /**
-    * Produces a dot string representation of this element.
+  /** Produces a dot string representation of this element.
     */
   def toDotString: String
 }
 
-/**
-  * Represents a node in a Graphviz dot file.
+/** Represents a node in a Graphviz dot file.
   */
 class DotNode(val id: String, val label: String) extends DotElement {
 
-  def this(label: String) =
-    this("n" + IDGenerator.getNewId, label)
+  def this(label: String) = this("n" + IDGenerator.getNewId, label)
 
   def this() = this("")
 
@@ -38,31 +51,65 @@ class DotNode(val id: String, val label: String) extends DotElement {
   override def toString: String = toDotString
 
   def toDotString: String =
-    s"\"${id}\"" + "[label=\"" + label + "\"]"
+    s"\"$id\"" + "[label=\"" + wrap(label, 80) + "\"]"
 
 }
 
-/**
-  * Represents an edge between two nodes in a Graphviz dot file.
+/** Represents an edge between two nodes in a Graphviz dot file.
   */
-class DotArrow(val fromNode: DotNode, arrow: String, val toNode: DotNode, val label: String) extends DotElement {
+class DotArrow(
+    val fromNode: DotNode,
+    arrow: String,
+    val toNode: DotNode,
+    val label: String,
+    val style: String = "solid",
+    val colour: String = "black"
+) extends DotElement {
 
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
 
-  def toDotString: String = s"\"${fromNode.id}\"" + " " + arrow + " " + s"\"${toNode.id}\"" + "[label=\"" + label + "\"]"
+  def toDotString: String =
+    s"\"${fromNode.id}\" $arrow \"${toNode.id}\"[label=\"$label\", style=\"$style\", color=\"$colour\"]"
 }
 
-/**
-  * Represents a directed edge between two nodes in a Graphviz dot file.
+/** Represents a directed edge between two regular cfg nodes in a Graphviz dot file.
   */
-class DotDirArrow(fromNode: DotNode, toNode: DotNode, label: String) extends DotArrow(fromNode, "->", toNode, label) {
+class DotRegularArrow(fromNode: DotNode, toNode: DotNode, label: String)
+    extends DotArrow(fromNode, "->", toNode, label) {
   def this(fromNode: DotNode, toNode: DotNode) = this(fromNode, toNode, "")
 
   override def toString: String = super.toDotString
 }
 
-/**
-  * Represents a Graphviz dot graph.
+/** Represents a directed, inline connection between two cfg nodes in a Graphviz dot file.
+  */
+class DotInlineArrow(fromNode: DotNode, toNode: DotNode, label: String)
+    extends DotArrow(fromNode, "->", toNode, label, style = "dashed", colour = "red") {
+  def this(fromNode: DotNode, toNode: DotNode) = this(fromNode, toNode, "")
+
+  override def toString: String = super.toDotString
+}
+
+/*
+ * Represents a directed, interprocedural edge between two nodes in a Graphviz dot file
+ */
+class DotInterArrow(fromNode: DotNode, toNode: DotNode, label: String)
+    extends DotArrow(fromNode, "->", toNode, label, style = "dashed", colour = "green") {
+  def this(fromNode: DotNode, toNode: DotNode) = this(fromNode, toNode, "")
+
+  override def toString: String = super.toDotString
+}
+
+/** Represents a directed, intraprocedural cfg edge in a Graphviz dot file.
+  */
+class DotIntraArrow(fromNode: DotNode, toNode: DotNode, label: String)
+    extends DotArrow(fromNode, "->", toNode, label, style = "dashed", colour = "blue") {
+  def this(fromNode: DotNode, toNode: DotNode) = this(fromNode, toNode, "")
+
+  override def toString: String = super.toDotString
+}
+
+/** Represents a Graphviz dot graph.
   */
 class DotGraph(val title: String, val nodes: Iterable[DotNode], val edges: Iterable[DotArrow]) extends DotElement {
 
@@ -87,5 +134,5 @@ class DotGraph(val title: String, val nodes: Iterable[DotNode], val edges: Itera
 
   override def toString: String = toDotString
 
-  def toDotString: String = "digraph " + title + "{" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
+  def toDotString: String = "digraph " + title + " {\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
 }

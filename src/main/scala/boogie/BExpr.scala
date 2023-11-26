@@ -7,16 +7,17 @@ trait BExpr {
   def functionOps: Set[FunctionOp] = Set()
   def locals: Set[BVar] = Set()
   def globals: Set[BVar] = Set()
-  def specGlobals: Set[SpecGlobal] = Set()
-  def oldSpecGlobals: Set[SpecGlobal] = Set()
+  def specGlobals: Set[SpecGlobalOrAccess] = Set()
+  def oldSpecGlobals: Set[SpecGlobalOrAccess] = Set()
   def resolveSpec: BExpr = this
   def resolveOld: BExpr = this
   def removeOld: BExpr = this
   def resolveSpecL: BExpr = this
+  def resolveInsideOld: BExpr = this
+  def loads: Set[BExpr] = Set()
 }
 
-trait BLiteral extends BExpr {
-}
+trait BLiteral extends BExpr {}
 
 sealed trait BoolBLiteral extends BLiteral
 
@@ -50,12 +51,14 @@ case class BVExtract(end: Int, start: Int, body: BExpr) extends BExpr {
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
-  override def specGlobals: Set[SpecGlobal] = body.specGlobals
-  override def oldSpecGlobals: Set[SpecGlobal] = body.oldSpecGlobals
+  override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
   override def resolveSpec: BVExtract = copy(body = body.resolveSpec)
   override def resolveSpecL: BVExtract = copy(body = body.resolveSpecL)
   override def resolveOld: BVExtract = copy(body = body.resolveOld)
+  override def resolveInsideOld: BVExtract = copy(body = body.resolveInsideOld)
   override def removeOld: BVExtract = copy(body = body.removeOld)
+  override def loads: Set[BExpr] = body.loads
 }
 
 case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
@@ -63,7 +66,7 @@ case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
 
   private def bodySize: Int = body.getType match {
     case bv: BitVecBType => bv.size
-    case _          => throw new Exception("type mismatch, non bv expression: " + body + " in body of extract: " + this)
+    case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of extract: " + this)
   }
   private def fnName: String = s"repeat${repeats}_$bodySize"
 
@@ -75,12 +78,14 @@ case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
   }
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
-  override def specGlobals: Set[SpecGlobal] = body.specGlobals
-  override def oldSpecGlobals: Set[SpecGlobal] = body.oldSpecGlobals
+  override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
   override def resolveSpec: BVRepeat = copy(body = body.resolveSpec)
   override def resolveSpecL: BVRepeat = copy(body = body.resolveSpecL)
   override def resolveOld: BVRepeat = copy(body = body.resolveOld)
+  override def resolveInsideOld: BVRepeat = copy(body = body.resolveInsideOld)
   override def removeOld: BVRepeat = copy(body = body.removeOld)
+  override def loads: Set[BExpr] = body.loads
 }
 
 case class BVZeroExtend(extension: Int, body: BExpr) extends BExpr {
@@ -101,12 +106,14 @@ case class BVZeroExtend(extension: Int, body: BExpr) extends BExpr {
   }
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
-  override def specGlobals: Set[SpecGlobal] = body.specGlobals
-  override def oldSpecGlobals: Set[SpecGlobal] = body.oldSpecGlobals
+  override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
   override def resolveSpec: BVZeroExtend = copy(body = body.resolveSpec)
   override def resolveSpecL: BVZeroExtend = copy(body = body.resolveSpecL)
   override def resolveOld: BExpr = copy(body = body.resolveOld)
+  override def resolveInsideOld: BExpr = copy(body = body.resolveInsideOld)
   override def removeOld: BExpr = copy(body = body.removeOld)
+  override def loads: Set[BExpr] = body.loads
 }
 
 case class BVSignExtend(extension: Int, body: BExpr) extends BExpr {
@@ -127,12 +134,14 @@ case class BVSignExtend(extension: Int, body: BExpr) extends BExpr {
   }
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
-  override def specGlobals: Set[SpecGlobal] = body.specGlobals
-  override def oldSpecGlobals: Set[SpecGlobal] = body.oldSpecGlobals
+  override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
   override def resolveSpecL: BVSignExtend = copy(body = body.resolveSpecL)
   override def resolveSpec: BVSignExtend = copy(body = body.resolveSpec)
   override def resolveOld: BExpr = copy(body = body.resolveOld)
+  override def resolveInsideOld: BExpr = copy(body = body.resolveInsideOld)
   override def removeOld: BExpr = copy(body = body.removeOld)
+  override def loads: Set[BExpr] = body.loads
 }
 
 abstract class BVar(val name: String, val bType: BType, val scope: Scope) extends BExpr with Ordered[BVar] {
@@ -156,8 +165,7 @@ abstract class BVar(val name: String, val bType: BType, val scope: Scope) extend
 }
 
 case class BVariable(override val name: String, override val bType: BType, override val scope: Scope)
-    extends BVar(name, bType, scope) {
-}
+    extends BVar(name, bType, scope) {}
 
 enum Scope {
   case Local
@@ -182,25 +190,26 @@ case class BFunctionCall(name: String, args: List[BExpr], bType: BType) extends 
   override def functionOps: Set[FunctionOp] = args.flatMap(a => a.functionOps).toSet
   override def locals: Set[BVar] = args.flatMap(a => a.locals).toSet
   override def globals: Set[BVar] = args.flatMap(a => a.globals).toSet
-  override def specGlobals: Set[SpecGlobal] = args.flatMap(a => a.specGlobals).toSet
-  override def oldSpecGlobals: Set[SpecGlobal] = args.flatMap(a => a.oldSpecGlobals).toSet
+  override def specGlobals: Set[SpecGlobalOrAccess] = args.flatMap(a => a.specGlobals).toSet
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = args.flatMap(a => a.oldSpecGlobals).toSet
   override def resolveSpec: BFunctionCall = copy(args = args.map(a => a.resolveSpec))
   override def resolveSpecL: BFunctionCall = copy(args = args.map(a => a.resolveSpecL))
   override def resolveOld: BExpr = copy(args = args.map(a => a.resolveOld))
   override def removeOld: BExpr = copy(args = args.map(a => a.removeOld))
+  override def loads: Set[BExpr] = args.flatMap(a => a.loads).toSet
 }
 
 case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
   override def getType: BType = (op, arg.getType) match {
-    case (_: BoolUnOp, BoolBType) => BoolBType
+    case (_: BoolUnOp, BoolBType)     => BoolBType
     case (_: BVUnOp, bv: BitVecBType) => bv
-    case (_: IntUnOp, IntBType)   => IntBType
+    case (_: IntUnOp, IntBType)       => IntBType
     case _ => throw new Exception("type mismatch, operator " + op + " type doesn't match arg: " + arg)
   }
 
   private def inSize = arg.getType match {
     case bv: BitVecBType => bv.size
-    case _          => throw new Exception("type mismatch")
+    case _               => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
@@ -220,8 +229,8 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
 
   override def locals: Set[BVar] = arg.locals
   override def globals: Set[BVar] = arg.globals
-  override def specGlobals: Set[SpecGlobal] = arg.specGlobals
-  override def oldSpecGlobals: Set[SpecGlobal] = arg.oldSpecGlobals
+  override def specGlobals: Set[SpecGlobalOrAccess] = arg.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = arg.oldSpecGlobals
   override def resolveSpec: UnaryBExpr = op match {
     case i: IntUnOp => copy(op = i.toBV, arg = arg.resolveSpec)
     case _          => copy(arg = arg.resolveSpec)
@@ -234,13 +243,16 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
     case i: IntUnOp => copy(op = i.toBV, arg = arg.resolveOld)
     case _          => copy(arg = arg.resolveOld)
   }
+  override def resolveInsideOld: BExpr = op match {
+    case i: IntUnOp => copy(op = i.toBV, arg = arg.resolveInsideOld)
+    case _          => copy(arg = arg.resolveInsideOld)
+  }
   override def removeOld: BExpr = op match {
     case i: IntUnOp => copy(op = i.toBV, arg = arg.removeOld)
     case _          => copy(arg = arg.removeOld)
   }
+  override def loads: Set[BExpr] = arg.loads
 }
-
-
 
 case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
   override def getType: BType = (op, arg1.getType, arg2.getType) match {
@@ -254,9 +266,6 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            //println(arg1)
-            //println(arg2)
-            //println(this)
             throw new Exception("bitvector size mismatch")
           }
         case BVCOMP =>
@@ -264,14 +273,11 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
             BitVecBType(1)
           } else {
             throw new Exception("bitvector size mismatch")
-            BitVecBType(1)
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolBType
           } else {
-            //println(arg1)
-            //println(arg2)
             throw new Exception("bitvector size mismatch")
           }
         case BVEQ | BVNEQ =>
@@ -288,7 +294,7 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
 
   private def inSize = arg1.getType match {
     case bv: BitVecBType => bv.size
-    case _          => throw new Exception("type mismatch")
+    case _               => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
@@ -320,8 +326,8 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
 
   override def locals: Set[BVar] = arg1.locals ++ arg2.locals
   override def globals: Set[BVar] = arg1.globals ++ arg2.globals
-  override def specGlobals: Set[SpecGlobal] = arg1.specGlobals ++ arg2.specGlobals
-  override def oldSpecGlobals: Set[SpecGlobal] = arg1.oldSpecGlobals ++ arg2.oldSpecGlobals
+  override def specGlobals: Set[SpecGlobalOrAccess] = arg1.specGlobals ++ arg2.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = arg1.oldSpecGlobals ++ arg2.oldSpecGlobals
 
   override def resolveSpec: BinaryBExpr = op match {
     case i: IntBinOp => copy(op = i.toBV, arg1 = arg1.resolveSpec, arg2 = arg2.resolveSpec)
@@ -338,10 +344,16 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
     case _           => copy(arg1 = arg1.resolveOld, arg2 = arg2.resolveOld)
   }
 
+  override def resolveInsideOld: BinaryBExpr = op match {
+    case i: IntBinOp => copy(op = i.toBV, arg1 = arg1.resolveInsideOld, arg2 = arg2.resolveInsideOld)
+    case _           => copy(arg1 = arg1.resolveInsideOld, arg2 = arg2.resolveInsideOld)
+  }
+
   override def removeOld: BinaryBExpr = op match {
     case i: IntBinOp => copy(op = i.toBV, arg1 = arg1.removeOld, arg2 = arg2.removeOld)
     case _           => copy(arg1 = arg1.removeOld, arg2 = arg2.removeOld)
   }
+  override def loads: Set[BExpr] = arg1.loads ++ arg2.loads
 }
 
 case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BExpr {
@@ -357,16 +369,20 @@ case class IfThenElse(guard: BExpr, thenExpr: BExpr, elseExpr: BExpr) extends BE
   override def functionOps: Set[FunctionOp] = guard.functionOps ++ thenExpr.functionOps ++ elseExpr.functionOps
   override def locals: Set[BVar] = guard.locals ++ thenExpr.locals ++ elseExpr.locals
   override def globals: Set[BVar] = guard.globals ++ thenExpr.globals ++ elseExpr.globals
-  override def specGlobals: Set[SpecGlobal] = guard.specGlobals ++ thenExpr.specGlobals ++ elseExpr.specGlobals
-  override def oldSpecGlobals: Set[SpecGlobal] = guard.oldSpecGlobals ++ thenExpr.oldSpecGlobals ++ elseExpr.oldSpecGlobals
+  override def specGlobals: Set[SpecGlobalOrAccess] = guard.specGlobals ++ thenExpr.specGlobals ++ elseExpr.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] =
+    guard.oldSpecGlobals ++ thenExpr.oldSpecGlobals ++ elseExpr.oldSpecGlobals
   override def resolveSpec: IfThenElse =
     copy(guard = guard.resolveSpec, thenExpr = thenExpr.resolveSpec, elseExpr = elseExpr.resolveSpec)
   override def resolveSpecL: IfThenElse =
     copy(guard = guard.resolveSpecL, thenExpr = thenExpr.resolveSpecL, elseExpr = elseExpr.resolveSpecL)
   override def resolveOld: IfThenElse =
     copy(guard = guard.resolveOld, thenExpr = thenExpr.resolveOld, elseExpr = elseExpr.resolveOld)
+  override def resolveInsideOld: IfThenElse =
+    copy(guard = guard.resolveInsideOld, thenExpr = thenExpr.resolveInsideOld, elseExpr = elseExpr.resolveInsideOld)
   override def removeOld: IfThenElse =
     copy(guard = guard.removeOld, thenExpr = thenExpr.removeOld, elseExpr = elseExpr.removeOld)
+  override def loads: Set[BExpr] = guard.loads ++ thenExpr.loads ++ elseExpr.loads
 }
 
 trait QuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends BExpr {
@@ -378,18 +394,22 @@ trait QuantifierExpr(sort: Quantifier, bound: List[BVar], body: BExpr) extends B
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals -- bound.toSet
   override def globals: Set[BVar] = body.globals -- bound.toSet
-  override def specGlobals: Set[SpecGlobal] = body.specGlobals
-  override def oldSpecGlobals: Set[SpecGlobal] = body.oldSpecGlobals
+  override def specGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.oldSpecGlobals
+  override def loads: Set[BExpr] = body.loads
 }
 
 enum Quantifier {
   case forall
   case exists
+  case lambda
 }
 
-case class ForAll(bound: List[BVar], body: BExpr) extends QuantifierExpr(Quantifier.forall, bound, body) 
+case class ForAll(bound: List[BVar], body: BExpr) extends QuantifierExpr(Quantifier.forall, bound, body)
 
 case class Exists(bound: List[BVar], body: BExpr) extends QuantifierExpr(Quantifier.exists, bound, body)
+
+case class Lambda(bound: List[BVar], body: BExpr) extends QuantifierExpr(Quantifier.lambda, bound, body)
 
 case class Old(body: BExpr) extends BExpr {
   override def toString: String = s"old($body)"
@@ -397,15 +417,12 @@ case class Old(body: BExpr) extends BExpr {
   override def functionOps: Set[FunctionOp] = body.functionOps
   override def locals: Set[BVar] = body.locals
   override def globals: Set[BVar] = body.globals
-  override def oldSpecGlobals: Set[SpecGlobal] = body.specGlobals
+  override def oldSpecGlobals: Set[SpecGlobalOrAccess] = body.specGlobals
   override def resolveSpec: BExpr = copy(body = body.resolveSpec)
   override def resolveSpecL: BExpr = copy(body = body.resolveSpecL)
-  override def resolveOld: BExpr = body match {
-    case s: SpecGlobal => s.toOldVar
-    case s: SpecGamma  => s.global.toOldGamma
-    case _             => this // TODO
-  }
+  override def resolveOld: BExpr = body.resolveInsideOld
   override def removeOld: BExpr = body.resolveSpec
+  override def loads: Set[BExpr] = body.loads
 }
 
 case class MapAccess(mapVar: BMapVar, index: BExpr) extends BExpr {
@@ -414,6 +431,7 @@ case class MapAccess(mapVar: BMapVar, index: BExpr) extends BExpr {
   override def functionOps: Set[FunctionOp] = index.functionOps
   override def locals: Set[BVar] = index.locals
   override def globals: Set[BVar] = index.globals ++ mapVar.globals
+  override def loads: Set[BExpr] = index.loads
 }
 
 case class MapUpdate(map: BExpr, index: BExpr, value: BExpr) extends BExpr {
@@ -422,13 +440,102 @@ case class MapUpdate(map: BExpr, index: BExpr, value: BExpr) extends BExpr {
   override def functionOps: Set[FunctionOp] = map.functionOps ++ index.functionOps ++ value.functionOps
   override def locals: Set[BVar] = map.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ map.globals ++ value.globals
+  override def loads: Set[BExpr] = index.loads ++ value.loads ++ map.loads
 }
 
 sealed trait FunctionOp
 
-case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BVar) extends FunctionOp
+case class BVFunctionOp(name: String, bvbuiltin: String, in: List[BVar], out: BVar) extends FunctionOp {
+  def attribute: BAttribute = BAttribute("bvbuiltin", Some(s"\"$bvbuiltin\""))
+}
 
-case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int) extends BExpr with FunctionOp {
+case class MemoryLoadOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int) extends FunctionOp {
+  val accesses: Int = bits / valueSize
+
+  val fnName: String = endian match {
+    case Endian.LittleEndian => s"memory_load${bits}_le"
+    case Endian.BigEndian    => s"memory_load${bits}_be"
+  }
+}
+case class MemoryStoreOp(addressSize: Int, valueSize: Int, endian: Endian, bits: Int) extends FunctionOp {
+  val accesses: Int = bits / valueSize
+
+  val fnName: String = endian match {
+    case Endian.LittleEndian => s"memory_store${bits}_le"
+    case Endian.BigEndian    => s"memory_store${bits}_be"
+  }
+}
+case class GammaLoadOp(addressSize: Int, bits: Int, accesses: Int) extends FunctionOp {
+  val fnName: String = s"gamma_load$bits"
+}
+case class GammaStoreOp(addressSize: Int, bits: Int, accesses: Int) extends FunctionOp {
+  val fnName: String = s"gamma_store$bits"
+}
+case class LOp(memoryType: BType, indexType: BType) extends FunctionOp
+
+/**
+ * Utility to extract a particular byte from a bitvector.
+ */
+case class ByteExtract(valueSize: Int, offsetSize: Int) extends FunctionOp {
+  val fnName: String = s"byte_extract${valueSize}_${offsetSize}"
+}
+
+case class BByteExtract(value: BExpr, offset: BExpr) extends BExpr {
+  override def toString: String = s"$fnName($value, $offset)"
+
+  val valueSize: Int = value.getType match {
+    case b: BitVecBType => b.size
+    case _              => throw new Exception(s"ByteExtract does not have Bitvector type: $this")
+  }
+
+  val offsetSize: Int = offset.getType match {
+    case b: BitVecBType => b.size
+    case _              => throw new Exception(s"ByteExtract does not have Bitvector type: $this")
+  }
+
+  val fnName: String = s"byte_extract${valueSize}_${offsetSize}"
+
+  override val getType: BType = BitVecBType(8)
+  override def functionOps: Set[FunctionOp] =
+    value.functionOps ++ offset.functionOps + ByteExtract(valueSize, offsetSize)
+  override def locals: Set[BVar] = value.locals ++ offset.locals
+  override def globals: Set[BVar] = value.globals ++ offset.globals
+  override def loads: Set[BExpr] = value.loads ++ offset.loads
+}
+
+/**
+ * Utility to test if a particular value i is within the bounds of a base variable
+ * and some length. Factors in the problem of wrap around, given the base + length
+ * exceeds the bitvector size.
+ *
+ * Assumes all inputs are of the same bitvector width.
+ */
+case class InBounds(bits: Int, endian: Endian) extends FunctionOp {
+  val fnName: String = endian match {
+    case Endian.LittleEndian => s"in_bounds${bits}_le"
+    case Endian.BigEndian=> s"in_bounds${bits}_be"
+  }
+}
+
+case class BInBounds(base: BExpr, len: BExpr, endian: Endian, i: BExpr) extends BExpr {
+  override def toString: String = s"$fnName($base, $len, $i)"
+
+  val baseSize: Int = base.getType match {
+    case b: BitVecBType => b.size
+    case _              => throw new Exception(s"InBounds does not have Bitvector type: $this")
+  }
+
+  val fnName: String = s"in_bounds${baseSize}"
+
+  override val getType: BType = BoolBType
+  override def functionOps: Set[FunctionOp] =
+    base.functionOps ++ len.functionOps ++ i.functionOps + InBounds(baseSize, endian)
+  override def locals: Set[BVar]  = base.locals ++ len.locals ++ i.locals
+  override def globals: Set[BVar] = base.globals ++ len.globals ++ i.globals 
+  override def loads: Set[BExpr]  = base.loads ++ len.loads ++ i.loads 
+}
+
+case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int) extends BExpr {
   override def toString: String = s"$fnName($memory, $index)"
 
   val fnName: String = endian match {
@@ -438,25 +545,23 @@ case class BMemoryLoad(memory: BMapVar, index: BExpr, endian: Endian, bits: Int)
 
   val addressSize: Int = memory.getType.param match {
     case b: BitVecBType => b.size
-    case _         => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
+    case _              => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
   }
 
   val valueSize: Int = memory.getType.result match {
     case b: BitVecBType => b.size
-    case _         => throw new Exception(s"MemoryLoad does not have Bitvector type: $this")
+    case _              => throw new Exception(s"MemoryLoad does not have Bitvector type: $this")
   }
 
-  val accesses: Int = bits / valueSize
-
   override val getType: BType = BitVecBType(bits)
-  override def functionOps: Set[FunctionOp] = memory.functionOps ++ index.functionOps + this
+  override def functionOps: Set[FunctionOp] =
+    memory.functionOps ++ index.functionOps + MemoryLoadOp(addressSize, valueSize, endian, bits)
   override def locals: Set[BVar] = memory.locals ++ index.locals
   override def globals: Set[BVar] = index.globals ++ memory.globals
+  override def loads: Set[BExpr] = Set(this) ++ index.loads
 }
 
-case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: Endian, bits: Int)
-    extends BExpr
-    with FunctionOp {
+case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: Endian, bits: Int) extends BExpr {
   override def toString: String = s"$fnName($memory, $index, $value)"
 
   val fnName: String = endian match {
@@ -466,63 +571,65 @@ case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: End
 
   val addressSize: Int = memory.getType.param match {
     case b: BitVecBType => b.size
-    case _         => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
+    case _              => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
   }
 
   val valueSize: Int = memory.getType.result match {
     case b: BitVecBType => b.size
-    case _         => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
+    case _              => throw new Exception(s"MemoryStore does not have Bitvector type: $this")
   }
 
-  val accesses: Int = bits / valueSize
-
   override val getType: BType = memory.getType
-  override def functionOps: Set[FunctionOp] = memory.functionOps ++ index.functionOps ++ value.functionOps + this
+  override def functionOps: Set[FunctionOp] =
+    memory.functionOps ++ index.functionOps ++ value.functionOps + MemoryStoreOp(addressSize, valueSize, endian, bits)
   override def locals: Set[BVar] = memory.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ memory.globals ++ value.globals
+  override def loads: Set[BExpr] = index.loads ++ value.loads
 }
 
-case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) extends BExpr with FunctionOp {
+case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) extends BExpr {
   override def toString: String = s"$fnName($gammaMap, $index)"
   val fnName: String = s"gamma_load$bits"
 
   val addressSize: Int = gammaMap.getType.param match {
     case b: BitVecBType => b.size
-    case _         => throw new Exception(s"GammaLoad does not have Bitvector type: $this")
+    case _              => throw new Exception(s"GammaLoad does not have Bitvector type: $this")
   }
 
   val valueSize: Int = bits / accesses
 
   override val getType: BType = BoolBType
-  override def functionOps: Set[FunctionOp] = gammaMap.functionOps ++ index.functionOps + this
+  override def functionOps: Set[FunctionOp] =
+    gammaMap.functionOps ++ index.functionOps + GammaLoadOp(addressSize, bits, accesses)
   override def locals: Set[BVar] = gammaMap.locals ++ index.locals
   override def globals: Set[BVar] = index.globals ++ gammaMap.globals
-
+  override def loads: Set[BExpr] = Set(this) ++ index.loads
 }
 
-case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int)
-    extends BExpr
-    with FunctionOp {
+case class GammaStore(gammaMap: BMapVar, index: BExpr, value: BExpr, bits: Int, accesses: Int) extends BExpr {
   override def toString: String = s"$fnName($gammaMap, $index, $value)"
   val fnName: String = s"gamma_store$bits"
 
   val addressSize: Int = gammaMap.getType.param match {
     case b: BitVecBType => b.size
-    case _         => throw new Exception(s"GammaStore does not have Bitvector type: $this")
+    case _              => throw new Exception(s"GammaStore does not have Bitvector type: $this")
   }
 
   val valueSize: Int = bits / accesses
 
   override val getType: BType = gammaMap.getType
-  override def functionOps: Set[FunctionOp] = gammaMap.functionOps ++ index.functionOps ++ value.functionOps + this
+  override def functionOps: Set[FunctionOp] =
+    gammaMap.functionOps ++ index.functionOps ++ value.functionOps + GammaStoreOp(addressSize, bits, accesses)
   override def locals: Set[BVar] = gammaMap.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ gammaMap.globals ++ value.globals
+  override def loads: Set[BExpr] = index.loads ++ value.loads
 }
 
-case class L(memory: BMapVar, index: BExpr) extends BExpr with FunctionOp {
+case class L(memory: BMapVar, index: BExpr) extends BExpr {
   override def toString: String = s"L($memory, $index)"
   override val getType: BType = BoolBType
-  override def functionOps: Set[FunctionOp] = index.functionOps + this
+  override def functionOps: Set[FunctionOp] = index.functionOps + LOp(memory.getType, index.getType)
   override def locals: Set[BVar] = index.locals
   override def globals: Set[BVar] = index.globals
+  override def loads: Set[BExpr] = index.loads
 }

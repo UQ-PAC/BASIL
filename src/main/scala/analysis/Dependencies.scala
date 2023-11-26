@@ -20,10 +20,12 @@ trait Dependencies[N]:
     */
   def indep(n: N): Set[N]
 
-/** Dependency methods for forward analyses.
-  */
-trait ForwardDependencies extends Dependencies[CfgNode]:
+trait InterproceduralForwardDependencies extends Dependencies[CfgNode] {
+  def outdep(n: CfgNode): Set[CfgNode] = n.succInter.toSet
+  def indep(n: CfgNode): Set[CfgNode] = n.predInter.toSet
+}
 
-  def outdep(n: CfgNode): Set[CfgNode] = n.succ.toSet
-
-  def indep(n: CfgNode): Set[CfgNode] = n.pred.toSet
+trait IntraproceduralForwardDependencies extends Dependencies[CfgNode] {
+  def outdep(n: CfgNode): Set[CfgNode] = n.succIntra.toSet
+  def indep(n: CfgNode): Set[CfgNode] = n.predIntra.toSet
+}
