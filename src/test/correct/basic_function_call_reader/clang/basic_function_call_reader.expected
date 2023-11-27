@@ -245,7 +245,7 @@ procedure main()
   l00000348:
     assume {:captureState "l00000348"} true;
     assert Gamma_R8;
-    goto l00000348_goto_l00000350, l00000348_goto_l0000037a;
+    goto l00000348_goto_l0000037a, l00000348_goto_l00000350;
   l00000350:
     assume {:captureState "l00000350"} true;
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 8bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 8bv64));

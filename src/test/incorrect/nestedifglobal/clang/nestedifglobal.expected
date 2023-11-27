@@ -242,7 +242,7 @@ procedure main()
   l00000396:
     assume {:captureState "l00000396"} true;
     assert Gamma_R8;
-    goto l00000396_goto_l0000039e, l00000396_goto_l0000045d;
+    goto l00000396_goto_l0000045d, l00000396_goto_l0000039e;
   l0000045d:
     assume {:captureState "l0000045d"} true;
     goto l0000045e;
@@ -264,7 +264,7 @@ procedure main()
     NF, Gamma_NF := bvadd32(#5, 1bv32)[32:31], Gamma_#5;
     R8, Gamma_R8 := zero_extend32_32(bvadd32(#5, 1bv32)), Gamma_#5;
     assert Gamma_ZF;
-    goto l0000039e_goto_l000003ce, l0000039e_goto_l000003d1;
+    goto l0000039e_goto_l000003d1, l0000039e_goto_l000003ce;
   l000003d1:
     assume {:captureState "l000003d1"} true;
     R8, Gamma_R8 := 1bv64, true;
@@ -276,7 +276,7 @@ procedure main()
   l000003d4:
     assume {:captureState "l000003d4"} true;
     assert Gamma_R8;
-    goto l000003d4_goto_l000003dc, l000003d4_goto_l00000448;
+    goto l000003d4_goto_l00000448, l000003d4_goto_l000003dc;
   l00000448:
     assume {:captureState "l00000448"} true;
     goto l00000449;
@@ -296,7 +296,7 @@ procedure main()
     NF, Gamma_NF := bvadd32(#6, 1bv32)[32:31], Gamma_#6;
     R8, Gamma_R8 := zero_extend32_32(bvadd32(#6, 1bv32)), Gamma_#6;
     assert Gamma_ZF;
-    goto l000003dc_goto_l00000407, l000003dc_goto_l0000040a;
+    goto l000003dc_goto_l0000040a, l000003dc_goto_l00000407;
   l0000040a:
     assume {:captureState "l0000040a"} true;
     R8, Gamma_R8 := 1bv64, true;

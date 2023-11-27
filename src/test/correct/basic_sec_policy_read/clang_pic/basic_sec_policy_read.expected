@@ -301,7 +301,7 @@ procedure main()
   l00000352:
     assume {:captureState "l00000352"} true;
     assert Gamma_R8;
-    goto l00000352_goto_l0000035a, l00000352_goto_l00000371;
+    goto l00000352_goto_l00000371, l00000352_goto_l0000035a;
   l00000371:
     assume {:captureState "l00000371"} true;
     goto l00000372;

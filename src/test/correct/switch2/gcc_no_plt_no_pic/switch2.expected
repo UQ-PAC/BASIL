@@ -294,7 +294,7 @@ procedure main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#8, 1bv32), 0bv32), Gamma_#8;
     NF, Gamma_NF := bvadd32(#8, 1bv32)[32:31], Gamma_#8;
     assert ((Gamma_NF && Gamma_VF) && Gamma_ZF);
-    goto l00000cc6_goto_l00000c41, l00000cc6_goto_l00000cee;
+    goto l00000cc6_goto_l00000cee, l00000cc6_goto_l00000c41;
   l00000cee:
     assume {:captureState "l00000cee"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
@@ -304,7 +304,7 @@ procedure main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#9, 1bv32), 0bv32), Gamma_#9;
     NF, Gamma_NF := bvadd32(#9, 1bv32)[32:31], Gamma_#9;
     assert Gamma_ZF;
-    goto l00000cee_goto_l00000d0f, l00000cee_goto_l00000d41;
+    goto l00000cee_goto_l00000d41, l00000cee_goto_l00000d0f;
   l00000d0f:
     assume {:captureState "l00000d0f"} true;
     R30, Gamma_R30 := 1944bv64, true;
@@ -324,7 +324,7 @@ procedure main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#10, 1bv32), 0bv32), Gamma_#10;
     NF, Gamma_NF := bvadd32(#10, 1bv32)[32:31], Gamma_#10;
     assert ((Gamma_NF && Gamma_VF) && Gamma_ZF);
-    goto l00000d41_goto_l00000c41, l00000d41_goto_l00000d69;
+    goto l00000d41_goto_l00000d69, l00000d41_goto_l00000c41;
   l00000d69:
     assume {:captureState "l00000d69"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
@@ -334,7 +334,7 @@ procedure main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#11, 1bv32), 0bv32), Gamma_#11;
     NF, Gamma_NF := bvadd32(#11, 1bv32)[32:31], Gamma_#11;
     assert Gamma_ZF;
-    goto l00000d69_goto_l00000d23, l00000d69_goto_l00000d8f;
+    goto l00000d69_goto_l00000d8f, l00000d69_goto_l00000d23;
   l00000d23:
     assume {:captureState "l00000d23"} true;
     R0, Gamma_R0 := 1bv64, true;

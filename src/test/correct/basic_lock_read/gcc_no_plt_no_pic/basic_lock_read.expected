@@ -224,7 +224,7 @@ procedure main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#4, 1bv32), 0bv32), Gamma_#4;
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     assert Gamma_ZF;
-    goto lmain_goto_l00000948, lmain_goto_l0000095f;
+    goto lmain_goto_l0000095f, lmain_goto_l00000948;
   l0000095f:
     assume {:captureState "l0000095f"} true;
     R0, Gamma_R0 := 69632bv64, true;

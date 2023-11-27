@@ -228,7 +228,7 @@ procedure main()
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     R8, Gamma_R8 := zero_extend32_32(bvadd32(#4, 1bv32)), Gamma_#4;
     assert Gamma_ZF;
-    goto lmain_goto_l00000958, lmain_goto_l0000095b;
+    goto lmain_goto_l0000095b, lmain_goto_l00000958;
   l0000095b:
     assume {:captureState "l0000095b"} true;
     R8, Gamma_R8 := 1bv64, true;
