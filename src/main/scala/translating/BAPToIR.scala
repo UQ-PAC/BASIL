@@ -23,6 +23,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       val in: ArrayBuffer[Parameter] = ArrayBuffer()
       val out: ArrayBuffer[Parameter] = ArrayBuffer()
       val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
+
+
       for (b <- s.blocks) {
         val block = Block(b.label, b.address, ArrayBuffer())
         blocks.append(block)

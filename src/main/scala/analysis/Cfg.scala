@@ -217,7 +217,7 @@ case class CfgFunctionEntryNode(
     override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     data: Procedure
 ) extends CfgNodeWithData[Procedure]:
-  override def block: Block = data.blocks.head
+  override def block: Block = data.entryBlock.get
   override def toString: String = s"[FunctionEntry] $data"
 
   /** Copy this node, but give unique ID and reset edges */
@@ -233,7 +233,7 @@ case class CfgFunctionExitNode(
     override val succInter: mutable.Set[CfgEdge] = mutable.Set[CfgEdge](),
     data: Procedure
 ) extends CfgNodeWithData[Procedure]:
-  override def block: Block = data.blocks.head
+  override def block: Block = data.entryBlock.get
   override def toString: String = s"[FunctionExit] $data"
 
   /** Copy this node, but give unique ID and reset edges */
@@ -653,7 +653,7 @@ class ProgramCfgFactory:
     val visitedBlocks: mutable.HashMap[Block, CfgCommandNode] = mutable.HashMap[Block, CfgCommandNode]()
 
     // Recurse through blocks
-    visitBlock(proc.blocks.head, funcEntryNode, TrueLiteral)
+    visitBlock(proc.entryBlock.get, funcEntryNode, TrueLiteral)
 
     /** Add a block to the CFG. A block in this case is a basic block, so it contains a list of consecutive statements
       * followed by a jump at the end to another block. We process statements in this block (if they exist), and then

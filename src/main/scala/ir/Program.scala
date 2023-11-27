@@ -7,7 +7,7 @@ import analysis.BitVectorEval
 import intrusiveList.{IntrusiveList, IntrusiveListElement}
 
 trait HasParent[T]:
-  protected var _parent: Option[T] = None
+  private var _parent: Option[T] = None
   def parent: T = _parent.get
 
   protected final def setParentValue(p: T): Unit = _parent = Some(p)
@@ -126,19 +126,34 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 
 class Procedure (
                   var name: String,
-                  var address: Option[Int],
-                  var blocks: IntrusiveList[Block],
-                  var in: ArrayBuffer[Parameter],
-                  var out: ArrayBuffer[Parameter]
+                  var address: Option[Int] = None,
+                  val blocks: IntrusiveList[Block] = IntrusiveList(),
+                  var in: ArrayBuffer[Parameter] = ArrayBuffer(),
+                  var out: ArrayBuffer[Parameter] = ArrayBuffer(),
                 ) {
   blocks.onInsert = x => {
+    x.deParent()
     x.setParent(this)
   }
   blocks.onRemove = x => {
     x.deParent()
   }
 
+  private var _entryBlock: Option[Block] = None
+  val returnBlock: Block = new Block(name + "_return", None, List(NOP()), new IndirectCall(Register("R30", BitVecType(64)), None, Some(name)))
+  returnBlock.setParent(this)
+  //blocks.append(returnBlock)
+
   private var _callers = new mutable.HashMap[Procedure, mutable.Set[Call]] with mutable.MultiMap[Procedure, Call]
+
+  def entryBlock: Option[Block] = {
+    _entryBlock match {
+      case None =>
+        _entryBlock = blocks.find(p => p.address == address)
+        _entryBlock
+      case Some(b) => Some(b)
+    }
+  }
 
   def calls: Set[Procedure] = blocks.flatMap(_.calls).toSet
   override def toString: String = {
@@ -169,7 +184,7 @@ class Procedure (
     val stackRefs: mutable.Set[Variable] = mutable.Set(stackPointer)
     val visitedBlocks: mutable.Set[Block] = mutable.Set()
     val stackMemory = Memory("stack", 64, 8)
-    val firstBlock = blocks.headOption
+    val firstBlock = entryBlock
     firstBlock.foreach(visitBlock)
 
     // does not handle loops but we do not currently support loops in block CFG so this should do for now anyway
@@ -268,6 +283,8 @@ class Block private (var label: String,
     _jump = Some(j)
     this
   }
+
+  def isReturn: Boolean = this == parent.returnBlock
 
 //  def replaceGoTo(targets: Iterable[Block], label: Option[String] = None): this.type = {
 //    _jump.foreach(_.deParent)

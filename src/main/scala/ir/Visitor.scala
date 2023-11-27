@@ -310,7 +310,7 @@ class ExternalRemover(external: Set[String]) extends Visitor {
     if (external.contains(node.name)) {
       // update the modifies set before removing the body
       node.modifies.addAll(node.blocks.flatMap(_.modifies))
-      node.blocks = IntrusiveList()
+      node.blocks.clear()
     }
     super.visitProcedure(node)
   }
@@ -338,4 +338,13 @@ class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
     node
   }
 
+}
+
+class ConvertToSingleProcedureReturn extends Visitor {
+  override def visitJump(node: Jump): Jump = {
+    node match
+      case c: IndirectCall =>
+        if c.target.name == "R30" then GoTo(Seq(c.parent.parent.returnBlock)) else node
+      case _ => node
+  }
 }

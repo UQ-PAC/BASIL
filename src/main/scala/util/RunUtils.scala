@@ -22,6 +22,7 @@ import intrusiveList.IntrusiveList
 
 import scala.collection.mutable
 
+
 object RunUtils {
   var memoryRegionAnalysisResults: Map[CfgNode, Set[MemoryRegion]] = Map()
 
@@ -88,8 +89,11 @@ object RunUtils {
     val externalNames = externalFunctions.map(e => e.name)
     val externalRemover = ExternalRemover(externalNames)
     val renamer = Renamer(reserved)
+    val returnUnifier = ConvertToSingleProcedureReturn()
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
+    //IRProgram = returnUnifier.visitProgram(IRProgram)
+
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il"))
 
@@ -454,9 +458,9 @@ object RunUtils {
                 val newLabel: String = block.label + t.name
                 val bl = Block(newLabel, None, ArrayBuffer(assume)).replaceJump(DirectCall(t, indirectCall.returnTarget, None))
                 //val directCall = DirectCall(t, indirectCall.returnTarget, null)
-                procedure.addBlock(bl)
                 newBlocks.append(bl)
               }
+              procedure.blocks.addAll(newBlocks)
               block.replaceJump(GoTo(newBlocks, indirectCall.label))
             }
           case _ =>

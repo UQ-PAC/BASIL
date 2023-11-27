@@ -152,6 +152,14 @@ class IndirectCall(var target: Variable, var returnTarget: Option[Block], overri
   } */
   override def toString: String = s"${labelStr}IndirectCall($target, ${returnTarget.map(_.label)})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitIndirectCall(this)
+
+  override def equals(obj: Any): Boolean = {
+    obj match
+      case c: IndirectCall => c.parent == parent && c.target == target && c.returnTarget == c.returnTarget && c.label == label
+      case o: Any => false
+  }
+
+  override def hashCode(): Int = toString.hashCode
 }
 
 object IndirectCall:

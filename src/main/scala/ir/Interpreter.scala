@@ -172,7 +172,7 @@ class Interpreter() {
     }
 
     // Procedure.Block
-    p.blocks.headOption match {
+    p.entryBlock match {
       case Some(block) => nextBlock = Some(block)
       case None        => nextBlock = Some(returnBlock.pop())
     }
