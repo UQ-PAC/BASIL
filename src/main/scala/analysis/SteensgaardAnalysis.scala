@@ -121,7 +121,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, Map
 
       case block: Block =>
         block.statements.foreach(visit(_, ()))
-        block.jumps.foreach(visit(_, ()))
+        visit(block.jump, ())
 
       case _ => // ignore other kinds of nodes
 

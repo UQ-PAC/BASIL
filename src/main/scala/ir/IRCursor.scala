@@ -35,27 +35,25 @@ object IntraProcIRCursor {
         if (s.parent.statements.hasNext(s)) {
           Set(s.parent.statements.getNext(s))
         } else {
-          s.parent.jumps.toSet
+          Set(s.parent.jump)
         }
       case j: Jump => j match {
         /* TODO jumps are ordered so prior jumps mask later jumps; assuming the union of the conditions is total 
          * This will not be the case once we make all jumps nondeterministic. */
-        case g: DetGoTo => Set[CFGPosition](g.target)
-        case n: NonDetGoTo => n.targets.toSet
+        case n: GoTo => n.targets.asInstanceOf[Set[CFGPosition]]
         case c: DirectCall => c.returnTarget match
           case Some(b) => Set(b)
           case None => Set(ProcedureUnknownJump(c.parent.parent, c))
-        case i: IndirectCall => i match 
-          case IndirectCall(v, parent, ret, label) =>
-            if (v.name == "R30") {
-              Set(ProcedureExit(parent.parent, pos))
-            } else {
-              ret match
-                case Some(block) => Set(block)
-                case None => Set(ProcedureUnknownJump(i.parent.parent, pos))
-            }
+        case i: IndirectCall =>
+          if (i.target.name == "R30") {
+            Set(ProcedureExit(i.parent.parent, pos))
+          } else {
+            i.returnTarget match
+              case Some(block: Block) => Set[CFGPosition](block)
+              case None => Set(ProcedureUnknownJump(i.parent.parent, pos))
+          }
       }
-      case b: Block => if b.statements.isEmpty then Set(b.jumps.head) else Set[CFGPosition](b.statements.head())
+      case b: Block => if b.statements.isEmpty then Set[CFGPosition](b.jump) else Set[CFGPosition](b.statements.head())
       case proc: Procedure => if proc.blocks.isEmpty then Set(ProcedureExit(proc, proc)) else Set(proc.blocks.head())
       case j: ProcedureUnknownJump => Set(ProcedureExit(j.fromProcedure, j))
       case e: ProcedureExit => Set()

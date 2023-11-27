@@ -6,11 +6,21 @@ import boogie.*
 import analysis.BitVectorEval
 import intrusiveList.{IntrusiveList, IntrusiveListElement}
 
+trait HasParent[T]:
+  protected var _parent: Option[T] = None
+  def parent: T = _parent.get
+
+  protected final def setParentValue(p: T): Unit = _parent = Some(p)
+
+  def deParent(): Unit = {}
+
+  def setParent(p: T): Unit = setParentValue(p)
+
 class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure,
               var initialMemory: ArrayBuffer[MemorySection],
               var readOnlyMemory: ArrayBuffer[MemorySection]) {
 
-  // This shouldn't be run before indirect calls are resolved?
+  // This shouldn't be run before indirect calls are resolved
   def stripUnreachableFunctions(): Unit = {
     val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
@@ -121,7 +131,12 @@ class Procedure (
                   var in: ArrayBuffer[Parameter],
                   var out: ArrayBuffer[Parameter]
                 ) {
-
+  blocks.onInsert = x => {
+    x.setParent(this)
+  }
+  blocks.onRemove = x => {
+    x.deParent()
+  }
 
   private var _callers = new mutable.HashMap[Procedure, mutable.Set[Call]] with mutable.MultiMap[Procedure, Call]
 
@@ -132,6 +147,12 @@ class Procedure (
 
   def removeCaller(c: Call): Unit = {
     _callers.removeBinding(c.parent.parent, c)
+  }
+
+  def addBlock(block: Block): Block = {
+    block.deParent()
+    block.setParent(this)
+    blocks.append(block)
   }
 
   def addCaller(c: Call): Unit = {
@@ -189,13 +210,10 @@ class Procedure (
         }
       }
       visitedBlocks.add(b)
-      for (j <- b.jumps) {
-        j match {
-          case g: DetGoTo => visitBlock(g.target)
-          case d: DirectCall => d.returnTarget.foreach(visitBlock)
-          case i: IndirectCall => i.returnTarget.foreach(visitBlock)
-          case n: NonDetGoTo => n.targets.foreach(visitBlock)
-        }
+      b.jump match {
+        case g: GoTo => g.targets.foreach(visitBlock)
+        case d: DirectCall => d.returnTarget.foreach(visitBlock)
+        case i: IndirectCall => i.returnTarget.foreach(visitBlock)
       }
     }
   }
@@ -207,61 +225,78 @@ class Parameter(var name: String, var size: Int, var value: Register) {
 }
 
 
-class Block private
-(var label: String,
+class Block private (var label: String,
  var address: Option[Int],
  val statements: IntrusiveList[Statement],
  // invariant: all Goto targets are disjoint
- private val _jumps: IntrusiveList[Jump],
+ private var _jump: Option[Jump],
  //private val _calls: IntrusiveList[Call],
  val incomingJumps: mutable.HashSet[Block],
- val parent: Procedure
-) extends IntrusiveListElement {
-  def this(label: String, address: Option[Int], statements: IterableOnce[Statement], jumps: IterableOnce[Jump], parent: Procedure) = {
-    this(label, address, IntrusiveList.from(statements), IntrusiveList.from(jumps), mutable.HashSet.empty, parent)
+) extends IntrusiveListElement, HasParent[Procedure] {
+  statements.foreach(_.setParent(this))
+  _jump.foreach(_.setParent(this))
+  statements.onInsert = x => x.setParent(this)
+  statements.onRemove = x => x.deParent()
+
+  statements.onInsert = parenter
+
+  def parenter(c: Statement): Statement = {
+    c.setParent(this)
+    c
+  }
+  def this(label: String, address: Option[Int], statements: IterableOnce[Statement], jump: Jump) = {
+    this(label, address, IntrusiveList.from(statements), Some(jump), mutable.HashSet.empty)
+    _jump.foreach(_.setParent(this))
   }
 
-  def jumps: immutable.List[Jump] = _jumps to immutable.List
-
-  def addJump(j: Jump): Unit = {
-    j.parent = this
-    _jumps.append(j)
+  def this(label: String, address: Option[Int], statements: IterableOnce[Statement]) = {
+    this(label, address, IntrusiveList.from(statements), None, mutable.HashSet.empty)
   }
+
+  def jump: Jump = _jump.get
+  def jumpSet: Set[Jump] = _jump.toSet
+
+  def addGoToTargets(targets: mutable.Set[Block]): this.type = {
+    require(_jump.isDefined && _jump.get.isInstanceOf[GoTo])
+    _jump.foreach(_.asInstanceOf[GoTo].addAllTargets(targets))
+    this
+  }
+
+  def replaceJump(j: Jump): this.type = {
+    _jump.foreach(_.deParent())
+    j.setParent(this)
+    _jump = Some(j)
+    this
+  }
+
+//  def replaceGoTo(targets: Iterable[Block], label: Option[String] = None): this.type = {
+//    _jump.foreach(_.deParent)
+//    _jump = Some(GoTo(targets, label).setParent(this))
+//    this
+//  }
+//
+//  def replaceDirectCall(target: Procedure, returnTarget: Option[Block] = None, label: Option[String] = None): this.type = {
+//    _jump.foreach(_.deParent)
+//    _jump = Some(DirectCall(target, returnTarget, label).setParent(this))
+//    this
+//  }
+//
+//  def addIndirectCall(target: Variable, returnTarget: Option[Block] = None, label: Option[String] = None): this.type = {
+//    _jump.foreach(_.deParent)
+//    _jump = Some(IndirectCall(target, returnTarget, label).setParent(this))
+//    this
+//  }
+
+  def removeJump(): this.type = {
+    _jump.foreach(_.deParent())
+    _jump = None
+    this
+  }
+
 
   def predecessors: immutable.Set[Block] = incomingJumps to immutable.Set
 
-  def removeJump(j: Jump) : Unit = {
-    assert(j.parent == this)
-    j.deParent()
-    _jumps.remove(j)
-  }
-
-  def replaceJump(j: Jump, newJ: Jump) : Unit = {
-    assert((j.parent == this))
-    if (j eq newJ) {
-      // GoTo/Call is responsible for maintaining the CFG if it is modified in-place
-      return
-    }
-    (j, newJ) match {
-      case (g: GoTo, f: GoTo) => {
-        removeJump(j)
-        addJump(newJ)
-      }
-      case (g: Call, f: Call) => {
-        removeJump(g)
-        addJump(f)
-      }
-      case (_, _) => throw Exception("Programmer error: can not replace jump with call or vice versa")
-    }
-  }
-
-  //def addStatementAfter(statement: Statement, newStatement: Statement): Statement = {
-  //  val i = statements.indexOf(statement)
-  //  statements.insert(i, newStatement)
-  //}
-
-
-  def calls: Set[Procedure] = _jumps.flatMap(_.calls).toSet
+  def calls: Set[Procedure] = _jump.toSet.flatMap(_.calls)
 
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet
   //def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
@@ -273,8 +308,7 @@ class Block private
   override def toString: String = {
     // display all statements and jumps
     val statementsString = statements.map(_.toString).mkString("\n")
-    val jumpsString = jumps.map(_.toString).mkString("\n")
-    s"Block $label with $statementsString\n$jumpsString"
+    s"Block $label with $statementsString\n$jump"
   }
 
   override def equals(obj: scala.Any): Boolean =
@@ -284,8 +318,6 @@ class Block private
 
   override def hashCode(): Int = label.hashCode()
 }
-
-
 
 
 /**
