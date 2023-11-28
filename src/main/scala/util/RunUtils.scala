@@ -109,10 +109,12 @@ object RunUtils {
     val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
     IRProgram.setModifies(specModifies)
 
+    /*
     if (q.runInterpret) {
       val interpreter = Interpreter()
       interpreter.interpret(IRProgram)
     }
+    */
 
     Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
@@ -151,45 +153,44 @@ object RunUtils {
     val domain = computeDomain(IRProgram)
 
     Logger.info("[!] Running Constant Propagation")
-    val constPropSolver = ConstantPropagationAnalysis.WorklistSolver(cfg)
-    val constPropResult: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = constPropSolver.analyze()
+    val constPropSolver = ConstantPropagationSolver(cfg)
+    val constPropResult = constPropSolver.analyze()
 
-    val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram, ConstantPropagationLattice)
-    val newCPResult: ilcpsolver.lattice.Element  = ilcpsolver.analyze()
+    def newSolverTest(): Unit = {
+      val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
+      val newCPResult: ilcpsolver.lattice.Element = ilcpsolver.analyze()
 
-    val newRes = newCPResult.flatMap((x, y) => y.flatMap {
-      case (_, ilcpsolver.lattice.sublattice.sublattice.FlatElement.Top) => None
-      case (_, ilcpsolver.lattice.sublattice.sublattice.FlatElement.Bot) => None
-      case z => Some(z)
-    })
-    val oldRes = constPropResult.flatMap((x, y) => y.flatMap {
-      case (_, constPropSolver.lattice.sublattice.sublattice.FlatElement.Top) => None
-      case (_, constPropSolver.lattice.sublattice.sublattice.FlatElement.Bot) => None
-      case z => Some(z)
-    })
-    val both = newRes.toSet.intersect(oldRes.toSet)
-    val notnew = (newRes.toSet).filter(x => !both.contains(x))
-    val notOld = (oldRes.toSet).filter(x => !both.contains(x))
-    // newRes and oldRes should have value equality
+      val newRes = newCPResult.flatMap((x, y) => y.flatMap {
+        case (_, el) if el == FlatLattice[BitVecLiteral].top || el == FlatLattice[BitVecLiteral].bottom => None
+        case z => Some(z)
+      })
+      val oldRes = constPropResult.flatMap((x, y) => y.flatMap {
+        case (_, el) if el == FlatLattice[BitVecLiteral].top || el == FlatLattice[BitVecLiteral].bottom => None
+        case z => Some(z)
+      })
+      val both = newRes.toSet.intersect(oldRes.toSet)
+      val notnew = (newRes.toSet).filter(x => !both.contains(x))
+      val notOld = (oldRes.toSet).filter(x => !both.contains(x))
+      // newRes and oldRes should have value equality
 
+      config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult, iteration), s"${s}_newconstprop$iteration.txt"))
+      config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram), s"program.dot"))
+      config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram, newCPResult.map((k,v) => (k, v.toString))), s"program-constprop.dot"))
+    }
+    newSolverTest()
 
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult, iteration), s"${s}_newconstprop$iteration.txt"))
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt"))
 
-    config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram), s"program.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram, newCPResult.map((k,v) => (k, v.toString))), s"program-constprop.dot"))
-
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder), s"${s}_constprop$iteration.dot"))
-
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder), s"${s}_constprop$iteration.dot"))
-
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt"))
 
     Logger.info("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
-    val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.analyze()
+    val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
+    val mraResult = mraSolver.analyze()
     memoryRegionAnalysisResults = mraResult
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder), s"${s}_mra$iteration.dot"))
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(mraResult, true), Output.dotIder), s"${s}_mra$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, mraResult, iteration), s"${s}_mra$iteration.txt"))
 
     Logger.info("[!] Running MMM")
@@ -197,11 +198,10 @@ object RunUtils {
     mmm.convertMemoryRegions(mraResult, mergedSubroutines)
 
     Logger.info("[!] Running VSA")
-    val vsaSolver =
-      ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
-    val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]  = vsaSolver.analyze()
+    val vsaSolver = ValueSetAnalysisSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
+    val vsaResult = vsaSolver.analyze()
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder), s"${s}_vsa$iteration.dot"))
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, true), Output.dotIder), s"${s}_vsa$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, vsaResult, iteration), s"${s}_vsa$iteration.txt"))
 
     Logger.info("[!] Resolving CFG")
@@ -338,7 +338,7 @@ object RunUtils {
               isEntryNode = false
             case _ => isEntryNode = false
           }
-          val successors = next.succ(true)
+          val successors = next.succIntra
           if (successors.size > 1) {
             val successorsCmd = successors.collect { case c: CfgCommandNode => c }.toSeq.sortBy(_.data.label)
             printGoTo(successorsCmd)
@@ -392,14 +392,14 @@ object RunUtils {
   ): (Program, Boolean) = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
-    cfg.startNode.succ(true).union(cfg.startNode.succ(false)).foreach(node => worklist.addOne(node))
+    cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
 
     val visited = MutableSet[CfgNode]()
     while (worklist.nonEmpty) {
       val node = worklist.remove(0)
       if (!visited.contains(node)) {
         process(node)
-        node.succ(true).union(node.succ(false)).foreach(node => worklist.addOne(node))
+        node.succIntra.union(node.succInter).foreach(node => worklist.addOne(node))
         visited.add(node)
       }
     }

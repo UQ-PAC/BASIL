@@ -3,7 +3,7 @@ import ir.IntraProcIRCursor
 
 /** Dependency methods for worklist-based analyses.
   */
-trait Dependencies[N](val intra: Boolean):
+trait Dependencies[N]:
 
   /** Outgoing dependencies. Used when propagating dataflow to successors.
     * @param n
@@ -21,19 +21,15 @@ trait Dependencies[N](val intra: Boolean):
     */
   def indep(n: N): Set[N]
 
-/** Dependency methods for forward analyses.
-  */
-trait ForwardDependencies extends Dependencies[CfgNode]:
+trait InterproceduralForwardDependencies extends Dependencies[CfgNode] {
+  override def outdep(n: CfgNode): Set[CfgNode] = n.succInter.toSet
+  override def indep(n: CfgNode): Set[CfgNode] = n.predInter.toSet
+}
 
-  /* TODO: add functionality here for distinguishing between Intra / Inter */
-
-  // Also add support for getting edges / conditions here?
-  override def outdep(n: CfgNode): Set[CfgNode] =
-    if intra then n.succ(intra).toSet else n.succ(intra).toSet.union(n.succ(!intra).toSet)
-
-  override def indep(n: CfgNode): Set[CfgNode] =
-    if intra then n.pred(intra).toSet else n.pred(intra).toSet.union(n.pred(!intra).toSet)
-
+trait IntraproceduralForwardDependencies extends Dependencies[CfgNode] {
+  override def outdep(n: CfgNode): Set[CfgNode] = n.succIntra.toSet
+  override def indep(n: CfgNode): Set[CfgNode] = n.predIntra.toSet
+}
 
 
 trait IntraProcDependencies extends Dependencies[IntraProcIRCursor.Node]:
@@ -42,6 +38,6 @@ trait IntraProcDependencies extends Dependencies[IntraProcIRCursor.Node]:
 
 /** Dependency methods for forward analyses.
   */
-object IntraProcDependencies extends Dependencies[IntraProcIRCursor.Node](true):
+object IntraProcDependencies extends Dependencies[IntraProcIRCursor.Node]:
   override def outdep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcIRCursor.succ(n)
   override def indep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcIRCursor.pred(n)
