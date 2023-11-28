@@ -624,6 +624,28 @@ class ProgramCfgFactory:
 
     cfg.startNode = procToCfg(program.mainProcedure)._1
 
+
+
+
+    // TEMPORARY: Loop detection
+    val detector = LoopDetector(cfg);
+    val foundLoops = detector.identify_loops()
+
+    foundLoops.foreach {
+        loop =>
+            println("Loop:")
+            println(s"  header:     ${loop.header}")
+
+            loop.edges.foreach { edge => println(s"    ${edge}")}
+
+            // println(s"  body:       ${loop.edges}")
+            println(s"  back edges: ${loop.backEdges}")
+            println(s"  pred edges: ${loop.entryEdges}")
+            println(s"  reducible?: ${loop.reducible}")
+            println(s"  re-entries: ${loop.reentries}")
+    }
+
+
     cfg
   }
 
