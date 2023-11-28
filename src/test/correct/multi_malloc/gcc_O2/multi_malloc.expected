@@ -504,6 +504,9 @@ procedure main()
     R30, Gamma_R30 := 1692bv64, true;
     call __printf_chk();
     goto l000001e1;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
   l000001e1:
     assume {:captureState "l000001e1"} true;
     R2, Gamma_R2 := 42bv64, true;
@@ -519,5 +522,8 @@ procedure main()
     R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
     R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
+    goto main_return;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }

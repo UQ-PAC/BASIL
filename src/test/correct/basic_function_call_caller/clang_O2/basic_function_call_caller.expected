@@ -220,5 +220,11 @@ procedure main()
     assert ((x_old == 0bv32) ==> (memory_load32_le(mem, $x_addr) == 0bv32));
     assert (Gamma_y_old ==> ((memory_load32_le(mem, $x_addr) == 0bv32) || gamma_load32(Gamma_mem, $y_addr)));
     assume {:captureState "%000002fa"} true;
+    goto main_return;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }

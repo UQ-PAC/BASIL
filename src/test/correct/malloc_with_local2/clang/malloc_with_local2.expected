@@ -624,31 +624,6 @@ procedure main()
     R30, Gamma_R30 := 2100bv64, true;
     call malloc();
     goto l000003b5;
-  l000003b5:
-    assume {:captureState "l000003b5"} true;
-    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R29, 18446744073709551600bv64), R0), gamma_store64(Gamma_stack, bvadd64(R29, 18446744073709551600bv64), Gamma_R0);
-    assume {:captureState "%000003bb"} true;
-    R8, Gamma_R8 := 11bv64, true;
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R29, 18446744073709551596bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R29, 18446744073709551596bv64), Gamma_R8);
-    assume {:captureState "%000003c8"} true;
-    R0, Gamma_R0 := 4bv64, true;
-    stack, Gamma_stack := memory_store64_le(stack, R31, R0), gamma_store64(Gamma_stack, R31, Gamma_R0);
-    assume {:captureState "%000003d5"} true;
-    R30, Gamma_R30 := 2124bv64, true;
-    call malloc();
-    goto l000003de;
-  l000003de:
-    assume {:captureState "l000003de"} true;
-    R8, Gamma_R8 := R0, Gamma_R0;
-    R0, Gamma_R0 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
-    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 32bv64), R8), gamma_store64(Gamma_stack, bvadd64(R31, 32bv64), Gamma_R8);
-    assume {:captureState "%000003f1"} true;
-    R8, Gamma_R8 := 10bv64, true;
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 28bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 28bv64), Gamma_R8);
-    assume {:captureState "%000003fe"} true;
-    R30, Gamma_R30 := 2148bv64, true;
-    call malloc();
-    goto l00000407;
   l00000407:
     assume {:captureState "l00000407"} true;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 16bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 16bv64), Gamma_R0);
@@ -676,16 +651,45 @@ procedure main()
     R30, Gamma_R30 := 2204bv64, true;
     call printf();
     goto l00000465;
-  l00000465:
-    assume {:captureState "l00000465"} true;
-    R8, Gamma_R8 := memory_load64_le(stack, bvadd64(R31, 32bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 32bv64));
-    call rely();
-    R1, Gamma_R1 := zero_extend32_32(memory_load32_le(mem, R8)), (gamma_load32(Gamma_mem, R8) || L(mem, R8));
-    R0, Gamma_R0 := 0bv64, true;
-    R0, Gamma_R0 := bvadd64(R0, 2313bv64), Gamma_R0;
-    R30, Gamma_R30 := 2224bv64, true;
-    call printf();
-    goto l00000485;
+  l000003de:
+    assume {:captureState "l000003de"} true;
+    R8, Gamma_R8 := R0, Gamma_R0;
+    R0, Gamma_R0 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 32bv64), R8), gamma_store64(Gamma_stack, bvadd64(R31, 32bv64), Gamma_R8);
+    assume {:captureState "%000003f1"} true;
+    R8, Gamma_R8 := 10bv64, true;
+    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 28bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 28bv64), Gamma_R8);
+    assume {:captureState "%000003fe"} true;
+    R30, Gamma_R30 := 2148bv64, true;
+    call malloc();
+    goto l00000407;
+  l000004ad:
+    assume {:captureState "l000004ad"} true;
+    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 32bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 32bv64));
+    R30, Gamma_R30 := 2256bv64, true;
+    call #free();
+    goto l000004bb;
+  l000004bb:
+    assume {:captureState "l000004bb"} true;
+    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 8bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 8bv64));
+    #5, Gamma_#5 := bvadd64(R31, 64bv64), Gamma_R31;
+    R29, Gamma_R29 := memory_load64_le(stack, #5), gamma_load64(Gamma_stack, #5);
+    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(#5, 8bv64)), gamma_load64(Gamma_stack, bvadd64(#5, 8bv64));
+    R31, Gamma_R31 := bvadd64(R31, 80bv64), Gamma_R31;
+    goto main_return;
+  l000003b5:
+    assume {:captureState "l000003b5"} true;
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R29, 18446744073709551600bv64), R0), gamma_store64(Gamma_stack, bvadd64(R29, 18446744073709551600bv64), Gamma_R0);
+    assume {:captureState "%000003bb"} true;
+    R8, Gamma_R8 := 11bv64, true;
+    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R29, 18446744073709551596bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R29, 18446744073709551596bv64), Gamma_R8);
+    assume {:captureState "%000003c8"} true;
+    R0, Gamma_R0 := 4bv64, true;
+    stack, Gamma_stack := memory_store64_le(stack, R31, R0), gamma_store64(Gamma_stack, R31, Gamma_R0);
+    assume {:captureState "%000003d5"} true;
+    R30, Gamma_R30 := 2124bv64, true;
+    call malloc();
+    goto l000003de;
   l00000485:
     assume {:captureState "l00000485"} true;
     R1, Gamma_R1 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
@@ -700,19 +704,21 @@ procedure main()
     R30, Gamma_R30 := 2248bv64, true;
     call #free();
     goto l000004ad;
-  l000004ad:
-    assume {:captureState "l000004ad"} true;
-    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 32bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 32bv64));
-    R30, Gamma_R30 := 2256bv64, true;
-    call #free();
-    goto l000004bb;
-  l000004bb:
-    assume {:captureState "l000004bb"} true;
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 8bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 8bv64));
-    #5, Gamma_#5 := bvadd64(R31, 64bv64), Gamma_R31;
-    R29, Gamma_R29 := memory_load64_le(stack, #5), gamma_load64(Gamma_stack, #5);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(#5, 8bv64)), gamma_load64(Gamma_stack, bvadd64(#5, 8bv64));
-    R31, Gamma_R31 := bvadd64(R31, 80bv64), Gamma_R31;
+  l00000465:
+    assume {:captureState "l00000465"} true;
+    R8, Gamma_R8 := memory_load64_le(stack, bvadd64(R31, 32bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 32bv64));
+    call rely();
+    R1, Gamma_R1 := zero_extend32_32(memory_load32_le(mem, R8)), (gamma_load32(Gamma_mem, R8) || L(mem, R8));
+    R0, Gamma_R0 := 0bv64, true;
+    R0, Gamma_R0 := bvadd64(R0, 2313bv64), Gamma_R0;
+    R30, Gamma_R30 := 2224bv64, true;
+    call printf();
+    goto l00000485;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }
 

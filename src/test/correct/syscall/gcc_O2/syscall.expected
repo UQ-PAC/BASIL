@@ -1,8 +1,4 @@
-var {:extern} Gamma_R16: bool;
-var {:extern} Gamma_R17: bool;
 var {:extern} Gamma_mem: [bv64]bool;
-var {:extern} R16: bv64;
-var {:extern} R17: bv64;
 var {:extern} mem: [bv64]bv8;
 const {:extern} $_IO_stdin_used_addr: bv64;
 axiom ($_IO_stdin_used_addr == 1960bv64);
@@ -66,7 +62,6 @@ procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
 procedure fork();
-  modifies Gamma_R16, Gamma_R17, R16, R17;
   free requires (memory_load8_le(mem, 69632bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69633bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69634bv64) == 0bv8);

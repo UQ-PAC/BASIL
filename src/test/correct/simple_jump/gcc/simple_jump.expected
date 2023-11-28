@@ -220,7 +220,7 @@ procedure main()
     assume {:captureState "l0000030a"} true;
     R0, Gamma_R0 := 0bv64, true;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
-    return;
+    goto main_return;
   lmain_goto_l0000030a:
     assume {:captureState "lmain_goto_l0000030a"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);
@@ -229,4 +229,10 @@ procedure main()
     assume {:captureState "lmain_goto_l0000031f"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);
     goto l0000031f;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  main_return:
+    assume {:captureState "main_return"} true;
+    return;
 }

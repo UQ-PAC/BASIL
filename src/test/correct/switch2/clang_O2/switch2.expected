@@ -153,5 +153,11 @@ procedure main()
 {
   lmain:
     assume {:captureState "lmain"} true;
+    goto main_return;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }

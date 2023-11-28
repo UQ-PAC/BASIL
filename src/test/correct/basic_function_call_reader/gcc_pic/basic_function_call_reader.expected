@@ -289,24 +289,30 @@ procedure main()
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     assert Gamma_ZF;
     goto lmain_goto_l0000034b, lmain_goto_l00000334;
-  l00000334:
-    assume {:captureState "l00000334"} true;
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
-    goto l00000340;
-  l0000034b:
-    assume {:captureState "l0000034b"} true;
-    R0, Gamma_R0 := 0bv64, true;
-    goto l00000340;
-  l00000340:
-    assume {:captureState "l00000340"} true;
-    R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
-    return;
-  lmain_goto_l00000334:
-    assume {:captureState "lmain_goto_l00000334"} true;
-    assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);
-    goto l00000334;
   lmain_goto_l0000034b:
     assume {:captureState "lmain_goto_l0000034b"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);
     goto l0000034b;
+  l00000334:
+    assume {:captureState "l00000334"} true;
+    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    goto l00000340;
+  lmain_goto_l00000334:
+    assume {:captureState "lmain_goto_l00000334"} true;
+    assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);
+    goto l00000334;
+  l0000034b:
+    assume {:captureState "l0000034b"} true;
+    R0, Gamma_R0 := 0bv64, true;
+    goto l00000340;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  l00000340:
+    assume {:captureState "l00000340"} true;
+    R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
+    goto main_return;
+  main_return:
+    assume {:captureState "main_return"} true;
+    return;
 }

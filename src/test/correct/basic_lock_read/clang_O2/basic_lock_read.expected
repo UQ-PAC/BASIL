@@ -195,6 +195,14 @@ procedure main()
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(mem, bvadd64(R8, 52bv64))), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
     assert Gamma_R8;
     goto lmain_goto_l000002dc, lmain_goto_l000002f7;
+  lmain_goto_l000002dc:
+    assume {:captureState "lmain_goto_l000002dc"} true;
+    assume (bvcomp32(R8[32:0], 0bv32) != 0bv1);
+    goto l000002dc;
+  lmain_goto_l000002f7:
+    assume {:captureState "lmain_goto_l000002f7"} true;
+    assume (bvcomp32(R8[32:0], 0bv32) == 0bv1);
+    goto l000002f7;
   l000002dc:
     assume {:captureState "l000002dc"} true;
     R8, Gamma_R8 := 69632bv64, true;
@@ -205,17 +213,15 @@ procedure main()
     assert (memory_load32_le(mem, $z_addr) == z_old);
     assume {:captureState "%000002eb"} true;
     R0, Gamma_R0 := 0bv64, true;
-    return;
+    goto main_return;
   l000002f7:
     assume {:captureState "l000002f7"} true;
     R0, Gamma_R0 := 0bv64, true;
+    goto main_return;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
-  lmain_goto_l000002dc:
-    assume {:captureState "lmain_goto_l000002dc"} true;
-    assume (bvcomp32(R8[32:0], 0bv32) != 0bv1);
-    goto l000002dc;
-  lmain_goto_l000002f7:
-    assume {:captureState "lmain_goto_l000002f7"} true;
-    assume (bvcomp32(R8[32:0], 0bv32) == 0bv1);
-    goto l000002f7;
 }

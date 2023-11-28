@@ -215,18 +215,23 @@ procedure main()
     R8, Gamma_R8 := zero_extend32_32(bvadd32(#4, 1bv32)), Gamma_#4;
     assert Gamma_ZF;
     goto lmain_goto_l00000938, lmain_goto_l0000093b;
-  l0000093b:
-    assume {:captureState "l0000093b"} true;
-    R8, Gamma_R8 := 1bv64, true;
-    goto l0000093e;
-  l00000938:
-    assume {:captureState "l00000938"} true;
-    R8, Gamma_R8 := 0bv64, true;
-    goto l0000093e;
   l0000093e:
     assume {:captureState "l0000093e"} true;
     assert Gamma_R8;
     goto l0000093e_goto_l00000946, l0000093e_goto_l0000095d;
+  l00000946:
+    assume {:captureState "l00000946"} true;
+    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
+    R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
+    goto main_return;
+  lmain_goto_l00000938:
+    assume {:captureState "lmain_goto_l00000938"} true;
+    assume (bvcomp1(ZF, 1bv1) != 0bv1);
+    goto l00000938;
+  l0000093b:
+    assume {:captureState "l0000093b"} true;
+    R8, Gamma_R8 := 1bv64, true;
+    goto l0000093e;
   l0000095d:
     assume {:captureState "l0000095d"} true;
     goto l0000095e;
@@ -236,19 +241,6 @@ procedure main()
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 8bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 8bv64), Gamma_R8);
     assume {:captureState "%0000096c"} true;
     goto l00000946;
-  l00000946:
-    assume {:captureState "l00000946"} true;
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
-    R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
-    return;
-  lmain_goto_l00000938:
-    assume {:captureState "lmain_goto_l00000938"} true;
-    assume (bvcomp1(ZF, 1bv1) != 0bv1);
-    goto l00000938;
-  lmain_goto_l0000093b:
-    assume {:captureState "lmain_goto_l0000093b"} true;
-    assume (bvcomp1(ZF, 1bv1) == 0bv1);
-    goto l0000093b;
   l0000093e_goto_l00000946:
     assume {:captureState "l0000093e_goto_l00000946"} true;
     assume (bvcomp1(R8[1:0], 1bv1) != 0bv1);
@@ -257,4 +249,18 @@ procedure main()
     assume {:captureState "l0000093e_goto_l0000095d"} true;
     assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
     goto l0000095d;
+  lmain_goto_l0000093b:
+    assume {:captureState "lmain_goto_l0000093b"} true;
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
+    goto l0000093b;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  l00000938:
+    assume {:captureState "l00000938"} true;
+    R8, Gamma_R8 := 0bv64, true;
+    goto l0000093e;
+  main_return:
+    assume {:captureState "main_return"} true;
+    return;
 }

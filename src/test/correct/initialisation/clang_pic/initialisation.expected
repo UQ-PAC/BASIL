@@ -405,5 +405,11 @@ procedure main()
     mem, Gamma_mem := memory_store8_le(mem, R9, R8[8:0]), gamma_store8(Gamma_mem, R9, Gamma_R8);
     assume {:captureState "%0000039a"} true;
     R0, Gamma_R0 := 0bv64, true;
+    goto main_return;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }

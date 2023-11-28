@@ -196,5 +196,11 @@ procedure main()
     assert (L(mem, bvadd64(R1, 20bv64)) ==> Gamma_R2);
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R1, 20bv64), R2[32:0]), gamma_store32(Gamma_mem, bvadd64(R1, 20bv64), Gamma_R2);
     assume {:captureState "%000001c5"} true;
+    goto main_return;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }

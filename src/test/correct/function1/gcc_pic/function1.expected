@@ -300,6 +300,12 @@ procedure get_two()
     R0, Gamma_R0 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
     R0, Gamma_R0 := zero_extend32_32(bvadd32(R1[32:0], R0[32:0])), (Gamma_R0 && Gamma_R1);
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
+    goto get_two_return;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  get_two_return:
+    assume {:captureState "get_two_return"} true;
     return;
 }
 
@@ -473,6 +479,13 @@ procedure main()
     R30, Gamma_R30 := 2036bv64, true;
     call get_two();
     goto l000003ed;
+  l00000433:
+    assume {:captureState "l00000433"} true;
+    R0, Gamma_R0 := 0bv64, true;
+    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
+    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
+    R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
+    goto main_return;
   l000003ed:
     assume {:captureState "l000003ed"} true;
     R1, Gamma_R1 := zero_extend32_32(R0[32:0]), Gamma_R0;
@@ -494,12 +507,11 @@ procedure main()
     R30, Gamma_R30 := 2080bv64, true;
     call printf();
     goto l00000433;
-  l00000433:
-    assume {:captureState "l00000433"} true;
-    R0, Gamma_R0 := 0bv64, true;
-    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
-    R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }
 

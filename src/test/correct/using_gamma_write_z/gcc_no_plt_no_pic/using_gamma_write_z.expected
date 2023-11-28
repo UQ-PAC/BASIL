@@ -199,5 +199,11 @@ procedure main()
     assert (Gamma_x_old ==> gamma_load32(Gamma_mem, $x_addr));
     assume {:captureState "%0000085b"} true;
     R0, Gamma_R0 := 0bv64, true;
+    goto main_return;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }

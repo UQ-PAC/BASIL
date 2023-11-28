@@ -227,5 +227,11 @@ procedure main()
     assert (memory_load32_le(mem, $x_addr) == x_old);
     assume {:captureState "%000002d9"} true;
     R0, Gamma_R0 := 0bv64, true;
+    goto main_return;
+  terminate:
+    assume {:captureState "terminate"} true;
+    goto terminate;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }
