@@ -457,7 +457,6 @@ object RunUtils {
                 val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)), null)
                 val newLabel: String = block.label + t.name
                 val bl = Block(newLabel, None, ArrayBuffer(assume), DirectCall(t, indirectCall.returnTarget, None))
-                //val directCall = DirectCall(t, indirectCall.returnTarget, null)
                 newBlocks.append(bl)
               }
               procedure.addBlocks(newBlocks)

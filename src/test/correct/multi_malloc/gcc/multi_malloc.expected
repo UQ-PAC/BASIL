@@ -571,9 +571,6 @@ procedure main()
     R30, Gamma_R30 := 2172bv64, true;
     call printf();
     goto l000003e8;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l0000036b:
     assume {:captureState "l0000036b"} true;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 24bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 24bv64), Gamma_R0);

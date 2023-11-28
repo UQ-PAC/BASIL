@@ -205,9 +205,6 @@ procedure main()
     assume {:captureState "l000001bd"} true;
     R0, Gamma_R0 := 0bv64, true;
     goto main_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l0000039c:
     assume {:captureState "l0000039c"} true;
     call rely();

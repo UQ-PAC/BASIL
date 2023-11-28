@@ -420,9 +420,6 @@ procedure main()
     R30, Gamma_R30 := 1916bv64, true;
     call printf();
     goto l00000359;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l00000370:
     assume {:captureState "l00000370"} true;
     R0, Gamma_R0 := 0bv64, true;

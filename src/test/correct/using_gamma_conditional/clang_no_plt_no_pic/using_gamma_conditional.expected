@@ -230,11 +230,24 @@ procedure main()
     assume {:captureState "l0000093d"} true;
     R8, Gamma_R8 := 0bv64, true;
     goto l00000943;
+  l00000943:
+    assume {:captureState "l00000943"} true;
+    assert Gamma_R8;
+    goto l00000943_goto_l00000973, l00000943_goto_l0000094b;
   l0000095e:
     assume {:captureState "l0000095e"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto main_return;
+  l00000943_goto_l00000973:
+    assume {:captureState "l00000943_goto_l00000973"} true;
+    assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
+    goto l00000973;
+  l00000974:
+    assume {:captureState "l00000974"} true;
+    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), 0bv32), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), true);
+    assume {:captureState "%0000097c"} true;
+    goto l0000095e;
   l0000094b:
     assume {:captureState "l0000094b"} true;
     R8, Gamma_R8 := 1bv64, true;
@@ -245,19 +258,6 @@ procedure main()
     assume {:captureState "l00000943_goto_l0000094b"} true;
     assume (bvcomp1(R8[1:0], 1bv1) != 0bv1);
     goto l0000094b;
-  l00000943:
-    assume {:captureState "l00000943"} true;
-    assert Gamma_R8;
-    goto l00000943_goto_l00000973, l00000943_goto_l0000094b;
-  l00000943_goto_l00000973:
-    assume {:captureState "l00000943_goto_l00000973"} true;
-    assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
-    goto l00000973;
-  l00000974:
-    assume {:captureState "l00000974"} true;
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), 0bv32), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), true);
-    assume {:captureState "%0000097c"} true;
-    goto l0000095e;
   lmain_goto_l00000940:
     assume {:captureState "lmain_goto_l00000940"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);
@@ -269,9 +269,6 @@ procedure main()
   l00000973:
     assume {:captureState "l00000973"} true;
     goto l00000974;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   lmain_goto_l0000093d:
     assume {:captureState "lmain_goto_l0000093d"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);

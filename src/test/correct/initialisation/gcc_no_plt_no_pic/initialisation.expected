@@ -290,9 +290,6 @@ procedure main()
     assume {:captureState "%00000a89"} true;
     R0, Gamma_R0 := 0bv64, true;
     goto main_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;

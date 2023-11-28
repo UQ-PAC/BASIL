@@ -355,9 +355,6 @@ procedure main()
     R8, Gamma_R8 := zero_extend32_32(bvadd32(#6, 1bv32)), Gamma_#6;
     assert Gamma_ZF;
     goto l000003c0_goto_l000003eb, l000003c0_goto_l000003ee;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l000003b8_goto_l000003c0:
     assume {:captureState "l000003b8_goto_l000003c0"} true;
     assume (bvcomp1(R8[1:0], 1bv1) != 0bv1);

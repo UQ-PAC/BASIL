@@ -251,9 +251,6 @@ procedure main()
     assume {:captureState "lmain_goto_l00000369"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);
     goto l00000369;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;

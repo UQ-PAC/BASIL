@@ -347,9 +347,6 @@ procedure main()
     assume {:captureState "l00000753"} true;
     assert ((Gamma_NF && Gamma_VF) && Gamma_ZF);
     goto l00000753_goto_l0000075c, l00000753_goto_l000006e8;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l00000663_goto_l0000036b:
     assume {:captureState "l00000663_goto_l0000036b"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);

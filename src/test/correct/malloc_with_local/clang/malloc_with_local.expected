@@ -697,9 +697,6 @@ procedure main()
     R30, Gamma_R30 := 2220bv64, true;
     call #free();
     goto l00000459;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;

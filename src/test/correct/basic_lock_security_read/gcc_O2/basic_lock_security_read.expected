@@ -197,9 +197,6 @@ procedure main()
   l000001c2:
     assume {:captureState "l000001c2"} true;
     goto main_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l0000039c:
     assume {:captureState "l0000039c"} true;
     call rely();

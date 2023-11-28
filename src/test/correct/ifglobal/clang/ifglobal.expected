@@ -265,9 +265,6 @@ procedure main()
   l00000343:
     assume {:captureState "l00000343"} true;
     goto l00000344;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;

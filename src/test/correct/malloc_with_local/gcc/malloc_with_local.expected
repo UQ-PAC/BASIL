@@ -714,9 +714,6 @@ procedure main()
     R30, Gamma_R30 := 2096bv64, true;
     call malloc();
     goto l00000383;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l00000383:
     assume {:captureState "l00000383"} true;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 40bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 40bv64), Gamma_R0);

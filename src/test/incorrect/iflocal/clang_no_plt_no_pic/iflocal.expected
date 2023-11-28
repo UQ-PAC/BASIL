@@ -245,9 +245,6 @@ procedure main()
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 4bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 4bv64), Gamma_R8);
     assume {:captureState "%0000098a"} true;
     goto l00000964;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   lmain_goto_l00000956:
     assume {:captureState "lmain_goto_l00000956"} true;
     assume (bvcomp1(ZF, 1bv1) != 0bv1);

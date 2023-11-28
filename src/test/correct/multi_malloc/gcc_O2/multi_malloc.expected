@@ -504,9 +504,6 @@ procedure main()
     R30, Gamma_R30 := 1692bv64, true;
     call __printf_chk();
     goto l000001e1;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l000001e1:
     assume {:captureState "l000001e1"} true;
     R2, Gamma_R2 := 42bv64, true;

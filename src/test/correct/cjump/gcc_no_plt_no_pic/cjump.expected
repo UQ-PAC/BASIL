@@ -248,9 +248,6 @@ procedure main()
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
     assume {:captureState "%00000997"} true;
     goto l00000999;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   lmain_goto_l000009a3:
     assume {:captureState "lmain_goto_l000009a3"} true;
     assume (bvcomp1(ZF, 1bv1) == 0bv1);

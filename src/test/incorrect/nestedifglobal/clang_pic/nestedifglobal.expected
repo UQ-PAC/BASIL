@@ -443,9 +443,6 @@ procedure main()
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 20bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 20bv64), Gamma_R8);
     assume {:captureState "%0000047b"} true;
     goto l000003f9;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;

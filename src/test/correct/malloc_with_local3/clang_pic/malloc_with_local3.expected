@@ -729,9 +729,6 @@ procedure main()
     R30, Gamma_R30 := 2124bv64, true;
     call malloc();
     goto l00000c9d;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l00000c9d:
     assume {:captureState "l00000c9d"} true;
     R8, Gamma_R8 := R0, Gamma_R0;
@@ -1205,9 +1202,6 @@ procedure printCharValue()
     R30, Gamma_R30 := memory_load64_le(stack, bvadd64(#6, 8bv64)), gamma_load64(Gamma_stack, bvadd64(#6, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
     goto printCharValue_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   printCharValue_return:
     assume {:captureState "printCharValue_return"} true;
     return;

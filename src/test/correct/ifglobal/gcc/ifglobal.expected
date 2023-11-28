@@ -231,9 +231,6 @@ procedure main()
     mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
     assume {:captureState "%00000327"} true;
     goto l00000302;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;

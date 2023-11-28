@@ -361,9 +361,6 @@ procedure main()
     assume {:captureState "l00000b22"} true;
     assert Gamma_R8;
     goto l00000b22_goto_l00000b49, l00000b22_goto_l00000b2a;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l00000b22_goto_l00000b2a:
     assume {:captureState "l00000b22_goto_l00000b2a"} true;
     assume (bvcomp1(R8[1:0], 1bv1) != 0bv1);

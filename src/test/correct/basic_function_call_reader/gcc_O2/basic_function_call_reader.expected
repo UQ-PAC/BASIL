@@ -206,9 +206,6 @@ procedure main()
     call rely();
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, bvadd64(R1, 4bv64))), (gamma_load32(Gamma_mem, bvadd64(R1, 4bv64)) || L(mem, bvadd64(R1, 4bv64)));
     goto l000001bc;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;

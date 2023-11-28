@@ -739,9 +739,6 @@ procedure main()
     R30, Gamma_R30 := 2208bv64, true;
     call printf();
     goto l00000457;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l00000470:
     assume {:captureState "l00000470"} true;
     R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 40bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 40bv64));

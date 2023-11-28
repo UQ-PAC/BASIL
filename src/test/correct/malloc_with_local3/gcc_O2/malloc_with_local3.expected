@@ -915,9 +915,6 @@ procedure main()
     R30, Gamma_R30 := 1876bv64, true;
     call #free();
     goto l000002e0;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l000002e0:
     assume {:captureState "l000002e0"} true;
     R0, Gamma_R0 := 0bv64, true;
@@ -1382,9 +1379,6 @@ procedure printCharValue()
     call __printf_chk();
     //no return target
     assume false;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   printCharValue_return:
     assume {:captureState "printCharValue_return"} true;
     return;

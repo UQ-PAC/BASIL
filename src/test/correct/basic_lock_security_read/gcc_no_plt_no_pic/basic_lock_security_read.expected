@@ -232,9 +232,6 @@ procedure main()
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto main_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   lmain_goto_l0000092f:
     assume {:captureState "lmain_goto_l0000092f"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);

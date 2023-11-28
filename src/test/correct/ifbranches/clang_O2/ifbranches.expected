@@ -200,9 +200,6 @@ procedure main()
     assume {:captureState "l000002db"} true;
     R0, Gamma_R0 := zero_extend32_32(R8[32:0]), Gamma_R8;
     goto l000002e2;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l000002e2:
     assume {:captureState "l000002e2"} true;
     goto main_return;

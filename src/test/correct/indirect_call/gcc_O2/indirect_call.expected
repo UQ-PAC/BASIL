@@ -318,9 +318,6 @@ procedure greet()
     call puts();
     //no return target
     assume false;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   greet_return:
     assume {:captureState "greet_return"} true;
     return;
@@ -545,9 +542,6 @@ procedure main()
     R30, Gamma_R30 := 1624bv64, true;
     call greet();
     goto l00000205;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;

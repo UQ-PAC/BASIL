@@ -294,9 +294,6 @@ procedure get_two()
     R0, Gamma_R0 := zero_extend32_32(R8[32:0]), Gamma_R8;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto get_two_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   get_two_return:
     assume {:captureState "get_two_return"} true;
     return;
@@ -487,9 +484,6 @@ procedure main()
     R30, Gamma_R30 := 2064bv64, true;
     call printf();
     goto l0000040b;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;

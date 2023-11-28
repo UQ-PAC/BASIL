@@ -240,9 +240,6 @@ procedure main()
     R30, Gamma_R30 := 1840bv64, true;
     call zero();
     goto l00000938;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l00000938:
     assume {:captureState "l00000938"} true;
     R8, Gamma_R8 := 69632bv64, true;
@@ -357,9 +354,6 @@ procedure zero()
     assume {:captureState "lzero"} true;
     R0, Gamma_R0 := 0bv64, true;
     goto zero_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   zero_return:
     assume {:captureState "zero_return"} true;
     return;

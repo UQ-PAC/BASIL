@@ -293,9 +293,6 @@ procedure main()
     assume {:captureState "l00000a79"} true;
     R8, Gamma_R8 := 0bv64, true;
     goto l00000a7f;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l00000a30:
     assume {:captureState "l00000a30"} true;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;

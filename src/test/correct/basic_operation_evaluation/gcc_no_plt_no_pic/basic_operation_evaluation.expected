@@ -249,9 +249,6 @@ procedure main()
     R0, Gamma_R0 := 0bv64, true;
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
     goto main_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   lmain_goto_l00000a73:
     assume {:captureState "lmain_goto_l00000a73"} true;
     assume (bvcomp32(R1[32:0], 0bv32) == 0bv1);

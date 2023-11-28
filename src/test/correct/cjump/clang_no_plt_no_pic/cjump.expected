@@ -238,6 +238,14 @@ procedure main()
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R9, 56bv64), R8[32:0]), gamma_store32(Gamma_mem, bvadd64(R9, 56bv64), Gamma_R8);
     assume {:captureState "%000009e8"} true;
     goto l000009bf;
+  l0000099f_goto_l000009d4:
+    assume {:captureState "l0000099f_goto_l000009d4"} true;
+    assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
+    goto l000009d4;
+  l00000999:
+    assume {:captureState "l00000999"} true;
+    R8, Gamma_R8 := 0bv64, true;
+    goto l0000099f;
   l000009d4:
     assume {:captureState "l000009d4"} true;
     goto l000009d5;
@@ -249,6 +257,14 @@ procedure main()
     assume {:captureState "lmain_goto_l0000099c"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);
     goto l0000099c;
+  l0000099f_goto_l000009a7:
+    assume {:captureState "l0000099f_goto_l000009a7"} true;
+    assume (bvcomp1(R8[1:0], 1bv1) != 0bv1);
+    goto l000009a7;
+  l0000099c:
+    assume {:captureState "l0000099c"} true;
+    R8, Gamma_R8 := 1bv64, true;
+    goto l0000099f;
   lmain_goto_l00000999:
     assume {:captureState "lmain_goto_l00000999"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);
@@ -262,25 +278,6 @@ procedure main()
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R9, 56bv64), R8[32:0]), gamma_store32(Gamma_mem, bvadd64(R9, 56bv64), Gamma_R8);
     assume {:captureState "%000009bc"} true;
     goto l000009bf;
-  l0000099f_goto_l000009d4:
-    assume {:captureState "l0000099f_goto_l000009d4"} true;
-    assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
-    goto l000009d4;
-  l00000999:
-    assume {:captureState "l00000999"} true;
-    R8, Gamma_R8 := 0bv64, true;
-    goto l0000099f;
-  l0000099f_goto_l000009a7:
-    assume {:captureState "l0000099f_goto_l000009a7"} true;
-    assume (bvcomp1(R8[1:0], 1bv1) != 0bv1);
-    goto l000009a7;
-  l0000099c:
-    assume {:captureState "l0000099c"} true;
-    R8, Gamma_R8 := 1bv64, true;
-    goto l0000099f;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l000009bf:
     assume {:captureState "l000009bf"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));

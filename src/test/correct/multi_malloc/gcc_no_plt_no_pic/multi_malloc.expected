@@ -588,9 +588,6 @@ procedure main()
     R30, Gamma_R30 := 2180bv64, true;
     call #free();
     goto l00000b04;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l00000a64:
     assume {:captureState "l00000a64"} true;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 16bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 16bv64), Gamma_R0);

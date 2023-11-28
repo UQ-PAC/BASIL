@@ -731,9 +731,6 @@ procedure main()
     R30, Gamma_R30 := 2224bv64, true;
     call #free();
     goto l00000d93;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l00000c61:
     assume {:captureState "l00000c61"} true;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 56bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 56bv64), Gamma_R0);
@@ -1272,9 +1269,6 @@ procedure printCharValue()
     R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
     goto printCharValue_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   printCharValue_return:
     assume {:captureState "printCharValue_return"} true;
     return;

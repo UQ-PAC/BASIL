@@ -195,9 +195,6 @@ procedure main()
     assert (arr$0_old == memory_load32_le(mem, bvadd64($arr_addr, 0bv64)));
     assume {:captureState "%000002d4"} true;
     goto main_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;

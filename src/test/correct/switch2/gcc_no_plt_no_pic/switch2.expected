@@ -438,9 +438,6 @@ procedure main()
     NF, Gamma_NF := bvadd32(#10, 1bv32)[32:31], Gamma_#10;
     assert ((Gamma_NF && Gamma_VF) && Gamma_ZF);
     goto l00000d41_goto_l00000d69, l00000d41_goto_l00000c41;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l00000cee_goto_l00000d0f:
     assume {:captureState "l00000cee_goto_l00000d0f"} true;
     assume (bvcomp1(ZF, 1bv1) != 0bv1);
@@ -529,9 +526,6 @@ procedure r()
     assume {:captureState "lr"} true;
     R0, Gamma_R0 := 1bv64, true;
     goto r_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   r_return:
     assume {:captureState "r_return"} true;
     return;

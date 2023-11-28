@@ -369,9 +369,6 @@ procedure main()
     assume {:captureState "l00000b21"} true;
     R8, Gamma_R8 := 1bv64, true;
     goto l00000b24;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   lmain_goto_l00000ae0:
     assume {:captureState "lmain_goto_l00000ae0"} true;
     assume (bvcomp1(ZF, 1bv1) != 0bv1);

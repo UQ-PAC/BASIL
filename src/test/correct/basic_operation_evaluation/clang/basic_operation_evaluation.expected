@@ -285,9 +285,6 @@ procedure main()
     assume {:captureState "lmain_goto_l000003c9"} true;
     assume (bvcomp32(R10[32:0], 0bv32) != 0bv1);
     goto l000003c9;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;

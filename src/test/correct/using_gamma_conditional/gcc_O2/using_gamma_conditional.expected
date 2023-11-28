@@ -221,9 +221,6 @@ procedure main()
   l000001d5:
     assume {:captureState "l000001d5"} true;
     goto main_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l000001d2:
     assume {:captureState "l000001d2"} true;
     R0, Gamma_R0 := 1bv64, true;

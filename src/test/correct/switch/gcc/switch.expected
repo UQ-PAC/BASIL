@@ -252,9 +252,6 @@ procedure main()
     assume {:captureState "l0000034c"} true;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto main_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   l0000036b:
     assume {:captureState "l0000036b"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 8bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 8bv64));

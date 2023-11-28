@@ -214,9 +214,6 @@ procedure main()
     assert ((z_old != 0bv32) ==> (memory_load32_le(mem, $z_addr) != 0bv32));
     assume {:captureState "%000002e7"} true;
     goto main_return;
-  terminate:
-    assume {:captureState "terminate"} true;
-    goto terminate;
   main_return:
     assume {:captureState "main_return"} true;
     return;
