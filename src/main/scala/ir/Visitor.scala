@@ -57,7 +57,7 @@ abstract class Visitor {
 
   def visitProcedure(node: Procedure): Procedure = {
     for (b <- node.blocks) {
-      node.blocks.replace(b, visitBlock(b))
+      node.replaceBlock(b, visitBlock(b))
     }
     for (i <- node.in.indices) {
       node.in(i) = visitParameter(node.in(i))
@@ -310,7 +310,7 @@ class ExternalRemover(external: Set[String]) extends Visitor {
     if (external.contains(node.name)) {
       // update the modifies set before removing the body
       node.modifies.addAll(node.blocks.flatMap(_.modifies))
-      node.blocks.clear()
+      node.replaceBlocks(Seq())
     }
     super.visitProcedure(node)
   }
@@ -344,7 +344,7 @@ class ConvertToSingleProcedureReturn extends Visitor {
   override def visitJump(node: Jump): Jump = {
     node match
       case c: IndirectCall =>
-        if c.target.name == "R30" then GoTo(Seq(c.parent.parent.returnBlock)) else node
+        if c.target.name == "R30" && c.returnTarget.isEmpty && c.parent != c.parent.parent.returnBlock then GoTo(Seq(c.parent.parent.returnBlock)) else node
       case _ => node
   }
 }

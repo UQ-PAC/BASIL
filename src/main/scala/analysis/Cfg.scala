@@ -653,7 +653,9 @@ class ProgramCfgFactory:
     val visitedBlocks: mutable.HashMap[Block, CfgCommandNode] = mutable.HashMap[Block, CfgCommandNode]()
 
     // Recurse through blocks
-    visitBlock(proc.entryBlock.get, funcEntryNode, TrueLiteral)
+    proc.entryBlock.foreach(visitBlock(_, funcEntryNode, TrueLiteral))
+    // If it has no entry-block we still visit the exit block because VSA analysis expects everything to have an Exit
+    visitBlock(proc.returnBlock, funcEntryNode, TrueLiteral)
 
     /** Add a block to the CFG. A block in this case is a basic block, so it contains a list of consecutive statements
       * followed by a jump at the end to another block. We process statements in this block (if they exist), and then

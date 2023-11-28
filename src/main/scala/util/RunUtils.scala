@@ -92,7 +92,7 @@ object RunUtils {
     val returnUnifier = ConvertToSingleProcedureReturn()
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
-    //IRProgram = returnUnifier.visitProgram(IRProgram)
+    IRProgram = returnUnifier.visitProgram(IRProgram)
 
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il"))
@@ -460,7 +460,7 @@ object RunUtils {
                 //val directCall = DirectCall(t, indirectCall.returnTarget, null)
                 newBlocks.append(bl)
               }
-              procedure.blocks.addAll(newBlocks)
+              procedure.addBlocks(newBlocks)
               block.replaceJump(GoTo(newBlocks, indirectCall.label))
             }
           case _ =>
@@ -472,7 +472,7 @@ object RunUtils {
     }
 
     def addFakeProcedure(name: String): Unit = {
-      IRProgram.procedures += Procedure(name, None, IntrusiveList(), ArrayBuffer(), ArrayBuffer())
+      IRProgram.procedures += Procedure(name)
     }
 
     def resolveAddresses(valueSet: Set[Value]): Set[AddressValue] = {

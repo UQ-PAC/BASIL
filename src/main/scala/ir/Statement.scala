@@ -4,6 +4,9 @@ import intrusiveList.IntrusiveListElement
 import scala.collection.mutable.ArrayBuffer
 import collection.mutable
 
+/*
+  To support the state-free IL iteration in CFG order all Commands must be classes with a unique object ref.
+*/
 
 sealed trait Command extends HasParent[Block] {
   val label: Option[String]
@@ -46,8 +49,8 @@ class MemoryAssign(var lhs: Memory, var rhs: MemoryStore,  override val label: O
 object MemoryAssign:
   def unapply(m: MemoryAssign): Option[(Memory, MemoryStore, Option[String])] = Some(m.lhs, m.rhs, m.label)
 
-case class NOP(override val label: Option[String] = None) extends Statement {
-  override def toString: String = s"$labelStr"
+class NOP(override val label: Option[String] = None) extends Statement {
+  override def toString: String = s"NOP $labelStr"
   override def acceptVisit(visitor: Visitor): Statement = this
 }
 

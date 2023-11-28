@@ -19,22 +19,22 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     var mainProcedure: Option[Procedure] = None
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
     for (s <- program.subroutines) {
-      val blocks: IntrusiveList[Block] = IntrusiveList[Block]()
-      val in: ArrayBuffer[Parameter] = ArrayBuffer()
-      val out: ArrayBuffer[Parameter] = ArrayBuffer()
-      val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
+      //val blocks: mutable.HashSet[Block] = mutable.HashSet[Block]()
+      //val in: ArrayBuffer[Parameter] = ArrayBuffer()
+      //val out: ArrayBuffer[Parameter] = ArrayBuffer()
+      val procedure = Procedure(s.name, Some(s.address), Seq(), Seq(), Seq())
 
 
       for (b <- s.blocks) {
         val block = Block(b.label, b.address, ArrayBuffer())
-        blocks.append(block)
+        procedure.addBlocks(block)
         labelToBlock.addOne(b.label, block)
       }
       for (p <- s.in) {
-        in.append(p.toIR)
+        procedure.in.append(p.toIR)
       }
       for (p <- s.out) {
-        out.append(p.toIR)
+        procedure.out.append(p.toIR)
       }
       if (s.address == mainAddress) {
         mainProcedure = Some(procedure)
@@ -51,8 +51,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
           block.statements.append(translate(st, block))
         }
         val (jump, newBlocks) = translate(b.jumps, block)
+        procedure.addBlocks(newBlocks)
         block.replaceJump(jump)
-        procedure.blocks.addAll(newBlocks)
       }
     }
 

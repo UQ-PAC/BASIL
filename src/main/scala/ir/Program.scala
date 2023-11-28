@@ -7,6 +7,12 @@ import analysis.BitVectorEval
 import intrusiveList.{IntrusiveList, IntrusiveListElement}
 
 trait HasParent[T]:
+  /*
+      If a node is reachable from the IL then it *must* have a parent defined. This will only be null until
+      the object is fully initialised.
+
+      All IL structures must set the parent of the child to itself, when a child is added to itself.
+   */
   private var _parent: Option[T] = None
   def parent: T = _parent.get
 
@@ -124,25 +130,21 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 
 }
 
-class Procedure (
+class Procedure private (
                   var name: String,
-                  var address: Option[Int] = None,
-                  val blocks: IntrusiveList[Block] = IntrusiveList(),
-                  var in: ArrayBuffer[Parameter] = ArrayBuffer(),
-                  var out: ArrayBuffer[Parameter] = ArrayBuffer(),
+                  var address: Option[Int],
+                  private val _blocks: mutable.HashSet[Block],
+                  var in: ArrayBuffer[Parameter],
+                  var out: ArrayBuffer[Parameter],
                 ) {
-  blocks.onInsert = x => {
-    x.deParent()
-    x.setParent(this)
-  }
-  blocks.onRemove = x => {
-    x.deParent()
+
+  def this(name: String, address: Option[Int] = None , blocks: IterableOnce[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
+    this(name, address, mutable.HashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
   }
 
   private var _entryBlock: Option[Block] = None
-  val returnBlock: Block = new Block(name + "_return", None, List(NOP()), new IndirectCall(Register("R30", BitVecType(64)), None, Some(name)))
-  returnBlock.setParent(this)
-  //blocks.append(returnBlock)
+  val returnBlock: Block = new Block(name + "_return", None, List(), new IndirectCall(Register("R30", BitVecType(64)), None, Some(name)))
+  addBlocks(returnBlock)
 
   private var _callers = new mutable.HashMap[Procedure, mutable.Set[Call]] with mutable.MultiMap[Procedure, Call]
 
@@ -160,14 +162,56 @@ class Procedure (
     s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
   }
 
+  def blocks: Iterator[Block] = _blocks.iterator
+
   def removeCaller(c: Call): Unit = {
     _callers.removeBinding(c.parent.parent, c)
   }
 
-  def addBlock(block: Block): Block = {
+  def addBlocks(block: Block): Block = {
     block.deParent()
     block.setParent(this)
-    blocks.append(block)
+    _blocks.add(block)
+    block
+  }
+
+  def addBlocks(blocks: Iterable[Block]): Unit = {
+    for (elem <- blocks) {
+      addBlocks(elem)
+    }
+  }
+
+  def replaceBlock(oldBlock: Block, block: Block): Block = {
+    require(_blocks.contains(oldBlock) || block == returnBlock)
+    if (oldBlock ne block) {
+      removeBlocks(oldBlock)
+      addBlocks(block)
+    }
+    block
+  }
+
+  /**
+   * Removes all blocks and replaces them with the provided iterator.
+   *
+   * @param newBlocks the new set of blocks
+   * @return an iterator to the new block set
+   */
+  def replaceBlocks(newBlocks: Iterable[Block]): Iterator[Block] = {
+    _blocks.clear
+    addBlocks(newBlocks)
+    blocks
+  }
+
+
+  def removeBlocks(block: Block): Block = {
+    block.deParent()
+    _blocks.remove(block)
+    block
+  }
+  def removeBlocks(blocks: Iterable[Block]): Unit = {
+    for (elem <- blocks) {
+      removeBlocks(elem)
+    }
   }
 
   def addCaller(c: Call): Unit = {
@@ -266,6 +310,10 @@ class Block private (var label: String,
 
   def this(label: String, address: Option[Int], statements: IterableOnce[Statement]) = {
     this(label, address, IntrusiveList.from(statements), None, mutable.HashSet.empty)
+  }
+
+  def this(label: String, address: Option[Int] = None) = {
+    this(label, address, IntrusiveList(), None, mutable.HashSet.empty)
   }
 
   def jump: Jump = _jump.get

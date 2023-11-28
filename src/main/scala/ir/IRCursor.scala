@@ -53,7 +53,7 @@ object IntraProcIRCursor {
       }
       case b: Block =>
         if b.statements.isEmpty
-          then Set[CFGPosition](b.jump)
+          then Set.from(b.jumpSet)
         else Set[CFGPosition](b.statements.head())
       case proc: Procedure =>
         if proc.entryBlock.isEmpty then Set(proc.returnBlock) else Set(proc.entryBlock.get)
@@ -88,6 +88,7 @@ def computeDomain(prog: Program): mutable.Set[CFGPosition] = {
   while (sizeBefore != sizeAfter) {
     for (i <- domain) {
       domain.addAll(IntraProcIRCursor.succ(i))
+      domain.addAll(IntraProcIRCursor.pred(i))
     }
     sizeBefore = sizeAfter
     sizeAfter = domain.size
@@ -128,8 +129,8 @@ def toDot(prog: Program, labels: Map[CFGPosition, String] = Map.empty) : String 
   for (node <- domain) {
     node match
       case s: Command => dotNodes.addOne(s -> DotNode(label(s.label), nodeText(s)))
-      case s: Block => dotNodes.addOne(s -> DotNode(label(None), nodeText(s)))
-      case s => dotNodes.addOne(s -> DotNode(label(None), nodeText(s)))
+      case s: Block => dotNodes.addOne(s -> DotNode(label(Some(s.label)), nodeText(s)))
+      case s => dotNodes.addOne(s -> DotNode(label(Some(s.toString)), nodeText(s)))
   }
 
   for (node <- domain) {
@@ -137,7 +138,7 @@ def toDot(prog: Program, labels: Map[CFGPosition, String] = Map.empty) : String 
       case s : Call =>
         IntraProcIRCursor.succ(s).foreach(n => dotArrows.addOne(DotInterArrow(dotNodes(s), dotNodes(n))))
       case s =>
-        IntraProcIRCursor.succ(s).foreach(n => dotArrows.addOne(DotIntraArrow(dotNodes(s), dotNodes(n))))
+        IntraProcIRCursor.succ(s).foreach(n => dotArrows.addOne(DotRegularArrow(dotNodes(s), dotNodes(n))))
       case _ => ()
     }
   }
