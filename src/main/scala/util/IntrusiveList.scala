@@ -80,6 +80,9 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
 
   override def head(): T = firstElem.get
 
+  override def headOption(): Option[T] = firstElem
+
+
   def begin(): T = firstElem.get
 
   private def containsRef(elem: T): Boolean = {

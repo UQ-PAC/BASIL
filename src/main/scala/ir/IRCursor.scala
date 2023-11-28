@@ -3,34 +3,56 @@ import cfg_visualiser.DotElement
 import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
 
 import collection.mutable
+import scala.annotation.tailrec
 
 /*
  * Defines a position in the IL / CFG; this becomes the lhs of the state map lattice in a static analysis.
  */
-type CFGPosition = Procedure | Block | Command | ProcedureUnknownJump  | ProcedureExit
+type CFGPosition = Procedure | Block | Command
 
 
 // Interprocedural
 //  position = (call string) + Position
 
 
-/*
-    An additional CFG node which implicitly follows the node at `pos`
-    A call to an unknown procedure without a return to here
- */
-case class ProcedureUnknownJump(fromProcedure: Procedure, pos: CFGPosition)
 
 /*
- *  An additional CFG node which implicitly follows the node at `pos`
- *  The exit from a procedure from pos (the last command/jump in the procedure).
+    Closed trace-perspective beginning of a composite IL structure.
  */
-case class ProcedureExit(fromProcedure: Procedure, pos: CFGPosition)
+def begin(c: CFGPosition): CFGPosition = {
+  c match {
+    case p:Procedure => p
+    case b:Block => b
+    case s:Statement => s.parent.statements.head()
+    case s:Jump => s
+  }
+}
+
+/*
+    Closed trace-perspective end of a composite IL structure.
+ */
+@tailrec
+def end(c: CFGPosition): CFGPosition = {
+  c match {
+    case p:Procedure => end(p.returnBlock)
+    case b:Block => b.jump
+    case s:Statement => s.parent.statements.back()
+    case s:Jump => s
+  }
+}
+
 
 object IntraProcIRCursor {
   type Node = CFGPosition
 
   def succ(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
+      case proc: Procedure =>
+        if proc.entryBlock.isEmpty then Set(proc.returnBlock) else Set(proc.entryBlock.get)
+      case b: Block =>
+        if b.statements.isEmpty
+        then Set.from(b.jumpSet)
+        else Set[CFGPosition](b.statements.head())
       case s: Statement =>
         if (s.parent.statements.hasNext(s)) {
           Set(s.parent.statements.getNext(s))
@@ -51,14 +73,6 @@ object IntraProcIRCursor {
               case None => Set()
           }
       }
-      case b: Block =>
-        if b.statements.isEmpty
-          then Set.from(b.jumpSet)
-        else Set[CFGPosition](b.statements.head())
-      case proc: Procedure =>
-        if proc.entryBlock.isEmpty then Set(proc.returnBlock) else Set(proc.entryBlock.get)
-      case j: ProcedureUnknownJump => Set(ProcedureExit(j.fromProcedure, j))
-      case e: ProcedureExit => Set()
     }
   }
 
@@ -71,12 +85,28 @@ object IntraProcIRCursor {
           Set(s.parent) // predecessor blocks
         }
       case j: Jump => if j.parent.statements.isEmpty then Set(j.parent) else Set(j.parent.statements.last)
-      case b: Block => b.predecessors.asInstanceOf[Set[CFGPosition]]
+      case b: Block => b.predecessors.map(end)
       case proc: Procedure => Set() // intraproc
-      case r: ProcedureUnknownJump => Set(r.pos)
-      case r: ProcedureExit => Set(r.pos)
     }
   }
+}
+
+object InterProcIRCursor {
+  type Node = CFGPosition
+
+  def succ(pos: CFGPosition): Set[CFGPosition] = {
+    IntraProcIRCursor.succ(pos) ++ (pos match
+      case c: DirectCall => Set(c.target)
+      case _ => Set()
+      )
+  }
+    def pred(pos: CFGPosition): Set[CFGPosition] = {
+      IntraProcIRCursor.pred(pos) ++ (pos match
+        case c: Procedure => c.callers().map(end)
+        case b: Block => if b.isReturn then b.parent.callers().map(end) else Set()
+        case _ => Set()
+        )
+    }
 }
 
 

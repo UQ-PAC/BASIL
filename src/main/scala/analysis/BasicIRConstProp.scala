@@ -61,6 +61,7 @@ trait ILValueAnalysisMisc:
 
       case _ => valuelattice.top
 
+  val calleePreservedRegisters = Set("R0", "R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9", "R10", "R11")
 
   /** Transfer function for state lattice elements.
     */
@@ -68,6 +69,7 @@ trait ILValueAnalysisMisc:
     n match
       case la: LocalAssign =>
         s + (la.lhs -> eval(la.rhs, s))
+      case c: Call => s ++ calleePreservedRegisters.filter(reg => s.keys.exists(_.name == reg)).map(n => Register(n, BitVecType(64)) -> statelattice.sublattice.top).toMap
       case _ => s
 
 

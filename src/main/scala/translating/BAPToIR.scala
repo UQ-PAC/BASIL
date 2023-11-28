@@ -19,11 +19,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     var mainProcedure: Option[Procedure] = None
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
     for (s <- program.subroutines) {
-      //val blocks: mutable.HashSet[Block] = mutable.HashSet[Block]()
-      //val in: ArrayBuffer[Parameter] = ArrayBuffer()
-      //val out: ArrayBuffer[Parameter] = ArrayBuffer()
-      val procedure = Procedure(s.name, Some(s.address), Seq(), Seq(), Seq())
-
+      val procedure = Procedure(s.name, Some(s.address))
 
       for (b <- s.blocks) {
         val block = Block(b.label, b.address, ArrayBuffer())
@@ -48,7 +44,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       for (b <- s.blocks) {
         val block = labelToBlock(b.label)
         for (st <- b.statements) {
-          block.statements.append(translate(st, block))
+          block.statements.append(translate(st))
         }
         val (jump, newBlocks) = translate(b.jumps, block)
         procedure.addBlocks(newBlocks)
@@ -65,7 +61,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     Program(procedures, mainProcedure.get, memorySections, ArrayBuffer())
   }
 
-  private def translate(s: BAPStatement, parent: Block) = s match {
+  private def translate(s: BAPStatement) = s match {
     case b: BAPMemAssign   => MemoryAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
     case b: BAPLocalAssign => LocalAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
   }
