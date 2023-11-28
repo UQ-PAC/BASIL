@@ -51,7 +51,7 @@ object IntraProcIRCursor {
         if proc.entryBlock.isEmpty then Set(proc.returnBlock) else Set(proc.entryBlock.get)
       case b: Block =>
         if b.statements.isEmpty
-        then Set.from(b.jumpSet)
+        then Set(b.jump)
         else Set[CFGPosition](b.statements.head())
       case s: Statement =>
         if (s.parent.statements.hasNext(s)) {

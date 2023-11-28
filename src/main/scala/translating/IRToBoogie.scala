@@ -323,9 +323,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
 
   def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr]): BProcedure = {
-    val body = p.blocks.map(b => translateBlock(b))
+    val body = p.blocks.map(translateBlock).toList
 
-    val callsRely: Boolean = body.flatten(_.body).exists(_ match
+    val callsRely: Boolean = body.flatMap(_.body).exists(_ match
       case BProcedureCall("rely", lhs, params, comment) => true
       case _ => false)
 
@@ -387,7 +387,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translateBlock(b: Block): BBlock = {
     val captureState = captureStateStatement(s"${b.label}")
-    val cmds = List(captureState) ++ (b.statements.flatMap(s => translate(s)) ++ translate(b.jump))
+    val cmds = List(captureState) ++ b.statements.flatMap(s => translate(s)) ++ translate(b.jump)
 
     BBlock(b.label, cmds)
   }

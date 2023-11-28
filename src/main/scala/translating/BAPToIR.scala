@@ -20,9 +20,12 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
     for (s <- program.subroutines) {
       val procedure = Procedure(s.name, Some(s.address))
+       val t = Block("terminate", None)
+      t.replaceJump(GoTo(Seq(t)))
+      procedure.addBlocks(t)
 
       for (b <- s.blocks) {
-        val block = Block(b.label, b.address, ArrayBuffer())
+        val block = Block(b.label, b.address, ArrayBuffer(), GoTo(Seq(t)))
         procedure.addBlocks(block)
         labelToBlock.addOne(b.label, block)
       }
@@ -50,6 +53,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
         procedure.addBlocks(newBlocks)
         block.replaceJump(jump)
       }
+
+      // Set entry block to the block with the same address as the procedure or the first in sequence
+      procedure.entryBlock = procedure.blocks.find(b => b.address == procedure.address)
+      if procedure.entryBlock.isEmpty then procedure.entryBlock = procedure.blocks.headOption
+
     }
 
     val memorySections: ArrayBuffer[MemorySection] = ArrayBuffer()

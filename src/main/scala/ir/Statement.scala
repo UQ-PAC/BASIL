@@ -1,7 +1,6 @@
 package ir
 import intrusiveList.IntrusiveListElement
 
-import scala.collection.mutable.ArrayBuffer
 import collection.mutable
 
 /*
@@ -99,12 +98,13 @@ class GoTo private (private var _targets: mutable.Set[Block], override val label
     }
   }
 
-  override def setParent(b: Block): Unit = {
-    setParentValue(b)
+  override def linkParent(b: Block): Unit = {
     _targets.foreach(_.incomingJumps.add(parent))
   }
 
-  override def deParent(): Unit = targets.foreach(_.incomingJumps.remove(parent))
+  override def unlinkParent(): Unit = {
+    targets.foreach(_.incomingJumps.remove(parent))
+  }
 
 
   def removeTarget(t: Block): Unit = {
@@ -136,13 +136,11 @@ class DirectCall(val target: Procedure, var returnTarget: Option[Block],  overri
   override def toString: String = s"${labelStr}DirectCall(${target.name}, ${returnTarget.map(_.label)})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitDirectCall(this)
 
-  override def setParent(p: Block): Unit = {
-    super.setParent(p)
+  override def linkParent(p: Block): Unit = {
     target.addCaller(this)
   }
 
-  override def deParent(): Unit = target.removeCaller(this)
-
+  override def unlinkParent(): Unit = target.removeCaller(this)
 }
 
 object DirectCall:
@@ -155,14 +153,6 @@ class IndirectCall(var target: Variable, var returnTarget: Option[Block], overri
   } */
   override def toString: String = s"${labelStr}IndirectCall($target, ${returnTarget.map(_.label)})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitIndirectCall(this)
-
-  override def equals(obj: Any): Boolean = {
-    obj match
-      case c: IndirectCall => c.parent == parent && c.target == target && c.returnTarget == c.returnTarget && c.label == label
-      case o: Any => false
-  }
-
-  override def hashCode(): Int = toString.hashCode
 }
 
 object IndirectCall:
