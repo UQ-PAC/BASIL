@@ -36,6 +36,8 @@ object Main {
       dumpIL: Option[String],
       @arg(name = "main-procedure-name", short = 'm', doc = "Name of the main procedure to begin analysis at.")
       mainProcedureName: String = "main",
+      @arg(name = "procedure-call-depth", doc = "Cull procedures beyond this call depth from the main function (defaults to Int.MaxValue)")
+      procedureDepth: Int = Int.MaxValue,
       @arg(name = "help", short = 'h', doc = "Show this help message.")
       help: Flag,
       @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
@@ -65,7 +67,7 @@ object Main {
     }
 
     val q = BASILConfig(
-      loading = ILLoadingConfig(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName),
+      loading = ILLoadingConfig(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth),
       runInterpret = conf.interpret.value,
       staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot)) else None,
       boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect),

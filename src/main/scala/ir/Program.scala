@@ -8,22 +8,25 @@ import analysis.BitVectorEval
 class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure, var initialMemory: ArrayBuffer[MemorySection], var readOnlyMemory: ArrayBuffer[MemorySection]) {
 
   // This shouldn't be run before indirect calls are resolved
-  def stripUnreachableFunctions(): Unit = {
-    val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
-    var next = mainProcedure.name
-    var reachableNames: Set[String] = Set(next)
-    var toVisit: List[String] = List()
+
+  def stripUnreachableFunctions(depth: Int = Int.MaxValue): Unit = {
+    val procedureCalleeNames = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
+
+    var toVisit: mutable.LinkedHashSet[(Int, String)] = mutable.LinkedHashSet((0, mainProcedure.name))
     var reachableFound = true
-    while (reachableFound) {
-      val children = functionToChildren(next) -- reachableNames -- toVisit - next
-      reachableNames = reachableNames ++ children
-      toVisit = toVisit ++ children
-      if (toVisit.isEmpty) {
-        reachableFound = false
-      } else {
-        next = toVisit.head
-        toVisit = toVisit.tail
+    val reachableNames = mutable.HashSet[String]()
+    while (toVisit.nonEmpty) {
+      val next = toVisit.head
+      toVisit.remove(next)
+
+      if (next._1 <= depth) {
+        reachableNames.addOne(next._2)
+
+        val callees = procedureCalleeNames(next._2)
+
+        toVisit.addAll(callees.diff(reachableNames).map(c => (next._1 + 1, c)))
+        reachableNames.addAll(callees)
       }
     }
     procedures = procedures.filter(f => reachableNames.contains(f.name))

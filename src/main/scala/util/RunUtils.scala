@@ -104,7 +104,7 @@ object RunUtils {
 
     Logger.info("[!] Stripping unreachable")
     val before = IRProgram.procedures.size
-    IRProgram.stripUnreachableFunctions()
+    IRProgram.stripUnreachableFunctions(q.loading.procedureTrimDepth)
     Logger.info(s"[!] Removed ${before - IRProgram.procedures.size} functions (${IRProgram.procedures.size} remaining)")
     IRProgram.stackIdentification()
 
