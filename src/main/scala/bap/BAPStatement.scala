@@ -1,22 +1,25 @@
 package bap
 
-sealed trait BAPJump
+sealed trait BAPJump {
+  val line: String
+  val instruction: String
+}
 
 case class BAPDirectCall(
     target: String,
     returnTarget: Option[String],
-    line: String,
-    instruction: String
+    override val line: String,
+    override val instruction: String
 ) extends BAPJump
 
 case class BAPIndirectCall(
     target: BAPVar,
     returnTarget: Option[String],
-    line: String,
-    instruction: String
+    override val line: String,
+    override val instruction: String
 ) extends BAPJump
 
-case class BAPGoTo(target: String, condition: BAPExpr, line: String, instruction: String) extends BAPJump
+case class BAPGoTo(target: String, condition: BAPExpr, override val line: String, override val instruction: String) extends BAPJump
 
 sealed trait BAPStatement
 

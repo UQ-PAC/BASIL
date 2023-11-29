@@ -225,10 +225,7 @@ procedure main()
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     R8, Gamma_R8 := zero_extend32_32(bvadd32(#4, 1bv32)), Gamma_#4;
     assert Gamma_ZF;
-    if ((bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1)) {
-      goto l0000093d;
-    }
-    goto l00000940;
+    goto lmain_goto_l0000093d, lmain_goto_l00000940;
   l00000940:
     assume {:captureState "l00000940"} true;
     R8, Gamma_R8 := 1bv64, true;
@@ -240,10 +237,7 @@ procedure main()
   l00000943:
     assume {:captureState "l00000943"} true;
     assert Gamma_R8;
-    if ((bvcomp1(R8[1:0], 1bv1) != 0bv1)) {
-      goto l0000094b;
-    }
-    goto l00000973;
+    goto l00000943_goto_l00000973, l00000943_goto_l0000094b;
   l0000094b:
     assume {:captureState "l0000094b"} true;
     R8, Gamma_R8 := 1bv64, true;
@@ -263,4 +257,20 @@ procedure main()
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     return;
+  lmain_goto_l0000093d:
+    assume {:captureState "lmain_goto_l0000093d"} true;
+    assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);
+    goto l0000093d;
+  lmain_goto_l00000940:
+    assume {:captureState "lmain_goto_l00000940"} true;
+    assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);
+    goto l00000940;
+  l00000943_goto_l0000094b:
+    assume {:captureState "l00000943_goto_l0000094b"} true;
+    assume (bvcomp1(R8[1:0], 1bv1) != 0bv1);
+    goto l0000094b;
+  l00000943_goto_l00000973:
+    assume {:captureState "l00000943_goto_l00000973"} true;
+    assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
+    goto l00000973;
 }

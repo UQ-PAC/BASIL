@@ -1,20 +1,24 @@
 package ir
 import intrusiveList.IntrusiveListElement
-import collection.mutable 
 
+import scala.collection.mutable.ArrayBuffer
+import collection.mutable
 
-sealed trait Command {
+/*
+  To support the state-free IL iteration in CFG order all Commands must be classes with a unique object ref.
+*/
+
+sealed trait Command extends HasParent[Block] {
   val label: Option[String]
-  var parent: Block
 
   def labelStr: String = label match {
     case Some(s) => s"$s: "
     case None => ""
   }
-  
+
 }
 
-sealed trait Statement extends Command with IntrusiveListElement {
+sealed trait Statement extends Command, HasParent[Block], IntrusiveListElement {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Statement = throw new Exception(
@@ -22,7 +26,7 @@ sealed trait Statement extends Command with IntrusiveListElement {
   )
 }
 
-class LocalAssign(var lhs: Variable, var rhs: Expr, var parent: Block, override val label: Option[String] = None) extends Statement {
+class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends Statement {
   //override def locals: Set[Variable] = rhs.locals + lhs
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
@@ -33,9 +37,9 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, var parent: Block, override 
 }
 
 object LocalAssign:
-  def unapply(l: LocalAssign): Option[(Variable, Expr, Block, Option[String])] = Some(l.lhs, l.rhs, l.parent, l.label)
+  def unapply(l: LocalAssign): Option[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
 
-class MemoryAssign(var lhs: Memory, var rhs: MemoryStore,  var parent: Block, override val label: Option[String] = None) extends Statement {
+class MemoryAssign(var lhs: Memory, var rhs: MemoryStore,  override val label: Option[String] = None) extends Statement {
   override def modifies: Set[Global] = Set(lhs)
   //override def locals: Set[Variable] = rhs.locals
   override def toString: String = s"$labelStr$lhs := $rhs"
@@ -43,77 +47,45 @@ class MemoryAssign(var lhs: Memory, var rhs: MemoryStore,  var parent: Block, ov
 }
 
 object MemoryAssign:
-  def unapply(m: MemoryAssign): Option[(Memory, MemoryStore, Block, Option[String])] = Some(m.lhs, m.rhs, m.parent,  m.label)
+  def unapply(m: MemoryAssign): Option[(Memory, MemoryStore, Option[String])] = Some(m.lhs, m.rhs, m.label)
 
-case class NOP(override val label: Option[String] = None, var parent: Block) extends Statement {
-  override def toString: String = s"$labelStr"
+class NOP(override val label: Option[String] = None) extends Statement {
+  override def toString: String = s"NOP $labelStr"
   override def acceptVisit(visitor: Visitor): Statement = this
 }
 
-class Assert(var body: Expr, var parent: Block, var comment: Option[String] = None, override val label: Option[String] = None) extends Statement {
+class Assert(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None) extends Statement {
   override def toString: String = s"${labelStr}assert $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssert(this)
 }
 
 object Assert:
-  def unapply(a: Assert): Option[(Expr, Block, Option[String], Option[String])] = Some(a.body, a.parent, a.comment, a.label)
+  def unapply(a: Assert): Option[(Expr, Option[String], Option[String])] = Some(a.body, a.comment, a.label)
 
-class Assume(var body: Expr,  var parent: Block, var comment: Option[String] = None, override val label: Option[String] = None) extends Statement {
+  /**
+   * checkSecurity is true if this is a branch condition that we want to assert has a security level of low before branching
+   * */
+class Assume(var body: Expr, var comment: Option[String] = None, override val label: Option[String] = None, var checkSecurity: Boolean = false) extends Statement {
+
   override def toString: String = s"${labelStr}assume $body" + comment.map(" //" + _)
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssume(this)
 }
 
 object Assume:
-  def unapply(a: Assume): Option[(Expr, Block, Option[String], Option[String])] = Some(a.body, a.parent, a.comment, a.label)
+  def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] = Some(a.body, a.comment, a.label, a.checkSecurity)
 
-sealed trait Jump extends Command, IntrusiveListElement {
+sealed trait Jump extends Command, IntrusiveListElement, HasParent[Block]  {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
   def calls: Set[Procedure] = Set()
   def acceptVisit(visitor: Visitor): Jump = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
-
-  /* Remove backwards control flow records from IL */
-  def deParent(): Unit
 }
 
 
-sealed trait GoTo extends Jump
 
-sealed class DetGoTo (private var _target: Block, var parent: Block, var condition: Option[Expr], override val label: Option[String] = None) extends GoTo {
-  _target.incomingJumps.add(parent)
- 
-   /* override def locals: Set[Variable] = condition match {
-     case Some(c) => c.locals
-     case None => Set()
-   } */
- 
-  def target: Block = _target
+class GoTo private (private var _targets: mutable.Set[Block], override val label: Option[String]) extends Jump {
 
-  override def deParent() : Unit = {
-   // assume you do not have two jumps to the same block from this block; would'nt make sense
-    target.incomingJumps.remove(parent)
-  }
- 
-  def replaceTarget(newTarget: Block): Block = {
-    _target.incomingJumps.remove(parent)
-    newTarget.incomingJumps.add(parent)
-    _target = newTarget
-    _target
-  }
-
-  override def toString: String = s"${labelStr}GoTo(${_target.label}, $condition)"
-
-  override def acceptVisit(visitor: Visitor): Jump = visitor.visitGoTo(this)
-}
-
-object DetGoTo:
-  def unapply(g: DetGoTo): Option[(Block, Block, Option[Expr], Option[String])] = Some(g.target, g.parent, g.condition, g.label)
-
-class NonDetGoTo private (private var _targets: mutable.Set[Block], var parent: Block, override val label: Option[String]) extends GoTo {
-  _targets.foreach(_.incomingJumps.add(parent))
-
-
-  def this(targets: IterableOnce[Block], parent: Block, label: Option[String] = None) = this(mutable.Set.from(targets), parent, label)
+  def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.Set.from(targets), label)
 
   def targets: Set[Block] = _targets.toSet
 
@@ -127,9 +99,13 @@ class NonDetGoTo private (private var _targets: mutable.Set[Block], var parent: 
     }
   }
 
-  override def deParent() :  Unit = {
-    targets.foreach(_.incomingJumps.remove(parent))
+  override def setParent(b: Block): Unit = {
+    setParentValue(b)
+    _targets.foreach(_.incomingJumps.add(parent))
   }
+
+  override def deParent(): Unit = targets.foreach(_.incomingJumps.remove(parent))
+
 
   def removeTarget(t: Block): Unit = {
     // making the assumption that blocks only contain the same outgoing edge once
@@ -141,14 +117,17 @@ class NonDetGoTo private (private var _targets: mutable.Set[Block], var parent: 
 
 
   override def toString: String = s"${labelStr}NonDetGoTo(${targets.map(_.label).mkString(", ")})"
-  override def acceptVisit(visitor: Visitor): Jump = visitor.visitNonDetGoTo(this)
+  override def acceptVisit(visitor: Visitor): Jump = visitor.visitGoTo(this)
 }
 
+object GoTo:
+  case class ConstructionPattern(targets: Iterable[Block], label: Option[String] = None)
+  def unapply(g: GoTo): Option[(Set[Block], Option[String])] = Some(g.targets, g.label)
 
-sealed trait Call extends Jump 
 
-class DirectCall(val target: Procedure, var returnTarget: Option[Block], var parent: Block, override val label: Option[String] = None) extends Call {
-  target.addCaller(this)
+sealed trait Call extends Jump
+
+class DirectCall(val target: Procedure, var returnTarget: Option[Block],  override val label: Option[String] = None) extends Call {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
@@ -157,15 +136,19 @@ class DirectCall(val target: Procedure, var returnTarget: Option[Block], var par
   override def toString: String = s"${labelStr}DirectCall(${target.name}, ${returnTarget.map(_.label)})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitDirectCall(this)
 
-  override def deParent(): Unit = {
-    target.removeCaller(this)
+  override def setParent(p: Block): Unit = {
+    super.setParent(p)
+    target.addCaller(this)
   }
+
+  override def deParent(): Unit = target.removeCaller(this)
+
 }
 
 object DirectCall:
-  def unapply(i: DirectCall): Option[(Procedure, Option[Block], Block, Option[String])] = Some(i.target, i.returnTarget, i.parent, i.label)
+  def unapply(i: DirectCall): Option[(Procedure,  Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
 
-class IndirectCall(var target: Variable, var parent: Block, var returnTarget: Option[Block], override val label: Option[String] = None) extends Call {
+class IndirectCall(var target: Variable, var returnTarget: Option[Block], override val label: Option[String] = None) extends Call {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)
@@ -173,8 +156,14 @@ class IndirectCall(var target: Variable, var parent: Block, var returnTarget: Op
   override def toString: String = s"${labelStr}IndirectCall($target, ${returnTarget.map(_.label)})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitIndirectCall(this)
 
-  override def deParent(): Unit = {}
+  override def equals(obj: Any): Boolean = {
+    obj match
+      case c: IndirectCall => c.parent == parent && c.target == target && c.returnTarget == c.returnTarget && c.label == label
+      case o: Any => false
+  }
+
+  override def hashCode(): Int = toString.hashCode
 }
 
 object IndirectCall:
-  def unapply(i: IndirectCall): Option[(Variable, Block, Option[Block], Option[String])] = Some(i.target, i.parent, i.returnTarget, i.label)
+  def unapply(i: IndirectCall): Option[(Variable, Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)

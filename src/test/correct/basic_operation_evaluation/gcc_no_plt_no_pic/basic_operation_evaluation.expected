@@ -230,10 +230,7 @@ procedure main()
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 20bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 20bv64));
     R1, Gamma_R1 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 24bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 24bv64));
     assert Gamma_R1;
-    if ((bvcomp32(R1[32:0], 0bv32) != 0bv1)) {
-      goto l00000a6e;
-    }
-    goto l00000a73;
+    goto lmain_goto_l00000a6e, lmain_goto_l00000a73;
   l00000a73:
     assume {:captureState "l00000a73"} true;
     R2, Gamma_R2 := zero_extend32_32(bvsdiv33(sign_extend1_32(R0[32:0]), sign_extend1_32(R1[32:0]))[32:0]), (Gamma_R1 && Gamma_R0);
@@ -252,4 +249,12 @@ procedure main()
     R0, Gamma_R0 := 0bv64, true;
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
     return;
+  lmain_goto_l00000a6e:
+    assume {:captureState "lmain_goto_l00000a6e"} true;
+    assume (bvcomp32(R1[32:0], 0bv32) != 0bv1);
+    goto l00000a6e;
+  lmain_goto_l00000a73:
+    assume {:captureState "lmain_goto_l00000a73"} true;
+    assume (bvcomp32(R1[32:0], 0bv32) == 0bv1);
+    goto l00000a73;
 }

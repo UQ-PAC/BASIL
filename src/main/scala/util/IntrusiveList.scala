@@ -4,8 +4,12 @@ import scala.collection.mutable
 // TODO: implement IterableOps
 //   So need iterablefactory https://docs.scala-lang.org/overviews/core/custom-collections.html
 
-final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int, var firstElem: Option[T], var lastElem: Option[T])
+final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int, var firstElem: Option[T],
+                                                              var lastElem: Option[T])
   extends mutable.Iterable[T], mutable.Growable[T]:
+  var onInsert: T => Unit = x => ()
+  var onRemove: T => Unit  = x => ()
+
   // invariant:
   //    numElems == first.length()
 
@@ -34,6 +38,7 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
   // end Growable
 
   def this() = this(0, None, None)
+
 
   // Iterable
 
@@ -75,6 +80,9 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
 
   override def head(): T = firstElem.get
 
+  override def headOption(): Option[T] = firstElem
+
+
   def begin(): T = firstElem.get
 
   private def containsRef(elem: T): Boolean = {
@@ -98,6 +106,7 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
   def prepend(newElem: T): T = {
     assert(newElem.unitary)
     assert(!containsRef(newElem))
+    onInsert(newElem)
     if (size > 0) {
       insertBefore(firstElem.get, newElem)
     } else {
@@ -111,6 +120,7 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
   def append(newElem : T): T = {
     assert(newElem.unitary)
     assert(!containsRef(newElem))
+    onInsert(newElem)
     if (size > 0) {
       insertAfter(lastElem.get, newElem)
     } else {
@@ -144,6 +154,7 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
     if (intrusiveListElement == firstElem.get) {
       firstElem = intrusiveListElement.next.asInstanceOf[Option[T]]
     }
+    onRemove(intrusiveListElement)
     intrusiveListElement.remove().asInstanceOf[T]
   }
 
@@ -157,6 +168,8 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
     if (intrusiveListElement == lastElem.get) {
       lastElem = Some(newElem)
     }
+
+    onInsert(newElem)
     intrusiveListElement.insertAfter(newElem).asInstanceOf[T]
   }
 
@@ -169,6 +182,7 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
     if (intrusiveListElement == firstElem.get) {
       firstElem = Some(newElem)
     }
+    onInsert(newElem)
     intrusiveListElement.insertBefore(newElem).asInstanceOf[T]
   }
 

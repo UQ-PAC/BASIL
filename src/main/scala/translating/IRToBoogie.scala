@@ -387,7 +387,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translateBlock(b: Block): BBlock = {
     val captureState = captureStateStatement(s"${b.label}")
-    val cmds = (List(captureState) ++ (b.statements.flatMap(s => translate(s))) ++ b.jumps.flatMap(j => translate(j)))
+    val cmds = List(captureState) ++ (b.statements.flatMap(s => translate(s)) ++ translate(b.jump))
 
     BBlock(b.label, cmds)
   }
@@ -411,17 +411,22 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           case None    => unresolved ++ List(Comment("no return target"), BAssume(FalseBLiteral))
         }
       }
-    case g: DetGoTo =>
-      g.condition match {
-        case Some(c) =>
-          val guard = c.toBoogie
-          val guardGamma = c.toGamma
-          List(BAssert(guardGamma), IfCmd(guard, List(GoToCmd(Seq(g.target.label)))))
-        case None =>
-          List(GoToCmd(Seq(g.target.label)))
+    case g: GoTo =>
+      // collects all targets of the goto with a branch condition that we need to check the security level for
+      // and collects the variables for that
+      val conditions = g.targets.flatMap(_.statements.headOption).collect { case a: Assume if a.checkSecurity => a }
+      val conditionVariables = conditions.flatMap(_.body.variables)
+      val gammas = conditionVariables.map(_.toGamma).toList.sorted
+      val conditionAssert: List[BCmd] = if (gammas.size > 1) {
+        val andedConditions = gammas.tail.foldLeft(gammas.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
+        List(BAssert(andedConditions))
+      } else if (gammas.size == 1) {
+        List(BAssert(gammas.head))
+      } else {
+        Nil
       }
-    case n: NonDetGoTo =>
-      List(GoToCmd(n.targets.map(_.label).toSeq))
+      val jump = GoToCmd(g.targets.map(_.label).toSeq)
+      conditionAssert :+ jump
   }
 
   def translate(s: Statement): List[BCmd] = s match {
@@ -433,8 +438,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val rhsGamma = m.rhs.toGamma
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val stateSplit = s match {
-        case MemoryAssign(_,_, parent, Some(label)) => List(captureStateStatement(s"$label"))
-        case LocalAssign(_,_, parent, Some(label)) => List(captureStateStatement(s"$label"))
+        case MemoryAssign(_,_, Some(label)) => List(captureStateStatement(s"$label"))
+        case LocalAssign(_,_, Some(label)) => List(captureStateStatement(s"$label"))
         case _ => List.empty
       }
       if (lhs == stack) {

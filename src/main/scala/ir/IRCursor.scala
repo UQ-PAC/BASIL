@@ -3,62 +3,76 @@ import cfg_visualiser.DotElement
 import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
 
 import collection.mutable
+import scala.annotation.tailrec
 
 /*
  * Defines a position in the IL / CFG; this becomes the lhs of the state map lattice in a static analysis.
  */
-type CFGPosition = Procedure | Block | Command | ProcedureUnknownJump  | ProcedureExit
+type CFGPosition = Procedure | Block | Command
 
 
 // Interprocedural
 //  position = (call string) + Position
 
 
-/*
-    An additional CFG node which implicitly follows the node at `pos`
-    A call to an unknown procedure without a return to here
- */
-case class ProcedureUnknownJump(fromProcedure: Procedure, pos: CFGPosition)
 
 /*
- *  An additional CFG node which implicitly follows the node at `pos`
- *  The exit from a procedure from pos (the last command/jump in the procedure).
+    Closed trace-perspective beginning of a composite IL structure.
  */
-case class ProcedureExit(fromProcedure: Procedure, pos: CFGPosition)
+def begin(c: CFGPosition): CFGPosition = {
+  c match {
+    case p:Procedure => p
+    case b:Block => b
+    case s:Statement => s.parent.statements.head()
+    case s:Jump => s
+  }
+}
+
+/*
+    Closed trace-perspective end of a composite IL structure.
+ */
+@tailrec
+def end(c: CFGPosition): CFGPosition = {
+  c match {
+    case p:Procedure => end(p.returnBlock)
+    case b:Block => b.jump
+    case s:Statement => s.parent.statements.back()
+    case s:Jump => s
+  }
+}
+
 
 object IntraProcIRCursor {
   type Node = CFGPosition
 
   def succ(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
+      case proc: Procedure =>
+        if proc.entryBlock.isEmpty then Set(proc.returnBlock) else Set(proc.entryBlock.get)
+      case b: Block =>
+        if b.statements.isEmpty
+        then Set.from(b.jumpSet)
+        else Set[CFGPosition](b.statements.head())
       case s: Statement =>
         if (s.parent.statements.hasNext(s)) {
           Set(s.parent.statements.getNext(s))
         } else {
-          s.parent.jumps.toSet
+          Set(s.parent.jump)
         }
       case j: Jump => j match {
-        /* TODO jumps are ordered so prior jumps mask later jumps; assuming the union of the conditions is total 
-         * This will not be the case once we make all jumps nondeterministic. */
-        case g: DetGoTo => Set[CFGPosition](g.target)
-        case n: NonDetGoTo => n.targets.toSet
+        case n: GoTo => n.targets.asInstanceOf[Set[CFGPosition]]
         case c: DirectCall => c.returnTarget match
           case Some(b) => Set(b)
-          case None => Set(ProcedureUnknownJump(c.parent.parent, c))
-        case i: IndirectCall => i match 
-          case IndirectCall(v, parent, ret, label) =>
-            if (v.name == "R30") {
-              Set(ProcedureExit(parent.parent, pos))
-            } else {
-              ret match
-                case Some(block) => Set(block)
-                case None => Set(ProcedureUnknownJump(i.parent.parent, pos))
-            }
+          case None => Set()
+        case i: IndirectCall =>
+          if (i.target.name == "R30") {
+            Set()
+          } else {
+            i.returnTarget match
+              case Some(block: Block) => Set[CFGPosition](block)
+              case None => Set()
+          }
       }
-      case b: Block => if b.statements.isEmpty then Set(b.jumps.head) else Set[CFGPosition](b.statements.head())
-      case proc: Procedure => if proc.blocks.isEmpty then Set(ProcedureExit(proc, proc)) else Set(proc.blocks.head())
-      case j: ProcedureUnknownJump => Set(ProcedureExit(j.fromProcedure, j))
-      case e: ProcedureExit => Set()
     }
   }
 
@@ -71,12 +85,28 @@ object IntraProcIRCursor {
           Set(s.parent) // predecessor blocks
         }
       case j: Jump => if j.parent.statements.isEmpty then Set(j.parent) else Set(j.parent.statements.last)
-      case b: Block => b.predecessors.asInstanceOf[Set[CFGPosition]]
+      case b: Block => b.predecessors.map(end)
       case proc: Procedure => Set() // intraproc
-      case r: ProcedureUnknownJump => Set(r.pos)
-      case r: ProcedureExit => Set(r.pos)
     }
   }
+}
+
+object InterProcIRCursor {
+  type Node = CFGPosition
+
+  def succ(pos: CFGPosition): Set[CFGPosition] = {
+    IntraProcIRCursor.succ(pos) ++ (pos match
+      case c: DirectCall => Set(c.target)
+      case _ => Set()
+      )
+  }
+    def pred(pos: CFGPosition): Set[CFGPosition] = {
+      IntraProcIRCursor.pred(pos) ++ (pos match
+        case c: Procedure => c.callers().map(end)
+        case b: Block => if b.isReturn then b.parent.callers().map(end) else Set()
+        case _ => Set()
+        )
+    }
 }
 
 
@@ -88,6 +118,7 @@ def computeDomain(prog: Program): mutable.Set[CFGPosition] = {
   while (sizeBefore != sizeAfter) {
     for (i <- domain) {
       domain.addAll(IntraProcIRCursor.succ(i))
+      domain.addAll(IntraProcIRCursor.pred(i))
     }
     sizeBefore = sizeAfter
     sizeAfter = domain.size
@@ -128,8 +159,8 @@ def toDot(prog: Program, labels: Map[CFGPosition, String] = Map.empty) : String 
   for (node <- domain) {
     node match
       case s: Command => dotNodes.addOne(s -> DotNode(label(s.label), nodeText(s)))
-      case s: Block => dotNodes.addOne(s -> DotNode(label(None), nodeText(s)))
-      case s => dotNodes.addOne(s -> DotNode(label(None), nodeText(s)))
+      case s: Block => dotNodes.addOne(s -> DotNode(label(Some(s.label)), nodeText(s)))
+      case s => dotNodes.addOne(s -> DotNode(label(Some(s.toString)), nodeText(s)))
   }
 
   for (node <- domain) {
@@ -137,7 +168,7 @@ def toDot(prog: Program, labels: Map[CFGPosition, String] = Map.empty) : String 
       case s : Call =>
         IntraProcIRCursor.succ(s).foreach(n => dotArrows.addOne(DotInterArrow(dotNodes(s), dotNodes(n))))
       case s =>
-        IntraProcIRCursor.succ(s).foreach(n => dotArrows.addOne(DotIntraArrow(dotNodes(s), dotNodes(n))))
+        IntraProcIRCursor.succ(s).foreach(n => dotArrows.addOne(DotRegularArrow(dotNodes(s), dotNodes(n))))
       case _ => ()
     }
   }

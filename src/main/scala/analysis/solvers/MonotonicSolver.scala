@@ -2,7 +2,6 @@ package analysis.solvers
 
 import analysis._
 
-import scala.collection.immutable.ListSet
 import scala.collection.mutable
 
 /** Fixpoint solver.
@@ -13,18 +12,18 @@ import scala.collection.mutable
   * TODO: investigate how to visit all reachable nodes at least once, then remove loopEscape. TODO: in longer term, add
   * a worklist to avoid processing nodes twice.
   */
-trait SimpleMonotonicSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[N] with Dependencies[N]:
+trait SimpleMonotonicSolver[A, T, L <: Lattice[T]] extends MapLatticeSolver[A, T, L] with LinkedHashSetWorklist[A] with Dependencies[A] {
   /** The current lattice element.
     */
-  var x: lattice.Element = _
+  var x: Map[A, T] = _
 
   /** The map domain.
     */
-  val domain: Set[N]
+  val first: Set[A]
 
-  private val loopEscape: mutable.Set[N] = mutable.Set.empty
+  private val loopEscape: mutable.Set[A] = mutable.Set.empty
 
-  override def process(n: N): Unit =
+  def process(n: A): Unit =
     val xn = x(n)
     val y = funsub(n, x)
     if y != xn || !loopEscape.contains(n) then
@@ -32,16 +31,9 @@ trait SimpleMonotonicSolver[N] extends MapLatticeSolver[N] with ListSetWorklist[
       x += n -> y
       add(outdep(n))
 
-  override def analyze(): lattice.Element =
-    // TODO this sort of type-dependent code should not be in the generic solver
-    // should probably base it upon WorklistFixpointSolverWithReachability from TIP instead?
-    val first: Set[N] = if (intra) {
-      domain.collect { case n: CfgFunctionEntryNode if n.pred(intra).isEmpty => n }
-    } else {
-      // TODO this is not the correct way to do things, we should set Cfg.startNode but don't have visibility here
-      domain.collect { case n: CfgFunctionEntryNode if n.data.name == "main" => n }
-    }
-
+  def analyze(): Map[A, T] = {
     x = lattice.bottom
     run(first)
     x
+  }
+}

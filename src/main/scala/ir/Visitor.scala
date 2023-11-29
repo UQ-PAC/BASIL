@@ -34,12 +34,7 @@ abstract class Visitor {
 
   def visitJump(node: Jump): Jump = node.acceptVisit(this)
 
-  def visitGoTo(node: DetGoTo): Jump = {
-    node.condition = node.condition.map(visitExpr)
-    node
-  }
-
-  def visitNonDetGoTo(node: NonDetGoTo): Jump = {
+  def visitGoTo(node: GoTo): Jump = {
     node
   }
 
@@ -56,16 +51,13 @@ abstract class Visitor {
     for (s <- node.statements) {
       node.statements.replace(s, visitStatement(s))
     }
-    for (j <- node.jumps) {
-      node.replaceJump(j, visitJump(j))
-      //node.jumps(i) = visitJump(j)
-    }
+    node.replaceJump(visitJump(node.jump))
     node
   }
 
   def visitProcedure(node: Procedure): Procedure = {
     for (b <- node.blocks) {
-      node.blocks.replace(b, visitBlock(b))
+      node.replaceBlock(b, visitBlock(b))
     }
     for (i <- node.in.indices) {
       node.in(i) = visitParameter(node.in(i))
@@ -216,7 +208,7 @@ abstract class ReadOnlyVisitor extends Visitor {
     node
   }
 
-  override def visitGoTo(node: DetGoTo): Jump = {
+  override def visitGoTo(node: GoTo): Jump = {
     node
   }
 
@@ -233,9 +225,7 @@ abstract class ReadOnlyVisitor extends Visitor {
     for (i <- node.statements) {
       visitStatement(i)
     }
-    for (i <- node.jumps) {
-      visitJump(i)
-    }
+    visitJump(node.jump)
     node
   }
 
@@ -320,7 +310,7 @@ class ExternalRemover(external: Set[String]) extends Visitor {
     if (external.contains(node.name)) {
       // update the modifies set before removing the body
       node.modifies.addAll(node.blocks.flatMap(_.modifies))
-      node.blocks = IntrusiveList()
+      node.replaceBlocks(Seq())
     }
     super.visitProcedure(node)
   }
@@ -348,4 +338,13 @@ class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
     node
   }
 
+}
+
+class ConvertToSingleProcedureReturn extends Visitor {
+  override def visitJump(node: Jump): Jump = {
+    node match
+      case c: IndirectCall =>
+        if c.target.name == "R30" && c.returnTarget.isEmpty && c.parent != c.parent.parent.returnBlock then GoTo(Seq(c.parent.parent.returnBlock)) else node
+      case _ => node
+  }
 }

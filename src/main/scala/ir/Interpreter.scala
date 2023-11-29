@@ -1,5 +1,4 @@
 package ir
-
 import analysis.BitVectorEval.*
 import util.Logger
 
@@ -15,7 +14,7 @@ class Interpreter() {
   private var nextBlock: Option[Block] = None
   private val returnBlock: mutable.Stack[Block] = mutable.Stack()
 
-  def eval(exp: Expr, env: mutable.Map[Variable, BitVecLiteral]): Literal = {
+  def eval(exp: Expr, env: mutable.Map[Variable, BitVecLiteral]): BitVecLiteral = {
     exp match {
       case id: Variable =>
         env.get(id) match {
@@ -47,16 +46,11 @@ class Interpreter() {
 
       case r: Repeat =>
         Logger.debug(s"\t$r")
-        val arg = eval(r.body, env)
-        var result = arg
-        for (_ <- 1 to r.repeats) {
-          result = smt_concat(result, arg)
-        }
-        result
+        ??? // TODO
 
       case bin: BinaryExpr =>
-        val left: BitVecLiteral = eval(bin.arg1, env).asInstanceOf[BitVecLiteral]
-        val right: BitVecLiteral = eval(bin.arg2, env).asInstanceOf[BitVecLiteral]
+        val left = eval(bin.arg1, env)
+        val right = eval(bin.arg2, env)
         Logger.debug(
           s"\tBinaryExpr(0x${left.value.toString(16)}[u${left.size}] ${bin.op} 0x${right.value.toString(16)}[u${right.size}])"
         )
@@ -69,27 +63,18 @@ class Interpreter() {
           case BVUREM   => smt_bvurem(left, right)
           case BVSHL    => smt_bvshl(left, right)
           case BVLSHR   => smt_bvlshr(left, right)
-          case BVULT    => smt_bvult(left, right)
-          case BVNAND   => ???
-          case BVNOR    => ???
-          case BVXOR    => ???
-          case BVXNOR   => ???
+          case BVNAND   => smt_bvnand(left, right)
+          case BVNOR    => smt_bvnor(left, right)
+          case BVXOR    => smt_bvxor(left, right)
+          case BVXNOR   => smt_bvxnor(left, right)
           case BVCOMP   => smt_bvcomp(left, right)
           case BVSUB    => smt_bvsub(left, right)
           case BVSDIV   => smt_bvsdiv(left, right)
           case BVSREM   => smt_bvsrem(left, right)
-          case BVSMOD   => ???
+          case BVSMOD   => smt_bvsmod(left, right)
           case BVASHR   => smt_bvashr(left, right)
-          case BVULE    => smt_bvule(left, right)
-          case BVUGT    => ???
-          case BVUGE    => ???
-          case BVSLT    => smt_bvslt(left, right)
-          case BVSLE    => smt_bvsle(left, right)
-          case BVSGT    => ???
-          case BVSGE    => ???
-          case BVEQ     => smt_bveq(left, right)
-          case BVNEQ    => smt_bvneq(left, right)
           case BVCONCAT => smt_concat(left, right)
+          case _ => ???
         }
 
       case un: UnaryExpr =>
@@ -98,8 +83,6 @@ class Interpreter() {
         un.op match {
           case BVNEG   => smt_bvneg(arg)
           case BVNOT   => smt_bvnot(arg)
-          case IntNEG  => ???
-          case BoolNOT => ???
         }
 
       case m: Memory =>
@@ -108,15 +91,86 @@ class Interpreter() {
 
       case ml: MemoryLoad =>
         Logger.debug(s"\t$ml")
-        val index: Int = eval(ml.index, env).asInstanceOf[BitVecLiteral].value.toInt
+        val index: Int = eval(ml.index, env).value.toInt
         getMemory(index, ml.size, ml.endian, mems)
 
       case ms: MemoryStore =>
-        val index: Int = eval(ms.index, env).asInstanceOf[BitVecLiteral].value.toInt
-        val value: BitVecLiteral = eval(ms.value, env).asInstanceOf[BitVecLiteral]
+        val index: Int = eval(ms.index, env).value.toInt
+        val value: BitVecLiteral = eval(ms.value, env)
         Logger.debug(s"\tMemoryStore(mem:${ms.mem}, index:0x${index.toHexString}, value:0x${value.value
           .toString(16)}[u${value.size}], size:${ms.size})")
         setMemory(index, ms.size, ms.endian, value, mems)
+    }
+  }
+
+  def evalBool(exp: Expr, env: mutable.Map[Variable, BitVecLiteral]): BoolLit = {
+    exp match {
+      case n: BoolLit => n
+      case bin: BinaryExpr =>
+        bin.op match {
+          case b: BoolBinOp =>
+            val arg1 = evalBool(bin.arg1, env)
+            val arg2 = evalBool(bin.arg2, env)
+            b match {
+              case BoolEQ =>
+                if (arg1 == arg2) {
+                  TrueLiteral
+                } else {
+                  FalseLiteral
+                }
+              case BoolNEQ =>
+                if (arg1 != arg2) {
+                  TrueLiteral
+                } else {
+                  FalseLiteral
+                }
+              case BoolAND =>
+                (arg1, arg2) match {
+                  case (TrueLiteral, TrueLiteral) => TrueLiteral
+                  case _ => FalseLiteral
+                }
+              case BoolOR =>
+                (arg1, arg2) match {
+                  case (FalseLiteral, FalseLiteral) => FalseLiteral
+                  case _ => TrueLiteral
+                }
+              case BoolIMPLIES =>
+                (arg1, arg2) match {
+                  case (TrueLiteral, FalseLiteral) => FalseLiteral
+                  case _ => TrueLiteral
+                }
+              case BoolEQUIV =>
+                if (arg1 == arg2) {
+                  TrueLiteral
+                } else {
+                  FalseLiteral
+                }
+            }
+          case b: BVBinOp =>
+            val left = eval(bin.arg1, env)
+            val right = eval(bin.arg2, env)
+            b match {
+              case BVULT => smt_bvult(left, right)
+              case BVULE => smt_bvule(left, right)
+              case BVUGT => smt_bvugt(left, right)
+              case BVUGE => smt_bvuge(left, right)
+              case BVSLT => smt_bvslt(left, right)
+              case BVSLE => smt_bvsle(left, right)
+              case BVSGT => smt_bvsgt(left, right)
+              case BVSGE => smt_bvsge(left, right)
+              case BVEQ => smt_bveq(left, right)
+              case BVNEQ => smt_bvneq(left, right)
+              case _ => ???
+            }
+          case _ => ???
+        }
+
+      case un: UnaryExpr =>
+        un.op match {
+          case BoolNOT => if evalBool(un.arg, env) == TrueLiteral then FalseLiteral else TrueLiteral
+          case _ => ???
+        }
+
     }
   }
 
@@ -172,14 +226,14 @@ class Interpreter() {
     }
 
     // Procedure.Block
-    p.blocks.headOption match {
+    p.entryBlock match {
       case Some(block) => nextBlock = Some(block)
       case None        => nextBlock = Some(returnBlock.pop())
     }
   }
 
   private def interpretBlock(b: Block): Unit = {
-    Logger.debug(s"Block:${nextBlock.get.label} ${nextBlock.get.address}")
+    Logger.debug(s"Block:${b.label} ${b.address}")
     // Block.Statement
     for ((statement, index) <- b.statements.zipWithIndex) {
       Logger.debug(s"statement[$index]:")
@@ -188,45 +242,44 @@ class Interpreter() {
 
     // Block.Jump
     breakable {
-      for ((jump, index) <- b.jumps.zipWithIndex) {
-        Logger.debug(s"jump[$index]:")
-        jump match {
-          case gt: NonDetGoTo => ???
-          case gt: DetGoTo =>
-            Logger.debug(s"$gt")
-            gt.condition match {
-              case Some(value) =>
-                eval(value, regs) match {
-                  case TrueLiteral =>
-                    nextBlock = Some(gt.target)
-                    break
-                  case FalseLiteral =>
-                }
+      Logger.debug(s"jump:")
+      b.jump match {
+        case gt: GoTo =>
+          Logger.debug(s"$gt")
+          for (g <- gt.targets) {
+            val condition: Option[Expr] = g.statements.headOption.collect { case a: Assume => a.body }
+            condition match {
+              case Some(e) => evalBool(e, regs) match {
+                case TrueLiteral =>
+                  nextBlock = Some(g)
+                  break
+                case _ =>
+              }
               case None =>
-                nextBlock = Some(gt.target)
+                nextBlock = Some(g)
                 break
             }
-          case dc: DirectCall =>
-            Logger.debug(s"$dc")
-            if (dc.returnTarget.isDefined) {
-              returnBlock.push(dc.returnTarget.get)
-            }
-            interpretProcedure(dc.target)
-            break
-          case ic: IndirectCall =>
-            Logger.debug(s"$ic")
-            if (ic.target == Register("R30", BitVecType(64)) && ic.returnTarget.isEmpty) {
-              if (returnBlock.nonEmpty) {
-                nextBlock = Some(returnBlock.pop())
-              } else {
-                //Exit Interpreter
-                nextBlock = None
-              }
-              break
+          }
+        case dc: DirectCall =>
+          Logger.debug(s"$dc")
+          if (dc.returnTarget.isDefined) {
+            returnBlock.push(dc.returnTarget.get)
+          }
+          interpretProcedure(dc.target)
+          break
+        case ic: IndirectCall =>
+          Logger.debug(s"$ic")
+          if (ic.target == Register("R30", BitVecType(64)) && ic.returnTarget.isEmpty) {
+            if (returnBlock.nonEmpty) {
+              nextBlock = Some(returnBlock.pop())
             } else {
-              ???
+              //Exit Interpreter
+              nextBlock = None
             }
-        }
+            break
+          } else {
+            ???
+          }
       }
     }
   }
@@ -236,12 +289,8 @@ class Interpreter() {
       case assign: LocalAssign =>
         Logger.debug(s"LocalAssign ${assign.lhs} = ${assign.rhs}")
         val evalRight = eval(assign.rhs, regs)
-        evalRight match {
-          case BitVecLiteral(value, size) =>
-            Logger.debug(s"LocalAssign ${assign.lhs} := 0x${value.toString(16)}[u$size]\n")
-            regs += (assign.lhs -> BitVecLiteral(value, size))
-          case _ => throw new Exception("cannot register non-bitvectors")
-        }
+        Logger.debug(s"LocalAssign ${assign.lhs} := 0x${evalRight.value.toString(16)}[u${evalRight.size}]\n")
+        regs += (assign.lhs -> evalRight)
 
       case assign: MemoryAssign =>
         Logger.debug(s"MemoryAssign ${assign.lhs} = ${assign.rhs}")
@@ -252,10 +301,13 @@ class Interpreter() {
           case _ => throw new Exception("cannot register non-bitvectors")
         }
       case _ : NOP => ()
-      case _ : Assume => ()
       case assert: Assert =>
         Logger.debug(assert)
-        ???
+        // TODO
+
+      case assume: Assume =>
+        Logger.debug(assume)
+        // TODO, but already taken into effect if it is a branch condition
     }
   }
 
