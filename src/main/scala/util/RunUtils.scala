@@ -241,9 +241,10 @@ object RunUtils {
               isEntryNode = false
               printNode(c)
             case c: Command =>
-              //if (c.parent.label != previousBlock) {
-              //  printBlock(c.parent)
-              //}
+              if (c.parent.label != previousBlock) {
+                printBlock(c.parent)
+              }
+              s.append("    ")
               printNode(c)
               previousBlock = c.parent.label
               isEntryNode = false
@@ -280,7 +281,7 @@ object RunUtils {
       node match {
         case _: Statement => s.append("[Stmt] ")
         case _: Procedure => s.append("[FunctionEntry] ")
-        case _: Call => s.append("[Jmp] ")
+        case _: Jump => s.append("[Jmp] ")
         case _ => ()
       }
 

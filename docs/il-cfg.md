@@ -32,7 +32,7 @@ We need to derive the predecessor/successor relation on CFG nodes IL .
 
 1. CFG positions are defined as 
     - The entry to a procedure
-    - An exit from a procedure
+    - The single return point from a procedure
     - The beginning of a block within a procedure
     - A statement command within a block
     - A jump or call command within a block
@@ -44,6 +44,9 @@ First we have basic blocks belonging to a procedure.
 
     Procedure(id)
     Block(id, procedure) 
+    EntryBlock(block_id, procedure)
+    ReturnBlock(block_id, procedure) 
+    Block(id, procedure) :- EntryBlock(id, procedure); ReturnBlock(id, procedure)
 
 A list of sequential statements belonging to a block
 
@@ -52,9 +55,9 @@ A list of sequential statements belonging to a block
 A list of jumps (either Calls or GoTos) belonging to a block, which occur after the statements. GoTos form the 
 intra-procedural edges, and Calls form the inter-procedural edges. 
 
-    GoTo(id, block, index, destinationBlock) 
-    Call(id, block, index, destinationProcedure) 
-    Jump(id, block) :- GoTo(id, block, _) ; Call(id, block, _)
+    GoTo(id, block, destinationBlock)  // multiple destinations
+    Call(id, block, destinationProcedure, returnBlock), count {Call(id, block, _, _)} == 1 
+    Jump(id, block) :- GoTo(id, block, _) ; Call(id, block, _, _)
 
 Statements and Jumps are both considered commands. All IL terms, commands, blocks, and procedures, have a unique
 identifier. All of the above are considered IL terms.
@@ -62,14 +65,7 @@ identifier. All of the above are considered IL terms.
     Command(id) :- Statement(id, _, _) ; Jump(id, _)
     ILTerm(id) :- Procedure(id); Block(id, _); Command(id) 
 
-The CFG extends this language with the following nodes:
-
-    ProcedureExit(id, fromProcedure, fromJump)
-    CallReturn(id, fromCall)
-
-    CFGNode(id) :- ProcedureExit(id,_,_) ; CallReturn(id,_) ; ILTerm(id)
-
-The predecessor/successor relates CFGNodes to CFGNodes, and is simply defined in terms of the nodes 
+The predecessor/successor relates ILTerms to ILTerms, and is simply defined in terms of the nodes 
 
     pred(i, j) :- succ(j, i)
 
@@ -79,15 +75,11 @@ The predecessor/successor relates CFGNodes to CFGNodes, and is simply defined in
 
     succ(goto, targetBlock) :- GoTo(goto, _, _, targetBlock) 
 
-    // We always insert nodes for calls to return to
-    CallReturn(i, call) :- Call(call, _, _, _)
-    succ(call, callreturn) :- CallReturn(callreturn, call), Procedure(call)
-
-    // a 'return' from the procedure is an indirect call to register R30
-    succ(call, exit) :- Call(call, block, _, "R30"), ProcedureExit(exit, procedure, call), Block(block, procedure)
+    succ(call, return_block) :- Call(call, block, dest_procedure, return_block)
 
 For an inter-procedural CFG we also have:
 
+    succ(call, return_block) :- ReturnBlock(return_block, call), Procedure(call)
     succ(call, targetProcedure) :- Call(call, _, _, targetProcedure) 
     succ(exit, returnNode) :- ProcedureExit(exit, procedure, call), CallReturn(returnNode, call)
 
@@ -128,11 +120,17 @@ Specifically this means we store
         - list of incoming Calls
         - subroutine to compute the set of all outgoing calls in all contained blocks
 
-To maintain this superimposed graph it is necessary to make the actual call lists private, and only allow 
-modification of through interfaces which maintain the graph.  
+This means the IL contains: 
+   - Forward graph edges in the forms of calls and gotos
+   - Forward syntax tree edges in the form of classes containing their children as fields
+   - Backwards graph edges in the form of lists of incoming jumps and calls
+      - Procedure has list of incoming calls
+      - Block has list of incoming gotos 
+   - Backwards syntax tree edges in the form of a parent field
+     - Implementation of the `HasParent` trait.
 
-Maintenance of the graph is the responsibility of the Block class: adding or removing jumps must ensure the edge 
-    references are maintained.
+To maintain the backwards edges it is necessary to make the actual data structures private, and only allow 
+modification through interfaces which maintain the graph/tree.  
 
 Jumps:
 - Must implement an interface to allow adding or removing edge references (references to themself) to and from their 
