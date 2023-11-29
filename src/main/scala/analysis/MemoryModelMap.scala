@@ -123,8 +123,8 @@ class StackRegion(override val regionIdentifier: String, val start: BitVecLitera
   }
 }
 
-class HeapRegion(override val regionIdentifier: String) extends MemoryRegion {
-  override def toString: String = s"Heap($regionIdentifier)"
+class HeapRegion(override val regionIdentifier: String, val size: BitVecLiteral) extends MemoryRegion {
+  override def toString: String = s"Heap($regionIdentifier, $size)"
   override def hashCode(): Int = regionIdentifier.hashCode()
   override def equals(obj: Any): Boolean = obj match {
     case h: HeapRegion => h.regionIdentifier == regionIdentifier

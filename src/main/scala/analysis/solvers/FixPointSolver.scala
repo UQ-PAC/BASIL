@@ -52,20 +52,19 @@ trait MapLatticeSolver[N, T, L <: Lattice[T]] extends LatticeSolver[Map[N, T]] w
  * Base trait for solvers for map lattices with lifted co-domains.
  * @tparam N type of the elements in the map domain.
  */
-trait MapLiftLatticeSolver[N] extends MapLatticeSolver[N] with Dependencies[N] {
-
-  val lattice: MapLattice[N, LiftLattice[Lattice]]
+trait MapLiftLatticeSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, T, L] with Dependencies[N] {
+  val lattice: MapLattice[N, LiftedElement[T], LiftLattice[N, T, L]]
 
   /**
    * The transfer function for the sub-sub-lattice.
    */
-  def transferUnlifted(n: N, s: lattice.sublattice.sublattice.Element): lattice.sublattice.sublattice.Element
+  def transferUnlifted(n: N, s: T): T
 
-  override def transfer(n: N, s: lattice.sublattice.Element): lattice.sublattice.Element = {
+  override def transfer(n: N, s: T): LiftedElement[T] = {
     import lattice.sublattice._
     s match {
-      case Bottom => Bottom // unreachable as input implied unreachable at output
-      case Lift(a) => lift(transferUnlifted(n, a))
+      case LiftedBottom => LiftedBottom // unreachable as input implied unreachable at output
+      case l: Lift[T] => lift(transferUnlifted(n, l.el))
     }
   }
 }
@@ -190,16 +189,16 @@ trait SimpleWorklistFixpointSolver[N, T, L <: Lattice[T]] extends WorklistFixpoi
  *
  * This solver works for map lattices with lifted co-domains, where the extra bottom element typically represents "unreachable".
  */
-trait WorklistFixpointSolverWithReachability[N] extends WorklistFixpointSolver[N] with MapLiftLatticeSolver[N] {
+trait WorklistFixpointSolverWithReachability[N, T, L <: Lattice[T]] extends WorklistFixpointSolver[N, T, L] with MapLiftLatticeSolver[N, T, L] {
 
   /**
    * The start locations, used as the initial contents of the worklist.
    */
   val first: Set[N]
 
-  def analyze(intra: Boolean): lattice.Element = {
+  def analyze(): Map[N, T] = {
     x = lattice.bottom
-    run(first, intra)
+    run(first)
     x
   }
 
@@ -212,10 +211,10 @@ trait WorklistFixpointSolverWithReachability[N] extends WorklistFixpointSolver[N
    */
   def unliftedAnalyze(intra: Boolean): lattice.sublattice.sublattice.Element = {
     import lattice.sublattice._
-    val res: lattice.Element = analyze(intra)
+    val res: lattice.Element = analyze()
     // Convert liftedResult to unlifted
     res.map((n, lift) => (n, lift match {
-      case Bottom => lattice.sublattice.sublattice.bottom
+      case LiftedBottom => lattice.sublattice.sublattice.bottom
       case Lift(a) => a
     })).asInstanceOf[lattice.sublattice.sublattice.Element]
   }

@@ -32,14 +32,9 @@ class PowersetLattice[A] extends Lattice[Set[A]] {
   def lub(x: Set[A], y: Set[A]): Set[A] = x.union(y)
 }
 
-trait FlatElement[+T]
-case class FlatEl[T](el: T) extends FlatElement[T]
-case object Top extends FlatElement[Nothing]
-case object Bottom extends FlatElement[Nothing]
-
 trait LiftedElement[+T]
 case class Lift[T](el: T) extends LiftedElement[T] {
-  override def toString = s"Lift($n)"
+  override def toString = s"Lift($el)"
 }
 case object LiftedBottom extends LiftedElement[Nothing] {
   override def toString = "LiftBot"
@@ -48,7 +43,7 @@ case object LiftedBottom extends LiftedElement[Nothing] {
  * The lift lattice for `sublattice`.
  * Supports implicit lifting and unlifting.
  */
-class LiftLattice[T, +L <: Lattice[T]](val sublattice: L) extends Lattice[LiftedElement[T]] {
+class LiftLattice[N, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[LiftedElement[T]] {
 
   val bottom: LiftedElement[T] = LiftedBottom
 
@@ -75,6 +70,11 @@ class LiftLattice[T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Lifted
     case LiftedBottom => throw new IllegalArgumentException("Cannot unlift bottom")
   }
 }
+
+trait FlatElement[+T]
+case class FlatEl[T](el: T) extends FlatElement[T]
+case object Top extends FlatElement[Nothing]
+case object Bottom extends FlatElement[Nothing]
 
 /** The flat lattice made of element of `X`. Top is greater than every other element, and Bottom is less than every
   * other element. No additional ordering is defined.
