@@ -1,6 +1,6 @@
 package analysis
 
-import analysis.{CfgNode, CfgEdge}
+import ir.{CFGPosition, IntraProcIRCursor, Program, Procedure}
 
 import scala.collection.mutable
 
@@ -13,22 +13,34 @@ import scala.collection.mutable
  * 
  */
 
+/* A connection between to IL nodes, purely for the representation of loops in
+ *
+ */
+class LoopEdge(from: CFGPosition, to: CFGPosition):
+    override def toString: String = s"From: ${from}, to: ${to}"
+    override def equals(n: Any): Boolean = n match {
+        case edge: LoopEdge => edge.getFrom() == from && edge.getTo() == to;
+        case _ => false
+    }
+
+    def getFrom(): CFGPosition = from
+    def getTo(): CFGPosition = to
 
 /* A loop is a subgraph <G_l, E_l> of a CFG <G, E>
  *
  */
- class Loop(var header: CfgNode):
-    val reentries: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()    // Edges to loop from outside that are not to the header
-    val backEdges: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()    // Edges from inside loop to the header
-    val entryEdges: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()   // Edges into the header node
+class Loop(var header: CFGPosition):
+    val reentries: mutable.Set[LoopEdge] = mutable.Set[LoopEdge]()    // Edges to loop from outside that are not to the header
+    val backEdges: mutable.Set[LoopEdge] = mutable.Set[LoopEdge]()    // Edges from inside loop to the header
+    val entryEdges: mutable.Set[LoopEdge] = mutable.Set[LoopEdge]()   // Edges into the header node
 
-    val nodes: mutable.Set[CfgNode] = mutable.Set[CfgNode]()        // G_l
-    val edges: mutable.Set[CfgEdge] = mutable.Set[CfgEdge]()        // G_e
-    var reducible: Boolean = true                                   // Assume reducible by default
+    val nodes: mutable.Set[CFGPosition] = mutable.Set[CFGPosition]()    // G_l
+    val edges: mutable.Set[LoopEdge] = mutable.Set[LoopEdge]()          // G_e
+    var reducible: Boolean = true                                       // Assume reducible by default
 
-    def addEdge(edge: CfgEdge) = {
-        nodes += edge.getFrom
-        nodes += edge.getTo
+    def addEdge(edge: LoopEdge) = {
+        nodes += edge.getFrom()
+        nodes += edge.getTo()
         edges += edge
     }
 
@@ -39,17 +51,17 @@ import scala.collection.mutable
 /* Loop detection and classification with respect to being reducible or irreducible. Implements the algorithm
  *  described by Wei in `A New Algorithm for Identifying Loops in Decompilation` (LNCS 4632 pp 170-183)
  */
-class LoopDetector(cfg: ProgramCfg):
+class LoopDetector(cfg: Program):
 
     // Header -> Loop
-    val loops: mutable.HashMap[CfgNode, Loop] = mutable.HashMap[CfgNode, Loop]()
-    val headers: mutable.Set[CfgNode] = mutable.Set[CfgNode]()
+    val loops: mutable.HashMap[CFGPosition, Loop] = mutable.HashMap[CFGPosition, Loop]()
+    val headers: mutable.Set[CFGPosition] = mutable.Set[CFGPosition]()
 
     // Algorithm helpers
-    val visitedNodes: mutable.Set[CfgNode] = mutable.Set[CfgNode]()
-    val nodeDFSPpos: mutable.HashMap[CfgNode, Int] = mutable.HashMap[CfgNode, Int]()
-    val iloopHeaders: mutable.HashMap[CfgNode, CfgNode] = mutable.HashMap[CfgNode, CfgNode]()
-    val edgeStack: mutable.Stack[CfgEdge] = mutable.Stack[CfgEdge]()
+    val visitedNodes: mutable.Set[CFGPosition] = mutable.Set[CFGPosition]()
+    val nodeDFSPpos: mutable.HashMap[CFGPosition, Int] = mutable.HashMap[CFGPosition, Int]()
+    val iloopHeaders: mutable.HashMap[CFGPosition, CFGPosition] = mutable.HashMap[CFGPosition, CFGPosition]()
+    val edgeStack: mutable.Stack[LoopEdge] = mutable.Stack[LoopEdge]()
 
     /* 
      *
@@ -62,7 +74,7 @@ class LoopDetector(cfg: ProgramCfg):
         }
 
         val wantedLoops: mutable.Set[Loop] = mutable.Set[Loop]();
-        val irrHeaders: Set[CfgNode] = irreducibleLoops.map(l => l.header);
+        val irrHeaders: Set[CFGPosition] = irreducibleLoops.map(l => l.header);
 
         irreducibleLoops;
     }
@@ -72,7 +84,7 @@ class LoopDetector(cfg: ProgramCfg):
      */
      def identify_loops(): Set[Loop] = {
         
-        val funcEntries = cfg.nodes.filter(_.isInstanceOf[CfgFunctionEntryNode]);
+        val funcEntries = cfg.procedures
 
         funcEntries.foreach { funcEntry =>
             traverse_loops_dfs(funcEntry, 1);
@@ -97,24 +109,25 @@ class LoopDetector(cfg: ProgramCfg):
      *          node into the target loop, making it irreducible, so we mark it as such.
      *
      */
-    def traverse_loops_dfs(b0: CfgNode, DFSPpos: Int): Option[CfgNode] = {
+    def traverse_loops_dfs(b0: CFGPosition, DFSPpos: Int): Option[CFGPosition] = {
 
         visitedNodes += b0;
         nodeDFSPpos(b0) = DFSPpos;
 
         // Process all outgoing edges from the current node
-        // b0.succEdges(true).toList.sortBy(n => n.getTo.ed).foreach{ edge =>
+        // b0.succEdges(true).toList.sortBy(n => n.to.ed).foreach{ edge =>
         //  The above makes the iteration of loops deterministic. The algorithm (and transform) should be agnostic of how loops are identified
-        //      (in the sense its application should completely resolve any irreducibility), though by nature of irreducible loops they can be 
-        //      characterised in different ways (i.e. )
-        b0.succEdges(true).foreach{ edge =>             
+        //      (in the sense its application should completely resolve any irreducibility), though by the nature of irreducible loops they can be 
+        //      characterised in different ways
+        IntraProcIRCursor.succ(b0).foreach {toNode => 
+            val edge = LoopEdge(b0, toNode);
             edgeStack.push(edge);
-            val from = edge.getFrom;
-            val b = edge.getTo;
+            val from = edge.getFrom();
+            val b = edge.getTo();
 
             if (!visitedNodes.contains(b)) {
                 // Case (a)
-                val nh: Option[CfgNode] = traverse_loops_dfs(b, DFSPpos + 1);
+                val nh: Option[CFGPosition] = traverse_loops_dfs(b, DFSPpos + 1);
                 tag_lhead(b0, nh);
             } else {
                 if (nodeDFSPpos(b) > 0) {
@@ -130,8 +143,8 @@ class LoopDetector(cfg: ProgramCfg):
                     newLoop.backEdges += edge
 
                     // Add loop entry edge
-                    b.predEdges(true).foreach { predEdge =>
-                        val predNode = predEdge.getFrom;
+                    IntraProcIRCursor.pred(b).foreach { predNode =>
+                        val predEdge = LoopEdge(predNode, b);
                         if (nodeDFSPpos.contains(predNode)) {
                             if (nodeDFSPpos(predNode) > 0 && predEdge != edge) {
                                 newLoop.entryEdges += predEdge;
@@ -149,19 +162,20 @@ class LoopDetector(cfg: ProgramCfg):
                     //  by looking through the instruction call stack)
                     ;
                 } else {
-                    var h: CfgNode = iloopHeaders(b);
+                    var h: CFGPosition = iloopHeaders(b);
                     if (nodeDFSPpos(h) > 0) {
                         // Case (d)
                         // h is in DFSP(b0)
                         val loop = loops(h);
 
                         // Add current path to the existing loop (a new path in the loop is discovered)
-                        // THis can happen for example in the case that there is a branch in a loop, or a `continue` stmt, etc
+                        // This can happen for example in the case that there is a branch in a loop, or a `continue` stmt, etc
                         edgeStack.reverse.slice(nodeDFSPpos(h) - 1, nodeDFSPpos(b0)).foreach {
                             pEdge => loop.addEdge(pEdge);
                         }
-                        b.succEdges(true).filter(e => e.getTo == h).foreach {
-                            outEdge => loop.addEdge(outEdge);
+                        IntraProcIRCursor.succ(b).filter(n => n == h).foreach { n =>
+                            val outEdge = LoopEdge(b, n);
+                            loop.addEdge(outEdge);
                         }
 
                         tag_lhead(b0, Some(h));
@@ -174,25 +188,24 @@ class LoopDetector(cfg: ProgramCfg):
                         var break = false;
 
                         // Make outer loops irreducible if the originating node of the re-entry edge is not within those loops
-                        b.succEdges(true).foreach { 
-                            nextEdge =>
-                                val nextNode = nextEdge.getTo;
-                                var ih = nextNode;
+                        IntraProcIRCursor.succ(b).foreach { nextNode =>
+                            val nextEdge = LoopEdge(b, nextNode) 
+                            var ih = nextNode;
 
-                                while (iloopHeaders.contains(ih)) {
-                                    ih = iloopHeaders(ih);
-                                    val thisLoop = loops(ih);
-                                    if (iloopHeaders.contains(from)) {
-                                        if (iloopHeaders(from) != ih) {
-                                            thisLoop.reducible = false;
-                                            thisLoop.reentries += edge;
-                                        }
-                                    } else {
-                                        // `from` must be outside the loop
+                            while (iloopHeaders.contains(ih)) {
+                                ih = iloopHeaders(ih);
+                                val thisLoop = loops(ih);
+                                if (iloopHeaders.contains(from)) {
+                                    if (iloopHeaders(from) != ih) {
                                         thisLoop.reducible = false;
                                         thisLoop.reentries += edge;
                                     }
+                                } else {
+                                    // `from` must be outside the loop
+                                    thisLoop.reducible = false;
+                                    thisLoop.reentries += edge;
                                 }
+                            }
                         }
 
                         while (iloopHeaders.contains(h) && !break) {
@@ -214,9 +227,9 @@ class LoopDetector(cfg: ProgramCfg):
     /** Sets the most inner loop header `h` for a given node `b`
      *
      */
-    def tag_lhead(b: CfgNode, h: Option[CfgNode]): Unit = {
-        var cur1: CfgNode = b;
-        var cur2: CfgNode = h match {
+    def tag_lhead(b: CFGPosition, h: Option[CFGPosition]): Unit = {
+        var cur1: CFGPosition = b;
+        var cur2: CFGPosition = h match {
             case Some(hh) => hh
             case _ => return
         };

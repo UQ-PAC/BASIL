@@ -405,7 +405,7 @@ class ProgramCfgFactory:
 
 
     // TEMPORARY: Loop detection
-    val detector = LoopDetector(cfg);
+    val detector = LoopDetector(program);
     val foundLoops = detector.identify_loops()
 
     foundLoops.foreach {
@@ -413,6 +413,7 @@ class ProgramCfgFactory:
             println("Loop:")
             println(s"  header:     ${loop.header}")
 
+            println("Body:")
             loop.edges.foreach { edge => println(s"    ${edge}")}
 
             // println(s"  body:       ${loop.edges}")
