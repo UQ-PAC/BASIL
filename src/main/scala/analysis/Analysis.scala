@@ -289,7 +289,6 @@ abstract class LiftedMemoryRegionAnalysis(
             val subroutines: Map[BigInt, String],
             val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
           ) extends IntraproceduralForwardDependencies
-  with MapLiftLatticeSolver[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]
   with MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp) {
 
   /**
@@ -318,7 +317,7 @@ abstract class LiftedMemoryRegionAnalysis(
       // function entry nodes are always reachable (if intra-procedural analysis)
       case _: CfgFunctionEntryNode => lift(stateLattice.bottom)
       // all other nodes are processed with join+transfer
-      case _ => lift(super.funsub(n, x))
+      case _ => lift(Map(n -> super.funsub(n, x)))
     }
   }
 }
@@ -346,4 +345,4 @@ class MemoryRegionAnalysisSolver(
 ) extends LiftedMemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
     with LiftedValueAnalysisMisc
     with IntraproceduralForwardDependencies
-    with WorklistFixpointSolverWithReachability[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]
+    with WorklistFixpointSolverWithReachability[CfgNode, LiftedElement[Map[CfgNode, Set[MemoryRegion]]], LiftLattice[CfgNode, Map[CfgNode, Set[MemoryRegion]], MapLattice[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]]]
