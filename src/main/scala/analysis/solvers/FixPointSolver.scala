@@ -52,7 +52,7 @@ trait MapLatticeSolver[N, T, L <: Lattice[T]] extends LatticeSolver[Map[N, T]] w
  * Base trait for solvers for map lattices with lifted co-domains.
  * @tparam N type of the elements in the map domain.
  */
-trait MapLiftLatticeSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, LiftedElement[T], LiftLattice[N, T, L]] with Dependencies[N] {
+trait MapLiftLatticeSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, T, L] with Dependencies[N] {
   val lattice: MapLattice[N, LiftedElement[T], LiftLattice[N, T, L]]
 
   /**
@@ -209,7 +209,7 @@ trait WorklistFixpointSolverWithReachability[N, T, L <: Lattice[T]] extends Work
    * @param intra
    * @return the sub-sub-lattice
    */
-  def unliftedAnalyze(intra: Boolean): lattice.sublattice.sublattice.Element = {
+  def unliftedAnalyze(): lattice.sublattice.sublattice.Element = {
     import lattice.sublattice._
     val res: lattice.Element = analyze()
     // Convert liftedResult to unlifted

@@ -283,12 +283,13 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
  * Base class for memory region analysis with lifted lattice, where the extra bottom element represents "unreachable".
  */
 abstract class LiftedMemoryRegionAnalysis(
-            val cfg: ProgramCfg,
-            val globals: Map[BigInt, String],
-            val globalOffsets: Map[BigInt, BigInt],
-            val subroutines: Map[BigInt, String],
-            val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
+            override val cfg: ProgramCfg,
+            override val globals: Map[BigInt, String],
+            override val globalOffsets: Map[BigInt, BigInt],
+            override val subroutines: Map[BigInt, String],
+            override val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
           ) extends IntraproceduralForwardDependencies
+  with MapLatticeSolver[CfgNode, LiftedElement[Map[CfgNode, Set[MemoryRegion]]], LiftLattice[CfgNode, Map[CfgNode, Set[MemoryRegion]], MapLattice[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]]]
   with MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp) {
 
   /**
@@ -311,13 +312,13 @@ abstract class LiftedMemoryRegionAnalysis(
   /**
    * Overrides `funsub` from [[tip.solvers.MapLatticeSolver]], treating function entry nodes as reachable.
    */
-  override def funsub(n: CfgNode, x: Map[CfgNode, Set[MemoryRegion]]): LiftedElement[Map[CfgNode, Set[MemoryRegion]]] = {
+  override def funsub(n: CfgNode, x: Map[CfgNode, LiftedElement[Map[CfgNode, Set[MemoryRegion]]]]): LiftedElement[Map[CfgNode, Set[MemoryRegion]]] = {
     import liftedstatelattice._
     n match {
       // function entry nodes are always reachable (if intra-procedural analysis)
       case _: CfgFunctionEntryNode => lift(stateLattice.bottom)
       // all other nodes are processed with join+transfer
-      case _ => lift(Map(n -> super.funsub(n, x)))
+      case _ => super.funsub(n, x)
     }
   }
 }
