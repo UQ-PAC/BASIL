@@ -5,7 +5,12 @@ import scala.collection.mutable
 import boogie.*
 import analysis.BitVectorEval
 
-class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure, var initialMemory: ArrayBuffer[MemorySection], var readOnlyMemory: ArrayBuffer[MemorySection]) {
+class Program(
+    var procedures: ArrayBuffer[Procedure],
+    var mainProcedure: Procedure,
+    var initialMemory: ArrayBuffer[MemorySection],
+    var readOnlyMemory: ArrayBuffer[MemorySection]
+) {
 
   // This shouldn't be run before indirect calls are resolved
   def stripUnreachableFunctions(): Unit = {
@@ -62,7 +67,10 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 
   // this is very crude but the simplest thing for now until we have a more sophisticated specification system that can relate to the IR instead of the Boogie
   def nameToGlobal(name: String): Global = {
-    if ((name.startsWith("R") || name.startsWith("V")) && (name.length == 2 || name.length == 3) && name.substring(1).forall(_.isDigit)) {
+    if (
+      (name.startsWith("R") || name
+        .startsWith("V")) && (name.length == 2 || name.length == 3) && name.substring(1).forall(_.isDigit)
+    ) {
       if (name.startsWith("R")) {
         Register(name, BitVecType(64))
       } else {
@@ -79,8 +87,7 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     }
   }
 
-  /**
-    * Takes all the memory sections we get from the ADT (previously in initialMemory) and restricts initialMemory to
+  /** Takes all the memory sections we get from the ADT (previously in initialMemory) and restricts initialMemory to
     * just the .data section (which contains things such as global variables which are mutable) and puts the .rodata
     * section in readOnlyMemory. It also takes the .rela.dyn entries taken from the readelf output and adds them to the
     * .rodata section, as they are the global offset table entries that we can assume are constant.
@@ -107,7 +114,6 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 
     initialMemory = initialMemoryNew
   }
-
 
 }
 
@@ -171,8 +177,8 @@ class Procedure(
       }
       visitedBlocks.add(b)
       b.jump match {
-        case g: GoTo => g.targets.foreach(visitBlock)
-        case d: DirectCall => d.returnTarget.foreach(visitBlock)
+        case g: GoTo         => g.targets.foreach(visitBlock)
+        case d: DirectCall   => d.returnTarget.foreach(visitBlock)
         case i: IndirectCall => i.returnTarget.foreach(visitBlock)
       }
     }
@@ -192,6 +198,10 @@ class Block(
 
   override def toString: String = {
     // display all statements and jumps
+    println("MANUAL STATEMENTS")
+    statements.foreach { stmt =>
+      println(stmt);
+    }
     val statementsString = statements.map(_.toString).mkString("\n")
     s"Block $label with $statementsString\n$jump"
   }
@@ -209,10 +219,13 @@ class Parameter(var name: String, var size: Int, var value: Register) {
   def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
 }
 
-/**
-  * @param name name
-  * @param address initial offset of memory section
-  * @param size number of bytes
-  * @param bytes sequence of bytes represented by BitVecLiterals of size 8
+/** @param name
+  *   name
+  * @param address
+  *   initial offset of memory section
+  * @param size
+  *   number of bytes
+  * @param bytes
+  *   sequence of bytes represented by BitVecLiterals of size 8
   */
 case class MemorySection(name: String, address: Int, size: Int, bytes: Seq[BitVecLiteral])

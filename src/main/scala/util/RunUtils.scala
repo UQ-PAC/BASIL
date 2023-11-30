@@ -50,7 +50,7 @@ object RunUtils {
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
 
-    val cfg = ir.cfg
+    val cfg = ir.cfg.get
     val texts = mods.map(_.sections.head).filter(_.name == ".text")
     val symbols = mods.map(_.symbols)
     val semantics = mods.map(getSemantics);
@@ -66,13 +66,14 @@ object RunUtils {
     val functionBlockDecoder = new MapDecoder(mods.head.auxData.get("functionBlocks").get.data)
     val functionEntries = functionEntryDecoder.decode()
     val functionBlocks = functionBlockDecoder.decode()
+    val entrypoint = mods.head.entryPoint
 
     // val proxy = mods.map(_.proxies)
 
     // println(proxy.map(_.toString()))
     // println(proxy.map(_.map(_.unknownFields)).map(_.map(_.getField(0).foreach(f => f.toString()))))
 
-    // FUNCTION BLOCKS WRITER
+    // // FUNCTION BLOCKS WRITER
     // val bw = new BufferedWriter(new FileWriter(new File("Function Entries + Function Blocks")))
     // bw.write("Function Entries" + System.lineSeparator())
     // functionEntries.map(_.toString()).foreach(f => f -> bw.write(f))
@@ -81,18 +82,28 @@ object RunUtils {
     // functionBlocks.map(_.toString()).foreach(f => f -> bw.write(f))
     // bw.close()
 
-    //CFG + SYMBOL WRITER
-    val bw = new BufferedWriter(new FileWriter(new File("output")))
-    symbols.head.map(_.toProtoString).foreach(f => f -> bw.write(f))
-    bw.write(cfg.head.toProtoString)
-    bw.close()
+    // //CFG + SYMBOL WRITER
+    // val bw = new BufferedWriter(new FileWriter(new File("output")))
+    // symbols.head.map(_.toProtoString).foreach(f => f -> bw.write(f))
+    // bw.write(cfg.head.toProtoString)
+    // bw.close()
 
-    //AUXDATA KEYS + ENTRYPOINT TO CFG
+    // //AUXDATA KEYS + ENTRYPOINT TO CFG
     //println(keys.toString())
     // println(mods.head.entryPoint)
 
     // val tl = new TalkingListener()
     // ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
+
+    //System.out.println(parser.semantics().toStringTree(parser));
+
+    val GtirbConverter = new GtirbToIR(entrypoint, functionEntries, functionBlocks, cfg, parser)
+    val program = GtirbConverter.createIR()
+
+    //program.procedures.foreach(println)
+    program.procedures.foreach(elem => println(elem.blocks))
+
+    // val new_cfg = ProgramCfgFactory().fromIR(program)
   }
 
   def loadReadELF(fileName: String): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {

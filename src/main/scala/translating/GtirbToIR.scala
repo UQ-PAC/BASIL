@@ -6,6 +6,7 @@ import com.grammatech.gtirb.proto.CFG.CFG
 import Parsers.*
 import ir._
 import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
 import java.awt.Taskbar.State
 import java.util.Base64
 import com.grammatech.gtirb.proto.CFG.Edge._
@@ -24,16 +25,17 @@ class GtirbToIR(
   def createIR(): Program = {
 
     var procedures: ArrayBuffer[Procedure] = ArrayBuffer()
-    for (funcs <- 0 until functionEntries.size) {
-      procedures(funcs) = createProcedure(functionEntries.keySet.toSeq(funcs))
+
+    functionEntries.keys.foreach { func =>
+      procedures += createProcedure(func)
     }
 
-    procedures = createJumps(procedures)
+    // procedures = createJumps(procedures)
 
     val initialMemory: ArrayBuffer[MemorySection] = ArrayBuffer() // this looks like its incomplete
     val readOnlyMemory: ArrayBuffer[MemorySection] = ArrayBuffer() //ditto
 
-    val intialproc: Procedure = ??? // TODO: just want to compile for now
+    val intialproc: Procedure = createProcedure(entrypoint) // TODO: Does this work?
 
     return Program(procedures, intialproc, initialMemory, readOnlyMemory)
   }
@@ -41,6 +43,7 @@ class GtirbToIR(
   def createProcedure(uuid: ByteString): Procedure = {
     val name = uuid.toString();
     val address: Option[Int] = None; //  TODO: - find where addresses are located
+
     val blocks: ArrayBuffer[Block] = createBlocks(uuid)
     val in: ArrayBuffer[Parameter] = ArrayBuffer() // TODO: gtirb does not contain this
     val out: ArrayBuffer[Parameter] = ArrayBuffer() // TODO: gtirb does not contain this either
@@ -55,16 +58,26 @@ class GtirbToIR(
 
   def createBlocks(uuid: ByteString): ArrayBuffer[Block] = {
     var blks: ArrayBuffer[Block] = ArrayBuffer[Block]()
-    for (blk <- functionBlocks.get(uuid).get) {
-      blks.addOne(createBlock(blk))
+    var funcblks = functionBlocks.getOrElse(uuid, Set.empty[ByteString])
+
+    if (funcblks.nonEmpty) {
+
+      funcblks.foreach(elem => blks += createBlock(elem))
+
+    } else {
+      println("here")
+      // TODO: check this, in what case is a basic block not in the functionblocks?
     }
+
     return blks
   }
 
   def createBlock(uuid: ByteString): Block = {
     val address: Option[Int] = None //TODO: find where addresses are located
+
     val semantics: ArrayBuffer[Statement] = createSemantics(uuid)
-    val jump: Jump = ???
+    // println(parser.semantics().basic_blk())
+    val jump: Jump = GoTo(ArrayBuffer[Block](), None) //TODO: placeholder for now
     return Block(uuid.toString(), address, semantics, jump)
   }
 
@@ -105,8 +118,12 @@ class GtirbToIR(
   }
 
   def createSemantics(uuid: ByteString): ArrayBuffer[Statement] = {
-    val visitor = SemanticsLoader(uuid, parser.semantics())
-    return visitor.createStatements()
+
+    var visitor = new SemanticsLoader(uuid, parser.semantics())
+    val statements = visitor.createStatements()
+    parser.reset()
+    return statements
+
   }
 
 }

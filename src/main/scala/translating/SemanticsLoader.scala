@@ -1,14 +1,14 @@
 package translating
-import Parsers.*
+import Parsers.SemanticsParser.*
 import com.google.protobuf.ByteString
+import Parsers.*
 import java.util.Base64
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import ir.*
 import scala.collection.mutable._
 import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 
-class SemanticsLoader(targetuuid: ByteString, context: SemanticsParser.SemanticsContext)
-    extends SemanticsBaseVisitor[Any] {
+class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends SemanticsBaseVisitor[Any] {
 
   var cseMap: Map[String, IRType] = Map[String, IRType]()
 
@@ -17,6 +17,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsParser.Semantics
   }
 
   def createStatements(): ArrayBuffer[Statement] = {
+
     val basicBlks = context.basic_blk().asScala
     var statements: ArrayBuffer[Statement] = null
 
@@ -29,19 +30,19 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsParser.Semantics
     return statements
   }
 
-  def getCondition(): Any = {
-    // this is just boilerplate for now, but may be useful for retriving conditions
-    val basicBlks = context.basic_blk().asScala
-    for (BasicBlk <- basicBlks) {
-      val Blkuuid = unChrisifyUUID(BasicBlk.uuid().getText())
-      if (Blkuuid.equals(targetuuid)) {
-        visitBasic_blk(BasicBlk)
-      }
-    }
+  // def getCondition(): Any = {
+  //   // this is just boilerplate for now, but may be useful for retriving conditions
+  //   val basicBlks = context.basic_blk().asScala
+  //   for (BasicBlk <- basicBlks) {
+  //     val Blkuuid = unChrisifyUUID(BasicBlk.uuid().getText())
+  //     if (Blkuuid.equals(targetuuid)) {
+  //       visitBasic_blk(BasicBlk)
+  //     }
+  //   }
 
-  }
+  // }
 
-  override def visitBasic_blk(ctx: SemanticsParser.Basic_blkContext): ArrayBuffer[Statement] = {
+  override def visitBasic_blk(ctx: Basic_blkContext): ArrayBuffer[Statement] = {
     val instructions = ctx.instruction().asScala
     val statements = ArrayBuffer[Statement]()
 
@@ -53,7 +54,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsParser.Semantics
     return statements
   }
 
-  override def visitInstruction(ctx: SemanticsParser.InstructionContext): ArrayBuffer[Statement] = {
+  override def visitInstruction(ctx: InstructionContext): ArrayBuffer[Statement] = {
     val statements = ArrayBuffer[Statement]()
     val stmts = ctx.stmt_string().asScala.map(_.stmt())
 
@@ -76,15 +77,18 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsParser.Semantics
     return statements
   }
 
-  def visitAssignment_stmt(ctx: SemanticsParser.Assignment_stmtContext): LocalAssign = {
+  def visitAssignment_stmt(ctx: Assignment_stmtContext): LocalAssign = {
     var stmt: LocalAssign = null
     ctx match
-      case a: SemanticsParser.AssignContext    => stmt = visitAssign(a)
-      case c: SemanticsParser.ConstDeclContext => stmt = visitConstDecl(c)
+      case a: AssignContext =>
+        stmt = visitAssign(a)
+
+      case c: ConstDeclContext =>
+        stmt = visitConstDecl(c)
     return stmt
   }
 
-  override def visitCall_stmt(ctx: SemanticsParser.Call_stmtContext): MemoryAssign = {
+  override def visitCall_stmt(ctx: Call_stmtContext): MemoryAssign = {
     val mem = Memory("mem", 64, 8) // yanked from BAP
     val addr = visitExpr(ctx.expr(0))
     val value = visitExpr(ctx.expr(1))
@@ -93,11 +97,11 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsParser.Semantics
     return MemoryAssign(mem, memstore)
   }
 
-  override def visitConditional_stmt(ctx: SemanticsParser.Conditional_stmtContext): Any = {
-    return ??? // see above comment in conditional statements
+  override def visitConditional_stmt(ctx: Conditional_stmtContext): Any = {
+    return // see above comment in conditional statements
   }
 
-  override def visitAssign(ctx: SemanticsParser.AssignContext): LocalAssign = {
+  override def visitAssign(ctx: AssignContext): LocalAssign = {
     val lhs = visitLexpr(ctx.lexpr())
     val rhs = visitExpr(ctx.expr())
     if (lhs == null || rhs == null) {
@@ -107,11 +111,11 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsParser.Semantics
     }
   }
 
-  override def visitConstDecl(ctx: SemanticsParser.ConstDeclContext): LocalAssign = {
+  override def visitConstDecl(ctx: ConstDeclContext): LocalAssign = {
     val ty = visitType(ctx.`type`())
     val name = ctx.METHOD().getText()
 
-    if (name.substring(0, 3).equals("cse")) {
+    if (name.startsWith("Cse")) {
       cseMap += (name -> ty)
     }
 
@@ -123,36 +127,36 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsParser.Semantics
     }
   }
 
-  def visitType(ctx: SemanticsParser.TypeContext): IRType = {
+  def visitType(ctx: TypeContext): IRType = {
     ctx match
-      case e: SemanticsParser.TypeBitsContext =>
+      case e: TypeBitsContext =>
         val size = visitExpr(e.expr()).asInstanceOf[IntLiteral].value.toInt
         return BitVecType(size)
       case _: Any => ??? // can be extended as more types added to grammar
   }
 
-  def visitExpr(ctx: SemanticsParser.ExprContext): Expr = {
+  def visitExpr(ctx: ExprContext): Expr = {
     var value: Expr = null
     ctx match
-      case e: SemanticsParser.ExprVarContext    => value = visitExprVar(e)
-      case e: SemanticsParser.ExprTApplyContext => value = visitExprTApply(e)
-      case e: SemanticsParser.ExprSlicesContext => value = visitExprSlices(e)
-      case e: SemanticsParser.ExprFieldContext  => value = visitExprField(e)
-      case e: SemanticsParser.ExprArrayContext  => value = visitExprArray(e)
-      case e: SemanticsParser.ExprLitIntContext => value = visitExprLitInt(e)
-      case e: SemanticsParser.ExprLitHexContext =>
+      case e: ExprVarContext    => value = visitExprVar(e)
+      case e: ExprTApplyContext => value = visitExprTApply(e)
+      case e: ExprSlicesContext => value = visitExprSlices(e)
+      case e: ExprFieldContext  => value = visitExprField(e)
+      case e: ExprArrayContext  => value = visitExprArray(e)
+      case e: ExprLitIntContext => value = visitExprLitInt(e)
+      case e: ExprLitHexContext =>
         ??? // not in current semantics, but still unsure how this ports to IR
-      case e: SemanticsParser.ExprLitBitsContext   => value = visitExprLitBits(e)
-      case e: SemanticsParser.ExprLitMaskContext   => ??? // ditto above comment
-      case e: SemanticsParser.ExprLitStringContext => ??? // ditto
+      case e: ExprLitBitsContext   => value = visitExprLitBits(e)
+      case e: ExprLitMaskContext   => ??? // ditto above comment
+      case e: ExprLitStringContext => ??? // ditto
     return value
   }
 
-  override def visitExprVar(ctx: SemanticsParser.ExprVarContext): Expr = {
+  override def visitExprVar(ctx: ExprVarContext): Expr = {
     return createExprVar(getExprVarText(ctx))
   }
 
-  def getExprVarText(ctx: SemanticsParser.ExprVarContext): String = {
+  def getExprVarText(ctx: ExprVarContext): String = {
     if (ctx.SSYMBOL() != null) {
       return ctx.SSYMBOL().getText()
     } else {
@@ -160,7 +164,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsParser.Semantics
     }
   }
 
-  override def visitExprTApply(ctx: SemanticsParser.ExprTApplyContext): Expr = {
+  override def visitExprTApply(ctx: ExprTApplyContext): Expr = {
     val str = ctx.METHOD.getText().substring(0, ctx.METHOD.getText().lastIndexOf("."))
     // removes everything up to and including the last dot
 
@@ -202,71 +206,99 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsParser.Semantics
         // there is no append but there is concat, so it probably does the same thing
         return BinaryExpr(BVCONCAT, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "ZeroExtend" =>
-        val intexpr = visitExpr(ctx.targs().asScala.tail.asInstanceOf[SemanticsParser.ExprContext])
-        val int = intexpr.asInstanceOf[IntLiteral].value
-        return ZeroExtend(int.toInt, visitExpr(ctx.expr(0)))
+        val intexpr = ctx.targs().asScala.last.expr() match {
+          case e: ExprLitIntContext =>
+            if (e.DEC() != null) {
+              e.DEC().getText().toInt
+            } else {
+              e.BINARY().getText().toInt
+            }
+        }
+        return ZeroExtend(intexpr, visitExpr(ctx.expr(0)))
+
       case "SignExtend" =>
-        val intexpr = visitExpr(ctx.targs().asScala.tail.asInstanceOf[SemanticsParser.ExprContext])
-        val int = intexpr.asInstanceOf[IntLiteral].value
-        return SignExtend(int.toInt, visitExpr(ctx.expr(0)))
+        val intexpr = ctx.targs().asScala.last.expr() match {
+          case e: ExprLitIntContext =>
+            if (e.DEC() != null) {
+              e.DEC().getText().toInt
+            } else {
+              e.BINARY().getText().toInt
+            }
+        }
+        return SignExtend(intexpr, visitExpr(ctx.expr(0)))
+
   }
 
-  override def visitExprSlices(ctx: SemanticsParser.ExprSlicesContext): Expr = {
+  override def visitExprSlices(ctx: ExprSlicesContext): Expr = {
     val (start, end) = visitSlice_expr(ctx.slice_expr()): @unchecked
     return Extract(start.asInstanceOf[Int], end.asInstanceOf[Int], visitExpr(ctx.expr()))
   }
 
-  override def visitSlice_expr(ctx: SemanticsParser.Slice_exprContext): Tuple = {
+  override def visitSlice_expr(ctx: Slice_exprContext): Tuple = {
     val start = visitExpr(ctx.expr(0)).asInstanceOf[IntLiteral].value.toInt
     val end = visitExpr(ctx.expr(1)).asInstanceOf[IntLiteral].value.toInt
     return (start, end)
   }
 
-  override def visitExprField(ctx: SemanticsParser.ExprFieldContext): Expr = {
+  override def visitExprField(ctx: ExprFieldContext): Expr = {
     var value: String = null
     ctx.expr() match
-      case e: SemanticsParser.ExprVarContext => value = getExprVarText(e)
-      case _: Any                            => visitExpr(ctx.expr())
+      case e: ExprVarContext => value = getExprVarText(e)
+      case _: Any            => visitExpr(ctx.expr())
     val field: ArrayBuffer[String] = ArrayBuffer(value, ctx.SSYMBOL().getText())
     return createExprVarArray(field)
   }
 
-  override def visitExprArray(ctx: SemanticsParser.ExprArrayContext): Expr = {
-    var value: String = null
-    val exprs = ctx.expr().asScala
-    var i = 0
-    val array = ArrayBuffer[String]()
-    for (i <- 0 until exprs.size) {
-      exprs(i) match
-        case e: SemanticsParser.ExprVarContext => value = getExprVarText(e)
-        case _: Any                            => visitExpr(exprs(i))
-      array(i) = value
+  override def visitExprArray(ctx: ExprArrayContext): Expr = {
+    val array: ArrayBuffer[String] = ctx
+      .expr()
+      .asScala
+      .map {
+        case e: ExprVarContext => getExprVarText(e)
+        case e: ExprLitIntContext =>
+          if (e.DEC() != null) {
+            e.DEC().getText()
+          } else {
+            e.BINARY().getText()
+          }
+        case e: ExprLitBitsContext => Integer.parseInt(e.BINARY().getText(), 2).asInstanceOf[String]
+      }
+      .to(ArrayBuffer)
+
+    createExprVarArray(array)
+  }
+
+  override def visitExprLitInt(ctx: ExprLitIntContext): Expr = {
+    //I'm too scared to change the grammar at this point in time, so i'm just going to roll with stuff like this for now
+    if (ctx.DEC() != null) {
+      IntLiteral(ctx.DEC().getText().toInt)
+    } else {
+      IntLiteral(ctx.BINARY().getText().toInt)
     }
-    return createExprVarArray(array)
+
   }
 
-  override def visitExprLitInt(ctx: SemanticsParser.ExprLitIntContext): Expr = {
-    return IntLiteral(ctx.DEC().getText().toInt)
+  override def visitExprLitBits(ctx: ExprLitBitsContext): Expr = {
+    return BitVecLiteral(BigInt.apply(ctx.BINARY().getText(), 2), ctx.BINARY().getText().length())
   }
 
-  override def visitExprLitBits(ctx: SemanticsParser.ExprLitBitsContext): Expr = {
-    return BitVecLiteral(Integer.parseInt(ctx.BINARY().getText(), 2), ctx.BINARY().getText().length())
-  }
-
-  def visitLexpr(ctx: SemanticsParser.LexprContext): Variable = {
+  def visitLexpr(ctx: LexprContext): Variable = {
     var value: Variable = null
     ctx match
-      case l: SemanticsParser.LExprVarContext   => value = visitLExprVar(l)
-      case l: SemanticsParser.LExprFieldContext => value = visitLExprField(l)
-      case l: SemanticsParser.LExprArrayContext => value = visitLExprArray(l)
+      case l: LExprVarContext =>
+        value = visitLExprVar(l)
+      case l: LExprFieldContext =>
+        value = visitLExprField(l)
+      case l: LExprArrayContext =>
+        value = visitLExprArray(l)
     return value
   }
 
-  override def visitLExprVar(ctx: SemanticsParser.LExprVarContext): Variable = {
+  override def visitLExprVar(ctx: LExprVarContext): Variable = {
     return createExprVar(getLExprVarText(ctx)).asInstanceOf[Variable]
   }
 
-  def getLExprVarText(ctx: SemanticsParser.LExprVarContext): String = {
+  def getLExprVarText(ctx: LExprVarContext): String = {
     if (ctx.SSYMBOL() != null) {
       return ctx.SSYMBOL().getText()
     } else {
@@ -274,54 +306,67 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsParser.Semantics
     }
   }
 
-  override def visitLExprField(ctx: SemanticsParser.LExprFieldContext): Variable = {
+  override def visitLExprField(ctx: LExprFieldContext): Variable = {
     var value: String = null
     ctx.lexpr() match
-      case l: SemanticsParser.LExprVarContext => value = getLExprVarText(l)
-      case _: Any                             => visitLexpr(ctx.lexpr())
+      case l: LExprVarContext => value = getLExprVarText(l)
+      case _: Any             => visitLexpr(ctx.lexpr())
     val field: ArrayBuffer[String] = ArrayBuffer(value, ctx.SSYMBOL().getText())
     return createExprVarArray(field)
   }
 
-  override def visitLExprArray(ctx: SemanticsParser.LExprArrayContext): Variable = {
-    var lvalue: String = null
-    var value: String = null
+  override def visitLExprArray(ctx: LExprArrayContext): Variable = {
+
+    val lvalue: String = ctx.lexpr() match {
+      case l: LExprVarContext => getLExprVarText(l)
+      case _                  => "error"
+    }
     val exprs = ctx.expr().asScala
-    var i = 1
-    val array = ArrayBuffer[String]()
 
-    ctx.lexpr() match
-      case l: SemanticsParser.LExprVarContext => value = getLExprVarText(l)
-      case _: Any                             => visitLexpr(ctx.lexpr)
-
-    for (i <- 1 until exprs.size) {
-      exprs(i - 1) match
-        case e: SemanticsParser.ExprVarContext => value = getExprVarText(e)
-        case _: Any                            => visitExpr(exprs(i - 1))
-      array(i) = value
+    val array: ArrayBuffer[String] = ArrayBuffer(lvalue) ++= exprs.map {
+      case e: ExprVarContext => getExprVarText(e)
+      case e: ExprLitIntContext =>
+        if (e.DEC() != null) {
+          e.DEC().getText()
+        } else {
+          e.BINARY().getText()
+        }
+      case e: ExprLitBitsContext => Integer.parseInt(e.BINARY().getText(), 2).asInstanceOf[String]
+      case _                     => ???
     }
 
-    array(0) = lvalue
-
-    return createExprVarArray(array)
+    createExprVarArray(array)
   }
 
   def createExprVar(name: String): Expr = {
     name match
-      case n if n.startsWith("cse") => return LocalVar(name, cseMap.get(name).get)
+      case n if n.startsWith("Cse") => return LocalVar(name, cseMap.get(name).get)
       case "TRUE"                   => return TrueLiteral
       case "FALSE"                  => return FalseLiteral
       case "SP_EL0"                 => return Register("R31", BitVecType(64))
-      case "_PC"           => null // null elements literally don't exist in IR, so pray we never have to read from them
-      case "__BranchTaken" => null
-      case "BTypeNext"     => null
+      case "_PC" =>
+        Register(
+          "_PC",
+          BitVecType(1)
+        ) // null elements literally don't exist in IR, so pray we never have to read from them
+      // TODO: figure out what to do with this, since they do appear :/
+      case "__BranchTaken" =>
+        Register(
+          "__BranchTaken",
+          BitVecType(1)
+        )
+      case "BTypeNext" =>
+        Register(
+          "__BTypeNext",
+          BitVecType(1)
+        )
   }
 
   def createExprVarArray(v: ArrayBuffer[String]): Variable = {
     v(0) match //currently only works for fields & arrays of size 2, but arrays bigger than that don't seem to appear
       case "_R" =>
         val size = getSizeofRegister(v(0))
-        val name = "R" + v(1).asInstanceOf[Int]
+        val name = "R" + v(1)
         return Register(name, BitVecType(size))
 
       case "PSTATE" =>
