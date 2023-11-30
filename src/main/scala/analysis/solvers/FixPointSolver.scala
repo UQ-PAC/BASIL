@@ -52,19 +52,19 @@ trait MapLatticeSolver[N, T, L <: Lattice[T]] extends LatticeSolver[Map[N, T]] w
  * Base trait for solvers for map lattices with lifted co-domains.
  * @tparam N type of the elements in the map domain.
  */
-trait MapLiftLatticeSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, LiftedElement[T], LiftLattice[N, T, L]] with Dependencies[N] {
-  val lattice: MapLattice[N, LiftedElement[T], LiftLattice[N, T, L]]
+trait MapLiftLatticeSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, LiftedElement[T], LiftLattice[T, L]] with Dependencies[N] {
+
+  val lattice: MapLattice[N, LiftedElement[T], LiftLattice[T, L]]
 
   /**
    * The transfer function for the sub-sub-lattice.
    */
   def transferUnlifted(n: N, s: T): T
 
-  override def transfer(n: N, s: T): LiftedElement[T] = {
-    import lattice.sublattice._
+  override def transfer(n: N, s: LiftedElement[T]): LiftedElement[T] = {
     s match {
       case LiftedBottom => LiftedBottom // unreachable as input implied unreachable at output
-      case l: Lift[T] => lift(transferUnlifted(n, l.el))
+      case Lift(a) => lattice.sublattice.lift(transferUnlifted(n, a))
     }
   }
 }
@@ -189,34 +189,17 @@ trait SimpleWorklistFixpointSolver[N, T, L <: Lattice[T]] extends WorklistFixpoi
  *
  * This solver works for map lattices with lifted co-domains, where the extra bottom element typically represents "unreachable".
  */
-trait WorklistFixpointSolverWithReachability[N, T, L <: Lattice[T]] extends WorklistFixpointSolver[N, T, L] with MapLiftLatticeSolver[N, T, L] {
+trait WorklistFixpointSolverWithReachability[N, T, L <: Lattice[T]] extends WorklistFixpointSolver[N, LiftedElement[T], LiftLattice[T, L]] with MapLiftLatticeSolver[N, T, L] {
 
   /**
    * The start locations, used as the initial contents of the worklist.
    */
   val first: Set[N]
 
-  def analyze(): Map[N, T] = {
+  def analyze(): Map[N, LiftedElement[T]] = {
     x = lattice.bottom
     run(first)
     x
-  }
-
-  /**
-   * The transfer function for the sub-sub-lattice. Unlifts the resulting MapLattice[N, LiftLattice[Lattice.sublattice]]
-   * to MapLattice[N, Lattice.sublattice.sublattice].
-   *
-   * @param intra
-   * @return the sub-sub-lattice
-   */
-  def unliftedAnalyze(): lattice.sublattice.sublattice.Element = {
-    import lattice.sublattice._
-    val res: lattice.Element = analyze()
-    // Convert liftedResult to unlifted
-    res.map((n, lift) => (n, lift match {
-      case LiftedBottom => lattice.sublattice.sublattice.bottom
-      case Lift(a) => a
-    })).asInstanceOf[lattice.sublattice.sublattice.Element]
   }
 }
 
@@ -248,7 +231,6 @@ trait PushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends MapLatticeSo
   }
 
   def process(n: N): Unit =
-    //val y = funsub(n, x, intra)
     val xn = x(n)
     val y = transfer(n, xn)
 

@@ -22,7 +22,7 @@ import util.Logger
 import scala.collection.mutable
 
 object RunUtils {
-  var memoryRegionAnalysisResults: Map[CfgNode, Set[MemoryRegion]] = Map()
+  var memoryRegionAnalysisResults: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
@@ -154,7 +154,7 @@ object RunUtils {
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
-    val mraResult = mraSolver.unliftedAnalyze()
+    val mraResult = mraSolver.analyze()
     memoryRegionAnalysisResults = mraResult
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(mraResult, true), Output.dotIder), s"${s}_mra$iteration.dot"))
@@ -245,7 +245,7 @@ object RunUtils {
     def printNode(node: CfgNode): Unit = {
       s.append(node)
       s.append(" :: ")
-      s.append(if result.contains(node) then result(node) else "Unreachable")
+      s.append(result(node))
       s.append(System.lineSeparator())
     }
 

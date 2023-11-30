@@ -161,17 +161,18 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     buffers
   }
 
-  /** The lattice of abstract values.
-   */
   val regionLattice: PowersetLattice[MemoryRegion] = PowersetLattice()
 
-  /** The lattice of abstract states.
-   */
-  val stateLattice: MapLattice[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]] = MapLattice(regionLattice)
+  /**
+    * Lifted memory region lattice, with new bottom element representing "unreachable".
+    */
+  val liftedLattice: LiftLattice[Set[MemoryRegion], PowersetLattice[MemoryRegion]] = LiftLattice(regionLattice)
+
+  val lattice: MapLattice[CfgNode, LiftedElement[Set[MemoryRegion]], LiftLattice[Set[MemoryRegion], PowersetLattice[MemoryRegion]]] = MapLattice(liftedLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
-  val first: Set[CfgNode] = domain.collect { case n: CfgFunctionEntryNode if n.predIntra.isEmpty => n }
+  val first: Set[CfgNode] = cfg.funEntries.toSet
 
   private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
@@ -248,7 +249,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
           if (directCall.target.name == "malloc") {
             evaluateExpression(mallocVariable, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
-                stateLattice.sublattice.lub(s, Set(HeapRegion(nextMallocCount(), b)))
+                regionLattice.lub(s, Set(HeapRegion(nextMallocCount(), b)))
               case None => s
             }
           } else {
@@ -259,13 +260,13 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
             return s
           }
           val result = eval(memAssign.rhs.index, s, cmd)
-          stateLattice.sublattice.lub(s, result)
+          regionLattice.lub(s, result)
         case localAssign: LocalAssign =>
           var m = s
           unwrapExpr(localAssign.rhs).foreach {
             case memoryLoad: MemoryLoad =>
               val result = eval(memoryLoad.index, s, cmd)
-              m = stateLattice.sublattice.lub(m, result)
+              m = regionLattice.lub(m, result)
             case _ => m
           }
           m
@@ -274,68 +275,8 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     case _ => s // ignore other kinds of nodes
   }
 
-  /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
-   */
-  def transfer(n: CfgNode, s: Set[MemoryRegion]): Set[MemoryRegion] = localTransfer(n, s)
-}
-
-/**
- * Base class for memory region analysis with lifted lattice, where the extra bottom element represents "unreachable".
- */
-abstract class LiftedMemoryRegionAnalysis(
-            override val cfg: ProgramCfg,
-            override val globals: Map[BigInt, String],
-            override val globalOffsets: Map[BigInt, BigInt],
-            override val subroutines: Map[BigInt, String],
-            override val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
-          ) extends IntraproceduralForwardDependencies
-  with MapLatticeSolver[CfgNode, LiftedElement[Map[CfgNode, Set[MemoryRegion]]], LiftLattice[CfgNode, Map[CfgNode, Set[MemoryRegion]], MapLattice[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]]]
-  with MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp) {
-
-  /**
-   * Lifted state lattice, with new bottom element representing "unreachable".
-   */
-  val liftedstatelattice: LiftLattice[CfgNode, Map[CfgNode, Set[MemoryRegion]], MapLattice[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]] = LiftLattice(stateLattice)
-
-  /**
-   * The analysis lattice.
-   */
-  override val lattice: MapLattice[CfgNode, LiftedElement[Map[CfgNode, Set[MemoryRegion]]], liftedstatelattice.type] = MapLattice(liftedstatelattice) // TODO: TYPING ISSUE
-
-  override val domain: Set[CfgNode] = cfg.nodes.toSet
-
-  /**
-   * The worklist is initialized with all function entry nodes.
-   */
-  override val first: Set[CfgNode] = cfg.funEntries.toSet[CfgNode]
-
-  /**
-   * Overrides `funsub` from [[tip.solvers.MapLatticeSolver]], treating function entry nodes as reachable.
-   */
-  override def funsub(n: CfgNode, x: Map[CfgNode, LiftedElement[Map[CfgNode, Set[MemoryRegion]]]]): LiftedElement[Map[CfgNode, Set[MemoryRegion]]] = {
-    import liftedstatelattice._
-    n match {
-      // function entry nodes are always reachable (if intra-procedural analysis)
-      case _: CfgFunctionEntryNode => lift(stateLattice.bottom)
-      // all other nodes are processed with join+transfer
-      case _ => super.funsub(n, x)
-    }
-  }
-}
-
-/**
- * Functionality for basic analyses with lifted state lattice.
- */
-trait LiftedValueAnalysisMisc extends MemoryRegionAnalysis {
-
-  /**
-   * Transfer function for state lattice elements.
-   * (Same as `localTransfer` for basic analyses with lifted state lattice.)
-   */
   def transferUnlifted(n: CfgNode, s: Set[MemoryRegion]): Set[MemoryRegion] = localTransfer(n, s)
 }
-
-
 
 class MemoryRegionAnalysisSolver(
     cfg: ProgramCfg,
@@ -343,7 +284,17 @@ class MemoryRegionAnalysisSolver(
     globalOffsets: Map[BigInt, BigInt],
     subroutines: Map[BigInt, String],
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
-) extends LiftedMemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
-    with LiftedValueAnalysisMisc
+) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
     with IntraproceduralForwardDependencies
-    with WorklistFixpointSolverWithReachability[CfgNode, LiftedElement[Map[CfgNode, Set[MemoryRegion]]], LiftLattice[CfgNode, Map[CfgNode, Set[MemoryRegion]], MapLattice[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]]]
+    with Analysis[Map[CfgNode, LiftedElement[Set[MemoryRegion]]]]
+    with WorklistFixpointSolverWithReachability[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]] {
+
+  override def funsub(n: CfgNode, x: Map[CfgNode, LiftedElement[Set[MemoryRegion]]]): LiftedElement[Set[MemoryRegion]] = {
+    n match {
+      // function entry nodes are always reachable as this is intraprocedural
+      case _: CfgFunctionEntryNode => liftedLattice.lift(regionLattice.bottom)
+      // all other nodes are processed with join+transfer
+      case _ => super.funsub(n, x)
+    }
+  }
+}

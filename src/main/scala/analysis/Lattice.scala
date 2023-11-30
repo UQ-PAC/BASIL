@@ -43,7 +43,7 @@ case object LiftedBottom extends LiftedElement[Nothing] {
  * The lift lattice for `sublattice`.
  * Supports implicit lifting and unlifting.
  */
-class LiftLattice[N, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[LiftedElement[T]] {
+class LiftLattice[T, +L <: Lattice[T]](val sublattice: L) extends Lattice[LiftedElement[T]] {
 
   val bottom: LiftedElement[T] = LiftedBottom
 
