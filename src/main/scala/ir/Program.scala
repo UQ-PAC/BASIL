@@ -207,7 +207,7 @@ class Procedure private (
      ++ (if _blocks.nonEmpty then Seq(returnBlock) else Seq())
 
   def removeCaller(c: Call): Unit = {
-    _callers.add(c)
+    _callers.remove(c)
   }
 
   def addBlocks(block: Block): Block = {
@@ -349,12 +349,6 @@ class Block private (var label: String,
   }
 
   def jump: Jump = _jump
-
-  def addGoToTargets(targets: mutable.Set[Block]): this.type = {
-    require(_jump.parent == this && _jump.isInstanceOf[GoTo])
-    _jump.asInstanceOf[GoTo].addAllTargets(targets)
-    this
-  }
 
   def replaceJump(j: Jump): this.type = {
     _jump.deParent()

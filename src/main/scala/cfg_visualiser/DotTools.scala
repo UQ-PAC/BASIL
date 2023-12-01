@@ -12,7 +12,6 @@ object IDGenerator {
 }
 
 def wrap(input: String, width: Integer = 20): String =
-  return input
   if (input.length() <= width) {
     input
   } else {

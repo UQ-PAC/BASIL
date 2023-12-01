@@ -428,8 +428,6 @@ class ProgramCfgFactory:
     } else {
       // Recurse through blocks
       visitBlock(proc.entryBlock.get, funcEntryNode)
-      // If it has no entry-block we still visit the exit block because VSA analysis expects everything to have an Exit
-      visitBlock(proc.returnBlock, funcEntryNode)
     }
 
     /** Add a block to the CFG. A block in this case is a basic block, so it contains a list of consecutive statements

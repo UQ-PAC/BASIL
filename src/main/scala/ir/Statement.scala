@@ -121,7 +121,6 @@ class GoTo private (private var _targets: mutable.Set[Block], override val label
 }
 
 object GoTo:
-  case class ConstructionPattern(targets: Iterable[Block], label: Option[String] = None)
   def unapply(g: GoTo): Option[(Set[Block], Option[String])] = Some(g.targets, g.label)
 
 
