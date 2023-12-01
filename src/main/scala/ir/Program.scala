@@ -175,7 +175,7 @@ class Procedure private (
                   var address: Option[Int],
                   var entryBlock: Option[Block],
                   var returnBlock: Option[Block],
-                  private val _blocks: mutable.HashSet[Block],
+                  private val _blocks: mutable.LinkedHashSet[Block],
                   var in: ArrayBuffer[Parameter],
                   var out: ArrayBuffer[Parameter],
                 ) {
@@ -186,7 +186,7 @@ class Procedure private (
   require(_blocks.isEmpty || entryBlock.isDefined) // blocks.nonEmpty ==> entryBlock.isDefined
 
   def this(name: String, address: Option[Int] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
-    this(name, address, entryBlock, returnBlock, mutable.HashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
+    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
   }
 
   override def toString: String = {
@@ -221,14 +221,14 @@ class Procedure private (
   }
 
   def replaceBlock(oldBlock: Block, block: Block): Block = {
+    require(_blocks.contains(oldBlock))
     if (oldBlock ne block) {
-      val isEntry: Boolean = entryBlock.isDefined && (oldBlock eq entryBlock.get)
-      require(_blocks.contains(oldBlock))
+      val isEntry: Boolean = entryBlock.contains(oldBlock)
+      val isReturn: Boolean = returnBlock.contains(oldBlock)
       removeBlocks(oldBlock)
       addBlocks(block)
-      if (isEntry) {
-        entryBlock = Some(block)
-      }
+      if isEntry then entryBlock = Some(block)
+      if isReturn then returnBlock = Some(block)
     }
     block
   }
@@ -393,13 +393,8 @@ class Block private (var label: String,
     jump.setParent(this)
   }
   override def unlinkParent(): Unit = {
-    if (parent.entryBlock.isDefined && parent.entryBlock == this) {
-      parent.entryBlock = None
-    }
-    if (parent.returnBlock.isDefined && parent.returnBlock == this) {
-      parent.returnBlock = None
-    }
-
+    if parent.entryBlock.contains(this) then parent.entryBlock = None
+    if parent.returnBlock.contains(this) then parent.returnBlock = None
     // to disconnect call() links that reference jump.parent.parent
     jump.deParent()
   }
