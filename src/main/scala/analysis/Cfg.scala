@@ -403,6 +403,18 @@ class ProgramCfgFactory:
 
 
 
+    // TEMPORARY: Procedure printer
+    program.procedures.foreach {proc =>
+      println("== PROC ==")
+      println(s"name: ${proc.name}")
+      proc.blocks.foreach {block =>
+        println("== BLOCK == ")
+        println(block)
+      }
+    }
+
+    println("===========")
+
 
     // TEMPORARY: Loop detection
     val detector = LoopDetector(program);
@@ -421,8 +433,28 @@ class ProgramCfgFactory:
             println(s"  pred edges: ${loop.entryEdges}")
             println(s"  reducible?: ${loop.reducible}")
             println(s"  re-entries: ${loop.reentries}")
+            println("=====")
     }
+    println(s"Found loops: ${foundLoops.size}")
 
+    // val transformer = LoopTransform(foundLoops);
+    // val newLoops = transformer.llvm_transform();
+    // println("====================")
+    // newLoops.foreach {
+    //     loop =>
+    //         println("Loop:")
+    //         println(s"  header:     ${loop.header}")
+
+    //         println("Body:")
+    //         loop.edges.foreach { edge => println(s"    ${edge}")}
+
+    //         // println(s"  body:       ${loop.edges}")
+    //         println(s"  back edges: ${loop.backEdges}")
+    //         println(s"  pred edges: ${loop.entryEdges}")
+    //         println(s"  reducible?: ${loop.reducible}")
+    //         println(s"  re-entries: ${loop.reentries}")
+    // }
+    
 
     cfg
   }

@@ -216,6 +216,52 @@ object RunUtils {
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
+    // TEMPORARY: Loop detection
+    val detector = LoopDetector(newIR);
+    val foundLoops = detector.identify_loops()
+
+    println(s"We found ${foundLoops.size} loops")
+
+    foundLoops.foreach {
+        loop =>
+            println("Loop:")
+            println(s"  header:     ${loop.header}")
+
+            println("Body:")
+            loop.edges.foreach { edge => println(s"    ${edge}")}
+
+            // println(s"  body:       ${loop.edges}")
+            println(s"  back edges: ${loop.backEdges}")
+            println(s"  pred edges: ${loop.entryEdges}")
+            println(s"  reducible?: ${loop.reducible}")
+            println(s"  re-entries: ${loop.reentries}")
+            println("=====")
+    }
+
+    val transformer = LoopTransform(foundLoops);
+    val newLoops = transformer.llvm_transform();
+    println("====================")
+    newLoops.foreach {
+        loop =>
+            println("Loop:")
+            println(s"  header:     ${loop.header}")
+
+            println("Body:")
+            loop.edges.foreach { edge => println(s"    ${edge}")}
+
+            // println(s"  body:       ${loop.edges}")
+            println(s"  back edges: ${loop.backEdges}")
+            println(s"  pred edges: ${loop.entryEdges}")
+            println(s"  reducible?: ${loop.reducible}")
+            println(s"  re-entries: ${loop.reentries}")
+    }
+
+    config.analysisDotPath.foreach { s =>
+      val newCFG = ProgramCfgFactory().fromIR(newIR)
+      writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG-fixed.dot")
+    }
+    
+
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
 
     newIR

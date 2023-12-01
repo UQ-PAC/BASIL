@@ -319,7 +319,7 @@ class Block private (var label: String,
   def jump: Jump = _jump.get
   def jumpSet: Set[Jump] = _jump.toSet
 
-  def addGoToTargets(targets: mutable.Set[Block]): this.type = {
+  def addGoToTargets(targets: Set[Block]): this.type = {
     require(_jump.isDefined && _jump.get.isInstanceOf[GoTo])
     _jump.foreach(_.asInstanceOf[GoTo].addAllTargets(targets))
     this
@@ -383,6 +383,8 @@ class Block private (var label: String,
 
   override def hashCode(): Int = label.hashCode()
 }
+
+
 
 
 /**

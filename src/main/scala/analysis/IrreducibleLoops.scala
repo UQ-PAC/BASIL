@@ -1,6 +1,7 @@
 package analysis
 
-import ir.{CFGPosition, IntraProcIRCursor, Program, Procedure}
+import ir.{CFGPosition, IntraProcIRCursor, Program, Procedure, Block, GoTo}
+import intrusiveList.{IntrusiveList}
 
 import scala.collection.mutable
 
@@ -16,15 +17,12 @@ import scala.collection.mutable
 /* A connection between to IL nodes, purely for the representation of loops in
  *
  */
-class LoopEdge(from: CFGPosition, to: CFGPosition):
+class LoopEdge(val from: CFGPosition, val to: CFGPosition):
     override def toString: String = s"From: ${from}, to: ${to}"
     override def equals(n: Any): Boolean = n match {
-        case edge: LoopEdge => edge.getFrom() == from && edge.getTo() == to;
+        case edge: LoopEdge => edge.from == from && edge.to == to;
         case _ => false
     }
-
-    def getFrom(): CFGPosition = from
-    def getTo(): CFGPosition = to
 
 /* A loop is a subgraph <G_l, E_l> of a CFG <G, E>
  *
@@ -39,8 +37,8 @@ class Loop(var header: CFGPosition):
     var reducible: Boolean = true                                       // Assume reducible by default
 
     def addEdge(edge: LoopEdge) = {
-        nodes += edge.getFrom()
-        nodes += edge.getTo()
+        nodes += edge.from
+        nodes += edge.to
         edges += edge
     }
 
@@ -115,15 +113,15 @@ class LoopDetector(cfg: Program):
         nodeDFSPpos(b0) = DFSPpos;
 
         // Process all outgoing edges from the current node
-        // b0.succEdges(true).toList.sortBy(n => n.to.ed).foreach{ edge =>
+        // IntraProcIRCursor.succ(b0).toList.sortBy(n => n.to.ed).foreach{ toNode =>
         //  The above makes the iteration of loops deterministic. The algorithm (and transform) should be agnostic of how loops are identified
         //      (in the sense its application should completely resolve any irreducibility), though by the nature of irreducible loops they can be 
         //      characterised in different ways
-        IntraProcIRCursor.succ(b0).foreach {toNode => 
+        IntraProcIRCursor.succ(b0).foreach { toNode => 
             val edge = LoopEdge(b0, toNode);
             edgeStack.push(edge);
-            val from = edge.getFrom();
-            val b = edge.getTo();
+            val from = edge.from;
+            val b = edge.to;
 
             if (!visitedNodes.contains(b)) {
                 // Case (a)
@@ -258,3 +256,112 @@ class LoopDetector(cfg: Program):
 
 
 
+
+class LoopTransform(loops: Set[Loop]):
+
+    /* For every irreducible loop, transform it into a reducible one. The algorithm
+     *  for doing this is "inspired" (read: copied) from LLVM, the source for which
+     *  can be found here: https://llvm.org/doxygen/FixIrreducible_8cpp_source.html
+     *
+     * Returns: Set of loops which were previously irreducible, but are no longer
+     */
+    def llvm_transform(): Set[Loop] = {
+        val newLoops: mutable.Set[Loop] = mutable.Set[Loop]();
+        var i: Integer = 0; // Exclusively for tracking 
+        loops.filter(l => !l.reducible).foreach {l =>
+            newLoops += llvm_transform_loop(l, i);
+            i = i + 1;
+        }
+
+        newLoops.toSet
+    }
+
+     /* Performs the LLVM transform for an individual loop. The algorithm is as follows:
+      *
+      * 1. Collect the set of headers, `H`, of the SCC
+      *     - note here that headers of an SCC include re-entry nodes, which distinguishes it from a loop. In
+      *         all other regards however this is equivalent to a loop.
+      * 2. Collect the set of predecessors, `P`, of these headers. These can be inside or outside the SCC
+      * 3. Create block `N` and redirect every edge from set `P` to `H` via `N`
+      *
+      * Returns: A new reducible loop which is semantically equivalent to the input irreducible loop
+      */
+    def llvm_transform_loop(loop: Loop, i: Integer): Loop = {
+        val entryEdges: Set[LoopEdge] = loop.entryEdges.union(loop.reentries).toSet
+
+        val P_e: Set[LoopEdge] = entryEdges                                                 // N entry edges
+        val P_b: Set[LoopEdge] = entryEdges.flatMap { e =>
+            val predNodes = IntraProcIRCursor.pred(e.to);
+
+            val incEdges = predNodes.map(a => LoopEdge(a, e.to));
+            incEdges
+        } -- P_e; // N back edges
+        val body: Set[LoopEdge] = (loop.edges -- P_b).toSet     // Regular control flow in the loop
+
+
+        // 3. Create block `N` and redirect every edge from set `P` to `H` via `N`
+        val conns = P_e.map(e => e.to).union(P_b.map(e => e.to)).collect{ case blk: Block => blk };
+        val NGoTo = GoTo(
+            targets = conns
+        )
+
+        val N: Block = Block(
+            label = s"N-${i}",
+            address = None,
+            statements = IntrusiveList(),
+        )
+
+        val newLoop = Loop(N);
+        newLoop.edges ++= body;
+
+        P_e.foreach { originalEdge => 
+            val origNode = originalEdge.from;
+            val origDest = originalEdge.to;
+
+            origNode match {
+                case origBlock: Block => {
+                    origBlock.replaceJump(GoTo(List(N)));
+
+                    newLoop.addEdge(LoopEdge(origBlock, N));
+                    newLoop.addEdge(LoopEdge(N, origDest));
+                }
+                case goto: GoTo => 
+                    // goto.removeTarget(origDest);
+                    goto.addTarget(N);
+                    
+                    newLoop.addEdge(LoopEdge(goto, N));
+                    newLoop.addEdge(LoopEdge(N, origDest));
+                case _ =>
+                    println("[!] Unexpected loop originating node");
+                    println(origNode)
+            };
+        }
+
+        P_b.foreach { originalEdge =>
+            val origNode = originalEdge.from;
+            val origDest = originalEdge.to;
+
+            origNode match {
+                case origBlock: Block =>
+                    origBlock.replaceJump(GoTo(List(N)));
+                    val toEdge = LoopEdge(origBlock, N);
+
+                    newLoop.addEdge(toEdge);
+                    newLoop.addEdge(LoopEdge(N, origDest));
+                    newLoop.backEdges += toEdge;
+                case goto: GoTo =>
+                    // goto.removeTarget(origDest);
+                    goto.addTarget(N);
+                    
+                    newLoop.addEdge(LoopEdge(goto, N));
+                    newLoop.addEdge(LoopEdge(N, origDest));
+                case _ =>
+                    println("[!] Unexpected loop originating node - 2");
+                    println(origNode);
+            }            
+        }
+
+        N.replaceJump(NGoTo);
+
+        newLoop;
+    }
