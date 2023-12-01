@@ -31,10 +31,9 @@ def begin(c: CFGPosition): CFGPosition = {
 /*
     Closed trace-perspective end of a composite IL structure.
  */
-@tailrec
 def end(c: CFGPosition): CFGPosition = {
   c match {
-    case p:Procedure => end(p.returnBlock)
+    case p:Procedure =>  p // TODO: not well-defined
     case b:Block => b.jump
     case s:Statement => s.parent.statements.back()
     case s:Jump => s
@@ -48,7 +47,7 @@ object IntraProcIRCursor {
   def succ(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
       case proc: Procedure =>
-        if proc.entryBlock.isEmpty then Set(proc.returnBlock) else Set(proc.entryBlock.get)
+        if proc.entryBlock.isEmpty then proc.returnBlock.toSet else proc.entryBlock.toSet
       case b: Block =>
         if b.statements.isEmpty
         then Set(b.jump)

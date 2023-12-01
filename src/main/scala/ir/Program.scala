@@ -1,7 +1,7 @@
 package ir
 
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.{immutable, mutable}
+import scala.collection.{View, immutable, mutable}
 import boogie.*
 import analysis.BitVectorEval
 import intrusiveList.{IntrusiveList, IntrusiveListElement}
@@ -174,20 +174,19 @@ class Procedure private (
                   var name: String,
                   var address: Option[Int],
                   var entryBlock: Option[Block],
+                  var returnBlock: Option[Block],
                   private val _blocks: mutable.HashSet[Block],
                   var in: ArrayBuffer[Parameter],
                   var out: ArrayBuffer[Parameter],
                 ) {
-  /* First block executed when the procedure begins */
-  /* returnBlock: Single return point for all returns from the procedure to its caller; always defined but only included
-   * in `blocks` if the procedure contains any real blocks.*/
-  val returnBlock: Block = new Block(name + "_return", None, List(), new IndirectCall(Register("R30", BitVecType(64)), None, Some(name)))
-  returnBlock.setParent(this)
-
   private var _callers = new mutable.HashSet[Call]
 
-  def this(name: String, address: Option[Int] = None , entryBlock: Option[Block] = None, blocks: IterableOnce[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
-    this(name, address, entryBlock, mutable.HashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
+  // class invariant
+  require(returnBlock.forall(b => _blocks.contains(b)) && entryBlock.forall(b => _blocks.contains(b)))
+  require(_blocks.isEmpty || entryBlock.isDefined) // blocks.nonEmpty ==> entryBlock.isDefined
+
+  def this(name: String, address: Option[Int] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
+    this(name, address, entryBlock, returnBlock, mutable.HashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
   }
 
   override def toString: String = {
@@ -197,23 +196,21 @@ class Procedure private (
   def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
 
   /**
-   * Horrible, compensating for not storing the blocks in-order and storing initialBlock and returnBlock separately.
-   * @return
+   * Block iteration order is defined such that that the entryBlock is first, and no order is defined beyond that.
+   * Both entry block and return block are elements of _blocks.
    */
-  def blocks: Seq[Block] =
-    (entryBlock match
-      case Some(b) if _blocks.nonEmpty => Seq(b) ++ _blocks.filter(x => x ne b).toSeq
-      case _ => _blocks.toSeq)
-     ++ (if _blocks.nonEmpty then Seq(returnBlock) else Seq())
+  def blocks: View[Block] = entryBlock.view ++ _blocks.filterNot(x => entryBlock.contains(x))
 
   def removeCaller(c: Call): Unit = {
     _callers.remove(c)
   }
 
   def addBlocks(block: Block): Block = {
-    block.deParent()
-    block.setParent(this)
-    _blocks.add(block)
+    if (!_blocks.contains(block)) {
+      block.deParent()
+      block.setParent(this)
+      _blocks.add(block)
+    }
     block
   }
 
@@ -225,9 +222,13 @@ class Procedure private (
 
   def replaceBlock(oldBlock: Block, block: Block): Block = {
     if (oldBlock ne block) {
-      require(_blocks.contains(oldBlock) || block == returnBlock)
+      val isEntry: Boolean = entryBlock.isDefined && (oldBlock eq entryBlock.get)
+      require(_blocks.contains(oldBlock))
       removeBlocks(oldBlock)
       addBlocks(block)
+      if (isEntry) {
+        entryBlock = Some(block)
+      }
     }
     block
   }
@@ -244,8 +245,10 @@ class Procedure private (
   }
 
   def removeBlocks(block: Block): Block = {
-    block.deParent()
-    _blocks.remove(block)
+    if (_blocks.contains(block)) {
+      block.deParent()
+      _blocks.remove(block)
+    }
     block
   }
   def removeBlocks(blocks: Iterable[Block]): Unit = {
@@ -383,8 +386,23 @@ class Block private (var label: String,
 
   override def hashCode(): Int = label.hashCode()
 
-  override def linkParent(p: Procedure): Unit = () // TODO; cannot support moving blocks around
-  override def unlinkParent(): Unit = () // TODO
+  override def linkParent(p: Procedure): Unit = {
+    // The first block added to the procedure is the entry block
+    if parent.blocks.isEmpty then parent.entryBlock = Some(this)
+    // to connect call() links that reference jump.parent.parent
+    jump.setParent(this)
+  }
+  override def unlinkParent(): Unit = {
+    if (parent.entryBlock.isDefined && parent.entryBlock == this) {
+      parent.entryBlock = None
+    }
+    if (parent.returnBlock.isDefined && parent.returnBlock == this) {
+      parent.returnBlock = None
+    }
+
+    // to disconnect call() links that reference jump.parent.parent
+    jump.deParent()
+  }
  }
 
 
