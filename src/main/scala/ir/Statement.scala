@@ -94,16 +94,16 @@ class GoTo private (private var _targets: mutable.Set[Block], override val label
 
   def addTarget(t: Block): Unit = {
     if (_targets.add(t)) {
-      t.incomingJumps.add(parent)
+      t.addIncomingJump(this)
     }
   }
 
   override def linkParent(b: Block): Unit = {
-    _targets.foreach(_.incomingJumps.add(parent))
+    _targets.foreach(_.removeIncomingJump(this))
   }
 
   override def unlinkParent(): Unit = {
-    targets.foreach(_.incomingJumps.remove(parent))
+    targets.foreach(_.removeIncomingJump(this))
   }
 
 
@@ -111,7 +111,7 @@ class GoTo private (private var _targets: mutable.Set[Block], override val label
     // making the assumption that blocks only contain the same outgoing edge once
     //  e.g. We don't have two edges going to the same block under different conditions
     if (_targets.remove(t)) {
-      t.incomingJumps.remove(parent)
+      t.removeIncomingJump(this)
     }
   }
 

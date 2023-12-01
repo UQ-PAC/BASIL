@@ -74,19 +74,18 @@ trait ILValueAnalysisMisc:
       case _ => s
 
 
-type IRNode = IntraProcIRCursor.Node
+type IRNode = IRIntraproceduralDependencies.walker.Node
 
 object IRSimpleValueAnalysis:
+
   class Solver(prog: Program) extends ILValueAnalysisMisc
-    with IntraProcDependencies
-    with Dependencies[IRNode]
+    with IRIntraproceduralDependencies.ForwardDependencies
     with Analysis[Map[IRNode, Map[Variable, FlatElement[BitVecLiteral]]]]
-    //with SimplePushDownWorklistFixpointSolver[IRNode]
     with SimplePushDownWorklistFixpointSolver[IRNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
     :
       /* Worklist initial set */
       //override val lattice: MapLattice[IRNode, statelattice.type] = MapLattice(statelattice)
       override val lattice: MapLattice[IRNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]] = MapLattice(statelattice)
 
-      override val domain : Set[IRNode] = computeDomain(prog).toSet
+      override val domain : Set[IRNode] = computeDomain(IntraProcIRCursor, prog.procedures).toSet
       def transfer(n: IRNode, s: statelattice.Element): statelattice.Element = localTransfer(n, s)

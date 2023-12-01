@@ -175,18 +175,18 @@ class Procedure private (
                   var address: Option[Int],
                   var entryBlock: Option[Block],
                   var returnBlock: Option[Block],
-                  private val _blocks: mutable.LinkedHashSet[Block],
+                  private val _blocks: mutable.HashSet[Block],
                   var in: ArrayBuffer[Parameter],
                   var out: ArrayBuffer[Parameter],
                 ) {
-  private var _callers = new mutable.HashSet[Call]
+  private var _callers = new mutable.HashSet[DirectCall]
 
   // class invariant
   require(returnBlock.forall(b => _blocks.contains(b)) && entryBlock.forall(b => _blocks.contains(b)))
   require(_blocks.isEmpty || entryBlock.isDefined) // blocks.nonEmpty ==> entryBlock.isDefined
 
   def this(name: String, address: Option[Int] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
-    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
+    this(name, address, entryBlock, returnBlock, mutable.HashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
   }
 
   override def toString: String = {
@@ -199,9 +199,13 @@ class Procedure private (
    * Block iteration order is defined such that that the entryBlock is first, and no order is defined beyond that.
    * Both entry block and return block are elements of _blocks.
    */
-  def blocks: View[Block] = entryBlock.view ++ _blocks.filterNot(x => entryBlock.contains(x))
+  def blocks: Iterator[Block] = _blocks.iterator
 
-  def removeCaller(c: Call): Unit = {
+  def addCaller(c: DirectCall): Unit = {
+    _callers.remove(c)
+  }
+
+  def removeCaller(c: DirectCall): Unit = {
     _callers.remove(c)
   }
 
@@ -257,11 +261,9 @@ class Procedure private (
     }
   }
 
-  def addCaller(c: Call): Unit = {
-    _callers.remove(c)
-  }
 
   def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).toSet[Procedure]
+  def incomingCalls(): Iterator[DirectCall] = _callers.iterator
 
   var modifies: mutable.Set[Global] = mutable.Set()
 
@@ -331,7 +333,7 @@ class Block private (var label: String,
  var address: Option[Int],
  val statements: IntrusiveList[Statement],
  private var _jump: Jump,
- val incomingJumps: mutable.HashSet[Block],
+ private val _incomingJumps: mutable.HashSet[GoTo],
 ) extends IntrusiveListElement, HasParent[Procedure] {
   statements.foreach(_.setParent(this))
   _jump.setParent(this)
@@ -353,6 +355,11 @@ class Block private (var label: String,
 
   def jump: Jump = _jump
 
+  def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
+
+  def addIncomingJump(g: GoTo) = _incomingJumps.add(g)
+  def removeIncomingJump(g: GoTo) = _incomingJumps.remove(g)
+
   def replaceJump(j: Jump): this.type = {
     _jump.deParent()
     j.setParent(this)
@@ -360,9 +367,8 @@ class Block private (var label: String,
     this
   }
 
-  def isReturn: Boolean = this == parent.returnBlock
-
-  def predecessors: immutable.Set[Block] = incomingJumps to immutable.Set
+  def isEntry: Boolean = parent.entryBlock.contains(this)
+  def isReturn: Boolean = parent.returnBlock.contains(this)
 
   def calls: Set[Procedure] = _jump.calls
 

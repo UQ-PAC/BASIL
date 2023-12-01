@@ -202,6 +202,14 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
     elem.getPrev.asInstanceOf[T]
   }
 
+  def nextOption(elem: T): Option[T] = {
+    elem.next.asInstanceOf[Option[T]]
+  }
+
+  def prevOption(elem: T): Option[T] = {
+    elem.prev.asInstanceOf[Option[T]]
+  }
+
 object IntrusiveList {
   def from[T <: IntrusiveListElement](it: IterableOnce[T]): IntrusiveList[T] = {
     val l = new IntrusiveList[T]()

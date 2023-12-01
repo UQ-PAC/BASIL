@@ -345,17 +345,16 @@ class ConvertToSingleProcedureReturn extends Visitor {
 
     val returnBlock = node.parent.parent.returnBlock match {
       case Some(b) => b
-      case None => {
+      case None =>
         val name = node.parent.parent.name + "_return"
         val returnBlock = new Block(name, None, List(), new IndirectCall(Register("R30", BitVecType(64)), None, None))
         node.parent.parent.addBlocks(returnBlock)
         node.parent.parent.returnBlock = Some(returnBlock)
-      }
     }
 
     node match
       case c: IndirectCall =>
-        if c.target.name == "R30" && c.returnTarget.isEmpty && c.parent != c.parent.parent.returnBlock then GoTo(Seq(c.parent.parent.returnBlock.get)) else node
+        if c.target.name == "R30" && c.returnTarget.isEmpty && !c.parent.isReturn then GoTo(Seq(c.parent.parent.returnBlock.get)) else node
       case _ => node
   }
 }

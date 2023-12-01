@@ -52,7 +52,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
 
       // Set entry block to the block with the same address as the procedure or the first in sequence
       procedure.entryBlock = procedure.blocks.find(b => b.address == procedure.address)
-      if procedure.entryBlock.isEmpty then procedure.entryBlock = procedure.blocks.headOption
+      if procedure.entryBlock.isEmpty then procedure.entryBlock = procedure.blocks.nextOption()
 
     }
 

@@ -150,7 +150,7 @@ object RunUtils {
 
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
-    val domain = computeDomain(IRProgram)
+    val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
 
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationSolver(cfg)
@@ -159,6 +159,7 @@ object RunUtils {
     def newSolverTest(): Unit = {
       val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
       val newCPResult: ilcpsolver.lattice.Element = ilcpsolver.analyze()
+
 
       val newRes = newCPResult.flatMap((x, y) => y.flatMap {
         case (_, el) if el == FlatLattice[BitVecLiteral].top || el == FlatLattice[BitVecLiteral].bottom => None
@@ -192,6 +193,10 @@ object RunUtils {
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(mraResult, true), Output.dotIder), s"${s}_mra$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, mraResult, iteration), s"${s}_mra$iteration.txt"))
+
+    val callGraph = dotCallGraph(IRProgram)
+    writeToFile(callGraph, "callgraphtest.dot")
+    writeToFile(dotBlockGraph(IRProgram), "blockgraphtest.dot")
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()

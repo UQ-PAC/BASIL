@@ -323,7 +323,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
 
   def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr]): BProcedure = {
-    val body = p.blocks.map(translateBlock).toList
+    val body = (p.entryBlock.view ++ p.blocks.filterNot(x => p.entryBlock.contains(x))).map(translateBlock).toList
 
     val callsRely: Boolean = body.flatMap(_.body).exists(_ match
       case BProcedureCall("rely", lhs, params, comment) => true

@@ -1,5 +1,5 @@
 package analysis
-import ir.IntraProcIRCursor
+import ir.{IRWalk, IntraProcIRCursor, InterProcIRCursor, CFGPosition}
 
 /** Dependency methods for worklist-based analyses.
   */
@@ -32,12 +32,20 @@ trait IntraproceduralForwardDependencies extends Dependencies[CfgNode] {
 }
 
 
-trait IntraProcDependencies extends Dependencies[IntraProcIRCursor.Node]:
-  override def outdep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcDependencies.outdep(n)
-  override def indep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcDependencies.indep(n)
+class IRDependencies[NT <: CFGPosition](val walker: IRWalk[NT]) {
+  trait ForwardDependencies extends  Dependencies[NT] {
+    override def outdep(n: NT): Set[NT] = walker.succ(n)
 
-/** Dependency methods for forward analyses.
-  */
-object IntraProcDependencies extends Dependencies[IntraProcIRCursor.Node]:
-  override def outdep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcIRCursor.succ(n)
-  override def indep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcIRCursor.pred(n)
+    override def indep(n: NT): Set[NT] = walker.pred(n)
+  }
+
+  trait BackwardDependencies extends Dependencies[NT] {
+    override def outdep(n: NT): Set[NT] = walker.pred(n)
+
+    override def indep(n: NT): Set[NT] = walker.succ(n)
+  }
+}
+
+object IRIntraproceduralDependencies extends IRDependencies[CFGPosition](IntraProcIRCursor)
+
+object IRInterproceduralDependencies extends IRDependencies[CFGPosition](InterProcIRCursor)
