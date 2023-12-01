@@ -100,8 +100,11 @@ object RunUtils {
     val GtirbConverter = new GtirbToIR(entrypoint, functionEntries, functionBlocks, cfg, parser)
     val program = GtirbConverter.createIR()
 
-    //program.procedures.foreach(println)
-    program.procedures.foreach(elem => println(elem.blocks))
+    // program.procedures.foreach(println)
+    // //program.procedures.map(_.blocks.map(_.statements.foreach(elem => println(elem))))
+    println(serialiseIL(program))
+
+    return
 
     // val new_cfg = ProgramCfgFactory().fromIR(program)
   }

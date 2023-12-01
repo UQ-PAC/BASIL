@@ -19,7 +19,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
   def createStatements(): ArrayBuffer[Statement] = {
 
     val basicBlks = context.basic_blk().asScala
-    var statements: ArrayBuffer[Statement] = null
+    var statements: ArrayBuffer[Statement] = ArrayBuffer[Statement]()
 
     for (BasicBlk <- basicBlks) {
       val Blkuuid = unChrisifyUUID(BasicBlk.uuid().getText())
@@ -350,6 +350,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
           BitVecType(1)
         ) // null elements literally don't exist in IR, so pray we never have to read from them
       // TODO: figure out what to do with this, since they do appear :/
+      // Nick says to just remove them, which i will soon
       case "__BranchTaken" =>
         Register(
           "__BranchTaken",
