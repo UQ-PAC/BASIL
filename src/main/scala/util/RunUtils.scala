@@ -18,6 +18,7 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
+import SSAForm.*
 
 import scala.collection.mutable
 
@@ -142,7 +143,7 @@ object RunUtils {
     Logger.info(subroutines)
 
     val mergedSubroutines = subroutines ++ externalAddresses
-
+    applySSA(IRProgram, false)
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
     Logger.info("[!] Running Constant Propagation")
@@ -151,6 +152,12 @@ object RunUtils {
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt"))
+
+    Logger.info("[!] Running Steensgaard")
+    val steensgaardSolver = SteensgaardAnalysis(cfg, constPropResult, globalAddresses, globalOffsets, mergedSubroutines)
+    steensgaardSolver.analyze()
+    steensgaardSolver.pointsTo()
+    steensgaardSolver.mayAlias()
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
@@ -182,13 +189,16 @@ object RunUtils {
       val newCFG = ProgramCfgFactory().fromIR(newIR)
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
+    config.analysisResultsPath.foreach(s =>
+      val newCFG = ProgramCfgFactory().fromIR(newIR)
+      writeToFile(printAnalysisResults(newCFG, Map.empty, 1, false), s"${s}_resolvedCFG.txt"))
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
 
     newIR
   }
 
-  def printAnalysisResults(cfg: ProgramCfg, result: Map[CfgNode, _], iteration: Int): String = {
+  def printAnalysisResults(cfg: ProgramCfg, result: Map[CfgNode, _], iteration: Int, hasResult: Boolean = true): String = {
     val functionEntries = cfg.nodes.collect { case n: CfgFunctionEntryNode => n }.toSeq.sortBy(_.data.name)
     val s = StringBuilder()
     s.append(System.lineSeparator())
@@ -244,8 +254,10 @@ object RunUtils {
 
     def printNode(node: CfgNode): Unit = {
       s.append(node)
-      s.append(" :: ")
-      s.append(result(node))
+      if (hasResult) {
+        s.append(" :: ")
+        s.append(result(node))
+      }
       s.append(System.lineSeparator())
     }
 

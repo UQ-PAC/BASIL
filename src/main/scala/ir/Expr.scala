@@ -343,7 +343,7 @@ case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr w
 }
 
 sealed trait Variable extends Expr {
-  val name: String
+  var name: String
   val irType: IRType
   override def getType: IRType = irType
   override def variables: Set[Variable] = Set(this)
@@ -363,16 +363,16 @@ sealed trait Variable extends Expr {
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
-case class Register(override val name: String, override val irType: IRType) extends Variable with Global {
+case class Register(var name: String, override val irType: IRType) extends Variable with Global {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
-  override def toString: String = s"Register($name, $irType)"
+  override def toString: String = s"Register(${name}_$ssa_id, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitRegister(this)
 }
 
-case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
+case class LocalVar(var name: String, override val irType: IRType) extends Variable {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar($name, $irType)"
+  override def toString: String = s"LocalVar(${name}_$ssa_id, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
