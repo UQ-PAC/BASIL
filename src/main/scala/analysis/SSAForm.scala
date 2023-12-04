@@ -23,8 +23,9 @@ object SSAForm {
 //  }
 
   def applySSA(program: Program, invasive: Boolean = false): Unit = {
+    val variableMapping = new mutable.HashMap[String, Int]().withDefault(_ => 0)
     for (proc <- program.procedures) {
-      val variableMapping = new mutable.HashMap[String, Int]().withDefault(_ => 0)
+      variableMapping.keys.foreach(key => variableMapping.update(key, variableMapping(key) + 1))
       for (block <- proc.blocks) {
         for (stmt <- block.statements) {
           println(stmt)

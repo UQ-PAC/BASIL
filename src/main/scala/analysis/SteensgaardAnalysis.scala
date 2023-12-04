@@ -80,55 +80,54 @@ class SteensgaardAnalysis(
     buffers
   }
 
-  def eval(exp: Expr, env: Set[MemoryRegion], n: CfgCommandNode): Set[MemoryRegion] = {
+  def eval(exp: Expr, n: CfgCommandNode): Option[MemoryRegion] = {
     Logger.debug(s"evaluating $exp")
-    Logger.debug(s"env: $env")
     Logger.debug(s"n: $n")
     exp match {
       case binOp: BinaryExpr =>
         if (binOp.arg1 == stackPointer) {
           evaluateExpression(binOp.arg2, constantProp(n)) match {
-            case Some(b: BitVecLiteral) => Set(poolMaster(b, n.parent))
-            case None => env
+            case Some(b: BitVecLiteral) => Some(poolMaster(b, n.parent))
+            case None => None
           }
         } else {
           evaluateExpression(binOp, constantProp(n)) match {
-            case Some(b: BitVecLiteral) => eval(b, env, n)
-            case None => env
+            case Some(b: BitVecLiteral) => eval(b, n)
+            case None => None
           }
         }
       case bitVecLiteral: BitVecLiteral =>
         if (globals.contains(bitVecLiteral.value)) {
           val globalName = globals(bitVecLiteral.value)
-          Set(DataRegion(globalName, bitVecLiteral))
+          Some(DataRegion(globalName, bitVecLiteral))
         } else if (subroutines.contains(bitVecLiteral.value)) {
           val subroutineName = subroutines(bitVecLiteral.value)
-          Set(DataRegion(subroutineName, bitVecLiteral))
+          Some(DataRegion(subroutineName, bitVecLiteral))
         } else if (globalOffsets.contains(bitVecLiteral.value)) {
           val val1 = globalOffsets(bitVecLiteral.value)
           if (subroutines.contains(val1)) {
             val globalName = subroutines(val1)
-            Set(DataRegion(globalName, bitVecLiteral))
+            Some(DataRegion(globalName, bitVecLiteral))
           } else {
-            Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
+            Some(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
           }
         } else {
           //throw new Exception(s"Unknown type for $bitVecLiteral")
           // unknown region here
-          Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
+          Some(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
         }
       case variable: Variable =>
         variable match {
           case _: LocalVar =>
-            env
+            None
           case reg: Register if reg == stackPointer =>
-            env
+            None
           case _ =>
             evaluateExpression(variable, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
-                eval(b, env, n)
+                eval(b, n)
               case _ =>
-                env // we cannot evaluate this to a concrete value, we need VSA for this
+                None // we cannot evaluate this to a concrete value, we need VSA for this
             }
         }
       // we cannot evaluate this to a concrete value, we need VSA for this
@@ -161,7 +160,7 @@ class SteensgaardAnalysis(
   def visit(n: CfgNode, arg: Unit): Unit = {
 
     def varToStTerm(vari: Variable): Term[StTerm] = IdentifierVariable(vari)
-    def exprToStTerm(expr: Expr): Term[StTerm] = ExpressionVariable(expr)
+    def exprToStTerm(expr: MemoryRegion | Expr): Term[StTerm] = ExpressionVariable(expr)
     def allocToTerm(alloc: MemoryRegion): Term[StTerm] = AllocVariable(alloc)
     //def identifierToTerm(id: AIdentifier): Term[StTerm] = IdentifierVariable(id)
 
@@ -192,10 +191,18 @@ class SteensgaardAnalysis(
                 unwrapExpr(localAssign.rhs).foreach {
                   case memoryLoad: MemoryLoad =>
                     val X1 = localAssign.lhs
-                    val X2_star = evaluateExpression(memoryLoad, constantProp(n)).getOrElse(memoryLoad.index)
-                    val alpha = FreshVariable()
-                    unify(exprToStTerm(X2_star), PointerRef(alpha)) // TODO: X2_star should be the value of the memload not the memload itself
-                    unify(alpha, varToStTerm(X1))
+                    val X2_star = eval(memoryLoad.index, cmd)
+                    if (X2_star.isDefined) {
+                      val alpha = FreshVariable()
+                      unify(exprToStTerm(X2_star.get), PointerRef(alpha)) // TODO: X2_star should be the value of the memload not the memload itself
+                      unify(alpha, varToStTerm(X1))
+                    }
+
+                    // TODO: This might not be correct for globals
+                    val $X2 = eval(memoryLoad.index, cmd)
+                    if ($X2.isDefined) {
+                      unify(varToStTerm(X1), PointerRef(allocToTerm($X2.get)))
+                    }
                   case variable: Variable =>
                     val X1 = localAssign.lhs
                     val X2 = variable
@@ -274,7 +281,7 @@ case class IdentifierVariable(id: Variable) extends StTerm with Var[StTerm] {
 
 /** A term variable that represents an expression in the program.
   */
-case class ExpressionVariable(expr: Expr) extends StTerm with Var[StTerm] {
+case class ExpressionVariable(expr: MemoryRegion | Expr) extends StTerm with Var[StTerm] {
 
   override def toString: String = s"$expr"
 }
