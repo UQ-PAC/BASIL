@@ -33,7 +33,7 @@ class SystemTests extends AnyFunSuite {
     val path = correctPath + "/" + p
     val variations = getSubdirectories(path)
     variations.foreach(t =>
-      test(p + "/" + t) {
+      test("correct/" + p + "/" + t) {
         runTest(correctPath, p, t, true)
       }
     )
@@ -43,7 +43,7 @@ class SystemTests extends AnyFunSuite {
     val path = incorrectPath + "/" + p
     val variations = getSubdirectories(path)
     variations.foreach(t =>
-      test(p + "/" + t) {
+      test("incorrect/" + p + "/" + t) {
         runTest(incorrectPath, p, t, false)
       }
     )
@@ -78,18 +78,19 @@ class SystemTests extends AnyFunSuite {
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
     val outPath = variationPath + ".bpl"
-    val ADTPath = variationPath + ".adt"
+        val ADTPath = variationPath + ".adt"
     val RELFPath = variationPath + ".relf"
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")
-    if (File(specPath).exists) {
-      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--spec", specPath, "--output", outPath))
-    } else {
-      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--output", outPath))
-    }
+
+    val args = mutable.ArrayBuffer("--adt", ADTPath, "--relf", RELFPath, "--output", outPath)
+    if (File(specPath).exists) args ++= Seq("--spec", specPath)
+
+    Main.main(args)
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(outPath + " done")
-    val boogieResult = Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath).!!
+    val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(outPath))
+    val boogieResult = (Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath) ++ extraSpec).!!
     val verifyTime = timer.checkPoint("verify")
     val resultPath = variationPath + "_result.txt"
     log(boogieResult, resultPath)
