@@ -42,7 +42,7 @@ object Main {
       analysisResultsDot: Option[String]
   )
 
-  def main(args: Array[String]): Unit = {
+  def main(args: Iterable[String]): Unit = {
     val parser = ParserForClass[Config]
     val parsed = parser.constructEither(args.toSeq)
 
