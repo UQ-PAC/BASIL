@@ -41,7 +41,9 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   val mapLattice: MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]] = MapLattice(powersetLattice)
 
-  val lattice: MapLattice[CfgNode, Map[Variable | MemoryRegion, Set[Value]], mapLattice.type] = MapLattice(mapLattice)
+  val liftedLattice: LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type] = LiftLattice(mapLattice)
+
+  val lattice: MapLattice[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]], LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type]] = MapLattice(liftedLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -180,7 +182,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transfer(n: CfgNode, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = localTransfer(n, s)
+  def transferUnlifted(n: CfgNode, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = localTransfer(n, s)
 }
 
 class ValueSetAnalysisSolver(
@@ -193,49 +195,15 @@ class ValueSetAnalysisSolver(
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
 ) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
     with InterproceduralForwardDependencies
-    with SimpleMonotonicSolver[CfgNode, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]]
+    with Analysis[Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
+    with WorklistFixpointSolverWithReachability[CfgNode, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]] {
 
-
-//abstract class IntraprocValueSetAnalysisWorklistSolver[L <: VSALatticeElem](
-//    cfg: ProgramCfg,
-//    globals: Map[BigInt, String],
-//    externalFunctions: Map[BigInt, String],
-//    globalOffsets: Map[BigInt, BigInt],
-//    subroutines: Map[BigInt, String],
-//    mmm: MemoryModelMap,
-//    constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]],
-//    val powersetLattice: L
-//) extends LiftedValueSetAnalysis(
-//    cfg,
-//    globals,
-//    externalFunctions,
-//    globalOffsets, subroutines,
-//    mmm,
-//    constantProp,
-//    true)
-//    with LiftedValueSetAnalysisMisc
-//    with WorklistFixpointSolverWithReachability[CfgNode]
-//    with ForwardDependencies
-//
-//object ValueSetAnalysis:
-//
-//  /** Interprocedural analysis that uses the worklist solver.
-//    */
-//  class WorklistSolver(
-//      cfg: ProgramCfg,
-//      globals: Map[BigInt, String],
-//      externalFunctions: Map[BigInt, String],
-//      globalOffsets: Map[BigInt, BigInt],
-//      subroutines: Map[BigInt, String],
-//      mmm: MemoryModelMap,
-//      constantProp: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]]
-//  ) extends InterprocValueSetAnalysisWorklistSolver(
-//        cfg,
-//        globals,
-//        externalFunctions,
-//        globalOffsets,
-//        subroutines,
-//        mmm,
-//        constantProp,
-//        MapLattice[Variable | MemoryRegion, PowersetLattice[Value]](PowersetLattice[Value])
-//      )
+  override def funsub(n: CfgNode, x: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]): LiftedElement[Map[Variable | MemoryRegion, Set[Value]]] = {
+    n match {
+      // function entry nodes are always reachable as this is intraprocedural
+      case _: CfgFunctionEntryNode => liftedLattice.lift(mapLattice.bottom)
+      // all other nodes are processed with join+transfer
+      case _ => super.funsub(n, x)
+    }
+  }
+}

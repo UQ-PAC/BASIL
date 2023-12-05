@@ -67,8 +67,6 @@ class MemoryModelMap {
           }
         case LiftedBottom =>
     }
-
-
     )
   }
 
