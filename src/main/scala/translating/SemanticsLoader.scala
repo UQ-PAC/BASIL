@@ -36,7 +36,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
   //   for (BasicBlk <- basicBlks) {
   //     val Blkuuid = unChrisifyUUID(BasicBlk.uuid().getText())
   //     if (Blkuuid.equals(targetuuid)) {
-  //       visitBasic_blk(BasicBlk)
+  //       visitBasic_blk(BasicBlk)  
   //     }
   //   }
 
@@ -66,7 +66,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
       } else if (stmt.call_stmt() != null) {
         val statement = visitCall_stmt(stmt.call_stmt())
         statements.addOne(statement)
-
+        
       } else if (stmt.conditional_stmt() != null) {
         visitConditional_stmt(
           stmt.conditional_stmt()
@@ -82,7 +82,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
     ctx match
       case a: AssignContext =>
         stmt = visitAssign(a)
-
+        
       case c: ConstDeclContext =>
         stmt = visitConstDecl(c)
     return stmt
