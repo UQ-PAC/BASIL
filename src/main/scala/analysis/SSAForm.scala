@@ -22,82 +22,142 @@ object SSAForm {
 //    }
 //  }
 
-  def applySSA(program: Program, invasive: Boolean = false): Unit = {
-    val variableMapping = new mutable.HashMap[String, Int]().withDefault(_ => 0)
+//  def applySSA(program: Program, invasive: Boolean = false): Unit = {
+//    val variableMapping = new mutable.HashMap[String, Int]().withDefault(_ => 0)
+//    for (proc <- program.procedures) {
+//      val blockBasedMappings = new mutable.HashMap[Block, mutable.Map[String, Int]]()
+//      variableMapping.keys.foreach(key => variableMapping.update(key, variableMapping(key) + 1))
+//      for (block <- proc.blocks) {
+//        blockBasedMappings.update(block, new mutable.HashMap[String, Int]().withDefault(_ => 0))
+//        for (stmt <- block.statements) {
+//          println(stmt)
+//          stmt match {
+//            case localAssign: LocalAssign => {
+//              if (invasive) {
+//                localAssign.rhs.variables.foreach(v => {
+//                  v.name = v.name + "_" + variableMapping(v.name)
+//                })
+//                variableMapping(localAssign.lhs.name) += 1
+//                localAssign.lhs.name = localAssign.lhs.name + "_" + variableMapping(localAssign.lhs.name)
+//              } else {
+//                localAssign.rhs.variables.foreach(v => {
+//                  v.ssa_id = variableMapping(v.name)
+//                })
+//                variableMapping(localAssign.lhs.name) += 1
+//                localAssign.lhs.ssa_id = variableMapping(localAssign.lhs.name)
+//              }
+//            }
+//            case memoryAssign: MemoryAssign => {
+//              if (invasive) {
+//                memoryAssign.lhs.variables.foreach(v => {
+//                  v.name = v.name + "_" + variableMapping(v.name)
+//                })
+//                memoryAssign.rhs.variables.foreach(v => {
+//                  v.name = v.name + "_" + variableMapping(v.name)
+//                })
+//              } else {
+//                memoryAssign.lhs.variables.foreach(v => {
+//                  v.ssa_id = variableMapping(v.name)
+//                })
+//                memoryAssign.rhs.variables.foreach(v => {
+//                  v.ssa_id = variableMapping(v.name)
+//                })
+//              }
+//            }
+//            case assume: Assume => {
+//              if (invasive) {
+//                assume.body.variables.foreach(v => {
+//                  v.name = v.name + "_" + variableMapping(v.name)
+//                })
+//              } else {
+//                assume.body.variables.foreach(v => {
+//                  v.ssa_id = variableMapping(v.name)
+//                })
+//              }
+//            } // no required for analyses
+//            case assume: Assert => {
+//              if (invasive) {
+//                assume.body.variables.foreach(v => {
+//                  v.name = v.name + "_" + variableMapping(v.name)
+//                })
+//              } else {
+//                assume.body.variables.foreach(v => {
+//                  v.ssa_id = variableMapping(v.name)
+//                })
+//              }
+//            } // no required for analyses
+//            case _ => throw new RuntimeException("No SSA form for " + stmt.getClass + " yet")
+//          }
+//        }
+//        block.jump match {
+//          case indirectCall: IndirectCall => {
+//            if (invasive) {
+//                indirectCall.target.variables.foreach(v => {
+//                    v.name = v.name + "_" + variableMapping(v.name)
+//                })
+//                } else {
+//                indirectCall.target.variables.foreach(v => {
+//                    v.ssa_id = variableMapping(v.name)
+//                })
+//            }
+//          }
+//          case _ => {}
+//        }
+//      }
+//    }
+//  }
+
+  def applySSA(program: Program): Unit = {
+    val varMaxTracker = new mutable.HashMap[String, Int]()
+    val blockBasedMappings = new mutable.HashMap[(Block, String), Set[Int]]().withDefault(_ => Set())
     for (proc <- program.procedures) {
-      variableMapping.keys.foreach(key => variableMapping.update(key, variableMapping(key) + 1))
       for (block <- proc.blocks) {
         for (stmt <- block.statements) {
           println(stmt)
           stmt match {
             case localAssign: LocalAssign => {
-              if (invasive) {
                 localAssign.rhs.variables.foreach(v => {
-                  v.name = v.name + "_" + variableMapping(v.name)
+                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
                 })
-                variableMapping(localAssign.lhs.name) += 1
-                localAssign.lhs.name = localAssign.lhs.name + "_" + variableMapping(localAssign.lhs.name)
-              } else {
-                localAssign.rhs.variables.foreach(v => {
-                  v.ssa_id = variableMapping(v.name)
-                })
-                variableMapping(localAssign.lhs.name) += 1
-                localAssign.lhs.ssa_id = variableMapping(localAssign.lhs.name)
-              }
+                val maxVal = varMaxTracker.getOrElse(localAssign.lhs.name, 0)
+                blockBasedMappings((block, localAssign.lhs.name)) = Set(maxVal + 1)
+
+                localAssign.lhs.ssa_id = blockBasedMappings((block, localAssign.lhs.name))
+                varMaxTracker(localAssign.lhs.name) = blockBasedMappings((block, localAssign.lhs.name)).max
             }
             case memoryAssign: MemoryAssign => {
-              if (invasive) {
                 memoryAssign.lhs.variables.foreach(v => {
-                  v.name = v.name + "_" + variableMapping(v.name)
+                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
                 })
                 memoryAssign.rhs.variables.foreach(v => {
-                  v.name = v.name + "_" + variableMapping(v.name)
+                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
                 })
-              } else {
-                memoryAssign.lhs.variables.foreach(v => {
-                  v.ssa_id = variableMapping(v.name)
-                })
-                memoryAssign.rhs.variables.foreach(v => {
-                  v.ssa_id = variableMapping(v.name)
-                })
-              }
             }
             case assume: Assume => {
-              if (invasive) {
                 assume.body.variables.foreach(v => {
-                  v.name = v.name + "_" + variableMapping(v.name)
+                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
                 })
-              } else {
-                assume.body.variables.foreach(v => {
-                  v.ssa_id = variableMapping(v.name)
-                })
-              }
             } // no required for analyses
             case assume: Assert => {
-              if (invasive) {
                 assume.body.variables.foreach(v => {
-                  v.name = v.name + "_" + variableMapping(v.name)
+                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
                 })
-              } else {
-                assume.body.variables.foreach(v => {
-                  v.ssa_id = variableMapping(v.name)
-                })
-              }
             } // no required for analyses
             case _ => throw new RuntimeException("No SSA form for " + stmt.getClass + " yet")
           }
         }
         block.jump match {
           case indirectCall: IndirectCall => {
-            if (invasive) {
-                indirectCall.target.variables.foreach(v => {
-                    v.name = v.name + "_" + variableMapping(v.name)
+              indirectCall.target.variables.foreach(v => {
+                v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
+              })
+          }
+          case goTo: GoTo => {
+              goTo.targets.foreach(b => {
+                varMaxTracker.keys.foreach(varr => {
+                  blockBasedMappings((b, varr)) = blockBasedMappings(b, varr) ++ blockBasedMappings(block, varr)
                 })
-                } else {
-                indirectCall.target.variables.foreach(v => {
-                    v.ssa_id = variableMapping(v.name)
-                })
-            }
+              })
           }
           case _ => {}
         }

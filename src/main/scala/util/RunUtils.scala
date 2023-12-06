@@ -143,7 +143,7 @@ object RunUtils {
     Logger.info(subroutines)
 
     val mergedSubroutines = subroutines ++ externalAddresses
-    applySSA(IRProgram, false)
+    applySSA(IRProgram)
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
     Logger.info("[!] Running Constant Propagation")

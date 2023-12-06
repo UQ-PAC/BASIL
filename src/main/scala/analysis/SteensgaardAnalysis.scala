@@ -3,10 +3,8 @@ package analysis
 import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
 import ir.*
 import util.Logger
-
-import java.io.{File, PrintWriter}
 import scala.collection.mutable
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.collection.mutable.ListBuffer
 
 /** Steensgaard-style pointer analysis. The analysis associates an [[StTerm]] with each variable declaration and
   * expression node in the AST. It is implemented using [[tip.solvers.UnionFindSolver]].
@@ -19,8 +17,6 @@ class SteensgaardAnalysis(
       subroutines: Map[BigInt, String]) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
-
-  val stringArr: ArrayBuffer[String] = ArrayBuffer()
 
   private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
@@ -141,15 +137,8 @@ class SteensgaardAnalysis(
   /** @inheritdoc
     */
   def analyze(): Unit =
-  // generate the constraints by traversing the AST and solve them on-the-fly
+    // generate the constraints by traversing the AST and solve them on-the-fly
     cfg.nodes.foreach(visit(_, ()))
-
-//  def dump_file(content: ArrayBuffer[String], name: String): Unit = {
-//    val outFile = File(s"$name")
-//    val pw = PrintWriter(outFile, "UTF-8")
-//    for (s <- content) { pw.append(s + "\n") }
-//    pw.close()
-//  }
 
   /** Generates the constraints for the given sub-AST.
     * @param node
@@ -179,7 +168,7 @@ class SteensgaardAnalysis(
           case localAssign: LocalAssign =>
             localAssign.rhs match {
               case binOp: BinaryExpr =>
-                // X1 = &X: [[X1]] = ↑[[X2]]
+                // X1 = &X2: [[X1]] = ↑[[X2]]
                 if (binOp.arg1 == stackPointer) {
                   evaluateExpression(binOp.arg2, constantProp(n)) match {
                     case Some(b: BitVecLiteral) =>

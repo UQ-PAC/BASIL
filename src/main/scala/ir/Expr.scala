@@ -3,7 +3,7 @@ package ir
 import boogie._
 
 trait Expr {
-  var ssa_id: Int = 0
+  var ssa_id: Set[Int] = Set()
   def toBoogie: BExpr
   def toGamma: BExpr = {
     val gammaVars: Set[BExpr] = gammas.map(_.toGamma)
@@ -361,6 +361,14 @@ sealed trait Variable extends Expr {
 
   override def acceptVisit(visitor: Visitor): Variable =
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
+
+  override def equals(obj: Any): Boolean =
+    obj match {
+      case v: Variable => v.name == name && v.irType == irType && (v.ssa_id == ssa_id || v.ssa_id.intersect(ssa_id).nonEmpty)
+      case _ => false
+    }
+
+  override def hashCode(): Int = name.hashCode + irType.hashCode + ssa_id.hashCode()
 }
 
 case class Register(var name: String, override val irType: IRType) extends Variable with Global {
