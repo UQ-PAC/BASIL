@@ -120,10 +120,10 @@ object SSAForm {
                   v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
                 })
                 val maxVal = varMaxTracker.getOrElse(localAssign.lhs.name, 0)
-                blockBasedMappings((block, localAssign.lhs.name)) = Set(maxVal + 1)
+                blockBasedMappings((block, localAssign.lhs.name)) = Set(maxVal)
 
                 localAssign.lhs.ssa_id = blockBasedMappings((block, localAssign.lhs.name))
-                varMaxTracker(localAssign.lhs.name) = blockBasedMappings((block, localAssign.lhs.name)).max
+                varMaxTracker(localAssign.lhs.name) = blockBasedMappings((block, localAssign.lhs.name)).max + 1
             }
             case memoryAssign: MemoryAssign => {
                 memoryAssign.lhs.variables.foreach(v => {
