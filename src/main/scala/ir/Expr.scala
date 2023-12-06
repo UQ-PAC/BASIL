@@ -2,8 +2,10 @@ package ir
 
 import boogie._
 
+import scala.collection.mutable
+
 trait Expr {
-  var ssa_id: Set[Int] = Set()
+  var ssa_id: mutable.Set[Int] = mutable.Set[Int]()
   def toBoogie: BExpr
   def toGamma: BExpr = {
     val gammaVars: Set[BExpr] = gammas.map(_.toGamma)

@@ -109,7 +109,8 @@ object SSAForm {
 
   def applySSA(program: Program): Unit = {
     val varMaxTracker = new mutable.HashMap[String, Int]()
-    val blockBasedMappings = new mutable.HashMap[(Block, String), Set[Int]]().withDefault(_ => Set())
+    val blockBasedMappings = new mutable.HashMap[(Block, String), mutable.Set[Int]]().withDefault(_ => mutable.Set())
+    val context = new mutable.HashMap[(Procedure, String), mutable.Set[Int]]().withDefault(_ => mutable.Set())
     for (proc <- program.procedures) {
       for (block <- proc.blocks) {
         for (stmt <- block.statements) {
@@ -117,39 +118,47 @@ object SSAForm {
           stmt match {
             case localAssign: LocalAssign => {
                 localAssign.rhs.variables.foreach(v => {
-                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
+                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), context.getOrElseUpdate((proc, v.name), mutable.Set()))
                 })
-                val maxVal = varMaxTracker.getOrElse(localAssign.lhs.name, 0)
-                blockBasedMappings((block, localAssign.lhs.name)) = Set(maxVal)
+                val maxVal = varMaxTracker.getOrElseUpdate(localAssign.lhs.name, 0)
+                blockBasedMappings((block, localAssign.lhs.name)) = mutable.Set(maxVal)
 
                 localAssign.lhs.ssa_id = blockBasedMappings((block, localAssign.lhs.name))
                 varMaxTracker(localAssign.lhs.name) = blockBasedMappings((block, localAssign.lhs.name)).max + 1
+                println("test")
             }
             case memoryAssign: MemoryAssign => {
                 memoryAssign.lhs.variables.foreach(v => {
-                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
+                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), context.getOrElseUpdate((proc, v.name), mutable.Set()))
                 })
                 memoryAssign.rhs.variables.foreach(v => {
-                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
+                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), context.getOrElseUpdate((proc, v.name), mutable.Set()))
                 })
             }
             case assume: Assume => {
                 assume.body.variables.foreach(v => {
-                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
+                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), context.getOrElseUpdate((proc, v.name), mutable.Set()))
                 })
             } // no required for analyses
             case assume: Assert => {
                 assume.body.variables.foreach(v => {
-                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
+                  v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), context.getOrElseUpdate((proc, v.name), mutable.Set()))
                 })
             } // no required for analyses
             case _ => throw new RuntimeException("No SSA form for " + stmt.getClass + " yet")
           }
         }
         block.jump match {
+          case directCall: DirectCall => {
+            varMaxTracker.keys.foreach(varr => {
+              //context((directCall.target, varr)) = context((directCall.target, varr)) ++ blockBasedMappings(block, varr)
+              context.getOrElseUpdate((directCall.target, varr), mutable.Set()) ++= blockBasedMappings((block, varr))
+            })
+            println(context)
+          }
           case indirectCall: IndirectCall => {
               indirectCall.target.variables.foreach(v => {
-                v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), Set())
+                v.ssa_id = blockBasedMappings.getOrElseUpdate((block, v.name), context.getOrElseUpdate((proc, v.name), mutable.Set()))
               })
           }
           case goTo: GoTo => {

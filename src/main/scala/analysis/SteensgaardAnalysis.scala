@@ -227,7 +227,6 @@ class SteensgaardAnalysis(
             // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
             val X1_star = eval(memoryAssign.rhs.index, cmd)
             val X2 = evaluateExpression(memoryAssign.rhs.value, constantProp(n)).getOrElse(memoryAssign.rhs.value)
-            println(X2)
             val alpha = FreshVariable()
             unify(exprToStTerm(X1_star), PointerRef(alpha))
             unify(alpha, exprToStTerm(X2))
@@ -235,7 +234,6 @@ class SteensgaardAnalysis(
         }
       case _ => // do nothing
     }
-    //dump_file(stringArr, "any")
   }
 
   private def unify(t1: Term[StTerm], t2: Term[StTerm]): Unit = {
