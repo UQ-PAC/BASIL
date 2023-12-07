@@ -3,7 +3,11 @@ import com.google.protobuf.ByteString
 import scala.collection.mutable
 import com.grammatech.gtirb.proto
 import com.grammatech.gtirb.proto.CFG.CFG
+import com.grammatech.gtirb.proto.IR.IR
+import com.grammatech.gtirb.proto.Module.Module
+import com.grammatech.gtirb.proto.Section.Section
 import Parsers.*
+import gtirb.*
 import ir._
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
@@ -14,15 +18,13 @@ import com.grammatech.gtirb.proto.CFG.Edge._
 /** Currently, this does procedurers first by going through the function blocks and functionEntries maps. Hopefully this
   * works, although more investigation will have to be done
   */
-class GtirbToIR(
-    entrypoint: ByteString,
-    functionEntries: mutable.Map[ByteString, mutable.Set[ByteString]],
-    functionBlocks: mutable.Map[ByteString, mutable.Set[ByteString]],
-    functionNames: mutable.Map[ByteString,ByteString],
-    symbols: Seq[com.grammatech.gtirb.proto.Symbol.Symbol],
-    cfg: CFG,
-    parser: SemanticsParser
-) {
+class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: SemanticsParser, cfg: CFG) {
+
+  val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
+  val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
+  val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
+  val entrypoint = mods.head.entryPoint
+  val symbols = mods.flatMap(_.symbols)
 
   def createIR(): Program = {
 
@@ -48,8 +50,6 @@ class GtirbToIR(
     if (functionNames.get(uuid) != None){ 
       name = symbols.find(functionNames(uuid) == _.uuid).get.name
     }
-
-
 
     val address: Option[Int] = None; //  TODO: - find where addresses are located
 

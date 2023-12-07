@@ -66,13 +66,9 @@ object RunUtils {
     //TODO: mods.head may not work here if multiple modules
 
 
-    // This is terrible for nowm but will fix
-    val functionEntryDecoder = new MapDecoder(mods.head.auxData.get("functionEntries").get.data)
-    val functionBlockDecoder = new MapDecoder(mods.head.auxData.get("functionBlocks").get.data)
-    val functionNamesDecoder = new UUIDDecoder(mods.head.auxData.get("functionNames").get.data)
-    val functionNames = functionNamesDecoder.decode()
-    val functionEntries = functionEntryDecoder.decode()
-    val functionBlocks = functionBlockDecoder.decode()
+    val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
+    val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
+    val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
     val entrypoint = mods.head.entryPoint
     val sym = mods.flatMap(_.symbols)
 
@@ -121,7 +117,7 @@ object RunUtils {
     //mods.map(_.sections.foreach(elem => println(elem.uuid)))
 
 
-    val GtirbConverter = new GtirbToIR(entrypoint, functionEntries, functionBlocks, functionNames, sym, cfg, parser)
+    val GtirbConverter = new GtirbToIR(mods, parser, cfg)
     val program = GtirbConverter.createIR()
 
     // // program.procedures.foreach(println)  
