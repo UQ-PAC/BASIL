@@ -25,6 +25,7 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
+import java.util.Base64
 
 import scala.collection.mutable
 
@@ -62,16 +63,24 @@ object RunUtils {
 
     parser.setBuildParseTree(true)
 
+    //TODO: mods.head may not work here if multiple modules
+
+
+    // This is terrible for nowm but will fix
     val functionEntryDecoder = new MapDecoder(mods.head.auxData.get("functionEntries").get.data)
     val functionBlockDecoder = new MapDecoder(mods.head.auxData.get("functionBlocks").get.data)
+    val functionNamesDecoder = new UUIDDecoder(mods.head.auxData.get("functionNames").get.data)
+    val functionNames = functionNamesDecoder.decode()
     val functionEntries = functionEntryDecoder.decode()
     val functionBlocks = functionBlockDecoder.decode()
     val entrypoint = mods.head.entryPoint
+    val sym = mods.flatMap(_.symbols)
 
+    
+
+    // // PROXYBLOCKS
     // val proxy = mods.map(_.proxies)
-
-    // println(proxy.map(_.toString()))
-    // println(proxy.map(_.map(_.unknownFields)).map(_.map(_.getField(0).foreach(f => f.toString()))))
+    // println(proxy.foreach(elem => println(elem)))
 
     // // FUNCTION BLOCKS WRITER
     // val bw = new BufferedWriter(new FileWriter(new File("Function Entries + Function Blocks")))
@@ -92,19 +101,30 @@ object RunUtils {
     //println(keys.toString())
     // println(mods.head.entryPoint)
 
+    // // BASIC BLOCKS TO CHRIS UUID
     // val tl = new TalkingListener()
     // ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
 
+    // // PARSE TREE
     //System.out.println(parser.semantics().toStringTree(parser));
+    
+    // for {
+    // mod <- mods
+    // section <- mod.sections
+    // byteInterval <- section.byteIntervals
+    // block <- byteInterval.blocks
+    // } {
+    // println(s"CodeBlock UUID: ${block.getCode.uuid}")
+    // println(s"DataBlock UUID: ${block.getData.uuid}")
+    // println
+    // }
+    //mods.map(_.sections.foreach(elem => println(elem.uuid)))
 
-    val GtirbConverter = new GtirbToIR(entrypoint, functionEntries, functionBlocks, cfg, parser)
+
+    val GtirbConverter = new GtirbToIR(entrypoint, functionEntries, functionBlocks, functionNames, sym, cfg, parser)
     val program = GtirbConverter.createIR()
 
-    //program.procedures.foreach(println)
-    // //program.procedures.map(_.blocks.map(_.statements.foreach(elem => println(elem))))
-
-
-    
+    // // program.procedures.foreach(println)  
     println(serialiseIL(program))
 
     return
@@ -145,10 +165,13 @@ object RunUtils {
       */
 
     val bapProgram = loadBAP(q.loading.adtFile)
+    
     // val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile)
 
     // val IRTranslator = BAPToIR(bapProgram, mainAddress)
     // var IRProgram = IRTranslator.translate
+
+    // println(serialiseIL(IRProgram))
 
     // val specification = loadSpecification(q.loading.specFile, IRProgram, globals)
 

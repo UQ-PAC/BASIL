@@ -18,6 +18,8 @@ class GtirbToIR(
     entrypoint: ByteString,
     functionEntries: mutable.Map[ByteString, mutable.Set[ByteString]],
     functionBlocks: mutable.Map[ByteString, mutable.Set[ByteString]],
+    functionNames: mutable.Map[ByteString,ByteString],
+    symbols: Seq[com.grammatech.gtirb.proto.Symbol.Symbol],
     cfg: CFG,
     parser: SemanticsParser
 ) {
@@ -41,7 +43,14 @@ class GtirbToIR(
   }
 
   def createProcedure(uuid: ByteString): Procedure = {
-    val name = uuid.toString();
+
+    var name = uuid.toString() 
+    if (functionNames.get(uuid) != None){ 
+      name = symbols.find(functionNames(uuid) == _.uuid).get.name
+    }
+
+
+
     val address: Option[Int] = None; //  TODO: - find where addresses are located
 
     val blocks: ArrayBuffer[Block] = createBlocks(uuid)
@@ -65,7 +74,6 @@ class GtirbToIR(
       funcblks.foreach(elem => blks += createBlock(elem))
 
     } else {
-      println("here")
       // TODO: check this, in what case is a basic block not in the functionblocks?
     }
 
@@ -76,9 +84,8 @@ class GtirbToIR(
     val address: Option[Int] = None //TODO: find where addresses are located
 
     val semantics: ArrayBuffer[Statement] = createSemantics(uuid)
-    // println(parser.semantics().basic_blk())
     val jump: Jump = GoTo(ArrayBuffer[Block](), None) //TODO: placeholder for now
-    return Block(uuid.toString(), address, semantics, jump)
+    return Block(uuid.toString(), address, semantics, jump) 
   }
 
   def createJumps(procedure: ArrayBuffer[Procedure]): ArrayBuffer[Procedure] = {

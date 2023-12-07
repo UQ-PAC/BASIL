@@ -55,26 +55,19 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
   }
 
   override def visitInstruction(ctx: InstructionContext): ArrayBuffer[Statement] = {
-    val statements = ArrayBuffer[Statement]()
-    val stmts = ctx.stmt_string().asScala.map(_.stmt())
-
-    for (stmt <- stmts) {
-      if (stmt.assignment_stmt() != null) { // match on type would be helpful, but i can't figure out how to gat antlr to co-operate
-        val statement = visitAssignment_stmt(stmt.assignment_stmt())
-        statements.addOne(statement)
-
-      } else if (stmt.call_stmt() != null) {
-        val statement = visitCall_stmt(stmt.call_stmt())
-        statements.addOne(statement)
-        
-      } else if (stmt.conditional_stmt() != null) {
-        visitConditional_stmt(
-          stmt.conditional_stmt()
-        ) //  may be useful for retriving conditions, but does nothing for now
-
+    val statements: ArrayBuffer[Statement] = ctx.stmt_string().asScala.flatMap { s =>
+      s.stmt() match {
+          case a if (a.assignment_stmt() != null) =>
+            Option(visitAssignment_stmt(a.assignment_stmt()))
+          case c if (c.call_stmt() != null) =>
+            Option(visitCall_stmt(c.call_stmt()))
+          case cond if (cond.conditional_stmt() != null) =>
+            visitConditional_stmt(cond.conditional_stmt())
+            None //  may be useful for retriving conditions, but does nothing for now
       }
-    }
-    return statements
+    }.to(ArrayBuffer)
+
+    statements
   }
 
   def visitAssignment_stmt(ctx: Assignment_stmtContext): LocalAssign = {
@@ -351,16 +344,8 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
         ) // null elements literally don't exist in IR, so pray we never have to read from them
       // TODO: figure out what to do with this, since they do appear :/
       // Nick says to just remove them, which i will soon
-      case "__BranchTaken" =>
-        Register(
-          "__BranchTaken",
-          BitVecType(1)
-        )
-      case "BTypeNext" =>
-        Register(
-          "__BTypeNext",
-          BitVecType(1)
-        )
+      case "__BranchTaken" => null
+      case "BTypeNext" => null
   }
 
   def createExprVarArray(v: ArrayBuffer[String]): Variable = {

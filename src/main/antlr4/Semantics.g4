@@ -70,7 +70,7 @@ targs: expr;
 
 slice_expr: 'Slice_LoWd' OPEN_PAREN expr COMMA expr CLOSE_PAREN;
 
-uuid: (VAR | ALPHA+) EQUALS EQUALS;
+uuid: (VAR | SSYMBOL) EQUALS EQUALS;
 BINARY: BIN+;
 BIN: [0-1];
 DEC: DIGIT+;
