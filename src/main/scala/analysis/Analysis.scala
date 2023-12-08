@@ -124,13 +124,13 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
   }
 
   /**
-    * Controls the pool of stack regions. Each pool is unique to a function.
-    * If the offset has already been defined in the context of the function, then the same region is returned.
-    *
-    * @param expr   : the offset
-    * @param parent : the function entry node
-    * @return the stack region corresponding to the offset
-    */
+   * Controls the pool of stack regions. Each pool is unique to a function.
+   * If the offset has already been defined in the context of the function, then the same region is returned.
+   *
+   * @param expr   : the offset
+   * @param parent : the function entry node
+   * @return the stack region corresponding to the offset
+   */
   def poolMaster(expr: BitVecLiteral, parent: CfgFunctionEntryNode): StackRegion = {
     val stackPool = stackMap.getOrElseUpdate(parent, mutable.HashMap())
     if (stackPool.contains(expr)) {
@@ -161,17 +161,18 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     buffers
   }
 
-  /** The lattice of abstract values.
-    */
-  val powersetLattice: PowersetLattice[MemoryRegion] = PowersetLattice()
+  val regionLattice: PowersetLattice[MemoryRegion] = PowersetLattice()
 
-  /** The lattice of abstract states.
+  /**
+    * Lifted memory region lattice, with new bottom element representing "unreachable".
     */
-  val lattice: MapLattice[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]] = MapLattice(powersetLattice)
+  val liftedLattice: LiftLattice[Set[MemoryRegion], PowersetLattice[MemoryRegion]] = LiftLattice(regionLattice)
+
+  val lattice: MapLattice[CfgNode, LiftedElement[Set[MemoryRegion]], LiftLattice[Set[MemoryRegion], PowersetLattice[MemoryRegion]]] = MapLattice(liftedLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
-  val first: Set[CfgNode] = domain.collect { case n: CfgFunctionEntryNode if n.predIntra.isEmpty => n }
+  val first: Set[CfgNode] = cfg.funEntries.toSet
 
   private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
@@ -232,6 +233,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                 env // we cannot evaluate this to a concrete value, we need VSA for this
             }
         }
+      // we cannot evaluate this to a concrete value, we need VSA for this
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")
         throw new Exception("Unknown type")
@@ -239,7 +241,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
   }
 
   /** Transfer function for state lattice elements.
-    */
+   */
   def localTransfer(n: CfgNode, s: Set[MemoryRegion]): Set[MemoryRegion] = n match {
     case cmd: CfgCommandNode =>
       cmd.data match {
@@ -247,7 +249,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
           if (directCall.target.name == "malloc") {
             evaluateExpression(mallocVariable, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
-                lattice.sublattice.lub(s, Set(HeapRegion(nextMallocCount())))
+                regionLattice.lub(s, Set(HeapRegion(nextMallocCount(), b)))
               case None => s
             }
           } else {
@@ -258,46 +260,13 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
             return s
           }
           val result = eval(memAssign.rhs.index, s, cmd)
-          /*
-          don't modify the IR in the middle of the analysis like this, also this produces a lot of incorrect results
-          result.collectFirst({
-            case StackRegion(name, _, _, _) =>
-              memAssign.rhs = MemoryStore(
-                Memory(name,
-                  memAssign.rhs.mem.addressSize,
-                  memAssign.rhs.mem.valueSize),
-                memAssign.rhs.index,
-                memAssign.rhs.value, memAssign.rhs.endian,
-                memAssign.rhs.size
-              )
-            case DataRegion(name, _, _, _) =>
-              memAssign.rhs = MemoryStore(
-                Memory(name, memAssign.rhs.mem.addressSize, memAssign.rhs.mem.valueSize),
-                memAssign.rhs.index,
-                memAssign.rhs.value,
-                memAssign.rhs.endian,
-                memAssign.rhs.size
-              )
-            case _ =>
-          })
-          */
-          lattice.sublattice.lub(s, result)
+          regionLattice.lub(s, result)
         case localAssign: LocalAssign =>
           var m = s
           unwrapExpr(localAssign.rhs).foreach {
             case memoryLoad: MemoryLoad =>
               val result = eval(memoryLoad.index, s, cmd)
-              /*
-              don't modify the IR in the middle of the analysis like this, this also produces incorrect results
-              result.collectFirst({
-                case StackRegion(name, _, _, _) =>
-                  memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
-                case DataRegion(name, _, _, _) =>
-                  memoryLoad.mem = Memory(name, memoryLoad.mem.addressSize, memoryLoad.mem.valueSize)
-                case _ =>
-              })
-              */
-              m = lattice.sublattice.lub(m, result)
+              m = regionLattice.lub(m, result)
             case _ => m
           }
           m
@@ -306,10 +275,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     case _ => s // ignore other kinds of nodes
   }
 
-  /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
-    */
-  def transfer(n: CfgNode, s: Set[MemoryRegion]): Set[MemoryRegion] = localTransfer(n, s)
-
+  def transferUnlifted(n: CfgNode, s: Set[MemoryRegion]): Set[MemoryRegion] = localTransfer(n, s)
 }
 
 class MemoryRegionAnalysisSolver(
@@ -320,4 +286,15 @@ class MemoryRegionAnalysisSolver(
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
 ) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
     with IntraproceduralForwardDependencies
-    with SimpleMonotonicSolver[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]]
+    with Analysis[Map[CfgNode, LiftedElement[Set[MemoryRegion]]]]
+    with WorklistFixpointSolverWithReachability[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]] {
+
+  override def funsub(n: CfgNode, x: Map[CfgNode, LiftedElement[Set[MemoryRegion]]]): LiftedElement[Set[MemoryRegion]] = {
+    n match {
+      // function entry nodes are always reachable as this is intraprocedural
+      case _: CfgFunctionEntryNode => liftedLattice.lift(regionLattice.bottom)
+      // all other nodes are processed with join+transfer
+      case _ => super.funsub(n, x)
+    }
+  }
+}

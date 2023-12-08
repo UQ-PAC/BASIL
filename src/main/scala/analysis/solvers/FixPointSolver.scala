@@ -48,6 +48,27 @@ trait MapLatticeSolver[N, T, L <: Lattice[T]] extends LatticeSolver[Map[N, T]] w
     val states = indep(n).map(o(_))
     states.foldLeft(lattice.sublattice.bottom)((acc, pred) => lattice.sublattice.lub(acc, pred))
 
+/**
+ * Base trait for solvers for map lattices with lifted co-domains.
+ * @tparam N type of the elements in the map domain.
+ */
+trait MapLiftLatticeSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, LiftedElement[T], LiftLattice[T, L]] with Dependencies[N] {
+
+  val lattice: MapLattice[N, LiftedElement[T], LiftLattice[T, L]]
+
+  /**
+   * The transfer function for the sub-sub-lattice.
+   */
+  def transferUnlifted(n: N, s: T): T
+
+  override def transfer(n: N, s: LiftedElement[T]): LiftedElement[T] = {
+    s match {
+      case LiftedBottom => LiftedBottom // unreachable as input implied unreachable at output
+      case Lift(a) => lattice.sublattice.lift(transferUnlifted(n, a))
+    }
+  }
+}
+
 /** An abstract worklist algorithm.
   *
   * @tparam N
@@ -163,6 +184,25 @@ trait SimpleWorklistFixpointSolver[N, T, L <: Lattice[T]] extends WorklistFixpoi
     run(domain)
     x
 
+/**
+ * The worklist-based fixpoint solver with reachability.
+ *
+ * This solver works for map lattices with lifted co-domains, where the extra bottom element typically represents "unreachable".
+ */
+trait WorklistFixpointSolverWithReachability[N, T, L <: Lattice[T]] extends WorklistFixpointSolver[N, LiftedElement[T], LiftLattice[T, L]] with MapLiftLatticeSolver[N, T, L] {
+
+  /**
+   * The start locations, used as the initial contents of the worklist.
+   */
+  val first: Set[N]
+
+  def analyze(): Map[N, LiftedElement[T]] = {
+    x = lattice.bottom
+    run(first)
+    x
+  }
+}
+
 /** A pushDown worklist-based fixpoint solvers. Pushes the results of the analysis one node down. This is used to have
   * the results of the pred node in the current node. ie. NODE 1: R0 = 69551bv64 RESULT LATTICE = {} NODE 2: R0 =
   * MemLoad[R0 + 54bv64] RESULT LATTICE = {R0 = 69551bv64} NODE 3: R1 = 0bv64 RESULT LATTICE = {R0 = TOP} ...
@@ -191,7 +231,6 @@ trait PushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends MapLatticeSo
   }
 
   def process(n: N): Unit =
-    //val y = funsub(n, x, intra)
     val xn = x(n)
     val y = transfer(n, xn)
 
