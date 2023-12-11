@@ -63,9 +63,9 @@ object RunUtils {
 
     parser.setBuildParseTree(true)
 
-    //TODO: mods.head may not work here if multiple modules
+    
 
-
+    // This is redundant now, but good for testing purposes
     val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
     val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
     val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
@@ -97,7 +97,7 @@ object RunUtils {
     //println(keys.toString())
     // println(mods.head.entryPoint)
 
-    // // BASIC BLOCKS TO CHRIS UUID
+    // BASIC BLOCKS TO CHRIS UUID
     // val tl = new TalkingListener()
     // ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
 
@@ -114,14 +114,19 @@ object RunUtils {
     // println(s"DataBlock UUID: ${block.getData.uuid}")
     // println
     // }
-    //mods.map(_.sections.foreach(elem => println(elem.uuid)))
+
+
+    // mods.map(_.sections.foreach(elem => println(elem.name)))
+
+    // mods.flatMap(_.symbols).foreach(elem => println(elem.name))
+    
 
 
     val GtirbConverter = new GtirbToIR(mods, parser, cfg)
     val program = GtirbConverter.createIR()
 
-    // // program.procedures.foreach(println)  
-    println(serialiseIL(program))
+    // program.procedures.foreach(println)  
+    println(serialiseIL(program)) // TODO: check reversed blocks? Look at Adresses of procedures
 
     return
 
