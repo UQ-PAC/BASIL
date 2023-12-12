@@ -153,8 +153,9 @@ object RunUtils {
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt"))
 
+    val contextTransfer = ContextTransfer(cfg, constPropResult).analyze()
     Logger.info("[!] Running Steensgaard")
-    val steensgaardSolver = SteensgaardAnalysis(cfg, constPropResult, globalAddresses, globalOffsets, mergedSubroutines)
+    val steensgaardSolver = SteensgaardAnalysis(cfg, constPropResult, contextTransfer, globalAddresses, globalOffsets, mergedSubroutines)
     steensgaardSolver.analyze()
     steensgaardSolver.pointsTo()
     steensgaardSolver.mayAlias()

@@ -33,6 +33,7 @@ case class RegisterVariableWrapper(variable: Variable) extends VariableWrapper {
 class SteensgaardAnalysis(
       cfg: ProgramCfg,
       constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
+      contextTransfer: mutable.Map[Procedure, mutable.Map[Variable, mutable.Set[FlatElement[BitVecLiteral]]]],
       globals: Map[BigInt, String],
       globalOffsets: Map[BigInt, BigInt],
       subroutines: Map[BigInt, String]) extends Analysis[Any] {
@@ -95,6 +96,85 @@ class SteensgaardAnalysis(
       case _ =>
     }
     buffers
+  }
+
+
+  def evalUsingContext(exp: Expr, n: CfgCommandNode, returnSet: mutable.Set[MemoryRegion]): mutable.Set[MemoryRegion] = {
+    Logger.debug(s"evaluating using context $exp")
+    Logger.debug(s"n: $n")
+    exp match {
+      case binOp: BinaryExpr =>
+        if (binOp.arg1 == stackPointer) {
+          evaluateExpression(binOp.arg2, constantProp(n)) match {
+            case Some(b: BitVecLiteral) =>
+              returnSet.add(poolMaster(b, n.parent))
+              returnSet
+            case None =>
+              returnSet
+          }
+        } else {
+          evaluateExpression(binOp, constantProp(n)) match {
+            case Some(b: BitVecLiteral) =>
+              returnSet.addAll(evalUsingContext(b, n, returnSet))
+              returnSet
+            case None =>
+              returnSet
+          }
+        }
+      case bitVecLiteral: BitVecLiteral =>
+        if (globals.contains(bitVecLiteral.value)) {
+          val globalName = globals(bitVecLiteral.value)
+          returnSet.add(DataRegion(globalName, bitVecLiteral))
+          returnSet
+        } else if (subroutines.contains(bitVecLiteral.value)) {
+          val subroutineName = subroutines(bitVecLiteral.value)
+          returnSet.add(DataRegion(subroutineName, bitVecLiteral))
+          returnSet
+        } else if (globalOffsets.contains(bitVecLiteral.value)) {
+          val val1 = globalOffsets(bitVecLiteral.value)
+          if (subroutines.contains(val1)) {
+            val globalName = subroutines(val1)
+            returnSet.add(DataRegion(globalName, bitVecLiteral))
+            returnSet
+          } else {
+            returnSet.add(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
+            returnSet
+          }
+        } else {
+          //throw new Exception(s"Unknown type for $bitVecLiteral")
+          // unknown region here
+          returnSet.add(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
+          returnSet
+        }
+      case variable: Variable =>
+        variable match {
+          case _: LocalVar =>
+            returnSet
+          case reg: Register if reg == stackPointer =>
+            returnSet
+          case _ =>
+            evaluateExpression(variable, constantProp(n)) match {
+              case Some(b: BitVecLiteral) =>
+                returnSet.addAll(evalUsingContext(b, n, returnSet))
+                returnSet
+              case _ =>
+                contextTransfer(n.parent.data).get(variable) match {
+                  case Some(set) =>
+                    set.foreach {
+                      case FlatEl(el) => returnSet.addAll(evalUsingContext(el, n, returnSet))
+                      case _ =>
+                    }
+                    returnSet
+                  case None =>
+                    returnSet // we cannot evaluate this to a concrete value, we need VSA for this
+                }
+            }
+        }
+      // we cannot evaluate this to a concrete value, we need VSA for this
+      case _ =>
+        Logger.debug(s"type: ${exp.getClass} $exp\n")
+        throw new Exception("Unknown type")
+    }
   }
 
   def eval(exp: Expr, n: CfgCommandNode): MemoryRegion | Expr = {
@@ -210,7 +290,7 @@ class SteensgaardAnalysis(
                     unify(alpha, varToStTerm(RegisterVariableWrapper(X1)))
 
                     // TODO: This might not be correct for globals
-                    // X1 = &X: [[X1]] = ^[[X2]] (but for globals)
+                    // X1 = &X: [[X1]] = ↑[[X2]] (but for globals)
                     val $X2 = eval(memoryLoad.index, cmd)
                     $X2 match
                       case region: MemoryRegion =>
