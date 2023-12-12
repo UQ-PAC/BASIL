@@ -11,18 +11,24 @@ import gtirb.*
 import ir._
 import scala.collection.mutable.ArrayBuffer
 import scala.jdk.CollectionConverters._
-import scala.collection.convert.ImplicitConversions._
 import java.awt.Taskbar.State
 import java.util.Base64
 import com.grammatech.gtirb.proto.CFG.Edge._
 import scala.collection.mutable.HashMap
 import java.nio.charset.*
+import scala.util.boundary, boundary.break
 
 
 /** Currently, this does procedurers first by going through the function blocks and functionEntries maps. Hopefully this
   * works, although more investigation will have to be done
   */
 class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: SemanticsParser, cfg: CFG) {
+
+  def getKey[K, V](value: V, map: mutable.Map[K, mutable.Set[V]]): Option[K] = {
+    val v = map.values.find(_.contains(value))
+    val key = v.flatMap(v => map.find(_._2 == v).map(_._1))
+    return key
+  }
 
   def create_addresses(): collection.mutable.HashMap[ByteString, Int] = {
 
@@ -42,13 +48,91 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
   } 
 
+  def create_cfg_map(): collection.mutable.HashMap[ByteString, ArrayBuffer[ByteString]] = {
+
+    val edges = cfg.edges 
+    val edgeMap: HashMap[ByteString, ArrayBuffer[ByteString]] = HashMap.empty
+
+    for (edge <- edges) {
+
+      if (edgeMap.contains(edge.sourceUuid)) {
+        edgeMap(edge.sourceUuid) += edge.targetUuid
+
+      } else {
+        edgeMap += (edge.sourceUuid -> ArrayBuffer(edge.targetUuid))
+
+      }
+
+    }
+    edgeMap
+  }
+
+  def create_symMap(): HashMap[ByteString, mutable.Set[proto.Symbol.Symbol]] = {
+    val symMap = HashMap[ByteString, mutable.Set[proto.Symbol.Symbol]]()
+
+    for (sym <- symbols) {
+      if (sym.optionalPayload.isReferentUuid) {
+        val ruuid = sym.optionalPayload.referentUuid.get
+
+        if (symMap.contains(ruuid)) {
+          symMap(ruuid) += sym
+        } else {
+          symMap += (ruuid -> mutable.Set[proto.Symbol.Symbol](sym))
+        }
+          
+      } 
+    }
+    symMap
+  }
+
+
+  def create_names(uuid: ByteString): String = {
+    var name: String = uuid.toString() 
+
+    if (functionNames.get(uuid) != None) { 
+      name = symbols.find(functionNames(uuid) == _.uuid).get.name //This is quite ineffecient if we have a ton of functions
+      
+
+      val entryBlocks: mutable.Set[ByteString] = functionEntries.get(uuid).get
+
+
+
+      val result = entryBlocks
+        .flatMap(e => edgeMap.getOrElse(e, None).iterator)
+        .flatMap(elem => mods.flatMap(_.proxies).find(_.uuid == elem))
+        .flatMap(proxy => symMap.getOrElse(proxy.uuid, None))
+        .map(p => p.name)
+
+      if (result.nonEmpty) {
+        return result.head
+      }
+
+      val syms: mutable.Set[proto.Symbol.Symbol] = entryBlocks.flatMap(entry => 
+        symMap.getOrElse(entry,None))
+      val names: mutable.Set[String] = syms.map(elem => elem.name)
+      
+      
+      if (names.size > 1) {
+        var nam = ""
+        nam += names.mkString(", ")
+        return nam
+      }
+      
+    }
+
+    name
+  }
+
+
   //TODO: mods.head may not work here if multiple modules
   val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
   val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
   val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
   val entrypoint = mods.head.entryPoint
   val symbols = mods.flatMap(_.symbols)
+  val symMap = create_symMap()
   val addresses = create_addresses()
+  val edgeMap: HashMap[ByteString, ArrayBuffer[ByteString]] = create_cfg_map()
  
 
   def createIR(): Program = {
@@ -71,10 +155,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
   def createProcedure(uuid: ByteString): Procedure = {
 
-    var name = uuid.toString() 
-    if (functionNames.get(uuid) != None){ 
-      name = symbols.find(functionNames(uuid) == _.uuid).get.name
-    }
+    val name = create_names(uuid)
     val blocks: ArrayBuffer[Block] = createBlocks(uuid)
     
     
@@ -88,11 +169,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     return Procedure(name, address, blocks, in, out)
   }
 
-  def getKey[K, V](value: V, map: mutable.Map[K, mutable.Set[V]]): Option[K] = {
-    val v = map.values.find(_.contains(value))
-    val key = v.flatMap(v => map.find(_._2 == v).map(_._1))
-    return key
-  }
+ 
 
   def createBlocks(uuid: ByteString): ArrayBuffer[Block] = {
     var blks: ArrayBuffer[Block] = ArrayBuffer[Block]()
@@ -116,29 +193,19 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
   }
 
 
-  def create_cfg_map(): collection.mutable.HashMap[ByteString, ArrayBuffer[ByteString]] = {
+  def createSemantics(uuid: ByteString): ArrayBuffer[Statement] = {
 
-    val edges = cfg.edges 
-    val edgeMap: HashMap[ByteString, ArrayBuffer[ByteString]] = HashMap.empty
+    var visitor = new SemanticsLoader(uuid, parser.semantics())
+    val statements = visitor.createStatements()
+    parser.reset()
+    return statements
 
-    for (edge <- edges) {
-
-      if (edgeMap.contains(edge.sourceUuid)) {
-        edgeMap(edge.sourceUuid) += edge.targetUuid
-
-      } else {
-        edgeMap += (edge.sourceUuid -> ArrayBuffer(edge.targetUuid))
-
-      }
-
-    }
-    edgeMap
   }
 
   def createJumps(procedures: ArrayBuffer[Procedure]): ArrayBuffer[Procedure] = {
 
 
-    val edgeMap: HashMap[ByteString, ArrayBuffer[ByteString]] = create_cfg_map()
+    
     println(edgeMap)
     val cpy = procedures
 
@@ -150,8 +217,8 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
         val targets = edgeMap(uuid)
         val target = targets(0) // this seems uber naive but i'll leave it for now
 
-        val entries = functionEntries.values
-        val blocks = functionEntries.values
+        val entries = functionEntries.valuesIterator 
+        val blocks = functionEntries.valuesIterator 
 
         if (entries.contains(target)) {
           val key = getKey(target, functionEntries)
@@ -172,17 +239,6 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
         
     }
     return procedures
-
-  }
-    
-  
-
-  def createSemantics(uuid: ByteString): ArrayBuffer[Statement] = {
-
-    var visitor = new SemanticsLoader(uuid, parser.semantics())
-    val statements = visitor.createStatements()
-    parser.reset()
-    return statements
 
   }
 

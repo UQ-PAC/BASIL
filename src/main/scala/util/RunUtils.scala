@@ -72,11 +72,9 @@ object RunUtils {
     val entrypoint = mods.head.entryPoint
     val sym = mods.flatMap(_.symbols)
 
-    
-
     // // PROXYBLOCKS
-    // val proxy = mods.map(_.proxies)
-    // println(proxy.foreach(elem => println(elem)))
+    // val proxy = mods.flatMap(_.proxies)
+    // proxy.foreach(elem => println(elem))
 
     // // FUNCTION BLOCKS WRITER
     // val bw = new BufferedWriter(new FileWriter(new File("Function Entries + Function Blocks")))
@@ -118,7 +116,7 @@ object RunUtils {
 
     // mods.map(_.sections.foreach(elem => println(elem.name)))
 
-    // mods.flatMap(_.symbols).foreach(elem => println(elem.name))
+    // println(mods.flatMap(_.symbols).find(_.name == "__libc_start_main").get.optionalPayload.referentUuid.get)
     
 
 
