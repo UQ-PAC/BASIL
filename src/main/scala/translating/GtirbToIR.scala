@@ -104,7 +104,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
         .map(p => p.name)
 
       if (result.nonEmpty) {
-        return result.head
+        return result.head //. head seems weird here but i guess it works
       }
 
       val syms: mutable.Set[proto.Symbol.Symbol] = entryBlocks.flatMap(entry => 
@@ -143,7 +143,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
       procedures += createProcedure(func)
     }
 
-    // procedures = createJumps(procedures)
+    procedures = createJumps(procedures)
 
     val initialMemory: ArrayBuffer[MemorySection] = ArrayBuffer() // this looks like its incomplete
     val readOnlyMemory: ArrayBuffer[MemorySection] = ArrayBuffer() //ditto
@@ -204,38 +204,46 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
   def createJumps(procedures: ArrayBuffer[Procedure]): ArrayBuffer[Procedure] = {
 
-
-    
-    println(edgeMap)
     val cpy = procedures
+    val entries = functionEntries.values.flatten.toList
+    val blocks = functionBlocks.values.flatten.toList
 
 
     for (p <- procedures) {
 
       for (b <- p.blocks) {
         val uuid = ByteString.copyFrom(Base64.getDecoder().decode(b.label))
-        val targets = edgeMap(uuid)
-        val target = targets(0) // this seems uber naive but i'll leave it for now
 
-        val entries = functionEntries.valuesIterator 
-        val blocks = functionEntries.valuesIterator 
+        if (edgeMap.contains(uuid)) {
 
-        if (entries.contains(target)) {
-          val key = getKey(target, functionEntries)
-          val proc = cpy.find(_.name == functionNames(uuid).toString).get
-          b.jump = DirectCall(proc, Option(b), Option(proc.name))
-        
-        } else if (blocks.contains(target) && !entries.contains(target)) {
-          val test: ArrayBuffer[Block] = ArrayBuffer[Block]()
-          b.jump = GoTo(test, None)         
+          val targets = edgeMap(uuid)
+          val target = targets(0) // this seems uber naive but i'll leave it for now -> Will probably be changed
 
-        } else if (!blocks.contains(target) && !entries.contains(target)) {
-          b.jump = IndirectCall(Register("TEST", BitVecType(1)), Option(b), None)
+          b.jump = target match {
+            case t if entries.contains(t) =>
+              val key = getKey(t, functionEntries).get
+              val proc = cpy.find(_.name == create_names(key)).get
+              DirectCall(proc, Option(b), Option(proc.name))
+              //potentially remove last stmt of block here since most likely just __PC call
+            case t if (blocks.contains(t) && !entries.contains(t)) =>
+              GoTo(ArrayBuffer[Block](), None)
+            
+            case _ =>
+              // This match statement seems wacky but i guess its oki
+              val reg : Variable = b.statements.last match {
+                case l : LocalAssign => l.rhs match {
+                  case v: Variable => v 
+                  case e: Extract => e.body.asInstanceOf[Variable]
+                }
+                case m : MemoryAssign => Register("TEST", BitVecType(1))
+              }
+              //potentially remove last stmt of block here since most likely just __PC call
+              IndirectCall(reg, Option(b), None)
+          }
 
         }
-
+        
       }
-
         
     }
     return procedures
