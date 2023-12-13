@@ -66,6 +66,7 @@ class ContextTransfer(
               }
             }
           }
+          case _ => {}
         }
       }
       case _ => // do nothing

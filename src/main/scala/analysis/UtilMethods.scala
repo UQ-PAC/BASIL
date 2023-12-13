@@ -51,3 +51,55 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
       None
   }
 }
+
+def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariableWrapper, Set[BitVecLiteral]]): Set[BitVecLiteral] = {
+  Logger.debug(s"evaluateExpression: $exp")
+
+  def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
+    val res = for {
+      x <- a
+      y <- b
+    } yield op(x, y)
+    res
+
+  def applySingle(op: BitVecLiteral => BitVecLiteral, a: Set[BitVecLiteral]): Set[BitVecLiteral] =
+    val res = for {
+      x <- a
+    } yield op(x)
+    res
+
+
+  exp match {
+    case binOp: BinaryExpr =>
+      val lhs = evaluateExpressionWithSSA(binOp.arg1, constantPropResult)
+      val rhs = evaluateExpressionWithSSA(binOp.arg2, constantPropResult)
+
+      (lhs, rhs) match {
+        case (l: Set[BitVecLiteral], r: Set[BitVecLiteral]) =>
+          binOp.op match {
+            case BVADD => apply(BitVectorEval.smt_bvadd, lhs, rhs)
+            case BVSUB => apply(BitVectorEval.smt_bvsub, lhs, rhs)
+            case BVASHR => apply(BitVectorEval.smt_bvashr, lhs, rhs)
+            case BVCOMP => apply(BitVectorEval.smt_bvcomp, lhs, rhs)
+            case BVCONCAT => apply(BitVectorEval.smt_concat, lhs, rhs)
+            case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
+          }
+        case _ => Set()
+      }
+    case extend: ZeroExtend =>
+      evaluateExpressionWithSSA(extend.body, constantPropResult) match {
+        case b: Set[BitVecLiteral] if b.nonEmpty => applySingle(BitVectorEval.smt_zero_extend(extend.extension, _: BitVecLiteral), b)
+        case _                => Set()
+      }
+    case e: Extract =>
+      evaluateExpressionWithSSA(e.body, constantPropResult) match {
+        case b: Set[BitVecLiteral] if b.nonEmpty => applySingle(BitVectorEval.boogie_extract(e.end, e.start, _: BitVecLiteral), b)
+        case _               => Set()
+      }
+    case registerVariableWrapper: RegisterVariableWrapper =>
+      constantPropResult(registerVariableWrapper)
+    case b: BitVecLiteral => Set(b)
+    case _ => //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
+      Set()
+  }
+}

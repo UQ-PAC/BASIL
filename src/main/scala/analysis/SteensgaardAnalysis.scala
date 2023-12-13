@@ -32,8 +32,7 @@ case class RegisterVariableWrapper(variable: Variable) extends VariableWrapper {
   */
 class SteensgaardAnalysis(
       cfg: ProgramCfg,
-      constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
-      contextTransfer: mutable.Map[Procedure, mutable.Map[Variable, mutable.Set[FlatElement[BitVecLiteral]]]],
+      constantProp: Map[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]]],
       globals: Map[BigInt, String],
       globalOffsets: Map[BigInt, BigInt],
       subroutines: Map[BigInt, String]) extends Analysis[Any] {
@@ -98,136 +97,55 @@ class SteensgaardAnalysis(
     buffers
   }
 
-
-  def evalUsingContext(exp: Expr, n: CfgCommandNode, returnSet: mutable.Set[MemoryRegion]): mutable.Set[MemoryRegion] = {
-    Logger.debug(s"evaluating using context $exp")
-    Logger.debug(s"n: $n")
-    exp match {
-      case binOp: BinaryExpr =>
-        if (binOp.arg1 == stackPointer) {
-          evaluateExpression(binOp.arg2, constantProp(n)) match {
-            case Some(b: BitVecLiteral) =>
-              returnSet.add(poolMaster(b, n.parent))
-              returnSet
-            case None =>
-              returnSet
-          }
-        } else {
-          evaluateExpression(binOp, constantProp(n)) match {
-            case Some(b: BitVecLiteral) =>
-              returnSet.addAll(evalUsingContext(b, n, returnSet))
-              returnSet
-            case None =>
-              returnSet
-          }
-        }
-      case bitVecLiteral: BitVecLiteral =>
-        if (globals.contains(bitVecLiteral.value)) {
-          val globalName = globals(bitVecLiteral.value)
-          returnSet.add(DataRegion(globalName, bitVecLiteral))
-          returnSet
-        } else if (subroutines.contains(bitVecLiteral.value)) {
-          val subroutineName = subroutines(bitVecLiteral.value)
-          returnSet.add(DataRegion(subroutineName, bitVecLiteral))
-          returnSet
-        } else if (globalOffsets.contains(bitVecLiteral.value)) {
-          val val1 = globalOffsets(bitVecLiteral.value)
-          if (subroutines.contains(val1)) {
-            val globalName = subroutines(val1)
-            returnSet.add(DataRegion(globalName, bitVecLiteral))
-            returnSet
-          } else {
-            returnSet.add(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
-            returnSet
-          }
-        } else {
-          //throw new Exception(s"Unknown type for $bitVecLiteral")
-          // unknown region here
-          returnSet.add(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
-          returnSet
-        }
-      case variable: Variable =>
-        variable match {
-          case _: LocalVar =>
-            returnSet
-          case reg: Register if reg == stackPointer =>
-            returnSet
-          case _ =>
-            evaluateExpression(variable, constantProp(n)) match {
-              case Some(b: BitVecLiteral) =>
-                returnSet.addAll(evalUsingContext(b, n, returnSet))
-                returnSet
-              case _ =>
-                contextTransfer(n.parent.data).get(variable) match {
-                  case Some(set) =>
-                    set.foreach {
-                      case FlatEl(el) => returnSet.addAll(evalUsingContext(el, n, returnSet))
-                      case _ =>
-                    }
-                    returnSet
-                  case None =>
-                    returnSet // we cannot evaluate this to a concrete value, we need VSA for this
-                }
-            }
-        }
-      // we cannot evaluate this to a concrete value, we need VSA for this
-      case _ =>
-        Logger.debug(s"type: ${exp.getClass} $exp\n")
-        throw new Exception("Unknown type")
-    }
-  }
-
-  def eval(exp: Expr, n: CfgCommandNode): MemoryRegion | Expr = {
+  def eval(exp: Expr, n: CfgCommandNode): Set[MemoryRegion] = {
     Logger.debug(s"evaluating $exp")
     Logger.debug(s"n: $n")
+    var regions = Set[MemoryRegion]()
     exp match {
       case binOp: BinaryExpr =>
         if (binOp.arg1 == stackPointer) {
-          evaluateExpression(binOp.arg2, constantProp(n)) match {
-            case Some(b: BitVecLiteral) => poolMaster(b, n.parent)
-            case None => exp
-          }
+          evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach(
+            b => regions += poolMaster(b, n.parent)
+          )
+            regions
         } else {
-          evaluateExpression(binOp, constantProp(n)) match {
-            case Some(b: BitVecLiteral) => eval(b, n)
-            case None => exp
-          }
+          evaluateExpressionWithSSA(binOp, constantProp(n)).foreach(
+              b => regions = regions ++ eval(b, n)
+          )
+            regions
         }
       case bitVecLiteral: BitVecLiteral =>
         if (globals.contains(bitVecLiteral.value)) {
           val globalName = globals(bitVecLiteral.value)
-          DataRegion(globalName, bitVecLiteral)
+          Set(DataRegion(globalName, bitVecLiteral))
         } else if (subroutines.contains(bitVecLiteral.value)) {
           val subroutineName = subroutines(bitVecLiteral.value)
-          DataRegion(subroutineName, bitVecLiteral)
+          Set(DataRegion(subroutineName, bitVecLiteral))
         } else if (globalOffsets.contains(bitVecLiteral.value)) {
           val val1 = globalOffsets(bitVecLiteral.value)
           if (subroutines.contains(val1)) {
             val globalName = subroutines(val1)
-            DataRegion(globalName, bitVecLiteral)
+            Set(DataRegion(globalName, bitVecLiteral))
           } else {
-            DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral)
+            Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
           }
         } else {
           //throw new Exception(s"Unknown type for $bitVecLiteral")
           // unknown region here
-          DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral)
+          Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
         }
       case variable: Variable =>
         variable match {
           case _: LocalVar =>
-            exp
+            Set()
           case reg: Register if reg == stackPointer =>
-            exp
+            Set()
           case _ =>
-            evaluateExpression(variable, constantProp(n)) match {
-              case Some(b: BitVecLiteral) =>
-                eval(b, n)
-              case _ =>
-                exp // we cannot evaluate this to a concrete value, we need VSA for this
-            }
+            evaluateExpressionWithSSA(variable, constantProp(n)).foreach(
+              b => regions = regions ++ eval(b, n)
+            )
+            regions
         }
-      // we cannot evaluate this to a concrete value, we need VSA for this
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")
         throw new Exception("Unknown type")
@@ -260,23 +178,17 @@ class SteensgaardAnalysis(
           case directCall: DirectCall =>
             // X = alloc P:  [[X]] = ↑[[alloc-i]]
             if (directCall.target.name == "malloc") {
-              evaluateExpression(mallocVariable, constantProp(n)) match {
-                case Some(b: BitVecLiteral) =>
-                  val alloc = HeapRegion(nextMallocCount(), b)
-                  unify(varToStTerm(RegisterVariableWrapper(mallocVariable)), PointerRef(allocToTerm(alloc)))
-              }
+              val alloc = HeapRegion(nextMallocCount(), BitVecLiteral(BigInt(0), 0))
+              unify(varToStTerm(RegisterVariableWrapper(mallocVariable)), PointerRef(allocToTerm(alloc)))
             }
           case localAssign: LocalAssign =>
             localAssign.rhs match {
               case binOp: BinaryExpr =>
                 // X1 = &X2: [[X1]] = ↑[[X2]]
                 if (binOp.arg1 == stackPointer) {
-                  evaluateExpression(binOp.arg2, constantProp(n)) match {
-                    case Some(b: BitVecLiteral) =>
-                      val $X2 = poolMaster(b, cmd.parent)
-                      val X1 = localAssign.lhs
-                      unify(varToStTerm(RegisterVariableWrapper(X1)), PointerRef(allocToTerm($X2)))
-                  }
+                  evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach(
+                    b => unify(varToStTerm(RegisterVariableWrapper(localAssign.lhs)), PointerRef(allocToTerm(poolMaster(b, cmd.parent))))
+                  )
                 }
               // TODO: should lookout for global base + offset case as well
               case _ =>
@@ -286,7 +198,9 @@ class SteensgaardAnalysis(
                     val X1 = localAssign.lhs
                     val X2_star = eval(memoryLoad.index, cmd)
                     val alpha = FreshVariable()
-                    unify(exprToStTerm(X2_star), PointerRef(alpha)) // TODO: X2_star should be the value of the memload not the memload itself
+                    X2_star.foreach(
+                      x => unify(exprToStTerm(x), PointerRef(alpha))
+                    )
                     unify(alpha, varToStTerm(RegisterVariableWrapper(X1)))
 
                     // TODO: This might not be correct for globals
@@ -306,10 +220,14 @@ class SteensgaardAnalysis(
           case memoryAssign: MemoryAssign =>
             // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
             val X1_star = eval(memoryAssign.rhs.index, cmd)
-            val X2 = evaluateExpression(memoryAssign.rhs.value, constantProp(n)).getOrElse(memoryAssign.rhs.value)
+            val X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(n))
             val alpha = FreshVariable()
-            unify(exprToStTerm(X1_star), PointerRef(alpha))
-            unify(alpha, exprToStTerm(X2))
+            X1_star.foreach(
+              x => unify(exprToStTerm(x), PointerRef(alpha))
+            )
+            X2.foreach(
+              x => unify(alpha, exprToStTerm(x))
+            )
           case _ => // do nothing TODO: Maybe LocalVar too?
         }
       case _ => // do nothing
