@@ -41,7 +41,9 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   val mapLattice: MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]] = MapLattice(powersetLattice)
 
-  val lattice: MapLattice[CfgNode, Map[Variable | MemoryRegion, Set[Value]], mapLattice.type] = MapLattice(mapLattice)
+  val liftedLattice: LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type] = LiftLattice(mapLattice)
+
+  val lattice: MapLattice[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]], LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type]] = MapLattice(liftedLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -102,6 +104,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
     Logger.debug(s"eval: $cmd")
     Logger.debug(s"state: $s")
     Logger.debug(s"node: $n")
+    var m = s
     cmd match
       case localAssign: LocalAssign =>
         localAssign.rhs match
@@ -111,19 +114,23 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
                 // this is an exception to the rule and only applies to data regions
                 evaluateExpression(memoryLoad.index, constantProp(n)) match
                   case Some(bitVecLiteral: BitVecLiteral) =>
-                    val m = s + (r -> Set(getValueType(bitVecLiteral)))
-                    m + (localAssign.lhs -> m(r))
+                    m = m + (r -> Set(getValueType(bitVecLiteral)))
+                    m = m + (localAssign.lhs -> m(r))
+                    m
                   case None =>
-                    s + (localAssign.lhs -> s(r))
+                    m = m + (localAssign.lhs -> m(r))
+                    m
               case None =>
                 Logger.warn("could not find region for " + localAssign)
-                s
+                m
           case e: Expr =>
             evaluateExpression(e, constantProp(n)) match {
-              case Some(bv: BitVecLiteral) => s + (localAssign.lhs -> Set(getValueType(bv)))
+              case Some(bv: BitVecLiteral) =>
+                m = m + (localAssign.lhs -> Set(getValueType(bv)))
+                m
               case None =>
                 Logger.warn("could not evaluate expression" + e)
-                s
+                m
             }
       case memAssign: MemoryAssign =>
         memAssign.rhs.index match
@@ -134,27 +141,29 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
                 val storeValue = memAssign.rhs.value
                 evaluateExpression(storeValue, constantProp(n)) match
                   case Some(bitVecLiteral: BitVecLiteral) =>
-                    s + (r -> Set(getValueType(bitVecLiteral)))
-                  /*
-                // TODO constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
-                case variable: Variable =>
-                  s + (r -> s(variable))
-                  */
+                    m = m + (r -> Set(getValueType(bitVecLiteral)))
+                    m
+                    /*
+                  // TODO constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
+                  case variable: Variable =>
+                    s + (r -> s(variable))
+                    */
                   case None =>
                     storeValue.match {
                       case v: Variable =>
-                        s + (r -> s(v))
+                        m = m + (r -> m(v))
+                        m
                       case _ =>
                         Logger.warn(s"Too Complex: $storeValue") // do nothing
-                        s
+                        m
                     }
               case None =>
                 Logger.warn("could not find region for " + memAssign)
-                s
+                m
           case _ =>
-            s
+            m
       case _ =>
-        s
+        m
   }
 
   /** Transfer function for state lattice elements.
@@ -173,7 +182,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transfer(n: CfgNode, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = localTransfer(n, s)
+  def transferUnlifted(n: CfgNode, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = localTransfer(n, s)
 }
 
 class ValueSetAnalysisSolver(
@@ -186,4 +195,15 @@ class ValueSetAnalysisSolver(
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
 ) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
     with InterproceduralForwardDependencies
-    with SimpleMonotonicSolver[CfgNode, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]]
+    with Analysis[Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
+    with WorklistFixpointSolverWithReachability[CfgNode, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]] {
+
+  override def funsub(n: CfgNode, x: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]): LiftedElement[Map[Variable | MemoryRegion, Set[Value]]] = {
+    n match {
+      // function entry nodes are always reachable as this is intraprocedural
+      case _: CfgFunctionEntryNode => liftedLattice.lift(mapLattice.bottom)
+      // all other nodes are processed with join+transfer
+      case _ => super.funsub(n, x)
+    }
+  }
+}

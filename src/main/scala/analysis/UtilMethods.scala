@@ -25,6 +25,7 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
             case BVSUB => Some(BitVectorEval.smt_bvsub(l, r))
             case BVASHR => Some(BitVectorEval.smt_bvashr(l, r))
             case BVCOMP => Some(BitVectorEval.smt_bvcomp(l, r))
+            case BVCONCAT => Some(BitVectorEval.smt_concat(l, r))
             case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
           }
         case _ => None
