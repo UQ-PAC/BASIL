@@ -116,10 +116,11 @@ class MemoryModelMap {
 trait MemoryRegion {
   val regionIdentifier: String
   var extent: Option[RangeKey] = None
+  val content: mutable.Set[BitVecLiteral] = mutable.Set()
 }
 
 class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral) extends MemoryRegion {
-  override def toString: String = s"Stack($regionIdentifier, $start)"
+  override def toString: String = s"Stack($regionIdentifier, $start) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
     case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier
@@ -128,7 +129,7 @@ class StackRegion(override val regionIdentifier: String, val start: BitVecLitera
 }
 
 class HeapRegion(override val regionIdentifier: String, val size: BitVecLiteral) extends MemoryRegion {
-  override def toString: String = s"Heap($regionIdentifier, $size)"
+  override def toString: String = s"Heap($regionIdentifier, $size) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode()
   override def equals(obj: Any): Boolean = obj match {
     case h: HeapRegion => h.regionIdentifier == regionIdentifier
@@ -137,7 +138,7 @@ class HeapRegion(override val regionIdentifier: String, val size: BitVecLiteral)
 }
 
 class DataRegion(override val regionIdentifier: String, val start: BitVecLiteral) extends MemoryRegion {
-  override def toString: String = s"Data($regionIdentifier, $start)"
+  override def toString: String = s"Data($regionIdentifier, $start) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
     case d: DataRegion => d.start == start && d.regionIdentifier == regionIdentifier

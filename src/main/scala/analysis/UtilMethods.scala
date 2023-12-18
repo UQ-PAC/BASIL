@@ -84,7 +84,6 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariabl
             case BVCONCAT => apply(BitVectorEval.smt_concat, lhs, rhs)
             case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
           }
-        case _ => Set()
       }
     case extend: ZeroExtend =>
       evaluateExpressionWithSSA(extend.body, constantPropResult) match {
@@ -97,6 +96,15 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariabl
         case _               => Set()
       }
     case registerVariableWrapper: RegisterVariableWrapper =>
+      constantPropResult.collect({
+        case (k, v) if k == registerVariableWrapper => v
+      }).flatten.toSet
+      constantPropResult(registerVariableWrapper)
+    case variable: Variable =>
+      val registerVariableWrapper = RegisterVariableWrapper(variable)
+      constantPropResult.collect({
+        case (k, v) if k == registerVariableWrapper => v
+      }).flatten.toSet
       constantPropResult(registerVariableWrapper)
     case b: BitVecLiteral => Set(b)
     case _ => //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")

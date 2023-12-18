@@ -23,7 +23,7 @@ case class RegisterVariableWrapper(variable: Variable) extends VariableWrapper {
     }
 
     override def hashCode(): Int = {
-        variable.hashCode() + variable.ssa_id.hashCode()
+        variable.hashCode()
     }
 }
 
@@ -223,7 +223,9 @@ class SteensgaardAnalysis(
             val X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(n))
             val alpha = FreshVariable()
             X1_star.foreach(
-              x => unify(exprToStTerm(x), PointerRef(alpha))
+              x => 
+                unify(exprToStTerm(x), PointerRef(alpha))
+                x.content.addAll(X2)
             )
             X2.foreach(
               x => unify(alpha, exprToStTerm(x))
