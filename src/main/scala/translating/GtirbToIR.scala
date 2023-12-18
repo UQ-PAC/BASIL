@@ -123,6 +123,13 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     name
   }
 
+  def get_jmp_reg(statement: Statement): Variable = statement match {
+    case LocalAssign(_, rhs: Variable, _) => rhs
+    case LocalAssign(_, rhs: Extract, _) => rhs.body.asInstanceOf[Variable]
+    case _ => Register("TEST", BitVecType(1))
+  }
+
+
 
   //TODO: mods.head may not work here if multiple modules
   val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
@@ -130,6 +137,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
   val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
   val entrypoint = mods.head.entryPoint
   val symbols = mods.flatMap(_.symbols)
+  val blkMap: HashMap[ByteString, Block] = HashMap[ByteString, Block]()
   val symMap = create_symMap()
   val addresses = create_addresses()
   val edgeMap: HashMap[ByteString, ArrayBuffer[ByteString]] = create_cfg_map()
@@ -189,7 +197,9 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     val address: Option[Int] = addresses.get(uuid)
     val semantics: ArrayBuffer[Statement] = createSemantics(uuid)
     val jump: Jump = GoTo(ArrayBuffer[Block](), None) //TODO: placeholder for now
-    return Block(Base64.getEncoder().encodeToString(uuid.toByteArray()), address, semantics, jump) 
+    val block = Block(Base64.getEncoder().encodeToString(uuid.toByteArray()), address, semantics, jump) 
+    blkMap += (uuid -> block)
+    return block
   }
 
 
@@ -202,52 +212,88 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
   }
 
-  def createJumps(procedures: ArrayBuffer[Procedure]): ArrayBuffer[Procedure] = {
+  def singleJump(procedures: ArrayBuffer[Procedure], block: Block, target: ByteString, 
+                  entries: List[ByteString], blocks: List[ByteString]): Jump = {
+    target match {
+      case t if entries.contains(t) => 
+        val key = getKey(target, functionEntries).get
+        val proc = procedures.find(_.name == create_names(key)).get
+        return DirectCall(proc, None, Option(proc.name))
+        //potentially remove last stmt of block here since most likely just __PC call
 
+      case t if (blocks.contains(t) && !entries.contains(t)) => 
+        return GoTo(ArrayBuffer[Block](blkMap(target)), None)
+
+      case _ => 
+        // This match statement seems wacky but i guess its oki
+        val reg: Variable = get_jmp_reg(block.statements.last)
+        return IndirectCall(reg, None, None)  
+        //potentially remove last stmt of block here since most likely just __PC call     
+    }
+  }
+
+  def multiJump(procedures: ArrayBuffer[Procedure], block: Block, targets: ArrayBuffer[ByteString], 
+                entries: List[ByteString], blocks: List[ByteString]): Jump = {
+
+    def resolveGotoTarget(): Block = {
+    targets.find(!entries.contains(_)).map(blkMap).get
+    }
+    
+    val hasDirectCall = targets.exists(entries.contains(_))
+    val hasIndirectCall = !targets.exists(blocks.contains(_)) && !hasDirectCall
+    val hasGoto = targets.exists(target => blocks.contains(target) && !entries.contains(target))
+
+    
+    (hasDirectCall, hasIndirectCall, hasGoto) match {
+      case (true, _, true) =>
+        val goto: Block = resolveGotoTarget()
+        val target = targets.find(entries.contains).get 
+        val key = getKey(target, functionEntries).get
+        val proc = procedures.find(_.name == create_names(key)).get 
+        DirectCall(proc, Option(goto), Option(proc.name))
+
+      case (_, true, true) =>
+        val goto: Block = resolveGotoTarget()
+        val reg: Variable = get_jmp_reg(block.statements.last)
+        IndirectCall(reg, Option(goto), None)
+
+      case (_, _, true) =>
+        val blks = targets.map(blkMap)
+        GoTo(blks, None)
+
+      case _ =>
+        GoTo(ArrayBuffer[Block](), None)
+    }
+
+  }
+
+
+  def createJumps(procedures: ArrayBuffer[Procedure]): ArrayBuffer[Procedure] = {
     val cpy = procedures
     val entries = functionEntries.values.flatten.toList
     val blocks = functionBlocks.values.flatten.toList
 
-
     for (p <- procedures) {
-
       for (b <- p.blocks) {
+
         val uuid = ByteString.copyFrom(Base64.getDecoder().decode(b.label))
 
         if (edgeMap.contains(uuid)) {
 
           val targets = edgeMap(uuid)
-          val target = targets(0) // this seems uber naive but i'll leave it for now -> Will probably be changed
 
-          b.jump = target match {
-            case t if entries.contains(t) =>
-              val key = getKey(t, functionEntries).get
-              val proc = cpy.find(_.name == create_names(key)).get
-              DirectCall(proc, Option(b), Option(proc.name))
-              //potentially remove last stmt of block here since most likely just __PC call
-            case t if (blocks.contains(t) && !entries.contains(t)) =>
-              GoTo(ArrayBuffer[Block](), None)
-            
-            case _ =>
-              // This match statement seems wacky but i guess its oki
-              val reg : Variable = b.statements.last match {
-                case l : LocalAssign => l.rhs match {
-                  case v: Variable => v 
-                  case e: Extract => e.body.asInstanceOf[Variable]
-                }
-                case m : MemoryAssign => Register("TEST", BitVecType(1))
-              }
-              //potentially remove last stmt of block here since most likely just __PC call
-              IndirectCall(reg, Option(b), None)
+          if (targets.size > 1) {
+            b.jump = multiJump(cpy, b, targets, entries, blocks)
+          } else {
+            val target = targets(0) // this seems uber naive but i'll leave it for now -> Will probably be changed
+            b.jump = singleJump(cpy, b, target, entries, blocks)
           }
-
         }
-        
-      }
-        
+   
+      }    
     }
-    return procedures
 
+    return procedures
   }
 
 }

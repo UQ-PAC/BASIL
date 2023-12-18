@@ -83,9 +83,9 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
 
   override def visitCall_stmt(ctx: Call_stmtContext): MemoryAssign = {
     val mem = Memory("mem", 64, 8) // yanked from BAP
-    val addr = visitExpr(ctx.expr(0))
-    val value = visitExpr(ctx.expr(1))
-    val size = visitExpr(ctx.expr(3)).asInstanceOf[IntLiteral].value.toInt
+    val addr = visitExpr(ctx.expr(1))
+    val value = visitExpr(ctx.expr(4))
+    val size = visitExpr(ctx.expr(2)).asInstanceOf[IntLiteral].value.toInt 
     val memstore = MemoryStore(mem, addr, value, Endian.LittleEndian, size)
     return MemoryAssign(mem, memstore)
   }
