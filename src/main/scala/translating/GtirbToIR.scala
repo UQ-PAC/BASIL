@@ -103,17 +103,18 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
       if (result.nonEmpty) {
         return result.head //. head seems weird here but i guess it works
       }
-
-      val syms: mutable.Set[proto.Symbol.Symbol] = entryBlocks.flatMap(entry => 
-        symMap.getOrElse(entry,None))
-      val names: mutable.Set[String] = syms.map(elem => elem.name)
+      
+      // This is probably uneccessary
+      // val syms: mutable.Set[proto.Symbol.Symbol] = entryBlocks.flatMap(entry => 
+      //   symMap.getOrElse(entry,None))
+      // val names: mutable.Set[String] = syms.map(elem => elem.name)
       
       
-      if (names.size > 1) {
-        var nam = ""
-        nam += names.mkString(", ")
-        return nam
-      }
+      // if (names.size > 1) {
+      //   var nam = ""
+      //   nam += names.mkString(", ")
+      //   return nam
+      // }
       
     }
 
@@ -177,13 +178,18 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
  
 
   def createBlocks(uuid: ByteString): ArrayBuffer[Block] = {
-    var blks: ArrayBuffer[Block] = ArrayBuffer[Block]()
+    
+    val entries = functionEntries(uuid)
+    var blks: ArrayBuffer[Block] = entries.map(createBlock).to(ArrayBuffer)
+
     var funcblks = functionBlocks.getOrElse(uuid, Set.empty[ByteString])
 
-    if (funcblks.nonEmpty) {
-      funcblks.foreach(elem => blks += createBlock(elem))
+     funcblks.foreach { elem => 
+      if (!functionEntries(uuid).contains(elem)) {
+        blks += createBlock(elem)
+      }  
     } 
-
+    
     return blks
   }
 
@@ -214,15 +220,13 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
         val key = getKey(target, functionEntries).get
         val proc = procedures.find(_.name == create_names(key)).get
         return DirectCall(proc, None, Option(proc.name))
-        // TODO: potentially remove last stmt of block here since most likely just __PC call
 
       case t if (blocks.contains(t) && !entries.contains(t)) => 
         return GoTo(ArrayBuffer[Block](blkMap(target)), None)
 
       case _ => 
         val reg: Variable = get_jmp_reg(block.statements.last)
-        return IndirectCall(reg, None, None)  
-        //potentially remove last stmt of block here since most likely just __PC call     
+        return IndirectCall(reg, None, None)    
     }
   }
 
@@ -284,6 +288,12 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
             val target = targets(0)
             b.jump = singleJump(cpy, b, target, entries, blocks)
           }
+        }
+
+        b.statements.lastOption match {
+          case Some(LocalAssign(lhs: Register, _, _)) if lhs.name == "_PC" =>
+             b.statements.remove(b.statements.size - 1) // Remove the last element
+          case _ => // Do nothing if the last element doesn't match the condition
         }
    
       }    
