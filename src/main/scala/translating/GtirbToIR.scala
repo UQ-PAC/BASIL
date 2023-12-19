@@ -18,10 +18,7 @@ import scala.collection.mutable.HashMap
 import java.nio.charset.*
 import scala.util.boundary, boundary.break
 
-
-/** Currently, this does procedurers first by going through the function blocks and functionEntries maps. Hopefully this
-  * works, although more investigation will have to be done
-  */
+/* GtirbtoIR function. Attempt to form an IR matching the one produced by BAP by using GTIRB instead */
 class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: SemanticsParser, cfg: CFG) {
 
   def getKey[K, V](value: V, map: mutable.Map[K, mutable.Set[V]]): Option[K] = {
@@ -168,7 +165,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     
     
     
-    val address: Option[Int] = addresses.get(functionEntries(uuid).head); //TODO: ask about entrypoints in BAP (or maybe function blocks is better here?)
+    val address: Option[Int] = addresses.get(functionEntries(uuid).head); //addresses are weird but it shouuuuld be fine :/
 
 
     val in: ArrayBuffer[Parameter] = ArrayBuffer() // TODO: gtirb does not contain this -> Datablocks or symbols are candidates
@@ -182,13 +179,11 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
   def createBlocks(uuid: ByteString): ArrayBuffer[Block] = {
     var blks: ArrayBuffer[Block] = ArrayBuffer[Block]()
     var funcblks = functionBlocks.getOrElse(uuid, Set.empty[ByteString])
-    // TODO: check this, because some procedures may randomly not have blocks
 
     if (funcblks.nonEmpty) {
-
       funcblks.foreach(elem => blks += createBlock(elem))
-
     } 
+
     return blks
   }
 
@@ -196,7 +191,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     
     val address: Option[Int] = addresses.get(uuid)
     val semantics: ArrayBuffer[Statement] = createSemantics(uuid)
-    val jump: Jump = GoTo(ArrayBuffer[Block](), None) //TODO: placeholder for now
+    val jump: Jump = GoTo(ArrayBuffer[Block](), None) //jumps should be done now, so if an empty GoTo comes up then something is wrong :(
     val block = Block(Base64.getEncoder().encodeToString(uuid.toByteArray()), address, semantics, jump) 
     blkMap += (uuid -> block)
     return block
@@ -219,13 +214,12 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
         val key = getKey(target, functionEntries).get
         val proc = procedures.find(_.name == create_names(key)).get
         return DirectCall(proc, None, Option(proc.name))
-        //potentially remove last stmt of block here since most likely just __PC call
+        // TODO: potentially remove last stmt of block here since most likely just __PC call
 
       case t if (blocks.contains(t) && !entries.contains(t)) => 
         return GoTo(ArrayBuffer[Block](blkMap(target)), None)
 
       case _ => 
-        // This match statement seems wacky but i guess its oki
         val reg: Variable = get_jmp_reg(block.statements.last)
         return IndirectCall(reg, None, None)  
         //potentially remove last stmt of block here since most likely just __PC call     
@@ -245,12 +239,14 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
     
     (hasDirectCall, hasIndirectCall, hasGoto) match {
+
       case (true, _, true) =>
         val goto: Block = resolveGotoTarget()
         val target = targets.find(entries.contains).get 
         val key = getKey(target, functionEntries).get
         val proc = procedures.find(_.name == create_names(key)).get 
         DirectCall(proc, Option(goto), Option(proc.name))
+        
 
       case (_, true, true) =>
         val goto: Block = resolveGotoTarget()
@@ -285,7 +281,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
           if (targets.size > 1) {
             b.jump = multiJump(cpy, b, targets, entries, blocks)
           } else {
-            val target = targets(0) // this seems uber naive but i'll leave it for now -> Will probably be changed
+            val target = targets(0)
             b.jump = singleJump(cpy, b, target, entries, blocks)
           }
         }

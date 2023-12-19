@@ -1,48 +1,24 @@
 {
-    "+QF2GMcTSCSLTsIEECUnkA==": [
+    "/+0NA1rRTEe7Fb2ezxrwOA==": [
         [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_TApply(ZeroExtend.0,[(Expr_LitInt('32'));(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('32')))]));(Expr_LitInt('64'))]))"
         ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('17')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111110111000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111110111000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('01'))",
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('17')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ]
-    ],
-    "0A45aRBUQk63Kfx8/f+3zA==": [
         [
             "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
         ],
         [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000011000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ],
         [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_LitBits('0000000000000000000000000000000000000000000000000000011011110000'))",
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000010111010000'))"
-        ]
-    ],
-    "0IaW4nqtQCuixdSl7/TDZw==": [
-        [],
-        [
-            "Stmt_ConstDecl(Type_Bits(Expr_LitInt('64')),Cse0__5,Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('1111111111111111111111111111111111111111111111111111111111110000'))]))",
-            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_Var(Cse0__5));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('29')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])",
-            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Var(Cse0__5));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])",
-            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_Var(Cse0__5))"
+            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('4'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('4'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('32')))]))])"
         ],
         [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ]
-    ],
-    "1tcnKO13Q+iHFQ8Sikj5eQ==": [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))"
+        ],
         [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000010'))"
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
+            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]))"
         ],
         [
             "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
@@ -50,91 +26,7 @@
             "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ]
     ],
-    "3gjhWHBnSrWrn4JMuZ5bcA==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_Slices(Expr_TApply(not_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('2')),Expr_TApply(append_bits.0,[(Expr_LitInt('63'));(Expr_LitInt('1'))],[(Expr_LitBits('000000000000000000000000000000000000000000000000000000000000000'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('63'),Expr_LitInt('1')))]))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('2')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_Slices(Expr_TApply(asr_bits.0,[(Expr_LitInt('64'));(Expr_LitInt('3'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('011'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_TApply(SignExtend.0,[(Expr_LitInt('63'));(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('1'),Expr_LitInt('63')))]));(Expr_LitInt('64'))]))"
-        ],
-        [
-            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011010111000')),],[],)"
-        ]
-    ],
-    "4+xb9uQCRnag/+TAugmnOA==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ],
-        [
-            "Stmt_ConstDecl(Type_Bits(Expr_LitInt('64')),Cse2__5,Expr_TApply(not_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]))",
-            "Stmt_ConstDecl(Type_Bits(Expr_LitInt('64')),Cse0__5,Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_Slices(Expr_TApply(not_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]))",
-            "Stmt_Assign(LExpr_Field(LExpr_Var(PSTATE),V),Expr_TApply(not_bits.0,[(Expr_LitInt('1'))],[(Expr_TApply(cvt_bool_bv.0,[],[(Expr_TApply(eq_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(SignExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(Cse0__5),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('65'))]));(Expr_TApply(add_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(SignExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('65'))]));(Expr_TApply(SignExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Var(Cse2__5));(Expr_LitInt('65'))]))]));(Expr_LitBits('00000000000000000000000000000000000000000000000000000000000000001'))]))]))]))]))",
-            "Stmt_Assign(LExpr_Field(LExpr_Var(PSTATE),C),Expr_TApply(not_bits.0,[(Expr_LitInt('1'))],[(Expr_TApply(cvt_bool_bv.0,[],[(Expr_TApply(eq_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(ZeroExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(Cse0__5),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('65'))]));(Expr_TApply(add_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(ZeroExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('65'))]));(Expr_TApply(ZeroExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Var(Cse2__5));(Expr_LitInt('65'))]))]));(Expr_LitBits('00000000000000000000000000000000000000000000000000000000000000001'))]))]))]))]))",
-            "Stmt_Assign(LExpr_Field(LExpr_Var(PSTATE),Z),Expr_TApply(cvt_bool_bv.0,[],[(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(Cse0__5),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]))]))",
-            "Stmt_Assign(LExpr_Field(LExpr_Var(PSTATE),N),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(Cse0__5),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))]),[(Slice_LoWd(Expr_LitInt('63'),Expr_LitInt('1')))]))"
-        ],
-        [
-            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('1'))],[(Expr_Field(Expr_Var(PSTATE),Z));(Expr_LitBits('1'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011001111100')),],[],)"
-        ]
-    ],
-    "79dryzr7SFiCMHQYDeyt4g==": [
-        [
-            "Stmt_ConstDecl(Type_Bits(Expr_LitInt('64')),Cse0__5,Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('1111111111111111111111111111111111111111111111111111111111100000'))]))",
-            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_Var(Cse0__5));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('29')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])",
-            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Var(Cse0__5));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])",
-            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_Var(Cse0__5))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ],
-        [
-            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('19')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('19')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_TApply(ZeroExtend.0,[(Expr_LitInt('32'));(Expr_LitInt('64'))],[(Expr_TApply(ZeroExtend.0,[(Expr_LitInt('8'));(Expr_LitInt('32'))],[(Expr_TApply(Mem.read.0,[(Expr_LitInt('1'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('19')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]));(Expr_LitInt('1'));(Expr_LitInt('0'))]));(Expr_LitInt('32'))]));(Expr_LitInt('64'))]))"
-        ],
-        [
-            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('1'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('1')))]));(Expr_LitBits('1'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011011111100')),],[],)"
-        ]
-    ],
-    "7PLh6+cxQYirhoKBU8b1Jw==": [
-        [
-            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ]
-    ],
-    "9URyl6Z9QhScwGRhfAeRzQ==": [
+    "/OLyS+EeQVqcsxOitlpb+w==": [
         [
             "Stmt_ConstDecl(Type_Bits(Expr_LitInt('64')),Cse0__5,Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('1111111111111111111111111111111111111111111111111111111111110000'))]))",
             "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_Var(Cse0__5));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('29')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])",
@@ -162,89 +54,30 @@
             "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011101001100'))"
         ]
     ],
-    "9s6E88JnQWa7gwYMaRgIkg==": [
-        [
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000010111100000'))"
-        ]
-    ],
-    "C8rwoqADQhiBrz2JVMsrKQ==": [
-        []
-    ],
-    "FZ7uf4IIRlSo7vc6VktgrA==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('19')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
-            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000100000'))]))"
-        ],
+    "2tVV3cm0Sz+a6PZzI6yAkQ==": [
         [
             "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
             "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
             "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ]
     ],
-    "I93JAhK3S766V0Y/jEs4cA==": [
+    "3tHT82xpTz6Q1Wn/DjUi0Q==": [
         [
-            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ]
-    ],
-    "OlYfOD5QTNSvKctA9jQE8g==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_LitBits('0000000000000000000000000000000000000000000000000000011011110100'))",
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011001010000'))"
-        ]
-    ],
-    "QH1/AGe4SROrHowXHwZWEQ==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
-            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]))"
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
         ],
         [
-            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ]
-    ],
-    "QY541ruMTfe/M2He34Ns0Q==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
-            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]))"
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('17')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111110111000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
         ],
         [
-            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ]
-    ],
-    "SyoeqVVGREa0pCrJIH30Hw==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111110111000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ],
         [
             "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('01'))",
             "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('17')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ]
     ],
-    "TnC82DihRdKCtyIFifeSoA==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('2')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('01'))",
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ]
-    ],
-    "UIOv9yZCSraLZFGAZg5J/w==": [
+    "51yzjhLNRNuYH+h1VvQIKg==": [
         [],
         [
             "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))"
@@ -282,26 +115,40 @@
             "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000010111000000'))"
         ]
     ],
-    "YTloGALJREOGDmnOk0l9mA==": [
+    "5SPjJRg/RQW6UVe/km68pQ==": [
         [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_TApply(ZeroExtend.0,[(Expr_LitInt('32'));(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('32')))]));(Expr_LitInt('64'))]))"
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
         ],
         [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('17')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
         ],
         [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000011000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111001000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ],
         [
-            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('4'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('4'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('32')))]))])"
+            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('01'))",
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('17')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ]
+    ],
+    "7+qXxsL6RquGGPDglEcPgA==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('2')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ],
         [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))"
+            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('01'))",
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ]
+    ],
+    "7JSX19LPQ2Oeyh/PlHonHQ==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('19')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
         ],
         [
             "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
             "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
-            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]))"
+            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000100000'))]))"
         ],
         [
             "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
@@ -309,7 +156,7 @@
             "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ]
     ],
-    "at25zwIGQNqveyRLUd8/Fg==": [
+    "8fkSIx4uTZGrGLyvt2qj4Q==": [
         [
             "Stmt_ConstDecl(Type_Bits(Expr_LitInt('64')),Cse0__5,Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('1111111111111111111111111111111111111111111111111111111111110000'))]))",
             "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_Var(Cse0__5));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])",
@@ -331,115 +178,31 @@
             "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('17')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ]
     ],
-    "ax0lp/J3Q4WIlRZY87kOvg==": [
+    "BTgrTPyXT1KcGvUUXZ7xVA==": [
         [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
+            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]))"
         ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111011000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
-        ],
-        [
-            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011001111100')),],[],)"
-        ]
-    ],
-    "dgm0taxpTB2fUqF2We30hg==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('17')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111001000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('01'))",
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('17')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ]
-    ],
-    "fs55+59fQ76DPCxLkhrz/w==": [
         [
             "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
             "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
             "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ]
     ],
-    "greCvZODSrOk+B1ZmBsp7Q==": [
+    "BoKeMNLsRRWoEzP/2PaGIA==": [
         [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))",
+            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
             "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011010000000'))"
+            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ]
     ],
-    "iR+G9vSWQK6uEf5u5sHWuA==": [
-        [],
-        []
-    ],
-    "p70VuiW7TcGQaVlWnj1AdA==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_LitBits('0000000000000000000000000000000000000000000000000000011000110100'))",
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000010111110000'))"
-        ]
-    ],
-    "qxAgPzRXSM2TSRnVoJmTdA==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111101000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
-        ],
-        [
-            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011001000100')),],[],)"
-        ]
-    ],
-    "rfqcQ9xQQBaHdjjxtnEVcw==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('17')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111000000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111000000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('01'))",
-            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
-            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('17')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
-        ]
-    ],
-    "sLKOzOesRGaMVx3DcmJdVA==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('2')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('2')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('2')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111111000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
-        ],
-        [
-            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('2')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011010111000')),],[],)"
-        ]
-    ],
-    "u/Gvpj8/SSCd0hNJwtlvow==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))"
-        ],
-        [
-            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('1'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('19')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]));(Expr_LitInt('1'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('8')))]))])"
-        ]
-    ],
-    "xW/r2MgaSne7LuDJWjH8Fg==": [
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
-        ],
-        [
-            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111100000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
-        ],
-        [
-            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011011110000')),],[],)"
-        ]
-    ],
-    "zma/CNtzQ1W+wXiHTSnZmg==": [
+    "C/pSZfEqSYCCpS/K2LyTiw==": [
         [],
         [
             "Stmt_ConstDecl(Type_Bits(Expr_LitInt('64')),Cse0__5,Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('1111111111111111111111111111111111111111111111111111111111110000'))]))",
@@ -456,7 +219,68 @@
             "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011000110100'))"
         ]
     ],
-    "zukfiyS2Sdq1F3p2KNE2pw==": [
+    "F/JfvDstQmSfHMabqwvQSw==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_LitBits('0000000000000000000000000000000000000000000000000000011011110000'))",
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000010111010000'))"
+        ]
+    ],
+    "HApsR+3lR4+vYc9fGmpQQg==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_LitBits('0000000000000000000000000000000000000000000000000000011011110100'))",
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011001010000'))"
+        ]
+    ],
+    "LYsQeMyTTS6DK0RdDtE8sA==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111101000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
+        ],
+        [
+            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011001000100')),],[],)"
+        ]
+    ],
+    "Qhj6PnIWQpOwkQq3PSfXTQ==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('30')),Expr_LitBits('0000000000000000000000000000000000000000000000000000011000110100'))",
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000010111110000'))"
+        ]
+    ],
+    "SGa7GJL1QLyLjINIu6IRbg==": [
+        []
+    ],
+    "SHH64hUoQUiuprmciVv8LQ==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))"
+        ],
+        [
+            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('1'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('19')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]));(Expr_LitInt('1'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('8')))]))])"
+        ]
+    ],
+    "UA3Q7USDQsGbieZ9XilhwQ==": [
+        [],
+        [
+            "Stmt_ConstDecl(Type_Bits(Expr_LitInt('64')),Cse0__5,Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('1111111111111111111111111111111111111111111111111111111111110000'))]))",
+            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_Var(Cse0__5));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('29')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])",
+            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Var(Cse0__5));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])",
+            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_Var(Cse0__5))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ]
+    ],
+    "We68En+xQJuqfQxeQ+7cPA==": [
         [
             "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
         ],
@@ -471,5 +295,181 @@
             "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
             "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('17')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
         ]
+    ],
+    "XRDhsOKtTv+E+XsaA18aYg==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111011000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
+        ],
+        [
+            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011001111100')),],[],)"
+        ]
+    ],
+    "eArHKA8HQHOeCxwBqpPMdA==": [
+        [
+            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ]
+    ],
+    "igB9efrkTWSpAl4LckOknw==": [
+        [
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000010111100000'))"
+        ]
+    ],
+    "l0tkyXoNQpiKTOgc1Fo3Kg==": [
+        [
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011010000000'))"
+        ]
+    ],
+    "lH9CFjaZRJWPcING+JCZJw==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('17')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111000000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111000000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('01'))",
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('17')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ]
+    ],
+    "m4ioAAXsR9638DavH8ojvQ==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ],
+        [
+            "Stmt_ConstDecl(Type_Bits(Expr_LitInt('64')),Cse2__5,Expr_TApply(not_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]))",
+            "Stmt_ConstDecl(Type_Bits(Expr_LitInt('64')),Cse0__5,Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_Slices(Expr_TApply(not_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]))",
+            "Stmt_Assign(LExpr_Field(LExpr_Var(PSTATE),V),Expr_TApply(not_bits.0,[(Expr_LitInt('1'))],[(Expr_TApply(cvt_bool_bv.0,[],[(Expr_TApply(eq_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(SignExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(Cse0__5),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('65'))]));(Expr_TApply(add_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(SignExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('65'))]));(Expr_TApply(SignExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Var(Cse2__5));(Expr_LitInt('65'))]))]));(Expr_LitBits('00000000000000000000000000000000000000000000000000000000000000001'))]))]))]))]))",
+            "Stmt_Assign(LExpr_Field(LExpr_Var(PSTATE),C),Expr_TApply(not_bits.0,[(Expr_LitInt('1'))],[(Expr_TApply(cvt_bool_bv.0,[],[(Expr_TApply(eq_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(ZeroExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(Cse0__5),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('65'))]));(Expr_TApply(add_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('65'))],[(Expr_TApply(ZeroExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitInt('65'))]));(Expr_TApply(ZeroExtend.0,[(Expr_LitInt('64'));(Expr_LitInt('65'))],[(Expr_Var(Cse2__5));(Expr_LitInt('65'))]))]));(Expr_LitBits('00000000000000000000000000000000000000000000000000000000000000001'))]))]))]))]))",
+            "Stmt_Assign(LExpr_Field(LExpr_Var(PSTATE),Z),Expr_TApply(cvt_bool_bv.0,[],[(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(Cse0__5),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]))]))",
+            "Stmt_Assign(LExpr_Field(LExpr_Var(PSTATE),N),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(Cse0__5),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))]),[(Slice_LoWd(Expr_LitInt('63'),Expr_LitInt('1')))]))"
+        ],
+        [
+            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('1'))],[(Expr_Field(Expr_Var(PSTATE),Z));(Expr_LitBits('1'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011001111100')),],[],)"
+        ]
+    ],
+    "pz3mR6glTH2i2ouLc+eLRg==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('16')),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('01'))",
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('16')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ]
+    ],
+    "q0X01qPWRxW8EROsVhA5MA==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000010'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ]
+    ],
+    "qKzE30IdQ4aD5sm1MNYMdA==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111100000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
+        ],
+        [
+            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011011110000')),],[],)"
+        ]
+    ],
+    "t/volgH9R0ufRlSUCpeaYg==": [
+        [
+            "Stmt_ConstDecl(Type_Bits(Expr_LitInt('64')),Cse0__5,Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('1111111111111111111111111111111111111111111111111111111111100000'))]))",
+            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_Var(Cse0__5));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('29')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])",
+            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Var(Cse0__5));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000001000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])",
+            "Stmt_Assign(LExpr_Var(SP_EL0),Expr_Var(Cse0__5))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('29')),Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ],
+        [
+            "Stmt_TCall(Mem.set.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Var(SP_EL0),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('19')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))])"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('19')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_TApply(ZeroExtend.0,[(Expr_LitInt('32'));(Expr_LitInt('64'))],[(Expr_TApply(ZeroExtend.0,[(Expr_LitInt('8'));(Expr_LitInt('32'))],[(Expr_TApply(Mem.read.0,[(Expr_LitInt('1'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('19')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]));(Expr_LitInt('1'));(Expr_LitInt('0'))]));(Expr_LitInt('32'))]));(Expr_LitInt('64'))]))"
+        ],
+        [
+            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('1'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('1')))]));(Expr_LitBits('1'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011011111100')),],[],)"
+        ]
+    ],
+    "tOlcAHDtRzWKKct6s9tKzA==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('2')),Expr_LitBits('0000000000000000000000000000000000000000000000011111000000000000'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('2')),Expr_TApply(Mem.read.0,[(Expr_LitInt('8'))],[(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('2')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000111111111000'))]));(Expr_LitInt('8'));(Expr_LitInt('0'))]))"
+        ],
+        [
+            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('2')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011010111000')),],[],)"
+        ]
+    ],
+    "thyqoRzkRfy3Vf8nO1uVIA==": [
+        [
+            "Stmt_Assign(LExpr_Var(BTypeNext),Expr_LitBits('00'))",
+            "Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE))",
+            "Stmt_Assign(LExpr_Var(_PC),Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('30')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ]
+    ],
+    "urR7DGRWRfu70c49+ITf+w==": [
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('0')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_LitBits('0000000000000000000000000000000000000000000000100000000000000000'))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000010000'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_Slices(Expr_TApply(not_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('0')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000001'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('2')),Expr_TApply(append_bits.0,[(Expr_LitInt('63'));(Expr_LitInt('1'))],[(Expr_LitBits('000000000000000000000000000000000000000000000000000000000000000'));(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('63'),Expr_LitInt('1')))]))]))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_Slices(Expr_TApply(add_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('2')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_Slices(Expr_TApply(asr_bits.0,[(Expr_LitInt('64'));(Expr_LitInt('3'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('011'))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))]),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]))"
+        ],
+        [
+            "Stmt_Assign(LExpr_Array(LExpr_Var(_R),Expr_LitInt('1')),Expr_TApply(SignExtend.0,[(Expr_LitInt('63'));(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('1'),Expr_LitInt('63')))]));(Expr_LitInt('64'))]))"
+        ],
+        [
+            "Stmt_If(Expr_TApply(eq_bits.0,[(Expr_LitInt('64'))],[(Expr_Slices(Expr_Array(Expr_Var(_R),Expr_LitInt('1')),[(Slice_LoWd(Expr_LitInt('0'),Expr_LitInt('64')))]));(Expr_LitBits('0000000000000000000000000000000000000000000000000000000000000000'))]),[,Stmt_Assign(LExpr_Var(__BranchTaken),Expr_Var(TRUE)),Stmt_Assign(LExpr_Var(_PC),Expr_LitBits('0000000000000000000000000000000000000000000000000000011010111000')),],[],)"
+        ]
+    ],
+    "ymUJ8jYhSGq0O+ssOGYCRQ==": [
+        [],
+        []
     ]
 }

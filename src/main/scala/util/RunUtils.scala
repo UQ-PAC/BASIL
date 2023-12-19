@@ -124,7 +124,7 @@ object RunUtils {
     val program = GtirbConverter.createIR()
 
     // program.procedures.foreach(println)  
-    println(serialiseIL(program)) // TODO: check reversed blocks? Look at Adresses of procedures
+    println(serialiseIL(program)) 
 
     return
 
