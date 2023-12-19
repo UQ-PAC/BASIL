@@ -5,7 +5,7 @@ import boogie._
 import scala.collection.mutable
 
 trait Expr {
-  var ssa_id: mutable.Set[Int] = mutable.Set[Int]()
+  var ssa_id: Int = 0
   def toBoogie: BExpr
   def toGamma: BExpr = {
     val gammaVars: Set[BExpr] = gammas.map(_.toGamma)

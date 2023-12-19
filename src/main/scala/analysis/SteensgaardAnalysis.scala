@@ -16,14 +16,14 @@ case class RegisterVariableWrapper(variable: Variable) extends VariableWrapper {
     override def equals(obj: Any): Boolean = {
         obj match {
         case RegisterVariableWrapper(other) =>
-            variable == other && (variable.ssa_id == other.ssa_id || variable.ssa_id.intersect(other.ssa_id).nonEmpty)
+            variable == other && (variable.ssa_id == other.ssa_id)
         case _ =>
             false
         }
     }
 
     override def hashCode(): Int = {
-        variable.hashCode()
+        variable.hashCode() + variable.ssa_id.hashCode()
     }
 }
 
@@ -31,7 +31,7 @@ case class RegisterVariableWrapper(variable: Variable) extends VariableWrapper {
   * expression node in the AST. It is implemented using [[tip.solvers.UnionFindSolver]].
   */
 class SteensgaardAnalysis(
-      cfg: ProgramCfg,
+      entryNode: CfgFunctionEntryNode,
       constantProp: Map[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]]],
       globals: Map[BigInt, String],
       globalOffsets: Map[BigInt, BigInt],
@@ -157,7 +157,9 @@ class SteensgaardAnalysis(
     */
   def analyze(): Unit =
     // generate the constraints by traversing the AST and solve them on-the-fly
-    cfg.nodes.foreach(visit(_, ()))
+    entryNode.succIntra.foreach(n =>
+      visit(n, ())
+    )
 
   /** Generates the constraints for the given sub-AST.
     * @param node
@@ -170,7 +172,6 @@ class SteensgaardAnalysis(
     def varToStTerm(vari: VariableWrapper): Term[StTerm] = IdentifierVariable(vari)
     def exprToStTerm(expr: MemoryRegion | Expr): Term[StTerm] = ExpressionVariable(expr)
     def allocToTerm(alloc: MemoryRegion): Term[StTerm] = AllocVariable(alloc)
-    //def identifierToTerm(id: AIdentifier): Term[StTerm] = IdentifierVariable(id)
 
     n match {
       case cmd: CfgCommandNode =>
@@ -223,7 +224,7 @@ class SteensgaardAnalysis(
             val X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(n))
             val alpha = FreshVariable()
             X1_star.foreach(
-              x => 
+              x =>
                 unify(exprToStTerm(x), PointerRef(alpha))
                 x.content.addAll(X2)
             )
@@ -234,6 +235,8 @@ class SteensgaardAnalysis(
         }
       case _ => // do nothing
     }
+
+    n.succIntra.foreach(n => visit(n, ()))
   }
 
   private def unify(t1: Term[StTerm], t2: Term[StTerm]): Unit = {
@@ -244,9 +247,11 @@ class SteensgaardAnalysis(
     ) // note that unification cannot fail, because there is only one kind of term constructor and no constants
   }
 
+  type PointsToGraph = Map[Object, Set[VariableWrapper | MemoryRegion]]
+
   /** @inheritdoc
     */
-  def pointsTo(): Map[Object, Set[VariableWrapper | MemoryRegion]] = {
+  def pointsTo(): PointsToGraph = {
     val solution = solver.solution()
     val unifications = solver.unifications()
     Logger.info(s"Solution: \n${solution.mkString(",\n")}\n")

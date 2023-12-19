@@ -162,10 +162,8 @@ object RunUtils {
 
     //val contextTransfer = ContextTransfer(cfg, constPropResult).analyze()
     Logger.info("[!] Running Steensgaard")
-    val steensgaardSolver = SteensgaardAnalysis(cfg, constPropResultWithSSA, globalAddresses, globalOffsets, mergedSubroutines)
-    steensgaardSolver.analyze()
-    steensgaardSolver.pointsTo()
-    steensgaardSolver.mayAlias()
+    val teaDSA = TeaDSA(cfg, constPropResultWithSSA, globalAddresses, globalOffsets, mergedSubroutines)
+    teaDSA.analyze()
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)

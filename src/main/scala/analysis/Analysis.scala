@@ -186,7 +186,7 @@ trait ConstantPropagationWithSSA(val cfg: ProgramCfg) {
 
 class ConstantPropagationSolverWithSSA(cfg: ProgramCfg) extends ConstantPropagationWithSSA(cfg)
   with SimplePushDownWorklistFixpointSolver[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]], MapLattice[RegisterVariableWrapper, Set[BitVecLiteral], ConstantPropagationLatticeWithSSA]]
-  with InterproceduralForwardDependencies
+  with IntraproceduralForwardDependencies
   with Analysis[Map[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]]]]
 
 trait MemoryRegionAnalysis(val cfg: ProgramCfg,
