@@ -157,6 +157,16 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
     }
   }
 
+  def get_int(ctx: ExprContext): Int = ctx match {
+    case e: ExprLitIntContext =>
+            if (e.DEC() != null) {
+              e.DEC().getText().toInt
+            } else {
+              e.BINARY().getText().toInt
+            }
+
+  }
+
   override def visitExprTApply(ctx: ExprTApplyContext): Expr = {
     val str = ctx.METHOD.getText().substring(0, ctx.METHOD.getText().lastIndexOf("."))
     // removes everything up to and including the last dot
@@ -199,32 +209,22 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
         // there is no append but there is concat, so it probably does the same thing
         return BinaryExpr(BVCONCAT, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "ZeroExtend" =>
-        val intexpr = ctx.targs().asScala.last.expr() match {
-          case e: ExprLitIntContext =>
-            if (e.DEC() != null) {
-              e.DEC().getText().toInt
-            } else {
-              e.BINARY().getText().toInt
-            }
-        }
-        return ZeroExtend(intexpr, visitExpr(ctx.expr(0)))
+        val init = get_int(ctx.targs().asScala.head.expr())
+        val fini = get_int(ctx.targs().asScala.last.expr())
+        return ZeroExtend(fini - init, visitExpr(ctx.expr(0)))
 
       case "SignExtend" =>
-        val intexpr = ctx.targs().asScala.last.expr() match {
-          case e: ExprLitIntContext =>
-            if (e.DEC() != null) {
-              e.DEC().getText().toInt
-            } else {
-              e.BINARY().getText().toInt
-            }
-        }
-        return SignExtend(intexpr, visitExpr(ctx.expr(0)))
+        val init = get_int(ctx.targs().asScala.head.expr())
+        val fini = get_int(ctx.targs().asScala.last.expr())
+        return SignExtend(fini - init, visitExpr(ctx.expr(0)))
 
   }
 
   override def visitExprSlices(ctx: ExprSlicesContext): Expr = {
-    val (start, end) = visitSlice_expr(ctx.slice_expr()): @unchecked
-    return Extract(start.asInstanceOf[Int], end.asInstanceOf[Int], visitExpr(ctx.expr()))
+    val (lo, hi) = visitSlice_expr(ctx.slice_expr()): @unchecked
+    val loInt = lo.asInstanceOf[Int]
+    val hiInt = hi.asInstanceOf[Int]
+    return Extract(loInt + hiInt, loInt, visitExpr(ctx.expr()))
   }
 
   override def visitSlice_expr(ctx: Slice_exprContext): Tuple = {

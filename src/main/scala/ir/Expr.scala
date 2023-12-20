@@ -54,6 +54,15 @@ case class IntLiteral(value: BigInt) extends Literal {
   override def toString: String = value.toString
 }
 
+/**
+  * end: high bit exclusive
+  * start: low bit inclusive
+  * body: idfk
+  *
+  * @param end
+  * @param start
+  * @param body
+  */
 class Extract(var end: Int, var start: Int, var body: Expr) extends Expr {
   override def toBoogie: BExpr = BVExtract(end, start, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas

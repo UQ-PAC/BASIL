@@ -292,8 +292,8 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
         b.statements.lastOption match {
           case Some(LocalAssign(lhs: Register, _, _)) if lhs.name == "_PC" =>
-             b.statements.remove(b.statements.size - 1) // Remove the last element
-          case _ => // Do nothing if the last element doesn't match the condition
+             b.statements.remove(b.statements.size - 1) 
+          case _ => // Do nothing 
         }
    
       }    
