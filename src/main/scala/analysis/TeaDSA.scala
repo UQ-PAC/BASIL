@@ -54,12 +54,24 @@ class TeaDSA(
   }
 
 
-//  def bottomUp(): Unit = {
-//    cfg.nodes.foreach(visitBottomUp(_, ()))
-//  }
-//
-//
-//  def topDown(): Unit = {
-//    cfg.nodes.foreach(visitTopDown(_, ()))
-//  }
+  /**
+   * Inlines the points-to graph of a procedure into the points-to graph of the caller.
+   */
+  def bottomUpMerge(callSite: CfgFunctionEntryNode, calleeGraph: PointsToGraph, callerGraph: PointsToGraph): Unit = {
+    // must inline the variables defined in this block with the other graph
+  }
+
+
+    /**
+     * Inlines the points-to graph context from call site into the points-to graph of the callee function.
+     */
+    def topDown(caller: CfgFunctionEntryNode, calleeGraph: PointsToGraph, callerGraph: PointsToGraph): Unit = {
+      caller.data.blocks.foreach(block =>
+        block.jump match {
+          case dc: DirectCall => {
+            // must inline the variables defined in this block with the other graphqq
+          }
+        }
+      )
+    }
 }

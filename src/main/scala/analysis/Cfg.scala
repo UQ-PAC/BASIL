@@ -89,6 +89,7 @@ trait CfgNodeWithData[T] extends CfgNode {
 /** Control-flow graph node for the entry of a function.
   */
 class CfgFunctionEntryNode(val data: Procedure) extends CfgNodeWithData[Procedure]:
+  val callers: mutable.Set[CfgFunctionEntryNode] = mutable.Set[CfgFunctionEntryNode]()
   override def toString: String = s"[FunctionEntry] $data"
 
   /** Copy this node, but give unique ID and reset edges */
@@ -556,6 +557,7 @@ class ProgramCfgFactory:
             }
           case dCall: DirectCall =>
             val targetProc: Procedure = dCall.target
+            funcEntryNode.callers.add(procToCfg(targetProc)._1)
 
             val callNode = CfgJumpNode(dCall, block, funcEntryNode)
 

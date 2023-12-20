@@ -67,12 +67,12 @@ class SteensgaardAnalysis(
    * @param parent : the function entry node
    * @return the stack region corresponding to the offset
    */
-  def poolMaster(expr: BitVecLiteral, parent: CfgFunctionEntryNode): StackRegion = {
+  def poolMaster(expr: BitVecLiteral, parent: CfgFunctionEntryNode, stackBase: RegisterVariableWrapper): StackRegion = {
     val stackPool = stackMap.getOrElseUpdate(parent, mutable.HashMap())
     if (stackPool.contains(expr)) {
       stackPool(expr)
     } else {
-      val newRegion = StackRegion(nextStackCount(), expr)
+      val newRegion = StackRegion(nextStackCount(), expr, stackBase)
       stackPool += (expr -> newRegion)
       newRegion
     }
@@ -105,7 +105,7 @@ class SteensgaardAnalysis(
       case binOp: BinaryExpr =>
         if (binOp.arg1 == stackPointer) {
           evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach(
-            b => regions += poolMaster(b, n.parent)
+            b => regions += poolMaster(b, n.parent, RegisterVariableWrapper(binOp.arg1.asInstanceOf[Register]))
           )
             regions
         } else {
@@ -188,7 +188,7 @@ class SteensgaardAnalysis(
                 // X1 = &X2: [[X1]] = ↑[[X2]]
                 if (binOp.arg1 == stackPointer) {
                   evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach(
-                    b => unify(varToStTerm(RegisterVariableWrapper(localAssign.lhs)), PointerRef(allocToTerm(poolMaster(b, cmd.parent))))
+                    b => unify(varToStTerm(RegisterVariableWrapper(localAssign.lhs)), PointerRef(allocToTerm(poolMaster(b, cmd.parent, RegisterVariableWrapper(binOp.arg1.asInstanceOf[Register])))))
                   )
                 }
               // TODO: should lookout for global base + offset case as well
