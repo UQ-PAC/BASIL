@@ -13,6 +13,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val controls = spec.controls
   private val controlled = spec.controlled
   private val relies = spec.relies.map(r => r.resolveSpec)
+  private val reliesParam = spec.relies.map(r => r.resolveSpecParam)
   private val reliesReflexive = spec.relies.map(r => r.removeOld)
   private val guarantees = spec.guarantees.map(g => g.resolveOld)
   private val guaranteesReflexive = spec.guarantees.map(g => g.removeOld)
@@ -22,12 +23,25 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val requiresDirect = spec.subroutines.map(s => s.name -> s.requiresDirect).toMap
   private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(e => e.resolveSpec)).toMap
   private val ensuresDirect = spec.subroutines.map(s => s.name -> s.ensuresDirect).toMap
+  private val libRelies = spec.subroutines.map(s => s.name -> s.rely).toMap
+  private val libGuarantees = spec.subroutines.map(s => s.name -> s.guarantee).toMap
   private val directFunctions = spec.directFunctions
 
   private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
   private val stack = BMapVar("stack", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val Gamma_stack = BMapVar("Gamma_stack", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+
+  private val mem_in = BMapVar("mem$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
+  private val Gamma_mem_in = BMapVar("Gamma_mem$in", MapBType(BitVecBType(64), BoolBType), Scope.Parameter)
+  private val mem_out = BMapVar("mem$out", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
+  private val Gamma_mem_out = BMapVar("Gamma_mem$out", MapBType(BitVecBType(64), BoolBType), Scope.Parameter)
+
+  private val mem_inv1 = BMapVar("mem$inv1", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local)
+  private val Gamma_mem_inv1 = BMapVar("Gamma_mem$inv1", MapBType(BitVecBType(64), BoolBType), Scope.Local)
+  private val mem_inv2 = BMapVar("mem$inv2", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local)
+  private val Gamma_mem_inv2 = BMapVar("Gamma_mem$inv2", MapBType(BitVecBType(64), BoolBType), Scope.Local)
+
 
   private var config: BoogieGeneratorConfig = BoogieGeneratorConfig()
   private val modifiedCheck: Set[BVar] = (for (i <- 19 to 29) yield {
@@ -65,16 +79,23 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
     val rgProcs = genRely(relies, readOnlyMemory) :+ guaranteeReflexive
 
-    val functionsUsed1 =
-      procedures.flatMap(p => p.functionOps).toSet ++
+    // if rely/guarantee lib exist, create genRelyInv, and genInv for every procedure where rely/guarantee lib exist
+    val rgLib = if (libRelies.values.flatten.nonEmpty && libGuarantees.values.flatten.nonEmpty) {
+      List(genRelyInv) ++ libGuarantees.flatMap((k, v) => if v.nonEmpty then Some(genInv(k)) else None)
+    } else {
+      List()
+    }
+
+    val functionsUsed1 = procedures.flatMap(p => p.functionOps).toSet ++
       rgProcs.flatMap(p => p.functionOps).toSet ++
+      rgLib.flatMap(p => p.functionOps).toSet ++
       directFunctions
     val functionsUsed2 = functionsUsed1.map(p => functionOpToDefinition(p))
     val functionsUsed3 = functionsUsed2.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed4 = functionsUsed3.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4).toList.sorted
 
-    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
+    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgLib ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
     BProgram(declarations)
   }
 
@@ -100,6 +121,59 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), List(), List(), List(), List(),
       Set(), reliesReflexive.map(r => BAssert(r)), List(externAttr))
     List(relyProc, relyTransitive, relyReflexive)
+  }
+
+  def genRelyInv: BProcedure = {
+    val reliesUsed = if (reliesParam.nonEmpty) {
+      reliesParam
+    } else {
+      // default case where no rely is given - rely on no external changes
+      List(BinaryBExpr(BVEQ, mem_out, mem_in), BinaryBExpr(BVEQ, Gamma_mem_out, Gamma_mem_in))
+    }
+    val relyEnsures = if (reliesParam.nonEmpty) {
+      val i = BVariable("i", BitVecBType(64), Scope.Local)
+      val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem_out, i), MapAccess(mem_in, i)), BinaryBExpr(BVEQ, MapAccess(Gamma_mem_out, i), MapAccess(Gamma_mem_in, i))))
+      List(rely2) ++ reliesUsed
+    } else {
+      reliesUsed
+    }
+    BProcedure("rely$inv", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), relyEnsures, List(), List(), List(), List(), List(),
+      Set(), List(), List(externAttr))
+  }
+
+  def genInv(name: String): BProcedure = {
+    // reliesParam OR procGuaranteeParam
+
+    val reliesUsed = if (reliesParam.nonEmpty) {
+      reliesParam
+    } else {
+      // default case where no rely is given - rely on no external changes
+      List(BinaryBExpr(BVEQ, mem_out, mem_in), BinaryBExpr(BVEQ, Gamma_mem_out, Gamma_mem_in))
+    }
+    val relyEnsures = if (reliesParam.nonEmpty) {
+      val i = BVariable("i", BitVecBType(64), Scope.Local)
+      val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem_out, i), MapAccess(mem_in, i)), BinaryBExpr(BVEQ, MapAccess(Gamma_mem_out, i), MapAccess(Gamma_mem_in, i))))
+      List(rely2) ++ reliesUsed
+    } else {
+      reliesUsed
+    }
+    val relyOneLine = if (relyEnsures.size > 1) {
+      relyEnsures.tail.foldLeft(relyEnsures.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
+    } else {
+      relyEnsures.head
+    }
+
+    val guaranteeEnsures = libGuarantees(name).map(g => g.resolveSpecParam)
+    val guaranteeOneLine = if (guaranteeEnsures.size > 1) {
+      guaranteeEnsures.tail.foldLeft(guaranteeEnsures.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
+    } else {
+      guaranteeEnsures.head
+    }
+
+    val invEnsures = List(BinaryBExpr(BoolOR, relyOneLine, guaranteeOneLine))
+
+    BProcedure(name + "$inv", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), invEnsures, List(), List(), List(), List(), List(),
+      Set(), List(), List(externAttr))
   }
 
   def functionOpToDefinition(f: FunctionOp): BFunction = {
@@ -394,12 +468,19 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translate(j: Jump): List[BCmd] = j match {
     case d: DirectCall =>
-      val call = List(BProcedureCall(d.target.name, List(), List()))
+      val call = BProcedureCall(d.target.name, List(), List())
       val returnTarget = d.returnTarget match {
-        case Some(r) => List(GoToCmd(Seq(r.label)))
-        case None    => List(Comment("no return target"), BAssume(FalseBLiteral))
+        case Some(r) => GoToCmd(Seq(r.label))
+        case None => BAssume(FalseBLiteral, Some("no return target"))
       }
-      call ++ returnTarget
+      if (libRelies(d.target.name).nonEmpty && libGuarantees(d.target.name).nonEmpty) {
+        val invCall1 = BProcedureCall(d.target.name + "$inv", List(mem_inv1, Gamma_mem_inv1), List(mem, Gamma_mem))
+        val invCall2 = BProcedureCall("rely$inv", List(mem_inv2, Gamma_mem_inv2), List(mem_inv1, Gamma_mem_inv1))
+        val libRGAssert = libRelies(d.target.name).map(r => BAssert(r.resolveSpecInv))
+        List(invCall1, invCall2) ++ libRGAssert ++ List(call, returnTarget)
+      } else {
+        List(call, returnTarget)
+      }
     case i: IndirectCall =>
       // TODO put this elsewhere
       if (i.target.name == "R30") {
