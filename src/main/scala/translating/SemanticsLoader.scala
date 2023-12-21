@@ -10,7 +10,7 @@ import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 
 class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends SemanticsBaseVisitor[Any] {
 
-  var cseMap: Map[String, IRType] = Map[String, IRType]()
+  var cseMap: HashMap[String, IRType] = HashMap[String, IRType]()
 
   def unChrisifyUUID(uuid: String): ByteString = { // This probably needs a better name, but :/
     return ByteString.copyFrom(Base64.getDecoder().decode(uuid))
@@ -30,17 +30,45 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
     return statements
   }
 
-  // def getCondition(): Any = {
-  //   // this is just boilerplate for now, but may be useful for retriving conditions
-  //   val basicBlks = context.basic_blk().asScala
-  //   for (BasicBlk <- basicBlks) {
-  //     val Blkuuid = unChrisifyUUID(BasicBlk.uuid().getText())
-  //     if (Blkuuid.equals(targetuuid)) {
-  //       visitBasic_blk(BasicBlk)  
-  //     }
-  //   }
+  def getCondition(uuid: String): Option[Statement] = {
+    val basicBlks = context.basic_blk().asScala
+    var statement: Option[Statement] = None
+    for (BasicBlk <- basicBlks) {
+      val Blkuuid = BasicBlk.uuid().getText()
+      if (Blkuuid.equals(uuid)) {
+        statement =  getBlkCond(BasicBlk) 
+      }
+    }
+    return statement 
+  }
 
-  // }
+  def getBlkCond(ctx: Basic_blkContext): Option[Statement] = {
+    val instructions = ctx.instruction().asScala
+    var statement: Option[Statement] = None
+
+    for (instuction <- instructions) {
+      val instructionstmt = getInstructionCond(instuction)
+      if (instructionstmt  != None) {
+        statement = instructionstmt
+      }
+
+    }
+
+    return statement
+  }
+
+  def getInstructionCond(ctx: InstructionContext): Option[Statement] = {
+    val statements = ctx.stmt_string().asScala.flatMap { s =>
+      s.stmt() match {
+        case cond if cond.conditional_stmt() != null =>
+          Some(visitConditional_stmt(cond.conditional_stmt()))
+        case _ => None
+      }
+    }
+
+    statements.headOption
+  }
+
 
   override def visitBasic_blk(ctx: Basic_blkContext): ArrayBuffer[Statement] = {
     val instructions = ctx.instruction().asScala
@@ -61,9 +89,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
             Option(visitAssignment_stmt(a.assignment_stmt()))
           case c if (c.call_stmt() != null) =>
             Option(visitCall_stmt(c.call_stmt()))
-          case cond if (cond.conditional_stmt() != null) =>
-            visitConditional_stmt(cond.conditional_stmt())
-            None //  may be useful for retriving conditions, but does nothing for now
+          case _ => None // Conditions were implemented above
       }
     }.to(ArrayBuffer)
 
@@ -90,10 +116,9 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
     return MemoryAssign(mem, memstore)
   }
 
-  override def visitConditional_stmt(ctx: Conditional_stmtContext): Any = {
-    return // see above comment in conditional statements
+  override def visitConditional_stmt(ctx: Conditional_stmtContext): Statement = {
+    Assert(visitExpr(ctx.expr), None)
   }
-
   override def visitAssign(ctx: AssignContext): LocalAssign = {
     val lhs = visitLexpr(ctx.lexpr())
     val rhs = visitExpr(ctx.expr())
@@ -340,10 +365,8 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
       case "_PC" =>
         Register(
           "_PC",
-          BitVecType(1)
-        ) // null elements literally don't exist in IR, so pray we never have to read from them
-      // TODO: figure out what to do with this, since they do appear :/
-      // Nick says to just remove them, which i will soon
+          BitVecType(64)
+        ) // "_PC" flag, useful for jumps later on
       case "__BranchTaken" => null
       case "BTypeNext" => null
   }

@@ -35,7 +35,7 @@ call_stmt:
 	)? CLOSE_BRACKET CLOSE_PAREN;
 
 conditional_stmt:
-	'Stmt_If' OPEN_PAREN expr COMMA OPEN_BRACKET (COMMA stmt)* COMMA? CLOSE_BRACKET COMMA
+	'Stmt_If' OPEN_PAREN expr COMMA OPEN_BRACKET (COMMA stmt)* COMMA? CLOSE_BRACKET COMMA //TODO: this will almost certianly fail on complex if statements, so check
 		OPEN_BRACKET CLOSE_BRACKET COMMA CLOSE_PAREN;
 
 type: 'Type_Bits' OPEN_PAREN expr CLOSE_PAREN # TypeBits;
