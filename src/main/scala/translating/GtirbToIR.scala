@@ -45,18 +45,18 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
   } 
 
-  def create_cfg_map(): collection.mutable.HashMap[ByteString, ArrayBuffer[ByteString]] = {
+  def create_cfg_map(): collection.mutable.HashMap[ByteString, ArrayBuffer[proto.CFG.Edge]] = {
 
     val edges = cfg.edges 
-    val edgeMap: HashMap[ByteString, ArrayBuffer[ByteString]] = HashMap.empty
+    val edgeMap: HashMap[ByteString, ArrayBuffer[proto.CFG.Edge]] = HashMap.empty
 
     for (edge <- edges) {
 
       if (edgeMap.contains(edge.sourceUuid)) {
-        edgeMap(edge.sourceUuid) += edge.targetUuid
+        edgeMap(edge.sourceUuid) += edge
 
       } else {
-        edgeMap += (edge.sourceUuid -> ArrayBuffer(edge.targetUuid))
+        edgeMap += (edge.sourceUuid -> ArrayBuffer(edge))
 
       }
 
@@ -92,11 +92,9 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
       val entryBlocks: mutable.Set[ByteString] = functionEntries.get(uuid).get
 
-
-
       val result = entryBlocks
-        .flatMap(e => edgeMap.getOrElse(e, None).iterator)
-        .flatMap(elem => mods.flatMap(_.proxies).find(_.uuid == elem))
+        .flatMap(e => edgeMap.getOrElse(e, None).iterator) 
+        .flatMap(elem => mods.flatMap(_.proxies).find(_.uuid == elem.targetUuid))
         .flatMap(proxy => symMap.getOrElse(proxy.uuid, None))
         .map(p => p.name)
 
@@ -129,7 +127,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
 
 
-  //TODO: mods.head may not work here if multiple modules
+  //TODO: mods.head may not work here if multiple modules, in which case decoder needs to change
   val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
   val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
   val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
@@ -138,7 +136,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
   val blkMap: HashMap[ByteString, Block] = HashMap[ByteString, Block]()
   val symMap = create_symMap()
   val addresses = create_addresses()
-  val edgeMap: HashMap[ByteString, ArrayBuffer[ByteString]] = create_cfg_map()
+  val edgeMap: HashMap[ByteString, ArrayBuffer[proto.CFG.Edge]] = create_cfg_map()
  
 
   def createIR(): Program = {
@@ -151,7 +149,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
     procedures = createJumps(procedures)
 
-    val initialMemory: ArrayBuffer[MemorySection] = ArrayBuffer() // this looks like its incomplete
+    val initialMemory: ArrayBuffer[MemorySection] = ArrayBuffer()// TODO: this looks like its incomplete
     val readOnlyMemory: ArrayBuffer[MemorySection] = ArrayBuffer() //ditto
 
     val intialproc: Procedure = createProcedure(getKey(entrypoint, functionEntries).get) // TODO: Does this work? -> They use readelf so i should probably do that
@@ -166,10 +164,10 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     
     
     
-    val address: Option[Int] = addresses.get(functionEntries(uuid).head); //addresses are weird but it shouuuuld be fine :/
+    val address: Option[Int] = addresses.get(functionEntries(uuid).head);
 
 
-    val in: ArrayBuffer[Parameter] = ArrayBuffer() // TODO: gtirb does not contain this -> Datablocks or symbols are candidates
+    val in: ArrayBuffer[Parameter] = ArrayBuffer() // TODO: gtirb does not contain this -> Kirsten said static analysis
     val out: ArrayBuffer[Parameter] = ArrayBuffer() // ditto above
 
     return Procedure(name, address, blocks, in, out)
@@ -213,56 +211,73 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
   }
 
-  def singleJump(procedures: ArrayBuffer[Procedure], block: Block, target: ByteString, 
+  def get_proc(target: ByteString, procedures: ArrayBuffer[Procedure]): Procedure = {
+    val key = getKey(target, functionEntries).get
+    procedures.find(_.name == create_names(key)).get
+  }
+
+  def singleJump(procedures: ArrayBuffer[Procedure], block: Block, edge: proto.CFG.Edge, 
                   entries: List[ByteString], blocks: List[ByteString]): Jump = {
-    target match {
-      case t if entries.contains(t) => 
-        val key = getKey(target, functionEntries).get
-        val proc = procedures.find(_.name == create_names(key)).get
-        return DirectCall(proc, None, Option(proc.name))
 
-      case t if (blocks.contains(t) && !entries.contains(t)) => 
-        return GoTo(ArrayBuffer[Block](blkMap(target)), None)
+    val label = edge.label.get
 
-      case _ => 
-        val reg: Variable = get_jmp_reg(block.statements.last)
-        return IndirectCall(reg, None, None)    
+    label.`type` match {
+
+      case proto.CFG.EdgeType.Type_Fallthrough => 
+        return GoTo(ArrayBuffer[Block](blkMap(edge.targetUuid)), None)
+      
+      case proto.CFG.EdgeType.Type_Call => 
+        if (label.direct) {
+          val proc = get_proc(edge.targetUuid, procedures)
+          return DirectCall(proc, None, Option(proc.name))
+        } else {
+          return IndirectCall(get_jmp_reg(block.statements.last), None, None) 
+        }
+      
+      case proto.CFG.EdgeType.Type_Branch => 
+        if (entries.contains(edge.targetUuid)) {
+          val proc = get_proc(edge.targetUuid, procedures)
+          return DirectCall(proc, None, Option(proc.name)) //TODO: This really should be a Direct, since branch instruction doesn't push to stack
+
+        } else if ((blocks.contains(edge.targetUuid) && !entries.contains(edge.targetUuid))) {
+          return GoTo(ArrayBuffer[Block](blkMap(edge.targetUuid)), None)
+
+        } else {
+          return IndirectCall(get_jmp_reg(block.statements.last), None, None) //TODO: This really should be a IndirectJump, since branch instruction doesn't push to stack
+        }
+      
+      case proto.CFG.EdgeType.Type_Return => 
+        return IndirectCall(get_jmp_reg(block.statements.last), None, None) 
     }
   }
 
-  def multiJump(procedures: ArrayBuffer[Procedure], block: Block, targets: ArrayBuffer[ByteString], 
+  def multiJump(procedures: ArrayBuffer[Procedure], block: Block, edges: ArrayBuffer[proto.CFG.Edge], 
                 entries: List[ByteString], blocks: List[ByteString]): Jump = {
 
     def resolveGotoTarget(): Block = {
-    targets.find(!entries.contains(_)).map(blkMap).get
+    edges.find(edge => !entries.contains(edge.targetUuid)).map(edge => blkMap(edge.targetUuid)).get
     }
     
-    val hasDirectCall = targets.exists(entries.contains(_))
-    val hasIndirectCall = !targets.exists(blocks.contains(_)) && !hasDirectCall
-    val hasGoto = targets.exists(target => blocks.contains(target) && !entries.contains(target))
+    val types = edges.map(_.label.get.`type`)
 
-    
-    (hasDirectCall, hasIndirectCall, hasGoto) match {
+    val hasFunctionReturn = types.contains(proto.CFG.EdgeType.Type_Call) && types.contains(proto.CFG.EdgeType.Type_Fallthrough)
 
-      case (true, _, true) =>
-        val goto: Block = resolveGotoTarget()
-        val target = targets.find(entries.contains).get 
-        val key = getKey(target, functionEntries).get
-        val proc = procedures.find(_.name == create_names(key)).get 
-        DirectCall(proc, Option(goto), Option(proc.name))
-        
+    val hasConditionalBranch = types.contains(proto.CFG.EdgeType.Type_Branch) && types.contains(proto.CFG.EdgeType.Type_Fallthrough)
 
-      case (_, true, true) =>
-        val goto: Block = resolveGotoTarget()
-        val reg: Variable = get_jmp_reg(block.statements.last)
-        IndirectCall(reg, Option(goto), None)
+    (hasFunctionReturn, hasConditionalBranch) match {
 
-      case (_, _, true) =>
-        val blks = targets.map(blkMap)
-        GoTo(blks, None)
+      case (true, false) => 
 
-      case _ =>
-        GoTo(ArrayBuffer[Block](), None)
+        if ( edges.map(_.label.get).find(elem => elem.`type` == proto.CFG.EdgeType.Type_Call).get.direct ) {
+          val target = edges.find(edge => entries.contains(edge.targetUuid)).get.targetUuid
+          val proc = get_proc(target, procedures)
+          DirectCall(proc, Option(resolveGotoTarget()), Option(proc.name))
+        } else {
+          IndirectCall(get_jmp_reg(block.statements.last), Option(resolveGotoTarget()), None)
+        }
+
+      case (false, true) => 
+        IndirectCall(Register("JUMP", BitVecType(1)), None, None)
     }
 
   }
@@ -280,17 +295,17 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
         if (edgeMap.contains(uuid)) {
 
-          val targets = edgeMap(uuid)
+          val edges = edgeMap(uuid)
 
-          if (targets.size > 1) {
-            b.jump = multiJump(cpy, b, targets, entries, blocks)
+          if (edges.size > 1) {
+            b.jump = multiJump(cpy, b, edges, entries, blocks)
           } else {
-            val target = targets(0)
-            b.jump = singleJump(cpy, b, target, entries, blocks)
+            val edge = edges(0)
+            b.jump = singleJump(cpy, b, edge, entries, blocks)
           }
         }
 
-        b.statements.lastOption match {
+        b.statements.lastOption match { // remove "_PC" statement
           case Some(LocalAssign(lhs: Register, _, _)) if lhs.name == "_PC" =>
              b.statements.remove(b.statements.size - 1) 
           case _ => // Do nothing 
