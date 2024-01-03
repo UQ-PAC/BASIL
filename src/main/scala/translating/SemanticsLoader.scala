@@ -139,7 +139,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
 
     val expr = visitExpr(ctx.expr())
     if (expr != null) {
-      return LocalAssign(LocalVar(name, ty), expr) //Check if localVar is right here, could be register
+      return LocalAssign(LocalVar(name, ty), expr) 
     } else {
       return null
     }
@@ -192,6 +192,27 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
 
   }
 
+  def fix_size(expr1: Expr, expr2: Expr): Expr = {
+
+    val size1 = expr1  match {
+      case e: Extract => e.body.asInstanceOf[Register].irType.asInstanceOf[BitVecType].size
+      case r: Register => r.irType.asInstanceOf[BitVecType].size
+      case b: BitVecLiteral => b.size
+    }
+
+    val size2 = expr2 match {
+      case e: Extract => e.body.asInstanceOf[Register].irType.asInstanceOf[BitVecType].size
+      case r: Register => r.irType.asInstanceOf[BitVecType].size
+      case b: BitVecLiteral => b.size
+    } 
+
+    if (size1 == size2) {
+      return expr2
+    } else {
+      return ZeroExtend(size1 - size2, expr2)
+    }
+  }
+
   override def visitExprTApply(ctx: ExprTApplyContext): Expr = {
     val str = ctx.METHOD.getText().substring(0, ctx.METHOD.getText().lastIndexOf("."))
     // removes everything up to and including the last dot
@@ -223,16 +244,28 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
       case "eq_bits"     => return BinaryExpr(BVEQ, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "add_bits"    => return BinaryExpr(BVADD, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "sub_bits"    => return BinaryExpr(BVSUB, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "mul_bits"    => return BinaryExpr(BVMUL, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "sdiv_bits"   => return BinaryExpr(BVSDIV, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
+      case "mul_bits"    => return BinaryExpr(BVMUL, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))  
+      case "sdiv_bits"   => return BinaryExpr(BVSDIV, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1))) 
       case "lsl_bits"    => return ??? //  can't find logical shift left binop?
-      case "lsr_bits"    => return BinaryExpr(BVLSHR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "asr_bits"    => return BinaryExpr(BVASHR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "slt_bits"    => return BinaryExpr(BVSLT, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "sle_bits"    => return BinaryExpr(BVSLE, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "append_bits" =>
+      case "lsr_bits"    =>
+        val expr1 = visitExpr(ctx.expr(0)) 
+        val expr2 = fix_size(expr1, visitExpr(ctx.expr(1)))
+        return BinaryExpr(BVLSHR, expr1, expr2)  
+      case "asr_bits"    =>
+        val expr1 = visitExpr(ctx.expr(0)) 
+        val expr2 = fix_size(expr1, visitExpr(ctx.expr(1)))
+        return BinaryExpr(BVASHR, expr1, expr2)  
+      case "slt_bits"    =>
+        val expr1 = visitExpr(ctx.expr(0)) 
+        val expr2 = fix_size(expr1, visitExpr(ctx.expr(1)))
+        return BinaryExpr(BVSLT, expr1, expr2)  
+      case "sle_bits"    =>
+        val expr1 = visitExpr(ctx.expr(0)) 
+        val expr2 = fix_size(expr1, visitExpr(ctx.expr(1)))
+        return BinaryExpr(BVSLE, expr1, expr2)  
+      case "append_bits" => 
         // there is no append but there is concat, so it probably does the same thing
-        return BinaryExpr(BVCONCAT, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
+        return BinaryExpr(BVCONCAT, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1))) 
       case "ZeroExtend" =>
         val init = get_int(ctx.targs().asScala.head.expr())
         val fini = get_int(ctx.targs().asScala.last.expr())

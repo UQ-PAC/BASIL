@@ -19,7 +19,7 @@ import java.nio.charset.*
 import scala.util.boundary, boundary.break
 
 /* GtirbtoIR function. Attempt to form an IR matching the one produced by BAP by using GTIRB instead */
-class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: SemanticsParser, cfg: CFG) {
+class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: SemanticsParser, cfg: CFG, mainAddress: Int) {
 
   def getKey[K, V](value: V, map: mutable.Map[K, mutable.Set[V]]): Option[K] = {
     val v = map.values.find(_.contains(value))
@@ -157,7 +157,8 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     val initialMemory: ArrayBuffer[MemorySection] = ArrayBuffer()// TODO: this looks like its incomplete
     val readOnlyMemory: ArrayBuffer[MemorySection] = ArrayBuffer() //ditto
 
-    val intialproc: Procedure = createProcedure(getKey(entrypoint, functionEntries).get) // TODO: Does this work? -> They use readelf so i should probably do that
+    val mainBlock: ByteString = addresses.find{ case (_, value) => value == mainAddress}.map(_._1).get
+    val intialproc: Procedure = createProcedure(getKey(mainBlock, functionEntries).get)
 
     return Program(procedures, intialproc, initialMemory, readOnlyMemory)
   }

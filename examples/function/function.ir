@@ -381,7 +381,7 @@ Procedure("1664:register_tm_clones", in(), out(), blocks(
       LocalAssign(Register(R1, bv64) := Extract(BinaryExpr("add", Extract(Register(R1, bv64)[64:0]), 16bv64)[64:0]))
       LocalAssign(Register(R1, bv64) := Extract(BinaryExpr("add", Extract(BinaryExpr("add", Extract(Register(R1, bv64)[64:0]), Extract(UnaryExpr("not", Extract(Register(R0, bv64)[64:0]))[64:0]))[64:0]), 1bv64)[64:0]))
       LocalAssign(Register(R2, bv64) := BinaryExpr("++", 0bv63, Extract(Register(R1, bv64)[64:63])))
-      LocalAssign(Register(R1, bv64) := Extract(BinaryExpr("add", Extract(Register(R2, bv64)[64:0]), Extract(BinaryExpr("ashr", Extract(Register(R1, bv64)[64:0]), 3bv3)[64:0]))[64:0]))
+      LocalAssign(Register(R1, bv64) := Extract(BinaryExpr("add", Extract(Register(R2, bv64)[64:0]), Extract(BinaryExpr("ashr", Extract(Register(R1, bv64)[64:0]), ZeroExtend(3bv3, 61))[64:0]))[64:0]))
       LocalAssign(Register(R1, bv64) := SignExtend(Extract(Register(R1, bv64)[64:1]), 1))
     ),
     jumps(

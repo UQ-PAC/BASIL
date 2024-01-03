@@ -38,7 +38,7 @@ object RunUtils {
   // constants
   private val exitRegister: Variable = Register("R30", BitVecType(64))
 
-  def loadBAP(fileName: String): Unit | BAPProgram = {
+  def loadBAP(fileName: String, mainAddress: Int): Unit | BAPProgram = {
     // val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
     // val tokens = CommonTokenStream(ADTLexer)
     // val parser = BAP_ADTParser(tokens)
@@ -118,12 +118,8 @@ object RunUtils {
 
     // println(mods.flatMap(_.symbols).find(_.name == "__libc_start_main").get.optionalPayload.referentUuid.get)
     
-
-
-    val GtirbConverter = new GtirbToIR(mods, parser, cfg)
+    val GtirbConverter = new GtirbToIR(mods, parser, cfg, mainAddress)
     val program = GtirbConverter.createIR()
-
-    // program.procedures.foreach(println)  
     println(serialiseIL(program)) 
 
     return
@@ -163,10 +159,10 @@ object RunUtils {
     /** Loading phase
       */
 
-    val bapProgram = loadBAP(q.loading.adtFile)
+    //val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile) //TODO: this seems to give some small error?
+    val bapProgram = loadBAP(q.loading.adtFile, 1812) 
     
-    // val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile)
-
+    
     // val IRTranslator = BAPToIR(bapProgram, mainAddress)
     // var IRProgram = IRTranslator.translate
 
