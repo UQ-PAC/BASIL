@@ -1,7 +1,7 @@
 package ir
 
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.{View, immutable, mutable}
+import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
 import analysis.BitVectorEval
 import intrusiveList.{IntrusiveList, IntrusiveListElement}
@@ -15,6 +15,8 @@ trait HasParent[T]:
    */
   private var _parent: Option[T] = None
   def parent: T = _parent.get
+
+  def parent_=(value: T): Unit = setParent(value)
 
 
   /**
@@ -36,7 +38,7 @@ trait HasParent[T]:
   protected[this] def unlinkParent(): Unit = ()
 
 
-/**
+  /**
    * Remove this element's parent and update any IL control-flow links implied by this relation.
    * Is idempotent.
    */
@@ -64,7 +66,7 @@ trait HasParent[T]:
 
 class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure,
               var initialMemory: ArrayBuffer[MemorySection],
-              var readOnlyMemory: ArrayBuffer[MemorySection]) {
+              var readOnlyMemory: ArrayBuffer[MemorySection]) extends Iterable[CFGPosition] {
 
   // This shouldn't be run before indirect calls are resolved
   def stripUnreachableFunctions(): Unit = {
@@ -167,6 +169,19 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     initialMemory = initialMemoryNew
   }
 
+  override def filter(f: CFGPosition => Boolean): Iterable[CFGPosition] = {
+    val b = mutable.ArrayBuffer[CFGPosition]()
+    val m = ILMap[CFGPosition](b, n => Some(n).filter(f))
+    m.visitProgram(this)
+    b
+  }
+
+  def iterator: Iterator[CFGPosition] = {
+    val b = mutable.ArrayBuffer[CFGPosition]()
+    val m = ILMap[CFGPosition](b, n => Some(n))
+    m.visitProgram(this)
+    b.iterator
+  }
 
 }
 
@@ -175,7 +190,7 @@ class Procedure private (
                   var address: Option[Int],
                   var entryBlock: Option[Block],
                   var returnBlock: Option[Block],
-                  private val _blocks: mutable.HashSet[Block],
+                  private val _blocks: mutable.LinkedHashSet[Block],
                   var in: ArrayBuffer[Parameter],
                   var out: ArrayBuffer[Parameter],
                 ) {
@@ -183,10 +198,10 @@ class Procedure private (
 
   // class invariant
   require(returnBlock.forall(b => _blocks.contains(b)) && entryBlock.forall(b => _blocks.contains(b)))
-  require(_blocks.isEmpty || entryBlock.isDefined) // blocks.nonEmpty ==> entryBlock.isDefined
+  require(_blocks.isEmpty == entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
   def this(name: String, address: Option[Int] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
-    this(name, address, entryBlock, returnBlock, mutable.HashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
+    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
   }
 
   override def toString: String = {
@@ -211,9 +226,11 @@ class Procedure private (
 
   def addBlocks(block: Block): Block = {
     if (!_blocks.contains(block)) {
-      block.deParent()
-      block.setParent(this)
+      block.parent = this
       _blocks.add(block)
+      if (entryBlock.isEmpty) {
+        entryBlock = Some(block)
+      }
     }
     block
   }
@@ -252,6 +269,9 @@ class Procedure private (
     if (_blocks.contains(block)) {
       block.deParent()
       _blocks.remove(block)
+    }
+    if (_blocks.isEmpty) {
+      entryBlock = None
     }
     block
   }
@@ -383,6 +403,47 @@ class Block private (var label: String,
     // display all statements and jumps
     val statementsString = statements.map(_.toString).mkString("\n")
     s"Block $label with $statementsString\n$jump"
+  }
+
+  /**
+   * @return The intra-procedural set of successor blocks. If the block ends in a call then the empty set is returned.
+   */
+  def nextBlocks: Set[Block] = {
+    jump match {
+      case c: GoTo => c.targets
+      case c: DirectCall => c.returnTarget.toSet
+      case c: IndirectCall => c.returnTarget.toSet
+    }
+  }
+
+  /**
+   * @return The intra-procedural set of predecessor blocks.
+   */
+  def prevBlocks: Set[Block] = {
+    incomingJumps.map(_.parent)
+  }
+
+  /**
+   * If the block has a single block successor then this returns that block, otherwise None.
+   *
+   * @return The successor block if there is exactly one
+   */
+  def singleSuccessor(block: Block): Option[Block] = {
+    block.jump match {
+      case c: GoTo if c.targets.size == 1 => c.targets.headOption
+      case _ => None
+    }
+  }
+
+  /**
+   * If the block has a single block predecessor then this returns that block, otherwise None.
+   *
+   * @return The predecessor block if there is exactly one
+   */
+  def singlePredecessor(block: Block): Option[Block] = {
+    if block.incomingJumps.size == 1 then {
+      block.incomingJumps.headOption.map(_.parent)
+    } else None
   }
 
   override def equals(obj: scala.Any): Boolean =

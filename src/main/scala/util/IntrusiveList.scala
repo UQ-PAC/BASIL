@@ -1,9 +1,32 @@
 package intrusiveList
 import scala.collection.mutable
 
+
+
 // TODO: implement IterableOps
 //   So need iterablefactory https://docs.scala-lang.org/overviews/core/custom-collections.html
 
+/**
+ * A simple intrusive list implementation.
+ *
+ * This is a linked list with the links stored as fields within the elements contained in the list, rather
+ * than boxing the elements in an external list structure.
+ *
+ * Therefore this structure can hold any elements that inherit the IntrusiveListElement trait and an intrusive list
+ * element can only be a member of a single list at a time.
+ *
+ * However, this allows us to create an iterator, or simply get the next or previous element from any point in the list,
+ * as well as insert or remove anywhere in the list without invalidating the iterator.
+ *
+ * Insert or remove before or after any element: O(1)
+ * Create iterator: O(1)
+ * Find element: O(n)
+ *
+ * @param numElems The size of the list
+ * @param firstElem The first list element if nonempty or none if empty.
+ * @param lastElem THe last list element if nonempty or none if empty.
+ * @tparam T
+ */
 final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int, var firstElem: Option[T],
                                                               var lastElem: Option[T])
   extends mutable.Iterable[T], mutable.Growable[T]:
@@ -262,6 +285,14 @@ trait IntrusiveListElement:
     this.next = None
     this.prev = None
     this
+  }
+
+  def succ(): Option[this.type] = {
+    next.map(_.asInstanceOf[this.type])
+  }
+
+  def pred(): Option[this.type] = {
+    prev.map(_.asInstanceOf[this.type])
   }
 
   private[intrusiveList] final def append(elem: IntrusiveListElement): IntrusiveListElement = {

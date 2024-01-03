@@ -10,15 +10,12 @@ import scala.annotation.tailrec
  */
 type CFGPosition = Procedure | Block | Command
 
-trait IRWalk[NT <: CFGPosition] {
-  type Node = NT
-  def succ(pos: NT): Set[NT]
-  def pred(pos: NT): Set[NT]
-
+trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] {
+  def succ(pos: IN): Set[NT]
+  def pred(pos: IN): Set[NT]
 }
 
-
-trait IntraProcIRCursor extends IRWalk[CFGPosition] {
+trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
 
   def succ(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
@@ -46,76 +43,85 @@ trait IntraProcIRCursor extends IRWalk[CFGPosition] {
           Set(s.parent) // predecessor blocks
         }
       case j: Jump => if j.parent.statements.isEmpty then Set(j.parent) else Set(j.parent.statements.last)
-      case b: Block => b.incomingJumps.asInstanceOf[Set[Node]]
+      case b: Block => b.incomingJumps.asInstanceOf[Set[CFGPosition]]
       case proc: Procedure => Set() // intraproc
     }
   }
 }
 
 object IntraProcIRCursor extends IntraProcIRCursor
-trait IntraProcBlockIRCursor extends IRWalk[Block] {
+
+trait IntraProcBlockIRCursor extends IRWalk[CFGPosition, Block] {
 
   @tailrec
-  final def succ(pos: Node): Set[Node] = {
+  final def succ(pos: CFGPosition): Set[Block] = {
     pos match {
-      case b: Block => IntraProcIRCursor.succ(b.jump).filter(_.isInstanceOf[Block]).asInstanceOf[Set[Node]]
+      case b: Block => b.nextBlocks
       case s: Command => succ(s.parent)
+      case s: Procedure => s.entryBlock.toSet
     }
   }
 
   @tailrec
-  final def pred(pos: Node): Set[Node] = {
+  final def pred(pos: CFGPosition): Set[Block] = {
     pos match {
-      case b: Block => if b.isEntry then Set() else b.incomingJumps.asInstanceOf[Set[Node]]
+      case b: Block => if b.isEntry then Set.empty else b.incomingJumps.map(_.parent)
       case j: Command => pred(j.parent)
+      case s: Procedure => Set.empty
     }
   }
 }
-
 object IntraProcBlockIRCursor extends IntraProcBlockIRCursor
 
-trait InterProcIRCursor extends IRWalk[CFGPosition] {
 
-  final def succ(pos: Node): Set[Node] = {
+trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
+
+  final def succ(pos: CFGPosition): Set[CFGPosition] = {
      pos match
       case c: DirectCall => Set(c.target)
       case c: IndirectCall => Set()
       case _ =>  IntraProcIRCursor.succ(pos)
   }
-  final def pred(pos: Node): Set[Node] = {
+  final def pred(pos: CFGPosition): Set[CFGPosition] = {
       IntraProcIRCursor.pred(pos) ++ (pos match
-        case c: Procedure => c.incomingCalls().toSet.asInstanceOf[Set[Node]]
-        case b: Block => if b.isEntry then Set(b.parent) else b.incomingJumps.toSet.asInstanceOf[Set[Node]]
+        case c: Procedure => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
+        case b: Block => if b.isEntry then Set(b.parent) else b.incomingJumps.asInstanceOf[Set[CFGPosition]]
         case _ => Set()
         )
     }
 }
 
+
+trait InterProcBlockIRCursor extends IRWalk[CFGPosition, Block] {
+
+  final def succ(pos: CFGPosition): Set[Block] = {
+    pos match {
+      case s: DirectCall => s.target.entryBlock.toSet
+      case _ => IntraProcBlockIRCursor.succ(pos)
+    }
+  }
+
+  final def pred(pos: CFGPosition): Set[Block] = {
+    pos match {
+      case b: Block => if b.isEntry then b.parent.incomingCalls().map(_.parent).toSet else b.prevBlocks
+      case _ => IntraProcBlockIRCursor.pred(pos)
+    }
+  }
+}
 object InterProcIRCursor extends InterProcIRCursor
 
-trait InterProcBlockIRCursor extends IRWalk[Block] {
-  final def succ(b: Node): Set[Node] =
-    b.jump match {
-      case b: GoTo => b.targets
-      case c: DirectCall => c.target.entryBlock.toSet
-      case _ => Set()
-  }
-  final def pred(b: Node): Set[Node] = if b.isEntry then b.parent.incomingCalls().map(_.parent).toSet else b.incomingJumps.map(_.parent)
-}
+trait CallGraph extends IRWalk[Procedure, Procedure] {
+  final def succ(b: Procedure): Set[Procedure] = b.calls
 
-trait CallGraph extends IRWalk[Procedure] {
-  final def succ(b: Node): Set[Node] = b.calls
-
-  final def pred(b: Node): Set[Node] = b.incomingCalls().map(_.target).toSet
+  final def pred(b: Procedure): Set[Procedure] = b.incomingCalls().map(_.target).toSet
 }
 
 object CallGraph extends CallGraph
 
 object InterProcBlockIRCursor extends IntraProcBlockIRCursor
 
-def computeDomain[T <: CFGPosition](walker: IRWalk[T], initial: IterableOnce[T]): mutable.Set[T] = {
-  val domain : mutable.Set[T] = mutable.Set.from(initial)
-
+def computeDomain[T <: CFGPosition, O <: T](walker: IRWalk[T, O], initial: IterableOnce[O]): mutable.Set[O] = {
+  val domain : mutable.Set[O] = mutable.Set.from(initial)
 
   var sizeBefore = 0
   var sizeAfter = domain.size
@@ -132,22 +138,22 @@ def computeDomain[T <: CFGPosition](walker: IRWalk[T], initial: IterableOnce[T])
 
 
 def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty): String= {
-  val domain = computeDomain[CFGPosition](IntraProcIRCursor, program.procedures)
+  val domain = computeDomain[CFGPosition, CFGPosition](IntraProcIRCursor, program.procedures)
   toDot[CFGPosition](domain, IntraProcIRCursor, labels)
 }
 
 def dotCallGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty): String= {
-  val domain = computeDomain[Procedure](CallGraph, program.procedures)
+  val domain = computeDomain[Procedure, Procedure](CallGraph, program.procedures)
   toDot[Procedure](domain, CallGraph, labels)
 }
 
 def dotBlockGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty): String= {
-  val domain = computeDomain[Block](IntraProcBlockIRCursor, program.procedures.flatMap(_.blocks).toSet)
+  val domain = computeDomain[CFGPosition, Block](IntraProcBlockIRCursor, program.procedures.flatMap(_.blocks).toSet)
   toDot[Block](domain, IntraProcBlockIRCursor, labels)
 }
 
 
-def toDot[T <: CFGPosition](domain: mutable.Set[T], iterator: IRWalk[T], labels: Map[CFGPosition, String]) : String = {
+def toDot[T <: CFGPosition](domain: mutable.Set[T], iterator: IRWalk[? >: T, ?], labels: Map[CFGPosition, String]) : String = {
 
   val visited : mutable.Set[CFGPosition] = mutable.Set.from(domain)
   var labelcounter = 0

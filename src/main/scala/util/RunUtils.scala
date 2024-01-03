@@ -196,7 +196,7 @@ object RunUtils {
 
     val callGraph = dotCallGraph(IRProgram)
     writeToFile(callGraph, "callgraphtest.dot")
-    writeToFile(dotBlockGraph(IRProgram), "blockgraphtest.dot")
+    writeToFile(dotBlockGraph(IRProgram, IRProgram.filter(a => a.isInstanceOf[Block]).map(b => b -> b.toString).toMap), "blockgraphtest.dot")
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
@@ -226,13 +226,13 @@ object RunUtils {
     newIR
   }
 
-  def printAnalysisResults(cfg: Program, result: Map[IntraProcIRCursor.Node, _], iteration: Int): String = {
+  def printAnalysisResults(cfg: Program, result: Map[CFGPosition, _], iteration: Int): String = {
     val functionEntries = cfg.procedures
     val s = StringBuilder()
     s.append(System.lineSeparator())
     for (f <- functionEntries) {
-      val stack: mutable.Stack[IntraProcIRCursor.Node] = mutable.Stack()
-      val visited: mutable.Set[IntraProcIRCursor.Node] = mutable.Set()
+      val stack: mutable.Stack[CFGPosition] = mutable.Stack()
+      val visited: mutable.Set[CFGPosition] = mutable.Set()
       stack.push(f)
       var previousBlock: String = ""
       var isEntryNode = false
@@ -282,7 +282,7 @@ object RunUtils {
       s.append(System.lineSeparator())
     }
 
-    def printNode(node: IntraProcIRCursor.Node): Unit = {
+    def printNode(node: CFGPosition): Unit = {
       node match {
         case _: Statement => s.append("[Stmt] ")
         case _: Procedure => s.append("[FunctionEntry] ")

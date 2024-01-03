@@ -66,7 +66,7 @@ trait ILValueAnalysisMisc:
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: IntraProcIRCursor.Node, s: statelattice.Element): statelattice.Element =
+  def localTransfer(n: CFGPosition, s: statelattice.Element): statelattice.Element =
     n match
       case la: LocalAssign =>
         s + (la.lhs -> eval(la.rhs, s))
@@ -74,18 +74,17 @@ trait ILValueAnalysisMisc:
       case _ => s
 
 
-type IRNode = IRIntraproceduralDependencies.walker.Node
 
 object IRSimpleValueAnalysis:
 
   class Solver(prog: Program) extends ILValueAnalysisMisc
     with IRIntraproceduralDependencies.ForwardDependencies
-    with Analysis[Map[IRNode, Map[Variable, FlatElement[BitVecLiteral]]]]
-    with SimplePushDownWorklistFixpointSolver[IRNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
+    with Analysis[Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]]
+    with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
     :
       /* Worklist initial set */
-      //override val lattice: MapLattice[IRNode, statelattice.type] = MapLattice(statelattice)
-      override val lattice: MapLattice[IRNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]] = MapLattice(statelattice)
+      //override val lattice: MapLattice[CFGPosition, statelattice.type] = MapLattice(statelattice)
+      override val lattice: MapLattice[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]] = MapLattice(statelattice)
 
-      override val domain : Set[IRNode] = computeDomain(IntraProcIRCursor, prog.procedures).toSet
-      def transfer(n: IRNode, s: statelattice.Element): statelattice.Element = localTransfer(n, s)
+      override val domain : Set[CFGPosition] = computeDomain(IntraProcIRCursor, prog.procedures).toSet
+      def transfer(n: CFGPosition, s: statelattice.Element): statelattice.Element = localTransfer(n, s)

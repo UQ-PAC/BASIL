@@ -32,7 +32,7 @@ trait IntraproceduralForwardDependencies extends Dependencies[CfgNode] {
 }
 
 
-class IRDependencies[NT <: CFGPosition](val walker: IRWalk[NT]) {
+class IRDependencies[NT <: CFGPosition](val walker: IRWalk[NT, NT]) {
   trait ForwardDependencies extends  Dependencies[NT] {
     override def outdep(n: NT): Set[NT] = walker.succ(n)
 
