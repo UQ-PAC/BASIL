@@ -5,7 +5,6 @@ stext: char[11]
 
 
 DIRECT functions: gamma_load64, gamma_load8, memory_load8_le, bvult64, bvule64, bvsub64, gamma_load32, bvuge64, bvugt64
-
   
 Subroutine: #free
   Requires DIRECT: "(forall i : int, j: bv64 :: (malloc_base[i] == R0 && bvuge64(j, R0) && bvult64(j,  malloc_end[i])) ==> Gamma_mem[j])"
@@ -31,7 +30,6 @@ Ensures DIRECT: "(forall i: int :: i != malloc_count ==> malloc_base[i] == old(m
 Ensures DIRECT: "bvuge64(R0, 100000000bv64)"
 // uninitialised memory is low (free ensures since not part of modifies)
 Ensures DIRECT: "(forall i : bv64 :: (bvuge64(i, R0) && bvult64(i, bvadd64(R0, old(R0)))) ==> (Gamma_mem[i] && gamma_load8(Gamma_mem, i)))"
-
 
 Subroutine: memcpy
   Modifies: mem
