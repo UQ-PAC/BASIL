@@ -48,6 +48,8 @@ class SteensgaardAnalysis(
   var mallocCount: Int = 0
   var stackCount: Int = 0
   val stackMap: mutable.Map[CfgFunctionEntryNode, mutable.Map[Expr, StackRegion]] = mutable.Map()
+  val spList = ListBuffer[Expr]()
+  spList.addOne(stackPointer)
 
   private def nextMallocCount() = {
     mallocCount += 1
@@ -97,13 +99,29 @@ class SteensgaardAnalysis(
     buffers
   }
 
+  def stackDetection(stmt: Statement): Unit = {
+    stmt match {
+      case localAssign: LocalAssign =>
+        if (spList.contains(localAssign.rhs)) {
+          // add lhs to spList
+          spList.addOne(localAssign.lhs)
+        } else {
+          // remove lhs from spList
+          if spList.contains(localAssign.lhs) then
+            spList.remove(spList.indexOf(localAssign.lhs))
+        }
+        // should handle the store case (last case)
+      case _ =>
+    }
+  }
+
   def eval(exp: Expr, n: CfgCommandNode): Set[MemoryRegion] = {
     Logger.debug(s"evaluating $exp")
     Logger.debug(s"n: $n")
     var regions = Set[MemoryRegion]()
     exp match {
       case binOp: BinaryExpr =>
-        if (binOp.arg1 == stackPointer) {
+        if (spList.contains(binOp.arg1)) {
           evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach(
             b => regions += poolMaster(b, n.parent, RegisterVariableWrapper(binOp.arg1.asInstanceOf[Register]))
           )
@@ -183,6 +201,7 @@ class SteensgaardAnalysis(
               unify(varToStTerm(RegisterVariableWrapper(mallocVariable)), PointerRef(allocToTerm(alloc)))
             }
           case localAssign: LocalAssign =>
+            stackDetection(localAssign)
             localAssign.rhs match {
               case binOp: BinaryExpr =>
                 // X1 = &X2: [[X1]] = ↑[[X2]]
