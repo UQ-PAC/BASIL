@@ -162,7 +162,7 @@ object RunUtils {
     //val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile) //TODO: this seems to give some small error?
     val bapProgram = loadBAP(q.loading.adtFile, 1812) 
     
-    
+    // val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile)
     // val IRTranslator = BAPToIR(bapProgram, mainAddress)
     // var IRProgram = IRTranslator.translate
 

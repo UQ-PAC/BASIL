@@ -19,7 +19,9 @@ stmt: assignment_stmt | call_stmt | conditional_stmt;
 
 assignment_stmt:
 	'Stmt_Assign' OPEN_PAREN lexpr COMMA expr CLOSE_PAREN					# Assign
-	| 'Stmt_ConstDecl' OPEN_PAREN type COMMA METHOD COMMA expr CLOSE_PAREN	# ConstDecl;
+	| 'Stmt_ConstDecl' OPEN_PAREN type COMMA METHOD COMMA expr CLOSE_PAREN	# ConstDecl
+	| 'Stmt_VarDecl' OPEN_PAREN type COMMA METHOD COMMA expr CLOSE_PAREN    # VarDecl
+	| 'Stmt_VarDeclsNoInit' OPEN_PAREN type COMMA OPEN_BRACKET OPEN_PAREN METHOD (COMMA METHOD)* CLOSE_PAREN CLOSE_BRACKET CLOSE_PAREN  # VarDeclsNoInit;
 
 call_stmt:
 	'Stmt_TCall' OPEN_PAREN (SSYMBOL | METHOD) (
@@ -35,10 +37,11 @@ call_stmt:
 	)? CLOSE_BRACKET CLOSE_PAREN;
 
 conditional_stmt:
-	'Stmt_If' OPEN_PAREN expr COMMA OPEN_BRACKET (COMMA stmt)* COMMA? CLOSE_BRACKET COMMA //TODO: this will almost certianly fail on complex if statements, so check
-		OPEN_BRACKET CLOSE_BRACKET COMMA CLOSE_PAREN;
+	'Stmt_If' OPEN_PAREN expr COMMA OPEN_BRACKET (COMMA stmt)* COMMA? CLOSE_BRACKET COMMA 
+		OPEN_BRACKET CLOSE_BRACKET COMMA (OPEN_PAREN 'else' conditional_stmt CLOSE_PAREN)* (OPEN_PAREN 'else' else_stmt CLOSE_PAREN)? CLOSE_PAREN;
+else_stmt: stmt;
 
-type: 'Type_Bits' OPEN_PAREN expr CLOSE_PAREN # TypeBits;
+type : 'Type_Bits' OPEN_PAREN expr CLOSE_PAREN # TypeBits;
 
 lexpr:
 	'LExpr_Var' OPEN_PAREN (SSYMBOL | METHOD) CLOSE_PAREN			# LExprVar

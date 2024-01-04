@@ -11,6 +11,7 @@ import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends SemanticsBaseVisitor[Any] {
 
   var cseMap: HashMap[String, IRType] = HashMap[String, IRType]()
+  var varMap: HashMap[String, IRType] = HashMap[String, IRType]()
 
   def unChrisifyUUID(uuid: String): ByteString = { // This probably needs a better name, but :/
     return ByteString.copyFrom(Base64.getDecoder().decode(uuid))
@@ -86,7 +87,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
     val statements: ArrayBuffer[Statement] = ctx.stmt_string().asScala.flatMap { s =>
       s.stmt() match {
           case a if (a.assignment_stmt() != null) =>
-            Option(visitAssignment_stmt(a.assignment_stmt()))
+            visitAssignment_stmt(a.assignment_stmt())
           case c if (c.call_stmt() != null) =>
             Option(visitCall_stmt(c.call_stmt()))
           case _ => None // Conditions were implemented above
@@ -96,16 +97,18 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
     statements
   }
 
-  def visitAssignment_stmt(ctx: Assignment_stmtContext): LocalAssign = {
-    var stmt: LocalAssign = null
+  def visitAssignment_stmt(ctx: Assignment_stmtContext): Option[LocalAssign] = {
     ctx match
-      case a: AssignContext =>
-        stmt = visitAssign(a)
+      case a: AssignContext => return Option(visitAssign(a))
         
-      case c: ConstDeclContext =>
-        stmt = visitConstDecl(c)
-    return stmt
+      case c: ConstDeclContext => return Option(visitConstDecl(c))
+
+      case v: VarDeclContext => return Option(visitVarDecl(v))
+
+      case v: VarDeclsNoInitContext => return visitVarDeclsNoInit(v)
   }
+
+  
 
   override def visitCall_stmt(ctx: Call_stmtContext): MemoryAssign = {
     val mem = Memory("mem", 64, 8) // yanked from BAP
@@ -117,8 +120,29 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
   }
 
   override def visitConditional_stmt(ctx: Conditional_stmtContext): Statement = {
-    Assert(visitExpr(ctx.expr), None)
+    Assert(visitExpr(ctx.expr), None) //TODO: Assume?
   }
+
+  override def visitVarDeclsNoInit(ctx: VarDeclsNoInitContext): Option[LocalAssign] = {
+    val ty = visitType(ctx.`type`())
+    ctx.METHOD().asScala.foreach(elem => varMap += (elem.getText() -> ty))
+    None
+  }
+
+  override def visitVarDecl(ctx: VarDeclContext): LocalAssign = {
+    val ty = visitType(ctx.`type`())
+    val name = ctx.METHOD().getText()
+
+    varMap += (name -> ty)
+
+    val expr = visitExpr(ctx.expr())
+    if (expr != null) {
+      return LocalAssign(LocalVar(name, ty), expr) 
+    } else {
+      return null
+    }
+  }
+
   override def visitAssign(ctx: AssignContext): LocalAssign = {
     val lhs = visitLexpr(ctx.lexpr())
     val rhs = visitExpr(ctx.expr())
@@ -391,7 +415,8 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
 
   def createExprVar(name: String): Expr = {
     name match
-      case n if n.startsWith("Cse") => return LocalVar(name, cseMap.get(name).get)
+      case n if n.startsWith("Cse") => return LocalVar(n, cseMap.get(n).get)
+      case v if varMap.contains(v)  => return LocalVar(v, varMap.get(v).get) 
       case "TRUE"                   => return TrueLiteral
       case "FALSE"                  => return FalseLiteral
       case "SP_EL0"                 => return Register("R31", BitVecType(64))
