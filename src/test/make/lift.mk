@@ -1,3 +1,6 @@
+
+# Run from the directory basil/src/test/*/test_case/compilation_variant/
+
 $(LIFT_ARTEFACTS): a.out
 	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
 	$(READELF) -s -r -W a.out > $(NAME).relf

@@ -1,10 +1,12 @@
 .EXPORT_ALL_VARIABLES:
 
-# - lets us continue if it doesnt exist
+# Run from the directory basil/src/test/*/test_case/
+
+# - means continue if it doesnt exist
 -include ./config.mk
 
 NAME=$(notdir $(shell pwd))
-GIT_ROOT?=$(shell git rev-parse --show-toplevel)
+GIT_ROOT?=$(realpath ../../../../)
 
 GCC ?= aarch64-linux-gnu-gcc
 CLANG ?= clang
@@ -34,5 +36,6 @@ $(TARGETS): $(ENABLED_COMPILERS)
 
 $(ENABLED_COMPILERS):
 	mkdir -p $@/
+	# - continue if fails
 	-$(MAKE) -C $(realpath $@) -f $(GIT_ROOT)/src/test/make/$@.mk $(MAKECMDGOALS)
 
