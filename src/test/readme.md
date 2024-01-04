@@ -7,9 +7,10 @@ ENABLED_COMPILERS = clang clang_pic gcc gcc_pic
 ```
 
 
-Lift all:
+To force recompile and lift all:
 
 ```
+make cleanall 
 make
 ```
 
