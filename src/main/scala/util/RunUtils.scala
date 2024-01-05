@@ -191,6 +191,8 @@ object RunUtils {
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
+    LivenessAnalysisWorklistSolver(cfg).analyze()
+
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
 
     newIR
