@@ -143,8 +143,6 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     }
   }
 
-  BoolType
-
   /**
     * Converts a BAPExpr condition that returns a bitvector of size 1 to an Expr condition that returns a Boolean
     *

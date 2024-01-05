@@ -694,8 +694,3 @@ case class L(memory: BMapVar, index: BExpr) extends BExpr {
   override def globals: Set[BVar] = index.globals
   override def loads: Set[BExpr] = index.loads
 }
-
-
-
-object BinaryBExpr {
-}

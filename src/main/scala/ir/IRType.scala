@@ -31,12 +31,3 @@ def coerceToBool(e: Expr): Expr = {
     case MapType(_, _) => ???
   }
 }
-
-def coerceToInt(e: Expr): Expr = {
-  e.getType match {
-    case BitVecType(_) => UnaryExpr(BVTOINT, e)
-    case IntType => e
-    case BoolType => IntLiteral(1)
-    case MapType(_, _) => ???
-  }
-}
