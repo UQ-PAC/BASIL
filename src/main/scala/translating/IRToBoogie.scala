@@ -39,8 +39,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translate(boogieGeneratorConfig: BoogieGeneratorConfig): BProgram = {
     config = boogieGeneratorConfig
-    //val readOnlyMemoryFunction = readOnlyMemoryPredicate(memoryToCondition(program.readOnlyMemory), mem)
-    //val readOnlyMemory = List(BFunctionCall(readOnlyMemoryFunction.name, List(mem), BoolBType))
     val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
 
     val procedures = program.procedures.map(f => translateProcedure(f, readOnlyMemory))
@@ -106,6 +104,14 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     List(relyProc, relyTransitive, relyReflexive)
   }
 
+  /**
+   * A predicate used to assert the value of all readonly memory.
+   * (Boogie does not like this it if it is too large due to it being a single expression)
+   *
+   * E.g.
+   *  val readOnlyMemoryFunction = readOnlyMemoryPredicate(memoryToCondition(program.readOnlyMemory), mem)
+   *  val readOnlyMemory = List(BFunctionCall(readOnlyMemoryFunction.name, List(mem), BoolBType))
+   */
   private def readOnlyMemoryPredicate(readonly: List[BExpr], mem: BVar) : BFunction = {
     BFunction("readonly_memory", List(BParam("mem", mem.bType)), BParam(BoolBType), Some(readonly.reduce((a, b) => BinaryBExpr(BoolAND, a, b))), List(externAttr))
   }
