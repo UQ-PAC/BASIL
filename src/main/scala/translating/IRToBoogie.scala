@@ -39,8 +39,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translate(boogieGeneratorConfig: BoogieGeneratorConfig): BProgram = {
     config = boogieGeneratorConfig
-    val readOnlyMemoryFunction = readOnlyMemoryPredicate(memoryToCondition(program.readOnlyMemory), mem)
-    val readOnlyMemory = List(BFunctionCall(readOnlyMemoryFunction.name, List(mem), BoolBType))
+    //val readOnlyMemoryFunction = readOnlyMemoryPredicate(memoryToCondition(program.readOnlyMemory), mem)
+    //val readOnlyMemory = List(BFunctionCall(readOnlyMemoryFunction.name, List(mem), BoolBType))
+    val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
 
     val procedures = program.procedures.map(f => translateProcedure(f, readOnlyMemory))
     val defaultGlobals = List(BVarDecl(mem, List(externAttr)), BVarDecl(Gamma_mem, List(externAttr)))
@@ -77,7 +78,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val functionsUsed4 = functionsUsed3.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4).toList.sorted
 
-    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ pushUpModifiesFixedPoint(rgProcs ++ procedures) ++ Seq(readOnlyMemoryFunction)
+    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
     BProgram(declarations)
   }
 
@@ -375,16 +376,49 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   }
 
   private def memoryToCondition(memory: ArrayBuffer[MemorySection]): List[BExpr] = {
-    val sections = memory.flatMap { s =>
-      for (b <- s.bytes.indices) yield {
-        BinaryBExpr(
-          BVEQ,
-          BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
-          s.bytes(b).toBoogie
-        )
+
+    def coalesced(): List[BExpr] = {
+      val sections = memory.flatMap { s =>
+        // Phrase the memory condition in terms of 64-bit operations, as long as the memory
+        // region is a multiple of such operations and appropriately aligned
+        if (s.address % 8 == 0 && s.bytes.size % 8 == 0) {
+          for (b <- s.bytes.indices by 8) yield {
+            // Combine the byte constants into a 64-bit value
+            val sum: BigInt =
+              (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * (BigInt(2).pow(y * 8))))
+            BinaryBExpr(
+              BVEQ,
+              BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
+              BitVecBLiteral(sum, 64)
+            )
+          }
+        } else {
+          for (b <- s.bytes.indices) yield {
+            BinaryBExpr(
+              BVEQ,
+              BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+              s.bytes(b).toBoogie
+            )
+          }
+        }
       }
+      sections.toList
     }
-    sections.toList
+
+    def bytes(): List[BExpr] = {
+      val sections = memory.flatMap { s =>
+        for (b <- s.bytes.indices) yield {
+          BinaryBExpr(
+            BVEQ,
+            BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+            s.bytes(b).toBoogie
+          )
+        }
+      }
+      sections.toList
+    }
+
+    if config.coalesceConstantMemory then coalesced() else bytes()
   }
 
 

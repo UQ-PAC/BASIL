@@ -43,12 +43,12 @@ case class BProcedure(
   override def compare(that: BProcedure): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
     val header = s"procedure $attrString$name(${in.map(_.withType).mkString(", ")})"
+    val implHeader = s"implementation $attrString$name(${in.map(_.withType).mkString(", ")})"
     val returns = if (out.nonEmpty) {
       s" returns (${out.map(_.withType).mkString(", ")})"
     } else {
       ""
     }
-    val semicolon = if body.nonEmpty then "" else ";"
     val modifiesStr = if (modifies.nonEmpty) {
       List(s"  modifies ${modifies.toSeq.sorted.mkString(", ")};")
     } else {
@@ -65,9 +65,11 @@ case class BProcedure(
     } else {
       List()
     }
+
     List(
-      header + returns + semicolon
-    ) ++ modifiesStr ++ requiresStrs ++ freeRequiresStrs ++ ensuresStrs ++ freeEnsuresStrs ++ bodyStr ++ List("")
+      header + returns + ";"
+    ) ++ modifiesStr ++ requiresStrs ++ freeRequiresStrs ++ ensuresStrs ++ freeEnsuresStrs++ List("")
+      ++ (if body.nonEmpty then  List(implHeader + returns) ++ bodyStr ++ List("") else List(""))
   }
   override def toString: String = toBoogie.mkString("\n")
   def functionOps: Set[FunctionOp] =

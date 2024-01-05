@@ -15,21 +15,32 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 
     var toVisit: mutable.LinkedHashSet[(Int, String)] = mutable.LinkedHashSet((0, mainProcedure.name))
     var reachableFound = true
-    val reachableNames = mutable.HashSet[String]()
+    val reachableNames = mutable.HashMap[String, Int]()
     while (toVisit.nonEmpty) {
       val next = toVisit.head
       toVisit.remove(next)
 
       if (next._1 <= depth) {
-        reachableNames.addOne(next._2)
+
+        def addName(depth: Int, name: String): Unit = {
+          val oldDepth = reachableNames.getOrElse(name, Integer.MAX_VALUE)
+          reachableNames.put(next._2, if depth < oldDepth then depth else oldDepth)
+        }
+        addName(next._1, next._2)
 
         val callees = procedureCalleeNames(next._2)
 
-        toVisit.addAll(callees.diff(reachableNames).map(c => (next._1 + 1, c)))
-        reachableNames.addAll(callees)
+        toVisit.addAll(callees.diff(reachableNames.keySet).map(c => (next._1 + 1, c)))
+        callees.foreach(c => addName(next._1 + 1, c))
       }
     }
-    procedures = procedures.filter(f => reachableNames.contains(f.name))
+    procedures = procedures.filter(f => reachableNames.keySet.contains(f.name))
+
+    for (elem <- procedures.filter(c => c.calls.exists(s => !procedures.contains(s)))) {
+      // last layer is analysed only as specifications so we remove the body for anything that calls
+      // a function we have removed
+      elem.blocks.clear()
+    }
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
