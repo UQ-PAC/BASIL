@@ -80,7 +80,7 @@ USER root
 # ====================
 # Bap with ASLi plugin
 # ====================
-FROM bap-upsteam.2.5 AS aslp-bap-upstream
+FROM bap-upstream.2.5 AS aslp-bap-upstream
 USER opam
 RUN git clone https://github.com/UQ-PAC/bap-asli-plugin.git
 RUN cd /home/opam/bap-asli-plugin && eval $(opam env) && make
@@ -196,5 +196,5 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
 # ------------------
 # Transplanted BAP 
 # ==================
-COPY --from=basil /basil/target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar /target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar
+COPY --from=basil /basil/target/scala-3.3.0/wptool-boogie-assembly-0.0.1.jar /target/scala-3.3.0/wptool-boogie-assembly-0.0.1.jar
 WORKDIR /app
