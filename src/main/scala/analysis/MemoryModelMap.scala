@@ -44,27 +44,29 @@ class MemoryModelMap {
     }
   }
 
-  def convertMemoryRegions(memoryRegions: Map[CfgNode, Set[MemoryRegion]], externalFunctions: Map[BigInt, String]): Unit = {
+  def convertMemoryRegions(memoryRegions: Map[CfgNode, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
     val externalFunctionRgns = externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64)))
 
     // get all function exit node
     val exitNodes = memoryRegions.keys.collect { case e: CfgFunctionExitNode => e }
     exitNodes.foreach(exitNode =>
-      val node = memoryRegions(exitNode)
+      memoryRegions(exitNode) match {
+        case Lift(node) =>
+          // for each function exit node we get the memory region and add it to the mapping
+          val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
+          val dataRgns = node.collect { case r: DataRegion => r }
 
-      // for each function exit node we get the memory region and add it to the mapping
-      val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
-      val dataRgns = node.collect { case r: DataRegion => r }
+          // add externalFunctionRgn to dataRgns and sort by value
+          val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.value)
 
-      // add externalFunctionRgn to dataRgns and sort by value
-      val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.value)
+          allStacks(exitNode.data.name) = stackRgns
 
-      allStacks(exitNode.data.name) = stackRgns
-
-      for (dataRgn <- allDataRgns) {
-        add(dataRgn.start.value, dataRgn)
-      }
+          for (dataRgn <- allDataRgns) {
+            add(dataRgn.start.value, dataRgn)
+          }
+        case LiftedBottom =>
+    }
     )
   }
 
@@ -108,3 +110,36 @@ class MemoryModelMap {
     s"Stack: ${rangeMap.stackMap}\n Heap: ${rangeMap.heapMap}\n Data: ${rangeMap.dataMap}\n"
 
 }
+
+trait MemoryRegion {
+  val regionIdentifier: String
+  var extent: Option[RangeKey] = None
+}
+
+class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral) extends MemoryRegion {
+  override def toString: String = s"Stack($regionIdentifier, $start)"
+  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier
+    case _ => false
+  }
+}
+
+class HeapRegion(override val regionIdentifier: String, val size: BitVecLiteral) extends MemoryRegion {
+  override def toString: String = s"Heap($regionIdentifier, $size)"
+  override def hashCode(): Int = regionIdentifier.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case h: HeapRegion => h.regionIdentifier == regionIdentifier
+    case _ => false
+  }
+}
+
+class DataRegion(override val regionIdentifier: String, val start: BitVecLiteral) extends MemoryRegion {
+  override def toString: String = s"Data($regionIdentifier, $start)"
+  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case d: DataRegion => d.start == start && d.regionIdentifier == regionIdentifier
+    case _ => false
+  }
+}
+

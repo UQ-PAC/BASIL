@@ -11,7 +11,7 @@ import util.Logger
   * @return:
   *   The evaluated expression (e.g. 0x69632)
   */
-def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, ConstantPropagationLattice.FlatElement]): Option[BitVecLiteral] = {
+def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[BitVecLiteral]]): Option[BitVecLiteral] = {
   Logger.debug(s"evaluateExpression: $exp")
   exp match {
     case binOp: BinaryExpr =>
@@ -25,6 +25,7 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, ConstantProp
             case BVSUB => Some(BitVectorEval.smt_bvsub(l, r))
             case BVASHR => Some(BitVectorEval.smt_bvashr(l, r))
             case BVCOMP => Some(BitVectorEval.smt_bvcomp(l, r))
+            case BVCONCAT => Some(BitVectorEval.smt_concat(l, r))
             case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
           }
         case _ => None
@@ -41,9 +42,9 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, ConstantProp
       }
     case variable: Variable =>
       constantPropResult(variable) match {
-        case ConstantPropagationLattice.FlatElement.FlatEl(value) => Some(value.asInstanceOf[BitVecLiteral])
-        case ConstantPropagationLattice.FlatElement.Top           => None
-        case ConstantPropagationLattice.FlatElement.Bot           => None
+        case FlatEl(value) => Some(value)
+        case Top           => None
+        case Bottom           => None
       }
     case b: BitVecLiteral => Some(b)
     case _ => //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")

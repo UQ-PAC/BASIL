@@ -22,7 +22,7 @@ import util.Logger
 import scala.collection.mutable
 
 object RunUtils {
-  var memoryRegionAnalysisResults: Map[CfgNode, Set[MemoryRegion]] = Map()
+  var memoryRegionAnalysisResults: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
@@ -111,10 +111,12 @@ object RunUtils {
     val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
     IRProgram.setModifies(specModifies)
 
+    /*
     if (q.runInterpret) {
       val interpreter = Interpreter()
       interpreter.interpret(IRProgram)
     }
+    */
 
     Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
@@ -150,18 +152,18 @@ object RunUtils {
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
     Logger.info("[!] Running Constant Propagation")
-    val constPropSolver = ConstantPropagationAnalysis.WorklistSolver(cfg)
-    val constPropResult: Map[CfgNode, Map[Variable, ConstantPropagationLattice.Element]] = constPropSolver.analyze(true)
+    val constPropSolver = ConstantPropagationSolver(cfg)
+    val constPropResult = constPropSolver.analyze()
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, constPropSolver.stateAfterNode), Output.dotIder), s"${s}_constprop$iteration.dot"))
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt"))
 
     Logger.info("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysis.WorklistSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
-    val mraResult: Map[CfgNode, Set[MemoryRegion]] = mraSolver.analyze(true)
+    val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
+    val mraResult = mraSolver.analyze()
     memoryRegionAnalysisResults = mraResult
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(mraResult, mraSolver.stateAfterNode), Output.dotIder), s"${s}_mra$iteration.dot"))
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(mraResult, true), Output.dotIder), s"${s}_mra$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, mraResult, iteration), s"${s}_mra$iteration.txt"))
 
     Logger.info("[!] Running MMM")
@@ -169,11 +171,10 @@ object RunUtils {
     mmm.convertMemoryRegions(mraResult, mergedSubroutines)
 
     Logger.info("[!] Running VSA")
-    val vsaSolver =
-      ValueSetAnalysis.WorklistSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
-    val vsaResult: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]]  = vsaSolver.analyze(false)
+    val vsaSolver = ValueSetAnalysisSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
+    val vsaResult: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, vsaSolver.stateAfterNode), Output.dotIder), s"${s}_vsa$iteration.dot"))
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, true), Output.dotIder), s"${s}_vsa$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, vsaResult, iteration), s"${s}_vsa$iteration.txt"))
 
     Logger.info("[!] Resolving CFG")
@@ -223,7 +224,7 @@ object RunUtils {
               isEntryNode = false
             case _ => isEntryNode = false
           }
-          val successors = next.succ(true)
+          val successors = next.succIntra
           if (successors.size > 1) {
             val successorsCmd = successors.collect { case c: CfgCommandNode => c }.toSeq.sortBy(_.data.label)
             printGoTo(successorsCmd)
@@ -272,19 +273,19 @@ object RunUtils {
 
   def resolveCFG(
       cfg: ProgramCfg,
-      valueSets: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]],
+      valueSets: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
       IRProgram: Program
   ): (Program, Boolean) = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
-    cfg.startNode.succ(true).union(cfg.startNode.succ(false)).foreach(node => worklist.addOne(node))
+    cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
 
     val visited = MutableSet[CfgNode]()
     while (worklist.nonEmpty) {
       val node = worklist.remove(0)
       if (!visited.contains(node)) {
         process(node)
-        node.succ(true).union(node.succ(false)).foreach(node => worklist.addOne(node))
+        node.succIntra.union(node.succInter).foreach(node => worklist.addOne(node))
         visited.add(node)
       }
     }
@@ -328,27 +329,31 @@ object RunUtils {
               // We want to replace all possible indirect calls based on this CFG, before regenerating it from the IR
               return
             }
-            val valueSet = valueSets(n)
-            val targetNames = resolveAddresses(valueSet(indirectCall.target)).map(_.name).toList.sorted
-            val targets = targetNames.map(name => IRProgram.procedures.filter(_.name.equals(name)).head)
-            if (targets.size == 1) {
-              modified = true
-              val newCall = DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label)
-              block.jump = newCall
-            } else if (targets.size > 1) {
-              modified = true
-              val procedure = c.parent.data
-              val newBlocks = ArrayBuffer[Block]()
-              for (t <- targets) {
-                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
-                val newLabel: String = block.label + t.name
-                val directCall = DirectCall(t, indirectCall.returnTarget)
-                newBlocks.append(Block(newLabel, None, ArrayBuffer(assume), directCall))
+            valueSets(n) match {
+              case Lift(valueSet) =>
+                val targetNames = resolveAddresses(valueSet(indirectCall.target)).map(_.name).toList.sorted
+                val targets = targetNames.map(name => IRProgram.procedures.filter(_.name.equals(name)).head)
+
+                if (targets.size == 1) {
+                  modified = true
+                  val newCall = DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label)
+                  block.jump = newCall
+                } else if (targets.size > 1) {
+                  modified = true
+                  val procedure = c.parent.data
+                  val newBlocks = ArrayBuffer[Block]()
+                  for (t <- targets) {
+                    val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
+                    val newLabel: String = block.label + t.name
+                    val directCall = DirectCall(t, indirectCall.returnTarget)
+                    newBlocks.append(Block(newLabel, None, ArrayBuffer(assume), directCall))
+                  }
+                  procedure.blocks.addAll(newBlocks)
+                  val newCall = GoTo(newBlocks, indirectCall.label)
+                  block.jump = newCall
+                }
+              case LiftedBottom =>
               }
-              procedure.blocks.addAll(newBlocks)
-              val newCall = GoTo(newBlocks, indirectCall.label)
-              block.jump = newCall
-            }
           case _ =>
       case _ =>
     }
