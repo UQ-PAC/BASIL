@@ -191,7 +191,9 @@ object RunUtils {
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
-    LivenessAnalysisWorklistSolver(cfg).analyze()
+    val livenessAnalysisResult = LivenessAnalysisWorklistSolver(cfg).analyze()
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(livenessAnalysisResult, true), Output.dotIder), s"${s}_liveness$iteration.dot"))
+
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
 
