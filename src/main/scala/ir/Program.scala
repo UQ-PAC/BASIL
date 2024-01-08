@@ -169,18 +169,30 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     initialMemory = initialMemoryNew
   }
 
-  override def filter(f: CFGPosition => Boolean): Iterable[CFGPosition] = {
-    val b = mutable.ArrayBuffer[CFGPosition]()
-    val m = ILMap[CFGPosition](b, n => Some(n).filter(f))
-    m.visitProgram(this)
-    b
+  class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
+    val stack = mutable.Stack[CFGPosition]()
+    stack.addAll(begin.procedures)
+
+    override def hasNext: Boolean = {
+      stack.nonEmpty
+    }
+
+    override def next(): CFGPosition = {
+      val n: CFGPosition  = stack.pop()
+
+      stack.pushAll(n match  {
+        case p : Procedure => p.blocks
+        case b: Block => Seq() ++ b.statements ++ Seq(b.jump)
+        case s: Command => Seq()
+      })
+
+      n
+    }
+
   }
 
   def iterator: Iterator[CFGPosition] = {
-    val b = mutable.ArrayBuffer[CFGPosition]()
-    val m = ILMap[CFGPosition](b, n => Some(n))
-    m.visitProgram(this)
-    b.iterator
+    ILUnorderedIterator(this)
   }
 
 }

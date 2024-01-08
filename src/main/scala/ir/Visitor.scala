@@ -342,9 +342,8 @@ class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
 
 
 
-class ILMap[T](val results: mutable.Growable[T], val apply: CFGPosition => Option[T]) extends ReadOnlyVisitor {
+class CFGPositionMap[T](val results: mutable.Growable[T], val apply: CFGPosition => Option[T]) extends ReadOnlyVisitor {
   //val results: mutable.Map[CFGPosition, T] = mutable.HashMap[CFGPosition, T]()
-
   override def visitJump(node: Jump): Jump = {
     apply(node).foreach(results += _)
     super.visitJump(node)
