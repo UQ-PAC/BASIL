@@ -848,3 +848,29 @@ class ProgramCfgFactory:
       }
     }
   }
+
+class rpowalker() {
+  var rpoVisitCount = 0
+  def walkCfg(initial: CfgFunctionEntryNode): Map[CfgNode, Int] = {
+    val seen = mutable.AnyRefMap[CfgNode, Int]()
+
+    /** Global reverse post-order walk for the control flow graph. */
+
+    def walk(node: CfgNode): Unit = {
+      seen(node) = -1
+      for (succ <- node.succIntra) {
+        if (!seen.contains(succ)) {
+          walk(succ)
+        }
+      }
+      seen(node) = rpoVisitCount
+      rpoVisitCount += 1
+    }
+
+    walk(initial)
+
+    seen.toMap
+  }
+
+}
+

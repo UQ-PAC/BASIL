@@ -203,3 +203,32 @@ def toDot[T <: CFGPosition](domain: mutable.Set[T], iterator: IRWalk[? >: T, ?],
   val allNodes = dotNodes.values.toList.sortBy(n => n.id)
   new DotGraph("CursorCFG", allNodes, dotArrows).toDotString
 }
+
+
+class irrpo() {
+
+  var rpoVisitCount = 0;
+
+  def rpoWalk(p: CFGPosition, it: IRWalk[CFGPosition, _]): Map[CFGPosition, Int] = {
+    val seen = mutable.AnyRefMap[CFGPosition, Int]()
+
+  /** Global reverse post-order walk for the control flow graph. */
+
+    def walk(node: CFGPosition): Unit = {
+      seen(node) = -1
+      for (succ <- it.succ(node)) {
+        if (!seen.contains(succ)) {
+          walk(succ)
+        }
+      }
+      seen(node) = rpoVisitCount
+      rpoVisitCount += 1
+    }
+
+    walk(p)
+
+    seen.toMap
+
+  }
+
+}

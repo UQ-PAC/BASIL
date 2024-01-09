@@ -159,8 +159,10 @@ object RunUtils {
     val constPropResult = constPropSolver.analyze()
 
     def newSolverTest(): Unit = {
+      Logger.info("[!] Running IR based const prop solver")
       val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
       val newCPResult = ilcpsolver.analyze()
+      Logger.info("[!] done 1")
 
       val newCommandDomain = ilcpsolver.domain.filter(_.isInstanceOf[Command])
 
@@ -183,6 +185,7 @@ object RunUtils {
 
       config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_new_cpres$iteration.txt"))
       config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_old_cpres$iteration.txt"))
+      Logger.info("[!] Done")
 
     }
     newSolverTest()

@@ -3,6 +3,7 @@ package analysis
 import ir._
 import analysis.BitVectorEval
 import util.Logger
+import scala.collection.immutable.HashMap
 
 /** Basic lattice
   */

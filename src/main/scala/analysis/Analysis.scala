@@ -92,6 +92,10 @@ trait ConstantPropagation(val cfg: ProgramCfg) {
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
+
+  val priorities: Map[CfgNode, Int] = Some(rpowalker()).map(r  => domain.collect{
+    case c : CfgFunctionEntryNode => c
+  }.flatMap(e => r.walkCfg(e)).toMap).get
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
   def transfer(n: CfgNode, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = localTransfer(n, s)
@@ -101,6 +105,7 @@ class ConstantPropagationSolver(cfg: ProgramCfg) extends ConstantPropagation(cfg
     with SimplePushDownWorklistFixpointSolver[CfgNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
     with IntraproceduralForwardDependencies
     with Analysis[Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]]
+
 
 
 trait MemoryRegionAnalysis(val cfg: ProgramCfg,

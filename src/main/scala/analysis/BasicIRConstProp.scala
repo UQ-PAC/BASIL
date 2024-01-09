@@ -56,7 +56,7 @@ trait ILValueAnalysisMisc:
     n match
       case la: LocalAssign =>
         s + (la.lhs -> eval(la.rhs, s))
-      //case c: Call => s ++ callerPreservedRegisters.filter(reg => s.keys.exists(_.name == reg)).map(n => Register(n, BitVecType(64)) -> statelattice.sublattice.top).toMap
+      case c: Call => s ++ callerPreservedRegisters.filter(reg => s.keys.exists(_.name == reg)).map(n => Register(n, BitVecType(64)) -> statelattice.sublattice.top).toMap
       case _ => s
 
 
@@ -73,4 +73,5 @@ object IRSimpleValueAnalysis:
       override val lattice: MapLattice[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]] = MapLattice(statelattice)
 
       override val domain : Set[CFGPosition] = computeDomain(IntraProcIRCursor, prog.procedures).toSet
+      override val priorities: Map[CFGPosition, Int] = Some(irrpo()).map(r => prog.procedures.flatMap(p => r.rpoWalk(p, IntraProcIRCursor))).get.toMap
       def transfer(n: CFGPosition, s: statelattice.Element): statelattice.Element = localTransfer(n, s)
