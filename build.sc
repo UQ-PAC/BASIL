@@ -1,9 +1,8 @@
 import mill._, mill.define._, scalalib._
 
-// https://index.scala-lang.org/ml86/mill-antlr
-import scalafmt._
-import $file.antlr
+import $file.antlr // https://index.scala-lang.org/ml86/mill-antlr
 
+import os.Path
 
 object basil extends RootModule with ScalaModule with antlr.AntlrModule {
   def scalaVersion = "3.3.1"
@@ -18,9 +17,9 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule {
   def mainClass = Some("Main")
 
 
-  def millSourcePath = super.millSourcePath / "src" / "main"
+  def millSourcePath = super.millSourcePath / "src"
   def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs)
-  def sources = T.sources {Seq(PathRef(this.millSourcePath /  "scala" ))}
+  def sources = T.sources {Seq(PathRef(this.millSourcePath / "main" / "scala" ))}
 
 
   override def antlrPackage: Option[String] = Some("Parsers")
@@ -32,16 +31,45 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule {
   object test extends ScalaTests with TestModule.ScalaTest  {
     def ivyDeps = Agg(scalaTests, javaTests)
     def sources = T.sources {Seq(PathRef(this.millSourcePath / "scala" ))}
-
-    //def millSourcePath = super.millSourcePath / "src" / "test"  
   }
 
 
-  // antlr
-  
-  //object test extends JavaModuleTests {
-  //  def ivyDeps = Agg(javaTests, scalaTests)
-  //}
+  /**
+   * Updates the expected
+   */
+  def updateExpected() = T.command {
+    val correctPath = test.millSourcePath /  "correct"
+    val incorrectPath = test.millSourcePath / "incorrect"
 
+    def expectedUpdate(path: Path, shouldVerify: Boolean): Unit = {
+      val examples = os.list(path).filter(os.isDir)
+      for (e <- examples) {
+        val variations = os.list(e).filter(os.isDir)
+        for (v <- variations) {
+          val name = e.last
+          val outPath = v / (name + ".bpl")
+          val expectedPath = v / (name + ".expected")
+          val resultPath = v / (name + "_result.txt")
+          if (os.exists(resultPath)) {
+            val result = os.read(resultPath)
+            val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
+            if (verified == shouldVerify) {
+              if (os.exists(outPath) && !(os.exists(expectedPath) && filesContentEqual(outPath, expectedPath))) {
+                println(s"updated $expectedPath")
+                os.copy(outPath, expectedPath)
+              }
+            }
+          }
+        }
+      }
+    }
+
+    def filesContentEqual(path1: Path, path2: Path): Boolean = {
+      os.read(path1) == os.read(path2)
+    }
+
+    expectedUpdate(correctPath, true)
+    expectedUpdate(incorrectPath, false)
+  }
 
 }
