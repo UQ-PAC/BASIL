@@ -420,7 +420,7 @@ class Block private (var label: String,
   /**
    * @return The intra-procedural set of successor blocks. If the block ends in a call then the empty set is returned.
    */
-  def nextBlocks: Set[Block] = {
+  def nextBlocks: Iterable[Block] = {
     jump match {
       case c: GoTo => c.targets
       case c: DirectCall => c.returnTarget.toSet
@@ -431,7 +431,7 @@ class Block private (var label: String,
   /**
    * @return The intra-procedural set of predecessor blocks.
    */
-  def prevBlocks: Set[Block] = {
+  def prevBlocks: Iterable[Block] = {
     incomingJumps.map(_.parent)
   }
 
@@ -440,8 +440,8 @@ class Block private (var label: String,
    *
    * @return The successor block if there is exactly one
    */
-  def singleSuccessor(block: Block): Option[Block] = {
-    block.jump match {
+  def singleSuccessor: Option[Block] = {
+    jump match {
       case c: GoTo if c.targets.size == 1 => c.targets.headOption
       case _ => None
     }
@@ -452,9 +452,9 @@ class Block private (var label: String,
    *
    * @return The predecessor block if there is exactly one
    */
-  def singlePredecessor(block: Block): Option[Block] = {
-    if block.incomingJumps.size == 1 then {
-      block.incomingJumps.headOption.map(_.parent)
+  def singlePredecessor: Option[Block] = {
+    if incomingJumps.size == 1 then {
+      incomingJumps.headOption.map(_.parent)
     } else None
   }
 

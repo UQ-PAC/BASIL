@@ -186,6 +186,9 @@ object RunUtils {
 
     }
     newSolverTest()
+    val psol = PreparedArgumentsAnalysis.Solver(IRProgram)
+    val paramres = psol.analyze()
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, paramres), s"${s}_params$iteration.txt"))
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_constprop$iteration.txt"))
@@ -262,7 +265,7 @@ object RunUtils {
     while (toVisit.nonEmpty) {
       val next = toVisit.pop()
       visited.add(next)
-      toVisit.addAll(IntraProcBlockIRCursor.succ(next).diff(visited.collect[Block] {
+      toVisit.pushAll(IntraProcBlockIRCursor.succ(next).diff(visited.collect[Block] {
         case b: Block => b
       }))
 
