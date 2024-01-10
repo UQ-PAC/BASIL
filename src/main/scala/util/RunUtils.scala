@@ -146,6 +146,20 @@ object RunUtils {
     applySSA(IRProgram)
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
+    Logger.info("[!] Running ANR")
+    val ANRSolver = ANRAnalysisSolver(cfg)
+    val ANRResult = ANRSolver.analyze()
+
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(ANRResult, true), Output.dotIder), s"${s}_ANR$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, ANRResult, iteration), s"${s}_ANR$iteration.txt"))
+
+    Logger.info("[!] Running RNA")
+    val RNASolver = RNAAnalysisSolver(cfg)
+    val RNAResult = RNASolver.analyze()
+
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(RNAResult, true), Output.dotIder), s"${s}_RNA$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, RNAResult, iteration), s"${s}_RNA$iteration.txt"))
+
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationSolver(cfg)
     val constPropResult = constPropSolver.analyze()
