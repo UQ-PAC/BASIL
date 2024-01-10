@@ -10,7 +10,7 @@ import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 
 class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends SemanticsBaseVisitor[Any] {
 
-  var cseMap: HashMap[String, IRType] = HashMap[String, IRType]()
+  var cseMap: HashMap[String, IRType] = HashMap[String, IRType]() // TODO: KEEP TRACK OF CSE NAMES
   var varMap: HashMap[String, IRType] = HashMap[String, IRType]()
 
   def unChrisifyUUID(uuid: String): ByteString = { // This probably needs a better name, but :/
@@ -29,45 +29,6 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
       }
     }
     return statements
-  }
-
-  def getCondition(uuid: String): Option[Statement] = {
-    val basicBlks = context.basic_blk().asScala
-    var statement: Option[Statement] = None
-    for (BasicBlk <- basicBlks) {
-      val Blkuuid = BasicBlk.uuid().getText()
-      if (Blkuuid.equals(uuid)) {
-        statement =  getBlkCond(BasicBlk) 
-      }
-    }
-    return statement 
-  }
-
-  def getBlkCond(ctx: Basic_blkContext): Option[Statement] = {
-    val instructions = ctx.instruction().asScala
-    var statement: Option[Statement] = None
-
-    for (instuction <- instructions) {
-      val instructionstmt = getInstructionCond(instuction)
-      if (instructionstmt  != None) {
-        statement = instructionstmt
-      }
-
-    }
-
-    return statement
-  }
-
-  def getInstructionCond(ctx: InstructionContext): Option[Statement] = {
-    val statements = ctx.stmt_string().asScala.flatMap { s =>
-      s.stmt() match {
-        case cond if cond.conditional_stmt() != null =>
-          Some(visitConditional_stmt(cond.conditional_stmt()))
-        case _ => None
-      }
-    }
-
-    statements.headOption
   }
 
 
@@ -90,7 +51,9 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
             visitAssignment_stmt(a.assignment_stmt())
           case c if (c.call_stmt() != null) =>
             Option(visitCall_stmt(c.call_stmt()))
-          case _ => None // Conditions were implemented above
+          case c if (c.conditional_stmt() != null ) => 
+            Option(visitConditional_stmt(c.conditional_stmt()))
+          case _ => ???
       }
     }.to(ArrayBuffer)
 
@@ -119,8 +82,47 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
     return MemoryAssign(mem, memstore)
   }
 
-  override def visitConditional_stmt(ctx: Conditional_stmtContext): Statement = {
-    Assert(visitExpr(ctx.expr), None) //TODO: Assume?
+  override def visitConditional_stmt(ctx: Conditional_stmtContext): TempIf = {
+
+
+    val totalStmts = ArrayBuffer.newBuilder[ArrayBuffer[Statement]]
+    val conds = ArrayBuffer.newBuilder[Statement]
+    
+    var currentContext = ctx
+    var prevContext = currentContext
+
+    while (currentContext != null) {
+      val stmts = currentContext.stmt().asScala.flatMap {s => s match {
+        case a if (a.assignment_stmt() != null) =>
+          visitAssignment_stmt(a.assignment_stmt())
+        case c if (c.call_stmt() != null) =>
+          Option(visitCall_stmt(c.call_stmt()))
+        case _ => None //There Shouldn't really be any conditional statements, these are handeled by parser + this while loop
+      }}
+
+      totalStmts += stmts.to(ArrayBuffer)
+      conds += Assume(visitExpr(currentContext.expr()))
+      prevContext = currentContext
+      currentContext = currentContext.conditional_stmt()
+    }
+
+    val elseBranch = prevContext.else_stmt()
+    if (elseBranch != null) {
+      
+
+      val elseStmt = elseBranch.stmt() match {
+        case a if (a.assignment_stmt() != null) =>
+          visitAssignment_stmt(a.assignment_stmt())
+        case c if (c.call_stmt() != null) =>
+          Option(visitCall_stmt(c.call_stmt()))
+        case _ => None 
+      }
+      return TempIf(true, conds.result(), totalStmts.result(), elseStmt)
+
+    } else {
+      return TempIf(false, conds.result(), totalStmts.result())
+    }
+
   }
 
   override def visitVarDeclsNoInit(ctx: VarDeclsNoInitContext): Option[LocalAssign] = {

@@ -63,28 +63,28 @@ Procedure("1728:__do_global_dtors_aux", in(), out(), blocks(
   )
   Block("?:OYljmBwySrOuzUQt9sfbkA== - FALSE",
     statements(
-      Assert(UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[1:0]), 1bv1)))
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[1:0]), 1bv1))
     ),
     jumps(
     GoTo("1752:7ixg4gTARmGP44R8bItiiA=="))
   )
   Block("?:OYljmBwySrOuzUQt9sfbkA== - TRUE",
     statements(
-      Assert(BinaryExpr("==", Extract(Register(R0, bv64)[1:0]), 1bv1))
+      BinaryExpr("==", Extract(Register(R0, bv64)[1:0]), 1bv1)
     ),
     jumps(
     GoTo("1788:tYRtYEqgREyHTT+JaEVN/A=="))
   )
   Block("?:7ixg4gTARmGP44R8bItiiA== - FALSE",
     statements(
-      Assert(UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[64:0]), 0bv64)))
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[64:0]), 0bv64))
     ),
     jumps(
     GoTo("1764:U8BQ6/jFQ1ySnBnGcj54ug=="))
   )
   Block("?:7ixg4gTARmGP44R8bItiiA== - TRUE",
     statements(
-      Assert(BinaryExpr("==", Extract(Register(R0, bv64)[64:0]), 0bv64))
+      BinaryExpr("==", Extract(Register(R0, bv64)[64:0]), 0bv64)
     ),
     jumps(
     GoTo("1776:NqD9fFulTLiLOCTsdGZx2w=="))
@@ -123,11 +123,882 @@ Procedure("1812:main", in(), out(), blocks(
       MemoryAssign(MemoryStore(Memory("mem", 64, 8)[BinaryExpr("add", Extract(Register(R31, bv64)[64:0]), 12bv64)] := Extract(Register(R0, bv64)[32:0])))
       MemoryAssign(MemoryStore(Memory("mem", 64, 8)[Extract(Register(R31, bv64)[64:0])] := Extract(Register(R1, bv64)[64:0])))
       LocalAssign(Register(R0, bv64) := ZeroExtend(MemoryLoad(Memory("mem", 64, 8), [BinaryExpr("add", Extract(Register(R31, bv64)[64:0]), 12bv64)]), 32))
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/BQ== - TRUE", "?:M0IlW5TkRzatKUgruQe/BQ== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/B3==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/B3== - TRUE", "?:M0IlW5TkRzatKUgruQe/B3== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/B4==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/B4== - TRUE", "?:M0IlW5TkRzatKUgruQe/B4== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/B5==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/B5== - TRUE", "?:M0IlW5TkRzatKUgruQe/B5== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/B6==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/B6== - TRUE", "?:M0IlW5TkRzatKUgruQe/B6== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/B7==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/B7== - TRUE", "?:M0IlW5TkRzatKUgruQe/B7== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/B8==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/B8== - TRUE", "?:M0IlW5TkRzatKUgruQe/B8== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/B9==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/B9== - TRUE", "?:M0IlW5TkRzatKUgruQe/B9== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/10==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/10== - TRUE", "?:M0IlW5TkRzatKUgruQe/10== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/11==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/11== - TRUE", "?:M0IlW5TkRzatKUgruQe/11== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/12==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/12== - TRUE", "?:M0IlW5TkRzatKUgruQe/12== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/13==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/13== - TRUE", "?:M0IlW5TkRzatKUgruQe/13== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/14==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/14== - TRUE", "?:M0IlW5TkRzatKUgruQe/14== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/15==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/15== - TRUE", "?:M0IlW5TkRzatKUgruQe/15== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/16==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/16== - TRUE", "?:M0IlW5TkRzatKUgruQe/16== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/17==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/17== - TRUE", "?:M0IlW5TkRzatKUgruQe/17== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/18==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/18== - TRUE", "?:M0IlW5TkRzatKUgruQe/18== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/19==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/19== - TRUE", "?:M0IlW5TkRzatKUgruQe/19== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/20==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/20== - TRUE", "?:M0IlW5TkRzatKUgruQe/20== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/21==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/21== - TRUE", "?:M0IlW5TkRzatKUgruQe/21== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/22==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/22== - TRUE", "?:M0IlW5TkRzatKUgruQe/22== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/23==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/23== - TRUE", "?:M0IlW5TkRzatKUgruQe/23== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/24==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/24== - TRUE", "?:M0IlW5TkRzatKUgruQe/24== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/25==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/25== - TRUE", "?:M0IlW5TkRzatKUgruQe/25== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/26==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/26== - TRUE", "?:M0IlW5TkRzatKUgruQe/26== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/27==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/27== - TRUE", "?:M0IlW5TkRzatKUgruQe/27== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/28==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/28== - TRUE", "?:M0IlW5TkRzatKUgruQe/28== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/29==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/29== - TRUE", "?:M0IlW5TkRzatKUgruQe/29== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/30==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/30== - TRUE", "?:M0IlW5TkRzatKUgruQe/30== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/31==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/31== - TRUE", "?:M0IlW5TkRzatKUgruQe/31== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/32==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/32== - TRUE", "?:M0IlW5TkRzatKUgruQe/32== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/33==",
+    statements(
+    ),
+    jumps(
+    GoTo("?:M0IlW5TkRzatKUgruQe/33== - TRUE", "?:M0IlW5TkRzatKUgruQe/33== - FALSE"))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/34==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 63bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/35==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 31bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/36==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 30bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/37==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 29bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/38==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 28bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/39==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 27bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/40==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 26bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/41==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 25bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/42==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 24bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/43==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 23bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/44==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 22bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/45==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 21bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/46==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 20bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/47==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 19bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/48==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 18bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/49==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 17bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/50==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 16bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/51==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 15bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/52==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 14bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/53==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 13bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/54==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 12bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/55==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 11bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/56==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 10bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/57==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 9bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/58==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 8bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/59==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 7bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/60==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 6bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/61==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 5bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/62==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 4bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/63==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 3bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/64==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 2bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/65==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 1bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/66==",
+    statements(
+      LocalAssign(LocalVar(HighestSetBit6__6, bv6) := 0bv6)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B2=="))
+  )
+  Block("1812:M0IlW5TkRzatKUgruQe/B2==",
+    statements(
       LocalAssign(Register(R0, bv64) := ZeroExtend(Extract(SignExtend(BinaryExpr("sub", 32bv7, BinaryExpr("add", SignExtend(LocalVar(HighestSetBit6__6, bv6), 1), 1bv7)), 25)[32:0]), 32))
       LocalAssign(Register(R31, bv64) := Extract(BinaryExpr("add", Extract(Register(R31, bv64)[64:0]), 16bv64)[64:0]))
     ),
     jumps(
     IndirectCall(Register(R30, bv64), ))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/BQ== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[32:31]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/33=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/BQ== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[32:31]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B9=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B3== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[31:30]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/33=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B3== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[31:30]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B9=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B4== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[30:29]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/33=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B4== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[30:29]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B9=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B5== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[29:28]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/33=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B5== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[29:28]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B9=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B6== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[28:27]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/33=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B6== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[28:27]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B9=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B7== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[27:26]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/49=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B7== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[27:26]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B9=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B8== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[26:25]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/49=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B8== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[26:25]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/B9=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B9== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[25:24]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/49=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/B9== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[25:24]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/19=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/10== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[24:23]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/49=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/10== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[24:23]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/19=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/11== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[23:22]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/49=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/11== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[23:22]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/19=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/12== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[22:21]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/49=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/12== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[22:21]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/19=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/13== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[21:20]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/49=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/13== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[21:20]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/19=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/14== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[20:19]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/49=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/14== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[20:19]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/19=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/15== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[19:18]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/49=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/15== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[19:18]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/19=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/16== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[18:17]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/49=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/16== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[18:17]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/19=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/17== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[17:16]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/59=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/17== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[17:16]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/19=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/18== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[16:15]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/59=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/18== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[16:15]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/19=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/19== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[15:14]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/59=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/19== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[15:14]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/29=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/20== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[14:13]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/59=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/20== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[14:13]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/29=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/21== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[13:12]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/59=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/21== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[13:12]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/29=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/22== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[12:11]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/59=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/22== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[12:11]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/29=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/23== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[11:10]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/59=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/23== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[11:10]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/29=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/24== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[10:9]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/59=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/24== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[10:9]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/29=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/25== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[9:8]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/59=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/25== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[9:8]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/29=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/26== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[8:7]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/59=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/26== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[8:7]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/29=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/27== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[7:6]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/66=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/27== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[7:6]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/29=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/28== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[6:5]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/66=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/28== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[6:5]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/29=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/29== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[5:4]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/66=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/29== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[5:4]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/33=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/30== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[4:3]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/66=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/30== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[4:3]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/33=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/31== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[3:2]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/66=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/31== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[3:2]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/33=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/32== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[2:1]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/66=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/32== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[2:1]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/33=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/33== - TRUE",
+    statements(
+      BinaryExpr("==", Extract(Register(R0, bv64)[1:0]), 1bv1)
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/66=="))
+  )
+  Block("?:M0IlW5TkRzatKUgruQe/33== - FALSE",
+    statements(
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[1:0]), 1bv1))
+    ),
+    jumps(
+    GoTo("1812:M0IlW5TkRzatKUgruQe/33=="))
   )
 )),
 Procedure("1808:frame_dummy", in(), out(), blocks(
@@ -230,28 +1101,28 @@ Procedure("1664:register_tm_clones", in(), out(), blocks(
   )
   Block("?:sw2azA/BQnCk/OWFT4c61w== - FALSE",
     statements(
-      Assert(UnaryExpr("!", BinaryExpr("==", Extract(Register(R1, bv64)[64:0]), 0bv64)))
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R1, bv64)[64:0]), 0bv64))
     ),
     jumps(
     GoTo("1700:pEcVZZfbQNm1bKhdUWx1bQ=="))
   )
   Block("?:sw2azA/BQnCk/OWFT4c61w== - TRUE",
     statements(
-      Assert(BinaryExpr("==", Extract(Register(R1, bv64)[64:0]), 0bv64))
+      BinaryExpr("==", Extract(Register(R1, bv64)[64:0]), 0bv64)
     ),
     jumps(
     GoTo("1720:jgJ2EbYXRGaReQdEgaIGVg=="))
   )
   Block("?:pEcVZZfbQNm1bKhdUWx1bQ== - FALSE",
     statements(
-      Assert(UnaryExpr("!", BinaryExpr("==", Extract(Register(R2, bv64)[64:0]), 0bv64)))
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R2, bv64)[64:0]), 0bv64))
     ),
     jumps(
     GoTo("1712:g8Q5GiavQtKN3+IITAYIQA=="))
   )
   Block("?:pEcVZZfbQNm1bKhdUWx1bQ== - TRUE",
     statements(
-      Assert(BinaryExpr("==", Extract(Register(R2, bv64)[64:0]), 0bv64))
+      BinaryExpr("==", Extract(Register(R2, bv64)[64:0]), 0bv64)
     ),
     jumps(
     GoTo("1720:jgJ2EbYXRGaReQdEgaIGVg=="))
@@ -336,14 +1207,14 @@ Procedure("1588:call_weak_fn", in(), out(), blocks(
   )
   Block("?:K0aLayVLTJ6S5rN+elEn1A== - FALSE",
     statements(
-      Assert(UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[64:0]), 0bv64)))
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R0, bv64)[64:0]), 0bv64))
     ),
     jumps(
     GoTo("1600:OOtWU905QoCpIGyQzJSgqQ=="))
   )
   Block("?:K0aLayVLTJ6S5rN+elEn1A== - TRUE",
     statements(
-      Assert(BinaryExpr("==", Extract(Register(R0, bv64)[64:0]), 0bv64))
+      BinaryExpr("==", Extract(Register(R0, bv64)[64:0]), 0bv64)
     ),
     jumps(
     GoTo("1604:1wCwmR6gTSGpzVkbhhqCzQ=="))
@@ -389,28 +1260,28 @@ Procedure("1616:deregister_tm_clones", in(), out(), blocks(
   )
   Block("?:2yCLFTXqTR2ed/y/CrszRA== - FALSE",
     statements(
-      Assert(UnaryExpr("!", BinaryExpr("==", LocalVar(ZF, bv1), 1bv1)))
+      UnaryExpr("!", BinaryExpr("==", LocalVar(ZF, bv1), 1bv1))
     ),
     jumps(
     GoTo("1640:3Ayosi1zQHqrQEWsql+QSQ=="))
   )
   Block("?:2yCLFTXqTR2ed/y/CrszRA== - TRUE",
     statements(
-      Assert(BinaryExpr("==", LocalVar(ZF, bv1), 1bv1))
+      BinaryExpr("==", LocalVar(ZF, bv1), 1bv1)
     ),
     jumps(
     GoTo("1660:tdJDSpj0SyiRWclelK2uWw=="))
   )
   Block("?:3Ayosi1zQHqrQEWsql+QSQ== - FALSE",
     statements(
-      Assert(UnaryExpr("!", BinaryExpr("==", Extract(Register(R1, bv64)[64:0]), 0bv64)))
+      UnaryExpr("!", BinaryExpr("==", Extract(Register(R1, bv64)[64:0]), 0bv64))
     ),
     jumps(
     GoTo("1652:wIWVdXsgT1KcZjHnWczI/Q=="))
   )
   Block("?:3Ayosi1zQHqrQEWsql+QSQ== - TRUE",
     statements(
-      Assert(BinaryExpr("==", Extract(Register(R1, bv64)[64:0]), 0bv64))
+      BinaryExpr("==", Extract(Register(R1, bv64)[64:0]), 0bv64)
     ),
     jumps(
     GoTo("1660:tdJDSpj0SyiRWclelK2uWw=="))
