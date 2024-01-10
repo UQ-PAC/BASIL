@@ -34,7 +34,7 @@ trait RNAAnalysis(cfg: ProgramCfg) {
       case assume: Assume =>
         m.union(assume.body.variables.filter(!ignoreRegions.contains(_)))
       case assert: Assert =>
-          m.union(assert.body.variables.filter(!ignoreRegions.contains(_)))
+        m.union(assert.body.variables.filter(!ignoreRegions.contains(_)))
       case memoryAssign: MemoryAssign =>
         m.union((memoryAssign.lhs.variables ++ memoryAssign.rhs.variables).filter(!ignoreRegions.contains(_)))
       case indirectCall: IndirectCall =>

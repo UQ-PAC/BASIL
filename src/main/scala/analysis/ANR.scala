@@ -19,10 +19,11 @@ trait ANRAnalysis(cfg: ProgramCfg) {
 
   val first: Set[CfgNode] = Set(cfg.startNode)
 
+  private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
   private val framePointer = Register("R29", BitVecType(64))
 
-  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
+  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer, stackPointer)
 
   /** Default implementation of eval.
     */
@@ -32,7 +33,7 @@ trait ANRAnalysis(cfg: ProgramCfg) {
       case assume: Assume =>
         m.diff(assume.body.variables)
       case assert: Assert =>
-          m.diff(assert.body.variables)
+        m.diff(assert.body.variables)
       case memoryAssign: MemoryAssign =>
         m.diff(memoryAssign.lhs.variables ++ memoryAssign.rhs.variables)
       case indirectCall: IndirectCall =>
