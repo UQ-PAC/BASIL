@@ -1,15 +1,16 @@
 package analysis
 
-import ir._
-import analysis.solvers._
+import analysis.solvers.*
+import ir.*
 
 import scala.collection.immutable
 
 /**
- * Calculates the set of variables that are not read after being written up to that point in the program.
- * Useful for detecting dead stores, constants and if what variables are passed as parameters in a function call.
+ * Calculates the set of variables that are read but not written in a given program.
+ * This helps to identify the set of variables that are read from memory before they have been initialised.
+ * This could be used on callee side to identify what parameters where passed to the function.
  */
-trait ANRAnalysis(cfg: ProgramCfg) {
+trait RNAAnalysis(cfg: ProgramCfg) {
 
   val powersetLattice: PowersetLattice[Variable] = PowersetLattice()
 
@@ -19,10 +20,11 @@ trait ANRAnalysis(cfg: ProgramCfg) {
 
   val first: Set[CfgNode] = Set(cfg.startNode)
 
+  private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
   private val framePointer = Register("R29", BitVecType(64))
 
-  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
+  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer, stackPointer)
 
   /** Default implementation of eval.
     */
@@ -30,17 +32,17 @@ trait ANRAnalysis(cfg: ProgramCfg) {
     var m = s
     cmd match {
       case assume: Assume =>
-        m.diff(assume.body.variables)
+        m.union(assume.body.variables.filter(!ignoreRegions.contains(_)))
       case assert: Assert =>
-          m.diff(assert.body.variables)
+          m.union(assert.body.variables.filter(!ignoreRegions.contains(_)))
       case memoryAssign: MemoryAssign =>
-        m.diff(memoryAssign.lhs.variables ++ memoryAssign.rhs.variables)
+        m.union((memoryAssign.lhs.variables ++ memoryAssign.rhs.variables).filter(!ignoreRegions.contains(_)))
       case indirectCall: IndirectCall =>
-        m - indirectCall.target
+        if (ignoreRegions.contains(indirectCall.target)) return m
+        m + indirectCall.target
       case localAssign: LocalAssign =>
-        m = m.diff(localAssign.rhs.variables)
-        if (ignoreRegions.contains(localAssign.lhs)) return m
-        m + localAssign.lhs
+        m = m - localAssign.lhs
+        m.union(localAssign.rhs.variables.filter(!ignoreRegions.contains(_)))
       case _ =>
         m
     }
@@ -59,10 +61,10 @@ trait ANRAnalysis(cfg: ProgramCfg) {
   def transfer(n: CfgNode, s: Set[Variable]): Set[Variable] = localTransfer(n, s)
 }
 
-class ANRAnalysisSolver(
+class RNAAnalysisSolver(
     cfg: ProgramCfg,
-) extends ANRAnalysis(cfg)
-    with IntraproceduralForwardDependencies
+) extends RNAAnalysis(cfg)
+    with IntraproceduralBackwardDependencies
     with Analysis[Map[CfgNode, Set[Variable]]]
     with SimpleWorklistFixpointSolver[CfgNode, Set[Variable], PowersetLattice[Variable]] {
 }
