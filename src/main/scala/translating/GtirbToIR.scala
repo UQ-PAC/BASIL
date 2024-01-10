@@ -167,8 +167,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     val initialMemory: ArrayBuffer[MemorySection] = ArrayBuffer()// TODO: this looks like its incomplete
     val readOnlyMemory: ArrayBuffer[MemorySection] = ArrayBuffer() //ditto
 
-    val mainBlock: ByteString = addresses.find{ case (_, value) => value == mainAddress}.map(_._1).get
-    val intialproc: Procedure = createProcedure(getKey(mainBlock, functionEntries).get)
+    val intialproc: Procedure = procedures.find(_.address.get == mainAddress).get
 
     return Program(procedures, intialproc, initialMemory, readOnlyMemory)
   }
@@ -200,13 +199,15 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
      funcblks.foreach { elem => 
       if (!functionEntries(uuid).contains(elem)) {
-        blks += createBlock(elem)
+        val blk = createBlock(elem)
+        blks += blk 
       }  
     }
 
     var extraBlks: ArrayBuffer[Block] = ArrayBuffer[Block]()
     var removeBlks: ArrayBuffer[Block] = ArrayBuffer[Block]()
-    blks.foreach {blk => 
+
+    blks.foreach {blk =>
       val newBlks = handle_long_if(blk)
       if (newBlks.nonEmpty) {
         extraBlks ++= newBlks
@@ -243,17 +244,16 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
   def handle_long_if(blk: Block): ArrayBuffer[Block] = {
 
     val get_ByteString: String => ByteString = uuid => ByteString.copyFrom(Base64.getDecoder().decode(uuid))
+
     val get_blkLabel: (String, Int) => String = (label, blkCount) => {
-      val subLabel = label.substring(0,label.length - blkCount.toString.length - 2)
-      subLabel + blkCount +  "=="
+      var decodedBytes: Array[Byte] = Base64.getDecoder().decode(label)
+      decodedBytes(decodedBytes.length - 1) = (decodedBytes.last + blkCount).toByte
+      Base64.getEncoder.encodeToString(decodedBytes)
     }
     val create_TempIf: Statement => TempIf = conds => TempIf(false, ArrayBuffer(conds), ArrayBuffer[ArrayBuffer[Statement]]())
 
     if (blk.statements.exists {elem =>  elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}) {
-
-
-      val extraBlks = ArrayBuffer.newBuilder[Block]
-
+       
       val (startStmts, endStmts) = blk.statements.span {elem => !(elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf)}
       val ifStmt = endStmts.remove(0).asInstanceOf[TempIf]
 
@@ -262,6 +262,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
       val startblk = Block(blk.label, blk.address, startStmts += create_TempIf(ifStmt.conds.remove(0)), GoTo(ArrayBuffer[Block](), None))
       val endBlk = Block(get_blkLabel(blk.label, blkCount), blk.address, endStmts, GoTo(ArrayBuffer[Block](), None))
+      blkMap += (get_ByteString(endBlk.label) -> endBlk)
       edgeMap += (endBlk.label -> edgeMap.get(startblk.label).get)
       blkCount += 1
 
@@ -274,9 +275,9 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
       }
 
       val label = get_blkLabel(blk.label, blkCount)
-      val falseBlks = (startblk +: tempFalseBlks.toList).to(ArrayBuffer) += 
-                      Block(label, blk.address, 
-                          ArrayBuffer(ifStmt.elseStatement.get), GoTo(ArrayBuffer[Block](endBlk), None))
+      val elseBlk = Block(label, blk.address, ArrayBuffer(ifStmt.elseStatement.get), GoTo(ArrayBuffer[Block](endBlk), None))
+      blkMap += (get_ByteString(elseBlk.label) -> elseBlk)
+      val falseBlks = (startblk +: tempFalseBlks.toList).to(ArrayBuffer) += elseBlk
       blkCount += 1
 
       
@@ -291,7 +292,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
       for (i <- 0 until falseBlks.size - 1) {
         val ifEdge = proto.CFG.Edge(get_ByteString(falseBlks(i).label), get_ByteString(trueBlks(i).label), Option(proto.CFG.EdgeLabel(false, false, proto.CFG.EdgeType.Type_Branch)))
         val fallEdge = proto.CFG.Edge(get_ByteString(falseBlks(i).label), get_ByteString(falseBlks(i + 1).label), Option(proto.CFG.EdgeLabel(false, false, proto.CFG.EdgeType.Type_Fallthrough)))
-        edgeMap(falseBlks(i).label) = ArrayBuffer(ifEdge, fallEdge)
+        edgeMap(falseBlks(i).label) = ArrayBuffer(fallEdge, ifEdge)
         blkMap += (get_ByteString(falseBlks(i).label) -> falseBlks(i))
       }
 
@@ -385,9 +386,10 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
               blks += Block(block.label + " - TRUE", None, ArrayBuffer(cond), 
                             GoTo(ArrayBuffer(blkMap(elem.targetUuid)) , None))
 
-            case proto.CFG.EdgeType.Type_Fallthrough => 
+            case proto.CFG.EdgeType.Type_Fallthrough =>
               blks += Block(block.label + " - FALSE", None, ArrayBuffer(notCond), 
                               GoTo(ArrayBuffer(blkMap(elem.targetUuid)) , None))
+              
             
             case _ => ???
 
