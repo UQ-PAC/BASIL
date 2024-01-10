@@ -56,7 +56,7 @@ trait IntraProcBlockIRCursor extends IRWalk[CFGPosition, Block] {
   @tailrec
   final def succ(pos: CFGPosition): Set[Block] = {
     pos match {
-      case b: Block => b.nextBlocks
+      case b: Block => b.nextBlocks.toSet
       case s: Command => succ(s.parent)
       case s: Procedure => s.entryBlock.toSet
     }
@@ -103,7 +103,7 @@ trait InterProcBlockIRCursor extends IRWalk[CFGPosition, Block] {
 
   final def pred(pos: CFGPosition): Set[Block] = {
     pos match {
-      case b: Block => if b.isEntry then b.parent.incomingCalls().map(_.parent).toSet else b.prevBlocks
+      case b: Block => if b.isEntry then b.parent.incomingCalls().map(_.parent).toSet else b.prevBlocks.toSet
       case _ => IntraProcBlockIRCursor.pred(pos)
     }
   }

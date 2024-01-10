@@ -262,7 +262,7 @@ object RunUtils {
     while (toVisit.nonEmpty) {
       val next = toVisit.pop()
       visited.add(next)
-      toVisit.addAll(IntraProcBlockIRCursor.succ(next).diff(visited.collect[Block] {
+      toVisit.pushAll(IntraProcBlockIRCursor.succ(next).diff(visited.collect[Block] {
         case b: Block => b
       }))
 
