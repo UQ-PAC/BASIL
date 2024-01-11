@@ -337,7 +337,7 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
     while (traversalQueue.nonEmpty) {
       val next = traversalQueue.pop()
 
-      def infix(b: BinaryBExpr): Unit = traversalQueue.pushAll(Seq("(", b.arg1, b.op, b.arg2, ")").reverse)
+      def infix(b: BinaryBExpr): Unit = traversalQueue.pushAll(Seq("(", b.arg1, s" ${b.op} ", b.arg2, ")").reverse)
       def prefix(b: BinaryBExpr): Unit = traversalQueue.pushAll(Seq(s"bv${b.op}${b.inSize}(", b.arg1, ",", b.arg2, ")").reverse)
 
       next match
