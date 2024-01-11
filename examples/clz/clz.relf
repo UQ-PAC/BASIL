@@ -123,3 +123,4 @@ Symbol table '.symtab' contains 92 entries:
     89: 0000000000020010     0 OBJECT  GLOBAL HIDDEN    22 __TMC_END__
     90: 0000000000000000     0 NOTYPE  WEAK   DEFAULT  UND _ITM_registerTMCloneTable
     91: 0000000000000588     0 FUNC    GLOBAL HIDDEN    11 _init
+    

@@ -8,10 +8,11 @@ import ir.*
 import scala.collection.mutable._
 import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 
-class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends SemanticsBaseVisitor[Any] {
+class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext, blkCount: Int) extends SemanticsBaseVisitor[Any] {
 
   var cseMap: HashMap[String, IRType] = HashMap[String, IRType]() // TODO: KEEP TRACK OF CSE NAMES
   var varMap: HashMap[String, IRType] = HashMap[String, IRType]()
+  var instructionCount = 0
 
   def unChrisifyUUID(uuid: String): ByteString = { // This probably needs a better name, but :/
     return ByteString.copyFrom(Base64.getDecoder().decode(uuid))
@@ -45,6 +46,8 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
   }
 
   override def visitInstruction(ctx: InstructionContext): ArrayBuffer[Statement] = {
+    cseMap = cseMap.empty
+    varMap = varMap.empty
     val statements: ArrayBuffer[Statement] = ctx.stmt_string().asScala.flatMap { s =>
       s.stmt() match {
           case a if (a.assignment_stmt() != null) =>
@@ -56,7 +59,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
           case _ => ???
       }
     }.to(ArrayBuffer)
-
+    instructionCount += 1
     statements
   }
 
@@ -139,7 +142,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
 
     val expr = visitExpr(ctx.expr())
     if (expr != null) {
-      return LocalAssign(LocalVar(name, ty), expr) 
+      return LocalAssign(LocalVar(name + "_" + blkCount + instructionCount, ty), expr) 
     } else {
       return null
     }
@@ -165,7 +168,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
 
     val expr = visitExpr(ctx.expr())
     if (expr != null) {
-      return LocalAssign(LocalVar(name, ty), expr) 
+      return LocalAssign(LocalVar(name.dropRight(3) + "_" + blkCount + instructionCount, ty), expr) 
     } else {
       return null
     }
@@ -417,8 +420,8 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext) extends
 
   def createExprVar(name: String): Expr = {
     name match
-      case n if n.startsWith("Cse") => return LocalVar(n, cseMap.get(n).get)
-      case v if varMap.contains(v)  => return LocalVar(v, varMap.get(v).get) 
+      case n if n.startsWith("Cse") => return LocalVar(n.dropRight(3) + "_" + blkCount + instructionCount, cseMap.get(n).get)
+      case v if varMap.contains(v)  => return LocalVar(v + "_" + blkCount + instructionCount, varMap.get(v).get) 
       case "TRUE"                   => return TrueLiteral
       case "FALSE"                  => return FalseLiteral
       case "SP_EL0"                 => return Register("R31", BitVecType(64))

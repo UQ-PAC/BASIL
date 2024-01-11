@@ -152,6 +152,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
   val symMap = create_symMap()
   val addresses = create_addresses()
   val edgeMap: HashMap[String, ArrayBuffer[proto.CFG.Edge]] = create_cfg_map()
+  var blkCount = 0
  
 
   def createIR(): Program = {
@@ -226,6 +227,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     val semantics: ArrayBuffer[Statement] = createSemantics(uuid)
     val jump: Jump = GoTo(ArrayBuffer[Block](), None) //jumps should be done now, so if an empty GoTo comes up then something is wrong :(
     val block = Block(Base64.getEncoder().encodeToString(uuid.toByteArray()), address, semantics, jump) 
+    blkCount += 1
     blkMap += (uuid -> block)
     return block
   }
@@ -233,7 +235,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
   def createSemantics(uuid: ByteString): ArrayBuffer[Statement] = {
 
-    var visitor = new SemanticsLoader(uuid, parser.semantics())
+    var visitor = new SemanticsLoader(uuid, parser.semantics(), blkCount)
     val statements = visitor.createStatements()
     parser.reset()
     return statements
