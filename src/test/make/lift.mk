@@ -5,10 +5,14 @@ $(LIFT_ARTEFACTS): a.out
 	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
 	$(READELF) -s -r -W a.out > $(NAME).relf
 
+
+ifdef $(SPEC) 
+BASIL_SPECARG = --spec $(SPEC) 
+endif
+
 # optional; create basil
 $(NAME).bpl: $(LIFT_ARTEFACTS) $(SPEC) $(BASIL)
-	echo $(BASIL)
-	java -jar $(BASIL) $(BASIL_FLAGS) --adt $(NAME).adt --relf $(NAME).relf -o $(NAME).bpl --spec $(SPEC)
+	java -jar $(BASIL) $(BASIL_FLAGS) --adt $(NAME).adt --relf $(NAME).relf -o $(NAME).bpl $(BASIL_SPECARG)
 
 .PHONY=$(BASIL)
 $(BASIL): 
@@ -27,14 +31,16 @@ recompile: a.out
 $(NAME)_result.txt: $(NAME).bpl $(EXTRA_SPEC)
 	bash -c "time boogie $(NAME).bpl $(EXTRA_SPEC) $(BOOGIE_FLAGS) | tee $(NAME)_result.txt"
 
-cleanall: clean cleanlift cleanbin
+cleanall: clean cleanlift cleanbin cleantest
+
+cleantest: 
+	rm -rf $(NAME).bpl
+	rm -rf $(NAME)_result.txt
 
 cleanbin:
 	rm -rf a.out
 
-clean: cleanbin
-	rm -rf $(NAME).bpl
-	rm -rf $(NAME)_result.txt
+clean: cleanlift cleanbin
 
 cleanlift:
 	rm -rf $(NAME).adt

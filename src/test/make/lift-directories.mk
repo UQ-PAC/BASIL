@@ -9,7 +9,7 @@ NAME=$(notdir $(shell pwd))
 GIT_ROOT?=$(realpath ../../../../)
 
 GCC ?= aarch64-linux-gnu-gcc
-CLANG ?= clang
+CLANG ?= clang-15
 CC ?= $(GCC)
 #CFLAGS=-fno-pic -fno-plt
 TARGET=aarch64-linux-gnu
@@ -21,7 +21,7 @@ BASIL=$(GIT_ROOT)/target/scala-3.3.1/wptool-boogie-assembly-0.0.1.jar
 C_SOURCE ?=$(realpath $(wildcard *.c))
 SPEC ?=$(realpath $(wildcard *.spec))
 EXTRA_SPEC ?=$(realpath $(wildcard *.bpl))
-BASIL_FLAGS ?= --boogie-use-lambda-stores
+BASIL_FLAGS ?= 
 #BOOGIE_FLAGS=/proverOpt:O:smt.array.extensional=false
 BOOGIE_FLAGS ?= /useArrayAxioms
 
