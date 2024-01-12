@@ -147,13 +147,26 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     * Converts a BAPExpr condition that returns a bitvector of size 1 to an Expr condition that returns a Boolean
     *
     * If negative is true then the negation of the condition is returned
+    *
+    * If the BAPExpr uses a comparator that returns a Boolean then no further conversion is performed except negation,
+    * if necessary.
     * */
   private def convertConditionBool(expr: BAPExpr, negative: Boolean): Expr = {
-    val boolExpr = coerceToBool(expr.toIR)
-    if (negative) {
-      UnaryExpr(BoolNOT, boolExpr)
-    } else {
-      boolExpr
+    val e = expr.toIR
+    e.getType match {
+      case BitVecType(s) =>
+        if (negative) {
+          BinaryExpr(BVEQ, e, BitVecLiteral(0, s))
+        } else {
+          BinaryExpr(BVNEQ, e, BitVecLiteral(0, s))
+        }
+      case BoolType =>
+        if (negative) {
+          UnaryExpr(BoolNOT, e)
+        } else {
+          e
+        }
+      case _ => ???
     }
   }
 
