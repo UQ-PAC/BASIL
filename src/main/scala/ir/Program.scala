@@ -73,12 +73,6 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     }
   }
 
-  def stackIdentification(): Unit = {
-    for (p <- procedures) {
-      p.stackIdentification()
-    }
-  }
-
   /**
     * Takes all the memory sections we get from the ADT (previously in initialMemory) and restricts initialMemory to
     * just the .data section (which contains things such as global variables which are mutable) and puts the .rodata
@@ -123,60 +117,6 @@ class Procedure(
     s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
   }
   var modifies: mutable.Set[Global] = mutable.Set()
-
-  def stackIdentification(): Unit = {
-    val stackPointer = Register("R31", BitVecType(64))
-    val stackRefs: mutable.Set[Variable] = mutable.Set(stackPointer)
-    val visitedBlocks: mutable.Set[Block] = mutable.Set()
-    val stackMemory = Memory("stack", 64, 8)
-    val firstBlock = blocks.headOption
-    firstBlock.foreach(visitBlock)
-
-    // does not handle loops but we do not currently support loops in block CFG so this should do for now anyway
-    def visitBlock(b: Block): Unit = {
-      if (visitedBlocks.contains(b)) {
-        return
-      }
-      for (s <- b.statements) {
-        s match {
-          case l: LocalAssign =>
-            // replace mem with stack in loads if index contains stack references
-            val loads = l.rhs.loads
-            for (load <- loads) {
-              val loadStackRefs = load.index.variables.intersect(stackRefs)
-              if (loadStackRefs.nonEmpty) {
-                load.mem = stackMemory
-              }
-            }
-
-            // update stack references
-            val variableVisitor = VariablesWithoutStoresLoads()
-            variableVisitor.visitExpr(l.rhs)
-
-            val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackRefs)
-            if (rhsStackRefs.nonEmpty) {
-              stackRefs.add(l.lhs)
-            } else if (stackRefs.contains(l.lhs) && l.lhs != stackPointer) {
-              stackRefs.remove(l.lhs)
-            }
-          case m: MemoryAssign =>
-            // replace mem with stack if index contains stack reference
-            val indexStackRefs = m.rhs.index.variables.intersect(stackRefs)
-            if (indexStackRefs.nonEmpty) {
-              m.lhs = stackMemory
-              m.rhs.mem = stackMemory
-            }
-          case _ =>
-        }
-      }
-      visitedBlocks.add(b)
-      b.jump match {
-        case g: GoTo => g.targets.foreach(visitBlock)
-        case d: DirectCall => d.returnTarget.foreach(visitBlock)
-        case i: IndirectCall => i.returnTarget.foreach(visitBlock)
-      }
-    }
-  }
 
 }
 

@@ -99,7 +99,8 @@ object RunUtils {
 
     IRProgram.determineRelevantMemory(globalOffsets)
     IRProgram.stripUnreachableFunctions()
-    IRProgram.stackIdentification()
+    val stackIdentification = StackSubstituter()
+    stackIdentification.visitProgram(IRProgram)
 
     val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
     IRProgram.setModifies(specModifies)
