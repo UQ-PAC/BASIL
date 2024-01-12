@@ -140,8 +140,11 @@ object RunUtils {
     // val IRTranslator = BAPToIR(bapProgram, mainAddress)
     // var IRProgram = IRTranslator.translate
 
-
-
+    // IRProgram.initialMemory.foreach{elem => 
+    // println(s"${elem.name}, ${elem.address} , ${elem.size}, ${elem.bytes}")
+    // println
+    // }
+  
     // println(serialiseIL(IRProgram))
 
     val specification = loadSpecification(q.loading.specFile, IRProgram, globals)

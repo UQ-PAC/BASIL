@@ -17,6 +17,7 @@ import com.grammatech.gtirb.proto.CFG.Edge._
 import scala.collection.mutable.HashMap
 import java.nio.charset.*
 import scala.util.boundary, boundary.break
+import java.nio.ByteBuffer
 
 class TempIf(val isLongIf: Boolean, val conds: ArrayBuffer[Statement], val stmts: ArrayBuffer[ArrayBuffer[Statement]], 
               val elseStatement: Option[Statement] = None, val label: Option[String] = None) extends Statement {}
@@ -164,10 +165,14 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     }
 
     procedures = createJumps(procedures)
+    val sections = mods.flatMap(_.sections)
 
-    val initialMemory: ArrayBuffer[MemorySection] = ArrayBuffer()// TODO: this looks like its incomplete
-    val readOnlyMemory: ArrayBuffer[MemorySection] = ArrayBuffer() //ditto
+    val initialMemory: ArrayBuffer[MemorySection] = sections.map{elem =>
+      val bytes = elem.byteIntervals.head.contents.toByteArray.map(byte => BitVecLiteral(BigInt(byte), 8))
+      MemorySection(elem.name, elem.byteIntervals.head.address.toInt, elem.byteIntervals.head.size.toInt, bytes.toSeq)
+        }.to(ArrayBuffer)
 
+    val readOnlyMemory: ArrayBuffer[MemorySection] = ArrayBuffer() 
     val intialproc: Procedure = procedures.find(_.address.get == mainAddress).get
 
     return Program(procedures, intialproc, initialMemory, readOnlyMemory)
