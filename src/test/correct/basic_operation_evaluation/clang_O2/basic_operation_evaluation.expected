@@ -1,25 +1,17 @@
 var {:extern} Gamma_R0: bool;
-
 var {:extern} Gamma_mem: [bv64]bool;
-
 var {:extern} R0: bv64;
-
 var {:extern} mem: [bv64]bv8;
-
 const {:extern} $_IO_stdin_used_addr: bv64;
 axiom ($_IO_stdin_used_addr == 1840bv64);
-
 function {:extern} {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
-
 function {:extern} memory_load64_le(memory: [bv64]bv8, index: bv64) returns (bv64) {
-  (memory[bvadd64(index, 7bv64)]++(memory[bvadd64(index, 6bv64)]++(memory[bvadd64(index, 5bv64)]++(memory[bvadd64(index, 4bv64)]++(memory[bvadd64(index, 3bv64)]++(memory[bvadd64(index, 2bv64)]++(memory[bvadd64(index, 1bv64)]++memory[index])))))))
+  (memory[bvadd64(index, 7bv64)] ++ (memory[bvadd64(index, 6bv64)] ++ (memory[bvadd64(index, 5bv64)] ++ (memory[bvadd64(index, 4bv64)] ++ (memory[bvadd64(index, 3bv64)] ++ (memory[bvadd64(index, 2bv64)] ++ (memory[bvadd64(index, 1bv64)] ++ memory[index])))))))
 }
-
 
 function {:extern} memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
   memory[index]
 }
-
 
 procedure {:extern} rely();
   modifies Gamma_mem, mem;
@@ -35,7 +27,6 @@ procedure {:extern} rely();
   free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
 
 
-
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
@@ -47,14 +38,11 @@ implementation {:extern} rely_transitive()
   call rely();
 }
 
-
 procedure {:extern} rely_reflexive();
-
 
 
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
-
 
 
 procedure main();
@@ -85,5 +73,4 @@ implementation main()
     R0, Gamma_R0 := 0bv64, true;
     return;
 }
-
 
