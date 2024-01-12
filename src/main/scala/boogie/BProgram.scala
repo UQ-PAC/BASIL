@@ -7,7 +7,6 @@ case class BProgram(declarations: List[BDeclaration]) {
   def writeToString(w: Writer): Unit = {
     declarations.foreach(x => {
       x.writeToString(w)
-      w.append(System.lineSeparator())
     })
   }
 }
