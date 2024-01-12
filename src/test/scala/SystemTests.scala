@@ -86,7 +86,7 @@ class SystemTests extends AnyFunSuite {
     val args = mutable.ArrayBuffer("--adt", ADTPath, "--relf", RELFPath, "--output", outPath)
     if (File(specPath).exists) args ++= Seq("--spec", specPath)
 
-    Main.main(args)
+    Main.main(args.toArray)
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(outPath + " done")
     val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(outPath))
