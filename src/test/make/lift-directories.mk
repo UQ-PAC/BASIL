@@ -9,7 +9,7 @@ NAME=$(notdir $(shell pwd))
 GIT_ROOT?=$(realpath ../../../../)
 
 GCC ?= aarch64-linux-gnu-gcc
-CLANG ?= clang-15
+CLANG ?= clang-15 -target $(TARGET)
 CC ?= $(GCC)
 #CFLAGS=-fno-pic -fno-plt
 TARGET=aarch64-linux-gnu

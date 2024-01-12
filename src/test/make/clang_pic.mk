@@ -1,3 +1,3 @@
 CC=$(CLANG)
-CFLAGS += -target $(TARGET) -fPIC
+CFLAGS += -fPIC
 include $(GIT_ROOT)/src/test/make/lift.mk
