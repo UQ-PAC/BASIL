@@ -32,7 +32,8 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     IRProgram = ExternalRemover(externalFunctions.map(e => e.name)).visitProgram(IRProgram)
     IRProgram = Renamer(Set("free")).visitProgram(IRProgram)
     IRProgram.stripUnreachableFunctions()
-    IRProgram.stackIdentification()
+    val stackIdentification = StackSubstituter()
+    stackIdentification.visitProgram(IRProgram)
     IRProgram.setModifies(Map())
 
     (IRProgram, globals)

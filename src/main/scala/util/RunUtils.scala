@@ -106,7 +106,9 @@ object RunUtils {
     val before = IRProgram.procedures.size
     IRProgram.stripUnreachableFunctions(q.loading.procedureTrimDepth)
     Logger.info(s"[!] Removed ${before - IRProgram.procedures.size} functions (${IRProgram.procedures.size} remaining)")
-    IRProgram.stackIdentification()
+
+    val stackIdentification = StackSubstituter()
+    stackIdentification.visitProgram(IRProgram)
 
     val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
     IRProgram.setModifies(specModifies)

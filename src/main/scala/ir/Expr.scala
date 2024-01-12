@@ -2,8 +2,7 @@ package ir
 
 import boogie._
 
-trait Expr {
-  var ssa_id: Int = 0
+sealed trait Expr {
   def toBoogie: BExpr
   def toGamma: BExpr = {
     val gammaVars: Set[BExpr] = gammas.map(_.toGamma)
@@ -24,7 +23,7 @@ trait Expr {
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
-trait Literal extends Expr {
+sealed trait Literal extends Expr {
   override def acceptVisit(visitor: Visitor): Literal = visitor.visitLiteral(this)
 }
 
@@ -54,7 +53,7 @@ case class IntLiteral(value: BigInt) extends Literal {
   override def toString: String = value.toString
 }
 
-class Extract(var end: Int, var start: Int, var body: Expr) extends Expr {
+case class Extract(end: Int, start: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVExtract(end, start, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
   override def variables: Set[Variable] = body.variables
@@ -64,7 +63,7 @@ class Extract(var end: Int, var start: Int, var body: Expr) extends Expr {
   override def loads: Set[MemoryLoad] = body.loads
 }
 
-class Repeat(var repeats: Int, var body: Expr) extends Expr {
+case class Repeat(repeats: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVRepeat(repeats, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
   override def variables: Set[Variable] = body.variables
@@ -78,7 +77,7 @@ class Repeat(var repeats: Int, var body: Expr) extends Expr {
   override def loads: Set[MemoryLoad] = body.loads
 }
 
-class ZeroExtend(var extension: Int, var body: Expr) extends Expr {
+case class ZeroExtend(extension: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVZeroExtend(extension, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
   override def variables: Set[Variable] = body.variables
@@ -92,7 +91,7 @@ class ZeroExtend(var extension: Int, var body: Expr) extends Expr {
   override def loads: Set[MemoryLoad] = body.loads
 }
 
-class SignExtend(var extension: Int, var body: Expr) extends Expr {
+case class SignExtend(extension: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVSignExtend(extension, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
   override def variables: Set[Variable] = body.variables
@@ -106,7 +105,7 @@ class SignExtend(var extension: Int, var body: Expr) extends Expr {
   override def loads: Set[MemoryLoad] = body.loads
 }
 
-class UnaryExpr(var op: UnOp, var arg: Expr) extends Expr {
+case class UnaryExpr(op: UnOp, arg: Expr) extends Expr {
   override def toBoogie: BExpr = UnaryBExpr(op, arg.toBoogie)
   override def gammas: Set[Expr] = arg.gammas
   override def variables: Set[Variable] = arg.variables
@@ -155,7 +154,7 @@ sealed trait BVUnOp(op: String) extends UnOp {
 case object BVNOT extends BVUnOp("not")
 case object BVNEG extends BVUnOp("neg")
 
-class BinaryExpr(var op: BinOp, var arg1: Expr, var arg2: Expr) extends Expr {
+case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
   override def toBoogie: BExpr = BinaryBExpr(op, arg1.toBoogie, arg2.toBoogie)
   override def gammas: Set[Expr] = arg1.gammas ++ arg2.gammas
   override def variables: Set[Variable] = arg1.variables ++ arg2.variables
@@ -299,7 +298,7 @@ enum Endian {
   case BigEndian
 }
 
-class MemoryStore(var mem: Memory, var index: Expr, var value: Expr, var endian: Endian, var size: Int) extends Expr {
+case class MemoryStore(mem: Memory, index: Expr, value: Expr, endian: Endian, size: Int) extends Expr {
   override def toBoogie: BMemoryStore = BMemoryStore(mem.toBoogie, index.toBoogie, value.toBoogie, endian, size)
   override def toGamma: GammaStore =
     GammaStore(mem.toGamma, index.toBoogie, value.toGamma, size, size / mem.valueSize)
@@ -313,7 +312,7 @@ class MemoryStore(var mem: Memory, var index: Expr, var value: Expr, var endian:
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemoryStore(this)
 }
 
-class MemoryLoad(var mem: Memory, var index: Expr, var endian: Endian, var size: Int) extends Expr {
+case class MemoryLoad(mem: Memory, index: Expr, endian: Endian, size: Int) extends Expr {
   override def toBoogie: BMemoryLoad = BMemoryLoad(mem.toBoogie, index.toBoogie, endian, size)
   override def toGamma: BExpr = if (mem.name == "stack") {
     GammaLoad(mem.toGamma, index.toBoogie, size, size / mem.valueSize)
