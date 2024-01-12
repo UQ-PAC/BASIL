@@ -65,10 +65,16 @@ case class BProcedure(
       List()
     }
 
-    List(
-      header + returns + ";"
-    ) ++ modifiesStr ++ requiresStrs ++ freeRequiresStrs ++ ensuresStrs ++ freeEnsuresStrs++ List("")
-      ++ (if body.nonEmpty then  List(implHeader + returns) ++ bodyStr ++ List("") else List(""))
+    val procDecl = s"$header$returns;"
+    val procList = List(procDecl) ++ modifiesStr ++ requiresStrs ++ freeRequiresStrs ++ ensuresStrs ++ freeEnsuresStrs
+    val implDecl = s"$implHeader$returns"
+    val implList = if (body.nonEmpty) {
+      List("", implDecl) ++ bodyStr
+    } else {
+      List()
+    }
+
+    procList ++ implList ++ List("")
   }
   override def toString: String = toBoogie.mkString("\n")
   def functionOps: Set[FunctionOp] =
