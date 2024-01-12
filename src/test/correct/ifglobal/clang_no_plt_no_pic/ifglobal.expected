@@ -63,7 +63,6 @@ procedure {:extern} rely();
   free ensures (memory_load64_le(mem, 69592bv64) == 1812bv64);
   free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
 
-
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
@@ -77,10 +76,8 @@ implementation {:extern} rely_transitive()
 
 procedure {:extern} rely_reflexive();
 
-
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
-
 
 procedure main();
   modifies Gamma_R0, Gamma_R31, Gamma_R8, Gamma_R9, Gamma_mem, Gamma_stack, R0, R31, R8, R9, mem, stack;
@@ -168,7 +165,7 @@ implementation main()
     goto l0000092d;
   lmain_goto_l00000930:
     assume {:captureState "lmain_goto_l00000930"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l00000930;
   l00000933_goto_l0000093b:
     assume {:captureState "l00000933_goto_l0000093b"} true;
@@ -176,7 +173,7 @@ implementation main()
     goto l0000093b;
   l00000933_goto_l00000952:
     assume {:captureState "l00000933_goto_l00000952"} true;
-    assume (!(bvcomp1(R8[1:0], 1bv1) != 0bv1));
+    assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
     goto l00000952;
 }
 

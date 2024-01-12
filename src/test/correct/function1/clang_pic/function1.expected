@@ -97,7 +97,6 @@ procedure {:extern} rely();
   free ensures (memory_load64_le(mem, 69680bv64) == 69680bv64);
   free ensures (memory_load64_le(mem, 69584bv64) == 69696bv64);
 
-
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
@@ -111,10 +110,8 @@ implementation {:extern} rely_transitive()
 
 procedure {:extern} rely_reflexive();
 
-
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
-
 
 procedure get_two();
   modifies Gamma_R0, Gamma_R31, Gamma_R8, Gamma_R9, Gamma_stack, R0, R31, R8, R9, stack;
@@ -249,5 +246,4 @@ procedure printf();
   free ensures (memory_load64_le(mem, 69056bv64) == 1856bv64);
   free ensures (memory_load64_le(mem, 69680bv64) == 69680bv64);
   free ensures (memory_load64_le(mem, 69584bv64) == 69696bv64);
-
 

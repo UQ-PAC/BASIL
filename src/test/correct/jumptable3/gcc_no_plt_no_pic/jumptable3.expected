@@ -76,7 +76,6 @@ procedure {:extern} rely();
   free ensures (memory_load64_le(mem, 69616bv64) == 1920bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
@@ -90,10 +89,8 @@ implementation {:extern} rely_transitive()
 
 procedure {:extern} rely_reflexive();
 
-
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
-
 
 procedure add_six();
   modifies Gamma_R0, Gamma_R1, Gamma_mem, R0, R1, mem;
@@ -642,7 +639,7 @@ implementation main()
     goto l000012f4;
   lmain_goto_l0000133b:
     assume {:captureState "lmain_goto_l0000133b"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l0000133b;
   l0000133b_goto_l00001332:
     assume {:captureState "l0000133b_goto_l00001332"} true;
@@ -650,7 +647,7 @@ implementation main()
     goto l00001332;
   l0000133b_goto_l00001363:
     assume {:captureState "l0000133b_goto_l00001363"} true;
-    assume (!(bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1));
+    assume (bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) == 0bv1);
     goto l00001363;
   l00001363_goto_l00001384:
     assume {:captureState "l00001363_goto_l00001384"} true;
@@ -658,7 +655,7 @@ implementation main()
     goto l00001384;
   l00001363_goto_l0000139e:
     assume {:captureState "l00001363_goto_l0000139e"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l0000139e;
   l0000139e_goto_l00001332:
     assume {:captureState "l0000139e_goto_l00001332"} true;
@@ -666,7 +663,7 @@ implementation main()
     goto l00001332;
   l0000139e_goto_l000013c6:
     assume {:captureState "l0000139e_goto_l000013c6"} true;
-    assume (!(bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1));
+    assume (bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) == 0bv1);
     goto l000013c6;
   l000013c6_goto_l000013e7:
     assume {:captureState "l000013c6_goto_l000013e7"} true;
@@ -674,7 +671,7 @@ implementation main()
     goto l000013e7;
   l000013c6_goto_l000013fe:
     assume {:captureState "l000013c6_goto_l000013fe"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l000013fe;
   l000013fe_goto_l00001332:
     assume {:captureState "l000013fe_goto_l00001332"} true;
@@ -682,7 +679,7 @@ implementation main()
     goto l00001332;
   l000013fe_goto_l00001426:
     assume {:captureState "l000013fe_goto_l00001426"} true;
-    assume (!(bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1));
+    assume (bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) == 0bv1);
     goto l00001426;
   l00001426_goto_l00001447:
     assume {:captureState "l00001426_goto_l00001447"} true;
@@ -690,7 +687,7 @@ implementation main()
     goto l00001447;
   l00001426_goto_l0000145e:
     assume {:captureState "l00001426_goto_l0000145e"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l0000145e;
   l0000145e_goto_l00001332:
     assume {:captureState "l0000145e_goto_l00001332"} true;
@@ -698,7 +695,7 @@ implementation main()
     goto l00001332;
   l0000145e_goto_l00001486:
     assume {:captureState "l0000145e_goto_l00001486"} true;
-    assume (!(bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1));
+    assume (bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) == 0bv1);
     goto l00001486;
   l00001486_goto_l000014a7:
     assume {:captureState "l00001486_goto_l000014a7"} true;
@@ -706,7 +703,7 @@ implementation main()
     goto l000014a7;
   l00001486_goto_l000014b3:
     assume {:captureState "l00001486_goto_l000014b3"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l000014b3;
   l000014b3_goto_l00001332:
     assume {:captureState "l000014b3_goto_l00001332"} true;
@@ -714,7 +711,7 @@ implementation main()
     goto l00001332;
   l000014b3_goto_l000014db:
     assume {:captureState "l000014b3_goto_l000014db"} true;
-    assume (!(bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1));
+    assume (bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) == 0bv1);
     goto l000014db;
   l000014db_goto_l000014fc:
     assume {:captureState "l000014db_goto_l000014fc"} true;
@@ -722,7 +719,7 @@ implementation main()
     goto l000014fc;
   l000014db_goto_l00001508:
     assume {:captureState "l000014db_goto_l00001508"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l00001508;
   l00001508_goto_l00001332:
     assume {:captureState "l00001508_goto_l00001332"} true;
@@ -730,7 +727,7 @@ implementation main()
     goto l00001332;
   l00001508_goto_l00001530:
     assume {:captureState "l00001508_goto_l00001530"} true;
-    assume (!(bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1));
+    assume (bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) == 0bv1);
     goto l00001530;
   l00001530_goto_l00001551:
     assume {:captureState "l00001530_goto_l00001551"} true;
@@ -738,7 +735,7 @@ implementation main()
     goto l00001551;
   l00001530_goto_l00001564:
     assume {:captureState "l00001530_goto_l00001564"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l00001564;
   l00001564_goto_l00001332:
     assume {:captureState "l00001564_goto_l00001332"} true;
@@ -746,7 +743,7 @@ implementation main()
     goto l00001332;
   l00001564_goto_l0000158c:
     assume {:captureState "l00001564_goto_l0000158c"} true;
-    assume (!(bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1));
+    assume (bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) == 0bv1);
     goto l0000158c;
   l0000158c_goto_l000015ad:
     assume {:captureState "l0000158c_goto_l000015ad"} true;
@@ -754,7 +751,7 @@ implementation main()
     goto l000015ad;
   l0000158c_goto_l000015bd:
     assume {:captureState "l0000158c_goto_l000015bd"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l000015bd;
   l000015bd_goto_l00001332:
     assume {:captureState "l000015bd_goto_l00001332"} true;
@@ -762,7 +759,7 @@ implementation main()
     goto l00001332;
   l000015bd_goto_l000015e5:
     assume {:captureState "l000015bd_goto_l000015e5"} true;
-    assume (!(bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1));
+    assume (bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) == 0bv1);
     goto l000015e5;
   l000015e5_goto_l00001606:
     assume {:captureState "l000015e5_goto_l00001606"} true;
@@ -770,7 +767,7 @@ implementation main()
     goto l00001606;
   l000015e5_goto_l0000161d:
     assume {:captureState "l000015e5_goto_l0000161d"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l0000161d;
   l0000161d_goto_l00001332:
     assume {:captureState "l0000161d_goto_l00001332"} true;
@@ -778,7 +775,7 @@ implementation main()
     goto l00001332;
   l0000161d_goto_l00001645:
     assume {:captureState "l0000161d_goto_l00001645"} true;
-    assume (!(bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1));
+    assume (bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) == 0bv1);
     goto l00001645;
   l00001645_goto_l00001666:
     assume {:captureState "l00001645_goto_l00001666"} true;
@@ -786,7 +783,7 @@ implementation main()
     goto l00001666;
   l00001645_goto_l00001676:
     assume {:captureState "l00001645_goto_l00001676"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l00001676;
   l00001676_goto_l00001332:
     assume {:captureState "l00001676_goto_l00001332"} true;
@@ -794,7 +791,7 @@ implementation main()
     goto l00001332;
   l00001676_goto_l0000169e:
     assume {:captureState "l00001676_goto_l0000169e"} true;
-    assume (!(bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) != 0bv1));
+    assume (bvand1(bvcomp1(NF, VF), bvcomp1(ZF, 0bv1)) == 0bv1);
     goto l0000169e;
   l0000169e_goto_l000016bf:
     assume {:captureState "l0000169e_goto_l000016bf"} true;
@@ -802,7 +799,7 @@ implementation main()
     goto l000016bf;
   l0000169e_goto_l000016d6:
     assume {:captureState "l0000169e_goto_l000016d6"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l000016d6;
   l000016d6_goto_l000016cf:
     assume {:captureState "l000016d6_goto_l000016cf"} true;
@@ -810,7 +807,7 @@ implementation main()
     goto l000016cf;
   l000016d6_goto_l000016fc:
     assume {:captureState "l000016d6_goto_l000016fc"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l000016fc;
 }
 

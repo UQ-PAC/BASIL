@@ -57,7 +57,6 @@ procedure {:extern} rely();
   free ensures (memory_load64_le(mem, 69592bv64) == 1812bv64);
   free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
 
-
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
@@ -71,10 +70,8 @@ implementation {:extern} rely_transitive()
 
 procedure {:extern} rely_reflexive();
 
-
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
-
 
 procedure main();
   modifies Gamma_R0, Gamma_R31, Gamma_R8, Gamma_stack, R0, R31, R8, stack;
@@ -236,7 +233,7 @@ implementation main()
     goto l00000379;
   lmain_goto_l0000037c:
     assume {:captureState "lmain_goto_l0000037c"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l0000037c;
   l0000037f_goto_l00000387:
     assume {:captureState "l0000037f_goto_l00000387"} true;
@@ -244,7 +241,7 @@ implementation main()
     goto l00000387;
   l0000037f_goto_l00000442:
     assume {:captureState "l0000037f_goto_l00000442"} true;
-    assume (!(bvcomp1(R8[1:0], 1bv1) != 0bv1));
+    assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
     goto l00000442;
   l00000387_goto_l000003b2:
     assume {:captureState "l00000387_goto_l000003b2"} true;
@@ -252,7 +249,7 @@ implementation main()
     goto l000003b2;
   l00000387_goto_l000003b5:
     assume {:captureState "l00000387_goto_l000003b5"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l000003b5;
   l000003b8_goto_l000003c0:
     assume {:captureState "l000003b8_goto_l000003c0"} true;
@@ -260,7 +257,7 @@ implementation main()
     goto l000003c0;
   l000003b8_goto_l0000042d:
     assume {:captureState "l000003b8_goto_l0000042d"} true;
-    assume (!(bvcomp1(R8[1:0], 1bv1) != 0bv1));
+    assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
     goto l0000042d;
   l000003c0_goto_l000003eb:
     assume {:captureState "l000003c0_goto_l000003eb"} true;
@@ -268,7 +265,7 @@ implementation main()
     goto l000003eb;
   l000003c0_goto_l000003ee:
     assume {:captureState "l000003c0_goto_l000003ee"} true;
-    assume (!(bvcomp1(ZF, 1bv1) != 0bv1));
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
     goto l000003ee;
   l000003f1_goto_l000003f9:
     assume {:captureState "l000003f1_goto_l000003f9"} true;
@@ -276,7 +273,7 @@ implementation main()
     goto l000003f9;
   l000003f1_goto_l00000418:
     assume {:captureState "l000003f1_goto_l00000418"} true;
-    assume (!(bvcomp1(R8[1:0], 1bv1) != 0bv1));
+    assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
     goto l00000418;
 }
 

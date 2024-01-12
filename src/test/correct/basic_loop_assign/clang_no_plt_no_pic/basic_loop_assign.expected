@@ -48,7 +48,6 @@ procedure {:extern} rely();
   free ensures (memory_load64_le(mem, 69592bv64) == 1812bv64);
   free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
 
-
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
   ensures (((memory_load32_le(mem, $x_addr) == old(memory_load32_le(mem, $x_addr))) || (bvsle32(memory_load32_le(mem, $x_addr), 10bv32) && bvslt32(old(memory_load32_le(mem, $x_addr)), 10bv32))) || ((memory_load32_le(mem, $x_addr) == 21bv32) && (old(memory_load32_le(mem, $x_addr)) == 20bv32)));

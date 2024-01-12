@@ -162,7 +162,6 @@ procedure {:extern} rely();
   free ensures (memory_load64_le(mem, 69616bv64) == 2068bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
@@ -176,10 +175,8 @@ implementation {:extern} rely_transitive()
 
 procedure {:extern} rely_reflexive();
 
-
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
-
 
 procedure #free();
   modifies Gamma_R16, Gamma_R17, R16, R17;
@@ -349,7 +346,6 @@ procedure #free();
   free ensures (memory_load64_le(mem, 69000bv64) == 1984bv64);
   free ensures (memory_load64_le(mem, 69616bv64) == 2068bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
-
 
 procedure main();
   modifies Gamma_R0, Gamma_R1, Gamma_R16, Gamma_R17, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_mem, Gamma_stack, R0, R1, R16, R17, R29, R30, R31, mem, stack;
@@ -797,7 +793,6 @@ procedure malloc();
   free ensures (memory_load64_le(mem, 69616bv64) == 2068bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-
 procedure printCharValue();
   modifies Gamma_R0, Gamma_R1, Gamma_R16, Gamma_R17, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_mem, Gamma_stack, R0, R1, R16, R17, R29, R30, R31, mem, stack;
   free requires (memory_load8_le(mem, 2328bv64) == 1bv8);
@@ -1181,5 +1176,4 @@ procedure printf();
   free ensures (memory_load64_le(mem, 69000bv64) == 1984bv64);
   free ensures (memory_load64_le(mem, 69616bv64) == 2068bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
-
 
