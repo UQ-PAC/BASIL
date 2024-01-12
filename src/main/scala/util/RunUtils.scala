@@ -38,7 +38,7 @@ object RunUtils {
   // constants
   private val exitRegister: Variable = Register("R30", BitVecType(64))
 
-  def loadBAP(fileName: String, mainAddress: Int): Unit | BAPProgram = {
+  def loadBAP(fileName: String, mainAddress: Int): Program = {
     // val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
     // val tokens = CommonTokenStream(ADTLexer)
     // val parser = BAP_ADTParser(tokens)
@@ -66,15 +66,15 @@ object RunUtils {
     
 
     // This is redundant now, but good for testing purposes
-    val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
-    val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
-    val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
-    val entrypoint = mods.head.entryPoint
-    val sym = mods.flatMap(_.symbols)
+    // val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
+    // val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
+    // val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
+    // val entrypoint = mods.head.entryPoint
+    // val sym = mods.flatMap(_.symbols)
 
-    // // PROXYBLOCKS
-    // val proxy = mods.flatMap(_.proxies)
-    // proxy.foreach(elem => println(elem))
+    // // // PROXYBLOCKS
+    // // val proxy = mods.flatMap(_.proxies)
+    // // proxy.foreach(elem => println(elem))
 
     // // FUNCTION BLOCKS WRITER
     // val bw = new BufferedWriter(new FileWriter(new File("Function Entries + Function Blocks")))
@@ -86,15 +86,7 @@ object RunUtils {
     // bw.close()
 
     // //CFG + SYMBOL WRITER
-    // val bw = new BufferedWriter(new FileWriter(new File("output")))
-    // symbols.head.map(_.toProtoString).foreach(f => f -> bw.write(f))
-    // bw.write(cfg.head.toProtoString)
-    // bw.close()
-
-    // //AUXDATA KEYS + ENTRYPOINT TO CFG
-    //println(keys.toString())
-    // println(mods.head.entryPoint)
-
+    // val bw = new BufferedWriter(new FileWrmai
     // // BASIC BLOCKS TO CHRIS UUID
     // val tl = new TalkingListener()
     // ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
@@ -102,29 +94,9 @@ object RunUtils {
     // // PARSE TREE
     //System.out.println(parser.semantics().toStringTree(parser));
     
-    // for {
-    // mod <- mods
-    // section <- mod.sections
-    // byteInterval <- section.byteIntervals
-    // block <- byteInterval.blocks
-    // } {
-    // println(s"CodeBlock UUID: ${block.getCode.uuid}")
-    // println(s"DataBlock UUID: ${block.getData.uuid}")
-    // println
-    // }
-
-
-    // mods.map(_.sections.foreach(elem => println(elem.name)))
-
-    // println(mods.flatMap(_.symbols).find(_.name == "__libc_start_main").get.optionalPayload.referentUuid.get)
-    
     val GtirbConverter = new GtirbToIR(mods, parser, cfg, mainAddress)
     val program = GtirbConverter.createIR()
-    println(serialiseIL(program)) 
-
-    return
-
-    // val new_cfg = ProgramCfgFactory().fromIR(program)
+    return program
   }
 
   def loadReadELF(fileName: String): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
@@ -151,7 +123,7 @@ object RunUtils {
   def run(q: BASILConfig): Unit = {
     Logger.info("[!] Writing file...")
     val boogieProgram = loadAndTranslate(q)
-    // writeToFile(boogieProgram.toString, q.outputPrefix)
+    writeToFile(boogieProgram.toString, q.outputPrefix)
   }
 
   def loadAndTranslate(q: BASILConfig): Unit | BProgram = {
@@ -159,53 +131,57 @@ object RunUtils {
     /** Loading phase
       */
 
-    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile) //TODO: this seems to give some small error?
-    val bapProgram = loadBAP(q.loading.adtFile, mainAddress) 
+    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile) 
+    var IRProgram = loadBAP(q.loading.adtFile, mainAddress) 
     
+    
+    // val bapProgram = loadBAP(q.loading.adtFile, 12121) 
     // val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile)
     // val IRTranslator = BAPToIR(bapProgram, mainAddress)
     // var IRProgram = IRTranslator.translate
 
+
+
     // println(serialiseIL(IRProgram))
 
-    // val specification = loadSpecification(q.loading.specFile, IRProgram, globals)
+    val specification = loadSpecification(q.loading.specFile, IRProgram, globals)
 
-    // /** Analysis Phase
-    //   */
-    // Logger.info("[!] Removing external function calls")
-    // // Remove external function references (e.g. @printf)
-    // val externalNames = externalFunctions.map(e => e.name)
-    // val externalRemover = ExternalRemover(externalNames)
-    // val renamer = Renamer(reserved)
-    // IRProgram = externalRemover.visitProgram(IRProgram)
-    // IRProgram = renamer.visitProgram(IRProgram)
+    /** Analysis Phase
+      */
+    Logger.info("[!] Removing external function calls")
+    // Remove external function references (e.g. @printf)
+    val externalNames = externalFunctions.map(e => e.name)
+    val externalRemover = ExternalRemover(externalNames)
+    val renamer = Renamer(reserved)
+    IRProgram = externalRemover.visitProgram(IRProgram)
+    IRProgram = renamer.visitProgram(IRProgram)
 
-    // q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il"))
+    q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il"))
 
-    // q.staticAnalysis.foreach { analysisConfig =>
-    //   IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets, analysisConfig, 1)
-    //   analysisConfig.dumpILToPath.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-after-analysis.il"))
-    // }
+    q.staticAnalysis.foreach { analysisConfig =>
+      IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets, analysisConfig, 1)
+      analysisConfig.dumpILToPath.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-after-analysis.il"))
+    }
 
-    // IRProgram.determineRelevantMemory(globalOffsets)
-    // IRProgram.stripUnreachableFunctions()
-    // IRProgram.stackIdentification()
+    IRProgram.determineRelevantMemory(globalOffsets)
+    IRProgram.stripUnreachableFunctions()
+    IRProgram.stackIdentification()
 
-    // val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
-    // IRProgram.setModifies(specModifies)
+    val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
+    IRProgram.setModifies(specModifies)
 
-    // /*
-    // if (q.runInterpret) {
-    //   val interpreter = Interpreter()
-    //   interpreter.interpret(IRProgram)
-    // }
-    //  */
+    /*
+    if (q.runInterpret) {
+      val interpreter = Interpreter()
+      interpreter.interpret(IRProgram)
+    }
+     */
 
-    // Logger.info("[!] Translating to Boogie")
-    // val boogieTranslator = IRToBoogie(IRProgram, specification)
-    // Logger.info("[!] Done! Exiting...")
-    // val boogieProgram = boogieTranslator.translate(q.boogieTranslation)
-    // boogieProgram
+    Logger.info("[!] Translating to Boogie")
+    val boogieTranslator = IRToBoogie(IRProgram, specification)
+    Logger.info("[!] Done! Exiting...")
+    val boogieProgram = boogieTranslator.translate(q.boogieTranslation)
+    boogieProgram
   }
 
   def analyse(

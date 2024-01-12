@@ -10,7 +10,7 @@ import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 
 class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext, blkCount: Int) extends SemanticsBaseVisitor[Any] {
 
-  var cseMap: HashMap[String, IRType] = HashMap[String, IRType]() // TODO: KEEP TRACK OF CSE NAMES
+  var cseMap: HashMap[String, IRType] = HashMap[String, IRType]() 
   var varMap: HashMap[String, IRType] = HashMap[String, IRType]()
   var instructionCount = 0
 
@@ -80,7 +80,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext, blkCoun
     val mem = Memory("mem", 64, 8) // yanked from BAP
     val addr = visitExpr(ctx.expr(1))
     val value = visitExpr(ctx.expr(4))
-    val size = visitExpr(ctx.expr(2)).asInstanceOf[IntLiteral].value.toInt 
+    val size = visitExpr(ctx.expr(2)).asInstanceOf[IntLiteral].value.toInt * 8
     val memstore = MemoryStore(mem, addr, value, Endian.LittleEndian, size)
     return MemoryAssign(mem, memstore)
   }
@@ -250,7 +250,7 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext, blkCoun
       case "Mem.read" =>
         val mem = Memory("mem", 64, 8) // yanked from BAP, hope this never changes
         val addr = visitExpr(ctx.expr(0))
-        val size = visitExpr(ctx.expr(1)).asInstanceOf[IntLiteral].value.toInt
+        val size = visitExpr(ctx.expr(1)).asInstanceOf[IntLiteral].value.toInt * 8 
         return MemoryLoad(mem, addr, Endian.LittleEndian, size)
       case "not_bool"    => return UnaryExpr(BoolNOT, visitExpr(ctx.expr(0)))
       case "cvt_bool_bv" =>
