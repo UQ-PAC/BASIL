@@ -370,18 +370,18 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     (hasFunctionReturn, hasConditionalBranch) match {
 
       case (true, false) => 
-        val callEdge = edges.find(_.label.exists(_.`type` 
-                                  == proto.CFG.EdgeType.Type_Call))
+        val callEdge = edges.find(_.label.get.`type` 
+                                  == proto.CFG.EdgeType.Type_Call).get
+        val fallEdge = edges.find(_.label.get.`type` 
+                                  == proto.CFG.EdgeType.Type_Fallthrough).get
 
-        callEdge.map { edge =>
-          if (edge.label.get.direct) {
-            val targetUuid = edge.targetUuid
-            val proc = get_proc(targetUuid, procedures)
-            Left(DirectCall(proc, Option(resolveGotoTarget(edge)), Option(proc.name)))
-          } else {
-            Left(IndirectCall(get_jmp_reg(block.statements.last), Option(resolveGotoTarget(edge)), None))
-          }
-        }.get
+        if (callEdge.label.get.direct) {
+          val targetUuid = callEdge.targetUuid
+          val proc = get_proc(targetUuid, procedures)
+          Left(DirectCall(proc, Option(resolveGotoTarget(fallEdge)), Option(proc.name)))
+        } else {
+          Left(IndirectCall(get_jmp_reg(block.statements.last), Option(resolveGotoTarget(fallEdge)), None))
+        }
 
       case (false, true) =>
         val blks = ArrayBuffer[Block]()
