@@ -146,6 +146,7 @@ sealed trait IntUnOp(op: String) extends UnOp {
 
 case object IntNEG extends IntUnOp("-")
 
+
 sealed trait BVUnOp(op: String) extends UnOp {
   override def toString: String = op
 }

@@ -8,25 +8,39 @@ import analysis.BitVectorEval
 class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure, var initialMemory: ArrayBuffer[MemorySection], var readOnlyMemory: ArrayBuffer[MemorySection]) {
 
   // This shouldn't be run before indirect calls are resolved
-  def stripUnreachableFunctions(): Unit = {
-    val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
-    var next = mainProcedure.name
-    var reachableNames: Set[String] = Set(next)
-    var toVisit: List[String] = List()
+
+  def stripUnreachableFunctions(depth: Int = Int.MaxValue): Unit = {
+    val procedureCalleeNames = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
+
+    var toVisit: mutable.LinkedHashSet[(Int, String)] = mutable.LinkedHashSet((0, mainProcedure.name))
     var reachableFound = true
-    while (reachableFound) {
-      val children = functionToChildren(next) -- reachableNames -- toVisit - next
-      reachableNames = reachableNames ++ children
-      toVisit = toVisit ++ children
-      if (toVisit.isEmpty) {
-        reachableFound = false
-      } else {
-        next = toVisit.head
-        toVisit = toVisit.tail
+    val reachableNames = mutable.HashMap[String, Int]()
+    while (toVisit.nonEmpty) {
+      val next = toVisit.head
+      toVisit.remove(next)
+
+      if (next._1 <= depth) {
+
+        def addName(depth: Int, name: String): Unit = {
+          val oldDepth = reachableNames.getOrElse(name, Integer.MAX_VALUE)
+          reachableNames.put(next._2, if depth < oldDepth then depth else oldDepth)
+        }
+        addName(next._1, next._2)
+
+        val callees = procedureCalleeNames(next._2)
+
+        toVisit.addAll(callees.diff(reachableNames.keySet).map(c => (next._1 + 1, c)))
+        callees.foreach(c => addName(next._1 + 1, c))
       }
     }
-    procedures = procedures.filter(f => reachableNames.contains(f.name))
+    procedures = procedures.filter(f => reachableNames.keySet.contains(f.name))
+
+    for (elem <- procedures.filter(c => c.calls.exists(s => !procedures.contains(s)))) {
+      // last layer is analysed only as specifications so we remove the body for anything that calls
+      // a function we have removed
+      elem.blocks.clear()
+    }
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {

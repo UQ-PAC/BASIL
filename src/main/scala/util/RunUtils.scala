@@ -40,12 +40,12 @@ object RunUtils {
     BAPLoader.visitProject(parser.project())
   }
 
-  def loadReadELF(fileName: String): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
+  def loadReadELF(fileName: String, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)
     parser.setBuildParseTree(true)
-    ReadELFLoader.visitSyms(parser.syms())
+    ReadELFLoader.visitSyms(parser.syms(), config)
   }
 
   def loadSpecification(filename: Option[String], program: Program, globals: Set[SpecGlobal]): Specification = {
@@ -62,9 +62,12 @@ object RunUtils {
   }
 
   def run(q: BASILConfig): Unit = {
-    Logger.info("[!] Writing file...")
     val boogieProgram = loadAndTranslate(q)
-    writeToFile(boogieProgram.toString, q.outputPrefix)
+
+    Logger.info("[!] Writing file...")
+    val wr = BufferedWriter(FileWriter(q.outputPrefix))
+    boogieProgram.writeToString(wr)
+    wr.close()
   }
 
   def loadAndTranslate(q: BASILConfig): BProgram = {
@@ -72,7 +75,7 @@ object RunUtils {
      *  Loading phase
      */
     val bapProgram = loadBAP(q.loading.adtFile)
-    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile)
+    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading)
 
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
@@ -98,7 +101,12 @@ object RunUtils {
     }
 
     IRProgram.determineRelevantMemory(globalOffsets)
-    IRProgram.stripUnreachableFunctions()
+
+    Logger.info("[!] Stripping unreachable")
+    val before = IRProgram.procedures.size
+    IRProgram.stripUnreachableFunctions(q.loading.procedureTrimDepth)
+    Logger.info(s"[!] Removed ${before - IRProgram.procedures.size} functions (${IRProgram.procedures.size} remaining)")
+
     val stackIdentification = StackSubstituter()
     stackIdentification.visitProgram(IRProgram)
 
@@ -114,7 +122,6 @@ object RunUtils {
 
     Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
-    Logger.info("[!] Done! Exiting...")
     val boogieProgram = boogieTranslator.translate(q.boogieTranslation)
     boogieProgram
   }
