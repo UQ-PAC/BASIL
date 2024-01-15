@@ -34,11 +34,11 @@
 0000051a:
 0000051e: R0 := 0x20000
 00000526: R0 := mem[R0 + 0x58, el]:u64
-0000052b: R30 := 0x8F0
+0000052b: R30 := 0x930
 0000052e: call @__cxa_finalize with return %000004fa
 
 000004fa:
-00000507: R30 := 0x8F4
+00000507: R30 := 0x934
 00000509: call @deregister_tm_clones with return %0000050b
 
 0000050b:
@@ -89,7 +89,7 @@
 000007a9: mem := mem with [#101 + 8, el]:u64 <- R30
 000007ad: R31 := #101
 000007b4: R29 := R31
-000007b9: R30 := 0x718
+000007b9: R30 := 0x768
 000007bb: call @call_weak_fn with return %000007bd
 
 000007bd:
@@ -112,11 +112,11 @@
 00000254: R0 := mem[R0 + 0xFD8, el]:u64
 0000025a: R3 := 0
 00000260: R4 := 0
-00000265: R30 := 0x830
+00000265: R30 := 0x870
 00000268: call @__libc_start_main with return %0000026a
 
 0000026a:
-0000026d: R30 := 0x834
+0000026d: R30 := 0x874
 00000270: call @abort with return %000008bb
 
 000008bb:
@@ -218,7 +218,7 @@
 000003c5: mem := mem with [R29 - 8, el]:u64 <- 0
 000003cd: mem := mem with [R29 - 0x10, el]:u64 <- 0
 000003d3: R0 := 0xB
-000003d8: R30 := 0x93C
+000003d8: R30 := 0x97C
 000003db: call @malloc with return %000003dd
 
 000003dd:
@@ -229,20 +229,20 @@
 00000401: R0 := 0x1F000
 00000409: R0 := mem[R0 + 0xFD0, el]:u64
 00000411: mem := mem with [R31, el]:u64 <- R0
-00000416: R30 := 0x95C
+00000416: R30 := 0x99C
 00000419: call @strlen with return %0000041b
 
 0000041b:
 00000421: R1 := mem[R31, el]:u64
 00000429: R2 := R0
 00000431: R0 := mem[R31 + 8, el]:u64
-00000436: R30 := 0x96C
+00000436: R30 := 0x9AC
 00000439: call @memcpy with return %0000043b
 
 0000043b:
 00000441: R8 := mem[R31 + 0x18, el]:u64
 00000449: R0 := mem[R8, el]:u64
-0000044e: R30 := 0x978
+0000044e: R30 := 0x9B8
 00000451: call @puts with return %00000453
 
 00000453:
@@ -253,20 +253,20 @@
 00000478: R9 := mem[R8, el]:u64
 00000480: mem := mem with [R31 + 0x10, el]:u64 <- R9
 00000488: R0 := mem[R8, el]:u64
-0000048d: R30 := 0x998
+0000048d: R30 := 0x9D8
 0000048f: call @strlen with return %00000491
 
 00000491:
 00000497: R2 := R0
 0000049f: R0 := mem[R31 + 0x10, el]:u64
 000004a6: R1 := 1
-000004ab: R30 := 0x9A8
+000004ab: R30 := 0x9E8
 000004ae: call @memset with return %000004b0
 
 000004b0:
 000004b6: R8 := mem[R31 + 0x18, el]:u64
 000004be: R0 := mem[R8, el]:u64
-000004c3: R30 := 0x9B4
+000004c3: R30 := 0x9F4
 000004c6: call @free with return %000004c8
 
 000004c8:
