@@ -62,7 +62,7 @@ case class IntLiteral(value: BigInt) extends Literal {
   * @param start
   * @param body
   */
-class Extract(var end: Int, var start: Int, var body: Expr) extends Expr {
+case class Extract(var end: Int, var start: Int, var body: Expr) extends Expr {
   override def toBoogie: BExpr = BVExtract(end, start, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
   override def variables: Set[Variable] = body.variables

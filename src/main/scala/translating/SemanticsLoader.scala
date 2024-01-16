@@ -227,12 +227,14 @@ class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext, blkCoun
       case e: Extract => e.body.asInstanceOf[Register].irType.asInstanceOf[BitVecType].size
       case r: Register => r.irType.asInstanceOf[BitVecType].size
       case b: BitVecLiteral => b.size
+      case _ => ???
     }
 
     val size2 = expr2 match {
       case e: Extract => e.body.asInstanceOf[Register].irType.asInstanceOf[BitVecType].size
       case r: Register => r.irType.asInstanceOf[BitVecType].size
       case b: BitVecLiteral => b.size
+      case _ => ???
     } 
 
     if (size1 == size2) {
