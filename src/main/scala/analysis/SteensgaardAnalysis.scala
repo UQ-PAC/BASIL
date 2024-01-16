@@ -13,18 +13,18 @@ sealed trait VariableWrapper {
 
 /** Wrapper for variables so we can have Steensgaard-specific equals method indirectly */
 case class RegisterVariableWrapper(variable: Variable) extends VariableWrapper {
-    override def equals(obj: Any): Boolean = {
-        obj match {
-        case RegisterVariableWrapper(other) =>
-            variable == other && (variable.ssa_id == other.ssa_id)
-        case _ =>
-            false
-        }
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case RegisterVariableWrapper(other) =>
+        variable == other && (variable.ssa_id == other.ssa_id)
+      case _ =>
+        false
     }
+  }
 
-    override def hashCode(): Int = {
-        variable.hashCode() + variable.ssa_id.hashCode()
-    }
+  override def hashCode(): Int = {
+    variable.hashCode() + variable.ssa_id.hashCode()
+  }
 }
 
 /** Steensgaard-style pointer analysis. The analysis associates an [[StTerm]] with each variable declaration and
@@ -176,8 +176,7 @@ class SteensgaardAnalysis(
   def analyze(): Unit =
     // generate the constraints by traversing the AST and solve them on-the-fly
     entryNode.succIntra.foreach(n =>
-      visit(n, ())
-    )
+      visit(n, ()))
 
   /** Generates the constraints for the given sub-AST.
     * @param node
@@ -200,6 +199,7 @@ class SteensgaardAnalysis(
               val alloc = HeapRegion(nextMallocCount(), BitVecLiteral(BigInt(0), 0))
               unify(varToStTerm(RegisterVariableWrapper(mallocVariable)), PointerRef(allocToTerm(alloc)))
             }
+
           case localAssign: LocalAssign =>
             stackDetection(localAssign)
             localAssign.rhs match {
