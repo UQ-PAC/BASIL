@@ -25,7 +25,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule {
   override def antlrPackage: Option[String] = Some("Parsers")
   override def antlrGenerateVisitor = true
   override def antlrGrammarSources = T.sources {
-    Seq(PathRef(millSourcePath / "antlr4"))
+    Seq(PathRef(millSourcePath / "main" / "antlr4"))
   }
 
   object test extends ScalaTests with TestModule.ScalaTest  {
