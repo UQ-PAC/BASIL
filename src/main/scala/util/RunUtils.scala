@@ -6,7 +6,6 @@ import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
 import spray.json._
 import gtirb.*
-
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Set as MutableSet
@@ -21,11 +20,13 @@ import ir.*
 import boogie.*
 import specification.*
 import Parsers.*
+import Parsers.SemanticsParser.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
 import java.util.Base64
+import spray.json.DefaultJsonProtocol._
 
 import scala.collection.mutable
 
@@ -38,65 +39,66 @@ object RunUtils {
   // constants
   private val exitRegister: Variable = Register("R30", BitVecType(64))
 
-  def loadBAP(fileName: String, mainAddress: Int): BAPProgram = {
-    val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
-    val tokens = CommonTokenStream(ADTLexer)
-    val parser = BAP_ADTParser(tokens)
-
-    parser.setBuildParseTree(true)
-
-    BAPLoader.visitProject(parser.project())
-
-    // var fIn = new FileInputStream(fileName)
-    // val ir = IR.parseFrom(fIn)
-    // val mods = ir.modules
-
-    // val cfg = ir.cfg.get
-    // val texts = mods.map(_.sections.head).filter(_.name == ".text")
-    // val symbols = mods.map(_.symbols)
-    // val semantics = mods.map(getSemantics);
-    // val keys = mods.head.auxData.keySet
-
-    // val semanticsLexer = SemanticsLexer(CharStreams.fromString(semantics.head.prettyPrint))
-    // val tokens = CommonTokenStream(semanticsLexer)
-    // val parser = SemanticsParser(tokens)
+  def loadBAP(fileName: String, mainAddress: Int): Program = {
+    // val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
+    // val tokens = CommonTokenStream(ADTLexer)
+    // val parser = BAP_ADTParser(tokens)
 
     // parser.setBuildParseTree(true)
 
+    // BAPLoader.visitProject(parser.project())
+
+    var fIn = new FileInputStream(fileName)
+    val ir = IR.parseFrom(fIn)
+    val mods = ir.modules
+
+    val cfg = ir.cfg.get
+    val symbols = mods.map(_.symbols)
+
+    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]]);
+
+    def parse_insn (f: String) : StmtContext = {
+      val semanticsLexer = SemanticsLexer(CharStreams.fromString(f))
+      val tokens = CommonTokenStream(semanticsLexer)
+      val parser = SemanticsParser(tokens)
+      parser.setBuildParseTree(true)
+      return parser.stmt()
+    }
+
+    val parserMap = semantics.map(_.map(((k: String,v: Array[Array[String]]) => (k, v.map(_.map(parse_insn(_)))))))
+
+    // This is redundant now, but good for testing purposes
+    // val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
+    // val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
+    // val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
+    // val entrypoint = mods.head.entryPoint
+    // val sym = mods.flatMap(_.symbols)
+
+    // // // PROXYBLOCKS
+    // // val proxy = mods.flatMap(_.proxies)
+    // // proxy.foreach(elem => println(elem))
+
+    // // FUNCTION BLOCKS WRITER
+    // val bw = new BufferedWriter(new FileWriter(new File("Function Entries + Function Blocks")))
+    // bw.write("Function Entries" + System.lineSeparator())
+    // functionEntries.map(_.toString()).foreach(f => f -> bw.write(f))
+    // bw.write(System.lineSeparator() + System.lineSeparator())
+    // bw.write("Function Blocks" + System.lineSeparator())
+    // functionBlocks.map(_.toString()).foreach(f => f -> bw.write(f))
+    // bw.close()
+
+    // //CFG + SYMBOL WRITER
+    // val bw = new BufferedWriter(new FileWrmai
+    // // BASIC BLOCKS TO CHRIS UUID
+    // val tl = new TalkingListener()
+    // ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
+
+    // // PARSE TREE
+    //System.out.println(parser.semantics().toStringTree(parser));
     
-
-    // // This is redundant now, but good for testing purposes
-    // // val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
-    // // val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
-    // // val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
-    // // val entrypoint = mods.head.entryPoint
-    // // val sym = mods.flatMap(_.symbols)
-
-    // // // // PROXYBLOCKS
-    // // // val proxy = mods.flatMap(_.proxies)
-    // // // proxy.foreach(elem => println(elem))
-
-    // // // FUNCTION BLOCKS WRITER
-    // // val bw = new BufferedWriter(new FileWriter(new File("Function Entries + Function Blocks")))
-    // // bw.write("Function Entries" + System.lineSeparator())
-    // // functionEntries.map(_.toString()).foreach(f => f -> bw.write(f))
-    // // bw.write(System.lineSeparator() + System.lineSeparator())
-    // // bw.write("Function Blocks" + System.lineSeparator())
-    // // functionBlocks.map(_.toString()).foreach(f => f -> bw.write(f))
-    // // bw.close()
-
-    // // //CFG + SYMBOL WRITER
-    // // val bw = new BufferedWriter(new FileWrmai
-    // // // BASIC BLOCKS TO CHRIS UUID
-    // // val tl = new TalkingListener()
-    // // ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
-
-    // // // PARSE TREE
-    // //System.out.println(parser.semantics().toStringTree(parser));
-    
-    // val GtirbConverter = new GtirbToIR(mods, parser, cfg, mainAddress)
-    // val program = GtirbConverter.createIR()
-    // return program
+    val GtirbConverter = new GtirbToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
+    val program = GtirbConverter.createIR()
+    return program
   }
 
   def loadReadELF(fileName: String, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
@@ -134,22 +136,16 @@ object RunUtils {
     /** Loading phase
       */
 
-    // val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading) 
-    // println(globals)
-    // var IRProgram = loadBAP(q.loading.adtFile, mainAddress) 
+    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading) 
+    var IRProgram = loadBAP(q.loading.adtFile, mainAddress) 
     
     
-    val bapProgram = loadBAP(q.loading.adtFile, 12121) 
-    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading)
-    val IRTranslator = BAPToIR(bapProgram, mainAddress)
-    var IRProgram = IRTranslator.translate
-
-    // IRProgram.initialMemory.foreach{elem => 
-    // println(s"${elem.name}, ${elem.address} , ${elem.size}, ${elem.bytes}")
-    // println
-    // }
+    // val bapProgram = loadBAP(q.loading.adtFile, 12121) 
+    // val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading)
+    // val IRTranslator = BAPToIR(bapProgram, mainAddress)
+    // var IRProgram = IRTranslator.translate
   
-    // println(serialiseIL(IRProgram))
+    // println(serialiseIL(IRProgram));
 
     val specification = loadSpecification(q.loading.specFile, IRProgram, globals)
 

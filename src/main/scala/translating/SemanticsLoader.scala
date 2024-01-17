@@ -5,62 +5,45 @@ import Parsers.*
 import java.util.Base64
 import scala.jdk.CollectionConverters._
 import ir.*
-import scala.collection.mutable._
+import scala.collection.mutable.HashMap
+import scala.collection.mutable.ArrayBuffer
 import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 
-class SemanticsLoader(targetuuid: ByteString, context: SemanticsContext, blkCount: Int) extends SemanticsBaseVisitor[Any] {
+class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array[StmtContext]]], blkCount: Int) extends SemanticsBaseVisitor[Any] {
 
   var cseMap: HashMap[String, IRType] = HashMap[String, IRType]() 
   var varMap: HashMap[String, IRType] = HashMap[String, IRType]()
   var instructionCount = 0
 
-  def unChrisifyUUID(uuid: String): ByteString = { // This probably needs a better name, but :/
-    return ByteString.copyFrom(Base64.getDecoder().decode(uuid))
+  def chrisifyUUID(uuid: ByteString): String = { // This probably needs a better name, but :/
+    return Base64.getEncoder().encodeToString(uuid.toByteArray()) 
   }
 
   def createStatements(): ArrayBuffer[Statement] = {
-
-    val basicBlks = context.basic_blk().asScala
-    var statements: ArrayBuffer[Statement] = ArrayBuffer[Statement]()
-
-    for (BasicBlk <- basicBlks) {
-      val Blkuuid = unChrisifyUUID(BasicBlk.uuid().getText())
-      if (Blkuuid.equals(targetuuid)) {
-        statements = visitBasic_blk(BasicBlk)
-      }
-    }
-    return statements
+    return visitInstructions(parserMap(chrisifyUUID(targetuuid)))
   }
 
+  def visitInstructions(stmts: Array[Array[StmtContext]]): ArrayBuffer[Statement] = {
 
-  override def visitBasic_blk(ctx: Basic_blkContext): ArrayBuffer[Statement] = {
-    val instructions = ctx.instruction().asScala
-    val statements = ArrayBuffer[Statement]()
-
-    for (instuction <- instructions) {
-      val instructionstmts = visitInstruction(instuction)
-      statements ++= instructionstmts
+    val statements: Array[Statement] = stmts.flatMap { elem => 
+      cseMap = cseMap.empty
+      varMap = varMap.empty
+      val stmts = elem.flatMap {
+        s => s match {
+            case a if (a.assignment_stmt() != null) =>
+              visitAssignment_stmt(a.assignment_stmt())
+            case c if (c.call_stmt() != null) =>
+              Option(visitCall_stmt(c.call_stmt()))
+            case c if (c.conditional_stmt() != null ) => 
+              Option(visitConditional_stmt(c.conditional_stmt()))
+            case _ => ???
+        }
+      }
+      instructionCount += 1
+      stmts
     }
 
-    return statements
-  }
-
-  override def visitInstruction(ctx: InstructionContext): ArrayBuffer[Statement] = {
-    cseMap = cseMap.empty
-    varMap = varMap.empty
-    val statements: ArrayBuffer[Statement] = ctx.stmt_string().asScala.flatMap { s =>
-      s.stmt() match {
-          case a if (a.assignment_stmt() != null) =>
-            visitAssignment_stmt(a.assignment_stmt())
-          case c if (c.call_stmt() != null) =>
-            Option(visitCall_stmt(c.call_stmt()))
-          case c if (c.conditional_stmt() != null ) => 
-            Option(visitConditional_stmt(c.conditional_stmt()))
-          case _ => ???
-      }
-    }.to(ArrayBuffer)
-    instructionCount += 1
-    statements
+    statements.to(ArrayBuffer)
   }
 
   def visitAssignment_stmt(ctx: Assignment_stmtContext): Option[LocalAssign] = {

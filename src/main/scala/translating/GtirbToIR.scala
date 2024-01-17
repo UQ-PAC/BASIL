@@ -7,6 +7,7 @@ import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
 import Parsers.*
+import Parsers.SemanticsParser.*
 import gtirb.*
 import ir._
 import scala.collection.mutable.ArrayBuffer
@@ -29,7 +30,7 @@ object TempIf {
 }
 
 /* GtirbtoIR function. Attempt to form an IR matching the one produced by BAP by using GTIRB instead */
-class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: SemanticsParser, cfg: CFG, mainAddress: Int) {
+class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap: Map[String, Array[Array[StmtContext]]], cfg: CFG, mainAddress: Int) {
 
   def getKey[K, V](value: V, map: mutable.Map[K, mutable.Set[V]]): Option[K] = {
     val v = map.values.find(_.contains(value))
@@ -133,7 +134,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
   def get_jmp_reg(statement: Statement): Variable = statement match {
     case LocalAssign(_, rhs: Variable, _) => rhs
     case LocalAssign(_, rhs: Extract, _) => rhs.body.asInstanceOf[Variable]
-    case _ => Register("TEST", BitVecType(1))
+    case _ => ???
   }
 
   def get_proc(target: ByteString, procedures: ArrayBuffer[Procedure]): Procedure = {
@@ -167,10 +168,10 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
     procedures = createJumps(procedures)
     val sections = mods.flatMap(_.sections)
 
-    val initialMemory: ArrayBuffer[MemorySection] = sections.map{elem =>
+    val initialMemory: ArrayBuffer[MemorySection] = sections.map {elem =>
       val bytes = elem.byteIntervals.head.contents.toByteArray.map(byte => BitVecLiteral(BigInt(byte), 8))
       MemorySection(elem.name, elem.byteIntervals.head.address.toInt, elem.byteIntervals.head.size.toInt, bytes.toSeq)
-        }.to(ArrayBuffer)
+    }.to(ArrayBuffer)
 
     val readOnlyMemory: ArrayBuffer[MemorySection] = ArrayBuffer() 
     val intialproc: Procedure = procedures.find(_.address.get == mainAddress).get
@@ -189,7 +190,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
 
     val in: ArrayBuffer[Parameter] = ArrayBuffer() // TODO: gtirb does not contain this -> Kirsten said static analysis
-    val out: ArrayBuffer[Parameter] = ArrayBuffer() // ditto above
+    val out: ArrayBuffer[Parameter] = ArrayBuffer(Parameter(name + "_result", 64, Register("R0", BitVecType(64))))
 
     return Procedure(name, address, blocks, in, out)
   }
@@ -239,12 +240,9 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
 
 
   def createSemantics(uuid: ByteString): ArrayBuffer[Statement] = {
-
-    var visitor = new SemanticsLoader(uuid, parser.semantics(), blkCount)
+    var visitor = new SemanticsLoader(uuid, parserMap, blkCount)
     val statements = visitor.createStatements()
-    parser.reset()
     return statements
-
   }
 
 
@@ -441,7 +439,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parser: Se
         b.statements.lastOption match { // remove "_PC" statement
           case Some(LocalAssign(lhs: Register, _, _)) if lhs.name == "_PC" =>
              b.statements.remove(b.statements.size - 1) 
-          case Some(TempIf(_, _, _, _, _)) =>
+          case Some(TempIf(_, _, _, _, _)) => // remove tempIF statement
             b.statements.remove(b.statements.size - 1) 
           case _ => // do Nothing
         }

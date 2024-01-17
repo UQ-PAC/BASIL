@@ -2,18 +2,6 @@ grammar Semantics;
 
 // See aslp/libASL/asl.ott for reference grammar Bap-ali-plugin/asli_lifer.ml may also be useful for
 // visitors
-semantics:
-	OPEN_CURLY (basic_blk (COMMA basic_blk)*)? CLOSE_CURLY EOF;
-
-basic_blk:
-	QUOTE uuid QUOTE COLON OPEN_BRACKET (
-		instruction (COMMA instruction)*
-	)? CLOSE_BRACKET;
-
-instruction:
-	OPEN_BRACKET (stmt_string (COMMA stmt_string)*)? CLOSE_BRACKET;
-
-stmt_string: QUOTE stmt QUOTE;
 
 stmt: assignment_stmt | call_stmt | conditional_stmt;
 
@@ -37,7 +25,7 @@ call_stmt:
 	)? CLOSE_BRACKET CLOSE_PAREN;
 
 conditional_stmt:
-	'Stmt_If' OPEN_PAREN expr COMMA OPEN_BRACKET (COMMA stmt)* COMMA? CLOSE_BRACKET COMMA 
+	'Stmt_If' OPEN_PAREN expr COMMA OPEN_BRACKET stmt* COMMA? CLOSE_BRACKET COMMA 
 		OPEN_BRACKET CLOSE_BRACKET COMMA (OPEN_PAREN 'else' conditional_stmt CLOSE_PAREN)? (OPEN_PAREN 'else' else_stmt CLOSE_PAREN)? CLOSE_PAREN;
 else_stmt: stmt;
 
@@ -63,11 +51,11 @@ expr:
 		CLOSE_BRACKET CLOSE_PAREN										# ExprSlices
 	| 'Expr_Field' OPEN_PAREN expr COMMA SSYMBOL CLOSE_PAREN			# ExprField
 	| 'Expr_Array' OPEN_PAREN expr (COMMA expr)* CLOSE_PAREN			# ExprArray
-	| 'Expr_LitInt' OPEN_PAREN SQUOTE (DEC | BINARY) SQUOTE CLOSE_PAREN	# ExprLitInt
-	| 'Expr_LitHex' OPEN_PAREN SQUOTE HEXDIGIT+ SQUOTE CLOSE_PAREN		# ExprLitHex
-	| 'Expr_LitBits' OPEN_PAREN SQUOTE BINARY SQUOTE CLOSE_PAREN		# ExprLitBits
-	| 'Expr_LitMask' OPEN_PAREN SQUOTE BINARY SQUOTE CLOSE_PAREN		# ExprLitMask
-	| 'Expr_LitString' OPEN_PAREN SQUOTE SSYMBOL SQUOTE CLOSE_PAREN		# ExprLitString;
+	| 'Expr_LitInt' OPEN_PAREN QUOTE (DEC | BINARY) QUOTE CLOSE_PAREN	# ExprLitInt
+	| 'Expr_LitHex' OPEN_PAREN QUOTE HEXDIGIT+ QUOTE CLOSE_PAREN		# ExprLitHex
+	| 'Expr_LitBits' OPEN_PAREN QUOTE BINARY QUOTE CLOSE_PAREN		# ExprLitBits
+	| 'Expr_LitMask' OPEN_PAREN QUOTE BINARY QUOTE CLOSE_PAREN		# ExprLitMask
+	| 'Expr_LitString' OPEN_PAREN QUOTE SSYMBOL QUOTE CLOSE_PAREN		# ExprLitString;
 
 targs: expr;
 
