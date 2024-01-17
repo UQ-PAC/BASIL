@@ -158,7 +158,7 @@ object RunUtils {
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
-    val cfg = ProgramCfgFactory().fromIR(IRProgram)
+    val cfg = ProgramCfgFactory().fromIR(IRProgram, inlineLimit = 0)
 
     val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
 
@@ -236,7 +236,7 @@ object RunUtils {
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
-    val livenessAnalysisResult = LivenessAnalysisWorklistSolver(cfg).analyze()
+    val livenessAnalysisResult = LiveVarIDEAnalysis(cfg).analyze()
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(livenessAnalysisResult, true), Output.dotIder), s"${s}_liveness$iteration.dot"))
 
 
