@@ -204,6 +204,34 @@ trait WorklistFixpointSolverWithReachability[N, T, L <: Lattice[T]] extends Work
   }
 }
 
+/**
+ * Common trait for pushdown worklist solvers
+ *
+ * @tparam N
+ *   type of the elements in the worklist.
+ * @tparam T Type of the elements in the sublattice
+ * @tparam L Sublattice
+ */
+trait PushDownWorklistFixPointFunctions[N, T, L <: Lattice[T]] extends LinkedHashSetWorklist[N]:
+
+  val lattice: MapLattice[N, T, L]
+
+  /** The current lattice element.
+   */
+  var x: Map[N, T] = _
+
+  /** Propagates lattice element y to node m.
+   * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L286
+   */
+  def propagate(y: T, m: N) = {
+    val xm = x(m)
+    val t = lattice.sublattice.lub(xm, y)
+    if (t != xm) {
+      add(m)
+      x += m -> t
+    }
+  }
+
 /** A pushDown worklist-based fixpoint solvers. Pushes the results of the analysis one node down. This is used to have
   * the results of the pred node in the current node. ie. NODE 1: R0 = 69551bv64 RESULT LATTICE = {} NODE 2: R0 =
   * MemLoad[R0 + 54bv64] RESULT LATTICE = {R0 = 69551bv64} NODE 3: R1 = 0bv64 RESULT LATTICE = {R0 = TOP} ...
@@ -214,22 +242,7 @@ trait WorklistFixpointSolverWithReachability[N, T, L <: Lattice[T]] extends Work
   * Better implementation of the same thing
   * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L311
   */
-trait PushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, T, L] with LinkedHashSetWorklist[N] with Dependencies[N]:
-  /** The current lattice element.
-    */
-  var x: Map[N, T] = _
-
-  /** Propagates lattice element y to node m.
-    * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L286
-    */
-  def propagate(y: T, m: N): Unit = {
-    val xm = x(m)
-    val t = lattice.sublattice.lub(xm, y)
-    if (t != xm) {
-      add(m)
-      x += m -> t
-    }
-  }
+trait PushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends MapLatticeSolver[N, T, L] with PushDownWorklistFixPointFunctions[N, T, L] with Dependencies[N]:
 
   def process(n: N): Unit =
     val xn = x(n)
@@ -261,24 +274,20 @@ trait SimplePushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends PushDo
     run(domain)
     x
 
-trait WorklistFixPointFunctions[N, T, L <: Lattice[T]]  extends  LinkedHashSetWorklist[N]:
 
-  val lattice: MapLattice[N, T, L]
-
-  var x: Map[N, T]
+/**
+ * Push down worklist solver that maps first to init
+ *
+ * @tparam N
+ *   type of the elements in the worklist.
+ * @tparam T Type of the elements in the sublattice
+ * @tparam L Sublattice
+ */
+trait InitializingPushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends PushDownWorklistFixPointFunctions[N, T, L]:
 
   val first: Set[N]
 
   def init: T
-
-  def propagate(y: T, m: N) = {
-    val xm = x(m)
-    val t = lattice.sublattice.lub(xm, y)
-    if (t != xm) {
-      add(m)
-      x += m -> t
-    }
-  }
 
   def analyze(): Map[N, T] = {
     x = first.foldLeft(lattice.bottom) { (l, cur) =>
