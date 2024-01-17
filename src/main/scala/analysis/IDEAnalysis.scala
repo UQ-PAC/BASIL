@@ -34,7 +34,7 @@ trait IDEAnalysis[D, T, L <: Lattice[T]] {
   /**
    * Edges for exit-to-aftercall.
    */
-  def edgesExitToAfterCall(exit: CfgProcedureReturnNode, aftercall: CfgCallReturnNode)(d: DL): Map[DL, edgelattice.Element]
+  def edgesExitToAfterCall(exit: CfgFunctionExitNode, aftercall: CfgCallReturnNode)(d: DL): Map[DL, edgelattice.Element]
 
   /**
    * Edges for call-to-aftercall.
