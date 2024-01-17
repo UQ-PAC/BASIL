@@ -143,7 +143,7 @@ object RunUtils {
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
-    val cfg = ProgramCfgFactory().fromIR(IRProgram)
+    val cfg = ProgramCfgFactory().fromIR(IRProgram, inlineLimit = 0)
 
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationSolver(cfg)
@@ -183,7 +183,7 @@ object RunUtils {
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
-    val livenessAnalysisResult = LivenessAnalysisWorklistSolver(cfg).analyze()
+    val livenessAnalysisResult = LiveVarIDEAnalysis(cfg).analyze()
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(livenessAnalysisResult, true), Output.dotIder), s"${s}_liveness$iteration.dot"))
 
 

@@ -2,7 +2,7 @@ package analysis
 
 import scala.collection.mutable
 
-class CfgIDECache extends IntraproceduralForwardDependencies {
+class CfgIDECache {
 
   val entryExitMap: BiMap[CfgFunctionEntryNode, CfgProcedureReturnNode] = new BiMap[CfgFunctionEntryNode, CfgProcedureReturnNode]
   val callReturnMap: BiMap[CfgJumpNode, CfgCallReturnNode] = new BiMap[CfgJumpNode, CfgCallReturnNode]
@@ -11,8 +11,6 @@ class CfgIDECache extends IntraproceduralForwardDependencies {
   private var traversed: Set[CfgNode] = Set()
 
   def cacheCfg(cfg: ProgramCfg) = {
-
-    println(cfg.funEntries)
 
     cfg.funEntries.foreach(entry => {
       traversed = Set()
@@ -56,14 +54,14 @@ class CfgIDECache extends IntraproceduralForwardDependencies {
       case exit: CfgProcedureReturnNode =>
         entryExitMap.addOne((entry, exit))
       case call: CfgJumpNode =>
-        outdep(call).foreach {
+        call.succIntra.foreach {
           case ret: CfgCallReturnNode =>
             callReturnMap.addOne((call, ret))
             traverse(entry, ret)
           case node => traverse(entry, node)
         }
       case node =>
-        outdep(node).foreach{child => traverse(entry, child)}
+        node.succIntra.foreach{child => traverse(entry, child)}
   }
 }
 
