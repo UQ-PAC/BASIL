@@ -4,10 +4,10 @@ import scala.collection.mutable
 
 class CfgIDECache {
 
-  val entryExitMap: BiMap[CfgFunctionEntryNode, CfgProcedureReturnNode] = new BiMap[CfgFunctionEntryNode, CfgProcedureReturnNode]
+  val entryExitMap: BiMap[CfgFunctionEntryNode, CfgFunctionExitNode] = new BiMap[CfgFunctionEntryNode, CfgFunctionExitNode]
   val callReturnMap: BiMap[CfgJumpNode, CfgCallReturnNode] = new BiMap[CfgJumpNode, CfgCallReturnNode]
   val callees: BiMap[CfgJumpNode, CfgFunctionEntryNode] = new BiMap[CfgJumpNode, CfgFunctionEntryNode]
-  val afterCall: mutable.Map[CfgProcedureReturnNode, Set[CfgCallReturnNode]] = mutable.Map[CfgProcedureReturnNode, Set[CfgCallReturnNode]]()
+  val afterCall: mutable.Map[CfgFunctionExitNode, Set[CfgCallReturnNode]] = mutable.Map[CfgFunctionExitNode, Set[CfgCallReturnNode]]()
   private var traversed: Set[CfgNode] = Set()
 
   def cacheCfg(cfg: ProgramCfg) = {
@@ -28,18 +28,13 @@ class CfgIDECache {
         val oldAfterCalls = afterCall.getOrElse(exit, Set())
         try {
           afterCall.put(exit, oldAfterCalls + callReturnMap(callees(entry)))
+          if (!exit.succInter.contains(callReturnMap(callees(entry)))) {
+            cfg.addInterprocCallEdge(exit, callReturnMap(callees(entry)))
+          }
         } catch
           case _: NoSuchElementException =>
           case e => throw e
     }
-
-//    entryExitMap.codomain.foreach(exit => exit.succInter.foreach {
-//      case s: CfgCallReturnNode =>
-//        val oldAfterCalls = afterCall.getOrElse(exit, Set())
-//        afterCall.put(exit, oldAfterCalls + s)
-//      case _ =>
-//    })
-
   }
 
   private def traverse(entry: CfgFunctionEntryNode, cfgNode: CfgNode): Unit = {
@@ -50,8 +45,8 @@ class CfgIDECache {
     }
 
     cfgNode match
-      case _: CfgFunctionExitNode =>
-      case exit: CfgProcedureReturnNode =>
+//      case _: CfgFunctionExitNode =>
+      case exit: CfgFunctionExitNode =>
         entryExitMap.addOne((entry, exit))
       case call: CfgJumpNode =>
         call.succIntra.foreach {
