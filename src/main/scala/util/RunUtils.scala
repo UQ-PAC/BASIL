@@ -191,7 +191,9 @@ object RunUtils {
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
-    val livenessAnalysisResult = LiveVarIDEAnalysis(cfg).analyze()
+    val cache = CfgIDECache()
+    cache.cacheCfg(cfg)
+    val livenessAnalysisResult = LiveVarIDEAnalysis(cfg, cache).analyze()
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(livenessAnalysisResult, true), Output.dotIder), s"${s}_liveness$iteration.dot"))
 
 

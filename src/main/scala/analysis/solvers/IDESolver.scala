@@ -1,13 +1,13 @@
 package analysis.solvers
 
-import analysis.{CfgCallReturnNode, CfgFunctionEntryNode, CfgIDECache, CfgJumpNode, CfgNode, CfgProcedureReturnNode, EdgeFunction, EdgeFunctionLattice, IDEAnalysis, Lambda, Lattice, MapLattice, ProgramCfg}
+import analysis.{CfgCallReturnNode, CfgFunctionEntryNode, CfgFunctionExitNode, CfgIDECache, CfgJumpNode, CfgNode, CfgProcedureReturnNode, EdgeFunction, EdgeFunctionLattice, IDEAnalysis, Lambda, Lattice, MapLattice, ProgramCfg}
 import ir.Procedure
 
 import scala.collection.mutable
 
 
 
-abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg)
+abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg, val cache: CfgIDECache)
   extends IDEAnalysis[D, T, L]
 {
   class Phase1(val cfg: ProgramCfg) extends WorklistFixPointFunctions[(CfgNode, DL , DL), EdgeFunction[T], EdgeFunctionLattice[T, valuelattice.type]]
@@ -19,8 +19,6 @@ abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg)
 
     val first: Set[(CfgNode, DL, DL)] = Set((cfg.startNode, Right(Lambda()), Right(Lambda())))
 
-    val cache = CfgIDECache()
-    cache.cacheCfg(cfg)
 
     private val callJumpCache = mutable.Map[(CfgFunctionEntryNode, DL, CfgJumpNode), mutable.Map[DL, EdgeFunction[T]]]()
     private val exitJumpCache = mutable.Map[(CfgFunctionEntryNode, DL), mutable.Set[DL]]()
@@ -38,7 +36,7 @@ abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg)
 
     def init: EdgeFunction[T] = IdEdge()
 
-    private def returnflow(d1: DL, d2: DL, funexit: CfgProcedureReturnNode, aftercall: CfgCallReturnNode): Unit = {
+    private def returnflow(d1: DL, d2: DL, funexit: CfgFunctionExitNode, aftercall: CfgCallReturnNode): Unit = {
       callJumpCache.getOrElseUpdate((cache.entryExitMap(funexit), d1, cache.callReturnMap(aftercall)), mutable.Map[DL, EdgeFunction[T]]()).foreach {
         case (d3, e12) => // d3 is now an item at the caller function entry, and e12 is the composed edge to d1 at the callee entry
           val e3 = x(funexit, d1, d2) // summary edge from d1 to d2 at the callee function
@@ -85,28 +83,13 @@ abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg)
                     }
                 }
 
-            case exit: CfgProcedureReturnNode =>
+            case exit: CfgFunctionExitNode =>
               try
-                cache.afterCall(exit).foreach(afterCall =>
-                  returnflow(d1, d2, exit, afterCall)
-                  // TODO
-                  if (!exit.succInter.contains(afterCall)) {
-                    cfg.addInterprocCallEdge(exit, afterCall)
-                  }
-
-                )
+                cache.afterCall(exit).foreach(afterCall => returnflow(d1, d2, exit, afterCall))
                 storeExitJump(cache.entryExitMap(exit), d1, d2)
               catch
                 case _: NoSuchElementException =>
                 case e => throw e
-
-              edgesOther(node)(d2).foreach {
-                case (d3, e2) =>
-                  val e3 = e2.composeWith(e1)
-                  node.succInter.foreach { m =>
-                    propagate(e3, (m, d1, d3))
-                  }
-              }
 
             case _ =>
               edgesOther(node)(d2).foreach {
@@ -125,7 +108,7 @@ abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg)
       x.foreach {
         case ((n, d1, d2), e) =>
           n match {
-            case exit: CfgProcedureReturnNode =>
+            case exit: CfgFunctionExitNode =>
               val proc = cache.entryExitMap(exit).data
               val m1 = res.getOrElseUpdate(proc, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]().withDefaultValue(mutable.Map[DL, EdgeFunction[T]]()))
               val m2 = m1.getOrElseUpdate(d1, mutable.Map[DL, EdgeFunction[T]]())
@@ -152,15 +135,15 @@ abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg)
           node match {
             // function call nodes
             case call: CfgJumpNode =>
-              if phase1.cache.callReturnMap.forwardMap.contains(call) then
-                val afterCallNode = phase1.cache.callReturnMap(call)
-                val entry = phase1.cache.callees(call)
+              if cache.callReturnMap.forwardMap.contains(call) then
+                val afterCallNode = cache.callReturnMap(call)
+                val entry = cache.callees(call)
                 edgesCallToEntry(call, entry)(d).foreach {
                   case (d2, e) =>
                     propagate(e(xnd), (entry, d2))
                     summaries(entry.data)(d2).foreach {
                       case (d3, e2) =>
-                        edgesExitToAfterCall(phase1.cache.entryExitMap(entry), afterCallNode)(d3).foreach {
+                        edgesExitToAfterCall(cache.entryExitMap(entry), afterCallNode)(d3).foreach {
                           case (d4, e3) =>
                             propagate(e3(e2(e(xnd))), (afterCallNode, d4))
                         }

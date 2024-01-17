@@ -13,7 +13,7 @@ trait LiveVarAnalysisFunctions extends IDEAnalysis[Variable, FlatElement[Nothing
     Map(d -> IdEdge())
   }
 
-  def edgesExitToAfterCall(exit: CfgProcedureReturnNode, aftercall: CfgCallReturnNode)(d: DL): Map[DL, edgelattice.Element] = {
+  def edgesExitToAfterCall(exit: CfgFunctionExitNode, aftercall: CfgCallReturnNode)(d: DL): Map[DL, edgelattice.Element] = {
     Map(d -> IdEdge())
   }
 
@@ -74,5 +74,5 @@ trait LiveVarAnalysisFunctions extends IDEAnalysis[Variable, FlatElement[Nothing
   }
 }
 
-class LiveVarIDEAnalysis(cfg: ProgramCfg)
-  extends IDESolver[Variable, FlatElement[Nothing] ,TwoElementLattice](cfg), LiveVarAnalysisFunctions
+class LiveVarIDEAnalysis(cfg: ProgramCfg, cache: CfgIDECache)
+  extends IDESolver[Variable, FlatElement[Nothing] ,TwoElementLattice](cfg, cache), LiveVarAnalysisFunctions
