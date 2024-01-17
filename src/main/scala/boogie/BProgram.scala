@@ -1,12 +1,27 @@
 package boogie
+import java.io.{StringWriter, Writer}
 
 case class BProgram(declarations: List[BDeclaration]) {
-  override def toString: String = declarations.flatMap(x => x.toBoogie).mkString("\n")
+  override def toString: String = declarations.flatMap(x => x.toBoogie).mkString(System.lineSeparator())
+
+  def writeToString(w: Writer): Unit = {
+    declarations.foreach(x => {
+      x.writeToString(w)
+    })
+  }
 }
 
 trait BDeclaration extends HasAttributes {
   override def attributes: List[BAttribute] = List()
   def toBoogie: List[String] = List(toString)
+
+  final def writeToString(w: Writer): Unit = {
+    for (elem <- toBoogie) {
+      w.append(elem)
+      w.append(System.lineSeparator())
+    }
+  }
+
 }
 
 case class BProcedure(
@@ -27,12 +42,12 @@ case class BProcedure(
   override def compare(that: BProcedure): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
     val header = s"procedure $attrString$name(${in.map(_.withType).mkString(", ")})"
+    val implHeader = s"implementation $attrString$name(${in.map(_.withType).mkString(", ")})"
     val returns = if (out.nonEmpty) {
       s" returns (${out.map(_.withType).mkString(", ")})"
     } else {
       ""
     }
-    val semicolon = if body.nonEmpty then "" else ";"
     val modifiesStr = if (modifies.nonEmpty) {
       List(s"  modifies ${modifies.toSeq.sorted.mkString(", ")};")
     } else {
@@ -49,9 +64,17 @@ case class BProcedure(
     } else {
       List()
     }
-    List(
-      header + returns + semicolon
-    ) ++ modifiesStr ++ requiresStrs ++ freeRequiresStrs ++ ensuresStrs ++ freeEnsuresStrs ++ bodyStr ++ List("")
+
+    val procDecl = s"$header$returns;"
+    val procList = List(procDecl) ++ modifiesStr ++ requiresStrs ++ freeRequiresStrs ++ ensuresStrs ++ freeEnsuresStrs
+    val implDecl = s"$implHeader$returns"
+    val implList = if (body.nonEmpty) {
+      List("", implDecl) ++ bodyStr
+    } else {
+      List()
+    }
+
+    procList ++ implList ++ List("")
   }
   override def toString: String = toBoogie.mkString("\n")
   def functionOps: Set[FunctionOp] =
@@ -72,12 +95,21 @@ case class BFunction(name: String, in: List[BVar], out: BVar, body: Option[BExpr
     with Ordered[BFunction] {
   override def compare(that: BFunction): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
+    val s = new StringWriter()
+
     val inString = in.map(_.withType).mkString(", ")
     val declString = s"function $attrString$name($inString) returns (${out.withType})"
-    body match {
-      case Some(b) => List(declString + " {", "  " + b.toString, "}", "")
-      case None    => List(declString + ";")
+    s.append(declString)
+
+    val decl = body match {
+      case Some(b) =>
+        s.append(" {" + System.lineSeparator() + "  ")
+        b.serialiseBoogie(s)
+        s.append(System.lineSeparator())
+        s.append("}" + System.lineSeparator())
+      case None    => s.append(";")
     }
+    List(s.toString)
   }
   override def toString: String = toBoogie.mkString("\n")
   def functionOps: Set[FunctionOp] = body match {
