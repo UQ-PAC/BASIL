@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.IDESolver
-import ir.{Assert, Assume, IndirectCall, LocalAssign, MemoryAssign, Register, Variable}
+import ir.{Assert, Assume, DirectCall, GoTo, IndirectCall, LocalAssign, MemoryAssign, Register, Variable}
 
 trait LiveVarAnalysisFunctions extends IDEAnalysis[Variable, FlatElement[Nothing] ,TwoElementLattice] {
 
@@ -63,11 +63,13 @@ trait LiveVarAnalysisFunctions extends IDEAnalysis[Variable, FlatElement[Nothing
           case _ => ???
         }
 
-      case IndirectCall(variable, maybeBlock, maybeString) =>
-        d match
-          case Left(value) => Map(d -> IdEdge())
-          case Right(_) => Map(Left(variable) -> ConstEdge(Top))
-
+      case node: CfgJumpNode =>
+        node.data match
+          case IndirectCall(variable, maybeBlock, maybeString) =>
+            d match
+              case Left(value) => Map(d -> IdEdge())
+              case Right(_) => Map(d -> IdEdge(), Left(variable) -> ConstEdge(Top))
+          case _ => Map(d -> IdEdge())
 
       case _ => Map(d -> IdEdge())
     }
