@@ -142,6 +142,24 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     procedures.find(_.name == create_names(key)).get
   }
 
+  def create_arguments(name: String): ArrayBuffer[Parameter] = {
+    val args = ArrayBuffer.newBuilder[Parameter]
+    var regNum = 0 
+
+    if (name == "main") {
+      args += Parameter("main_argc", 64, Register("R0", BitVecType(64)))
+      args += Parameter("main_argv", 64, Register("R1", BitVecType(64)))
+      regNum = 2
+    }
+
+    while (regNum < 8) {
+      args += Parameter(name + "_arg" + (regNum + 1), 64, Register("R" + regNum, BitVecType(64)))
+      regNum += 1
+    }
+
+    args.result()
+  }
+
 
 
   //TODO: mods.head may not work here if multiple modules, in which case decoder needs to change
@@ -188,9 +206,10 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     
     val address: Option[Int] = addresses.get(functionEntries(uuid).head);
 
-
-    val in: ArrayBuffer[Parameter] = ArrayBuffer() // TODO: gtirb does not contain this -> Kirsten said static analysis
-    val out: ArrayBuffer[Parameter] = ArrayBuffer(Parameter(name + "_result", 64, Register("R0", BitVecType(64))))
+    //TODO: function arguments are hardcoded, it's impossible to determine whether a function returns or not. 
+      //Function arguments may also be determined through modified liveness analysi but :/
+    val in: ArrayBuffer[Parameter] = create_arguments(name)
+    val out: ArrayBuffer[Parameter] = ArrayBuffer(Parameter(name + "_result", 64, Register("R0", BitVecType(64)))) 
 
     return Procedure(name, address, blocks, in, out)
   }
@@ -246,7 +265,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
   }
 
 
-  def handle_long_if(blk: Block): ArrayBuffer[Block] = {
+  def handle_long_if(blk: Block): ArrayBuffer[Block] = { //NOTE: This will only handle ONE longif currently. To make it do more, make the function recursive. (or think of some better way)
 
     val get_ByteString: String => ByteString = uuid => ByteString.copyFrom(Base64.getDecoder().decode(uuid))
 
@@ -279,13 +298,6 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
         block
       }
 
-      val label = get_blkLabel(blk.label, blkCount)
-      val elseBlk = Block(label, blk.address, ArrayBuffer(ifStmt.elseStatement.get), GoTo(ArrayBuffer[Block](endBlk), None))
-      blkMap += (get_ByteString(elseBlk.label) -> elseBlk)
-      val falseBlks = (startblk +: tempFalseBlks.toList).to(ArrayBuffer) += elseBlk
-      blkCount += 1
-
-      
       val trueBlks: ArrayBuffer[Block] = ifStmt.stmts.map { stmts =>
         val label = get_blkLabel(blk.label, blkCount)
         val block = Block(label, blk.address, stmts, GoTo(ArrayBuffer[Block](endBlk), None))
@@ -293,6 +305,12 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
         blkCount += 1 
         block
       }
+
+      val label = get_blkLabel(blk.label, blkCount)
+      val elseBlk = Block(label, blk.address, ArrayBuffer(ifStmt.elseStatement.get), GoTo(ArrayBuffer[Block](endBlk), None))
+      blkMap += (get_ByteString(elseBlk.label) -> elseBlk)
+      val falseBlks = (startblk +: tempFalseBlks.toList).to(ArrayBuffer) += elseBlk
+      blkCount += 1
 
       for (i <- 0 until falseBlks.size - 1) {
         val ifEdge = proto.CFG.Edge(get_ByteString(falseBlks(i).label), get_ByteString(trueBlks(i).label), Option(proto.CFG.EdgeLabel(false, false, proto.CFG.EdgeType.Type_Branch)))
