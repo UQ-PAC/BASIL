@@ -18,7 +18,6 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
-import SSAForm.*
 
 import scala.collection.mutable
 
@@ -143,8 +142,8 @@ object RunUtils {
     Logger.info(subroutines)
 
     val mergedSubroutines = subroutines ++ externalAddresses
-    applySSA(IRProgram)
-    val cfg = ProgramCfgFactory().fromIR(IRProgram)
+
+    var cfg = ProgramCfgFactory().fromIR(IRProgram)
 
     Logger.info("[!] Running ANR")
     val ANRSolver = ANRAnalysisSolver(cfg)
@@ -159,6 +158,11 @@ object RunUtils {
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(RNAResult, true), Output.dotIder), s"${s}_RNA$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, RNAResult, iteration), s"${s}_RNA$iteration.txt"))
+
+    val ssaResolver = SSAForm(cfg, ANRResult, RNAResult)
+    ssaResolver.applySSA()
+    cfg = ProgramCfgFactory().fromIR(IRProgram)
+
 
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationSolver(cfg)
