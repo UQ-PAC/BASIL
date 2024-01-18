@@ -299,6 +299,8 @@ class ProgramCfg:
 
       successors.foreach { s =>
         (n, s) match {
+          case (from: CfgNode, to: CfgNode) =>
+            dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
           case (from: CfgFunctionEntryNode, to: CfgNode) =>
             dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
           case (from: CfgJumpNode, to: CfgProcedureReturnNode) =>
@@ -311,10 +313,12 @@ class ProgramCfg:
             dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
 
           case (from: CfgCommandNode, to: CfgFunctionEntryNode) =>
-            DotInlineArrow(dotNodes(n), dotNodes(to))
+//            DotInlineArrow(dotNodes(n), dotNodes(to))
+            dotArrows += DotInterArrow(dotNodes(n), dotNodes(to))
 
           case (from: CfgFunctionExitNode, to: CfgNode) =>
-            DotInlineArrow(dotNodes(n), dotNodes(to))
+//            DotInlineArrow(dotNodes(n), dotNodes(to))
+            dotArrows += DotInterArrow(dotNodes(n), dotNodes(to))
 
           case (from: CfgJumpNode, to: (CfgCallReturnNode | CfgCallNoReturnNode)) =>
             dotArrows += DotIntraArrow(dotNodes(n), dotNodes(to))
@@ -325,6 +329,13 @@ class ProgramCfg:
           case (from: CfgCommandNode, to: CfgFunctionEntry) =>
             dotArrows += DotInterArrow(dotNodes(n), dotNodes(to))
             */
+
+//          case (from: CfgProcedureReturnNode, to: CfgJumpNode) =>
+//            dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
+//          case (from: CfgCommandNode, to: CfgCallReturnNode) => //TODO
+//            dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
+//          case (from: (CfgProcedureReturnNode | CfgCallNoReturnNode | CfgCallReturnNode), to: CfgJumpNode) =>
+//            dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
           case _ =>
         }
       }
