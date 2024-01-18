@@ -30,7 +30,7 @@ case class RegisterVariableWrapper(variable: Variable) extends VariableWrapper {
 /** Steensgaard-style pointer analysis. The analysis associates an [[StTerm]] with each variable declaration and
   * expression node in the AST. It is implemented using [[tip.solvers.UnionFindSolver]].
   */
-class SteensgaardAnalysis(
+class InterprocSteensgaardAnalysis(
       cfg: ProgramCfg,
       constantProp: Map[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]]],
       globals: Map[BigInt, String],
@@ -48,6 +48,7 @@ class SteensgaardAnalysis(
   var mallocCount: Int = 0
   var stackCount: Int = 0
   val stackMap: mutable.Map[CfgFunctionEntryNode, mutable.Map[Expr, StackRegion]] = mutable.Map()
+  val spList = ListBuffer[Expr](stackPointer)
 
   private def nextMallocCount() = {
     mallocCount += 1
@@ -67,12 +68,12 @@ class SteensgaardAnalysis(
    * @param parent : the function entry node
    * @return the stack region corresponding to the offset
    */
-  def poolMaster(expr: BitVecLiteral, parent: CfgFunctionEntryNode): StackRegion = {
+  def poolMaster(expr: BitVecLiteral, parent: CfgFunctionEntryNode, stackBase: RegisterVariableWrapper): StackRegion = {
     val stackPool = stackMap.getOrElseUpdate(parent, mutable.HashMap())
     if (stackPool.contains(expr)) {
       stackPool(expr)
     } else {
-      val newRegion = StackRegion(nextStackCount(), expr)
+      val newRegion = StackRegion(nextStackCount(), expr, stackBase)
       stackPool += (expr -> newRegion)
       newRegion
     }
@@ -97,22 +98,41 @@ class SteensgaardAnalysis(
     buffers
   }
 
+  def stackDetection(stmt: Statement): Unit = {
+    println("Stack detection")
+    println(spList)
+    stmt match {
+      case localAssign: LocalAssign =>
+        if (spList.contains(localAssign.rhs)) {
+          // add lhs to spList
+          spList.addOne(localAssign.lhs)
+        } else {
+          // remove lhs from spList
+          if spList.contains(localAssign.lhs) && localAssign.lhs != stackPointer then // TODO: This is a hack: it should check for stack ptr using the wrapper
+            spList.remove(spList.indexOf(localAssign.lhs))
+          else if spList.contains(localAssign.lhs) then {
+            println("Not removing stack pointer")
+          }
+        }
+        // should handle the store case (last case)
+      case _ =>
+    }
+  }
+
   def eval(exp: Expr, n: CfgCommandNode): Set[MemoryRegion] = {
     Logger.debug(s"evaluating $exp")
     Logger.debug(s"n: $n")
     var regions = Set[MemoryRegion]()
     exp match {
       case binOp: BinaryExpr =>
-        if (binOp.arg1 == stackPointer) {
+        if (spList.contains(binOp.arg1)) {
           evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach(
-            b => regions += poolMaster(b, n.parent)
+            b => regions += poolMaster(b, n.parent, RegisterVariableWrapper(binOp.arg1.asInstanceOf[Register]))
           )
-            regions
         } else {
           evaluateExpressionWithSSA(binOp, constantProp(n)).foreach(
               b => regions = regions ++ eval(b, n)
           )
-            regions
         }
       case bitVecLiteral: BitVecLiteral =>
         if (globals.contains(bitVecLiteral.value)) {
@@ -137,19 +157,17 @@ class SteensgaardAnalysis(
       case variable: Variable =>
         variable match {
           case _: LocalVar =>
-            Set()
-          case reg: Register if reg == stackPointer =>
-            Set()
+          case reg: Register if spList.contains(reg) =>
           case _ =>
             evaluateExpressionWithSSA(variable, constantProp(n)).foreach(
               b => regions = regions ++ eval(b, n)
             )
-            regions
         }
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")
         throw new Exception("Unknown type")
     }
+    regions
   }
 
 
@@ -170,7 +188,6 @@ class SteensgaardAnalysis(
     def varToStTerm(vari: VariableWrapper): Term[StTerm] = IdentifierVariable(vari)
     def exprToStTerm(expr: MemoryRegion | Expr): Term[StTerm] = ExpressionVariable(expr)
     def allocToTerm(alloc: MemoryRegion): Term[StTerm] = AllocVariable(alloc)
-    //def identifierToTerm(id: AIdentifier): Term[StTerm] = IdentifierVariable(id)
 
     n match {
       case cmd: CfgCommandNode =>
@@ -181,13 +198,15 @@ class SteensgaardAnalysis(
               val alloc = HeapRegion(nextMallocCount(), BitVecLiteral(BigInt(0), 0))
               unify(varToStTerm(RegisterVariableWrapper(mallocVariable)), PointerRef(allocToTerm(alloc)))
             }
+
           case localAssign: LocalAssign =>
+            stackDetection(localAssign)
             localAssign.rhs match {
               case binOp: BinaryExpr =>
                 // X1 = &X2: [[X1]] = ↑[[X2]]
                 if (binOp.arg1 == stackPointer) {
                   evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach(
-                    b => unify(varToStTerm(RegisterVariableWrapper(localAssign.lhs)), PointerRef(allocToTerm(poolMaster(b, cmd.parent))))
+                    b => unify(varToStTerm(RegisterVariableWrapper(localAssign.lhs)), PointerRef(allocToTerm(poolMaster(b, cmd.parent, RegisterVariableWrapper(binOp.arg1.asInstanceOf[Register])))))
                   )
                 }
               // TODO: should lookout for global base + offset case as well
@@ -221,9 +240,13 @@ class SteensgaardAnalysis(
             // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
             val X1_star = eval(memoryAssign.rhs.index, cmd)
             val X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(n))
+            println("X2 is: " + X2)
+            println("Evaluated: " + memoryAssign.rhs.value)
+            println("Region " + X1_star)
+            println("Index " + memoryAssign.rhs.index)
             val alpha = FreshVariable()
             X1_star.foreach(
-              x => 
+              x =>
                 unify(exprToStTerm(x), PointerRef(alpha))
                 x.content.addAll(X2)
             )
@@ -244,9 +267,11 @@ class SteensgaardAnalysis(
     ) // note that unification cannot fail, because there is only one kind of term constructor and no constants
   }
 
+  type PointsToGraph = Map[Object, Set[VariableWrapper | MemoryRegion]]
+
   /** @inheritdoc
     */
-  def pointsTo(): Map[Object, Set[VariableWrapper | MemoryRegion]] = {
+  def pointsTo(): PointsToGraph = {
     val solution = solver.solution()
     val unifications = solver.unifications()
     Logger.info(s"Solution: \n${solution.mkString(",\n")}\n")

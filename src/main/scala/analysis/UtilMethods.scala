@@ -53,7 +53,7 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
 }
 
 def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariableWrapper, Set[BitVecLiteral]]): Set[BitVecLiteral] = {
-  Logger.debug(s"evaluateExpression: $exp")
+  Logger.info(s"evaluateExpression: $exp")
 
   def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
     val res = for {
