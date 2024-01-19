@@ -83,3 +83,35 @@ trait LiveVarAnalysisFunctions extends IDEAnalysis[Variable, FlatElement[Nothing
 
 class LiveVarIDEAnalysis(cfg: ProgramCfg, cache: CfgIDECache)
   extends IDESolver[Variable, FlatElement[Nothing] ,TwoElementLattice](cfg, cache), LiveVarAnalysisFunctions
+
+/**
+ * Wrapper class for LiveVarIDEAnalysis
+ * @param cfg Program Cfg
+ */
+class LiveVarAnalysis(cfg: ProgramCfg) {
+  /**
+   * Live Variable Analysis
+   * Cfg is manipulated for the Analysis (Added edges from fun exit to call return nodes)
+   * @return Analysis Result
+   */
+  def analyze(): Map[CfgNode, Map[Variable, FlatElement[Nothing]]] = {
+    val cache = CfgIDECache()
+    cache.cacheCfg(cfg)
+    cache.reverseCfg(cfg)
+    var livenessAnalysisResult = LiveVarIDEAnalysis(cfg, cache).analyze()
+    cache.entryExitMap.forwardMap.foreach(
+      (entry, exit) =>
+        val exitResult = livenessAnalysisResult.getOrElse(entry, Map())
+        val entryResult = livenessAnalysisResult.getOrElse(exit, Map())
+        livenessAnalysisResult = livenessAnalysisResult + (entry -> entryResult, exit -> exitResult)
+    )
+    cache.callReturnMap.forwardMap.foreach(
+      (call, ret) =>
+        val retResult = livenessAnalysisResult.getOrElse(call, Map())
+        val callResult = livenessAnalysisResult.getOrElse(ret, Map())
+        livenessAnalysisResult = livenessAnalysisResult + (call -> callResult, ret -> retResult)
+    )
+    cache.reverseCfg(cfg)
+    livenessAnalysisResult
+  }
+}
