@@ -7,6 +7,11 @@ object BiMap {
   implicit object MethodDistinctor extends MethodDistinctor
 }
 
+/**
+ * Bi Directional Map
+ * @tparam X
+ * @tparam Y
+ */
 class BiMap[X, Y] {
   val forwardMap: mutable.Map[X, Y] = mutable.Map[X, Y]()
   val backwardMap: mutable.Map[Y, X] = mutable.Map[Y, X]()
@@ -20,7 +25,7 @@ class BiMap[X, Y] {
 
   def apply(x: X): Y = forwardMap(x)
   def apply(y: Y)(implicit d: BiMap.MethodDistinctor): X = backwardMap(y)
-  
+
   override def toString: String = forwardMap.toString
 
 }
