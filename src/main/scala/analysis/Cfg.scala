@@ -299,7 +299,7 @@ class ProgramCfg:
 
       successors.foreach { s =>
         (n, s) match {
-          case (from: CfgNode, to: CfgNode) =>
+          case (from: CfgNode, to: CfgNode) => // Shows all edges in the cfg for debugging
             dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
           case (from: CfgFunctionEntryNode, to: CfgNode) =>
             dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
@@ -330,12 +330,6 @@ class ProgramCfg:
             dotArrows += DotInterArrow(dotNodes(n), dotNodes(to))
             */
 
-//          case (from: CfgProcedureReturnNode, to: CfgJumpNode) =>
-//            dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
-//          case (from: CfgCommandNode, to: CfgCallReturnNode) => //TODO
-//            dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
-//          case (from: (CfgProcedureReturnNode | CfgCallNoReturnNode | CfgCallReturnNode), to: CfgJumpNode) =>
-//            dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
           case _ =>
         }
       }

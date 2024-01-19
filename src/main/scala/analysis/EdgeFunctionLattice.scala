@@ -2,6 +2,7 @@ package analysis
 
 /**
  * Adapted from Tip
+ * https://github.com/cs-au-dk/TIP/blob/master/src/tip/lattices/EdgeFunctionLattice.scala
  * An "edge" represents a function L -> L where L is the value lattice.
  */
 trait EdgeFunction[T] extends (T => T) {

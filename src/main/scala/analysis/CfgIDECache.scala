@@ -4,15 +4,31 @@ import ir.DirectCall
 
 import scala.collection.mutable
 
+/**
+ * Utility class for IDE solver
+ */
 class CfgIDECache {
 
+  // Maps functions starts to function exit nodes
   val entryExitMap: BiMap[CfgFunctionEntryNode, CfgFunctionExitNode] = new BiMap[CfgFunctionEntryNode, CfgFunctionExitNode]
+
+  // Maps Direct Jump nodes to Call Return Sites
   val callReturnMap: BiMap[CfgJumpNode, CfgCallReturnNode] = new BiMap[CfgJumpNode, CfgCallReturnNode]
+
+  // Maps a direct call to a function entry node
   val callees: BiMap[CfgJumpNode, CfgFunctionEntryNode] = new BiMap[CfgJumpNode, CfgFunctionEntryNode]
+
+  // Maps exit node to its successor set of Call return nodes
   val afterCall: mutable.Map[CfgFunctionExitNode, Set[CfgCallReturnNode]] = mutable.Map[CfgFunctionExitNode, Set[CfgCallReturnNode]]()
+
   private var traversed: Set[CfgNode] = Set()
   private var reversed: Set[CfgNode] = Set()
 
+  /**
+   * Reverses Cfg by swapping the direction of edges for backward Analyses using the IDE solver
+   * Swaps places of Function entry/exit and call/return nodes
+   * @param cfg Program Cfg
+   */
   def reverseCfg(cfg: ProgramCfg) = {
     entryExitMap.forwardMap.foreach(
       (entry, exit) =>
@@ -50,7 +66,6 @@ class CfgIDECache {
         exit.predInter --= exit.predInter
         exit.predInter ++= tempInter
 
-
         reversed = reversed ++ Vector(entry, exit)
 
     )
@@ -63,14 +78,6 @@ class CfgIDECache {
 
     callReturnMap.forwardMap.foreach(
       (call, ret) =>
-//        println(call)
-//        println(s"Intra Pred: ${call.predIntra}, Inter Pred: ${call.predInter}")
-//        println(s"Intra Succ: ${call.succIntra}, Inter Succ: ${call.succInter}")
-//        println(ret)
-//        println(s"Intra Pred: ${ret.predIntra}, Inter Pred: ${ret.predInter}")
-//        println(s"Intra Succ: ${ret.succIntra}, Inter Succ: ${ret.succInter}")
-//
-
 
         ret.predIntra.foreach( node =>
           node.succIntra -= ret
@@ -112,7 +119,7 @@ class CfgIDECache {
         ret.predInter ++= ret.succInter
         ret.succInter --= ret.succInter
         ret.succInter ++= callSucc
-      
+
     )
   }
 
@@ -123,17 +130,18 @@ class CfgIDECache {
     node.predIntra --= node.predIntra
     node.predIntra ++= temp
 
-//    if (!(node.isInstanceOf[CfgJumpNode] && callReturnMap.forwardMap.contains(node.asInstanceOf[CfgJumpNode]))
-//        && !(node.isInstanceOf[CfgCallReturnNode] &&
-//      callReturnMap.backwardMap.contains(node.asInstanceOf[CfgCallReturnNode]))) {
-      temp = node.succInter.clone()
-      node.succInter --= node.succInter
-      node.succInter ++= node.predInter
-      node.predInter --= node.predInter
-      node.predInter ++= temp
-//    }
+    temp = node.succInter.clone()
+    node.succInter --= node.succInter
+    node.succInter ++= node.predInter
+    node.predInter --= node.predInter
+    node.predInter ++= temp
   }
 
+  /**
+   * Caches Cfg Maps
+   * Adds an edge from function exit to corresponding call return nodes
+   * @param cfg Program Cfg
+   */
   def cacheCfg(cfg: ProgramCfg) = {
 
     cfg.funEntries.foreach(entry => {

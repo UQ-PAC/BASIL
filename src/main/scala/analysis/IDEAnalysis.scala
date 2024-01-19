@@ -1,7 +1,8 @@
 package analysis
 
-
 /**
+ * Adapted from Tip
+ * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/IDEAnalysis.scala
  * The special item representing the empty element in IDE.
  */
 final case class Lambda()
