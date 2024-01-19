@@ -5,22 +5,45 @@ import ir.Procedure
 
 import scala.collection.mutable
 
-
-
+/**
+ * (A variant of) the IDE analysis algorithm.
+ * Adapted from Tip
+ * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/IDESolver.scala
+ */
 abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg, val cache: CfgIDECache)
   extends IDEAnalysis[D, T, L]
 {
+
+  /**
+   * Phase 1 of the IDE algorithm.
+   * Computes Path functions and Summary functions
+   * The original version of the algorithm uses summary edges from call nodes to after-call nodes
+   * instead of `callJumpCache` and `exitJumpCache`.
+   */
   class Phase1(val cfg: ProgramCfg) extends WorklistFixPointFunctions[(CfgNode, DL , DL), EdgeFunction[T], EdgeFunctionLattice[T, valuelattice.type]]
   {
 
     val lattice = new MapLattice(edgelattice)
 
+    // Current Lattice Element
     var x: Map[(CfgNode, DL , DL), EdgeFunction[T]] = _
 
-    val first: Set[(CfgNode, DL, DL)] = Set((cfg.startNode, Right(Lambda()), Right(Lambda())))
+    val first: Set[(CfgNode, DL, DL)] = cfg.funEntries.foldLeft(Set() : Set[(CfgNode, DL, DL)]) {
+      (s, node) => s.+((node, Right(Lambda()), Right(Lambda())))
+    }
 
 
+    /**
+     * callJumpCache(funentry, d1, call)(d3) returns the composition of the edges (call.funentry, d3) -> (call, *) -> (funentry, d1).
+     * Allows faster lookup than scanning through the current lattice element.
+     */
     private val callJumpCache = mutable.Map[(CfgFunctionEntryNode, DL, CfgJumpNode), mutable.Map[DL, EdgeFunction[T]]]()
+
+
+    /**
+     * exitJumpCache(funentry, d1) contains d2 if there is a non-bottom edge (funentry, d1) -> (funentry.exit, d2).
+     * Allows faster lookup than scanning through the current lattice element.
+     */
     private val exitJumpCache = mutable.Map[(CfgFunctionEntryNode, DL), mutable.Set[DL]]()
 
 
@@ -120,10 +143,22 @@ abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg, val cache: 
     }
   }
 
+  /**
+   * Phase 2 of the IDE algorithm.
+   * Performs a forward dataflow analysis using the decomposed lattice and the micro-transformers.
+   * The original RHS version of IDE uses jump functions for all nodes, not only at exits, but the analysis result and complexity is the same.
+   */
   class Phase2(val cfg: ProgramCfg, val phase1: Phase1) extends WorklistFixPointFunctions[(CfgNode, DL), T, valuelattice.type]:
     val lattice: MapLattice[(CfgNode, DL), T, valuelattice.type] = new MapLattice(valuelattice)
     var x: Map[(CfgNode, DL), T] = _
-    val first: Set[(CfgNode, DL)] = Set((cfg.startNode, Right(Lambda())))
+    val first: Set[(CfgNode, DL)] = cfg.funEntries.foldLeft(Set(): Set[(CfgNode, DL)]) {
+      (s, node) => s.+((node, Right(Lambda())))
+    }
+
+    /**
+     * Function summaries from phase 1.
+     * Built when first invoked.
+     */
     lazy val summaries: mutable.Map[Procedure, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]] = phase1.summaries()
 
     def init: T = lattice.sublattice.top
@@ -171,6 +206,9 @@ abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg, val cache: 
 
     val restructuredlattice: MapLattice[CfgNode, Map[D, T], MapLattice[D, T, valuelattice.type]] = new MapLattice(new MapLattice(valuelattice))
 
+    /**
+     * Restructures the analysis output to match `restructuredlattice`.
+     */
     def restructure(y: lattice.Element): restructuredlattice.Element =
       y.foldLeft(Map[CfgNode, Map[D, valuelattice.Element]]()) {
         case (acc, ((n, dl), e)) =>

@@ -1,8 +1,13 @@
 package analysis
 
 import analysis.solvers.IDESolver
-import ir.{Assert, Assume, DirectCall, GoTo, IndirectCall, LocalAssign, MemoryAssign, Register, Variable}
+import ir.{Assert, Assume, IndirectCall, LocalAssign, MemoryAssign, Variable}
 
+/**
+ * Micro-transfer-functions for LiveVar analysis
+ * Tip SPA IDE Slides include a short and clear explanation of microfunctions
+ * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
+ */
 trait LiveVarAnalysisFunctions extends IDEAnalysis[Variable, FlatElement[Nothing] ,TwoElementLattice] {
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
