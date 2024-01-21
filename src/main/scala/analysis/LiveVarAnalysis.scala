@@ -1,7 +1,9 @@
 package analysis
 
 import analysis.solvers.IDESolver
+import cfg_visualiser.Output
 import ir.{Assert, Assume, IndirectCall, LocalAssign, MemoryAssign, Variable}
+import util.RunUtils.writeToFile
 
 /**
  * Micro-transfer-functions for LiveVar analysis
@@ -99,6 +101,7 @@ class LiveVarAnalysis(cfg: ProgramCfg) {
     cache.cacheCfg(cfg)
     cache.reverseCfg(cfg)
     var livenessAnalysisResult = LiveVarIDEAnalysis(cfg, cache).analyze()
+    writeToFile(cfg.toDot(Output.labeler(livenessAnalysisResult, true), Output.dotIder), s"midpoint_liveness.dot")
     cache.entryExitMap.forwardMap.foreach(
       (entry, exit) =>
         val exitResult = livenessAnalysisResult.getOrElse(entry, Map())

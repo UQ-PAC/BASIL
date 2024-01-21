@@ -1,6 +1,6 @@
 package analysis
 
-import ir.DirectCall
+import ir.{DirectCall, GoTo, IndirectCall}
 
 import scala.collection.mutable
 
@@ -33,44 +33,68 @@ class CfgIDECache {
     entryExitMap.forwardMap.foreach(
       (entry, exit) =>
         val tempIntra = entry.succIntra.clone()
-        entry.succIntra.foreach(node =>
-          node.predIntra -= entry
-          node.predIntra += exit
-        )
 
-        exit.predIntra.foreach(node =>
-          node.succIntra -= exit
-          node.succIntra += entry
-        )
+        //TODO this won't work if entry has a branch where exit is reached immedietly and another where it is not
+        if (!entry.succIntra.contains(exit))
 
-        entry.succIntra --= entry.succIntra
-        entry.succIntra ++= exit.predIntra
+          entry.succIntra.foreach(node =>
+            node.predIntra -= entry
+            node.predIntra += exit
+          )
 
-        exit.predIntra --= exit.predIntra
-        exit.predIntra ++= tempIntra
+          exit.predIntra.foreach(node =>
+            node.succIntra -= exit
+            node.succIntra += entry
+          )
 
-        val tempInter = entry.succInter.clone()
-        entry.succInter.foreach(node =>
-          node.predInter -= entry
-          node.predInter += exit
-        )
+          entry.succIntra --= entry.succIntra
+          entry.succIntra ++= exit.predIntra
 
-        exit.predInter.foreach(node =>
-          node.succInter -= exit
-          node.succInter += entry
-        )
+          exit.predIntra --= exit.predIntra
+          exit.predIntra ++= tempIntra
 
-        entry.succInter --= entry.succInter
-        entry.succInter ++= exit.predInter
+          val entrySuccInter = entry.succInter.clone()
+          val exitPredInter = exit.predInter.clone()
 
-        exit.predInter --= exit.predInter
-        exit.predInter ++= tempInter
+          entry.succInter.foreach(node =>
+            node.predInter -= entry
+            node.predInter += exit
+          )
+
+          exit.predInter.foreach(node =>
+            node.succInter -= exit
+            node.succInter += entry
+          )
+
+          entry.succInter --= entry.succInter
+          entry.succInter ++= exit.predInter
+
+          exit.predInter --= exit.predInter
+          exit.predInter ++= entrySuccInter
 
         reversed = reversed ++ Vector(entry, exit)
-
     )
 
     cfg.nodes.foreach(node =>
+      if (node.id == 196) {
+        print("")
+      }
+
+      node match
+        case jumpNode: CfgJumpNode => // makes indirect calls take intra procedural path in the analysis
+          jumpNode.data match
+            case call: IndirectCall =>
+              jumpNode.succIntra.foreach {
+                case ret: CfgCallReturnNode =>
+                  jumpNode.succInter.add(ret)
+                  ret.predInter.add(jumpNode)
+                case noRet: CfgCallNoReturnNode =>
+                  jumpNode.succInter.add(noRet)
+                  noRet.predInter.add(jumpNode)
+                case _ =>
+              }
+            case _ =>
+        case _ =>
       if (!reversed.contains(node)) {
         swapEdges(node)
       }
