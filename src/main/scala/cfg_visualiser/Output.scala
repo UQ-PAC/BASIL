@@ -16,7 +16,7 @@ object Output {
     val desc = n match {
       case entry: CfgFunctionEntryNode => s"Function ${entry.data.name} entry"
       case exit: CfgFunctionExitNode   => s"Function ${exit.data.name} exit"
-      case _                           => n.toString
+      case _                           => n.toString + s" ${n.id}"
     }
     if (stateAfterNode) s"$desc\n$r"
     else s"$r\n$desc"
