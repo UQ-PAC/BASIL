@@ -55,6 +55,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   def translate(boogieGeneratorConfig: BoogieGeneratorConfig): BProgram = {
     config = boogieGeneratorConfig
     val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
+
     val procedures = program.procedures.map(f => translateProcedure(f, readOnlyMemory))
     val defaultGlobals = List(BVarDecl(mem, List(externAttr)), BVarDecl(Gamma_mem, List(externAttr)))
     val globalVars = procedures.flatMap(p => p.globals ++ p.freeRequires.flatMap(_.globals) ++ p.freeEnsures.flatMap(_.globals) ++ p.ensures.flatMap(_.globals) ++ p.requires.flatMap(_.globals))
@@ -91,6 +92,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       rgProcs.flatMap(p => p.functionOps).toSet ++
       rgLib.flatMap(p => p.functionOps).toSet ++
       directFunctions
+
     val functionsUsed2 = functionsUsed1.map(p => functionOpToDefinition(p))
     val functionsUsed3 = functionsUsed2.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed4 = functionsUsed3.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
@@ -185,7 +187,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     List(invProc, invTransitive)
   }
 
-
   def genLibGuarantee(name: String): BProcedure = {
     // G_f
     val guaranteeLib = libGuarantees(name).map(g => g.resolveSpecParam)
@@ -199,6 +200,18 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     // G_c is ensures clause
     BProcedure(name + "$guarantee", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), guaranteesParam, List(),
       List(), List(), List(), List(), Set(), List(guaranteeAssume), List(externAttr))
+  }
+
+  /**
+   * A predicate used to assert the value of all readonly memory.
+   * (Boogie does not like this it if it is too large due to it being a single expression)
+   *
+   * E.g.
+   *  val readOnlyMemoryFunction = readOnlyMemoryPredicate(memoryToCondition(program.readOnlyMemory), mem)
+   *  val readOnlyMemory = List(BFunctionCall(readOnlyMemoryFunction.name, List(mem), BoolBType))
+   */
+  private def readOnlyMemoryPredicate(readonly: List[BExpr], mem: BVar) : BFunction = {
+    BFunction("readonly_memory", List(BParam("mem", mem.bType)), BParam(BoolBType), Some(readonly.reduce((a, b) => BinaryBExpr(BoolAND, a, b))), List(externAttr))
   }
 
   def functionOpToDefinition(f: FunctionOp): BFunction = {
@@ -467,18 +480,50 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   }
 
   private def memoryToCondition(memory: ArrayBuffer[MemorySection]): List[BExpr] = {
-    val sections = memory.flatMap { s =>
-      for (b <- s.bytes.indices) yield {
-        BinaryBExpr(
-          BVEQ,
-          BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
-          s.bytes(b).toBoogie
-        )
-      }
-    }
-    sections.toList
-  }
 
+    def coalesced(): List[BExpr] = {
+      val sections = memory.flatMap { s =>
+        // Phrase the memory condition in terms of 64-bit operations, as long as the memory
+        // region is a multiple of such operations and appropriately aligned
+        if (s.address % 8 == 0 && s.bytes.size % 8 == 0) {
+          for (b <- s.bytes.indices by 8) yield {
+            // Combine the byte constants into a 64-bit value
+            val sum: BigInt =
+              (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * (BigInt(2).pow(y * 8))))
+            BinaryBExpr(
+              BVEQ,
+              BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
+              BitVecBLiteral(sum, 64)
+            )
+          }
+        } else {
+          for (b <- s.bytes.indices) yield {
+            BinaryBExpr(
+              BVEQ,
+              BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+              s.bytes(b).toBoogie
+            )
+          }
+        }
+      }
+      sections.toList
+    }
+
+    def bytes(): List[BExpr] = {
+      val sections = memory.flatMap { s =>
+        for (b <- s.bytes.indices) yield {
+          BinaryBExpr(
+            BVEQ,
+            BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+            s.bytes(b).toBoogie
+          )
+        }
+      }
+      sections.toList
+    }
+
+    if config.coalesceConstantMemory then coalesced() else bytes()
+  }
 
   def captureStateStatement(stateName: String): BAssume = {
     BAssume(TrueBLiteral, None, List(BAttribute("captureState", Some(s"\"$stateName\""))))

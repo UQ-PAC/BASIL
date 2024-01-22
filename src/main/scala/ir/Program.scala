@@ -8,25 +8,39 @@ import analysis.BitVectorEval
 class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure, var initialMemory: ArrayBuffer[MemorySection], var readOnlyMemory: ArrayBuffer[MemorySection]) {
 
   // This shouldn't be run before indirect calls are resolved
-  def stripUnreachableFunctions(): Unit = {
-    val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
-    var next = mainProcedure.name
-    var reachableNames: Set[String] = Set(next)
-    var toVisit: List[String] = List()
+
+  def stripUnreachableFunctions(depth: Int = Int.MaxValue): Unit = {
+    val procedureCalleeNames = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
+
+    var toVisit: mutable.LinkedHashSet[(Int, String)] = mutable.LinkedHashSet((0, mainProcedure.name))
     var reachableFound = true
-    while (reachableFound) {
-      val children = functionToChildren(next) -- reachableNames -- toVisit - next
-      reachableNames = reachableNames ++ children
-      toVisit = toVisit ++ children
-      if (toVisit.isEmpty) {
-        reachableFound = false
-      } else {
-        next = toVisit.head
-        toVisit = toVisit.tail
+    val reachableNames = mutable.HashMap[String, Int]()
+    while (toVisit.nonEmpty) {
+      val next = toVisit.head
+      toVisit.remove(next)
+
+      if (next._1 <= depth) {
+
+        def addName(depth: Int, name: String): Unit = {
+          val oldDepth = reachableNames.getOrElse(name, Integer.MAX_VALUE)
+          reachableNames.put(next._2, if depth < oldDepth then depth else oldDepth)
+        }
+        addName(next._1, next._2)
+
+        val callees = procedureCalleeNames(next._2)
+
+        toVisit.addAll(callees.diff(reachableNames.keySet).map(c => (next._1 + 1, c)))
+        callees.foreach(c => addName(next._1 + 1, c))
       }
     }
-    procedures = procedures.filter(f => reachableNames.contains(f.name))
+    procedures = procedures.filter(f => reachableNames.keySet.contains(f.name))
+
+    for (elem <- procedures.filter(c => c.calls.exists(s => !procedures.contains(s)))) {
+      // last layer is analysed only as specifications so we remove the body for anything that calls
+      // a function we have removed
+      elem.blocks.clear()
+    }
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
@@ -70,12 +84,6 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
       }
     } else {
       Memory(name, 64, 8)
-    }
-  }
-
-  def stackIdentification(): Unit = {
-    for (p <- procedures) {
-      p.stackIdentification()
     }
   }
 
@@ -123,60 +131,6 @@ class Procedure(
     s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
   }
   var modifies: mutable.Set[Global] = mutable.Set()
-
-  def stackIdentification(): Unit = {
-    val stackPointer = Register("R31", BitVecType(64))
-    val stackRefs: mutable.Set[Variable] = mutable.Set(stackPointer)
-    val visitedBlocks: mutable.Set[Block] = mutable.Set()
-    val stackMemory = Memory("stack", 64, 8)
-    val firstBlock = blocks.headOption
-    firstBlock.foreach(visitBlock)
-
-    // does not handle loops but we do not currently support loops in block CFG so this should do for now anyway
-    def visitBlock(b: Block): Unit = {
-      if (visitedBlocks.contains(b)) {
-        return
-      }
-      for (s <- b.statements) {
-        s match {
-          case l: LocalAssign =>
-            // replace mem with stack in loads if index contains stack references
-            val loads = l.rhs.loads
-            for (load <- loads) {
-              val loadStackRefs = load.index.variables.intersect(stackRefs)
-              if (loadStackRefs.nonEmpty) {
-                load.mem = stackMemory
-              }
-            }
-
-            // update stack references
-            val variableVisitor = VariablesWithoutStoresLoads()
-            variableVisitor.visitExpr(l.rhs)
-
-            val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackRefs)
-            if (rhsStackRefs.nonEmpty) {
-              stackRefs.add(l.lhs)
-            } else if (stackRefs.contains(l.lhs) && l.lhs != stackPointer) {
-              stackRefs.remove(l.lhs)
-            }
-          case m: MemoryAssign =>
-            // replace mem with stack if index contains stack reference
-            val indexStackRefs = m.rhs.index.variables.intersect(stackRefs)
-            if (indexStackRefs.nonEmpty) {
-              m.lhs = stackMemory
-              m.rhs.mem = stackMemory
-            }
-          case _ =>
-        }
-      }
-      visitedBlocks.add(b)
-      b.jump match {
-        case g: GoTo => g.targets.foreach(visitBlock)
-        case d: DirectCall => d.returnTarget.foreach(visitBlock)
-        case i: IndirectCall => i.returnTarget.foreach(visitBlock)
-      }
-    }
-  }
 
 }
 

@@ -33,7 +33,7 @@ class SystemTests extends AnyFunSuite {
     val path = correctPath + "/" + p
     val variations = getSubdirectories(path)
     variations.foreach(t =>
-      test(p + "/" + t) {
+      test("correct/" + p + "/" + t) {
         runTest(correctPath, p, t, true)
       }
     )
@@ -43,7 +43,7 @@ class SystemTests extends AnyFunSuite {
     val path = incorrectPath + "/" + p
     val variations = getSubdirectories(path)
     variations.foreach(t =>
-      test(p + "/" + t) {
+      test("incorrect/" + p + "/" + t) {
         runTest(incorrectPath, p, t, false)
       }
     )
@@ -78,29 +78,35 @@ class SystemTests extends AnyFunSuite {
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
     val outPath = variationPath + ".bpl"
-    val ADTPath = variationPath + ".adt"
+        val ADTPath = variationPath + ".adt"
     val RELFPath = variationPath + ".relf"
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")
-    if (File(specPath).exists) {
-      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--spec", specPath, "--output", outPath))
-    } else {
-      Main.main(Array("--adt", ADTPath, "--relf", RELFPath, "--output", outPath))
-    }
+
+    val args = mutable.ArrayBuffer("--adt", ADTPath, "--relf", RELFPath, "--output", outPath)
+    if (File(specPath).exists) args ++= Seq("--spec", specPath)
+
+    Main.main(args.toArray)
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(outPath + " done")
-    val boogieResult = Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath).!!
+    val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(outPath))
+    val boogieResult = (Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath) ++ extraSpec).!!
     val verifyTime = timer.checkPoint("verify")
     val resultPath = variationPath + "_result.txt"
     log(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
+    val proveFailed =  boogieResult.contains("could not be proved")
     val timedOut = boogieResult.strip() contains "timed out"
 
-    val failureMsg = (verified, shouldVerify, timedOut) match {
-      case (_, _, true) => "SMT solver timed out: unknown result"
-      case (true, false, false) => "Expected verification failure, but got success."
-      case (false, true, false) => "Expected verification success, but got failure."
-      case (_, _, false) => "Test passed"
+    def xor(x: Boolean, y:Boolean): Boolean = (x || y) && ! (x && y)
+
+    val failureMsg = if timedOut then "SMT Solver timed out" else 
+      (verified, shouldVerify, xor(verified, proveFailed)) match {
+        case (true, true, true) =>   "Test passed"
+        case (false , false, true) => "Test passed"
+        case (_, _, false) => "Prover error: unknown result"
+        case (true, false, true) => "Expected verification failure, but got success."
+        case (false, true, true) => "Expected verification success, but got failure."
     }
 
     val expectedOutPath = variationPath + ".expected"
@@ -114,7 +120,7 @@ class SystemTests extends AnyFunSuite {
     } else {
       info("Note: this test has not previously succeeded")
     }
-    val passed = !timedOut && (verified == shouldVerify)
+    val passed = !timedOut && (verified == shouldVerify)  && (xor(verified , proveFailed))
     val result = TestResult(passed, verified, shouldVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
     testResults.append((s"$name/$variation", result))
     if (!passed) fail(failureMsg)
