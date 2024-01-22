@@ -16,6 +16,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val reliesParam = spec.relies.map(r => r.resolveSpecParam)
   private val reliesReflexive = spec.relies.map(r => r.removeOld)
   private val guarantees = spec.guarantees.map(g => g.resolveOld)
+  private val guaranteesParam = spec.guarantees.map(g => g.resolveSpecParam)
   private val guaranteesReflexive = spec.guarantees.map(g => g.removeOld)
   private val guaranteeOldVars = spec.guaranteeOldVars
   private val LPreds = spec.LPreds.map((k, v) => k -> v.resolveSpecL)
@@ -81,7 +82,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
     // if rely/guarantee lib exist, create genRelyInv, and genInv for every procedure where rely/guarantee lib exist
     val rgLib = if (libRelies.values.flatten.nonEmpty && libGuarantees.values.flatten.nonEmpty) {
-      List(genRelyInv) ++ libGuarantees.flatMap((k, v) => if v.nonEmpty then Some(genInv(k)) else None)
+      List(genRelyInv) ++ libGuarantees.flatMap((k, v) => if v.nonEmpty then genInv(k) :+ genLibGuarantee(k) else Nil)
     } else {
       List()
     }
@@ -137,11 +138,11 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     } else {
       reliesUsed
     }
-    BProcedure("rely$inv", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), relyEnsures, List(), List(), List(), List(), List(),
-      Set(), List(), List(externAttr))
+    BProcedure("rely$inv", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), relyEnsures, List(), List(),
+      List(), List(), List(), Set(), List(), List(externAttr))
   }
 
-  def genInv(name: String): BProcedure = {
+  def genInv(name: String): List[BProcedure] = {
     // reliesParam OR procGuaranteeParam
 
     val reliesUsed = if (reliesParam.nonEmpty) {
@@ -172,8 +173,32 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
     val invEnsures = List(BinaryBExpr(BoolOR, relyOneLine, guaranteeOneLine))
 
-    BProcedure(name + "$inv", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), invEnsures, List(), List(), List(), List(), List(),
-      Set(), List(), List(externAttr))
+    val invProc = BProcedure(name + "$inv", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), invEnsures,
+      List(), List(), List(), List(), List(), Set(), List(), List(externAttr))
+
+    val invTransitive = BProcedure(name + "$inv_transitive", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out),
+      invEnsures, List(), List(), List(), List(), List(), Set(),
+      List(BProcedureCall(name + "$inv", List(mem_out, Gamma_mem_out), List(mem_in, Gamma_mem_in)),
+        BProcedureCall(name + "$inv", List(mem_out, Gamma_mem_out), List(mem_out, Gamma_mem_out))
+      ), List(externAttr))
+
+    List(invProc, invTransitive)
+  }
+
+
+  def genLibGuarantee(name: String): BProcedure = {
+    // G_f
+    val guaranteeLib = libGuarantees(name).map(g => g.resolveSpecParam)
+    val guaranteeOneLine = if (guaranteeLib.size > 1) {
+      guaranteeLib.tail.foldLeft(guaranteeLib.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
+    } else {
+      guaranteeLib.head
+    }
+    val guaranteeAssume = BAssume(guaranteeOneLine)
+
+    // G_c is ensures clause
+    BProcedure(name + "$guarantee", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), guaranteesParam, List(),
+      List(), List(), List(), List(), Set(), List(guaranteeAssume), List(externAttr))
   }
 
   def functionOpToDefinition(f: FunctionOp): BFunction = {
