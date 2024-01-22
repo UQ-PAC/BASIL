@@ -236,8 +236,7 @@ implementation greet()
     R0, Gamma_R0 := 0bv64, true;
     R0, Gamma_R0 := bvadd64(R0, 1992bv64), Gamma_R0;
     call puts();
-    //no return target
-    assume false;
+    assume false; //no return target
 }
 
 procedure main();
