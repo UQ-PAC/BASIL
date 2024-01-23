@@ -194,16 +194,6 @@ object RunUtils {
     val livenessAnalysisResult = LiveVarAnalysis(cfg).analyze()
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(livenessAnalysisResult, true), Output.dotIder), s"${s}_liveness$iteration.dot"))
 
-//    val UninitAnalysisResult = UninitVariablesAnalysis(cfg).analyze()
-//    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(UninitAnalysisResult, false), Output.dotIder), s"${s}_uninit$iteration.dot"))
-
-//    val reachingDefsAnalysisResult = ReachingDefsAnalysis(cfg).analyze()
-//    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(reachingDefsAnalysisResult, false), Output.dotIder), s"${s}_reaching$iteration.dot"))
-//    config.analysisDotPath.foreach(s => writeToFile(printAnalysisResults(cfg, reachingDefsAnalysisResult, iteration), s"${s}_reaching$iteration.txt"))
-
-//    val copyConstantAnalysisResults = CopyConstantAnalysis(cfg).analyze()
-//    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(copyConstantAnalysisResults, false), Output.dotIder), s"${s}_copy$iteration.dot"))
-
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
 
     newIR
