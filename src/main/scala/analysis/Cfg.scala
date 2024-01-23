@@ -611,7 +611,6 @@ class ProgramCfgFactory:
                 cfg.addEdge(jmpNode, noReturn)
                 cfg.addEdge(noReturn, funcExitNode)
             }
-          case _ => assert(false, s"unexpected jump encountered, jump: $jmp")
         } // `jmps.head` match
       } // `visitJumps` function
     } // `visitBlocks` function

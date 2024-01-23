@@ -204,7 +204,6 @@ def toDot[T <: CFGPosition](
         iterator.succ(s).foreach(n => dotArrows.addOne(DotInterArrow(dotNodes(s), dotNodes(n))))
       case s =>
         iterator.succ(s).foreach(n => dotArrows.addOne(DotRegularArrow(dotNodes(s), dotNodes(n))))
-      case _ => ()
     }
   }
 

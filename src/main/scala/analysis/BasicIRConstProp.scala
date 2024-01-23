@@ -56,7 +56,7 @@ trait ILValueAnalysisMisc:
     n match
       case la: LocalAssign =>
         s + (la.lhs -> eval(la.rhs, s))
-      //case c: Call => s ++ callerPreservedRegisters.filter(reg => s.keys.exists(_.name == reg)).map(n => Register(n, BitVecType(64)) -> statelattice.sublattice.top).toMap
+      case c: Call => s ++ callerPreservedRegisters.filter(reg => s.keys.exists(_.name == reg)).map(n => Register(n, BitVecType(64)) -> statelattice.sublattice.top).toMap
       case _ => s
 
 
