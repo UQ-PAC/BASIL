@@ -224,7 +224,7 @@ class Procedure private (
    * @return an iterator to the new block set
    */
   def replaceBlocks(newBlocks: Iterable[Block]): Unit = {
-    removeBlocks(_blocks)
+    clearBlocks()
     addBlocks(newBlocks)
   }
 
@@ -245,7 +245,8 @@ class Procedure private (
   }
 
   def clearBlocks() : Unit = {
-    removeBlocks(blocks)
+    // O(n) because we are careful to unlink the parents etc.
+    removeBlocks(_blocks)
   }
 
 
