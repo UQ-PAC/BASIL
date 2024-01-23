@@ -241,6 +241,7 @@ implementation greet()
   greet_return:
     assume {:captureState "greet_return"} true;
     return;
+
 }
 
 procedure main();
