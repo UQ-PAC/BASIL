@@ -1,4 +1,4 @@
-package intrusiveList
+package intrusivelist
 import scala.collection.mutable
 
 
@@ -27,9 +27,9 @@ import scala.collection.mutable
  * @param lastElem THe last list element if nonempty or none if empty.
  * @tparam T
  */
-final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int, var firstElem: Option[T],
-                                                              var lastElem: Option[T])
-  extends mutable.Iterable[T], mutable.Growable[T]:
+final class IntrusiveList[T <: IntrusiveListElement[T]] private (var numElems: Int, var firstElem: Option[T],
+                                                              var lastElem: Option[T]) 
+                                                        extends mutable.Iterable[T], mutable.Growable[T]:
   var onInsert: T => Unit = x => ()
   var onRemove: T => Unit  = x => ()
 
@@ -73,15 +73,15 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
     assert(i < size)
     var elem = firstElem.get
     for (c <- 0 until i)  {
-      elem = elem.getNext.asInstanceOf[T]
+      elem = elem.getNext
     }
     elem
   }
 
-  class IntrusiveListIterator(var elem: Option[IntrusiveListElement]) extends Iterator[T] {
+  class IntrusiveListIterator(var elem: Option[T]) extends Iterator[T] {
     override def hasNext: Boolean = elem.isDefined
     override def next: T = {
-      val t = elem.get.asInstanceOf[T]
+      val t = elem.get
       elem = t.next
       t
     }
@@ -92,7 +92,7 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
   // end Iterable
 
 
-  def iteratorFrom(elem: IntrusiveListElement): Iterator[T] = {
+  def iteratorFrom(elem: T): Iterator[T] = {
     assert(elem.first() == firstElem.get)
     IntrusiveListIterator(Some(elem))
   }
@@ -172,13 +172,13 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
     assert(containsRef(intrusiveListElement))
     numElems -= 1
     if (intrusiveListElement == lastElem.get) {
-      lastElem = intrusiveListElement.prev.asInstanceOf[Option[T]]
+      lastElem = intrusiveListElement.prev
     }
     if (intrusiveListElement == firstElem.get) {
-      firstElem = intrusiveListElement.next.asInstanceOf[Option[T]]
+      firstElem = intrusiveListElement.next
     }
     onRemove(intrusiveListElement)
-    intrusiveListElement.remove().asInstanceOf[T]
+    intrusiveListElement.remove()
   }
 
 
@@ -193,7 +193,7 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
     }
 
     onInsert(newElem)
-    intrusiveListElement.insertAfter(newElem).asInstanceOf[T]
+    intrusiveListElement.insertAfter(newElem)
   }
 
   def insertBefore(intrusiveListElement: T, newElem: T): T = {
@@ -206,11 +206,11 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
       firstElem = Some(newElem)
     }
     onInsert(newElem)
-    intrusiveListElement.insertBefore(newElem).asInstanceOf[T]
+    intrusiveListElement.insertBefore(newElem)
   }
 
   def getNext(elem: T): T = {
-    elem.getNext.asInstanceOf[T]
+    elem.getNext
   }
 
   def hasNext(elem: T): Boolean = {
@@ -222,60 +222,59 @@ final class IntrusiveList[T <: IntrusiveListElement] private (var numElems: Int,
   }
 
   def getPrev(elem: T): T = {
-    elem.getPrev.asInstanceOf[T]
+    elem.getPrev
   }
 
   def nextOption(elem: T): Option[T] = {
-    elem.next.asInstanceOf[Option[T]]
+    elem.next
   }
 
   def prevOption(elem: T): Option[T] = {
-    elem.prev.asInstanceOf[Option[T]]
+    elem.prev
   }
 
 object IntrusiveList {
-  def from[T <: IntrusiveListElement](it: IterableOnce[T]): IntrusiveList[T] = {
+  def from[T <: IntrusiveListElement[T]](it: IterableOnce[T]): IntrusiveList[T] = {
     val l = new IntrusiveList[T]()
     l.addAll(it)
     l
   }
-  def empty[T <: IntrusiveListElement] : IntrusiveList[T] =  new IntrusiveList[T]()
-
+  def empty[T <: IntrusiveListElement[T]] : IntrusiveList[T] =  new IntrusiveList[T]()
 }
 
-trait IntrusiveListElement:
-  private[intrusiveList] var next: Option[IntrusiveListElement] = None
-  private[intrusiveList] var prev: Option[IntrusiveListElement] = None
-  private[intrusiveList] final def insertBefore(elem: IntrusiveListElement): IntrusiveListElement = {
+trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
+  private[intrusivelist] var next: Option[T] = None
+  private[intrusivelist] var prev: Option[T] = None
+  private[intrusivelist] final def insertBefore(elem: T): T = {
     elem.prev = prev
     if (prev.isDefined) {
       prev.get.next = Some(elem)
     }
     prev = Some(elem)
-    elem.next = Some(this)
+    elem.next = Some(this.asInstanceOf[T])
     elem
   }
 
-  private[intrusiveList] final def unitary: Boolean = next.isEmpty && prev.isEmpty
+  private[intrusivelist] final def unitary: Boolean = next.isEmpty && prev.isEmpty
 
 
-  private[intrusiveList] final def insertAfter(elem: IntrusiveListElement): IntrusiveListElement = {
+  private[intrusivelist] final def insertAfter(elem: T):  T = {
     if (next.isDefined) {
       next.get.prev = Some(elem)
     }
     elem.next = next
     next = Some(elem)
-    elem.prev = Some(this)
+    elem.prev = Some(this.asInstanceOf[T])
     elem
   }
 
-  private[intrusiveList] final def replace(elem: IntrusiveListElement): IntrusiveListElement = {
+  private[intrusivelist] final def replace(elem: T): T = {
     insertAfter(elem)
     remove()
     elem
   }
 
-  private[intrusiveList] final def remove(): IntrusiveListElement = {
+  private[intrusivelist] final def remove(): T = {
     if (next.isDefined) {
       next.get.prev = prev
     }
@@ -284,7 +283,7 @@ trait IntrusiveListElement:
     }
     this.next = None
     this.prev = None
-    this
+    this.asInstanceOf[T]
   }
 
   def succ(): Option[this.type] = {
@@ -295,37 +294,37 @@ trait IntrusiveListElement:
     prev.map(_.asInstanceOf[this.type])
   }
 
-  private[intrusiveList] final def append(elem: IntrusiveListElement): IntrusiveListElement = {
+  private[intrusivelist] final def append(elem: T): T = {
     last().insertAfter(elem)
   }
 
-  private[intrusiveList] final def prepend(elem: IntrusiveListElement): IntrusiveListElement = {
+  private[intrusivelist] final def prepend(elem: T): T = {
     first().insertBefore(elem)
   }
 
-  private[intrusiveList] final def getNext: IntrusiveListElement = next.get
+  private[intrusivelist] final def getNext: T = next.get
 
-  private[intrusiveList] final def getPrev: IntrusiveListElement = prev.get
+  private[intrusivelist] final def getPrev: T = prev.get
 
-  private[intrusiveList] final def hasNext: Boolean = next.isDefined
-  private[intrusiveList] final def hasPrev: Boolean = prev.isDefined
+  private[intrusivelist] final def hasNext: Boolean = next.isDefined
+  private[intrusivelist] final def hasPrev: Boolean = prev.isDefined
 
-  private[intrusiveList] final def last(): IntrusiveListElement = {
+  private[intrusivelist] final def last(): T = {
     next match  {
       case Some(n) => n.last()
-      case None => this
+      case None => this.asInstanceOf[T]
     }
   }
 
-  private[intrusiveList] final def first(): IntrusiveListElement = {
+  private[intrusivelist] final def first(): T = {
     prev match {
       case Some(n) => n.first()
-      case None => this
+      case None => this.asInstanceOf[T]
     }
   }
 
-  private[intrusiveList] final def splice(at: IntrusiveListElement, insertBegin: IntrusiveListElement,
-                                          insertEnd: IntrusiveListElement): Unit = {
+  private[intrusivelist] final def splice(at: T, insertBegin: T,
+                                          insertEnd: T): Unit = {
     assert(insertEnd.last() == insertEnd)
     assert(insertBegin.last() == insertEnd)
     assert(insertBegin.first() == insertBegin)
@@ -338,11 +337,11 @@ trait IntrusiveListElement:
 
   }
 
-  private[intrusiveList] final def contains(elem: IntrusiveListElement): Boolean = {
+  private[intrusivelist] final def contains(elem: T): Boolean = {
     elem.first() == first()
   }
 
-  private[intrusiveList] final def containsRef(elem: IntrusiveListElement): Boolean = {
+  private[intrusivelist] final def containsRef(elem: T): Boolean = {
     elem.first() eq first()
   }
 

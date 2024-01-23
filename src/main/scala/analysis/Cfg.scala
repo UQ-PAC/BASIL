@@ -1,7 +1,6 @@
 package analysis
 
 import scala.collection.mutable
-import intrusiveList.IntrusiveList
 import ir.*
 import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
 

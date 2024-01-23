@@ -18,7 +18,7 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
-import intrusiveList.IntrusiveList
+import intrusivelist.IntrusiveList
 import analysis.CfgCommandNode
 
 import scala.annotation.tailrec

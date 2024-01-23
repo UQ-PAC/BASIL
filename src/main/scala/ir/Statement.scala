@@ -1,5 +1,5 @@
 package ir
-import intrusiveList.IntrusiveListElement
+import intrusivelist.IntrusiveListElement
 
 import collection.mutable
 
@@ -17,7 +17,7 @@ sealed trait Command extends HasParent[Block] {
 
 }
 
-sealed trait Statement extends Command, HasParent[Block], IntrusiveListElement {
+sealed trait Statement extends Command, HasParent[Block], IntrusiveListElement[Statement] {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Statement = throw new Exception(
@@ -73,7 +73,7 @@ class Assume(var body: Expr, var comment: Option[String] = None, override val la
 object Assume:
   def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] = Some(a.body, a.comment, a.label, a.checkSecurity)
 
-sealed trait Jump extends Command, IntrusiveListElement, HasParent[Block]  {
+sealed trait Jump extends Command, HasParent[Block]  {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
   def calls: Set[Procedure] = Set()

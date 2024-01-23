@@ -4,7 +4,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
 import analysis.BitVectorEval
-import intrusiveList.{IntrusiveList, IntrusiveListElement}
+import intrusivelist.{IntrusiveList, IntrusiveListElement}
 
 trait HasParent[T]:
   /*
