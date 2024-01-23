@@ -10,6 +10,7 @@ import scala.annotation.tailrec
  */
 type CFGPosition = Procedure | Block | Command
 
+// todo: we could just use the dependencies trait directly instead to avoid the instantiation issue
 trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] {
   def succ(pos: IN): Set[NT]
   def pred(pos: IN): Set[NT]

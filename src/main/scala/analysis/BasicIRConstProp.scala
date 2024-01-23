@@ -64,7 +64,7 @@ trait ILValueAnalysisMisc:
 object IRSimpleValueAnalysis:
 
   class Solver(prog: Program) extends ILValueAnalysisMisc
-    with IRIntraproceduralDependencies.ForwardDependencies
+    with IRIntraproceduralForwardDependencies 
     with Analysis[Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]]
     with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
     :
