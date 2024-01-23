@@ -21,6 +21,7 @@ The IL has two structural interpretations:
 
 1. Its syntax tree; expressions have sub expressions and so on.
     - This can be traversed using Visitors
+    - It can also be traversed down by accessing class fields, and upward using the Parent trait
     - The traversal order is defined by the order of terms in the language with a depth-first traversal of sub-terms.
 2. Its control flow graph; this is part of the language's semantics, and is inferred from the Jump and Call statements.
     - This is traversed using the control flow iterator, or by constructing the separate Tip-style CFG and traversing that.
@@ -33,6 +34,7 @@ We need to derive the predecessor/successor relation on CFG nodes IL .
 1. CFG positions are defined as 
     - The entry to a procedure
     - The single return point from a procedure
+    - The block and jump statement that return from the procedure 
     - The beginning of a block within a procedure
     - A statement command within a block
     - A jump or call command within a block
@@ -81,7 +83,8 @@ For an inter-procedural CFG we also have:
 
     succ(call, return_block) :- ReturnBlock(return_block, call), Procedure(call)
     succ(call, targetProcedure) :- Call(call, _, _, targetProcedure) 
-    succ(exit, returnNode) :- ProcedureExit(exit, procedure, call), CallReturn(returnNode, call)
+
+An inter-procedural solver is expected to keep track of call sites which return statements jump back to.
 
 So a sequential application of `succ` might look like
 
