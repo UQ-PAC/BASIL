@@ -2,7 +2,7 @@ package translating
 
 import bap.*
 import boogie.UnaryBExpr
-import ir.{UnaryExpr, *}
+import ir.{UnaryExpr, BinaryExpr, *}
 import specification.*
 
 import scala.collection.mutable
@@ -148,10 +148,27 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     * Converts a BAPExpr condition that returns a bitvector of size 1 to an Expr condition that returns a Boolean
     *
     * If negative is true then the negation of the condition is returned
+    *
+    * If the BAPExpr uses a comparator that returns a Boolean then no further conversion is performed except negation,
+    * if necessary.
     * */
   private def convertConditionBool(expr: BAPExpr, negative: Boolean): Expr = {
-    val op = if negative then BVEQ else BVNEQ
-    BinaryExpr(op, expr.toIR, BitVecLiteral(0, expr.size))
+    val e = expr.toIR
+    e.getType match {
+      case BitVecType(s) =>
+        if (negative) {
+          BinaryExpr(BVEQ, e, BitVecLiteral(0, s))
+        } else {
+          BinaryExpr(BVNEQ, e, BitVecLiteral(0, s))
+        }
+      case BoolType =>
+        if (negative) {
+          UnaryExpr(BoolNOT, e)
+        } else {
+          e
+        }
+      case _ => ???
+    }
   }
 
   private def newBlockCondition(block: Block, target: Block, condition: Expr): Block = {

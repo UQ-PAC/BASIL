@@ -1,9 +1,9 @@
-import analysis.{CfgNode, MemoryRegion}
+import analysis.{CfgNode, LiftedElement, MemoryRegion}
 import org.scalatest.Inside.inside
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import util.RunUtils
-import util.{BASILConfig, ILLoadingConfig, BoogieGeneratorConfig, StaticAnalysisConfig, BoogieMemoryAccessMode}
+import util.{BASILConfig, BoogieGeneratorConfig, BoogieMemoryAccessMode, ILLoadingConfig, StaticAnalysisConfig}
 
 import java.io.{File, OutputStream, PrintStream, PrintWriter}
 class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
@@ -15,7 +15,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
   def runMain(name: String, dump: Boolean = false): Unit = {
     var expected = ""
     var actual = ""
-    var output: Map[CfgNode, Set[MemoryRegion]] = Map()
+    var output: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
@@ -23,6 +23,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
           relfFile = examplesPath + s"$name/$name.relf",
           specFile = None,
           dumpIL = None,
+          mainProcedureName = "main",
         ),
         runInterpret = false,
         staticAnalysis =  Some(StaticAnalysisConfig()),

@@ -22,3 +22,12 @@ case class BitVecType(size: Int) extends IRType("bv" + size) {
 case class MapType(param: IRType, result: IRType) extends IRType(s"[$param]$result") {
   override def toBoogie: BType = MapBType(param.toBoogie, result.toBoogie)
 }
+
+def coerceToBool(e: Expr): Expr = {
+  e.getType match {
+    case BitVecType(s) => BinaryExpr(BVNEQ, e, BitVecLiteral(0, s))
+    case IntType => BinaryExpr(IntNEQ, e, IntLiteral(0))
+    case BoolType => e
+    case MapType(_, _) => ???
+  }
+}

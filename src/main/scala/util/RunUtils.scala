@@ -26,7 +26,7 @@ import scala.collection.mutable
 
 
 object RunUtils {
-  var memoryRegionAnalysisResults: Map[CfgNode, Set[MemoryRegion]] = Map()
+  var memoryRegionAnalysisResults: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
@@ -44,12 +44,12 @@ object RunUtils {
     BAPLoader.visitProject(parser.project())
   }
 
-  def loadReadELF(fileName: String): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
+  def loadReadELF(fileName: String, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)
     parser.setBuildParseTree(true)
-    ReadELFLoader.visitSyms(parser.syms())
+    ReadELFLoader.visitSyms(parser.syms(), config)
   }
 
   def loadSpecification(filename: Option[String], program: Program, globals: Set[SpecGlobal]): Specification = {
@@ -66,9 +66,12 @@ object RunUtils {
   }
 
   def run(q: BASILConfig): Unit = {
-    Logger.info("[!] Writing file...")
     val boogieProgram = loadAndTranslate(q)
-    writeToFile(boogieProgram.toString, q.outputPrefix)
+
+    Logger.info("[!] Writing file...")
+    val wr = BufferedWriter(FileWriter(q.outputPrefix))
+    boogieProgram.writeToString(wr)
+    wr.close()
   }
 
   def loadAndTranslate(q: BASILConfig): BProgram = {
@@ -76,7 +79,7 @@ object RunUtils {
      *  Loading phase
      */
     val bapProgram = loadBAP(q.loading.adtFile)
-    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile)
+    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading)
 
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
@@ -105,8 +108,14 @@ object RunUtils {
     }
 
     IRProgram.determineRelevantMemory(globalOffsets)
-    IRProgram.stripUnreachableFunctions()
-    IRProgram.stackIdentification()
+
+    Logger.info("[!] Stripping unreachable")
+    val before = IRProgram.procedures.size
+    IRProgram.stripUnreachableFunctions(q.loading.procedureTrimDepth)
+    Logger.info(s"[!] Removed ${before - IRProgram.procedures.size} functions (${IRProgram.procedures.size} remaining)")
+
+    val stackIdentification = StackSubstituter()
+    stackIdentification.visitProgram(IRProgram)
 
     val specModifies = specification.subroutines.map(s => s.name -> s.modifies).toMap
     IRProgram.setModifies(specModifies)
@@ -120,7 +129,6 @@ object RunUtils {
 
     Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
-    Logger.info("[!] Done! Exiting...")
     val boogieProgram = boogieTranslator.translate(q.boogieTranslation)
     boogieProgram
   }
@@ -158,34 +166,34 @@ object RunUtils {
     val constPropSolver = ConstantPropagationSolver(cfg)
     val constPropResult = constPropSolver.analyze()
 
-    def newSolverTest(): Unit = {
-      val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
-      val newCPResult = ilcpsolver.analyze()
+    //def newSolverTest(): Unit = {
+    //  val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
+    //  val newCPResult = ilcpsolver.analyze()
 
-      val newCommandDomain = ilcpsolver.domain.filter(_.isInstanceOf[Command])
+    //  val newCommandDomain = ilcpsolver.domain.filter(_.isInstanceOf[Command])
 
-      val newRes = newCPResult.flatMap((x, y) => y.flatMap {
-        case (_, el) if el == FlatLattice[BitVecLiteral].top || el == FlatLattice[BitVecLiteral].bottom => None
-        case z => Some(x -> z)
-      })
-      val oldRes = constPropResult.filter((x,y) => x.isInstanceOf[CfgNodeWithData[CFGPosition]]).flatMap((x, y) => y.flatMap {
-        case (_, el) if el == FlatLattice[BitVecLiteral].top || el == FlatLattice[BitVecLiteral].bottom => None
-        case z => Some(x.asInstanceOf[CfgNodeWithData[Any]].data -> z)
-      })
-      val both = newRes.toSet.intersect(oldRes.toSet)
-      val notnew = (newRes.toSet).filter(x => !both.contains(x)).toList.sorted((a, b) => a._2._1.name.compare(b._2._1.name))
-      val notOld = (oldRes.toSet).filter(x => !both.contains(x)).toList.sorted((a,b) => a._2._1.name.compare(b._2._1.name))
-      // newRes and oldRes should have value equality
+    //  val newRes = newCPResult.flatMap((x, y) => y.flatMap {
+    //    case (_, el) if el == FlatLattice[BitVecLiteral].top || el == FlatLattice[BitVecLiteral].bottom => None
+    //    case z => Some(x -> z)
+    //  })
+    //  val oldRes = constPropResult.filter((x,y) => x.isInstanceOf[CfgNodeWithData[CFGPosition]]).flatMap((x, y) => y.flatMap {
+    //    case (_, el) if el == FlatLattice[BitVecLiteral].top || el == FlatLattice[BitVecLiteral].bottom => None
+    //    case z => Some(x.asInstanceOf[CfgNodeWithData[Any]].data -> z)
+    //  })
+    //  val both = newRes.toSet.intersect(oldRes.toSet)
+    //  val notnew = (newRes.toSet).filter(x => !both.contains(x)).toList.sorted((a, b) => a._2._1.name.compare(b._2._1.name))
+    //  val notOld = (oldRes.toSet).filter(x => !both.contains(x)).toList.sorted((a,b) => a._2._1.name.compare(b._2._1.name))
+    //  // newRes and oldRes should have value equality
 
-      //config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_newconstprop$iteration.txt"))
-      config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram), s"program.dot"))
-      config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram, newCPResult.map((k,v) => (k, v.toString))), s"program-constprop.dot"))
+    //  //config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_newconstprop$iteration.txt"))
+    //  config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram), s"program.dot"))
+    //  config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram, newCPResult.map((k,v) => (k, v.toString))), s"program-constprop.dot"))
 
-      config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_new_cpres$iteration.txt"))
-      config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_old_cpres$iteration.txt"))
+    //  config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_new_cpres$iteration.txt"))
+    //  config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_old_cpres$iteration.txt"))
 
-    }
-    newSolverTest()
+    //}
+    //newSolverTest()
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_constprop$iteration.txt"))
@@ -211,7 +219,7 @@ object RunUtils {
 
     Logger.info("[!] Running VSA")
     val vsaSolver = ValueSetAnalysisSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
-    val vsaResult = vsaSolver.analyze()
+    val vsaResult: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, true), Output.dotIder), s"${s}_vsa$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, vsaResult), s"${s}_vsa$iteration.txt"))
@@ -369,7 +377,7 @@ object RunUtils {
 
   def resolveCFG(
       cfg: ProgramCfg,
-      valueSets: Map[CfgNode, Map[Variable | MemoryRegion, Set[Value]]],
+      valueSets: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
       IRProgram: Program
   ): (Program, Boolean) = {
     var modified: Boolean = false
@@ -425,25 +433,31 @@ object RunUtils {
               // We want to replace all possible indirect calls based on this CFG, before regenerating it from the IR
               return
             }
-            val valueSet = valueSets(n)
-            val targetNames = resolveAddresses(valueSet(indirectCall.target)).map(_.name).toList.sorted
-            val targets = targetNames.map(name => IRProgram.procedures.filter(_.name.equals(name)).head)
-            if (targets.size == 1) {
-              modified = true
-              block.replaceJump(DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label))
-            } else if (targets.size > 1) {
-              modified = true
-              val procedure = c.parent.data
-              val newBlocks = ArrayBuffer[Block]()
-              for (t <- targets) {
-                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
-                val newLabel: String = block.label + t.name
-                val bl = Block(newLabel, None, ArrayBuffer(assume), DirectCall(t, indirectCall.returnTarget, None))
-                newBlocks.append(bl)
+            valueSets(n) match {
+              case Lift(valueSet) =>
+                val targetNames = resolveAddresses(valueSet(indirectCall.target)).map(_.name).toList.sorted
+                val targets = targetNames.map(name => IRProgram.procedures.filter(_.name.equals(name)).head)
+
+                if (targets.size == 1) {
+                  modified = true
+                  val newCall = DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label)
+                  block.replaceJump(newCall)
+                } else if (targets.size > 1) {
+                  modified = true
+                  val procedure = c.parent.data
+                  val newBlocks = ArrayBuffer[Block]()
+                  for (t <- targets) {
+                    val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
+                    val newLabel: String = block.label + t.name
+                    val directCall = DirectCall(t, indirectCall.returnTarget)
+                    newBlocks.append(Block(newLabel, None, ArrayBuffer(assume), directCall))
+                  }
+                  procedure.addBlocks(newBlocks)
+                  val newCall = GoTo(newBlocks, indirectCall.label)
+                  block.replaceJump(newCall)
+                }
+              case LiftedBottom =>
               }
-              procedure.addBlocks(newBlocks)
-              block.replaceJump(GoTo(newBlocks, indirectCall.label))
-            }
           case _ =>
       case _ =>
     }

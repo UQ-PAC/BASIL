@@ -170,7 +170,7 @@ class Interpreter() {
           case BoolNOT => if evalBool(un.arg, env) == TrueLiteral then FalseLiteral else TrueLiteral
           case _ => ???
         }
-
+      case _ => ???
     }
   }
 

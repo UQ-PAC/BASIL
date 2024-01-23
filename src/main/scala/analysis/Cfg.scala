@@ -204,6 +204,7 @@ class ProgramCfg:
 
   var startNode: CfgFunctionEntryNode = _
   var nodes: mutable.Set[CfgNode] = mutable.Set()
+  var funEntries: mutable.Set[CfgFunctionEntryNode] = mutable.Set()
 
   /** Inline edges are for connecting an intraprocedural cfg with a copy of another procedure's intraprocedural cfg
     * which is placed inside this one. They are considered interprocedural edges, and will not be followed if the caller
@@ -415,6 +416,7 @@ class ProgramCfgFactory:
     val funcExitNode: CfgFunctionExitNode = CfgFunctionExitNode(proc)
     cfg.nodes += funcEntryNode
     cfg.nodes += funcExitNode
+    cfg.funEntries += funcEntryNode
 
     procToCfg += (proc -> (funcEntryNode, funcExitNode))
     callToNodes += (funcEntryNode -> mutable.Set())
