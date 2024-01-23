@@ -20,11 +20,11 @@ import java.nio.charset.*
 import scala.util.boundary, boundary.break
 import java.nio.ByteBuffer
 
-class TempIf(val isLongIf: Boolean, val conds: ArrayBuffer[Statement], val stmts: ArrayBuffer[ArrayBuffer[Statement]], 
+class TempIf(val isLongIf: Boolean, val conds: ArrayBuffer[Expr], val stmts: ArrayBuffer[ArrayBuffer[Statement]], 
               val elseStatement: Option[Statement] = None, val label: Option[String] = None) extends Statement {}
 
 object TempIf {
-  def unapply(tempIf: TempIf): Option[(Boolean, ArrayBuffer[Statement], ArrayBuffer[ArrayBuffer[Statement]], Option[Statement], Option[String])] = {
+  def unapply(tempIf: TempIf): Option[(Boolean, ArrayBuffer[Expr], ArrayBuffer[ArrayBuffer[Statement]], Option[Statement], Option[String])] = {
     Some((tempIf.isLongIf, tempIf.conds, tempIf.stmts, tempIf.elseStatement, tempIf.label))
   }
 }
@@ -274,7 +274,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
       decodedBytes(decodedBytes.length - 1) = (decodedBytes.last + blkCount).toByte
       Base64.getEncoder.encodeToString(decodedBytes)
     }
-    val create_TempIf: Statement => TempIf = conds => TempIf(false, ArrayBuffer(conds), ArrayBuffer[ArrayBuffer[Statement]]())
+    val create_TempIf: Expr => TempIf = conds => TempIf(false, ArrayBuffer(conds), ArrayBuffer[ArrayBuffer[Statement]]())
 
     if (blk.statements.exists {elem =>  elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}) {
        
@@ -401,8 +401,8 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
       case (false, true) =>
         val blks = ArrayBuffer[Block]()
-        val cond: Statement = ifStmt.asInstanceOf[TempIf].conds(0)
-        val notCond = Assume(UnaryExpr(BoolNOT, cond.asInstanceOf[Assume].body))
+        val cond: Statement = Assume(BinaryExpr(BVNEQ, ifStmt.asInstanceOf[TempIf].conds(0), BitVecLiteral(0,1)))
+        val notCond = Assume(BinaryExpr(BVEQ, ifStmt.asInstanceOf[TempIf].conds(0), BitVecLiteral(0,1)))
         edges.foreach { elem => 
           elem.label.get.`type` match {
             case proto.CFG.EdgeType.Type_Branch => 

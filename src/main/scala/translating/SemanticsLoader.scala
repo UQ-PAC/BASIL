@@ -72,7 +72,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
 
 
     val totalStmts = ArrayBuffer.newBuilder[ArrayBuffer[Statement]]
-    val conds = ArrayBuffer.newBuilder[Statement]
+    val conds = ArrayBuffer.newBuilder[Expr]
     
     var currentContext = ctx
     var prevContext = currentContext
@@ -87,7 +87,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
       }}
 
       totalStmts += stmts.to(ArrayBuffer)
-      conds += Assume(visitExpr(currentContext.expr()))
+      conds += visitExpr(currentContext.expr())
       prevContext = currentContext
       currentContext = currentContext.conditional_stmt()
     }
@@ -255,7 +255,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
       case "or_bits"     => return BinaryExpr(BVOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "and_bits"    => return BinaryExpr(BVAND, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "eor_bits"    => return BinaryExpr(BVXOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "eq_bits"     => return BinaryExpr(BVEQ, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
+      case "eq_bits"     => return BinaryExpr(BVCOMP, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "add_bits"    => return BinaryExpr(BVADD, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "sub_bits"    => return BinaryExpr(BVSUB, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "mul_bits"    => return BinaryExpr(BVMUL, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))  

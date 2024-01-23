@@ -266,7 +266,7 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
 
   private def inSize = arg.getType match {
     case bv: BitVecBType => bv.size
-    case _               => throw new Exception("type mismatch")
+    case _               => throw new Exception(s"Expected Bv but got ${arg.getType}")
   }
 
   override def toString: String = op match {
