@@ -90,7 +90,7 @@ object RunUtils {
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
 
-    q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il"))
+    q.loading.dumpIL.foreach(s => writeToFile(serialiseILSimple(IRProgram), s"$s-before-analysis.il"))
 
     q.staticAnalysis.foreach { analysisConfig =>
       IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets, analysisConfig, 1)
