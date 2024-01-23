@@ -674,15 +674,6 @@ implementation main()
     R30, Gamma_R30 := 1812bv64, true;
     call malloc();
     goto l00000249;
-  l0000029a:
-    assume {:captureState "l0000029a"} true;
-    R2, Gamma_R2 := 42bv64, true;
-    R1, Gamma_R1 := 0bv64, true;
-    R0, Gamma_R0 := 1bv64, true;
-    R1, Gamma_R1 := bvadd64(R1, 2296bv64), Gamma_R1;
-    R30, Gamma_R30 := 1848bv64, true;
-    call __printf_chk();
-    goto l000002b6;
   l00000249:
     assume {:captureState "l00000249"} true;
     R1, Gamma_R1 := 65bv64, true;
@@ -694,6 +685,15 @@ implementation main()
     R30, Gamma_R30 := 1828bv64, true;
     call printCharValue();
     goto l0000029a;
+  l0000029a:
+    assume {:captureState "l0000029a"} true;
+    R2, Gamma_R2 := 42bv64, true;
+    R1, Gamma_R1 := 0bv64, true;
+    R0, Gamma_R0 := 1bv64, true;
+    R1, Gamma_R1 := bvadd64(R1, 2296bv64), Gamma_R1;
+    R30, Gamma_R30 := 1848bv64, true;
+    call __printf_chk();
+    goto l000002b6;
   l000002b6:
     assume {:captureState "l000002b6"} true;
     R1, Gamma_R1 := 0bv64, true;

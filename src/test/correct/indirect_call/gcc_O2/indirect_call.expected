@@ -382,6 +382,11 @@ implementation main()
     R30, Gamma_R30 := 1620bv64, true;
     call puts();
     goto l000001ef;
+  l000001ef:
+    assume {:captureState "l000001ef"} true;
+    R30, Gamma_R30 := 1624bv64, true;
+    call greet();
+    goto l00000205;
   l00000205:
     assume {:captureState "l00000205"} true;
     R0, Gamma_R0 := 0bv64, true;
@@ -389,11 +394,6 @@ implementation main()
     R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
     goto main_return;
-  l000001ef:
-    assume {:captureState "l000001ef"} true;
-    R30, Gamma_R30 := 1624bv64, true;
-    call greet();
-    goto l00000205;
   main_return:
     assume {:captureState "main_return"} true;
     return;

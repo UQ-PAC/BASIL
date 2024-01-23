@@ -310,14 +310,6 @@ implementation main()
     R30, Gamma_R30 := 1900bv64, true;
     call printf();
     goto l00000342;
-  l00000359:
-    assume {:captureState "l00000359"} true;
-    R0, Gamma_R0 := 0bv64, true;
-    R0, Gamma_R0 := bvadd64(R0, 2016bv64), Gamma_R0;
-    R1, Gamma_R1 := 10bv64, true;
-    R30, Gamma_R30 := 1932bv64, true;
-    call printf();
-    goto l00000370;
   l00000342:
     assume {:captureState "l00000342"} true;
     R0, Gamma_R0 := 0bv64, true;
@@ -326,6 +318,14 @@ implementation main()
     R30, Gamma_R30 := 1916bv64, true;
     call printf();
     goto l00000359;
+  l00000359:
+    assume {:captureState "l00000359"} true;
+    R0, Gamma_R0 := 0bv64, true;
+    R0, Gamma_R0 := bvadd64(R0, 2016bv64), Gamma_R0;
+    R1, Gamma_R1 := 10bv64, true;
+    R30, Gamma_R30 := 1932bv64, true;
+    call printf();
+    goto l00000370;
   l00000370:
     assume {:captureState "l00000370"} true;
     R0, Gamma_R0 := 0bv64, true;

@@ -126,25 +126,25 @@ implementation main()
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     assert Gamma_ZF;
     goto lmain_goto_l000002fd, lmain_goto_l000002fa;
-  lmain_goto_l000002fd:
-    assume {:captureState "lmain_goto_l000002fd"} true;
-    assume (bvcomp1(ZF, 1bv1) == 0bv1);
-    goto l000002fd;
   l000002fd:
     assume {:captureState "l000002fd"} true;
     R0, Gamma_R0 := 0bv64, true;
     goto l00000300;
-  l00000300:
-    assume {:captureState "l00000300"} true;
-    goto main_return;
   l000002fa:
     assume {:captureState "l000002fa"} true;
     R0, Gamma_R0 := zero_extend32_32(R9[32:0]), Gamma_R9;
     goto l00000300;
+  l00000300:
+    assume {:captureState "l00000300"} true;
+    goto main_return;
   lmain_goto_l000002fa:
     assume {:captureState "lmain_goto_l000002fa"} true;
     assume (bvcomp1(ZF, 1bv1) != 0bv1);
     goto l000002fa;
+  lmain_goto_l000002fd:
+    assume {:captureState "lmain_goto_l000002fd"} true;
+    assume (bvcomp1(ZF, 1bv1) == 0bv1);
+    goto l000002fd;
   main_return:
     assume {:captureState "main_return"} true;
     return;
