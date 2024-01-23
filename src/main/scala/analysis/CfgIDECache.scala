@@ -76,10 +76,6 @@ class CfgIDECache {
     )
 
     cfg.nodes.foreach(node =>
-      if (node.id == 196) {
-        print("")
-      }
-
       node match
         case jumpNode: CfgJumpNode => // makes indirect calls take intra procedural path in the analysis
           jumpNode.data match

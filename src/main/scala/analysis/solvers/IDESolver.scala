@@ -28,8 +28,13 @@ abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg, val cache: 
     // Current Lattice Element
     var x: Map[(CfgNode, DL , DL), EdgeFunction[T]] = _
 
-    val first: Set[(CfgNode, DL, DL)] = cfg.funEntries.foldLeft(Set() : Set[(CfgNode, DL, DL)]) {
-      (s, node) => s.+((node, Right(Lambda()), Right(Lambda())))
+    val first: Set[(CfgNode, DL, DL)] = //Set((cfg.startNode, Right(Lambda()), Right(Lambda())))
+      cfg.funEntries.foldLeft(Set() : Set[(CfgNode, DL, DL)]) {
+      (s, node) =>
+        if node.predInter.size == 0 then
+          s.+((node, Right(Lambda()), Right(Lambda())))
+        else
+          s
     }
 
 
@@ -151,8 +156,13 @@ abstract class IDESolver[D, T, L <: Lattice[T]](val cfg: ProgramCfg, val cache: 
   class Phase2(val cfg: ProgramCfg, val phase1: Phase1) extends WorklistFixPointFunctions[(CfgNode, DL), T, valuelattice.type]:
     val lattice: MapLattice[(CfgNode, DL), T, valuelattice.type] = new MapLattice(valuelattice)
     var x: Map[(CfgNode, DL), T] = _
-    val first: Set[(CfgNode, DL)] = cfg.funEntries.foldLeft(Set(): Set[(CfgNode, DL)]) {
-      (s, node) => s.+((node, Right(Lambda())))
+    val first: Set[(CfgNode, DL)] = // Set((cfg.startNode, Right(Lambda())))
+      cfg.funEntries.foldLeft(Set(): Set[(CfgNode, DL)]) {
+      (s, node) =>
+        if node.predInter.size == 0 then
+          s.+((node, Right(Lambda())))
+        else
+          s
     }
 
     /**
