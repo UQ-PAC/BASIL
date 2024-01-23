@@ -160,6 +160,14 @@ object RunUtils {
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(RNAResult, true), Output.dotIder), s"${s}_RNA$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, RNAResult, iteration), s"${s}_RNA$iteration.txt"))
 
+    Logger.info("[!] Running RegToMemAnalysisSolver")
+    val RegToSolver = RegToMemAnalysisSolver(cfg)
+    val RegToResult = RegToSolver.analyze()
+
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(RegToResult, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, RegToResult, iteration), s"${s}_RegTo$iteration.txt"))
+
+
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationSolver(cfg)
     val constPropResult = constPropSolver.analyze()
@@ -182,7 +190,7 @@ object RunUtils {
     steensgaardSolver.mayAlias()
 
     Logger.info("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult)
+    val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, RegToResult)
     val mraResult = mraSolver.analyze()
     memoryRegionAnalysisResults = mraResult
 
@@ -202,10 +210,11 @@ object RunUtils {
 
     Logger.info("[!] Resolving CFG")
     val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult, IRProgram)
-    if (modified) {
-      Logger.info(s"[!] Analysing again (iter $iteration)")
-      return analyse(newIR, externalFunctions, globals, globalOffsets, config, iteration + 1)
-    }
+    // TODO: Uncomment
+//    if (modified) {
+//      Logger.info(s"[!] Analysing again (iter $iteration)")
+//      return analyse(newIR, externalFunctions, globals, globalOffsets, config, iteration + 1)
+//    }
 
     config.analysisDotPath.foreach { s =>
       val newCFG = ProgramCfgFactory().fromIR(newIR)

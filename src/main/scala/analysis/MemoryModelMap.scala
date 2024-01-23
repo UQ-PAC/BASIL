@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.*
-import ir.BitVecLiteral
+import ir.{BitVecLiteral, Procedure}
 
 import scala.collection.mutable
 
@@ -117,8 +117,8 @@ trait MemoryRegion {
   val content: mutable.Set[BitVecLiteral] = mutable.Set()
 }
 
-class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral, val parent: RegisterVariableWrapper = null) extends MemoryRegion {
-  override def toString: String = s"Stack($regionIdentifier, $start, ${if parent != null then parent.variable else "Null"}) -> $content"
+class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral, val parent: Procedure = null) extends MemoryRegion {
+  override def toString: String = s"Stack($regionIdentifier, $start, ${if parent != null then parent else "Null"}) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
     case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier && s.parent == parent

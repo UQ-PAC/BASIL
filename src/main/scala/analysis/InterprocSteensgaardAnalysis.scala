@@ -47,7 +47,7 @@ class InterprocSteensgaardAnalysis(
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
-  val stackMap: mutable.Map[CfgFunctionEntryNode, mutable.Map[Expr, StackRegion]] = mutable.Map()
+  val stackMap: mutable.Map[Expr, StackRegion] = mutable.Map()
   val spList = ListBuffer[Expr](stackPointer)
 
   private def nextMallocCount() = {
@@ -68,12 +68,12 @@ class InterprocSteensgaardAnalysis(
    * @param parent : the function entry node
    * @return the stack region corresponding to the offset
    */
-  def poolMaster(expr: BitVecLiteral, parent: CfgFunctionEntryNode, stackBase: RegisterVariableWrapper): StackRegion = {
-    val stackPool = stackMap.getOrElseUpdate(parent, mutable.HashMap())
+  def poolMaster(expr: BitVecLiteral, stackBase: RegisterVariableWrapper): StackRegion = {
+    val stackPool = stackMap
     if (stackPool.contains(expr)) {
       stackPool(expr)
     } else {
-      val newRegion = StackRegion(nextStackCount(), expr, stackBase)
+      val newRegion = StackRegion(nextStackCount(), expr)
       stackPool += (expr -> newRegion)
       newRegion
     }
@@ -110,11 +110,8 @@ class InterprocSteensgaardAnalysis(
           // remove lhs from spList
           if spList.contains(localAssign.lhs) && localAssign.lhs != stackPointer then // TODO: This is a hack: it should check for stack ptr using the wrapper
             spList.remove(spList.indexOf(localAssign.lhs))
-          else if spList.contains(localAssign.lhs) then {
-            println("Not removing stack pointer")
-          }
         }
-        // should handle the store case (last case)
+        // TODO: should handle the store case (last case)
       case _ =>
     }
   }
@@ -127,7 +124,7 @@ class InterprocSteensgaardAnalysis(
       case binOp: BinaryExpr =>
         if (spList.contains(binOp.arg1)) {
           evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach(
-            b => regions += poolMaster(b, n.parent, RegisterVariableWrapper(binOp.arg1.asInstanceOf[Register]))
+            b => regions += poolMaster(b, RegisterVariableWrapper(binOp.arg1.asInstanceOf[Register]))
           )
         } else {
           evaluateExpressionWithSSA(binOp, constantProp(n)).foreach(
@@ -137,22 +134,21 @@ class InterprocSteensgaardAnalysis(
       case bitVecLiteral: BitVecLiteral =>
         if (globals.contains(bitVecLiteral.value)) {
           val globalName = globals(bitVecLiteral.value)
-          Set(DataRegion(globalName, bitVecLiteral))
+          regions = regions ++ Set(DataRegion(globalName, bitVecLiteral))
         } else if (subroutines.contains(bitVecLiteral.value)) {
           val subroutineName = subroutines(bitVecLiteral.value)
-          Set(DataRegion(subroutineName, bitVecLiteral))
+          regions = regions ++ Set(DataRegion(subroutineName, bitVecLiteral))
         } else if (globalOffsets.contains(bitVecLiteral.value)) {
           val val1 = globalOffsets(bitVecLiteral.value)
           if (subroutines.contains(val1)) {
             val globalName = subroutines(val1)
-            Set(DataRegion(globalName, bitVecLiteral))
+            regions = regions ++ Set(DataRegion(globalName, bitVecLiteral))
           } else {
-            Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
+            regions = regions ++ Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
           }
         } else {
-          //throw new Exception(s"Unknown type for $bitVecLiteral")
           // unknown region here
-          Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
+          regions = regions ++ Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
         }
       case variable: Variable =>
         variable match {
@@ -164,8 +160,10 @@ class InterprocSteensgaardAnalysis(
             )
         }
       case _ =>
-        Logger.debug(s"type: ${exp.getClass} $exp\n")
-        throw new Exception("Unknown type")
+        regions
+        // TODO: FIXME
+//        Logger.info(s"type: ${exp.getClass} $exp\n")
+//        throw new Exception("Unknown type")
     }
     regions
   }
@@ -206,7 +204,7 @@ class InterprocSteensgaardAnalysis(
                 // X1 = &X2: [[X1]] = ↑[[X2]]
                 if (binOp.arg1 == stackPointer) {
                   evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach(
-                    b => unify(varToStTerm(RegisterVariableWrapper(localAssign.lhs)), PointerRef(allocToTerm(poolMaster(b, cmd.parent, RegisterVariableWrapper(binOp.arg1.asInstanceOf[Register])))))
+                    b => unify(varToStTerm(RegisterVariableWrapper(localAssign.lhs)), PointerRef(allocToTerm(poolMaster(b, RegisterVariableWrapper(binOp.arg1.asInstanceOf[Register])))))
                   )
                 }
               // TODO: should lookout for global base + offset case as well
@@ -225,10 +223,9 @@ class InterprocSteensgaardAnalysis(
                     // TODO: This might not be correct for globals
                     // X1 = &X: [[X1]] = ↑[[X2]] (but for globals)
                     val $X2 = eval(memoryLoad.index, cmd)
-                    $X2 match
-                      case region: MemoryRegion =>
-                        unify(varToStTerm(RegisterVariableWrapper(X1)), PointerRef(allocToTerm(region)))
-                      case _ =>
+                    $X2.foreach(
+                      x => unify(varToStTerm(RegisterVariableWrapper(localAssign.lhs)), PointerRef(allocToTerm(x)))
+                    )
                   case variable: Variable =>
                     // X1 = X2: [[X1]] = [[X2]]
                     val X1 = localAssign.lhs
@@ -239,7 +236,9 @@ class InterprocSteensgaardAnalysis(
           case memoryAssign: MemoryAssign =>
             // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
             val X1_star = eval(memoryAssign.rhs.index, cmd)
-            val X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(n))
+            var X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(n))
+            if X2.isEmpty then
+              println("Maybe a region: " + eval(memoryAssign.rhs.value, cmd))
             println("X2 is: " + X2)
             println("Evaluated: " + memoryAssign.rhs.value)
             println("Region " + X1_star)

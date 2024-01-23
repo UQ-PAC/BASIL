@@ -193,11 +193,14 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                            val globals: Map[BigInt, String],
                            val globalOffsets: Map[BigInt, BigInt],
                            val subroutines: Map[BigInt, String],
-                           val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]) {
+                           val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
+                           val ANRResult: Map[CfgNode, Set[Variable]],
+                           val RNAResult: Map[CfgNode, Set[Variable]],
+                           val RegToResult: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[MemoryLoad]]]) {
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
-  val stackMap: mutable.Map[CfgFunctionEntryNode, mutable.Map[Expr, StackRegion]] = mutable.Map()
+  val stackMap: mutable.Map[Procedure, mutable.Map[Expr, StackRegion]] = mutable.Map()
 
   private def nextMallocCount() = {
     mallocCount += 1
@@ -217,12 +220,12 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
    * @param parent : the function entry node
    * @return the stack region corresponding to the offset
    */
-  def poolMaster(expr: BitVecLiteral, parent: CfgFunctionEntryNode): StackRegion = {
-    val stackPool = stackMap.getOrElseUpdate(parent, mutable.HashMap())
+  def poolMaster(expr: BitVecLiteral, stackBase: Procedure): StackRegion = {
+    val stackPool = stackMap.getOrElseUpdate(stackBase, mutable.HashMap())
     if (stackPool.contains(expr)) {
       stackPool(expr)
     } else {
-      val newRegion = StackRegion(nextStackCount(), expr)
+      val newRegion = StackRegion(nextStackCount(), expr, stackBase)
       stackPool += (expr -> newRegion)
       newRegion
     }
@@ -247,6 +250,24 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     buffers
   }
 
+  def stackDetection(stmt: Statement): Unit = {
+    println("Stack detection")
+    println(spList)
+    stmt match {
+      case localAssign: LocalAssign =>
+        if (spList.contains(localAssign.rhs)) {
+          // add lhs to spList
+          spList.addOne(localAssign.lhs)
+        } else {
+          // remove lhs from spList
+          if spList.contains(localAssign.lhs) && localAssign.lhs != stackPointer then // TODO: This is a hack: it should check for stack ptr using the wrapper
+            spList.remove(spList.indexOf(localAssign.lhs))
+        }
+      // TODO: should handle the store case (last case)
+      case _ =>
+    }
+  }
+
   val regionLattice: PowersetLattice[MemoryRegion] = PowersetLattice()
 
   /**
@@ -263,10 +284,11 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
   private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
   private val framePointer = Register("R29", BitVecType(64))
-
-  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
-
   private val mallocVariable = Register("R0", BitVecType(64))
+  private val spList = ListBuffer[Expr](stackPointer)
+  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
+  val regToRegion: mutable.Map[RegisterVariableWrapper, MemoryRegion] = mutable.Map()
+  val procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]] = mutable.Map()
 
   def eval(exp: Expr, env: Set[MemoryRegion], n: CfgCommandNode): Set[MemoryRegion] = {
     Logger.debug(s"evaluating $exp")
@@ -274,9 +296,9 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     Logger.debug(s"n: $n")
     exp match {
       case binOp: BinaryExpr =>
-        if (binOp.arg1 == stackPointer) {
+        if (spList.contains(binOp.arg1)) {
           evaluateExpression(binOp.arg2, constantProp(n)) match {
-            case Some(b: BitVecLiteral) => Set(poolMaster(b, n.parent))
+            case Some(b: BitVecLiteral) => Set(poolMaster(b, n.parent.data))
             case None => env
           }
         } else {
@@ -309,7 +331,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
         variable match {
           case _: LocalVar =>
             env
-          case reg: Register if reg == stackPointer =>
+          case reg: Register if spList.contains(reg) =>
             env
           case _ =>
             evaluateExpression(variable, constantProp(n)) match {
@@ -332,6 +354,21 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     case cmd: CfgCommandNode =>
       cmd.data match {
         case directCall: DirectCall =>
+          val ANR = ANRResult(n)
+          val RNA = RNAResult(n)
+          val parameters = ANR.intersect(RNA)
+          for (elem <- parameters) {
+            val ctx = RegToResult(n)
+            if (ctx.contains(RegisterVariableWrapper(elem))) {
+              ctx(RegisterVariableWrapper(elem)) match {
+                case FlatEl(al) =>
+                  val regions = eval(al, s, cmd)
+                  //val targetMap = stackMap(directCall.target)
+                  //cfg.funEntries.filter(fn => fn.data == directCall.target).head
+                  procedureToSharedRegions(directCall.target).addAll(regions)
+              }
+            }
+          }
           if (directCall.target.name == "malloc") {
             evaluateExpression(mallocVariable, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
@@ -369,8 +406,11 @@ class MemoryRegionAnalysisSolver(
     globals: Map[BigInt, String],
     globalOffsets: Map[BigInt, BigInt],
     subroutines: Map[BigInt, String],
-    constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]
-) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp)
+    constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
+    ANRResult: Map[CfgNode, Set[Variable]],
+    RNAResult: Map[CfgNode, Set[Variable]],
+    RegToResult: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[MemoryLoad]]]
+) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, RegToResult)
     with IntraproceduralForwardDependencies
     with Analysis[Map[CfgNode, LiftedElement[Set[MemoryRegion]]]]
     with WorklistFixpointSolverWithReachability[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]] {
