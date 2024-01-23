@@ -187,18 +187,22 @@ object RunUtils {
     }
 
     config.analysisDotPath.foreach { s =>
-      val newCFG = ProgramCfgFactory().fromIR(newIR)
-      writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
+      val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 0)
+      writeToFile(newCFG.toDot(Output.labeler(Map(), false), Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
-//    val livenessAnalysisResult = LiveVarAnalysis(cfg).analyze()
-//    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(livenessAnalysisResult, true), Output.dotIder), s"${s}_liveness$iteration.dot"))
+    val livenessAnalysisResult = LiveVarAnalysis(cfg).analyze()
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(livenessAnalysisResult, true), Output.dotIder), s"${s}_liveness$iteration.dot"))
 
 //    val UninitAnalysisResult = UninitVariablesAnalysis(cfg).analyze()
 //    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(UninitAnalysisResult, false), Output.dotIder), s"${s}_uninit$iteration.dot"))
 
-    val ReachingDefsAnalysisResult = ReachingDefsAnalysis(cfg).analyze()
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(ReachingDefsAnalysisResult, false), Output.dotIder), s"${s}_reaching$iteration.dot"))
+//    val reachingDefsAnalysisResult = ReachingDefsAnalysis(cfg).analyze()
+//    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(reachingDefsAnalysisResult, false), Output.dotIder), s"${s}_reaching$iteration.dot"))
+//    config.analysisDotPath.foreach(s => writeToFile(printAnalysisResults(cfg, reachingDefsAnalysisResult, iteration), s"${s}_reaching$iteration.txt"))
+
+//    val copyConstantAnalysisResults = CopyConstantAnalysis(cfg).analyze()
+//    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(copyConstantAnalysisResults, false), Output.dotIder), s"${s}_copy$iteration.dot"))
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
 
@@ -262,7 +266,7 @@ object RunUtils {
     def printNode(node: CfgNode): Unit = {
       s.append(node)
       s.append(" :: ")
-      s.append(result(node))
+      s.append(result.getOrElse(node, "-"))
       s.append(System.lineSeparator())
     }
 
