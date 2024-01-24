@@ -175,6 +175,9 @@ implementation main()
     assert ((z_old == 0bv32) ==> ((memory_load32_le(mem, $x_addr) == x_old) && (memory_load32_le(mem, $z_addr) == z_old)));
     assume {:captureState "%00000339"} true;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
+    goto main_return;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }
 

@@ -205,6 +205,9 @@ implementation main()
     assert (L(mem, bvadd64(R1, 24bv64)) ==> Gamma_R2);
     mem, Gamma_mem := memory_store8_le(mem, bvadd64(R1, 24bv64), R2[8:0]), gamma_store8(Gamma_mem, bvadd64(R1, 24bv64), Gamma_R2);
     assume {:captureState "%0000020a"} true;
+    goto main_return;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }
 

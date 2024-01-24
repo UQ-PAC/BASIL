@@ -186,7 +186,7 @@ implementation main()
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 4bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 4bv64), Gamma_R8);
     assume {:captureState "%00000407"} true;
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
-    return;
+    goto main_return;
   lmain_goto_l000003c9:
     assume {:captureState "lmain_goto_l000003c9"} true;
     assume (bvcomp32(R10[32:0], 0bv32) != 0bv1);
@@ -195,5 +195,8 @@ implementation main()
     assume {:captureState "lmain_goto_l000003ce"} true;
     assume (bvcomp32(R10[32:0], 0bv32) == 0bv1);
     goto l000003ce;
+  main_return:
+    assume {:captureState "main_return"} true;
+    return;
 }
 

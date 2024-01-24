@@ -68,6 +68,9 @@ implementation main()
   lmain:
     assume {:captureState "lmain"} true;
     R0, Gamma_R0 := 0bv64, true;
+    goto main_return;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }
 
