@@ -120,6 +120,10 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     initialMemory = initialMemoryNew
   }
 
+  /**
+   * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+   * not guaranteed to be in any defined order. 
+   */
   class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
     val stack = mutable.Stack[CFGPosition]()
     stack.addAll(begin.procedures)
@@ -142,6 +146,10 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 
   }
 
+  /**
+   * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+   * not guaranteed to be in any defined order. 
+   */
   def iterator: Iterator[CFGPosition] = {
     ILUnorderedIterator(this)
   }
