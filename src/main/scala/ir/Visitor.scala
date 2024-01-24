@@ -423,6 +423,22 @@ class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
 }
 
 
+class AddCallReturnBlocks extends Visitor {
+  /**
+   * Add a dummy call return block with no statements after each call. 
+   */
+  override def visitDirectCall(node: DirectCall): Jump = {
+    node.returnTarget = Some(CallReturnBlock(node))
+    node
+  }
+
+  override def visitIndirectCall(node: IndirectCall): Jump = {
+    node.returnTarget = Some(CallReturnBlock(node))
+    node
+  }
+}
+
+
 class ConvertToSingleProcedureReturn extends Visitor {
   override def visitJump(node: Jump): Jump = {
 

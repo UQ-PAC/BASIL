@@ -95,9 +95,11 @@ object RunUtils {
     val externalRemover = ExternalRemover(externalNames)
     val renamer = Renamer(reserved)
     val returnUnifier = ConvertToSingleProcedureReturn()
+    val callReturner = AddCallReturnBlocks()
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
     IRProgram = returnUnifier.visitProgram(IRProgram)
+    IRProgram = callReturner.visitProgram(IRProgram)
 
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il"))
