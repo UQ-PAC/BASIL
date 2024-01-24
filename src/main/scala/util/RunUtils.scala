@@ -18,12 +18,8 @@ import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
-import intrusivelist.IntrusiveList
-import analysis.CfgCommandNode
 
-import scala.annotation.tailrec
 import scala.collection.mutable
-
 
 object RunUtils {
   var memoryRegionAnalysisResults: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
@@ -222,7 +218,7 @@ object RunUtils {
     val vsaResult: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, true), Output.dotIder), s"${s}_vsa$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, vsaResult), s"${s}_vsa$iteration.txt"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, vsaResult, iteration), s"${s}_vsa$iteration.txt"))
 
     Logger.info("[!] Resolving CFG")
     val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult, IRProgram)
@@ -333,7 +329,7 @@ object RunUtils {
           }
           val successors = next.succIntra
           if (successors.size > 1) {
-            val successorsCmd = successors.collect { case c: CfgCommandNode => c }.toSeq.sortBy(_.data.toString)
+            val successorsCmd = successors.collect { case c: CfgCommandNode => c }.toSeq.sortBy(_.data.label)
             printGoTo(successorsCmd)
             for (s <- successorsCmd) {
               if (!visited.contains(s)) {
