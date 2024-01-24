@@ -1061,11 +1061,9 @@ implementation printCharValue()
     mem, Gamma_mem := memory_store8_le(mem, R3, R2[8:0]), gamma_store8(Gamma_mem, R3, Gamma_R2);
     assume {:captureState "%00000293"} true;
     call __printf_chk();
-    //no return target
-    assume false;
+    assume false; //no return target
   printCharValue_return:
     assume {:captureState "printCharValue_return"} true;
     return;
-
 }
 
