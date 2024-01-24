@@ -108,6 +108,9 @@ implementation main()
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R1, 28bv64), R2[32:0]), gamma_store32(Gamma_mem, bvadd64(R1, 28bv64), Gamma_R2);
     assert (arr$0_old == memory_load32_le(mem, bvadd64($arr_addr, 0bv64)));
     assume {:captureState "%000001be"} true;
+    goto main_return;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }
 

@@ -133,6 +133,9 @@ implementation main()
     mem, Gamma_mem := memory_store32_le(mem, R8, 0bv32), gamma_store32(Gamma_mem, R8, true);
     assert ((z_old == 0bv32) ==> ((memory_load32_le(mem, $x_addr) == x_old) && (memory_load32_le(mem, $z_addr) == z_old)));
     assume {:captureState "%000002fd"} true;
+    goto main_return;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }
 

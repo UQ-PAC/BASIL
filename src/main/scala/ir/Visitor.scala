@@ -2,6 +2,7 @@ package ir
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
+import intrusivelist.IntrusiveList
 
 abstract class Visitor {
 
@@ -47,16 +48,16 @@ abstract class Visitor {
   }
 
   def visitBlock(node: Block): Block = {
-    for (i <- node.statements.indices) {
-      node.statements(i) = visitStatement(node.statements(i))
+    for (s <- node.statements) {
+      node.statements.replace(s, visitStatement(s))
     }
-    node.jump = visitJump(node.jump)
+    node.replaceJump(visitJump(node.jump))
     node
   }
 
   def visitProcedure(node: Procedure): Procedure = {
-    for (i <- node.blocks.indices) {
-      node.blocks(i) = visitBlock(node.blocks(i))
+    for (b <- node.blocks) {
+      node.replaceBlock(b, visitBlock(b))
     }
     for (i <- node.in.indices) {
       node.in(i) = visitParameter(node.in(i))
@@ -253,7 +254,7 @@ abstract class IntraproceduralControlFlowVisitor extends Visitor {
   private val visitedBlocks: mutable.Set[Block] = mutable.Set()
 
   override def visitProcedure(node: Procedure): Procedure = {
-    node.blocks.headOption.foreach(visitBlock)
+    node.entryBlock.foreach(visitBlock)
     node
   }
 
@@ -261,11 +262,11 @@ abstract class IntraproceduralControlFlowVisitor extends Visitor {
     if (visitedBlocks.contains(node)) {
       return node
     }
-    for (i <- node.statements.indices) {
-      node.statements(i) = visitStatement(node.statements(i))
+    for (i <- node.statements) {
+      visitStatement(i)
     }
     visitedBlocks.add(node)
-    node.jump = visitJump(node.jump)
+    node.replaceJump(visitJump(node.jump))
     node
   }
 
@@ -391,7 +392,7 @@ class ExternalRemover(external: Set[String]) extends Visitor {
     if (external.contains(node.name)) {
       // update the modifies set before removing the body
       node.modifies.addAll(node.blocks.flatMap(_.modifies))
-      node.blocks = ArrayBuffer()
+      node.replaceBlocks(Seq())
     }
     super.visitProcedure(node)
   }
@@ -419,4 +420,24 @@ class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
     node
   }
 
+}
+
+
+class ConvertToSingleProcedureReturn extends Visitor {
+  override def visitJump(node: Jump): Jump = {
+
+    val returnBlock = node.parent.parent.returnBlock match {
+      case Some(b) => b
+      case None =>
+        val name = node.parent.parent.name + "_return"
+        val returnBlock = new Block(name, None, List(), new IndirectCall(Register("R30", BitVecType(64)), None, None))
+        node.parent.parent.addBlocks(returnBlock)
+        node.parent.parent.returnBlock = Some(returnBlock)
+    }
+
+    node match
+      case c: IndirectCall =>
+        if c.target.name == "R30" && c.returnTarget.isEmpty && !c.parent.isReturn then GoTo(Seq(c.parent.parent.returnBlock.get)) else node
+      case _ => node
+  }
 }

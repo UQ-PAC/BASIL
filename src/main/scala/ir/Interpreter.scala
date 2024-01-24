@@ -226,7 +226,7 @@ class Interpreter() {
     }
 
     // Procedure.Block
-    p.blocks.headOption match {
+    p.entryBlock match {
       case Some(block) => nextBlock = Some(block)
       case None        => nextBlock = Some(returnBlock.pop())
     }
@@ -295,8 +295,12 @@ class Interpreter() {
       case assign: MemoryAssign =>
         Logger.debug(s"MemoryAssign ${assign.lhs} = ${assign.rhs}")
         val evalRight = eval(assign.rhs, regs)
-        Logger.debug(s"MemoryAssign ${assign.lhs} := 0x${evalRight.value.toString(16)}[u$evalRight.size]\n")
-
+        evalRight match {
+          case BitVecLiteral(value, size) =>
+            Logger.debug(s"MemoryAssign ${assign.lhs} := 0x${value.toString(16)}[u$size]\n")
+          case _ => throw new Exception("cannot register non-bitvectors")
+        }
+      case _ : NOP => ()
       case assert: Assert =>
         Logger.debug(assert)
         // TODO

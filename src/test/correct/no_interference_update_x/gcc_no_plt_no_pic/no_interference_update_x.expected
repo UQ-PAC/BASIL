@@ -108,6 +108,9 @@ implementation main()
     assert (memory_load32_le(mem, $y_addr) == y_old);
     assume {:captureState "%0000085b"} true;
     R0, Gamma_R0 := 0bv64, true;
+    goto main_return;
+  main_return:
+    assume {:captureState "main_return"} true;
     return;
 }
 

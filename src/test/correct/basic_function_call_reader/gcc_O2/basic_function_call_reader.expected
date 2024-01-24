@@ -103,7 +103,7 @@ implementation main()
     call rely();
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, bvadd64(R0, 20bv64))), (gamma_load32(Gamma_mem, bvadd64(R0, 20bv64)) || L(mem, bvadd64(R0, 20bv64)));
     assert Gamma_R0;
-    goto lmain_goto_l000001bc, lmain_goto_l00000398;
+    goto lmain_goto_l00000398, lmain_goto_l000001bc;
   l00000398:
     assume {:captureState "l00000398"} true;
     call rely();
@@ -111,7 +111,7 @@ implementation main()
     goto l000001bc;
   l000001bc:
     assume {:captureState "l000001bc"} true;
-    return;
+    goto main_return;
   lmain_goto_l000001bc:
     assume {:captureState "lmain_goto_l000001bc"} true;
     assume (bvcomp32(R0[32:0], 0bv32) != 0bv1);
@@ -120,5 +120,8 @@ implementation main()
     assume {:captureState "lmain_goto_l00000398"} true;
     assume (bvcomp32(R0[32:0], 0bv32) == 0bv1);
     goto l00000398;
+  main_return:
+    assume {:captureState "main_return"} true;
+    return;
 }
 

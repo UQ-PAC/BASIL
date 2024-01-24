@@ -130,7 +130,7 @@ implementation main()
     assume {:captureState "l00000318"} true;
     R0, Gamma_R0 := 0bv64, true;
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
-    return;
+    goto main_return;
   lmain_goto_l00000318:
     assume {:captureState "lmain_goto_l00000318"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);
@@ -139,5 +139,8 @@ implementation main()
     assume {:captureState "lmain_goto_l0000032d"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);
     goto l0000032d;
+  main_return:
+    assume {:captureState "main_return"} true;
+    return;
 }
 
