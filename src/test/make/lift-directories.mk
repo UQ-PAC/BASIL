@@ -25,7 +25,7 @@ BASIL_FLAGS ?=
 #BOOGIE_FLAGS=/proverOpt:O:smt.array.extensional=false
 BOOGIE_FLAGS ?= /useArrayAxioms
 
-LIFT_ARTEFACTS=$(NAME).adt $(NAME).bir $(NAME).relf
+LIFT_ARTEFACTS=$(NAME).adt $(NAME).bir $(NAME).relf $(NAME).gts
 
 ENABLED_COMPILERS ?= clang clang_O2 clang_pic clang_no_plt_no_pic gcc gcc_O2 gcc_no_plt_no_pic gcc_pic
 
