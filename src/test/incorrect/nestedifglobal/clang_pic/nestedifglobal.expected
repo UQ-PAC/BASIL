@@ -10,6 +10,12 @@ var {:extern} R8: bv64;
 var {:extern} R9: bv64;
 var {:extern} mem: [bv64]bv8;
 var {:extern} stack: [bv64]bv8;
+const {:extern} $_IO_stdin_used_addr: bv64;
+axiom ($_IO_stdin_used_addr == 2124bv64);
+const {:extern} $x_addr: bv64;
+axiom ($x_addr == 131124bv64);
+const {:extern} $z_addr: bv64;
+axiom ($z_addr == 131128bv64);
 function {:extern} L(memory: [bv64]bv8, index: bv64) returns (bool) {
   false
 }
@@ -64,16 +70,16 @@ procedure {:extern} rely();
   modifies Gamma_mem, mem;
   ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
-  free ensures (memory_load8_le(mem, 2052bv64) == 1bv8);
-  free ensures (memory_load8_le(mem, 2053bv64) == 0bv8);
-  free ensures (memory_load8_le(mem, 2054bv64) == 2bv8);
-  free ensures (memory_load8_le(mem, 2055bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 69576bv64) == 69684bv64);
-  free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
-  free ensures (memory_load64_le(mem, 69048bv64) == 1872bv64);
-  free ensures (memory_load64_le(mem, 69568bv64) == 69688bv64);
-  free ensures (memory_load64_le(mem, 69592bv64) == 1876bv64);
-  free ensures (memory_load64_le(mem, 69056bv64) == 1792bv64);
+  free ensures (memory_load8_le(mem, 2124bv64) == 1bv8);
+  free ensures (memory_load8_le(mem, 2125bv64) == 0bv8);
+  free ensures (memory_load8_le(mem, 2126bv64) == 2bv8);
+  free ensures (memory_load8_le(mem, 2127bv64) == 0bv8);
+  free ensures (memory_load64_le(mem, 131112bv64) == 131112bv64);
+  free ensures (memory_load64_le(mem, 130472bv64) == 1936bv64);
+  free ensures (memory_load64_le(mem, 131016bv64) == 131124bv64);
+  free ensures (memory_load64_le(mem, 131032bv64) == 1940bv64);
+  free ensures (memory_load64_le(mem, 131008bv64) == 131128bv64);
+  free ensures (memory_load64_le(mem, 130480bv64) == 1856bv64);
 
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
@@ -93,30 +99,30 @@ procedure {:extern} guarantee_reflexive();
 
 procedure main();
   modifies Gamma_R0, Gamma_R31, Gamma_R8, Gamma_R9, Gamma_mem, Gamma_stack, R0, R31, R8, R9, mem, stack;
-  free requires (memory_load64_le(mem, 69664bv64) == 0bv64);
-  free requires (memory_load64_le(mem, 69672bv64) == 69672bv64);
-  free requires (memory_load8_le(mem, 2052bv64) == 1bv8);
-  free requires (memory_load8_le(mem, 2053bv64) == 0bv8);
-  free requires (memory_load8_le(mem, 2054bv64) == 2bv8);
-  free requires (memory_load8_le(mem, 2055bv64) == 0bv8);
-  free requires (memory_load64_le(mem, 69576bv64) == 69684bv64);
-  free requires (memory_load64_le(mem, 69672bv64) == 69672bv64);
-  free requires (memory_load64_le(mem, 69048bv64) == 1872bv64);
-  free requires (memory_load64_le(mem, 69568bv64) == 69688bv64);
-  free requires (memory_load64_le(mem, 69592bv64) == 1876bv64);
-  free requires (memory_load64_le(mem, 69056bv64) == 1792bv64);
+  free requires (memory_load64_le(mem, 131104bv64) == 0bv64);
+  free requires (memory_load64_le(mem, 131112bv64) == 131112bv64);
+  free requires (memory_load8_le(mem, 2124bv64) == 1bv8);
+  free requires (memory_load8_le(mem, 2125bv64) == 0bv8);
+  free requires (memory_load8_le(mem, 2126bv64) == 2bv8);
+  free requires (memory_load8_le(mem, 2127bv64) == 0bv8);
+  free requires (memory_load64_le(mem, 131112bv64) == 131112bv64);
+  free requires (memory_load64_le(mem, 130472bv64) == 1936bv64);
+  free requires (memory_load64_le(mem, 131016bv64) == 131124bv64);
+  free requires (memory_load64_le(mem, 131032bv64) == 1940bv64);
+  free requires (memory_load64_le(mem, 131008bv64) == 131128bv64);
+  free requires (memory_load64_le(mem, 130480bv64) == 1856bv64);
   free ensures (Gamma_R31 == old(Gamma_R31));
   free ensures (R31 == old(R31));
-  free ensures (memory_load8_le(mem, 2052bv64) == 1bv8);
-  free ensures (memory_load8_le(mem, 2053bv64) == 0bv8);
-  free ensures (memory_load8_le(mem, 2054bv64) == 2bv8);
-  free ensures (memory_load8_le(mem, 2055bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 69576bv64) == 69684bv64);
-  free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
-  free ensures (memory_load64_le(mem, 69048bv64) == 1872bv64);
-  free ensures (memory_load64_le(mem, 69568bv64) == 69688bv64);
-  free ensures (memory_load64_le(mem, 69592bv64) == 1876bv64);
-  free ensures (memory_load64_le(mem, 69056bv64) == 1792bv64);
+  free ensures (memory_load8_le(mem, 2124bv64) == 1bv8);
+  free ensures (memory_load8_le(mem, 2125bv64) == 0bv8);
+  free ensures (memory_load8_le(mem, 2126bv64) == 2bv8);
+  free ensures (memory_load8_le(mem, 2127bv64) == 0bv8);
+  free ensures (memory_load64_le(mem, 131112bv64) == 131112bv64);
+  free ensures (memory_load64_le(mem, 130472bv64) == 1936bv64);
+  free ensures (memory_load64_le(mem, 131016bv64) == 131124bv64);
+  free ensures (memory_load64_le(mem, 131032bv64) == 1940bv64);
+  free ensures (memory_load64_le(mem, 131008bv64) == 131128bv64);
+  free ensures (memory_load64_le(mem, 130480bv64) == 1856bv64);
 
 implementation main()
 {
@@ -137,22 +143,22 @@ implementation main()
   lmain:
     assume {:captureState "lmain"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551584bv64), Gamma_R31;
-    R8, Gamma_R8 := 65536bv64, true;
+    R8, Gamma_R8 := 126976bv64, true;
     call rely();
     R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 4040bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 4040bv64)) || L(mem, bvadd64(R8, 4040bv64)));
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 8bv64), R8), gamma_store64(Gamma_stack, bvadd64(R31, 8bv64), Gamma_R8);
-    assume {:captureState "%0000035e"} true;
+    assume {:captureState "%00000366"} true;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 28bv64), 0bv32), gamma_store32(Gamma_stack, bvadd64(R31, 28bv64), true);
-    assume {:captureState "%00000365"} true;
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 24bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 24bv64), Gamma_R0);
     assume {:captureState "%0000036d"} true;
+    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 24bv64), R0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 24bv64), Gamma_R0);
+    assume {:captureState "%00000375"} true;
     R9, Gamma_R9 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 24bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 24bv64));
     call rely();
     assert (L(mem, R8) ==> Gamma_R9);
     mem, Gamma_mem := memory_store32_le(mem, R8, R9[32:0]), gamma_store32(Gamma_mem, R8, Gamma_R9);
-    assume {:captureState "%0000037c"} true;
+    assume {:captureState "%00000384"} true;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 20bv64), 0bv32), gamma_store32(Gamma_stack, bvadd64(R31, 20bv64), true);
-    assume {:captureState "%00000383"} true;
+    assume {:captureState "%0000038b"} true;
     call rely();
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(mem, R8)), (gamma_load32(Gamma_mem, R8) || L(mem, R8));
     #4, Gamma_#4 := bvadd32(R8[32:0], 4294967295bv32), Gamma_R8;
@@ -162,30 +168,30 @@ implementation main()
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     R8, Gamma_R8 := zero_extend32_32(bvadd32(#4, 1bv32)), Gamma_#4;
     assert Gamma_ZF;
-    goto lmain_goto_l000003ae, lmain_goto_l000003ab;
-  l000003ae:
-    assume {:captureState "l000003ae"} true;
+    goto lmain_goto_l000003b6, lmain_goto_l000003b3;
+  l000003b6:
+    assume {:captureState "l000003b6"} true;
     R8, Gamma_R8 := 1bv64, true;
-    goto l000003b1;
-  l000003ab:
-    assume {:captureState "l000003ab"} true;
+    goto l000003b9;
+  l000003b3:
+    assume {:captureState "l000003b3"} true;
     R8, Gamma_R8 := 0bv64, true;
-    goto l000003b1;
-  l000003b1:
-    assume {:captureState "l000003b1"} true;
-    assert Gamma_R8;
-    goto l000003b1_goto_l000003b9, l000003b1_goto_l00000481;
-  l00000481:
-    assume {:captureState "l00000481"} true;
-    goto l00000482;
-  l00000482:
-    assume {:captureState "l00000482"} true;
-    R8, Gamma_R8 := 3bv64, true;
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 20bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 20bv64), Gamma_R8);
-    assume {:captureState "%00000490"} true;
     goto l000003b9;
   l000003b9:
     assume {:captureState "l000003b9"} true;
+    assert Gamma_R8;
+    goto l000003b9_goto_l00000495, l000003b9_goto_l000003c1;
+  l00000495:
+    assume {:captureState "l00000495"} true;
+    goto l00000496;
+  l00000496:
+    assume {:captureState "l00000496"} true;
+    R8, Gamma_R8 := 3bv64, true;
+    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 20bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 20bv64), Gamma_R8);
+    assume {:captureState "%000004a4"} true;
+    goto l000003c1;
+  l000003c1:
+    assume {:captureState "l000003c1"} true;
     R8, Gamma_R8 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     call rely();
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(mem, R8)), (gamma_load32(Gamma_mem, R8) || L(mem, R8));
@@ -196,30 +202,30 @@ implementation main()
     NF, Gamma_NF := bvadd32(#5, 1bv32)[32:31], Gamma_#5;
     R8, Gamma_R8 := zero_extend32_32(bvadd32(#5, 1bv32)), Gamma_#5;
     assert Gamma_ZF;
-    goto l000003b9_goto_l000003eb, l000003b9_goto_l000003ee;
-  l000003ee:
-    assume {:captureState "l000003ee"} true;
+    goto l000003c1_goto_l000003f6, l000003c1_goto_l000003f3;
+  l000003f6:
+    assume {:captureState "l000003f6"} true;
     R8, Gamma_R8 := 1bv64, true;
-    goto l000003f1;
-  l000003eb:
-    assume {:captureState "l000003eb"} true;
+    goto l000003f9;
+  l000003f3:
+    assume {:captureState "l000003f3"} true;
     R8, Gamma_R8 := 0bv64, true;
-    goto l000003f1;
-  l000003f1:
-    assume {:captureState "l000003f1"} true;
-    assert Gamma_R8;
-    goto l000003f1_goto_l000003f9, l000003f1_goto_l0000046c;
-  l0000046c:
-    assume {:captureState "l0000046c"} true;
-    goto l0000046d;
-  l0000046d:
-    assume {:captureState "l0000046d"} true;
-    R8, Gamma_R8 := 5bv64, true;
-    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 20bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 20bv64), Gamma_R8);
-    assume {:captureState "%0000047b"} true;
     goto l000003f9;
   l000003f9:
     assume {:captureState "l000003f9"} true;
+    assert Gamma_R8;
+    goto l000003f9_goto_l00000480, l000003f9_goto_l00000401;
+  l00000480:
+    assume {:captureState "l00000480"} true;
+    goto l00000481;
+  l00000481:
+    assume {:captureState "l00000481"} true;
+    R8, Gamma_R8 := 5bv64, true;
+    stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 20bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 20bv64), Gamma_R8);
+    assume {:captureState "%0000048f"} true;
+    goto l00000401;
+  l00000401:
+    assume {:captureState "l00000401"} true;
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 20bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 20bv64));
     #6, Gamma_#6 := bvadd32(R8[32:0], 4294967292bv32), Gamma_R8;
     VF, Gamma_VF := bvnot1(bvcomp33(sign_extend1_32(bvadd32(#6, 1bv32)), bvadd33(sign_extend1_32(R8[32:0]), 8589934589bv33))), (Gamma_R8 && Gamma_#6);
@@ -228,85 +234,89 @@ implementation main()
     NF, Gamma_NF := bvadd32(#6, 1bv32)[32:31], Gamma_#6;
     R8, Gamma_R8 := zero_extend32_32(bvadd32(#6, 1bv32)), Gamma_#6;
     assert Gamma_ZF;
-    goto l000003f9_goto_l00000424, l000003f9_goto_l00000427;
-  l00000427:
-    assume {:captureState "l00000427"} true;
+    goto l00000401_goto_l0000042f, l00000401_goto_l0000042c;
+  l0000042f:
+    assume {:captureState "l0000042f"} true;
     R8, Gamma_R8 := 1bv64, true;
-    goto l0000042a;
-  l00000424:
-    assume {:captureState "l00000424"} true;
+    goto l00000432;
+  l0000042c:
+    assume {:captureState "l0000042c"} true;
     R8, Gamma_R8 := 0bv64, true;
-    goto l0000042a;
-  l0000042a:
-    assume {:captureState "l0000042a"} true;
+    goto l00000432;
+  l00000432:
+    assume {:captureState "l00000432"} true;
     assert Gamma_R8;
-    goto l0000042a_goto_l00000449, l0000042a_goto_l00000432;
-  l00000449:
-    assume {:captureState "l00000449"} true;
-    goto l0000044a;
-  l0000044a:
-    assume {:captureState "l0000044a"} true;
-    R8, Gamma_R8 := 65536bv64, true;
+    goto l00000432_goto_l0000043a, l00000432_goto_l0000045d;
+  l0000045d:
+    assume {:captureState "l0000045d"} true;
+    goto l0000045e;
+  l0000045e:
+    assume {:captureState "l0000045e"} true;
+    R8, Gamma_R8 := 126976bv64, true;
     call rely();
     R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 4032bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 4032bv64)) || L(mem, bvadd64(R8, 4032bv64)));
     call rely();
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(mem, R8)), (gamma_load32(Gamma_mem, R8) || L(mem, R8));
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 20bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 20bv64), Gamma_R8);
-    assume {:captureState "%00000466"} true;
-    goto l00000432;
-  l00000432:
-    assume {:captureState "l00000432"} true;
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
+    assume {:captureState "%0000047a"} true;
+    goto l0000043a;
+  l0000043a:
+    assume {:captureState "l0000043a"} true;
+    R8, Gamma_R8 := 126976bv64, true;
+    call rely();
+    R8, Gamma_R8 := memory_load64_le(mem, bvadd64(R8, 4032bv64)), (gamma_load64(Gamma_mem, bvadd64(R8, 4032bv64)) || L(mem, bvadd64(R8, 4032bv64)));
+    call rely();
+    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R8)), (gamma_load32(Gamma_mem, R8) || L(mem, R8));
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
     goto main_return;
-  lmain_goto_l000003ab:
-    assume {:captureState "lmain_goto_l000003ab"} true;
+  lmain_goto_l000003b3:
+    assume {:captureState "lmain_goto_l000003b3"} true;
     assume (bvcomp1(ZF, 1bv1) != 0bv1);
-    goto l000003ab;
-  lmain_goto_l000003ae:
-    assume {:captureState "lmain_goto_l000003ae"} true;
+    goto l000003b3;
+  lmain_goto_l000003b6:
+    assume {:captureState "lmain_goto_l000003b6"} true;
     assume (bvcomp1(ZF, 1bv1) == 0bv1);
-    goto l000003ae;
-  l000003b1_goto_l000003b9:
-    assume {:captureState "l000003b1_goto_l000003b9"} true;
+    goto l000003b6;
+  l000003b9_goto_l000003c1:
+    assume {:captureState "l000003b9_goto_l000003c1"} true;
     assume (bvcomp1(R8[1:0], 1bv1) != 0bv1);
-    goto l000003b9;
-  l000003b1_goto_l00000481:
-    assume {:captureState "l000003b1_goto_l00000481"} true;
+    goto l000003c1;
+  l000003b9_goto_l00000495:
+    assume {:captureState "l000003b9_goto_l00000495"} true;
     assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
-    goto l00000481;
-  l000003b9_goto_l000003eb:
-    assume {:captureState "l000003b9_goto_l000003eb"} true;
+    goto l00000495;
+  l000003c1_goto_l000003f3:
+    assume {:captureState "l000003c1_goto_l000003f3"} true;
     assume (bvcomp1(ZF, 1bv1) != 0bv1);
-    goto l000003eb;
-  l000003b9_goto_l000003ee:
-    assume {:captureState "l000003b9_goto_l000003ee"} true;
+    goto l000003f3;
+  l000003c1_goto_l000003f6:
+    assume {:captureState "l000003c1_goto_l000003f6"} true;
     assume (bvcomp1(ZF, 1bv1) == 0bv1);
-    goto l000003ee;
-  l000003f1_goto_l000003f9:
-    assume {:captureState "l000003f1_goto_l000003f9"} true;
+    goto l000003f6;
+  l000003f9_goto_l00000401:
+    assume {:captureState "l000003f9_goto_l00000401"} true;
     assume (bvcomp1(R8[1:0], 1bv1) != 0bv1);
-    goto l000003f9;
-  l000003f1_goto_l0000046c:
-    assume {:captureState "l000003f1_goto_l0000046c"} true;
+    goto l00000401;
+  l000003f9_goto_l00000480:
+    assume {:captureState "l000003f9_goto_l00000480"} true;
     assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
-    goto l0000046c;
-  l000003f9_goto_l00000424:
-    assume {:captureState "l000003f9_goto_l00000424"} true;
+    goto l00000480;
+  l00000401_goto_l0000042c:
+    assume {:captureState "l00000401_goto_l0000042c"} true;
     assume (bvcomp1(ZF, 1bv1) != 0bv1);
-    goto l00000424;
-  l000003f9_goto_l00000427:
-    assume {:captureState "l000003f9_goto_l00000427"} true;
+    goto l0000042c;
+  l00000401_goto_l0000042f:
+    assume {:captureState "l00000401_goto_l0000042f"} true;
     assume (bvcomp1(ZF, 1bv1) == 0bv1);
-    goto l00000427;
-  l0000042a_goto_l00000432:
-    assume {:captureState "l0000042a_goto_l00000432"} true;
+    goto l0000042f;
+  l00000432_goto_l0000043a:
+    assume {:captureState "l00000432_goto_l0000043a"} true;
     assume (bvcomp1(R8[1:0], 1bv1) != 0bv1);
-    goto l00000432;
-  l0000042a_goto_l00000449:
-    assume {:captureState "l0000042a_goto_l00000449"} true;
+    goto l0000043a;
+  l00000432_goto_l0000045d:
+    assume {:captureState "l00000432_goto_l0000045d"} true;
     assume (bvcomp1(R8[1:0], 1bv1) == 0bv1);
-    goto l00000449;
+    goto l0000045d;
   main_return:
     assume {:captureState "main_return"} true;
     return;
