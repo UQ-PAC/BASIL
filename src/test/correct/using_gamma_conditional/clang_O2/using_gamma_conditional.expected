@@ -132,7 +132,7 @@ implementation main()
     goto l000002eb;
   l000002eb:
     assume {:captureState "l000002eb"} true;
-    return;
+    goto main_return;
   lmain_goto_l000002e5:
     assume {:captureState "lmain_goto_l000002e5"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) != 0bv1);
@@ -141,5 +141,8 @@ implementation main()
     assume {:captureState "lmain_goto_l000002e8"} true;
     assume (bvnot1(bvcomp1(ZF, 1bv1)) == 0bv1);
     goto l000002e8;
+  main_return:
+    assume {:captureState "main_return"} true;
+    return;
 }
 

@@ -8,6 +8,7 @@ import specification.*
 import scala.collection.mutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
+import intrusivelist.IntrusiveList
 
 class BAPToIR(var program: BAPProgram, mainAddress: Int) {
 
@@ -18,22 +19,18 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     var mainProcedure: Option[Procedure] = None
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
     for (s <- program.subroutines) {
-      val blocks: ArrayBuffer[Block] = ArrayBuffer()
-      val dummyJump = GoTo(ArrayBuffer(), None)
+      val procedure = Procedure(s.name, Some(s.address))
       for (b <- s.blocks) {
-        val block = Block(b.label, b.address, ArrayBuffer(), dummyJump)
-        blocks.append(block)
+        val block = Block(b.label, b.address)
+        procedure.addBlocks(block)
         labelToBlock.addOne(b.label, block)
       }
-      val in: ArrayBuffer[Parameter] = ArrayBuffer()
       for (p <- s.in) {
-        in.append(p.toIR)
+        procedure.in.append(p.toIR)
       }
-      val out: ArrayBuffer[Parameter] = ArrayBuffer()
       for (p <- s.out) {
-        out.append(p.toIR)
+        procedure.out.append(p.toIR)
       }
-      val procedure = Procedure(s.name, Some(s.address), blocks, in, out)
       if (s.address == mainAddress) {
         mainProcedure = Some(procedure)
       }
@@ -49,9 +46,14 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
           block.statements.append(translate(st))
         }
         val (jump, newBlocks) = translate(b.jumps, block)
-        block.jump = jump
-        procedure.blocks.addAll(newBlocks)
+        procedure.addBlocks(newBlocks)
+        block.replaceJump(jump)
       }
+
+      // Set entry block to the block with the same address as the procedure or the first in sequence
+      procedure.entryBlock = procedure.blocks.find(b => b.address == procedure.address)
+      if procedure.entryBlock.isEmpty then procedure.entryBlock = procedure.blocks.nextOption()
+
     }
 
     val memorySections: ArrayBuffer[MemorySection] = ArrayBuffer()
@@ -67,7 +69,6 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     case b: BAPMemAssign   => MemoryAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
     case b: BAPLocalAssign => LocalAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
   }
-
 
   /**
     * Translates a list of jumps from BAP into a single Jump at the IR level by moving any conditions on jumps to
@@ -173,7 +174,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
   private def newBlockCondition(block: Block, target: Block, condition: Expr): Block = {
     val newLabel = s"${block.label}_goto_${target.label}"
     val assume = Assume(condition, checkSecurity = true)
-    Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target), None))
+    Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target)))
   }
 
 }

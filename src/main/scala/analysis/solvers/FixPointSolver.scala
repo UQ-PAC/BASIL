@@ -112,7 +112,7 @@ trait ListSetWorklist[N] extends Worklist[N]:
   def add(n: N): Unit =
     worklist += n
 
-  def add(ns: Set[N]): Unit = worklist ++= ns
+  def add(ns: Iterable[N]): Unit = worklist ++= ns
 
   def run(first: Set[N]): Unit =
     worklist = new ListSet[N] ++ first

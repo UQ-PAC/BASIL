@@ -435,9 +435,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
 
   def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr]): BProcedure = {
-    val body = p.blocks.map(b => translateBlock(b))
+    val body = (p.entryBlock.view ++ p.blocks.filterNot(x => p.entryBlock.contains(x))).map(translateBlock).toList
 
-    val callsRely: Boolean = body.flatten(_.body).exists(_ match
+    val callsRely: Boolean = body.flatMap(_.body).exists(_ match
       case BProcedureCall("rely", lhs, params, comment) => true
       case _ => false)
 
@@ -531,7 +531,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translateBlock(b: Block): BBlock = {
     val captureState = captureStateStatement(s"${b.label}")
-    val cmds = List(captureState) ++ (b.statements.flatMap(s => translate(s)) ++ translate(b.jump))
+    val cmds = List(captureState) ++ b.statements.flatMap(s => translate(s)) ++ translate(b.jump)
 
     BBlock(b.label, cmds)
   }
@@ -566,8 +566,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       // collects all targets of the goto with a branch condition that we need to check the security level for
       // and collects the variables for that
       val conditions = g.targets.flatMap(_.statements.headOption).collect { case a: Assume if a.checkSecurity => a }
-      val conditionVariables = conditions.flatMap(_.body.variables).distinct
-      val gammas = conditionVariables.map(_.toGamma).sorted
+      val conditionVariables = conditions.flatMap(_.body.variables)
+      val gammas = conditionVariables.map(_.toGamma).toList.sorted
       val conditionAssert: List[BCmd] = if (gammas.size > 1) {
         val andedConditions = gammas.tail.foldLeft(gammas.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
         List(BAssert(andedConditions))
@@ -581,6 +581,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   }
 
   def translate(s: Statement): List[BCmd] = s match {
+    case m: NOP => List.empty
     case m: MemoryAssign =>
       val lhs = m.lhs.toBoogie
       val rhs = m.rhs.toBoogie
