@@ -188,7 +188,7 @@ class Procedure private (
   def blocks: Iterator[Block] = _blocks.iterator
 
   def addCaller(c: DirectCall): Unit = {
-    _callers.remove(c)
+    _callers.add(c)
   }
 
   def removeCaller(c: DirectCall): Unit = {
@@ -334,8 +334,8 @@ class Block private (
 
   def kind : BlockKind = {
     _kind match {
-      case Regular if (parent.entryBlock.contains(this)) => Entry(parent) 
-      case Regular if (parent.returnBlock.contains(this)) => Return(parent)
+      case c: Regular if (parent.entryBlock.contains(this)) => Entry(parent)
+      case c: Regular if (parent.returnBlock.contains(this)) => Return(parent)
       case _ => _kind
     }
   }

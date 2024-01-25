@@ -47,13 +47,16 @@ object IRWalk:
   }
 
 
+/**
+ * Does not include edges between procedures.
+ */
 trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
 
   def succ(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
       case proc: Procedure => proc.entryBlock.toSet
       case b: Block        => Set(b.statements.headOption().getOrElse(b.jump))
-      case s: Statement    => Set(s.parent.statements.nextOption(s).getOrElse(s.parent.jump))
+      case s: Statement    =>  Set(s.succ().getOrElse(s.parent.jump))
       case j: Jump =>
         j match {
           case n: GoTo         => n.targets.asInstanceOf[Set[CFGPosition]]
@@ -65,13 +68,8 @@ trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
 
   def pred(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
-      case s: Statement =>
-        if (s.parent.statements.hasPrev(s)) {
-          Set(s.parent.statements.getPrev(s))
-        } else {
-          Set(s.parent) // predecessor blocks
-        }
-      case j: Jump => if j.parent.statements.isEmpty then Set(j.parent) else Set(j.parent.statements.last)
+      case s: Statement => Set(s.pred().getOrElse(s.parent))
+      case j: Jump => Set(j.parent.statements.lastOption.getOrElse(j.parent))
       case b: Block =>
         b.kind match {
           case CallReturn(from) => Set(from)
@@ -111,25 +109,37 @@ trait IntraProcBlockIRCursor extends IRWalk[CFGPosition, Block] {
 }
 object IntraProcBlockIRCursor extends IntraProcBlockIRCursor
 
+/**
+ * Includes all intraproc edges as well as edges between procedures.
+ *
+ * forwards:
+ * Direct call -> target
+ * return indirect Call -> the procedure return block for all possible direct-call sites
+ *
+ * backwards:
+ * Procedure -> all possible direct-call sites
+ * Call-return block -> return Call of the procedure called
+ *
+ */
 trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
 
   final def succ(pos: CFGPosition): Set[CFGPosition] = {
-    pos match
+    IntraProcIRCursor.succ(pos) ++ (pos match
       case c: DirectCall   => Set(c.target)
-      case c: IndirectCall => Set()
-      case _               => IntraProcIRCursor.succ(pos)
+      case c: IndirectCall =>  c.parent.kind match
+        case Return(proc) =>
+          proc.incomingCalls().flatMap(_.returnTarget).toSet
+        case _ => Set()
+      case _ => Set()
+      )
   }
   final def pred(pos: CFGPosition): Set[CFGPosition] = {
     IntraProcIRCursor.pred(pos) ++ (pos match
       case c: Procedure       => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
       case b: Block =>
         b.kind match {
-          case Entry(proc) => Set(proc)
-          case CallReturn(from) =>
-            from match
-              case d: DirectCall   => d.target.returnBlock.map(_.jump).toSet
-              case c: IndirectCall => Set()
-          case regular => b.incomingJumps.asInstanceOf[Set[CFGPosition]]
+          case CallReturn(DirectCall(target, returnTarget, _)) => target.returnBlock.map(_.jump).toSet
+          case _ => Set()
         }
       case _ => Set()
     )
@@ -254,8 +264,8 @@ def toDot[T <: CFGPosition](
   for (node <- domain) {
     node match {
       case s =>
-   //     iterator.succ(s).foreach(n => dotArrows.addOne(getArrow(s,n)))
-        iterator.pred(s).foreach(n => dotArrows.addOne(getArrow(s,n)))
+        iterator.succ(s).foreach(n => dotArrows.addOne(getArrow(s,n)))
+ //       iterator.pred(s).foreach(n => dotArrows.addOne(getArrow(s,n)))
     }
   }
 
