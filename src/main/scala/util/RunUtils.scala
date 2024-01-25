@@ -160,6 +160,10 @@ object RunUtils {
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
+
+    val dumpdomain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, IRProgram.procedures)
+    writeToFile(toDot(dumpdomain, InterProcIRCursor, Map.empty), s"new_ir_constprop$iteration.dot")
+
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
     val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
@@ -184,9 +188,15 @@ object RunUtils {
     memoryRegionAnalysisResults = mraResult
 
     config.analysisDotPath.foreach(s => {
+
       writeToFile(cfg.toDot(Output.labeler(mraResult, true), Output.dotIder), s"${s}_mra$iteration.dot")
       writeToFile(dotCallGraph(IRProgram), s"${s}_callgraph$iteration.dot")
       writeToFile(dotBlockGraph(IRProgram, IRProgram.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph$iteration.dot")
+
+      writeToFile(toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> (newCPResult(b).toString)).toMap), s"${s}_new_ir_constprop$iteration.dot")
+
+//      config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_new_ir_constprop$iteration.txt"))
+
     })
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, mraResult), s"${s}_mra$iteration.txt"))
 
@@ -427,7 +437,7 @@ object RunUtils {
                     val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
                     val newLabel: String = block.label + t.name
                     val directCall = DirectCall(t, indirectCall.returnTarget)
-                    newBlocks.append(Block(newLabel, None, ArrayBuffer(assume), directCall))
+                    newBlocks.append(Block.regular(newLabel, None, ArrayBuffer(assume), directCall))
                   }
                   procedure.addBlocks(newBlocks)
                   val newCall = GoTo(newBlocks, indirectCall.label)

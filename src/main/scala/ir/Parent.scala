@@ -9,6 +9,7 @@ trait HasParent[T]:
    */
   private var _parent: Option[T] = None
   def parent: T = _parent.get
+  def hasParent: Boolean = _parent.isDefined
 
   def parent_=(value: T): Unit = setParent(value)
 
