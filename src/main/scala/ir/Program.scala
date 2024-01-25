@@ -304,7 +304,6 @@ class Block private (
  val statements: IntrusiveList[Statement],
  private var _jump: Jump,
  private val _incomingJumps: mutable.HashSet[GoTo],
-// private val _incomingFallthrough: mutable.HashSet[Call],
 ) extends HasParent[Procedure] {
   _jump.setParent(this)
   statements.foreach(_.setParent(this))
@@ -344,10 +343,6 @@ class Block private (
 
   def addIncomingJump(g: GoTo) = _incomingJumps.add(g)
   def removeIncomingJump(g: GoTo) = _incomingJumps.remove(g)
-
-//  def incomingFallthroughs: immutable.Set[Call] = _incomingFallthrough.toSet
-//  def addIncomingFallthrough(g: Call) = _incomingFallthrough.add(g)
-//  def removeIncomingFallthrough(g: Call) = _incomingFallthrough.remove(g)
 
   def calls: Set[Procedure] = _jump.calls
 
