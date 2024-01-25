@@ -207,10 +207,9 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     val address: Option[Int] = addresses.get(functionEntries(uuid).head);
 
     //TODO: function arguments are hardcoded, it's impossible to determine whether a function returns or not. 
-      //Function arguments may also be determined through modified liveness analysi but :/
+      //Function arguments may also be determined through modified liveness analysis but :/
     val in: ArrayBuffer[Parameter] = create_arguments(name)
     val out: ArrayBuffer[Parameter] = ArrayBuffer(Parameter(name + "_result", 64, Register("R0", BitVecType(64)))) 
-
     return Procedure(name, address, blocks, in, out)
   }
 
@@ -221,28 +220,13 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     val entries = functionEntries(uuid)
     var blks: ArrayBuffer[Block] = entries.map(createBlock).to(ArrayBuffer)
 
-    var funcblks = functionBlocks.getOrElse(uuid, Set.empty[ByteString])
+    val funcUuids = functionBlocks.getOrElse(uuid, Set.empty[ByteString]).to(ArrayBuffer)
+    val funcblks = funcUuids.filterNot(entries.contains).map(createBlock)
+    
+    blks ++= funcblks
+    blks = blks.flatMap(handle_long_if)
 
-     funcblks.foreach { elem => 
-      if (!functionEntries(uuid).contains(elem)) {
-        val blk = createBlock(elem)
-        blks += blk 
-      }  
-    }
-
-    var extraBlks: ArrayBuffer[Block] = ArrayBuffer[Block]()
-    var removeBlks: ArrayBuffer[Block] = ArrayBuffer[Block]()
-
-    blks.foreach {blk =>
-      val newBlks = handle_long_if(blk)
-      if (newBlks.nonEmpty) {
-        extraBlks ++= newBlks
-        removeBlks += blk
-      }
-    }
-
-    blks --= removeBlks
-    return blks ++ extraBlks
+    return blks.flatMap(handle_unlifted_indirects)
   }
   
 
@@ -264,16 +248,40 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     return statements
   }
 
+  def get_ByteString(uuid: String): ByteString = ByteString.copyFrom(Base64.getDecoder().decode(uuid))
 
-  def handle_long_if(blk: Block): ArrayBuffer[Block] = { //NOTE: This will only handle ONE longif currently. To make it do more, make the function recursive. (or think of some better way)
-
-    val get_ByteString: String => ByteString = uuid => ByteString.copyFrom(Base64.getDecoder().decode(uuid))
-
-    val get_blkLabel: (String, Int) => String = (label, blkCount) => {
+  def get_blkLabel(label: String, blkCount: Int): String =  {
       var decodedBytes: Array[Byte] = Base64.getDecoder().decode(label)
       decodedBytes(decodedBytes.length - 1) = (decodedBytes.last + blkCount).toByte
       Base64.getEncoder.encodeToString(decodedBytes)
+  }
+
+  def handle_unlifted_indirects(blk: Block): ArrayBuffer[Block] = {
+
+    val stmts_without_jmp = blk.statements.to(List).dropRight(1)
+
+    if (stmts_without_jmp.exists {elem => elem.isInstanceOf[LocalAssign] && elem.asInstanceOf[LocalAssign].lhs.name == "_PC"} ) {
+      val (startStmts, endStmts) = blk.statements.span {elem => !(elem.isInstanceOf[LocalAssign] && elem.asInstanceOf[LocalAssign].lhs.name == "_PC") }
+      val unliftedJmp = endStmts.remove(0).asInstanceOf[LocalAssign]
+
+      val startBlk = Block(blk.label, blk.address, startStmts += unliftedJmp, GoTo(ArrayBuffer[Block](), None))
+      val endBlk = Block(get_blkLabel(blk.label, 2), blk.address, endStmts, GoTo(ArrayBuffer[Block](), None))
+
+      blkMap += (get_ByteString(endBlk.label) -> endBlk)
+      edgeMap += (endBlk.label -> edgeMap.get(startBlk.label).get)
+      val newEdge = proto.CFG.Edge(get_ByteString(startBlk.label), get_ByteString(endBlk.label), Option(proto.CFG.EdgeLabel(false, false, proto.CFG.EdgeType.Type_Branch)))
+      edgeMap(startBlk.label) = ArrayBuffer(newEdge)
+
+
+      return ArrayBuffer[Block](startBlk, endBlk)
+    } else {
+      return ArrayBuffer[Block](blk)
     }
+  }
+
+
+  def handle_long_if(blk: Block): ArrayBuffer[Block] = { //NOTE: This will only handle ONE longif currently. To make it do more, make the function recursive. (or think of some better way)
+
     val create_TempIf: Expr => TempIf = conds => TempIf(false, ArrayBuffer(conds), ArrayBuffer[ArrayBuffer[Statement]]())
 
     if (blk.statements.exists {elem =>  elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}) {
@@ -320,10 +328,9 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
       }
 
       return falseBlks ++ trueBlks ++ ArrayBuffer(endBlk)
-
     
     } else {
-      ArrayBuffer[Block]()
+      ArrayBuffer[Block](blk)
     }
     
   }
@@ -401,8 +408,8 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
       case (false, true) =>
         val blks = ArrayBuffer[Block]()
-        val cond: Statement = Assume(BinaryExpr(BVNEQ, ifStmt.asInstanceOf[TempIf].conds(0), BitVecLiteral(0,1)))
-        val notCond = Assume(BinaryExpr(BVEQ, ifStmt.asInstanceOf[TempIf].conds(0), BitVecLiteral(0,1)))
+        val cond: Statement = Assume(ifStmt.asInstanceOf[TempIf].conds(0), checkSecurity=true)
+        val notCond = Assume(UnaryExpr(BoolNOT, ifStmt.asInstanceOf[TempIf].conds(0)), checkSecurity=true)
         edges.foreach { elem => 
           elem.label.get.`type` match {
             case proto.CFG.EdgeType.Type_Branch => 

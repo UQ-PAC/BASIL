@@ -239,10 +239,12 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
         return MemoryLoad(mem, addr, Endian.LittleEndian, size)
       case "not_bool"    => return UnaryExpr(BoolNOT, visitExpr(ctx.expr(0)))
       case "cvt_bool_bv" =>
-        // in ocaml, takes bool and turns to bitvector -> since this is usually tied to a BinaryExpr, and
-        // BinaryExpr's don't have any "evaluate" method, i have just returned the binary expr that will
-        //evaluate to a bool
-        return visitExpr(ctx.expr(0))
+      // in ocaml, takes bool and turns to bitvector 
+        val expr = visitExpr(ctx.expr(0))
+        expr match {
+          case b: BinaryExpr if b.op == BVEQ => BinaryExpr(BVCOMP, b.arg1, b.arg2)
+          case _ => ???
+        }
       case "eq_enum"  => return BinaryExpr(BVXNOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "or_bool"  => return BinaryExpr(BoolOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "and_bool" => return BinaryExpr(BoolAND, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
@@ -255,7 +257,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
       case "or_bits"     => return BinaryExpr(BVOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "and_bits"    => return BinaryExpr(BVAND, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "eor_bits"    => return BinaryExpr(BVXOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "eq_bits"     => return BinaryExpr(BVCOMP, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
+      case "eq_bits"     => return BinaryExpr(BVEQ, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "add_bits"    => return BinaryExpr(BVADD, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "sub_bits"    => return BinaryExpr(BVSUB, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "mul_bits"    => return BinaryExpr(BVMUL, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))  

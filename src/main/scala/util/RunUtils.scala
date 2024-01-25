@@ -39,7 +39,8 @@ object RunUtils {
   // constants
   private val exitRegister: Variable = Register("R30", BitVecType(64))
 
-  def loadBAP(fileName: String, mainAddress: Int): Program = {
+  def loadBAP(fileName: String, mainAddress: Int): BAPProgram = {
+    // // BAP LOGIC
     // val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
     // val tokens = CommonTokenStream(ADTLexer)
     // val parser = BAP_ADTParser(tokens)
@@ -48,6 +49,8 @@ object RunUtils {
 
     // BAPLoader.visitProject(parser.project())
 
+
+    // GTIRB LOGIC
     var fIn = new FileInputStream(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
@@ -67,35 +70,6 @@ object RunUtils {
 
     val parserMap = semantics.map(_.map(((k: String,v: Array[Array[String]]) => (k, v.map(_.map(parse_insn(_)))))))
 
-    // This is redundant now, but good for testing purposes
-    // val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
-    // val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
-    // val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
-    // val entrypoint = mods.head.entryPoint
-    // val sym = mods.flatMap(_.symbols)
-
-    // // // PROXYBLOCKS
-    // // val proxy = mods.flatMap(_.proxies)
-    // // proxy.foreach(elem => println(elem))
-
-    // // FUNCTION BLOCKS WRITER
-    // val bw = new BufferedWriter(new FileWriter(new File("Function Entries + Function Blocks")))
-    // bw.write("Function Entries" + System.lineSeparator())
-    // functionEntries.map(_.toString()).foreach(f => f -> bw.write(f))
-    // bw.write(System.lineSeparator() + System.lineSeparator())
-    // bw.write("Function Blocks" + System.lineSeparator())
-    // functionBlocks.map(_.toString()).foreach(f => f -> bw.write(f))
-    // bw.close()
-
-    // //CFG + SYMBOL WRITER
-    // val bw = new BufferedWriter(new FileWrmai
-    // // BASIC BLOCKS TO CHRIS UUID
-    // val tl = new TalkingListener()
-    // ParseTreeWalker.DEFAULT.walk(tl, parser.semantics())
-
-    // // PARSE TREE
-    //System.out.println(parser.semantics().toStringTree(parser));
-    
     val GtirbConverter = new GtirbToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
     val program = GtirbConverter.createIR()
     return program
@@ -145,7 +119,7 @@ object RunUtils {
     // val IRTranslator = BAPToIR(bapProgram, mainAddress)
     // var IRProgram = IRTranslator.translate
   
-    //println(serialiseIL(IRProgram));
+    // println(serialiseIL(IRProgram));
 
     val specification = loadSpecification(q.loading.specFile, IRProgram, globals)
 
