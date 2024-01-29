@@ -166,6 +166,8 @@ class Procedure private (
                   var out: ArrayBuffer[Parameter],
                 ) {
   private var _callers = new mutable.HashSet[DirectCall]
+  _blocks.foreach(_.parent = this)
+
 
   // class invariant
   require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
