@@ -2,7 +2,7 @@ package ir
 import org.scalatest.funsuite.AnyFunSuite
 import intrusivelist.{IntrusiveList, IntrusiveListElement}
 
-case class Elem(val t: Int) extends IntrusiveListElement[Elem]
+class Elem(val t: Int) extends IntrusiveListElement[Elem]
 
 class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
 
@@ -49,7 +49,7 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
     x.append(Elem(13))
     x.append(Elem(14))
 
-    x.foreach(println(_))
+//    x.foreach(println(_))
 
     val y = x.head()
     assert(y.t == 10)
@@ -150,6 +150,28 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
     assert(l.iteratorFrom(l(2)).length == 8)
     assert(it.length == 7)
   }
+
+  test("splitat") {
+    val l = IntrusiveList[Elem]()
+    
+    l.addOne(Elem(1))
+
+    val e = Elem(15)
+    val toAdd = List(e,Elem(16),Elem(17))
+
+    l.addAll(toAdd)
+    assert(l.size == 4)
+    assert(l.contains(e))
+
+    val l2 = l.splitOn(e)
+    assert(l2.size == 2)
+    assert(l.size == 2)
+    assert(l.find(_.t == 1).isDefined)
+    assert(l.find(_.t == 15).isDefined)
+    assert(l2.find(_.t == 16).isDefined)
+    assert(l2.find(_.t == 17).isDefined)
+  }
+
 
   test("addAll") {
     val l = getSequentialList(3)
