@@ -19,6 +19,7 @@ import scala.collection.mutable.HashMap
 import java.nio.charset.*
 import scala.util.boundary, boundary.break
 import java.nio.ByteBuffer
+import intrusivelist.{IntrusiveList, IntrusiveListElement}
 
 /**
 * TempIf class, used to temporarily store information about Jumps so that multiple parse runs are not needed. 
@@ -85,7 +86,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
     for (edge <- edges) { 
 
-      val sourceUuid =  Base64.getEncoder().encodeToString(edge.sourceUuid.toByteArray()) 
+      val sourceUuid = "l_" + Base64.getUrlEncoder().encodeToString(edge.sourceUuid.toByteArray()).replace("=", "").replace("-", "")
       if (edgeMap.contains(sourceUuid)) {
         edgeMap(sourceUuid) += edge
 
@@ -247,7 +248,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     val address: Option[Int] = addresses.get(uuid)
     val semantics: ArrayBuffer[Statement] = createSemantics(uuid)
     val jump: Jump = GoTo(ArrayBuffer[Block](), None) // Empty Goto implies block not connected to proc, but i think these get removed somewhere
-    val block = Block(Base64.getEncoder().encodeToString(uuid.toByteArray()), address, semantics, jump) 
+    val block = Block("l_" + Base64.getUrlEncoder().encodeToString(uuid.toByteArray()).replace("=", "").replace("-", ""), address, semantics, jump) 
     blkCount += 1
     blkMap += (uuid -> block)
     return block
@@ -267,7 +268,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
   def get_blkLabel(label: String, blkCount: Int): String =  {
       var decodedBytes: Array[Byte] = Base64.getDecoder().decode(label)
       decodedBytes(decodedBytes.length - 1) = (decodedBytes.last + blkCount).toByte
-      Base64.getEncoder.encodeToString(decodedBytes)
+      "l_" + Base64.getUrlEncoder().encodeToString(decodedBytes).replace("=", "").replace("-", "")
   }
 
   /** 
@@ -283,10 +284,15 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     val stmts_without_jmp = blk.statements.dropRight(1)
 
     if (stmts_without_jmp.exists {elem => elem.isInstanceOf[LocalAssign] && elem.asInstanceOf[LocalAssign].lhs.name == "_PC"} ) {
-      val (startStmts, endStmts) = blk.statements.span {elem => !(elem.isInstanceOf[LocalAssign] && elem.asInstanceOf[LocalAssign].lhs.name == "_PC") }
-      val unliftedJmp = endStmts.to(ArrayBuffer).remove(0).asInstanceOf[LocalAssign]
+      val (tempStartStmts, tempEndStmts) = blk.statements.span {elem => !(elem.isInstanceOf[LocalAssign] && elem.asInstanceOf[LocalAssign].lhs.name == "_PC") }
 
-      val startBlk = Block(blk.label, blk.address, startStmts.to(ArrayBuffer) += unliftedJmp, GoTo(ArrayBuffer[Block](), None))
+      val endStmts = IntrusiveList.from(tempEndStmts)
+      val startStmts = IntrusiveList.from(tempStartStmts)
+
+      val unliftedJmp = endStmts.remove(endStmts.head).asInstanceOf[LocalAssign]
+      
+
+      val startBlk = Block(blk.label, blk.address, startStmts.addOne(unliftedJmp), GoTo(ArrayBuffer[Block](), None))
       val endBlk = Block(get_blkLabel(blk.label, 2), blk.address, endStmts, GoTo(ArrayBuffer[Block](), None))
 
       // Adds relevant edge to startBlock, replacing write to PC
@@ -320,13 +326,19 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     if (blk.statements.exists {elem =>  elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}) {
       
       // Split Blk in two and remove IfStmt
-      val (startStmts, endStmts) = blk.statements.span {elem => !(elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf)}
-      val ifStmt = endStmts.to(ArrayBuffer).remove(0).asInstanceOf[TempIf]
+      val (tempStartStmts, tempEndStmts) = blk.statements.span {elem => !(elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf)}
+
+      val endStmts = IntrusiveList.from(tempEndStmts)
+      val startStmts = IntrusiveList.from(tempStartStmts)
+
+      val ifStmt = endStmts.remove(endStmts.head).asInstanceOf[TempIf]
+
+       
 
       // Used to keep track of how many new blocks are created, and to create unique UUIDs
       var blkCount: Int = 2
 
-      val startblk = Block(blk.label, blk.address, startStmts.to(ArrayBuffer) += create_TempIf(ifStmt.conds.remove(0)), GoTo(ArrayBuffer[Block](), None))
+      val startblk = Block(blk.label, blk.address, startStmts.addOne(create_TempIf(ifStmt.conds.remove(0))), GoTo(ArrayBuffer[Block](), None))
       val endBlk = Block(get_blkLabel(blk.label, blkCount), blk.address, endStmts, GoTo(ArrayBuffer[Block](), None))
       blkMap += (get_ByteString(endBlk.label) -> endBlk)
       edgeMap += (endBlk.label -> edgeMap.get(startblk.label).get)

@@ -78,7 +78,7 @@ class SystemTests extends AnyFunSuite {
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
     val outPath = variationPath + ".bpl"
-        val ADTPath = variationPath + ".adt"
+        val ADTPath = variationPath + ".gts"
     val RELFPath = variationPath + ".relf"
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")

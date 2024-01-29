@@ -25,10 +25,10 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       mainProcedureName = "main",
     )
 
-    val bapProgram = loadBAP(loading.adtFile)
     val (externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)
-    val IRTranslator = BAPToIR(bapProgram, mainAddress)
-    var IRProgram = IRTranslator.translate
+    var IRProgram = loadBAP(loading.adtFile, mainAddress)
+    // val IRTranslator = BAPToIR(bapProgram, mainAddress)
+    // var IRProgram = IRTranslator.translate
     IRProgram = ExternalRemover(externalFunctions.map(e => e.name)).visitProgram(IRProgram)
     IRProgram = Renamer(Set("free")).visitProgram(IRProgram)
     IRProgram.stripUnreachableFunctions()
