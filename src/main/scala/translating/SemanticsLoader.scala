@@ -204,6 +204,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
 
   }
 
+  //Used to match ZeroExtend sizes to Bap 
   def fix_size(expr1: Expr, expr2: Expr): Expr = {
 
     val size1 = expr1  match {

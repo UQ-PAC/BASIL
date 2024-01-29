@@ -20,6 +20,17 @@ import java.nio.charset.*
 import scala.util.boundary, boundary.break
 import java.nio.ByteBuffer
 
+/**
+* TempIf class, used to temporarily store information about Jumps so that multiple parse runs are not needed. 
+* Specifically, this is useful in the case that the IF statment has multiple conditions( and elses) and as such many extra blocks 
+* need to be created. 
+*
+* @param isLongIf: if this IF is long(i.e. contains multiple nested if else chains), then true. 
+* @param conds: conditions on this if statement 
+* @param statements: statements of this if statement 
+* @param elsestatement: if this Ifstatement has a self-contained else, it is stored here
+*
+*/ 
 class TempIf(val isLongIf: Boolean, val conds: ArrayBuffer[Expr], val stmts: ArrayBuffer[ArrayBuffer[Statement]], 
               val elseStatement: Option[Statement] = None, override val label: Option[String] = None) extends Assert(conds.head) {}
 
@@ -29,15 +40,25 @@ object TempIf {
   }
 }
 
-/* GtirbtoIR function. Attempt to form an IR matching the one produced by BAP by using GTIRB instead */
+/** 
+* GtirbtoIR class. Forms an IR as close as possible to the one produced by BAP by using GTIRB instead 
+*
+* @param mods: Modules of the Gtirb file. 
+* @param parserMap: A Map from UUIDs to basic block statements, used for parsing 
+* @param cfg: The cfg provided by gtirb
+* @param mainAddress: The address of the main function
+*
+*/
 class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap: Map[String, Array[Array[StmtContext]]], cfg: CFG, mainAddress: Int) {
 
+  // Util function used to get Key of a map that maps any K -> Set(V) using V
   def getKey[K, V](value: V, map: mutable.Map[K, mutable.Set[V]]): Option[K] = {
     val v = map.values.find(_.contains(value))
     val key = v.flatMap(v => map.find(_._2 == v).map(_._1))
     return key
   }
 
+  //Creates addresses of blks using gtirb maps
   def create_addresses(): collection.mutable.HashMap[ByteString, Int] = {
 
     val blockAddresses: HashMap[ByteString, Int] = HashMap.empty
@@ -56,6 +77,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
   } 
 
+  // Creates CFG map mapping blk UUIDs to a buffer of outgoing edges 
   def create_cfg_map(): collection.mutable.HashMap[String, ArrayBuffer[proto.CFG.Edge]] = {
 
     val edges = cfg.edges 
@@ -76,6 +98,8 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     edgeMap
   }
 
+  // Another map of blk UUIDs to Symbols related to that blk. 
+  // Symbols are usually blk names or strings related to that blk
   def create_symMap(): HashMap[ByteString, mutable.Set[proto.Symbol.Symbol]] = {
     val symMap = HashMap[ByteString, mutable.Set[proto.Symbol.Symbol]]()
 
@@ -94,12 +118,12 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     symMap
   }
 
-
+  // Gets name of function using a UUID
   def create_names(uuid: ByteString): String = {
     var name: String = uuid.toString() 
 
     if (functionNames.get(uuid) != None) { 
-      name = symbols.find(functionNames(uuid) == _.uuid).get.name //This is quite ineffecient if we have a ton of functions
+      name = symbols.find(functionNames(uuid) == _.uuid).get.name
       
 
       val entryBlocks: mutable.Set[ByteString] = functionEntries.get(uuid).get
@@ -149,7 +173,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
   }
 
 
-
+  // Utility Maps used for below functions
   //TODO: mods.head may not work here if multiple modules, in which case decoder needs to change
   val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
   val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
@@ -222,7 +246,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     
     val address: Option[Int] = addresses.get(uuid)
     val semantics: ArrayBuffer[Statement] = createSemantics(uuid)
-    val jump: Jump = GoTo(ArrayBuffer[Block](), None) //jumps should be done now, so if an empty GoTo comes up then something is wrong :(
+    val jump: Jump = GoTo(ArrayBuffer[Block](), None) // Empty Goto implies block not connected to proc, but i think these get removed somewhere
     val block = Block(Base64.getEncoder().encodeToString(uuid.toByteArray()), address, semantics, jump) 
     blkCount += 1
     blkMap += (uuid -> block)
@@ -236,14 +260,24 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     return statements
   }
 
+  // Converter between ByteString and Base64 because Gtirb is weird like that
   def get_ByteString(uuid: String): ByteString = ByteString.copyFrom(Base64.getDecoder().decode(uuid))
 
+  // Form new ByteString using old Base64label and some Int, useful for creating many small blocks
   def get_blkLabel(label: String, blkCount: Int): String =  {
       var decodedBytes: Array[Byte] = Base64.getDecoder().decode(label)
       decodedBytes(decodedBytes.length - 1) = (decodedBytes.last + blkCount).toByte
       Base64.getEncoder.encodeToString(decodedBytes)
   }
 
+  /** 
+  * Handles the case where ddisasm fails to lift an indirect call correctly (such as blr instruction)
+  * This results in a write to PC in the middle of a block. the block is split up, with the first half having the correct indirect call
+  * 
+  * @param blk 
+  * @return An Arraybuffer contaning two blocks, that have been split from the original
+  *
+  */
   def handle_unlifted_indirects(blk: Block): ArrayBuffer[Block] = {
 
     val stmts_without_jmp = blk.statements.dropRight(1)
@@ -255,9 +289,10 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
       val startBlk = Block(blk.label, blk.address, startStmts.to(ArrayBuffer) += unliftedJmp, GoTo(ArrayBuffer[Block](), None))
       val endBlk = Block(get_blkLabel(blk.label, 2), blk.address, endStmts, GoTo(ArrayBuffer[Block](), None))
 
+      // Adds relevant edge to startBlock, replacing write to PC
       blkMap += (get_ByteString(endBlk.label) -> endBlk)
       edgeMap += (endBlk.label -> edgeMap.get(startBlk.label).get)
-      val newEdge = proto.CFG.Edge(get_ByteString(startBlk.label), get_ByteString(endBlk.label), Option(proto.CFG.EdgeLabel(false, false, proto.CFG.EdgeType.Type_Branch)))
+      val newEdge = proto.CFG.Edge(get_ByteString(startBlk.label), get_ByteString(endBlk.label), Option(proto.CFG.EdgeLabel(false, false, proto.CFG.EdgeType.Type_Call)))
       edgeMap(startBlk.label) = ArrayBuffer(newEdge)
 
 
@@ -267,17 +302,28 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     }
   }
 
-
-  def handle_long_if(blk: Block): ArrayBuffer[Block] = { //NOTE: This will only handle ONE longif currently. To make it do more, make the function recursive. (or think of some better way)
+  /** 
+  * Handles the case where an if-else chain appears in the middle of a block. 
+  * In this case, the block is split into two, before and after the occurance of this IF. 
+  *
+  * Additionally, several trueBlocks(blocks containing stmts that are to be executed if the condition preceding is true)
+  *                    and falseBlocks(blocks containing GoTos to the next condition if the previous condition was false)
+  * Need to be created.
+  *
+  * @return: An ArrayBuffer containing the new blocks, or an arraybuffer containing just the original block if no if-else chain appears
+  *
+  */
+  def handle_long_if(blk: Block): ArrayBuffer[Block] = { //NOTE: This will only handle ONE longif per block curently. Will probably need to put a while loop around it to continously check endBlk
 
     val create_TempIf: Expr => TempIf = conds => TempIf(false, ArrayBuffer(conds), ArrayBuffer[ArrayBuffer[Statement]]())
 
     if (blk.statements.exists {elem =>  elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}) {
-       
+      
+      // Split Blk in two and remove IfStmt
       val (startStmts, endStmts) = blk.statements.span {elem => !(elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf)}
       val ifStmt = endStmts.to(ArrayBuffer).remove(0).asInstanceOf[TempIf]
 
-
+      // Used to keep track of how many new blocks are created, and to create unique UUIDs
       var blkCount: Int = 2
 
       val startblk = Block(blk.label, blk.address, startStmts.to(ArrayBuffer) += create_TempIf(ifStmt.conds.remove(0)), GoTo(ArrayBuffer[Block](), None))
@@ -286,7 +332,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
       edgeMap += (endBlk.label -> edgeMap.get(startblk.label).get)
       blkCount += 1
 
-
+      // falseBlock creation
       val tempFalseBlks: ArrayBuffer[Block] = ifStmt.conds.map { stmts => 
         val label = get_blkLabel(blk.label, blkCount)
         val block = Block(label, blk.address, ArrayBuffer(create_TempIf(stmts)), GoTo(ArrayBuffer[Block](), None))
@@ -294,6 +340,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
         block
       }
 
+      // trueBlock creation
       val trueBlks: ArrayBuffer[Block] = ifStmt.stmts.map { stmts =>
         val label = get_blkLabel(blk.label, blkCount)
         val block = Block(label, blk.address, stmts, GoTo(ArrayBuffer[Block](endBlk), None))
@@ -302,12 +349,15 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
         block
       }
 
+      // Adds Else to FalseBlocks
       val label = get_blkLabel(blk.label, blkCount)
       val elseBlk = Block(label, blk.address, ArrayBuffer(ifStmt.elseStatement.get), GoTo(ArrayBuffer[Block](endBlk), None))
       blkMap += (get_ByteString(elseBlk.label) -> elseBlk)
       val falseBlks = (startblk +: tempFalseBlks.toList).to(ArrayBuffer) += elseBlk
       blkCount += 1
 
+
+      // Adds relevant edges to falseBlocks, so that extra blocks can be added when jumps are parsed
       for (i <- 0 until falseBlks.size - 1) {
         val ifEdge = proto.CFG.Edge(get_ByteString(falseBlks(i).label), get_ByteString(trueBlks(i).label), Option(proto.CFG.EdgeLabel(false, false, proto.CFG.EdgeType.Type_Branch)))
         val fallEdge = proto.CFG.Edge(get_ByteString(falseBlks(i).label), get_ByteString(falseBlks(i + 1).label), Option(proto.CFG.EdgeLabel(false, false, proto.CFG.EdgeType.Type_Fallthrough)))
@@ -323,7 +373,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     
   }
 
-
+  // Handles the case where a block has one outgoing edge using gtirb cfg labelling
   def singleJump(procedures: ArrayBuffer[Procedure], block: Block, edge: proto.CFG.Edge, 
                   entries: List[ByteString], blocks: List[ByteString]): Jump = {
 
@@ -365,6 +415,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
   }
 
+  // Ditto above, but handles the case where a block has more than one outgoing edge 
   def multiJump(procedures: ArrayBuffer[Procedure], block: Block, edges: ArrayBuffer[proto.CFG.Edge], 
                 entries: List[ByteString], ifStmt: Statement): Either[Jump, ArrayBuffer[Block]] = {
 
@@ -397,7 +448,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
       case (false, true) =>
         val blks = ArrayBuffer[Block]()
         val cond: Statement = Assume(ifStmt.asInstanceOf[TempIf].conds(0), checkSecurity=true)
-        val notCond = Assume(UnaryExpr(BoolNOT, ifStmt.asInstanceOf[TempIf].conds(0)), checkSecurity=true)
+        val notCond = Assume(UnaryExpr(BoolNOT, ifStmt.asInstanceOf[TempIf].conds(0)), checkSecurity=true) // Inverted Condition
         edges.foreach { elem => 
           elem.label.get.`type` match {
             case proto.CFG.EdgeType.Type_Branch => 
@@ -421,7 +472,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
   }
 
-
+  // Blanket createJumps function that calls the above two as neccessary
   def createJumps(procedures: ArrayBuffer[Procedure]): ArrayBuffer[Procedure] = {
     val cpy = procedures
     val entries = functionEntries.values.flatten.toList
