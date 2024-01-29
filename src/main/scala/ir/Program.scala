@@ -159,17 +159,19 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 class Procedure private (
                   var name: String,
                   var address: Option[Int],
-                  var entryBlock: Option[Block],
-                  var returnBlock: Option[Block],
+                  private var _entryBlock: Option[Block],
+                  private var _returnBlock: Option[Block],
                   private val _blocks: mutable.LinkedHashSet[Block],
                   var in: ArrayBuffer[Parameter],
                   var out: ArrayBuffer[Parameter],
                 ) {
   private var _callers = new mutable.HashSet[DirectCall]
+  _blocks.foreach(_.parent = this)
+
 
   // class invariant
-  require(returnBlock.forall(b => _blocks.contains(b)) && entryBlock.forall(b => _blocks.contains(b)))
-  require(_blocks.isEmpty == entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
+  require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
+  require(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
   def this(name: String, address: Option[Int] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
     this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
@@ -188,11 +190,25 @@ class Procedure private (
   def blocks: Iterator[Block] = _blocks.iterator
 
   def addCaller(c: DirectCall): Unit = {
-    _callers.remove(c)
+    _callers.add(c)
   }
 
   def removeCaller(c: DirectCall): Unit = {
     _callers.remove(c)
+  }
+
+  def returnBlock: Option[Block] = _returnBlock
+
+  def returnBlock_=(value: Block): Unit = {
+    removeBlocks(_returnBlock)
+    _returnBlock = Some(addBlocks(value))
+  }
+
+  def entryBlock: Option[Block] = _entryBlock
+
+  def entryBlock_=(value: Block): Unit = {
+    removeBlocks(_entryBlock)
+    _entryBlock = Some(addBlocks(value))
   }
 
   def addBlocks(block: Block): Block = {
@@ -200,7 +216,7 @@ class Procedure private (
       block.parent = this
       _blocks.add(block)
       if (entryBlock.isEmpty) {
-        entryBlock = Some(block)
+        entryBlock = block
       }
     }
     block
@@ -219,8 +235,8 @@ class Procedure private (
       val isReturn: Boolean = returnBlock.contains(oldBlock)
       removeBlocks(oldBlock)
       addBlocks(block)
-      if isEntry then entryBlock = Some(block)
-      if isReturn then returnBlock = Some(block)
+      if isEntry then entryBlock = block
+      if isReturn then returnBlock = block
     }
     block
   }
@@ -241,11 +257,15 @@ class Procedure private (
       block.deParent()
       _blocks.remove(block)
     }
-    if (_blocks.isEmpty) {
-      entryBlock = None
+    if (_entryBlock.contains(block)) {
+      _entryBlock = None
+    }
+    if (_returnBlock.contains(block)) {
+      _returnBlock = None
     }
     block
   }
+
   def removeBlocks(blocks: IterableOnce[Block]): Unit = {
     for (elem <- blocks.iterator) {
       removeBlocks(elem)
@@ -256,7 +276,6 @@ class Procedure private (
     // O(n) because we are careful to unlink the parents etc.
     removeBlocks(_blocks)
   }
-
 
   def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).toSet[Procedure]
   def incomingCalls(): Iterator[DirectCall] = _callers.iterator
@@ -270,46 +289,62 @@ class Parameter(var name: String, var size: Int, var value: Register) {
 }
 
 
-class Block private (var label: String,
+
+sealed trait BlockKind
+
+
+trait Regular extends BlockKind
+object Regular extends BlockKind
+case class CallReturn(from: Call) extends Regular
+case class Return(from: Procedure) extends Regular
+case class Entry(from: Procedure) extends Regular
+
+class Block private (
+  private val _kind: BlockKind,
+  var label: String,
  var address: Option[Int],
  val statements: IntrusiveList[Statement],
  private var _jump: Jump,
  private val _incomingJumps: mutable.HashSet[GoTo],
-) extends IntrusiveListElement, HasParent[Procedure] {
-  statements.foreach(_.setParent(this))
+) extends HasParent[Procedure] {
   _jump.setParent(this)
+  statements.foreach(_.setParent(this))
 
   statements.onInsert = x => x.setParent(this)
   statements.onRemove = x => x.deParent()
 
-  def this(label: String, address: Option[Int], statements: IterableOnce[Statement], jump: Jump) = {
-    this(label, address, IntrusiveList.from(statements), jump, mutable.HashSet.empty)
-  }
-
-  def this(label: String, address: Option[Int], statements: IterableOnce[Statement]) = {
-    this(label, address, IntrusiveList.from(statements), GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
-  }
-
-  def this(label: String, address: Option[Int] = None) = {
-    this(label, address, IntrusiveList(), GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
+  def this(kind: BlockKind, label: String, address: Option[Int], statements: IterableOnce[Statement], jump: Jump) = {
+    this(kind, label, address, IntrusiveList.from(statements), jump, mutable.HashSet.empty)
   }
 
   def jump: Jump = _jump
+
+  def jump_=(j: Jump): Unit = {
+    if (j ne _jump) {
+      _jump.deParent()
+      _jump = j
+      _jump.parent = this
+    }
+  }
+
+  def replaceJump(j: Jump) = {
+    jump = j
+    this
+  }
+
+
+  def kind : BlockKind = {
+    _kind match {
+      case c: Regular if (parent.entryBlock.contains(this)) => Entry(parent)
+      case c: Regular if (parent.returnBlock.contains(this)) => Return(parent)
+      case _ => _kind
+    }
+  }
 
   def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
 
   def addIncomingJump(g: GoTo) = _incomingJumps.add(g)
   def removeIncomingJump(g: GoTo) = _incomingJumps.remove(g)
-
-  def replaceJump(j: Jump): this.type = {
-    _jump.deParent()
-    j.setParent(this)
-    _jump = j
-    this
-  }
-
-  def isEntry: Boolean = parent.entryBlock.contains(this)
-  def isReturn: Boolean = parent.returnBlock.contains(this)
 
   def calls: Set[Procedure] = _jump.calls
 
@@ -332,8 +367,7 @@ class Block private (var label: String,
   def nextBlocks: Iterable[Block] = {
     jump match {
       case c: GoTo => c.targets
-      case c: DirectCall => c.returnTarget
-      case c: IndirectCall => c.returnTarget
+      case _ => Seq()
     }
   }
 
@@ -375,18 +409,42 @@ class Block private (var label: String,
   override def hashCode(): Int = label.hashCode()
 
   override def linkParent(p: Procedure): Unit = {
-    // The first block added to the procedure is the entry block
-    if parent.blocks.isEmpty then parent.entryBlock = Some(this)
     // to connect call() links that reference jump.parent.parent
     jump.setParent(this)
   }
+
   override def unlinkParent(): Unit = {
-    if parent.entryBlock.contains(this) then parent.entryBlock = None
-    if parent.returnBlock.contains(this) then parent.returnBlock = None
     // to disconnect call() links that reference jump.parent.parent
     jump.deParent()
   }
  }
+
+
+object Block:
+
+  def regular(label: String, address: Option[Int], statements: IterableOnce[Statement], jump: Jump) : Block = {
+    new Block(Regular, label, address, statements, jump)
+  }
+
+  def regular(label: String, address: Option[Int], statements: IterableOnce[Statement]) : Block = {
+    new Block(Regular, label, address, statements, GoTo(Seq(), Some(label + "_unknown")))
+  }
+
+  def regular(label: String, address: Option[Int] = None) : Block = {
+    new Block(Regular, label, address, IntrusiveList.empty, GoTo(Seq(), Some(label + "_unknown")))
+  }
+
+  def callReturn(from: Call) : Block = {
+    val jump = from match 
+      case d: DirectCall => GoTo(d.returnTarget.toSet)
+      case c: IndirectCall => GoTo(c.returnTarget.toSet)
+    
+    new Block(CallReturn(from), from.parent.label + "_basil_callreturn", None, Seq(), jump)
+  }
+
+  def procedureReturn(from: Procedure): Block = {
+      new Block(Return(from), (from.name + "_basil_return"), None, List(), IndirectCall(Register("R30", BitVecType(64)), None, None))
+  }
 
 
 /**

@@ -99,7 +99,7 @@ class GoTo private (private var _targets: mutable.Set[Block], override val label
   }
 
   override def linkParent(b: Block): Unit = {
-    _targets.foreach(_.removeIncomingJump(this))
+    _targets.foreach(_.addIncomingJump(this))
   }
 
   override def unlinkParent(): Unit = {
@@ -127,6 +127,7 @@ object GoTo:
 sealed trait Call extends Jump
 
 class DirectCall(val target: Procedure, var returnTarget: Option[Block],  override val label: Option[String] = None) extends Call {
+  require(returnTarget.forall(_.hasParent))
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
@@ -146,6 +147,7 @@ object DirectCall:
   def unapply(i: DirectCall): Option[(Procedure,  Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
 
 class IndirectCall(var target: Variable, var returnTarget: Option[Block], override val label: Option[String] = None) extends Call {
+  require(returnTarget.forall(_.hasParent))
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)

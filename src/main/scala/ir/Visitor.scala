@@ -423,21 +423,41 @@ class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
 }
 
 
+class AddCallReturnBlocks extends Visitor {
+  /**
+   * Add a dummy call return block with no statements after each call. 
+   */
+  override def visitDirectCall(node: DirectCall): Jump = {
+    val b = node.parent.parent.addBlocks(Block.callReturn(node))
+    node.returnTarget = Some(b)
+    node
+  }
+
+  override def visitIndirectCall(node: IndirectCall): Jump = {
+    // skip return nodes
+    if !(node.parent.kind.isInstanceOf[Return]) then { 
+      val b = node.parent.parent.addBlocks(Block.callReturn(node))
+      node.returnTarget = Some(b)
+    } 
+    node
+  }
+}
+
+
 class ConvertToSingleProcedureReturn extends Visitor {
   override def visitJump(node: Jump): Jump = {
-
-    val returnBlock = node.parent.parent.returnBlock match {
-      case Some(b) => b
-      case None =>
-        val name = node.parent.parent.name + "_return"
-        val returnBlock = new Block(name, None, List(), new IndirectCall(Register("R30", BitVecType(64)), None, None))
-        node.parent.parent.addBlocks(returnBlock)
-        node.parent.parent.returnBlock = Some(returnBlock)
-    }
-
     node match
       case c: IndirectCall =>
-        if c.target.name == "R30" && c.returnTarget.isEmpty && !c.parent.isReturn then GoTo(Seq(c.parent.parent.returnBlock.get)) else node
+        val returnBlock = node.parent.parent.returnBlock match {
+          case Some(b) => b
+          case None => {
+            val b = Block.procedureReturn(node.parent.parent)
+            node.parent.parent.returnBlock = b
+            b
+          }
+        }
+        // if we are return outside the return block then replace with a goto to the return block
+        if c.target.name == "R30" && c.returnTarget.isEmpty && !(c.parent.kind.isInstanceOf[Return]) then GoTo(Seq(returnBlock)) else node
       case _ => node
   }
 }
