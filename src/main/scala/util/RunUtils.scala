@@ -160,14 +160,6 @@ object RunUtils {
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(RNAResult, true), Output.dotIder), s"${s}_RNA$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, RNAResult, iteration), s"${s}_RNA$iteration.txt"))
 
-    Logger.info("[!] Running RegToMemAnalysisSolver")
-    val RegToSolver = RegToMemAnalysisSolver(cfg)
-    val RegToResult = RegToSolver.analyze()
-
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(RegToResult, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, RegToResult, iteration), s"${s}_RegTo$iteration.txt"))
-
-
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationSolver(cfg)
     val constPropResult = constPropSolver.analyze()
@@ -175,19 +167,19 @@ object RunUtils {
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResult, iteration), s"${s}_constprop$iteration.txt"))
 
+    Logger.info("[!] Running RegToMemAnalysisSolver")
+    val RegToSolver = RegToMemAnalysisSolver(cfg, constPropResult)
+    val RegToResult = RegToSolver.analyze()
+
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(RegToResult, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, RegToResult, iteration), s"${s}_RegTo$iteration.txt"))
+
     Logger.info("[!] Running Constant Propagation with SSA")
     val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(cfg)
     val constPropResultWithSSA = constPropSolverWithSSA.analyze()
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResultWithSSA, true), Output.dotIder), s"${s}_constpropWithSSA$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResultWithSSA, iteration), s"${s}_constpropWithSSA$iteration.txt"))
-
-    //val contextTransfer = ContextTransfer(cfg, constPropResult).analyze()
-    Logger.info("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, globalAddresses, globalOffsets, mergedSubroutines)
-    steensgaardSolver.analyze()
-    steensgaardSolver.pointsTo()
-    steensgaardSolver.mayAlias()
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, RegToResult)
@@ -199,7 +191,13 @@ object RunUtils {
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
-    mmm.convertMemoryRegions(mraResult, mergedSubroutines)
+    mmm.convertMemoryRegions(mraResult, mergedSubroutines, mraSolver.procedureToSharedRegions)
+
+    Logger.info("[!] Running Steensgaard")
+    val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, globalAddresses, globalOffsets, mergedSubroutines, mmm)
+    steensgaardSolver.analyze()
+    steensgaardSolver.pointsTo()
+    steensgaardSolver.mayAlias()
 
     Logger.info("[!] Running VSA")
     val vsaSolver = ValueSetAnalysisSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)

@@ -35,7 +35,8 @@ class InterprocSteensgaardAnalysis(
       constantProp: Map[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]]],
       globals: Map[BigInt, String],
       globalOffsets: Map[BigInt, BigInt],
-      subroutines: Map[BigInt, String]) extends Analysis[Any] {
+      subroutines: Map[BigInt, String],
+      mmm: MemoryModelMap) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
 

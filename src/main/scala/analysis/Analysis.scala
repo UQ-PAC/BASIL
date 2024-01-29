@@ -196,7 +196,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                            val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
                            val ANRResult: Map[CfgNode, Set[Variable]],
                            val RNAResult: Map[CfgNode, Set[Variable]],
-                           val RegToResult: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[MemoryLoad]]]) {
+                           val RegToResult: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]) {
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
@@ -287,7 +287,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
   private val mallocVariable = Register("R0", BitVecType(64))
   private val spList = ListBuffer[Expr](stackPointer)
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
-  val regToRegion: mutable.Map[RegisterVariableWrapper, MemoryRegion] = mutable.Map()
+  val registerToRegions: mutable.Map[RegisterVariableWrapper, mutable.Set[MemoryRegion]] = mutable.Map()
   val procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]] = mutable.Map()
 
   def eval(exp: Expr, env: Set[MemoryRegion], n: CfgCommandNode): Set[MemoryRegion] = {
@@ -341,6 +341,8 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                 env // we cannot evaluate this to a concrete value, we need VSA for this
             }
         }
+      case memoryLoad: MemoryLoad =>
+        eval(memoryLoad.index, env, n)
       // we cannot evaluate this to a concrete value, we need VSA for this
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")
@@ -355,17 +357,18 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
       cmd.data match {
         case directCall: DirectCall =>
           val ANR = ANRResult(n)
-          val RNA = RNAResult(n)
-          val parameters = ANR.intersect(RNA)
+          val RNA = RNAResult(cfg.funEntries.filter(fn => fn.data == directCall.target).head)
+          val parameters = RNA.intersect(ANR)
+          val ctx = RegToResult(n)
           for (elem <- parameters) {
-            val ctx = RegToResult(n)
             if (ctx.contains(RegisterVariableWrapper(elem))) {
               ctx(RegisterVariableWrapper(elem)) match {
                 case FlatEl(al) =>
                   val regions = eval(al, s, cmd)
                   //val targetMap = stackMap(directCall.target)
                   //cfg.funEntries.filter(fn => fn.data == directCall.target).head
-                  procedureToSharedRegions(directCall.target).addAll(regions)
+                  procedureToSharedRegions.getOrElseUpdate(directCall.target, mutable.Set.empty).addAll(regions)
+                  registerToRegions.getOrElseUpdate(RegisterVariableWrapper(elem), mutable.Set.empty).addAll(regions)
               }
             }
           }
@@ -409,7 +412,7 @@ class MemoryRegionAnalysisSolver(
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
     ANRResult: Map[CfgNode, Set[Variable]],
     RNAResult: Map[CfgNode, Set[Variable]],
-    RegToResult: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[MemoryLoad]]]
+    RegToResult: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]
 ) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, RegToResult)
     with IntraproceduralForwardDependencies
     with Analysis[Map[CfgNode, LiftedElement[Set[MemoryRegion]]]]

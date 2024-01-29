@@ -37,7 +37,6 @@ object SSAForm {
 
               localAssign.lhs.ssa_id = blockBasedMappings((block, localAssign.lhs.name))
               varMaxTracker(localAssign.lhs.name) = blockBasedMappings((block, localAssign.lhs.name)).max + 1
-              println("test")
             }
             case memoryAssign: MemoryAssign => {
               transformVariables(memoryAssign.lhs.variables, block, proc)

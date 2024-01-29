@@ -8,12 +8,18 @@ import scala.collection.immutable
 /**
  * Calculates the set of variables that are not read after being written up to that point in the program.
  * Useful for detecting dead stores, constants and if what variables are passed as parameters in a function call.
+ *
+ * Tracks
+ * R_x = MemoryLoad[Base + Offset]
+ * R_x = Base + Offset
+ *
+ * Both in which constant propagation mark as TOP which is not useful.
  */
-trait RegToMemAnalysis(cfg: ProgramCfg) {
+trait RegToMemAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]) {
 
-  val mapLattice: MapLattice[RegisterVariableWrapper, FlatElement[MemoryLoad], FlatLattice[MemoryLoad]] = MapLattice(FlatLattice[_root_.ir.MemoryLoad]())
+  val mapLattice: MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]] = MapLattice(FlatLattice[_root_.ir.Expr]())
 
-  val lattice: MapLattice[CfgNode, Map[RegisterVariableWrapper, FlatElement[MemoryLoad]], MapLattice[RegisterVariableWrapper, FlatElement[MemoryLoad], FlatLattice[MemoryLoad]]] = MapLattice(mapLattice)
+  val lattice: MapLattice[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] = MapLattice(mapLattice)
 
   val domain: Set[CfgNode] = cfg.nodes.toSet
 
@@ -21,13 +27,18 @@ trait RegToMemAnalysis(cfg: ProgramCfg) {
 
   /** Default implementation of eval.
    */
-  def eval(cmd: Command, s: Map[RegisterVariableWrapper, FlatElement[MemoryLoad]]): Map[RegisterVariableWrapper, FlatElement[MemoryLoad]] = {
+  def eval(cmd: Command, constants:  Map[Variable, FlatElement[BitVecLiteral]], s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = {
     var m = s
     cmd match {
       case localAssign: LocalAssign =>
         localAssign.rhs match {
           case memoryLoad: MemoryLoad =>
-            m + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(memoryLoad).asInstanceOf[FlatElement[MemoryLoad]])
+            m + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(memoryLoad).asInstanceOf[FlatElement[Expr]])
+          case binaryExpr: BinaryExpr =>
+            if (evaluateExpression(binaryExpr.arg1, constants).isEmpty) {
+              return m + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(binaryExpr).asInstanceOf[FlatElement[Expr]])
+            }
+            m
           case _ => m
         }
       case _ =>
@@ -37,21 +48,22 @@ trait RegToMemAnalysis(cfg: ProgramCfg) {
 
   /** Transfer function for state lattice elements.
    */
-  def localTransfer(n: CfgNode, s: Map[RegisterVariableWrapper, FlatElement[MemoryLoad]]): Map[RegisterVariableWrapper, FlatElement[MemoryLoad]] = n match {
+  def localTransfer(n: CfgNode, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = n match {
     case cmd: CfgCommandNode =>
-      eval(cmd.data, s)
+      eval(cmd.data, constantProp(n), s)
     case _ => s // ignore other kinds of nodes
   }
 
   /** Transfer function for state lattice elements.
    */
-  def transfer(n: CfgNode, s: Map[RegisterVariableWrapper, FlatElement[MemoryLoad]]): Map[RegisterVariableWrapper, FlatElement[MemoryLoad]] = localTransfer(n, s)
+  def transfer(n: CfgNode, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = localTransfer(n, s)
 }
 
 class RegToMemAnalysisSolver(
                          cfg: ProgramCfg,
-                       ) extends RegToMemAnalysis(cfg)
+                         constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
+                       ) extends RegToMemAnalysis(cfg, constantProp)
   with InterproceduralForwardDependencies
-  with Analysis[Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[MemoryLoad]]]]
-  with SimpleWorklistFixpointSolver[CfgNode, Map[RegisterVariableWrapper, FlatElement[MemoryLoad]], MapLattice[RegisterVariableWrapper, FlatElement[MemoryLoad], FlatLattice[MemoryLoad]]] {
+  with Analysis[Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]]
+  with SimpleWorklistFixpointSolver[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] {
 }

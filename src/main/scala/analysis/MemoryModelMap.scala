@@ -44,7 +44,7 @@ class MemoryModelMap {
     }
   }
 
-  def convertMemoryRegions(memoryRegions: Map[CfgNode, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String]): Unit = {
+  def convertMemoryRegions(memoryRegions: Map[CfgNode, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
     val externalFunctionRgns = externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64)))
 
@@ -53,9 +53,14 @@ class MemoryModelMap {
     exitNodes.foreach(exitNode =>
       memoryRegions(exitNode) match {
         case Lift(node) =>
+          var allRegions: Set[MemoryRegion] = node
+          if (procedureToSharedRegions.contains(exitNode.data)) {
+            val sharedRegions = procedureToSharedRegions(exitNode.data)
+            allRegions = allRegions ++ sharedRegions
+          }
           // for each function exit node we get the memory region and add it to the mapping
-          val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
-          val dataRgns = node.collect { case r: DataRegion => r }
+          val stackRgns = allRegions.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
+          val dataRgns = allRegions.collect { case r: DataRegion => r }
 
           // add externalFunctionRgn to dataRgns and sort by value
           val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.value)
@@ -143,4 +148,3 @@ class DataRegion(override val regionIdentifier: String, val start: BitVecLiteral
     case _ => false
   }
 }
-
