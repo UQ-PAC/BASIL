@@ -315,7 +315,7 @@ class Block private (var label: String,
   override def toString: String = {
     // display all statements and jumps
     val statementsString = statements.map(_.toString).mkString("\n")
-    s"Block $label with $statementsString\n$jump"
+    s"Block $label" // with $statementsString\n$jump"
   }
 
   /**

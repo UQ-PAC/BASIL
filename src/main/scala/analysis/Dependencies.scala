@@ -1,5 +1,7 @@
 package analysis
 
+import ir.{CFGPosition, InterProcIRCursor, IntraProcIRCursor}
+
 /** Dependency methods for worklist-based analyses.
   */
 trait Dependencies[N]:

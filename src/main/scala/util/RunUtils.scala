@@ -232,8 +232,38 @@ object RunUtils {
       writeToFile(newCFG.toDot(Output.labeler(Map(), false), Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
-    val livenessAnalysisResult = LiveVarAnalysis(cfg).analyze()
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(livenessAnalysisResult, true), Output.dotIder), s"${s}_liveness$iteration.dot"))
+    val reachingDefsIRAnalysisResults = ReachingDefsIRAnalysis(newIR).analyze()
+    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, reachingDefsIRAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
+      (m, f) => m + (f._1 -> f._2.toString())
+    })
+      , s"${s}_reaching$iteration.dot"))
+
+    val liveVarAnalysisResult = IRLiveVarAnalysis(newIR).analyze()
+    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, liveVarAnalysisResult.foldLeft(Map(): Map[CFGPosition, String]) {
+      (m, f) => m + (f._1 -> f._2.toString())
+    })
+      , s"${s}_livevarsInter$iteration.dot"))
+
+
+    val possiblyUninitVarsAnalysisResult = PossiblyUninitVarsAnalysis(newIR).analyze()
+    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, possiblyUninitVarsAnalysisResult.foldLeft(Map(): Map[CFGPosition, String]) {
+      (m, f) => m + (f._1 -> f._2.toString())
+    })
+      , s"${s}_uninit$iteration.dot"))
+
+
+    val copyConstantAnalysisResult = IRCopyConstantAnalysis(newIR).analyze()
+    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, copyConstantAnalysisResult.foldLeft(Map(): Map[CFGPosition, String]) {
+      (m, f) => m + (f._1 -> f._2.toString())
+    })
+      , s"${s}_copy$iteration.dot"))
+
+
+    val livenessAnalysisResult = LivenessAnalysisWorklistSolver(newIR).analyze()
+    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, livenessAnalysisResult.foldLeft(Map() : Map[CFGPosition, String]) {
+      (m, f) => m + (f._1 -> f._2.toString())
+    })
+   , s"${s}_livenessIntra$iteration.dot"))
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
 
