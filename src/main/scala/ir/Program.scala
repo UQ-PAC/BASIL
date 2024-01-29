@@ -292,6 +292,8 @@ class Parameter(var name: String, var size: Int, var value: Register) {
 
 sealed trait BlockKind
 
+/* Block can be a call return entry or return */
+case class Regular() extends BlockKind
 
 /* Block is the fallthrough / return target of a call. */
 case class CallReturn(from: Call) extends BlockKind
@@ -426,15 +428,15 @@ class Block private (
 object Block:
 
   def regular(label: String, address: Option[Int], statements: IterableOnce[Statement], jump: Jump) : Block = {
-    new Block(Regular, label, address, statements, jump)
+    new Block(Regular(), label, address, statements, jump)
   }
 
   def regular(label: String, address: Option[Int], statements: IterableOnce[Statement]) : Block = {
-    new Block(Regular, label, address, statements, GoTo(Seq(), Some(label + "_unknown")))
+    new Block(Regular(), label, address, statements, GoTo(Seq(), Some(label + "_unknown")))
   }
 
   def regular(label: String, address: Option[Int] = None) : Block = {
-    new Block(Regular, label, address, IntrusiveList.empty, GoTo(Seq(), Some(label + "_unknown")))
+    new Block(Regular(), label, address, IntrusiveList.empty, GoTo(Seq(), Some(label + "_unknown")))
   }
 
   def callReturn(from: Call) : Block = {
