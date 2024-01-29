@@ -123,7 +123,7 @@ object RunUtils {
     // val IRTranslator = BAPToIR(bapProgram, mainAddress)
     // var IRProgram = IRTranslator.translate
   
-    // println(serialiseIL(IRProgram));
+    //println(serialiseIL(IRProgram));
 
     val specification = loadSpecification(q.loading.specFile, IRProgram, globals)
 

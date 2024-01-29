@@ -21,7 +21,7 @@ import scala.util.boundary, boundary.break
 import java.nio.ByteBuffer
 
 class TempIf(val isLongIf: Boolean, val conds: ArrayBuffer[Expr], val stmts: ArrayBuffer[ArrayBuffer[Statement]], 
-              val elseStatement: Option[Statement] = None, val label: Option[String] = None) extends Statement {}
+              val elseStatement: Option[Statement] = None, override val label: Option[String] = None) extends Assert(conds.head) {}
 
 object TempIf {
   def unapply(tempIf: TempIf): Option[(Boolean, ArrayBuffer[Expr], ArrayBuffer[ArrayBuffer[Statement]], Option[Statement], Option[String])] = {
@@ -114,18 +114,6 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
         return result.head //. head seems weird here but i guess it works
       }
       
-      // This is probably uneccessary
-      // val syms: mutable.Set[proto.Symbol.Symbol] = entryBlocks.flatMap(entry => 
-      //   symMap.getOrElse(entry,None))
-      // val names: mutable.Set[String] = syms.map(elem => elem.name)
-      
-      
-      // if (names.size > 1) {
-      //   var nam = ""
-      //   nam += names.mkString(", ")
-      //   return nam
-      // }
-      
     }
 
     name
@@ -210,7 +198,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
       //Function arguments may also be determined through modified liveness analysis but :/
     val in: ArrayBuffer[Parameter] = create_arguments(name)
     val out: ArrayBuffer[Parameter] = ArrayBuffer(Parameter(name + "_result", 64, Register("R0", BitVecType(64)))) 
-    return Procedure(name, address, blocks, in, out)
+    return Procedure(name, address, blocks.headOption, None, blocks, in, out)
   }
 
  
@@ -258,13 +246,13 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
   def handle_unlifted_indirects(blk: Block): ArrayBuffer[Block] = {
 
-    val stmts_without_jmp = blk.statements.to(List).dropRight(1)
+    val stmts_without_jmp = blk.statements.dropRight(1)
 
     if (stmts_without_jmp.exists {elem => elem.isInstanceOf[LocalAssign] && elem.asInstanceOf[LocalAssign].lhs.name == "_PC"} ) {
       val (startStmts, endStmts) = blk.statements.span {elem => !(elem.isInstanceOf[LocalAssign] && elem.asInstanceOf[LocalAssign].lhs.name == "_PC") }
-      val unliftedJmp = endStmts.remove(0).asInstanceOf[LocalAssign]
+      val unliftedJmp = endStmts.to(ArrayBuffer).remove(0).asInstanceOf[LocalAssign]
 
-      val startBlk = Block(blk.label, blk.address, startStmts += unliftedJmp, GoTo(ArrayBuffer[Block](), None))
+      val startBlk = Block(blk.label, blk.address, startStmts.to(ArrayBuffer) += unliftedJmp, GoTo(ArrayBuffer[Block](), None))
       val endBlk = Block(get_blkLabel(blk.label, 2), blk.address, endStmts, GoTo(ArrayBuffer[Block](), None))
 
       blkMap += (get_ByteString(endBlk.label) -> endBlk)
@@ -287,12 +275,12 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     if (blk.statements.exists {elem =>  elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}) {
        
       val (startStmts, endStmts) = blk.statements.span {elem => !(elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf)}
-      val ifStmt = endStmts.remove(0).asInstanceOf[TempIf]
+      val ifStmt = endStmts.to(ArrayBuffer).remove(0).asInstanceOf[TempIf]
 
 
       var blkCount: Int = 2
 
-      val startblk = Block(blk.label, blk.address, startStmts += create_TempIf(ifStmt.conds.remove(0)), GoTo(ArrayBuffer[Block](), None))
+      val startblk = Block(blk.label, blk.address, startStmts.to(ArrayBuffer) += create_TempIf(ifStmt.conds.remove(0)), GoTo(ArrayBuffer[Block](), None))
       val endBlk = Block(get_blkLabel(blk.label, blkCount), blk.address, endStmts, GoTo(ArrayBuffer[Block](), None))
       blkMap += (get_ByteString(endBlk.label) -> endBlk)
       edgeMap += (endBlk.label -> edgeMap.get(startblk.label).get)
@@ -450,27 +438,27 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
           if (edges.size > 1) {
             multiJump(cpy, b, edges, entries, b.statements(b.statements.size - 1)) match {
               case Left(jump) =>
-                b.jump = jump
+                b.replaceJump(jump)
               case Right(blks) =>
                 extraBlocks ++= blks
-                b.jump = GoTo(blks, None)
+                b.replaceJump(GoTo(blks, None))
             }
           } else {
             val edge = edges(0)
-            b.jump = singleJump(cpy, b, edge, entries, blocks)
+            b.replaceJump(singleJump(cpy, b, edge, entries, blocks))
           }
         }
 
         b.statements.lastOption match { // remove "_PC" statement
           case Some(LocalAssign(lhs: Register, _, _)) if lhs.name == "_PC" =>
-             b.statements.remove(b.statements.size - 1) 
+             b.statements.remove(b.statements.lastElem.get) 
           case Some(TempIf(_, _, _, _, _)) => // remove tempIF statement
-            b.statements.remove(b.statements.size - 1) 
+            b.statements.remove(b.statements.lastElem.get) 
           case _ => // do Nothing
         }
    
       }
-      p.blocks ++= extraBlocks    
+      p.addBlocks(extraBlocks)    
     }
 
     return procedures
