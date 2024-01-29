@@ -26,8 +26,6 @@ abstract class IRIDESolver[E <: CFGPosition, EE <: CFGPosition, C <: CFGPosition
   protected def getExitProc(exit: EE) : Procedure
   protected def getEntryProc(entry: E) : Procedure
 
-
-
   /**
    * Phase 1 of the IDE algorithm.
    * Computes Path functions and Summary functions
@@ -65,10 +63,8 @@ abstract class IRIDESolver[E <: CFGPosition, EE <: CFGPosition, C <: CFGPosition
 
     def init: EdgeFunction[T] = IdEdge()
 
-
     private def returnflow(d1: DL, d2: DL, funexit: EE, aftercall: R): Unit = {
-      // TODO better finding of aftercall's call node
-      val entry = exitToEntry(funexit)  // funexit.parent.parent
+      val entry = exitToEntry(funexit)
       val call = returnToCall(aftercall)
       callJumpCache.getOrElseUpdate((entry, d1, call), mutable.Map[DL, EdgeFunction[T]]()).foreach {
         case (d3, e12) => // d3 is now an item at the caller function entry, and e12 is the composed edge to d1 at the callee entry
