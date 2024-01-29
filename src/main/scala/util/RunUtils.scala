@@ -162,34 +162,9 @@ object RunUtils {
     val constPropSolver = ConstantPropagationSolver(cfg)
     val constPropResult = constPropSolver.analyze()
 
-    def newSolverTest(): Unit = {
-      val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
-      val newCPResult = ilcpsolver.analyze()
-
-      val newCommandDomain = ilcpsolver.domain.filter(_.isInstanceOf[Command])
-
-      val newRes = newCPResult.flatMap((x, y) => y.flatMap {
-        case (_, el) if el == FlatLattice[BitVecLiteral].top || el == FlatLattice[BitVecLiteral].bottom => None
-        case z => Some(x -> z)
-      })
-      val oldRes = constPropResult.filter((x,y) => x.isInstanceOf[CfgNodeWithData[CFGPosition]]).flatMap((x, y) => y.flatMap {
-        case (_, el) if el == FlatLattice[BitVecLiteral].top || el == FlatLattice[BitVecLiteral].bottom => None
-        case z => Some(x.asInstanceOf[CfgNodeWithData[Any]].data -> z)
-      })
-      val both = newRes.toSet.intersect(oldRes.toSet)
-      val notnew = (newRes.toSet).filter(x => !both.contains(x)).toList.sorted((a, b) => a._2._1.name.compare(b._2._1.name))
-      val notOld = (oldRes.toSet).filter(x => !both.contains(x)).toList.sorted((a,b) => a._2._1.name.compare(b._2._1.name))
-      // newRes and oldRes should have value equality
-
-      //config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_newconstprop$iteration.txt"))
-      config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram), s"program.dot"))
-      config.analysisResultsPath.foreach(s => writeToFile(toDot(IRProgram, newCPResult.map((k,v) => (k, v.toString))), s"program-constprop.dot"))
-
-      config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_new_cpres$iteration.txt"))
-      config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_old_cpres$iteration.txt"))
-
-    }
-    newSolverTest()
+    val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
+    val newCPResult = ilcpsolver.analyze()
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_new_ir_constprop$iteration.txt"))
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_constprop$iteration.txt"))
