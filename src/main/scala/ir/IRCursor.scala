@@ -73,6 +73,7 @@ trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
       case b: Block =>
         b.kind match {
           case CallReturn(from) => Set(from)
+          case Entry(proc)      => Set(proc)
           case _                => b.incomingJumps.asInstanceOf[Set[CFGPosition]]
         }
       case proc: Procedure => Set() // intraproc
