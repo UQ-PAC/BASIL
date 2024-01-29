@@ -293,11 +293,14 @@ class Parameter(var name: String, var size: Int, var value: Register) {
 sealed trait BlockKind
 
 
-trait Regular extends BlockKind
-object Regular extends BlockKind
-case class CallReturn(from: Call) extends Regular
-case class Return(from: Procedure) extends Regular
-case class Entry(from: Procedure) extends Regular
+/* Block is the fallthrough / return target of a call. */
+case class CallReturn(from: Call) extends BlockKind
+
+/* Block is the single return point for a procedure */
+case class Return(from: Procedure) extends BlockKind
+
+/* Block is the single entry point for a procedure */
+case class Entry(from: Procedure) extends BlockKind
 
 class Block private (
   private val _kind: BlockKind,
@@ -335,8 +338,8 @@ class Block private (
 
   def kind : BlockKind = {
     _kind match {
-      case c: Regular if (parent.entryBlock.contains(this)) => Entry(parent)
-      case c: Regular if (parent.returnBlock.contains(this)) => Return(parent)
+      case c if (parent.entryBlock.contains(this)) => Entry(parent)
+      case c if (parent.returnBlock.contains(this)) => Return(parent)
       case _ => _kind
     }
   }
