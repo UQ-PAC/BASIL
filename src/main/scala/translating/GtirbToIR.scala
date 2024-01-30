@@ -79,24 +79,31 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
   } 
 
   // Creates CFG map mapping blk UUIDs to a buffer of outgoing edges 
-  def create_cfg_map(): collection.mutable.HashMap[String, ArrayBuffer[proto.CFG.Edge]] = {
+  def create_cfg_map(): (collection.mutable.HashMap[String, ArrayBuffer[proto.CFG.Edge]],collection.mutable.HashMap[String, ArrayBuffer[proto.CFG.Edge]])  = {
 
     val edges = cfg.edges 
     val edgeMap: HashMap[String, ArrayBuffer[proto.CFG.Edge]] = HashMap.empty
+    val incomingEdgeMap: HashMap[String, ArrayBuffer[proto.CFG.Edge]] = HashMap.empty
 
     for (edge <- edges) { 
 
+      val targetUuid = Base64.getUrlEncoder().encodeToString(edge.targetUuid.toByteArray())
       val sourceUuid = Base64.getUrlEncoder().encodeToString(edge.sourceUuid.toByteArray())
+
       if (edgeMap.contains(sourceUuid)) {
         edgeMap(sourceUuid) += edge
-
       } else {
         edgeMap += (sourceUuid -> ArrayBuffer(edge))
+      }
 
+      if (incomingEdgeMap.contains(targetUuid)) {
+        incomingEdgeMap(targetUuid) += edge
+      } else {
+        incomingEdgeMap += (targetUuid -> ArrayBuffer(edge))
       }
 
     }
-    edgeMap
+    (edgeMap, incomingEdgeMap)
   }
 
   // Another map of blk UUIDs to Symbols related to that blk. 
@@ -184,7 +191,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
   val blkMap: HashMap[ByteString, Block] = HashMap[ByteString, Block]()
   val symMap = create_symMap()
   val addresses = create_addresses()
-  val edgeMap: HashMap[String, ArrayBuffer[proto.CFG.Edge]] = create_cfg_map()
+  val (edgeMap, incomingEdgeMap) = create_cfg_map()
   var blkCount = 0
  
 
@@ -271,13 +278,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
   }
 
   // makes blkLabel boogie friendly 
-  def convert_label(label: String): String = {
-    if (label.startsWith("l_")) {
-      label
-    } else {
-      "l_" + label.replace("=", "").replace("-", "")
-    }
-  } 
+  def convert_label(label: String): String = "l_" + label.replace("=", "").replace("-", "")
 
   /** 
   * Handles the case where ddisasm fails to lift an indirect call correctly (such as blr instruction)
@@ -459,7 +460,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
     (hasFunctionReturn, hasConditionalBranch) match {
 
-      case (true, false) => 
+      case (true, false) => //Function return and fallthrough to next block 
         val callEdge = edges.find(_.label.get.`type` 
                                   == proto.CFG.EdgeType.Type_Call).get
         val fallEdge = edges.find(_.label.get.`type` 
@@ -473,7 +474,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
           Left(IndirectCall(get_jmp_reg(block.statements.last), Option(resolveGotoTarget(fallEdge)), None))
         }
 
-      case (false, true) =>
+      case (false, true) => //If statement, need to create TRUE and FALSE blocks that contain asserts
         val blks = ArrayBuffer[Block]()
         val cond: Statement = Assume(ifStmt.asInstanceOf[TempIf].conds(0), checkSecurity=true)
         val notCond = Assume(UnaryExpr(BoolNOT, ifStmt.asInstanceOf[TempIf].conds(0)), checkSecurity=true) // Inverted Condition
@@ -500,17 +501,19 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
   }
 
-  // Blanket createJumps function that calls the above two as neccessary
+  // Blanket createJumps function that calls the above two as neccessary, as well as stripping temporary statements and superfluous blocks 
   def createJumps(procedures: ArrayBuffer[Procedure]): ArrayBuffer[Procedure] = {
     val cpy = procedures
     val entries = functionEntries.values.flatten.toList
     val blocks = functionBlocks.values.flatten.toList
 
     for (p <- procedures) {
-      var extraBlocks: ArrayBuffer[Block] = ArrayBuffer[Block]()
+      var extraBlocks = ArrayBuffer[Block]()
+      var superfluousBlocks = ArrayBuffer[Block]()
       for (b <- p.blocks) {
 
         if (edgeMap.contains(b.label)) {
+          // Block has outgoing edges, call jump functions
 
           val edges = edgeMap(b.label)
 
@@ -526,6 +529,12 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
             val edge = edges(0)
             b.replaceJump(singleJump(cpy, b, edge, entries, blocks))
           }
+        } else {
+          //Block has no outgoing edges, check for incoming edges. 
+          if (!incomingEdgeMap.contains(b.label)) {
+            superfluousBlocks += b //No incoming or outgoing edge, remove
+          }
+
         }
 
         b.statements.lastOption match { // remove "_PC" statement
@@ -537,6 +546,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
         }
         b.label = convert_label(b.label) // convert into boogie friendly format
       }
+      p.removeBlocks(superfluousBlocks)
       p.addBlocks(extraBlocks)    
     }
 
