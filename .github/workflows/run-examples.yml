@@ -13,7 +13,7 @@ jobs:
     timeout-minutes: 10 
     container:
       # Requires repo to have action access in package settings
-      image: ghcr.io/uq-pac/basil-dev:latest
+      image: ghcr.io/uq-pac/basil-nix-dev:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.github_token }}

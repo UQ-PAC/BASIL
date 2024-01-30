@@ -1,7 +1,7 @@
 # ====
 # ASLP
 # ====
-FROM ocaml/opam:ubuntu-23.04-ocaml-4.14 AS aslp
+FROM docker.io/ocaml/opam:ubuntu-23.04-ocaml-4.14 AS aslp
 USER root
 
 # Install system dependencies
@@ -47,7 +47,7 @@ USER root
 # it requires old versions of libffi and libtinfo and generally 
 # doesn't support ubuntu well.
 # Opam install is the most reliable way.
-FROM ocaml/opam:ubuntu-23.04-ocaml-4.14 AS aslp-bap
+FROM docker.io/ocaml/opam:ubuntu-23.04-ocaml-4.14 AS aslp-bap
 USER root
 # Install system dependencies
 RUN apt-get update && apt-get install -y python3 libgmp-dev yasm m4 \
@@ -112,11 +112,10 @@ USER root
 # =======================
 # BASIL build environment
 # =======================
-FROM ubuntu:23.04 AS scala
+FROM docker.io/ubuntu:23.04 AS scala
 ENV PATH="$PATH:/root/.local/share/coursier/bin"
 RUN apt-get update && apt-get install default-jre-headless curl git --yes \ 
  && curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup --yes \
- && apt-get remove curl --yes \
   && apt-get autoremove --purge -y \
   && apt-get autoclean -y
 

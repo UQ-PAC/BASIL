@@ -7,6 +7,15 @@ services:
     volumes:
       - ./:/host:rw
     working_dir: /host
+  basil-nix-dev:
+    image: ghcr.io/uq-pac/basil-nix-dev:latest
+    build:
+      dockerfile: docker/nixdocker.Dockerfile
+      target: nix-dev-base
+    volumes:
+      - ./:/host:rw
+    working_dir: /host
+
   basil-dev:
     image: ghcr.io/uq-pac/basil-dev:latest
     build:
