@@ -22,16 +22,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Compile BASIL 
-        run: mill compile 
+        run: ./mill compile 
 
       - name: Bitvec Tests
-        run: mill test.testOnly BitVectorAnalysisTests
+        run: ./mill test.testOnly BitVectorAnalysisTests
 
       - name: IntrusiveListTest
-        run: mill test.testOnly SystemTests IntrusiveListPublicInterfaceTests
+        run: ./mill test.testOnly SystemTests IntrusiveListPublicInterfaceTests
 
       - name: System Tests
-        run: mill test.testOnly *SystemTests -- -z basic_assign_increment/gcc_no_plt_no_pic -z basic_assign_increment/clang_no_plt_no_pic -z secret_write/gcc_no_plt_no_pic
+        run: ./mill test.testOnly *SystemTests -- -z basic_assign_increment/gcc_no_plt_no_pic -z basic_assign_increment/clang_no_plt_no_pic -z secret_write/gcc_no_plt_no_pic
 
 
 
