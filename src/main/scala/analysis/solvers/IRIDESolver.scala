@@ -12,7 +12,7 @@ import scala.collection.mutable
  * Adapted from Tip
  * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/IDESolver.scala
  */
-abstract class IRIDESolver[E <: CFGPosition, EE <: CFGPosition, C <: CFGPosition, R <: CFGPosition, D, T, L <: Lattice[T]](val program: Program, val cache: IRIDECache, val startNode: CFGPosition)
+abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Command), C <: (DirectCall | Block), R <: (DirectCall | Block), D, T, L <: Lattice[T]](val program: Program, val cache: IRIDECache, val startNode: CFGPosition)
   extends IRIDEAnalysis[E, EE, C, R, D, T, L], Dependencies[CFGPosition] {
 
   protected def entryToExit(entry: E) : EE

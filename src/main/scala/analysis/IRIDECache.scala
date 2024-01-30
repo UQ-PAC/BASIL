@@ -53,7 +53,8 @@ class IRIDECache(program: Program) {
         }
         else
           c match
-            case directCall: DirectCall if directCall.returnTarget.isDefined  =>
+            // A direct call that we care about (it had a return block and the function called is not empty)
+            case directCall: DirectCall if directCall.returnTarget.isDefined && directCall.target.blocks.nonEmpty =>
               callReturnMap.addOne(directCall, directCall.returnTarget.head)
             case _ =>
             IntraProcIRCursor.succ(c).foreach(traverse)
