@@ -13,7 +13,6 @@ jobs:
     timeout-minutes: 10 
     container:
       # Requires repo to have action access in package settings
-      # 
       image: ghcr.io/uq-pac/basil-dev:latest
       credentials:
         username: ${{ github.actor }}
@@ -23,13 +22,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Compile BASIL 
-        run: sbt assembly
+        run: mill compile 
 
       - name: Bitvec Tests
-        run: sbt "testOnly BitVectorAnalysisTests"
+        run: mill test.testOnly BitVectorAnalysisTests
+
+      - name: IntrusiveListTest
+        run: mill test.testOnly SystemTests IntrusiveListPublicInterfaceTests
 
       - name: System Tests
-        run: sbt "testOnly *SystemTests -- -z basic_assign_increment/gcc_no_plt_no_pic -z basic_assign_increment/clang_no_plt_no_pic -z secret_write/gcc_no_plt_no_pic"
+        run: mill test.testOnly *SystemTests -- -z basic_assign_increment/gcc_no_plt_no_pic -z basic_assign_increment/clang_no_plt_no_pic -z secret_write/gcc_no_plt_no_pic
 
 
 
