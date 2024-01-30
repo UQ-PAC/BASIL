@@ -293,6 +293,10 @@ class Block private (var label: String,
     this(label, address, IntrusiveList.from(statements), GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
   }
 
+  def this(label: String, address: Option[Int], statements: IntrusiveList[Statement]) = {
+    this(label, address, statements, GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
+  }
+
   def this(label: String, address: Option[Int] = None) = {
     this(label, address, IntrusiveList(), GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
   }
@@ -374,12 +378,7 @@ class Block private (var label: String,
     } else None
   }
 
-  override def equals(obj: scala.Any): Boolean =
-    obj match
-      case b: Block => b.label == this.label
-      case _ => false
 
-  override def hashCode(): Int = label.hashCode()
 
   override def linkParent(p: Procedure): Unit = {
       // The first block added to the procedure is the entry block
