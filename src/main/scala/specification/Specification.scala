@@ -30,6 +30,30 @@ case class SpecGlobal(name: String, override val size: Int, arraySize: Option[In
     Endian.LittleEndian,
     size
   )
+  override def resolveSpecParam: BMemoryLoad = BMemoryLoad(
+    BMapVar("mem$out", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
+    toAddrVar,
+    Endian.LittleEndian,
+    size
+  )
+  override def resolveSpecParamOld: BMemoryLoad = BMemoryLoad(
+    BMapVar("mem$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
+    toAddrVar,
+    Endian.LittleEndian,
+    size
+  )
+  override def resolveSpecInv: BMemoryLoad = BMemoryLoad(
+    BMapVar("mem$inv2", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local),
+    toAddrVar,
+    Endian.LittleEndian,
+    size
+  )
+  override def resolveSpecInvOld: BMemoryLoad = BMemoryLoad(
+    BMapVar("mem$inv1", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local),
+    toAddrVar,
+    Endian.LittleEndian,
+    size
+  )
   override def resolveOld: BMemoryLoad = resolveSpec
   override def resolveInsideOld: BExpr = toOldVar
   override def removeOld: BMemoryLoad = resolveSpec
@@ -49,6 +73,30 @@ case class SpecGamma(global: SpecGlobal) extends SpecVar {
     global.size,
     global.size / 8
   )
+  override def resolveSpecParam: GammaLoad = GammaLoad(
+    BMapVar("Gamma_mem$out", MapBType(BitVecBType(64), BoolBType), Scope.Parameter),
+    global.toAddrVar,
+    global.size,
+    global.size / 8
+  )
+  override def resolveSpecParamOld: GammaLoad = GammaLoad(
+    BMapVar("Gamma_mem$in", MapBType(BitVecBType(64), BoolBType), Scope.Parameter),
+    global.toAddrVar,
+    global.size,
+    global.size / 8
+  )
+  override def resolveSpecInv: GammaLoad = GammaLoad(
+    BMapVar("Gamma_mem$inv2", MapBType(BitVecBType(64), BoolBType), Scope.Local),
+    global.toAddrVar,
+    global.size,
+    global.size / 8
+  )
+  override def resolveSpecInvOld: GammaLoad = GammaLoad(
+    BMapVar("Gamma_mem$inv1", MapBType(BitVecBType(64), BoolBType), Scope.Local),
+    global.toAddrVar,
+    global.size,
+    global.size / 8
+  )
   override def resolveOld: GammaLoad = resolveSpec
   override def resolveInsideOld: BExpr = global.toOldGamma
   override def removeOld: GammaLoad = resolveSpec
@@ -64,6 +112,31 @@ case class ArrayAccess(global: SpecGlobal, index: Int) extends SpecGlobalOrAcces
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
   override def resolveSpec: BMemoryLoad = BMemoryLoad(
     BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global),
+    toAddrVar,
+    Endian.LittleEndian,
+    global.size
+  )
+  override def resolveSpecParam: BMemoryLoad = BMemoryLoad(
+    BMapVar("mem$out", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
+    toAddrVar,
+    Endian.LittleEndian,
+    global.size
+  )
+  override def resolveSpecParamOld: BMemoryLoad = BMemoryLoad(
+    BMapVar("mem$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
+    toAddrVar,
+    Endian.LittleEndian,
+    global.size
+  )
+
+  override def resolveSpecInv: BMemoryLoad = BMemoryLoad(
+    BMapVar("mem$inv2", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local),
+    toAddrVar,
+    Endian.LittleEndian,
+    global.size
+  )
+  override def resolveSpecInvOld: BMemoryLoad = BMemoryLoad(
+    BMapVar("mem$inv1", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local),
     toAddrVar,
     Endian.LittleEndian,
     global.size
@@ -102,7 +175,9 @@ case class SubroutineSpec(
     requiresDirect: List[String],
     ensures: List[BExpr],
     ensuresDirect: List[String],
-    modifies: List[String]
+    modifies: List[String],
+    rely: List[BExpr],
+    guarantee: List[BExpr]
 )
 
 case class ExternalFunction(name: String, offset: BigInt)

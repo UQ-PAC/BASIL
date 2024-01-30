@@ -1,32 +1,50 @@
 package ir
 
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable
+import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
 import analysis.BitVectorEval
+import intrusivelist.{IntrusiveList, IntrusiveListElement}
 
-class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure, var initialMemory: ArrayBuffer[MemorySection], var readOnlyMemory: ArrayBuffer[MemorySection]) {
+class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure,
+              var initialMemory: ArrayBuffer[MemorySection],
+              var readOnlyMemory: ArrayBuffer[MemorySection]) extends Iterable[CFGPosition] {
 
   // This shouldn't be run before indirect calls are resolved
-  def stripUnreachableFunctions(): Unit = {
-    val functionToChildren = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
-    var next = mainProcedure.name
-    var reachableNames: Set[String] = Set(next)
-    var toVisit: List[String] = List()
+
+  def stripUnreachableFunctions(depth: Int = Int.MaxValue): Unit = {
+    val procedureCalleeNames = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
+
+    var toVisit: mutable.LinkedHashSet[(Int, String)] = mutable.LinkedHashSet((0, mainProcedure.name))
     var reachableFound = true
-    while (reachableFound) {
-      val children = functionToChildren(next) -- reachableNames -- toVisit - next
-      reachableNames = reachableNames ++ children
-      toVisit = toVisit ++ children
-      if (toVisit.isEmpty) {
-        reachableFound = false
-      } else {
-        next = toVisit.head
-        toVisit = toVisit.tail
+    val reachableNames = mutable.HashMap[String, Int]()
+    while (toVisit.nonEmpty) {
+      val next = toVisit.head
+      toVisit.remove(next)
+
+      if (next._1 <= depth) {
+
+        def addName(depth: Int, name: String): Unit = {
+          val oldDepth = reachableNames.getOrElse(name, Integer.MAX_VALUE)
+          reachableNames.put(next._2, if depth < oldDepth then depth else oldDepth)
+        }
+        addName(next._1, next._2)
+
+        val callees = procedureCalleeNames(next._2)
+
+        toVisit.addAll(callees.diff(reachableNames.keySet).map(c => (next._1 + 1, c)))
+        callees.foreach(c => addName(next._1 + 1, c))
       }
     }
-    procedures = procedures.filter(f => reachableNames.contains(f.name))
+    procedures = procedures.filter(f => reachableNames.keySet.contains(f.name))
+
+    for (elem <- procedures.filter(c => c.calls.exists(s => !procedures.contains(s)))) {
+      // last layer is analysed only as specifications so we remove the body for anything that calls
+      // a function we have removed
+
+      elem.clearBlocks()
+    }
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
@@ -73,12 +91,6 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     }
   }
 
-  def stackIdentification(): Unit = {
-    for (p <- procedures) {
-      p.stackIdentification()
-    }
-  }
-
   /**
     * Takes all the memory sections we get from the ADT (previously in initialMemory) and restricts initialMemory to
     * just the .data section (which contains things such as global variables which are mutable) and puts the .rodata
@@ -108,87 +120,205 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     initialMemory = initialMemoryNew
   }
 
+  /**
+   * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+   * not guaranteed to be in any defined order. 
+   */
+  class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
+    val stack = mutable.Stack[CFGPosition]()
+    stack.addAll(begin.procedures)
+
+    override def hasNext: Boolean = {
+      stack.nonEmpty
+    }
+
+    override def next(): CFGPosition = {
+      val n: CFGPosition  = stack.pop()
+
+      stack.pushAll(n match  {
+        case p : Procedure => p.blocks
+        case b: Block => Seq() ++ b.statements ++ Seq(b.jump)
+        case s: Command => Seq()
+      })
+
+      n
+    }
+
+  }
+
+  /**
+   * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+   * not guaranteed to be in any defined order. 
+   */
+  def iterator: Iterator[CFGPosition] = {
+    ILUnorderedIterator(this)
+  }
 
 }
 
-class Procedure(
-    var name: String,
-    var address: Option[Int],
-    var blocks: ArrayBuffer[Block],
-    var in: ArrayBuffer[Parameter],
-    var out: ArrayBuffer[Parameter]
-) {
-  def calls: Set[Procedure] = blocks.flatMap(_.calls).toSet
+class Procedure private (
+                  var name: String,
+                  var address: Option[Int],
+                  var entryBlock: Option[Block],
+                  var returnBlock: Option[Block],
+                  private val _blocks: mutable.LinkedHashSet[Block],
+                  var in: ArrayBuffer[Parameter],
+                  var out: ArrayBuffer[Parameter],
+                ) {
+  private var _callers = new mutable.HashSet[DirectCall]
+
+  // class invariant
+  require(returnBlock.forall(b => _blocks.contains(b)) && entryBlock.forall(b => _blocks.contains(b)))
+  require(_blocks.isEmpty == entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
+
+  def this(name: String, address: Option[Int] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
+    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
+  }
+
   override def toString: String = {
     s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
   }
-  var modifies: mutable.Set[Global] = mutable.Set()
 
-  def stackIdentification(): Unit = {
-    val stackPointer = Register("R31", BitVecType(64))
-    val stackRefs: mutable.Set[Variable] = mutable.Set(stackPointer)
-    val visitedBlocks: mutable.Set[Block] = mutable.Set()
-    val stackMemory = Memory("stack", 64, 8)
-    val firstBlock = blocks.headOption
-    firstBlock.foreach(visitBlock)
+  def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
 
-    // does not handle loops but we do not currently support loops in block CFG so this should do for now anyway
-    def visitBlock(b: Block): Unit = {
-      if (visitedBlocks.contains(b)) {
-        return
+  /**
+   * Block iteration order is defined such that that the entryBlock is first, and no order is defined beyond that.
+   * Both entry block and return block are elements of _blocks.
+   */
+  def blocks: Iterator[Block] = _blocks.iterator
+
+  def addCaller(c: DirectCall): Unit = {
+    _callers.remove(c)
+  }
+
+  def removeCaller(c: DirectCall): Unit = {
+    _callers.remove(c)
+  }
+
+  def addBlocks(block: Block): Block = {
+    if (!_blocks.contains(block)) {
+      block.parent = this
+      _blocks.add(block)
+      if (entryBlock.isEmpty) {
+        entryBlock = Some(block)
       }
-      for (s <- b.statements) {
-        s match {
-          case l: LocalAssign =>
-            // replace mem with stack in loads if index contains stack references
-            val loads = l.rhs.loads
-            for (load <- loads) {
-              val loadStackRefs = load.index.variables.intersect(stackRefs)
-              if (loadStackRefs.nonEmpty) {
-                load.mem = stackMemory
-              }
-            }
+    }
+    block
+  }
 
-            // update stack references
-            val variableVisitor = VariablesWithoutStoresLoads()
-            variableVisitor.visitExpr(l.rhs)
-
-            val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackRefs)
-            if (rhsStackRefs.nonEmpty) {
-              stackRefs.add(l.lhs)
-            } else if (stackRefs.contains(l.lhs) && l.lhs != stackPointer) {
-              stackRefs.remove(l.lhs)
-            }
-          case m: MemoryAssign =>
-            // replace mem with stack if index contains stack reference
-            val indexStackRefs = m.rhs.index.variables.intersect(stackRefs)
-            if (indexStackRefs.nonEmpty) {
-              m.lhs = stackMemory
-              m.rhs.mem = stackMemory
-            }
-          case _ =>
-        }
-      }
-      visitedBlocks.add(b)
-      b.jump match {
-        case g: GoTo => g.targets.foreach(visitBlock)
-        case d: DirectCall => d.returnTarget.foreach(visitBlock)
-        case i: IndirectCall => i.returnTarget.foreach(visitBlock)
-      }
+  def addBlocks(blocks: Iterable[Block]): Unit = {
+    for (elem <- blocks) {
+      addBlocks(elem)
     }
   }
 
+  def replaceBlock(oldBlock: Block, block: Block): Block = {
+    require(_blocks.contains(oldBlock))
+    if (oldBlock ne block) {
+      val isEntry: Boolean = entryBlock.contains(oldBlock)
+      val isReturn: Boolean = returnBlock.contains(oldBlock)
+      removeBlocks(oldBlock)
+      addBlocks(block)
+      if isEntry then entryBlock = Some(block)
+      if isReturn then returnBlock = Some(block)
+    }
+    block
+  }
+
+  /**
+   * Removes all blocks and replaces them with the provided iterator.
+   *
+   * @param newBlocks the new set of blocks
+   * @return an iterator to the new block set
+   */
+  def replaceBlocks(newBlocks: Iterable[Block]): Unit = {
+    clearBlocks()
+    addBlocks(newBlocks)
+  }
+
+  def removeBlocks(block: Block): Block = {
+    if (_blocks.contains(block)) {
+      block.deParent()
+      _blocks.remove(block)
+    }
+    if (_blocks.isEmpty) {
+      entryBlock = None
+    }
+    block
+  }
+  def removeBlocks(blocks: IterableOnce[Block]): Unit = {
+    for (elem <- blocks.iterator) {
+      removeBlocks(elem)
+    }
+  }
+
+  def clearBlocks() : Unit = {
+    // O(n) because we are careful to unlink the parents etc.
+    removeBlocks(_blocks)
+  }
+
+
+  def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).toSet[Procedure]
+  def incomingCalls(): Iterator[DirectCall] = _callers.iterator
+
+  var modifies: mutable.Set[Global] = mutable.Set()
 }
 
-class Block(
-    var label: String,
-    var address: Option[Int],
-    var statements: ArrayBuffer[Statement],
-    var jump: Jump
-) {
-  def calls: Set[Procedure] = jump.calls
+class Parameter(var name: String, var size: Int, var value: Register) {
+  def toBoogie: BVariable = BParam(name, BitVecBType(size))
+  def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
+}
+
+
+class Block private (var label: String,
+ var address: Option[Int],
+ val statements: IntrusiveList[Statement],
+ private var _jump: Jump,
+ private val _incomingJumps: mutable.HashSet[GoTo],
+) extends IntrusiveListElement, HasParent[Procedure] {
+  statements.foreach(_.setParent(this))
+  _jump.setParent(this)
+
+  statements.onInsert = x => x.setParent(this)
+  statements.onRemove = x => x.deParent()
+
+  def this(label: String, address: Option[Int], statements: IterableOnce[Statement], jump: Jump) = {
+    this(label, address, IntrusiveList.from(statements), jump, mutable.HashSet.empty)
+  }
+
+  def this(label: String, address: Option[Int], statements: IterableOnce[Statement]) = {
+    this(label, address, IntrusiveList.from(statements), GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
+  }
+
+  def this(label: String, address: Option[Int] = None) = {
+    this(label, address, IntrusiveList(), GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
+  }
+
+  def jump: Jump = _jump
+
+  def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
+
+  def addIncomingJump(g: GoTo) = _incomingJumps.add(g)
+  def removeIncomingJump(g: GoTo) = _incomingJumps.remove(g)
+
+  def replaceJump(j: Jump): this.type = {
+    _jump.deParent()
+    j.setParent(this)
+    _jump = j
+    this
+  }
+
+  def isEntry: Boolean = parent.entryBlock.contains(this)
+  def isReturn: Boolean = parent.returnBlock.contains(this)
+
+  def calls: Set[Procedure] = _jump.calls
+
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet
   //def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
+
+  def calledBy: Set[Block] = {
+    Set.empty
+  }
 
   override def toString: String = {
     // display all statements and jumps
@@ -196,18 +326,68 @@ class Block(
     s"Block $label with $statementsString\n$jump"
   }
 
+  /**
+   * @return The intra-procedural set of successor blocks. If the block ends in a call then the empty set is returned.
+   */
+  def nextBlocks: Iterable[Block] = {
+    jump match {
+      case c: GoTo => c.targets
+      case c: DirectCall => c.returnTarget
+      case c: IndirectCall => c.returnTarget
+    }
+  }
+
+  /**
+   * @return The intra-procedural set of predecessor blocks.
+   */
+  def prevBlocks: Iterable[Block] = {
+    incomingJumps.map(_.parent)
+  }
+
+  /**
+   * If the block has a single block successor then this returns that block, otherwise None.
+   *
+   * @return The successor block if there is exactly one
+   */
+  def singleSuccessor: Option[Block] = {
+    jump match {
+      case c: GoTo if c.targets.size == 1 => c.targets.headOption
+      case _ => None
+    }
+  }
+
+  /**
+   * If the block has a single block predecessor then this returns that block, otherwise None.
+   *
+   * @return The predecessor block if there is exactly one
+   */
+  def singlePredecessor: Option[Block] = {
+    if incomingJumps.size == 1 then {
+      incomingJumps.headOption.map(_.parent)
+    } else None
+  }
+
   override def equals(obj: scala.Any): Boolean =
     obj match
       case b: Block => b.label == this.label
-      case _        => false
+      case _ => false
 
   override def hashCode(): Int = label.hashCode()
-}
 
-class Parameter(var name: String, var size: Int, var value: Register) {
-  def toBoogie: BVariable = BParam(name, BitVecBType(size))
-  def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
-}
+  override def linkParent(p: Procedure): Unit = {
+    // The first block added to the procedure is the entry block
+    if parent.blocks.isEmpty then parent.entryBlock = Some(this)
+    // to connect call() links that reference jump.parent.parent
+    jump.setParent(this)
+  }
+  override def unlinkParent(): Unit = {
+    if parent.entryBlock.contains(this) then parent.entryBlock = None
+    if parent.returnBlock.contains(this) then parent.returnBlock = None
+    // to disconnect call() links that reference jump.parent.parent
+    jump.deParent()
+  }
+ }
+
 
 /**
   * @param name name

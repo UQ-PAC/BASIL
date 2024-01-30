@@ -243,6 +243,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   ): BExpr = ctx match {
     case n: NegExprContext       => UnaryBExpr(BVNEG, visitUnaryExpr(n.unaryExpr, nameToGlobals, params))
     case a: AtomUnaryExprContext => visitAtomExpr(a.atomExpr, nameToGlobals, params)
+    case n: NotExprContext       => UnaryBExpr(BoolNOT, visitUnaryExpr(n.unaryExpr, nameToGlobals, params))
   }
 
   def visitAtomExpr(
@@ -385,7 +386,17 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       r.QUOTESTRING.getText.stripPrefix("\"").stripSuffix("\"")
     }.toList
 
-    SubroutineSpec(ctx.id.getText, requires, requiresDirect, ensures, ensuresDirect, modifies)
+    val rely = Option(ctx.relies) match {
+      case Some(_) => visitRelies(ctx.relies, nameToGlobals)
+      case None => List()
+    }
+
+    val guarantee = Option(ctx.guarantees) match {
+      case Some(_) => visitGuarantees(ctx.guarantees, nameToGlobals)
+      case None => List()
+    }
+
+    SubroutineSpec(ctx.id.getText, requires, requiresDirect, ensures, ensuresDirect, modifies, rely, guarantee)
   }
 
   def visitModifies(ctx: ModifiesContext): List[String] = {

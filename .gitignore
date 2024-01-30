@@ -17,6 +17,8 @@ src/main/antlr4/.antlr
 *.dot
 *.il
 *.txt
+*.o
+*.so
 examplesold/
 src/test/scala/dump/
 src/test/analysis/dump/

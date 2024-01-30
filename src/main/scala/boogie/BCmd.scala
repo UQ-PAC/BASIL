@@ -50,8 +50,8 @@ case class BProcedureCall(name: String, lhss: Seq[BVar], params: Seq[BExpr], com
     }
   }
   override def functionOps: Set[FunctionOp] = params.flatMap(p => p.functionOps).toSet
-  override def locals: Set[BVar] = params.flatMap(p => p.locals).toSet
-  override def globals: Set[BVar] = params.flatMap(p => p.globals).toSet
+  override def locals: Set[BVar] = lhss.flatMap(l => l.locals).toSet ++ params.flatMap(p => p.locals)
+  override def globals: Set[BVar] = lhss.flatMap(l => l.globals).toSet ++ params.flatMap(p => p.globals)
 }
 
 case class AssignCmd(lhss: Seq[BVar], rhss: Seq[BExpr], comment: Option[String] = None) extends BCmd {

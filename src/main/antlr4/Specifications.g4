@@ -27,7 +27,7 @@ directFunction: MEMORY_LOAD_DIRECT #memoryLoad
               | BVOP_DIRECT #bvOp
               ;
 
-subroutine: 'Subroutine:' id modifies? requires* ensures*;
+subroutine: 'Subroutine:' id modifies? requires* ensures* relies? guarantees?;
 modifies: 'Modifies:' id (COMMA id)*;
 requires: 'Requires:' expr #parsedRequires
         | 'Requires DIRECT:' QUOTESTRING #directRequires
@@ -56,6 +56,7 @@ factor : arg1=unaryExpr ( op=mulDivModOp arg2=unaryExpr )? ;
 
 unaryExpr : atomExpr #atomUnaryExpr
           | SUB_OP unaryExpr #negExpr
+          | NOT_OP unaryExpr #notExpr
           ;
 
 atomExpr : boolLit #boolLitExpr
@@ -131,6 +132,7 @@ GE_OP : '>=';
 ADD_OP : '+';
 SUB_OP : '-';
 MUL_OP : '*';
+NOT_OP : '!';
 
 COLON: ':';
 fragment UNDERSCORE: '_';
