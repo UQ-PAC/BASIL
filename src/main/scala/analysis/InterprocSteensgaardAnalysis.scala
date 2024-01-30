@@ -61,22 +61,29 @@ class InterprocSteensgaardAnalysis(
     s"stack_$stackCount"
   }
 
-  /**
-   * Controls the pool of stack regions. Each pool is unique to a function.
-   * If the offset has already been defined in the context of the function, then the same region is returned.
-   *
-   * @param expr   : the offset
-   * @param parent : the function entry node
-   * @return the stack region corresponding to the offset
-   */
-  def poolMaster(expr: BitVecLiteral, stackBase: RegisterVariableWrapper): StackRegion = {
-    val stackPool = stackMap
-    if (stackPool.contains(expr)) {
-      stackPool(expr)
-    } else {
-      val newRegion = StackRegion(nextStackCount(), expr)
-      stackPool += (expr -> newRegion)
-      newRegion
+  def exprToRegion(expr: Expr, n: CfgCommandNode): Set[MemoryRegion] = {
+    var res = Set[MemoryRegion]()
+    mmm.popContext()
+    mmm.pushContext(n.parent.data.name)
+    expr match {
+      case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
+        evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach {
+          case b: BitVecLiteral =>
+            val region = mmm.findStackObject(b.value)
+            if (region.isDefined) {
+              res = res + region.get
+            }
+        }
+        res
+      case _ =>
+        evaluateExpressionWithSSA(expr, constantProp(n)).foreach {
+          case b: BitVecLiteral =>
+            val region = mmm.findDataObject(b.value)
+            if (region.isDefined) {
+              res = res + region.get
+            }
+        }
+        res
     }
   }
 
@@ -117,59 +124,6 @@ class InterprocSteensgaardAnalysis(
     }
   }
 
-  def eval(exp: Expr, n: CfgCommandNode): Set[MemoryRegion] = {
-    Logger.debug(s"evaluating $exp")
-    Logger.debug(s"n: $n")
-    var regions = Set[MemoryRegion]()
-    exp match {
-      case binOp: BinaryExpr =>
-        if (spList.contains(binOp.arg1)) {
-          evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach(
-            b => regions += poolMaster(b, RegisterVariableWrapper(binOp.arg1.asInstanceOf[Register]))
-          )
-        } else {
-          evaluateExpressionWithSSA(binOp, constantProp(n)).foreach(
-              b => regions = regions ++ eval(b, n)
-          )
-        }
-      case bitVecLiteral: BitVecLiteral =>
-        if (globals.contains(bitVecLiteral.value)) {
-          val globalName = globals(bitVecLiteral.value)
-          regions = regions ++ Set(DataRegion(globalName, bitVecLiteral))
-        } else if (subroutines.contains(bitVecLiteral.value)) {
-          val subroutineName = subroutines(bitVecLiteral.value)
-          regions = regions ++ Set(DataRegion(subroutineName, bitVecLiteral))
-        } else if (globalOffsets.contains(bitVecLiteral.value)) {
-          val val1 = globalOffsets(bitVecLiteral.value)
-          if (subroutines.contains(val1)) {
-            val globalName = subroutines(val1)
-            regions = regions ++ Set(DataRegion(globalName, bitVecLiteral))
-          } else {
-            regions = regions ++ Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
-          }
-        } else {
-          // unknown region here
-          regions = regions ++ Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
-        }
-      case variable: Variable =>
-        variable match {
-          case _: LocalVar =>
-          case reg: Register if spList.contains(reg) =>
-          case _ =>
-            evaluateExpressionWithSSA(variable, constantProp(n)).foreach(
-              b => regions = regions ++ eval(b, n)
-            )
-        }
-      case _ =>
-        regions
-        // TODO: FIXME
-//        Logger.info(s"type: ${exp.getClass} $exp\n")
-//        throw new Exception("Unknown type")
-    }
-    regions
-  }
-
-
   /** @inheritdoc
     */
   def analyze(): Unit =
@@ -203,18 +157,16 @@ class InterprocSteensgaardAnalysis(
             localAssign.rhs match {
               case binOp: BinaryExpr =>
                 // X1 = &X2: [[X1]] = ↑[[X2]]
-                if (binOp.arg1 == stackPointer) {
-                  evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach(
-                    b => unify(varToStTerm(RegisterVariableWrapper(localAssign.lhs)), PointerRef(allocToTerm(poolMaster(b, RegisterVariableWrapper(binOp.arg1.asInstanceOf[Register])))))
-                  )
-                }
+                exprToRegion(binOp, cmd).foreach(
+                  x => unify(varToStTerm(RegisterVariableWrapper(localAssign.lhs)), PointerRef(allocToTerm(x)))
+                )
               // TODO: should lookout for global base + offset case as well
               case _ =>
                 unwrapExpr(localAssign.rhs).foreach {
                   case memoryLoad: MemoryLoad =>
                     // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable
                     val X1 = localAssign.lhs
-                    val X2_star = eval(memoryLoad.index, cmd)
+                    val X2_star = exprToRegion(memoryLoad.index, cmd)
                     val alpha = FreshVariable()
                     X2_star.foreach(
                       x => unify(exprToStTerm(x), PointerRef(alpha))
@@ -223,7 +175,7 @@ class InterprocSteensgaardAnalysis(
 
                     // TODO: This might not be correct for globals
                     // X1 = &X: [[X1]] = ↑[[X2]] (but for globals)
-                    val $X2 = eval(memoryLoad.index, cmd)
+                    val $X2 = exprToRegion(memoryLoad.index, cmd)
                     $X2.foreach(
                       x => unify(varToStTerm(RegisterVariableWrapper(localAssign.lhs)), PointerRef(allocToTerm(x)))
                     )
@@ -236,10 +188,10 @@ class InterprocSteensgaardAnalysis(
             }
           case memoryAssign: MemoryAssign =>
             // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
-            val X1_star = eval(memoryAssign.rhs.index, cmd)
-            var X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(n))
+            val X1_star = exprToRegion(memoryAssign.rhs.index, cmd)
+            val X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(n))
             if X2.isEmpty then
-              println("Maybe a region: " + eval(memoryAssign.rhs.value, cmd))
+              println("Maybe a region: " + exprToRegion(memoryAssign.rhs.value, cmd))
             println("X2 is: " + X2)
             println("Evaluated: " + memoryAssign.rhs.value)
             println("Region " + X1_star)

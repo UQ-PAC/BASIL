@@ -126,7 +126,7 @@ class StackRegion(override val regionIdentifier: String, val start: BitVecLitera
   override def toString: String = s"Stack($regionIdentifier, $start, ${if parent != null then parent else "Null"}) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier && s.parent == parent
+    case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier
     case _ => false
   }
 }
