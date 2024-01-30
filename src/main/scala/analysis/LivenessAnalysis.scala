@@ -23,10 +23,7 @@ abstract class LivenessAnalysis(program: Program) extends Analysis[Any]:
           case call: Call =>
             call match
               case IndirectCall(variable, maybeBlock, maybeString) => s + variable
-              case call: DirectCall =>
-//                val a = InterProcIRCursor.succ(call)
-//                val b = IntraProcIRCursor.succ(call)
-                s
+              case call: DirectCall => s
           case to: GoTo => s
       case _ => s
 

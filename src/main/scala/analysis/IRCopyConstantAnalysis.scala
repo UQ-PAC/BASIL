@@ -1,6 +1,6 @@
 package analysis
 
-import analysis.solvers.{ForwardIDESolver, IDESolver}
+import analysis.solvers.ForwardIDESolver
 import ir.{BitVecLiteral, BitVecType, Block, CFGPosition, Command, DirectCall, Literal, LocalAssign,  Procedure, Program, Register, Variable}
 
 import scala.collection.mutable

@@ -1,6 +1,6 @@
 package analysis
 
-import analysis.solvers.{IDESolver, ForwardIDESolver}
+import analysis.solvers.ForwardIDESolver
 import ir.{Block, CFGPosition, Command, DirectCall, LocalAssign, Procedure, Program, Variable}
 
 trait IRReachingDefsAnalysisFunctions extends ForwardIDEAnalysis[LocalAssign, FlatElement[Nothing] ,TwoElementLattice] {

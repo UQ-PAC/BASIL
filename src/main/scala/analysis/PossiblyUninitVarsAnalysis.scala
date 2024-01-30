@@ -1,7 +1,7 @@
 package analysis
 
 
-import analysis.solvers.{ForwardIDESolver, IDESolver}
+import analysis.solvers.ForwardIDESolver
 import ir.{Assert, Assume, BitVecType, Block, CFGPosition, Command, DirectCall, IndirectCall, LocalAssign, MemoryAssign, Procedure, Program, Register, Variable}
 
 import scala.collection.mutable
