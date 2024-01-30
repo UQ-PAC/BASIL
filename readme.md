@@ -1,8 +1,8 @@
-# BAP-to-Boogie Translator
+# BIL-to-Boogie Translator
 
 ## About
 
-The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
+The BIL-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
 binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
 
 This repository contains a program which takes BAP adt files and readelf output as input, and produces a boogie program.
@@ -10,13 +10,29 @@ This repository contains a program which takes BAP adt files and readelf output 
 ### Example
 
 ```sh
-$ sbt "run --adt src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write.relf --s
-pec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl"
-[info] welcome to sbt 1.8.2 (Private Build Java 17.0.8)
-...
-[info] running Main --adt src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write
-.relf --spec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl
-[success] Total time: 1 s, completed Sep 11, 2023, 7:24:11 AM
+$ mill run
+[53/53] run 
+Missing arguments: -a --adt <str> -r --relf <str>
+Expected Signature: BASIL
+  -a --adt <str>                BAP ADT file name.
+  --analyse                     Run static analysis pass.
+  --analysis-results <str>      Log analysis results in files at specified path.
+  --analysis-results-dot <str>  Log analysis results in .dot form at specified path.
+  --boogie-use-lambda-stores    Use lambda representation of store operations.
+  --dump-il <str>               Dump the Intermediate Language to text.
+  -h --help                     Show this help message.
+  --interpret                   Run BASIL IL interpreter.
+  -o --output <str>             Boogie output destination file.
+  -r --relf <str>               Name of the file containing the output of 'readelf -s -r -W'.
+  -s --spec <str>               BASIL specification file.
+  -v --verbose                  Show extra debugging logs.
+
+$ mill run --adt src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write.relf --spec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl
+[53/53] run 
+[INFO]   [!] Writing file... [run@RunUtils.scala:65]
+[INFO]   [!] Removing external function calls [loadAndTranslate@RunUtils.scala:85]
+[INFO]   [!] Translating to Boogie [loadAndTranslate@RunUtils.scala:114]
+[INFO]   [!] Done! Exiting... [loadAndTranslate@RunUtils.scala:116]
 $ tail boogie_out.bpl 
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R9, 52bv64), R8[32:0]), gamma_store32(Gamma_mem, bvadd64(R9, 52bv64), Gamma_R8);
     assert ((bvadd64(R9, 52bv64) == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
@@ -35,92 +51,34 @@ Boogie program verifier finished with 4 verified, 0 errors
 
 ## Installation and use
 
-### Using Containers 
-
-(This method has only been tested on linux)
-
-The docker config can be used to provide bap with the asli-plugin as well as compile the tool itself.
-
-Requirements:
-
-- podman, podman-compose
-
-#### 1. Obtain the image image
-
-##### From github 
-
-`podman pull ghcr.io/uq-pac/basil-dev:latest`
-
-##### Build the images
-
-To build the images, from the root of the respository run
-
-```
-podman-compose build
-```
-
-#### 2. Use the images with compose 
-
-Individual services can be built with `podman compose build $servicename` from the root of the repo. 
-
-The services provided are:
-
-- `basil-dev` dev environment containng scala build environment, bap and cross-compilers
-   - To compile basil into the current directory using the sbt and scala provided by the docker image: 
-      - `podman compose run basil-dev sbt assembly`
-   - To enter a shell inside the container
-      - `podman compose run basil-build`
-- `basil-build`
-   - The same as above however containg only the scala build environment and compiled basil
-   - To recompile with the currently checked-out repo run `podman-compose build basil-build`
-   - To enter a shell inside the container
-      - `podman compose run basil-build`
-- `basil` precompiled jar file and tools
-   - To run the jar inside the docker image `podman-compose run basil-dev $arguments...`
-- `compiler-explorer`
-    - instance of [godbolt.org](godbolt.org) with the tools installed. 
-
-Or enter the dev container manually, mounting the current directory (the same as podman-compose basil-dev).
-
-
-#### 2. Use the images manually  
-
-##### Compiler Explorer Container
-
-```sh
-podman pull ghcr.io/uq-pac/basil-compiler-explorer:latest
-```
-
-
-```sh
-podman-compose run compiler-explorer
-```
-
-OR
-
-```
-podman run -p 10240:10240 ghcr.io/uq-pac/basil-compiler-explorer:latest
-```
-
-##### Development/Testing Container
-
-This mounts the current directory as the working directory of the container.
-
-```
-podman pull ghcr.io/uq-pac/basil-dev /bin/bash
-podman run -v .:/host -w /host -it ghcr.io/uq-pac/basil-dev /bin/bash
-```
+This is a Scala 3 project using the [mill](mill-build.com) build system, it can be run with `mill run`. 
 
 ### Local Development 
-
-See: [Wiki Development Page](https://github.com/UQ-PAC/bil-to-boogie-translator/wiki/Development).
 
 The tool is a Scala project, and is therefore OS-independent, but is only tested under linux. 
 
 Furthermore, lifting input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. 
 On Windows, WSL2 may be used to run any Linux-specific tasks, but it is less thoroughly tested.
 
-Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 17](https://openjdk.org/install/) is required.
+Installing [mill](),  [sbt](https://www.scala-sbt.org/download.html) and [JDK >= 17](https://openjdk.org/install/) is required.
+
+This can be done via [coursier](https://get-coursier.io/docs/cli-overview).
+
+#### IDE Support
+
+Mill supports the Metals language server and IntelliJ through Build Server Protocol (BSP), which is the recommended use. 
+
+SBT has an intellij plugin in addition to BSP. 
+
+### Note about using sbt with IntelliJ
+
+[See Also](https://github.com/UQ-PAC/bil-to-boogie-translator/wiki/Development)
+
+The project uses sbt to build the project. For the most part this should *just work*, and there are IntelliJ run files (located in the .run folder) which automatically compile and run the project.
+However, to prevent some issues in IntelliJ, it is necessary to unmark `target/scala-3.1.0/src_managed/` as a sources root folder, in the `File > Project Structure > Modules` dialog.
+
+
+---
 
 The tool takes as inputs a BAP ADT file (here denoted with `.adt`) and a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.
 
@@ -128,34 +86,71 @@ To build and run the tool using sbt, use the following command:
 
 `sbt "run --adt file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
 
+or mill:
+
+`sbt run --adt file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]`.
+
 #### Usage
 
-The `--analyse` flag is optional and enables the static analysis functionality.
-
+The `--analyse` flag is optional and enables the static analysis functionality which resolves indirect calls where possible. 
 
 ```
-BASIL
-  -a --adt <str>     BAP ADT file name.
-  -r --relf <str>    Output of 'readelf -s -r -W'.
-  -s --spec <str>    BASIL specification file.
-  -o --output <str>  Boogie output destination file.
-  -v --verbose       Show extra debugging logs.
-  --analyse          Run static analysis pass.
-  --interpret        Run BASIL IR interpreter.
-  -h --help          Show this help message.
+Expected Signature: BASIL
+  -a --adt <str>                BAP ADT file name.
+  --analyse                     Run static analysis pass.
+  --analysis-results <str>      Log analysis results in files at specified path.
+  --analysis-results-dot <str>  Log analysis results in .dot form at specified path.
+  --boogie-use-lambda-stores    Use lambda representation of store operations.
+  --dump-il <str>               Dump the Intermediate Language to text.
+  -h --help                     Show this help message.
+  --interpret                   Run BASIL IL interpreter.
+  -o --output <str>             Boogie output destination file.
+  -r --relf <str>               Name of the file containing the output of 'readelf -s -r -W'.
+  -s --spec <str>               BASIL specification file.
+  -v --verbose                  Show extra debugging logs.
 ```
 
 The sbt shell can also be used for multiple tasks with less overhead by executing `sbt` and then the relevant sbt commands.
 
 To build a standalone `.jar` file, use the following command:
 
-`sbt assembly`
+`mill assembly`
 
-This is located at `target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar`.
+From `sbt` the resulting `.jar` is located at `target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar` and from 
+`mill` this is `out/assembly.dest/out.jar`.
 
 To compile the source without running it - this helps IntelliJ highlight things properly:
 
-`sbt compile`
+`mill compile`
+
+
+#### Running Tests
+
+The test suites use [ScalaTest](https://www.scalatest.org/), they can be run via.
+
+```
+$ mill test
+```
+
+To run a single test suite, for example only the system tests (requires boogie):
+
+```
+$ mill.test.testOnly SystemTests
+```
+
+To run single tests in from the test suite:
+
+```
+$ mill test.testOnly SystemTests -- -z basic_arrays_read -z basic_arrays_write
+```
+
+To update the expected basil output files from the test results run
+
+```
+$ mill updateExpected
+```
+
+This is used to keep track of which tests have passed previously, as well as changes to the basil output.
 
 ## Generating inputs (Lifting)
 
@@ -168,13 +163,15 @@ The tool takes a `.adt` and a `.relf` file as inputs, which are produced by BAP 
 
 - `bap` with the ASLp plugin
 - `readelf`
-- cross-compiliation toolchains:
+- cross-compiliation toolchains, e.g.:
     - `gcc-13-aarch64-linux-gnu`
     - `clang`
 
-[BAP](https://github.com/BinaryAnalysisPlatform/bap) can be installed by following the instructions in the link given.
+This can be installed using the [nix packages](https://github.com/katrinafyi/pac-nix).
 
-This can also be installed using the [nix package](https://github.com/katrinafyi/pac-nix).
+The `dev` podman container also contains these tools and can be used by mounting current directory into the container as described at [docker/readme.md](docker/readme.md). 
+
+[BAP](https://github.com/BinaryAnalysisPlatform/bap) can be installed by following the instructions in the link given.
 
 Given a AArch64/ARM64 binary file (`*.out`), the `.adt` file can be produced by running
 
@@ -182,7 +179,7 @@ Given a AArch64/ARM64 binary file (`*.out`), the `.adt` file can be produced by 
 
 and the `.relf` file can be produced by running
 
-`readelf -s -r -W *.out > *.relf`.
+`aarch64-linux-gnu-readelf -s -r -W *.out > *.relf`.
 
 To cross-compile a C source file to a AArch64 binary, `gcc-aarch64-linux-gnu` must be installed. This can be done with the following commands on Ubuntu:
 
@@ -207,19 +204,14 @@ It is recommended to use Boogie version 3.0.4 and Z3 version 4.8.8 (which is rec
 
 The `\useArrayAxioms` flag is necessary for Boogie versions 2.16.8 and greater; for earlier versions it can be removed.
 
+### Installing boogie
+
 Boogie can be installed through dotnet and requires dotnet 6.
 
 ```
-sudo apt-get install dotnet-sdk-6.0
+sudo apt-get install dotnet6
 dotnet install boogie
 ```
-
-### Note about using sbt with IntelliJ
-
-[See Also](https://github.com/UQ-PAC/bil-to-boogie-translator/wiki/Development)
-
-The project uses sbt to build the project. For the most part this should *just work*, and there are IntelliJ run files (located in the .run folder) which automatically compile and run the project.
-However, to prevent some issues in IntelliJ, it is necessary to unmark `target/scala-3.1.0/src_managed/` as a sources root folder, in the `File > Project Structure > Modules` dialog.
 
 ## Other useful commands 
 
