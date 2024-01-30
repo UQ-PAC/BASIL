@@ -6,4 +6,7 @@ RUN  nix profile install --impure 'github:katrinafyi/pac-nix#aslp'
 RUN  nix profile install --impure 'github:katrinafyi/pac-nix#bap-aslp'  
 RUN  nix profile install --impure 'nixpkgs#boogie'
 RUN  nix profile install --impure 'nixpkgs#openjdk'
-RUN  nix profile install --impure 'nixpkgs#coursier' && cs setup --yes && cs install mill --yes
+RUN  nix profile install --impure 'nixpkgs#coursier' && cs setup --yes
+RUN  cs install mill
+ENV  PATH=$PATH:/root/.local/share/coursier/bin
+

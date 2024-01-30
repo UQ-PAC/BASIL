@@ -115,7 +115,7 @@ USER root
 FROM docker.io/ubuntu:23.04 AS scala
 ENV PATH="$PATH:/root/.local/share/coursier/bin"
 RUN apt-get update && apt-get install default-jre-headless curl git --yes \ 
- && curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup --yes \
+ && curl -fL https://github.com/coursier/coursier/releases/latest/download/cs-x86_64-pc-linux.gz | gzip -d > cs && chmod +x cs && ./cs setup --yes && cs install mill \
   && apt-get autoremove --purge -y \
   && apt-get autoclean -y
 
