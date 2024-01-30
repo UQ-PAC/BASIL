@@ -9,7 +9,7 @@ import org.antlr.v4.tool.{ANTLRMessage, ANTLRToolListener}
 import scala.collection.mutable
 
 trait AntlrModule extends JavaModule {
-  def antlrGrammarSources: Sources
+  def antlrGrammarSources: mill.define.Target[Seq[mill.api.PathRef]]
   def antlrPackage: Option[String] = None
   def antlrGenerateVisitor: Boolean = false
   def antlrGenerateListener: Boolean = false
