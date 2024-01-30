@@ -1,6 +1,7 @@
 package ir
 import org.scalatest.funsuite.AnyFunSuite
 import intrusivelist.{IntrusiveList, IntrusiveListElement}
+import scala.collection.mutable
 
 class Elem(val t: Int) extends IntrusiveListElement[Elem]
 
@@ -182,6 +183,33 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
       assert(l(i).t == i)
     }
   }
+
+  test("construct") {
+    val l = getSequentialList(3)
+
+
+    val l2 = IntrusiveList.from(l)
+    assert(l2.size == 3)
+
+    assert(l.forall(x => l2.contains(x)))
+
+    assert (l eq l2)
+
+    val l3 = mutable.ArrayBuffer(Elem(1), Elem(2), Elem(3))
+
+    val l4 = IntrusiveList.from(l3)
+
+    assert(l3 ne l4)
+    assert(l3.forall(x => l4.contains(x)))
+
+    assert(l4.size == 3)
+
+
+
+
+
+  }
+
 
 
 }

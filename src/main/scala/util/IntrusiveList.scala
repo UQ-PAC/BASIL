@@ -246,11 +246,11 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   }
 
 object IntrusiveList {
-  def from[T <: IntrusiveListElement[T]](it: IterableOnce[T]): IntrusiveList[T] = {
-    val l = new IntrusiveList[T]()
-    l.addAll(it)
-    l
-  }
+
+  def from[T <: IntrusiveListElement[T]](it: IntrusiveList[T]): IntrusiveList[T] = it
+
+  def from[T <: IntrusiveListElement[T]](it: IterableOnce[T]): IntrusiveList[T] = IntrusiveList[T]().addAll(it)
+
   def empty[T <: IntrusiveListElement[T]]: IntrusiveList[T] = new IntrusiveList[T]()
 }
 
