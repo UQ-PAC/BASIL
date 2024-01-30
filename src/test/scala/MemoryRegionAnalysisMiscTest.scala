@@ -23,6 +23,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
           relfFile = examplesPath + s"$name/$name.relf",
           specFile = None,
           dumpIL = None,
+          mainProcedureName = "main",
         ),
         runInterpret = false,
         staticAnalysis =  Some(StaticAnalysisConfig()),

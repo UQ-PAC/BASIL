@@ -435,7 +435,7 @@ class ProgramCfgFactory:
       cfg.addEdge(funcEntryNode, funcExitNode)
     } else {
       // Recurse through blocks
-      visitBlock(proc.blocks.head, funcEntryNode)
+      visitBlock(proc.entryBlock.get, funcEntryNode)
     }
 
     /** Add a block to the CFG. A block in this case is a basic block, so it contains a list of consecutive statements
@@ -479,12 +479,10 @@ class ProgramCfgFactory:
         *   Statements in this block
         * @param prevNode
         *   Preceding block's end node (jump)
-        * @param cond
-        *   Condition on the jump from `prevNode` to the first statement of this block
         * @return
         *   The last statement's CFG node
         */
-      def visitStmts(stmts: ArrayBuffer[Statement], prevNode: CfgNode): CfgCommandNode = {
+      def visitStmts(stmts: Iterable[Statement], prevNode: CfgNode): CfgCommandNode = {
 
         val firstNode = CfgStatementNode(stmts.head, block, funcEntryNode)
         cfg.addEdge(prevNode, firstNode)
@@ -513,9 +511,6 @@ class ProgramCfgFactory:
         * @param prevNode
         *   Either the previous statement in the block, or the previous block's end node (in the case that this block
         *   contains no statements)
-        * @param cond
-        *   Jump from `prevNode` to this. `TrueLiteral` if `prevNode` is a statement, and any `Expr` if `prevNode` is a
-        *   jump.
         * @param solitary
         *   `True` if this block contains no statements, `False` otherwise
         */
@@ -624,7 +619,6 @@ class ProgramCfgFactory:
                 cfg.addEdge(jmpNode, noReturn)
                 cfg.addEdge(noReturn, funcExitNode)
             }
-          case _ => assert(false, s"unexpected jump encountered, jump: $jmp")
         } // `jmps.head` match
       } // `visitJumps` function
     } // `visitBlocks` function
