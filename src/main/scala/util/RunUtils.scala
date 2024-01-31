@@ -34,6 +34,9 @@ object RunUtils {
   // constants
   private val exitRegister: Variable = Register("R30", BitVecType(64))
 
+  private val procedureRegisters: Set[Variable] = Seq(0,1,2,3,4,5,6,7).map(i => Register(s"R$i", BitVecType(64))).toSet
+
+
   def loadBAP(fileName: String): BAPProgram = {
     val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(ADTLexer)
@@ -102,12 +105,13 @@ object RunUtils {
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il"))
 
+    IRProgram.determineRelevantMemory(globalOffsets)
+
     q.staticAnalysis.foreach { analysisConfig =>
       IRProgram = analyse(IRProgram, externalFunctions, globals, globalOffsets, analysisConfig, 1)
       analysisConfig.dumpILToPath.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-after-analysis.il"))
     }
 
-    IRProgram.determineRelevantMemory(globalOffsets)
 
     Logger.info("[!] Stripping unreachable")
     val before = IRProgram.procedures.size
@@ -131,6 +135,66 @@ object RunUtils {
     val boogieTranslator = IRToBoogie(IRProgram, specification)
     val boogieProgram = boogieTranslator.translate(q.boogieTranslation)
     boogieProgram
+  }
+
+  def parseExpressionString(s: String) : Expr = {
+      
+    val specLexer = SpecificationsLexer(CharStreams.fromString(s))
+    val specTokens = CommonTokenStream(specLexer)
+    val specParser = SpecificationsParser(specTokens)
+    specParser.setBuildParseTree(true)
+    val specLoader = SpecificationLoaderIL(procedureRegisters)
+    specLoader.visitExpr(specParser.expr())
+  }
+
+  def resolveBASILAsserts(globalOffsets: Map[BigInt, BigInt], ir: Program) = { 
+    val ilcpsolver = IRSimpleValueAnalysis.Solver(ir)
+    val CPResult = ilcpsolver.analyze()
+
+    // Loads special asserts from the binary file; asserts are of the form:
+    // The args allowed are R1...R7
+    // #define BASIL_ASSERT(text, ...)   ((int (*)(char *, ...))0xfeeb)(text, __VA_ARGS__)
+
+    // load assert string from global memory regions 
+    // create parser and parse string from spec -> IL
+    // construct assertion 
+    // append assertion to block
+    // replace indirect call with goto to fallthru edge
+
+
+    val found = ir.collect(p => p match 
+      case c : IndirectCall if CPResult(c).get(c.target).collect(_ match 
+        case FlatEl(b: BitVecLiteral) => b
+        ).contains(BitVecLiteral(0xfeeb, 64)) => c 
+      )
+
+    for (c <- found) {
+      val strAddr = CPResult(c)(procedureRegisters.head) match 
+        case FlatEl(b: BitVecLiteral) => Some(b.value)
+        case _ => None
+
+      val str =  strAddr.flatMap(addr => (ir.readOnlyMemory.find(v => (addr.intValue >= v.address) && (addr.intValue < (v.address + v.bytes.size)))).map((addr, _)))
+
+      ir.readOnlyMemory.map(s => Logger.info(s"readonly ${s.address} ${s.bytes.map(_.value.charValue).toString()}"))
+
+      val assertString = str.map((addr, memrgn) => memrgn.bytes.drop(addr.intValue - memrgn.address).map(_.value.charValue).takeWhile(c => c != 0).mkString)
+
+      assertString.map(s => Logger.info(s"assert string: $s"))
+
+      val assertStmt = assertString.map(parseExpressionString).map(Assert(_))
+
+      assertStmt.map(assert => 
+      {
+        c.parent.statements.append(assert)
+        c.parent.replaceJump(GoTo(Seq(c.returnTarget.get)))
+      })
+      ir.initialMemory.map(s => Logger.info(s"initial ${s.bytes.map(_.value.charValue).toString()}"))
+
+      Logger.info(s"[!] Replaced magic indirect call with $assertStmt")
+
+
+    }
+
   }
 
   def analyse(
@@ -166,8 +230,10 @@ object RunUtils {
     val constPropSolver = ConstantPropagationSolver(cfg)
     val constPropResult = constPropSolver.analyze()
 
+    resolveBASILAsserts(globalOffsets, IRProgram)
     val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
     val newCPResult = ilcpsolver.analyze()
+
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_new_ir_constprop$iteration.txt"))
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
