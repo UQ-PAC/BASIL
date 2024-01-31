@@ -329,6 +329,23 @@ class Block private (
 
   def jump: Jump = _jump
 
+
+  def jump_=(j: Call): Unit = {
+    if (j ne _jump) {
+      _jump.deParent()
+      _jump match {
+        case c: IndirectCall => c.returnTarget.filter(b=>b.kind.isInstanceOf[AfterCall]).map(b => parent.removeBlocks(b))
+        case c: DirectCall => c.returnTarget.filter(b=>b.kind.isInstanceOf[AfterCall]).map(b => parent.removeBlocks(b))
+      }
+      _jump = j
+      _jump.parent = this
+      j match {
+        case c: IndirectCall => c.returnTarget = Some(parent.addBlocks(Block.afterCall(c)))
+        case c: DirectCall => c.returnTarget = Some(parent.addBlocks(Block.afterCall(c)))
+      }
+    }
+  }
+
   def jump_=(j: Jump): Unit = {
     if (j ne _jump) {
       _jump.deParent()
@@ -347,9 +364,9 @@ class Block private (
     }
   }
 
+
   def replaceJump(j: Jump) = {
     jump = j
-    assert(jump.parent eq this)
     this
   }
 
@@ -460,10 +477,7 @@ object Block:
       case d: DirectCall => GoTo(d.returnTarget.toSet)
       case c: IndirectCall => GoTo(c.returnTarget.toSet)
 
-    jump.parent = from.parent
-    val ac = Block(AfterCall(from), from.parent.label + "_basil_aftercall", None, Seq(), jump)
-    ac.parent = from.parent.parent
-    ac
+    Block(AfterCall(from), from.parent.label + "_basil_aftercall", None, Seq(), jump)
   }
 
   def procedureReturn(from: Procedure): Block = {
