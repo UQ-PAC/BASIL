@@ -1,4 +1,5 @@
-package ir 
+package ir
+import util.Logger
 
 trait HasParent[T]:
   /*
@@ -8,7 +9,14 @@ trait HasParent[T]:
       All IL structures must set the parent of the child to itself, when a child is added to itself.
    */
   private var _parent: Option[T] = None
-  def parent: T = _parent.get
+  private var last_parent: Option[T] = None
+  def parent: T = {
+    if (!hasParent) {
+      Logger.error(s"Trying to get the parent of a node that is detached from the progam: $this. Node was last attached to: $last_parent")
+    }
+    _parent.get
+  }
+
   def hasParent: Boolean = _parent.isDefined
 
   def parent_=(value: T): Unit = setParent(value)
@@ -39,6 +47,7 @@ trait HasParent[T]:
    */
   final def deParent(): Unit = if _parent.isDefined then {
     unlinkParent()
+    if _parent.isDefined then (last_parent = _parent)
     _parent = None
     }
 

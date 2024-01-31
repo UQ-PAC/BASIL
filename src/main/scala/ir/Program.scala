@@ -200,18 +200,23 @@ class Procedure private (
   def returnBlock: Option[Block] = _returnBlock
 
   def returnBlock_=(value: Block): Unit = {
-    removeBlocks(_returnBlock)
-    _returnBlock = Some(addBlocks(value))
+    if (!returnBlock.contains(value)) {
+      removeBlocks(_returnBlock)
+      _returnBlock = Some(addBlocks(value))
+    }
   }
 
   def entryBlock: Option[Block] = _entryBlock
 
   def entryBlock_=(value: Block): Unit = {
-    removeBlocks(_entryBlock)
-    _entryBlock = Some(addBlocks(value))
+    if (!entryBlock.contains(value)) {
+      removeBlocks(_entryBlock)
+      _entryBlock = Some(addBlocks(value))
+    }
   }
 
   def addBlocks(block: Block): Block = {
+    block.parent = this
     if (!_blocks.contains(block)) {
       block.parent = this
       _blocks.add(block)
@@ -296,7 +301,7 @@ sealed trait BlockKind
 case class Regular() extends BlockKind
 
 /* Block is the fallthrough / return target of a call. */
-case class CallReturn(from: Call) extends BlockKind
+case class AfterCall(from: Call) extends BlockKind
 
 /* Block is the single return point for a procedure */
 case class Return(from: Procedure) extends BlockKind
@@ -327,13 +332,24 @@ class Block private (
   def jump_=(j: Jump): Unit = {
     if (j ne _jump) {
       _jump.deParent()
+      //_jump match {
+      //  case c: IndirectCall => c.returnTarget.filter(b=>b.kind.isInstanceOf[AfterCall]).map(b => parent.removeBlocks(b))
+      //  case c: DirectCall => c.returnTarget.filter(b=>b.kind.isInstanceOf[AfterCall]).map(b => parent.removeBlocks(b))
+      //  case _ => ()
+      //}
       _jump = j
       _jump.parent = this
+      //j match {
+      //  case c: IndirectCall => c.returnTarget = Some(parent.addBlocks(Block.afterCall(c)))
+      //  case c: DirectCall => c.returnTarget = Some(parent.addBlocks(Block.afterCall(c)))
+      //  case _ => ()
+      //}
     }
   }
 
   def replaceJump(j: Jump) = {
     jump = j
+    assert(jump.parent eq this)
     this
   }
 
@@ -439,12 +455,15 @@ object Block:
     new Block(Regular(), label, address, IntrusiveList.empty, GoTo(Seq(), Some(label + "_unknown")))
   }
 
-  def callReturn(from: Call) : Block = {
-    val jump = from match 
+  def afterCall(from: Call) : Block = {
+    val jump = from match
       case d: DirectCall => GoTo(d.returnTarget.toSet)
       case c: IndirectCall => GoTo(c.returnTarget.toSet)
-    
-    new Block(CallReturn(from), from.parent.label + "_basil_callreturn", None, Seq(), jump)
+
+    jump.parent = from.parent
+    val ac = Block(AfterCall(from), from.parent.label + "_basil_aftercall", None, Seq(), jump)
+    ac.parent = from.parent.parent
+    ac
   }
 
   def procedureReturn(from: Procedure): Block = {

@@ -96,10 +96,10 @@ object RunUtils {
     val renamer = Renamer(reserved)
     val returnUnifier = ConvertToSingleProcedureReturn()
     val callReturner = AddCallReturnBlocks()
+    IRProgram = callReturner.visitProgram(IRProgram)
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
     IRProgram = returnUnifier.visitProgram(IRProgram)
-    IRProgram = callReturner.visitProgram(IRProgram)
 
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il"))
@@ -157,12 +157,21 @@ object RunUtils {
     Logger.info(externalAddresses)
     Logger.info("Subroutine Addresses:")
     Logger.info(subroutines)
+    var unparented = IRProgram.collect {
+      case c: Command if !c.hasParent => c
+      case b: Block if !b.hasParent => b
+    }
+    assert(unparented.isEmpty)
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
 
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
+    unparented = IRProgram.collect {
+      case c: IndirectCall if (!c.hasParent) => c
+    }
+    assert(unparented.isEmpty)
     val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
 
     Logger.info("[!] Running Constant Propagation")
@@ -214,6 +223,13 @@ object RunUtils {
 
     Logger.info("[!] Resolving CFG")
     val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult, IRProgram)
+
+    unparented = IRProgram.collect {
+      case c: Command if !c.hasParent => c
+      case b: Block if !b.hasParent => b
+    }
+    assert(unparented.isEmpty)
+
     if (modified) {
       Logger.info(s"[!] Analysing again (iter $iteration)")
       return analyse(newIR, externalFunctions, globals, globalOffsets, config, iteration + 1)
