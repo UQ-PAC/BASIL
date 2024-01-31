@@ -222,13 +222,12 @@ object RunUtils {
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, vsaResult), s"${s}_vsa$iteration.txt"))
 
     Logger.info("[!] Resolving CFG")
-    val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult, IRProgram)
+    val (newIR, modified): (Program, Boolean) =  resolveCFG(cfg, vsaResult, IRProgram)
 
-    unparented = IRProgram.collect {
+    unparented = newIR.collect {
       case c: Command if !c.hasParent => c
       case b: Block if !b.hasParent => b
     }
-    assert(unparented.isEmpty)
 
     if (modified) {
       Logger.info(s"[!] Analysing again (iter $iteration)")
@@ -444,16 +443,25 @@ object RunUtils {
 
                 if (targets.size == 1) {
                   modified = true
-                  val newCall = DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label)
+
+                  indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
+                  val newCall = DirectCall(targets.head, None, indirectCall.label)
+                  newCall.parent = indirectCall.parent
+                  newCall.returnTarget = Some(indirectCall.parent.parent.addBlocks(Block.afterCall(newCall)))
+
                   block.replaceJump(newCall)
                 } else if (targets.size > 1) {
                   modified = true
                   val procedure = c.parent.data
                   val newBlocks = ArrayBuffer[Block]()
+                  indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
                   for (t <- targets) {
                     val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
                     val newLabel: String = block.label + t.name
-                    val directCall = DirectCall(t, indirectCall.returnTarget)
+                    val directCall = DirectCall(t, None)
+                    directCall.parent = indirectCall.parent
+                    directCall.returnTarget = Some(indirectCall.parent.parent.addBlocks(Block.afterCall(directCall)))
+
                     newBlocks.append(Block.regular(newLabel, None, ArrayBuffer(assume), directCall))
                   }
                   procedure.addBlocks(newBlocks)
@@ -480,7 +488,7 @@ object RunUtils {
         case globalAddress: GlobalAddress =>
           if (nameExists(globalAddress.name)) {
             functionNames += globalAddress
-            Logger.info(s"RESOLVED: Call to Global address ${globalAddress.name} resolved.")
+            Logger.info(s"RESOLVED: Call to Global address ${globalAddress.name} rt statuesolved.")
           } else {
             addFakeProcedure(globalAddress.name)
             functionNames += globalAddress

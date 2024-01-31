@@ -330,37 +330,12 @@ class Block private (
   def jump: Jump = _jump
 
 
-  def jump_=(j: Call): Unit = {
-    if (j ne _jump) {
-      _jump.deParent()
-      _jump match {
-        case c: IndirectCall => c.returnTarget.filter(b=>b.kind.isInstanceOf[AfterCall]).map(b => parent.removeBlocks(b))
-        case c: DirectCall => c.returnTarget.filter(b=>b.kind.isInstanceOf[AfterCall]).map(b => parent.removeBlocks(b))
-      }
-      _jump = j
-      _jump.parent = this
-      j match {
-        case c: IndirectCall => c.returnTarget = Some(parent.addBlocks(Block.afterCall(c)))
-        case c: DirectCall => c.returnTarget = Some(parent.addBlocks(Block.afterCall(c)))
-      }
-    }
-  }
 
   def jump_=(j: Jump): Unit = {
     if (j ne _jump) {
       _jump.deParent()
-      //_jump match {
-      //  case c: IndirectCall => c.returnTarget.filter(b=>b.kind.isInstanceOf[AfterCall]).map(b => parent.removeBlocks(b))
-      //  case c: DirectCall => c.returnTarget.filter(b=>b.kind.isInstanceOf[AfterCall]).map(b => parent.removeBlocks(b))
-      //  case _ => ()
-      //}
       _jump = j
       _jump.parent = this
-      //j match {
-      //  case c: IndirectCall => c.returnTarget = Some(parent.addBlocks(Block.afterCall(c)))
-      //  case c: DirectCall => c.returnTarget = Some(parent.addBlocks(Block.afterCall(c)))
-      //  case _ => ()
-      //}
     }
   }
 
