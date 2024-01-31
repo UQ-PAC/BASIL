@@ -62,6 +62,12 @@ object RunUtils {
     val cfg = ir.cfg.get
     val symbols = mods.map(_.symbols)
 
+    // //CFG + SYMBOL WRITER
+    // val bw = new BufferedWriter(new FileWriter(new File("output")))
+    // symbols.head.map(_.toProtoString).foreach(f => f -> bw.write(f))
+    // bw.write(cfg.toProtoString)
+    // bw.close()
+
     val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]]);
 
     def parse_insn (f: String) : StmtContext = {

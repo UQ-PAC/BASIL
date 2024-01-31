@@ -246,7 +246,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
           case b: BinaryExpr if b.op == BVEQ => BinaryExpr(BVCOMP, b.arg1, b.arg2)
           case _ => ???
         }
-      case "eq_enum"  => return BinaryExpr(BVXNOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
+      case "eq_enum"  => return BinaryExpr(BoolEQ, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "or_bool"  => return BinaryExpr(BoolOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "and_bool" => return BinaryExpr(BoolAND, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "replicate_bits" =>
@@ -427,6 +427,11 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
       case "_R" =>
         val size = getSizeofRegister(v(0))
         val name = "R" + v(1)
+        return Register(name, BitVecType(size))
+
+      case "_Z" =>
+        val size = getSizeofRegister(v(0))
+        val name = "V" + v(1)
         return Register(name, BitVecType(size))
 
       case "PSTATE" =>
