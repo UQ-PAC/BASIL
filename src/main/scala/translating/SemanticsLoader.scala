@@ -347,7 +347,12 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
   }
 
   override def visitExprLitBits(ctx: ExprLitBitsContext): Expr = {
-    return BitVecLiteral(BigInt.apply(ctx.BINARY().getText(), 2), ctx.BINARY().getText().length())
+    var num = BigInt(ctx.BINARY().getText(), 2) 
+    val len = ctx.BINARY().getText().length()
+    if (num < 0) {
+      num = num + (BigInt(1) << len)
+    } 
+    return BitVecLiteral(num, len)
   }
 
   def visitLexpr(ctx: LexprContext): Variable = {

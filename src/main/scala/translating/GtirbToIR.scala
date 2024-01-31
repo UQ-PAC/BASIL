@@ -207,7 +207,14 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     val sections = mods.flatMap(_.sections)
 
     val initialMemory: ArrayBuffer[MemorySection] = sections.map {elem =>
-      val bytes = elem.byteIntervals.head.contents.toByteArray.map(byte => BitVecLiteral(BigInt(byte), 8))
+      val bytestoInt = elem.byteIntervals.head.contents.toByteArray.map(byte => BigInt(byte))
+      val bytes = bytestoInt.map {byte => 
+        if (byte < 0) {
+          BitVecLiteral(byte + (BigInt(1) << 8), 8)
+        } else {
+          BitVecLiteral(byte, 8)
+        }
+      } 
       MemorySection(elem.name, elem.byteIntervals.head.address.toInt, elem.byteIntervals.head.size.toInt, bytes.toSeq)
     }.to(ArrayBuffer)
 
@@ -299,7 +306,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
   def handle_unlifted_indirects(blk: Block): ArrayBuffer[Block] = {
     
     var block = blk
-    val blkBuffer = ArrayBuffer.newBuilder[Block]
+    var blkBuffer = ArrayBuffer[Block]()
     var stmts_without_jump = block.statements.dropRight(1)
 
     while (stmts_without_jump.exists {elem => elem.isInstanceOf[LocalAssign] && elem.asInstanceOf[LocalAssign].lhs.name == "_PC"} ) {
@@ -322,17 +329,16 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
       blkMap += (get_ByteString(endBlk.label) -> endBlk)
       blkMap(get_ByteString(startBlk.label)) = startBlk
       
-      blkBuffer ++= ArrayBuffer(startBlk)
+      blkBuffer += startBlk
       block = endBlk
       stmts_without_jump = endBlk.statements.dropRight(1)
     }
     
-    blkBuffer += block
-    val blks = blkBuffer.result()
-    if (!blks.isEmpty) {
-      return blks
+    if (blkBuffer.isEmpty) {
+      ArrayBuffer(blk)
     } else {
-      return ArrayBuffer[Block](blk)
+      blkBuffer += block
+      return blkBuffer
     }
   }
 
@@ -347,26 +353,30 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
   * @return: An ArrayBuffer containing the new blocks, or an arraybuffer containing just the original block if no if-else chain appears
   *
   */
-  def handle_long_if(blk: Block): ArrayBuffer[Block] = { //NOTE: This will only handle ONE longif per block curently. Will probably need to put a while loop around it to continously check endBlk
+  def handle_long_if(blk: Block): ArrayBuffer[Block] = { 
 
     val create_TempIf: Expr => TempIf = conds => TempIf(false, ArrayBuffer(conds), ArrayBuffer[ArrayBuffer[Statement]]())
 
     val create_endEdge: (String, String) => proto.CFG.Edge = (uuid, endUuid) =>  
         proto.CFG.Edge(get_ByteString(uuid), get_ByteString(endUuid), Option(proto.CFG.EdgeLabel(false, true, proto.CFG.EdgeType.Type_Fallthrough)))
+    
+    var block = blk
+    var blkBuffer = ArrayBuffer[Block]()
 
-    if (blk.statements.exists {elem =>  elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}) {
+    while (block.statements.exists {elem =>  elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}) {
+      extraBlkCount += 1
       
       // Split Blk in two and remove IfStmt
-      val ifStmt = blk.statements.find {elem => elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}.get.asInstanceOf[TempIf]
+      val ifStmt = block.statements.find {elem => elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}.get.asInstanceOf[TempIf]
 
-      val endStmts = blk.statements.splitOn(ifStmt)
-      val startStmts = blk.statements
+      val endStmts = block.statements.splitOn(ifStmt)
+      val startStmts = block.statements
       startStmts.remove(ifStmt)
       startStmts.append(create_TempIf(ifStmt.conds.remove(0)))
 
 
-      val startBlk = Block(blk.label, blk.address, startStmts)
-      val endBlk = Block(get_blkLabel(blk.label, extraBlkCount), blk.address, endStmts)
+      val startBlk = Block(block.label, block.address, startStmts)
+      val endBlk = Block(get_blkLabel(block.label, extraBlkCount), block.address, endStmts)
       edgeMap += (endBlk.label -> edgeMap.get(startBlk.label).get)
       extraBlkCount += 1
 
@@ -375,28 +385,28 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
       // falseBlock creation
       val tempFalseBlks: ArrayBuffer[Block] = ifStmt.conds.map { stmts => 
-        val label = get_blkLabel(blk.label, extraBlkCount)
-        val block = Block(label, blk.address, ArrayBuffer(create_TempIf(stmts)))
-        extraBlkCount = 1 
-        block
+        val label = get_blkLabel(block.label, extraBlkCount)
+        val falseBlock = Block(label, block.address, ArrayBuffer(create_TempIf(stmts)))
+        extraBlkCount += 1 
+        falseBlock
       }
       
 
       // trueBlock creation
       val trueBlks: ArrayBuffer[Block] = ifStmt.stmts.map { stmts =>
-        val label = get_blkLabel(blk.label, extraBlkCount)
-        val block = Block(label, blk.address, stmts)
+        val label = get_blkLabel(block.label, extraBlkCount)
+        val trueBlock = Block(label, block.address, stmts)
 
         val edge = create_endEdge(label, endBlk.label)
         edgeMap += (label -> ArrayBuffer(edge))
-        blkMap += (get_ByteString(label) -> block)
+        blkMap += (get_ByteString(label) -> trueBlock)
         extraBlkCount += 1 
-        block
+        trueBlock
       }
 
       // Adds Else to FalseBlocks
-      val label = get_blkLabel(blk.label, extraBlkCount)
-      val elseBlk = Block(label, blk.address, ArrayBuffer(ifStmt.elseStatement.get))
+      val label = get_blkLabel(block.label, extraBlkCount)
+      val elseBlk = Block(label, block.address, ArrayBuffer(ifStmt.elseStatement.get))
 
       val edge = create_endEdge(label, endBlk.label)
       edgeMap += (label -> ArrayBuffer(edge))
@@ -413,12 +423,17 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
         blkMap += (get_ByteString(falseBlks(i).label) -> falseBlks(i))
       }
 
-      return falseBlks ++ trueBlks ++ ArrayBuffer(endBlk)
-    
+      blkBuffer ++= falseBlks
+      blkBuffer ++= trueBlks
+      block = endBlk
+    } 
+
+    if (blkBuffer.isEmpty) {
+      ArrayBuffer(blk)
     } else {
-      ArrayBuffer[Block](blk)
-    }
-    
+      blkBuffer += block
+      return blkBuffer
+    }   
   }
 
   // Handles the case where a block has one outgoing edge using gtirb cfg labelling
@@ -474,10 +489,13 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
     val hasConditionalBranch = types.contains(proto.CFG.EdgeType.Type_Branch) 
                                 && types.contains(proto.CFG.EdgeType.Type_Fallthrough)
+    
+    val hasOverApproximation = types.contains(proto.CFG.EdgeType.Type_Return) || types.contains(proto.CFG.EdgeType.Type_Branch)
 
-    (hasFunctionReturn, hasConditionalBranch) match {
 
-      case (true, false) => //Function return and fallthrough to next block 
+    (hasFunctionReturn, hasConditionalBranch, hasOverApproximation) match {
+
+      case (true, false, _) => //Function return and fallthrough to next block 
         val callEdge = edges.find(_.label.get.`type` 
                                   == proto.CFG.EdgeType.Type_Call).get
         val fallEdge = edges.find(_.label.get.`type` 
@@ -491,7 +509,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
           Left(IndirectCall(get_jmp_reg(block.statements.last), Option(blkMap(fallEdge.targetUuid)), None))
         }
 
-      case (false, true) => //If statement, need to create TRUE and FALSE blocks that contain asserts
+      case (false, true, _) => //If statement, need to create TRUE and FALSE blocks that contain asserts
         val blks = ArrayBuffer[Block]()
         val cond: Statement = Assume(ifStmt.asInstanceOf[TempIf].conds(0), checkSecurity=true)
         val notCond = Assume(UnaryExpr(BoolNOT, ifStmt.asInstanceOf[TempIf].conds(0)), checkSecurity=true) // Inverted Condition
@@ -505,15 +523,13 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
               blks += Block(convert_label(block.label + "_FALSE"), None, ArrayBuffer(notCond), 
                               GoTo(ArrayBuffer(blkMap(elem.targetUuid)) , None))
               
-            
             case _ => ???
-
           }
         }
         Right(blks)
 
-
-      case _ => ???
+      case (_, _ , true) => // Overapproximation by disassembler, created multiple return edges (see jumptable3) 
+         Left(IndirectCall(get_jmp_reg(block.statements.last), None, None))
     }
 
   }

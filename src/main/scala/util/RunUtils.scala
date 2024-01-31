@@ -58,15 +58,7 @@ object RunUtils {
     var fIn = new FileInputStream(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
-
     val cfg = ir.cfg.get
-    val symbols = mods.map(_.symbols)
-
-    // //CFG + SYMBOL WRITER
-    // val bw = new BufferedWriter(new FileWriter(new File("output")))
-    // symbols.head.map(_.toProtoString).foreach(f => f -> bw.write(f))
-    // bw.write(cfg.toProtoString)
-    // bw.close()
 
     val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]]);
 
@@ -120,17 +112,17 @@ object RunUtils {
     /** Loading phase
       */
 
+
+    // GTIRB LOGIC
     val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading) 
     var IRProgram = loadBAP(q.loading.adtFile, mainAddress) 
     
-    
+    // // BAP LOGIC
     // val bapProgram = loadBAP(q.loading.adtFile, 12121) 
     // val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading)
     // val IRTranslator = BAPToIR(bapProgram, mainAddress)
     // var IRProgram = IRTranslator.translate
   
-    //println(serialiseIL(IRProgram));
-
     val specification = loadSpecification(q.loading.specFile, IRProgram, globals)
 
     /** Analysis Phase
