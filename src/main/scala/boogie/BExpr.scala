@@ -34,6 +34,12 @@ case object TrueBLiteral extends BoolBLiteral {
   override def toString: String = "true"
 }
 
+case object StarBLiteral extends BoolBLiteral {
+  override val getType: BType = BoolBType
+  override def toString: String = "*"
+}
+
+
 case object FalseBLiteral extends BoolBLiteral {
   override val getType: BType = BoolBType
   override def toString: String = "false"
