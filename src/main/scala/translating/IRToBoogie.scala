@@ -551,7 +551,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val procInv= BProcedure(targetName + "$InlineInv", List(), List(), List(inv), List(), List(), List(), List(), List(),
         Set(mem, Gamma_mem), List(), List())
 
-      val proc2 = BProcedure(targetName + "$notRcimpliesRf", List(), List(), List(BinaryBExpr(BoolAND, Rc, UnaryBExpr(BoolNOT, Rf))), List(), List(), List(), List(),
+      val proc2 = BProcedure(targetName + "$notRcimpliesRf", List(), List(), List(UnaryBExpr(BoolNOT, conseq)), List(), List(), List(), List(),
         List(), Set(mem, Gamma_mem), List(), List())
 
       val procGf = BProcedure(targetName + "$Gf", List(), List(), List(Gf), List(), List(), List(), List(),

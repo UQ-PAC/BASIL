@@ -22,11 +22,11 @@ Requires: z == 0bv32
 Subroutine: secret
 Modifies: mem
 Requires: z mod 2bv32 == 1bv32
-Ensures DIRECT: "(forall i : bv64 :: (bvuge64(i, $x_addr) && bvult64(i, bvadd64($x_addr, 4bv64))) ==> (mem[i] == old(mem[i])))"
-Ensures DIRECT: "(forall i : bv64 ::  (bvuge64(i, $x_addr) && bvult64(i, bvadd64($x_addr, 4bv64))) ==> (Gamma_mem[i] == old(Gamma_mem[i])))"
+Ensures DIRECT: "(forall i : bv64 :: (bvuge64(i, $z_addr) && bvult64(i, bvadd64($z_addr, 4bv64))) ==> (mem[i] == old(mem[i])))"
+Ensures DIRECT: "(forall i : bv64 ::  (bvuge64(i, $z_addr) && bvult64(i, bvadd64($z_addr, 4bv64))) ==> (Gamma_mem[i] == old(Gamma_mem[i])))"
 Ensures: !Gamma_x && (z mod 2bv32 == 1bv32)
 // env doesn't change security classification or level of x
-Rely: z mod 2bv32 == 1bv32, z == old(z), Gamma_x  || !Gamma_x
+Rely: z mod 2bv32 == 1bv32, z == old(z)
 // we don't change the security classification of x
 Guarantee: z == old(z)
 
