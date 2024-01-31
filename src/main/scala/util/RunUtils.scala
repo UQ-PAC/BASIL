@@ -27,6 +27,8 @@ import scala.collection.mutable
 
 object RunUtils {
   var memoryRegionAnalysisResults: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
+  var liveVarAnalysisResults: Map[CFGPosition, Map[Variable, FlatElement[Nothing]]] = Map()
+  var programIR : Program = _
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
@@ -218,43 +220,46 @@ object RunUtils {
       return analyse(newIR, externalFunctions, globals, globalOffsets, config, iteration + 1)
     }
 
+
+//    val reachingDefsIRAnalysisResults = ReachingDefsIRAnalysis(newIR).analyze()
+    //    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, reachingDefsIRAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
+    //      (m, f) => m + (f._1 -> f._2.toString())
+    //    })
+    //      , s"${s}_reaching$iteration.dot"))
+    //
+    Logger.info("[!] Live Var Analysis")
+    programIR = newIR
+    liveVarAnalysisResults = IRLiveVarAnalysis(newIR).analyze()
+    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
+      (m, f) => m + (f._1 -> f._2.toString())
+    })
+      , s"${s}_livevarsInter$iteration.dot"))
+    //
+    //
+    //    val possiblyUninitVarsAnalysisResult = PossiblyUninitVarsAnalysis(newIR).analyze()
+    //    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, possiblyUninitVarsAnalysisResult.foldLeft(Map(): Map[CFGPosition, String]) {
+    //      (m, f) => m + (f._1 -> f._2.toString())
+    //    })
+    //      , s"${s}_uninit$iteration.dot"))
+    //
+    //
+    //    val copyConstantAnalysisResult = IRCopyConstantAnalysis(newIR).analyze()
+    //    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, copyConstantAnalysisResult.foldLeft(Map(): Map[CFGPosition, String]) {
+    //      (m, f) => m + (f._1 -> f._2.toString())
+    //    })
+    //      , s"${s}_copy$iteration.dot"))
+    //
+    //
+        val livenessAnalysisResult = LivenessAnalysisWorklistSolver(newIR).analyze()
+        config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, livenessAnalysisResult.foldLeft(Map() : Map[CFGPosition, String]) {
+          (m, f) => m + (f._1 -> f._2.toString())
+        })
+       , s"${s}_livenessIntra$iteration.dot"))
+
     config.analysisDotPath.foreach { s =>
       val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 0)
       writeToFile(newCFG.toDot(Output.labeler(Map(), false), Output.dotIder), s"${s}_resolvedCFG.dot")
     }
-
-    val reachingDefsIRAnalysisResults = ReachingDefsIRAnalysis(newIR).analyze()
-    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, reachingDefsIRAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
-      (m, f) => m + (f._1 -> f._2.toString())
-    })
-      , s"${s}_reaching$iteration.dot"))
-
-    val liveVarAnalysisResult = IRLiveVarAnalysis(newIR).analyze()
-    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, liveVarAnalysisResult.foldLeft(Map(): Map[CFGPosition, String]) {
-      (m, f) => m + (f._1 -> f._2.toString())
-    })
-      , s"${s}_livevarsInter$iteration.dot"))
-
-
-    val possiblyUninitVarsAnalysisResult = PossiblyUninitVarsAnalysis(newIR).analyze()
-    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, possiblyUninitVarsAnalysisResult.foldLeft(Map(): Map[CFGPosition, String]) {
-      (m, f) => m + (f._1 -> f._2.toString())
-    })
-      , s"${s}_uninit$iteration.dot"))
-
-
-    val copyConstantAnalysisResult = IRCopyConstantAnalysis(newIR).analyze()
-    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, copyConstantAnalysisResult.foldLeft(Map(): Map[CFGPosition, String]) {
-      (m, f) => m + (f._1 -> f._2.toString())
-    })
-      , s"${s}_copy$iteration.dot"))
-
-
-    val livenessAnalysisResult = LivenessAnalysisWorklistSolver(newIR).analyze()
-    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, livenessAnalysisResult.foldLeft(Map() : Map[CFGPosition, String]) {
-      (m, f) => m + (f._1 -> f._2.toString())
-    })
-   , s"${s}_livenessIntra$iteration.dot"))
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
 

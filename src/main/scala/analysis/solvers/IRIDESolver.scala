@@ -254,7 +254,10 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: 
 
 
 abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: IRIDECache)
-  extends IRIDESolver[Command, Procedure, Block, DirectCall, D, T, L](program, cache, cache.entryExitMap(program.mainProcedure)),
+  extends IRIDESolver[Command, Procedure, Block, DirectCall, D, T, L](program, cache,
+    if cache.entryExitMap.forwardMap.contains(program.mainProcedure) then cache.entryExitMap(program.mainProcedure)
+    else program.mainProcedure
+  ),
     BackwardIDEAnalysis[D, T, L], IRInterproceduralBackwardDependencies {
 
   protected def entryToExit(entry: Command): Procedure = cache.entryExitMap(entry)
