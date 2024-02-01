@@ -2,7 +2,7 @@ package translating
 import ir.{BoolOR, *}
 import boogie.*
 import specification.*
-import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode}
+import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -81,12 +81,18 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
     val rgProcs = genRely(relies, readOnlyMemory) :+ guaranteeReflexive
 
-    // if rely/guarantee lib exist, create genRelyInv, and genInv for every procedure where rely/guarantee lib exist
-    val rgLib = if (libRelies.values.flatten.nonEmpty && libGuarantees.values.flatten.nonEmpty) {
-      List(genRelyInv) ++ libGuarantees.flatMap((k, v) => if v.nonEmpty then genInv(k) :+ genLibGuarantee(k) else Nil)
-    } else {
-      List()
-    }
+
+    val rgLib = (config.procedureRely match {
+      case Some(ProcRelyVersion.Function) =>
+        // if rely/guarantee lib exist, create genRelyInv, and genInv for every procedure where rely/guarantee lib exist
+        if (libRelies.values.flatten.nonEmpty && libGuarantees.values.flatten.nonEmpty) {
+          List(genRelyInv) ++ libGuarantees.flatMap((k, v) => if v.nonEmpty then genInv(k) :+ genLibGuarantee(k) else Nil)
+        } else {
+          List()
+        }
+      case Some(ProcRelyVersion.IfCommandContradiction) => libRGFuns.values.flatten
+    })
+
 
     val functionsUsed1 = procedures.flatMap(p => p.functionOps).toSet ++
       rgProcs.flatMap(p => p.functionOps).toSet ++
@@ -98,7 +104,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val functionsUsed4 = functionsUsed3.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4).toList.sorted
 
-    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ libRGFuns.values.flatten ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
+
+    val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgLib ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
     BProgram(declarations)
   }
 
@@ -589,15 +596,19 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         case Some(r) => GoToCmd(Seq(r.label))
         case None => BAssume(FalseBLiteral, Some("no return target"))
       }
-      //if (libRelies.contains(d.target.name) && libGuarantees.contains(d.target.name) && libRelies(d.target.name).nonEmpty && libGuarantees(d.target.name).nonEmpty) {
-      //  val invCall1 = BProcedureCall(d.target.name + "$inv", List(mem_inv1, Gamma_mem_inv1), List(mem, Gamma_mem))
-      //  val invCall2 = BProcedureCall("rely$inv", List(mem_inv2, Gamma_mem_inv2), List(mem_inv1, Gamma_mem_inv1))
-      //  val libRGAssert = libRelies(d.target.name).map(r => BAssert(r.resolveSpecInv))
-      //  List(invCall1, invCall2) ++ libRGAssert ++ List(call, returnTarget)
-      //} else {
-      //  List(call, returnTarget)
-      //}
-      relyfun(d.target.name).toList ++ List(call, returnTarget)
+
+      (config.procedureRely match {
+        case Some(ProcRelyVersion.Function) =>
+          if (libRelies.contains(d.target.name) && libGuarantees.contains(d.target.name) && libRelies(d.target.name).nonEmpty && libGuarantees(d.target.name).nonEmpty) {
+            val invCall1 = BProcedureCall(d.target.name + "$inv", List(mem_inv1, Gamma_mem_inv1), List(mem, Gamma_mem))
+            val invCall2 = BProcedureCall("rely$inv", List(mem_inv2, Gamma_mem_inv2), List(mem_inv1, Gamma_mem_inv1))
+            val libRGAssert = libRelies(d.target.name).map(r => BAssert(r.resolveSpecInv))
+            List(invCall1, invCall2) ++ libRGAssert
+          } else {
+            List()
+          }
+        case Some(ProcRelyVersion.IfCommandContradiction) => relyfun(d.target.name).toList
+      }) ++ List(call, returnTarget)
     case i: IndirectCall =>
       // TODO put this elsewhere
       if (i.target.name == "R30") {
