@@ -258,6 +258,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     case i: IfThenElseExprContext  => visitIfThenElseExpr(i, nameToGlobals, params)
     case a: ArrayAccessExprContext => visitArrayAccess(a.arrayAccess, nameToGlobals, params)
     case b: BvExprContext          => visitBv(b.bv)
+    case d: DirectExprContext      => visitDirectE(d)
   }
 
   def visitArrayAccess(
@@ -270,6 +271,20 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case _ => throw new Exception("invalid array access '" + ctx.getText + "' to non-global in specification")
     }
     ArrayAccess(global, Integer.parseInt(ctx.nat.getText))
+  }
+
+  def visitBoogieTypeName(ctx: BoogieTypeNameContext): BType = {
+    ctx match {
+      case b: BvBTypeContext => BitVecBType(Integer.parseInt(b.BVSIZE.getText.stripPrefix("bv")))
+      case c: IntBTypeContext => IntBType
+      case c: BoolBTypeContext => BoolBType
+      case m: MapBTypeContext => MapBType(visitBoogieTypeName(m.keyT), visitBoogieTypeName(m.valT))
+    }
+  }
+
+  def visitDirectE(ctx: DirectExprContext): BDirectExpr = {
+    BDirectExpr(
+      ctx.literalval.getText.stripPrefix("\"").stripSuffix("\""), visitBoogieTypeName(ctx.btype))
   }
 
   def visitBv(ctx: BvContext): BitVecBLiteral = {

@@ -724,6 +724,11 @@ case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: End
   override def loads: Set[BExpr] = index.loads ++ value.loads
 }
 
+case class BDirectExpr(text: String, t: BType) extends BExpr {
+  override def toString: String = text
+  override def getType: BType = t
+}
+
 case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) extends BExpr {
   override def toString: String = s"$fnName($gammaMap, $index)"
   val fnName: String = s"gamma_load$bits"
