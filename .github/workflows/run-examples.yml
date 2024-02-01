@@ -47,5 +47,5 @@ jobs:
         uses: actions/checkout@v4
 
       - name: System Tests
-        run: ./scripts/mill test.testOnly SystemTests || true && cat src/test/summary.csv >> "$GITHUB_OUTPUT" && echo "" >> "$GITHUB_OUTPUT" && src/test/testResults.csv >> "$GITHUB_OUTPUT"
+        run: ./scripts/mill test.testOnly SystemTests && cat src/test/summary.csv && echo ""  && cat src/test/testResults.csv
 
