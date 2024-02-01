@@ -60,9 +60,11 @@ The tool is a Scala project, and is therefore OS-independent, but is only tested
 Furthermore, lifting input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. 
 On Windows, WSL2 may be used to run any Linux-specific tasks, but it is less thoroughly tested.
 
-Installing [mill](),  [sbt](https://www.scala-sbt.org/download.html) and [JDK >= 17](https://openjdk.org/install/) is required.
+Installing [mill](https://mill-build.com/mill/Installation_IDE_Support.html) or [sbt](https://www.scala-sbt.org/download.html) and [JDK >= 17](https://openjdk.org/install/) is required.
 
 This can be done via [coursier](https://get-coursier.io/docs/cli-overview).
+
+A mill script is checked in at `./scripts/mill` so it does not need to be installed. 
 
 #### IDE Support
 
