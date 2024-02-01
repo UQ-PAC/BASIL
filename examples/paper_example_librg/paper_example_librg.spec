@@ -2,6 +2,7 @@ Globals:
 text: char[14]
 copiedtext: char[14]
 
+// Verifies spuriously due to missing `modifies` on procedure rely/guarantee
 
 
 // L: z -> true, x -> z mod 2bv32 == 0bv32
