@@ -82,7 +82,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val rgProcs = genRely(relies, readOnlyMemory) :+ guaranteeReflexive
 
 
-    val rgLib = (config.procedureRely match {
+    val rgLib = config.procedureRely match {
       case Some(ProcRelyVersion.Function) =>
         // if rely/guarantee lib exist, create genRelyInv, and genInv for every procedure where rely/guarantee lib exist
         if (libRelies.values.flatten.nonEmpty && libGuarantees.values.flatten.nonEmpty) {
@@ -90,8 +90,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         } else {
           List()
         }
-      case Some(ProcRelyVersion.IfCommandContradiction) => libRGFuns.values.flatten
-    })
+      case Some(ProcRelyVersion.IfCommandContradiction) => libRGFunsContradictionProof.values.flatten
+    }
 
 
     val functionsUsed1 = procedures.flatMap(p => p.functionOps).toSet ++
@@ -544,7 +544,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     BBlock(b.label, cmds)
   }
 
-  val libRGFuns: Map[String, Seq[BProcedure]] = {
+  val libRGFunsContradictionProof: Map[String, Seq[BProcedure]] = {
     (libRelies.keySet ++ libGuarantees.keySet).filter(x => libRelies(x).nonEmpty && libGuarantees(x).nonEmpty).map(targetName => {
       val Rc : BExpr = spec.relies.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
       val Gc : BExpr = spec.guarantees.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
@@ -556,19 +556,19 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       val conseq = BinaryBExpr(BoolIMPLIES, Rc, Rf)
 
       val procInv= BProcedure(targetName + "$InlineInv", List(), List(), List(inv), List(), List(), List(), List(), List(),
-        Set(mem, Gamma_mem), List(), List())
+        inv.globals, List(), List())
 
       val proc2 = BProcedure(targetName + "$notRcimpliesRf", List(), List(), List(UnaryBExpr(BoolNOT, conseq)), List(), List(), List(), List(),
-        List(), Set(mem, Gamma_mem), List(), List())
+        List(), conseq.globals, List(), List())
 
       val procGf = BProcedure(targetName + "$Gf", List(), List(), List(Gf), List(), List(), List(), List(),
-        List(), Set(mem, Gamma_mem), List(), List())
+        List(), Gf.globals, List(), List())
 
       val proc4 = BProcedure(targetName + "$GfimpliesGc", List(), List(), List(Gc), List(), List(), List(), List(),
-        List(), Set(mem, Gamma_mem), List(BProcedureCall(procGf.name, List(), List())))
+        List(), Gc.globals, List(BProcedureCall(procGf.name, List(), List())))
 
       val proc5 = BProcedure(targetName + "$InlineInvTransitive", List(), List(), List(inv), List(), List(), List(), List(), List(),
-        Set(mem, Gamma_mem), List(
+        inv.globals, List(
           BProcedureCall(procInv.name, List(), List()),
           BProcedureCall(procInv.name, List(), List())
         ))
@@ -578,7 +578,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   }
 
   def relyfun(targetName: String) : Option[IfCmd] = {
-    libRGFuns.get(targetName).map(proc =>
+    libRGFunsContradictionProof.get(targetName).map(proc =>
       {
         IfCmd(StarBLiteral, List(
           BProcedureCall(proc(0).name, Seq(), Seq()),
