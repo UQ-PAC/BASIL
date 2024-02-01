@@ -126,8 +126,47 @@ object GoTo:
 
 sealed trait Call extends Jump
 
-class DirectCall(val target: Procedure, var returnTarget: Option[Block],  override val label: Option[String] = None) extends Call {
-  require(returnTarget.forall(_.hasParent))
+trait FallThrough extends Call: 
+  /**
+   * Manages the fallthrough block for a call.
+   *
+   *  There is a aftercall block inserted after each call, which is visited after the call in the cfg 
+   *
+   *  Replacing the return target of the call replaces the aftercall block. 
+   */
+
+  private var _afterCall: Option[Block] = None
+  private var _returnTarget: Option[Block] = None
+
+
+  // replacing the return target of a call
+  def returnTarget_=(b: Block) : Unit = {
+    require(b.hasParent)
+
+    if (hasParent) {
+      // if we don't have a parent now, delay adding the fallthrough block until linking
+      linkParent(parent)
+    }
+    _returnTarget = Some(b) 
+  }
+
+  def returnTarget: Option[Block] = _returnTarget
+
+  def afterCall: Option[Block] = _afterCall 
+  
+  // moving a call between blocks
+  override def linkParent(p: Block): Unit = {
+    _afterCall = _returnTarget.map(b => (p.parent.addBlocks(Block.afterCall(this, Some(b)))))
+    _afterCall.foreach(parent.parent.addBlocks(_))
+  }
+
+  override def unlinkParent(): Unit = {
+    _afterCall.foreach(ac => {parent.parent.removeBlocks(ac)})
+  }
+
+
+class DirectCall(val target: Procedure, private val _returnTarget: Option[Block] = None,  override val label: Option[String] = None) extends Call with FallThrough {
+  _returnTarget.foreach(x => returnTarget = x) 
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
@@ -137,17 +176,22 @@ class DirectCall(val target: Procedure, var returnTarget: Option[Block],  overri
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitDirectCall(this)
 
   override def linkParent(p: Block): Unit = {
+    super.linkParent(p)
     target.addCaller(this)
   }
 
-  override def unlinkParent(): Unit = target.removeCaller(this)
+  override def unlinkParent(): Unit = {
+    super.unlinkParent()
+    target.removeCaller(this)
+  }
+
 }
 
 object DirectCall:
   def unapply(i: DirectCall): Option[(Procedure,  Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
 
-class IndirectCall(var target: Variable, var returnTarget: Option[Block], override val label: Option[String] = None) extends Call {
-  require(returnTarget.forall(_.hasParent))
+class IndirectCall(var target: Variable, private val _returnTarget: Option[Block] = None, override val label: Option[String] = None) extends Call with FallThrough{
+  _returnTarget.foreach(x => returnTarget = x) 
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)

@@ -95,11 +95,11 @@ object RunUtils {
     val externalRemover = ExternalRemover(externalNames)
     val renamer = Renamer(reserved)
     val returnUnifier = ConvertToSingleProcedureReturn()
-    val callReturner = AddCallReturnBlocks()
+    //val callReturner = AddCallReturnBlocks()
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
     IRProgram = returnUnifier.visitProgram(IRProgram)
-    IRProgram = callReturner.visitProgram(IRProgram)
+    //IRProgram = callReturner.visitProgram(IRProgram)
 
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il"))
@@ -444,11 +444,8 @@ object RunUtils {
                 if (targets.size == 1) {
                   modified = true
 
-                  indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
-                  val newCall = DirectCall(targets.head, None, indirectCall.label)
-                  newCall.parent = indirectCall.parent
-                  newCall.returnTarget = Some(indirectCall.parent.parent.addBlocks(Block.afterCall(newCall)))
-
+                  // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
+                  val newCall = DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label)
                   block.replaceJump(newCall)
                 } else if (targets.size > 1) {
                   modified = true
@@ -458,9 +455,8 @@ object RunUtils {
                   for (t <- targets) {
                     val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
                     val newLabel: String = block.label + t.name
-                    val directCall = DirectCall(t, None)
+                    val directCall = DirectCall(t, indirectCall.returnTarget)
                     directCall.parent = indirectCall.parent
-                    directCall.returnTarget = Some(indirectCall.parent.parent.addBlocks(Block.afterCall(directCall)))
 
                     newBlocks.append(Block.regular(newLabel, None, ArrayBuffer(assume), directCall))
                   }

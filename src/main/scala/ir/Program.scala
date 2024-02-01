@@ -447,16 +447,16 @@ object Block:
     new Block(Regular(), label, address, IntrusiveList.empty, GoTo(Seq(), Some(label + "_unknown")))
   }
 
-  def afterCall(from: Call) : Block = {
+  def afterCall(from: Call, to: Option[Block]) : Block = {
     val jump = from match
-      case d: DirectCall => GoTo(d.returnTarget.toSet)
-      case c: IndirectCall => GoTo(c.returnTarget.toSet)
+      case d: DirectCall => GoTo(to.toSet)
+      case c: IndirectCall => GoTo(to.toSet)
 
     Block(AfterCall(from), from.parent.label + "_basil_aftercall", None, Seq(), jump)
   }
 
   def procedureReturn(from: Procedure): Block = {
-      new Block(Return(from), (from.name + "_basil_return"), None, List(), IndirectCall(Register("R30", BitVecType(64)), None, None))
+      new Block(Return(from), (from.name + "_basil_return"), None, List(), IndirectCall(Register("R30", BitVecType(64))))
   }
 
 
