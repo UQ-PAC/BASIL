@@ -95,4 +95,21 @@ class IRLiveVarAnalysis(program: Program) {
 
     IRLiveVarIDEAnalysis(program, cache).analyze()
   }
+
 }
+
+def pretty(analysisResults: Map[CFGPosition, Map[Variable, FlatElement[Nothing]]]): String = {
+  val pp = analysisResults.foldLeft("") {
+    (m, f) =>
+      val cfgPosition: CFGPosition = f._1
+      val mapping: Map[Variable, FlatElement[Nothing]] = f._2
+      val positionMaps = mapping.foldLeft("") {
+        (line, pair) =>
+          line + s"${pair._1}->${pair._2}<>"
+      }
+
+      m + s"$cfgPosition==>${positionMaps.dropRight(2)}\n"
+  }
+  pp.dropRight(1)
+}
+

@@ -1,0 +1,33 @@
+%000003f7: Register(R0, bv64) := bvadd64(Register(R0, bv64), 24bv64)==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top
+%000003be: Register(R31, bv64) := LocalVar(#6, bv64)==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top
+%00000412: Register(R29, bv64) := MemoryLoad(Memory(mem, 64, 8), Register(R31, bv64), LittleEndian, 64)==>Register(R31, bv64)->Top
+%00000406: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), Register(R0, bv64), Register(R1, bv64)[32:0], LittleEndian, 32)==>Register(R31, bv64)->Top
+Block main_basil_return==>Register(R30, bv64)->Top
+%000003cc: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 28bv64), Register(R0, bv64)[32:0], LittleEndian, 32)==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top
+Procedure zero at 1820 with 2 blocks and 0 in and 1 out parameters==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+NonDetGoTo(l000003d5)==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top
+%000003c4: Register(R29, bv64) := Register(R31, bv64)==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top
+%000003d3: DirectCall(zero, Some(lmain_basil_callreturn))==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+NonDetGoTo(main_basil_return)==>Register(R30, bv64)->Top
+Procedure main at 1828 with 4 blocks and 2 in and 2 out parameters==>Register(R0, bv64)->Top<>Register(R29, bv64)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+Block lmain_basil_callreturn==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top
+%000003ae: LocalVar(#6, bv64) := bvadd64(Register(R31, bv64), 18446744073709551584bv64)==>Register(R0, bv64)->Top<>Register(R29, bv64)->Top<>Register(R30, bv64)->Top<>LocalVar(#6, bv64)->Top
+Block lmain==>Register(R29, bv64)->Top<>Register(R31, bv64)->Top<>Register(R0, bv64)->Top<>Register(R30, bv64)->Top
+%000003de: Register(R0, bv64) := 69632bv64==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top<>Register(R1, bv64)->Top
+Block l000003d5==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top
+%000003d1: Register(R30, bv64) := 1844bv64==>Register(R30, bv64)->Top<>Register(R0, bv64)->Top<>Register(R31, bv64)->Top
+%000003ec: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), Register(R0, bv64), Register(R1, bv64)[32:0], LittleEndian, 32)==>Register(R31, bv64)->Top
+%000003a3: Register(R0, bv64) := 0bv64==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+%00000417: Register(R30, bv64) := MemoryLoad(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 8bv64), LittleEndian, 64)==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+%000003ba: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), bvadd64(LocalVar(#6, bv64), 8bv64), Register(R30, bv64), LittleEndian, 64)==>Register(R0, bv64)->Top<>LocalVar(#6, bv64)->Top
+Block zero_basil_return==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top<>Register(R0, bv64)->Top
+%000003fe: Register(R1, bv64) := ZeroExtend(32, MemoryLoad(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 28bv64), LittleEndian, 32))==>Register(R31, bv64)->Top<>Register(R1, bv64)->Top<>Register(R0, bv64)->Top
+%000003b4: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), LocalVar(#6, bv64), Register(R29, bv64), LittleEndian, 64)==>LocalVar(#6, bv64)->Top<>Register(R30, bv64)->Top<>Register(R0, bv64)->Top
+%000003f1: Register(R0, bv64) := 69632bv64==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top
+%000003d9: Register(R1, bv64) := ZeroExtend(32, Register(R0, bv64)[32:0])==>Register(R1, bv64)->Top<>Register(R31, bv64)->Top
+Block lzero==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+%000003e4: Register(R0, bv64) := bvadd64(Register(R0, bv64), 20bv64)==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top<>Register(R1, bv64)->Top
+NonDetGoTo(zero_basil_return)==>Register(R30, bv64)->Top<>Register(R0, bv64)->Top<>Register(R31, bv64)->Top
+%0000041b: Register(R31, bv64) := bvadd64(Register(R31, bv64), 32bv64)==>Register(R30, bv64)->Top
+%0000040b: Register(R0, bv64) := 0bv64==>Register(R31, bv64)->Top
+IndirectCall(Register(R30, bv64), None)==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top

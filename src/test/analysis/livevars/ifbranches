@@ -1,0 +1,35 @@
+%000003e8: Register(R0, bv64) := 2bv64==>Register(R0, bv64)->Top<>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+%000003c4: Register(R0, bv64) := ZeroExtend(32, MemoryLoad(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 12bv64), LittleEndian, 32))==>Register(R30, bv64)->Top<>Register(R0, bv64)->Top<>Register(R31, bv64)->Top
+Block lmain_goto_l0000056e==>Register(R30, bv64)->Top<>LocalVar(ZF, bv1)->Top<>Register(R31, bv64)->Top
+%000003ae: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 12bv64), Register(R0, bv64)[32:0], LittleEndian, 32)==>Register(R30, bv64)->Top<>Register(R1, bv64)->Top<>Register(R31, bv64)->Top
+assume (bvnot1(bvcomp1(LocalVar(ZF, bv1), 1bv1)) == 0bv1)None==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+NonDetGoTo(l000003e0)==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+NonDetGoTo(l0000056e)==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+%000003f7: Register(R0, bv64) := ZeroExtend(32, MemoryLoad(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 24bv64), LittleEndian, 32))==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top<>Register(R0, bv64)->Top
+%000003e2: NonDetGoTo(lmain_goto_l000003e0, lmain_goto_l0000056e)==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top<>LocalVar(ZF, bv1)->Top
+%000003bd: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 24bv64), 0bv32, LittleEndian, 32)==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+%000003f0: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 24bv64), Register(R0, bv64)[32:0], LittleEndian, 32)==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+Block lmain==>Register(R31, bv64)->Top<>Register(R1, bv64)->Top<>Register(R0, bv64)->Top<>Register(R30, bv64)->Top
+%00000579: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 24bv64), Register(R0, bv64)[32:0], LittleEndian, 32)==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+%000003fd: Register(R0, bv64) := ZeroExtend(32, bvadd32(Register(R0, bv64)[32:0], 1bv32))==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top<>Register(R30, bv64)->Top
+%000003cf: LocalVar(VF, bv1) := bvnot1(bvcomp33(SignExtend(1, LocalVar(#6, bv32)), bvadd33(SignExtend(1, Register(R0, bv64)[32:0]), 0bv33)))==>LocalVar(#6, bv32)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top<>Register(R0, bv64)->Top
+%000003d4: LocalVar(CF, bv1) := bvnot1(bvcomp33(ZeroExtend(1, LocalVar(#6, bv32)), bvadd33(ZeroExtend(1, Register(R0, bv64)[32:0]), 4294967296bv33)))==>Register(R30, bv64)->Top<>LocalVar(#6, bv32)->Top<>Register(R31, bv64)->Top
+Block main_basil_return==>Register(R30, bv64)->Top
+%0000040c: Register(R0, bv64) := ZeroExtend(32, MemoryLoad(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 28bv64), LittleEndian, 32))==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+%0000057d: NonDetGoTo(l000003f2)==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+%000003b6: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), Register(R31, bv64), Register(R1, bv64), LittleEndian, 64)==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+%000003dc: LocalVar(NF, bv1) := LocalVar(#6, bv32)[32:31]==>LocalVar(ZF, bv1)->Top<>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+%00000405: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 28bv64), Register(R0, bv64)[32:0], LittleEndian, 32)==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+NonDetGoTo(main_basil_return)==>Register(R30, bv64)->Top
+%00000571: Register(R0, bv64) := 1bv64==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+Procedure main at 1820 with 7 blocks and 2 in and 2 out parameters==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top<>Register(R1, bv64)->Top
+Block l0000056e==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+Block l000003e0==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+%000003a6: Register(R31, bv64) := bvadd64(Register(R31, bv64), 18446744073709551584bv64)==>Register(R1, bv64)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top<>Register(R0, bv64)->Top
+%000003d8: LocalVar(ZF, bv1) := bvcomp32(LocalVar(#6, bv32), 0bv32)==>LocalVar(ZF, bv1)->Top<>Register(R30, bv64)->Top<>Register(R31, bv64)->Top<>LocalVar(#6, bv32)->Top
+Block lmain_goto_l000003e0==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top<>LocalVar(ZF, bv1)->Top
+%00000412: Register(R31, bv64) := bvadd64(Register(R31, bv64), 32bv64)==>Register(R30, bv64)->Top
+Block l000003f2==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+assume (bvnot1(bvcomp1(LocalVar(ZF, bv1), 1bv1)) != 0bv1)None==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+%00000865: NonDetGoTo(l000003f2)==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+%000003ca: LocalVar(#6, bv32) := bvadd32(Register(R0, bv64)[32:0], 0bv32)==>Register(R0, bv64)->Top<>LocalVar(#6, bv32)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
