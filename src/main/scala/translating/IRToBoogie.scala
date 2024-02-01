@@ -91,6 +91,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           List()
         }
       case Some(ProcRelyVersion.IfCommandContradiction) => libRGFunsContradictionProof.values.flatten
+      case None => None
     }
 
 
@@ -545,6 +546,24 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   }
 
   val libRGFunsContradictionProof: Map[String, Seq[BProcedure]] = {
+    /**
+     * Generate proof obligations for the library procedure rely/guarantee check.
+     *
+     *    1. \forall v' . Rc \/ Rv => (\forall v'' . (Rc => Rf) [(v, v')\ (v', v"))
+     *    2. Rc \/ Rv transitive
+     *    3. Gf => Gc
+     *
+     *  (1.) is checked by an inline if block which c
+     *
+     *      if (*)  {
+     *        assume (Rc \/ Rf) // v -> v'
+     *        assume not(Rc => Rf) // v' -> v"
+     *        assert false;
+     *      }
+     *
+     *   Procedures with no precond and the predicate as their postcond are generated to encode two-state assumptions.
+     *
+     */
     (libRelies.keySet ++ libGuarantees.keySet).filter(x => libRelies(x).nonEmpty && libGuarantees(x).nonEmpty).map(targetName => {
       val Rc : BExpr = spec.relies.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
       val Gc : BExpr = spec.guarantees.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
@@ -608,6 +627,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
             List()
           }
         case Some(ProcRelyVersion.IfCommandContradiction) => relyfun(d.target.name).toList
+        case None => List()
       }) ++ List(call, returnTarget)
     case i: IndirectCall =>
       // TODO put this elsewhere
