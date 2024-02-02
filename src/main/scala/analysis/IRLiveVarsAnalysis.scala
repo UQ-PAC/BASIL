@@ -26,7 +26,8 @@ trait IRLiveVarAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatEleme
   }
 
   def edgesCallToAfterCall(call: Block, aftercall: DirectCall)(d: DL): Map[DL, edgelattice.Element] = {
-    Map(d -> IdEdge())
+//    Map(d -> IdEdge())
+    Map()
   }
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, edgelattice.Element] = {
