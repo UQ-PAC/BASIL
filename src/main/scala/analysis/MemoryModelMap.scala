@@ -6,13 +6,18 @@ import ir.{BitVecLiteral, Procedure}
 import scala.collection.mutable
 
 // Define a case class to represent a range
-case class RangeKey(var start: BigInt, var end: BigInt):
+case class RangeKey(var start: BigInt, var end: BigInt) extends Ordered[RangeKey]:
   def size(): BigInt = end - start
+  override def compare(that: RangeKey): Int = {
+    if (start < that.start) -1
+    else if (start > that.start) 1
+    else 0
+  }
 
 case class RegionToRangesMap():
-  val stackMap: mutable.Map[RangeKey, StackRegion] = mutable.Map()
-  val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.Map()
-  val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.Map()
+  val stackMap: mutable.Map[RangeKey, StackRegion] = mutable.TreeMap()
+  val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.TreeMap()
+  val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.TreeMap()
 
 // Custom data structure for storing range-to-object mappings
 class MemoryModelMap {
@@ -48,6 +53,8 @@ class MemoryModelMap {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
     val externalFunctionRgns = externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64)))
 
+    // we should collect all data regions otherwise the ordering might be wrong
+    var dataRgns: Set[DataRegion] = Set.empty
     // get all function exit node
     val exitNodes = memoryRegions.keys.collect { case e: CfgFunctionExitNode => e }
     exitNodes.foreach(exitNode =>
@@ -60,21 +67,19 @@ class MemoryModelMap {
           }
           // for each function exit node we get the memory region and add it to the mapping
           val stackRgns = allRegions.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
-          val dataRgns = allRegions.collect { case r: DataRegion => r }
-
-          // add externalFunctionRgn to dataRgns and sort by value
-          val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.value)
+          dataRgns = dataRgns ++ allRegions.collect { case r: DataRegion => r }
 
           allStacks(exitNode.data.name) = stackRgns
-
-          for (dataRgn <- allDataRgns) {
-            add(dataRgn.start.value, dataRgn)
-          }
         case LiftedBottom =>
     }
     )
+    // add externalFunctionRgn to dataRgns and sort by value
+    val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.value)
+    for (dataRgn <- allDataRgns) {
+      add(dataRgn.start.value, dataRgn)
+    }
   }
-
+  // TODO: push and pop could be optimised by caching the results
   def pushContext(funName: String): Unit = {
     contextStack.push(allStacks(funName))
     rangeMap.stackMap.clear()
@@ -114,19 +119,44 @@ class MemoryModelMap {
   override def toString: String =
     s"Stack: ${rangeMap.stackMap}\n Heap: ${rangeMap.heapMap}\n Data: ${rangeMap.dataMap}\n"
 
+  def printRegionsContent(hideEmpty: Boolean = false): Unit = {
+    println("Stack:")
+    for name <- allStacks.keys do
+      popContext()
+      pushContext(name)
+      println(s"  Function: $name")
+      // must sort by ranges
+      for ((range, region) <- rangeMap.stackMap) {
+        if (region.content.nonEmpty || !hideEmpty) {
+          println(s"    $range -> $region")
+        }
+      }
+    println("Heap:")
+    for ((range, region) <- rangeMap.heapMap) {
+      if (region.content.nonEmpty || !hideEmpty) {
+        println(s"  $range -> $region")
+      }
+    }
+    println("Data:")
+    for ((range, region) <- rangeMap.dataMap) {
+      if (region.content.nonEmpty || !hideEmpty) {
+        println(s"  $range -> $region")
+      }
+    }
+  }
 }
 
 trait MemoryRegion {
   val regionIdentifier: String
   var extent: Option[RangeKey] = None
-  val content: mutable.Set[BitVecLiteral] = mutable.Set()
+  val content: mutable.Set[BitVecLiteral | MemoryRegion] = mutable.Set()
 }
 
 class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral, val parent: Procedure = null) extends MemoryRegion {
   override def toString: String = s"Stack($regionIdentifier, $start, ${if parent != null then parent else "Null"}) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier
+    case s: StackRegion => s.start == start && s.regionIdentifier.equals(regionIdentifier)
     case _ => false
   }
 }
@@ -135,7 +165,7 @@ class HeapRegion(override val regionIdentifier: String, val size: BitVecLiteral)
   override def toString: String = s"Heap($regionIdentifier, $size) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case h: HeapRegion => h.regionIdentifier == regionIdentifier
+    case h: HeapRegion => h.regionIdentifier.equals(regionIdentifier)
     case _ => false
   }
 }
@@ -144,7 +174,7 @@ class DataRegion(override val regionIdentifier: String, val start: BitVecLiteral
   override def toString: String = s"Data($regionIdentifier, $start) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case d: DataRegion => d.start == start && d.regionIdentifier == regionIdentifier
+    case d: DataRegion => d.start == start && d.regionIdentifier.equals(regionIdentifier)
     case _ => false
   }
 }
