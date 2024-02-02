@@ -222,7 +222,7 @@ object RunUtils {
     mmm.convertMemoryRegions(mraResult, mergedSubroutines, mraSolver.procedureToSharedRegions)
 
     Logger.info("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, globalAddresses, globalOffsets, mergedSubroutines, mmm)
+    val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, RegToResult, mmm)
     steensgaardSolver.analyze()
     steensgaardSolver.pointsTo()
     steensgaardSolver.mayAlias()
@@ -246,11 +246,9 @@ object RunUtils {
       val newCFG = ProgramCfgFactory().fromIR(newIR)
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
-    config.analysisResultsPath.foreach(s =>
-      val newCFG = ProgramCfgFactory().fromIR(newIR)
-      writeToFile(printAnalysisResults(newCFG, Map.empty, 1, false), s"${s}_resolvedCFG.txt"))
-
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
+
+    mmm.printRegionsContent(true)
 
     newIR
   }

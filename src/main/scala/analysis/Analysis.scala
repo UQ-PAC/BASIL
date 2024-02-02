@@ -250,6 +250,18 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     buffers
   }
 
+  def resolveGlobalOffset(address: BitVecLiteral): DataRegion = {
+    val tableAddress = globalOffsets.getOrElse(address.value, address.value)
+    var name = "@ERROR"
+    if (globals.contains(tableAddress)) {
+      name = globals(tableAddress)
+    } else if (subroutines.contains(tableAddress)) {
+      name = subroutines(tableAddress)
+    }
+
+    DataRegion(name, address)
+  }
+
   def stackDetection(stmt: Statement): Unit = {
     println("Stack detection")
     println(spList)
@@ -308,25 +320,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
           }
         }
       case bitVecLiteral: BitVecLiteral =>
-        if (globals.contains(bitVecLiteral.value)) {
-          val globalName = globals(bitVecLiteral.value)
-          Set(DataRegion(globalName, bitVecLiteral))
-        } else if (subroutines.contains(bitVecLiteral.value)) {
-          val subroutineName = subroutines(bitVecLiteral.value)
-          Set(DataRegion(subroutineName, bitVecLiteral))
-        } else if (globalOffsets.contains(bitVecLiteral.value)) {
-          val val1 = globalOffsets(bitVecLiteral.value)
-          if (subroutines.contains(val1)) {
-            val globalName = subroutines(val1)
-            Set(DataRegion(globalName, bitVecLiteral))
-          } else {
-            Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
-          }
-        } else {
-          //throw new Exception(s"Unknown type for $bitVecLiteral")
-          // unknown region here
-          Set(DataRegion(s"Unknown_$bitVecLiteral", bitVecLiteral))
-        }
+          Set(resolveGlobalOffset(bitVecLiteral))
       case variable: Variable =>
         variable match {
           case _: LocalVar =>
