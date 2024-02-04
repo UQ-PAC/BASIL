@@ -14,7 +14,7 @@ trait IRReachingDefsAnalysisFunctions extends ForwardIDEAnalysis[LocalAssign, Fl
 
   def edgesExitToAfterCall(exit: Command, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = Map(d -> IdEdge())
 
-  def edgesCallToAfterCall(call: DirectCall, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = Map(d -> IdEdge())
+  def edgesCallToAfterCall(call: DirectCall, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = Map()
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, edgelattice.Element] = {
     n match

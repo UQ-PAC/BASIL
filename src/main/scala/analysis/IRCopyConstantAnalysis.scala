@@ -17,7 +17,7 @@ trait IRCopyConstantAnalysisFunctions extends ForwardIDEAnalysis[Variable, FlatE
 
   def edgesExitToAfterCall(exit: Command, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = Map(d -> IdEdge())
 
-  def edgesCallToAfterCall(call: DirectCall, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = Map(d -> IdEdge())
+  def edgesCallToAfterCall(call: DirectCall, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = Map()
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, edgelattice.Element] = {
     if n.isInstanceOf[DirectCall] then
