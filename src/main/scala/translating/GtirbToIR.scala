@@ -182,10 +182,9 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
 
   // Utility Maps used for below functions
-  //TODO: mods.head may not work here if multiple modules, in which case decoder needs to change
-  val functionNames = MapDecoder.decode_uuid(mods.head.auxData.get("functionNames").get.data)
-  val functionEntries = MapDecoder.decode_set(mods.head.auxData.get("functionEntries").get.data)
-  val functionBlocks = MapDecoder.decode_set(mods.head.auxData.get("functionBlocks").get.data)
+  val functionNames = MapDecoder.decode_uuid(mods.map(_.auxData.get("functionNames").get.data))
+  val functionEntries = MapDecoder.decode_set(mods.map(_.auxData.get("functionEntries").get.data))
+  val functionBlocks = MapDecoder.decode_set(mods.map(_.auxData.get("functionBlocks").get.data))
   val symbols = mods.flatMap(_.symbols)
   var blkMap: collection.mutable.HashMap[ByteString, Block] = collection.mutable.HashMap[ByteString, Block]()
   val symMap = create_symMap()

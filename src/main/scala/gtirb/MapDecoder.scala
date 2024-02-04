@@ -15,66 +15,84 @@ import java.nio.charset.StandardCharsets
 */
 object MapDecoder {
 
-    def decode_set(bytes: ByteString): collection.mutable.Map[ByteString, collection.mutable.Set[ByteString]]  = {
-
-        val bytesArr: Array[Byte] = bytes.toByteArray()
-        val byteStream = new ByteArrayInputStream(bytesArr)
-
-        val map : collection.mutable.Map[ByteString, collection.mutable.Set[ByteString]] 
+    def decode_set(totalBytes: Seq[ByteString]): collection.mutable.Map[ByteString, collection.mutable.Set[ByteString]]  = {
+        
+        val totalMap: collection.mutable.Map[ByteString, collection.mutable.Set[ByteString]] 
         = collection.mutable.Map.empty[ByteString, collection.mutable.Set[ByteString]]
+        
+        for (bytes <- totalBytes) {
+            val bytesArr: Array[Byte] = bytes.toByteArray()
+            val byteStream = new ByteArrayInputStream(bytesArr)
 
-        val len = bytesToInt(read_bytes(8, byteStream), true)
-        val num = len.toInt
-        for (s <- 0 until num) {
-            val key = ByteString.copyFrom(read_bytes(16, byteStream))
-            val uuids: collection.mutable.Set[ByteString] = collection.mutable.Set[ByteString]();
-            val len = bytesToInt(read_bytes(8, byteStream), true);
-            for (k <- 0 until len.toInt) {
-                val byte = ByteString.copyFrom(read_bytes(16, byteStream))
-                uuids += byte
+            val map : collection.mutable.Map[ByteString, collection.mutable.Set[ByteString]] 
+            = collection.mutable.Map.empty[ByteString, collection.mutable.Set[ByteString]]
+
+            val len = bytesToInt(read_bytes(8, byteStream), true)
+            val num = len.toInt
+            for (s <- 0 until num) {
+                val key = ByteString.copyFrom(read_bytes(16, byteStream))
+                val uuids: collection.mutable.Set[ByteString] = collection.mutable.Set[ByteString]();
+                val len = bytesToInt(read_bytes(8, byteStream), true);
+                for (k <- 0 until len.toInt) {
+                    val byte = ByteString.copyFrom(read_bytes(16, byteStream))
+                    uuids += byte
+                }
+
+                map += (key -> uuids);
             }
-
-            map += (key -> uuids);
+            totalMap ++= map
         }
-        return map
+        return totalMap
+        
     }
 
-    def decode_uuid(bytes: ByteString): collection.mutable.Map[ByteString, ByteString]  = {
+    def decode_uuid(totalBytes: Seq[ByteString]): collection.mutable.Map[ByteString, ByteString]  = {
 
-        val bytesArr: Array[Byte] = bytes.toByteArray()
-        val byteStream = new ByteArrayInputStream(bytesArr)
-
-        val map : collection.mutable.Map[ByteString, ByteString] 
+        val totalMap : collection.mutable.Map[ByteString, ByteString] 
         = collection.mutable.Map.empty[ByteString, ByteString]
+        
+        for (bytes <- totalBytes) {
+            val bytesArr: Array[Byte] = bytes.toByteArray()
+            val byteStream = new ByteArrayInputStream(bytesArr)
 
-        val len = bytesToInt(read_bytes(8, byteStream), true)
-        val num = len.toInt
-        for (s <- 0 until num) {
-            val key = ByteString.copyFrom(read_bytes(16, byteStream))
-            val uuid = ByteString.copyFrom(read_bytes(16, byteStream))
-            map += (key -> uuid);
+            val map : collection.mutable.Map[ByteString, ByteString] 
+            = collection.mutable.Map.empty[ByteString, ByteString]
+
+            val len = bytesToInt(read_bytes(8, byteStream), true)
+            val num = len.toInt
+            for (s <- 0 until num) {
+                val key = ByteString.copyFrom(read_bytes(16, byteStream))
+                val uuid = ByteString.copyFrom(read_bytes(16, byteStream))
+                map += (key -> uuid);
+            }
+            totalMap ++= map
         }
-        return map
+        return totalMap
     }
 
-    def decode_string(bytes: ByteString): mutable.Map[ByteString, String] = {
+    def decode_string(totalBytes: Seq[ByteString]): mutable.Map[ByteString, String] = {
         // THIS DOESNT WORK YET
         // literally can't figure out what's wrong, might be something to do with java/scala treating all bits as signed, 
         // when api is unsigned
+        val totalMap : mutable.Map[ByteString, String] = mutable.Map.empty[ByteString, String]
 
-        val map : mutable.Map[ByteString, String] = mutable.Map.empty[ByteString, String]
-        val bytesArr: Array[Byte] = bytes.toByteArray()
-        val byteStream = new ByteArrayInputStream(bytesArr)
+        for (bytes <- totalBytes) {
 
-        val len = bytesToInt(read_bytes(8, byteStream), true)
-        val num = len.toInt
-        for (s <- 0 until num) {
-            val key = ByteString.copyFrom(read_bytes(16, byteStream))
-            val len = bytesToInt(read_bytes(8, byteStream), true);
-            val str = new String(read_bytes(len.toInt, byteStream), StandardCharsets.UTF_8)
-            map += (key -> str);
-        }
-        return map
+            val map : mutable.Map[ByteString, String] = mutable.Map.empty[ByteString, String]
+            val bytesArr: Array[Byte] = bytes.toByteArray()
+            val byteStream = new ByteArrayInputStream(bytesArr)
+
+            val len = bytesToInt(read_bytes(8, byteStream), true)
+            val num = len.toInt
+            for (s <- 0 until num) {
+                val key = ByteString.copyFrom(read_bytes(16, byteStream))
+                val len = bytesToInt(read_bytes(8, byteStream), true);
+                val str = new String(read_bytes(len.toInt, byteStream), StandardCharsets.UTF_8)
+                map += (key -> str);
+            }
+            totalMap ++= map 
+        } 
+        return totalMap
     }
 
 
