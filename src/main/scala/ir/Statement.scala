@@ -82,7 +82,7 @@ sealed trait Jump extends Command, HasParent[Block]  {
 
 
 
-class GoTo private (private var _targets: mutable.Set[Block], override val label: Option[String]) extends Jump {
+class GoTo private (private val _targets: mutable.Set[Block], override val label: Option[String]) extends Jump {
 
   def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.Set.from(targets), label)
 
@@ -113,6 +113,8 @@ class GoTo private (private var _targets: mutable.Set[Block], override val label
     if (_targets.remove(t)) {
       t.removeIncomingJump(this)
     }
+    assert(!_targets.contains(t))
+    assert(!t.incomingJumps.contains(this))
   }
 
 

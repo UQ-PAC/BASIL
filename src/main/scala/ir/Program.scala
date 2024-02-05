@@ -257,7 +257,13 @@ class Procedure private (
     addBlocks(newBlocks)
   }
 
+  /**
+   * Removes a block assuming no existing blocks jump to it.
+   * @param block the block to remove
+   * @return the removed block
+   */
   def removeBlocks(block: Block): Block = {
+    require(block.incomingJumps.isEmpty) // don't leave jumps dangling
     if (_blocks.contains(block)) {
       block.deParent()
       _blocks.remove(block)
@@ -270,6 +276,40 @@ class Procedure private (
     }
     block
   }
+
+  /**
+   * Remove blocks with the semantics of replacing them with a noop. The incoming jumps to this are replaced
+   * with a jump(s) to this blocks jump target(s). If this block ends in a call then only its statements are removed.
+   * @param blocks the block/blocks to remove
+   */
+  def removeBlocksInline(blocks: Block*): Unit = {
+    for (elem <- blocks) {
+      elem.jump match {
+        case g: GoTo =>
+          // rewrite all the jumps to include our jump targets
+          elem.incomingJumps.foreach(_.removeTarget(elem))
+          elem.incomingJumps.foreach(_.addAllTargets(g.targets))
+          removeBlocks(elem)
+        case c: Call =>
+          // just remove statements, keep call
+          elem.statements.clear()
+      }
+    }
+  }
+
+  /**
+   * Remove block(s) and all jumps that target it
+   * @param blocks the blocks to remove
+   */
+  def removeBlocksDisconnect(blocks: Block*): Unit = {
+    for (elem <- blocks.toSeq) {
+      for (j <- elem.incomingJumps) {
+        j.removeTarget(elem)
+      }
+      removeBlocks(elem)
+    }
+  }
+  
 
   def removeBlocks(blocks: IterableOnce[Block]): Unit = {
     for (elem <- blocks.iterator) {
@@ -357,7 +397,10 @@ class Block private (
   def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
 
   def addIncomingJump(g: GoTo) = _incomingJumps.add(g)
-  def removeIncomingJump(g: GoTo) = _incomingJumps.remove(g)
+  def removeIncomingJump(g: GoTo) = {
+    _incomingJumps.remove(g)
+    assert(!incomingJumps.contains(g))
+  }
 
   def calls: Set[Procedure] = _jump.calls
 
@@ -380,6 +423,7 @@ class Block private (
   def nextBlocks: Iterable[Block] = {
     jump match {
       case c: GoTo => c.targets
+      case c: FallThrough => c.afterCall
       case _ => Seq()
     }
   }
