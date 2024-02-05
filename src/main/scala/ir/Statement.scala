@@ -116,7 +116,7 @@ class GoTo private (private var _targets: mutable.Set[Block], override val label
   }
 
 
-  override def toString: String = s"${labelStr}NonDetGoTo(${targets.map(_.label).mkString(", ")})"
+  override def toString: String = s"${labelStr}GoTo(${targets.map(_.label).mkString(", ")})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitGoTo(this)
 }
 
