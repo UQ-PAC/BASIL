@@ -200,18 +200,23 @@ class Procedure private (
   def returnBlock: Option[Block] = _returnBlock
 
   def returnBlock_=(value: Block): Unit = {
-    removeBlocks(_returnBlock)
-    _returnBlock = Some(addBlocks(value))
+    if (!returnBlock.contains(value)) {
+      removeBlocks(_returnBlock)
+      _returnBlock = Some(addBlocks(value))
+    }
   }
 
   def entryBlock: Option[Block] = _entryBlock
 
   def entryBlock_=(value: Block): Unit = {
-    removeBlocks(_entryBlock)
-    _entryBlock = Some(addBlocks(value))
+    if (!entryBlock.contains(value)) {
+      removeBlocks(_entryBlock)
+      _entryBlock = Some(addBlocks(value))
+    }
   }
 
   def addBlocks(block: Block): Block = {
+    block.parent = this
     if (!_blocks.contains(block)) {
       block.parent = this
       _blocks.add(block)
@@ -296,7 +301,7 @@ sealed trait BlockKind
 case class Regular() extends BlockKind
 
 /* Block is the fallthrough / return target of a call. */
-case class CallReturn(from: Call) extends BlockKind
+case class AfterCall(from: Call) extends BlockKind
 
 /* Block is the single return point for a procedure */
 case class Return(from: Procedure) extends BlockKind
@@ -324,6 +329,8 @@ class Block private (
 
   def jump: Jump = _jump
 
+
+
   def jump_=(j: Jump): Unit = {
     if (j ne _jump) {
       _jump.deParent()
@@ -331,6 +338,7 @@ class Block private (
       _jump.parent = this
     }
   }
+
 
   def replaceJump(j: Jump) = {
     jump = j
@@ -439,16 +447,16 @@ object Block:
     new Block(Regular(), label, address, IntrusiveList.empty, GoTo(Seq(), Some(label + "_unknown")))
   }
 
-  def callReturn(from: Call) : Block = {
-    val jump = from match 
-      case d: DirectCall => GoTo(d.returnTarget.toSet)
-      case c: IndirectCall => GoTo(c.returnTarget.toSet)
-    
-    new Block(CallReturn(from), from.parent.label + "_basil_callreturn", None, Seq(), jump)
+  def afterCall(from: Call, to: Option[Block]) : Block = {
+    val jump = from match
+      case d: DirectCall => GoTo(to.toSet)
+      case c: IndirectCall => GoTo(to.toSet)
+
+    Block(AfterCall(from), from.parent.label + "_basil_aftercall", None, Seq(), jump)
   }
 
   def procedureReturn(from: Procedure): Block = {
-      new Block(Return(from), (from.name + "_basil_return"), None, List(), IndirectCall(Register("R30", BitVecType(64)), None, None))
+      new Block(Return(from), (from.name + "_basil_return"), None, List(), IndirectCall(Register("R30", BitVecType(64))))
   }
 
 

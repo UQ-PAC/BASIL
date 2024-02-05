@@ -48,6 +48,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
         val (jump, newBlocks) = translate(b.jumps, block)
         procedure.addBlocks(newBlocks)
         block.replaceJump(jump)
+        assert(jump.hasParent)
       }
 
       // Set entry block to the block with the same address as the procedure or the first in sequence

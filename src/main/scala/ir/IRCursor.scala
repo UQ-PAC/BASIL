@@ -72,7 +72,7 @@ trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
       case j: Jump => Set(j.parent.statements.lastOption.getOrElse(j.parent))
       case b: Block =>
         b.kind match {
-          case CallReturn(from) => Set(from)
+          case AfterCall(from) => Set(from)
           case Entry(proc)      => Set(proc)
           case _                => b.incomingJumps.asInstanceOf[Set[CFGPosition]]
         }
@@ -100,7 +100,7 @@ trait IntraProcBlockIRCursor extends IRWalk[CFGPosition, Block] {
       case b: Block =>
         b.kind match {
           case Entry(_)         => Set.empty
-          case CallReturn(from) => Set(from.parent)
+          case AfterCall(from) => Set(from.parent)
           case _                => b.incomingJumps.map(_.parent)
         }
       case j: Command   => pred(j.parent)
@@ -139,7 +139,7 @@ trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
       case c: Procedure       => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
       case b: Block =>
         b.kind match {
-          case CallReturn(DirectCall(target, returnTarget, _)) => target.returnBlock.map(_.jump).toSet
+          case AfterCall(DirectCall(target, returnTarget, _)) => target.returnBlock.map(_.jump).toSet
           case _ => Set()
         }
       case _ => IntraProcIRCursor.pred(pos)
@@ -160,7 +160,7 @@ trait InterProcBlockIRCursor extends IRWalk[CFGPosition, Block] {
     pos match {
       case b: Block =>
         b.kind match {
-          case CallReturn(from) => from.parent.parent.returnBlock.toSet
+          case AfterCall(from) => from.parent.parent.returnBlock.toSet
           case Entry(of)        => of.incomingCalls().map(_.parent).toSet
           case _                => b.prevBlocks.toSet
         }

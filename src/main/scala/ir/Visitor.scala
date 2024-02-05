@@ -428,16 +428,16 @@ class AddCallReturnBlocks extends Visitor {
    * Add a dummy call return block with no statements after each call. 
    */
   override def visitDirectCall(node: DirectCall): Jump = {
-    val b = node.parent.parent.addBlocks(Block.callReturn(node))
-    node.returnTarget = Some(b)
+    val b = node.parent.parent.addBlocks(Block.afterCall(node, node.returnTarget))
+    node.returnTarget = b
     node
   }
 
   override def visitIndirectCall(node: IndirectCall): Jump = {
     // skip return nodes
     if !(node.parent.kind.isInstanceOf[Return]) then { 
-      val b = node.parent.parent.addBlocks(Block.callReturn(node))
-      node.returnTarget = Some(b)
+      val b = node.parent.parent.addBlocks(Block.afterCall(node, node.returnTarget))
+      node.returnTarget = b
     } 
     node
   }

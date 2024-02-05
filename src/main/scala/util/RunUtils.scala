@@ -95,11 +95,11 @@ object RunUtils {
     val externalRemover = ExternalRemover(externalNames)
     val renamer = Renamer(reserved)
     val returnUnifier = ConvertToSingleProcedureReturn()
-    val callReturner = AddCallReturnBlocks()
+    //val callReturner = AddCallReturnBlocks()
     IRProgram = externalRemover.visitProgram(IRProgram)
     IRProgram = renamer.visitProgram(IRProgram)
     IRProgram = returnUnifier.visitProgram(IRProgram)
-    IRProgram = callReturner.visitProgram(IRProgram)
+    //IRProgram = callReturner.visitProgram(IRProgram)
 
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(IRProgram), s"$s-before-analysis.il"))
@@ -157,11 +157,20 @@ object RunUtils {
     Logger.info(externalAddresses)
     Logger.info("Subroutine Addresses:")
     Logger.info(subroutines)
+    var unparented = IRProgram.collect {
+      case c: Command if !c.hasParent => c
+      case b: Block if !b.hasParent => b
+    }
+    assert(unparented.isEmpty)
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
     val cfg = ProgramCfgFactory().fromIR(IRProgram, inlineLimit = 0)
 
+    unparented = IRProgram.collect {
+      case c: IndirectCall if (!c.hasParent) => c
+    }
+    assert(unparented.isEmpty)
     val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
 
     Logger.info("[!] Running Constant Propagation")
@@ -212,7 +221,13 @@ object RunUtils {
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, vsaResult), s"${s}_vsa$iteration.txt"))
 
     Logger.info("[!] Resolving CFG")
-    val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult, IRProgram)
+    val (newIR, modified): (Program, Boolean) =  resolveCFG(cfg, vsaResult, IRProgram)
+
+    unparented = newIR.collect {
+      case c: Command if !c.hasParent => c
+      case b: Block if !b.hasParent => b
+    }
+
     if (modified) {
       Logger.info(s"[!] Analysing again (iter $iteration)")
       return analyse(newIR, externalFunctions, globals, globalOffsets, config, iteration + 1)
@@ -436,16 +451,21 @@ object RunUtils {
 
                 if (targets.size == 1) {
                   modified = true
+
+                  // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
                   val newCall = DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label)
                   block.replaceJump(newCall)
                 } else if (targets.size > 1) {
                   modified = true
                   val procedure = c.parent.data
                   val newBlocks = ArrayBuffer[Block]()
+                  indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
                   for (t <- targets) {
                     val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
                     val newLabel: String = block.label + t.name
                     val directCall = DirectCall(t, indirectCall.returnTarget)
+                    directCall.parent = indirectCall.parent
+
                     newBlocks.append(Block.regular(newLabel, None, ArrayBuffer(assume), directCall))
                   }
                   procedure.addBlocks(newBlocks)
@@ -472,7 +492,7 @@ object RunUtils {
         case globalAddress: GlobalAddress =>
           if (nameExists(globalAddress.name)) {
             functionNames += globalAddress
-            Logger.info(s"RESOLVED: Call to Global address ${globalAddress.name} resolved.")
+            Logger.info(s"RESOLVED: Call to Global address ${globalAddress.name} rt statuesolved.")
           } else {
             addFakeProcedure(globalAddress.name)
             functionNames += globalAddress
