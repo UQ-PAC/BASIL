@@ -2,35 +2,28 @@
 #include <string.h>
 #include <stdio.h>
 
-#define MALLOC_SIZE 4
-// times out with 64 bit buffer
-
-// cntlm 22
-
 char *buf;
 char password = 7; // secret value; has to be a variable so that we get a Gamma_password variable
-char stext[11] = "hel";
-
-
+char stext[11] = "user:pass";
 
 int main() {
     char *pos = NULL, *dom = NULL;
-    
 
-   stext[2] = password;
-   buf = malloc(strlen(stext) + 1);
-   memcpy(buf, stext, strlen(stext) + 1); // inlined by -O2
+   //memset(stext, 'h', 10);
+  // stext[5] = password;
+   buf = malloc(11);
+   // it only verifies if memcpy is the WHOLE string
+   memcpy(buf, stext, strlen(stext)); // inlined by -O2
 
    puts(buf);
 
    // find the split between username and password ("username:password")
-   pos = buf + 1;
+   pos = buf + 4;
     
   // including this makes verification fail
- // *pos = 0;
+  // *pos = 0;
 
-  memset(buf, 0, strlen(buf) + 1);
+  memset(buf, 1, strlen(buf));
   free(buf); // requires secret[i] == true
-
 }
 

@@ -1,5 +1,5 @@
 package analysis
-import ir.IntraProcIRCursor
+import ir.{IRWalk, IntraProcIRCursor, InterProcIRCursor, CFGPosition}
 
 /** Dependency methods for worklist-based analyses.
   */
@@ -32,12 +32,22 @@ trait IntraproceduralForwardDependencies extends Dependencies[CfgNode] {
 }
 
 
-trait IntraProcDependencies extends Dependencies[IntraProcIRCursor.Node]:
-  override def outdep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcDependencies.outdep(n)
-  override def indep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcDependencies.indep(n)
+trait IRInterproceduralForwardDependencies extends Dependencies[CFGPosition] {
+  override def outdep(n: CFGPosition): Set[CFGPosition] = InterProcIRCursor.succ(n) 
+  override def indep(n: CFGPosition): Set[CFGPosition] = InterProcIRCursor.pred(n) 
+}
 
-/** Dependency methods for forward analyses.
-  */
-object IntraProcDependencies extends Dependencies[IntraProcIRCursor.Node]:
-  override def outdep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcIRCursor.succ(n)
-  override def indep(n: IntraProcIRCursor.Node): Set[IntraProcIRCursor.Node] = IntraProcIRCursor.pred(n)
+trait IRIntraproceduralForwardDependencies extends Dependencies[CFGPosition] {
+  override def outdep(n: CFGPosition): Set[CFGPosition] = IntraProcIRCursor.succ(n) 
+  override def indep(n: CFGPosition): Set[CFGPosition] = IntraProcIRCursor.pred(n) 
+}
+
+trait IRInterproceduralBackwardDependencies extends  IRInterproceduralForwardDependencies {
+  override def outdep(n: CFGPosition): Set[CFGPosition] =  super.indep(n) 
+  override def indep(n: CFGPosition): Set[CFGPosition] =  super.outdep(n) 
+}
+
+trait IRIntraproceduralBackwardDependencies extends IRIntraproceduralForwardDependencies {
+  override def outdep(n: CFGPosition): Set[CFGPosition] = super.indep(n)
+  override def indep(n: CFGPosition): Set[CFGPosition] = super.outdep(n) 
+}

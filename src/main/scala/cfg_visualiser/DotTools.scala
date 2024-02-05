@@ -12,7 +12,6 @@ object IDGenerator {
 }
 
 def wrap(input: String, width: Integer = 20): String =
-  return input
   if (input.length() <= width) {
     input
   } else {
@@ -58,7 +57,7 @@ class DotNode(val id: String, val label: String) extends DotElement {
 
 /** Represents an edge between two nodes in a Graphviz dot file.
   */
-class DotArrow(
+ case class DotArrow(
     val fromNode: DotNode,
     arrow: String,
     val toNode: DotNode,

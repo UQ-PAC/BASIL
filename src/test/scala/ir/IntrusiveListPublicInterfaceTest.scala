@@ -1,8 +1,8 @@
 package ir
 import org.scalatest.funsuite.AnyFunSuite
-import intrusiveList.{IntrusiveList, IntrusiveListElement}
+import intrusivelist.{IntrusiveList, IntrusiveListElement}
 
-case class Elem(val t: Float) extends IntrusiveListElement
+case class Elem(val t: Int) extends IntrusiveListElement[Elem]
 
 class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
 

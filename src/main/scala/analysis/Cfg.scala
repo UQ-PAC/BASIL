@@ -1,7 +1,6 @@
 package analysis
 
 import scala.collection.mutable
-import intrusiveList.IntrusiveList
 import ir.*
 import cfg_visualiser.{DotArrow, DotGraph, DotInlineArrow, DotInterArrow, DotIntraArrow, DotNode, DotRegularArrow}
 
@@ -204,6 +203,7 @@ class ProgramCfg:
 
   var startNode: CfgFunctionEntryNode = _
   var nodes: mutable.Set[CfgNode] = mutable.Set()
+  var funEntries: mutable.Set[CfgFunctionEntryNode] = mutable.Set()
 
   /** Inline edges are for connecting an intraprocedural cfg with a copy of another procedure's intraprocedural cfg
     * which is placed inside this one. They are considered interprocedural edges, and will not be followed if the caller
@@ -470,6 +470,7 @@ class ProgramCfgFactory:
     val funcExitNode: CfgFunctionExitNode = CfgFunctionExitNode(proc)
     cfg.nodes += funcEntryNode
     cfg.nodes += funcExitNode
+    cfg.funEntries += funcEntryNode
 
     procToCfg += (proc -> (funcEntryNode, funcExitNode))
     callToNodes += (funcEntryNode -> mutable.Set())
@@ -483,8 +484,6 @@ class ProgramCfgFactory:
     } else {
       // Recurse through blocks
       visitBlock(proc.entryBlock.get, funcEntryNode)
-      // If it has no entry-block we still visit the exit block because VSA analysis expects everything to have an Exit
-      visitBlock(proc.returnBlock, funcEntryNode)
     }
 
     /** Add a block to the CFG. A block in this case is a basic block, so it contains a list of consecutive statements
@@ -667,7 +666,6 @@ class ProgramCfgFactory:
                 cfg.addEdge(jmpNode, noReturn)
                 cfg.addEdge(noReturn, funcExitNode)
             }
-          case _ => assert(false, s"unexpected jump encountered, jump: $jmp")
         } // `jmps.head` match
       } // `visitJumps` function
     } // `visitBlocks` function

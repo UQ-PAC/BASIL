@@ -80,7 +80,7 @@ USER root
 # ====================
 # Bap with ASLi plugin
 # ====================
-FROM bap-upsteam.2.5 AS aslp-bap-upstream
+FROM bap-upstream.2.5 AS aslp-bap-upstream
 USER opam
 RUN git clone https://github.com/UQ-PAC/bap-asli-plugin.git
 RUN cd /home/opam/bap-asli-plugin && eval $(opam env) && make

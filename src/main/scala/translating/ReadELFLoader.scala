@@ -1,17 +1,19 @@
 package translating
 
-import Parsers.ReadELFParser._
-import specification._
-import scala.jdk.CollectionConverters._
+import Parsers.ReadELFParser.*
+import specification.*
+import util.ILLoadingConfig
+
+import scala.jdk.CollectionConverters.*
 
 object ReadELFLoader {
-  def visitSyms(ctx: SymsContext): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
+  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
     val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableExtFunc(r)).toSet
     val relocationOffsets = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableOffsets(r)).toMap
     val globalVariables = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toSet
-    val mainAddress = ctx.symbolTable.asScala.flatMap(s => getMainAddress(s))
+    val mainAddress = ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, config.mainProcedureName))
     if (mainAddress.isEmpty) {
-      throw Exception("no main function in symbol table")
+      throw Exception(s"no ${config.mainProcedureName} function in symbol table")
     }
     (externalFunctions, globalVariables, relocationOffsets, mainAddress.head)
   }
@@ -56,11 +58,15 @@ object ReadELFLoader {
     }
   }
 
-  def getMainAddress(ctx: SymbolTableContext): Option[Int] = {
+  def getFunctionAddress(ctx: SymsContext, functionName: String): Option[Int] = {
+    ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, functionName)).headOption
+  }
+
+  private def getFunctionAddress(ctx: SymbolTableContext, functionName: String): Option[Int] = {
     if (ctx.symbolTableHeader.tableName.STRING.getText == ".symtab") {
       val rows = ctx.symbolTableRow.asScala
       val mainAddress = rows.collectFirst {
-        case r if r.entrytype.getText == "FUNC" && r.bind.getText == "GLOBAL" && r.name.getText == "main" =>
+        case r if r.entrytype.getText == "FUNC" && r.bind.getText == "GLOBAL" && r.name.getText == functionName =>
           Integer.parseInt(r.value.getText, 16)
       }
       mainAddress

@@ -2,7 +2,7 @@ package ir
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
-import intrusiveList.IntrusiveList
+import intrusivelist.IntrusiveList
 
 abstract class Visitor {
 
@@ -86,47 +86,35 @@ abstract class Visitor {
   }
 
   def visitExtract(node: Extract): Expr = {
-    node.body = visitExpr(node.body)
-    node
+    node.copy(body = visitExpr(node.body))
   }
 
   def visitRepeat(node: Repeat): Expr = {
-    node.body = visitExpr(node.body)
-    node
+    node.copy(body = visitExpr(node.body))
   }
 
   def visitZeroExtend(node: ZeroExtend): Expr = {
-    node.body = visitExpr(node.body)
-    node
+    node.copy(body = visitExpr(node.body))
   }
 
   def visitSignExtend(node: SignExtend): Expr = {
-    node.body = visitExpr(node.body)
-    node
+    node.copy(body = visitExpr(node.body))
   }
 
   def visitUnaryExpr(node: UnaryExpr): Expr = {
-    node.arg = visitExpr(node.arg)
-    node
+    node.copy(arg = visitExpr(node.arg))
   }
 
   def visitBinaryExpr(node: BinaryExpr): Expr = {
-    node.arg1 = visitExpr(node.arg1)
-    node.arg2 = visitExpr(node.arg2)
-    node
+    node.copy(arg1 = visitExpr(node.arg1), arg2 = visitExpr(node.arg2))
   }
 
   def visitMemoryStore(node: MemoryStore): MemoryStore = {
-    node.mem = visitMemory(node.mem)
-    node.index = visitExpr(node.index)
-    node.value = visitExpr(node.value)
-    node
+    node.copy(mem = visitMemory(node.mem), index = visitExpr(node.index), value = visitExpr(node.value))
   }
 
   def visitMemoryLoad(node: MemoryLoad): Expr = {
-    node.mem = visitMemory(node.mem)
-    node.index = visitExpr(node.index)
-    node
+    node.copy(mem = visitMemory(node.mem), index = visitExpr(node.index))
   }
 
   def visitMemory(node: Memory): Memory = node
@@ -256,6 +244,100 @@ abstract class ReadOnlyVisitor extends Visitor {
 
 }
 
+/**
+  * Visits all reachable blocks in a procedure, depth-first, in the order they are reachable from the start of the
+  * procedure.
+  * Does not jump to other procedures.
+  * Only modifies statements and jumps.
+  * */
+abstract class IntraproceduralControlFlowVisitor extends Visitor {
+  private val visitedBlocks: mutable.Set[Block] = mutable.Set()
+
+  override def visitProcedure(node: Procedure): Procedure = {
+    node.entryBlock.foreach(visitBlock)
+    node
+  }
+
+  override def visitBlock(node: Block): Block = {
+    if (visitedBlocks.contains(node)) {
+      return node
+    }
+    for (i <- node.statements) {
+      visitStatement(i)
+    }
+    visitedBlocks.add(node)
+    node.replaceJump(visitJump(node.jump))
+    node
+  }
+
+  override def visitGoTo(node: GoTo): Jump = {
+    node.targets.foreach(visitBlock)
+    node
+  }
+
+  override def visitDirectCall(node: DirectCall): Jump = {
+    node.returnTarget.foreach(visitBlock)
+    node
+  }
+
+  override def visitIndirectCall(node: IndirectCall): Jump = {
+    node.target = visitVariable(node.target)
+    node.returnTarget.foreach(visitBlock)
+    node
+  }
+}
+
+// TODO: does this break for programs with loops? need to calculate a fixed-point?
+class StackSubstituter extends IntraproceduralControlFlowVisitor {
+  private val stackPointer = Register("R31", BitVecType(64))
+  private val stackMemory = Memory("stack", 64, 8)
+  val stackRefs: mutable.Set[Variable] = mutable.Set(stackPointer)
+
+  override def visitProcedure(node: Procedure): Procedure = {
+    // reset for each procedure
+    stackRefs.clear()
+    stackRefs.add(stackPointer)
+    super.visitProcedure(node)
+  }
+
+  override def visitMemoryLoad(node: MemoryLoad): MemoryLoad = {
+    // replace mem with stack in load if index contains stack references
+    val loadStackRefs = node.index.variables.intersect(stackRefs)
+    if (loadStackRefs.nonEmpty) {
+      node.copy(mem = stackMemory)
+    } else {
+      node
+    }
+  }
+
+  override def visitLocalAssign(node: LocalAssign): Statement = {
+    node.lhs = visitVariable(node.lhs)
+    node.rhs = visitExpr(node.rhs)
+
+    // update stack references
+    val variableVisitor = VariablesWithoutStoresLoads()
+    variableVisitor.visitExpr(node.rhs)
+
+    val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackRefs)
+    if (rhsStackRefs.nonEmpty) {
+      stackRefs.add(node.lhs)
+    } else if (stackRefs.contains(node.lhs) && node.lhs != stackPointer) {
+      stackRefs.remove(node.lhs)
+    }
+    node
+  }
+
+  override def visitMemoryAssign(node: MemoryAssign): Statement = {
+    val indexStackRefs = node.rhs.index.variables.intersect(stackRefs)
+    if (indexStackRefs.nonEmpty) {
+      node.lhs = stackMemory
+      node.rhs = node.rhs.copy(mem = stackMemory)
+    }
+    node
+  }
+
+}
+
 class Substituter(variables: Map[Variable, Variable] = Map(), memories: Map[Memory, Memory] = Map()) extends Visitor {
   override def visitVariable(node: Variable): Variable = variables.get(node) match {
     case Some(v: Variable) => v
@@ -340,11 +422,42 @@ class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
 
 }
 
+
+class AddCallReturnBlocks extends Visitor {
+  /**
+   * Add a dummy call return block with no statements after each call. 
+   */
+  override def visitDirectCall(node: DirectCall): Jump = {
+    val b = node.parent.parent.addBlocks(Block.afterCall(node, node.returnTarget))
+    node.returnTarget = b
+    node
+  }
+
+  override def visitIndirectCall(node: IndirectCall): Jump = {
+    // skip return nodes
+    if !(node.parent.kind.isInstanceOf[Return]) then { 
+      val b = node.parent.parent.addBlocks(Block.afterCall(node, node.returnTarget))
+      node.returnTarget = b
+    } 
+    node
+  }
+}
+
+
 class ConvertToSingleProcedureReturn extends Visitor {
   override def visitJump(node: Jump): Jump = {
     node match
       case c: IndirectCall =>
-        if c.target.name == "R30" && c.returnTarget.isEmpty && c.parent != c.parent.parent.returnBlock then GoTo(Seq(c.parent.parent.returnBlock)) else node
+        val returnBlock = node.parent.parent.returnBlock match {
+          case Some(b) => b
+          case None => {
+            val b = Block.procedureReturn(node.parent.parent)
+            node.parent.parent.returnBlock = b
+            b
+          }
+        }
+        // if we are return outside the return block then replace with a goto to the return block
+        if c.target.name == "R30" && c.returnTarget.isEmpty && !(c.parent.kind.isInstanceOf[Return]) then GoTo(Seq(returnBlock)) else node
       case _ => node
   }
 }
