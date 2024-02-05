@@ -59,6 +59,44 @@ class InterprocSteensgaardAnalysis(
     s"stack_$stackCount"
   }
 
+  def reducibleToRegion(binExpr: BinaryExpr, n: CfgCommandNode): Set[MemoryRegion] = {
+    var reducedRegions = Set.empty[MemoryRegion]
+    binExpr.arg1 match {
+      case variable: Variable =>
+        val reg = RegisterVariableWrapper(variable)
+        val ctx = RegToResult(n)
+        if (ctx.contains(reg)) {
+          ctx(reg) match {
+            case FlatEl(al) =>
+              val regions = exprToRegion(al, n)
+              evaluateExpressionWithSSA(binExpr.arg2, constantProp(n)).foreach (
+                b =>
+                  regions.foreach {
+                    case stackRegion: StackRegion =>
+                      val nextOffset = BinaryExpr(op = BVADD, arg1 = stackRegion.start, arg2 = b)
+                      evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach (
+                        b2 => reducedRegions = reducedRegions ++ exprToRegion(BinaryExpr(op = BVADD, arg1 = Register("R31", BitVecType(64)), arg2 = b2), n)
+                      )
+                    case dataRegion: DataRegion =>
+                      val nextOffset = BinaryExpr(op = BVADD, arg1 = dataRegion.start, arg2 = b)
+                      evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach(
+                        b2 => reducedRegions = reducedRegions ++ exprToRegion(b2, n)
+                      )
+                    case _ =>
+                  }
+              )
+          }
+        }
+        evaluateExpressionWithSSA(binExpr, constantProp(n)).foreach (
+          b =>
+            val region = mmm.findDataObject(b.value)
+            reducedRegions = reducedRegions ++ region
+        )
+      case _ =>
+    }
+    reducedRegions
+  }
+
   def exprToRegion(expr: Expr, n: CfgCommandNode): Set[MemoryRegion] = {
     var res = Set[MemoryRegion]()
     mmm.popContext()
@@ -73,6 +111,9 @@ class InterprocSteensgaardAnalysis(
             }
         }
         res
+      case binaryExpr: BinaryExpr =>
+        res = res ++ reducibleToRegion(binaryExpr, n)
+        res
       case _ =>
         evaluateExpressionWithSSA(expr, constantProp(n)).foreach {
           case b: BitVecLiteral =>
@@ -82,7 +123,7 @@ class InterprocSteensgaardAnalysis(
               res = res + region.get
             }
         }
-        if (res.isEmpty && expr.isInstanceOf[Variable]) {
+        if (res.isEmpty && expr.isInstanceOf[Variable]) { // may be passed as param
           val ctx = RegToResult(n)
           if (ctx.contains(RegisterVariableWrapper(expr.asInstanceOf[Variable]))) {
             ctx(RegisterVariableWrapper(expr.asInstanceOf[Variable])) match {
@@ -90,6 +131,9 @@ class InterprocSteensgaardAnalysis(
                 al match
                   case load: MemoryLoad => // treat as a region
                     res = res ++ exprToRegion(load.index, n)
+                  case binaryExpr: BinaryExpr =>
+                    res = res ++ reducibleToRegion(binaryExpr, n)
+                    res = res ++ exprToRegion(al, n)
                   case _ => // also treat as a region (for now) even if just Base + Offset without memLoad
                     res = res ++ exprToRegion(al, n)
             }
@@ -221,7 +265,7 @@ class InterprocSteensgaardAnalysis(
               x =>
                 unify(exprToStTerm(x), PointerRef(alpha))
                 x.content.addAll(X2)
-                x.content.addAll(possibleRegions)
+                x.content.addAll(possibleRegions.filter(r => r != x))
             )
             X2.foreach(
               x => unify(alpha, exprToStTerm(x))

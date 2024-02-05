@@ -164,7 +164,6 @@ trait ConstantPropagationWithSSA(val cfg: ProgramCfg) {
           // assignments
           case la: LocalAssign =>
             if (s.contains(RegisterVariableWrapper(la.lhs))) {
-                println("Contains")
                 s + (RegisterVariableWrapper(la.lhs) -> s(RegisterVariableWrapper(la.lhs)).union(eval(la.rhs, s)))
             } else {
               s + (RegisterVariableWrapper(la.lhs) -> eval(la.rhs, s))
@@ -302,6 +301,44 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
   val registerToRegions: mutable.Map[RegisterVariableWrapper, mutable.Set[MemoryRegion]] = mutable.Map()
   val procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]] = mutable.Map()
 
+  def reducibleToRegion(binExpr: BinaryExpr, n: CfgCommandNode): Set[MemoryRegion] = {
+    var reducedRegions = Set.empty[MemoryRegion]
+    binExpr.arg1 match {
+      case variable: Variable =>
+        val reg = RegisterVariableWrapper(variable)
+        val ctx = RegToResult(n)
+        if (ctx.contains(reg)) {
+          ctx(reg) match {
+            case FlatEl(al) =>
+              val regions = eval(al, Set.empty, n)
+              evaluateExpression(binExpr.arg2, constantProp(n)) match {
+                case Some(b: BitVecLiteral) =>
+                  regions.foreach {
+                    case stackRegion: StackRegion =>
+                      val nextOffset = BinaryExpr(op = BVADD, arg1 = stackRegion.start, arg2 = b)
+                      evaluateExpression(nextOffset, constantProp(n)) match {
+                        case Some(b2: BitVecLiteral) =>
+                          reducedRegions = reducedRegions + poolMaster(b2, n.parent.data)
+                        case None =>
+                      }
+                    case dataRegion: DataRegion =>
+                      val nextOffset = BinaryExpr(op = BVADD, arg1 = dataRegion.start, arg2 = b)
+                      evaluateExpression(nextOffset, constantProp(n)) match {
+                        case Some(b2: BitVecLiteral) =>
+                          reducedRegions = reducedRegions + poolMaster(b2, n.parent.data)
+                        case None =>
+                      }
+                    case _ =>
+                  }
+                case None =>
+              }
+          }
+        }
+      case _ =>
+    }
+    reducedRegions
+  }
+
   def eval(exp: Expr, env: Set[MemoryRegion], n: CfgCommandNode): Set[MemoryRegion] = {
     Logger.debug(s"evaluating $exp")
     Logger.debug(s"env: $env")
@@ -313,6 +350,8 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
             case Some(b: BitVecLiteral) => Set(poolMaster(b, n.parent.data))
             case None => env
           }
+        } else if (reducibleToRegion(binOp, n).nonEmpty) {
+          reducibleToRegion(binOp, n)
         } else {
           evaluateExpression(binOp, constantProp(n)) match {
             case Some(b: BitVecLiteral) => eval(b, env, n)

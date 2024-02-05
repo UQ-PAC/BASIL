@@ -85,6 +85,9 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariabl
             case BVASHR => apply(BitVectorEval.smt_bvashr, lhs, rhs)
             case BVCOMP => apply(BitVectorEval.smt_bvcomp, lhs, rhs)
             case BVCONCAT => apply(BitVectorEval.smt_concat, lhs, rhs)
+            case BVLSHR => apply(BitVectorEval.smt_bvlshr, lhs, rhs)
+            case BVSHL => apply(BitVectorEval.smt_bvshl, lhs, rhs)
+            case BVOR => apply(BitVectorEval.smt_bvor, lhs, rhs)
             case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
           }
       }
