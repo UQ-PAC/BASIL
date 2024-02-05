@@ -16,7 +16,7 @@ object Main {
 
   @main(name = "BASIL")
   case class Config(
-      @arg(name = "input", short = 'i', doc = "BAP .adt file or Gtirb/ASLi .gts file")
+      @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
       inputFileName: String,
       @arg(name = "relf", short = 'r', doc = "Name of the file containing the output of 'readelf -s -r -W'.")
       relfFileName: String,

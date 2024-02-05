@@ -80,7 +80,7 @@ object RunUtils {
 
     val parserMap = semantics.map(_.map((k: String, v: Array[Array[String]]) => (k, v.map(_.map(parse_insn)))))
 
-    val GtirbConverter = GtirbToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
+    val GtirbConverter = GTIRBToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
     GtirbConverter.createIR()
   }
 
