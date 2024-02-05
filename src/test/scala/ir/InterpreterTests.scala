@@ -18,17 +18,16 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
 
     val loading = ILLoadingConfig(
-      adtFile = s"examples/$name/$name.adt",
+      inputFile = s"examples/$name/$name.adt",
       relfFile = s"examples/$name/$name.relf",
       specFile = None,
-      dumpIL = None,
-      mainProcedureName = "main",
+      dumpIL = None
     )
 
+    val bapProgram = loadBAP(loading.inputFile)
     val (externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)
-    var IRProgram = loadBAP(loading.adtFile, mainAddress)
-    // val IRTranslator = BAPToIR(bapProgram, mainAddress)
-    // var IRProgram = IRTranslator.translate
+    val IRTranslator = BAPToIR(bapProgram, mainAddress)
+    var IRProgram = IRTranslator.translate
     IRProgram = ExternalRemover(externalFunctions.map(e => e.name)).visitProgram(IRProgram)
     IRProgram = Renamer(Set("free")).visitProgram(IRProgram)
     IRProgram.stripUnreachableFunctions()

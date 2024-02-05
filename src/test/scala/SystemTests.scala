@@ -34,7 +34,7 @@ class SystemTests extends AnyFunSuite {
     val variations = getSubdirectories(path)
     variations.foreach(t =>
       test("correct/" + p + "/" + t) {
-        runTest(correctPath, p, t, true)
+        runTest(correctPath, p, t, true, true)
       }
     )
   }
@@ -44,7 +44,7 @@ class SystemTests extends AnyFunSuite {
     val variations = getSubdirectories(path)
     variations.foreach(t =>
       test("incorrect/" + p + "/" + t) {
-        runTest(incorrectPath, p, t, false)
+        runTest(incorrectPath, p, t, false, true)
       }
     )
   }
@@ -72,18 +72,17 @@ class SystemTests extends AnyFunSuite {
     log(summaryHeader + System.lineSeparator() + summaryRow, testPath + "summary.csv")
   }
 
-
-  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean): Unit= {
+  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean): Unit= {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
     val outPath = variationPath + ".bpl"
-        val ADTPath = variationPath + ".gts"
+    val inputPath = if useADT then variationPath + ".adt" else variationPath + ".gts"
     val RELFPath = variationPath + ".relf"
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")
 
-    val args = mutable.ArrayBuffer("--adt", ADTPath, "--relf", RELFPath, "--output", outPath)
+    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath)
     if (File(specPath).exists) args ++= Seq("--spec", specPath)
 
     Main.main(args.toArray)

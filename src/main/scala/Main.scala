@@ -16,8 +16,8 @@ object Main {
 
   @main(name = "BASIL")
   case class Config(
-      @arg(name = "adt", short = 'a', doc = "BAP ADT file name.")
-      adtFileName: String,
+      @arg(name = "input", short = 'i', doc = "BAP .adt file or Gtirb/ASLi .gts file")
+      inputFileName: String,
       @arg(name = "relf", short = 'r', doc = "Name of the file containing the output of 'readelf -s -r -W'.")
       relfFileName: String,
       @arg(name = "spec", short = 's', doc = "BASIL specification file.")
@@ -67,7 +67,7 @@ object Main {
     }
 
     val q = BASILConfig(
-      loading = ILLoadingConfig(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth),
+      loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth),
       runInterpret = conf.interpret.value,
       staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot)) else None,
       boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect),

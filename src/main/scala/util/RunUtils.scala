@@ -50,39 +50,38 @@ object RunUtils {
     // val tokens = CommonTokenStream(ADTLexer)
     // val parser = BAP_ADTParser(tokens)
 
-    // parser.setBuildParseTree(true)
+    parser.setBuildParseTree(true)
 
-    // BAPLoader.visitProject(parser.project())
+    BAPLoader.visitProject(parser.project())
+  }
 
-
-    // GTIRB LOGIC
-    var fIn = new FileInputStream(fileName)
+  def loadGtirb(fileName: String, mainAddress: Int): Program = {
+    val fIn = FileInputStream(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
     val cfg = ir.cfg.get
 
-    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]]);
+    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]])
 
-    def parse_insn (f: String) : StmtContext = {
+    def parse_insn(f: String): StmtContext = {
       try {
         val semanticsLexer = SemanticsLexer(CharStreams.fromString(f))
         val tokens = CommonTokenStream(semanticsLexer)
         val parser = SemanticsParser(tokens)
-        parser.setErrorHandler(new BailErrorStrategy())
-        parser.setBuildParseTree(true)     
-        return parser.stmt()
+        parser.setErrorHandler(BailErrorStrategy())
+        parser.setBuildParseTree(true)
+        parser.stmt()
       } catch {
         case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
-          println(f)
-          throw new RuntimeException(e)
+          Logger.error(f)
+          throw RuntimeException(e)
       }
     }
 
-    val parserMap = semantics.map(_.map(((k: String,v: Array[Array[String]]) => (k, v.map(_.map(parse_insn(_)))))))
+    val parserMap = semantics.map(_.map((k: String, v: Array[Array[String]]) => (k, v.map(_.map(parse_insn)))))
 
-    val GtirbConverter = new GtirbToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
-    val program = GtirbConverter.createIR()
-    return program
+    val GtirbConverter = GtirbToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
+    GtirbConverter.createIR()
   }
 
   def loadReadELF(fileName: String, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
@@ -116,21 +115,20 @@ object RunUtils {
   }
 
   def loadAndTranslate(q: BASILConfig): BProgram = {
-
     /** Loading phase
       */
+    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading)
 
+    var IRProgram: Program = if (q.loading.inputFile.endsWith(".adt")) {
+      val bapProgram = loadBAP(q.loading.inputFile)
+      val IRTranslator = BAPToIR(bapProgram, mainAddress)
+      IRTranslator.translate
+    } else if (q.loading.inputFile.endsWith(".gts")) {
+      loadGtirb(q.loading.inputFile, mainAddress)
+    } else {
+      throw Exception(s"input file name ${q.loading.inputFile} must be an .adt or .gst file")
+    }
 
-    // GTIRB LOGIC
-    val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading) 
-    var IRProgram = loadBAP(q.loading.adtFile, mainAddress) 
-    
-    // // BAP LOGIC
-    // val bapProgram = loadBAP(q.loading.adtFile, 12121) 
-    // val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading)
-    // val IRTranslator = BAPToIR(bapProgram, mainAddress)
-    // var IRProgram = IRTranslator.translate
-  
     val specification = loadSpecification(q.loading.specFile, IRProgram, globals)
 
     /** Analysis Phase
