@@ -125,25 +125,24 @@ object IntraProcBlockIRCursor extends IntraProcBlockIRCursor
 trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
 
   final def succ(pos: CFGPosition): Set[CFGPosition] = {
-    IntraProcIRCursor.succ(pos) ++ (pos match
+    pos match
       case c: DirectCall   => Set(c.target)
       case c: IndirectCall =>  c.parent.kind match
         case Return(proc) =>
           proc.incomingCalls().flatMap(_.returnTarget).toSet
         case _ => Set()
-      case _ => Set()
-      )
+      case _ => IntraProcIRCursor.succ(pos)
   }
+
   final def pred(pos: CFGPosition): Set[CFGPosition] = {
-    IntraProcIRCursor.pred(pos) ++ (pos match
+    pos match
       case c: Procedure       => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
       case b: Block =>
         b.kind match {
           case CallReturn(DirectCall(target, returnTarget, _)) => target.returnBlock.map(_.jump).toSet
           case _ => Set()
         }
-      case _ => Set()
-    )
+      case _ => IntraProcIRCursor.pred(pos)
   }
 }
 
