@@ -46,7 +46,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
     statements.to(ArrayBuffer)
   }
 
-  def visitAssignment_stmt(ctx: Assignment_stmtContext): Option[LocalAssign] = {
+  def visitAssignment_stmt(ctx: Assignment_stmtContext): Option[Statement] = {
     ctx match
       case a: AssignContext => return Option(visitAssign(a))
         
@@ -55,6 +55,13 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
       case v: VarDeclContext => return Option(visitVarDecl(v))
 
       case v: VarDeclsNoInitContext => return visitVarDeclsNoInit(v)
+
+      case a: AssertContext => return Option(visitAssert(a))
+  }
+
+  override def visitAssert(ctx: AssertContext): Assert = {
+    val expr = visitExpr(ctx.expr)
+    return Assert(expr)
   }
 
   
@@ -69,8 +76,6 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
   }
 
   override def visitConditional_stmt(ctx: Conditional_stmtContext): TempIf = {
-
-
     val totalStmts = ArrayBuffer.newBuilder[ArrayBuffer[Statement]]
     val conds = ArrayBuffer.newBuilder[Expr]
     
@@ -93,20 +98,21 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
     }
 
     val elseBranch = prevContext.else_stmt()
-    if (elseBranch != null) {
-      
-
-      val elseStmt = elseBranch.stmt() match {
-        case a if (a.assignment_stmt() != null) =>
-          visitAssignment_stmt(a.assignment_stmt())
-        case c if (c.call_stmt() != null) =>
-          Option(visitCall_stmt(c.call_stmt()))
-        case _ => None 
-      }
+    if (!elseBranch.isEmpty) {
+    
+      val elseStmt: ArrayBuffer[Statement] = elseBranch.asScala.flatMap { elem =>
+           elem.stmt() match {
+            case a if (a.assignment_stmt() != null) =>
+            visitAssignment_stmt(a.assignment_stmt())
+          case c if (c.call_stmt() != null) =>
+            Option(visitCall_stmt(c.call_stmt()))
+          case _ => None 
+        }
+      }.to(ArrayBuffer)
       return TempIf(true, conds.result(), totalStmts.result(), elseStmt)
 
     } else {
-      return TempIf(false, conds.result(), totalStmts.result())
+      return TempIf(false, conds.result(), totalStmts.result(), ArrayBuffer[Statement]())
     }
 
   }
@@ -145,9 +151,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
     val ty = visitType(ctx.`type`())
     val name = ctx.METHOD().getText()
 
-    if (name.startsWith("Cse")) {
-      cseMap += (name -> ty)
-    }
+    cseMap += (name -> ty)
 
     val expr = visitExpr(ctx.expr())
     if (expr != null) {
@@ -208,16 +212,32 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
   def fix_size(expr1: Expr, expr2: Expr): Expr = {
 
     val size1 = expr1  match {
-      case e: Extract => e.body.asInstanceOf[Register].irType.asInstanceOf[BitVecType].size
+      case e: Extract => e.end - e.start
       case r: Register => r.irType.asInstanceOf[BitVecType].size
       case b: BitVecLiteral => b.size
+      case z: ZeroExtend => 
+        val innerSize = z.body match { 
+          case e: Extract => e.end - e.start
+          case r: Register => r.irType.asInstanceOf[BitVecType].size
+          case b: BitVecLiteral => b.size
+          case _ => ???
+        } 
+        innerSize + z.extension
       case _ => ???
     }
 
     val size2 = expr2 match {
-      case e: Extract => e.body.asInstanceOf[Register].irType.asInstanceOf[BitVecType].size
+      case e: Extract => e.end - e.start
       case r: Register => r.irType.asInstanceOf[BitVecType].size
       case b: BitVecLiteral => b.size
+      case z: ZeroExtend => 
+        val innerSize = z.body match { 
+          case e: Extract => e.end - e.start
+          case r: Register => r.irType.asInstanceOf[BitVecType].size
+          case b: BitVecLiteral => b.size
+          case _ => ???
+        } 
+        innerSize + z.extension
       case _ => ???
     } 
 
@@ -263,7 +283,10 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
       case "sub_bits"    => return BinaryExpr(BVSUB, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
       case "mul_bits"    => return BinaryExpr(BVMUL, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))  
       case "sdiv_bits"   => return BinaryExpr(BVSDIV, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1))) 
-      case "lsl_bits"    => return ??? //  can't find logical shift left binop?
+      case "lsl_bits"    => 
+        val expr1 = visitExpr(ctx.expr(0)) 
+        val expr2 = fix_size(expr1, visitExpr(ctx.expr(1)))
+        return BinaryExpr(BVSHL, expr1, expr2)  // need to fix size here?
       case "lsr_bits"    =>
         val expr1 = visitExpr(ctx.expr(0)) 
         val expr2 = fix_size(expr1, visitExpr(ctx.expr(1)))
@@ -413,7 +436,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
 
   def createExprVar(name: String): Expr = {
     name match
-      case n if n.startsWith("Cse") => return LocalVar(n.dropRight(3) + "_" + blkCount + instructionCount, cseMap.get(n).get)
+      case n if cseMap.contains(n)  => return LocalVar(n.dropRight(3) + "_" + blkCount + instructionCount, cseMap.get(n).get)
       case v if varMap.contains(v)  => return LocalVar(v + "_" + blkCount + instructionCount, varMap.get(v).get) 
       case "TRUE"                   => return TrueLiteral
       case "FALSE"                  => return FalseLiteral
@@ -425,6 +448,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: Map[String, Array[Array
         ) // "_PC" flag, useful for jumps later on
       case "__BranchTaken" => null
       case "BTypeNext" => null
+      case "BTypeCompatible" => null
   }
 
   def createExprVarArray(v: ArrayBuffer[String]): Variable = {

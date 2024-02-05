@@ -22,6 +22,7 @@ import specification.*
 import Parsers.*
 import Parsers.SemanticsParser.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
+import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
@@ -63,11 +64,18 @@ object RunUtils {
     val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]]);
 
     def parse_insn (f: String) : StmtContext = {
-      val semanticsLexer = SemanticsLexer(CharStreams.fromString(f))
-      val tokens = CommonTokenStream(semanticsLexer)
-      val parser = SemanticsParser(tokens)
-      parser.setBuildParseTree(true)
-      return parser.stmt()
+      try {
+        val semanticsLexer = SemanticsLexer(CharStreams.fromString(f))
+        val tokens = CommonTokenStream(semanticsLexer)
+        val parser = SemanticsParser(tokens)
+        parser.setErrorHandler(new BailErrorStrategy())
+        parser.setBuildParseTree(true)     
+        return parser.stmt()
+      } catch {
+        case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
+          println(f)
+          throw new RuntimeException(e)
+      }
     }
 
     val parserMap = semantics.map(_.map(((k: String,v: Array[Array[String]]) => (k, v.map(_.map(parse_insn(_)))))))

@@ -33,10 +33,10 @@ import intrusivelist.{IntrusiveList, IntrusiveListElement}
 *
 */ 
 class TempIf(val isLongIf: Boolean, val conds: ArrayBuffer[Expr], val stmts: ArrayBuffer[ArrayBuffer[Statement]], 
-              val elseStatement: Option[Statement] = None, override val label: Option[String] = None) extends Assert(conds.head) {}
+              val elseStatement: ArrayBuffer[Statement], override val label: Option[String] = None) extends Assert(conds.head) {}
 
 object TempIf {
-  def unapply(tempIf: TempIf): Option[(Boolean, ArrayBuffer[Expr], ArrayBuffer[ArrayBuffer[Statement]], Option[Statement], Option[String])] = {
+  def unapply(tempIf: TempIf): Option[(Boolean, ArrayBuffer[Expr], ArrayBuffer[ArrayBuffer[Statement]], ArrayBuffer[Statement], Option[String])] = {
     Some((tempIf.isLongIf, tempIf.conds, tempIf.stmts, tempIf.elseStatement, tempIf.label))
   }
 }
@@ -251,7 +251,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
     
     blks ++= funcblks
 
-
+    extraBlkCount = 2
     blks = blks.flatMap(handle_long_if)
 
     return blks.flatMap(handle_unlifted_indirects)
@@ -354,7 +354,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
   */
   def handle_long_if(blk: Block): ArrayBuffer[Block] = { 
 
-    val create_TempIf: Expr => TempIf = conds => TempIf(false, ArrayBuffer(conds), ArrayBuffer[ArrayBuffer[Statement]]())
+    val create_TempIf: Expr => TempIf = conds => TempIf(false, ArrayBuffer(conds), ArrayBuffer[ArrayBuffer[Statement]](), ArrayBuffer[Statement]())
 
     val create_endEdge: (String, String) => proto.CFG.Edge = (uuid, endUuid) =>  
         proto.CFG.Edge(get_ByteString(uuid), get_ByteString(endUuid), Option(proto.CFG.EdgeLabel(false, true, proto.CFG.EdgeType.Type_Fallthrough)))
@@ -364,7 +364,6 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
     while (block.statements.exists {elem =>  elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}) {
       extraBlkCount += 1
-      
       // Split Blk in two and remove IfStmt
       val ifStmt = block.statements.find {elem => elem.isInstanceOf[TempIf] && elem.asInstanceOf[TempIf].isLongIf}.get.asInstanceOf[TempIf]
 
@@ -372,7 +371,6 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
       val startStmts = block.statements
       startStmts.remove(ifStmt)
       startStmts.append(create_TempIf(ifStmt.conds.remove(0)))
-
 
       val startBlk = Block(block.label, block.address, startStmts)
       val endBlk = Block(get_blkLabel(block.label, extraBlkCount), block.address, endStmts)
@@ -382,6 +380,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
       blkMap(get_ByteString(startBlk.label)) = startBlk
       blkMap += (get_ByteString(endBlk.label) -> endBlk)
 
+      
       // falseBlock creation
       val tempFalseBlks: ArrayBuffer[Block] = ifStmt.conds.map { stmts => 
         val label = get_blkLabel(block.label, extraBlkCount)
@@ -389,13 +388,11 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
         extraBlkCount += 1 
         falseBlock
       }
-      
 
       // trueBlock creation
       val trueBlks: ArrayBuffer[Block] = ifStmt.stmts.map { stmts =>
         val label = get_blkLabel(block.label, extraBlkCount)
         val trueBlock = Block(label, block.address, stmts)
-
         val edge = create_endEdge(label, endBlk.label)
         edgeMap += (label -> ArrayBuffer(edge))
         blkMap += (get_ByteString(label) -> trueBlock)
@@ -405,10 +402,9 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
       // Adds Else to FalseBlocks
       val label = get_blkLabel(block.label, extraBlkCount)
-      val elseBlk = Block(label, block.address, ArrayBuffer(ifStmt.elseStatement.get))
-
+      val elseBlk = Block(label, block.address, ifStmt.elseStatement)
       val edge = create_endEdge(label, endBlk.label)
-      edgeMap += (label -> ArrayBuffer(edge))
+      edgeMap += (elseBlk.label -> ArrayBuffer(edge))
       blkMap += (get_ByteString(elseBlk.label) -> elseBlk)
       val falseBlks = (startBlk +: tempFalseBlks.toList).to(ArrayBuffer) += elseBlk
       extraBlkCount += 1
@@ -479,7 +475,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
   // Ditto above, but handles the case where a block has more than one outgoing edge 
   def multiJump(procedures: ArrayBuffer[Procedure], block: Block, edges: ArrayBuffer[proto.CFG.Edge], 
-                entries: List[ByteString], ifStmt: Statement): Either[Jump, ArrayBuffer[Block]] = {
+                entries: List[ByteString]): Either[Jump, ArrayBuffer[Block]] = {
    
     val types = edges.map(_.label.get.`type`)
 
@@ -510,6 +506,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
 
       case (false, true, _) => //If statement, need to create TRUE and FALSE blocks that contain asserts
         val blks = ArrayBuffer[Block]()
+        val ifStmt = block.statements.lastElem.get
         val cond: Statement = Assume(ifStmt.asInstanceOf[TempIf].conds(0), checkSecurity=true)
         val notCond = Assume(UnaryExpr(BoolNOT, ifStmt.asInstanceOf[TempIf].conds(0)), checkSecurity=true) // Inverted Condition
         edges.foreach { elem => 
@@ -550,7 +547,7 @@ class GtirbToIR (mods: Seq[com.grammatech.gtirb.proto.Module.Module], parserMap:
           val edges = edgeMap(b.label)
 
           if (edges.size > 1) {
-            multiJump(cpy, b, edges, entries, b.statements(b.statements.size - 1)) match {
+            multiJump(cpy, b, edges, entries) match {
               case Left(jump) =>
                 b.replaceJump(jump)
               case Right(blks) =>
