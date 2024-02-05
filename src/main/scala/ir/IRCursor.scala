@@ -60,8 +60,8 @@ trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
       case j: Jump =>
         j match {
           case n: GoTo         => n.targets.asInstanceOf[Set[CFGPosition]]
-          case c: DirectCall   => c.returnTarget.toSet
-          case i: IndirectCall => i.returnTarget.toSet
+          case c: DirectCall   => c.afterCall.toSet
+          case i: IndirectCall => i.afterCall.toSet
         }
     }
   }
@@ -129,7 +129,7 @@ trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
       case c: DirectCall   => Set(c.target)
       case c: IndirectCall =>  c.parent.kind match
         case Return(proc) =>
-          proc.incomingCalls().flatMap(_.returnTarget).toSet
+          proc.incomingCalls().flatMap(_.afterCall).toSet
         case _ => Set()
       case _ => IntraProcIRCursor.succ(pos)
   }
@@ -139,8 +139,8 @@ trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
       case c: Procedure       => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
       case b: Block =>
         b.kind match {
-          case AfterCall(DirectCall(target, returnTarget, _)) => target.returnBlock.map(_.jump).toSet
-          case _ => Set()
+          case AfterCall(DirectCall(target, afterCall, _)) => target.returnBlock.map(_.jump).toSet
+          case _ => IntraProcIRCursor.pred(pos)
         }
       case _ => IntraProcIRCursor.pred(pos)
   }
