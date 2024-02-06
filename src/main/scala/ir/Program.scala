@@ -238,8 +238,12 @@ class Procedure private (
     if (oldBlock ne block) {
       val isEntry: Boolean = entryBlock.contains(oldBlock)
       val isReturn: Boolean = returnBlock.contains(oldBlock)
-      removeBlocks(oldBlock)
+      val incoming = oldBlock.incomingJumps
+      removeBlocksDisconnect(oldBlock)
       addBlocks(block)
+      for (elem <- incoming) {
+        elem.addTarget(block)
+      }
       if isEntry then entryBlock = block
       if isReturn then returnBlock = block
     }

@@ -1,15 +1,25 @@
 package ir
 
 import scala.collection.mutable
-import scala.collection.immutable._
+import scala.collection.immutable.*
 import org.scalatest.funsuite.AnyFunSuite
 import intrusivelist.{IntrusiveList, IntrusiveListElement}
+import ir.IRDSL.R0
 
 
 class IRTest extends AnyFunSuite {
 
 
   import IRDSL._
+
+  extension (p: Program)
+    def procs: Map[String, Procedure] = p.collect {
+      case b: Procedure => b.name -> b
+    }.toMap
+
+    def blocks: Map[String, Block] = p.collect {
+      case b: Block => b.label -> b
+    }.toMap
 
   def getProg(): Program = {
     prog(
@@ -182,6 +192,146 @@ class IRTest extends AnyFunSuite {
 
     assert(afterCalls.forall(b => IntraProcBlockIRCursor.pred(b).contains(blocks("l_main_1"))))
 
+  }
+
+
+  test("addblocks") {
+
+    val p = prog(
+      proc("main",
+        block("lmain",
+          goto("lmain1")
+        ),
+        block("lmain1",
+          goto("lmain2")),
+        block("lmain2",
+          ret)
+      )
+    )
+
+
+    val b2 = block("newblock2",
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      goto("lmain2")
+    ).resolve(p)
+    val b1 = block("newblock1",
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      goto("lmain2")
+    ).resolve(p)
+
+    p.procedures.head.addBlocks(Seq(b1, b2))
+
+    val blocks = p.collect {
+      case b: Block => b.label -> b
+    }.toMap
+
+    assert(p.toSet.contains(b1))
+    assert(p.toSet.contains(b2))
+    assert(blocks("lmain2").incomingJumps.contains(b1.jump.asInstanceOf[GoTo]))
+    assert(blocks("lmain2").incomingJumps.contains(b2.jump.asInstanceOf[GoTo]))
+
+
+  }
+
+  test("addblocks empty proc") {
+
+    val p = prog(
+      proc("main",
+        block("lmain",
+          goto("lmain1")
+        ),
+        block("lmain1",
+          goto("lmain2")),
+        block("lmain2",
+          ret)
+      ),
+      proc("called")
+    )
+
+
+    val b1= block("newblock2",
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      call("main", None)
+    ).resolve(p)
+    val b2 = block("newblock1",
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      LocalAssign(R0, bv64(22)),
+      ret
+    ).resolve(p)
+
+
+
+    assert(p.mainProcedure eq p.procedures.find(_.name == "main").get)
+    val called = p.procedures.find(_.name == "called").get
+    called.addBlocks(b1)
+    called.addBlocks(b2)
+
+    assert(called.blocks.size == 2)
+    assert(called.entryBlock.contains(b1))
+    assert(called.returnBlock.isEmpty)
+
+    def blocks = p.collect {
+      case b: Block => b.label -> b
+    }.toMap
+
+    assert(called.incomingCalls().isEmpty)
+    val b3 = block("newblock3",
+      LocalAssign(R0, bv64(22)),
+      call("called", None)
+    ).resolve(p)
+
+    assert(b3.calls.toSet == Set(p.procs("called")))
+    val oldb = blocks("lmain2")
+    p.mainProcedure.replaceBlock(blocks("lmain2"), b3)
+
+    assert(p.mainProcedure.calls.toSet == Set(p.procs("called")))
+    assert(p.mainProcedure.calls.forall(_.callers().exists(_ == p.mainProcedure)))
+    assert(!oldb.hasParent)
+    assert(oldb.incomingJumps.isEmpty)
+    assert(!blocks("lmain").jump.asInstanceOf[GoTo].targets.contains(oldb))
+    assert(called.incomingCalls().toSet == Set(b3.jump))
+    assert(called.incomingCalls().map(_.parent.parent).toSet == called.callers().toSet)
+    val olds = blocks.size
+    p.mainProcedure.replaceBlock(b3, b3)
+    assert(called.incomingCalls().toSet == Set(b3.jump))
+    assert(olds == blocks.size)
+    p.mainProcedure.addBlocks(block("test", ret).resolve(p))
+    assert(olds != blocks.size)
+
+    p.mainProcedure.replaceBlocks(Set(block("test", ret).resolve(p)))
+    assert(blocks.count(_._2.parent.name == "main") == 1)
+
+  }
+
+  test("clearblocks") {
+    val p = prog(
+        proc("main",
+          block("l_main",
+            LocalAssign(R0, bv64(10)),
+            LocalAssign(R1, bv64(10)),
+            goto("returntarget")
+          ),
+          block("returntarget",
+            ret
+          )
+        ),
+      )
+
+    assert(p.blocks.size > 1)
+    assert(p.procs("main").entryBlock.isDefined)
+    p.procs("main").returnBlock = block("retb", ret).resolve(p)
+    assert(p.procs("main").returnBlock.isDefined)
+    p.procs("main").clearBlocks()
+    assert(p.blocks.isEmpty)
+    assert(p.procs("main").entryBlock.isEmpty)
+    assert(p.procs("main").returnBlock.isEmpty)
   }
 
 
