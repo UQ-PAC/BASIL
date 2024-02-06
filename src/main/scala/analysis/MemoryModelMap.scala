@@ -49,6 +49,16 @@ class MemoryModelMap {
     }
   }
 
+  /**
+   * For DataRegions, the address used needs to be converted to the actual address.
+   * This is because when regions are found, the actual address is used and as such match
+   * the correct range.
+   *
+   * @param name
+   * @param address
+   * @param globalOffsets
+   * @return DataRegion: a DataRegion representing the actual address
+   */
   def resolveInverseGlobalOffset(name: String, address: BitVecLiteral, globalOffsets: Map[BigInt, BigInt]): DataRegion = {
     val inverseGlobalOffsets = globalOffsets.map(_.swap)
     var tableAddress = inverseGlobalOffsets.getOrElse(address.value, address.value)

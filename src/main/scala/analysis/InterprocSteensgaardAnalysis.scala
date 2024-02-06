@@ -54,11 +54,23 @@ class InterprocSteensgaardAnalysis(
     s"malloc_$mallocCount"
   }
 
-  private def nextStackCount() = {
-    stackCount += 1
-    s"stack_$stackCount"
-  }
-
+  /**
+   * Used to reduce an expression that may be a sub-region of a memory region.
+   * Pointer reduction example:
+   * 1) R2 = R31 + 20         <- ie. stack access (R31 = stackPointer)
+   *         ↓
+   *    R2 = StackRegion("stack_1", 20)
+   *
+   * 2) Mem[R2 + 8] <- R1     <- ie. memStore
+   *         ↓
+   *    (StackRegion("stack_1", 20) + 8) <- R1
+   *         ↓
+   *    MMM.get(20 + 8) <- R1
+   *
+   * @param binExpr
+   * @param n
+   * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
+   */
   def reducibleToRegion(binExpr: BinaryExpr, n: CfgCommandNode): Set[MemoryRegion] = {
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
@@ -102,6 +114,13 @@ class InterprocSteensgaardAnalysis(
     reducedRegions
   }
 
+  /**
+   * Finds a region for a given expression using MMM results
+   *
+   * @param expr
+   * @param n
+   * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
+   */
   def exprToRegion(expr: Expr, n: CfgCommandNode): Set[MemoryRegion] = {
     var res = Set[MemoryRegion]()
     mmm.popContext()
@@ -146,25 +165,6 @@ class InterprocSteensgaardAnalysis(
         }
         res
     }
-  }
-
-  def unwrapExpr(expr: Expr): ListBuffer[Expr] = {
-    val buffers = ListBuffer[Expr]()
-    expr match {
-      case e: Extract => unwrapExpr(e.body)
-      case e: SignExtend => unwrapExpr(e.body)
-      case e: ZeroExtend => unwrapExpr(e.body)
-      case repeat: Repeat => unwrapExpr(repeat.body)
-      case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
-      case binaryExpr: BinaryExpr =>
-        unwrapExpr(binaryExpr.arg1)
-        unwrapExpr(binaryExpr.arg2)
-      case memoryLoad: MemoryLoad =>
-        buffers.addOne(memoryLoad)
-        unwrapExpr(memoryLoad.index)
-      case _ =>
-    }
-    buffers
   }
 
   def stackDetection(stmt: Statement): Unit = {

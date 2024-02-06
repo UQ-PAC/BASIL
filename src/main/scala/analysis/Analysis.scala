@@ -230,47 +230,6 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     }
   }
 
-  def unwrapExpr(expr: Expr): ListBuffer[Expr] = {
-    val buffers = ListBuffer[Expr]()
-    expr match {
-      case e: Extract => unwrapExpr(e.body)
-      case e: SignExtend => unwrapExpr(e.body)
-      case e: ZeroExtend => unwrapExpr(e.body)
-      case repeat: Repeat => unwrapExpr(repeat.body)
-      case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
-      case binaryExpr: BinaryExpr =>
-        unwrapExpr(binaryExpr.arg1)
-        unwrapExpr(binaryExpr.arg2)
-      case memoryLoad: MemoryLoad =>
-        buffers.addOne(memoryLoad)
-        unwrapExpr(memoryLoad.index)
-      case _ =>
-    }
-    buffers
-  }
-
-  def resolveGlobalOffset(address: BitVecLiteral): DataRegion = {
-    var tableAddress = globalOffsets.getOrElse(address.value, address.value)
-    // addresses may be layered as in jumptable2 example for recursive search required
-    var exitLoop = false
-    while (globalOffsets.contains(tableAddress) && !exitLoop) {
-      val newAddress = globalOffsets.getOrElse(tableAddress, tableAddress)
-      if (newAddress == tableAddress) {
-        exitLoop = true
-      } else {
-        tableAddress = newAddress
-      }
-    }
-    var name = "@ERROR"
-    if (globals.contains(tableAddress)) {
-      name = globals(tableAddress)
-    } else if (subroutines.contains(tableAddress)) {
-      name = subroutines(tableAddress)
-    }
-
-    DataRegion(name, address)
-  }
-
   def stackDetection(stmt: Statement): Unit = {
     println("Stack detection")
     println(spList)
@@ -336,23 +295,11 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                           reducedRegions = reducedRegions + poolMaster(b2, n.parent.data)
                         case None =>
                       }
-                    case dataRegion: DataRegion =>
-                      val nextOffset = BinaryExpr(op = BVADD, arg1 = dataRegion.start, arg2 = b)
-                      evaluateExpression(nextOffset, constantProp(n)) match {
-                        case Some(b2: BitVecLiteral) =>
-                          reducedRegions = reducedRegions + resolveGlobalOffset(b2)
-                        case None =>
-                      }
                     case _ =>
                   }
                 case None =>
               }
           }
-        }
-        evaluateExpression(binExpr, constantProp(n)) match {
-            case Some(b: BitVecLiteral) =>
-                reducedRegions = reducedRegions + resolveGlobalOffset(b)
-            case None =>
         }
       case _ =>
     }
@@ -378,8 +325,6 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
             case None => env
           }
         }
-      case bitVecLiteral: BitVecLiteral =>
-          Set(resolveGlobalOffset(bitVecLiteral))
       case variable: Variable =>
         variable match {
           case _: LocalVar =>
@@ -396,6 +341,9 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
         }
       case memoryLoad: MemoryLoad =>
         eval(memoryLoad.index, env, n)
+      // ignore case where it could be a global region (loaded later in MMM from relf)
+      case _: BitVecLiteral =>
+        env
       // we cannot evaluate this to a concrete value, we need VSA for this
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")

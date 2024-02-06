@@ -2,6 +2,8 @@ package analysis
 import ir.*
 import util.Logger
 
+import scala.collection.mutable.ListBuffer
+
 /** Evaluate an expression in a hope of finding a global variable.
   *
   * @param exp
@@ -116,4 +118,23 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariabl
     case _ => //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
       Set()
   }
+}
+
+def unwrapExpr(expr: Expr): ListBuffer[Expr] = {
+  val buffers = ListBuffer[Expr]()
+  expr match {
+    case e: Extract => unwrapExpr(e.body)
+    case e: SignExtend => unwrapExpr(e.body)
+    case e: ZeroExtend => unwrapExpr(e.body)
+    case repeat: Repeat => unwrapExpr(repeat.body)
+    case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
+    case binaryExpr: BinaryExpr =>
+      unwrapExpr(binaryExpr.arg1)
+      unwrapExpr(binaryExpr.arg2)
+    case memoryLoad: MemoryLoad =>
+      buffers.addOne(memoryLoad)
+      unwrapExpr(memoryLoad.index)
+    case _ =>
+  }
+  buffers
 }
