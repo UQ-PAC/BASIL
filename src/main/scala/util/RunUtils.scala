@@ -44,11 +44,10 @@ object RunUtils {
   // constants
   private val exitRegister: Variable = Register("R30", BitVecType(64))
 
-  def loadBAP(fileName: String, mainAddress: Int): BAPProgram = {
-    // // BAP LOGIC
-    // val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
-    // val tokens = CommonTokenStream(ADTLexer)
-    // val parser = BAP_ADTParser(tokens)
+  def loadBAP(fileName: String): BAPProgram = {
+    val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))
+    val tokens = CommonTokenStream(ADTLexer)
+    val parser = BAP_ADTParser(tokens)
 
     parser.setBuildParseTree(true)
 
