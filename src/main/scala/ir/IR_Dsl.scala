@@ -76,7 +76,7 @@ package object IRDSL {
 
 
   case class EventuallyBlock(label: String, sl: Seq[Statement], j: EventuallyJump) {
-    val tempBlock: Block = Block(Regular(), label, None, sl, GoTo(List.empty))
+    val tempBlock: Block = Block(label, None, sl, GoTo(List.empty))
 
     def resolve(prog: Program) = {
       tempBlock.replaceJump(j.resolve(prog))

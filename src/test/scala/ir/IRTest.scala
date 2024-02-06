@@ -151,20 +151,36 @@ class IRTest extends AnyFunSuite {
 
   test("aftercalls") {
     val p = getProg()
+
+    val blocks = p.collect {
+      case b: Block => b.label -> b
+    }.toMap
+
+
     val directcalls = p.collect {
       case c: DirectCall => c
     }
-    assert(directcalls.forall(_.afterCall.isDefined))
 
-    assert(directcalls.forall(c => IntraProcIRCursor.succ(c).contains(c.afterCall.get)))
-    assert(directcalls.forall(c => IntraProcBlockIRCursor.succ(c).contains(c.afterCall.get)))
+    assert(blocks("l_main_1").fallthrough.nonEmpty)
+    assert(p.toSet.contains(blocks("l_main_1").fallthrough.get))
+    assert(directcalls.forall(c => IntraProcIRCursor.succ(c).count(_.asInstanceOf[GoTo].isAfterCall) == 1))
+    assert(directcalls.forall(c => IntraProcBlockIRCursor.succ(c).count(_.isAfterCall) == 1))
 
     val afterCalls = p.collect {
-      case b: Block if b.kind.isInstanceOf[AfterCall] => (b, b.kind.asInstanceOf[AfterCall])
-    }
+      case b: Block if b.isAfterCall => b
+    }.toSet
 
-    assert(afterCalls.forall((b, ac) => IntraProcIRCursor.pred(b).contains(ac.from)))
-    assert(afterCalls.forall((b, ac) => IntraProcBlockIRCursor.pred(b).contains(ac.from.parent)))
+    assert(afterCalls.toSet == Set(blocks("returntarget")))
+    val aftercallGotos = p.collect {
+      case c: Jump if c.isAfterCall => c
+    }.toSet
+    assert(aftercallGotos == Set(blocks("l_main_1").fallthrough.get))
+
+
+    assert(1 == aftercallGotos.count(b => IntraProcIRCursor.pred(b).contains(blocks("l_main_1").jump)))
+    assert(1 == aftercallGotos.count(b => IntraProcIRCursor.succ(b).contains(blocks("l_main_1").fallthrough.map(_.targets.head).head)))
+
+    assert(afterCalls.forall(b => IntraProcBlockIRCursor.pred(b).contains(blocks("l_main_1"))))
 
   }
 

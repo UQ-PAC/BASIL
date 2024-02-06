@@ -422,28 +422,6 @@ class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
 
 }
 
-
-class AddCallReturnBlocks extends Visitor {
-  /**
-   * Add a dummy call return block with no statements after each call. 
-   */
-  override def visitDirectCall(node: DirectCall): Jump = {
-    val b = node.parent.parent.addBlocks(Block.afterCall(node, node.returnTarget))
-    node.returnTarget = b
-    node
-  }
-
-  override def visitIndirectCall(node: IndirectCall): Jump = {
-    // skip return nodes
-    if !(node.parent.kind.isInstanceOf[Return]) then { 
-      val b = node.parent.parent.addBlocks(Block.afterCall(node, node.returnTarget))
-      node.returnTarget = b
-    } 
-    node
-  }
-}
-
-
 class ConvertToSingleProcedureReturn extends Visitor {
   override def visitJump(node: Jump): Jump = {
     node match
@@ -457,7 +435,7 @@ class ConvertToSingleProcedureReturn extends Visitor {
           }
         }
         // if we are return outside the return block then replace with a goto to the return block
-        if c.target.name == "R30" && c.returnTarget.isEmpty && !(c.parent.kind.isInstanceOf[Return]) then GoTo(Seq(returnBlock)) else node
+        if c.target.name == "R30" && c.returnTarget.isEmpty && !c.parent.isProcReturn then GoTo(Seq(returnBlock)) else node
       case _ => node
   }
 }
