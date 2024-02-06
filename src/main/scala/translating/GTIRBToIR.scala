@@ -465,11 +465,12 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     val types = edges.map(_.label.get.`type`)
     val hasFunctionReturn = types.contains(Type_Call) && types.contains(Type_Fallthrough)
     val hasConditionalBranch = types.contains(Type_Branch) && types.contains(Type_Fallthrough)
-    val hasOverApproximation = types.contains(Type_Return) || types.contains(Type_Branch)
+    val hasResolvedCall = types.forall(_ == Type_Branch) 
+    val hasMultiReturn = types.forall(_ == Type_Return)
 
-    (hasFunctionReturn, hasConditionalBranch, hasOverApproximation) match {
+    (hasFunctionReturn, hasConditionalBranch, hasResolvedCall, hasMultiReturn) match {
 
-      case (true, false, _) => // Function return and fallthrough to next block
+      case (true, false, _, _) => // Function return and fallthrough to next block
         val callEdge = edges.find(_.label.get.`type` == Type_Call).get
         val fallEdge = edges.find(_.label.get.`type` == Type_Fallthrough).get
 
@@ -481,7 +482,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           Left(IndirectCall(get_jmp_reg(block.statements.last), Option(blkMap(fallEdge.targetUuid)), None))
         }
 
-      case (false, true, _) => // If statement, need to create TRUE and FALSE blocks that contain asserts
+      case (false, true, _, _) => // If statement, need to create TRUE and FALSE blocks that contain asserts
         val blks = ArrayBuffer[Block]()
         val ifStmt = block.statements.lastElem.get
         val cond: Statement = Assume(ifStmt.asInstanceOf[TempIf].conds(0), checkSecurity=true)
@@ -500,8 +501,12 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           }
         }
         Right(blks)
+      
+      case (_, _, true, _) => 
+        val resolvedBlocks = edges.map(elem => blkMap(elem.targetUuid))
+        Left(GoTo(resolvedBlocks))
 
-      case (_, _, true) => // Overapproximation by disassembler, created multiple return edges (see jumptable3)
+      case (_, _, _, true) => // Overapproximation by disassembler, created multiple return edges (see jumptable3)
         Left(IndirectCall(get_jmp_reg(block.statements.last), None, None))
 
       case _ => ???
