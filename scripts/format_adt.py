@@ -21,32 +21,25 @@ import argparse
 import dataclasses
 import contextlib
 
-# grep -E "'([A-Z][a-zA-Z]+)'" src/main/antlr4/BAP_ADT.g4 --only-matching --no-filename | sort | uniq | xargs printf "'%s', " | fold -w80 -s
-heads = [
-  'AND', 'Annotation', 'Arg', 'Args', 'ARSHIFT', 'Attr', 'Attrs', 'BigEndian', 
-  'Blk', 'Blks', 'Both', 'Call', 'Concat', 'Def', 'Defs', 'Direct', 'DIVIDE', 
-  'EQ', 'Extract', 'Goto', 'HIGH', 'Imm', 'In', 'Indirect', 'Int', 'Jmp', 'Jmps', 
-  'LE', 'LittleEndian', 'Load', 'LOW', 'LSHIFT', 'LT', 'Mem', 'Memmap', 'MINUS', 
-  'MOD', 'NEG', 'NEQ', 'NOT', 'OR', 'Out', 'Phi', 'Phis', 'PLUS', 'Program', 
-  'Project', 'Region', 'RSHIFT', 'SDIVIDE', 'Section', 'Sections', 'SIGNED', 
-  'SLE', 'SLT', 'SMOD', 'Store', 'Sub', 'Subs', 'Tid', 'TIMES', 'UNSIGNED', 
-  'Var', 'XOR',
-]
-heads_joined = '|'.join(heads)
-heads_joined_b = heads_joined.encode('ascii')
-
 log = logging.getLogger()
 
 notspace_re = re.compile(rb'\S')
-head_re = re.compile(rb'[^\s(]+')
+head_re = re.compile(rb'[^\s(,;)]+')
 num_re = re.compile(rb'[_0-9xa-fA-F]+')
 string_re = re.compile(rb'"(?:[^"\\]|\\.)*"')
+
+multiline_keywords = set(
+  [b'Project', b'Def', b'Goto', b'Call', b'Sub', b'Blk', b'Arg'] +
+  [b'Stmt_Assign', b'Expr_Slices', b'Stmt_If', b'Expr_TApply']
+)
 
 @dataclasses.dataclass
 class Context:
   begin: int
   closer: bytes
   multiline: bool
+  head: bytes | None = None
+  index: int = 0  # count of children in this bracketed list
 
 flip = {
   b'(': b')',
@@ -79,31 +72,45 @@ def pretty(outfile, data: bytes, spaces: int):
       assert m
       outfile.write(m[0])
       i = m.end(0)
-    elif c == b',':
-      outfile.write(b',')
+    elif c in b',;':
+      # XXX: (else stmt1 \n stmt2 ...) is not handled correctly due to significant whitespace
+      outfile.write(c)
       i += 1
       if stack[-1].multiline:
         outfile.write(b'\n')
         outfile.write(indent * depth)
       else:
         outfile.write(b' ')
-    elif c.isupper():
+      stack[-1].index += 1
+    elif c.isalpha() or c == b'_':
       m = head_re.match(data, i)
       assert m
       i = m.end(0)
       head = m[0]
       outfile.write(head)
+      if head == b'else':
+        stack[-1].multiline = True
+        depth += 1
+
+        outfile.write(b'\n')
+        outfile.write(indent * depth)
     elif c in b'([': 
       outfile.write(c)
       i += 1
       islist = c == b'[' and ']' != chr(data[i])
-      multiline = islist or head in (b'Project', b'Def', b'Goto', b'Call', b'Sub', b'Blk', b'Arg')
+      multiline = islist or head in multiline_keywords
+      if stack and stack[-1].head == b'Expr_TApply' and stack[-1].index == 1:
+        multiline = False
       if multiline:
         depth += 1
-        outfile.write(b'\n')
-        outfile.write(indent * depth)
+        if stack and stack[-1].multiline and islist:  # if we are in a multiline block, we should not insert \n immediately after [
+          outfile.write(b' ' * (spaces - 1))
+        else:
+          outfile.write(b'\n')
+          outfile.write(indent * depth)
 
-      stack.append(Context(i, flip[c], multiline))
+      stack.append(Context(i, flip[c], multiline, head))
+      head = None
     elif c in b')]':
       outfile.write(c)
       i += 1
