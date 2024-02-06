@@ -2,8 +2,10 @@
 # Run from the directory basil/src/test/*/test_case/compilation_variant/
 
 $(LIFT_ARTEFACTS): a.out
-	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
 	$(READELF) -s -r -W a.out > $(NAME).relf
+	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
+	ddisasm a.out --ir $(NAME).gtirb
+	gtirb-semantics-nix $(NAME).gtirb $(NAME).gts
 
 
 ifdef $(SPEC) 
@@ -12,7 +14,7 @@ endif
 
 # optional; create basil
 $(NAME).bpl: $(LIFT_ARTEFACTS) $(SPEC) $(BASIL)
-	java -jar $(BASIL) $(BASIL_FLAGS) --adt $(NAME).adt --relf $(NAME).relf -o $(NAME).bpl $(BASIL_SPECARG)
+	java -jar $(BASIL) $(BASIL_FLAGS) --adt $(NAME).adt --relf $(NAME).relf -o $(NAME).expected $(BASIL_SPECARG)
 
 .PHONY=$(BASIL)
 $(BASIL): 
@@ -24,7 +26,7 @@ a.out: $(C_SOURCE)
 	$(CC) $(CFLAGS) $(C_SOURCE)
 
 .PHONY=recompile verify clean cleanlift cleanall cleanbin
-verify: $(NAME)_result.txt 
+verify: $(NAME).bpl
 
 recompile: a.out
 
