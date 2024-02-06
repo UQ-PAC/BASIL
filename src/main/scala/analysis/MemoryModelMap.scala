@@ -49,9 +49,26 @@ class MemoryModelMap {
     }
   }
 
-  def convertMemoryRegions(memoryRegions: Map[CfgNode, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
+  def resolveInverseGlobalOffset(name: String, address: BitVecLiteral, globalOffsets: Map[BigInt, BigInt]): DataRegion = {
+    val inverseGlobalOffsets = globalOffsets.map(_.swap)
+    var tableAddress = inverseGlobalOffsets.getOrElse(address.value, address.value)
+    // addresses may be layered as in jumptable2 example for recursive search required
+    var exitLoop = false
+    while (inverseGlobalOffsets.contains(tableAddress) && !exitLoop) {
+      val newAddress = inverseGlobalOffsets.getOrElse(tableAddress, tableAddress)
+      if (newAddress == tableAddress) {
+        exitLoop = true
+      } else {
+        tableAddress = newAddress
+      }
+    }
+
+    DataRegion(name, BitVecLiteral(tableAddress, 64))
+  }
+
+  def convertMemoryRegions(memoryRegions: Map[CfgNode, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
-    val externalFunctionRgns = externalFunctions.map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64)))
+    val externalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(name, BitVecLiteral(offset, 64), globalOffsets))
 
     // we should collect all data regions otherwise the ordering might be wrong
     var dataRgns: Set[DataRegion] = Set.empty

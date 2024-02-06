@@ -68,7 +68,12 @@ class InterprocSteensgaardAnalysis(
         if (ctx.contains(reg)) {
           ctx(reg) match {
             case FlatEl(al) =>
-              val regions = exprToRegion(al, n)
+              val regions = al match {
+                case loadL: MemoryLoad =>
+                  exprToRegion(loadL.index, n)
+                case _ =>
+                  exprToRegion(al, n)
+              }
               evaluateExpressionWithSSA(binExpr.arg2, constantProp(n)).foreach (
                 b =>
                   regions.foreach {

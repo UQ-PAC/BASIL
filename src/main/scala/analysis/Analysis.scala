@@ -250,7 +250,17 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
   }
 
   def resolveGlobalOffset(address: BitVecLiteral): DataRegion = {
-    val tableAddress = globalOffsets.getOrElse(address.value, address.value)
+    var tableAddress = globalOffsets.getOrElse(address.value, address.value)
+    // addresses may be layered as in jumptable2 example for recursive search required
+    var exitLoop = false
+    while (globalOffsets.contains(tableAddress) && !exitLoop) {
+      val newAddress = globalOffsets.getOrElse(tableAddress, tableAddress)
+      if (newAddress == tableAddress) {
+        exitLoop = true
+      } else {
+        tableAddress = newAddress
+      }
+    }
     var name = "@ERROR"
     if (globals.contains(tableAddress)) {
       name = globals(tableAddress)
@@ -310,7 +320,12 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
         if (ctx.contains(reg)) {
           ctx(reg) match {
             case FlatEl(al) =>
-              val regions = eval(al, Set.empty, n)
+              val regions = al match {
+                case memoryLoad: MemoryLoad =>
+                    eval(memoryLoad.index, Set.empty, n)
+                case _ =>
+                    eval(al, Set.empty, n)
+              }
               evaluateExpression(binExpr.arg2, constantProp(n)) match {
                 case Some(b: BitVecLiteral) =>
                   regions.foreach {
@@ -325,7 +340,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                       val nextOffset = BinaryExpr(op = BVADD, arg1 = dataRegion.start, arg2 = b)
                       evaluateExpression(nextOffset, constantProp(n)) match {
                         case Some(b2: BitVecLiteral) =>
-                          reducedRegions = reducedRegions + poolMaster(b2, n.parent.data)
+                          reducedRegions = reducedRegions + resolveGlobalOffset(b2)
                         case None =>
                       }
                     case _ =>
@@ -333,6 +348,11 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                 case None =>
               }
           }
+        }
+        evaluateExpression(binExpr, constantProp(n)) match {
+            case Some(b: BitVecLiteral) =>
+                reducedRegions = reducedRegions + resolveGlobalOffset(b)
+            case None =>
         }
       case _ =>
     }

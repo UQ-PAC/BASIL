@@ -219,7 +219,7 @@ object RunUtils {
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
-    mmm.convertMemoryRegions(mraResult, mergedSubroutines, mraSolver.procedureToSharedRegions)
+    mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, mraSolver.procedureToSharedRegions)
 
     Logger.info("[!] Running Steensgaard")
     val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, RegToResult, mmm)
@@ -248,7 +248,7 @@ object RunUtils {
     }
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
 
-    mmm.printRegionsContent(true)
+    mmm.printRegionsContent(false)
 
     newIR
   }
