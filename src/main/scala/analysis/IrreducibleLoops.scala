@@ -1,7 +1,7 @@
 package analysis
 
-import ir.{CFGPosition, IntraProcIRCursor, Program, Procedure, Block, GoTo}
-import intrusiveList.{IntrusiveList}
+import ir.{CFGPosition, IntraProcIRCursor, Program, Procedure, Block, GoTo, Regular}
+import intrusivelist.{IntrusiveList}
 
 import scala.collection.mutable
 
@@ -287,8 +287,17 @@ class LoopTransform(loops: Set[Loop]):
       * Returns: A new reducible loop which is semantically equivalent to the input irreducible loop
       */
     def llvm_transform_loop(loop: Loop, i: Integer): Loop = {
-        val entryEdges: Set[LoopEdge] = loop.entryEdges.union(loop.reentries).toSet
+        println("ENTRY EDGES PLAIN")
+        loop.entryEdges.foreach { l => println(s"- ${l}")}
+        println("</> ENTRY EDGES PLAIN")
 
+        println("REENTRIES")
+        loop.reentries.foreach { l => println(s"- ${l}")}
+        println("</> REENTRIES")
+        val entryEdges: Set[LoopEdge] = loop.entryEdges.union(loop.reentries).union(loop.backEdges).toSet
+        println("THE ENTRY EDGES")
+        entryEdges.foreach{ e => println(s"- ${e}")}
+        println("</> THE ENTRY EDGES")
         val P_e: Set[LoopEdge] = entryEdges                                                 // N entry edges
         val P_b: Set[LoopEdge] = entryEdges.flatMap { e =>
             val predNodes = IntraProcIRCursor.pred(e.to);
@@ -306,9 +315,11 @@ class LoopTransform(loops: Set[Loop]):
         )
 
         val N: Block = Block(
+            kind = Regular(),
             label = s"N-${i}",
             address = None,
             statements = IntrusiveList(),
+            NGoTo
         )
 
         val newLoop = Loop(N);
@@ -317,20 +328,33 @@ class LoopTransform(loops: Set[Loop]):
         P_e.foreach { originalEdge => 
             val origNode = originalEdge.from;
             val origDest = originalEdge.to;
+            
+            println(s"-- For Edge ${originalEdge}")
 
             origNode match {
                 case origBlock: Block => {
+                    println("Coming from Block");
                     origBlock.replaceJump(GoTo(List(N)));
 
                     newLoop.addEdge(LoopEdge(origBlock, N));
                     newLoop.addEdge(LoopEdge(N, origDest));
                 }
                 case goto: GoTo => 
-                    // goto.removeTarget(origDest);
-                    goto.addTarget(N);
-                    
-                    newLoop.addEdge(LoopEdge(goto, N));
-                    newLoop.addEdge(LoopEdge(N, origDest));
+                    origDest match {
+                        case origDest: Block => {
+
+                            println(s"*GoTo ${goto}")
+                            println(s"    removing target: ${origDest}")
+                            println(s"    adding target: ${N}")
+
+                            goto.removeTarget(origDest);
+                            goto.addTarget(N);
+                            
+                            newLoop.addEdge(LoopEdge(goto, N));
+                            newLoop.addEdge(LoopEdge(N, origDest));
+                        }
+                        case _ =>
+                    }
                 case _ =>
                     println("[!] Unexpected loop originating node");
                     println(origNode)
@@ -361,7 +385,7 @@ class LoopTransform(loops: Set[Loop]):
             }            
         }
 
-        N.replaceJump(NGoTo);
+        // N.replaceJump(NGoTo);
 
         newLoop;
     }
