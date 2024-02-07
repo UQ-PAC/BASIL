@@ -232,7 +232,34 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   }
 
   /**
+   * Split the list into two lists, the first retains all elements up to to and including the provided element,
+   * and and returns the second list from the element until the end.
+   *
+   * @param n The element to split on, remains in the first list.
+   * @return A list containing all elements after n.
+   */
+  def splitOn(n: T): IntrusiveList[T] = {
+    require(!lastElem.contains(n))
+    require(containsRef(n))
+
+    val ne = n.next
+
+    val newlist = new IntrusiveList[T]()
+    var next = n.next
+    while (next.isDefined) {
+      remove(next.get)
+      newlist.addOne(next.get)
+
+      next = n.next
+    }
+
+    newlist
+  }
+
+
+  /**
    * Remove an element from the list.
+   *
    * @param intrusiveListElement the element to remove
    * @return The removed element
    */
@@ -328,11 +355,11 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   }
 
 object IntrusiveList {
-  def from[T <: IntrusiveListElement[T]](it: IterableOnce[T]): IntrusiveList[T] = {
-    val l = new IntrusiveList[T]()
-    l.addAll(it)
-    l
-  }
+
+  def from[T <: IntrusiveListElement[T]](it: IntrusiveList[T]): IntrusiveList[T] = it
+
+  def from[T <: IntrusiveListElement[T]](it: IterableOnce[T]): IntrusiveList[T] = IntrusiveList[T]().addAll(it)
+
   def empty[T <: IntrusiveListElement[T]]: IntrusiveList[T] = new IntrusiveList[T]()
 }
 
@@ -354,6 +381,8 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
     elem.next = Some(this.asInstanceOf[T])
     elem
   }
+
+
 
   private[intrusivelist] final def unitary: Boolean = next.isEmpty && prev.isEmpty
 
