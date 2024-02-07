@@ -1,6 +1,6 @@
 package analysis
 
-import ir.{CFGPosition, IntraProcIRCursor, Program, Procedure, Block, GoTo, Regular}
+import ir.{CFGPosition, IntraProcIRCursor, Program, Procedure, Block, GoTo}
 import intrusivelist.{IntrusiveList}
 
 import scala.collection.mutable
@@ -308,7 +308,6 @@ class LoopTransform(loops: Set[Loop]):
         )
 
         val N: Block = Block(
-            kind = Regular(),
             label = s"N-${i}",
             address = None,
             statements = IntrusiveList(),
