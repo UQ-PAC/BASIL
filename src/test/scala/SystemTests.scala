@@ -100,7 +100,7 @@ trait SystemTests extends AnyFunSuite {
         case (false, true, true) => "Expected verification success, but got failure."
       }
 
-    val expectedOutPath = if useADT then variationPath + "_bap.expected" else variationPath + "_gtirb.adt"
+    val expectedOutPath = if useADT then variationPath + ".expected" else variationPath + "_gtirb.expected"
     val hasExpected = File(expectedOutPath).exists
     var matchesExpected = true
     if (hasExpected) {
