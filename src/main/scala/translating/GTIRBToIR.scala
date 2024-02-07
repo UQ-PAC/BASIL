@@ -255,7 +255,6 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
   }
 
   def createBlock(uuid: ByteString): Block = {
-
     val address: Option[Int] = addresses.get(uuid)
     val semantics: ArrayBuffer[Statement] = createSemantics(uuid)
     val block = Block(Base64.getUrlEncoder.encodeToString(uuid.toByteArray), address, semantics) // Empty Goto implies block not connected to proc, but i think these get removed somewhere
@@ -282,10 +281,10 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
   // makes blkLabel boogie friendly 
   def convert_label(label: String): String = {
-    if (label.startsWith("l_")) {
+    if (label.startsWith("$")) {
       label
     } else {
-      "l_" + label.replace("=", "").replace("-", "")
+      "$" + label.replace("=", "").replace("-", "~").replace("/", "\'")
     }
   }
 
