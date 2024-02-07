@@ -305,6 +305,9 @@ class LoopTransform(loops: Set[Loop]):
             val incEdges = predNodes.map(a => LoopEdge(a, e.to));
             incEdges
         } -- P_e; // N back edges
+        println("BACK EDGES")
+        P_b.foreach{ e => println(s"- ${e}")} 
+        println("</> BACK EDGES")
         val body: Set[LoopEdge] = (loop.edges -- P_b).toSet     // Regular control flow in the loop
 
 
@@ -374,11 +377,20 @@ class LoopTransform(loops: Set[Loop]):
                     newLoop.addEdge(LoopEdge(N, origDest));
                     newLoop.backEdges += toEdge;
                 case goto: GoTo =>
-                    // goto.removeTarget(origDest);
-                    goto.addTarget(N);
-                    
-                    newLoop.addEdge(LoopEdge(goto, N));
-                    newLoop.addEdge(LoopEdge(N, origDest));
+                    origDest match {
+                        case origDest: Block => {
+                            goto.removeTarget(origDest)
+                            println("WE ARE HERE")
+                            println(s"GoTo: ${goto}")
+                            println(s"Orig: ${origNode}")
+                            goto.addTarget(N);
+
+                            newLoop.addEdge(LoopEdge(goto, N));
+                            newLoop.addEdge(LoopEdge(N, origDest));
+                        }
+                        case _ =>
+                            println("UNKNOWN")
+                    }
                 case _ =>
                     println("[!] Unexpected loop originating node - 2");
                     println(origNode);
