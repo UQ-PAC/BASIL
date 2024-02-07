@@ -287,17 +287,10 @@ class LoopTransform(loops: Set[Loop]):
       * Returns: A new reducible loop which is semantically equivalent to the input irreducible loop
       */
     def llvm_transform_loop(loop: Loop, i: Integer): Loop = {
-        println("ENTRY EDGES PLAIN")
         loop.entryEdges.foreach { l => println(s"- ${l}")}
-        println("</> ENTRY EDGES PLAIN")
 
-        println("REENTRIES")
-        loop.reentries.foreach { l => println(s"- ${l}")}
-        println("</> REENTRIES")
         val entryEdges: Set[LoopEdge] = loop.entryEdges.union(loop.reentries).union(loop.backEdges).toSet
-        println("THE ENTRY EDGES")
-        entryEdges.foreach{ e => println(s"- ${e}")}
-        println("</> THE ENTRY EDGES")
+
         val P_e: Set[LoopEdge] = entryEdges                                                 // N entry edges
         val P_b: Set[LoopEdge] = entryEdges.flatMap { e =>
             val predNodes = IntraProcIRCursor.pred(e.to);
@@ -305,9 +298,6 @@ class LoopTransform(loops: Set[Loop]):
             val incEdges = predNodes.map(a => LoopEdge(a, e.to));
             incEdges
         } -- P_e; // N back edges
-        println("BACK EDGES")
-        P_b.foreach{ e => println(s"- ${e}")} 
-        println("</> BACK EDGES")
         val body: Set[LoopEdge] = (loop.edges -- P_b).toSet     // Regular control flow in the loop
 
 
@@ -332,11 +322,8 @@ class LoopTransform(loops: Set[Loop]):
             val origNode = originalEdge.from;
             val origDest = originalEdge.to;
             
-            println(s"-- For Edge ${originalEdge}")
-
             origNode match {
                 case origBlock: Block => {
-                    println("Coming from Block");
                     origBlock.replaceJump(GoTo(List(N)));
 
                     newLoop.addEdge(LoopEdge(origBlock, N));
@@ -345,10 +332,6 @@ class LoopTransform(loops: Set[Loop]):
                 case goto: GoTo => 
                     origDest match {
                         case origDest: Block => {
-
-                            println(s"*GoTo ${goto}")
-                            println(s"    removing target: ${origDest}")
-                            println(s"    adding target: ${N}")
 
                             goto.removeTarget(origDest);
                             goto.addTarget(N);
@@ -359,7 +342,7 @@ class LoopTransform(loops: Set[Loop]):
                         case _ =>
                     }
                 case _ =>
-                    println("[!] Unexpected loop originating node");
+                    println("[!] Unexpected loop originating node - 1");
                     println(origNode)
             };
         }
@@ -380,24 +363,18 @@ class LoopTransform(loops: Set[Loop]):
                     origDest match {
                         case origDest: Block => {
                             goto.removeTarget(origDest)
-                            println("WE ARE HERE")
-                            println(s"GoTo: ${goto}")
-                            println(s"Orig: ${origNode}")
                             goto.addTarget(N);
 
                             newLoop.addEdge(LoopEdge(goto, N));
                             newLoop.addEdge(LoopEdge(N, origDest));
                         }
                         case _ =>
-                            println("UNKNOWN")
                     }
                 case _ =>
                     println("[!] Unexpected loop originating node - 2");
                     println(origNode);
             }            
         }
-
-        // N.replaceJump(NGoTo);
 
         newLoop;
     }
