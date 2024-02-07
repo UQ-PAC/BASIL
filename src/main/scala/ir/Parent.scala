@@ -54,8 +54,8 @@ trait HasParent[T]:
    */
   final def deParent()(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
     if _parent.isDefined then {
+      last_parent = _parent.map(x => (x, file.value, name.value, line.value))
       unlinkParent()
-      if _parent.isDefined then (last_parent = _parent.map(x => (x, file.value, name.value, line.value)))
       _parent = None
     }
   }

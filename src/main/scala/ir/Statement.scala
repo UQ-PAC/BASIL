@@ -82,7 +82,7 @@ sealed trait Jump extends Command, HasParent[Block]  {
 
 
 
-class GoTo private (private var _targets: mutable.Set[Block], override val label: Option[String]) extends Jump {
+class GoTo private (private val _targets: mutable.Set[Block], override val label: Option[String]) extends Jump {
 
   def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.Set.from(targets), label)
 
@@ -113,10 +113,12 @@ class GoTo private (private var _targets: mutable.Set[Block], override val label
     if (_targets.remove(t)) {
       t.removeIncomingJump(this)
     }
+    assert(!_targets.contains(t))
+    assert(!t.incomingJumps.contains(this))
   }
 
 
-  override def toString: String = s"${labelStr}NonDetGoTo(${targets.map(_.label).mkString(", ")})"
+  override def toString: String = s"${labelStr}GoTo(${targets.map(_.label).mkString(", ")})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitGoTo(this)
 }
 
@@ -126,16 +128,11 @@ object GoTo:
 
 sealed trait Call extends Jump
 
-trait FallThrough extends Call: 
+abstract trait FallThrough extends HasParent[Block]:
   /**
-   * Manages the fallthrough block for a call.
-   *
-   *  There is a aftercall block inserted after each call, which is visited after the call in the cfg 
-   *
-   *  Replacing the return target of the call replaces the aftercall block. 
+   * Manages the fallthrough target for a call in the parent block.
    */
 
-  private var _afterCall: Option[Block] = None
   private var _returnTarget: Option[Block] = None
 
 
@@ -145,23 +142,21 @@ trait FallThrough extends Call:
 
     if (hasParent) {
       // if we don't have a parent now, delay adding the fallthrough block until linking
-      linkParent(parent)
+      parent.fallthrough = Some(GoTo(Set(b)))
     }
+
     _returnTarget = Some(b) 
   }
 
   def returnTarget: Option[Block] = _returnTarget
 
-  def afterCall: Option[Block] = _afterCall 
-  
   // moving a call between blocks
   override def linkParent(p: Block): Unit = {
-    _afterCall = _returnTarget.map(b => (p.parent.addBlocks(Block.afterCall(this, Some(b)))))
-    _afterCall.foreach(parent.parent.addBlocks(_))
+    returnTarget.foreach(t => parent.fallthrough = Some(GoTo(Set(t))))
   }
 
   override def unlinkParent(): Unit = {
-    _afterCall.foreach(ac => {parent.parent.removeBlocks(ac)})
+    parent.fallthrough = None
   }
 
 
@@ -190,7 +185,7 @@ class DirectCall(val target: Procedure, private val _returnTarget: Option[Block]
 object DirectCall:
   def unapply(i: DirectCall): Option[(Procedure,  Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
 
-class IndirectCall(var target: Variable, private val _returnTarget: Option[Block] = None, override val label: Option[String] = None) extends Call with FallThrough{
+class IndirectCall(var target: Variable, private val _returnTarget: Option[Block] = None, override val label: Option[String] = None) extends Call with FallThrough {
   _returnTarget.foreach(x => returnTarget = x) 
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
