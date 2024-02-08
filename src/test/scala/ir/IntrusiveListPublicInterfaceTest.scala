@@ -1,8 +1,9 @@
 package ir
 import org.scalatest.funsuite.AnyFunSuite
 import intrusivelist.{IntrusiveList, IntrusiveListElement}
+import scala.collection.mutable
 
-case class Elem(val t: Int) extends IntrusiveListElement[Elem]
+class Elem(val t: Int) extends IntrusiveListElement[Elem]
 
 class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
 
@@ -49,7 +50,7 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
     x.append(Elem(13))
     x.append(Elem(14))
 
-    x.foreach(println(_))
+//    x.foreach(println(_))
 
     val y = x.head()
     assert(y.t == 10)
@@ -151,6 +152,28 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
     assert(it.length == 7)
   }
 
+  test("splitat") {
+    val l = IntrusiveList[Elem]()
+    
+    l.addOne(Elem(1))
+
+    val e = Elem(15)
+    val toAdd = List(e,Elem(16),Elem(17))
+
+    l.addAll(toAdd)
+    assert(l.size == 4)
+    assert(l.contains(e))
+
+    val l2 = l.splitOn(e)
+    assert(l2.size == 2)
+    assert(l.size == 2)
+    assert(l.find(_.t == 1).isDefined)
+    assert(l.find(_.t == 15).isDefined)
+    assert(l2.find(_.t == 16).isDefined)
+    assert(l2.find(_.t == 17).isDefined)
+  }
+
+
   test("addAll") {
     val l = getSequentialList(3)
     val toAdd = List(Elem(3),Elem(4),Elem(5))
@@ -160,6 +183,33 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
       assert(l(i).t == i)
     }
   }
+
+  test("construct") {
+    val l = getSequentialList(3)
+
+
+    val l2 = IntrusiveList.from(l)
+    assert(l2.size == 3)
+
+    assert(l.forall(x => l2.contains(x)))
+
+    assert (l eq l2)
+
+    val l3 = mutable.ArrayBuffer(Elem(1), Elem(2), Elem(3))
+
+    val l4 = IntrusiveList.from(l3)
+
+    assert(l3 ne l4)
+    assert(l3.forall(x => l4.contains(x)))
+
+    assert(l4.size == 3)
+
+
+
+
+
+  }
+
 
 
 }

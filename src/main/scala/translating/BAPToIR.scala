@@ -21,7 +21,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     for (s <- program.subroutines) {
       val procedure = Procedure(s.name, Some(s.address))
       for (b <- s.blocks) {
-        val block = Block.regular(b.label, b.address)
+        val block = Block(b.label, b.address)
         procedure.addBlocks(block)
         labelToBlock.addOne(b.label, block)
       }
@@ -175,7 +175,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
   private def newBlockCondition(block: Block, target: Block, condition: Expr): Block = {
     val newLabel = s"${block.label}_goto_${target.label}"
     val assume = Assume(condition, checkSecurity = true)
-    Block.regular(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target)))
+    Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target)))
   }
 
 }

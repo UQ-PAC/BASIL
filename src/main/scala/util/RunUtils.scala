@@ -466,7 +466,7 @@ object RunUtils {
                     val directCall = DirectCall(t, indirectCall.returnTarget)
                     directCall.parent = indirectCall.parent
 
-                    newBlocks.append(Block.regular(newLabel, None, ArrayBuffer(assume), directCall))
+                    newBlocks.append(Block(newLabel, None, ArrayBuffer(assume), directCall))
                   }
                   procedure.addBlocks(newBlocks)
                   val newCall = GoTo(newBlocks, indirectCall.label)
