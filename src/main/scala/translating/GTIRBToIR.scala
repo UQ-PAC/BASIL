@@ -153,8 +153,8 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
   }
 
   def get_jmp_reg(statement: Statement): Variable = statement match {
-    case LocalAssign(_, rhs: Variable, _) => rhs
-    case LocalAssign(_, rhs: Extract, _) => rhs.body.asInstanceOf[Variable]
+    case LocalAssign(lhs: Register, rhs: Variable, _) if lhs.name == "_PC" => rhs
+    case LocalAssign(lhs: Register, rhs: Extract, _) if lhs.name == "_PC" => rhs.body.asInstanceOf[Variable]
     case _ => ???
   }
 

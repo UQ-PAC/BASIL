@@ -66,12 +66,23 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
   }
 
   override def visitCall_stmt(ctx: Call_stmtContext): MemoryAssign = {
-    val mem = Memory("mem", 64, 8) // yanked from BAP
-    val addr = visitExpr(ctx.expr(1))
-    val value = visitExpr(ctx.expr(4))
-    val size = visitExpr(ctx.expr(2)).asInstanceOf[IntLiteral].value.toInt * 8
-    val memstore = MemoryStore(mem, addr, value, Endian.LittleEndian, size)
-    MemoryAssign(mem, memstore)
+    val func: String = if (ctx.METHOD() == null) ctx.SSYMBOL().getText else ctx.METHOD().getText
+
+    func match {
+      case "Mem.set.0" => 
+        val mem = Memory("mem", 64, 8) // yanked from BAP
+        val addr = visitExpr(ctx.expr(1))
+        val value = visitExpr(ctx.expr(4))
+        val size = visitExpr(ctx.expr(2)).asInstanceOf[IntLiteral].value.toInt * 8
+        val memstore = MemoryStore(mem, addr, value, Endian.LittleEndian, size)
+        MemoryAssign(mem, memstore)
+      
+      case "AtomicStart.0" => ??? 
+
+      case "AtomicEnd.0" => ???
+
+      case _ => ???
+    }
   }
 
   override def visitConditional_stmt(ctx: Conditional_stmtContext): TempIf = {

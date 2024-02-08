@@ -13,9 +13,8 @@ assignment_stmt:
 	| 'Stmt_Assert' OPEN_PAREN expr CLOSE_PAREN # Assert;
 
 call_stmt:
-	'Stmt_TCall' OPEN_PAREN (SSYMBOL | METHOD) (
-		COMMA (SSYMBOL | METHOD)
-	)* COMMA OPEN_BRACKET (
+	'Stmt_TCall' OPEN_PAREN (SSYMBOL | METHOD) COMMA 
+	OPEN_BRACKET (
 		OPEN_PAREN expr CLOSE_PAREN (
 			SCOLON OPEN_PAREN expr CLOSE_PAREN
 		)*
