@@ -1,10 +1,17 @@
 package analysis
 
-import ir.{CFGPosition, IntraProcIRCursor, Program, Procedure, Block, GoTo}
+import ir.{CFGPosition, IntraProcIRCursor, Program, Procedure, Block, GoTo, IRWalk}
 import intrusivelist.{IntrusiveList}
 
 import scala.collection.mutable
 
+private def label(p: CFGPosition) = {
+p match {
+    case b: Block =>  "block." + b.label
+    case p: Procedure =>  "proc." + p.name
+    case  c  =>  "cmd." + c.hashCode().toString()
+}
+}
 
 
 
@@ -18,7 +25,7 @@ import scala.collection.mutable
  *
  */
 class LoopEdge(val from: CFGPosition, val to: CFGPosition):
-    override def toString: String = s"From: ${from}, to: ${to}"
+    override def toString: String = s"(${label(from)}, ${label(to)})"
     override def equals(n: Any): Boolean = n match {
         case edge: LoopEdge => edge.from == from && edge.to == to;
         case _ => false
@@ -42,8 +49,9 @@ class Loop(var header: CFGPosition):
         edges += edge
     }
 
+
     override def toString() = {
-        s"Header: ${header}, Body: ${edges}"
+        s"Header: ${label(header)}, Body: ${edges}"
     }
 
 /* Loop detection and classification with respect to being reducible or irreducible. Implements the algorithm
@@ -62,6 +70,7 @@ class LoopDetector(cfg: Program):
     val edgeStack: mutable.Stack[LoopEdge] = mutable.Stack[LoopEdge]()
 
     /* 
+     * Returns the set of irreducible loops in the program. 
      *
      */
     def loops_to_transform(): Set[Loop] = {
@@ -78,7 +87,7 @@ class LoopDetector(cfg: Program):
     }
 
     /*
-     *
+     * Returns the set of loops in the program.
      */
      def identify_loops(): Set[Loop] = {
         
@@ -107,7 +116,7 @@ class LoopDetector(cfg: Program):
      *          node into the target loop, making it irreducible, so we mark it as such.
      *
      */
-    def traverse_loops_dfs(b0: CFGPosition, DFSPpos: Int): Option[CFGPosition] = {
+    private def traverse_loops_dfs(b0: CFGPosition, DFSPpos: Int): Option[CFGPosition] = {
 
         visitedNodes += b0;
         nodeDFSPpos(b0) = DFSPpos;
@@ -225,7 +234,7 @@ class LoopDetector(cfg: Program):
     /** Sets the most inner loop header `h` for a given node `b`
      *
      */
-    def tag_lhead(b: CFGPosition, h: Option[CFGPosition]): Unit = {
+    private def tag_lhead(b: CFGPosition, h: Option[CFGPosition]): Unit = {
         var cur1: CFGPosition = b;
         var cur2: CFGPosition = h match {
             case Some(hh) => hh
@@ -313,6 +322,7 @@ class LoopTransform(loops: Set[Loop]):
             statements = IntrusiveList(),
             NGoTo
         )
+        IRWalk.procedure(loop.header).addBlocks(N)
 
         val newLoop = Loop(N);
         newLoop.edges ++= body;
