@@ -4,8 +4,8 @@ import util.Logger
 
 import scala.collection.mutable
 
-/** Steensgaard-style pointer analysis. The analysis associates an [[UnifiableTerm]] with each variable declaration and
-  * expression node in the AST. It is implemented using [[tip.solvers.UnionFindSolver]].
+/** Abandoned helper analysis for intraproc steensgaard to transfer the context of the constant
+ *  propagation analysis to the call sites.
   */
 class ContextTransfer(
       cfg: ProgramCfg,

@@ -16,6 +16,7 @@ case class RangeKey(var start: BigInt, var end: BigInt) extends Ordered[RangeKey
 
 case class RegionToRangesMap():
   val stackMap: mutable.Map[RangeKey, StackRegion] = mutable.TreeMap()
+  val sharedStackMap: mutable.Map[RangeKey, StackRegion] = mutable.TreeMap()
   val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.TreeMap()
   val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.TreeMap()
 
@@ -25,13 +26,24 @@ class MemoryModelMap {
   private val rangeMap = RegionToRangesMap()
   private val MAX_BIGINT: BigInt = BigInt(Long.MaxValue)
   private val contextStack = mutable.Stack.empty[List[StackRegion]]
-  private val allStacks = mutable.Map[String, List[StackRegion]]()
+  private val sharedContextStack = mutable.Stack.empty[List[StackRegion]]
+  private val localStacks = mutable.Map[String, List[StackRegion]]()
+  private val sharedStacks = mutable.Map[String, List[StackRegion]]()
 
-  // Add a range and object to the mapping
-  def add(offset: BigInt, region: MemoryRegion): Unit = {
+  /** Add a range and object to the mapping
+   *
+   * @param offset the offset of the range
+   * @param region the region to add
+   * @param shared if the region is shared. When true, the region is added to the sharedStackMap
+   *                otherwise to the stackMap
+   */
+  def add(offset: BigInt, region: MemoryRegion, shared: Boolean = false): Unit = {
     region match {
       case s: StackRegion =>
-        val stackMap = rangeMap.stackMap
+        var stackMap = rangeMap.stackMap
+        if (shared) {
+          stackMap = rangeMap.sharedStackMap
+        }
         if (stackMap.isEmpty) {
           stackMap(RangeKey(offset, MAX_BIGINT)) = s
         } else {
@@ -50,8 +62,8 @@ class MemoryModelMap {
   }
 
   /**
-   * For DataRegions, the address used needs to be converted to the actual address.
-   * This is because when regions are found, the actual address is used and as such match
+   * For DataRegions, the actual address used needs to be converted to the relocated address.
+   * This is because when regions are found, the relocated address is used and as such match
    * the correct range.
    *
    * @param name
@@ -87,16 +99,16 @@ class MemoryModelMap {
     exitNodes.foreach(exitNode =>
       memoryRegions(exitNode) match {
         case Lift(node) =>
-          var allRegions: Set[MemoryRegion] = node
           if (procedureToSharedRegions.contains(exitNode.data)) {
             val sharedRegions = procedureToSharedRegions(exitNode.data)
-            allRegions = allRegions ++ sharedRegions
+            sharedStacks(exitNode.data.name) = sharedRegions.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
           }
           // for each function exit node we get the memory region and add it to the mapping
-          val stackRgns = allRegions.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
-          dataRgns = dataRgns ++ allRegions.collect { case r: DataRegion => r }
+          val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
+          dataRgns = dataRgns ++ node.collect { case r: DataRegion => r }
 
-          allStacks(exitNode.data.name) = stackRgns
+          localStacks(exitNode.data.name) = stackRgns
+
         case LiftedBottom =>
     }
     )
@@ -108,10 +120,16 @@ class MemoryModelMap {
   }
   // TODO: push and pop could be optimised by caching the results
   def pushContext(funName: String): Unit = {
-    contextStack.push(allStacks(funName))
+    contextStack.push(localStacks(funName))
     rangeMap.stackMap.clear()
     for (stackRgn <- contextStack.top) {
       add(stackRgn.start.value, stackRgn)
+    }
+
+    sharedContextStack.push(sharedStacks(funName))
+    rangeMap.sharedStackMap.clear()
+    for (stackRgn <- sharedContextStack.top) {
+      add(stackRgn.start.value, stackRgn, true)
     }
   }
 
@@ -123,22 +141,22 @@ class MemoryModelMap {
         add(stackRgn.start.value, stackRgn)
       }
     }
+
+    if (sharedContextStack.size > 1) {
+      sharedContextStack.pop()
+      rangeMap.sharedStackMap.clear()
+      for (stackRgn <- sharedContextStack.top) {
+        add(stackRgn.start.value, stackRgn, true)
+      }
+    }
   }
-
-//  def set_stack_regions(node: CfgNode): Unit = {
-//    rangeMap.stackMap.clear()
-//    val stackRgns = MRA(node).asInstanceOf[Set[Any]].filter(_.isInstanceOf[StackRegion]).map(_.asInstanceOf[StackRegion]).toList.sortBy(_.start.asInstanceOf[BitVecLiteral].value)
-//    print(MRA(node))
-//    for (stackRgn <- stackRgns) {
-//      add(stackRgn.start.asInstanceOf[BitVecLiteral].value, stackRgn)
-//    }
-//  }
-
-  // Find an object for a given value within a range
 
 
   def findStackObject(value: BigInt): Option[StackRegion] = 
     rangeMap.stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
+
+  def findSharedStackObject(value: BigInt): Option[StackRegion] =
+    rangeMap.sharedStackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
 
   def findDataObject(value: BigInt): Option[DataRegion] = 
     rangeMap.dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
@@ -148,7 +166,7 @@ class MemoryModelMap {
 
   def printRegionsContent(hideEmpty: Boolean = false): Unit = {
     println("Stack:")
-    for name <- allStacks.keys do
+    for name <- localStacks.keys do
       popContext()
       pushContext(name)
       println(s"  Function: $name")
@@ -180,7 +198,7 @@ trait MemoryRegion {
 }
 
 class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral, val parent: Procedure = null) extends MemoryRegion {
-  override def toString: String = s"Stack($regionIdentifier, $start, ${if parent != null then parent else "Null"}) -> $content"
+  override def toString: String = s"Stack($regionIdentifier, $start, ${if parent != null then parent.name else "Null"}) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
     case s: StackRegion => s.start == start && s.regionIdentifier.equals(regionIdentifier)

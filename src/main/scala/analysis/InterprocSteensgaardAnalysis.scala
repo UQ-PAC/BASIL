@@ -16,7 +16,7 @@ case class RegisterVariableWrapper(variable: Variable) extends VariableWrapper {
     override def equals(obj: Any): Boolean = {
         obj match {
         case RegisterVariableWrapper(other) =>
-            variable == other && (variable.ssa_id == other.ssa_id || variable.ssa_id.intersect(other.ssa_id).nonEmpty)
+            variable == other && variable.ssa_id.intersect(other.ssa_id).nonEmpty
         case _ =>
             false
         }
@@ -28,12 +28,12 @@ case class RegisterVariableWrapper(variable: Variable) extends VariableWrapper {
 }
 
 /** Steensgaard-style pointer analysis. The analysis associates an [[StTerm]] with each variable declaration and
-  * expression node in the AST. It is implemented using [[tip.solvers.UnionFindSolver]].
+  * expression node in the AST. It is implemented using [[analysis.solvers.UnionFindSolver]].
   */
 class InterprocSteensgaardAnalysis(
       cfg: ProgramCfg,
       constantProp: Map[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]]],
-      RegToResult: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
+      regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
       mmm: MemoryModelMap) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
@@ -57,7 +57,11 @@ class InterprocSteensgaardAnalysis(
   /**
    * Used to reduce an expression that may be a sub-region of a memory region.
    * Pointer reduction example:
-   * 1) R2 = R31 + 20         <- ie. stack access (R31 = stackPointer)
+   * R2 = R31 + 20
+   * Mem[R2 + 8] <- R1
+   *
+   * Steps:
+   * 1) R2 = R31 + 20         <- ie. stack access (assume R31 = stackPointer)
    *         ↓
    *    R2 = StackRegion("stack_1", 20)
    *
@@ -71,20 +75,20 @@ class InterprocSteensgaardAnalysis(
    * @param n
    * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
    */
-  def reducibleToRegion(binExpr: BinaryExpr, n: CfgCommandNode): Set[MemoryRegion] = {
+  def reducibleToRegion(binExpr: BinaryExpr, n: CfgCommandNode, shared: Boolean = false): Set[MemoryRegion] = {
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
       case variable: Variable =>
         val reg = RegisterVariableWrapper(variable)
-        val ctx = RegToResult(n)
+        val ctx = regionAccesses(n)
         if (ctx.contains(reg)) {
           ctx(reg) match {
             case FlatEl(al) =>
               val regions = al match {
                 case loadL: MemoryLoad =>
-                  exprToRegion(loadL.index, n)
+                  exprToRegion(loadL.index, n, shared)
                 case _ =>
-                  exprToRegion(al, n)
+                  exprToRegion(al, n, shared)
               }
               evaluateExpressionWithSSA(binExpr.arg2, constantProp(n)).foreach (
                 b =>
@@ -92,12 +96,12 @@ class InterprocSteensgaardAnalysis(
                     case stackRegion: StackRegion =>
                       val nextOffset = BinaryExpr(op = BVADD, arg1 = stackRegion.start, arg2 = b)
                       evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach (
-                        b2 => reducedRegions = reducedRegions ++ exprToRegion(BinaryExpr(op = BVADD, arg1 = Register("R31", BitVecType(64)), arg2 = b2), n)
+                        b2 => reducedRegions = reducedRegions ++ exprToRegion(BinaryExpr(op = BVADD, arg1 = stackPointer, arg2 = b2), n, shared)
                       )
                     case dataRegion: DataRegion =>
                       val nextOffset = BinaryExpr(op = BVADD, arg1 = dataRegion.start, arg2 = b)
                       evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach(
-                        b2 => reducedRegions = reducedRegions ++ exprToRegion(b2, n)
+                        b2 => reducedRegions = reducedRegions ++ exprToRegion(b2, n, shared)
                       )
                     case _ =>
                   }
@@ -114,6 +118,8 @@ class InterprocSteensgaardAnalysis(
     reducedRegions
   }
 
+  // TODO: You must redefine how shared regions are accessed by finding if the register we are evaluating is shared
+
   /**
    * Finds a region for a given expression using MMM results
    *
@@ -121,7 +127,7 @@ class InterprocSteensgaardAnalysis(
    * @param n
    * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
    */
-  def exprToRegion(expr: Expr, n: CfgCommandNode): Set[MemoryRegion] = {
+  def exprToRegion(expr: Expr, n: CfgCommandNode, shared: Boolean = false): Set[MemoryRegion] = {
     var res = Set[MemoryRegion]()
     mmm.popContext()
     mmm.pushContext(n.parent.data.name)
@@ -129,7 +135,7 @@ class InterprocSteensgaardAnalysis(
       case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
         evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach {
           case b: BitVecLiteral =>
-            val region = mmm.findStackObject(b.value)
+            val region = if shared then mmm.findSharedStackObject(b.value) else mmm.findStackObject(b.value)
             if (region.isDefined) {
               res = res + region.get
             }
@@ -148,18 +154,18 @@ class InterprocSteensgaardAnalysis(
             }
         }
         if (res.isEmpty && expr.isInstanceOf[Variable]) { // may be passed as param
-          val ctx = RegToResult(n)
+          val ctx = regionAccesses(n)
           if (ctx.contains(RegisterVariableWrapper(expr.asInstanceOf[Variable]))) {
             ctx(RegisterVariableWrapper(expr.asInstanceOf[Variable])) match {
               case FlatEl(al) =>
                 al match
                   case load: MemoryLoad => // treat as a region
-                    res = res ++ exprToRegion(load.index, n)
+                    res = res ++ exprToRegion(load.index, n, shared)
                   case binaryExpr: BinaryExpr =>
-                    res = res ++ reducibleToRegion(binaryExpr, n)
+                    res = res ++ reducibleToRegion(binaryExpr, n, shared)
                     res = res ++ exprToRegion(al, n)
                   case _ => // also treat as a region (for now) even if just Base + Offset without memLoad
-                    res = res ++ exprToRegion(al, n)
+                    res = res ++ exprToRegion(al, n, shared)
             }
           }
         }

@@ -5,6 +5,10 @@ import ir.{SignExtend, *}
 
 import scala.collection.mutable
 
+/** Set-Based SSA
+ * - Each variable has a set of versions
+ * - New assignments create new versions and replaces any new versions
+ */
 object SSAForm {
 
   val varMaxTracker = new mutable.HashMap[String, Int]()
@@ -53,7 +57,7 @@ object SSAForm {
         }
         block.jump match {
           case directCall: DirectCall => {
-            // TODO: transfers the whole context but it should be using ANR and RNA to transfer only the relevant context
+            // TODO: transfers the whole context but it could be using ANR and RNA to transfer only the relevant context
             varMaxTracker.keys.foreach(varr => {
               //context((directCall.target, varr)) = context((directCall.target, varr)) ++ blockBasedMappings(block, varr)
               context.getOrElseUpdate((directCall.target, varr), mutable.Set()) ++= blockBasedMappings((block, varr))

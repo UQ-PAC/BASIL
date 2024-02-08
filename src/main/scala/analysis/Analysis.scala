@@ -195,7 +195,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                            val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
                            val ANRResult: Map[CfgNode, Set[Variable]],
                            val RNAResult: Map[CfgNode, Set[Variable]],
-                           val RegToResult: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]) {
+                           val regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]) {
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
@@ -267,6 +267,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
   private val mallocVariable = Register("R0", BitVecType(64))
   private val spList = ListBuffer[Expr](stackPointer)
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
+  // TODO: this could be used instead of regionAccesses in other analyses to reduce the Expr to region conversion
   val registerToRegions: mutable.Map[RegisterVariableWrapper, mutable.Set[MemoryRegion]] = mutable.Map()
   val procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]] = mutable.Map()
 
@@ -275,7 +276,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     binExpr.arg1 match {
       case variable: Variable =>
         val reg = RegisterVariableWrapper(variable)
-        val ctx = RegToResult(n)
+        val ctx = regionAccesses(n)
         if (ctx.contains(reg)) {
           ctx(reg) match {
             case FlatEl(al) =>
@@ -360,7 +361,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
           val ANR = ANRResult(n)
           val RNA = RNAResult(cfg.funEntries.filter(fn => fn.data == directCall.target).head)
           val parameters = RNA.intersect(ANR)
-          val ctx = RegToResult(n)
+          val ctx = regionAccesses(n)
           for (elem <- parameters) {
             if (ctx.contains(RegisterVariableWrapper(elem))) {
               ctx(RegisterVariableWrapper(elem)) match {
@@ -413,8 +414,8 @@ class MemoryRegionAnalysisSolver(
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
     ANRResult: Map[CfgNode, Set[Variable]],
     RNAResult: Map[CfgNode, Set[Variable]],
-    RegToResult: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]
-) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, RegToResult)
+    regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]
+) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, regionAccesses)
     with IntraproceduralForwardDependencies
     with Analysis[Map[CfgNode, LiftedElement[Set[MemoryRegion]]]]
     with WorklistFixpointSolverWithReachability[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]] {

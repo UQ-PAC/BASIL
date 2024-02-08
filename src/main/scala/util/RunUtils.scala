@@ -192,11 +192,11 @@ object RunUtils {
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_constprop$iteration.txt"))
 
     Logger.info("[!] Running RegToMemAnalysisSolver")
-    val RegToSolver = RegToMemAnalysisSolver(cfg, constPropResult)
-    val RegToResult = RegToSolver.analyze()
+    val regionAccessesAnalysisSolver = RegionAccessesAnalysisSolver(cfg, constPropResult)
+    val regionAccessesAnalysisResults = regionAccessesAnalysisSolver.analyze()
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(RegToResult, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, RegToResult, iteration), s"${s}_RegTo$iteration.txt"))
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(regionAccessesAnalysisResults, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, regionAccessesAnalysisResults, iteration), s"${s}_RegTo$iteration.txt"))
 
     Logger.info("[!] Running Constant Propagation with SSA")
     val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(cfg)
@@ -206,7 +206,7 @@ object RunUtils {
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResultWithSSA, iteration), s"${s}_constpropWithSSA$iteration.txt"))
 
     Logger.info("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, RegToResult)
+    val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults)
     val mraResult = mraSolver.analyze()
     memoryRegionAnalysisResults = mraResult
 
@@ -222,7 +222,7 @@ object RunUtils {
     mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, mraSolver.procedureToSharedRegions)
 
     Logger.info("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, RegToResult, mmm)
+    val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm)
     steensgaardSolver.analyze()
     steensgaardSolver.pointsTo()
     steensgaardSolver.mayAlias()
