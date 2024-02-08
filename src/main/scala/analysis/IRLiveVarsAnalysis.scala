@@ -3,7 +3,7 @@ package analysis
 import analysis.solvers
 import analysis.solvers.BackwardIDESolver
 import cfg_visualiser.Output
-import ir.{Assert, Assume, Block, CFGPosition, Command, DirectCall, IndirectCall, LocalAssign, MemoryAssign, Procedure, Program, Variable}
+import ir.{Assert, Assume, GoTo, CFGPosition, Command, DirectCall, IndirectCall, LocalAssign, MemoryAssign, Procedure, Program, Variable}
 import util.RunUtils.writeToFile
 
 /**
@@ -17,17 +17,32 @@ trait IRLiveVarAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatEleme
   val edgelattice: EdgeFunctionLattice[FlatElement[Nothing], valuelattice.type] = new EdgeFunctionLattice[FlatElement[Nothing], valuelattice.type](valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
 
-  def edgesCallToEntry(call: Block, entry: Command)(d: DL): Map[DL, edgelattice.Element] = {
+  def edgesCallToEntry(call: GoTo, entry: Command)(d: DL): Map[DL, edgelattice.Element] = {
+    // this analysis is implemented in order to Identify parameters and function interface
+    // if parameters are known this should map only parameter registers to IdEdge() or in this case
+    // return (since it is a backward analysis)
+    // all other dataflow facts except lambda should be mapped to bottom (return empty Map())
     Map(d -> IdEdge())
+
+//    d match
+//      case Left(value) => Map()
+//      case Right(_) => Map(d -> IdEdge())
   }
 
   def edgesExitToAfterCall(exit: Procedure, aftercall: DirectCall)(d: DL): Map[DL, edgelattice.Element] = {
+    // this analysis is implemented in order to Identify parameters and function interface
+    // if parameters are known this should map return registers to IdEdge() or in this case
+    // parameters (since it is a backward analysis)
+    // all other dataflow facts except lambda should be mapped to bottom (return empty Map())
     Map(d -> IdEdge())
   }
 
-  def edgesCallToAfterCall(call: Block, aftercall: DirectCall)(d: DL): Map[DL, edgelattice.Element] = {
-//    Map(d -> IdEdge())
-    Map()
+  def edgesCallToAfterCall(call: GoTo, aftercall: DirectCall)(d: DL): Map[DL, edgelattice.Element] = {
+    // this analysis is implemented in order to Identify parameters and function interface
+    // if parameters are known this should map all non parameter registers to IdEdge() instead
+    d match
+      case Left(value) => Map()
+      case Right(_) => Map(d -> IdEdge())
   }
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, edgelattice.Element] = {

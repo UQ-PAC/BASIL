@@ -1,5 +1,6 @@
 import analysis.{FlatEl, IRLiveVarAnalysis, Top}
-import ir.{BitVecLiteral, BitVecType, Block, CFGPosition, DirectCall, GoTo, InterProcIRCursor, LocalAssign, Procedure, Program, Register, Regular, Statement, Variable, toDot}
+import ir.IRDSL.EventuallyJump
+import ir.{BitVecLiteral, BitVecType, Block, CFGPosition, DirectCall, GoTo, IRDSL, InterProcIRCursor, LocalAssign, Procedure, Program, Register, Statement, Variable, toDot}
 import org.scalatest.funsuite.AnyFunSuite
 import util.RunUtils.writeToFile
 import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
@@ -9,11 +10,14 @@ import scala.collection.mutable.ArrayBuffer
 
 class LiveVarsAnalysisTests extends AnyFunSuite {
 
-  private val stackPointer = Register("R31", BitVecType(64))
-  private val linkRegister = Register("R30", BitVecType(64))
-  private val framePointer = Register("R29", BitVecType(64))
+  extension (p: Program)
+    def procs: Map[String, Procedure] = p.collect {
+      case b: Procedure => b.name -> b
+    }.toMap
 
-  private val initialized: Set[Variable] = Set(stackPointer, linkRegister, framePointer)
+    def blocks: Map[String, Block] = p.collect {
+      case b: Block => b.label -> b
+    }.toMap
 
   val testPath = "./src/test/analysis/livevars/"
   val dumpPath = testPath + "dump/"
@@ -99,189 +103,263 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     }.toString
   }
 
-//  def createSimpleProcedure(name: String, statements: IterableOnce[Statement]) : Procedure = {
-//    val proc = new Procedure(name)
-//    val procReturnBlock = Block.procedureReturn(proc)
-//    val procJump = new GoTo(Set(procReturnBlock))
-//    val procMainBlock = Block.regular("l" + name, None, statements, procJump)
-//    statements.iterator.foreach(_.setParent(procMainBlock))
-//    procReturnBlock.linkParent(proc)
-//    procMainBlock.linkParent(proc)
-//    procReturnBlock.addIncomingJump(procJump)
-//    proc.addBlocks(Set(procMainBlock, procReturnBlock))
-//    proc.entryBlock = procMainBlock
-//    proc.returnBlock = procReturnBlock
-//
-//    proc
-//
-//  }
-//
-//  def createSimpleCall(proc: Procedure, callee: Procedure, blockName:String, returnTarget: Block, statements: IterableOnce[Statement]): Block = {
-//    val directCall = new DirectCall(callee, Some(returnTarget))
-//    val callBlock = Block.regular(blockName, None, statements, directCall)
-//    statements.iterator.foreach(_.setParent(callBlock))
-//    callBlock.linkParent(proc)
-//    callBlock.setParent(proc)
-//    directCall.setParent(callBlock)
-//    directCall.linkParent(callBlock)
-//    val callReturn = Block.callReturn(directCall)
-//    callReturn.linkParent(proc)
-//    callReturn.setParent(proc)
-//    directCall.returnTarget = Some(callReturn)
-//
-//    callBlock
-//  }
-//
-//
-//  def differentCalleesBothLive(): Unit = {
-//    val r0 = Register("R0", BitVecType(64))
-//    val r1 = Register("R1", BitVecType(64))
-//    val r2 = Register("R2", BitVecType(64))
-//    val r30 = Register("R30", BitVecType(64))
-//
-//
-//    val constant1 = BitVecLiteral(1, 64)
-//    val r0ConstantAssign = new LocalAssign(r0, constant1, Some("00001"))
-//    val r1ConstantAssign = new LocalAssign(r1, constant1, Some("00002"))
-//    val r2r0Assign = new LocalAssign(r2, r0, Some("00003"))
-//    val r2r1Assign = new LocalAssign(r2, r1, Some("00004"))
-//
-//    val callee1 = createSimpleProcedure("callee1", Set(r2r0Assign))
-//    val callee2 = createSimpleProcedure("callee2", Set(r2r1Assign))
-//
-//    val caller = new Procedure("main")
-//    val callerReturnBlock = Block.procedureReturn(caller)
-//    callerReturnBlock.linkParent(caller)
-//    callerReturnBlock.setParent(caller)
-//
-//    val secondCallBlock = createSimpleCall(caller, callee2, "lmain2", callerReturnBlock, Set())
-//    val firstCallBlock = createSimpleCall(caller, callee1, "lmain1", secondCallBlock, List(r0ConstantAssign, r1ConstantAssign))
-//
-//    caller.entryBlock = firstCallBlock
-//    caller.returnBlock = callerReturnBlock
-//
-//    val program = new Program(ArrayBuffer(caller, callee1, callee2), caller, ArrayBuffer(), ArrayBuffer())
-//    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
-//
-//    assert(liveVarAnalysisResults(caller) == Map(r30 -> Top))
-//    assert(liveVarAnalysisResults(callee1) == Map(r0 -> Top, r1 -> Top, r30 -> Top))
-//    assert(liveVarAnalysisResults(callee2) == Map(r1 -> Top, r30 -> Top))
-//
-//    RunUtils.writeToFile(toDot(program, Map.empty), "./test")
-//
-//    writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
-//      (m, f) => m + (f._1 -> f._2.toString())
-//    })
+  def createSimpleProc(name: String, statements: Seq[Statement | EventuallyJump]): IRDSL.EventuallyProcedure = {
+    import IRDSL._
+    proc(name,
+      block("l" + name,
+        (statements.:+(goto(name + "_return"))): _*
+      ),
+      block(name + "_return",
+        ret
+      )
+    )
+  }
+
+  def differentCalleesBothLive(): Unit = {
+    import IRDSL._
+
+    val r30 = Register("R30", BitVecType(64))
+    val constant1 = bv64(1)
+    val r0ConstantAssign = new LocalAssign(R0, constant1, Some("00001"))
+    val r1ConstantAssign = new LocalAssign(R1, constant1, Some("00002"))
+    val r2r0Assign = new LocalAssign(R2, R0, Some("00003"))
+    val r2r1Assign = new LocalAssign(R2, R1, Some("00004"))
+
+    val program: Program = prog(
+      proc("main",
+        block("first_call",
+          r0ConstantAssign,
+          r1ConstantAssign,
+          call("callee1", Some("second_call"))
+        ),
+        block("second_call",
+          call("callee2", Some("returnBlock"))
+        ),
+        block("returnBlock",
+          ret
+        )
+      ),
+      createSimpleProc("callee1", Seq(r2r0Assign)),
+      createSimpleProc("callee2", Seq(r2r1Assign))
+    )
+
+    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+
+    val procs = program.procs
+    assert(liveVarAnalysisResults(procs("main")) == Map(r30 -> Top))
+    assert(liveVarAnalysisResults(procs("callee1")) == Map(R0 -> Top, R1 -> Top, r30 -> Top))
+    assert(liveVarAnalysisResults(procs("callee2")) == Map(R1 -> Top, r30 -> Top))
+  }
+
+
+  def differentCalleesOneAlive(): Unit = {
+    import IRDSL._
+
+    val r30 = Register("R30", BitVecType(64))
+    val constant1 = bv64(1)
+    val r0ConstantAssign = new LocalAssign(R0, constant1, Some("00001"))
+    val r1ConstantAssign = new LocalAssign(R1, constant1, Some("00002"))
+    val r2r0Assign = new LocalAssign(R2, R0, Some("00003"))
+    val r2r1Assign = new LocalAssign(R2, R1, Some("00004"))
+    val r1Reassign = new LocalAssign(R1, BitVecLiteral(2, 64), Some("00005"))
+
+
+    val program: Program = prog(
+      proc("main",
+        block("first_call",
+          r0ConstantAssign,
+          r1ConstantAssign,
+          call("callee1", Some("second_call"))
+        ),
+        block("second_call",
+          call("callee2", Some("returnBlock"))
+        ),
+        block("returnBlock",
+          ret
+        )
+      ),
+      createSimpleProc("callee1", Seq(r1Reassign, r2r0Assign)),
+      createSimpleProc("callee2", Seq(r2r1Assign))
+    )
+
+    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+
+    val procs = program.procs
+    assert(liveVarAnalysisResults(procs("main")) == Map(r30 -> Top))
+    assert(liveVarAnalysisResults(procs("callee1")) == Map(R0 -> Top, r30 -> Top))
+    assert(liveVarAnalysisResults(procs("callee2")) == Map(R1 -> Top, r30 -> Top))
+  }
+
+
+  def twoCallers(): Unit = {
+    import IRDSL._
+
+    val r30 = Register("R30", BitVecType(64))
+    val constant1 = bv64(1)
+    val r0ConstantAssign = new LocalAssign(R0, constant1, Some("00001"))
+    val r0Reassign = new LocalAssign(R0, BitVecLiteral(2, 64), Some("00004"))
+    val r1Assign = new LocalAssign(R0, R1, Some("00002"))
+    val r2Assign = new LocalAssign(R0, R2, Some("00003"))
+
+    val program = prog(
+      proc("main",
+        block("main_first_call",
+          call("wrapper1", Some("main_second_call"))
+        ),
+        block("main_second_call",
+          call("wrapper2", Some("main_return"))
+        ),
+        block("main_return", ret)
+      ),
+      createSimpleProc("callee", Seq(r0ConstantAssign)),
+      createSimpleProc("callee2", Seq(r1Assign)),
+      createSimpleProc("callee3", Seq(r2Assign)),
+      proc("wrapper1",
+        block("wrapper1_first_call",
+          LocalAssign(R1, constant1),
+          call("callee", Some("wrapper1_second_call"))
+        ),
+        block("wrapper1_second_call",
+          call("callee2", Some("wrapper1_return"))),
+        block("wrapper1_return", ret)
+      ),
+      proc("wrapper2",
+        block("wrapper2_first_call",
+          LocalAssign(R2, constant1),
+          call("callee", Some("wrapper2_second_call"))
+        ),
+        block("wrapper2_second_call",
+          call("callee3", Some("wrapper2_return"))),
+        block("wrapper2_return", ret)
+      )
+    )
+
+    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+    val blocks = program.blocks
+
+    assert(liveVarAnalysisResults(blocks("wrapper1_first_call").jump) == Map(R1 -> Top, r30 -> Top))
+    assert(liveVarAnalysisResults(blocks("wrapper2_first_call").jump) == Map(R2 -> Top, r30 -> Top))
+
+  }
+
+  def deadBeforeCall(): Unit = {
+    import IRDSL._
+
+    val r30 = Register("R30", BitVecType(64))
+    val program = prog(
+      proc("main",
+        block("lmain",
+          call("killer", Some("aftercall"))
+        ),
+        block("aftercall",
+          LocalAssign(R0, R1),
+          ret
+        )
+      ),
+      createSimpleProc("killer", Seq(LocalAssign(R1, bv64(1))))
+    )
+
+    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+    val blocks = program.blocks
+
+    assert(liveVarAnalysisResults(blocks("aftercall")) == Map(R1 -> Top, r30 -> Top))
+    assert(liveVarAnalysisResults(blocks("lmain")) == Map(r30 -> Top))
+  }
+
+  def simpleBranch(): Unit = {
+    import IRDSL._
+
+    val r30 = Register("R30", BitVecType(64))
+    val r1Assign = new LocalAssign(R0, R1, Some("00001"))
+    val r2Assign = new LocalAssign(R0, R2, Some("00002"))
+
+    val program : Program = prog(
+      proc(
+        "main",
+        block(
+          "lmain",
+          goto("branch1", "branch2")
+        ),
+        block(
+          "branch1",
+          r1Assign,
+          goto("main_return")
+        ),
+        block(
+          "branch2",
+          r2Assign,
+          goto("main_return")
+        ),
+        block("main_return", ret)
+      )
+    )
+
+
+    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+    val blocks = program.blocks
+
+
+    assert(liveVarAnalysisResults(blocks("branch1")) == Map(R1 -> Top, r30 -> Top))
+    assert(liveVarAnalysisResults(blocks("branch2")) == Map(R2 -> Top, r30 -> Top))
+    assert(liveVarAnalysisResults(blocks("lmain")) == Map(R1 -> Top, R2 -> Top, r30 -> Top))
+
+  }
+
+  def recursion(): Unit = {
+    import IRDSL._
+    val r30 = Register("R30", BitVecType(64))
+    val program : Program = prog(
+      proc("main",
+        block(
+          "lmain",
+          LocalAssign(R0, R1),
+          call("main", Some("return"))
+        ),
+        block("return",
+          LocalAssign(R0, R2),
+          ret
+        )
+      )
+    )
+
+//    writeToFile(toDot(program, Map.empty)
 //      , "testResult")
-//  }
-//
-//  def differentCalleesOneDies(): Unit = {
-//    val r0 = Register("R0", BitVecType(64))
-//    val r1 = Register("R1", BitVecType(64))
-//    val r2 = Register("R2", BitVecType(64))
-//    val r30 = Register("R30", BitVecType(64))
-//
-//    val caller = new Procedure("main")
-//
-//    val constant1 = BitVecLiteral(1, 64)
-//    val r0ConstantAssign = new LocalAssign(r0, constant1, Some("00001"))
-//    val r1ConstantAssign = new LocalAssign(r1, constant1, Some("00002"))
-//    val r2r0Assign = new LocalAssign(r2, r0, Some("00003"))
-//    val r2r1Assign = new LocalAssign(r2, r1, Some("00004"))
-//    val r1Reassign = new LocalAssign(r1, BitVecLiteral(2, 64), Some("00005"))
-//
-//    val callee1 = createSimpleProcedure("callee1", Set(r1Reassign, r2r0Assign))
-//    val callee2 = createSimpleProcedure("callee2", Set(r2r1Assign))
-//
-//    val callerReturnBlock = Block.procedureReturn(caller)
-//    callerReturnBlock.linkParent(caller)
-//    callerReturnBlock.setParent(caller)
-//
-//    val secondCallBlock = createSimpleCall(caller, callee2, "lmain2", callerReturnBlock, Set())
-//    val firstCallBlock = createSimpleCall(caller, callee1, "lmain1", secondCallBlock, List(r0ConstantAssign, r1ConstantAssign))
-//
-//    caller.entryBlock = firstCallBlock
-//    caller.returnBlock = callerReturnBlock
-//
-//    val program = new Program(ArrayBuffer(caller, callee1, callee2), caller, ArrayBuffer(), ArrayBuffer())
-//    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
-//
-//    assert(liveVarAnalysisResults(caller) == Map(r30 -> Top))
-//    assert(liveVarAnalysisResults(callee1) == Map(r0 -> Top, r30 -> Top))
-//    assert(liveVarAnalysisResults(callee2) == Map(r1 -> Top, r30 -> Top))
-//  }
-//
-//  def twoCallers(): Unit = {
-//    val r0 = Register("R0", BitVecType(64))
-//    val r1 = Register("R1", BitVecType(64))
-//    val r2 = Register("R2", BitVecType(64))
-//    val r30 = Register("R30", BitVecType(64))
-//
-//
-//    val constant1 = BitVecLiteral(1, 64)
-//    val r0ConstantAssign = new LocalAssign(r0, constant1, Some("00001"))
-//    val r0Reassign = new LocalAssign(r0, BitVecLiteral(2, 64), Some("00004"))
-//    val r1Assign = new LocalAssign(r1, r0, Some("00002"))
-//    val r2Assign = new LocalAssign(r2, r0, Some("00003"))
-//
-//    val callee = createSimpleProcedure("callee", Set(r0ConstantAssign))
-//    val callee2 = createSimpleProcedure("callee2", Set(r1Assign))
-//    val callee3 = createSimpleProcedure("callee3", List(r0Reassign, r2Assign))
-//
-//    // create the first wrapper function of callee
-//    val wrapper1 = new Procedure("wrapper1")
-//    val wrapper1ReturnBlock = Block.procedureReturn(wrapper1)
-//    wrapper1ReturnBlock.linkParent(wrapper1)
-//    wrapper1ReturnBlock.setParent(wrapper1)
-//    var secondCallBlock = createSimpleCall(wrapper1, callee2, "lwrapper1_2", wrapper1ReturnBlock, Set())
-//    var firstCallBlock = createSimpleCall(wrapper1, callee, "lwrapper1_1", secondCallBlock, Set())
-//    wrapper1.entryBlock = firstCallBlock
-//    wrapper1.returnBlock = wrapper1ReturnBlock
-//
-//
-//    // create the second wrapper function of callee
-//    val wrapper2 = new Procedure("wrapper2")
-//    val wrapper2ReturnBlock = Block.procedureReturn(wrapper2)
-//    wrapper2ReturnBlock.linkParent(wrapper2)
-//    wrapper2ReturnBlock.setParent(wrapper2)
-//    secondCallBlock = createSimpleCall(wrapper2, callee3, "lwrapper2_2", wrapper2ReturnBlock, Set())
-//    firstCallBlock = createSimpleCall(wrapper2, callee, "lwrapper2_1", secondCallBlock, Set())
-//    wrapper2.entryBlock = firstCallBlock
-//    wrapper2.returnBlock = wrapper2ReturnBlock
-//
-//
-//    // create the main function calling both wrapper functions of callee
-//    val main = new Procedure("main")
-//    val mainReturnBlock = Block.procedureReturn(main)
-//    mainReturnBlock.linkParent(main)
-//    mainReturnBlock.setParent(main)
-//    secondCallBlock = createSimpleCall(main, wrapper2, "lwrapper2", mainReturnBlock, Set())
-//    firstCallBlock = createSimpleCall(main, wrapper1, "lwrapper1", secondCallBlock, Set())
-//    main.entryBlock = firstCallBlock
-//    main.returnBlock = mainReturnBlock
-//
-//    val program = new Program(ArrayBuffer(main, callee, callee2, callee3, wrapper1, wrapper2), main, ArrayBuffer(), ArrayBuffer())
-//    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
-//
-//    RunUtils.writeToFile(toDot(program, Map.empty), "./test")
-//
-//    writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
-//      (m, f) => m + (f._1 -> f._2.toString())
-//    })
-//      , "testResult")
-//  }
-//
-//  test("twoCalleesBothLive") {
-//    differentCalleesBothLive()
-//  }
-//
-//  test("twoCalleesOneDies") {
-//    differentCalleesOneDies()
-//  }
-//
-//  test("twoCallers"){
-//    twoCallers()
-//  }
+
+    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+    val blocks = program.blocks
+
+
+
+//        writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
+//          (m, f) => m + (f._1 -> f._2.toString())
+//        })
+//          , "testResult")
+
+  }
+
+  test("differentCalleesBothAlive") {
+    differentCalleesBothLive()
+  }
+
+  test("differentCalleesOneAlive") {
+    differentCalleesOneAlive()
+  }
+
+  test("twoCallers") {
+    twoCallers()
+  }
+
+  test("deadBeforeCall") {
+    deadBeforeCall()
+  }
+
+  test("simpleBranch") {
+    simpleBranch()
+  }
+
+  test("recursion") {
+    recursion()
+  }
 
   test("basic_array_write") {
     runTest(examplePath, "basic_arrays_write", example = true)

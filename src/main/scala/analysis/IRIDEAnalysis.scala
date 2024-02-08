@@ -1,6 +1,6 @@
 package analysis
 
-import ir.{Block, CFGPosition, Command, DirectCall, Procedure, Program}
+import ir.{Block, CFGPosition, Command, DirectCall, GoTo, Procedure, Program}
 
 /**
  * Base trait for IDE analyses.
@@ -49,7 +49,7 @@ trait IRIDEAnalysis[E, EE, C, R, D, T, L <: Lattice[T]] {
 }
 
 
-trait ForwardIDEAnalysis[D, T, L <: Lattice[T]] extends IRIDEAnalysis[Procedure, Command, DirectCall, Block, D, T, L]
+trait ForwardIDEAnalysis[D, T, L <: Lattice[T]] extends IRIDEAnalysis[Procedure, Command, DirectCall, GoTo, D, T, L]
 
 
-trait BackwardIDEAnalysis[D, T, L <: Lattice[T]] extends IRIDEAnalysis[Command, Procedure, Block, DirectCall, D, T, L]
+trait BackwardIDEAnalysis[D, T, L <: Lattice[T]] extends IRIDEAnalysis[Command, Procedure, GoTo, DirectCall, D, T, L]

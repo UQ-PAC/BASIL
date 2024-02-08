@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.ForwardIDESolver
-import ir.{BitVecLiteral, BitVecType, Block, CFGPosition, Command, DirectCall, Literal, LocalAssign,  Procedure, Program, Register, Variable}
+import ir.{BitVecLiteral, BitVecType, GoTo, CFGPosition, Command, DirectCall, Literal, LocalAssign,  Procedure, Program, Register, Variable}
 
 import scala.collection.mutable
 
@@ -15,9 +15,9 @@ trait IRCopyConstantAnalysisFunctions extends ForwardIDEAnalysis[Variable, FlatE
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, edgelattice.Element] =
     Map(d -> IdEdge())
 
-  def edgesExitToAfterCall(exit: Command, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = Map(d -> IdEdge())
+  def edgesExitToAfterCall(exit: Command, aftercall: GoTo)(d: DL): Map[DL, edgelattice.Element] = Map(d -> IdEdge())
 
-  def edgesCallToAfterCall(call: DirectCall, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = Map()
+  def edgesCallToAfterCall(call: DirectCall, aftercall: GoTo)(d: DL): Map[DL, edgelattice.Element] = Map()
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, edgelattice.Element] = {
     if n.isInstanceOf[DirectCall] then

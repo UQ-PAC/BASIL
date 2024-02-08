@@ -2,7 +2,7 @@ package analysis
 
 
 import analysis.solvers.ForwardIDESolver
-import ir.{Assert, Assume, BitVecType, Block, CFGPosition, Command, DirectCall, IndirectCall, LocalAssign, MemoryAssign, Procedure, Program, Register, Variable}
+import ir.{Assert, Assume, BitVecType, GoTo, CFGPosition, Command, DirectCall, IndirectCall, LocalAssign, MemoryAssign, Procedure, Program, Register, Variable}
 
 import scala.collection.mutable
 
@@ -22,11 +22,11 @@ trait PossiblyUninitVarsFunctions extends ForwardIDEAnalysis[Variable, FlatEleme
     Map(d -> IdEdge())
   }
 
-  def edgesExitToAfterCall(exit: Command, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = {
+  def edgesExitToAfterCall(exit: Command, aftercall: GoTo)(d: DL): Map[DL, edgelattice.Element] = {
     Map(d -> IdEdge())
   }
 
-  def edgesCallToAfterCall(call: DirectCall, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = {
+  def edgesCallToAfterCall(call: DirectCall, aftercall: GoTo)(d: DL): Map[DL, edgelattice.Element] = {
     Map()
   }
 

@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.ForwardIDESolver
-import ir.{Block, CFGPosition, Command, DirectCall, LocalAssign, Procedure, Program, Variable}
+import ir.{GoTo, CFGPosition, Command, DirectCall, LocalAssign, Procedure, Program, Variable}
 
 trait IRReachingDefsAnalysisFunctions extends ForwardIDEAnalysis[LocalAssign, FlatElement[Nothing] ,TwoElementLattice] {
 
@@ -12,9 +12,9 @@ trait IRReachingDefsAnalysisFunctions extends ForwardIDEAnalysis[LocalAssign, Fl
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, edgelattice.Element] =
     Map(d -> IdEdge())
 
-  def edgesExitToAfterCall(exit: Command, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = Map(d -> IdEdge())
+  def edgesExitToAfterCall(exit: Command, aftercall: GoTo)(d: DL): Map[DL, edgelattice.Element] = Map(d -> IdEdge())
 
-  def edgesCallToAfterCall(call: DirectCall, aftercall: Block)(d: DL): Map[DL, edgelattice.Element] = Map()
+  def edgesCallToAfterCall(call: DirectCall, aftercall: GoTo)(d: DL): Map[DL, edgelattice.Element] = Map()
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, edgelattice.Element] = {
     n match

@@ -6,11 +6,11 @@ import scala.collection.mutable
 
 class IRIDECache(program: Program) {
   val entryExitMap: BiMap[Procedure, Command] = new BiMap[Procedure, Command]
-  val callReturnMap: BiMap[DirectCall, Block] = new BiMap[DirectCall, Block]
+  val callReturnMap: BiMap[DirectCall, GoTo] = new BiMap[DirectCall, GoTo]
   val callees: mutable.Map[DirectCall, Procedure] = mutable.Map[DirectCall, Procedure]()
   val callers: mutable.Map[Procedure, Set[DirectCall]] = mutable.Map[Procedure, Set[DirectCall]]()
-  val afterCall: mutable.Map[Command, Set[Block]] = mutable.Map[Command, Set[Block]]()
-  val retExit: mutable.Map[Block, Command] = mutable.Map[Block, Command]()
+  val afterCall: mutable.Map[Command, Set[GoTo]] = mutable.Map[Command, Set[GoTo]]()
+  val retExit: mutable.Map[GoTo, Command] = mutable.Map[GoTo, Command]()
   private var traversed: Set[CFGPosition] = Set()
 
   def cache() = {
@@ -27,7 +27,7 @@ class IRIDECache(program: Program) {
 
     entryExitMap.forwardMap.foreach(
       (entry, exit) =>
-        val afterCalls: mutable.Set[Block] = mutable.Set()
+        val afterCalls: mutable.Set[GoTo] = mutable.Set()
         callees.foreach(
           (call, proc) =>
             if (entry == proc) then
@@ -53,9 +53,9 @@ class IRIDECache(program: Program) {
         }
         else
           c match
-            // A direct call that we care about (it had a return block and the function called is not empty)
+            // A direct call that we care about (it had a return GoTo and the function called is not empty)
             case directCall: DirectCall if directCall.returnTarget.isDefined && directCall.target.blocks.nonEmpty =>
-              callReturnMap.addOne(directCall, IntraProcIRCursor.succ(directCall).head.asInstanceOf[Block])
+              callReturnMap.addOne(directCall, IntraProcIRCursor.succ(directCall).head.asInstanceOf[GoTo])
             case _ =>
             IntraProcIRCursor.succ(c).foreach(traverse)
 

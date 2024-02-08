@@ -1,7 +1,7 @@
 package analysis.solvers
 
 import analysis.{BackwardIDEAnalysis, Dependencies, EdgeFunction, EdgeFunctionLattice, ForwardIDEAnalysis, IRIDEAnalysis, IRIDECache, IRInterproceduralBackwardDependencies, IRInterproceduralForwardDependencies, Lambda, Lattice, MapLattice}
-import ir.{Block, CFGPosition, Command, DirectCall, InterProcIRCursor, IntraProcIRCursor, Jump, Procedure, Program}
+import ir.{Block, CFGPosition, Command, DirectCall, GoTo, InterProcIRCursor, IntraProcIRCursor, Jump, Procedure, Program}
 import util.Logger
 
 import scala.collection.immutable.Map
@@ -12,7 +12,7 @@ import scala.collection.mutable
  * Adapted from Tip
  * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/IDESolver.scala
  */
-abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Command), C <: (DirectCall | Block), R <: (DirectCall | Block), D, T, L <: Lattice[T]](val program: Program, val cache: IRIDECache, val startNode: CFGPosition)
+abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Command), C <: (DirectCall | GoTo), R <: (DirectCall | GoTo), D, T, L <: Lattice[T]](val program: Program, val cache: IRIDECache, val startNode: CFGPosition)
   extends IRIDEAnalysis[E, EE, C, R, D, T, L], Dependencies[CFGPosition] {
 
   protected def entryToExit(entry: E) : EE
@@ -222,16 +222,16 @@ abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Comman
 
 
 abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: IRIDECache)
-  extends IRIDESolver[Procedure, Command, DirectCall, Block, D, T, L](program, cache, program.mainProcedure),
+  extends IRIDESolver[Procedure, Command, DirectCall, GoTo, D, T, L](program, cache, program.mainProcedure),
     ForwardIDEAnalysis[D, T, L], IRInterproceduralForwardDependencies {
 
   protected def entryToExit(entry: Procedure): Command = cache.entryExitMap(entry)
 
   protected def exitToEntry(exit: Command): Procedure = cache.entryExitMap(exit)
 
-  protected def callToReturn(call: DirectCall): Block = cache.callReturnMap(call)
+  protected def callToReturn(call: DirectCall): GoTo = cache.callReturnMap(call)
 
-  protected def returnToCall(ret: Block): DirectCall = cache.callReturnMap(ret)
+  protected def returnToCall(ret: GoTo): DirectCall = cache.callReturnMap(ret)
 
   protected def getCallee(call: DirectCall): Procedure = cache.callees(call)
 
@@ -245,7 +245,7 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: 
       case command: Command => cache.afterCall.contains(command)
       case _ => false
 
-  protected def getAfterCalls(exit: Command): Set[Block] = cache.afterCall(exit)
+  protected def getAfterCalls(exit: Command): Set[GoTo] = cache.afterCall(exit)
 
   protected def getExitProc(exit: Command): Procedure = exit.parent.parent
 
@@ -254,7 +254,7 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: 
 
 
 abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: IRIDECache)
-  extends IRIDESolver[Command, Procedure, Block, DirectCall, D, T, L](program, cache,
+  extends IRIDESolver[Command, Procedure, GoTo, DirectCall, D, T, L](program, cache,
     if cache.entryExitMap.forwardMap.contains(program.mainProcedure) then cache.entryExitMap(program.mainProcedure)
     else program.mainProcedure
   ),
@@ -264,15 +264,15 @@ abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache:
 
   protected def exitToEntry(exit: Procedure): Command = cache.entryExitMap(exit)
 
-  protected def callToReturn(call: Block): DirectCall = cache.callReturnMap(call)
+  protected def callToReturn(call: GoTo): DirectCall = cache.callReturnMap(call)
 
-  protected def returnToCall(ret: DirectCall): Block = cache.callReturnMap(ret)
+  protected def returnToCall(ret: DirectCall): GoTo = cache.callReturnMap(ret)
 
-  protected def getCallee(call: Block): Command = cache.retExit(call)
+  protected def getCallee(call: GoTo): Command = cache.retExit(call)
 
   protected def isCall(call: CFGPosition): Boolean =
     call match
-      case block: Block => cache.callReturnMap.backwardMap.contains(block)
+      case goto: GoTo => cache.callReturnMap.backwardMap.contains(goto)
       case _ => false
 
   protected def isExit(exit: CFGPosition): Boolean =
