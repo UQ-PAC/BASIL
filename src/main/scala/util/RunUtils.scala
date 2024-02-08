@@ -462,7 +462,7 @@ object RunUtils {
                   modified = true
                   val procedure = c.parent.data
                   val newBlocks = ArrayBuffer[Block]()
-                  indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
+                  // indirectCall.parent.parent.removeBlocksDisconnect(indirectCall.returnTarget)
                   for (t <- targets) {
                     val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
                     val newLabel: String = block.label + t.name

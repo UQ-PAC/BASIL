@@ -286,7 +286,7 @@ class Procedure private (
    * with a jump(s) to this blocks jump target(s). If this block ends in a call then only its statements are removed.
    * @param blocks the block/blocks to remove
    */
-  def removeBlocksInline(blocks: Block*): Unit = {
+  def removeBlocksInline(blocks: Iterable[Block]): Unit = {
     for (elem <- blocks) {
       elem.jump match {
         case g: GoTo =>
@@ -301,17 +301,26 @@ class Procedure private (
     }
   }
 
+
+  def removeBlocksInline(blocks: Block*): Unit = {
+    removeBlocksInline(blocks.toSeq)
+  }
+
   /**
    * Remove block(s) and all jumps that target it
    * @param blocks the blocks to remove
    */
-  def removeBlocksDisconnect(blocks: Block*): Unit = {
-    for (elem <- blocks.toSeq) {
+  def removeBlocksDisconnect(blocks: Iterable[Block]): Unit = {
+    for (elem <- blocks) {
       for (j <- elem.incomingJumps) {
         j.removeTarget(elem)
       }
       removeBlocks(elem)
     }
+  }
+
+  def removeBlocksDisconnect(blocks: Block*): Unit = {
+    removeBlocksDisconnect(blocks.toSeq)
   }
   
 
