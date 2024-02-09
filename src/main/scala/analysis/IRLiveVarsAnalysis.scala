@@ -8,6 +8,11 @@ import util.RunUtils.writeToFile
 
 /**
  * Micro-transfer-functions for LiveVar analysis
+ * this analysis works by inlining function calls (instead of just mapping parameters and returns all
+ * live variables (registers) are propagated to and from callee functions)
+ * The result of what variables are alive at each point in the program should still be correct
+ * However, the functions that are callees of other functions will have an over approximation of their parameters
+ * alive at the top of the function
  * Tip SPA IDE Slides include a short and clear explanation of microfunctions
  * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
  */
@@ -22,11 +27,12 @@ trait IRLiveVarAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatEleme
     // if parameters are known this should map only parameter registers to IdEdge() or in this case
     // return (since it is a backward analysis)
     // all other dataflow facts except lambda should be mapped to bottom (return empty Map())
-    Map(d -> IdEdge())
+    //    d match
+    //      case Left(value) => Map()
+    //      case Right(_) => Map(d -> IdEdge())
 
-//    d match
-//      case Left(value) => Map()
-//      case Right(_) => Map(d -> IdEdge())
+
+    Map(d -> IdEdge())
   }
 
   def edgesExitToAfterCall(exit: Procedure, aftercall: DirectCall)(d: DL): Map[DL, edgelattice.Element] = {
@@ -39,7 +45,20 @@ trait IRLiveVarAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatEleme
 
   def edgesCallToAfterCall(call: GoTo, aftercall: DirectCall)(d: DL): Map[DL, edgelattice.Element] = {
     // this analysis is implemented in order to Identify parameters and function interface
-    // if parameters are known this should map all non parameter registers to IdEdge() instead
+    // if parameters are known this should map all non parameter registers to IdEdge() instead and all parameter to bottom
+    //    d match
+    //      case Left(value) =>
+    //        val p = aftercall.target.out.foldLeft(false) {
+    //          (b, param) =>
+    //            if value == param.value then
+    //              true
+    //            else
+    //              b
+    //        }
+    //
+    //        if p then Map() else Map(d -> IdEdge())
+    //      case Right(_) => Map(d -> IdEdge())
+
     d match
       case Left(value) => Map()
       case Right(_) => Map(d -> IdEdge())
