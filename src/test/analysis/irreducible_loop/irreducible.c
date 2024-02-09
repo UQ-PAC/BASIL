@@ -1,4 +1,9 @@
+// Should verify with irreducible loop resolution and loop unrolling
+// run -o basil-out.bpl -a src/test/analysis/irreducible_loop/irreducible.adt -r src/test/analysis/irreducible_loop/irreducible.relf -s src/test/analysis/irreducible_loop/irreducible.spec --analyse
+// boogie basil-out.bpl /useArrayAxioms /loopUnroll 15
+
 #include <stdio.h>
+//#include <assert.h>
 //
 //	      +---+
 //    /---| H |---\
@@ -11,22 +16,24 @@
 //
 //
 
+int i,x;
+
 int main(int argc, char** argv)
 {
-	int i,x;
 	i = 0;
-	x = 0;
 H:
 	if (x % 2 == 0)
 		goto B;
 	else
 		goto A;	
 A:
-	printf("A-%d\n", i);
+	puts("i");
+//	printf("A-i=%d\n", i);
 	i++;
 	goto B;
 B:
-	printf("B-%d\n", i);
+	puts("i");
+//	printf("B-i=%d\n", i);
 	if (i == 5) {
 		goto E;
 	} else {
@@ -34,6 +41,8 @@ B:
 	}
 
 E:
-	printf("We have exited!\n");
+	puts("exited\n");
+//	assert(i == 5);
+//	printf("We have exited!\n");
 	return 0;
 }

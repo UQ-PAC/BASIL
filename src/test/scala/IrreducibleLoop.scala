@@ -44,7 +44,7 @@ class IrreducibleLoop extends AnyFunSuite {
     val timer = PerformanceTimer(s"test $variationPath")
     Logger.info(variationPath)
 
-    val args = mutable.ArrayBuffer("--adt", ADTPath, "--relf", RELFPath, "--output", outPath, "--analyse")
+    val args = mutable.ArrayBuffer("--adt", ADTPath, "--relf", RELFPath, "--output", outPath, "--analyse", "-v")
 
     val program : Program = load(ILLoadingConfig(ADTPath, RELFPath))
 
@@ -59,6 +59,9 @@ class IrreducibleLoop extends AnyFunSuite {
         Logger.info(s"found loops\n${l}")
         )
 
+    val loops_to_transform = detector.irreducible_loops()
+    assert(loops_to_transform.forall(foundLoops.contains(_)))
+
 
     val transformer = LoopTransform(foundLoops);
     val newLoops = transformer.llvm_transform();
@@ -72,6 +75,7 @@ class IrreducibleLoop extends AnyFunSuite {
     val foundLoops2 = newDetect.identify_loops()
     assert(foundLoops2.count(_.reducible) == foundLoops.size)
     assert(foundLoops2.count(_.reducible) > foundLoops.count(_.reducible))
+    assert(newDetect.irreducible_loops().isEmpty)
 
 
 
@@ -88,6 +92,36 @@ class IrreducibleLoop extends AnyFunSuite {
 
   test("irreducible 2") {
     runTest(testPath + "/" +  "irreducible_loop_2", "irreducible2")
+  }
+
+
+  test("testverify fail irreducible_loop") { 
+    val path = "src/test/analysis/irreducible_loop/irreducible"
+    val outPath = s"$path.bpl"
+    val args = s"-o $outPath -a $path.adt -r $path.relf -s $path.spec".split(" ")
+
+    Main.main(args)
+
+    val boogieResult = (Seq("boogie", "/useArrayAxioms", outPath)).!!
+
+    Logger.info("Boogie result: " + boogieResult)
+
+    assert(boogieResult.contains("Irreducible flow graphs are unsupported."))
+  }
+
+  test("testverify reduced irreducible_loop") { 
+    val path = "src/test/analysis/irreducible_loop/irreducible"
+    val outPath = s"$path.bpl"
+    val args = s"-o $outPath -a $path.adt -r $path.relf -s $path.spec --analyse".split(" ")
+
+    Main.main(args)
+
+    val boogieResult = (Seq("boogie", "/smoke", "/useArrayAxioms", outPath)).!!
+
+    Logger.info("Boogie result: " + boogieResult)
+
+    assert(boogieResult.contains("Boogie program verifier finished with 2 verified, 0 errors"))
+    assert(!(boogieResult.contains("found unreachable code")))
   }
 
 

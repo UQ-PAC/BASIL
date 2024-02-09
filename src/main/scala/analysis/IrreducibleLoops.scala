@@ -2,6 +2,7 @@ package analysis
 
 import ir.{CFGPosition, IntraProcIRCursor, Program, Procedure, Block, GoTo, IRWalk}
 import intrusivelist.{IntrusiveList}
+import util.Logger
 
 import scala.collection.mutable
 
@@ -49,6 +50,7 @@ class Loop(var header: CFGPosition):
         edges += edge
     }
 
+    def name: String = label(header)
 
     override def toString() = {
         s"Header: ${label(header)}, Body: ${edges}"
@@ -73,7 +75,7 @@ class LoopDetector(cfg: Program):
      * Returns the set of irreducible loops in the program. 
      *
      */
-    def loops_to_transform(): Set[Loop] = {
+    def irreducible_loops(): Set[Loop] = {
         val irreducibleLoops: Set[Loop] = loops.values.filter(l => !l.reducible).toSet;
 
         if (irreducibleLoops.isEmpty) {
@@ -296,8 +298,6 @@ class LoopTransform(loops: Set[Loop]):
       * Returns: A new reducible loop which is semantically equivalent to the input irreducible loop
       */
     def llvm_transform_loop(loop: Loop, i: Integer): Loop = {
-        loop.entryEdges.foreach { l => println(s"- ${l}")}
-
         val entryEdges: Set[LoopEdge] = loop.entryEdges.union(loop.reentries).union(loop.backEdges).toSet
 
         val P_e: Set[LoopEdge] = entryEdges                                                 // N entry edges
@@ -317,7 +317,7 @@ class LoopTransform(loops: Set[Loop]):
         )
 
         val N: Block = Block(
-            label = s"N-${i}",
+            label =  s"${(IRWalk.procedure(loop.header)).name}_N_${i}",
             address = None,
             statements = IntrusiveList(),
             NGoTo
@@ -351,8 +351,8 @@ class LoopTransform(loops: Set[Loop]):
                         case _ =>
                     }
                 case _ =>
-                    println("[!] Unexpected loop originating node - 1");
-                    println(origNode)
+                    Logger.error("Unexpected loop originating node - 1");
+                    Logger.error(origNode)
             };
         }
 
@@ -380,8 +380,8 @@ class LoopTransform(loops: Set[Loop]):
                         case _ =>
                     }
                 case _ =>
-                    println("[!] Unexpected loop originating node - 2");
-                    println(origNode);
+                    Logger.error("Unexpected loop originating node - 1");
+                    Logger.error(origNode)
             }            
         }
 

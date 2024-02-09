@@ -242,9 +242,11 @@ object RunUtils {
 
     val detector = LoopDetector(newIR);
     val foundLoops = detector.identify_loops()
+    foundLoops.foreach(l => Logger.info(s"Loop found: ${l.name}"))
 
     val transformer = LoopTransform(foundLoops);
     val newLoops = transformer.llvm_transform();
+    newLoops.foreach(l => Logger.info(s"Loop found: ${l.name}"))
 
     config.analysisDotPath.foreach { s =>
       val newCFG = ProgramCfgFactory().fromIR(newIR)
