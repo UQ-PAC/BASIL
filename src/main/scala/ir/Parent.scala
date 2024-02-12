@@ -1,4 +1,7 @@
-package ir 
+package ir
+import util.Logger
+
+import scala.io.AnsiColor
 
 trait HasParent[T]:
   /*
@@ -8,7 +11,20 @@ trait HasParent[T]:
       All IL structures must set the parent of the child to itself, when a child is added to itself.
    */
   private var _parent: Option[T] = None
-  def parent: T = _parent.get
+  private var last_parent: Option[(T, String, String, Int)] = None
+  def parent: T = {
+    _parent match {
+      case Some(p) => p
+      case None =>  {
+        val msg = s"Trying to get the parent of a node that is detached from the progam: $this. " +
+          s"Node was last attached to: ${last_parent.map(_._1)}, detached at ${last_parent.map(x => x._2 + x._3 + "@" + x._4)} "
+        Logger.error(msg)
+        throw new RuntimeException(msg)
+      }
+    }
+  }
+
+  def hasParent: Boolean = _parent.isDefined
 
   def parent_=(value: T): Unit = setParent(value)
 
@@ -36,10 +52,13 @@ trait HasParent[T]:
    * Remove this element's parent and update any IL control-flow links implied by this relation.
    * Is idempotent.
    */
-  final def deParent(): Unit = if _parent.isDefined then {
-    unlinkParent()
-    _parent = None
+  final def deParent()(implicit line: sourcecode.Line, file: sourcecode.FileName, name: sourcecode.Name): Unit = {
+    if _parent.isDefined then {
+      last_parent = _parent.map(x => (x, file.value, name.value, line.value))
+      unlinkParent()
+      _parent = None
     }
+  }
 
   /**
    * Set this element's parent and update any IL control-flow links implied by this relation.

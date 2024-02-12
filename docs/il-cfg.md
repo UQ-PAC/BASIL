@@ -48,7 +48,7 @@ First we have basic blocks belonging to a procedure.
     Block(id, procedure) 
     EntryBlock(block_id, procedure)
     ReturnBlock(block_id, procedure) 
-    Block(id, procedure) :- EntryBlock(id, procedure); ReturnBlock(id, procedure)
+    Block(id, procedure) :- EntryBlock(id, procedure); ReturnBlock(id, procedure); AfterCallBlock(id, call)
 
 A list of sequential statements belonging to a block
 
@@ -64,7 +64,7 @@ intra-procedural edges, and Calls form the inter-procedural edges.
 Statements and Jumps are both considered commands. All IL terms, commands, blocks, and procedures, have a unique
 identifier. All of the above are considered IL terms.
 
-    Command(id) :- Statement(id, _, _) ; Jump(id, _)
+    Command(id) :- Statement(id, _, _) ; Jump(id, _) 
     ILTerm(id) :- Procedure(id); Block(id, _); Command(id) 
 
 The predecessor/successor relates ILTerms to ILTerms, and is simply defined in terms of the nodes 
@@ -77,12 +77,13 @@ The predecessor/successor relates ILTerms to ILTerms, and is simply defined in t
 
     succ(goto, targetBlock) :- GoTo(goto, _, _, targetBlock) 
 
-    succ(call, return_block) :- Call(call, block, dest_procedure, return_block)
+    succ(call, aftercall_block) :- Call(call, block, dest_procedure, aftercall_block), AfterCallBlock(aftercall_block, call)
 
 For an inter-procedural CFG we also have:
 
-    succ(call, return_block) :- ReturnBlock(return_block, call), Procedure(call)
-    succ(call, targetProcedure) :- Call(call, _, _, targetProcedure) 
+    succ(return_block, aftercall_block) :- ReturnBlock(return_block, proc), AfterCallBlock(call,), Call(call, _,_, proc),  
+            Procedure(proc)
+    succ(call, targetProcedure) :- Call(call, _, _, targetProcedure), Procedure(targetProcedure) 
 
 An inter-procedural solver is expected to keep track of call sites which return statements jump back to.
 
@@ -123,24 +124,34 @@ Specifically this means we store
         - list of incoming Calls
         - subroutine to compute the set of all outgoing calls in all contained blocks
 
-This means the IL contains: 
-   - Forward graph edges in the forms of calls and gotos
-   - Forward syntax tree edges in the form of classes containing their children as fields
-   - Backwards graph edges in the form of lists of incoming jumps and calls
-      - Procedure has list of incoming calls
-      - Block has list of incoming gotos 
-   - Backwards syntax tree edges in the form of a parent field
-     - Implementation of the `HasParent` trait.
+This means the IL contains:
+- Forward graph edges in the forms of calls and gotos
+- Forward syntax tree edges in the form of classes containing their children as fields
+- Backwards graph edges in the form of lists of incoming jumps and calls
+    - Procedure has list of incoming calls
+    - Block has list of incoming gotos
+- Backwards syntax tree edges in the form of a parent field
+    - Implementation of the `HasParent` trait.
 
-To maintain the backwards edges it is necessary to make the actual data structures private, and only allow 
-modification through interfaces which maintain the graph/tree.  
+To maintain the backwards edges it is necessary to make the actual data structures private, and only allow
+modification through interfaces which maintain the graph/tree.
 
 Jumps:
-- Must implement an interface to allow adding or removing edge references (references to themself) to and from their 
-  target 
+- Must implement an interface to allow adding or removing edge references (references to themself) to and from their
+  target
 
 Blocks and Procedures:
-- Implement an interface for adding and removing edge references 
+- Implement an interface for adding and removing edge references
 
 Furthermore;
 - Reparenting Blocks and Commands in the IL must preserve the parent field, this is not really implemented yet
+
+`HasParent` Relation
+------------------
+ 
+The parent invariant means that any node that is connected to the IR/CFG: i.e. nodes reachable from a Program, Procedure, 
+or Block, control-flow, etc. has a parent defined. On removal from the program `deParent()` is called, and on adding 
+`setParent(newparent)` is called. These in turn call `linkParent` and `unlinkParent`. 
+
+Implementations of these methods are responsible for maintaining the other invariants of the IR. For example, the 
+invariant that the target of every goto contains a reference to the goto in its `incomingJumps` set.

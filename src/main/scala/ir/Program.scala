@@ -137,7 +137,7 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 
       stack.pushAll(n match  {
         case p : Procedure => p.blocks
-        case b: Block => Seq() ++ b.statements ++ Seq(b.jump)
+        case b: Block => Seq() ++ b.statements ++ Seq(b.jump) ++ b.fallthrough.toSet
         case s: Command => Seq()
       })
 
@@ -159,17 +159,19 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 class Procedure private (
                   var name: String,
                   var address: Option[Int],
-                  var entryBlock: Option[Block],
-                  var returnBlock: Option[Block],
+                  private var _entryBlock: Option[Block],
+                  private var _returnBlock: Option[Block],
                   private val _blocks: mutable.LinkedHashSet[Block],
                   var in: ArrayBuffer[Parameter],
                   var out: ArrayBuffer[Parameter],
                 ) {
   private var _callers = new mutable.HashSet[DirectCall]
+  _blocks.foreach(_.parent = this)
+
 
   // class invariant
-  require(returnBlock.forall(b => _blocks.contains(b)) && entryBlock.forall(b => _blocks.contains(b)))
-  require(_blocks.isEmpty == entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
+  require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
+  require(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
   def this(name: String, address: Option[Int] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
     this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
@@ -188,19 +190,38 @@ class Procedure private (
   def blocks: Iterator[Block] = _blocks.iterator
 
   def addCaller(c: DirectCall): Unit = {
-    _callers.remove(c)
+    _callers.add(c)
   }
 
   def removeCaller(c: DirectCall): Unit = {
     _callers.remove(c)
   }
 
+  def returnBlock: Option[Block] = _returnBlock
+
+  def returnBlock_=(value: Block): Unit = {
+    if (!returnBlock.contains(value)) {
+      removeBlocks(_returnBlock)
+      _returnBlock = Some(addBlocks(value))
+    }
+  }
+
+  def entryBlock: Option[Block] = _entryBlock
+
+  def entryBlock_=(value: Block): Unit = {
+    if (!entryBlock.contains(value)) {
+      removeBlocks(_entryBlock)
+      _entryBlock = Some(addBlocks(value))
+    }
+  }
+
   def addBlocks(block: Block): Block = {
+    block.parent = this
     if (!_blocks.contains(block)) {
       block.parent = this
       _blocks.add(block)
       if (entryBlock.isEmpty) {
-        entryBlock = Some(block)
+        entryBlock = block
       }
     }
     block
@@ -217,10 +238,14 @@ class Procedure private (
     if (oldBlock ne block) {
       val isEntry: Boolean = entryBlock.contains(oldBlock)
       val isReturn: Boolean = returnBlock.contains(oldBlock)
-      removeBlocks(oldBlock)
+      val incoming = oldBlock.incomingJumps
+      removeBlocksDisconnect(oldBlock)
       addBlocks(block)
-      if isEntry then entryBlock = Some(block)
-      if isReturn then returnBlock = Some(block)
+      for (elem <- incoming) {
+        elem.addTarget(block)
+      }
+      if isEntry then entryBlock = block
+      if isReturn then returnBlock = block
     }
     block
   }
@@ -236,16 +261,60 @@ class Procedure private (
     addBlocks(newBlocks)
   }
 
+  /**
+   * Removes a block assuming no existing blocks jump to it.
+   * @param block the block to remove
+   * @return the removed block
+   */
   def removeBlocks(block: Block): Block = {
+    require(block.incomingJumps.isEmpty) // don't leave jumps dangling
     if (_blocks.contains(block)) {
       block.deParent()
       _blocks.remove(block)
     }
-    if (_blocks.isEmpty) {
-      entryBlock = None
+    if (_entryBlock.contains(block)) {
+      _entryBlock = None
+    }
+    if (_returnBlock.contains(block)) {
+      _returnBlock = None
     }
     block
   }
+
+  /**
+   * Remove blocks with the semantics of replacing them with a noop. The incoming jumps to this are replaced
+   * with a jump(s) to this blocks jump target(s). If this block ends in a call then only its statements are removed.
+   * @param blocks the block/blocks to remove
+   */
+  def removeBlocksInline(blocks: Block*): Unit = {
+    for (elem <- blocks) {
+      elem.jump match {
+        case g: GoTo =>
+          // rewrite all the jumps to include our jump targets
+          elem.incomingJumps.foreach(_.removeTarget(elem))
+          elem.incomingJumps.foreach(_.addAllTargets(g.targets))
+          removeBlocks(elem)
+        case c: Call =>
+          // just remove statements, keep call
+          elem.statements.clear()
+      }
+    }
+  }
+
+  /**
+   * Remove block(s) and all jumps that target it
+   * @param blocks the blocks to remove
+   */
+  def removeBlocksDisconnect(blocks: Block*): Unit = {
+    for (elem <- blocks.toSeq) {
+      for (j <- elem.incomingJumps) {
+        j.removeTarget(elem)
+      }
+      removeBlocks(elem)
+    }
+  }
+  
+
   def removeBlocks(blocks: IterableOnce[Block]): Unit = {
     for (elem <- blocks.iterator) {
       removeBlocks(elem)
@@ -256,7 +325,6 @@ class Procedure private (
     // O(n) because we are careful to unlink the parents etc.
     removeBlocks(_blocks)
   }
-
 
   def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).toSet[Procedure]
   def incomingCalls(): Iterator[DirectCall] = _callers.iterator
@@ -270,46 +338,60 @@ class Parameter(var name: String, var size: Int, var value: Register) {
 }
 
 
-class Block private (var label: String,
+
+class Block private (
+  var label: String,
  var address: Option[Int],
  val statements: IntrusiveList[Statement],
  private var _jump: Jump,
  private val _incomingJumps: mutable.HashSet[GoTo],
-) extends IntrusiveListElement, HasParent[Procedure] {
-  statements.foreach(_.setParent(this))
+ var _fallthrough : Option[GoTo],
+) extends HasParent[Procedure] {
   _jump.setParent(this)
+  statements.foreach(_.setParent(this))
 
   statements.onInsert = x => x.setParent(this)
   statements.onRemove = x => x.deParent()
 
-  def this(label: String, address: Option[Int], statements: IterableOnce[Statement], jump: Jump) = {
-    this(label, address, IntrusiveList.from(statements), jump, mutable.HashSet.empty)
-  }
 
-  def this(label: String, address: Option[Int], statements: IterableOnce[Statement]) = {
-    this(label, address, IntrusiveList.from(statements), GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
-  }
-
-  def this(label: String, address: Option[Int] = None) = {
-    this(label, address, IntrusiveList(), GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
+  def this(label: String, address: Option[Int] = None, statements: IterableOnce[Statement] = Set.empty, jump: Jump = GoTo(Set.empty)) = {
+    this(label, address, IntrusiveList.from(statements), jump,  mutable.HashSet.empty, None)
   }
 
   def jump: Jump = _jump
 
-  def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
+  def fallthrough = _fallthrough
 
-  def addIncomingJump(g: GoTo) = _incomingJumps.add(g)
-  def removeIncomingJump(g: GoTo) = _incomingJumps.remove(g)
+  def fallthrough_=(g: Option[GoTo]): Unit = {
+    /*
+     * Fallthrough is only set if Jump is a call, this is maintained maintained at the 
+     * linkParent implementation on FallThrough of Call.
+     */
+    _fallthrough.foreach(_.deParent())
+    g.foreach(x => x.parent = this)
+    _fallthrough = g
+  }
 
-  def replaceJump(j: Jump): this.type = {
-    _jump.deParent()
-    j.setParent(this)
-    _jump = j
+  def jump_=(j: Jump): Unit = {
+    if (j ne _jump) {
+      _jump.deParent()
+      _jump = j
+      _jump.parent = this
+    }
+  }
+
+  def replaceJump(j: Jump) = {
+    jump = j
     this
   }
 
-  def isEntry: Boolean = parent.entryBlock.contains(this)
-  def isReturn: Boolean = parent.returnBlock.contains(this)
+  def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
+
+  def addIncomingJump(g: GoTo) = _incomingJumps.add(g)
+  def removeIncomingJump(g: GoTo) = {
+    _incomingJumps.remove(g)
+    assert(!incomingJumps.contains(g))
+  }
 
   def calls: Set[Procedure] = _jump.calls
 
@@ -332,8 +414,10 @@ class Block private (var label: String,
   def nextBlocks: Iterable[Block] = {
     jump match {
       case c: GoTo => c.targets
-      case c: DirectCall => c.returnTarget
-      case c: IndirectCall => c.returnTarget
+      case c: Call =>  fallthrough match {
+          case Some(x) => x.targets
+          case _ => Seq()
+      }
     }
   }
 
@@ -375,18 +459,22 @@ class Block private (var label: String,
   override def hashCode(): Int = label.hashCode()
 
   override def linkParent(p: Procedure): Unit = {
-    // The first block added to the procedure is the entry block
-    if parent.blocks.isEmpty then parent.entryBlock = Some(this)
     // to connect call() links that reference jump.parent.parent
     jump.setParent(this)
   }
+
   override def unlinkParent(): Unit = {
-    if parent.entryBlock.contains(this) then parent.entryBlock = None
-    if parent.returnBlock.contains(this) then parent.returnBlock = None
     // to disconnect call() links that reference jump.parent.parent
     jump.deParent()
   }
  }
+
+
+object Block:
+
+  def procedureReturn(from: Procedure): Block = {
+      new Block((from.name + "_basil_return"), None, List(), IndirectCall(Register("R30", BitVecType(64))))
+  }
 
 
 /**
