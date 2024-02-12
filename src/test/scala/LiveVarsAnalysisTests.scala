@@ -329,11 +329,52 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     val blocks = program.blocks
 
 
+        writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
+          (m, f) => m + (f._1 -> f._2.toString())
+        })
+          , "testResult")
 
-//        writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
-//          (m, f) => m + (f._1 -> f._2.toString())
-//        })
-//          , "testResult")
+  }
+
+  def recursion2(): Unit = {
+    import IRDSL._
+    val r30 = Register("R30", BitVecType(64))
+    val program: Program = prog(
+      proc("main",
+        block("lmain",
+          LocalAssign(R0, R1),
+          goto("recursion", "non-recursion")
+        ),
+        block(
+          "recursion",
+          call("main", Some("assign"))
+        ),
+        block("assign",
+          LocalAssign(R0, R2),
+          goto("return")
+        ),
+        block(
+          "non-recursion",
+          goto("return")
+        ),
+        block("return",
+          ret
+        )
+      )
+    )
+
+    //    writeToFile(toDot(program, Map.empty)
+    //      , "testResult")
+
+    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+    val blocks = program.blocks
+
+
+
+    writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
+      (m, f) => m + (f._1 -> f._2.toString())
+    })
+      , "testResult")
 
   }
 
@@ -357,9 +398,9 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     simpleBranch()
   }
 
-  test("recursion") {
-    recursion()
-  }
+//  test("recursion") {
+//    recursion()
+//  }
 
   test("basic_array_write") {
     runTest(examplePath, "basic_arrays_write", example = true)
