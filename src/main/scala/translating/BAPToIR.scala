@@ -48,11 +48,12 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
         val (jump, newBlocks) = translate(b.jumps, block)
         procedure.addBlocks(newBlocks)
         block.replaceJump(jump)
+        assert(jump.hasParent)
       }
 
       // Set entry block to the block with the same address as the procedure or the first in sequence
-      procedure.entryBlock = procedure.blocks.find(b => b.address == procedure.address)
-      if procedure.entryBlock.isEmpty then procedure.entryBlock = procedure.blocks.nextOption()
+      procedure.blocks.find(b => b.address == procedure.address).foreach(procedure.entryBlock = _)
+      if procedure.entryBlock.isEmpty then procedure.blocks.nextOption().foreach(procedure.entryBlock = _)
 
     }
 
