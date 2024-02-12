@@ -28,7 +28,7 @@ class MemoryModelMap {
   private val contextStack = mutable.Stack.empty[List[StackRegion]]
   private val sharedContextStack = mutable.Stack.empty[List[StackRegion]]
   private val localStacks = mutable.Map[String, List[StackRegion]]()
-  private val sharedStacks = mutable.Map[String, List[StackRegion]]()
+  private val sharedStacks = mutable.Map[String, List[StackRegion]]().withDefaultValue(List.empty[StackRegion])
 
   /** Add a range and object to the mapping
    *
@@ -170,11 +170,18 @@ class MemoryModelMap {
       popContext()
       pushContext(name)
       println(s"  Function: $name")
+      if rangeMap.stackMap.nonEmpty then println(s"    Local:")
       // must sort by ranges
       for ((range, region) <- rangeMap.stackMap) {
         if (region.content.nonEmpty || !hideEmpty) {
-          println(s"    $range -> $region")
+          println(s"       $range -> $region")
         }
+      }
+      if rangeMap.sharedStackMap.nonEmpty then println(s"    Shared:")
+      for ((range, region) <- rangeMap.sharedStackMap) {
+          if (region.content.nonEmpty || !hideEmpty) {
+          println(s"       $range -> $region")
+          }
       }
     println("Heap:")
     for ((range, region) <- rangeMap.heapMap) {

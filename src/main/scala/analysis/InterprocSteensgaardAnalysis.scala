@@ -47,7 +47,6 @@ class InterprocSteensgaardAnalysis(
   var mallocCount: Int = 0
   var stackCount: Int = 0
   val stackMap: mutable.Map[Expr, StackRegion] = mutable.Map()
-  val spList = ListBuffer[Expr](stackPointer)
 
   private def nextMallocCount() = {
     mallocCount += 1
@@ -160,34 +159,16 @@ class InterprocSteensgaardAnalysis(
               case FlatEl(al) =>
                 al match
                   case load: MemoryLoad => // treat as a region
-                    res = res ++ exprToRegion(load.index, n, shared)
+                    res = res ++ exprToRegion(load.index, n, true)
                   case binaryExpr: BinaryExpr =>
-                    res = res ++ reducibleToRegion(binaryExpr, n, shared)
+                    res = res ++ reducibleToRegion(binaryExpr, n, true)
                     res = res ++ exprToRegion(al, n)
                   case _ => // also treat as a region (for now) even if just Base + Offset without memLoad
-                    res = res ++ exprToRegion(al, n, shared)
+                    res = res ++ exprToRegion(al, n, true)
             }
           }
         }
         res
-    }
-  }
-
-  def stackDetection(stmt: Statement): Unit = {
-    println("Stack detection")
-    println(spList)
-    stmt match {
-      case localAssign: LocalAssign =>
-        if (spList.contains(localAssign.rhs)) {
-          // add lhs to spList
-          spList.addOne(localAssign.lhs)
-        } else {
-          // remove lhs from spList
-          if spList.contains(localAssign.lhs) && localAssign.lhs != stackPointer then // TODO: This is a hack: it should check for stack ptr using the wrapper
-            spList.remove(spList.indexOf(localAssign.lhs))
-        }
-        // TODO: should handle the store case (last case)
-      case _ =>
     }
   }
 
@@ -220,7 +201,6 @@ class InterprocSteensgaardAnalysis(
             }
 
           case localAssign: LocalAssign =>
-            stackDetection(localAssign)
             localAssign.rhs match {
               case binOp: BinaryExpr =>
                 // X1 = &X2: [[X1]] = ↑[[X2]]
