@@ -1,7 +1,7 @@
 package analysis.solvers
 
-import analysis.{BackwardIDEAnalysis, Dependencies, EdgeFunction, EdgeFunctionLattice, ForwardIDEAnalysis, IRIDEAnalysis, IRIDECache, IRInterproceduralBackwardDependencies, IRInterproceduralForwardDependencies, Lambda, Lattice, MapLattice}
-import ir.{Block, CFGPosition, Command, DirectCall, GoTo, InterProcIRCursor, IntraProcIRCursor, Jump, Procedure, Program}
+import analysis.{BackwardIDEAnalysis, Dependencies, EdgeFunction, EdgeFunctionLattice, ForwardIDEAnalysis, IDEAnalysis, IDECache, IRInterproceduralBackwardDependencies, IRInterproceduralForwardDependencies, Lambda, Lattice, MapLattice}
+import ir.{Block, CFGPosition, Command, DirectCall, GoTo, IndirectCall, InterProcIRCursor, IntraProcIRCursor, Jump, Procedure, Program, IRWalk}
 import util.Logger
 
 import scala.collection.immutable.Map
@@ -12,8 +12,8 @@ import scala.collection.mutable
  * Adapted from Tip
  * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/IDESolver.scala
  */
-abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Command), C <: (DirectCall | GoTo), R <: (DirectCall | GoTo), D, T, L <: Lattice[T]](val program: Program, val cache: IRIDECache, val startNode: CFGPosition)
-  extends IRIDEAnalysis[E, EE, C, R, D, T, L], Dependencies[CFGPosition] {
+abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Command), C <: (DirectCall | GoTo), R <: (DirectCall | GoTo), D, T, L <: Lattice[T]](val program: Program, val cache: IDECache, val startNode: CFGPosition)
+  extends IDEAnalysis[E, EE, C, R, D, T, L], Dependencies[CFGPosition] {
 
   protected def entryToExit(entry: E) : EE
   protected def exitToEntry(exit: EE) : E
@@ -23,8 +23,6 @@ abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Comman
   protected def isCall(call: CFGPosition) : Boolean
   protected def isExit(exit: CFGPosition) : Boolean
   protected def getAfterCalls(exit: EE) : Set[R]
-  protected def getExitProc(exit: EE) : Procedure
-  protected def getEntryProc(entry: E) : Procedure
 
   /**
    * Phase 1 of the IDE algorithm.
@@ -87,6 +85,8 @@ abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Comman
             case call: C if isCall(call) => // at a call node
               val entry: E = getCallee(call)
               val ret: R = callToReturn(call)
+              if ret.asInstanceOf[DirectCall].target.name == "callee" then
+                print("")
 
               edgesCallToEntry(call, entry)(d2).foreach {
                 case (d3, e2) =>
@@ -109,10 +109,22 @@ abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Comman
               storeExitJump(exitToEntry(exit), d1, d2)
 
             case _ =>
+//              if position.isInstanceOf[Block] && position.asInstanceOf[Block].label == "wrapper2_second_call" then
+//                print("")
+
+
               edgesOther(position)(d2).foreach {
                 case (d3, e2) =>
                   val e3 = e2.composeWith(e1)
+//                  val p = outdep(position)
+//                  print("")
                   outdep(position).foreach { m =>
+//                    if m.isInstanceOf[IndirectCall] && m.asInstanceOf[IndirectCall].parent.parent.name == "callee" then
+//                      val b = position
+//                      print("")
+//                    else
+//                      val b = position
+//                      print("")
                     propagate(e3, (m, d1, d3))
                   }
               }
@@ -125,7 +137,7 @@ abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Comman
         case ((n, d1, d2), e) =>
           n match {
             case exit: EE if isExit(exit) =>
-              val proc = getExitProc(exit)
+              val proc = IRWalk.procedure(exit)
               val m1 = res.getOrElseUpdate(proc, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]().withDefaultValue(mutable.Map[DL, EdgeFunction[T]]()))
               val m2 = m1.getOrElseUpdate(d1, mutable.Map[DL, EdgeFunction[T]]())
               m2 += d2 -> e
@@ -172,7 +184,7 @@ abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Comman
               edgesCallToEntry(call, entry)(d).foreach {
                 case (d2, e) =>
                   propagate(e(xnd), (entry, d2))
-                  summaries(getEntryProc(entry))(d2).foreach {
+                  summaries(IRWalk.procedure(entry))(d2).foreach {
                     case (d3, e2) =>
                       edgesExitToAfterCall(entryToExit(entry), ret)(d3).foreach {
                         case (d4, e3) =>
@@ -221,7 +233,7 @@ abstract class IRIDESolver[E <: (Procedure | Command), EE <: (Procedure | Comman
 }
 
 
-abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: IRIDECache)
+abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: IDECache)
   extends IRIDESolver[Procedure, Command, DirectCall, GoTo, D, T, L](program, cache, program.mainProcedure),
     ForwardIDEAnalysis[D, T, L], IRInterproceduralForwardDependencies {
 
@@ -247,13 +259,10 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: 
 
   protected def getAfterCalls(exit: Command): Set[GoTo] = cache.afterCall(exit)
 
-  protected def getExitProc(exit: Command): Procedure = exit.parent.parent
-
-  protected def getEntryProc(entry: Procedure): Procedure = entry
 }
 
 
-abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: IRIDECache)
+abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: IDECache)
   extends IRIDESolver[Command, Procedure, GoTo, DirectCall, D, T, L](program, cache,
     if cache.entryExitMap.forwardMap.contains(program.mainProcedure) then cache.entryExitMap(program.mainProcedure)
     else program.mainProcedure
@@ -282,7 +291,4 @@ abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache:
 
   protected def getAfterCalls(exit: Procedure): Set[DirectCall] = cache.callers(exit)
 
-  protected def getExitProc(exit: Procedure): Procedure = exit
-
-  protected def getEntryProc(entry: Command): Procedure = entry.parent.parent
 }

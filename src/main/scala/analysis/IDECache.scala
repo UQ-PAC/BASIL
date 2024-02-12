@@ -4,7 +4,7 @@ import ir.{Block, CFGPosition, Call, Command, DirectCall, GoTo, IndirectCall, In
 
 import scala.collection.mutable
 
-class IRIDECache(program: Program) {
+class IDECache(program: Program) {
   val entryExitMap: BiMap[Procedure, Command] = new BiMap[Procedure, Command]
   val callReturnMap: BiMap[DirectCall, GoTo] = new BiMap[DirectCall, GoTo]
   val callees: mutable.Map[DirectCall, Procedure] = mutable.Map[DirectCall, Procedure]()

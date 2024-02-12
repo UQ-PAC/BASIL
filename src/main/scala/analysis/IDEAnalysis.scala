@@ -12,7 +12,7 @@ import ir.{Block, CFGPosition, Command, DirectCall, GoTo, Procedure, Program}
  */
 final case class Lambda()
 
-trait IRIDEAnalysis[E, EE, C, R, D, T, L <: Lattice[T]] {
+trait IDEAnalysis[E, EE, C, R, D, T, L <: Lattice[T]] {
   val program: Program
 
   type DL = Either[D, Lambda]
@@ -49,7 +49,7 @@ trait IRIDEAnalysis[E, EE, C, R, D, T, L <: Lattice[T]] {
 }
 
 
-trait ForwardIDEAnalysis[D, T, L <: Lattice[T]] extends IRIDEAnalysis[Procedure, Command, DirectCall, GoTo, D, T, L]
+trait ForwardIDEAnalysis[D, T, L <: Lattice[T]] extends IDEAnalysis[Procedure, Command, DirectCall, GoTo, D, T, L]
 
 
-trait BackwardIDEAnalysis[D, T, L <: Lattice[T]] extends IRIDEAnalysis[Command, Procedure, GoTo, DirectCall, D, T, L]
+trait BackwardIDEAnalysis[D, T, L <: Lattice[T]] extends IDEAnalysis[Command, Procedure, GoTo, DirectCall, D, T, L]

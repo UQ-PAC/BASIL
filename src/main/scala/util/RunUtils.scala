@@ -235,13 +235,19 @@ object RunUtils {
 
     
     Logger.info("[!] Live Var Analysis")
-    val liveVarAnalysisResults: Map[CFGPosition, Map[Variable, FlatElement[Nothing]]] = IRLiveVarAnalysis(newIR).analyze()
-    config.analysisResultsPath.foreach(s=>writeToFile(pretty(liveVarAnalysisResults), s"${s}livevar_analysis_results"))
+    val liveVarAnalysisResults: Map[CFGPosition, Map[Variable, FlatElement[Nothing]]] = LiveVarAnalysis(newIR).analyze()
+    config.analysisResultsPath.foreach(s=>writeToFile(LiveVarAnalysis.encodeAnalysisResults(liveVarAnalysisResults),
+      s"${s}livevar_analysis_results"))
     config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
       (m, f) => m + (f._1 -> f._2.toString())
     })
       , s"${s}_livevarInter$iteration.dot"))
-   
+
+    Logger.info("[!] Parameter Analysis")
+    val res = ParamAnalysis(newIR).analyze()
+    config.analysisResultsPath.foreach(s=>writeToFile(ParamAnalysis.encodeAnalysisResults(res), s"${s}paramAnalysisResults.txt"))
+    println(res)
+
     config.analysisDotPath.foreach { s =>
       val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 0)
       writeToFile(newCFG.toDot(Output.labeler(Map(), false), Output.dotIder), s"${s}_resolvedCFG.dot")

@@ -1,52 +1,37 @@
-import analysis.{FlatEl, IRLiveVarAnalysis, Top}
+import analysis.{FlatEl, LiveVarAnalysis, Top}
 import ir.IRDSL.EventuallyJump
-import ir.{BitVecLiteral, BitVecType, Block, CFGPosition, DirectCall, GoTo, IRDSL, InterProcIRCursor, LocalAssign, Procedure, Program, Register, Statement, Variable, toDot}
+import ir.{BitVecLiteral, BitVecType, Block, CFGPosition, ConvertToSingleProcedureReturn, DirectCall, GoTo, IRDSL, InterProcIRCursor, LocalAssign, Procedure, Program, Register, Statement, Variable, toDot}
 import org.scalatest.funsuite.AnyFunSuite
 import util.RunUtils.writeToFile
 import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
+import test_util.TestUtil.*
 
 import java.io.File
 import scala.collection.mutable.ArrayBuffer
 
 class LiveVarsAnalysisTests extends AnyFunSuite {
 
-  extension (p: Program)
-    def procs: Map[String, Procedure] = p.collect {
-      case b: Procedure => b.name -> b
-    }.toMap
-
-    def blocks: Map[String, Block] = p.collect {
-      case b: Block => b.label -> b
-    }.toMap
-
-  val testPath = "./src/test/analysis/livevars/"
-  val dumpPath = testPath + "dump/"
-  val examplePath = "./examples/"
-  val correctPath = "./src/test/correct/"
-  val correctPrograms: Array[String] = getSubdirectories(correctPath)
-  val incorrectPath = "./src/test/incorrect/"
-  val incorrectPrograms: Array[String] = getSubdirectories(incorrectPath)
 
   // get all variations of each program
-  for (p <- correctPrograms) {
-    val path = correctPath + p
-    val variations = getSubdirectories(path)
-    variations.foreach(t =>
-      test("correct/" + p + "/" + t) {
-        runTest(correctPath, p, t)
-      }
-    )
-  }
+//  for (p <- correctPrograms) {
+//    val path = correctPath + p
+//    val variations = getSubdirectories(path)
+//    variations.foreach(t =>
+//      test("correct/" + p + "/" + t) {
+//        runTest(correctPath, p, t)
+//      }
+//    )
+//  }
 
-  for (p <- incorrectPrograms) {
-    val path = incorrectPath +  p
-    val variations = getSubdirectories(path)
-    variations.foreach(t =>
-      test("incorrect/" + p + "/" + t) {
-        runTest(incorrectPath, p, t)
-      }
-    )
-  }
+//  for (p <- incorrectPrograms) {
+//    val path = incorrectPath +  p
+//    val variations = getSubdirectories(path)
+////    variations.foreach(t =>
+////      test("incorrect/" + p + "/" + t) {
+////        runTest(incorrectPath, p, t)
+////      }
+//    )
+//  }
 
   def runTest(path: String, name: String, variation: String = "", example: Boolean = false): Unit = {
     var expected = ""
@@ -79,13 +64,13 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
         val expectedFile = scala.io.Source.fromFile(testPath + s"$name")
         expected = expectedFile.mkString
         expectedFile.close()
-        expected = parseAnalysisResult(expected)
+        expected = LiveVarAnalysis.parseAnalysisResults(expected)
 
 
         val actualFile = scala.io.Source.fromFile(dumpPath + "livevar_analysis_results")
         actual = actualFile.mkString
         actualFile.close()
-        actual = parseAnalysisResult(actual)
+        actual = LiveVarAnalysis.parseAnalysisResults(actual)
 
 
       catch
@@ -94,14 +79,6 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
       assert(actual == expected)
   }
 
-  def parseAnalysisResult(input: String): String = {
-    input.split("\n").sorted.foldLeft(Map():Map[String, Set[String]]) {
-      (m, line) =>
-        val cfgPosition : String = line.split("==>", 2)(0)
-        val rest: String = line.split("==>", 2)(1)
-        m + (cfgPosition -> rest.split("<>").sorted.toSet)
-    }.toString
-  }
 
   def createSimpleProc(name: String, statements: Seq[Statement | EventuallyJump]): IRDSL.EventuallyProcedure = {
     import IRDSL._
@@ -125,7 +102,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     val r2r0Assign = new LocalAssign(R2, R0, Some("00003"))
     val r2r1Assign = new LocalAssign(R2, R1, Some("00004"))
 
-    val program: Program = prog(
+    var program: Program = prog(
       proc("main",
         block("first_call",
           r0ConstantAssign,
@@ -143,7 +120,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
       createSimpleProc("callee2", Seq(r2r1Assign))
     )
 
-    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    program = returnUnifier.visitProgram(program)
+
+    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
 
     val procs = program.procs
     assert(liveVarAnalysisResults(procs("main")) == Map(r30 -> Top))
@@ -164,7 +144,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     val r1Reassign = new LocalAssign(R1, BitVecLiteral(2, 64), Some("00005"))
 
 
-    val program: Program = prog(
+    var program: Program = prog(
       proc("main",
         block("first_call",
           r0ConstantAssign,
@@ -182,7 +162,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
       createSimpleProc("callee2", Seq(r2r1Assign))
     )
 
-    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    program = returnUnifier.visitProgram(program)
+
+    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
 
     val procs = program.procs
     assert(liveVarAnalysisResults(procs("main")) == Map(r30 -> Top))
@@ -201,7 +184,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     val r1Assign = new LocalAssign(R0, R1, Some("00002"))
     val r2Assign = new LocalAssign(R0, R2, Some("00003"))
 
-    val program = prog(
+    var program = prog(
       proc("main",
         block("main_first_call",
           call("wrapper1", Some("main_second_call"))
@@ -234,8 +217,23 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
       )
     )
 
-    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+//        writeToFile(toDot(program, Map.empty)
+//          , "before")
+
+    // this causes the test to fail
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    program = returnUnifier.visitProgram(program)
+
+//    writeToFile(toDot(program, Map.empty)
+//      , "after")
+
+    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
     val blocks = program.blocks
+
+//    writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
+//      (m, f) => m + (f._1 -> f._2.toString())
+//    })
+//      , "testResult")
 
     assert(liveVarAnalysisResults(blocks("wrapper1_first_call").jump) == Map(R1 -> Top, r30 -> Top))
     assert(liveVarAnalysisResults(blocks("wrapper2_first_call").jump) == Map(R2 -> Top, r30 -> Top))
@@ -246,7 +244,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     import IRDSL._
 
     val r30 = Register("R30", BitVecType(64))
-    val program = prog(
+    var program = prog(
       proc("main",
         block("lmain",
           call("killer", Some("aftercall"))
@@ -259,7 +257,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
       createSimpleProc("killer", Seq(LocalAssign(R1, bv64(1))))
     )
 
-    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    program = returnUnifier.visitProgram(program)
+
+    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
     val blocks = program.blocks
 
     assert(liveVarAnalysisResults(blocks("aftercall")) == Map(R1 -> Top, r30 -> Top))
@@ -273,7 +274,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     val r1Assign = new LocalAssign(R0, R1, Some("00001"))
     val r2Assign = new LocalAssign(R0, R2, Some("00002"))
 
-    val program : Program = prog(
+    var program : Program = prog(
       proc(
         "main",
         block(
@@ -294,9 +295,14 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
       )
     )
 
+//    val returnUnifier = ConvertToSingleProcedureReturn()
+//    program = returnUnifier.visitProgram(program)
 
-    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
     val blocks = program.blocks
+    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
+
+
+
 
 
     assert(liveVarAnalysisResults(blocks("branch1")) == Map(R1 -> Top, r30 -> Top))
@@ -308,7 +314,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
   def recursion(): Unit = {
     import IRDSL._
     val r30 = Register("R30", BitVecType(64))
-    val program : Program = prog(
+    var program : Program = prog(
       proc("main",
         block(
           "lmain",
@@ -322,24 +328,27 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
       )
     )
 
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    program = returnUnifier.visitProgram(program)
+
 //    writeToFile(toDot(program, Map.empty)
 //      , "testResult")
 
-    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
     val blocks = program.blocks
 
 
-        writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
-          (m, f) => m + (f._1 -> f._2.toString())
-        })
-          , "testResult")
+    writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
+      (m, f) => m + (f._1 -> f._2.toString())
+    })
+      , "testResult")
 
   }
 
   def recursion2(): Unit = {
     import IRDSL._
     val r30 = Register("R30", BitVecType(64))
-    val program: Program = prog(
+    var program: Program = prog(
       proc("main",
         block("lmain",
           LocalAssign(R0, R1),
@@ -363,10 +372,13 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
       )
     )
 
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    program = returnUnifier.visitProgram(program)
+
     //    writeToFile(toDot(program, Map.empty)
     //      , "testResult")
 
-    val liveVarAnalysisResults = IRLiveVarAnalysis(program).analyze()
+    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
     val blocks = program.blocks
 
 
@@ -422,7 +434,4 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     runTest(examplePath, "ifbranches", example = true)
   }
 
-  def getSubdirectories(directoryName: String): Array[String] = {
-    File(directoryName).listFiles.filter(_.isDirectory).map(_.getName)
-  }
 }

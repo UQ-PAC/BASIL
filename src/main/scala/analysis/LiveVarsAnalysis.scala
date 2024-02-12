@@ -16,7 +16,7 @@ import util.RunUtils.writeToFile
  * Tip SPA IDE Slides include a short and clear explanation of microfunctions
  * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
  */
-trait IRLiveVarAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElement[Nothing] ,TwoElementLattice] {
+trait LiveVarAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElement[Nothing] ,TwoElementLattice] {
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
   val edgelattice: EdgeFunctionLattice[FlatElement[Nothing], valuelattice.type] = new EdgeFunctionLattice[FlatElement[Nothing], valuelattice.type](valuelattice)
@@ -103,7 +103,7 @@ trait IRLiveVarAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatEleme
             }
       case IndirectCall(variable, maybeBlock, maybeString) =>
         d match
-          case Left(value) => Map(d -> IdEdge())
+          case Left(value) => if value != variable then Map(d -> IdEdge()) else Map()
           case Right(_) => Map(d -> IdEdge(), Left(variable) -> ConstEdge(Top))
       case _ => Map(d -> IdEdge())
 
@@ -111,40 +111,54 @@ trait IRLiveVarAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatEleme
   }
 }
 
-class IRLiveVarIDEAnalysis(program: Program, cache: IRIDECache)
-  extends BackwardIDESolver[Variable, FlatElement[Nothing] ,TwoElementLattice](program, cache), IRLiveVarAnalysisFunctions
+class LiveVarIDEAnalysis(program: Program, cache: IDECache)
+  extends BackwardIDESolver[Variable, FlatElement[Nothing] ,TwoElementLattice](program, cache), LiveVarAnalysisFunctions
 
 /**
  * Wrapper class for LiveVarIDEAnalysis
  * @param program Program IR
  */
-class IRLiveVarAnalysis(program: Program) {
+class LiveVarAnalysis(program: Program) {
   /**
    * Live Variable Analysis
    * Cfg is manipulated for the Analysis (Added edges from fun exit to call return nodes)
    * @return Analysis Result
    */
   def analyze(): Map[CFGPosition, Map[Variable, FlatElement[Nothing]]] = {
-    val cache = IRIDECache(program)
+    val cache = IDECache(program)
     cache.cache()
 
-    IRLiveVarIDEAnalysis(program, cache).analyze()
+    LiveVarIDEAnalysis(program, cache).analyze()
   }
 
 }
 
-def pretty(analysisResults: Map[CFGPosition, Map[Variable, FlatElement[Nothing]]]): String = {
-  val pp = analysisResults.foldLeft("") {
-    (m, f) =>
-      val cfgPosition: CFGPosition = f._1
-      val mapping: Map[Variable, FlatElement[Nothing]] = f._2
-      val positionMaps = mapping.foldLeft("") {
-        (line, pair) =>
-          line + s"${pair._1}->${pair._2}<>"
-      }
+object LiveVarAnalysis extends AnalysisResult[Map[CFGPosition, Map[Variable, FlatElement[Nothing]]]] {
 
-      m + s"$cfgPosition==>${positionMaps.dropRight(2)}\n"
+  def encodeAnalysisResults(result: Map[CFGPosition, Map[Variable, FlatElement[Nothing]]]): String = {
+    val pp = result.foldLeft("") {
+      (m, f) =>
+        val cfgPosition: CFGPosition = f._1
+        val mapping: Map[Variable, FlatElement[Nothing]] = f._2
+        val positionMaps = mapping.foldLeft("") {
+          (line, pair) =>
+            line + s"${pair._1}->${pair._2}<>"
+        }
+
+        m + s"$cfgPosition==>${positionMaps.dropRight(2)}\n"
+    }
+    pp.dropRight(1)
   }
-  pp.dropRight(1)
+
+  def parseAnalysisResults(input: String): String = {
+    input.split("\n").sorted.foldLeft(Map(): Map[String, Set[String]]) {
+      (m, line) =>
+        val cfgPosition: String = line.split("==>", 2)(0)
+        val rest: String = line.split("==>", 2)(1)
+        m + (cfgPosition -> rest.split("<>").sorted.toSet)
+    }.toString
+  }
 }
+
+
 
