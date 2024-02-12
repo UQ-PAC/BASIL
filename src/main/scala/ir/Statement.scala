@@ -82,9 +82,9 @@ sealed trait Jump extends Command, HasParent[Block]  {
 
 
 
-class GoTo private (private val _targets: mutable.Set[Block], override val label: Option[String]) extends Jump {
+class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String]) extends Jump {
 
-  def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.Set.from(targets), label)
+  def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.LinkedHashSet.from(targets), label)
 
   def targets: Set[Block] = _targets.toSet
 
