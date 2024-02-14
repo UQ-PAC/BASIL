@@ -26,7 +26,6 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
   private val linkRegister = Register("R30", BitVecType(64))
   private val framePointer = Register("R29", BitVecType(64))
 
-  // TODO assuming do not need to worry about ignore registers
   private val ignoreRegisters: Set[Variable] = Set(linkRegister, framePointer, stackPointer)
 
 

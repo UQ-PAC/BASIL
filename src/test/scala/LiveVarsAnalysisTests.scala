@@ -12,7 +12,6 @@ import scala.collection.mutable.ArrayBuffer
 class LiveVarsAnalysisTests extends AnyFunSuite {
 
 
-  // get all variations of each program
 //  for (p <- correctPrograms) {
 //    val path = correctPath + p
 //    val variations = getSubdirectories(path)
@@ -22,14 +21,14 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
 //      }
 //    )
 //  }
-
+//
 //  for (p <- incorrectPrograms) {
 //    val path = incorrectPath +  p
 //    val variations = getSubdirectories(path)
-////    variations.foreach(t =>
-////      test("incorrect/" + p + "/" + t) {
-////        runTest(incorrectPath, p, t)
-////      }
+//    variations.foreach(t =>
+//      test("incorrect/" + p + "/" + t) {
+//        runTest(incorrectPath, p, t)
+//      }
 //    )
 //  }
 
@@ -295,8 +294,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
       )
     )
 
-//    val returnUnifier = ConvertToSingleProcedureReturn()
-//    program = returnUnifier.visitProgram(program)
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    program = returnUnifier.visitProgram(program)
 
     val blocks = program.blocks
     val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
