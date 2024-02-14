@@ -111,27 +111,9 @@ trait LiveVarAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElement
   }
 }
 
-class LiveVarIDEAnalysis(program: Program, cache: IDECache)
-  extends BackwardIDESolver[Variable, FlatElement[Nothing] ,TwoElementLattice](program, cache), LiveVarAnalysisFunctions
+class LiveVarAnalysis(program: Program)
+  extends BackwardIDESolver[Variable, FlatElement[Nothing] ,TwoElementLattice](program), LiveVarAnalysisFunctions
 
-/**
- * Wrapper class for LiveVarIDEAnalysis
- * @param program Program IR
- */
-class LiveVarAnalysis(program: Program) {
-  /**
-   * Live Variable Analysis
-   * Cfg is manipulated for the Analysis (Added edges from fun exit to call return nodes)
-   * @return Analysis Result
-   */
-  def analyze(): Map[CFGPosition, Map[Variable, FlatElement[Nothing]]] = {
-    val cache = IDECache(program)
-    cache.cache()
-
-    LiveVarIDEAnalysis(program, cache).analyze()
-  }
-
-}
 
 object LiveVarAnalysis extends AnalysisResult[Map[CFGPosition, Map[Variable, FlatElement[Nothing]]]] {
 

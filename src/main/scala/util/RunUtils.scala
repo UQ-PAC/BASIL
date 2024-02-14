@@ -245,8 +245,7 @@ object RunUtils {
 
     Logger.info("[!] Parameter Analysis")
     val res = ParamAnalysis(newIR).analyze()
-    config.analysisResultsPath.foreach(s=>writeToFile(ParamAnalysis.encodeAnalysisResults(res), s"${s}paramAnalysisResults.txt"))
-    println(res)
+    config.analysisResultsPath.foreach(s=>writeToFile(ParamAnalysis.encodeAnalysisResults(res), s"${s}param_analysis_results"))
 
     config.analysisDotPath.foreach { s =>
       val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 0)

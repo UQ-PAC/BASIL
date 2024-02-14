@@ -1,6 +1,6 @@
 package analysis.solvers
 
-import analysis.{BackwardIDEAnalysis, Dependencies, EdgeFunction, EdgeFunctionLattice, ForwardIDEAnalysis, IDEAnalysis, IDECache, IRInterproceduralBackwardDependencies, IRInterproceduralForwardDependencies, Lambda, Lattice, MapLattice}
+import analysis.{BackwardIDEAnalysis, Dependencies, EdgeFunction, EdgeFunctionLattice, ForwardIDEAnalysis, IDEAnalysis, IRInterproceduralBackwardDependencies, IRInterproceduralForwardDependencies, Lambda, Lattice, MapLattice}
 import ir.{Block, CFGPosition, Call, Command, DirectCall, GoTo, IRWalk, IndirectCall, InterProcIRCursor, IntraProcIRCursor, Jump, Procedure, Program, end, isAfterCall}
 import util.Logger
 
@@ -12,7 +12,7 @@ import scala.collection.mutable
  * Adapted from Tip
  * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/IDESolver.scala
  */
-abstract class IDESolver[E <: (Procedure | Command), EE <: (Procedure | Command), C <: (DirectCall | GoTo), R <: (DirectCall | GoTo), D, T, L <: Lattice[T]](val program: Program, val cache: IDECache, val startNode: CFGPosition)
+abstract class IDESolver[E <: (Procedure | Command), EE <: (Procedure | Command), C <: (DirectCall | GoTo), R <: (DirectCall | GoTo), D, T, L <: Lattice[T]](val program: Program,  val startNode: CFGPosition)
   extends IDEAnalysis[E, EE, C, R, D, T, L], Dependencies[CFGPosition] {
 
   protected def entryToExit(entry: E) : EE
@@ -81,53 +81,39 @@ abstract class IDESolver[E <: (Procedure | Command), EE <: (Procedure | Command)
       n match {
         case (position, d1, d2) =>
           val e1 = x(n)
-          position match
-            case call: C if isCall(call) => // at a call node
-              val entry: E = getCallee(call)
-              val ret: R = callToReturn(call)
-//              if ret.asInstanceOf[DirectCall].target.name == "callee" then
-//                print("")
+          if isCall(position) then // at a call node
+            val call: C = position.asInstanceOf[C]
+            val entry: E = getCallee(call)
+            val ret: R = callToReturn(call)
 
-              edgesCallToEntry(call, entry)(d2).foreach {
-                case (d3, e2) =>
-                  // propagate to function entry
-                  propagate(IdEdge(), (entry, d3, d3))
-                  // cache the composed edge from the entry of the caller to the entry of the callee
-                  storeCallJump(entry, d3, call, e2.composeWith(e1), d1)
-                  // propagate existing return flow to the after-call node
-                  exitJumpCache.getOrElseUpdate((entry, d3), mutable.Set[DL]()).foreach { d4 =>
-                    returnflow(d3, d4, entryToExit(entry), ret)
-                  }
-              }
+            edgesCallToEntry(call, entry)(d2).foreach {
+              case (d3, e2) =>
+                // propagate to function entry
+                propagate(IdEdge(), (entry, d3, d3))
+                // cache the composed edge from the entry of the caller to the entry of the callee
+                storeCallJump(entry, d3, call, e2.composeWith(e1), d1)
+                // propagate existing return flow to the after-call node
+                exitJumpCache.getOrElseUpdate((entry, d3), mutable.Set[DL]()).foreach { d4 =>
+                  returnflow(d3, d4, entryToExit(entry), ret)
+                }
+            }
 
-              edgesCallToAfterCall(call, ret)(d2).foreach {
-                case (d3, e2) =>
-                  propagate(e2.composeWith(e1), (ret, d1, d3))
-              }
-            case exit: EE if isExit(exit) => // at an exit node
-              getAfterCalls(exit).foreach(afterCall => returnflow(d1, d2, exit, afterCall))
-              storeExitJump(exitToEntry(exit), d1, d2)
-
-            case _ =>
-//              if position.isInstanceOf[Block] && position.asInstanceOf[Block].label == "wrapper2_second_call" then
-//                print("")
-
-
-              edgesOther(position)(d2).foreach {
-                case (d3, e2) =>
-                  val e3 = e2.composeWith(e1)
-//                  val p = outdep(position)
-//                  print("")
-                  outdep(position).foreach { m =>
-//                    if m.isInstanceOf[IndirectCall] && m.asInstanceOf[IndirectCall].parent.parent.name == "callee" then
-//                      val b = position
-//                      print("")
-//                    else
-//                      val b = position
-//                      print("")
-                    propagate(e3, (m, d1, d3))
-                  }
-              }
+            edgesCallToAfterCall(call, ret)(d2).foreach {
+              case (d3, e2) =>
+                propagate(e2.composeWith(e1), (ret, d1, d3))
+            }
+          else if isExit(position) then // at an exit node
+            val exit: EE = position.asInstanceOf[EE]
+            getAfterCalls(exit).foreach(afterCall => returnflow(d1, d2, exit, afterCall))
+            storeExitJump(exitToEntry(exit), d1, d2)
+          else
+            edgesOther(position)(d2).foreach {
+              case (d3, e2) =>
+                val e3 = e2.composeWith(e1)
+                outdep(position).foreach { m =>
+                  propagate(e3, (m, d1, d3))
+                }
+            }
       }
     }
 
@@ -175,38 +161,35 @@ abstract class IDESolver[E <: (Procedure | Command), EE <: (Procedure | Command)
       val xnd = x(n)
       n match {
         case (position, d) =>
-          position match {
-            // function call nodes
-            case call: C if isCall(call) => // at a call node
-              val entry: E = getCallee(call)
-              val ret: R = callToReturn(call)
+          if isCall(position) then // at a call node
+            val call: C = position.asInstanceOf[C]
+            val entry: E = getCallee(call)
+            val ret: R = callToReturn(call)
 
-              edgesCallToEntry(call, entry)(d).foreach {
-                case (d2, e) =>
-                  propagate(e(xnd), (entry, d2))
-                  summaries(IRWalk.procedure(entry))(d2).foreach {
-                    case (d3, e2) =>
-                      edgesExitToAfterCall(entryToExit(entry), ret)(d3).foreach {
-                        case (d4, e3) =>
-                          propagate(e3(e2(e(xnd))), (ret, d4))
-                      }
-                  }
-              }
+            edgesCallToEntry(call, entry)(d).foreach {
+              case (d2, e) =>
+                propagate(e(xnd), (entry, d2))
+                summaries(IRWalk.procedure(entry))(d2).foreach {
+                  case (d3, e2) =>
+                    edgesExitToAfterCall(entryToExit(entry), ret)(d3).foreach {
+                      case (d4, e3) =>
+                        propagate(e3(e2(e(xnd))), (ret, d4))
+                    }
+                }
+            }
 
-              edgesCallToAfterCall(call, ret)(d).foreach {
-                case (d2, e) =>
-                  propagate(e(xnd), (ret, d2))
-              }
-
-            // Function exit
-            case exit: EE if isExit(exit) => // ignore, return flow is handled at the call nodes
-
-            case _ =>
-              edgesOther(position)(d).foreach {
-                case (d2, e) =>
-                  outdep(position).foreach(m => propagate(e(xnd), (m, d2)))
-              }
+            edgesCallToAfterCall(call, ret)(d).foreach {
+              case (d2, e) =>
+                propagate(e(xnd), (ret, d2))
+            }
+          else if (isExit(position)) { // at exit node
+            // ignore, return flow is handled at the call nodes
           }
+          else
+            edgesOther(position)(d).foreach {
+              case (d2, e) =>
+                outdep(position).foreach(m => propagate(e(xnd), (m, d2)))
+            }
       }
     }
 
@@ -233,84 +216,65 @@ abstract class IDESolver[E <: (Procedure | Command), EE <: (Procedure | Command)
 }
 
 
-abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: IDECache)
-  extends IDESolver[Procedure, Command, DirectCall, GoTo, D, T, L](program, cache, program.mainProcedure),
+abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
+  extends IDESolver[Procedure, Command, DirectCall, GoTo, D, T, L](program, program.mainProcedure),
     ForwardIDEAnalysis[D, T, L], IRInterproceduralForwardDependencies {
 
   protected def entryToExit(entry: Procedure): Command = entry.end.asInstanceOf[Command]
-    // cache.entryExitMap(entry)
 
   protected def exitToEntry(exit: Command): Procedure = IRWalk.procedure(exit)
-     // cache.entryExitMap(exit)
 
   protected def callToReturn(call: DirectCall): GoTo = call.parent.fallthrough.get
-    // cache.callReturnMap(call)
 
   protected def returnToCall(ret: GoTo): DirectCall = ret.parent.jump.asInstanceOf[DirectCall]
-    // cache.callReturnMap(ret)
 
   protected def getCallee(call: DirectCall): Procedure = call.target
-    // cache.callees(call)
 
   protected def isCall(call: CFGPosition): Boolean =
     call match
-      case directCall: DirectCall if directCall.returnTarget.isDefined && directCall.target.blocks.nonEmpty => true
-        //cache.callReturnMap.forwardMap.contains(directCall)
+      case directCall: DirectCall if directCall.returnTarget.isDefined && directCall.target.returnBlock.isDefined => true
       case _ => false
 
   protected def isExit(exit: CFGPosition): Boolean =
     exit match
       // only looking at functions with statements
       case command: Command => IRWalk.procedure(command).end == command
-        // cache.afterCall.contains(command)
       case _ => false
 
   protected def getAfterCalls(exit: Command): Set[GoTo] =
     InterProcIRCursor.succ(exit).foreach(s => assert(s.isInstanceOf[GoTo]))
     InterProcIRCursor.succ(exit).filter(_.isInstanceOf[GoTo]).map(_.asInstanceOf[GoTo])
-//    cache.afterCall(exit)
 
 }
 
 
-abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program, cache: IDECache)
-  extends IDESolver[Command, Procedure, GoTo, DirectCall, D, T, L](program, cache,
-    if cache.entryExitMap.forwardMap.contains(program.mainProcedure) then cache.entryExitMap(program.mainProcedure)
-    else program.mainProcedure
+abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program)
+  extends IDESolver[Command, Procedure, GoTo, DirectCall, D, T, L](program, program.mainProcedure.end
   ),
     BackwardIDEAnalysis[D, T, L], IRInterproceduralBackwardDependencies {
 
   protected def entryToExit(entry: Command): Procedure = IRWalk.procedure(entry)
-    // cache.entryExitMap(entry)
 
   protected def exitToEntry(exit: Procedure): Command = exit.end.asInstanceOf[Command]
-    // cache.entryExitMap(exit)
 
   protected def callToReturn(call: GoTo): DirectCall = call.parent.jump.asInstanceOf[DirectCall]
-    // cache.callReturnMap(call)
 
   protected def returnToCall(ret: DirectCall): GoTo = ret.parent.fallthrough.get
-    // cache.callReturnMap(ret)
 
   protected def getCallee(call: GoTo): Command = callToReturn(call).target.end.asInstanceOf[Command]
-    // cache.retExit(call)
 
   protected def isCall(call: CFGPosition): Boolean =
     call match
       case goto: GoTo if goto.isAfterCall =>
         goto.parent.jump match
-          case directCall: DirectCall => directCall.returnTarget.isDefined && directCall.target.blocks.nonEmpty
+          case directCall: DirectCall => directCall.returnTarget.isDefined && directCall.target.returnBlock.isDefined
           case _ => false
-      //        cache.callReturnMap.backwardMap.contains(goto)
       case _ => false
 
   protected def isExit(exit: CFGPosition): Boolean =
     exit match
-      case procedure: Procedure => true // procedure.blocks.nonEmpty // TODO
-        // cache.callers.contains(procedure)
+      case procedure: Procedure => procedure.blocks.nonEmpty
       case _ => false
 
   protected def getAfterCalls(exit: Procedure): Set[DirectCall] = InterProcIRCursor.pred(exit).filter(_.isInstanceOf[DirectCall]).map(_.asInstanceOf[DirectCall])
-    // cache.callers(exit)
-
 }

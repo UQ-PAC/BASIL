@@ -2,16 +2,21 @@ import analysis.{FlatEl, LiveVarAnalysis, Top}
 import ir.IRDSL.EventuallyJump
 import ir.{BitVecLiteral, BitVecType, Block, CFGPosition, ConvertToSingleProcedureReturn, DirectCall, GoTo, IRDSL, InterProcIRCursor, LocalAssign, Procedure, Program, Register, Statement, Variable, toDot}
 import org.scalatest.funsuite.AnyFunSuite
+import test_util.TestUtil
 import util.RunUtils.writeToFile
 import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
-import test_util.TestUtil.*
 
 import java.io.File
 import scala.collection.mutable.ArrayBuffer
 
-class LiveVarsAnalysisTests extends AnyFunSuite {
+class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
 
+  override val testPath = "./src/test/analysis/livevars/"
+  override val resultsFile = "livevar_analysis_results"
+  override val dumpPath: String = testPath + "dump/"
+  override val resultParser: String => String = LiveVarAnalysis.parseAnalysisResults
 
+  // runs analysis phase on all correct and incorrect programs
 //  for (p <- correctPrograms) {
 //    val path = correctPath + p
 //    val variations = getSubdirectories(path)
@@ -31,53 +36,6 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
 //      }
 //    )
 //  }
-
-  def runTest(path: String, name: String, variation: String = "", example: Boolean = false): Unit = {
-    var expected = ""
-    var actual = ""
-
-    val dumpFolder = File(dumpPath)
-    if (!dumpFolder.exists) {
-      dumpFolder.mkdir()
-    }
-
-    RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          adtFile = path + s"/$name" + (if !example then s"/$variation" else "") + s"/$name.adt",
-          relfFile = path + s"/$name" + (if !example then s"/$variation" else "") + s"/$name.relf",
-          specFile = None,
-          dumpIL = None,
-          mainProcedureName = "main",
-        ),
-        runInterpret = false,
-        staticAnalysis = Some(StaticAnalysisConfig(analysisResultsPath = Some(dumpPath))),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
-
-
-    if example then
-      try
-        val expectedFile = scala.io.Source.fromFile(testPath + s"$name")
-        expected = expectedFile.mkString
-        expectedFile.close()
-        expected = LiveVarAnalysis.parseAnalysisResults(expected)
-
-
-        val actualFile = scala.io.Source.fromFile(dumpPath + "livevar_analysis_results")
-        actual = actualFile.mkString
-        actualFile.close()
-        actual = LiveVarAnalysis.parseAnalysisResults(actual)
-
-
-      catch
-        case e: Exception => throw e//new Exception(s"$path/$name Test Crashed", e)
-
-      assert(actual == expected)
-  }
-
 
   def createSimpleProc(name: String, statements: Seq[Statement | EventuallyJump]): IRDSL.EventuallyProcedure = {
     import IRDSL._
@@ -133,7 +91,6 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
 
   def differentCalleesOneAlive(): Unit = {
     import IRDSL._
-
     val r30 = Register("R30", BitVecType(64))
     val constant1 = bv64(1)
     val r0ConstantAssign = new LocalAssign(R0, constant1, Some("00001"))
@@ -141,7 +98,6 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     val r2r0Assign = new LocalAssign(R2, R0, Some("00003"))
     val r2r1Assign = new LocalAssign(R2, R1, Some("00004"))
     val r1Reassign = new LocalAssign(R1, BitVecLiteral(2, 64), Some("00005"))
-
 
     var program: Program = prog(
       proc("main",
@@ -171,7 +127,6 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     assert(liveVarAnalysisResults(procs("callee1")) == Map(R0 -> Top, r30 -> Top))
     assert(liveVarAnalysisResults(procs("callee2")) == Map(R1 -> Top, r30 -> Top))
   }
-
 
   def twoCallers(): Unit = {
     import IRDSL._
@@ -216,24 +171,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
       )
     )
 
-//        writeToFile(toDot(program, Map.empty)
-//          , "before")
-
-    // this causes the test to fail
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-//    writeToFile(toDot(program, Map.empty)
-//      , "after")
-
     val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
     val blocks = program.blocks
-
-//    writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
-//      (m, f) => m + (f._1 -> f._2.toString())
-//    })
-//      , "testResult")
-
     assert(liveVarAnalysisResults(blocks("wrapper1_first_call").jump) == Map(R1 -> Top, r30 -> Top))
     assert(liveVarAnalysisResults(blocks("wrapper2_first_call").jump) == Map(R2 -> Top, r30 -> Top))
 
@@ -300,17 +242,13 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     val blocks = program.blocks
     val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
 
-
-
-
-
     assert(liveVarAnalysisResults(blocks("branch1")) == Map(R1 -> Top, r30 -> Top))
     assert(liveVarAnalysisResults(blocks("branch2")) == Map(R2 -> Top, r30 -> Top))
     assert(liveVarAnalysisResults(blocks("lmain")) == Map(R1 -> Top, R2 -> Top, r30 -> Top))
 
   }
 
-  def recursion(): Unit = {
+  def recursionInfinite(): Unit = { // can't handle this infinite recursion case
     import IRDSL._
     val r30 = Register("R30", BitVecType(64))
     var program : Program = prog(
@@ -330,21 +268,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-//    writeToFile(toDot(program, Map.empty)
-//      , "testResult")
-
     val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
     val blocks = program.blocks
-
-
-    writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
-      (m, f) => m + (f._1 -> f._2.toString())
-    })
-      , "testResult")
-
   }
 
-  def recursion2(): Unit = {
+  def recursionBaseCase(): Unit = {
     import IRDSL._
     val r30 = Register("R30", BitVecType(64))
     var program: Program = prog(
@@ -374,19 +302,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    //    writeToFile(toDot(program, Map.empty)
-    //      , "testResult")
-
     val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
     val blocks = program.blocks
 
-
-
-    writeToFile(toDot(program, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
-      (m, f) => m + (f._1 -> f._2.toString())
-    })
-      , "testResult")
-
+    assert(liveVarAnalysisResults(program.mainProcedure) == Map(R1 -> Top, R2 -> Top, r30 -> Top))
   }
 
   test("differentCalleesBothAlive") {
@@ -409,9 +328,9 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
     simpleBranch()
   }
 
-//  test("recursion") {
-//    recursion()
-//  }
+  test("recursion") {
+    recursionBaseCase()
+  }
 
   test("basic_array_write") {
     runTest(examplePath, "basic_arrays_write", example = true)
@@ -432,5 +351,4 @@ class LiveVarsAnalysisTests extends AnyFunSuite {
   test("ifbranches") {
     runTest(examplePath, "ifbranches", example = true)
   }
-
 }

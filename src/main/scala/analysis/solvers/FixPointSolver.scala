@@ -272,16 +272,6 @@ trait WorklistFixPointFunctions[N, T, L <: Lattice[T]]  extends  LinkedHashSetWo
   def init: T
 
   def propagate(y: T, m: N) = {
-    // TODO remove
-//    m match
-//      case (position, d1, d2) =>
-//        position match
-//          case indirectCall: IndirectCall =>
-//            if indirectCall.parent.parent.name == "callee" then
-//              print("")
-//          case _=>
-//      case _ =>
-
     val xm = x(m)
     val t = lattice.sublattice.lub(xm, y)
     if (t != xm) {
