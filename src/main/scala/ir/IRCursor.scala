@@ -145,7 +145,10 @@ trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
     IntraProcIRCursor.pred(pos) ++
     (pos match
       case c: Procedure       => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
-      case b: Block if b.isAfterCall => b.incomingJumps.map(_.parent.jump).filter(_.isInstanceOf[DirectCall]).flatMap(_.asInstanceOf[DirectCall].target.returnBlock).map(_.jump).toSet
+      case b: GoTo if b.isAfterCall => b.parent.jump match {
+        case DirectCall(t,_, _) if t.blocks.nonEmpty => t.returnBlock.toSet
+        case _ => Set(b)
+      }
       case _ => Set.empty)
   }
 }
@@ -181,7 +184,7 @@ trait CallGraph extends IRWalk[Procedure, Procedure] {
 
 object CallGraph extends CallGraph
 
-object InterProcBlockIRCursor extends IntraProcBlockIRCursor
+object InterProcBlockIRCursor extends InterProcBlockIRCursor
 
 /** Computes the reachability transitive closure of the CFGPositions in initial under the successor relation defined by
   * walker.
