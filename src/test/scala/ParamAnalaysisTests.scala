@@ -1,10 +1,6 @@
 import analysis.ParamAnalysis
-import ir.{Block, Procedure, Program}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.TestUtil
-import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
-
-import java.io.File
 
 class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
 

@@ -1,6 +1,6 @@
 package analysis
 
-import ir.{Block, CFGPosition, Command, DirectCall, GoTo, Procedure, Program}
+import ir.{CFGPosition, Command, DirectCall, GoTo, Procedure, Program}
 
 /**
  * Base trait for IDE analyses.

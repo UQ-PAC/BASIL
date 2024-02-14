@@ -1,7 +1,7 @@
 package analysis.solvers
 
 import analysis.{BackwardIDEAnalysis, Dependencies, EdgeFunction, EdgeFunctionLattice, ForwardIDEAnalysis, IDEAnalysis, IRInterproceduralBackwardDependencies, IRInterproceduralForwardDependencies, Lambda, Lattice, MapLattice}
-import ir.{Block, CFGPosition, Call, Command, DirectCall, GoTo, IRWalk, IndirectCall, InterProcIRCursor, IntraProcIRCursor, Jump, Procedure, Program, end, isAfterCall}
+import ir.{CFGPosition, Command, DirectCall, GoTo, IRWalk, InterProcIRCursor, Procedure, Program, end, isAfterCall}
 import util.Logger
 
 import scala.collection.immutable.Map
@@ -12,7 +12,7 @@ import scala.collection.mutable
  * Adapted from Tip
  * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/IDESolver.scala
  */
-abstract class IDESolver[E <: (Procedure | Command), EE <: (Procedure | Command), C <: (DirectCall | GoTo), R <: (DirectCall | GoTo), D, T, L <: Lattice[T]](val program: Program,  val startNode: CFGPosition)
+abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C <: DirectCall | GoTo, R <: DirectCall | GoTo, D, T, L <: Lattice[T]](val program: Program,  val startNode: CFGPosition)
   extends IDEAnalysis[E, EE, C, R, D, T, L], Dependencies[CFGPosition] {
 
   protected def entryToExit(entry: E) : EE
@@ -30,7 +30,7 @@ abstract class IDESolver[E <: (Procedure | Command), EE <: (Procedure | Command)
    * The original version of the algorithm uses summary edges from call nodes to after-call nodes
    * instead of `callJumpCache` and `exitJumpCache`.
    */
-  class Phase1(val program: Program) extends WorklistFixPointFunctions[(CFGPosition, DL, DL), EdgeFunction[T], EdgeFunctionLattice[T, valuelattice.type]] {
+  private class Phase1(val program: Program) extends WorklistFixPointFunctions[(CFGPosition, DL, DL), EdgeFunction[T], EdgeFunctionLattice[T, valuelattice.type]] {
 
     val lattice: MapLattice[(CFGPosition, DL, DL), EdgeFunction[T], EdgeFunctionLattice[T, valuelattice.type]] = new MapLattice(edgelattice)
     var x: Map[(CFGPosition, DL, DL), EdgeFunction[T]] = _
@@ -57,7 +57,7 @@ abstract class IDESolver[E <: (Procedure | Command), EE <: (Procedure | Command)
       exitJumpCache.getOrElseUpdate((funentry, d1), mutable.Set[DL]()) += d2
 
 
-    import edgelattice.{IdEdge}
+    import edgelattice.IdEdge
 
     def init: EdgeFunction[T] = IdEdge()
 
@@ -121,16 +121,15 @@ abstract class IDESolver[E <: (Procedure | Command), EE <: (Procedure | Command)
       val res = mutable.Map[Procedure, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]]()
       x.foreach {
         case ((n, d1, d2), e) =>
-          n match {
-            case exit: EE if isExit(exit) =>
-              val proc = IRWalk.procedure(exit)
-              val m1 = res.getOrElseUpdate(proc, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]().withDefaultValue(mutable.Map[DL, EdgeFunction[T]]()))
-              val m2 = m1.getOrElseUpdate(d1, mutable.Map[DL, EdgeFunction[T]]())
-              m2 += d2 -> e
-            case _ => // ignore other node kinds
-          }
+          if isExit(n) then
+            val exit: EE = n.asInstanceOf[EE]
+            val proc = IRWalk.procedure(exit)
+            val m1 = res.getOrElseUpdate(proc, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]().withDefaultValue(mutable.Map[DL, EdgeFunction[T]]()))
+            val m2 = m1.getOrElseUpdate(d1, mutable.Map[DL, EdgeFunction[T]]())
+            m2 += d2 -> e
+
       }
-      Logger.info(s"Function summaries:\n${
+      Logger.debug(s"Function summaries:\n${
         res.map {
           case (f, s) => s"  function $f:\n${s.map { case (d1, m) => s"${m.map { case (d2, e) => s"    ($d1,$d2): $e" }.mkString("\n")}" }.mkString("\n")}"
         }.mkString("\n")
@@ -144,7 +143,7 @@ abstract class IDESolver[E <: (Procedure | Command), EE <: (Procedure | Command)
    * Performs a forward dataflow analysis using the decomposed lattice and the micro-transformers.
    * The original RHS version of IDE uses jump functions for all nodes, not only at exits, but the analysis result and complexity is the same.
    */
-  class Phase2(val program: Program , val phase1: Phase1) extends WorklistFixPointFunctions[(CFGPosition, DL), T, valuelattice.type]:
+  private class Phase2(val program: Program , val phase1: Phase1) extends WorklistFixPointFunctions[(CFGPosition, DL), T, valuelattice.type]:
     val lattice: MapLattice[(CFGPosition, DL), T, valuelattice.type] = new MapLattice(valuelattice)
     var x: Map[(CFGPosition, DL), T] = _
     val first: Set[(CFGPosition, DL)] = Set((startNode, Right(Lambda())))

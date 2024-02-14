@@ -299,8 +299,6 @@ class ProgramCfg:
 
       successors.foreach { s =>
         (n, s) match {
-          case (from: CfgNode, to: CfgNode) => // Shows all edges in the cfg for debugging
-            dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
           case (from: CfgFunctionEntryNode, to: CfgNode) =>
             dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
           case (from: CfgJumpNode, to: CfgProcedureReturnNode) =>
@@ -311,15 +309,10 @@ class ProgramCfg:
             dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
           case (from: CfgCommandNode, to: (CfgCommandNode | CfgFunctionExitNode)) =>
             dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
-
           case (from: CfgCommandNode, to: CfgFunctionEntryNode) =>
-//            DotInlineArrow(dotNodes(n), dotNodes(to))
-            dotArrows += DotInterArrow(dotNodes(n), dotNodes(to))
-
+            DotInlineArrow(dotNodes(n), dotNodes(to))
           case (from: CfgFunctionExitNode, to: CfgNode) =>
-//            DotInlineArrow(dotNodes(n), dotNodes(to))
-            dotArrows += DotInterArrow(dotNodes(n), dotNodes(to))
-
+            DotInlineArrow(dotNodes(n), dotNodes(to))
           case (from: CfgJumpNode, to: (CfgCallReturnNode | CfgCallNoReturnNode)) =>
             dotArrows += DotIntraArrow(dotNodes(n), dotNodes(to))
           /*

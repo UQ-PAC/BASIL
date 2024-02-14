@@ -25,13 +25,13 @@ trait EdgeFunction[T] extends (T => T) {
 }
 
 /**
-  * The lattice of edge functions, used by [[tip.solvers.IDEAnalysis]].
+  * The lattice of edge functions, used by [[IDEAnalysis]].
 * A map lattice, but maps are represent differently than in `MapLattice`.
 * Currently only supports the identity function and constant functions.
 */
 class EdgeFunctionLattice[T, L <: Lattice[T]](val valuelattice: L) extends Lattice[EdgeFunction[T]] {
 
-  val bottom = ConstEdge(valuelattice.bottom)
+  val bottom: ConstEdge = ConstEdge(valuelattice.bottom)
 
   def lub(x: Element, y: Element): Element = x.joinWith(y)
   

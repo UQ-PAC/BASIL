@@ -14,6 +14,13 @@ import scala.annotation.tailrec
  */
 type CFGPosition = Procedure | Block | Command
 
+extension (p: CFGPosition)
+  def toShortString: String =
+    p match
+      case procedure: Procedure => procedure.toString
+      case block: Block => s"Block ${block.label}"
+      case command: Command => command.toString
+
 // todo: we could just use the dependencies trait directly instead to avoid the instantiation issue
 trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] {
   def succ(pos: IN): Set[NT]
@@ -247,7 +254,7 @@ def toDot[T <: CFGPosition](
       case s        => s.toString
     }
     if (labels.contains(node)) {
-      text = text + "\n" + labels(node) // TODO
+      text += "\n" ++ labels(node)
     }
     text
   }

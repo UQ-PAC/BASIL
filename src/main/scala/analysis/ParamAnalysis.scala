@@ -8,13 +8,13 @@ import ir.{BitVecType, Procedure, Program, Register, Variable}
  * @param program program to be analysed
  */
 class ParamAnalysis(val program: Program) extends Analysis[Any] {
-  private val intraLivenessResults = LivenessAnalysisWorklistSolver(program).analyze()
-  private val interLivenessResults = LiveVarAnalysis(program).analyze()
+  private val intraLivenessResults = IntraLiveVarsAnalysis(program).analyze()
+  private val interLivenessResults = InterLiveVarsAnalysis(program).analyze()
   private var completeProcs: Set[Procedure] = Set()
   private var visitedProcs: Set[Procedure] = Set()
   private var results : Map[Procedure, Set[Variable]] = Map()
 
-  val calledProcs: Set[Procedure] = interLivenessResults.foldLeft(Set(): Set[Procedure]) {
+  private val calledProcs: Set[Procedure] = interLivenessResults.foldLeft(Set(): Set[Procedure]) {
     (s, map) =>
       map match
         case (proc: Procedure, _) =>
@@ -29,7 +29,7 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
   private val ignoreRegisters: Set[Variable] = Set(linkRegister, framePointer, stackPointer)
 
 
-  def getProcParams(proc: Procedure): Set[Variable] = {
+  private def getProcParams(proc: Procedure): Set[Variable] = {
     if completeProcs.contains(proc) then // already know the parameters for this procedure
       assert(visitedProcs.contains(proc))
       results(proc)
@@ -62,16 +62,7 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
   }
 
   override def analyze(): Map[Procedure, Set[Variable]] = {
-
-    calledProcs.foreach(
-      proc =>
-        val expectedParams  = proc.in.iterator.foldLeft(Set():Set[Variable]) {
-          (s, p) => s + p.value
-        }
-        getProcParams(proc)
-
-//        assert(expectedParams == getProcParams(proc))
-    )
+    calledProcs.foreach(getProcParams)
     results
   }
 }

@@ -235,8 +235,8 @@ object RunUtils {
 
     
     Logger.info("[!] Live Var Analysis")
-    val liveVarAnalysisResults: Map[CFGPosition, Map[Variable, FlatElement[Nothing]]] = LiveVarAnalysis(newIR).analyze()
-    config.analysisResultsPath.foreach(s=>writeToFile(LiveVarAnalysis.encodeAnalysisResults(liveVarAnalysisResults),
+    val liveVarAnalysisResults: Map[CFGPosition, Map[Variable, FlatElement[Nothing]]] = InterLiveVarsAnalysis(newIR).analyze()
+    config.analysisResultsPath.foreach(s=>writeToFile(InterLiveVarsAnalysis.encodeAnalysisResults(liveVarAnalysisResults),
       s"${s}livevar_analysis_results"))
     config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
       (m, f) => m + (f._1 -> f._2.toString())

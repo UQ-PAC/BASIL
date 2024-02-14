@@ -1,10 +1,7 @@
 package analysis
 
-import analysis.solvers
 import analysis.solvers.BackwardIDESolver
-import cfg_visualiser.Output
-import ir.{Assert, Assume, GoTo, CFGPosition, Command, DirectCall, IndirectCall, LocalAssign, MemoryAssign, Procedure, Program, Variable}
-import util.RunUtils.writeToFile
+import ir.{Assert, Assume, GoTo, CFGPosition, Command, DirectCall, IndirectCall, LocalAssign, MemoryAssign, Procedure, Program, Variable, toShortString}
 
 /**
  * Micro-transfer-functions for LiveVar analysis
@@ -16,51 +13,23 @@ import util.RunUtils.writeToFile
  * Tip SPA IDE Slides include a short and clear explanation of microfunctions
  * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
  */
-trait LiveVarAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElement[Nothing] ,TwoElementLattice] {
+trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElement[Nothing] ,TwoElementLattice] {
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
   val edgelattice: EdgeFunctionLattice[FlatElement[Nothing], valuelattice.type] = new EdgeFunctionLattice[FlatElement[Nothing], valuelattice.type](valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
 
   def edgesCallToEntry(call: GoTo, entry: Command)(d: DL): Map[DL, edgelattice.Element] = {
-    // this analysis is implemented in order to Identify parameters and function interface
-    // if parameters are known this should map only parameter registers to IdEdge() or in this case
-    // return (since it is a backward analysis)
-    // all other dataflow facts except lambda should be mapped to bottom (return empty Map())
-    //    d match
-    //      case Left(value) => Map()
-    //      case Right(_) => Map(d -> IdEdge())
-
-
     Map(d -> IdEdge())
   }
 
   def edgesExitToAfterCall(exit: Procedure, aftercall: DirectCall)(d: DL): Map[DL, edgelattice.Element] = {
-    // this analysis is implemented in order to Identify parameters and function interface
-    // if parameters are known this should map return registers to IdEdge() or in this case
-    // parameters (since it is a backward analysis)
-    // all other dataflow facts except lambda should be mapped to bottom (return empty Map())
     Map(d -> IdEdge())
   }
 
   def edgesCallToAfterCall(call: GoTo, aftercall: DirectCall)(d: DL): Map[DL, edgelattice.Element] = {
-    // this analysis is implemented in order to Identify parameters and function interface
-    // if parameters are known this should map all non parameter registers to IdEdge() instead and all parameter to bottom
-    //    d match
-    //      case Left(value) =>
-    //        val p = aftercall.target.out.foldLeft(false) {
-    //          (b, param) =>
-    //            if value == param.value then
-    //              true
-    //            else
-    //              b
-    //        }
-    //
-    //        if p then Map() else Map(d -> IdEdge())
-    //      case Right(_) => Map(d -> IdEdge())
-
     d match
-      case Left(value) => Map()
+      case Left(value) => Map() // maps all variables before the call to bottom
       case Right(_) => Map(d -> IdEdge())
   }
 
@@ -111,11 +80,11 @@ trait LiveVarAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElement
   }
 }
 
-class LiveVarAnalysis(program: Program)
-  extends BackwardIDESolver[Variable, FlatElement[Nothing] ,TwoElementLattice](program), LiveVarAnalysisFunctions
+class InterLiveVarsAnalysis(program: Program)
+  extends BackwardIDESolver[Variable, FlatElement[Nothing] ,TwoElementLattice](program), LiveVarsAnalysisFunctions
 
 
-object LiveVarAnalysis extends AnalysisResult[Map[CFGPosition, Map[Variable, FlatElement[Nothing]]]] {
+object InterLiveVarsAnalysis extends AnalysisResult[Map[CFGPosition, Map[Variable, FlatElement[Nothing]]]] {
 
   def encodeAnalysisResults(result: Map[CFGPosition, Map[Variable, FlatElement[Nothing]]]): String = {
     val pp = result.foldLeft("") {
@@ -127,7 +96,7 @@ object LiveVarAnalysis extends AnalysisResult[Map[CFGPosition, Map[Variable, Fla
             line + s"${pair._1}->${pair._2}<>"
         }
 
-        m + s"$cfgPosition==>${positionMaps.dropRight(2)}\n"
+        m + s"${cfgPosition.toShortString}==>${positionMaps.dropRight(2)}\n"
     }
     pp.dropRight(1)
   }

@@ -1,47 +1,44 @@
-import analysis.{FlatEl, LiveVarAnalysis, Top}
+import analysis.{InterLiveVarsAnalysis, Top}
 import ir.IRDSL.EventuallyJump
-import ir.{BitVecLiteral, BitVecType, Block, CFGPosition, ConvertToSingleProcedureReturn, DirectCall, GoTo, IRDSL, InterProcIRCursor, LocalAssign, Procedure, Program, Register, Statement, Variable, toDot}
+import ir.{BitVecLiteral, BitVecType, ConvertToSingleProcedureReturn, IRDSL, LocalAssign, Program, Register, Statement, Variable}
+import org.scalatest.Ignore
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.TestUtil
-import util.RunUtils.writeToFile
-import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
 
-import java.io.File
-import scala.collection.mutable.ArrayBuffer
 
 class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
 
   override val testPath = "./src/test/analysis/livevars/"
   override val resultsFile = "livevar_analysis_results"
   override val dumpPath: String = testPath + "dump/"
-  override val resultParser: String => String = LiveVarAnalysis.parseAnalysisResults
+  override val resultParser: String => String = InterLiveVarsAnalysis.parseAnalysisResults
 
   // runs analysis phase on all correct and incorrect programs
-//  for (p <- correctPrograms) {
-//    val path = correctPath + p
-//    val variations = getSubdirectories(path)
-//    variations.foreach(t =>
-//      test("correct/" + p + "/" + t) {
-//        runTest(correctPath, p, t)
-//      }
-//    )
-//  }
-//
-//  for (p <- incorrectPrograms) {
-//    val path = incorrectPath +  p
-//    val variations = getSubdirectories(path)
-//    variations.foreach(t =>
-//      test("incorrect/" + p + "/" + t) {
-//        runTest(incorrectPath, p, t)
-//      }
-//    )
-//  }
+  for (p <- correctPrograms) {
+    val path = correctPath + p
+    val variations = getSubdirectories(path)
+    variations.foreach(t =>
+      test("correct/" + p + "/" + t) {
+        runTest(correctPath, p, t)
+      }
+    )
+  }
+
+  for (p <- incorrectPrograms) {
+    val path = incorrectPath +  p
+    val variations = getSubdirectories(path)
+    variations.foreach(t =>
+      test("incorrect/" + p + "/" + t) {
+        runTest(incorrectPath, p, t)
+      }
+    )
+  }
 
   def createSimpleProc(name: String, statements: Seq[Statement | EventuallyJump]): IRDSL.EventuallyProcedure = {
     import IRDSL._
     proc(name,
       block("l" + name,
-        (statements.:+(goto(name + "_return"))): _*
+        statements.:+(goto(name + "_return")): _*
       ),
       block(name + "_return",
         ret
@@ -80,7 +77,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
+    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
 
     val procs = program.procs
     assert(liveVarAnalysisResults(procs("main")) == Map(r30 -> Top))
@@ -120,7 +117,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
+    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
 
     val procs = program.procs
     assert(liveVarAnalysisResults(procs("main")) == Map(r30 -> Top))
@@ -174,7 +171,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
+    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
     val blocks = program.blocks
     assert(liveVarAnalysisResults(blocks("wrapper1_first_call").jump) == Map(R1 -> Top, r30 -> Top))
     assert(liveVarAnalysisResults(blocks("wrapper2_first_call").jump) == Map(R2 -> Top, r30 -> Top))
@@ -201,7 +198,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
+    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
     val blocks = program.blocks
 
     assert(liveVarAnalysisResults(blocks("aftercall")) == Map(R1 -> Top, r30 -> Top))
@@ -240,7 +237,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     program = returnUnifier.visitProgram(program)
 
     val blocks = program.blocks
-    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
+    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
 
     assert(liveVarAnalysisResults(blocks("branch1")) == Map(R1 -> Top, r30 -> Top))
     assert(liveVarAnalysisResults(blocks("branch2")) == Map(R2 -> Top, r30 -> Top))
@@ -268,8 +265,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
+    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
     val blocks = program.blocks
+
+    assert(liveVarAnalysisResults(program.mainProcedure) == Map(R1 -> Top, R2 -> Top, r30 -> Top))
   }
 
   def recursionBaseCase(): Unit = {
@@ -302,7 +301,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val liveVarAnalysisResults = LiveVarAnalysis(program).analyze()
+    val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
     val blocks = program.blocks
 
     assert(liveVarAnalysisResults(program.mainProcedure) == Map(R1 -> Top, R2 -> Top, r30 -> Top))
@@ -328,7 +327,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     simpleBranch()
   }
 
-  test("recursion") {
+  ignore("recursionInfinite") {
+    recursionInfinite()
+  }
+
+  test("recursionBaseCase") {
     recursionBaseCase()
   }
 
