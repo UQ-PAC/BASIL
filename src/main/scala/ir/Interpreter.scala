@@ -226,10 +226,7 @@ class Interpreter() {
     }
 
     // Procedure.Block
-    p.entryBlock match {
-      case Some(block) => nextBlock = Some(block)
-      case None        => nextBlock = Some(returnBlock.pop())
-    }
+    nextBlock = Some(p.entryBlock)
   }
 
   private def interpretBlock(b: Block): Unit = {
@@ -279,6 +276,13 @@ class Interpreter() {
             break
           } else {
             ???
+          }
+        case r: Return =>
+          if (returnBlock.nonEmpty) {
+            nextBlock = Some(returnBlock.pop())
+          } else {
+            //Exit Interpreter
+            nextBlock = None
           }
       }
     }

@@ -433,7 +433,7 @@ class ProgramCfgFactory:
       cfg.addEdge(funcEntryNode, funcExitNode)
     } else {
       // Recurse through blocks
-      visitBlock(proc.entryBlock.get, funcEntryNode)
+      visitBlock(proc.entryBlock, funcEntryNode)
     }
 
     /** Add a block to the CFG. A block in this case is a basic block, so it contains a list of consecutive statements
@@ -581,6 +581,10 @@ class ProgramCfgFactory:
                 cfg.addEdge(callNode, noReturn)
                 cfg.addEdge(noReturn, funcExitNode)
             }
+          case r : Return =>
+            val returnNode = CfgProcedureReturnNode()
+            cfg.addEdge(jmpNode, returnNode)
+            cfg.addEdge(returnNode, funcExitNode)
           case iCall: IndirectCall =>
             Logger.info(s"Indirect call found: $iCall in ${proc.name}")
 

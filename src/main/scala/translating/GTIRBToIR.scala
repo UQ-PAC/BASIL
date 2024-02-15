@@ -269,14 +269,15 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     val blockAddress = blockUUIDToAddress.get(blockUUID)
     val block = Block(blockLabel, blockAddress)
-    procedure.addBlocks(block)
+    procedure.addBlock(block)
     if (uuidToBlock.contains(blockUUID)) {
       // TODO this is a case that requires special consideration
       throw Exception(s"block ${byteStringToString(blockUUID)} is in multiple functions")
     }
     uuidToBlock += (blockUUID -> block)
     if (blockUUID == entranceUUID) {
-      procedure.entryBlock = block
+      assert(procedure.entryBlock.singleSuccessor.contains(procedure.returnBlock))
+      procedure.entryBlock.replaceJump(GoTo(block))
     }
     block
   }

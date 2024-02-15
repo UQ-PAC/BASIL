@@ -99,7 +99,7 @@ def block(label: String, sl: (Statement | EventuallyJump)*): EventuallyBlock = {
 
 case class EventuallyProcedure(label: String, blocks: Seq[EventuallyBlock]) {
   val _blocks: Seq[Block] = blocks.map(_.tempBlock)
-  val tempProc: Procedure = Procedure(label, None, _blocks.headOption, None, _blocks)
+  val tempProc: Procedure = Procedure(label, None, _blocks.headOption, _blocks)
   val jumps: Map[Block, EventuallyJump] = blocks.map(b => b.tempBlock -> b.j).toMap
 
   def resolve(prog: Program): Procedure = {

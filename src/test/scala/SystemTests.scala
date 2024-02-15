@@ -1,5 +1,6 @@
 import org.scalatest.funsuite.AnyFunSuite
 import util.{Logger, PerformanceTimer}
+import org.scalatest.tagobjects.Slow
 
 
 import java.io.{BufferedWriter, File, FileWriter}
@@ -28,20 +29,28 @@ trait SystemTests extends AnyFunSuite {
 
   val testResults: mutable.ArrayBuffer[(String, TestResult)] = mutable.ArrayBuffer()
 
-  def runTests(programs: Array[String], path: String, name: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
-    // get all variations of each program
-    for (p <- programs) {
-      val programPath = path + "/" + p
-      val variations = getSubdirectories(programPath)
-      variations.foreach(t =>
-        test(name + "/" + p + "/" + t) {
-          runTest(path, p, t, shouldVerify, useADT)
-        }
-      )
-    }
+  // get all variations of each program
+  for (p <- correctPrograms) {
+    val path = correctPath + "/" + p
+    val variations = getSubdirectories(path)
+    variations.foreach(t =>
+      test("correct/" + p + "/" + t, Slow) {
+        runTest(correctPath, p, t, true)
+      }
+    )
   }
 
-  def summary(): Unit = {
+  for (p <- incorrectPrograms) {
+    val path = incorrectPath + "/" + p
+    val variations = getSubdirectories(path)
+    variations.foreach(t =>
+      test("incorrect/" + p + "/" + t, Slow) {
+        runTest(incorrectPath, p, t, false)
+      }
+    )
+  }
+
+  test("summary", Slow) {
     val csv: String = "testCase," + TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r._1},${r._2.toCsv}").mkString(System.lineSeparator())
     log(csv, testPath + "testResults.csv")
 

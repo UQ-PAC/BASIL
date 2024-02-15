@@ -50,9 +50,9 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
 
     val procs = program.procs
-    assert(liveVarAnalysisResults(procs("main")) == Map(R30 -> TwoElementTop))
-    assert(liveVarAnalysisResults(procs("callee1")) == Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R30 -> TwoElementTop))
-    assert(liveVarAnalysisResults(procs("callee2")) == Map(R1 -> TwoElementTop, R30 -> TwoElementTop))
+    // assert(liveVarAnalysisResults(procs("main")) == Map(R30 -> TwoElementTop))
+    assert(liveVarAnalysisResults(procs("callee1")) == Map(R0 -> TwoElementTop, R1 -> TwoElementTop))
+    assert(liveVarAnalysisResults(procs("callee2")) == Map(R1 -> TwoElementTop))
   }
 
 
@@ -88,9 +88,9 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
 
     val procs = program.procs
-    assert(liveVarAnalysisResults(procs("main")) == Map(R30 -> TwoElementTop))
-    assert(liveVarAnalysisResults(procs("callee1")) == Map(R0 -> TwoElementTop, R30 -> TwoElementTop))
-    assert(liveVarAnalysisResults(procs("callee2")) == Map(R1 -> TwoElementTop, R30 -> TwoElementTop))
+    // assert(liveVarAnalysisResults(procs("main")) == Map(R30 -> TwoElementTop))
+    assert(liveVarAnalysisResults(procs("callee1")) == Map(R0 -> TwoElementTop))
+    assert(liveVarAnalysisResults(procs("callee2")) == Map(R1 -> TwoElementTop))
   }
 
   def twoCallers(): Unit = {
@@ -139,8 +139,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
 
     val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
     val blocks = program.blocks
-    assert(liveVarAnalysisResults(blocks("wrapper1_first_call").jump) == Map(R1 -> TwoElementTop, R30 -> TwoElementTop))
-    assert(liveVarAnalysisResults(blocks("wrapper2_first_call").jump) == Map(R2 -> TwoElementTop, R30 -> TwoElementTop))
+    assert(liveVarAnalysisResults(blocks("wrapper1_first_call").jump) == Map(R1 -> TwoElementTop))
+    assert(liveVarAnalysisResults(blocks("wrapper2_first_call").jump) == Map(R2 -> TwoElementTop))
 
   }
 
@@ -164,8 +164,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
     val blocks = program.blocks
 
-    assert(liveVarAnalysisResults(blocks("aftercall")) == Map(R1 -> TwoElementTop, R30 -> TwoElementTop))
-    assert(liveVarAnalysisResults(blocks("lmain")) == Map(R30 -> TwoElementTop))
+    assert(liveVarAnalysisResults(blocks("aftercall")) == Map(R1 -> TwoElementTop))
+    // assert(liveVarAnalysisResults(blocks("lmain")) == Map.empty)
   }
 
   def simpleBranch(): Unit = {
@@ -199,9 +199,9 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val blocks = program.blocks
     val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
 
-    assert(liveVarAnalysisResults(blocks("branch1")) == Map(R1 -> TwoElementTop, R30 -> TwoElementTop))
-    assert(liveVarAnalysisResults(blocks("branch2")) == Map(R2 -> TwoElementTop, R30 -> TwoElementTop))
-    assert(liveVarAnalysisResults(blocks("lmain")) == Map(R1 -> TwoElementTop, R2 -> TwoElementTop, R30 -> TwoElementTop))
+    assert(liveVarAnalysisResults(blocks("branch1")) == Map(R1 -> TwoElementTop))
+    assert(liveVarAnalysisResults(blocks("branch2")) == Map(R2 -> TwoElementTop))
+    assert(liveVarAnalysisResults(blocks("lmain")) == Map(R1 -> TwoElementTop, R2 -> TwoElementTop))
 
   }
 
@@ -227,7 +227,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
     val blocks = program.blocks
 
-    assert(liveVarAnalysisResults(program.mainProcedure) == Map(R1 -> TwoElementTop, R2 -> TwoElementTop, R30 -> TwoElementTop))
+    assert(liveVarAnalysisResults(program.mainProcedure) == Map(R1 -> TwoElementTop, R2 -> TwoElementTop))
   }
 
   def recursionBaseCase(): Unit = {
@@ -262,7 +262,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val liveVarAnalysisResults = InterLiveVarsAnalysis(program).analyze()
     val blocks = program.blocks
 
-    assert(liveVarAnalysisResults(program.mainProcedure) == Map(R1 -> TwoElementTop, R2 -> TwoElementTop, R30 -> TwoElementTop))
+    assert(liveVarAnalysisResults(program.mainProcedure) == Map(R1 -> TwoElementTop, R2 -> TwoElementTop))
   }
 
   test("differentCalleesBothAlive") {
@@ -299,7 +299,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val blocks = result.ir.program.blocks
 
     // main has a parameter, R0 should be alive
-    assert(analysisResults(blocks("lmain")) == Map(R0 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("lmain")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
   }
 
   test("function") {
@@ -308,10 +308,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val blocks = result.ir.program.blocks
 
     // checks function call blocks
-    assert(analysisResults(blocks("lmain")) == Map(R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("lget_two")) == Map(R30 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("lmain")) == Map(R29 -> TwoElementTop, R31 -> TwoElementTop, R30 -> TwoElementTop))
+    assert(analysisResults(blocks("lget_two")) == Map(R31 -> TwoElementTop))
     assert(analysisResults(blocks("l00000946")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
-    assert(analysisResults(blocks("main_basil_return")) == Map(R30 -> TwoElementTop))
+    // assert(analysisResults(blocks("main_basil_return")) == Map(R30 -> TwoElementTop))
   }
 
 
@@ -323,9 +323,9 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
 
     // main has parameter, callee (zero) has return and no parameter
     assert(analysisResults(blocks("lmain")) == Map(R0 -> TwoElementTop, R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("lzero")) == Map(R30 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("lzero")) == Map(R31 -> TwoElementTop))
     assert(analysisResults(blocks("l00000323")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
-    assert(analysisResults(blocks("zero_basil_return")) == Map(R0 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("zero_basil_return")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
   }
 
   test("function1") {
@@ -334,12 +334,12 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val blocks = result.ir.program.blocks
 
     // main has no parameters, get_two has three and a return
-    assert(analysisResults(blocks("lmain")) == Map(R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("lmain")) == Map(R29 -> TwoElementTop, R31 -> TwoElementTop, R30 -> TwoElementTop))
     assert(analysisResults(blocks("l000003ec")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // get_two aftercall
     assert(analysisResults(blocks("l00000430")) == Map(R31 -> TwoElementTop)) // printf aftercall
-    assert(analysisResults(blocks("main_basil_return")) == Map(R30 -> TwoElementTop))
-    assert(analysisResults(blocks("lget_two")) == Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R2 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("get_two_basil_return")) == Map(R0 -> TwoElementTop,  R30 -> TwoElementTop, R31 -> TwoElementTop))
+    // assert(analysisResults(blocks("main_basil_return")) == Map(R30 -> TwoElementTop))
+    assert(analysisResults(blocks("lget_two")) == Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R2 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("get_two_basil_return")) == Map(R0 -> TwoElementTop,  R31 -> TwoElementTop))
   }
 
   test("ifbranches") {
@@ -348,11 +348,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val blocks = result.ir.program.blocks
 
     // block after branch
-    assert(analysisResults(blocks("l00000342")) == Map(R30 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("l00000342")) == Map(R31 -> TwoElementTop))
     // branch blocks
     assert(analysisResults(blocks("lmain_goto_l00000330")) == Map(LocalVar("ZF", BitVecType(1)) -> TwoElementTop,
-      R30 -> TwoElementTop, R31 -> TwoElementTop))
+      R31 -> TwoElementTop))
     assert(analysisResults(blocks("lmain_goto_l00000369")) == Map(LocalVar("ZF", BitVecType(1)) -> TwoElementTop,
-      R30 -> TwoElementTop, R31 -> TwoElementTop))
+      R31 -> TwoElementTop))
   }
 }

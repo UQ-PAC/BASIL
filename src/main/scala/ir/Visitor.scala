@@ -56,9 +56,11 @@ abstract class Visitor {
   }
 
   def visitProcedure(node: Procedure): Procedure = {
-    for (b <- node.blocks) {
+    visitBlock(node.entryBlock)
+    for (b <- node.innerBlocks) {
       node.replaceBlock(b, visitBlock(b))
     }
+    visitBlock(node.returnBlock)
     for (i <- node.in.indices) {
       node.in(i) = visitParameter(node.in(i))
     }
@@ -254,7 +256,7 @@ abstract class IntraproceduralControlFlowVisitor extends Visitor {
   private val visitedBlocks: mutable.Set[Block] = mutable.Set()
 
   override def visitProcedure(node: Procedure): Procedure = {
-    node.entryBlock.foreach(visitBlock)
+    visitBlock(node.entryBlock)
     node
   }
 
@@ -392,6 +394,7 @@ class ExternalRemover(external: Set[String]) extends Visitor {
     if (external.contains(node.name)) {
       // update the modifies set before removing the body
       node.modifies.addAll(node.blocks.flatMap(_.modifies))
+      node.clearBlocks()
       node.replaceBlocks(Seq())
     }
     super.visitProcedure(node)
@@ -426,15 +429,8 @@ class ConvertToSingleProcedureReturn extends Visitor {
   override def visitJump(node: Jump): Jump = {
     node match
       case c: IndirectCall =>
-        val returnBlock = node.parent.parent.returnBlock match {
-          case Some(b) => b
-          case None =>
-            val b = Block.procedureReturn(node.parent.parent)
-            node.parent.parent.returnBlock = b
-            b
-        }
-        // if we are return outside the return block then replace with a goto to the return block
-        if c.target.name == "R30" && c.returnTarget.isEmpty && !c.parent.isProcReturn then GoTo(Seq(returnBlock)) else node
+        c.parent.parent.replaceReturnCMD(c.parent)
+        c
       case _ => node
   }
 }

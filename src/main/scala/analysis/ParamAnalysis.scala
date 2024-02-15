@@ -43,7 +43,7 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
         )
         results += (proc -> intraLivenessResults(proc).diff(ignoreRegisters))
       else
-        val exit = proc.returnBlock.get.jump
+        val exit = proc.returnBlock.jump
         val calleeParams = proc.calls.intersect(calledProcs).foldLeft(Set(): Set[Variable]) {
           (s, proc) =>
             s ++ getProcParams(proc)

@@ -40,9 +40,7 @@ class SSAForm(program: Program) {
       val stack = mutable.Stack[Block]()
 
       // Start with the entry block
-      if (proc.entryBlock.isDefined) {
-        stack.push(proc.entryBlock.get)
-      }
+      stack.push(proc.entryBlock)
 
       while (stack.nonEmpty) {
         val currentBlock = stack.pop()

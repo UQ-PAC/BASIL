@@ -82,6 +82,8 @@ class IrreducibleLoop extends AnyFunSuite {
     val outPath = s"$path.bpl"
     val args = Array("-o", s"$outPath", "-i", s"$path.adt", "-r", s"$path.relf", "-s", s"$path.spec")
 
+    val ir = IRLoading.load(ILLoadingConfig(inputFile = s"$path.adt", relfFile = s"$path.relf", specFile = Some(s"$path.spec")))
+
     Main.main(args)
 
     val boogieResult = Seq("boogie", "/useArrayAxioms", outPath).!!

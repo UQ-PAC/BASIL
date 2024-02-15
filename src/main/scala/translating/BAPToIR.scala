@@ -8,7 +8,8 @@ import specification.*
 import scala.collection.mutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
-import util.intrusive_list.*
+import util.intrusive_list.IntrusiveList
+import util.Logger
 
 class BAPToIR(var program: BAPProgram, mainAddress: Int) {
 
@@ -22,9 +23,10 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       val procedure = Procedure(s.name, Some(s.address))
       for (b <- s.blocks) {
         val block = Block(b.label, b.address)
-        procedure.addBlocks(block)
+        procedure.addBlock(block)
+
         if (b.address.isDefined && b.address.isDefined && b.address.get == procedure.address.get) {
-          procedure.entryBlock = block
+          procedure.entryBlock.replaceJump(GoTo(block))
         }
         labelToBlock.addOne(b.label, block)
       }
@@ -42,22 +44,28 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     }
 
     for (s <- program.subroutines) {
-      val procedure = nameToProcedure(s.name)
+      val procedure: Procedure = nameToProcedure(s.name)
       for (b <- s.blocks) {
         val block = labelToBlock(b.label)
         for (st <- b.statements) {
           block.statements.append(translate(st))
         }
-        val (jump, newBlocks) = translate(b.jumps, block)
+        var (jump, newBlocks) = translate(b.jumps, block)
         procedure.addBlocks(newBlocks)
-        block.replaceJump(jump)
+        jump = block.replaceJump(jump)
         assert(jump.hasParent)
       }
 
       // Set entry block to the block with the same address as the procedure or the first in sequence
-      procedure.blocks.find(b => b.address == procedure.address).foreach(procedure.entryBlock = _)
-      if procedure.entryBlock.isEmpty then procedure.blocks.nextOption().foreach(procedure.entryBlock = _)
-      // TODO maybe throw an exception if there is no block with the same address, to be safe?
+      procedure.blocks.find(b => b.address == procedure.address) match 
+        case Some(x) => procedure.entryBlock.replaceJump(GoTo(Set(x)))
+        case None => {
+          if (procedure.hasImplementation) then {
+            // TODO maybe throw an exception if there is no block with the same address, to be safe?
+            Logger.warn("No block with procedure's address found; using the first available block as the entry")
+            procedure.innerBlocks.nextOption().foreach(b => procedure.entryBlock.replaceJump(GoTo(Set(b))))
+          }
+        }
 
     }
 

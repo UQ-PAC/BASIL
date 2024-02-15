@@ -438,7 +438,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
 
   def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr]): BProcedure = {
-    val body = (p.entryBlock.view ++ p.blocks.filterNot(x => p.entryBlock.contains(x))).map(translateBlock).toList
+    val body = if p.hasImplementation then p.blocks.map(translateBlock).toList else List.empty
 
     val callsRely: Boolean = body.flatMap(_.body).exists(_ match
       case BProcedureCall("rely", lhs, params, comment) => true
@@ -609,20 +609,15 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         case Some(r) => GoToCmd(Seq(r.label))
         case None => BAssume(FalseBLiteral, Some("no return target"))
       }
-
-      (config.procedureRely match {
-        case Some(ProcRelyVersion.Function) =>
-          if (libRelies.contains(d.target.name) && libGuarantees.contains(d.target.name) && libRelies(d.target.name).nonEmpty && libGuarantees(d.target.name).nonEmpty) {
-            val invCall1 = BProcedureCall(d.target.name + "$inv", List(mem_inv1, Gamma_mem_inv1), List(mem, Gamma_mem))
-            val invCall2 = BProcedureCall("rely$inv", List(mem_inv2, Gamma_mem_inv2), List(mem_inv1, Gamma_mem_inv1))
-            val libRGAssert = libRelies(d.target.name).map(r => BAssert(r.resolveSpecInv))
-            List(invCall1, invCall2) ++ libRGAssert
-          } else {
-            List()
-          }
-        case Some(ProcRelyVersion.IfCommandContradiction) => relyfun(d.target.name).toList
-        case None => List()
-      }) ++ List(call, returnTarget)
+      if (libRelies.contains(d.target.name) && libGuarantees.contains(d.target.name) && libRelies(d.target.name).nonEmpty && libGuarantees(d.target.name).nonEmpty) {
+        val invCall1 = BProcedureCall(d.target.name + "$inv", List(mem_inv1, Gamma_mem_inv1), List(mem, Gamma_mem))
+        val invCall2 = BProcedureCall("rely$inv", List(mem_inv2, Gamma_mem_inv2), List(mem_inv1, Gamma_mem_inv1))
+        val libRGAssert = libRelies(d.target.name).map(r => BAssert(r.resolveSpecInv))
+        List(invCall1, invCall2) ++ libRGAssert ++ List(call, returnTarget)
+      } else {
+        List(call, returnTarget)
+      }
+    case g: Return => List(ReturnCmd)
     case i: IndirectCall =>
       // TODO put this elsewhere
       if (i.target.name == "R30") {

@@ -81,7 +81,6 @@ sealed trait Jump extends Command, HasParent[Block]  {
 }
 
 
-
 class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String]) extends Jump {
 
   def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.LinkedHashSet.from(targets), label)
@@ -96,11 +95,16 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
 
   def addTarget(t: Block): Unit = {
     if (_targets.add(t)) {
+      //assert(hasParent && t.parent == parent.parent)
       t.addIncomingJump(this)
     }
   }
 
   override def linkParent(b: Block): Unit = {
+    // assert(hasParent && _targets.forall(_.parent == parent.parent))
+    // TODO: we might want a stronger assertion here
+    //  - we risk getting GoTos between procedures if we move blocks between procedures.
+    assert(_targets.forall(t => !t.hasParent || !parent.hasParent || t.parent == parent.parent))
     _targets.foreach(_.addIncomingJump(this))
   }
 
@@ -115,6 +119,7 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
     if (_targets.remove(t)) {
       t.removeIncomingJump(this)
     }
+    // assert(_targets.nonEmpty) // empty goto is not allowed
     assert(!_targets.contains(t))
     assert(!t.incomingJumps.contains(this))
   }
@@ -129,6 +134,23 @@ object GoTo:
 
 
 sealed trait Call extends Jump
+
+class Return(override val label: Option[String] = None) extends Call {
+  override def toString(): String = "return"
+  override def acceptVisit(visitor: Visitor): Return = this
+}
+
+class GoToReturn(returnBlock: Block) extends GoTo(Set(returnBlock)) {
+
+  override def addTarget(t: Block): Unit = {
+    throw IllegalArgumentException("Not allowed to add targets to a GoToReturn")
+  }
+
+  override def removeTarget(t: Block): Unit = {
+    throw IllegalArgumentException("Not allowed to remove targets from a GoToReturn")
+  }
+
+} 
 
 abstract trait FallThrough extends HasParent[Block]:
   /**
@@ -155,9 +177,13 @@ abstract trait FallThrough extends HasParent[Block]:
   // moving a call between blocks
   override def linkParent(p: Block): Unit = {
     returnTarget.foreach(t => parent.fallthrough = Some(GoTo(Set(t))))
+
+    // If this is a Return, then replace it with a goto to the procedures ReturnBlock
+    if p.hasParent then p.parent.replaceReturnCMD(p)
   }
 
   override def unlinkParent(): Unit = {
+    super.unlinkParent()
     parent.fallthrough = None
   }
 
