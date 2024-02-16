@@ -56,7 +56,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule {
             if (verified == shouldVerify) {
               if (os.exists(outPath) && !(os.exists(expectedPath) && filesContentEqual(outPath, expectedPath))) {
                 println(s"updated $expectedPath")
-                os.copy(outPath, expectedPath)
+                os.copy.over(outPath, expectedPath)
               }
             }
           }
