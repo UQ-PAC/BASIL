@@ -24,16 +24,22 @@ import analysis.CfgCommandNode
 import scala.annotation.tailrec
 import scala.collection.mutable
 
+/** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.
+  */
 
+/** Stores the IR Program loaded from the binary and ELF tables, which is modified during analysis and program
+  * transformation.
+  */
 case class IRContext(
     externalFunctions: Set[ExternalFunction],
     globals: Set[SpecGlobal],
     globalOffsets: Map[BigInt, BigInt],
     specification: Specification,
-    program: Program
+    program: Program // internally mutable
 ) {}
 
-
+/** Stores the results of the static analyses.
+  */
 case class StaticAnalysisContext(
     cfg: ProgramCfg,
     constPropResult: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
@@ -42,15 +48,22 @@ case class StaticAnalysisContext(
     vsaResult: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
 ) {}
 
-
+/** Results of the main program execution.
+  */
 case class BasilResult(val ir: IRContext, analysis: Option[StaticAnalysisContext], boogie: BProgram) {}
 
+/** Tools for loading the IR program into an IRContext.
+  */
 object IRLoading {
 
+  /** Create a context from just an IR program.
+    */
   def load(p: Program): IRContext = {
     IRContext(Set.empty, Set.empty, Map.empty, IRLoading.loadSpecification(None, p, Set.empty), p)
   }
 
+  /** Load a program from files using the provided configuration.
+    */
   def load(q: ILLoadingConfig): IRContext = {
     val bapProgram = IRLoading.loadBAP(q.adtFile)
     val (externalFunctions, globals, globalOffsets, mainAddress) = IRLoading.loadReadELF(q.relfFile, q)
@@ -98,10 +111,15 @@ object IRLoading {
   }
 }
 
-
+/** Methods related to transforming the IR `Program` in-place.
+  *
+  * These operate over the IRContext, and possibly use static analysis results.
+  */
 object IRTransform {
   val boogieReserved: Set[String] = Set("free")
 
+  /** Initial cleanup before analysis.
+    */
   def doCleanup(ctx: IRContext) = {
     Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
@@ -116,23 +134,8 @@ object IRTransform {
     ctx
   }
 
-  def doTransforms(config: ILLoadingConfig, ctx: IRContext) = {
-    ctx.program.determineRelevantMemory(ctx.globalOffsets)
-
-    Logger.info("[!] Stripping unreachable")
-    val before = ctx.program.procedures.size
-    ctx.program.stripUnreachableFunctions(config.procedureTrimDepth)
-    Logger.info(
-      s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
-    )
-
-    val stackIdentification = StackSubstituter()
-    stackIdentification.visitProgram(ctx.program)
-
-    val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
-    ctx.program.setModifies(specModifies)
-  }
-
+  /** Resolve indirect calls to an address-conditional choice between direct calls using the Value Set Analysis results.
+    */
   def resolveIndirectCalls(
       cfg: ProgramCfg,
       valueSets: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
@@ -261,19 +264,45 @@ object IRTransform {
 
     (IRProgram, modified)
   }
+
+  /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
+    * add in modifies from the spec.
+    */
+  def prepareForTranslation(config: ILLoadingConfig, ctx: IRContext) = {
+    ctx.program.determineRelevantMemory(ctx.globalOffsets)
+
+    Logger.info("[!] Stripping unreachable")
+    val before = ctx.program.procedures.size
+    ctx.program.stripUnreachableFunctions(config.procedureTrimDepth)
+    Logger.info(
+      s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
+    )
+
+    val stackIdentification = StackSubstituter()
+    stackIdentification.visitProgram(ctx.program)
+
+    val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
+    ctx.program.setModifies(specModifies)
+  }
+
 }
 
-
+/** Methods relating to program static analysis.
+  */
 object StaticAnalysis {
 
+  /** Run all static analysis passes on the provided IRProgram.
+    */
   def analyse(
-      IRProgram: Program,
-      externalFunctions: Set[ExternalFunction],
-      globals: Set[SpecGlobal],
-      globalOffsets: Map[BigInt, BigInt],
+      ctx: IRContext,
       config: StaticAnalysisConfig,
       iteration: Int
   ): StaticAnalysisContext = {
+    val IRProgram: Program = ctx.program
+    val externalFunctions: Set[ExternalFunction] = ctx.externalFunctions
+    val globals: Set[SpecGlobal] = ctx.globals
+    val globalOffsets: Map[BigInt, BigInt] = ctx.globalOffsets
+
     val subroutines = IRProgram.procedures
       .filter(p => p.address.isDefined)
       .map(p => BigInt(p.address.get) -> p.name)
@@ -526,7 +555,6 @@ object StaticAnalysis {
 
 }
 
-
 object RunUtils {
 
   def run(q: BASILConfig): Unit = {
@@ -536,36 +564,6 @@ object RunUtils {
     val wr = BufferedWriter(FileWriter(q.outputPrefix))
     result.boogie.writeToString(wr)
     wr.close()
-  }
-
-  /** Resolve indirect calls and replace in IR until fixed point.
-    */
-  def staticAnalysis(config: StaticAnalysisConfig, ctx: IRContext): StaticAnalysisContext = {
-    var iteration = 1
-    var modified: Boolean = true
-    var analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
-    while (modified) {
-      var newIR = null
-      Logger.info("[!] Running Static Analysis")
-      val result =
-        StaticAnalysis.analyse(ctx.program, ctx.externalFunctions, ctx.globals, ctx.globalOffsets, config, iteration)
-      analysisResult.append(result)
-      Logger.info("[!] Replacing Indirect Calls")
-      val (ir, mod) = IRTransform.resolveIndirectCalls(result.cfg, result.vsaResult, ctx.program)
-      modified = mod
-      if (modified) {
-        iteration += 1
-        Logger.info(s"[!] Analysing again (iter $iteration)")
-      }
-    }
-
-    config.analysisDotPath.foreach { s =>
-      val newCFG = analysisResult.last.cfg
-      writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
-    }
-
-    Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
-    analysisResult.last
   }
 
   def loadAndTranslate(q: BASILConfig): BasilResult = {
@@ -583,13 +581,42 @@ object RunUtils {
       interpreter.interpret(ctx.program)
     }
 
-    IRTransform.doTransforms(q.loading, ctx)
+    IRTransform.prepareForTranslation(q.loading, ctx)
 
     Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(ctx.program, ctx.specification)
     val boogieProgram = boogieTranslator.translate(q.boogieTranslation)
 
     BasilResult(ctx, analysis, boogieProgram)
+  }
+
+  /** Use static analysis to resolve indirect calls and replace them in the IR until fixed point.
+    */
+  def staticAnalysis(config: StaticAnalysisConfig, ctx: IRContext): StaticAnalysisContext = {
+    var iteration = 1
+    var modified: Boolean = true
+    var analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
+    while (modified) {
+      var newIR = null
+      Logger.info("[!] Running Static Analysis")
+      val result = StaticAnalysis.analyse(ctx, config, iteration)
+      analysisResult.append(result)
+      Logger.info("[!] Replacing Indirect Calls")
+      val (ir, mod) = IRTransform.resolveIndirectCalls(result.cfg, result.vsaResult, ctx.program)
+      modified = mod
+      if (modified) {
+        iteration += 1
+        Logger.info(s"[!] Analysing again (iter $iteration)")
+      }
+    }
+
+    config.analysisDotPath.foreach { s =>
+      val newCFG = analysisResult.last.cfg
+      writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
+    }
+
+    Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
+    analysisResult.last
   }
 }
 
