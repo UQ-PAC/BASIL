@@ -165,8 +165,7 @@ object RunUtils {
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
-
-    val cfg = ProgramCfgFactory().fromIR(IRProgram)
+    val cfg = ProgramCfgFactory().fromIR(IRProgram, inlineLimit = 0)
 
     unparented = IRProgram.collect {
       case c: IndirectCall if (!c.hasParent) => c
@@ -234,9 +233,23 @@ object RunUtils {
       return analyse(newIR, externalFunctions, globals, globalOffsets, config, iteration + 1)
     }
 
+    
+    Logger.info("[!] Live Var Analysis")
+    val liveVarAnalysisResults: Map[CFGPosition, Map[Variable, FlatElement[Nothing]]] = InterLiveVarsAnalysis(newIR).analyze()
+    config.analysisResultsPath.foreach(s=>writeToFile(InterLiveVarsAnalysis.encodeAnalysisResults(liveVarAnalysisResults),
+      s"${s}livevar_analysis_results"))
+    config.analysisDotPath.foreach(s => writeToFile(toDot(newIR, liveVarAnalysisResults.foldLeft(Map(): Map[CFGPosition, String]) {
+      (m, f) => m + (f._1 -> f._2.toString())
+    })
+      , s"${s}_livevarInter$iteration.dot"))
+
+    Logger.info("[!] Parameter Analysis")
+    val res = ParamAnalysis(newIR).analyze()
+    config.analysisResultsPath.foreach(s=>writeToFile(ParamAnalysis.encodeAnalysisResults(res), s"${s}param_analysis_results"))
+
     config.analysisDotPath.foreach { s =>
-      val newCFG = ProgramCfgFactory().fromIR(newIR)
-      writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
+      val newCFG = ProgramCfgFactory().fromIR(newIR, inlineLimit = 0)
+      writeToFile(newCFG.toDot(Output.labeler(Map(), false), Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
@@ -358,7 +371,7 @@ object RunUtils {
     def printNode(node: CfgNode): Unit = {
       s.append(node)
       s.append(" :: ")
-      s.append(result(node))
+      s.append(result.getOrElse(node, "-"))
       s.append(System.lineSeparator())
     }
 

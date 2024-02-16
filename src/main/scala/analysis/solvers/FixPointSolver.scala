@@ -1,6 +1,7 @@
 package analysis.solvers
 
 import analysis.*
+import ir.*
 import scala.collection.immutable.ListSet
 import scala.collection.mutable.LinkedHashSet
 
@@ -259,3 +260,30 @@ trait SimplePushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends PushDo
     x = lattice.bottom
     run(domain)
     x
+
+trait WorklistFixPointFunctions[N, T, L <: Lattice[T]]  extends  LinkedHashSetWorklist[N]:
+
+  val lattice: MapLattice[N, T, L]
+
+  var x: Map[N, T]
+
+  val first: Set[N]
+
+  def init: T
+
+  def propagate(y: T, m: N) = {
+    val xm = x(m)
+    val t = lattice.sublattice.lub(xm, y)
+    if (t != xm) {
+      add(m)
+      x += m -> t
+    }
+  }
+
+  def analyze(): Map[N, T] = {
+    x = first.foldLeft(lattice.bottom) { (l, cur) =>
+      l + (cur -> init)
+    }
+    run(first)
+    x
+  }

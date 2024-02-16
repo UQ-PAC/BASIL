@@ -95,6 +95,8 @@ class FlatLattice[X] extends Lattice[FlatElement[X]] {
   }
 }
 
+class TwoElementLattice extends FlatLattice[Nothing]
+
 /** A lattice of maps from a set of elements of type `A` to a lattice with element `L'. Bottom is the default value.
   */
 class MapLattice[A, T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Map[A, T]] {
