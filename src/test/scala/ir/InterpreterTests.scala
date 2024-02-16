@@ -6,7 +6,7 @@ import org.scalatest.BeforeAndAfter
 import specification.SpecGlobal
 import translating.BAPToIR
 import util.{LogLevel, Logger}
-import util.RunUtils.{loadBAP, loadReadELF}
+import util.IRLoading.{loadBAP, loadReadELF}
 import util.ILLoadingConfig
 
 class InterpreterTests extends AnyFunSuite with BeforeAndAfter {

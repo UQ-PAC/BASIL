@@ -22,7 +22,6 @@ trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] {
 
 object IRWalk:
   def procedure(pos: CFGPosition) : Procedure = {
-    Logger.info(s"pos: $pos")
     pos match {
       case p: Procedure => p
       case b: Block => b.parent
