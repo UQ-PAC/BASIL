@@ -309,13 +309,10 @@ class ProgramCfg:
             dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
           case (from: CfgCommandNode, to: (CfgCommandNode | CfgFunctionExitNode)) =>
             dotArrows += DotRegularArrow(dotNodes(n), dotNodes(to))
-
           case (from: CfgCommandNode, to: CfgFunctionEntryNode) =>
             DotInlineArrow(dotNodes(n), dotNodes(to))
-
           case (from: CfgFunctionExitNode, to: CfgNode) =>
             DotInlineArrow(dotNodes(n), dotNodes(to))
-
           case (from: CfgJumpNode, to: (CfgCallReturnNode | CfgCallNoReturnNode)) =>
             dotArrows += DotIntraArrow(dotNodes(n), dotNodes(to))
           /*
@@ -325,6 +322,7 @@ class ProgramCfg:
           case (from: CfgCommandNode, to: CfgFunctionEntry) =>
             dotArrows += DotInterArrow(dotNodes(n), dotNodes(to))
             */
+
           case _ =>
         }
       }
