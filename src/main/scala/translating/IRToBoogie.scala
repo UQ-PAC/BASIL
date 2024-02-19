@@ -5,6 +5,8 @@ import specification.*
 import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable
+
 
 class IRToBoogie(var program: Program, var spec: Specification) {
   private val externAttr = BAttribute("extern")
@@ -27,6 +29,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val libRelies = spec.subroutines.map(s => s.name -> s.rely).toMap
   private val libGuarantees = spec.subroutines.map(s => s.name -> s.guarantee).toMap
   private val directFunctions = spec.directFunctions
+  private val libRGFunsContradictionProofFunctions = mutable.HashMap[String, BProcedure]()
 
   private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
@@ -90,7 +93,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         } else {
           List()
         }
-      case Some(ProcRelyVersion.IfCommandContradiction) => libRGFunsContradictionProof.values.flatten
+      case Some(ProcRelyVersion.IfCommandContradiction) => libRGFunsContradictionProofFunctions.values
       case None => None
     }
 
@@ -545,7 +548,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     BBlock(b.label, cmds)
   }
 
-  val libRGFunsContradictionProof: Map[String, Seq[BProcedure]] = {
+  def libRGFunsContradictionProof(caller: String, callee: String): Option[Seq[BProcedure]] = {
     /**
      * Generate proof obligations for the library procedure rely/guarantee check.
      *
@@ -562,42 +565,44 @@ class IRToBoogie(var program: Program, var spec: Specification) {
      *      }
      *
      *   Procedures with no precond and the predicate as their postcond are generated to encode two-state assumptions.
-     *
-     */
-    (libRelies.keySet ++ libGuarantees.keySet).filter(x => libRelies(x).nonEmpty && libGuarantees(x).nonEmpty).map(targetName => {
-      val Rc : BExpr = spec.relies.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
-      val Gc : BExpr = spec.guarantees.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
+     * */
 
-      val Rf : BExpr = libRelies(targetName).reduce(((a, b) => BinaryBExpr(BoolAND, a, b))).resolveSpec
-      val Gf : BExpr = libGuarantees(targetName).reduce(((a, b) => BinaryBExpr(BoolAND, a, b))).resolveSpec
+      if !(libRelies.contains(callee) && libGuarantees.contains(callee)) then return None
+
+      val Rf : BExpr = libRelies(callee).reduce(((a, b) => BinaryBExpr(BoolAND, a, b))).resolveSpec
+      val Gf : BExpr = libGuarantees(callee).reduce(((a, b) => BinaryBExpr(BoolAND, a, b))).resolveSpec
+
+      val Rc : BExpr = libRelies.get(caller).getOrElse(spec.relies).reduce(((a, b) => BinaryBExpr(BoolAND, a, b))).resolveSpec
+      val Gc : BExpr = libRelies.get(caller).getOrElse(spec.guarantees).reduce(((a, b) => BinaryBExpr(BoolAND, a, b))).resolveSpec
 
       val inv = BinaryBExpr(BoolOR, Rc, Gf)
       val conseq = BinaryBExpr(BoolIMPLIES, Rc, Rf)
 
-      val procInv= BProcedure(targetName + "$InlineInv", List(), List(), List(inv), List(), List(), List(), List(), List(),
+      val procInv= BProcedure(callee + "$InlineInv", List(), List(), List(inv), List(), List(), List(), List(), List(),
         inv.globals, List(), List())
 
-      val proc2 = BProcedure(targetName + "$notRcimpliesRf", List(), List(), List(UnaryBExpr(BoolNOT, conseq)), List(), List(), List(), List(),
+      val proc2 = BProcedure(callee + "$notRcimpliesRf", List(), List(), List(UnaryBExpr(BoolNOT, conseq)), List(), List(), List(), List(),
         List(), conseq.globals, List(), List())
 
-      val procGf = BProcedure(targetName + "$Gf", List(), List(), List(Gf), List(), List(), List(), List(),
+      val procGf = BProcedure(callee + "$Gf", List(), List(), List(Gf), List(), List(), List(), List(),
         List(), Gf.globals, List(), List())
 
-      val proc4 = BProcedure(targetName + "$GfimpliesGc", List(), List(), List(Gc), List(), List(), List(), List(),
+      val proc4 = BProcedure(callee + "$GfimpliesGc", List(), List(), List(Gc), List(), List(), List(), List(),
         List(), Gc.globals, List(BProcedureCall(procGf.name, List(), List())))
 
-      val proc5 = BProcedure(targetName + "$InlineInvTransitive", List(), List(), List(inv), List(), List(), List(), List(), List(),
+      val proc5 = BProcedure(callee + "$InlineInvTransitive", List(), List(), List(inv), List(), List(), List(), List(), List(),
         inv.globals, List(
           BProcedureCall(procInv.name, List(), List()),
           BProcedureCall(procInv.name, List(), List())
         ))
 
-      targetName -> Seq(procInv, proc2, procGf, proc4, proc5)
-    }).toMap
+
+      libRGFunsContradictionProofFunctions ++= Seq(procInv, proc2, procGf, proc4, proc5).map(v => v.name -> v).toMap
+      Some(Seq(procInv, proc2, procGf, proc4, proc5))
   }
 
-  def relyfun(targetName: String) : Option[IfCmd] = {
-    libRGFunsContradictionProof.get(targetName).map(proc =>
+  def relyfun(calleeName: String, targetName: String) : Option[IfCmd] = {
+    libRGFunsContradictionProof(calleeName, targetName).map(proc =>
       {
         IfCmd(StarBLiteral, List(
           BProcedureCall(proc(0).name, Seq(), Seq()),
@@ -626,7 +631,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           } else {
             List()
           }
-        case Some(ProcRelyVersion.IfCommandContradiction) => relyfun(d.target.name).toList
+        case Some(ProcRelyVersion.IfCommandContradiction) => relyfun(j.parent.parent.name, d.parent.parent.name).toList
         case None => List()
       }) ++ List(call, returnTarget)
     case i: IndirectCall =>
