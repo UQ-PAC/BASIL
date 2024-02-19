@@ -44,9 +44,9 @@ ensures: 'Ensures:' expr #parsedEnsures
 
 boolLit : TRUE | FALSE;
 
+nat: (DIGIT)+ ;
 arrayAccess: id '[' nat ']';
 id : ID;
-nat: (DIGIT)+ ;
 bv: value=nat BVSIZE;
 
 // based upon boogie grammar: https://boogie-docs.readthedocs.io/en/latest/LangRef.html#grammar
@@ -63,11 +63,14 @@ factor : arg1=unaryExpr ( op=mulDivModOp arg2=unaryExpr )? ;
 unaryExpr : atomExpr #atomUnaryExpr
           | SUB_OP unaryExpr #negExpr
           | NOT_OP unaryExpr #notExpr
+          | 'memory_load' '('  addr=atomExpr ',' size=nat ')'   #loadExpr
+          | 'gamma_load'  '(' addr=atomExpr',' size=nat  ')'   #gammaLoadExpr
           ;
 
 atomExpr : boolLit #boolLitExpr
          | bv #bvExpr
          | id #idExpr
+         | REG #regExpr
          | arrayAccess #arrayAccessExpr
          | OLD LPAREN expr RPAREN #oldExpr
          | LPAREN expr RPAREN #parenExpr
@@ -117,6 +120,7 @@ MOD_OP : 'mod';
 
 BVSIZE: BV DIGIT+;
 
+REG :  ('R'|'r') DIGIT+ ;
 ID : NON_DIGIT ( NON_DIGIT | DIGIT )* ;
 NON_DIGIT : ( [A-Z] | [a-z] | '\'' | '~' | '#' | '$' | '^' | '_' | '.' | '?' | '`') ;
 DIGIT : [0-9];

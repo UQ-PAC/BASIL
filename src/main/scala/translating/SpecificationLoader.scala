@@ -244,7 +244,22 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     case n: NegExprContext       => UnaryBExpr(BVNEG, visitUnaryExpr(n.unaryExpr, nameToGlobals, params))
     case a: AtomUnaryExprContext => visitAtomExpr(a.atomExpr, nameToGlobals, params)
     case n: NotExprContext       => UnaryBExpr(BoolNOT, visitUnaryExpr(n.unaryExpr, nameToGlobals, params))
+    case l: LoadExprContext      =>  
+
+      val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+      val op = MemoryLoadOp(64, 8, Endian.LittleEndian, Integer.parseInt(l.size.getText))
+
+      BMemoryLoad(mem, visitAtomExpr(l.addr, nameToGlobals, params), Endian.LittleEndian, Integer.parseInt(l.size.getText()))
+
+    case l: GammaLoadExprContext      =>  
+      val op = GammaLoadOp(64, Integer.parseInt(l.size.getText), 0)
+      val gmem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+      GammaLoad(gmem, visitAtomExpr(l.addr, nameToGlobals, params), Integer.parseInt(l.size.getText), Integer.parseInt(l.size.getText) / 8)
   }
+
+  def visitRegExpr(ctx: RegExprContext) : BExpr = {
+    BVariable(ctx.getText, BitVecBType(64), Scope.Global)
+  } 
 
   def visitAtomExpr(
       ctx: AtomExprContext,
@@ -256,6 +271,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     case o: OldExprContext         => visitOldExpr(o, nameToGlobals, params)
     case p: ParenExprContext       => visitExpr(p.expr, nameToGlobals, params)
     case i: IfThenElseExprContext  => visitIfThenElseExpr(i, nameToGlobals, params)
+    case r: RegExprContext         => visitRegExpr(r)
     case a: ArrayAccessExprContext => visitArrayAccess(a.arrayAccess, nameToGlobals, params)
     case b: BvExprContext          => visitBv(b.bv)
     case d: DirectExprContext      => visitDirectE(d)
