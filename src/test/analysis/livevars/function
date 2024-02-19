@@ -1,0 +1,31 @@
+Procedure get_two at 1876 with 2 blocks and 0 in and 1 out parameters==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+%000003ae: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), bvadd64(LocalVar(#6, bv64), 8bv64), Register(R30, bv64), LittleEndian, 64)==>LocalVar(#6, bv64)->Top
+GoTo(get_two_basil_return)==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+Block main_basil_return==>Register(R30, bv64)->Top
+%0000053c: Register(R1, bv64) := ZeroExtend(32, Register(R0, bv64)[32:0])==>Register(R31, bv64)->Top<>Register(R1, bv64)->Top
+%000003c8: Register(R1, bv64) := 1bv64==>Register(R1, bv64)->Top<>Register(R0, bv64)->Top<>Register(R31, bv64)->Top
+%0000054f: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), Register(R0, bv64), Register(R1, bv64)[32:0], LittleEndian, 32)==>Register(R31, bv64)->Top
+%000003d8: DirectCall(get_two, Some(l00000538))==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+%000003bd: Register(R0, bv64) := 69632bv64==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top
+%00000560: Register(R30, bv64) := MemoryLoad(Memory(mem, 64, 8), bvadd64(Register(R31, bv64), 8bv64), LittleEndian, 64)==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+IndirectCall(Register(R30, bv64), None)==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top
+%000003a8: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), LocalVar(#6, bv64), Register(R29, bv64), LittleEndian, 64)==>LocalVar(#6, bv64)->Top<>Register(R30, bv64)->Top
+%0000055b: Register(R29, bv64) := MemoryLoad(Memory(mem, 64, 8), Register(R31, bv64), LittleEndian, 64)==>Register(R31, bv64)->Top
+Block lget_two==>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+%000003dc: Register(R0, bv64) := 2bv64==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top<>Register(R30, bv64)->Top
+%00000547: Register(R0, bv64) := bvadd64(Register(R0, bv64), 24bv64)==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top<>Register(R1, bv64)->Top
+Block get_two_basil_return==>Register(R0, bv64)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+%000003d5: Register(R30, bv64) := 1848bv64==>Register(R30, bv64)->Top<>Register(R31, bv64)->Top
+Block l00000538==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top
+Block lmain==>Register(R29, bv64)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top
+%00000564: Register(R31, bv64) := bvadd64(Register(R31, bv64), 16bv64)==>Register(R30, bv64)->Top
+%000003a2: LocalVar(#6, bv64) := bvadd64(Register(R31, bv64), 18446744073709551600bv64)==>Register(R30, bv64)->Top<>Register(R29, bv64)->Top<>LocalVar(#6, bv64)->Top
+%000003d0: Memory(mem, 64, 8) := MemoryStore(Memory(mem, 64, 8), Register(R0, bv64), Register(R1, bv64)[32:0], LittleEndian, 32)==>Register(R31, bv64)->Top
+%000003b2: Register(R31, bv64) := LocalVar(#6, bv64)==>Register(R31, bv64)->Top
+GoTo(main_basil_return)==>Register(R30, bv64)->Top
+%00000554: Register(R0, bv64) := 0bv64==>Register(R31, bv64)->Top
+GoTo(l00000538)==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top
+%000003c3: Register(R0, bv64) := bvadd64(Register(R0, bv64), 20bv64)==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top
+%000003b8: Register(R29, bv64) := Register(R31, bv64)==>Register(R31, bv64)->Top
+%00000541: Register(R0, bv64) := 69632bv64==>Register(R31, bv64)->Top<>Register(R0, bv64)->Top<>Register(R1, bv64)->Top
+Procedure main at 1820 with 3 blocks and 2 in and 2 out parameters==>Register(R29, bv64)->Top<>Register(R31, bv64)->Top<>Register(R30, bv64)->Top

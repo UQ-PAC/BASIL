@@ -1,6 +1,6 @@
 
 import org.scalatest.funsuite.AnyFunSuite
-import util.{Logger, PerformanceTimer, ILLoadingConfig, RunUtils}
+import util.{Logger, PerformanceTimer, ILLoadingConfig, RunUtils, IRLoading}
 import translating.BAPToIR
 import analysis.LoopDetector
 import analysis.LoopTransform
@@ -26,10 +26,8 @@ class IrreducibleLoop extends AnyFunSuite {
   val testPath = "./src/test/analysis/"
 
   def load(conf: ILLoadingConfig) : Program = {
-    val bapProgram = RunUtils.loadBAP(conf.adtFile)
-
-    val (externalFunctions, globals, globalOffsets, mainAddress) = RunUtils.loadReadELF(conf.relfFile, conf)
-
+    val bapProgram = IRLoading.loadBAP(conf.adtFile)
+    val (externalFunctions, globals, globalOffsets, mainAddress) = IRLoading.loadReadELF(conf.relfFile, conf)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
     IRProgram

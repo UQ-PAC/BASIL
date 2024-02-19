@@ -112,7 +112,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
                   val conditionsIR = conditions.map(c => convertConditionBool(c, true))
                   conditionsIR.tail.foldLeft(currentCondition)((ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands))
                 }
-                val newBlock = newBlockCondition(block, target, currentCondition)
+                val newBlock = newBlockCondition(block, target, condition)
                 newBlocks.append(newBlock)
                 targets.append(newBlock)
                 conditions.append(b.condition)

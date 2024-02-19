@@ -10,7 +10,7 @@ enum LogLevel(val id: Int):
   case ERROR extends LogLevel(3)
 
 object Logger:
-  private var level: LogLevel = LogLevel.DEBUG
+  private var level: LogLevel = LogLevel.INFO
   import LogLevel.*
 
   def write(

@@ -1,5 +1,6 @@
 package analysis
-import ir.{IRWalk, IntraProcIRCursor, InterProcIRCursor, CFGPosition}
+
+import ir.{CFGPosition, InterProcIRCursor, IntraProcIRCursor}
 
 /** Dependency methods for worklist-based analyses.
   */
@@ -31,23 +32,28 @@ trait IntraproceduralForwardDependencies extends Dependencies[CfgNode] {
   override def indep(n: CfgNode): Set[CfgNode] = n.predIntra.toSet
 }
 
+trait IntraproceduralBackwardDependencies extends Dependencies[CfgNode] {
+  def outdep(n: CfgNode): Set[CfgNode] = n.predIntra.toSet
+  def indep(n: CfgNode): Set[CfgNode] = n.succIntra.toSet
+}
+
 
 trait IRInterproceduralForwardDependencies extends Dependencies[CFGPosition] {
-  override def outdep(n: CFGPosition): Set[CFGPosition] = InterProcIRCursor.succ(n) 
-  override def indep(n: CFGPosition): Set[CFGPosition] = InterProcIRCursor.pred(n) 
+  override def outdep(n: CFGPosition): Set[CFGPosition] = InterProcIRCursor.succ(n)
+  override def indep(n: CFGPosition): Set[CFGPosition] = InterProcIRCursor.pred(n)
 }
 
 trait IRIntraproceduralForwardDependencies extends Dependencies[CFGPosition] {
-  override def outdep(n: CFGPosition): Set[CFGPosition] = IntraProcIRCursor.succ(n) 
-  override def indep(n: CFGPosition): Set[CFGPosition] = IntraProcIRCursor.pred(n) 
+  override def outdep(n: CFGPosition): Set[CFGPosition] = IntraProcIRCursor.succ(n)
+  override def indep(n: CFGPosition): Set[CFGPosition] = IntraProcIRCursor.pred(n)
 }
 
 trait IRInterproceduralBackwardDependencies extends  IRInterproceduralForwardDependencies {
-  override def outdep(n: CFGPosition): Set[CFGPosition] =  super.indep(n) 
-  override def indep(n: CFGPosition): Set[CFGPosition] =  super.outdep(n) 
+  override def outdep(n: CFGPosition): Set[CFGPosition] =  super.indep(n)
+  override def indep(n: CFGPosition): Set[CFGPosition] =  super.outdep(n)
 }
 
 trait IRIntraproceduralBackwardDependencies extends IRIntraproceduralForwardDependencies {
   override def outdep(n: CFGPosition): Set[CFGPosition] = super.indep(n)
-  override def indep(n: CFGPosition): Set[CFGPosition] = super.outdep(n) 
+  override def indep(n: CFGPosition): Set[CFGPosition] = super.outdep(n)
 }
