@@ -54,7 +54,7 @@ object RunUtils {
     BAPLoader.visitProject(parser.project())
   }
 
-  def loadGtirb(fileName: String, mainAddress: Int): Program = {
+  def loadGTIRB(fileName: String, mainAddress: Int): Program = {
     val fIn = FileInputStream(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
@@ -79,8 +79,8 @@ object RunUtils {
 
     val parserMap = semantics.map(_.map((k: String, v: Array[Array[String]]) => (k, v.map(_.map(parse_insn)))))
 
-    val GtirbConverter = GTIRBToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
-    GtirbConverter.createIR()
+    val GTIRBConverter = GTIRBToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
+    GTIRBConverter.createIR()
   }
 
   def loadReadELF(fileName: String, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
@@ -123,7 +123,7 @@ object RunUtils {
       val IRTranslator = BAPToIR(bapProgram, mainAddress)
       IRTranslator.translate
     } else if (q.loading.inputFile.endsWith(".gts")) {
-      loadGtirb(q.loading.inputFile, mainAddress)
+      loadGTIRB(q.loading.inputFile, mainAddress)
     } else {
       throw Exception(s"input file name ${q.loading.inputFile} must be an .adt or .gst file")
     }

@@ -7,475 +7,509 @@ import java.util.Base64
 import scala.jdk.CollectionConverters.*
 import ir.*
 
-import scala.collection.mutable
+import scala.collection.{immutable, mutable}
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
-
-import scala.collection.immutable
+import util.Logger
 
 class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, Array[Array[StmtContext]]], blkCount: Int) extends SemanticsBaseVisitor[Any] {
 
-  private var cseMap = mutable.Map[String, IRType]()
+  private var constMap = mutable.Map[String, IRType]()
   private var varMap = mutable.Map[String, IRType]()
   private var instructionCount = 0
 
-  def chrisifyUUID(uuid: ByteString): String = { // This probably needs a better name, but :/
-    Base64.getEncoder.encodeToString(uuid.toByteArray)
-  }
-
   def createStatements(): ArrayBuffer[Statement] = {
-    visitInstructions(parserMap(chrisifyUUID(targetuuid)))
+    visitInstructions(parserMap(Base64.getEncoder.encodeToString(targetuuid.toByteArray)))
   }
 
   def visitInstructions(stmts: Array[Array[StmtContext]]): ArrayBuffer[Statement] = {
+    val statements: ArrayBuffer[Statement] = ArrayBuffer()
 
-    val statements: Array[Statement] = stmts.flatMap { elem => 
-      cseMap = cseMap.empty
+    for (insn <- stmts) {
+      constMap = constMap.empty
       varMap = varMap.empty
-      val stmts = elem.flatMap {
-        s => s match {
-          case a if a.assignment_stmt() != null =>
-            visitAssignment_stmt(a.assignment_stmt())
-          case c if c.call_stmt() != null =>
-            Option(visitCall_stmt(c.call_stmt()))
-          case c if c.conditional_stmt() != null =>
-            Option(visitConditional_stmt(c.conditional_stmt()))
-          case _ => ???
+      for (s <- insn) {
+        val s2 = visitStmt(s)
+        if (s2.isDefined) {
+          statements.append(s2.get)
         }
       }
       instructionCount += 1
-      stmts
     }
-
-    statements.to(ArrayBuffer)
+    statements
   }
 
-  def visitAssignment_stmt(ctx: Assignment_stmtContext): Option[Statement] = {
-    ctx match
-      case a: AssignContext => Option(visitAssign(a))
-      case c: ConstDeclContext => Option(visitConstDecl(c))
-      case v: VarDeclContext => Option(visitVarDecl(v))
-      case v: VarDeclsNoInitContext => visitVarDeclsNoInit(v)
-      case a: AssertContext => Option(visitAssert(a))
+  def visitStmt(ctx: StmtContext): Option[Statement] = {
+    ctx match {
+      case a: AssignContext => visitAssign(a)
+      case c: ConstDeclContext => visitConstDecl(c)
+      case v: VarDeclContext => visitVarDecl(v)
+      case v: VarDeclsNoInitContext =>
+        visitVarDeclsNoInit(v)
+        None
+      case a: AssertContext => visitAssert(a)
+      case t: TCallContext => visitTCall(t)
+      case i: IfContext => visitIf(i)
+      case t: ThrowContext => Some(visitThrow(t))
+    }
   }
 
-  override def visitAssert(ctx: AssertContext): Assert = {
+  override def visitAssert(ctx: AssertContext): Option[Assert] = {
     val expr = visitExpr(ctx.expr)
-    Assert(expr)
-  }
-
-  override def visitCall_stmt(ctx: Call_stmtContext): MemoryAssign = {
-    val func: String = if (ctx.METHOD() == null) ctx.SSYMBOL().getText else ctx.METHOD().getText
-
-    func match {
-      case "Mem.set.0" => 
-        val mem = Memory("mem", 64, 8) // yanked from BAP
-        val addr = visitExpr(ctx.expr(1))
-        val value = visitExpr(ctx.expr(4))
-        val size = visitExpr(ctx.expr(2)).asInstanceOf[IntLiteral].value.toInt * 8
-        val memstore = MemoryStore(mem, addr, value, Endian.LittleEndian, size)
-        MemoryAssign(mem, memstore)
-      
-      case "AtomicStart.0" => ??? 
-
-      case "AtomicEnd.0" => ???
-
-      case _ => ???
-    }
-  }
-
-  override def visitConditional_stmt(ctx: Conditional_stmtContext): TempIf = {
-    val totalStmts = ArrayBuffer.newBuilder[ArrayBuffer[Statement]]
-    val conds = ArrayBuffer.newBuilder[Expr]
-    
-    var currentContext = ctx
-    var prevContext = currentContext
-
-    while (currentContext != null) {
-      val stmts = currentContext.stmt().asScala.flatMap {s => s match {
-        case a if a.assignment_stmt() != null =>
-          visitAssignment_stmt(a.assignment_stmt())
-        case c if c.call_stmt() != null =>
-          Option(visitCall_stmt(c.call_stmt()))
-        case _ => None //There Shouldn't really be any conditional statements, these are handled by parser + this while loop
-      }}
-
-      totalStmts += stmts.to(ArrayBuffer)
-      conds += visitExpr(currentContext.expr())
-      prevContext = currentContext
-      currentContext = currentContext.conditional_stmt()
-    }
-
-    val elseBranch = prevContext.else_stmt()
-    if (!elseBranch.isEmpty) {
-    
-      val elseStmt: ArrayBuffer[Statement] = elseBranch.asScala.flatMap { elem =>
-           elem.stmt() match {
-            case a if a.assignment_stmt() != null =>
-            visitAssignment_stmt(a.assignment_stmt())
-          case c if c.call_stmt() != null =>
-            Option(visitCall_stmt(c.call_stmt()))
-          case _ => None 
-        }
-      }.to(ArrayBuffer)
-      TempIf(true, conds.result(), totalStmts.result(), elseStmt)
-
+    if (expr.isDefined) {
+      Some(Assert(expr.get))
     } else {
-      TempIf(false, conds.result(), totalStmts.result(), ArrayBuffer[Statement]())
+      None
+    }
+  }
+
+  override def visitThrow(ctx: ThrowContext): Assert = {
+    val message = ctx.ID().asScala.map(_.getText).mkString(" ,")
+    Assert(FalseLiteral, Some(message))
+  }
+
+  override def visitTCall(ctx: TCallContext): Option[Statement] = {
+    val function = ctx.ID.getText
+
+    val typeArgs = Option(ctx.tes) match {
+      case Some(e) => e.expr().asScala
+      case None => Nil
+    }
+    val args = Option(ctx.args) match {
+      case Some(e) => e.expr().asScala
+      case None => Nil
     }
 
+    function match {
+      case "Mem.set.0" =>
+        checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
+        val mem = Memory("mem", 64, 8) // yanked from BAP
+        val size = parseInt(typeArgs.head) * 8
+        val index = visitExpr(args.head)
+        val value = visitExpr(args(3))
+        val otherSize = parseInt(args(1)) * 8
+        val mysteryArg = parseInt(args(2))
+        if (size != otherSize) {
+          throw Exception(" ")
+        }
+        if (mysteryArg != 0) {
+          Logger.debug("")
+        }
+
+        // LittleEndian is an assumption
+        if (index.isDefined && value.isDefined) {
+          val memstore = MemoryStore(mem, index.get, value.get, Endian.LittleEndian, size)
+          Some(MemoryAssign(mem, memstore))
+        } else {
+          None
+        }
+
+      case _ =>
+        Logger.debug("")
+        None
+    }
   }
 
-  override def visitVarDeclsNoInit(ctx: VarDeclsNoInitContext): Option[LocalAssign] = {
-    val ty = visitType(ctx.`type`())
-    ctx.METHOD().asScala.foreach(elem => varMap += (elem.getText -> ty))
-    None
+  private def checkArgs(name: String, typeArgsExpected: Int, argsExpected: Int, typeArgsCount: Int, argsCount: Int, token: String): Unit = {
+    if (typeArgsExpected != typeArgsCount || argsExpected != argsCount) {
+      throw Exception(s"Unexpected argument counts for $name - expected $typeArgsExpected type argument(s) and $argsExpected argument(s), got $typeArgsCount type arguments and $argsCount arguments: $token")
+    }
   }
 
-  override def visitVarDecl(ctx: VarDeclContext): LocalAssign = {
-    val ty = visitType(ctx.`type`())
-    val name = ctx.METHOD().getText
+  private def parseInt(ctx: ExprContext) = ctx match {
+    case e: ExprLitIntContext => e.value.getText.toInt
+    case _ => throw Exception(s"expected ${ctx.getText} to be an integer literal")
+  }
 
+  override def visitIf(ctx: IfContext): Option[TempIf] = {
+    val condition = visitExpr(ctx.cond)
+    val thenStmts = ctx.stmt().asScala.flatMap(visitStmt)
+
+    val elseStmts = Option(ctx.elseStmt) match {
+      case Some(_) => ctx.elseStmt.stmt().asScala.flatMap(visitStmt)
+      case None => mutable.Buffer()
+    }
+
+    if (condition.isDefined) {
+      Some(TempIf(condition.get, thenStmts, elseStmts))
+    } else {
+      None
+    }
+  }
+
+  override def visitVarDeclsNoInit(ctx: VarDeclsNoInitContext): Unit = {
+    val ty = visitType(ctx.`type`())
+    ctx.lvars.ID().asScala.foreach(lvar => varMap += (lvar.getText -> ty))
+  }
+
+  override def visitVarDecl(ctx: VarDeclContext): Option[LocalAssign] = {
+    val ty = visitType(ctx.`type`())
+    val name = ctx.lvar.getText
     varMap += (name -> ty)
 
     val expr = visitExpr(ctx.expr())
-    if (expr != null) {
-      LocalAssign(LocalVar(name + "_" + blkCount + instructionCount, ty), expr) 
+    if (expr.isDefined) {
+      Some(LocalAssign(LocalVar(name, ty), expr.get))
     } else {
-      null
+      None
     }
   }
 
-  override def visitAssign(ctx: AssignContext): LocalAssign = {
-    val lhs = visitLexpr(ctx.lexpr())
-    val rhs = visitExpr(ctx.expr())
-    if (lhs == null || rhs == null) {
-      null
+  override def visitAssign(ctx: AssignContext): Option[LocalAssign] = {
+    val lhs = visitLexpr(ctx.lexpr)
+    val rhs = visitExpr(ctx.expr)
+    if (lhs.isDefined && rhs.isDefined) {
+      Some(LocalAssign(lhs.get, rhs.get))
     } else {
-      LocalAssign(lhs, rhs)
+      None
     }
   }
 
-  override def visitConstDecl(ctx: ConstDeclContext): LocalAssign = {
+  override def visitConstDecl(ctx: ConstDeclContext): Option[LocalAssign] = {
     val ty = visitType(ctx.`type`())
-    val name = ctx.METHOD().getText
-
-    cseMap += (name -> ty)
-
-    val expr = visitExpr(ctx.expr())
-    if (expr != null) {
-      LocalAssign(LocalVar(name.dropRight(3) + "_" + blkCount + instructionCount, ty), expr) 
+    val name = ctx.lvar.getText
+    constMap += (name -> ty)
+    val expr = visitExpr(ctx.expr)
+    if (expr.isDefined) {
+      Some(LocalAssign(LocalVar(name + "_" + blkCount + "_" + instructionCount, ty), expr.get))
     } else {
-      null
+      None
     }
   }
 
   def visitType(ctx: TypeContext): IRType = {
     ctx match
-      case e: TypeBitsContext =>
-        val size = visitExpr(e.expr()).asInstanceOf[IntLiteral].value.toInt
-        BitVecType(size)
-      case _ => ??? // can be extended as more types added to grammar
+      case e: TypeBitsContext => BitVecType(parseInt(e.size))
+      case r: TypeRegisterContext =>
+        // this is a special register - not the same as a register in the IR
+        // ignoring the register's fields for now
+        BitVecType(r.size.getText.toInt)
+      case c: TypeConstructorContext => c.str.getText.match {
+        case "FPRounding" => BitVecType(2)
+        case _ => throw Exception(s"unknown type ${ctx.getText}")
+      }
+      case _ => throw Exception(s"unknown type ${ctx.getText}")
   }
 
-  def visitExpr(ctx: ExprContext): Expr = {
-    ctx match
-      case e: ExprVarContext    => visitExprVar(e)
+  def visitExpr(ctx: ExprContext): Option[Expr] = {
+    ctx match {
+      case e: ExprVarContext => visitExprVar(e)
       case e: ExprTApplyContext => visitExprTApply(e)
       case e: ExprSlicesContext => visitExprSlices(e)
-      case e: ExprFieldContext  => visitExprField(e)
-      case e: ExprArrayContext  => visitExprArray(e)
-      case e: ExprLitIntContext => visitExprLitInt(e)
-      case e: ExprLitHexContext =>
-        ??? // not in current semantics, but still unsure how this ports to IR
-      case e: ExprLitBitsContext   => visitExprLitBits(e)
-      case e: ExprLitMaskContext   => ??? // ditto above comment
-      case e: ExprLitStringContext => ??? // ditto
-      case _ => ???
-  }
-
-  override def visitExprVar(ctx: ExprVarContext): Expr = {
-    createExprVar(getExprVarText(ctx))
-  }
-
-  def getExprVarText(ctx: ExprVarContext): String = {
-    if (ctx.SSYMBOL() != null) {
-      ctx.SSYMBOL().getText
-    } else {
-      ctx.METHOD().getText
+      case e: ExprFieldContext => Some(visitExprField(e))
+      case e: ExprArrayContext => Some(visitExprArray(e))
+      case e: ExprLitIntContext => None // we should not encounter this unless expected TODO replace with exception
+      case e: ExprLitBitsContext => Some(visitExprLitBits(e))
     }
   }
 
-  def get_int(ctx: ExprContext): Int = ctx match {
-    case e: ExprLitIntContext =>
-      if (e.DEC() != null) {
-        e.DEC().getText.toInt
-      } else {
-        e.BINARY().getText.toInt
-      }
-  }
-
-  // Used to match ZeroExtend sizes to Bap
-  def fix_size(expr1: Expr, expr2: Expr): Expr = {
-
-    val size1 = expr1 match {
-      case e: Extract => e.end - e.start
-      case r: Register => r.size
-      case b: BitVecLiteral => b.size
-      case z: ZeroExtend => 
-        val innerSize = z.body match { 
-          case e: Extract => e.end - e.start
-          case r: Register => r.size
-          case b: BitVecLiteral => b.size
-          case _ => ???
-        } 
-        innerSize + z.extension
-      case _ => ???
-    }
-
-    val size2 = expr2 match {
-      case e: Extract => e.end - e.start
-      case r: Register => r.size
-      case b: BitVecLiteral => b.size
-      case z: ZeroExtend => 
-        val innerSize = z.body match { 
-          case e: Extract => e.end - e.start
-          case r: Register => r.size
-          case b: BitVecLiteral => b.size
-          case _ => ???
-        } 
-        innerSize + z.extension
-      case _ => ???
-    } 
-
-    if (size1 == size2) {
-      expr2
-    } else {
-      ZeroExtend(size1 - size2, expr2)
+  override def visitExprVar(ctx: ExprVarContext): Option[Expr] = {
+    val name = ctx.ID.getText
+    name match {
+      case n if constMap.contains(n) => Some(LocalVar(n + "_" + blkCount + "_" + instructionCount, constMap(n)))
+      case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
+      case "SP_EL0" => Some(Register("R31", BitVecType(64)))
+      case "_PC" => Some(Register("_PC", BitVecType(64)))
+      case "TRUE" => Some(TrueLiteral)
+      case "FALSE" => Some(FalseLiteral)
+      case "FPCR" => Some(LocalVar("FPCR", BitVecType(32)))
+      // ignore the following
+      case "__BranchTaken" => None
+      case "BTypeNext" => None
+      case "BTypeCompatible" => None
+      case _ => throw Exception(s"could not identify variable '$name'")
     }
   }
 
-  override def visitExprTApply(ctx: ExprTApplyContext): Expr = {
-    val str = ctx.METHOD.getText.substring(0, ctx.METHOD.getText.lastIndexOf("."))
-    // removes everything up to and including the last dot
+  override def visitExprTApply(ctx: ExprTApplyContext): Option[Expr] = {
 
-    str match
-      case "Mem.read" =>
-        val mem = Memory("mem", 64, 8) // yanked from BAP, hope this never changes
-        val addr = visitExpr(ctx.expr(0))
-        val size = visitExpr(ctx.expr(1)).asInstanceOf[IntLiteral].value.toInt * 8 
-        MemoryLoad(mem, addr, Endian.LittleEndian, size)
-      case "not_bool"    => UnaryExpr(BoolNOT, visitExpr(ctx.expr(0)))
-      case "cvt_bool_bv" =>
-      // in ocaml, takes bool and turns to bitvector 
-        val expr = visitExpr(ctx.expr(0))
-        expr match {
-          case b: BinaryExpr if b.op == BVEQ => BinaryExpr(BVCOMP, b.arg1, b.arg2)
-          case _ => ???
+    val function = ctx.ID.getText
+
+    val typeArgs: mutable.Buffer[ExprContext] = Option(ctx.tes) match {
+      case Some(e) => e.expr().asScala
+      case None => mutable.Buffer()
+    }
+    val args: mutable.Buffer[ExprContext] = Option(ctx.args) match {
+      case Some(e) => e.expr().asScala
+      case None => mutable.Buffer()
+    }
+
+    function match {
+      case "Mem.read.0" =>
+        checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
+        val mem = Memory("mem", 64, 8)
+        val index = visitExpr(args.head)
+        val size = parseInt(typeArgs.head) * 8
+
+        val otherSize = parseInt(args(1)) * 8
+        val mysteryArg = parseInt(args(2))
+        if (size != otherSize) {
+          throw Exception(s"${ctx.getText}")
         }
-      case "eq_enum"  => BinaryExpr(BoolEQ, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "or_bool"  => BinaryExpr(BoolOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "and_bool" => BinaryExpr(BoolAND, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "replicate_bits" =>
-        val value = visitExpr(ctx.expr(0)).asInstanceOf[IntLiteral].value
-        // not 100% on this, since it hasn't come up yet
-        val size = visitExpr(ctx.expr(1)).asInstanceOf[IntLiteral].value.toInt
-        BitVecLiteral(value, size)
-      case "not_bits"    => UnaryExpr(BVNOT, visitExpr(ctx.expr(0)))
-      case "or_bits"     => BinaryExpr(BVOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "and_bits"    => BinaryExpr(BVAND, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "eor_bits"    => BinaryExpr(BVXOR, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "eq_bits"     => BinaryExpr(BVEQ, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "add_bits"    => BinaryExpr(BVADD, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "sub_bits"    => BinaryExpr(BVSUB, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))
-      case "mul_bits"    => BinaryExpr(BVMUL, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1)))  
-      case "sdiv_bits"   => BinaryExpr(BVSDIV, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1))) 
-      case "lsl_bits"    => 
-        val expr1 = visitExpr(ctx.expr(0)) 
-        val expr2 = fix_size(expr1, visitExpr(ctx.expr(1)))
-        BinaryExpr(BVSHL, expr1, expr2)  // need to fix size here?
-      case "lsr_bits"    =>
-        val expr1 = visitExpr(ctx.expr(0)) 
-        val expr2 = fix_size(expr1, visitExpr(ctx.expr(1)))
-        BinaryExpr(BVLSHR, expr1, expr2)  
-      case "asr_bits"    =>
-        val expr1 = visitExpr(ctx.expr(0)) 
-        val expr2 = fix_size(expr1, visitExpr(ctx.expr(1)))
-        BinaryExpr(BVASHR, expr1, expr2)  
-      case "slt_bits"    =>
-        val expr1 = visitExpr(ctx.expr(0)) 
-        val expr2 = fix_size(expr1, visitExpr(ctx.expr(1)))
-        BinaryExpr(BVSLT, expr1, expr2)  
-      case "sle_bits"    =>
-        val expr1 = visitExpr(ctx.expr(0)) 
-        val expr2 = fix_size(expr1, visitExpr(ctx.expr(1)))
-        BinaryExpr(BVSLE, expr1, expr2)  
-      case "append_bits" => 
-        // there is no append but there is concat, so it probably does the same thing
-        BinaryExpr(BVCONCAT, visitExpr(ctx.expr(0)), visitExpr(ctx.expr(1))) 
-      case "ZeroExtend" =>
-        val init = get_int(ctx.targs().asScala.head.expr())
-        val fini = get_int(ctx.targs().asScala.last.expr())
-        ZeroExtend(fini - init, visitExpr(ctx.expr(0)))
+        if (mysteryArg != 0) {
+          Logger.debug("")
+        }
 
-      case "SignExtend" =>
-        val init = get_int(ctx.targs().asScala.head.expr())
-        val fini = get_int(ctx.targs().asScala.last.expr())
-        SignExtend(fini - init, visitExpr(ctx.expr(0)))
+        if (index.isDefined) {
+          // LittleEndian is assumed
+          Some(MemoryLoad(mem, index.get, Endian.LittleEndian, size))
+        } else {
+          None
+        }
 
-  }
-
-  override def visitExprSlices(ctx: ExprSlicesContext): Expr = {
-    val (lo, hi) = visitSlice_expr(ctx.slice_expr())
-    val loInt = lo
-    val hiInt = hi
-    Extract(loInt + hiInt, loInt, visitExpr(ctx.expr()))
-  }
-
-  override def visitSlice_expr(ctx: Slice_exprContext): (Int, Int) = {
-    val start = visitExpr(ctx.expr(0)).asInstanceOf[IntLiteral].value.toInt
-    val end = visitExpr(ctx.expr(1)).asInstanceOf[IntLiteral].value.toInt
-    (start, end)
-  }
-
-  override def visitExprField(ctx: ExprFieldContext): Expr = {
-    var value: String = null
-    ctx.expr() match
-      case e: ExprVarContext => value = getExprVarText(e)
-      case _: Any            => visitExpr(ctx.expr())
-    val field: ArrayBuffer[String] = ArrayBuffer(value, ctx.SSYMBOL().getText)
-    createExprVarArray(field)
-  }
-
-  override def visitExprArray(ctx: ExprArrayContext): Expr = {
-    val array: ArrayBuffer[String] = ctx
-      .expr()
-      .asScala
-      .map {
-        case e: ExprVarContext => getExprVarText(e)
-        case e: ExprLitIntContext =>
-          if (e.DEC() != null) {
-            e.DEC().getText
-          } else {
-            e.BINARY().getText
+      case "cvt_bool_bv.0" =>
+        checkArgs(function, 0, 1, typeArgs.size, args.size, ctx.getText)
+        val expr = visitExpr(args.head)
+        if (expr.isDefined) {
+          val e = expr.get
+          e match {
+            case b: BinaryExpr if b.op == BVEQ => Some(BinaryExpr(BVCOMP, b.arg1, b.arg2))
+            case _ => throw Exception(s"unhandled conversion from bool to bitvector: ${ctx.getText}")
           }
-        case e: ExprLitBitsContext => Integer.parseInt(e.BINARY().getText, 2).asInstanceOf[String]
-      }
-      .to(ArrayBuffer)
+        } else {
+          None
+        }
 
-    createExprVarArray(array)
-  }
+      case "not_bool.0" => resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText)
+      case "eq_enum.0" => resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText)
+      case "or_bool.0" => resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText)
+      case "and_bool.0" => resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText)
 
-  override def visitExprLitInt(ctx: ExprLitIntContext): Expr = {
-    //I'm too scared to change the grammar at this point in time, so i'm just going to roll with stuff like this for now
-    if (ctx.DEC() != null) {
-      IntLiteral(ctx.DEC().getText.toInt)
-    } else {
-      IntLiteral(ctx.BINARY().getText.toInt)
+      case "not_bits.0" => resolveUnaryOp(BVNOT, function, 1, typeArgs, args, ctx.getText)
+      case "or_bits.0" => resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText)
+      case "and_bits.0" => resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText)
+      case "eor_bits.0" => resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText)
+      case "eq_bits.0" => resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText)
+      case "add_bits.0" => resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText)
+      case "sub_bits.0" => resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText)
+      case "mul_bits.0" => resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText)
+      case "sdiv_bits.0" => resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText)
+
+      // have not yet encountered these two so need to be careful
+      case "slt_bits.0" => resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText)
+      case "sle_bits.0" => resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText)
+
+      case "lsl_bits.0" => resolveBitShiftOp(BVSHL, function, typeArgs, args, ctx.getText)
+      case "lsr_bits.0" => resolveBitShiftOp(BVLSHR, function, typeArgs, args, ctx.getText)
+      case "asr_bits.0" => resolveBitShiftOp(BVASHR, function, typeArgs, args, ctx.getText)
+
+      case "append_bits.0" =>
+        resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText)
+
+      case "ZeroExtend.0" =>
+        checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
+        val oldSize = parseInt(typeArgs(0))
+        val newSize = parseInt(typeArgs(1))
+        val arg0 = visitExpr(args(0))
+        val arg1 = parseInt(args(1))
+        if (arg1 != newSize) {
+          throw Exception(" ")
+        }
+        if (arg0.isDefined) {
+          Some(ZeroExtend(newSize - oldSize, arg0.get))
+        } else {
+          None
+        }
+
+      case "SignExtend.0" =>
+        checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
+        val oldSize = parseInt(typeArgs(0))
+        val newSize = parseInt(typeArgs(1))
+        val arg0 = visitExpr(args(0))
+        val arg1 = parseInt(args(1))
+        if (arg1 != newSize) {
+          throw Exception(" ")
+        }
+        if (arg0.isDefined) {
+          Some(SignExtend(newSize - oldSize, arg0.get))
+        } else {
+          None
+        }
+
+      case _ =>
+        Logger.debug(s"unidentified call to $function")
+        None
     }
 
   }
 
-  override def visitExprLitBits(ctx: ExprLitBitsContext): Expr = {
-    var num = BigInt(ctx.BINARY().getText, 2) 
-    val len = ctx.BINARY().getText.length()
+  private def resolveBinaryOp(operator: BinOp,
+                              function: String,
+                              typeArgsExpected: Int,
+                              typeArgs: mutable.Buffer[ExprContext],
+                              args: mutable.Buffer[ExprContext],
+                              token: String
+                             ): Option[BinaryExpr] = {
+    checkArgs(function, typeArgsExpected, 2, typeArgs.size, args.size, token)
+    // we don't currently check the size for BV ops which is the type arg
+    val arg0 = visitExpr(args(0))
+    val arg1 = visitExpr(args(1))
+    if (arg0.isDefined && arg1.isDefined) {
+      Some(BinaryExpr(operator, arg0.get, arg1.get))
+    } else {
+      None
+    }
+  }
+
+  private def resolveUnaryOp(operator: UnOp,
+                             function: String,
+                             typeArgsExpected: Int,
+                             typeArgs: mutable.Buffer[ExprContext],
+                             args: mutable.Buffer[ExprContext],
+                             token: String
+                            ): Option[UnaryExpr] = {
+    checkArgs(function, typeArgsExpected, 1, typeArgs.size, args.size, token)
+    // we don't currently check the size for BV ops which is the type arg
+    val arg = visitExpr(args.head)
+    if (arg.isDefined) {
+      Some(UnaryExpr(operator, arg.get))
+    } else {
+      None
+    }
+  }
+
+  private def resolveBitShiftOp(operator: BinOp,
+                                function: String,
+                                typeArgs: mutable.Buffer[ExprContext],
+                                args: mutable.Buffer[ExprContext],
+                                token: String
+                               ): Option[BinaryExpr] = {
+    checkArgs(function, 2, 2, typeArgs.size, args.size, token)
+    val size0 = parseInt(typeArgs(0))
+    val size1 = parseInt(typeArgs(1))
+    val arg0 = visitExpr(args(0))
+    val arg1 = visitExpr(args(1))
+    if (arg0.isDefined && arg1.isDefined) {
+      if (size0 == size1) {
+        Some(BinaryExpr(operator, arg0.get, arg1.get))
+      } else {
+        Some(BinaryExpr(operator, arg0.get, ZeroExtend(size0 - size1, arg1.get)))
+      }
+    } else {
+      None
+    }
+  }
+
+  override def visitExprSlices(ctx: ExprSlicesContext): Option[Extract] = {
+    val slices = ctx.slices.slice().asScala
+    if (slices.size != 1) {
+      // need to determine the semantics for this case
+      throw Exception(s"currently unable to handle Expr_Slices that contains more than one slice: ${ctx.getText}")
+    }
+    val (hi, lo) = visitSliceContext(slices.head)
+    val expr = visitExpr(ctx.expr)
+    if (expr.isDefined) {
+      Some(Extract(hi, lo, expr.get))
+    } else {
+      None
+    }
+  }
+
+  def visitSliceContext(ctx: SliceContext): (Int, Int) = {
+    ctx match {
+      case s: Slice_HiLoContext =>
+        val hi = parseInt(s.hi)
+        val lo = parseInt(s.lo)
+        (hi + 1, lo)
+      case s: Slice_LoWdContext =>
+        val lo = parseInt(s.lo)
+        val wd = parseInt(s.wd)
+        (lo + wd, lo)
+    }
+  }
+
+  override def visitExprField(ctx: ExprFieldContext): LocalVar = {
+    val name = ctx.expr match {
+      case e: ExprVarContext => e.ID.getText
+      case _ => throw Exception(" ")
+    }
+    val field = ctx.field.getText
+
+    resolveFieldExpr(name, field)
+  }
+
+  override def visitExprArray(ctx: ExprArrayContext): Register = {
+    val name = ctx.array match {
+      case e: ExprVarContext => e.ID.getText
+      case _ => throw Exception(" ")
+    }
+    val index = parseInt(ctx.index)
+
+    resolveArrayExpr(name, index)
+  }
+
+  override def visitExprLitBits(ctx: ExprLitBitsContext): BitVecLiteral = {
+    var num = BigInt(ctx.value.getText, 2)
+    val len = ctx.value.getText.length
     if (num < 0) {
       num = num + (BigInt(1) << len)
-    } 
+    }
     BitVecLiteral(num, len)
   }
 
-  def visitLexpr(ctx: LexprContext): Variable = {
-    ctx match
+  def visitLexpr(ctx: LexprContext): Option[Variable] = {
+    ctx match {
       case l: LExprVarContext => visitLExprVar(l)
-      case l: LExprFieldContext => visitLExprField(l)
-      case l: LExprArrayContext => visitLExprArray(l)
-      case _ => ???
-  }
-
-  override def visitLExprVar(ctx: LExprVarContext): Variable = {
-    createExprVar(getLExprVarText(ctx)).asInstanceOf[Variable]
-  }
-
-  def getLExprVarText(ctx: LExprVarContext): String = {
-    if (ctx.SSYMBOL() != null) {
-      ctx.SSYMBOL().getText
-    } else {
-      ctx.METHOD().getText
+      case l: LExprFieldContext => Some(visitLExprField(l))
+      case l: LExprArrayContext => Some(visitLExprArray(l))
     }
   }
 
-  override def visitLExprField(ctx: LExprFieldContext): Variable = {
-    var value: String = null
-    ctx.lexpr() match
-      case l: LExprVarContext => value = getLExprVarText(l)
-      case _: Any             => visitLexpr(ctx.lexpr())
-    val field: ArrayBuffer[String] = ArrayBuffer(value, ctx.SSYMBOL().getText)
-    createExprVarArray(field)
-  }
-
-  override def visitLExprArray(ctx: LExprArrayContext): Variable = {
-
-    val lvalue: String = ctx.lexpr() match {
-      case l: LExprVarContext => getLExprVarText(l)
-      case _                  => "error"
+  override def visitLExprVar(ctx: LExprVarContext): Option[Variable] = {
+    val name = ctx.ID.getText
+    name match {
+      case n if constMap.contains(n) => Some(LocalVar(n + "_" + blkCount + "_" + instructionCount, constMap(n)))
+      case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
+      case "SP_EL0" => Some(Register("R31", BitVecType(64)))
+      case "_PC" => Some(Register("_PC", BitVecType(64)))
+      // ignore the following
+      case "TRUE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
+      case "FALSE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
+      case "__BranchTaken" => None
+      case "BTypeNext" => None
+      case "BTypeCompatible" => None
+      case _ => throw Exception(s"could not identify variable '$name'")
     }
-    val exprs = ctx.expr().asScala
+  }
 
-    val array: ArrayBuffer[String] = ArrayBuffer(lvalue) ++= exprs.map {
-      case e: ExprVarContext => getExprVarText(e)
-      case e: ExprLitIntContext =>
-        if (e.DEC() != null) {
-          e.DEC().getText
-        } else {
-          e.BINARY().getText
-        }
-      case e: ExprLitBitsContext => Integer.parseInt(e.BINARY().getText, 2).asInstanceOf[String]
-      case _                     => ???
+  override def visitLExprField(ctx: LExprFieldContext): LocalVar = {
+    val name = ctx.lexpr match {
+      case l: LExprVarContext => l.ID.getText
+      case _ => throw Exception(" ")
     }
+    val field = ctx.field.getText
 
-    createExprVarArray(array)
+    resolveFieldExpr(name, field)
   }
 
-  def createExprVar(name: String): Expr = {
-    name match
-      case n if cseMap.contains(n)  => LocalVar(n.dropRight(3) + "_" + blkCount + instructionCount, cseMap(n))
-      case v if varMap.contains(v)  => LocalVar(v + "_" + blkCount + instructionCount, varMap(v))
-      case "TRUE"                   => TrueLiteral
-      case "FALSE"                  => FalseLiteral
-      case "SP_EL0"                 => Register("R31", BitVecType(64))
-      case "_PC" =>
-        Register(
-          "_PC",
-          BitVecType(64)
-        ) // "_PC" flag, useful for jumps later on
-      case "__BranchTaken" => null
-      case "BTypeNext" => null
-      case "BTypeCompatible" => null
+  override def visitLExprArray(ctx: LExprArrayContext): Register = {
+    val name = ctx.lexpr match {
+      case l: LExprVarContext => l.ID.getText
+      case _ => throw Exception(" ")
+    }
+    val index = parseInt(ctx.index)
+
+    resolveArrayExpr(name, index)
   }
 
-  def createExprVarArray(v: ArrayBuffer[String]): Variable = {
-    v(0) match //currently only works for fields & arrays of size 2, but arrays bigger than that don't seem to appear
-      case "_R" =>
-        val size = getSizeofRegister(v(0))
-        val name = "R" + v(1)
-        Register(name, BitVecType(size))
-
-      case "_Z" =>
-        val size = getSizeofRegister(v(0))
-        val name = "V" + v(1)
-        Register(name, BitVecType(size))
-
+  private def resolveFieldExpr(name: String, field: String): LocalVar = {
+    name match {
       case "PSTATE" =>
-        val Rname = v(1) + "F"
-        LocalVar(Rname, BitVecType(1))
+        if (field == "V" || field == "C" || field == "Z" || field == "N") {
+          LocalVar(field + "F", BitVecType(1))
+        } else {
+          throw Exception(" ")
+        }
+      case _ => throw Exception(" ")
+    }
   }
 
-  def getSizeofRegister(name: String): Int = {
-    name match
-      case "_R" => return 64
-      case "_Z" => return 128 // or _V?  vector registers haven't come up yet
+  private def resolveArrayExpr(name: String, index: Int): Register = {
+    name match {
+      case "_R" => Register(s"R$index", BitVecType(64))
+      case "_Z" => Register(s"V$index", BitVecType(128))
+      case _ => throw Exception(" ")
+    }
   }
-
 }
