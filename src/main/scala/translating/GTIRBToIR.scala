@@ -149,8 +149,8 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
         if (block.statements.isEmpty && !blockOutgoingEdges.contains(blockUUID)) {
           // remove blocks that are just nop padding
-          // TODO cleanup blocks that are entirely nop but have fallthrough edges
-          Logger.info(s"removing block ${block.label}")
+          // TODO cleanup blocks that are entirely nop but have fallthrough edges?
+          Logger.debug(s"removing block ${block.label}")
           procedure.removeBlocks(block)
         } else {
           if (!blockOutgoingEdges.contains(blockUUID)) {
