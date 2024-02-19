@@ -34,6 +34,12 @@ case object TrueBLiteral extends BoolBLiteral {
   override def toString: String = "true"
 }
 
+case object StarBLiteral extends BoolBLiteral {
+  override val getType: BType = BoolBType
+  override def toString: String = "*"
+}
+
+
 case object FalseBLiteral extends BoolBLiteral {
   override val getType: BType = BoolBType
   override def toString: String = "false"
@@ -716,6 +722,11 @@ case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: End
   override def locals: Set[BVar] = memory.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ memory.globals ++ value.globals
   override def loads: Set[BExpr] = index.loads ++ value.loads
+}
+
+case class BDirectExpr(text: String, t: BType) extends BExpr {
+  override def toString: String = text
+  override def getType: BType = t
 }
 
 case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) extends BExpr {
