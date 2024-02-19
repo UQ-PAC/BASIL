@@ -209,7 +209,6 @@ object IRTransform {
                   modified = true
                   val procedure = c.parent.data
                   val newBlocks = ArrayBuffer[Block]()
-                  // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
                   for (t <- targets) {
                     val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
                     val newLabel: String = block.label + t.name
@@ -317,6 +316,22 @@ object StaticAnalysis {
     Logger.info(externalAddresses)
     Logger.info("Subroutine Addresses:")
     Logger.info(subroutines)
+
+
+    // reducible loops
+    val detector = LoopDetector(IRProgram);
+    val foundLoops = detector.identify_loops()
+    foundLoops.foreach(l => Logger.info(s"Loop found: ${l.name}"))
+
+    val transformer = LoopTransform(foundLoops);
+    val newLoops = transformer.llvm_transform();
+    newLoops.foreach(l => Logger.info(s"Loop found: ${l.name}"))
+
+    config.analysisDotPath.foreach { s =>
+      val newCFG = ProgramCfgFactory().fromIR(IRProgram)
+      writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG-reducible.dot")
+      writeToFile(dotBlockGraph(IRProgram, IRProgram.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-reduce-$iteration.dot")
+    }
 
     val mergedSubroutines = subroutines ++ externalAddresses
 

@@ -397,7 +397,7 @@ class ProgramCfgFactory:
       addInterprocEdges(leafCallNodes)
     }
 
-    cfg.startNode = procToCfg(program.mainProcedure)._1
+    cfg.startNode = procToCfg(program.mainProcedure)._1    
 
     cfg
   }
