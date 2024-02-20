@@ -137,14 +137,16 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     // maybe good to sort blocks by address around here?
 
+    val semanticsLoader = SemanticsLoader(parserMap)
+
     for ((functionUUID, blockUUIDs) <- functionBlocks) {
       val procedure = uuidToProcedure(functionUUID)
       var blockCount = 0
       for (blockUUID <- blockUUIDs) {
         val block = uuidToBlock(blockUUID)
-        val semanticsLoader = SemanticsLoader(blockUUID, parserMap, blockCount)
+
+        val statements = semanticsLoader.visitBlock(blockUUID, blockCount, block.address)
         blockCount += 1
-        val statements = semanticsLoader.createStatements()
         block.statements.addAll(statements)
 
         if (block.statements.isEmpty && !blockOutgoingEdges.contains(blockUUID)) {
@@ -230,6 +232,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     uuidToProcedure += (functionUUID -> procedure)
     entranceUUIDtoProcedure += (entranceUUID -> procedure)
 
+    // sort blocks by address to give a more practical order
     val blockUUIDs = functionBlocks(functionUUID)
     val blockUUIDsSorted = blockUUIDs.toSeq.sortBy(addresses(_))
     // should probably check if empty?

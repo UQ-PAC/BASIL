@@ -27,7 +27,7 @@ import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
 import java.util.Base64
-import spray.json.DefaultJsonProtocol._
+import spray.json.DefaultJsonProtocol.*
 import intrusivelist.IntrusiveList
 import analysis.CfgCommandNode
 
