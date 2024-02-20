@@ -6,7 +6,6 @@ $(LIFT_ARTEFACTS): a.out
 	$(BAP) a.out -d adt:$(NAME).adt -d bir:$(NAME).bir
 	ddisasm a.out --ir $(NAME).gtirb
 	gtirb-semantics-nix $(NAME).gtirb $(NAME).gts
-	debug-gts.py $(NAME).gts > $(NAME).json
 
 ifdef $(SPEC) 
 BASIL_SPECARG = --spec $(SPEC) 
@@ -28,10 +27,15 @@ $(BASIL):
 a.out: $(C_SOURCE)
 	$(CC) $(CFLAGS) $(C_SOURCE)
 
-.PHONY=recompile verify clean cleanlift cleanall cleanbin json
+.PHONY=recompile verify clean cleanlift cleanall cleanbin cleantest cleangts json gts
 verify: $(NAME)_bap.bpl $(NAME)_gtirb.bpl
 
 recompile: a.out
+
+gts: a.out
+	ddisasm a.out --ir $(NAME).gtirb
+	gtirb-semantics-nix $(NAME).gtirb $(NAME).gts
+	rm -rf $(NAME).gtirb
 
 json:
 	debug-gts.py $(NAME).gts > $(NAME).json
@@ -42,7 +46,7 @@ $(NAME)bap_result.txt: $(NAME)_bap.bpl $(EXTRA_SPEC)
 $(NAME)gtirb_result.txt: $(NAME)_gtirb.bpl $(EXTRA_SPEC)
 	bash -c "time boogie $(NAME)_gtirb.bpl $(EXTRA_SPEC) $(BOOGIE_FLAGS) | tee $(NAME)_result.txt"
 
-cleanall: clean cleanlift cleanbin cleantest
+cleanall: clean cleanlift cleanbin cleantest cleanjson
 
 cleantest: 
 	rm -rf $(NAME).bpl
@@ -56,11 +60,16 @@ cleanbin:
 	rm -rf a.out
 	rm -rf $(NAME).gtirb
 
-clean: cleanlift cleanbin
+clean: cleanlift cleanbin cleanjson
+
+cleanjson:
+	rm -rf $(NAME).json
 
 cleanlift:
 	rm -rf $(NAME).adt
 	rm -rf $(NAME).bir
 	rm -rf $(NAME).relf
-	rm -rf $(NAME).json
+	rm -rf $(NAME).gts
 
+cleangts:
+	rm -rf $(NAME).gts
