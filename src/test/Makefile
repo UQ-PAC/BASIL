@@ -1,4 +1,4 @@
-TARGETSS := all verify clean cleanall cleanlift recompile json
+TARGETSS := all verify clean cleanall cleanlift recompile json cleanjson cleangts gts
 
 SUBTARGETS = $(wildcard correct/*/ incorrect/*/)
 .PHONY : $(TARGETSS) $(SUBTARGETS) correct incorrect
