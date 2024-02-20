@@ -91,10 +91,10 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
         val otherSize = parseInt(args(1)) * 8
         val mysteryArg = parseInt(args(2))
         if (size != otherSize) {
-          throw Exception(" ")
+          throw Exception(s"inconsistent size parameters in Mem.set.0: ${ctx.getText}")
         }
         if (mysteryArg != 0) {
-          Logger.debug("")
+          Logger.debug(s"mystery 3rd arg of Mem.set.0 has value $mysteryArg: ${ctx.getText}")
         }
 
         // LittleEndian is an assumption
@@ -106,7 +106,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
         }
 
       case _ =>
-        Logger.debug("")
+        Logger.debug(s"Unidentified function call $function: ${ctx.getText}")
         None
     }
   }
@@ -245,10 +245,10 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
         val otherSize = parseInt(args(1)) * 8
         val mysteryArg = parseInt(args(2))
         if (size != otherSize) {
-          throw Exception(s"${ctx.getText}")
+          throw Exception(s"inconsistent size parameters in Mem.read.0: ${ctx.getText}")
         }
         if (mysteryArg != 0) {
-          Logger.debug("")
+          Logger.debug(s"mystery 3rd arg of Mem.read.0 has value $mysteryArg: ${ctx.getText}")
         }
 
         if (index.isDefined) {
@@ -304,7 +304,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
         val arg0 = visitExpr(args(0))
         val arg1 = parseInt(args(1))
         if (arg1 != newSize) {
-          throw Exception(" ")
+          Exception(s"inconsistent size parameters in ZeroExtend.0: ${ctx.getText}")
         }
         if (arg0.isDefined) {
           Some(ZeroExtend(newSize - oldSize, arg0.get))
@@ -319,7 +319,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
         val arg0 = visitExpr(args(0))
         val arg1 = parseInt(args(1))
         if (arg1 != newSize) {
-          throw Exception(" ")
+          Exception(s"inconsistent size parameters in SignExtend.0: ${ctx.getText}")
         }
         if (arg0.isDefined) {
           Some(SignExtend(newSize - oldSize, arg0.get))
@@ -328,7 +328,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
         }
 
       case _ =>
-        Logger.debug(s"unidentified call to $function")
+        Logger.debug(s"unidentified call to $function: ${ctx.getText}")
         None
     }
 
@@ -422,7 +422,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
   override def visitExprField(ctx: ExprFieldContext): LocalVar = {
     val name = ctx.expr match {
       case e: ExprVarContext => e.ID.getText
-      case _ => throw Exception(" ")
+      case _ => throw Exception(s"expected ${ctx.getText} to have an Expr_Var as first parameter")
     }
     val field = ctx.field.getText
 
@@ -432,7 +432,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
   override def visitExprArray(ctx: ExprArrayContext): Register = {
     val name = ctx.array match {
       case e: ExprVarContext => e.ID.getText
-      case _ => throw Exception(" ")
+      case _ => throw Exception(s"expected ${ctx.getText} to have an Expr_Var as first parameter")
     }
     val index = parseInt(ctx.index)
 
@@ -469,14 +469,14 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
       case "__BranchTaken" => None
       case "BTypeNext" => None
       case "BTypeCompatible" => None
-      case _ => throw Exception(s"could not identify variable '$name'")
+      case _ => throw Exception(s"could not identify variable '$name' in ${ctx.getText}")
     }
   }
 
   override def visitLExprField(ctx: LExprFieldContext): LocalVar = {
     val name = ctx.lexpr match {
       case l: LExprVarContext => l.ID.getText
-      case _ => throw Exception(" ")
+      case _ => throw Exception(s"expected ${ctx.getText} to have an LExpr_Var as first parameter")
     }
     val field = ctx.field.getText
 
@@ -486,7 +486,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
   override def visitLExprArray(ctx: LExprArrayContext): Register = {
     val name = ctx.lexpr match {
       case l: LExprVarContext => l.ID.getText
-      case _ => throw Exception(" ")
+      case _ => throw Exception(s"expected ${ctx.getText} to have an LExpr_Var as first parameter")
     }
     val index = parseInt(ctx.index)
 
@@ -495,13 +495,9 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
 
   private def resolveFieldExpr(name: String, field: String): LocalVar = {
     name match {
-      case "PSTATE" =>
-        if (field == "V" || field == "C" || field == "Z" || field == "N") {
+      case "PSTATE" if field == "V" || field == "C" || field == "Z" || field == "N" =>
           LocalVar(field + "F", BitVecType(1))
-        } else {
-          throw Exception(" ")
-        }
-      case _ => throw Exception(" ")
+      case _ => throw Exception(s"unidentified Expr_Field ($name, $field)")
     }
   }
 
@@ -509,7 +505,7 @@ class SemanticsLoader(targetuuid: ByteString, parserMap: immutable.Map[String, A
     name match {
       case "_R" => Register(s"R$index", BitVecType(64))
       case "_Z" => Register(s"V$index", BitVecType(128))
-      case _ => throw Exception(" ")
+      case _ => throw Exception(s"unidentified Expr_Array ($name, $index)")
     }
   }
 }

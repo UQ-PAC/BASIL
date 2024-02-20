@@ -321,7 +321,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     val target = l.rhs match {
       case r: Register => r
-      case _ => throw Exception(" ")
+      case _ => throw Exception(s"unhandled indirect call $l does not assign a register to __PC")
     }
     val returnTarget = if (currentBlock.statements.hasNext(l)) {
       // unidentified indirect call is mid-block
@@ -346,7 +346,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
             afterBlock.replaceJump(currentBlock.jump)
             afterBlock
           }
-        case _ => throw Exception(" ")
+        case _ => throw Exception(s"unhandled indirect call $l is at end of block ${currentBlock.label} that ends in call ${currentBlock.jump}")
       }
     }
     val indirectCall = IndirectCall(target, Some(returnTarget))
@@ -418,7 +418,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
             IndirectCall(target, None)
           } else if (proxySymbols.size > 1) {
             // TODO requires further consideration once encountered
-            throw Exception(" ")
+            throw Exception(s"multiple symbols ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${byteStringToString(edge.targetUuid)}, target of indirect call from block ${block.label}")
           } else {
             // indirect call to external procedure with name
             val externalName = proxySymbols.head.name
@@ -440,7 +440,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           removePCAssign(block)
           GoTo(mutable.Set(target))
         } else {
-          throw Exception(" ")
+          throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block or proxy block")
         }
       case EdgeLabel(false, true, Type_Branch, _) =>
         // direct jump, either goto or tail call
@@ -460,7 +460,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           removePCAssign(block)
           GoTo(mutable.Set(target))
         } else {
-          throw Exception("")
+          throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block")
         }
       case EdgeLabel(false, _, Type_Return, _) =>
         // return statement, value of 'direct' is just whether DDisasm has resolved the return target
@@ -478,7 +478,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           val target = uuidToBlock(edge.targetUuid)
           GoTo(mutable.Set(target))
         } else {
-          throw Exception(" ")
+          throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block")
         }
       case EdgeLabel(false, true, Type_Call, _) =>
         // call that will not return according to DDisasm even though R30 may be set
@@ -488,7 +488,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           removePCAssign(block)
           DirectCall(target, None)
         } else {
-          throw Exception(" ")
+          throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known procedure entrance")
         }
 
       // case EdgeLabel(false, false, Type_Call, _) => probably what a blr instruction should be
@@ -571,24 +571,28 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
   }
 
   private def handleConditionalBranch(fallthrough: Edge, branch: Edge, block: Block, procedure: Procedure): GoTo = {
-    if (uuidToBlock.contains(branch.targetUuid) && uuidToBlock.contains(fallthrough.targetUuid)) {
-      val tempIf = block.statements.last match {
-        case i: TempIf => i
-        case _ => throw Exception(s"last statement of block ${block.label} is not an if statement")
-      }
-      // maybe need to actually examine the if statement's contents?
-
-      val trueBlock = newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond)
-      val falseBlock = newBlockCondition(block, uuidToBlock(fallthrough.targetUuid), UnaryExpr(BoolNOT, tempIf.cond))
-
-      val newBlocks = ArrayBuffer(trueBlock, falseBlock)
-      procedure.addBlocks(newBlocks)
-      block.statements.remove(tempIf)
-
-      GoTo(newBlocks)
-    } else {
-      throw Exception(s"${branch} ${fallthrough} ")
+    if (!uuidToBlock.contains(fallthrough.targetUuid)) {
+      throw Exception(s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block")
     }
+
+    if (!uuidToBlock.contains(branch.targetUuid)) {
+      throw Exception(s"block ${block.label} has branch edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block")
+    }
+
+    val tempIf = block.statements.last match {
+      case i: TempIf => i
+      case _ => throw Exception(s"last statement of block ${block.label} is not an if statement")
+    }
+    // maybe need to actually examine the if statement's contents?
+
+    val trueBlock = newBlockCondition(block, uuidToBlock(branch.targetUuid), tempIf.cond)
+    val falseBlock = newBlockCondition(block, uuidToBlock(fallthrough.targetUuid), UnaryExpr(BoolNOT, tempIf.cond))
+
+    val newBlocks = ArrayBuffer(trueBlock, falseBlock)
+    procedure.addBlocks(newBlocks)
+    block.statements.remove(tempIf)
+
+    GoTo(newBlocks)
   }
 
   private def newBlockCondition(block: Block, target: Block, condition: Expr): Block = {
@@ -596,6 +600,5 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     val assume = Assume(condition, checkSecurity = true)
     Block(newLabel, None, ArrayBuffer(assume), GoTo(ArrayBuffer(target)))
   }
-
 
 }
