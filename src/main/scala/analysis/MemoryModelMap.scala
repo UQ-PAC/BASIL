@@ -16,7 +16,7 @@ case class RangeKey(var start: BigInt, var end: BigInt) extends Ordered[RangeKey
 
 case class RegionToRangesMap():
   val stackMap: mutable.Map[RangeKey, StackRegion] = mutable.TreeMap()
-  val sharedStackMap: mutable.Map[RangeKey, StackRegion] = mutable.TreeMap()
+  val sharedStackMap: mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]] = mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]]()
   val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.TreeMap()
   val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.TreeMap()
 
@@ -42,7 +42,7 @@ class MemoryModelMap {
       case s: StackRegion =>
         var stackMap = rangeMap.stackMap
         if (shared) {
-          stackMap = rangeMap.sharedStackMap
+          stackMap = rangeMap.sharedStackMap.getOrElseUpdate(s.parent, mutable.TreeMap())
         }
         if (stackMap.isEmpty) {
           stackMap(RangeKey(offset, MAX_BIGINT)) = s
@@ -155,8 +155,8 @@ class MemoryModelMap {
   def findStackObject(value: BigInt): Option[StackRegion] = 
     rangeMap.stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
 
-  def findSharedStackObject(value: BigInt): Option[StackRegion] =
-    rangeMap.sharedStackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
+  def findSharedStackObject(value: BigInt): Set[StackRegion] =
+    rangeMap.sharedStackMap.values.flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj}).toSet).toSet
 
   def findDataObject(value: BigInt): Option[DataRegion] = 
     rangeMap.dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
@@ -178,10 +178,13 @@ class MemoryModelMap {
         }
       }
       if rangeMap.sharedStackMap.nonEmpty then println(s"    Shared:")
-      for ((range, region) <- rangeMap.sharedStackMap) {
-          if (region.content.nonEmpty || !hideEmpty) {
-          println(s"       $range -> $region")
-          }
+      for ((parent, treeMap) <- rangeMap.sharedStackMap) {
+          println(s"        Parent: ${parent.name}")
+            for ((range, region) <- treeMap) {
+                if (region.content.nonEmpty || !hideEmpty) {
+                println(s"           $range -> $region")
+                }
+            }
       }
     println("Heap:")
     for ((range, region) <- rangeMap.heapMap) {
@@ -208,7 +211,7 @@ class StackRegion(override val regionIdentifier: String, val start: BitVecLitera
   override def toString: String = s"Stack($regionIdentifier, $start, ${if parent != null then parent.name else "Null"}) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case s: StackRegion => s.start == start && s.regionIdentifier.equals(regionIdentifier)
+    case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier
     case _ => false
   }
 }
@@ -226,7 +229,7 @@ class DataRegion(override val regionIdentifier: String, val start: BitVecLiteral
   override def toString: String = s"Data($regionIdentifier, $start) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
-    case d: DataRegion => d.start == start && d.regionIdentifier.equals(regionIdentifier)
+    case d: DataRegion => d.start == start && d.regionIdentifier == regionIdentifier
     case _ => false
   }
 }

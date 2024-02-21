@@ -85,9 +85,9 @@ class InterprocSteensgaardAnalysis(
             case FlatEl(al) =>
               val regions = al match {
                 case loadL: MemoryLoad =>
-                  exprToRegion(loadL.index, n, shared)
+                  exprToRegion(loadL.index, n)
                 case _ =>
-                  exprToRegion(al, n, shared)
+                  exprToRegion(al, n)
               }
               evaluateExpressionWithSSA(binExpr.arg2, constantProp(n)).foreach (
                 b =>
@@ -95,12 +95,12 @@ class InterprocSteensgaardAnalysis(
                     case stackRegion: StackRegion =>
                       val nextOffset = BinaryExpr(op = BVADD, arg1 = stackRegion.start, arg2 = b)
                       evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach (
-                        b2 => reducedRegions = reducedRegions ++ exprToRegion(BinaryExpr(op = BVADD, arg1 = stackPointer, arg2 = b2), n, shared)
+                        b2 => reducedRegions = reducedRegions ++ exprToRegion(BinaryExpr(op = BVADD, arg1 = stackPointer, arg2 = b2), n)
                       )
                     case dataRegion: DataRegion =>
                       val nextOffset = BinaryExpr(op = BVADD, arg1 = dataRegion.start, arg2 = b)
                       evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach(
-                        b2 => reducedRegions = reducedRegions ++ exprToRegion(b2, n, shared)
+                        b2 => reducedRegions = reducedRegions ++ exprToRegion(b2, n)
                       )
                     case _ =>
                   }
@@ -126,7 +126,7 @@ class InterprocSteensgaardAnalysis(
    * @param n
    * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
    */
-  def exprToRegion(expr: Expr, n: CfgCommandNode, shared: Boolean = false): Set[MemoryRegion] = {
+  def exprToRegion(expr: Expr, n: CfgCommandNode): Set[MemoryRegion] = {
     var res = Set[MemoryRegion]()
     mmm.popContext()
     mmm.pushContext(n.parent.data.name)
@@ -134,7 +134,7 @@ class InterprocSteensgaardAnalysis(
       case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
         evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach {
           case b: BitVecLiteral =>
-            val region = if shared then mmm.findSharedStackObject(b.value) else mmm.findStackObject(b.value)
+            val region = mmm.findStackObject(b.value)
             if (region.isDefined) {
               res = res + region.get
             }
@@ -159,12 +159,12 @@ class InterprocSteensgaardAnalysis(
               case FlatEl(al) =>
                 al match
                   case load: MemoryLoad => // treat as a region
-                    res = res ++ exprToRegion(load.index, n, true)
+                    res = res ++ exprToRegion(load.index, n)
                   case binaryExpr: BinaryExpr =>
                     res = res ++ reducibleToRegion(binaryExpr, n, true)
                     res = res ++ exprToRegion(al, n)
                   case _ => // also treat as a region (for now) even if just Base + Offset without memLoad
-                    res = res ++ exprToRegion(al, n, true)
+                    res = res ++ exprToRegion(al, n)
             }
           }
         }

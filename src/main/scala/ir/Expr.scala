@@ -4,7 +4,6 @@ import boogie._
 import scala.collection.mutable
 
 sealed trait Expr {
-  var ssa_id: mutable.Set[Int] = mutable.Set[Int]()
   def toBoogie: BExpr
   def toGamma: BExpr = {
     val gammaVars: Set[BExpr] = gammas.map(_.toGamma)
@@ -347,6 +346,8 @@ case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr w
 sealed trait Variable extends Expr {
   val name: String
   val irType: IRType
+  val ssa_id: mutable.Set[Int] = mutable.Set[Int]()
+  
   override def getType: IRType = irType
   override def variables: Set[Variable] = Set(this)
   override def gammas: Set[Expr] = Set(this)

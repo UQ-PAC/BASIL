@@ -165,7 +165,7 @@ object RunUtils {
     assert(unparented.isEmpty)
 
     val mergedSubroutines = subroutines ++ externalAddresses
-    applySSA(IRProgram)
+    SSAForm().applySSA(IRProgram)
 
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 

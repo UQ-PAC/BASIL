@@ -40,8 +40,7 @@ trait ANRAnalysis(cfg: ProgramCfg) {
         m - indirectCall.target
       case localAssign: LocalAssign =>
         m = m.diff(localAssign.rhs.variables)
-        if (ignoreRegions.contains(localAssign.lhs)) return m
-        m + localAssign.lhs
+        if ignoreRegions.contains(localAssign.lhs) then m else m + localAssign.lhs
       case _ =>
         m
     }
