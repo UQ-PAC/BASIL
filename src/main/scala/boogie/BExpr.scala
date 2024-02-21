@@ -339,20 +339,19 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            println(s"$arg1, $arg2")
-            throw new Exception("bitvector size mismatch")
+            throw new Exception(s"bitvector size mismatch: $arg1, $arg2")
           }
         case BVCOMP =>
           if (bv1.size == bv2.size) {
             BitVecBType(1)
           } else {
-            throw new Exception("bitvector size mismatch")
+            throw new Exception(s"bitvector size mismatch: $arg1, $arg2")
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolBType
           } else {
-            throw new Exception("bitvector size mismatch")
+            throw new Exception(s"bitvector size mismatch: $arg1, $arg2")
           }
         case BVEQ | BVNEQ =>
           BoolBType
