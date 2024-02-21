@@ -1,11 +1,9 @@
-# BAP-to-Boogie Translator
+# BASIL (Boogie Analysis for Secure Information-Flow Logics)
 
 ## About
 
-The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
-binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
-
-This repository contains a program which takes BAP adt files and readelf output as input, and produces a boogie program.
+The BASIL tool generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
+binaries that have been lifted to intermediate formats. Supported input formats are BAP (Binary Analysis Platform) intermediate ADT format, and the `.gts` format produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics).
 
 ### Example
 
