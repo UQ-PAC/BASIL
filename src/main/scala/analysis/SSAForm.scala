@@ -21,9 +21,12 @@ case class SSAForm() {
 
   def transformVariables(vars: Set[Variable], block: Block, proc: Procedure): Unit = {
     vars.foreach(v => {
+      if (context.contains((proc, v.name))) {
+        v.sharedVariable = true
+      }
       v.ssa_id.clear()
-      v.ssa_id.addAll(blockBasedMappings.getOrElseUpdate(
-        (block, v.name),
+      v.ssa_id.addAll(
+        blockBasedMappings.getOrElseUpdate((block, v.name),
         context.getOrElseUpdate((proc, v.name), mutable.Set(getMax(v.name)))
       ))
     })
@@ -78,7 +81,6 @@ case class SSAForm() {
                 //context((directCall.target, varr)) = context((directCall.target, varr)) ++ blockBasedMappings(block, varr)
                 context.getOrElseUpdate((directCall.target, varr), mutable.Set()) ++= blockBasedMappings((currentBlock, varr))
               })
-              println(context)
             }
             case indirectCall: IndirectCall => {
               transformVariables(indirectCall.target.variables, currentBlock, proc)

@@ -74,7 +74,7 @@ class InterprocSteensgaardAnalysis(
    * @param n
    * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
    */
-  def reducibleToRegion(binExpr: BinaryExpr, n: CfgCommandNode, shared: Boolean = false): Set[MemoryRegion] = {
+  def reducibleToRegion(binExpr: BinaryExpr, n: CfgCommandNode): Set[MemoryRegion] = {
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
       case variable: Variable =>
@@ -99,7 +99,7 @@ class InterprocSteensgaardAnalysis(
                       )
                     case dataRegion: DataRegion =>
                       val nextOffset = BinaryExpr(op = BVADD, arg1 = dataRegion.start, arg2 = b)
-                      evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach(
+                      evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach (
                         b2 => reducedRegions = reducedRegions ++ exprToRegion(b2, n)
                       )
                     case _ =>
@@ -134,9 +134,17 @@ class InterprocSteensgaardAnalysis(
       case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
         evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach {
           case b: BitVecLiteral =>
-            val region = mmm.findStackObject(b.value)
-            if (region.isDefined) {
-              res = res + region.get
+            if binOp.arg2.variables.exists { case v: Variable => v.sharedVariable } then {
+              println("Shared stack object: " + b)
+              println("Shared in: " + expr)
+              val regions = mmm.findSharedStackObject(b.value)
+              println("found: " + regions)
+              res = res ++ regions
+            } else {
+              val region = mmm.findStackObject(b.value)
+              if (region.isDefined) {
+                res = res + region.get
+              }
             }
         }
         res
@@ -161,7 +169,7 @@ class InterprocSteensgaardAnalysis(
                   case load: MemoryLoad => // treat as a region
                     res = res ++ exprToRegion(load.index, n)
                   case binaryExpr: BinaryExpr =>
-                    res = res ++ reducibleToRegion(binaryExpr, n, true)
+                    res = res ++ reducibleToRegion(binaryExpr, n)
                     res = res ++ exprToRegion(al, n)
                   case _ => // also treat as a region (for now) even if just Base + Offset without memLoad
                     res = res ++ exprToRegion(al, n)
