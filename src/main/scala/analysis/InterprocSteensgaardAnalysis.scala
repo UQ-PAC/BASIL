@@ -34,7 +34,8 @@ class InterprocSteensgaardAnalysis(
       cfg: ProgramCfg,
       constantProp: Map[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]]],
       regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
-      mmm: MemoryModelMap) extends Analysis[Any] {
+      mmm: MemoryModelMap,
+      globalOffsets: Map[BigInt, BigInt]) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
 
@@ -51,6 +52,17 @@ class InterprocSteensgaardAnalysis(
   private def nextMallocCount() = {
     mallocCount += 1
     s"malloc_$mallocCount"
+  }
+
+  /**
+   * In expressions that have accesses within a region, we need to relocate
+   * the base address to the actual address using the relocation table.
+   * @param address
+   * @return BitVecLiteral: the relocated address
+   */
+  def relocatedBase(address: BitVecLiteral): BitVecLiteral = {
+    val tableAddress = globalOffsets.getOrElse(address.value, address.value)
+    BitVecLiteral(tableAddress, address.size)
   }
 
   /**
@@ -98,7 +110,7 @@ class InterprocSteensgaardAnalysis(
                         b2 => reducedRegions = reducedRegions ++ exprToRegion(BinaryExpr(op = BVADD, arg1 = stackPointer, arg2 = b2), n)
                       )
                     case dataRegion: DataRegion =>
-                      val nextOffset = BinaryExpr(op = BVADD, arg1 = dataRegion.start, arg2 = b)
+                      val nextOffset = BinaryExpr(op = BVADD, arg1 = relocatedBase(dataRegion.start), arg2 = b)
                       evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach (
                         b2 => reducedRegions = reducedRegions ++ exprToRegion(b2, n)
                       )

@@ -74,7 +74,7 @@ class MemoryModelMap {
   def resolveInverseGlobalOffset(name: String, address: BitVecLiteral, globalOffsets: Map[BigInt, BigInt]): DataRegion = {
     val inverseGlobalOffsets = globalOffsets.map(_.swap)
     var tableAddress = inverseGlobalOffsets.getOrElse(address.value, address.value)
-    // addresses may be layered as in jumptable2 example for recursive search required
+    // addresses may be layered as in jumptable2 example for which recursive search is required
     var exitLoop = false
     while (inverseGlobalOffsets.contains(tableAddress) && !exitLoop) {
       val newAddress = inverseGlobalOffsets.getOrElse(tableAddress, tableAddress)
