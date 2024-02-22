@@ -77,7 +77,7 @@ object RunUtils {
 
   def loadAndTranslate(q: BASILConfig): BProgram = {
     /**
-     *  Loading phase
+     * Loading phase
      */
     val bapProgram = loadBAP(q.loading.adtFile)
     val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading)
@@ -137,13 +137,13 @@ object RunUtils {
   }
 
   def analyse(
-      IRProgram: Program,
-      externalFunctions: Set[ExternalFunction],
-      globals: Set[SpecGlobal],
-      globalOffsets: Map[BigInt, BigInt],
-      config: StaticAnalysisConfig,
-      iteration: Int
-  ): Program = {
+       IRProgram: Program,
+       externalFunctions: Set[ExternalFunction],
+       globals: Set[SpecGlobal],
+       globalOffsets: Map[BigInt, BigInt],
+       config: StaticAnalysisConfig,
+       iteration: Int
+     ): Program = {
     val subroutines = IRProgram.procedures
       .filter(p => p.address.isDefined)
       .map(p => BigInt(p.address.get) -> p.name)
@@ -247,7 +247,6 @@ object RunUtils {
     val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, globalOffsets)
     steensgaardSolver.analyze()
     steensgaardSolver.pointsTo()
-    steensgaardSolver.mayAlias()
 
     Logger.info("[!] Running VSA")
     val vsaSolver = ValueSetAnalysisSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
@@ -257,18 +256,19 @@ object RunUtils {
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, vsaResult), s"${s}_vsa$iteration.txt"))
 
     Logger.info("[!] Resolving CFG")
-    val (newIR, modified): (Program, Boolean) =  resolveCFG(cfg, vsaResult, IRProgram)
+    val (newIR, modified): (Program, Boolean) = resolveCFGUsingPointsTo(cfg, steensgaardSolver.pointsTo().asInstanceOf[Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]]], IRProgram)
+    //val (newIR, modified): (Program, Boolean) = resolveCFG(cfg, vsaResult, IRProgram)
 
     unparented = newIR.collect {
       case c: Command if !c.hasParent => c
       case b: Block if !b.hasParent => b
     }
 
-    // TODO: Uncomment
-//    if (modified) {
-//      Logger.info(s"[!] Analysing again (iter $iteration)")
-//      return analyse(newIR, externalFunctions, globals, globalOffsets, config, iteration + 1)
-//    }
+     // TODO: Uncomment
+    if (modified) {
+      Logger.info(s"[!] Analysing again (iter $iteration)")
+      return analyse(newIR, externalFunctions, globals, globalOffsets, config, iteration + 1)
+    }
 
     config.analysisDotPath.foreach { s =>
       val newCFG = ProgramCfgFactory().fromIR(newIR)
@@ -322,9 +322,11 @@ object RunUtils {
       val t = next match
         case p: Procedure => s"\nProcedure ${p.name}"
         case b: Block => Seq(
-            s"  Block ${b.label}${contentStr(b)}"
-            , b.statements.map(s => {"    " + s.toString + contentStr(s)}).mkString("\n")
-            , "    " + b.jump.toString + contentStr(b.jump)).mkString("\n")
+          s"  Block ${b.label}${contentStr(b)}"
+          , b.statements.map(s => {
+            "    " + s.toString + contentStr(s)
+          }).mkString("\n")
+          , "    " + b.jump.toString + contentStr(b.jump)).mkString("\n")
         case s: Statement => s"    Statement $s${contentStr(s)}"
         case s: Jump => s"  Jump $s${contentStr(s)}"
       results.addOne(t)
@@ -334,7 +336,7 @@ object RunUtils {
   }
 
 
-    def printAnalysisResults(cfg: ProgramCfg, result: Map[CfgNode, _], iteration: Int): String = {
+  def printAnalysisResults(cfg: ProgramCfg, result: Map[CfgNode, _], iteration: Int): String = {
     val functionEntries = cfg.nodes.collect { case n: CfgFunctionEntryNode => n }.toSeq.sortBy(_.data.name)
     val s = StringBuilder()
     s.append(System.lineSeparator())
@@ -415,6 +417,120 @@ object RunUtils {
     s.toString
   }
 
+  def resolveCFGUsingPointsTo(
+      cfg: ProgramCfg,
+      pointsTos: Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]],
+      IRProgram: Program
+    ): (Program, Boolean) = {
+    var modified: Boolean = false
+    val worklist = ListBuffer[CfgNode]()
+    cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
+
+    val visited = MutableSet[CfgNode]()
+    while (worklist.nonEmpty) {
+      val node = worklist.remove(0)
+      if (!visited.contains(node)) {
+        process(node)
+        node.succIntra.union(node.succInter).foreach(node => worklist.addOne(node))
+        visited.add(node)
+      }
+    }
+
+    def searchRegion(region: MemoryRegion): mutable.Set[String] = {
+      val result = mutable.Set[String]()
+      region match {
+        case stackRegion: StackRegion =>
+          for (c <- stackRegion.content) {
+            c match {
+              case bitVecLiteral: BitVecLiteral => ???
+              case memoryRegion: MemoryRegion =>
+                result.addAll(searchRegion(memoryRegion))
+            }
+          }
+          result
+        case dataRegion: DataRegion =>
+          if (dataRegion.content.isEmpty) {
+            result.add(dataRegion.regionIdentifier)
+          } else {
+            for (c <- dataRegion.content) {
+              c match {
+                case bitVecLiteral: BitVecLiteral => ???
+                case memoryRegion: MemoryRegion =>
+                  result.addAll(searchRegion(memoryRegion))
+              }
+            }
+          }
+          result
+      }
+    }
+
+    def addFakeProcedure(name: String): Procedure = {
+      val newProcedure = Procedure(name)
+      IRProgram.procedures += newProcedure
+      newProcedure
+    }
+
+    def resolveAddresses(variable: Variable): mutable.Set[String] = {
+      val names = mutable.Set[String]()
+      val variableWrapper = RegisterVariableWrapper(variable)
+      pointsTos.get(variableWrapper) match {
+        case Some(value) =>
+          value.map {
+            case v: VariableWrapper => names.addAll(resolveAddresses(v.variable))
+            case m: MemoryRegion =>
+              names.addAll(searchRegion(m))
+          }
+          names
+        case None => names
+      }
+    }
+
+    def process(n: CfgNode): Unit = n match {
+      case c: CfgJumpNode =>
+        val block = c.block
+        c.data match
+          case indirectCall: IndirectCall =>
+            if (block.jump != indirectCall) {
+              // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data
+              // Hence if we have already processed this CFG node there will be no corresponding IndirectCall in the IR
+              // to replace.
+              // We want to replace all possible indirect calls based on this CFG, before regenerating it from the IR
+              return
+            }
+            val targetNames = resolveAddresses(indirectCall.target)
+            println(s"Points-To approximated call ${indirectCall.target} with ${targetNames}")
+            println(IRProgram.procedures)
+            val targets: mutable.Set[Procedure] = targetNames.map(name => IRProgram.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
+
+            if (targets.size == 1) {
+              modified = true
+
+              // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
+              val newCall = DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label)
+              block.replaceJump(newCall)
+            } else if (targets.size > 1) {
+              modified = true
+              val procedure = c.parent.data
+              val newBlocks = ArrayBuffer[Block]()
+              // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
+              for (t <- targets) {
+                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
+                val newLabel: String = block.label + t.name
+                val directCall = DirectCall(t, indirectCall.returnTarget)
+                directCall.parent = indirectCall.parent
+
+                newBlocks.append(Block(newLabel, None, ArrayBuffer(assume), directCall))
+              }
+              procedure.addBlocks(newBlocks)
+              val newCall = GoTo(newBlocks, indirectCall.label)
+              block.replaceJump(newCall)
+            }
+          case _ =>
+      case _ =>
+    }
+    (IRProgram, modified)
+  }
+
   def resolveCFG(
       cfg: ProgramCfg,
       valueSets: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
@@ -477,6 +593,7 @@ object RunUtils {
               case Lift(valueSet) =>
                 val targetNames = resolveAddresses(valueSet(indirectCall.target)).map(_.name).toList.sorted
                 val targets = targetNames.map(name => IRProgram.procedures.filter(_.name.equals(name)).head)
+                println(s"VSA approximated call ${indirectCall.target} with ${targetNames}")
 
                 if (targets.size == 1) {
                   modified = true
