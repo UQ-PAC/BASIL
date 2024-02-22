@@ -1,6 +1,51 @@
 CFG Iterator Implementation
 ===========================
 
+The IR is the internal data structure representing the program and its control flow. 
+
+The language is described roughly below. The full description of expressions is missing.  
+
+```math
+\begin{align*}
+Program ::=&~ Procedure* \\ 
+Procedure ::=&~ (name: ProcID) (entryBlock: Block) (returnBlock: Block) (blocks: Block*) \\
+               &~ \text{Where }entryBlock, returnBlock \in blocks \\
+Block ::=&~ BlockID \; (Statement*)\; Jump \; (fallthrough: (GoTo | None))\\
+         &~ \text{Where $fallthough$ may be $GoTo$ IF $Jump$ is $Call$} \\
+Statement ::=&~ MemoryAssign ~|~ LocalAssign ~|~ Assume ~|~ Assert ~|~ NOP \\
+ProcID ::=&~ String \\
+BlockID ::=&~ String \\
+\\
+Jump ::=&~ Call ~|~ GoTo \\
+GoTo ::=&~ \text{goto } BlockID* \\
+Call ::=&~ DirectCall ~|~ IndirectCall  \\
+DirectCall ::=&~ \text{call } ProcID \\
+IndirectCall ::=&~ \text{call } Expr \\
+\\
+          &~ loads(e: Expr) = \{x |  x:MemoryLoad, x \in e \} \\
+          &~ stores(e: Expr) = \{x |  x:MemoryStore, x \in e \} \\
+\\
+MemoryAssign ::=&~ Memory := MemoryStore \\
+LocalAssign ::=&~ Variable := Expr \\
+Assume ::=&~ \text{assume } body:Expr\\
+          &\text {Such that } loads(body) = stores(body) = \emptyset \\
+Assert ::=&~ \text{assert } body:Expr\\
+          &\text {Such that } loads(body) = stores(body) = \emptyset \\
+\\
+Expr ::=&~ MemoryStore ~|~ MemoryLoad ~|~ Variable ~|~ Literal ~|~ Extract ~|~ Repeat \\
+          &~ ~|~ ZeroExtend ~|~ SignExtend ~|~ UnaryExpr ~|~ BinaryExpr \\
+Variable ::=&~ Global ~|~ LocalVar \\
+MemoryStore ::=&~  (mem:Memory) (addr: Expr) (val: Expr) (Endian) (size: Int) \\
+          &\text {Such that } loads(addr) = loads(val) = stores(addr) = stores(val) = \emptyset \\
+MemoryLoad ::=&~  (mem:Memory)  (addr: Expr)  (Endian) (size: Int) \\
+          &\text {Such that } loads(addr) = stores(addr) = stores(val) = \emptyset \\
+Memory ::=&~ Stack ~|~ Mem \\
+Endian ::=&~ BigEndian ~|~ LittleEndian \\
+\end{align*}
+```
+
+
+
 This file explains the in-place CFG representation on top of the IL.
 
 Motivations
