@@ -165,6 +165,21 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     }
   }
 
+  def splitOn(n: T): IntrusiveList[T] = {
+    val ne = n.next 
+
+    val newlist = new IntrusiveList[T]()
+    var next = n.next
+    while (next.isDefined) {
+      remove(next.get)
+      newlist.addOne(next.get)
+
+      next = n.next
+    }
+
+    newlist
+  }
+
   def remove(intrusiveListElement: T): T = {
     assert(size >= 0)
     assert(containsRef(intrusiveListElement))
@@ -231,11 +246,11 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   }
 
 object IntrusiveList {
-  def from[T <: IntrusiveListElement[T]](it: IterableOnce[T]): IntrusiveList[T] = {
-    val l = new IntrusiveList[T]()
-    l.addAll(it)
-    l
-  }
+
+  def from[T <: IntrusiveListElement[T]](it: IntrusiveList[T]): IntrusiveList[T] = it
+
+  def from[T <: IntrusiveListElement[T]](it: IterableOnce[T]): IntrusiveList[T] = IntrusiveList[T]().addAll(it)
+
   def empty[T <: IntrusiveListElement[T]]: IntrusiveList[T] = new IntrusiveList[T]()
 }
 
@@ -251,6 +266,8 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
     elem.next = Some(this.asInstanceOf[T])
     elem
   }
+
+
 
   private[intrusivelist] final def unitary: Boolean = next.isEmpty && prev.isEmpty
 

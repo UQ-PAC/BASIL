@@ -405,32 +405,29 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   }
 
   def pushUpModifiesFixedPoint(procedures: List[BProcedure]): List[BProcedure] = {
-    pushUpModifies(procedures) match {
-      case (true, proc) => pushUpModifiesFixedPoint(proc)
-      case (false, proc) => proc
-    }
-  }
 
-  def pushUpModifies(procedures: List[BProcedure]): (Boolean, List[BProcedure]) = {
-    var changed = false
+    var changed = true
+    var proceduresUpdated = procedures
+    while (changed) {
+      changed = false
+      val nameToProcedure = proceduresUpdated.map(p => p.name -> p).toMap
+      proceduresUpdated = proceduresUpdated.map(
+        procedure => {
+          val cmds: List[BCmd] = procedure.body.flatten {
+            case b: BBlock => b.body
+            case c: BCmd => Seq(c)
+          }
+          val callModifies = cmds.collect { case c: BProcedureCall => nameToProcedure(c.name) }.flatMap(_.modifies)
+          val modifiesUpdate = procedure.modifies ++ callModifies
+          if (modifiesUpdate != procedure.modifies) {
+            changed = true
+          }
 
-    val procs: List[BProcedure] = procedures.map(
-      procedure => {
-        val cmds: List[BCmd] = procedure.body.flatten {
-          case b: BBlock => b.body
-          case c: BCmd => Seq(c)
+          procedure.copy(modifies = modifiesUpdate)
         }
-
-        val modifies: Set[BVar] = procedure.modifies ++ cmds.collect{ case x: BProcedureCall => procedures.find(_.name == x.name)}
-          .flatten.flatMap(_.modifies)
-
-        if (procedure.modifies != procedure.modifies)
-          changed = true
-
-        procedure.copy(modifies = modifies)
-      }
-    )
-    (changed, procs)
+      )
+    }
+    proceduresUpdated
   }
 
 
@@ -475,7 +472,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       freeEnsures,
       freeRequires,
       modifies.toSet,
-      body.toList
+      body
     )
   }
 

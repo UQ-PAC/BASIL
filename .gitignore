@@ -22,3 +22,5 @@ src/main/antlr4/.antlr
 examplesold/
 src/test/scala/dump/
 src/test/analysis/dump/
+*.gtirb
+*.json

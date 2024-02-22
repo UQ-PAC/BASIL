@@ -11,12 +11,10 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
               var readOnlyMemory: ArrayBuffer[MemorySection]) extends Iterable[CFGPosition] {
 
   // This shouldn't be run before indirect calls are resolved
-
-
   def stripUnreachableFunctions(depth: Int = Int.MaxValue): Unit = {
     val procedureCalleeNames = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
 
-    var toVisit: mutable.LinkedHashSet[(Int, String)] = mutable.LinkedHashSet((0, mainProcedure.name))
+    val toVisit: mutable.LinkedHashSet[(Int, String)] = mutable.LinkedHashSet((0, mainProcedure.name))
     var reachableFound = true
     val reachableNames = mutable.HashMap[String, Int]()
     while (toVisit.nonEmpty) {
@@ -80,7 +78,8 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 
   // this is very crude but the simplest thing for now until we have a more sophisticated specification system that can relate to the IR instead of the Boogie
   def nameToGlobal(name: String): Global = {
-    if ((name.startsWith("R") || name.startsWith("V")) && (name.length == 2 || name.length == 3) && name.substring(1).forall(_.isDigit)) {
+    if ((name.startsWith("R") || name.startsWith("V")) && (name.length == 2 || name.length == 3)
+      && name.substring(1).forall(_.isDigit)) {
       if (name.startsWith("R")) {
         Register(name, BitVecType(64))
       } else {
@@ -125,7 +124,7 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
    * not guaranteed to be in any defined order. 
    */
   class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
-    val stack = mutable.Stack[CFGPosition]()
+    private val stack = mutable.Stack[CFGPosition]()
     stack.addAll(begin.procedures)
 
     override def hasNext: Boolean = {
@@ -135,8 +134,8 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     override def next(): CFGPosition = {
       val n: CFGPosition  = stack.pop()
 
-      stack.pushAll(n match  {
-        case p : Procedure => p.blocks
+      stack.pushAll(n match {
+        case p: Procedure => p.blocks
         case b: Block => Seq() ++ b.statements ++ Seq(b.jump)
         case s: Command => Seq()
       })
@@ -165,8 +164,8 @@ class Procedure private (
                   var in: ArrayBuffer[Parameter],
                   var out: ArrayBuffer[Parameter],
                 ) {
-  private var _callers = new mutable.HashSet[DirectCall]
-
+  private val _callers = mutable.HashSet[DirectCall]()
+  _blocks.foreach(_.setParent(this))
   // class invariant
   require(returnBlock.forall(b => _blocks.contains(b)) && entryBlock.forall(b => _blocks.contains(b)))
   require(_blocks.isEmpty == entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
@@ -290,6 +289,10 @@ class Block private (var label: String,
     this(label, address, IntrusiveList.from(statements), GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
   }
 
+  def this(label: String, address: Option[Int], statements: IntrusiveList[Statement]) = {
+    this(label, address, statements, GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
+  }
+
   def this(label: String, address: Option[Int] = None) = {
     this(label, address, IntrusiveList(), GoTo(Seq(), Some(label + "_unknown")), mutable.HashSet.empty)
   }
@@ -298,8 +301,8 @@ class Block private (var label: String,
 
   def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
 
-  def addIncomingJump(g: GoTo) = _incomingJumps.add(g)
-  def removeIncomingJump(g: GoTo) = _incomingJumps.remove(g)
+  def addIncomingJump(g: GoTo): Boolean = _incomingJumps.add(g)
+  def removeIncomingJump(g: GoTo): Boolean = _incomingJumps.remove(g)
 
   def replaceJump(j: Jump): this.type = {
     _jump.deParent()
@@ -321,7 +324,6 @@ class Block private (var label: String,
   }
 
   override def toString: String = {
-    // display all statements and jumps
     val statementsString = statements.map(_.toString).mkString("\n")
     s"Block $label with $statementsString\n$jump"
   }
@@ -367,13 +369,6 @@ class Block private (var label: String,
     } else None
   }
 
-  override def equals(obj: scala.Any): Boolean =
-    obj match
-      case b: Block => b.label == this.label
-      case _ => false
-
-  override def hashCode(): Int = label.hashCode()
-
   override def linkParent(p: Procedure): Unit = {
     // The first block added to the procedure is the entry block
     if parent.blocks.isEmpty then parent.entryBlock = Some(this)
@@ -386,8 +381,7 @@ class Block private (var label: String,
     // to disconnect call() links that reference jump.parent.parent
     jump.deParent()
   }
- }
-
+}
 
 /**
   * @param name name

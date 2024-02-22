@@ -1,5 +1,11 @@
 package util
 
+import java.io.{File, PrintWriter, FileInputStream, BufferedWriter, FileWriter, IOException}
+import com.grammatech.gtirb.proto.IR.IR
+import com.grammatech.gtirb.proto.Module.Module
+import com.grammatech.gtirb.proto.Section.Section
+import spray.json._
+import gtirb.*
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Set as MutableSet
@@ -14,10 +20,14 @@ import ir.*
 import boogie.*
 import specification.*
 import Parsers.*
+import Parsers.SemanticsParser.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
+import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
+import java.util.Base64
+import spray.json.DefaultJsonProtocol.*
 import intrusivelist.IntrusiveList
 import analysis.CfgCommandNode
 
@@ -42,6 +52,35 @@ object RunUtils {
     parser.setBuildParseTree(true)
 
     BAPLoader.visitProject(parser.project())
+  }
+
+  def loadGTIRB(fileName: String, mainAddress: Int): Program = {
+    val fIn = FileInputStream(fileName)
+    val ir = IR.parseFrom(fIn)
+    val mods = ir.modules
+    val cfg = ir.cfg.get
+
+    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]])
+
+    def parse_insn(f: String): StmtContext = {
+      try {
+        val semanticsLexer = SemanticsLexer(CharStreams.fromString(f))
+        val tokens = CommonTokenStream(semanticsLexer)
+        val parser = SemanticsParser(tokens)
+        parser.setErrorHandler(BailErrorStrategy())
+        parser.setBuildParseTree(true)
+        parser.stmt()
+      } catch {
+        case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
+          Logger.error(f)
+          throw RuntimeException(e)
+      }
+    }
+
+    val parserMap = semantics.map(_.map((k: String, v: Array[Array[String]]) => (k, v.map(_.map(parse_insn)))))
+
+    val GTIRBConverter = GTIRBToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
+    GTIRBConverter.createIR()
   }
 
   def loadReadELF(fileName: String, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
@@ -75,20 +114,24 @@ object RunUtils {
   }
 
   def loadAndTranslate(q: BASILConfig): BProgram = {
-    /**
-     *  Loading phase
-     */
-    val bapProgram = loadBAP(q.loading.adtFile)
+    /** Loading phase
+      */
     val (externalFunctions, globals, globalOffsets, mainAddress) = loadReadELF(q.loading.relfFile, q.loading)
 
-    val IRTranslator = BAPToIR(bapProgram, mainAddress)
-    var IRProgram = IRTranslator.translate
+    var IRProgram: Program = if (q.loading.inputFile.endsWith(".adt")) {
+      val bapProgram = loadBAP(q.loading.inputFile)
+      val IRTranslator = BAPToIR(bapProgram, mainAddress)
+      IRTranslator.translate
+    } else if (q.loading.inputFile.endsWith(".gts")) {
+      loadGTIRB(q.loading.inputFile, mainAddress)
+    } else {
+      throw Exception(s"input file name ${q.loading.inputFile} must be an .adt or .gst file")
+    }
 
     val specification = loadSpecification(q.loading.specFile, IRProgram, globals)
 
-    /**
-     * Analysis Phase
-     */
+    /** Analysis Phase
+      */
     Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
     val externalNames = externalFunctions.map(e => e.name)
@@ -125,7 +168,7 @@ object RunUtils {
       val interpreter = Interpreter()
       interpreter.interpret(IRProgram)
     }
-    */
+     */
 
     Logger.info("[!] Translating to Boogie")
     val boogieTranslator = IRToBoogie(IRProgram, specification)
@@ -298,8 +341,8 @@ object RunUtils {
             case c: CfgFunctionEntryNode =>
               printNode(c)
               isEntryNode = true
-            case c:
-              CfgCallNoReturnNode => s.append(System.lineSeparator())
+            case c: CfgCallNoReturnNode =>
+              s.append(System.lineSeparator())
               isEntryNode = false
             case _ => isEntryNode = false
           }
@@ -319,7 +362,7 @@ object RunUtils {
             }
             successor.match {
               case c: CfgCommandNode if (c.block.label != previousBlock) && (!isEntryNode) => printGoTo(Seq(c))
-              case _ =>
+              case _                                                                       =>
             }
           }
         }
@@ -393,10 +436,10 @@ object RunUtils {
                   val result = exprValues.reduce((a, b) => BinaryExpr(BVOR, a, b)) // need to express nondeterministic
                                                                                    // choice between these specific options
                   localAssign.rhs = result
-                   */
+       */
                 }
               case _ =>
-      */
+       */
       case c: CfgJumpNode =>
         val block = c.block
         c.data match

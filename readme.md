@@ -1,20 +1,18 @@
-# BAP-to-Boogie Translator
+# BASIL (Boogie Analysis for Secure Information-Flow Logics)
 
 ## About
 
-The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
-binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
-
-This repository contains a program which takes BAP adt files and readelf output as input, and produces a boogie program.
+The BASIL tool generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
+binaries that have been lifted to intermediate formats. Supported input formats are BAP (Binary Analysis Platform) intermediate ADT format, and the `.gts` format produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics).
 
 ### Example
 
 ```sh
-$ sbt "run --adt src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write.relf --s
+$ sbt "run --input src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write.relf --s
 pec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl"
 [info] welcome to sbt 1.8.2 (Private Build Java 17.0.8)
 ...
-[info] running Main --adt src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write
+[info] running Main --input src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write
 .relf --spec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl
 [success] Total time: 1 s, completed Sep 11, 2023, 7:24:11 AM
 $ tail boogie_out.bpl 
@@ -122,27 +120,35 @@ On Windows, WSL2 may be used to run any Linux-specific tasks, but it is less tho
 
 Installing [sbt](https://www.scala-sbt.org/download.html) and [JDK 17](https://openjdk.org/install/) is required.
 
-The tool takes as inputs a BAP ADT file (here denoted with `.adt`) and a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.
+The tool takes as inputs either a BAP ADT file (here denoted with `.adt`) or a `.gts` file produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics), as well as a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.
 
 To build and run the tool using sbt, use the following command:
 
-`sbt "run --adt file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
+`sbt "run --input file.{adt, gts} --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
 
 #### Usage
 
 The `--analyse` flag is optional and enables the static analysis functionality.
 
+Other flags are listed below:
 
 ```
 BASIL
-  -a --adt <str>     BAP ADT file name.
-  -r --relf <str>    Output of 'readelf -s -r -W'.
-  -s --spec <str>    BASIL specification file.
-  -o --output <str>  Boogie output destination file.
-  -v --verbose       Show extra debugging logs.
-  --analyse          Run static analysis pass.
-  --interpret        Run BASIL IR interpreter.
-  -h --help          Show this help message.
+  --analyse                       Run static analysis pass.
+  --analysis-results <str>        Log analysis results in files at specified path.
+  --analysis-results-dot <str>    Log analysis results in .dot form at specified path.
+  --boogie-use-lambda-stores      Use lambda representation of store operations.
+  --dump-il <str>                 Dump the Intermediate Language to text.
+  -h --help                       Show this help message.
+  -i --input <str>                BAP .adt file or GTIRB/ASLi .gts file
+  --interpret                     Run BASIL IL interpreter.
+  -m --main-procedure-name <str>  Name of the main procedure to begin analysis at.
+  -o --output <str>               Boogie output destination file.
+  --procedure-call-depth <int>    Cull procedures beyond this call depth from the main function
+                                  (defaults to Int.MaxValue)
+  -r --relf <str>                 Name of the file containing the output of 'readelf -s -r -W'.
+  -s --spec <str>                 BASIL specification file.
+  -v --verbose                    Show extra debugging logs.
 ```
 
 The sbt shell can also be used for multiple tasks with less overhead by executing `sbt` and then the relevant sbt commands.
@@ -159,7 +165,7 @@ To compile the source without running it - this helps IntelliJ highlight things 
 
 ## Generating inputs (Lifting)
 
-Many lifted examples are already profied in the tests directory: [src/test/correct](src/test/correct), these instructions
+Many lifted examples are already profiled in the tests directory: [src/test/correct](src/test/correct), these instructions
 are for if you want to lift new compiled binaries.
 
 The tool takes a `.adt` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.
