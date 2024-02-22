@@ -99,12 +99,13 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         val index = visitExpr(args.head)
         val value = visitExpr(args(3))
         val otherSize = parseInt(args(1)) * 8
-        val mysteryArg = parseInt(args(2))
+        val accessType = parseInt(args(2)) // AccType enum in ASLi
         if (size != otherSize) {
           throw Exception(s"inconsistent size parameters in Mem.set.0: ${ctx.getText}")
         }
-        if (mysteryArg != 0) {
-          Logger.debug(s"mystery 3rd arg of Mem.set.0 has value $mysteryArg: ${ctx.getText}")
+        // we expect this to be 0 'AccType_NORMAL' but if we encounter other values they may require further investigation
+        if (accessType != 0) {
+          Logger.info(s"Mem.set.0 with non-0 access type encountered: ${ctx.getText}")
         }
 
         // LittleEndian is an assumption
@@ -253,13 +254,15 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         val size = parseInt(typeArgs.head) * 8
 
         val otherSize = parseInt(args(1)) * 8
-        val mysteryArg = parseInt(args(2))
+        val accessType = parseInt(args(2)) // AccType enum in ASLi
         if (size != otherSize) {
           throw Exception(s"inconsistent size parameters in Mem.read.0: ${ctx.getText}")
         }
-        if (mysteryArg != 0) {
-          Logger.debug(s"mystery 3rd arg of Mem.read.0 has value $mysteryArg: ${ctx.getText}")
+        // we expect this to be 0 'AccType_NORMAL' but if we encounter other values they may require further investigation
+        if (accessType != 0) {
+          Logger.info(s"Mem.set.0 with non-0 access type encountered: ${ctx.getText}")
         }
+
 
         if (index.isDefined) {
           // LittleEndian is assumed

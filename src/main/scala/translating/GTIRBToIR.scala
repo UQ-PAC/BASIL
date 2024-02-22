@@ -53,14 +53,33 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
   private val functionNames = MapDecoder.decode_uuid(mods.map(_.auxData("functionNames").data))
   private val functionEntries = MapDecoder.decode_set(mods.map(_.auxData("functionEntries").data))
   private val functionBlocks = MapDecoder.decode_set(mods.map(_.auxData("functionBlocks").data))
-  private val addresses = createAddresses()
-  private val symbols = mods.flatMap(_.symbols).map(s => s.uuid -> s).toMap
-  private val uuidToSymbols = createSymbolMap()
-  private val uuidToProcedure: mutable.Map[ByteString, Procedure] = mutable.Map()
-  private val entranceUUIDtoProcedure: mutable.Map[ByteString, Procedure] = mutable.Map()
-  private val uuidToBlock: mutable.Map[ByteString, Block] = mutable.Map()
+
+  // maps block UUIDs to their address
+  private val blockUUIDToAddress = createAddresses()
+
+  // mapping from a symbol's UUID to the symbol itself
+  private val uuidToSymbol = mods.flatMap(_.symbols).map(s => s.uuid -> s).toMap
+
+  // mapping from a node's UUID to the symbols associated with that node
+  // can be used to get the names of external functions associated with proxy blocks
+  private val nodeUUIDToSymbols = createSymbolMap()
+
+  // mapping from a proxy block's UUID to the proxy block
   private val proxies = mods.flatMap(_.proxies.map(p => p.uuid -> p)).toMap
+
+  // mapping from a block's UUID to the outgoing edges from that block
   private val blockOutgoingEdges = createCFGMap()
+
+  // mapping from a procedure's identifier UUID to the IR procedure
+  private val uuidToProcedure: mutable.Map[ByteString, Procedure] = mutable.Map()
+
+  // mapping from the UUID of a procedure's entrance block to the IR procedure
+  private val entranceUUIDtoProcedure: mutable.Map[ByteString, Procedure] = mutable.Map()
+
+  // mapping from a block's UUID to the IR block
+  private val uuidToBlock: mutable.Map[ByteString, Block] = mutable.Map()
+
+  // mapping from an external procedure's name to the IR procedure
   private val externalProcedures = mutable.Map[String, Procedure]()
 
   // maps block UUIDs to their address
@@ -92,11 +111,11 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     edgeMap
   }
 
-  // maps UUIDs of blocks, etc. to the symbols they are associated with
+  // maps UUIDs of blocks, etc. to the uuidToSymbol they are associated with
   // can be used to get names of external calls from proxy blocks, may have other uses
   private def createSymbolMap(): mutable.Map[ByteString, mutable.Set[Symbol]] = {
     val symMap = mutable.Map[ByteString, mutable.Set[Symbol]]()
-    for (sym <- symbols.values) {
+    for (sym <- uuidToSymbol.values) {
       if (sym.optionalPayload.isReferentUuid) {
         val ruuid = sym.optionalPayload.referentUuid.get
         if (symMap.contains(ruuid)) {
@@ -212,7 +231,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
   }
 
   private def createProcedure(functionUUID: ByteString, symbolUUID: ByteString): Procedure = {
-    val name = symbols(symbolUUID).name
+    val name = uuidToSymbol(symbolUUID).name
 
     val entrances = functionEntries(functionUUID)
     if (entrances.size > 1) {
@@ -224,7 +243,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     }
 
     val entranceUUID = entrances.head
-    val address = addresses.get(entranceUUID)
+    val address = blockUUIDToAddress.get(entranceUUID)
 
     val (in, out) = createArguments(name)
 
@@ -234,7 +253,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     // sort blocks by address to give a more practical order
     val blockUUIDs = functionBlocks(functionUUID)
-    val blockUUIDsSorted = blockUUIDs.toSeq.sortBy(addresses(_))
+    val blockUUIDsSorted = blockUUIDs.toSeq.sortBy(blockUUIDToAddress(_))
     // should probably check if empty?
 
     var blockCount = 0
@@ -248,7 +267,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
   private def createBlock(blockUUID: ByteString, procedure: Procedure, entranceUUID: ByteString, blockCount: Int): Block = {
     val blockLabel = convertLabel(procedure, blockUUID, blockCount)
 
-    val blockAddress = addresses.get(blockUUID)
+    val blockAddress = blockUUIDToAddress.get(blockUUID)
     val block = Block(blockLabel, blockAddress)
     procedure.addBlocks(block)
     if (uuidToBlock.contains(blockUUID)) {
@@ -267,6 +286,9 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     "$" + procedure.name + "$__" + blockCount + "__$" + byteStringToString(label).replace("=", "").replace("-", "~").replace("/", "\'")
   }
 
+  // handles stray assignments to the program counter (which are indirect calls that DDisasm failed to identify)
+  // also handles if statements that are not related to conditional edges in the GTIRB CFG
+  // both must be transformed to ensure correct control flow in the IR
   private def cleanUpIfPCAssign(block: Block, procedure: Procedure): Unit = {
     var newBlockCount = 0
     var currentBlock = block
@@ -275,7 +297,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     val queue = mutable.Queue[Block]()
     while (!breakLoop) {
       currentStatement match {
-        // temp
+        // if statement not related to conditional edges - requires creating new blocks for the if statement contents
         case i: TempIf =>
           val newBlocks = handleIfStatement(i, currentBlock, block.label, newBlockCount)
           queue.enqueueAll(newBlocks)
@@ -288,6 +310,9 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           } else {
             breakLoop = true
           }
+        // assignment to program counter not associated with an edge
+        // caused by indirect call that DDisasm fails to identify
+        // potentially requires splitting block
         case l: LocalAssign if l.lhs == Register("_PC", BitVecType(64)) =>
           val newBlocks = handleUnidentifiedIndirectCall(l, currentBlock, block.label, newBlockCount)
           procedure.addBlocks(newBlocks)
@@ -318,6 +343,12 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     }
   }
 
+  // Handles assignments to the program counter that are not related to edges in the GTIRB CFG
+  // These are likely blr instructions (which are indirect calls) that DDisasm failed to identify as branching
+  // If the PC assignment is mid-block, the block is split into two, and an indirect call is created at the end of the first block
+  // If the PC assignment is at the end of the block, an indirect call is added to the block
+  // The PC assignment is removed in all cases
+  // No other cases of unhandled program counter assignments have been identified yet
   private def handleUnidentifiedIndirectCall(l: LocalAssign, currentBlock: Block, parentLabel: String, newBlockCountIn: Int): ArrayBuffer[Block] = {
     val newBlocks = ArrayBuffer[Block]()
     var newBlockCount = newBlockCountIn
@@ -333,7 +364,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       newBlockCount += 1
       newBlocks.append(afterBlock)
       afterBlock.replaceJump(currentBlock.jump)
-      // TODO currently assume return target is afterBlock, probably best to check properly though once calculating address of instructions is done
+      // we are assuming this is a blr instruction and so R30 has been set to point to the next instruction
       afterBlock
     } else {
       // unidentified indirect call is at end of block with fallthrough edge
@@ -349,9 +380,16 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
             afterBlock.replaceJump(currentBlock.jump)
             afterBlock
           }
-        case _ => throw Exception(s"unhandled indirect call $l is at end of block ${currentBlock.label} that ends in call ${currentBlock.jump}")
+        case _ =>
+          throw Exception(s"unhandled indirect call $l is at end of block ${currentBlock.label} that ends in call ${currentBlock.jump}")
       }
     }
+    // check that R30 has been set by previous statement - if it did not then this is a case that requires further investigation
+    currentBlock.statements.getPrev(l) match {
+      case LocalAssign(Register("R30", BitVecType(64)), _, _) =>
+      case _ => throw Exception("unhandled assignment to PC did not set R30 beforehand")
+    }
+
     val indirectCall = IndirectCall(target, Some(returnTarget))
     currentBlock.replaceJump(indirectCall)
     currentBlock.statements.remove(l)
@@ -359,6 +397,8 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     newBlocks
   }
 
+  // handles if statements that are not related to conditional edges in the GTIRB CFG
+  // this creates new blocks for the contents of the if statements and removes the TempIfs
   private def handleIfStatement(i: TempIf, currentBlock: Block, parentLabel: String, newBlockCountIn: Int): ArrayBuffer[Block] = {
     var newBlockCount = newBlockCountIn
     val newBlocks = ArrayBuffer[Block]()
@@ -376,7 +416,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     newBlocks.append(falseBlock)
 
     if (currentBlock.statements.hasNext(i)) {
-      // if statement is mid-block
+      // if statement is mid-block - need to split block and create new blocks for the if statement's contents
       val afterStatements = currentBlock.statements.splitOn(i)
       val afterBlock = Block(parentLabel + "$__" + newBlockCount, None, afterStatements)
       newBlockCount += 1
@@ -386,7 +426,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       trueBlock.replaceJump(GoTo(afterBlock))
       falseBlock.replaceJump(GoTo(afterBlock))
     } else {
-      // if statement is at end of block
+      // if statement is at end of block - only need to create new blocks for the if statement's contents
       // need to copy jump as it can't have multiple parents
       val jumpCopy = currentBlock.jump match {
         case GoTo(targets, label) => GoTo(targets, label)
@@ -410,7 +450,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
         // indirect jump, possibly to external subroutine, possibly to another block in procedure
         // perhaps other possibilities not yet encountered
         if (proxies.contains(edge.targetUuid)) {
-          val proxySymbols = uuidToSymbols.getOrElse(edge.targetUuid, mutable.Set())
+          val proxySymbols = nodeUUIDToSymbols.getOrElse(edge.targetUuid, mutable.Set())
           if (proxySymbols.isEmpty) {
             // indirect call with no further information
             val target = block.statements.last match {
@@ -421,7 +461,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
             IndirectCall(target, None)
           } else if (proxySymbols.size > 1) {
             // TODO requires further consideration once encountered
-            throw Exception(s"multiple symbols ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${byteStringToString(edge.targetUuid)}, target of indirect call from block ${block.label}")
+            throw Exception(s"multiple uuidToSymbol ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${byteStringToString(edge.targetUuid)}, target of indirect call from block ${block.label}")
           } else {
             // indirect call to external procedure with name
             val externalName = proxySymbols.head.name
