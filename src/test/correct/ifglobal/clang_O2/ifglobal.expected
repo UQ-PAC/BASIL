@@ -97,7 +97,7 @@ implementation main()
     call rely();
     R9, Gamma_R9 := zero_extend32_32(memory_load32_le(mem, bvadd64(R8, 52bv64))), (gamma_load32(Gamma_mem, bvadd64(R8, 52bv64)) || L(mem, bvadd64(R8, 52bv64)));
     assert Gamma_R9;
-    goto lmain_goto_l000002dc, lmain_goto_l000002f8;
+    goto lmain_goto_l000002f8, lmain_goto_l000002dc;
   l000002dc:
     assume {:captureState "l000002dc"} true;
     R9, Gamma_R9 := 1bv64, true;

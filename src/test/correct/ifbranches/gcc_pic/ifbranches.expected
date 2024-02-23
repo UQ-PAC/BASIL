@@ -1,11 +1,19 @@
+var {:extern} CF: bv1;
+var {:extern} Gamma_CF: bool;
+var {:extern} Gamma_NF: bool;
 var {:extern} Gamma_R0: bool;
 var {:extern} Gamma_R1: bool;
 var {:extern} Gamma_R31: bool;
+var {:extern} Gamma_VF: bool;
+var {:extern} Gamma_ZF: bool;
 var {:extern} Gamma_mem: [bv64]bool;
 var {:extern} Gamma_stack: [bv64]bool;
+var {:extern} NF: bv1;
 var {:extern} R0: bv64;
 var {:extern} R1: bv64;
 var {:extern} R31: bv64;
+var {:extern} VF: bv1;
+var {:extern} ZF: bv1;
 var {:extern} mem: [bv64]bv8;
 var {:extern} stack: [bv64]bv8;
 function {:extern} {:bvbuiltin "bvadd"} bvadd32(bv32, bv32) returns (bv32);
@@ -80,7 +88,7 @@ procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
 procedure main();
-  modifies Gamma_R0, Gamma_R31, Gamma_stack, R0, R31, stack;
+  modifies CF, Gamma_CF, Gamma_NF, Gamma_R0, Gamma_R31, Gamma_VF, Gamma_ZF, Gamma_stack, NF, R0, R31, VF, ZF, stack;
   requires (Gamma_R0 == true);
   free requires (memory_load64_le(mem, 69632bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
@@ -106,15 +114,7 @@ procedure main();
 implementation main()
 {
   var #4: bv32;
-  var CF: bv1;
   var Gamma_#4: bool;
-  var Gamma_CF: bool;
-  var Gamma_NF: bool;
-  var Gamma_VF: bool;
-  var Gamma_ZF: bool;
-  var NF: bv1;
-  var VF: bv1;
-  var ZF: bv1;
   lmain:
     assume {:captureState "lmain"} true;
     R31, Gamma_R31 := bvadd64(R31, 18446744073709551584bv64), Gamma_R31;
@@ -131,7 +131,7 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#4, 1bv32), 0bv32), Gamma_#4;
     NF, Gamma_NF := bvadd32(#4, 1bv32)[32:31], Gamma_#4;
     assert Gamma_ZF;
-    goto lmain_goto_l00000963, lmain_goto_l0000099c;
+    goto lmain_goto_l0000099c, lmain_goto_l00000963;
   l00000963:
     assume {:captureState "l00000963"} true;
     R0, Gamma_R0 := 2bv64, true;

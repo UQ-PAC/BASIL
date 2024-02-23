@@ -110,7 +110,7 @@ implementation main()
     call rely();
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, bvadd64(R0, 20bv64))), (gamma_load32(Gamma_mem, bvadd64(R0, 20bv64)) || L(mem, bvadd64(R0, 20bv64)));
     assert Gamma_R0;
-    goto lmain_goto_l000001bd, lmain_goto_l0000039c;
+    goto lmain_goto_l0000039c, lmain_goto_l000001bd;
   l0000039c:
     assume {:captureState "l0000039c"} true;
     call rely();

@@ -1,15 +1,23 @@
+var {:extern} CF: bv1;
+var {:extern} Gamma_CF: bool;
+var {:extern} Gamma_NF: bool;
 var {:extern} Gamma_R0: bool;
 var {:extern} Gamma_R1: bool;
 var {:extern} Gamma_R29: bool;
 var {:extern} Gamma_R30: bool;
 var {:extern} Gamma_R31: bool;
+var {:extern} Gamma_VF: bool;
+var {:extern} Gamma_ZF: bool;
 var {:extern} Gamma_mem: [bv64]bool;
 var {:extern} Gamma_stack: [bv64]bool;
+var {:extern} NF: bv1;
 var {:extern} R0: bv64;
 var {:extern} R1: bv64;
 var {:extern} R29: bv64;
 var {:extern} R30: bv64;
 var {:extern} R31: bv64;
+var {:extern} VF: bv1;
+var {:extern} ZF: bv1;
 var {:extern} mem: [bv64]bv8;
 var {:extern} stack: [bv64]bv8;
 function {:extern} L(memory: [bv64]bv8, index: bv64) returns (bool) {
@@ -173,7 +181,7 @@ implementation add_two()
 }
 
 procedure main();
-  modifies Gamma_R0, Gamma_R1, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_mem, Gamma_stack, R0, R1, R29, R30, R31, mem, stack;
+  modifies CF, Gamma_CF, Gamma_NF, Gamma_R0, Gamma_R1, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_VF, Gamma_ZF, Gamma_mem, Gamma_stack, NF, R0, R1, R29, R30, R31, VF, ZF, mem, stack;
   requires (Gamma_R0 == true);
   free requires (memory_load8_le(mem, 69632bv64) == 0bv8);
   free requires (memory_load8_le(mem, 69633bv64) == 0bv8);
@@ -241,7 +249,6 @@ implementation main()
   var #7: bv32;
   var #8: bv32;
   var #9: bv32;
-  var CF: bv1;
   var Gamma_#10: bool;
   var Gamma_#11: bool;
   var Gamma_#12: bool;
@@ -265,13 +272,6 @@ implementation main()
   var Gamma_#7: bool;
   var Gamma_#8: bool;
   var Gamma_#9: bool;
-  var Gamma_CF: bool;
-  var Gamma_NF: bool;
-  var Gamma_VF: bool;
-  var Gamma_ZF: bool;
-  var NF: bv1;
-  var VF: bv1;
-  var ZF: bv1;
   lmain:
     assume {:captureState "lmain"} true;
     #4, Gamma_#4 := bvadd64(R31, 18446744073709551584bv64), Gamma_R31;
@@ -302,7 +302,7 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#6, 1bv32), 0bv32), Gamma_#6;
     NF, Gamma_NF := bvadd32(#6, 1bv32)[32:31], Gamma_#6;
     assert ((Gamma_NF && Gamma_VF) && Gamma_ZF);
-    goto l0000133b_goto_l00001363, l0000133b_goto_l00001332;
+    goto l0000133b_goto_l00001332, l0000133b_goto_l00001363;
   l00001363:
     assume {:captureState "l00001363"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
@@ -312,7 +312,7 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#7, 1bv32), 0bv32), Gamma_#7;
     NF, Gamma_NF := bvadd32(#7, 1bv32)[32:31], Gamma_#7;
     assert Gamma_ZF;
-    goto l00001363_goto_l0000139e, l00001363_goto_l00001384;
+    goto l00001363_goto_l00001384, l00001363_goto_l0000139e;
   l00001384:
     assume {:captureState "l00001384"} true;
     R30, Gamma_R30 := 2288bv64, true;
@@ -413,7 +413,7 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#13, 1bv32), 0bv32), Gamma_#13;
     NF, Gamma_NF := bvadd32(#13, 1bv32)[32:31], Gamma_#13;
     assert Gamma_ZF;
-    goto l00001486_goto_l000014a7, l00001486_goto_l000014b3;
+    goto l00001486_goto_l000014b3, l00001486_goto_l000014a7;
   l000014b3:
     assume {:captureState "l000014b3"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
@@ -423,7 +423,7 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#14, 1bv32), 0bv32), Gamma_#14;
     NF, Gamma_NF := bvadd32(#14, 1bv32)[32:31], Gamma_#14;
     assert ((Gamma_NF && Gamma_VF) && Gamma_ZF);
-    goto l000014b3_goto_l00001332, l000014b3_goto_l000014db;
+    goto l000014b3_goto_l000014db, l000014b3_goto_l00001332;
   l000014db:
     assume {:captureState "l000014db"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
@@ -433,7 +433,7 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#15, 1bv32), 0bv32), Gamma_#15;
     NF, Gamma_NF := bvadd32(#15, 1bv32)[32:31], Gamma_#15;
     assert Gamma_ZF;
-    goto l000014db_goto_l00001508, l000014db_goto_l000014fc;
+    goto l000014db_goto_l000014fc, l000014db_goto_l00001508;
   l00001508:
     assume {:captureState "l00001508"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
@@ -443,7 +443,7 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#16, 1bv32), 0bv32), Gamma_#16;
     NF, Gamma_NF := bvadd32(#16, 1bv32)[32:31], Gamma_#16;
     assert ((Gamma_NF && Gamma_VF) && Gamma_ZF);
-    goto l00001508_goto_l00001332, l00001508_goto_l00001530;
+    goto l00001508_goto_l00001530, l00001508_goto_l00001332;
   l00001530:
     assume {:captureState "l00001530"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
@@ -496,7 +496,7 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#18, 1bv32), 0bv32), Gamma_#18;
     NF, Gamma_NF := bvadd32(#18, 1bv32)[32:31], Gamma_#18;
     assert ((Gamma_NF && Gamma_VF) && Gamma_ZF);
-    goto l00001564_goto_l0000158c, l00001564_goto_l00001332;
+    goto l00001564_goto_l00001332, l00001564_goto_l0000158c;
   l0000158c:
     assume {:captureState "l0000158c"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
@@ -557,7 +557,7 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#22, 1bv32), 0bv32), Gamma_#22;
     NF, Gamma_NF := bvadd32(#22, 1bv32)[32:31], Gamma_#22;
     assert ((Gamma_NF && Gamma_VF) && Gamma_ZF);
-    goto l0000161d_goto_l00001332, l0000161d_goto_l00001645;
+    goto l0000161d_goto_l00001645, l0000161d_goto_l00001332;
   l00001645:
     assume {:captureState "l00001645"} true;
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 28bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 28bv64));
@@ -587,7 +587,7 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#25, 1bv32), 0bv32), Gamma_#25;
     NF, Gamma_NF := bvadd32(#25, 1bv32)[32:31], Gamma_#25;
     assert Gamma_ZF;
-    goto l0000169e_goto_l000016bf, l0000169e_goto_l000016d6;
+    goto l0000169e_goto_l000016d6, l0000169e_goto_l000016bf;
   l000016bf:
     assume {:captureState "l000016bf"} true;
     R30, Gamma_R30 := 2208bv64, true;
@@ -605,7 +605,7 @@ implementation main()
     ZF, Gamma_ZF := bvcomp32(bvadd32(#26, 1bv32), 0bv32), Gamma_#26;
     NF, Gamma_NF := bvadd32(#26, 1bv32)[32:31], Gamma_#26;
     assert Gamma_ZF;
-    goto l000016d6_goto_l000016cf, l000016d6_goto_l000016fc;
+    goto l000016d6_goto_l000016fc, l000016d6_goto_l000016cf;
   l000016cf:
     assume {:captureState "l000016cf"} true;
     R30, Gamma_R30 := 2216bv64, true;
