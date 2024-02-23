@@ -13,10 +13,10 @@ import ir.{Assert, Assume, GoTo, CFGPosition, Command, DirectCall, IndirectCall,
  * Tip SPA IDE Slides include a short and clear explanation of microfunctions
  * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
  */
-trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElement[Nothing] ,TwoElementLattice] {
+trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElementLatticeEl ,TwoElementLattice] {
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
-  val edgelattice: EdgeFunctionLattice[FlatElement[Nothing], valuelattice.type] = new EdgeFunctionLattice[FlatElement[Nothing], valuelattice.type](valuelattice)
+  val edgelattice: EdgeFunctionLattice[TwoElementLatticeEl, valuelattice.type] = new EdgeFunctionLattice[TwoElementLatticeEl, valuelattice.type](valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
 
   def edgesCallToEntry(call: GoTo, entry: Command)(d: DL): Map[DL, edgelattice.Element] = {
@@ -44,7 +44,7 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElemen
               Map(d -> IdEdge())
 
           case Right(_) => expr.variables.foldLeft(Map(d -> IdEdge()): Map[DL, edgelattice.Element]) {
-            (mp, expVar) => mp + (Left(expVar) -> ConstEdge(Top))
+            (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
           }
 
       case MemoryAssign(memory, store, maybeString) => // s ++ store.index.variables ++ store.value.variables
@@ -52,7 +52,7 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElemen
           case Left(value) => Map(d -> IdEdge())
           case Right(_) =>
             (store.index.variables ++ store.value.variables).foldLeft(Map(d -> IdEdge()) : Map[DL, edgelattice.Element]) {
-              (mp, storVar) => mp + (Left(storVar) -> ConstEdge(Top))
+              (mp, storVar) => mp + (Left(storVar) -> ConstEdge(TwoElementTop))
             }
 
       case Assume(expr, maybeString, maybeString1, bool) => // s ++ expr.variables
@@ -60,7 +60,7 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElemen
           case Left(value) => Map(d -> IdEdge())
           case Right(_) =>
             expr.variables.foldLeft(Map(d -> IdEdge()): Map[DL, edgelattice.Element]) {
-              (mp, expVar) => mp + (Left(expVar) -> ConstEdge(Top))
+              (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
             }
 
       case Assert(expr, maybeString, maybeString1) => // s ++ expr.variables
@@ -68,12 +68,12 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElemen
           case Left(value) => Map(d -> IdEdge())
           case Right(_) =>
             expr.variables.foldLeft(Map(d -> IdEdge()): Map[DL, edgelattice.Element]) {
-              (mp, expVar) => mp + (Left(expVar) -> ConstEdge(Top))
+              (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
             }
       case IndirectCall(variable, maybeBlock, maybeString) =>
         d match
           case Left(value) => if value != variable then Map(d -> IdEdge()) else Map()
-          case Right(_) => Map(d -> IdEdge(), Left(variable) -> ConstEdge(Top))
+          case Right(_) => Map(d -> IdEdge(), Left(variable) -> ConstEdge(TwoElementTop))
       case _ => Map(d -> IdEdge())
 
 
@@ -81,16 +81,16 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, FlatElemen
 }
 
 class InterLiveVarsAnalysis(program: Program)
-  extends BackwardIDESolver[Variable, FlatElement[Nothing] ,TwoElementLattice](program), LiveVarsAnalysisFunctions
+  extends BackwardIDESolver[Variable, TwoElementLatticeEl ,TwoElementLattice](program), LiveVarsAnalysisFunctions
 
 
-object InterLiveVarsAnalysis extends AnalysisResult[Map[CFGPosition, Map[Variable, FlatElement[Nothing]]]] {
+object InterLiveVarsAnalysis extends AnalysisResult[Map[CFGPosition, Map[Variable, TwoElementLatticeEl]]] {
 
-  def encodeAnalysisResults(result: Map[CFGPosition, Map[Variable, FlatElement[Nothing]]]): String = {
+  def encodeAnalysisResults(result: Map[CFGPosition, Map[Variable, TwoElementLatticeEl]]): String = {
     val pp = result.foldLeft("") {
       (m, f) =>
         val cfgPosition: CFGPosition = f._1
-        val mapping: Map[Variable, FlatElement[Nothing]] = f._2
+        val mapping: Map[Variable, TwoElementLatticeEl] = f._2
         val positionMaps = mapping.foldLeft("") {
           (line, pair) =>
             line + s"${pair._1}->${pair._2}<>"
