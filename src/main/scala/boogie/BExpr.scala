@@ -272,7 +272,7 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
 
   private def inSize = arg.getType match {
     case bv: BitVecBType => bv.size
-    case _               => throw new Exception("type mismatch")
+    case _               => throw new Exception(s"Expected Bv but got ${arg.getType}")
   }
 
   override def toString: String = op match {
@@ -345,19 +345,19 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            throw new Exception("bitvector size mismatch")
+            throw new Exception(s"bitvector size mismatch: $arg1, $arg2")
           }
         case BVCOMP =>
           if (bv1.size == bv2.size) {
             BitVecBType(1)
           } else {
-            throw new Exception("bitvector size mismatch")
+            throw new Exception(s"bitvector size mismatch: $arg1, $arg2")
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolBType
           } else {
-            throw new Exception("bitvector size mismatch")
+            throw new Exception(s"bitvector size mismatch: $arg1, $arg2")
           }
         case BVEQ | BVNEQ =>
           BoolBType

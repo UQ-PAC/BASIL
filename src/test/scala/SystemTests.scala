@@ -10,8 +10,8 @@ import scala.sys.process.*
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
-class SystemTests extends AnyFunSuite {
 
+trait SystemTests extends AnyFunSuite {
   val testPath = "./src/test/"
   val correctPath = "./src/test/correct"
   val correctPrograms: Array[String] = getSubdirectories(correctPath)
@@ -28,28 +28,20 @@ class SystemTests extends AnyFunSuite {
 
   val testResults: mutable.ArrayBuffer[(String, TestResult)] = mutable.ArrayBuffer()
 
-  // get all variations of each program
-  for (p <- correctPrograms) {
-    val path = correctPath + "/" + p
-    val variations = getSubdirectories(path)
-    variations.foreach(t =>
-      test("correct/" + p + "/" + t) {
-        runTest(correctPath, p, t, true)
-      }
-    )
+  def runTests(programs: Array[String], path: String, name: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
+    // get all variations of each program
+    for (p <- programs) {
+      val programPath = path + "/" + p
+      val variations = getSubdirectories(programPath)
+      variations.foreach(t =>
+        test(name + "/" + p + "/" + t) {
+          runTest(path, p, t, shouldVerify, useADT)
+        }
+      )
+    }
   }
 
-  for (p <- incorrectPrograms) {
-    val path = incorrectPath + "/" + p
-    val variations = getSubdirectories(path)
-    variations.foreach(t =>
-      test("incorrect/" + p + "/" + t) {
-        runTest(incorrectPath, p, t, false)
-      }
-    )
-  }
-
-  test("summary") {
+  def summary(): Unit = {
     val csv: String = "testCase," + TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r._1},${r._2.toCsv}").mkString(System.lineSeparator())
     log(csv, testPath + "testResults.csv")
 
@@ -65,25 +57,24 @@ class SystemTests extends AnyFunSuite {
     if (verifying.nonEmpty)
       info(s"Average time to verify: ${verifying.sum / verifying.size}")
     if (counterExamples.nonEmpty)
-      info(s"Average time to counterexample: ${counterExamples.sum/ counterExamples.size}")
+      info(s"Average time to counterexample: ${counterExamples.sum / counterExamples.size}")
 
     val summaryHeader = "passedCount,failedCount,verifiedCount,counterexampleCount,timeoutCount,verifyTotalTime,counterexampleTotalTime"
     val summaryRow = s"$numSuccess,$numFail,$numVerified,${counterExamples.size},$numTimeout,${verifying.sum},${counterExamples.sum}"
     log(summaryHeader + System.lineSeparator() + summaryRow, testPath + "summary.csv")
   }
 
-
-  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean): Unit= {
+  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
-    val outPath = variationPath + ".bpl"
-        val ADTPath = variationPath + ".adt"
+    val outPath = if useADT then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
+    val inputPath = if useADT then variationPath + ".adt" else variationPath + ".gts"
     val RELFPath = variationPath + ".relf"
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")
 
-    val args = mutable.ArrayBuffer("--adt", ADTPath, "--relf", RELFPath, "--output", outPath, "--analyse")
+    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath)
     if (File(specPath).exists) args ++= Seq("--spec", specPath)
 
     Main.main(args.toArray)
@@ -92,24 +83,24 @@ class SystemTests extends AnyFunSuite {
     val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(outPath))
     val boogieResult = (Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath) ++ extraSpec).!!
     val verifyTime = timer.checkPoint("verify")
-    val resultPath = variationPath + "_result.txt"
+    val resultPath = if useADT then variationPath + "bap_result.txt" else variationPath + "gtirb_result.txt"
     log(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
-    val proveFailed =  boogieResult.contains("could not be proved")
+    val proveFailed = boogieResult.contains("could not be proved")
     val timedOut = boogieResult.strip() contains "timed out"
 
-    def xor(x: Boolean, y:Boolean): Boolean = (x || y) && ! (x && y)
+    def xor(x: Boolean, y: Boolean): Boolean = (x || y) && !(x && y)
 
-    val failureMsg = if timedOut then "SMT Solver timed out" else 
+    val failureMsg = if timedOut then "SMT Solver timed out" else
       (verified, shouldVerify, xor(verified, proveFailed)) match {
-        case (true, true, true) =>   "Test passed"
+        case (true, true, true) => "Test passed"
         case (false , false, true) => "Test passed"
         case (_, _, false) => "Prover error: unknown result: " + boogieResult
         case (true, false, true) => "Expected verification failure, but got success."
         case (false, true, true) => "Expected verification success, but got failure."
-    }
+      }
 
-    val expectedOutPath = variationPath + ".expected"
+    val expectedOutPath = if useADT then variationPath + ".expected" else variationPath + "_gtirb.expected"
     val hasExpected = File(expectedOutPath).exists
     var matchesExpected = true
     if (hasExpected) {
@@ -120,7 +111,7 @@ class SystemTests extends AnyFunSuite {
     } else {
       info("Note: this test has not previously succeeded")
     }
-    val passed = !timedOut && (verified == shouldVerify)  && (xor(verified , proveFailed))
+    val passed = !timedOut && (verified == shouldVerify) && (xor(verified, proveFailed))
     val result = TestResult(passed, verified, shouldVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
     testResults.append((s"$name/$variation", result))
     if (!passed) fail(failureMsg)
@@ -152,9 +143,9 @@ class SystemTests extends AnyFunSuite {
   }
 
   /** @param directoryName
-    *   of the parent directory
+    * of the parent directory
     * @return
-    *   the names all subdirectories of the given parent directory
+    * the names all subdirectories of the given parent directory
     */
   def getSubdirectories(directoryName: String): Array[String] = {
     File(directoryName).listFiles.filter(_.isDirectory).map(_.getName)
@@ -165,5 +156,22 @@ class SystemTests extends AnyFunSuite {
     writer.write(text)
     writer.flush()
     writer.close()
+  }
+
+}
+
+class SystemTestsBAP extends SystemTests  {
+  runTests(correctPrograms, correctPath, "correct", true, true)
+  runTests(incorrectPrograms, incorrectPath, "incorrect", false, true)
+  test("summary") {
+    summary()
+  }
+}
+
+class SystemTestsGTIRB extends SystemTests  {
+  runTests(correctPrograms, correctPath, "correct", true, false)
+  runTests(incorrectPrograms, incorrectPath, "incorrect", false, false)
+  test("summary") {
+    summary()
   }
 }

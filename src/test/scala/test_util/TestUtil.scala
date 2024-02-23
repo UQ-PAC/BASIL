@@ -40,7 +40,7 @@ trait TestUtil {
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          adtFile = path + s"/$name" + (if !example then s"/$variation" else "") + s"/$name.adt",
+          inputFile = path + s"/$name" + (if !example then s"/$variation" else "") + s"/$name.adt",
           relfFile = path + s"/$name" + (if !example then s"/$variation" else "") + s"/$name.relf",
           specFile = None,
           dumpIL = None,

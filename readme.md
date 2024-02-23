@@ -1,49 +1,49 @@
+<<<<<<< HEAD
 # BIL-to-Boogie Translator
+||||||| 7ad7a203
+# BAP-to-Boogie Translator
+=======
+# BASIL (Boogie Analysis for Secure Information-Flow Logics)
+>>>>>>> main
 
 ## About
 
+<<<<<<< HEAD
 The BIL-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
 binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
 
 This repository contains a program which takes BAP adt files and readelf output as input, and produces a boogie program.
+||||||| 7ad7a203
+The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
+binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
+
+This repository contains a program which takes BAP adt files and readelf output as input, and produces a boogie program.
+=======
+The BASIL tool generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
+binaries that have been lifted to intermediate formats. Supported input formats are BAP (Binary Analysis Platform) intermediate ADT format, and the `.gts` format produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics).
+>>>>>>> main
 
 ### Example
 
 ```sh
-$ mill run
-[53/53] run 
-Missing arguments: -a --adt <str> -r --relf <str>
-Expected Signature: BASIL
-  -a --adt <str>                BAP ADT file name.
-  --analyse                     Run static analysis pass.
-  --analysis-results <str>      Log analysis results in files at specified path.
-  --analysis-results-dot <str>  Log analysis results in .dot form at specified path.
-  --boogie-use-lambda-stores    Use lambda representation of store operations.
-  --dump-il <str>               Dump the Intermediate Language to text.
-  -h --help                     Show this help message.
-  --interpret                   Run BASIL IL interpreter.
-  -o --output <str>             Boogie output destination file.
-  -r --relf <str>               Name of the file containing the output of 'readelf -s -r -W'.
-  -s --spec <str>               BASIL specification file.
-  -v --verbose                  Show extra debugging logs.
-
-$ mill run --adt src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write.relf --spec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl
-[53/53] run 
-[INFO]   [!] Writing file... [run@RunUtils.scala:65]
-[INFO]   [!] Removing external function calls [loadAndTranslate@RunUtils.scala:85]
-[INFO]   [!] Translating to Boogie [loadAndTranslate@RunUtils.scala:114]
-[INFO]   [!] Done! Exiting... [loadAndTranslate@RunUtils.scala:116]
+$ mill run --input src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write.relf --spec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl
+[INFO]   [!] Loading Program
+[INFO]   [!] Removing external function calls
+[INFO]   [!] Stripping unreachable
+[INFO]   [!] Removed 11 functions (1 remaining)
+[INFO]   [!] Translating to Boogie
+[INFO]   [!] Writing file...
 $ tail boogie_out.bpl 
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R9, 52bv64), R8[32:0]), gamma_store32(Gamma_mem, bvadd64(R9, 52bv64), Gamma_R8);
     assert ((bvadd64(R9, 52bv64) == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assert bvsge32(memory_load32_le(mem, $z_addr), z_old);
-    main_argv_out, Gamma_main_argv_out := R1, Gamma_R1;
-    main_result, Gamma_main_result := R0[32:0], Gamma_R0;
-    FP_out, Gamma_FP_out := R29, Gamma_R29;
-    LR_out, Gamma_LR_out := R30, Gamma_R30;
-    SP_out, Gamma_SP_out := R31, Gamma_R31;
+    assume {:captureState "%0000033f"} true;
+    goto main_basil_return;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
+
 $ boogie boogie_out.bpl 
 
 Boogie program verifier finished with 4 verified, 0 errors
@@ -82,34 +82,39 @@ However, to prevent some issues in IntelliJ, it is necessary to unmark `target/s
 
 ---
 
-The tool takes as inputs a BAP ADT file (here denoted with `.adt`) and a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.
+The tool takes as inputs either a BAP ADT file (here denoted with `.adt`) or a `.gts` file produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics), as well as a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.
 
 To build and run the tool using sbt, use the following command:
 
-`sbt "run --adt file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
+`sbt "run --input file.{adt, gts} --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
 
 or mill:
 
-`sbt run --adt file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]`.
+`mill run --input file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]`.
 
 #### Usage
 
 The `--analyse` flag is optional and enables the static analysis functionality which resolves indirect calls where possible. 
 
+Other flags are listed below:
+
 ```
-Expected Signature: BASIL
-  -a --adt <str>                BAP ADT file name.
-  --analyse                     Run static analysis pass.
-  --analysis-results <str>      Log analysis results in files at specified path.
-  --analysis-results-dot <str>  Log analysis results in .dot form at specified path.
-  --boogie-use-lambda-stores    Use lambda representation of store operations.
-  --dump-il <str>               Dump the Intermediate Language to text.
-  -h --help                     Show this help message.
-  --interpret                   Run BASIL IL interpreter.
-  -o --output <str>             Boogie output destination file.
-  -r --relf <str>               Name of the file containing the output of 'readelf -s -r -W'.
-  -s --spec <str>               BASIL specification file.
-  -v --verbose                  Show extra debugging logs.
+BASIL
+  --analyse                       Run static analysis pass.
+  --analysis-results <str>        Log analysis results in files at specified path.
+  --analysis-results-dot <str>    Log analysis results in .dot form at specified path.
+  --boogie-use-lambda-stores      Use lambda representation of store operations.
+  --dump-il <str>                 Dump the Intermediate Language to text.
+  -h --help                       Show this help message.
+  -i --input <str>                BAP .adt file or GTIRB/ASLi .gts file
+  --interpret                     Run BASIL IL interpreter.
+  -m --main-procedure-name <str>  Name of the main procedure to begin analysis at.
+  -o --output <str>               Boogie output destination file.
+  --procedure-call-depth <int>    Cull procedures beyond this call depth from the main function
+                                  (defaults to Int.MaxValue)
+  -r --relf <str>                 Name of the file containing the output of 'readelf -s -r -W'.
+  -s --spec <str>                 BASIL specification file.
+  -v --verbose                    Show extra debugging logs.
 ```
 
 The sbt shell can also be used for multiple tasks with less overhead by executing `sbt` and then the relevant sbt commands.
@@ -156,7 +161,7 @@ This is used to keep track of which tests have passed previously, as well as cha
 
 ## Generating inputs (Lifting)
 
-Many lifted examples are already profied in the tests directory: [src/test/correct](src/test/correct), these instructions
+Many lifted examples are already profiled in the tests directory: [src/test/correct](src/test/correct), these instructions
 are for if you want to lift new compiled binaries.
 
 The tool takes a `.adt` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.

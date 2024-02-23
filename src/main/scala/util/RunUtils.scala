@@ -1,5 +1,11 @@
 package util
 
+import java.io.{File, PrintWriter, FileInputStream, BufferedWriter, FileWriter, IOException}
+import com.grammatech.gtirb.proto.IR.IR
+import com.grammatech.gtirb.proto.Module.Module
+import com.grammatech.gtirb.proto.Section.Section
+import spray.json._
+import gtirb.*
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Set as MutableSet
@@ -14,10 +20,14 @@ import ir.*
 import boogie.*
 import specification.*
 import Parsers.*
+import Parsers.SemanticsParser.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
+import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
+import java.util.Base64
+import spray.json.DefaultJsonProtocol.*
 import intrusivelist.IntrusiveList
 import analysis.CfgCommandNode
 
@@ -65,11 +75,17 @@ object IRLoading {
   /** Load a program from files using the provided configuration.
     */
   def load(q: ILLoadingConfig): IRContext = {
-    val bapProgram = IRLoading.loadBAP(q.adtFile)
     val (externalFunctions, globals, globalOffsets, mainAddress) = IRLoading.loadReadELF(q.relfFile, q)
 
-    val IRTranslator = BAPToIR(bapProgram, mainAddress)
-    val program = IRTranslator.translate
+    var program: Program = if (q.inputFile.endsWith(".adt")) {
+      val bapProgram = loadBAP(q.inputFile)
+      val IRTranslator = BAPToIR(bapProgram, mainAddress)
+      IRTranslator.translate
+    } else if (q.inputFile.endsWith(".gts")) {
+      loadGTIRB(q.inputFile, mainAddress)
+    } else {
+      throw Exception(s"input file name ${q.inputFile} must be an .adt or .gst file")
+    }
 
     val specification = IRLoading.loadSpecification(q.specFile, program, globals)
 
@@ -84,6 +100,35 @@ object IRLoading {
     parser.setBuildParseTree(true)
 
     BAPLoader.visitProject(parser.project())
+  }
+
+  def loadGTIRB(fileName: String, mainAddress: Int): Program = {
+    val fIn = FileInputStream(fileName)
+    val ir = IR.parseFrom(fIn)
+    val mods = ir.modules
+    val cfg = ir.cfg.get
+
+    val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]])
+
+    def parse_insn(f: String): StmtContext = {
+      try {
+        val semanticsLexer = SemanticsLexer(CharStreams.fromString(f))
+        val tokens = CommonTokenStream(semanticsLexer)
+        val parser = SemanticsParser(tokens)
+        parser.setErrorHandler(BailErrorStrategy())
+        parser.setBuildParseTree(true)
+        parser.stmt()
+      } catch {
+        case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
+          Logger.error(f)
+          throw RuntimeException(e)
+      }
+    }
+
+    val parserMap = semantics.map(_.map((k: String, v: Array[Array[String]]) => (k, v.map(_.map(parse_insn)))))
+
+    val GTIRBConverter = GTIRBToIR(mods, parserMap.flatten.toMap, cfg, mainAddress)
+    GTIRBConverter.createIR()
   }
 
   def loadReadELF(
