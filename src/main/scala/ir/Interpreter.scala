@@ -85,10 +85,6 @@ class Interpreter() {
           case BVNOT   => smt_bvnot(arg)
         }
 
-      case m: Memory =>
-        Logger.debug(s"\t$m")
-        ???
-
       case ml: MemoryLoad =>
         Logger.debug(s"\t$ml")
         val index: Int = eval(ml.index, env).value.toInt

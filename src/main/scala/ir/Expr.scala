@@ -323,30 +323,6 @@ case class MemoryLoad(mem: Memory, index: Expr, endian: Endian, size: Int) exten
 // Not the same as global in the sense of shared memory between threads
 sealed trait Global
 
-// A memory section
-sealed trait Memory extends Expr with Global {
-  val name: String
-  val addressSize: Int
-  val valueSize: Int
-  override def toBoogie: BMapVar = BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
-  override def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapBType(BitVecBType(addressSize), BoolBType), Scope.Global)
-  override val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
-  override def toString: String = s"Memory($name, $addressSize, $valueSize)"
-
-  override def acceptVisit(visitor: Visitor): Memory =
-    throw new Exception("visitor " + visitor + " unimplemented for: " + this)
-}
-
-// A stack section of memory, which is local to a thread
-case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
-  override def acceptVisit(visitor: Visitor): Memory = visitor.visitStackMemory(this)
-}
-
-// A non-stack region of memory, which is shared between threads
-case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
-  override def acceptVisit(visitor: Visitor): Memory = visitor.visitSharedMemory(this)
-}
-
 // A variable that is accessible without a memory load/store
 sealed trait Variable extends Expr {
   val name: String
@@ -380,4 +356,28 @@ case class LocalVar(override val name: String, override val irType: IRType) exte
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
   override def toString: String = s"LocalVar($name, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
+}
+
+// A memory section
+sealed trait Memory extends Global {
+  val name: String
+  val addressSize: Int
+  val valueSize: Int
+  def toBoogie: BMapVar = BMapVar(name, MapBType(BitVecBType(addressSize), BitVecBType(valueSize)), Scope.Global)
+  def toGamma: BMapVar = BMapVar(s"Gamma_$name", MapBType(BitVecBType(addressSize), BoolBType), Scope.Global)
+  val getType: IRType = MapType(BitVecType(addressSize), BitVecType(valueSize))
+  override def toString: String = s"Memory($name, $addressSize, $valueSize)"
+
+  def acceptVisit(visitor: Visitor): Memory =
+    throw new Exception("visitor " + visitor + " unimplemented for: " + this)
+}
+
+// A stack section of memory, which is local to a thread
+case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
+  override def acceptVisit(visitor: Visitor): Memory = visitor.visitStackMemory(this)
+}
+
+// A non-stack region of memory, which is shared between threads
+case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
+  override def acceptVisit(visitor: Visitor): Memory = visitor.visitSharedMemory(this)
 }

@@ -7,19 +7,6 @@ import ir._
 trait BAPExpr {
   def toIR: Expr
 
-  /* def toGamma: Expr = {
-    val gammaVars: Set[Expr] = gammas.map(_.toGamma)
-    if (gammaVars.isEmpty) {
-      TrueLiteral
-    } else if (gammaVars.size == 1) {
-      gammaVars.head
-    } else {
-      gammaVars.tail.foldLeft(gammaVars.head) { (join: Expr, next: Expr) =>
-        BinaryExpr(BoolAND, next, join)
-      }
-    }
-  }
-   */
   /*
    * The size of output of the given expression.
    *
@@ -250,12 +237,15 @@ case class BAPLocalVar(override val name: String, override val size: Int) extend
   */
 case class BAPMemAccess(memory: BAPMemory, index: BAPExpr, endian: Endian, override val size: Int) extends BAPVariable {
   override def toString: String = s"${memory.name}[$index]"
-  override def toIR: MemoryLoad = MemoryLoad(memory.toIR, index.toIR, endian, size)
+  override def toIR: MemoryLoad = {
+    MemoryLoad(memory.toIRMemory, index.toIR, endian, size)
+  }
 }
 
 case class BAPMemory(name: String, addressSize: Int, valueSize: Int) extends BAPVariable {
   override val size: Int = valueSize // should reconsider
-  override def toIR: Memory = SharedMemory(name, addressSize, valueSize)
+  override def toIR: Expr = ??? // should not encounter
+  def toIRMemory: Memory = SharedMemory(name, addressSize, valueSize)
 }
 
 case class BAPStore(memory: BAPMemory, index: BAPExpr, value: BAPExpr, endian: Endian, size: Int) extends BAPExpr {
