@@ -431,7 +431,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     }
   }
 
-  private  def visitExprField(ctx: ExprFieldContext): LocalVar = {
+  private  def visitExprField(ctx: ExprFieldContext): Register = {
     val name = ctx.expr match {
       case e: ExprVarContext => e.ID.getText
       case _ => throw Exception(s"expected ${ctx.getText} to have an Expr_Var as first parameter")
@@ -485,7 +485,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     }
   }
 
-  private def visitLExprField(ctx: LExprFieldContext): LocalVar = {
+  private def visitLExprField(ctx: LExprFieldContext): Register = {
     val name = ctx.lexpr match {
       case l: LExprVarContext => l.ID.getText
       case _ => throw Exception(s"expected ${ctx.getText} to have an LExpr_Var as first parameter")
@@ -505,10 +505,10 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     resolveArrayExpr(name, index)
   }
 
-  private def resolveFieldExpr(name: String, field: String): LocalVar = {
+  private def resolveFieldExpr(name: String, field: String): Register = {
     name match {
       case "PSTATE" if field == "V" || field == "C" || field == "Z" || field == "N" =>
-          LocalVar(field + "F", BitVecType(1))
+          Register(field + "F", 1)
       case _ => throw Exception(s"unidentified Expr_Field ($name, $field)")
     }
   }
