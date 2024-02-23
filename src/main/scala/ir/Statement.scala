@@ -25,6 +25,7 @@ sealed trait Statement extends Command, HasParent[Block], IntrusiveListElement[S
   )
 }
 
+// invariant: rhs contains at most one MemoryLoad
 class Assign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends Statement {
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
@@ -37,6 +38,7 @@ class Assign(var lhs: Variable, var rhs: Expr, override val label: Option[String
 object Assign:
   def unapply(l: Assign): Option[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
 
+// invariant: index and value do not contain MemoryLoads
 class MemoryAssign(var mem: Memory, var index: Expr, var value: Expr, var endian: Endian, var size: Int, override val label: Option[String] = None) extends Statement {
   override def modifies: Set[Global] = Set(mem)
   override def toString: String = s"$labelStr$mem[$index] := MemoryStore($value, $endian, $size)"
@@ -112,7 +114,6 @@ class GoTo private (private var _targets: mutable.Set[Block], override val label
       t.removeIncomingJump(this)
     }
   }
-
 
   override def toString: String = s"${labelStr}NonDetGoTo(${targets.map(_.label).mkString(", ")})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitGoTo(this)
