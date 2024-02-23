@@ -94,7 +94,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     function match {
       case "Mem.set.0" =>
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
-        val mem = Memory("mem", 64, 8) // yanked from BAP
+        val mem = SharedMemory("mem", 64, 8) // yanked from BAP
         val size = parseInt(typeArgs.head) * 8
         val index = visitExpr(args.head)
         val value = visitExpr(args(3))
@@ -110,8 +110,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
         // LittleEndian is an assumption
         if (index.isDefined && value.isDefined) {
-          val memstore = MemoryStore(mem, index.get, value.get, Endian.LittleEndian, size)
-          Some(MemoryAssign(mem, memstore, label))
+          Some(MemoryAssign(mem, index.get, value.get, Endian.LittleEndian, size, label))
         } else {
           None
         }
@@ -154,36 +153,36 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     ctx.lvars.ID().asScala.foreach(lvar => varMap += (lvar.getText -> ty))
   }
 
-  private def visitVarDecl(ctx: VarDeclContext, label: Option[String] = None): Option[LocalAssign] = {
+  private def visitVarDecl(ctx: VarDeclContext, label: Option[String] = None): Option[Assign] = {
     val ty = visitType(ctx.`type`())
     val name = ctx.lvar.getText
     varMap += (name -> ty)
 
     val expr = visitExpr(ctx.expr())
     if (expr.isDefined) {
-      Some(LocalAssign(LocalVar(name, ty), expr.get, label))
+      Some(Assign(LocalVar(name, ty), expr.get, label))
     } else {
       None
     }
   }
 
-  private def visitAssign(ctx: AssignContext, label: Option[String] = None): Option[LocalAssign] = {
+  private def visitAssign(ctx: AssignContext, label: Option[String] = None): Option[Assign] = {
     val lhs = visitLexpr(ctx.lexpr)
     val rhs = visitExpr(ctx.expr)
     if (lhs.isDefined && rhs.isDefined) {
-      Some(LocalAssign(lhs.get, rhs.get, label))
+      Some(Assign(lhs.get, rhs.get, label))
     } else {
       None
     }
   }
 
-  private def visitConstDecl(ctx: ConstDeclContext, label: Option[String] = None): Option[LocalAssign] = {
+  private def visitConstDecl(ctx: ConstDeclContext, label: Option[String] = None): Option[Assign] = {
     val ty = visitType(ctx.`type`())
     val name = ctx.lvar.getText
     constMap += (name -> ty)
     val expr = visitExpr(ctx.expr)
     if (expr.isDefined) {
-      Some(LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label))
+      Some(Assign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label))
     } else {
       None
     }
@@ -220,11 +219,11 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     name match {
       case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
-      case "SP_EL0" => Some(Register("R31", BitVecType(64)))
-      case "_PC" => Some(Register("_PC", BitVecType(64)))
+      case "SP_EL0" => Some(Register("R31", 64))
+      case "_PC" => Some(Register("_PC", 64))
       case "TRUE" => Some(TrueLiteral)
       case "FALSE" => Some(FalseLiteral)
-      case "FPCR" => Some(LocalVar("FPCR", BitVecType(32)))
+      case "FPCR" => Some(Register("FPCR", 32))
       // ignore the following
       case "__BranchTaken" => None
       case "BTypeNext" => None
@@ -249,7 +248,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     function match {
       case "Mem.read.0" =>
         checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
-        val mem = Memory("mem", 64, 8)
+        val mem = SharedMemory("mem", 64, 8)
         val index = visitExpr(args.head)
         val size = parseInt(typeArgs.head) * 8
 
@@ -474,8 +473,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     name match {
       case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
-      case "SP_EL0" => Some(Register("R31", BitVecType(64)))
-      case "_PC" => Some(Register("_PC", BitVecType(64)))
+      case "SP_EL0" => Some(Register("R31", 64))
+      case "_PC" => Some(Register("_PC", 64))
       // ignore the following
       case "TRUE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
       case "FALSE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
@@ -516,8 +515,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
   private def resolveArrayExpr(name: String, index: Int): Register = {
     name match {
-      case "_R" => Register(s"R$index", BitVecType(64))
-      case "_Z" => Register(s"V$index", BitVecType(128))
+      case "_R" => Register(s"R$index", 64)
+      case "_Z" => Register(s"V$index", 128)
       case _ => throw Exception(s"unidentified Expr_Array ($name, $index)")
     }
   }

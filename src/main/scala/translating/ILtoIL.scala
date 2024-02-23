@@ -32,7 +32,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   override def visitStatement(node: Statement): Statement = node.acceptVisit(this)
 
-  override def visitLocalAssign(node: LocalAssign): Statement = {
+  override def visitAssign(node: Assign): Statement = {
     program ++= "LocalAssign("
     visitVariable(node.lhs)
     program ++= " := "
@@ -43,7 +43,12 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   override def visitMemoryAssign(node: MemoryAssign): Statement = {
     program ++= "MemoryAssign("
-    visitMemoryStore(node.rhs)
+    visitMemory(node.mem)
+    program ++= "["
+    visitExpr(node.index)
+    program ++= "]"
+    program ++= " := "
+    visitExpr(node.value)
     program ++= ")"
     node
   }
@@ -202,17 +207,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node
   }
 
-  override def visitMemoryStore(node: MemoryStore): MemoryStore = {
-    program ++= "MemoryStore("
-    visitMemory(node.mem)
-    program ++= "["
-    visitExpr(node.index)
-    program ++= "] := "
-    visitExpr(node.value)
-    program ++= ")"
-    node
-  }
-
   override def visitMemoryLoad(node: MemoryLoad): Expr = {
     program ++= "MemoryLoad("
     visitMemory(node.mem)
@@ -244,7 +238,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
   }
 
   override def visitLiteral(node: Literal): Literal = {
-    program ++= node.toString()
+    program ++= node.toString
     node
   }
 

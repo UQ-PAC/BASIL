@@ -42,7 +42,7 @@ object RunUtils {
   val reserved: Set[String] = Set("free")
 
   // constants
-  private val exitRegister: Variable = Register("R30", BitVecType(64))
+  private val exitRegister: Variable = Register("R30", 64)
 
   def loadBAP(fileName: String): BAPProgram = {
     val ADTLexer = BAP_ADTLexer(CharStreams.fromFileName(fileName))

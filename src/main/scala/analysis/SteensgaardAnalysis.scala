@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
-import ir.{Block, DirectCall, Expr, LocalAssign, MemoryAssign, Procedure, Program, Variable, BitVecLiteral}
+import ir.{Block, DirectCall, Expr, Assign, MemoryAssign, Procedure, Program, Variable, BitVecLiteral}
 import util.Logger
 
 import java.io.{File, PrintWriter}
@@ -55,7 +55,7 @@ class SteensgaardAnalysis(program: Program, constantPropResult: Map[CfgNode, Map
       //      case AAssignStmt(id1: AIdentifier, AUnaryOp(DerefOp, id2: AIdentifier, _), _) => ??? //<--- Complete here
       //      case AAssignStmt(ADerefWrite(id1: AIdentifier, _), id2: AIdentifier, _) => ??? //<--- Complete here
 
-      case localAssign: LocalAssign =>
+      case localAssign: Assign =>
         localAssign.rhs match {
           case variable: Variable =>
             localAssign.lhs match

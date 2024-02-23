@@ -136,12 +136,12 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     var regNum = 0
 
     val in = if (name == "main") {
-      ArrayBuffer(Parameter("main_argc", 32, Register("R0", BitVecType(64))), Parameter("main_argv", 64, Register("R1", BitVecType(64))))
+      ArrayBuffer(Parameter("main_argc", 32, Register("R0", 64)), Parameter("main_argv", 64, Register("R1", 64)))
     } else {
       ArrayBuffer()
     }
 
-    val out = ArrayBuffer(Parameter(name + "_result", 32, Register("R0", BitVecType(64))))
+    val out = ArrayBuffer(Parameter(name + "_result", 32, Register("R0", 64)))
 
     (in, out)
   }
@@ -221,7 +221,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
   private def removePCAssign(block: Block): Unit = {
     block.statements.last match {
-      case LocalAssign(lhs: Register, _, _) if lhs.name == "_PC" => block.statements.remove(block.statements.last)
+      case Assign(lhs: Register, _, _) if lhs.name == "_PC" => block.statements.remove(block.statements.last)
       case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
     }
   }
@@ -313,7 +313,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
         // assignment to program counter not associated with an edge
         // caused by indirect call that DDisasm fails to identify
         // potentially requires splitting block
-        case l: LocalAssign if l.lhs == Register("_PC", BitVecType(64)) =>
+        case l: Assign if l.lhs == Register("_PC", 64) =>
           val newBlocks = handleUnidentifiedIndirectCall(l, currentBlock, block.label, newBlockCount)
           procedure.addBlocks(newBlocks)
           newBlockCount += newBlocks.size
@@ -349,7 +349,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
   // If the PC assignment is at the end of the block, an indirect call is added to the block
   // The PC assignment is removed in all cases
   // No other cases of unhandled program counter assignments have been identified yet
-  private def handleUnidentifiedIndirectCall(l: LocalAssign, currentBlock: Block, parentLabel: String, newBlockCountIn: Int): ArrayBuffer[Block] = {
+  private def handleUnidentifiedIndirectCall(l: Assign, currentBlock: Block, parentLabel: String, newBlockCountIn: Int): ArrayBuffer[Block] = {
     val newBlocks = ArrayBuffer[Block]()
     var newBlockCount = newBlockCountIn
 
@@ -386,7 +386,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     }
     // check that R30 has been set by previous statement - if it did not then this is a case that requires further investigation
     currentBlock.statements.getPrev(l) match {
-      case LocalAssign(Register("R30", BitVecType(64)), _, _) =>
+      case Assign(Register("R30", 64), _, _) =>
       case _ => throw Exception("unhandled assignment to PC did not set R30 beforehand")
     }
 
@@ -454,7 +454,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           if (proxySymbols.isEmpty) {
             // indirect call with no further information
             val target = block.statements.last match {
-              case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
+              case Assign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
               case _ => throw Exception(s"no assignment to program counter found before indirect call in block ${block.label}")
             }
             block.statements.remove(block.statements.last) // remove _PC assignment
@@ -508,7 +508,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       case EdgeLabel(false, _, Type_Return, _) =>
         // return statement, value of 'direct' is just whether DDisasm has resolved the return target
         removePCAssign(block)
-        IndirectCall(Register("R30", BitVecType(64)), None)
+        IndirectCall(Register("R30", 64), None)
       case EdgeLabel(false, true, Type_Fallthrough, _) =>
         // end of block that doesn't end in a control flow instruction and falls through to next
         if (entranceUUIDtoProcedure.contains(edge.targetUuid)) {
@@ -546,7 +546,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     if (edgeLabels.forall { (e: EdgeLabel) => !e.conditional && e.direct && e.`type` == Type_Return }) {
       // multiple resolved returns, translate as single return
       removePCAssign(block)
-      IndirectCall(Register("R30", BitVecType(64)), None)
+      IndirectCall(Register("R30", 64), None)
 
     } else if (edgeLabels.forall { (e: EdgeLabel) => !e.conditional && !e.direct && e.`type` == Type_Branch }) {
       // resolved indirect call

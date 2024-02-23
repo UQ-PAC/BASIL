@@ -69,8 +69,14 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
   }
 
   private def translate(s: BAPStatement) = s match {
-    case b: BAPMemAssign   => MemoryAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
-    case b: BAPLocalAssign => LocalAssign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
+    case b: BAPMemAssign =>
+      val mem = b.lhs.toIR
+      if (mem != b.rhs.memory.toIR) {
+        throw Exception(s"$b has conflicting lhs ${b.lhs} and rhs ${b.rhs.memory}")
+      }
+      MemoryAssign(mem, b.rhs.index.toIR, b.rhs.value.toIR, b.rhs.endian, b.rhs.size, Some(b.line))
+    case b: BAPLocalAssign =>
+      Assign(b.lhs.toIR, b.rhs.toIR, Some(b.line))
   }
 
   /**

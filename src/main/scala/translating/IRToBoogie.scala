@@ -30,8 +30,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
-  private val stack = BMapVar("stack", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-  private val Gamma_stack = BMapVar("Gamma_stack", MapBType(BitVecBType(64), BoolBType), Scope.Global)
 
   private val mem_in = BMapVar("mem$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
   private val Gamma_mem_in = BMapVar("Gamma_mem$in", MapBType(BitVecBType(64), BoolBType), Scope.Parameter)
@@ -48,8 +46,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   private val modifiedCheck: Set[BVar] = (for (i <- 19 to 29) yield {
     Set(BVariable("R" + i, BitVecBType(64), Scope.Global), BVariable("Gamma_R" + i, BoolBType, Scope.Global))
   }).flatten.toSet ++ Set(
-    BVariable("R" + 31, BitVecBType(64), Scope.Global),
-    BVariable("Gamma_R" + 31, BoolBType, Scope.Global)
+    BVariable("R31", BitVecBType(64), Scope.Global),
+    BVariable("Gamma_R31", BoolBType, Scope.Global)
   )
 
   def translate(boogieGeneratorConfig: BoogieGeneratorConfig): BProgram = {
@@ -65,18 +63,10 @@ class IRToBoogie(var program: Program, var spec: Specification) {
       globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar, List(externAttr)), g.toAxiom)).toList.sorted
 
     val guaranteeReflexive = BProcedure(
-      "guarantee_reflexive",
-      List(),
-      List(),
-      List(),
-      List(),
-      List(),
-      List(),
-      List(),
-      List(),
-      Set(mem, Gamma_mem),
-      guaranteesReflexive.map(g => BAssert(g)),
-      List(externAttr)
+      name = "guarantee_reflexive",
+      modifies = Set(mem, Gamma_mem),
+      body = guaranteesReflexive.map(g => BAssert(g)),
+      attributes = List(externAttr)
     )
 
     val rgProcs = genRely(relies, readOnlyMemory) :+ guaranteeReflexive
@@ -116,13 +106,10 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     } else {
       reliesUsed
     }
-    val relyProc = BProcedure("rely", List(), List(), relyEnsures, List(), List(), List(), readOnlyMemory, List(),
-      Set(mem, Gamma_mem), List(), List(externAttr))
-    val relyTransitive = BProcedure("rely_transitive", List(), List(), reliesUsed, List(), List(), List(), List(), List(),
-      Set(mem, Gamma_mem), List(BProcedureCall("rely", List(), List()), BProcedureCall("rely", List(), List())),
-      List(externAttr))
-    val relyReflexive = BProcedure("rely_reflexive", List(), List(), List(), List(), List(), List(), List(), List(),
-      Set(), reliesReflexive.map(r => BAssert(r)), List(externAttr))
+    val relyProc = BProcedure("rely", ensures = relyEnsures, freeEnsures = readOnlyMemory, modifies = Set(mem, Gamma_mem), attributes = List(externAttr))
+    val relyTransitive = BProcedure("rely_transitive", ensures = reliesUsed, modifies = Set(mem, Gamma_mem), body = List(BProcedureCall("rely"), BProcedureCall("rely")),
+      attributes = List(externAttr))
+    val relyReflexive = BProcedure("rely_reflexive", body = reliesReflexive.map(r => BAssert(r)), attributes = List(externAttr))
     List(relyProc, relyTransitive, relyReflexive)
   }
 
@@ -140,8 +127,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     } else {
       reliesUsed
     }
-    BProcedure("rely$inv", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), relyEnsures, List(), List(),
-      List(), List(), List(), Set(), List(), List(externAttr))
+    BProcedure("rely$inv", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), relyEnsures, attributes = List(externAttr))
   }
 
   def genInv(name: String): List[BProcedure] = {
@@ -176,13 +162,12 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val invEnsures = List(BinaryBExpr(BoolOR, relyOneLine, guaranteeOneLine))
 
     val invProc = BProcedure(name + "$inv", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), invEnsures,
-      List(), List(), List(), List(), List(), Set(), List(), List(externAttr))
+      attributes = List(externAttr))
 
     val invTransitive = BProcedure(name + "$inv_transitive", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out),
-      invEnsures, List(), List(), List(), List(), List(), Set(),
-      List(BProcedureCall(name + "$inv", List(mem_out, Gamma_mem_out), List(mem_in, Gamma_mem_in)),
+      invEnsures, body = List(BProcedureCall(name + "$inv", List(mem_out, Gamma_mem_out), List(mem_in, Gamma_mem_in)),
         BProcedureCall(name + "$inv", List(mem_out, Gamma_mem_out), List(mem_out, Gamma_mem_out))
-      ), List(externAttr))
+      ), attributes = List(externAttr))
 
     List(invProc, invTransitive)
   }
@@ -198,8 +183,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     val guaranteeAssume = BAssume(guaranteeOneLine)
 
     // G_c is ensures clause
-    BProcedure(name + "$guarantee", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), guaranteesParam, List(),
-      List(), List(), List(), List(), Set(), List(guaranteeAssume), List(externAttr))
+    BProcedure(name + "$guarantee", List(mem_in, Gamma_mem_in), List(mem_out, Gamma_mem_out), guaranteesParam,
+      body = List(guaranteeAssume), attributes = List(externAttr))
   }
 
   /**
@@ -535,7 +520,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
   def translate(j: Jump): List[BCmd] = j match {
     case d: DirectCall =>
-      val call = BProcedureCall(d.target.name, List(), List())
+      val call = BProcedureCall(d.target.name)
       val returnTarget = d.returnTarget match {
         case Some(r) => GoToCmd(Seq(r.label))
         case None => BAssume(FalseBLiteral, Some("no return target"))
@@ -562,7 +547,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     case g: GoTo =>
       // collects all targets of the goto with a branch condition that we need to check the security level for
       // and collects the variables for that
-      val conditions = g.targets.flatMap(_.statements.headOption).collect { case a: Assume if a.checkSecurity => a }
+      val conditions = g.targets.flatMap(_.statements.headOption()).collect { case a: Assume if a.checkSecurity => a }
       val conditionVariables = conditions.flatMap(_.body.variables)
       val gammas = conditionVariables.map(_.toGamma).toList.sorted
       val conditionAssert: List[BCmd] = if (gammas.size > 1) {
@@ -580,54 +565,60 @@ class IRToBoogie(var program: Program, var spec: Specification) {
   def translate(s: Statement): List[BCmd] = s match {
     case m: NOP => List.empty
     case m: MemoryAssign =>
-      val lhs = m.lhs.toBoogie
-      val rhs = m.rhs.toBoogie
-      val lhsGamma = m.lhs.toGamma
-      val rhsGamma = m.rhs.toGamma
+      val lhs = m.mem.toBoogie
+      val rhs = BMemoryStore(m.mem.toBoogie, m.index.toBoogie, m.value.toBoogie, m.endian, m.size)
+      val lhsGamma = m.mem.toGamma
+      val rhsGamma = GammaStore(m.mem.toGamma, m.index.toBoogie, m.value.toGamma, m.size, m.size / m.mem.valueSize)
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val stateSplit = s match {
-        case MemoryAssign(_,_, Some(label)) => List(captureStateStatement(s"$label"))
-        case LocalAssign(_,_, Some(label)) => List(captureStateStatement(s"$label"))
+        case MemoryAssign(_, _, _, _, _, Some(label)) => List(captureStateStatement(s"$label"))
+        case Assign(_, _, Some(label)) => List(captureStateStatement(s"$label"))
         case _ => List.empty
       }
-      if (lhs == stack) {
-        List(store) ++ stateSplit
-      } else {
-        val rely = BProcedureCall("rely", List(), List())
-        val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.rhs.value.toGamma))
-        val oldAssigns =
-          guaranteeOldVars.map(g => AssignCmd(g.toOldVar, BMemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size)))
-        val oldGammaAssigns = controlled.map(g =>
-          AssignCmd(
-            g.toOldGamma,
-            BinaryBExpr(BoolOR, GammaLoad(lhsGamma, g.toAddrVar, g.size, g.size / m.lhs.valueSize), L(lhs, g.toAddrVar))
+      m.mem match {
+        case s: StackMemory =>
+          List(store) ++ stateSplit
+        case s: SharedMemory =>
+          val rely = BProcedureCall("rely")
+          val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.value.toGamma))
+          val oldAssigns =
+            guaranteeOldVars.map(g => AssignCmd(g.toOldVar, BMemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size)))
+          val oldGammaAssigns = controlled.map(g =>
+            AssignCmd(
+              g.toOldGamma,
+              BinaryBExpr(BoolOR, GammaLoad(lhsGamma, g.toAddrVar, g.size, g.size / m.mem.valueSize), L(lhs, g.toAddrVar))
+            )
           )
-        )
-        val secureUpdate = for (c <- controls.keys) yield {
-          val addrCheck = BinaryBExpr(BVEQ, rhs.index, c.toAddrVar)
-          val checks = controls(c).map(v => BinaryBExpr(BoolIMPLIES, L(lhs, v.toAddrVar), v.toOldGamma)).toList
-          val checksAnd = if (checks.size > 1) {
-            checks.tail.foldLeft(checks.head)((next: BExpr, ands: BExpr) => BinaryBExpr(BoolAND, next, ands))
-          } else {
-            checks.head
+          val secureUpdate = for (c <- controls.keys) yield {
+            val addrCheck = BinaryBExpr(BVEQ, rhs.index, c.toAddrVar)
+            val checks = controls(c).map(v => BinaryBExpr(BoolIMPLIES, L(lhs, v.toAddrVar), v.toOldGamma)).toList
+            val checksAnd = if (checks.size > 1) {
+              checks.tail.foldLeft(checks.head)((next: BExpr, ands: BExpr) => BinaryBExpr(BoolAND, next, ands))
+            } else {
+              checks.head
+            }
+            BAssert(BinaryBExpr(BoolIMPLIES, addrCheck, checksAnd))
           }
-          BAssert(BinaryBExpr(BoolIMPLIES, addrCheck, checksAnd))
-        }
-        val guaranteeChecks = guarantees.map(v => BAssert(v))
-        (List(rely, gammaValueCheck) ++ oldAssigns ++ oldGammaAssigns :+ store) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
+          val guaranteeChecks = guarantees.map(v => BAssert(v))
+          (List(rely, gammaValueCheck) ++ oldAssigns ++ oldGammaAssigns :+ store) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
       }
-    case l: LocalAssign =>
+    case l: Assign =>
       val lhs = l.lhs.toBoogie
       val rhs = l.rhs.toBoogie
       val lhsGamma = l.lhs.toGamma
       val rhsGamma = l.rhs.toGamma
       val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
-      val loads = rhs.loads.collect { case m: BMemoryLoad => m }
-      if (loads.isEmpty || loads.forall(_.memory == stack)) {
-        List(assign)
-      } else {
-        val memories = loads.map(m => m.memory).toSeq.sorted
-        List(BProcedureCall("rely", Seq(), Seq()), assign)
+      val loads = l.rhs.loads
+      if (loads.size > 1) {
+        throw Exception(s"$l contains multiple loads")
+      }
+      // add rely call if assignment contains a non-stack load
+      loads.headOption match {
+        case Some(MemoryLoad(SharedMemory(_, _, _), _, _, _)) =>
+          List(BProcedureCall("rely"), assign)
+        case _ =>
+          // load is a stack load or doesn't exist
+          List(assign)
       }
     case a: Assert =>
       val body = a.body.toBoogie

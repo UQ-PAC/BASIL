@@ -80,7 +80,7 @@ trait ConstantPropagation(val cfg: ProgramCfg) {
       case r: CfgCommandNode =>
         r.data match
           // assignments
-          case la: LocalAssign =>
+          case la: Assign =>
             s + (la.lhs -> eval(la.rhs, s))
           // all others: like no-ops
           case _ => s
@@ -174,13 +174,13 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
 
   val first: Set[CfgNode] = cfg.funEntries.toSet
 
-  private val stackPointer = Register("R31", BitVecType(64))
-  private val linkRegister = Register("R30", BitVecType(64))
-  private val framePointer = Register("R29", BitVecType(64))
+  private val stackPointer = Register("R31", 64)
+  private val linkRegister = Register("R30", 64)
+  private val framePointer = Register("R29", 64)
 
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
 
-  private val mallocVariable = Register("R0", BitVecType(64))
+  private val mallocVariable = Register("R0", 64)
 
   def eval(exp: Expr, env: Set[MemoryRegion], n: CfgCommandNode): Set[MemoryRegion] = {
     Logger.debug(s"evaluating $exp")
@@ -256,12 +256,12 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
             s
           }
         case memAssign: MemoryAssign =>
-          if (ignoreRegions.contains(memAssign.rhs.value)) {
+          if (ignoreRegions.contains(memAssign.value)) {
             return s
           }
-          val result = eval(memAssign.rhs.index, s, cmd)
+          val result = eval(memAssign.index, s, cmd)
           regionLattice.lub(s, result)
-        case localAssign: LocalAssign =>
+        case localAssign: Assign =>
           var m = s
           unwrapExpr(localAssign.rhs).foreach {
             case memoryLoad: MemoryLoad =>

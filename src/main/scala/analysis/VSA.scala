@@ -49,13 +49,13 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   val first: Set[CfgNode] = Set(cfg.startNode)
 
-  private val stackPointer = Register("R31", BitVecType(64))
-  private val linkRegister = Register("R30", BitVecType(64))
-  private val framePointer = Register("R29", BitVecType(64))
+  private val stackPointer = Register("R31", 64)
+  private val linkRegister = Register("R30", 64)
+  private val framePointer = Register("R29", 64)
 
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
 
-  private val mallocVariable = Register("R0", BitVecType(64))
+  private val mallocVariable = Register("R0", 64)
 
   def resolveGlobalOffset(address: BigInt): String = {
     val tableAddress = globalOffsets(address)
@@ -106,7 +106,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
     Logger.debug(s"node: $n")
     var m = s
     cmd match
-      case localAssign: LocalAssign =>
+      case localAssign: Assign =>
         localAssign.rhs match
           case memoryLoad: MemoryLoad =>
             exprToRegion(memoryLoad.index, n) match
@@ -133,12 +133,12 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
                 m
             }
       case memAssign: MemoryAssign =>
-        memAssign.rhs.index match
+        memAssign.index match
           case binOp: BinaryExpr =>
             val region: Option[MemoryRegion] = exprToRegion(binOp, n)
             region match
               case Some(r: MemoryRegion) =>
-                val storeValue = memAssign.rhs.value
+                val storeValue = memAssign.value
                 evaluateExpression(storeValue, constantProp(n)) match
                   case Some(bitVecLiteral: BitVecLiteral) =>
                     m = m + (r -> Set(getValueType(bitVecLiteral)))

@@ -81,12 +81,14 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     if ((name.startsWith("R") || name.startsWith("V")) && (name.length == 2 || name.length == 3)
       && name.substring(1).forall(_.isDigit)) {
       if (name.startsWith("R")) {
-        Register(name, BitVecType(64))
+        Register(name, 64)
       } else {
-        Register(name, BitVecType(128))
+        Register(name, 128)
       }
+    } else if (name == "stack") {
+      StackMemory(name, 64, 8)
     } else {
-      Memory(name, 64, 8)
+      SharedMemory(name, 64, 8)
     }
   }
 

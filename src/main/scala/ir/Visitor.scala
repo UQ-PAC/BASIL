@@ -10,15 +10,16 @@ abstract class Visitor {
 
   def visitStatement(node: Statement): Statement = node.acceptVisit(this)
 
-  def visitLocalAssign(node: LocalAssign): Statement = {
+  def visitAssign(node: Assign): Statement = {
     node.lhs = visitVariable(node.lhs)
     node.rhs = visitExpr(node.rhs)
     node
   }
 
   def visitMemoryAssign(node: MemoryAssign): Statement = {
-    node.lhs = visitMemory(node.lhs)
-    node.rhs = visitMemoryStore(node.rhs)
+    node.mem = visitMemory(node.mem)
+    node.index = visitExpr(node.index)
+    node.value = visitExpr(node.value)
     node
   }
 
@@ -109,15 +110,15 @@ abstract class Visitor {
     node.copy(arg1 = visitExpr(node.arg1), arg2 = visitExpr(node.arg2))
   }
 
-  def visitMemoryStore(node: MemoryStore): MemoryStore = {
-    node.copy(mem = visitMemory(node.mem), index = visitExpr(node.index), value = visitExpr(node.value))
-  }
-
   def visitMemoryLoad(node: MemoryLoad): Expr = {
     node.copy(mem = visitMemory(node.mem), index = visitExpr(node.index))
   }
 
-  def visitMemory(node: Memory): Memory = node
+  def visitMemory(node: Memory): Memory = node.acceptVisit(this)
+
+  def visitStackMemory(node: StackMemory): Memory = node
+
+  def visitSharedMemory(node: SharedMemory): Memory = node
 
   def visitVariable(node: Variable): Variable = node.acceptVisit(this)
 
@@ -161,28 +162,22 @@ abstract class ReadOnlyVisitor extends Visitor {
     node
   }
 
-  override def visitMemoryStore(node: MemoryStore): MemoryStore = {
-    visitMemory(node.mem)
-    visitExpr(node.index)
-    visitExpr(node.value)
-    node
-  }
-
   override def visitMemoryLoad(node: MemoryLoad): Expr = {
     visitMemory(node.mem)
     visitExpr(node.index)
     node
   }
 
-  override def visitLocalAssign(node: LocalAssign): Statement = {
+  override def visitAssign(node: Assign): Statement = {
     visitVariable(node.lhs)
     visitExpr(node.rhs)
     node
   }
 
   override def visitMemoryAssign(node: MemoryAssign): Statement = {
-    visitMemory(node.lhs)
-    visitMemoryStore(node.rhs)
+    visitMemory(node.mem)
+    visitExpr(node.index)
+    visitExpr(node.value)
     node
   }
 
@@ -289,8 +284,8 @@ abstract class IntraproceduralControlFlowVisitor extends Visitor {
 
 // TODO: does this break for programs with loops? need to calculate a fixed-point?
 class StackSubstituter extends IntraproceduralControlFlowVisitor {
-  private val stackPointer = Register("R31", BitVecType(64))
-  private val stackMemory = Memory("stack", 64, 8)
+  private val stackPointer = Register("R31", 64)
+  private val stackMemory = StackMemory("stack", 64, 8)
   val stackRefs: mutable.Set[Variable] = mutable.Set(stackPointer)
 
   override def visitProcedure(node: Procedure): Procedure = {
@@ -310,7 +305,7 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
     }
   }
 
-  override def visitLocalAssign(node: LocalAssign): Statement = {
+  override def visitAssign(node: Assign): Statement = {
     node.lhs = visitVariable(node.lhs)
     node.rhs = visitExpr(node.rhs)
 
@@ -328,10 +323,9 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
   }
 
   override def visitMemoryAssign(node: MemoryAssign): Statement = {
-    val indexStackRefs = node.rhs.index.variables.intersect(stackRefs)
+    val indexStackRefs = node.index.variables.intersect(stackRefs)
     if (indexStackRefs.nonEmpty) {
-      node.lhs = stackMemory
-      node.rhs = node.rhs.copy(mem = stackMemory)
+      node.mem = stackMemory
     }
     node
   }
@@ -363,7 +357,15 @@ class Renamer(reserved: Set[String]) extends Visitor {
     }
   }
 
-  override def visitMemory(node: Memory): Memory = {
+  override def visitStackMemory(node: StackMemory): StackMemory = {
+    if (reserved.contains(node.name)) {
+      node.copy(name = s"#${node.name}")
+    } else {
+      node
+    }
+  }
+
+  override def visitSharedMemory(node: SharedMemory): SharedMemory = {
     if (reserved.contains(node.name)) {
       node.copy(name = s"#${node.name}")
     } else {
@@ -407,12 +409,9 @@ class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
     variables.add(node)
     node
   }
+
   override def visitLocalVar(node: LocalVar): LocalVar = {
     variables.add(node)
-    node
-  }
-
-  override def visitMemoryStore(node: MemoryStore): MemoryStore = {
     node
   }
 
@@ -430,7 +429,7 @@ class ConvertToSingleProcedureReturn extends Visitor {
       case Some(b) => b
       case None =>
         val name = node.parent.parent.name + "_return"
-        val returnBlock = new Block(name, None, List(), new IndirectCall(Register("R30", BitVecType(64)), None, None))
+        val returnBlock = Block(name, None, List(), IndirectCall(Register("R30", 64), None, None))
         node.parent.parent.addBlocks(returnBlock)
         node.parent.parent.returnBlock = Some(returnBlock)
     }
