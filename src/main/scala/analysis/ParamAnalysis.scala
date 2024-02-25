@@ -67,27 +67,3 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
   }
 }
 
-object ParamAnalysis extends AnalysisResult[Map[Procedure, Set[Variable]]] {
-  def encodeAnalysisResults(result: Map[Procedure, Set[Variable]]): String = {
-    result.foldLeft("") {
-      (s, tup) =>
-        s + s"${tup._1}->${
-          tup._2.foldLeft("") {
-            (ss, v) =>
-              ss + s"${v.name},"
-          }
-        }\n"
-    }
-  }
-
-  def parseAnalysisResults(input: String): String = {
-    input.split("\n").sorted.foldLeft(Map(): Map[String, Set[String]]) {
-      (m, line) =>
-        val proc: String = line.split("->", 2)(0)
-        val params: String = line.split("->", 2)(1)
-
-        m + (proc -> params.split(",").sorted.toSet)
-    }.toString
-  }
-}
-

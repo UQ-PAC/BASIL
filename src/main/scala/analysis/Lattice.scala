@@ -82,7 +82,7 @@ case object TwoElementBottom extends TwoElementLatticeEl
  */
 class TwoElementLattice extends Lattice[TwoElementLatticeEl]:
   override val bottom: TwoElementLatticeEl = TwoElementBottom
-  override def top: TwoElementLatticeEl = TwoElementTop
+  override val top: TwoElementLatticeEl = TwoElementTop
 
   def lub(x: TwoElementLatticeEl, y: TwoElementLatticeEl): TwoElementLatticeEl = (x, y) match {
     case (TwoElementBottom, TwoElementBottom) => TwoElementBottom

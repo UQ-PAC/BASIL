@@ -204,7 +204,7 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
           }
       }
 
-  def analyze(): Map[CFGPosition, Map[D, valuelattice.Element]] = {
+  def analyze(): Map[CFGPosition, Map[D, T]] = {
     val phase1 = new Phase1(program)
     phase1.analyze()
     val phase2 = new Phase2(program, phase1)

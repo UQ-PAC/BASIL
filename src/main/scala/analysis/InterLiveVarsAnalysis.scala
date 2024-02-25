@@ -16,7 +16,7 @@ import ir.{Assert, Assume, GoTo, CFGPosition, Command, DirectCall, IndirectCall,
 trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElementLatticeEl ,TwoElementLattice] {
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
-  val edgelattice: EdgeFunctionLattice[TwoElementLatticeEl, valuelattice.type] = new EdgeFunctionLattice[TwoElementLatticeEl, valuelattice.type](valuelattice)
+  val edgelattice: EdgeFunctionLattice[TwoElementLatticeEl, valuelattice.type ] = new EdgeFunctionLattice[TwoElementLatticeEl, valuelattice.type](valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
 
   def edgesCallToEntry(call: GoTo, entry: Command)(d: DL): Map[DL, edgelattice.Element] = {
@@ -84,32 +84,6 @@ class InterLiveVarsAnalysis(program: Program)
   extends BackwardIDESolver[Variable, TwoElementLatticeEl ,TwoElementLattice](program), LiveVarsAnalysisFunctions
 
 
-object InterLiveVarsAnalysis extends AnalysisResult[Map[CFGPosition, Map[Variable, TwoElementLatticeEl]]] {
-
-  def encodeAnalysisResults(result: Map[CFGPosition, Map[Variable, TwoElementLatticeEl]]): String = {
-    val pp = result.foldLeft("") {
-      (m, f) =>
-        val cfgPosition: CFGPosition = f._1
-        val mapping: Map[Variable, TwoElementLatticeEl] = f._2
-        val positionMaps = mapping.foldLeft("") {
-          (line, pair) =>
-            line + s"${pair._1}->${pair._2}<>"
-        }
-
-        m + s"${cfgPosition.toShortString}==>${positionMaps.dropRight(2)}\n"
-    }
-    pp.dropRight(1)
-  }
-
-  def parseAnalysisResults(input: String): String = {
-    input.split("\n").sorted.foldLeft(Map(): Map[String, Set[String]]) {
-      (m, line) =>
-        val cfgPosition: String = line.split("==>", 2)(0)
-        val rest: String = line.split("==>", 2)(1)
-        m + (cfgPosition -> rest.split("<>").sorted.toSet)
-    }.toString
-  }
-}
 
 
 
