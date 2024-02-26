@@ -322,7 +322,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     // checks function call blocks
     assert(analysisResults(blocks("lmain")) == Map(R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
     assert(analysisResults(blocks("lget_two")) == Map(R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("l00000538")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
+    assert(analysisResults(blocks("l00000946")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
     assert(analysisResults(blocks("main_basil_return")) == Map(R30 -> TwoElementTop))
   }
 
@@ -336,7 +336,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     // main has parameter, callee (zero) has return and no parameter
     assert(analysisResults(blocks("lmain")) == Map(R0 -> TwoElementTop, R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
     assert(analysisResults(blocks("lzero")) == Map(R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("l000003d5")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
+    assert(analysisResults(blocks("l00000323")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // aftercall block
     assert(analysisResults(blocks("zero_basil_return")) == Map(R0 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
   }
 
@@ -347,8 +347,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
 
     // main has no parameters, get_two has three and a return
     assert(analysisResults(blocks("lmain")) == Map(R29 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("l000004a1")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // get_two aftercall
-    assert(analysisResults(blocks("l000004e5")) == Map(R31 -> TwoElementTop)) // printf aftercall
+    assert(analysisResults(blocks("l000003ec")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // get_two aftercall
+    assert(analysisResults(blocks("l00000430")) == Map(R31 -> TwoElementTop)) // printf aftercall
     assert(analysisResults(blocks("main_basil_return")) == Map(R30 -> TwoElementTop))
     assert(analysisResults(blocks("lget_two")) == Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R2 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
     assert(analysisResults(blocks("get_two_basil_return")) == Map(R0 -> TwoElementTop,  R30 -> TwoElementTop, R31 -> TwoElementTop))
@@ -360,11 +360,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val blocks = result.ir.program.blocks
 
     // block after branch
-    assert(analysisResults(blocks("l000003f2")) == Map(R30 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("l00000342")) == Map(R30 -> TwoElementTop, R31 -> TwoElementTop))
     // branch blocks
-    assert(analysisResults(blocks("lmain_goto_l000003e0")) == Map(LocalVar("ZF", BitVecType(1)) -> TwoElementTop,
+    assert(analysisResults(blocks("lmain_goto_l00000330")) == Map(LocalVar("ZF", BitVecType(1)) -> TwoElementTop,
       R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("lmain_goto_l0000056e")) == Map(LocalVar("ZF", BitVecType(1)) -> TwoElementTop,
+    assert(analysisResults(blocks("lmain_goto_l00000369")) == Map(LocalVar("ZF", BitVecType(1)) -> TwoElementTop,
       R30 -> TwoElementTop, R31 -> TwoElementTop))
   }
 }
