@@ -38,7 +38,7 @@ class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[S
 object LocalAssign:
   def unapply(l: LocalAssign): Option[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
 
-class MemoryAssign(var lhs: Memory, var rhs: MemoryStore,  override val label: Option[String] = None) extends Statement {
+class MemoryAssign(var lhs: Memory, var rhs: MemoryStore, override val label: Option[String] = None) extends Statement {
   override def modifies: Set[Global] = Set(lhs)
   //override def locals: Set[Variable] = rhs.locals
   override def toString: String = s"$labelStr$lhs := $rhs"
@@ -86,10 +86,12 @@ class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override
 
   def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.LinkedHashSet.from(targets), label)
 
+  def this(target: Block) = this(mutable.Set(target), None)
+
   def targets: Set[Block] = _targets.toSet
 
   def addAllTargets(t: Iterable[Block]): Unit = {
-    t.foreach(addTarget(_))
+    t.foreach(addTarget)
   }
 
   def addTarget(t: Block): Unit = {

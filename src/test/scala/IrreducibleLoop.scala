@@ -26,7 +26,7 @@ class IrreducibleLoop extends AnyFunSuite {
   val testPath = "./src/test/analysis/"
 
   def load(conf: ILLoadingConfig) : Program = {
-    val bapProgram = IRLoading.loadBAP(conf.adtFile)
+    val bapProgram = IRLoading.loadBAP(conf.inputFile)
     val (externalFunctions, globals, globalOffsets, mainAddress) = IRLoading.loadReadELF(conf.relfFile, conf)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
@@ -42,7 +42,7 @@ class IrreducibleLoop extends AnyFunSuite {
     val timer = PerformanceTimer(s"test $variationPath")
     Logger.info(variationPath)
 
-    val args = mutable.ArrayBuffer("--adt", ADTPath, "--relf", RELFPath, "--output", outPath, "--analyse", "-v")
+    val args = mutable.ArrayBuffer("--input", ADTPath, "--relf", RELFPath, "--output", outPath, "--analyse", "-v")
 
     val program : Program = load(ILLoadingConfig(ADTPath, RELFPath))
 
@@ -96,7 +96,7 @@ class IrreducibleLoop extends AnyFunSuite {
   test("testverify fail irreducible_loop") { 
     val path = "src/test/analysis/irreducible_loop/irreducible"
     val outPath = s"$path.bpl"
-    val args = s"-o $outPath -a $path.adt -r $path.relf -s $path.spec".split(" ")
+    val args = s"-o $outPath -i $path.adt -r $path.relf -s $path.spec".split(" ")
 
     Main.main(args)
 
@@ -110,7 +110,7 @@ class IrreducibleLoop extends AnyFunSuite {
   test("testverify reduced irreducible_loop") { 
     val path = "src/test/analysis/irreducible_loop/irreducible"
     val outPath = s"$path.bpl"
-    val args = s"-o $outPath -a $path.adt -r $path.relf -s $path.spec --analyse".split(" ")
+    val args = s"-o $outPath -i $path.adt -r $path.relf -s $path.spec --analyse".split(" ")
 
     Main.main(args)
 

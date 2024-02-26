@@ -1,0 +1,25 @@
+//===- DataBlock.proto ----------------------------------------*- Proto -*-===//
+//
+//  Copyright (C) 2020 GrammaTech, Inc.
+//
+//  This code is licensed under the MIT license. See the LICENSE file in the
+//  project root for license terms.
+//
+//  This project is sponsored by the Office of Naval Research, One Liberty
+//  Center, 875 N. Randolph Street, Arlington, VA 22203 under contract #
+//  N68335-17-C-0700.  The content of the information does not necessarily
+//  reflect the position or policy of the Government and no official
+//  endorsement should be inferred.
+//
+//===----------------------------------------------------------------------===//
+syntax = "proto3";
+package gtirb.proto;
+option java_package = "com.grammatech.gtirb.proto";
+
+message DataBlock {
+  reserved "address";
+  reserved 2;
+
+  bytes uuid = 1;
+  uint64 size = 3;
+}

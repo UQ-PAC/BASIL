@@ -298,9 +298,8 @@ class Interpreter() {
         evalRight match {
           case BitVecLiteral(value, size) =>
             Logger.debug(s"MemoryAssign ${assign.lhs} := 0x${value.toString(16)}[u$size]\n")
-          case _ => throw new Exception("cannot register non-bitvectors")
         }
-      case _ : NOP => ()
+      case _ : NOP =>
       case assert: Assert =>
         Logger.debug(assert)
         // TODO

@@ -29,7 +29,7 @@ trait TestUtil {
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          adtFile = examplePath + s"/$name/$name.adt",
+          inputFile = examplePath + s"/$name/$name.adt",
           relfFile = examplePath + s"/$name/$name.relf",
           specFile = None,
           dumpIL = None,

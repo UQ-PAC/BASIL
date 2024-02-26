@@ -325,7 +325,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
         case None =>
           nameToGlobals.get(gamma_id) match {
             case Some(g: SpecGlobal) => SpecGamma(g)
-            case None                => throw new Exception(s"unresolvable reference to 'Gamma_$id' in specification")
+            case None                => throw new Exception(s"unresolvable reference to '$id' in specification")
           }
       }
     } else {

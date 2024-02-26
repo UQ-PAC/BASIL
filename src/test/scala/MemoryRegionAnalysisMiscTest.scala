@@ -19,7 +19,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          adtFile = examplesPath + s"$name/$name.adt",
+          inputFile = examplesPath + s"$name/$name.adt",
           relfFile = examplesPath + s"$name/$name.relf",
           specFile = None,
           dumpIL = None,
