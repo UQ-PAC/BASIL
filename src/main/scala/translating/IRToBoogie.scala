@@ -91,7 +91,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
           List()
         }
       case Some(ProcRelyVersion.IfCommandContradiction) => libRGFunsContradictionProof.values.flatten
-      case None => None
+      case None => Nil
     }
 
 
@@ -319,8 +319,8 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         val in = List(gammaMapVar, indexVar, valueVar)
         val out = BParam(gammaMapType)
 
-        val body : BExpr = config.memoryFunctionType match {
-          case BoogieMemoryAccessMode.LambdaStoreSelect => {
+        val body: BExpr = config.memoryFunctionType match {
+          case BoogieMemoryAccessMode.LambdaStoreSelect =>
             if g.accesses == 1 then
               MapUpdate(gammaMapVar, indexVar, valueVar)
             else {
@@ -330,8 +330,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
                 valueVar,
                 MapAccess(gammaMapVar, i)))
             }
-          }
-          case BoogieMemoryAccessMode.SuccessiveStoreSelect => {
+          case BoogieMemoryAccessMode.SuccessiveStoreSelect =>
             val indices: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
               if (i == 0) {
                 indexVar
@@ -348,7 +347,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
             indiceValues.tail.foldLeft(MapUpdate(gammaMapVar, indices.head, values.head)) {
               (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
             }
-          }
         }
 
         BFunction(g.fnName, in, out, Some(body), List(externAttr))
@@ -542,7 +540,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     BBlock(b.label, cmds)
   }
 
-  val libRGFunsContradictionProof: Map[String, Seq[BProcedure]] = {
+  private val libRGFunsContradictionProof: Map[String, Seq[BProcedure]] = {
     /**
      * Generate proof obligations for the library procedure rely/guarantee check.
      *
@@ -562,16 +560,16 @@ class IRToBoogie(var program: Program, var spec: Specification) {
      *
      */
     (libRelies.keySet ++ libGuarantees.keySet).filter(x => libRelies(x).nonEmpty && libGuarantees(x).nonEmpty).map(targetName => {
-      val Rc : BExpr = spec.relies.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
-      val Gc : BExpr = spec.guarantees.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
+      val Rc: BExpr = spec.relies.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
+      val Gc: BExpr = spec.guarantees.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
 
-      val Rf : BExpr = libRelies(targetName).reduce(((a, b) => BinaryBExpr(BoolAND, a, b))).resolveSpec
-      val Gf : BExpr = libGuarantees(targetName).reduce(((a, b) => BinaryBExpr(BoolAND, a, b))).resolveSpec
+      val Rf: BExpr = libRelies(targetName).reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
+      val Gf: BExpr = libGuarantees(targetName).reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
 
       val inv = BinaryBExpr(BoolOR, Rc, Gf)
       val conseq = BinaryBExpr(BoolIMPLIES, Rc, Rf)
 
-      val procInv= BProcedure(targetName + "$InlineInv", List(), List(), List(inv), List(), List(), List(), List(), List(),
+      val procInv = BProcedure(targetName + "$InlineInv", List(), List(), List(inv), List(), List(), List(), List(), List(),
         inv.globals, List(), List())
 
       val proc2 = BProcedure(targetName + "$notRcimpliesRf", List(), List(), List(UnaryBExpr(BoolNOT, conseq)), List(), List(), List(), List(),
@@ -640,7 +638,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     case g: GoTo =>
       // collects all targets of the goto with a branch condition that we need to check the security level for
       // and collects the variables for that
-      val conditions = g.targets.flatMap(_.statements.headOption).collect { case a: Assume if a.checkSecurity => a }
+      val conditions = g.targets.flatMap(_.statements.headOption()).collect { case a: Assume if a.checkSecurity => a }
       val conditionVariables = conditions.flatMap(_.body.variables)
       val gammas = conditionVariables.map(_.toGamma).toList.sorted
       val conditionAssert: List[BCmd] = if (gammas.size > 1) {

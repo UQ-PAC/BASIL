@@ -363,17 +363,18 @@ class IRTest extends AnyFunSuite {
       case c : GoTo => (c.parent == p.blocks("l_main")) && c.isAfterCall
     }.contains(true))
 
-    assert(next.toSet == Set(p.procs("p1"), p.blocks("l_main").fallthrough.get))
+    assert(next == Set(p.procs("p1"), p.blocks("l_main").fallthrough.get))
 
-    val prevB : Block = (p.blocks("l_main").jump match
-      case c : IndirectCall  => c.returnTarget
-      case c : DirectCall => c.returnTarget
+    val prevB: Block = (p.blocks("l_main").jump match
+      case c: IndirectCall => c.returnTarget
+      case c: DirectCall => c.returnTarget
+      case _ => None
     ).get
 
     assert(prevB.isAfterCall)
     assert(InterProcIRCursor.pred(prevB).size == 1)
-    assert(InterProcIRCursor.pred(prevB).toSet == Set(p.blocks("l_main").fallthrough.get))
-    assert(InterProcBlockIRCursor.pred(prevB).toSet == Set(p.blocks("l_main"), p.procs("p1").returnBlock.get))
+    assert(InterProcIRCursor.pred(prevB).head == p.blocks("l_main").fallthrough.get)
+    assert(InterProcBlockIRCursor.pred(prevB).head == p.blocks("l_main"), p.procs("p1").returnBlock.get)
 
 
 
