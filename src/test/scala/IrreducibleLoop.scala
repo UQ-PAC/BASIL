@@ -29,43 +29,33 @@ class IrreducibleLoop extends AnyFunSuite {
     val bapProgram = IRLoading.loadBAP(conf.adtFile)
     val (externalFunctions, globals, globalOffsets, mainAddress) = IRLoading.loadReadELF(conf.relfFile, conf)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
-    var IRProgram = IRTranslator.translate
+    val IRProgram = IRTranslator.translate
     IRProgram
   }
 
-
-  def runTest(path: String, name: String): Unit= {
+  def runTest(path: String, name: String): Unit = {
     val variationPath = path + "/" + name
     val outPath = variationPath + ".bpl"
     val ADTPath = variationPath + ".adt"
     val RELFPath = variationPath + ".relf"
-    val timer = PerformanceTimer(s"test $variationPath")
     Logger.info(variationPath)
 
-    val args = mutable.ArrayBuffer("--adt", ADTPath, "--relf", RELFPath, "--output", outPath, "--analyse", "-v")
+    val program: Program = load(ILLoadingConfig(ADTPath, RELFPath))
 
-    val program : Program = load(ILLoadingConfig(ADTPath, RELFPath))
-
-    val detector = LoopDetector(program);
+    val detector = LoopDetector(program)
     val foundLoops = detector.identify_loops()
     val oldn = foundLoops.count(_.reducible)
 
-
     writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${variationPath}_blockgraph-before-reduce.dot")
 
-    foundLoops.foreach(l => 
-        Logger.info(s"found loops\n${l}")
-        )
+    foundLoops.foreach(l => Logger.info(s"found loops${System.lineSeparator()}$l"))
 
     val loops_to_transform = detector.irreducible_loops()
-    assert(loops_to_transform.forall(foundLoops.contains(_)))
+    assert(loops_to_transform.forall(foundLoops.contains))
 
-
-    val transformer = LoopTransform(foundLoops);
-    val newLoops = transformer.llvm_transform();
-    newLoops.foreach(l => 
-        Logger.info(s"newloops\n${l}")
-        )
+    val transformer = LoopTransform(foundLoops)
+    val newLoops = transformer.llvm_transform()
+    newLoops.foreach(l => Logger.info(s"newloops${System.lineSeparator()}$l"))
 
     val newDetect = LoopDetector(program)
 
@@ -75,13 +65,7 @@ class IrreducibleLoop extends AnyFunSuite {
     assert(foundLoops2.count(_.reducible) > foundLoops.count(_.reducible))
     assert(newDetect.irreducible_loops().isEmpty)
 
-
-
-    foundLoops2.foreach(l => 
-        Logger.info(s"updated found loops\n${l}")
-        )
-
-
+    foundLoops2.foreach(l => Logger.info(s"updated found loops${System.lineSeparator()}$l"))
   }
 
   test("irreducible 1") {
@@ -93,33 +77,33 @@ class IrreducibleLoop extends AnyFunSuite {
   }
 
 
-  test("testverify fail irreducible_loop") { 
+  test("testverify fail irreducible_loop") {
     val path = "src/test/analysis/irreducible_loop/irreducible"
     val outPath = s"$path.bpl"
-    val args = s"-o $outPath -a $path.adt -r $path.relf -s $path.spec".split(" ")
+    val args = Array("-o", s"$outPath", "-a", s"$path.adt", "-r", s"$path.relf", "-s", s"$path.spec")
 
     Main.main(args)
 
-    val boogieResult = (Seq("boogie", "/useArrayAxioms", outPath)).!!
+    val boogieResult = Seq("boogie", "/useArrayAxioms", outPath).!!
 
     Logger.info("Boogie result: " + boogieResult)
 
     assert(boogieResult.contains("Irreducible flow graphs are unsupported."))
   }
 
-  test("testverify reduced irreducible_loop") { 
+  test("testverify reduced irreducible_loop") {
     val path = "src/test/analysis/irreducible_loop/irreducible"
     val outPath = s"$path.bpl"
-    val args = s"-o $outPath -a $path.adt -r $path.relf -s $path.spec --analyse".split(" ")
+    val args = Array("-o", s"$outPath", "-a", s"$path.adt", "-r", s"$path.relf", "-s", s"$path.spec", "--analyse")
 
     Main.main(args)
 
-    val boogieResult = (Seq("boogie", "/smoke", "/useArrayAxioms", outPath)).!!
+    val boogieResult = Seq("boogie", "/smoke", "/useArrayAxioms", outPath).!!
 
     Logger.info("Boogie result: " + boogieResult)
 
     assert(boogieResult.contains("Boogie program verifier finished with 2 verified, 0 errors"))
-    assert(!(boogieResult.contains("found unreachable code")))
+    assert(!boogieResult.contains("found unreachable code"))
   }
 
 

@@ -78,7 +78,7 @@ class SystemTests extends AnyFunSuite {
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
     val outPath = variationPath + ".bpl"
-        val ADTPath = variationPath + ".adt"
+    val ADTPath = variationPath + ".adt"
     val RELFPath = variationPath + ".relf"
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")
@@ -98,7 +98,7 @@ class SystemTests extends AnyFunSuite {
     val proveFailed =  boogieResult.contains("could not be proved")
     val timedOut = boogieResult.strip() contains "timed out"
 
-    def xor(x: Boolean, y:Boolean): Boolean = (x || y) && ! (x && y)
+    def xor(x: Boolean, y: Boolean): Boolean = (x || y) && ! (x && y)
 
     val failureMsg = if timedOut then "SMT Solver timed out" else 
       (verified, shouldVerify, xor(verified, proveFailed)) match {
