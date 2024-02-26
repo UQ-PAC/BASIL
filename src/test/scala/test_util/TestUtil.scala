@@ -25,12 +25,12 @@ trait TestUtil {
   }
 
 
-  def runExample(name: String): BasilResult = {
+  def runExample(name: String, path: String = correctPath, variation: String = "gcc/"): BasilResult = {
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = examplePath + s"/$name/$name.adt",
-          relfFile = examplePath + s"/$name/$name.relf",
+          adtFile = path + s"/$name/$variation$name.adt",
+          relfFile = path + s"/$name/$variation$name.relf",
           specFile = None,
           dumpIL = None,
           mainProcedureName = "main",

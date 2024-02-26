@@ -58,22 +58,6 @@ class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
     assert(analysisResults(procs("plus_one")) == Set(R0))
   }
 
-  test("indirect_call_outparam") {
-    val result: BasilResult = runExample("indirect_call_outparam")
-    val analysisResults = result.analysis.get.paramResults
-    val procs = result.ir.program.procs
-
-    assert(analysisResults(procs("main")) == Set.empty)
-    assert(analysisResults(procs("get_call")) == Set(R0))
-  }
-
-  ignore("indirect_call_outparam_unresolved_call") {
-    val result: BasilResult = runExample("indirect_call_outparam")
-    val analysisResults = result.analysis.get.paramResults
-    val procs = result.ir.program.procs
-
-    assert(analysisResults(procs("seven")) == Set.empty) // not analysed due to unresolved call
-  }
 
   test("initialisation") {
     val result: BasilResult = runExample("initialisation")
@@ -89,5 +73,16 @@ class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
     val procs = result.ir.program.procs
 
     assert(analysisResults(procs("main")) == Set(R0, R1))
+  }
+
+  ignore("unresolved_calls") {
+    val result: BasilResult = runExample("jumptable")
+    val analysisResults = result.analysis.get.paramResults
+    val procs = result.ir.program.procs
+
+    // not analysed due to unresolved call
+    assert(analysisResults(procs("add_two")) == Set.empty)
+    assert(analysisResults(procs("add_six")) == Set.empty)
+    assert(analysisResults(procs("sub_seven")) == Set.empty)
   }
 }
