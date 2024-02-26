@@ -45,7 +45,9 @@ case class StaticAnalysisContext(
     constPropResult: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
     IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
     memoryRegionResult: Map[CfgNode, LiftedElement[Set[MemoryRegion]]],
-    vsaResult: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
+    vsaResult: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
+    interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElementLatticeEl]],
+    paramResults: Map[Procedure, Set[Variable]]
 ) {}
 
 /** Results of the main program execution.
@@ -407,12 +409,20 @@ object StaticAnalysis {
       writeToFile(printAnalysisResults(IRProgram, cfg, vsaResult), s"${s}_vsa$iteration.txt")
     )
 
+    Logger.info("[!] Running Interprocedural Live Variables Analysis")
+    val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
+
+    Logger.info("[!] Running Parameter Analysis")
+    val paramResults = ParamAnalysis(IRProgram).analyze()
+
     StaticAnalysisContext(
       cfg = cfg,
       constPropResult = constPropResult,
       IRconstPropResult = newCPResult,
       memoryRegionResult = mraResult,
-      vsaResult = vsaResult
+      vsaResult = vsaResult,
+      interLiveVarsResults = interLiveVarsResults,
+      paramResults = paramResults
     )
   }
 

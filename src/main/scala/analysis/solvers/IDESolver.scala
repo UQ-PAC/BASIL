@@ -30,10 +30,9 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
    * The original version of the algorithm uses summary edges from call nodes to after-call nodes
    * instead of `callJumpCache` and `exitJumpCache`.
    */
-  private class Phase1(val program: Program) extends WorklistFixPointFunctions[(CFGPosition, DL, DL), EdgeFunction[T], EdgeFunctionLattice[T, valuelattice.type]] {
+  private class Phase1(val program: Program) extends InitializingPushDownWorklistFixpointSolver[(CFGPosition, DL, DL), EdgeFunction[T], EdgeFunctionLattice[T, valuelattice.type]] {
 
     val lattice: MapLattice[(CFGPosition, DL, DL), EdgeFunction[T], EdgeFunctionLattice[T, valuelattice.type]] = new MapLattice(edgelattice)
-    var x: Map[(CFGPosition, DL, DL), EdgeFunction[T]] = _
     val first: Set[(CFGPosition, DL, DL)] = Set((startNode, Right(Lambda()), Right(Lambda())))
 
     /**
@@ -143,9 +142,8 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
    * Performs a forward dataflow analysis using the decomposed lattice and the micro-transformers.
    * The original RHS version of IDE uses jump functions for all nodes, not only at exits, but the analysis result and complexity is the same.
    */
-  private class Phase2(val program: Program , val phase1: Phase1) extends WorklistFixPointFunctions[(CFGPosition, DL), T, valuelattice.type]:
+  private class Phase2(val program: Program , val phase1: Phase1) extends InitializingPushDownWorklistFixpointSolver[(CFGPosition, DL), T, valuelattice.type]:
     val lattice: MapLattice[(CFGPosition, DL), T, valuelattice.type] = new MapLattice(valuelattice)
-    var x: Map[(CFGPosition, DL), T] = _
     val first: Set[(CFGPosition, DL)] = Set((startNode, Right(Lambda())))
 
     /**
@@ -206,7 +204,7 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
           }
       }
 
-  def analyze(): Map[CFGPosition, Map[D, valuelattice.Element]] = {
+  def analyze(): Map[CFGPosition, Map[D, T]] = {
     val phase1 = new Phase1(program)
     phase1.analyze()
     val phase2 = new Phase2(program, phase1)

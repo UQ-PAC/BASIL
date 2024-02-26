@@ -71,6 +71,24 @@ class LiftLattice[T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Lifted
   }
 }
 
+trait TwoElementLatticeEl
+
+case object TwoElementTop extends TwoElementLatticeEl
+case object TwoElementBottom extends TwoElementLatticeEl
+
+
+/**
+ * A lattice with only top and bottom
+ */
+class TwoElementLattice extends Lattice[TwoElementLatticeEl]:
+  override val bottom: TwoElementLatticeEl = TwoElementBottom
+  override val top: TwoElementLatticeEl = TwoElementTop
+
+  def lub(x: TwoElementLatticeEl, y: TwoElementLatticeEl): TwoElementLatticeEl = (x, y) match {
+    case (TwoElementBottom, TwoElementBottom) => TwoElementBottom
+    case _ => TwoElementTop
+  }
+
 trait FlatElement[+T]
 case class FlatEl[T](el: T) extends FlatElement[T]
 case object Top extends FlatElement[Nothing]
@@ -95,7 +113,6 @@ class FlatLattice[X] extends Lattice[FlatElement[X]] {
   }
 }
 
-class TwoElementLattice extends FlatLattice[Nothing]
 
 /** A lattice of maps from a set of elements of type `A` to a lattice with element `L'. Bottom is the default value.
   */
