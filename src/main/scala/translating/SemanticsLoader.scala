@@ -103,9 +103,9 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         if (size != otherSize) {
           throw Exception(s"inconsistent size parameters in Mem.set.0: ${ctx.getText}")
         }
-        // we expect this to be 0 'AccType_NORMAL' but if we encounter other values they may require further investigation
-        if (accessType != 0) {
-          Logger.info(s"Mem.set.0 with non-0 access type encountered: ${ctx.getText}")
+        // we expect this to be 0 'AccType_NORMAL' or 1 'AccType_VEC' but if we encounter other values they may require further investigation
+        if (accessType != 0 && accessType != 1) {
+          Logger.info(s"Mem.set.0 with unfamiliar type encountered: ${ctx.getText}")
         }
 
         // LittleEndian is an assumption
@@ -117,7 +117,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         }
 
       case _ =>
-        Logger.debug(s"Unidentified function call $function: ${ctx.getText}")
+        Logger.info(s"Unidentified TCall $function: ${ctx.getText}")
         None
     }
   }
@@ -197,7 +197,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         // ignoring the register's fields for now
         BitVecType(r.size.getText.toInt)
       case c: TypeConstructorContext => c.str.getText.match {
-        case "FPRounding" => BitVecType(2)
+        case "FPRounding" => BitVecType(3)
+        case "integer" => IntType
         case _ => throw Exception(s"unknown type ${ctx.getText}")
       }
       case _ => throw Exception(s"unknown type ${ctx.getText}")
@@ -258,11 +259,10 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         if (size != otherSize) {
           throw Exception(s"inconsistent size parameters in Mem.read.0: ${ctx.getText}")
         }
-        // we expect this to be 0 'AccType_NORMAL' but if we encounter other values they may require further investigation
-        if (accessType != 0) {
-          Logger.info(s"Mem.set.0 with non-0 access type encountered: ${ctx.getText}")
+        // we expect this to be 0 'AccType_NORMAL' or 1 'AccType_VEC' but if we encounter other values they may require further investigation
+        if (accessType != 0 && accessType != 1) {
+          Logger.info(s"Mem.set.0 with unfamiliar type encountered: ${ctx.getText}")
         }
-
 
         if (index.isDefined) {
           // LittleEndian is assumed
@@ -341,7 +341,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         }
 
       case _ =>
-        Logger.debug(s"unidentified call to $function: ${ctx.getText}")
+        Logger.info(s"unidentified TApply $function: ${ctx.getText}")
         None
     }
 
