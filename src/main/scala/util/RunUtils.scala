@@ -47,7 +47,7 @@ case class IRContext(
     globalOffsets: Map[BigInt, BigInt],
     specification: Specification,
     program: Program // internally mutable
-) {}
+)
 
 /** Stores the results of the static analyses.
   */
@@ -59,12 +59,13 @@ case class StaticAnalysisContext(
     vsaResult: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
     interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElementLatticeEl]],
     paramResults: Map[Procedure, Set[Variable]],
-    steensgaardResults: Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]]
-) {}
+    steensgaardResults: Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]],
+    mmmResults: MemoryModelMap
+)
 
 /** Results of the main program execution.
   */
-case class BasilResult(val ir: IRContext, analysis: Option[StaticAnalysisContext], boogie: BProgram) {}
+case class BasilResult(ir: IRContext, analysis: Option[StaticAnalysisContext], boogie: BProgram)
 
 /** Tools for loading the IR program into an IRContext.
   */
@@ -81,7 +82,7 @@ object IRLoading {
   def load(q: ILLoadingConfig): IRContext = {
     val (externalFunctions, globals, globalOffsets, mainAddress) = IRLoading.loadReadELF(q.relfFile, q)
 
-    var program: Program = if (q.inputFile.endsWith(".adt")) {
+    val program: Program = if (q.inputFile.endsWith(".adt")) {
       val bapProgram = loadBAP(q.inputFile)
       val IRTranslator = BAPToIR(bapProgram, mainAddress)
       IRTranslator.translate
@@ -169,7 +170,7 @@ object IRTransform {
 
   /** Initial cleanup before analysis.
     */
-  def doCleanup(ctx: IRContext) = {
+  def doCleanup(ctx: IRContext): IRContext = {
     Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
     val externalNames = ctx.externalFunctions.map(e => e.name)
@@ -314,10 +315,10 @@ object IRTransform {
   }
 
   def resolveIndirectCallsUsingPointsTo(
-                               cfg: ProgramCfg,
-                               pointsTos: Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]],
-                               IRProgram: Program
-                             ): (Program, Boolean) = {
+     cfg: ProgramCfg,
+     pointsTos: Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]],
+     IRProgram: Program
+   ): (Program, Boolean) = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
     cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
@@ -394,7 +395,7 @@ object IRTransform {
               return
             }
             val targetNames = resolveAddresses(indirectCall.target)
-            println(s"Points-To approximated call ${indirectCall.target} with ${targetNames}")
+            println(s"Points-To approximated call ${indirectCall.target} with $targetNames")
             println(IRProgram.procedures)
             val targets: mutable.Set[Procedure] = targetNames.map(name => IRProgram.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
 
@@ -431,7 +432,7 @@ object IRTransform {
   /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
     * add in modifies from the spec.
     */
-  def prepareForTranslation(config: ILLoadingConfig, ctx: IRContext) = {
+  def prepareForTranslation(config: ILLoadingConfig, ctx: IRContext): Unit = {
     ctx.program.determineRelevantMemory(ctx.globalOffsets)
 
     Logger.info("[!] Stripping unreachable")
@@ -453,9 +454,6 @@ object IRTransform {
 /** Methods relating to program static analysis.
   */
 object StaticAnalysis {
-  var memoryRegionAnalysisResults: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
-  var mmmResults: MemoryModelMap = MemoryModelMap()
-
   /** Run all static analysis passes on the provided IRProgram.
     */
   def analyse(
@@ -589,12 +587,11 @@ object StaticAnalysis {
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
     mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, mraSolver.procedureToSharedRegions)
-    mmmResults = mmm
 
     Logger.info("[!] Running Steensgaard")
     val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, globalOffsets)
     steensgaardSolver.analyze()
-    steensgaardSolver.pointsTo()
+    val steensgaardResults = steensgaardSolver.pointsTo().asInstanceOf[Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]]]
 
     Logger.info("[!] Running VSA")
     val vsaSolver =
@@ -614,7 +611,7 @@ object StaticAnalysis {
     Logger.info("[!] Running Parameter Analysis")
     val paramResults = ParamAnalysis(IRProgram).analyze()
 
-    mmm.printRegionsContent(false)
+    //mmm.printRegionsContent(false)
 
     StaticAnalysisContext(
       cfg = cfg,
@@ -624,7 +621,8 @@ object StaticAnalysis {
       vsaResult = vsaResult,
       interLiveVarsResults = interLiveVarsResults,
       paramResults = paramResults,
-      steensgaardResults = steensgaardSolver.pointsTo().asInstanceOf[Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]]]
+      steensgaardResults = steensgaardResults,
+      mmmResults = mmm
     )
   }
 

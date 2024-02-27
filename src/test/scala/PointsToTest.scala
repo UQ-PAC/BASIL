@@ -3,7 +3,7 @@ import ir.Endian.LittleEndian
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
-import util.{RunUtils, StaticAnalysisConfig}
+import util.{RunUtils, StaticAnalysisConfig, StaticAnalysis, StaticAnalysisContext, IRContext}
 
 import java.io.IOException
 import java.nio.file.*
@@ -38,11 +38,13 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
     Files.createDirectories(directory)
   }
 
-  def runSteensgaardAnalysis(program: Program,
-                             externalFunctions: Set[ExternalFunction] = Set.empty,
-                             globals: Set[SpecGlobal] = Set.empty,
-                             globalOffsets: Map[BigInt, BigInt] = Map.empty): Unit = {
-    RunUtils.analyse(program, externalFunctions, globals, globalOffsets, StaticAnalysisConfig(), 1)
+  def runAnalyses(program: Program,
+                  externalFunctions: Set[ExternalFunction] = Set.empty,
+                  globals: Set[SpecGlobal] = Set.empty,
+                  globalOffsets: Map[BigInt, BigInt] = Map.empty): StaticAnalysisContext = {
+
+    val ctx = IRContext(externalFunctions, globals, globalOffsets, Specification(Set(), Map(), List(), List(), List(), Set()), program)
+    StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 1)
   }
 
   def getRegister(name: String): Register = {
@@ -69,11 +71,11 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
-    runSteensgaardAnalysis(program)
-    RunUtils.mmmResults.pushContext("main")
-    assert(RunUtils.mmmResults.findStackObject(BigInt(4)).isDefined)
-    assert(RunUtils.mmmResults.findStackObject(BigInt(4)).get.start == bv64(4))
-    assert(RunUtils.mmmResults.findStackObject(BigInt(4)).get.regionIdentifier == "stack_1")
+    val results = runAnalyses(program)
+    results.mmmResults.pushContext("main")
+    assert(results.mmmResults.findStackObject(BigInt(4)).isDefined)
+    assert(results.mmmResults.findStackObject(BigInt(4)).get.start == bv64(4))
+    assert(results.mmmResults.findStackObject(BigInt(4)).get.regionIdentifier == "stack_1")
   }
 
   /**
@@ -96,18 +98,18 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
-    runSteensgaardAnalysis(program)
-    RunUtils.mmmResults.pushContext("main")
-    assert(RunUtils.mmmResults.findStackObject(BigInt(4)).isDefined)
-    assert(RunUtils.mmmResults.findStackObject(BigInt(5)).isDefined)
-    assert(RunUtils.mmmResults.findStackObject(BigInt(6)).isDefined)
-    assert(RunUtils.mmmResults.findStackObject(BigInt(10)).isDefined)
+    val results = runAnalyses(program)
+    results.mmmResults.pushContext("main")
+    assert(results.mmmResults.findStackObject(BigInt(4)).isDefined)
+    assert(results.mmmResults.findStackObject(BigInt(5)).isDefined)
+    assert(results.mmmResults.findStackObject(BigInt(6)).isDefined)
+    assert(results.mmmResults.findStackObject(BigInt(10)).isDefined)
 
 
-    assert(RunUtils.mmmResults.findStackObject(BigInt(4)).get.start == bv64(4))
-    assert(RunUtils.mmmResults.findStackObject(BigInt(5)).get.start == bv64(4))
-    assert(RunUtils.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
-    assert(RunUtils.mmmResults.findStackObject(BigInt(10)).get.start == bv64(6))
+    assert(results.mmmResults.findStackObject(BigInt(4)).get.start == bv64(4))
+    assert(results.mmmResults.findStackObject(BigInt(5)).get.start == bv64(4))
+    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
+    assert(results.mmmResults.findStackObject(BigInt(10)).get.start == bv64(6))
   }
 
 //  /**
@@ -137,17 +139,17 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
 //    )
 //
 //    runSteensgaardAnalysis(program)
-//    RunUtils.mmmResults.pushContext("main")
-//    assert(RunUtils.mmmResults.findStackObject(BigInt(4)).isDefined) // Explicit memStore
-//    assert(RunUtils.mmmResults.findStackObject(BigInt(6)).isDefined) // Explicit memLoad
-//    assert(RunUtils.mmmResults.findStackObject(BigInt(10)).isDefined) // Implicit memLoad
-//    assert(RunUtils.mmmResults.findStackObject(BigInt(20)).isDefined) // Implicit memStore
+//    results.mmmResults.pushContext("main")
+//    assert(results.mmmResults.findStackObject(BigInt(4)).isDefined) // Explicit memStore
+//    assert(results.mmmResults.findStackObject(BigInt(6)).isDefined) // Explicit memLoad
+//    assert(results.mmmResults.findStackObject(BigInt(10)).isDefined) // Implicit memLoad
+//    assert(results.mmmResults.findStackObject(BigInt(20)).isDefined) // Implicit memStore
 //
 //
-//    assert(RunUtils.mmmResults.findStackObject(BigInt(4)).get.start == bv64(4))
-//    assert(RunUtils.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
-//    assert(RunUtils.mmmResults.findStackObject(BigInt(10)).get.start == bv64(10))
-//    assert(RunUtils.mmmResults.findStackObject(BigInt(20)).get.start == bv64(20))
+//    assert(results.mmmResults.findStackObject(BigInt(4)).get.start == bv64(4))
+//    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
+//    assert(results.mmmResults.findStackObject(BigInt(10)).get.start == bv64(10))
+//    assert(results.mmmResults.findStackObject(BigInt(20)).get.start == bv64(20))
 //  }
 
   /**
@@ -180,20 +182,20 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
-    runSteensgaardAnalysis(program)
-    RunUtils.mmmResults.pushContext("main")
-    assert(RunUtils.mmmResults.findStackObject(BigInt(6)).isDefined)
+    val results = runAnalyses(program)
+    results.mmmResults.pushContext("main")
+    assert(results.mmmResults.findStackObject(BigInt(6)).isDefined)
 
-    assert(RunUtils.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
+    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
 
     /* ------------------------------------------------------------------------- */
 
-    RunUtils.mmmResults.pushContext("p2")
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(6)).nonEmpty)
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(10)).nonEmpty)
+    results.mmmResults.pushContext("p2")
+    assert(results.mmmResults.findSharedStackObject(BigInt(6)).nonEmpty)
+    assert(results.mmmResults.findSharedStackObject(BigInt(10)).nonEmpty)
 
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(6)).head.start == bv64(6))
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(10)).head.start == bv64(10))
+    assert(results.mmmResults.findSharedStackObject(BigInt(6)).head.start == bv64(6))
+    assert(results.mmmResults.findSharedStackObject(BigInt(10)).head.start == bv64(10))
   }
 
   /**
@@ -236,25 +238,25 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
-    runSteensgaardAnalysis(program)
-    RunUtils.mmmResults.pushContext("main")
-    assert(RunUtils.mmmResults.findStackObject(BigInt(6)).isDefined)
+    val results = runAnalyses(program)
+    results.mmmResults.pushContext("main")
+    assert(results.mmmResults.findStackObject(BigInt(6)).isDefined)
 
-    assert(RunUtils.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
+    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
 
     /* ------------------------------------------------------------------------- */
 
-    RunUtils.mmmResults.pushContext("p2")
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(6)).nonEmpty)
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(10)).nonEmpty)
+    results.mmmResults.pushContext("p2")
+    assert(results.mmmResults.findSharedStackObject(BigInt(6)).nonEmpty)
+    assert(results.mmmResults.findSharedStackObject(BigInt(10)).nonEmpty)
 
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(6)).size == 2)
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(10)).size == 2)
+    assert(results.mmmResults.findSharedStackObject(BigInt(6)).size == 2)
+    assert(results.mmmResults.findSharedStackObject(BigInt(10)).size == 2)
 
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(6)).exists(_.parent.name == "main"))
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(6)).exists(_.parent.name == "foo"))
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(10)).exists(_.parent.name == "main"))
-    assert(RunUtils.mmmResults.findSharedStackObject(BigInt(10)).exists(_.parent.name == "foo"))
+    assert(results.mmmResults.findSharedStackObject(BigInt(6)).exists(_.parent.name == "main"))
+    assert(results.mmmResults.findSharedStackObject(BigInt(6)).exists(_.parent.name == "foo"))
+    assert(results.mmmResults.findSharedStackObject(BigInt(10)).exists(_.parent.name == "main"))
+    assert(results.mmmResults.findSharedStackObject(BigInt(10)).exists(_.parent.name == "foo"))
   }
 
 //  /**
