@@ -1,27 +1,9 @@
-<<<<<<< HEAD
-# BIL-to-Boogie Translator
-||||||| 7ad7a203
-# BAP-to-Boogie Translator
-=======
 # BASIL (Boogie Analysis for Secure Information-Flow Logics)
->>>>>>> main
 
 ## About
 
-<<<<<<< HEAD
-The BIL-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
-binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
-
-This repository contains a program which takes BAP adt files and readelf output as input, and produces a boogie program.
-||||||| 7ad7a203
-The BAP-to-Boogie Translator generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
-binaries that have been lifted to the BAP (Binary Analysis Platform) intermediate ADT format. 
-
-This repository contains a program which takes BAP adt files and readelf output as input, and produces a boogie program.
-=======
 The BASIL tool generates semantically equivalent Boogie source files (`.bpl`) from AArch64/ARM64 
 binaries that have been lifted to intermediate formats. Supported input formats are BAP (Binary Analysis Platform) intermediate ADT format, and the `.gts` format produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics).
->>>>>>> main
 
 ### Example
 
@@ -71,6 +53,23 @@ A mill script is checked in at `./scripts/mill` so it does not need to be instal
 Mill supports the Metals language server and IntelliJ through Build Server Protocol (BSP), which is the recommended use. 
 
 SBT has an intellij plugin in addition to BSP. 
+
+To use specifically Mill's bsp support, delete `.bsp`, run `mill mill.bsp.BSP/install`, and replace the first argument of `argv` in the resulting `.bsp/mill-bsp.json` with the 
+command used to run mill. 
+
+```
+~ rm -r .bsp
+~ ./scripts/setup-bsp.sh 
++ MILL_CMD=mill
+# create bsp config file
++ mill mill.bsp.BSP/install
+[2/2] mill.bsp.BSP.install 
+Creating BSP connection file: /home/am/Documents/programming/2023/bil-to-boogie-translator/.bsp/mill-bsp.json
+# fix config file 
+++ perl -pe 's/"argv":\[".*?",/"argv":["$MILL_CMD",/g' .bsp/mill-bsp.json
++ fixed='{"name":"mill-bsp","argv":["","--bsp","--disable-ticker","--color","false","--jobs","1"],"millVersion":"0.11.6","bspVersion":"2.1.0-M7","languages":["scala","java"]}'
++ echo '{"name":"mill-bsp","argv":["","--bsp","--disable-ticker","--color","false","--jobs","1"],"millVersion":"0.11.6","bspVersion":"2.1.0-M7","languages":["scala","java"]}'
+```
 
 ### Note about using sbt with IntelliJ
 
