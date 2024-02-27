@@ -14,6 +14,12 @@ typeName: BVSIZE #bvType
         ;
 arraySize: '[' size=nat ']';
 
+boogieTypeName: BVSIZE #bvBType
+        | INT #intBType
+        | BOOL #boolBType
+        | '[' (keyT=boogieTypeName) ']' (valT=boogieTypeName) #mapBType
+        ;
+
 relies: 'Rely:' expr (COMMA expr)*;
 guarantees: 'Guarantee:' expr (COMMA expr)*;
 
@@ -66,6 +72,7 @@ atomExpr : boolLit #boolLitExpr
          | OLD LPAREN expr RPAREN #oldExpr
          | LPAREN expr RPAREN #parenExpr
          | IF guard=expr THEN thenExpr=expr ELSE elseExpr=expr #ifThenElseExpr
+         | 'DIRECT' DCOLON (literalval=QUOTESTRING) COLON (btype=boogieTypeName) #directExpr
          ;
 
 QUOTE : '"';
@@ -95,6 +102,7 @@ LONG: 'long';
 SHORT: 'short';
 INT: 'int';
 CHAR: 'char';
+BOOL: 'bool';
 
 TRUE : 'true';
 FALSE : 'false';
@@ -135,6 +143,7 @@ MUL_OP : '*';
 NOT_OP : '!';
 
 COLON: ':';
+DCOLON: '::';
 fragment UNDERSCORE: '_';
 fragment LE: '_le';
 fragment BE: '_be';

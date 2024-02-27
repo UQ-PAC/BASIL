@@ -334,6 +334,51 @@ class IRTest extends AnyFunSuite {
     assert(p.procs("main").returnBlock.isEmpty)
   }
 
+  test("interproc aftercall") {
+
+    val p = prog(
+      proc("p1",
+        block("b1",
+          LocalAssign(R0, bv64(10)),
+          ret
+        )
+      ),
+      proc("main",
+        block("l_main",
+          LocalAssign(R0, bv64(10)),
+          call("p1", Some("returntarget"))
+        ),
+        block("returntarget",
+          ret
+        )
+      ),
+    )
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    returnUnifier.visitProgram(p)
+
+    val next = InterProcIRCursor.succ(p.blocks("l_main").jump)
+    val prev = InterProcIRCursor.pred(p.blocks("returntarget"))
+
+    assert(prev.size == 1 && prev.collect {
+      case c : GoTo => (c.parent == p.blocks("l_main")) && c.isAfterCall
+    }.contains(true))
+
+    assert(next == Set(p.procs("p1"), p.blocks("l_main").fallthrough.get))
+
+    val prevB: Block = (p.blocks("l_main").jump match
+      case c: IndirectCall => c.returnTarget
+      case c: DirectCall => c.returnTarget
+      case _ => None
+    ).get
+
+    assert(prevB.isAfterCall)
+    assert(InterProcIRCursor.pred(prevB).size == 1)
+    assert(InterProcIRCursor.pred(prevB).head == p.blocks("l_main").fallthrough.get)
+    assert(InterProcBlockIRCursor.pred(prevB).head == p.blocks("l_main"), p.procs("p1").returnBlock.get)
+
+
+
+  }
 
 }
 

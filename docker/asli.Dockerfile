@@ -195,5 +195,5 @@ RUN apt-get update && apt-get install --yes default-jre-headless python3 libgmp-
 # ------------------
 # Transplanted BAP 
 # ==================
-COPY --from=basil /basil/target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar /target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar
+COPY --from=basil /basil/target/scala-3.3.0/wptool-boogie-assembly-0.0.1.jar /target/scala-3.3.0/wptool-boogie-assembly-0.0.1.jar
 WORKDIR /app

@@ -1,0 +1,39 @@
+//===- Section.proto ------------------------------------------*- Proto -*-===//
+//
+//  Copyright (C) 2020 GrammaTech, Inc.
+//
+//  This code is licensed under the MIT license. See the LICENSE file in the
+//  project root for license terms.
+//
+//  This project is sponsored by the Office of Naval Research, One Liberty
+//  Center, 875 N. Randolph Street, Arlington, VA 22203 under contract #
+//  N68335-17-C-0700.  The content of the information does not necessarily
+//  reflect the position or policy of the Government and no official
+//  endorsement should be inferred.
+//
+//===----------------------------------------------------------------------===//
+syntax = "proto3";
+package gtirb.proto;
+option java_package = "com.grammatech.gtirb.proto";
+
+import "ByteInterval.proto";
+
+enum SectionFlag {
+  Section_Undefined = 0;
+  Readable = 1;
+  Writable = 2;
+  Executable = 3;
+  Loaded = 4;
+  Initialized = 5;
+  ThreadLocal = 6;
+}
+
+message Section {
+  reserved "address", "size";
+  reserved 3, 4;
+
+  bytes uuid = 1;
+  string name = 2;
+  repeated ByteInterval byte_intervals = 5;
+  repeated SectionFlag section_flags = 6;
+}

@@ -54,6 +54,11 @@ case class IntLiteral(value: BigInt) extends Literal {
   override def toString: String = value.toString
 }
 
+/**
+  * @param end : high bit exclusive
+  * @param start : low bit inclusive
+  * @param body
+  */
 case class Extract(end: Int, start: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVExtract(end, start, body.toBoogie)
   override def gammas: Set[Expr] = body.gammas
@@ -372,6 +377,7 @@ case class Register(override val name: String, override val irType: IRType) exte
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
   override def toString: String = s"Register(${name}_${ssa_id}_$sharedVariable, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitRegister(this)
+  override def size: Int = irType.asInstanceOf[BitVecType].size
 }
 
 case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
