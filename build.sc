@@ -3,12 +3,8 @@ import mill._, mill.define._, scalalib._
 import $file.antlr // https://index.scala-lang.org/ml86/mill-antlr
 
 import os.Path
-import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
-import contrib.scalapblib._
 
-
-
-object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule{
+object basil extends RootModule with ScalaModule with antlr.AntlrModule {
   def scalaVersion = "3.3.1"
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
@@ -17,17 +13,12 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   val antlrRuntime = ivy"org.antlr:antlr4-runtime:4.9"
   val sourceCode = ivy"com.lihaoyi::sourcecode:0.3.0"
   val mainArgs = ivy"com.lihaoyi::mainargs:0.5.1"
-  val sprayJson = ivy"io.spray::spray-json:1.3.6"
-  val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15" 
-
-  def scalaPBVersion = "0.11.15"
-
 
   def mainClass = Some("Main")
 
-  override def scalaPBSources = T.sources {Seq(PathRef(this.millSourcePath / "main" / "protobuf"))}
+
   def millSourcePath = super.millSourcePath / "src"
-  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb)
+  def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs)
   def sources = T.sources {Seq(PathRef(this.millSourcePath / "main" / "scala" ))}
 
 
@@ -65,7 +56,7 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
             if (verified == shouldVerify) {
               if (os.exists(outPath) && !(os.exists(expectedPath) && filesContentEqual(outPath, expectedPath))) {
                 println(s"updated $expectedPath")
-                os.copy.over(outPath, expectedPath)
+                os.copy(outPath, expectedPath)
               }
             }
           }

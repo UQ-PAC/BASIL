@@ -3,7 +3,7 @@ import org.scalatest.Inside.inside
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import util.RunUtils
-import util.{BASILConfig, BoogieGeneratorConfig, BoogieMemoryAccessMode, ILLoadingConfig, StaticAnalysisConfig, BasilResult}
+import util.{BASILConfig, BoogieGeneratorConfig, BoogieMemoryAccessMode, ILLoadingConfig, StaticAnalysisConfig}
 
 import java.io.{File, OutputStream, PrintStream, PrintWriter}
 class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
@@ -16,10 +16,10 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
     var expected = ""
     var actual = ""
     var output: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
-    val results = RunUtils.loadAndTranslate(
+    RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = examplesPath + s"$name/$name.adt",
+          adtFile = examplesPath + s"$name/$name.adt",
           relfFile = examplesPath + s"$name/$name.relf",
           specFile = None,
           dumpIL = None,
@@ -38,7 +38,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
         dumpFolder.mkdir()
       }
 
-      output = results.analysis.get.memoryRegionResult
+      output = RunUtils.memoryRegionAnalysisResults
       val outFile = new File(tempPath + s"$name")
       val pw = new PrintWriter(outFile, "UTF-8")
       output.foreach { case (k, v) =>

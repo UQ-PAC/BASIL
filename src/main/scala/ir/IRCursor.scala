@@ -14,13 +14,6 @@ import scala.annotation.tailrec
  */
 type CFGPosition = Procedure | Block | Command
 
-extension (p: CFGPosition)
-  def toShortString: String =
-    p match
-      case procedure: Procedure => procedure.toString
-      case block: Block => s"Block ${block.label}"
-      case command: Command => command.toString
-
 // todo: we could just use the dependencies trait directly instead to avoid the instantiation issue
 trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] {
   def succ(pos: IN): Set[NT]
@@ -29,6 +22,7 @@ trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] {
 
 object IRWalk:
   def procedure(pos: CFGPosition) : Procedure = {
+    Logger.info(s"pos: $pos")
     pos match {
       case p: Procedure => p
       case b: Block => b.parent
@@ -151,10 +145,7 @@ trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
     IntraProcIRCursor.pred(pos) ++
     (pos match
       case c: Procedure       => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
-      case b: GoTo if b.isAfterCall => b.parent.jump match {
-        case DirectCall(t,_, _) if t.blocks.nonEmpty => t.returnBlock.toSet
-        case _ => Set(b)
-      }
+      case b: Block if b.isAfterCall => b.incomingJumps.map(_.parent.jump).filter(_.isInstanceOf[DirectCall]).flatMap(_.asInstanceOf[DirectCall].target.returnBlock).map(_.jump).toSet
       case _ => Set.empty)
   }
 }
@@ -190,7 +181,7 @@ trait CallGraph extends IRWalk[Procedure, Procedure] {
 
 object CallGraph extends CallGraph
 
-object InterProcBlockIRCursor extends InterProcBlockIRCursor
+object InterProcBlockIRCursor extends IntraProcBlockIRCursor
 
 /** Computes the reachability transitive closure of the CFGPositions in initial under the successor relation defined by
   * walker.

@@ -23,9 +23,6 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       for (b <- s.blocks) {
         val block = Block(b.label, b.address)
         procedure.addBlocks(block)
-        if (b.address.isDefined && b.address.isDefined && b.address.get == procedure.address.get) {
-          procedure.entryBlock = block
-        }
         labelToBlock.addOne(b.label, block)
       }
       for (p <- s.in) {
@@ -57,7 +54,6 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       // Set entry block to the block with the same address as the procedure or the first in sequence
       procedure.blocks.find(b => b.address == procedure.address).foreach(procedure.entryBlock = _)
       if procedure.entryBlock.isEmpty then procedure.blocks.nextOption().foreach(procedure.entryBlock = _)
-      // TODO maybe throw an exception if there is no block with the same address, to be safe?
 
     }
 
@@ -116,7 +112,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
                   val conditionsIR = conditions.map(c => convertConditionBool(c, true))
                   conditionsIR.tail.foldLeft(currentCondition)((ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands))
                 }
-                val newBlock = newBlockCondition(block, target, condition)
+                val newBlock = newBlockCondition(block, target, currentCondition)
                 newBlocks.append(newBlock)
                 targets.append(newBlock)
                 conditions.append(b.condition)

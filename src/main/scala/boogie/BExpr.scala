@@ -34,12 +34,6 @@ case object TrueBLiteral extends BoolBLiteral {
   override def toString: String = "true"
 }
 
-case object StarBLiteral extends BoolBLiteral {
-  override val getType: BType = BoolBType
-  override def toString: String = "*"
-}
-
-
 case object FalseBLiteral extends BoolBLiteral {
   override val getType: BType = BoolBType
   override def toString: String = "false"
@@ -272,7 +266,7 @@ case class UnaryBExpr(op: UnOp, arg: BExpr) extends BExpr {
 
   private def inSize = arg.getType match {
     case bv: BitVecBType => bv.size
-    case _               => throw new Exception(s"Expected Bv but got ${arg.getType}")
+    case _               => throw new Exception("type mismatch")
   }
 
   override def toString: String = op match {
@@ -345,19 +339,19 @@ case class BinaryBExpr(op: BinOp, arg1: BExpr, arg2: BExpr) extends BExpr {
           if (bv1.size == bv2.size) {
             bv1
           } else {
-            throw new Exception(s"bitvector size mismatch: $arg1, $arg2")
+            throw new Exception("bitvector size mismatch")
           }
         case BVCOMP =>
           if (bv1.size == bv2.size) {
             BitVecBType(1)
           } else {
-            throw new Exception(s"bitvector size mismatch: $arg1, $arg2")
+            throw new Exception("bitvector size mismatch")
           }
         case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
           if (bv1.size == bv2.size) {
             BoolBType
           } else {
-            throw new Exception(s"bitvector size mismatch: $arg1, $arg2")
+            throw new Exception("bitvector size mismatch")
           }
         case BVEQ | BVNEQ =>
           BoolBType
@@ -722,11 +716,6 @@ case class BMemoryStore(memory: BMapVar, index: BExpr, value: BExpr, endian: End
   override def locals: Set[BVar] = memory.locals ++ index.locals ++ value.locals
   override def globals: Set[BVar] = index.globals ++ memory.globals ++ value.globals
   override def loads: Set[BExpr] = index.loads ++ value.loads
-}
-
-case class BDirectExpr(text: String, t: BType) extends BExpr {
-  override def toString: String = text
-  override def getType: BType = t
 }
 
 case class GammaLoad(gammaMap: BMapVar, index: BExpr, bits: Int, accesses: Int) extends BExpr {
