@@ -55,7 +55,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
    * Test that the analysis correctly identifies the stack pointer even when it is aliased
    */
   test("stack pointer aliasing: MMM Stage") {
-    val program: Program = prog(
+    var program: Program = prog(
       proc("main",
         block("0x0",
           LocalAssign(getRegister("R6"), getRegister("R31")),
@@ -71,6 +71,9 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    program = returnUnifier.visitProgram(program)
+
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
     assert(results.mmmResults.findStackObject(BigInt(4)).isDefined)
@@ -82,7 +85,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
    * Test that the analysis correctly identifies stack pointers within regions
    */
   test("approximate stack region: MMM Stage") {
-    val program: Program = prog(
+    var program: Program = prog(
       proc("main",
         block("0x0",
           LocalAssign(getRegister("R1"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
@@ -97,6 +100,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
         )
       )
     )
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    program = returnUnifier.visitProgram(program)
 
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
@@ -156,7 +161,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
    * Test that the analysis correctly collects shared regions and exposes only the shared ones
    */
   test("collects single function shared regions: MMM Stage") {
-    val program: Program = prog(
+    var program: Program = prog(
       proc("main",
         block("0x0",
           LocalAssign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
@@ -182,6 +187,9 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    program = returnUnifier.visitProgram(program)
+
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
     assert(results.mmmResults.findStackObject(BigInt(6)).isDefined)
@@ -202,7 +210,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
    * Test that the analysis correctly collects shared regions from multiple functions
    */
   test("collects multiple functions shared regions: MMM Stage") {
-    val program: Program = prog(
+    var program: Program = prog(
       proc("main",
         block("0x0",
           LocalAssign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
@@ -237,6 +245,9 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
         )
       )
     )
+
+    val returnUnifier = ConvertToSingleProcedureReturn()
+    program = returnUnifier.visitProgram(program)
 
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
