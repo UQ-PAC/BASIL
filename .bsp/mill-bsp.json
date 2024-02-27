@@ -1,1 +1,0 @@
-{"name":"mill-bsp","argv":["mill", "--bsp","--disable-ticker","--color","false","--jobs","1"],"millVersion":"0.11.6","bspVersion":"2.1.0-M7","languages":["scala","java"]}

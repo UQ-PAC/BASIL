@@ -6,7 +6,7 @@ import org.scalatest.BeforeAndAfter
 import specification.SpecGlobal
 import translating.BAPToIR
 import util.{LogLevel, Logger}
-import util.RunUtils.{loadBAP, loadReadELF}
+import util.IRLoading.{loadBAP, loadReadELF}
 import util.ILLoadingConfig
 
 class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
@@ -18,14 +18,13 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
 
     val loading = ILLoadingConfig(
-      adtFile = s"examples/$name/$name.adt",
+      inputFile = s"examples/$name/$name.adt",
       relfFile = s"examples/$name/$name.relf",
       specFile = None,
-      dumpIL = None,
-      mainProcedureName = "main",
+      dumpIL = None
     )
 
-    val bapProgram = loadBAP(loading.adtFile)
+    val bapProgram = loadBAP(loading.inputFile)
     val (externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate

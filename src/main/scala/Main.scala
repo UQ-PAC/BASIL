@@ -16,8 +16,8 @@ object Main {
 
   @main(name = "BASIL")
   case class Config(
-      @arg(name = "adt", short = 'a', doc = "BAP ADT file name.")
-      adtFileName: String,
+      @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
+      inputFileName: String,
       @arg(name = "relf", short = 'r', doc = "Name of the file containing the output of 'readelf -s -r -W'.")
       relfFileName: String,
       @arg(name = "spec", short = 's', doc = "BASIL specification file.")
@@ -26,6 +26,8 @@ object Main {
       outFileName: String = "basil-out",
       @arg(name = "boogie-use-lambda-stores", doc = "Use lambda representation of store operations.")
       lambdaStores: Flag,
+      @arg(name = "boogie-procedure-rg", doc = "Switch version of procedure rely/guarantee checks to emit. (function|ifblock)")
+      procedureRG: Option[String],
       @arg(name = "verbose", short = 'v', doc = "Show extra debugging logs.")
       verbose: Flag,
       @arg(name = "analyse", doc = "Run static analysis pass.")
@@ -66,11 +68,19 @@ object Main {
       Logger.setLevel(LogLevel.DEBUG)
     }
 
+    val rely = conf.procedureRG match {
+      case Some("function") => Some(ProcRelyVersion.Function)
+      case Some("ifblock") => Some(ProcRelyVersion.IfCommandContradiction)
+      case None => None
+      case Some(_) => throw new IllegalArgumentException("Illegal option to boogie-procedure-rg, allowed are: ifblock,function")
+    }
+
     val q = BASILConfig(
-      loading = ILLoadingConfig(conf.adtFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth),
+      loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth),
       runInterpret = conf.interpret.value,
       staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot)) else None,
-      boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect),
+      boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect,
+        true, rely),
       outputPrefix = conf.outFileName,
     )
 
