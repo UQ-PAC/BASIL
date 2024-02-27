@@ -28,6 +28,7 @@ import scala.collection.mutable
 
 object RunUtils {
   var memoryRegionAnalysisResults: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
+  var mmmResults: MemoryModelMap = MemoryModelMap()
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
@@ -242,6 +243,7 @@ object RunUtils {
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
     mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, mraSolver.procedureToSharedRegions)
+    mmmResults = mmm
 
     Logger.info("[!] Running Steensgaard")
     val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, globalOffsets)
