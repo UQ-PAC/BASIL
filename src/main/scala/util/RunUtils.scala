@@ -58,7 +58,8 @@ case class StaticAnalysisContext(
     memoryRegionResult: Map[CfgNode, LiftedElement[Set[MemoryRegion]]],
     vsaResult: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
     interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElementLatticeEl]],
-    paramResults: Map[Procedure, Set[Variable]]
+    paramResults: Map[Procedure, Set[Variable]],
+    steensgaardResults: Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]]
 ) {}
 
 /** Results of the main program execution.
@@ -68,8 +69,6 @@ case class BasilResult(val ir: IRContext, analysis: Option[StaticAnalysisContext
 /** Tools for loading the IR program into an IRContext.
   */
 object IRLoading {
-  var memoryRegionAnalysisResults: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
-  var mmmResults: MemoryModelMap = MemoryModelMap()
 
   /** Create a context from just an IR program.
     */
@@ -314,6 +313,121 @@ object IRTransform {
     (IRProgram, modified)
   }
 
+  def resolveIndirectCallsUsingPointsTo(
+                               cfg: ProgramCfg,
+                               pointsTos: Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]],
+                               IRProgram: Program
+                             ): (Program, Boolean) = {
+    var modified: Boolean = false
+    val worklist = ListBuffer[CfgNode]()
+    cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
+
+    val visited = MutableSet[CfgNode]()
+    while (worklist.nonEmpty) {
+      val node = worklist.remove(0)
+      if (!visited.contains(node)) {
+        process(node)
+        node.succIntra.union(node.succInter).foreach(node => worklist.addOne(node))
+        visited.add(node)
+      }
+    }
+
+    def searchRegion(region: MemoryRegion): mutable.Set[String] = {
+      val result = mutable.Set[String]()
+      region match {
+        case stackRegion: StackRegion =>
+          for (c <- stackRegion.content) {
+            c match {
+              case bitVecLiteral: BitVecLiteral => ???
+              case memoryRegion: MemoryRegion =>
+                result.addAll(searchRegion(memoryRegion))
+            }
+          }
+          result
+        case dataRegion: DataRegion =>
+          if (dataRegion.content.isEmpty) {
+            result.add(dataRegion.regionIdentifier)
+          } else {
+            for (c <- dataRegion.content) {
+              c match {
+                case bitVecLiteral: BitVecLiteral => ???
+                case memoryRegion: MemoryRegion =>
+                  result.addAll(searchRegion(memoryRegion))
+              }
+            }
+          }
+          result
+      }
+    }
+
+    def addFakeProcedure(name: String): Procedure = {
+      val newProcedure = Procedure(name)
+      IRProgram.procedures += newProcedure
+      newProcedure
+    }
+
+    def resolveAddresses(variable: Variable): mutable.Set[String] = {
+      val names = mutable.Set[String]()
+      val variableWrapper = RegisterVariableWrapper(variable)
+      pointsTos.get(variableWrapper) match {
+        case Some(value) =>
+          value.map {
+            case v: VariableWrapper => names.addAll(resolveAddresses(v.variable))
+            case m: MemoryRegion =>
+              names.addAll(searchRegion(m))
+          }
+          names
+        case None => names
+      }
+    }
+
+    def process(n: CfgNode): Unit = n match {
+      case c: CfgJumpNode =>
+        val block = c.block
+        c.data match
+          case indirectCall: IndirectCall =>
+            if (block.jump != indirectCall) {
+              // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data
+              // Hence if we have already processed this CFG node there will be no corresponding IndirectCall in the IR
+              // to replace.
+              // We want to replace all possible indirect calls based on this CFG, before regenerating it from the IR
+              return
+            }
+            val targetNames = resolveAddresses(indirectCall.target)
+            println(s"Points-To approximated call ${indirectCall.target} with ${targetNames}")
+            println(IRProgram.procedures)
+            val targets: mutable.Set[Procedure] = targetNames.map(name => IRProgram.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
+
+            if (targets.size == 1) {
+              modified = true
+
+              // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
+              val newCall = DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label)
+              block.replaceJump(newCall)
+            } else if (targets.size > 1) {
+              modified = true
+              val procedure = c.parent.data
+              val newBlocks = ArrayBuffer[Block]()
+              // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
+              for (t <- targets) {
+                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
+                val newLabel: String = block.label + t.name
+                val directCall = DirectCall(t, indirectCall.returnTarget)
+                directCall.parent = indirectCall.parent
+
+                newBlocks.append(Block(newLabel, None, ArrayBuffer(assume), directCall))
+              }
+              procedure.addBlocks(newBlocks)
+              val newCall = GoTo(newBlocks, indirectCall.label)
+              block.replaceJump(newCall)
+            }
+          case _ =>
+      case _ =>
+    }
+
+    (IRProgram, modified)
+  }
+
   /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
     * add in modifies from the spec.
     */
@@ -339,6 +453,8 @@ object IRTransform {
 /** Methods relating to program static analysis.
   */
 object StaticAnalysis {
+  var memoryRegionAnalysisResults: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
+  var mmmResults: MemoryModelMap = MemoryModelMap()
 
   /** Run all static analysis passes on the provided IRProgram.
     */
@@ -498,6 +614,8 @@ object StaticAnalysis {
     Logger.info("[!] Running Parameter Analysis")
     val paramResults = ParamAnalysis(IRProgram).analyze()
 
+    mmm.printRegionsContent(false)
+
     StaticAnalysisContext(
       cfg = cfg,
       constPropResult = constPropResult,
@@ -505,7 +623,8 @@ object StaticAnalysis {
       memoryRegionResult = mraResult,
       vsaResult = vsaResult,
       interLiveVarsResults = interLiveVarsResults,
-      paramResults = paramResults
+      paramResults = paramResults,
+      steensgaardResults = steensgaardSolver.pointsTo().asInstanceOf[Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]]]
     )
   }
 
@@ -662,138 +781,6 @@ object StaticAnalysis {
   }
 
 }
-  def resolveCFGUsingPointsTo(
-      cfg: ProgramCfg,
-      pointsTos: Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]],
-      IRProgram: Program
-    ): (Program, Boolean) = {
-    var modified: Boolean = false
-    val worklist = ListBuffer[CfgNode]()
-    cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
-
-    val visited = MutableSet[CfgNode]()
-    while (worklist.nonEmpty) {
-      val node = worklist.remove(0)
-      if (!visited.contains(node)) {
-        process(node)
-        node.succIntra.union(node.succInter).foreach(node => worklist.addOne(node))
-        visited.add(node)
-      }
-    }
-
-    def searchRegion(region: MemoryRegion): mutable.Set[String] = {
-      val result = mutable.Set[String]()
-      region match {
-        case stackRegion: StackRegion =>
-          for (c <- stackRegion.content) {
-            c match {
-              case bitVecLiteral: BitVecLiteral => ???
-              case memoryRegion: MemoryRegion =>
-                result.addAll(searchRegion(memoryRegion))
-            }
-          }
-          result
-        case dataRegion: DataRegion =>
-          if (dataRegion.content.isEmpty) {
-            result.add(dataRegion.regionIdentifier)
-          } else {
-            for (c <- dataRegion.content) {
-              c match {
-                case bitVecLiteral: BitVecLiteral => ???
-                case memoryRegion: MemoryRegion =>
-                  result.addAll(searchRegion(memoryRegion))
-              }
-            }
-          }
-          result
-      }
-    }
-
-    def addFakeProcedure(name: String): Procedure = {
-      val newProcedure = Procedure(name)
-      IRProgram.procedures += newProcedure
-      newProcedure
-    }
-
-    def resolveAddresses(variable: Variable): mutable.Set[String] = {
-      val names = mutable.Set[String]()
-      val variableWrapper = RegisterVariableWrapper(variable)
-      pointsTos.get(variableWrapper) match {
-        case Some(value) =>
-          value.map {
-            case v: VariableWrapper => names.addAll(resolveAddresses(v.variable))
-            case m: MemoryRegion =>
-              names.addAll(searchRegion(m))
-          }
-          names
-        case None => names
-      }
-    }
-
-    def process(n: CfgNode): Unit = n match {
-      case c: CfgJumpNode =>
-        val block = c.block
-        c.data match
-          case indirectCall: IndirectCall =>
-            if (block.jump != indirectCall) {
-              // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data
-              // Hence if we have already processed this CFG node there will be no corresponding IndirectCall in the IR
-              // to replace.
-              // We want to replace all possible indirect calls based on this CFG, before regenerating it from the IR
-              return
-            }
-            val targetNames = resolveAddresses(indirectCall.target)
-            println(s"Points-To approximated call ${indirectCall.target} with ${targetNames}")
-            println(IRProgram.procedures)
-            val targets: mutable.Set[Procedure] = targetNames.map(name => IRProgram.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
-
-            if (targets.size == 1) {
-              modified = true
-
-              // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
-              val newCall = DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label)
-              block.replaceJump(newCall)
-            } else if (targets.size > 1) {
-              modified = true
-              val procedure = c.parent.data
-              val newBlocks = ArrayBuffer[Block]()
-              // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
-              for (t <- targets) {
-                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
-                val newLabel: String = block.label + t.name
-                val directCall = DirectCall(t, indirectCall.returnTarget)
-                directCall.parent = indirectCall.parent
-
-                newBlocks.append(Block(newLabel, None, ArrayBuffer(assume), directCall))
-              }
-              procedure.addBlocks(newBlocks)
-              val newCall = GoTo(newBlocks, indirectCall.label)
-              block.replaceJump(newCall)
-            }
-          case _ =>
-      case _ =>
-    }
-    (IRProgram, modified)
-  }
-
-  def resolveCFG(
-      cfg: ProgramCfg,
-      valueSets: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
-      IRProgram: Program
-  ): (Program, Boolean) = {
-    var modified: Boolean = false
-    val worklist = ListBuffer[CfgNode]()
-    cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
-
-    val visited = MutableSet[CfgNode]()
-    while (worklist.nonEmpty) {
-      val node = worklist.remove(0)
-      if (!visited.contains(node)) {
-        process(node)
-        node.succIntra.union(node.succInter).foreach(node => worklist.addOne(node))
-        visited.add(node)
-      }
-    }
 
 object RunUtils {
 
@@ -831,7 +818,7 @@ object RunUtils {
   }
 
   /** Use static analysis to resolve indirect calls and replace them in the IR until fixed point.
-    */
+   */
   def staticAnalysis(config: StaticAnalysisConfig, ctx: IRContext): StaticAnalysisContext = {
     var iteration = 1
     var modified: Boolean = true
@@ -842,7 +829,8 @@ object RunUtils {
       val result = StaticAnalysis.analyse(ctx, config, iteration)
       analysisResult.append(result)
       Logger.info("[!] Replacing Indirect Calls")
-      val (ir, mod) = IRTransform.resolveIndirectCalls(result.cfg, result.vsaResult, ctx.program)
+      //val (ir, mod) = IRTransform.resolveIndirectCalls(result.cfg, result.vsaResult, ctx.program)
+      val (ir, mod) = IRTransform.resolveIndirectCallsUsingPointsTo(result.cfg, result.steensgaardResults, ctx.program)
       modified = mod
       if (modified) {
         iteration += 1
