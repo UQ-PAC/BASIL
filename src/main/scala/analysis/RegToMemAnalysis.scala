@@ -14,15 +14,13 @@ import scala.collection.immutable
  *
  * Both in which constant propagation mark as TOP which is not useful.
  */
-trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]) {
+trait RegionAccessesAnalysis(prog: Program, constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) {
 
   val mapLattice: MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]] = MapLattice(FlatLattice[_root_.ir.Expr]())
 
-  val lattice: MapLattice[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] = MapLattice(mapLattice)
+  val lattice: MapLattice[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] = MapLattice(mapLattice)
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
-
-  val first: Set[CfgNode] = Set(cfg.startNode)
+  val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, prog.procedures).toSet
 
   /** Default implementation of eval.
    */
@@ -46,22 +44,22 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
 
   /** Transfer function for state lattice elements.
    */
-  def localTransfer(n: CfgNode, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = n match {
-    case cmd: CfgCommandNode =>
-      eval(cmd.data, constantProp(n), s)
+  def localTransfer(n: CFGPosition, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = n match {
+    case cmd: Command =>
+      eval(cmd, constantProp(n), s)
     case _ => s // ignore other kinds of nodes
   }
 
   /** Transfer function for state lattice elements.
    */
-  def transfer(n: CfgNode, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = localTransfer(n, s)
+  def transfer(n: CFGPosition, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = localTransfer(n, s)
 }
 
 class RegionAccessesAnalysisSolver(
-                         cfg: ProgramCfg,
-                         constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
-                       ) extends RegionAccessesAnalysis(cfg, constantProp)
-  with InterproceduralForwardDependencies
-  with Analysis[Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]]
-  with SimpleWorklistFixpointSolver[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] {
+                         prog: Program,
+                         constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                       ) extends RegionAccessesAnalysis(prog, constantProp)
+  with IRInterproceduralForwardDependencies
+  with Analysis[Map[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]]]]
+  with SimpleWorklistFixpointSolver[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] {
 }

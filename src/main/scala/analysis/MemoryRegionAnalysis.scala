@@ -7,14 +7,14 @@ import util.Logger
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-trait MemoryRegionAnalysis(val cfg: ProgramCfg,
+trait MemoryRegionAnalysis(val prog: Program,
                            val globals: Map[BigInt, String],
                            val globalOffsets: Map[BigInt, BigInt],
                            val subroutines: Map[BigInt, String],
-                           val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
-                           val ANRResult: Map[CfgNode, Set[Variable]],
-                           val RNAResult: Map[CfgNode, Set[Variable]],
-                           val regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]) {
+                           val constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                           val ANRResult: Map[CFGPosition, Set[Variable]],
+                           val RNAResult: Map[CFGPosition, Set[Variable]],
+                           val regionAccesses: Map[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]]]) {
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
@@ -74,11 +74,11 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
    */
   val liftedLattice: LiftLattice[Set[MemoryRegion], PowersetLattice[MemoryRegion]] = LiftLattice(regionLattice)
 
-  val lattice: MapLattice[CfgNode, LiftedElement[Set[MemoryRegion]], LiftLattice[Set[MemoryRegion], PowersetLattice[MemoryRegion]]] = MapLattice(liftedLattice)
+  val lattice: MapLattice[CFGPosition, LiftedElement[Set[MemoryRegion]], LiftLattice[Set[MemoryRegion], PowersetLattice[MemoryRegion]]] = MapLattice(liftedLattice)
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
+  val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, prog.procedures).toSet
 
-  val first: Set[CfgNode] = cfg.funEntries.toSet
+  val first: Set[CFGPosition] = prog.procedures.toSet // TODO: Check if this is right
 
   private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
@@ -90,7 +90,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
   val registerToRegions: mutable.Map[RegisterVariableWrapper, mutable.Set[MemoryRegion]] = mutable.Map()
   val procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]] = mutable.Map()
 
-  def reducibleToRegion(binExpr: BinaryExpr, n: CfgCommandNode): Set[MemoryRegion] = {
+  def reducibleToRegion(binExpr: BinaryExpr, n: Command): Set[MemoryRegion] = {
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
       case variable: Variable =>
@@ -112,7 +112,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                       val nextOffset = BinaryExpr(op = BVADD, arg1 = stackRegion.start, arg2 = b)
                       evaluateExpression(nextOffset, constantProp(n)) match {
                         case Some(b2: BitVecLiteral) =>
-                          reducedRegions = reducedRegions + poolMaster(b2, n.parent.data)
+                          reducedRegions = reducedRegions + poolMaster(b2, n.parent.parent)
                         case None =>
                       }
                     case _ =>
@@ -126,7 +126,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     reducedRegions
   }
 
-  def eval(exp: Expr, env: Set[MemoryRegion], n: CfgCommandNode): Set[MemoryRegion] = {
+  def eval(exp: Expr, env: Set[MemoryRegion], n: Command): Set[MemoryRegion] = {
     Logger.debug(s"evaluating $exp")
     Logger.debug(s"env: $env")
     Logger.debug(s"n: $n")
@@ -134,7 +134,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
       case binOp: BinaryExpr =>
         if (spList.contains(binOp.arg1)) {
           evaluateExpression(binOp.arg2, constantProp(n)) match {
-            case Some(b: BitVecLiteral) => Set(poolMaster(b, n.parent.data))
+            case Some(b: BitVecLiteral) => Set(poolMaster(b, n.parent.parent))
             case None => env
           }
         } else if (reducibleToRegion(binOp, n).nonEmpty) {
@@ -173,12 +173,12 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
 
   /** Transfer function for state lattice elements.
    */
-  def localTransfer(n: CfgNode, s: Set[MemoryRegion]): Set[MemoryRegion] = n match {
-    case cmd: CfgCommandNode =>
-      cmd.data match {
+  def localTransfer(n: CFGPosition, s: Set[MemoryRegion]): Set[MemoryRegion] = n match {
+    case cmd: Command =>
+      cmd match {
         case directCall: DirectCall =>
           val ANR = ANRResult(n)
-          val RNA = RNAResult(cfg.funEntries.filter(fn => fn.data == directCall.target).head)
+          val RNA = RNAResult(prog.procedures.filter(fn => fn == directCall.target).head)
           val parameters = RNA.intersect(ANR)
           val ctx = regionAccesses(n)
           for (elem <- parameters) {
@@ -223,27 +223,27 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     case _ => s // ignore other kinds of nodes
   }
 
-  def transferUnlifted(n: CfgNode, s: Set[MemoryRegion]): Set[MemoryRegion] = localTransfer(n, s)
+  def transferUnlifted(n: CFGPosition, s: Set[MemoryRegion]): Set[MemoryRegion] = localTransfer(n, s)
 }
 
 class MemoryRegionAnalysisSolver(
-    cfg: ProgramCfg,
+    prog: Program,
     globals: Map[BigInt, String],
     globalOffsets: Map[BigInt, BigInt],
     subroutines: Map[BigInt, String],
-    constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
-    ANRResult: Map[CfgNode, Set[Variable]],
-    RNAResult: Map[CfgNode, Set[Variable]],
-    regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]
-  ) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, regionAccesses)
-  with IntraproceduralForwardDependencies
-  with Analysis[Map[CfgNode, LiftedElement[Set[MemoryRegion]]]]
-  with WorklistFixpointSolverWithReachability[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]] {
+    constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+    ANRResult: Map[CFGPosition, Set[Variable]],
+    RNAResult: Map[CFGPosition, Set[Variable]],
+    regionAccesses: Map[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]]]
+  ) extends MemoryRegionAnalysis(prog, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, regionAccesses)
+  with IRIntraproceduralForwardDependencies
+  with Analysis[Map[CFGPosition, LiftedElement[Set[MemoryRegion]]]]
+  with WorklistFixpointSolverWithReachability[CFGPosition, Set[MemoryRegion], PowersetLattice[MemoryRegion]] {
 
-  override def funsub(n: CfgNode, x: Map[CfgNode, LiftedElement[Set[MemoryRegion]]]): LiftedElement[Set[MemoryRegion]] = {
+  override def funsub(n: CFGPosition, x: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]]): LiftedElement[Set[MemoryRegion]] = {
     n match {
       // function entry nodes are always reachable as this is intraprocedural
-      case _: CfgFunctionEntryNode => liftedLattice.lift(regionLattice.bottom)
+      case _: Procedure => liftedLattice.lift(regionLattice.bottom)
       // all other nodes are processed with join+transfer
       case _ => super.funsub(n, x)
     }

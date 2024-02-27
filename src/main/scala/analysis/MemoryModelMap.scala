@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.*
-import ir.{BitVecLiteral, Procedure}
+import ir.{BitVecLiteral, CFGPosition, Command, Procedure}
 
 import scala.collection.mutable
 
@@ -88,14 +88,14 @@ class MemoryModelMap {
     DataRegion(name, BitVecLiteral(tableAddress, 64))
   }
 
-  def convertMemoryRegions(memoryRegions: Map[CfgNode, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
+  def convertMemoryRegions(memoryRegions: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
     val externalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(name, BitVecLiteral(offset, 64), globalOffsets))
 
     // we should collect all data regions otherwise the ordering might be wrong
     var dataRgns: Set[DataRegion] = Set.empty
     // get all function exit node
-    val exitNodes = memoryRegions.keys.collect { case e: CfgFunctionExitNode => e }
+    val exitNodes = memoryRegions.keys.collect { case e: Command if e. => e }
     exitNodes.foreach(exitNode =>
       memoryRegions(exitNode) match {
         case Lift(node) =>

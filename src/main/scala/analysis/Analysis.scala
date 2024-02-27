@@ -22,7 +22,7 @@ trait Analysis[+R]:
 
 /** Base class for value analysis with simple (non-lifted) lattice.
   */
-trait ConstantPropagation(val cfg: ProgramCfg) {
+trait ConstantPropagation(val prog: Program) {
   /** The lattice of abstract states.
     */
 
@@ -75,10 +75,10 @@ trait ConstantPropagation(val cfg: ProgramCfg) {
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] =
+  def localTransfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] =
     n match
-      case r: CfgCommandNode =>
-        r.data match
+      case r: Command =>
+        r match
           // assignments
           case la: LocalAssign =>
             s + (la.lhs -> eval(la.rhs, s))
@@ -88,23 +88,23 @@ trait ConstantPropagation(val cfg: ProgramCfg) {
 
   /** The analysis lattice.
     */
-  val lattice: MapLattice[CfgNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]] = MapLattice(statelattice)
+  val lattice: MapLattice[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]] = MapLattice(statelattice)
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
+  val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, prog.procedures).toSet
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transfer(n: CfgNode, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = localTransfer(n, s)
+  def transfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = localTransfer(n, s)
 }
 
-class ConstantPropagationSolver(cfg: ProgramCfg) extends ConstantPropagation(cfg)
-    with SimplePushDownWorklistFixpointSolver[CfgNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
-    with IntraproceduralForwardDependencies
-    with Analysis[Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]]
+class ConstantPropagationSolver(prog: Program) extends ConstantPropagation(prog)
+    with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
+    with IRIntraproceduralForwardDependencies
+    with Analysis[Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]]
 
 /** Base class for value analysis with simple (non-lifted) lattice.
  */
-trait ConstantPropagationWithSSA(val cfg: ProgramCfg) {
+trait ConstantPropagationWithSSA(val prog: Program) {
   /** The lattice of abstract states.
    */
 
@@ -157,10 +157,10 @@ trait ConstantPropagationWithSSA(val cfg: ProgramCfg) {
 
   /** Transfer function for state lattice elements.
    */
-  def localTransfer(n: CfgNode, s: Map[RegisterVariableWrapper, Set[BitVecLiteral]]): Map[RegisterVariableWrapper, Set[BitVecLiteral]] =
+  def localTransfer(n: CFGPosition, s: Map[RegisterVariableWrapper, Set[BitVecLiteral]]): Map[RegisterVariableWrapper, Set[BitVecLiteral]] =
     n match
-      case r: CfgCommandNode =>
-        r.data match
+      case r: Command =>
+        r match
           // assignments
           case la: LocalAssign =>
             if (s.contains(RegisterVariableWrapper(la.lhs))) {
@@ -174,16 +174,16 @@ trait ConstantPropagationWithSSA(val cfg: ProgramCfg) {
 
   /** The analysis lattice.
    */
-  val lattice: MapLattice[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]], MapLattice[RegisterVariableWrapper, Set[BitVecLiteral], ConstantPropagationLatticeWithSSA]] = MapLattice(statelattice)
+  val lattice: MapLattice[CFGPosition, Map[RegisterVariableWrapper, Set[BitVecLiteral]], MapLattice[RegisterVariableWrapper, Set[BitVecLiteral], ConstantPropagationLatticeWithSSA]] = MapLattice(statelattice)
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
+  val domain: Set[CFGPosition] = computeDomain(InterProcIRCursor, prog.procedures).toSet
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
    */
-  def transfer(n: CfgNode, s: Map[RegisterVariableWrapper, Set[BitVecLiteral]]): Map[RegisterVariableWrapper, Set[BitVecLiteral]] = localTransfer(n, s)
+  def transfer(n: CFGPosition, s: Map[RegisterVariableWrapper, Set[BitVecLiteral]]): Map[RegisterVariableWrapper, Set[BitVecLiteral]] = localTransfer(n, s)
 }
 
-class ConstantPropagationSolverWithSSA(cfg: ProgramCfg) extends ConstantPropagationWithSSA(cfg)
-  with SimplePushDownWorklistFixpointSolver[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]], MapLattice[RegisterVariableWrapper, Set[BitVecLiteral], ConstantPropagationLatticeWithSSA]]
-  with IntraproceduralForwardDependencies
-  with Analysis[Map[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]]]]
+class ConstantPropagationSolverWithSSA(prog: Program) extends ConstantPropagationWithSSA(prog)
+  with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[RegisterVariableWrapper, Set[BitVecLiteral]], MapLattice[RegisterVariableWrapper, Set[BitVecLiteral], ConstantPropagationLatticeWithSSA]]
+  with IRInterproceduralForwardDependencies
+  with Analysis[Map[CFGPosition, Map[RegisterVariableWrapper, Set[BitVecLiteral]]]]

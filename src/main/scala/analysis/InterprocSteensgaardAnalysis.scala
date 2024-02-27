@@ -31,9 +31,9 @@ case class RegisterVariableWrapper(variable: Variable) extends VariableWrapper {
   * expression node in the AST. It is implemented using [[analysis.solvers.UnionFindSolver]].
   */
 class InterprocSteensgaardAnalysis(
-      cfg: ProgramCfg,
-      constantProp: Map[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]]],
-      regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
+      prog: Program,
+      constantProp: Map[CFGPosition, Map[RegisterVariableWrapper, Set[BitVecLiteral]]],
+      regionAccesses: Map[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]]],
       mmm: MemoryModelMap) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
@@ -74,7 +74,7 @@ class InterprocSteensgaardAnalysis(
    * @param n
    * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
    */
-  def reducibleToRegion(binExpr: BinaryExpr, n: CfgCommandNode, shared: Boolean = false): Set[MemoryRegion] = {
+  def reducibleToRegion(binExpr: BinaryExpr, n: Command, shared: Boolean = false): Set[MemoryRegion] = {
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
       case variable: Variable =>
@@ -126,10 +126,10 @@ class InterprocSteensgaardAnalysis(
    * @param n
    * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
    */
-  def exprToRegion(expr: Expr, n: CfgCommandNode, shared: Boolean = false): Set[MemoryRegion] = {
+  def exprToRegion(expr: Expr, n: Command, shared: Boolean = false): Set[MemoryRegion] = {
     var res = Set[MemoryRegion]()
     mmm.popContext()
-    mmm.pushContext(n.parent.data.name)
+    mmm.pushContext(n.parent.parent.name)
     expr match { // TODO: Stack detection here should be done in a better way or just merged with data
       case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
         evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach {
@@ -176,7 +176,7 @@ class InterprocSteensgaardAnalysis(
     */
   def analyze(): Unit =
     // generate the constraints by traversing the AST and solve them on-the-fly
-    cfg.nodes.foreach(visit(_, ()))
+    prog.procedures.foreach(p => p.blocks.foreach(b => b.statements.foreach(s => visit(s, ()))))
 
   /** Generates the constraints for the given sub-AST.
     * @param node
@@ -184,15 +184,15 @@ class InterprocSteensgaardAnalysis(
     * @param arg
     *   unused for this visitor
     */
-  def visit(n: CfgNode, arg: Unit): Unit = {
+  def visit(n: Statement, arg: Unit): Unit = {
 
     def varToStTerm(vari: VariableWrapper): Term[StTerm] = IdentifierVariable(vari)
     def exprToStTerm(expr: MemoryRegion | Expr): Term[StTerm] = ExpressionVariable(expr)
     def allocToTerm(alloc: MemoryRegion): Term[StTerm] = AllocVariable(alloc)
 
     n match {
-      case cmd: CfgCommandNode =>
-        cmd.data match {
+      case cmd: Command =>
+        cmd match {
           case directCall: DirectCall =>
             // X = alloc P:  [[X]] = ↑[[alloc-i]]
             if (directCall.target.name == "malloc") {

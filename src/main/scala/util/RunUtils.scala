@@ -27,7 +27,7 @@ import scala.collection.mutable
 
 
 object RunUtils {
-  var memoryRegionAnalysisResults: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
+  var memoryRegionAnalysisResults: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]] = Map()
 
   // ids reserved by boogie
   val reserved: Set[String] = Set("free")
@@ -176,85 +176,80 @@ object RunUtils {
     val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
 
     Logger.info("[!] Running ANR")
-    val ANRSolver = ANRAnalysisSolver(cfg)
+    val ANRSolver = ANRAnalysisSolver(IRProgram)
     val ANRResult = ANRSolver.analyze()
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(ANRResult, true), Output.dotIder), s"${s}_ANR$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, ANRResult, iteration), s"${s}_ANR$iteration.txt"))
+    //config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(ANRResult, true), Output.dotIder), s"${s}_ANR$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, ANRResult), s"${s}_ANR$iteration.txt"))
 
     Logger.info("[!] Running RNA")
-    val RNASolver = RNAAnalysisSolver(cfg)
+    val RNASolver = RNAAnalysisSolver(IRProgram)
     val RNAResult = RNASolver.analyze()
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(RNAResult, true), Output.dotIder), s"${s}_RNA$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, RNAResult, iteration), s"${s}_RNA$iteration.txt"))
+    //config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(RNAResult, true), Output.dotIder), s"${s}_RNA$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, RNAResult), s"${s}_RNA$iteration.txt"))
 
     Logger.info("[!] Running Constant Propagation")
-    val constPropSolver = ConstantPropagationSolver(cfg)
+    val constPropSolver = ConstantPropagationSolver(IRProgram)
     val constPropResult = constPropSolver.analyze()
+
+    //config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, constPropResult), s"${s}_constprop$iteration.txt"))
 
     val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
     val newCPResult = ilcpsolver.analyze()
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_new_ir_constprop$iteration.txt"))
-
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_constprop$iteration.txt"))
-
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResult, true), Output.dotIder), s"${s}_constprop$iteration.dot"))
 
     config.analysisDotPath.foreach(f => {
       val dumpdomain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, IRProgram.procedures)
       writeToFile(toDot(dumpdomain, InterProcIRCursor, Map.empty), s"${f}_new_ir_intercfg$iteration.dot")
     })
 
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_constprop$iteration.txt"))
-
     Logger.info("[!] Running RegToMemAnalysisSolver")
-    val regionAccessesAnalysisSolver = RegionAccessesAnalysisSolver(cfg, constPropResult)
+    val regionAccessesAnalysisSolver = RegionAccessesAnalysisSolver(IRProgram, constPropResult)
     val regionAccessesAnalysisResults = regionAccessesAnalysisSolver.analyze()
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(regionAccessesAnalysisResults, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, regionAccessesAnalysisResults, iteration), s"${s}_RegTo$iteration.txt"))
+    //config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(regionAccessesAnalysisResults, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, regionAccessesAnalysisResults), s"${s}_RegTo$iteration.txt"))
 
     Logger.info("[!] Running Constant Propagation with SSA")
-    val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(cfg)
+    val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(IRProgram)
     val constPropResultWithSSA = constPropSolverWithSSA.analyze()
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResultWithSSA, true), Output.dotIder), s"${s}_constpropWithSSA$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResultWithSSA, iteration), s"${s}_constpropWithSSA$iteration.txt"))
+    //config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResultWithSSA, true), Output.dotIder), s"${s}_constpropWithSSA$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, constPropResultWithSSA), s"${s}_constpropWithSSA$iteration.txt"))
 
     Logger.info("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults)
+    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults)
     val mraResult = mraSolver.analyze()
     memoryRegionAnalysisResults = mraResult
 
     config.analysisDotPath.foreach(s => {
-
-      writeToFile(cfg.toDot(Output.labeler(mraResult, true), Output.dotIder), s"${s}_mra$iteration.dot")
+      //writeToFile(cfg.toDot(Output.labeler(mraResult, true), Output.dotIder), s"${s}_mra$iteration.dot")
       writeToFile(dotCallGraph(IRProgram), s"${s}_callgraph$iteration.dot")
       writeToFile(dotBlockGraph(IRProgram, IRProgram.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph$iteration.dot")
 
       writeToFile(toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> (newCPResult(b).toString)).toMap), s"${s}_new_ir_constprop$iteration.dot")
 
     })
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, mraResult), s"${s}_mra$iteration.txt"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, mraResult), s"${s}_mra$iteration.txt"))
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
     mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, mraSolver.procedureToSharedRegions)
 
     Logger.info("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm)
+    val steensgaardSolver = InterprocSteensgaardAnalysis(IRProgram, constPropResultWithSSA, regionAccessesAnalysisResults, mmm)
     steensgaardSolver.analyze()
     steensgaardSolver.pointsTo()
     steensgaardSolver.mayAlias()
 
     Logger.info("[!] Running VSA")
-    val vsaSolver = ValueSetAnalysisSolver(cfg, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
-    val vsaResult: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
+    val vsaSolver = ValueSetAnalysisSolver(IRProgram, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
+    val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, true), Output.dotIder), s"${s}_vsa$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, cfg, vsaResult), s"${s}_vsa$iteration.txt"))
+    //config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(vsaResult, true), Output.dotIder), s"${s}_vsa$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, vsaResult), s"${s}_vsa$iteration.txt"))
 
     Logger.info("[!] Resolving CFG")
     val (newIR, modified): (Program, Boolean) =  resolveCFG(cfg, vsaResult, IRProgram)
@@ -417,14 +412,14 @@ object RunUtils {
 
   def resolveCFG(
       cfg: ProgramCfg,
-      valueSets: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
+      valueSets: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
       IRProgram: Program
   ): (Program, Boolean) = {
     var modified: Boolean = false
-    val worklist = ListBuffer[CfgNode]()
+    val worklist = ListBuffer[CFGPosition]()
     cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
 
-    val visited = MutableSet[CfgNode]()
+    val visited = MutableSet[CFGPosition]()
     while (worklist.nonEmpty) {
       val node = worklist.remove(0)
       if (!visited.contains(node)) {
@@ -521,7 +516,7 @@ object RunUtils {
         case globalAddress: GlobalAddress =>
           if (nameExists(globalAddress.name)) {
             functionNames += globalAddress
-            Logger.info(s"RESOLVED: Call to Global address ${globalAddress.name} rt statuesolved.")
+            Logger.info(s"RESOLVED: Call to Global address ${globalAddress.name} resolved.")
           } else {
             addFakeProcedure(globalAddress.name)
             functionNames += globalAddress
