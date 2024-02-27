@@ -37,7 +37,11 @@ This is a Scala 3 project using the [mill](mill-build.com) build system, it can 
 
 ### Local Development 
 
+
 The tool is a Scala project, and is therefore OS-independent, but is only tested under linux. 
+
+
+The protobuffer compiler is required to build the project (due to ddisasm), this can be installed as the apt `protobuf-compiler` package, or from [here](https://protobuf.dev/downloads/).
 
 Furthermore, lifting input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. 
 On Windows, WSL2 may be used to run any Linux-specific tasks, but it is less thoroughly tested.
@@ -69,7 +73,7 @@ Creating BSP connection file: /home/am/Documents/programming/2023/bil-to-boogie-
 + fixed='{"name":"mill-bsp","argv":["./mill","--bsp","--disable-ticker","--color","false","--jobs","1"],"millVersion":"0.11.6","bspVersion":"2.1.0-M7","languages":["scala","java"]}'
 ```
 More information is available [here](https://mill-build.com/mill/Installation_IDE_Support.html#_build_server_protocol_bsp).
-
+However 
 ### Note about using sbt with IntelliJ
 
 [See Also](https://github.com/UQ-PAC/bil-to-boogie-translator/wiki/Development)
