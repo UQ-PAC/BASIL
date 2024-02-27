@@ -15,14 +15,14 @@ def wrap(input: String, width: Integer = 20): String =
   if (input.length() <= width) {
     input
   } else {
-    var splitPoint = width;
+    var splitPoint = width
     while (input.charAt(splitPoint).isLetterOrDigit && splitPoint > width / 2) {
       // search backwards for a non alphanumeric charcter to split on
       splitPoint -= 1
     }
     if (input.charAt(splitPoint).isLetterOrDigit) {
       // didn't find a character to split on
-      splitPoint = width;
+      splitPoint = width
     }
     val line = input.substring(0, splitPoint)
     line + "\\l" + wrap(input.substring(splitPoint), width)

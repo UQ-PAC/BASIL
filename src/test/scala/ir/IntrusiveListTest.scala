@@ -15,7 +15,7 @@ class IntrusiveListElemTest  extends AnyFunSuite {
   }
 
   test("ListElem traversal") {
-    val x = Elem(10);
+    val x = Elem(10)
     val p1 = x.insertBefore(Elem(9))
     assert(p1.hasNext)
     assert(x.hasPrev)
