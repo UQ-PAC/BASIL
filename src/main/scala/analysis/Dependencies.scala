@@ -32,9 +32,14 @@ trait IntraproceduralForwardDependencies extends Dependencies[CfgNode] {
   override def indep(n: CfgNode): Set[CfgNode] = n.predIntra.toSet
 }
 
+trait InterproceduralBackwardDependencies extends Dependencies[CfgNode] {
+  override def outdep(n: CfgNode): Set[CfgNode] = n.predInter.toSet
+  override def indep(n: CfgNode): Set[CfgNode] = n.succInter.toSet
+}
+
 trait IntraproceduralBackwardDependencies extends Dependencies[CfgNode] {
-  def outdep(n: CfgNode): Set[CfgNode] = n.predIntra.toSet
-  def indep(n: CfgNode): Set[CfgNode] = n.succIntra.toSet
+  override def outdep(n: CfgNode): Set[CfgNode] = n.predIntra.toSet
+  override def indep(n: CfgNode): Set[CfgNode] = n.succIntra.toSet
 }
 
 

@@ -89,6 +89,7 @@ trait CfgNodeWithData[T] extends CfgNode {
 /** Control-flow graph node for the entry of a function.
   */
 class CfgFunctionEntryNode(val data: Procedure) extends CfgNodeWithData[Procedure]:
+  val callers: mutable.Set[CfgFunctionEntryNode] = mutable.Set[CfgFunctionEntryNode]()
   override def toString: String = s"[FunctionEntry] $data"
 
   /** Copy this node, but give unique ID and reset edges */
@@ -366,7 +367,7 @@ class ProgramCfgFactory:
     * @param inlineLimit
     *   How many levels deep to inline function calls. Default is 3
     */
-  def fromIR(program: Program, unify: Boolean = false, inlineLimit: Int = 3): ProgramCfg = {
+  def fromIR(program: Program, unify: Boolean = true, inlineLimit: Int = 0): ProgramCfg = {
     CfgNode.id = 0
     require(inlineLimit >= 0, "Can't inline procedures to negative depth...")
     Logger.info("[+] Generating CFG...")
@@ -381,6 +382,18 @@ class ProgramCfgFactory:
     )
 
     // Create CFG for individual procedures
+    program.procedures.foreach(
+      proc => {
+        val funcEntryNode: CfgFunctionEntryNode = CfgFunctionEntryNode(proc)
+        val funcExitNode: CfgFunctionExitNode = CfgFunctionExitNode(proc)
+        cfg.nodes += funcEntryNode
+        cfg.nodes += funcExitNode
+        cfg.funEntries += funcEntryNode
+
+        procToCfg += (proc -> (funcEntryNode, funcExitNode))
+        callToNodes += (funcEntryNode -> mutable.Set())
+      }
+    )
     program.procedures.foreach(proc => cfgForProcedure(proc))
 
     // Inline functions up to `inlineLimit` level
@@ -390,7 +403,7 @@ class ProgramCfgFactory:
     //    `addInterprocEdges`.
     val procCallNodes: Set[CfgJumpNode] = procToCalls.values.flatten.toSet
     val leafCallNodes: Set[CfgJumpNode] =
-      if !unify then inlineProcedureCalls(procCallNodes, inlineLimit) else unifyProcedureCalls(procCallNodes)
+      if !unify then inlineProcedureCalls(procCallNodes, inlineLimit) else procCallNodes
 
     // Add inter-proc edges to leaf call nodes
     if (leafCallNodes.nonEmpty) {
@@ -409,14 +422,8 @@ class ProgramCfgFactory:
     *   Procedure for which to generate the intraprocedural cfg
     */
   private def cfgForProcedure(proc: Procedure): Unit = {
-    val funcEntryNode: CfgFunctionEntryNode = CfgFunctionEntryNode(proc)
-    val funcExitNode: CfgFunctionExitNode = CfgFunctionExitNode(proc)
-    cfg.nodes += funcEntryNode
-    cfg.nodes += funcExitNode
-    cfg.funEntries += funcEntryNode
-
-    procToCfg += (proc -> (funcEntryNode, funcExitNode))
-    callToNodes += (funcEntryNode -> mutable.Set())
+    val funcEntryNode: CfgFunctionEntryNode = procToCfg(proc)._1
+    val funcExitNode: CfgFunctionExitNode = procToCfg(proc)._2
 
     // Track blocks we've already processed so we don't double up
     val visitedBlocks: mutable.Map[Block, CfgCommandNode] = mutable.Map()
@@ -543,6 +550,7 @@ class ProgramCfgFactory:
             }
           case dCall: DirectCall =>
             val targetProc: Procedure = dCall.target
+            funcEntryNode.callers.add(procToCfg(targetProc)._1)
 
             val callNode = CfgJumpNode(dCall, block, funcEntryNode)
 
@@ -713,44 +721,6 @@ class ProgramCfgFactory:
     }
 
     inlineProcedureCalls(nextProcNodes.toSet, inlineAmount - 1)
-  }
-
-  @tailrec
-  private def unifyProcedureCalls(procNodes: Set[CfgJumpNode]): Set[CfgJumpNode] = {
-    Logger.info(s"[+] Unifyig ${procNodes.size} leaf call nodest")
-
-    if (procNodes.isEmpty) {
-      return procNodes
-    }
-
-    // Set of procedure calls to be discovered by unifying the ones in `procNodes`
-    val nextProcNodes: mutable.Set[CfgJumpNode] = mutable.Set()
-
-    procNodes.foreach { procNode =>
-      procNode.data match {
-        case targetCall: DirectCall => // Retrieve information about the call to the target procedure
-          val targetProc: Procedure = targetCall.target
-
-          val (procEntry, procExit) = procToCfg(targetProc)
-
-          // Add link between call node and the procedure's `Entry`.
-          cfg.addInlineEdge(procNode, procEntry)
-
-          // Link the procedure's `Exit` to the return point. There should only be one.
-          assert(
-            procNode.succIntra.size == 1,
-            s"More than 1 return node... $procNode has ${procNode.succIntra}"
-          )
-          val returnNode = procNode.succIntra.head
-          cfg.addInlineEdge(procExit, returnNode)
-
-          // Add new (un-inlined) function calls to be inlined
-          nextProcNodes ++= callToNodes(procEntry)
-        case _ =>
-      }
-    }
-
-    unifyProcedureCalls(nextProcNodes.toSet)
   }
 
   /** Clones the intraproc-cfg of the given procedure, with unique CfgNode ids. Adds the new nodes to the cfg, and

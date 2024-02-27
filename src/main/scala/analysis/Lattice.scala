@@ -171,3 +171,72 @@ class ConstantPropagationLattice extends FlatLattice[BitVecLiteral] {
     apply(BitVectorEval.boogie_extract(high, low, _: BitVecLiteral), a)
   def concat(a: FlatElement[BitVecLiteral], b: FlatElement[BitVecLiteral]): FlatElement[BitVecLiteral] = apply(BitVectorEval.smt_concat, a, b)
 }
+
+/** Constant propagation lattice.
+ *
+ */
+class ConstantPropagationLatticeWithSSA extends PowersetLattice[BitVecLiteral] {
+  private def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
+    val res = for {
+      x <- a
+      y <- b
+    } yield op(x, y)
+    res
+
+  private def apply(op: BitVecLiteral => BitVecLiteral, a: Set[BitVecLiteral]): Set[BitVecLiteral] =
+    val res = for {
+      x <- a
+    } yield op(x)
+    res
+
+  def bv(a: BitVecLiteral): Set[BitVecLiteral] = Set(a)
+
+  def bvadd(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvadd, a, b)
+
+  def bvsub(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvsub, a, b)
+
+  def bvmul(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvmul, a, b)
+
+  def bvudiv(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvudiv, a, b)
+
+  def bvsdiv(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvsdiv, a, b)
+
+  def bvsrem(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvsrem, a, b)
+
+  def bvurem(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvurem, a, b)
+
+  def bvsmod(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvsmod, a, b)
+
+  def bvand(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvand, a, b)
+
+  def bvor(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvor, a, b)
+
+  def bvxor(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvxor, a, b)
+
+  def bvnand(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvnand, a, b)
+
+  def bvnor(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvnor, a, b)
+
+  def bvxnor(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvxnor, a, b)
+
+  def bvnot(a: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvnot, a)
+
+  def bvneg(a: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvneg, a)
+
+  def bvshl(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvshl, a, b)
+
+  def bvlshr(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvlshr, a, b)
+
+  def bvashr(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvashr, a, b)
+
+  def bvcomp(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvcomp, a, b)
+
+  def zero_extend(width: Int, a: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_zero_extend(width, _: BitVecLiteral), a)
+
+  def sign_extend(width: Int, a: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_sign_extend(width, _: BitVecLiteral), a)
+
+  def extract(high: Int, low: Int, a: Set[BitVecLiteral]): Set[BitVecLiteral] =
+    apply(BitVectorEval.boogie_extract(high, low, _: BitVecLiteral), a)
+
+  def concat(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_concat, a, b)
+}

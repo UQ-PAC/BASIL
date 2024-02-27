@@ -398,6 +398,20 @@ class ExternalRemover(external: Set[String]) extends Visitor {
   }
 }
 
+///** Replaces all registers that are just an alias for memLoad */
+//class RegisterOptimiser extends Visitor {
+//    val regToMemLoad: mutable.Map[Register, MemoryLoad] = mutable.Map()
+//
+//  override def visitLocalAssign(node: LocalAssign): Statement =
+//    node.rhs match {
+//      case r: Register =>
+//        regToMemLoad.addOne(())
+//        super.visitLocalAssign(node)
+//      case _ =>
+//        super.visitLocalAssign(node)
+//    }
+//}
+
 /** Gives variables that are not contained within a MemoryStore or MemoryLoad
   * */
 class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
