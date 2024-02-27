@@ -1,7 +1,7 @@
 package test_util
 
 import ir.{Block, Procedure, Program}
-import util.{BASILConfig, BasilResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
 
 import java.io.File
 
@@ -10,7 +10,7 @@ trait TestUtil {
   val correctPrograms: Array[String] = getSubdirectories(correctPath)
   val incorrectPath = "./src/test/incorrect/"
   val incorrectPrograms: Array[String] = getSubdirectories(incorrectPath)
-  extension (p: Program)
+  extension (p: Program) {
     def procs: Map[String, Procedure] = p.collect {
       case b: Procedure => b.name -> b
     }.toMap
@@ -18,13 +18,13 @@ trait TestUtil {
     def blocks: Map[String, Block] = p.collect {
       case b: Block => b.label -> b
     }.toMap
+  }
 
   def getSubdirectories(directoryName: String): Array[String] = {
     File(directoryName).listFiles.filter(_.isDirectory).map(_.getName)
   }
 
-
-  def runExample(name: String, path: String = correctPath, variation: String = "gcc/"): BasilResult = {
+  def runExample(name: String, path: String = correctPath, variation: String = "gcc/"): BASILResult = {
     RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(

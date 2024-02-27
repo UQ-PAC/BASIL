@@ -4,11 +4,10 @@ import java.io.{File, PrintWriter, FileInputStream, BufferedWriter, FileWriter, 
 import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
-import spray.json._
+import spray.json.*
 import gtirb.*
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.Set as MutableSet
 import java.io.{File, PrintWriter}
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters.*
@@ -29,7 +28,7 @@ import util.Logger
 import SSAForm.*
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
-import intrusivelist.IntrusiveList
+import util.intrusive_list.IntrusiveList
 import analysis.CfgCommandNode
 
 import scala.annotation.tailrec
@@ -65,7 +64,7 @@ case class StaticAnalysisContext(
 
 /** Results of the main program execution.
   */
-case class BasilResult(ir: IRContext, analysis: Option[StaticAnalysisContext], boogie: BProgram)
+case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], boogie: BProgram)
 
 /** Tools for loading the IR program into an IRContext.
   */
@@ -195,7 +194,7 @@ object IRTransform {
     val worklist = ListBuffer[CfgNode]()
     cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
 
-    val visited = MutableSet[CfgNode]()
+    val visited = mutable.Set[CfgNode]()
     while (worklist.nonEmpty) {
       val node = worklist.remove(0)
       if (!visited.contains(node)) {
@@ -323,7 +322,7 @@ object IRTransform {
     val worklist = ListBuffer[CfgNode]()
     cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
 
-    val visited = MutableSet[CfgNode]()
+    val visited = mutable.Set[CfgNode]()
     while (worklist.nonEmpty) {
       val node = worklist.remove(0)
       if (!visited.contains(node)) {
@@ -791,7 +790,7 @@ object RunUtils {
     wr.close()
   }
 
-  def loadAndTranslate(q: BASILConfig): BasilResult = {
+  def loadAndTranslate(q: BASILConfig): BASILResult = {
     Logger.info("[!] Loading Program")
     val ctx = IRLoading.load(q.loading)
 
@@ -812,7 +811,7 @@ object RunUtils {
     val boogieTranslator = IRToBoogie(ctx.program, ctx.specification)
     val boogieProgram = boogieTranslator.translate(q.boogieTranslation)
 
-    BasilResult(ctx, analysis, boogieProgram)
+    BASILResult(ctx, analysis, boogieProgram)
   }
 
   /** Use static analysis to resolve indirect calls and replace them in the IR until fixed point.

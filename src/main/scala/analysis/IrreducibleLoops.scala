@@ -1,7 +1,7 @@
 package analysis
 
 import ir.{CFGPosition, Command, IntraProcIRCursor, Program, Procedure, Block, GoTo, IRWalk}
-import intrusivelist.IntrusiveList
+import util.intrusive_list.IntrusiveList
 import util.Logger
 
 import scala.collection.mutable

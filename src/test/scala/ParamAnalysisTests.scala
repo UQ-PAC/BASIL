@@ -1,13 +1,13 @@
 import analysis.ParamAnalysis
-import ir.IRDSL.{R0, R1, R2}
+import ir.dsl.{R0, R1, R2}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.TestUtil
-import util.BasilResult
+import util.BASILResult
 
-class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
+class ParamAnalysisTests extends AnyFunSuite, TestUtil{
 
   test("basic_arrays_write") {
-    val result: BasilResult = runExample("basic_arrays_write")
+    val result: BASILResult = runExample("basic_arrays_write")
     val analysisResults = result.analysis.get.paramResults
     val procs = result.ir.program.procs
 
@@ -15,7 +15,7 @@ class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
   }
 
   test("function") {
-    val result: BasilResult = runExample("function")
+    val result: BASILResult = runExample("function")
     val analysisResults = result.analysis.get.paramResults
     val procs = result.ir.program.procs
 
@@ -24,7 +24,7 @@ class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
   }
 
   test("basic_function_call_caller") {
-    val result: BasilResult = runExample("basic_function_call_caller")
+    val result: BASILResult = runExample("basic_function_call_caller")
     val analysisResults = result.analysis.get.paramResults
     val procs = result.ir.program.procs
 
@@ -33,7 +33,7 @@ class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
   }
 
   test("function1") {
-    val result: BasilResult = runExample("function1")
+    val result: BASILResult = runExample("function1")
     val analysisResults = result.analysis.get.paramResults
     val procs = result.ir.program.procs
 
@@ -42,7 +42,7 @@ class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
   }
 
   test("ifbranches") {
-    val result: BasilResult = runExample("ifbranches")
+    val result: BASILResult = runExample("ifbranches")
     val analysisResults = result.analysis.get.paramResults
     val procs = result.ir.program.procs
 
@@ -50,7 +50,7 @@ class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
   }
 
   test("functions_with_params") {
-    val result: BasilResult = runExample("functions_with_params")
+    val result: BASILResult = runExample("functions_with_params")
     val analysisResults = result.analysis.get.paramResults
     val procs = result.ir.program.procs
 
@@ -60,7 +60,7 @@ class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
 
 
   test("initialisation") {
-    val result: BasilResult = runExample("initialisation")
+    val result: BASILResult = runExample("initialisation")
     val analysisResults = result.analysis.get.paramResults
     val procs = result.ir.program.procs
 
@@ -68,7 +68,7 @@ class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
   }
 
   test("jumptable") {
-    val result: BasilResult = runExample("jumptable")
+    val result: BASILResult = runExample("jumptable")
     val analysisResults = result.analysis.get.paramResults
     val procs = result.ir.program.procs
 
@@ -76,7 +76,7 @@ class ParamAnalaysisTests extends AnyFunSuite, TestUtil{
   }
 
   ignore("unresolved_calls") {
-    val result: BasilResult = runExample("jumptable")
+    val result: BASILResult = runExample("jumptable")
     val analysisResults = result.analysis.get.paramResults
     val procs = result.ir.program.procs
 

@@ -1,18 +1,14 @@
 import analysis.{InterLiveVarsAnalysis, TwoElementTop}
-import ir.IRDSL.{EventuallyJump, R0, R1, R2}
-import ir.{BitVecLiteral, BitVecType, ConvertToSingleProcedureReturn, IRDSL, LocalAssign, LocalVar, Program, Register, Statement, Variable}
+import ir.dsl.*
+import ir.{BitVecLiteral, BitVecType, ConvertToSingleProcedureReturn, dsl, LocalAssign, LocalVar, Program, Register, Statement, Variable}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.TestUtil
-import util.BasilResult
+import util.BASILResult
 
 
 class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
 
-  val R29 = Register("R29", BitVecType(64))
-  val R30 = Register("R30", BitVecType(64))
-  val R31 = Register("R31", BitVecType(64))
-  def createSimpleProc(name: String, statements: Seq[Statement | EventuallyJump]): IRDSL.EventuallyProcedure = {
-    import IRDSL._
+  def createSimpleProc(name: String, statements: Seq[Statement | EventuallyJump]): EventuallyProcedure = {
     proc(name,
       block("l" + name,
         statements.:+(goto(name + "_return")): _*
@@ -24,13 +20,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   def differentCalleesBothLive(): Unit = {
-    import IRDSL._
-
     val constant1 = bv64(1)
-    val r0ConstantAssign = new LocalAssign(R0, constant1, Some("00001"))
-    val r1ConstantAssign = new LocalAssign(R1, constant1, Some("00002"))
-    val r2r0Assign = new LocalAssign(R2, R0, Some("00003"))
-    val r2r1Assign = new LocalAssign(R2, R1, Some("00004"))
+    val r0ConstantAssign = LocalAssign(R0, constant1, Some("00001"))
+    val r1ConstantAssign = LocalAssign(R1, constant1, Some("00002"))
+    val r2r0Assign = LocalAssign(R2, R0, Some("00003"))
+    val r2r1Assign = LocalAssign(R2, R1, Some("00004"))
 
     var program: Program = prog(
       proc("main",
@@ -63,13 +57,12 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
 
 
   def differentCalleesOneAlive(): Unit = {
-    import IRDSL._
     val constant1 = bv64(1)
-    val r0ConstantAssign = new LocalAssign(R0, constant1, Some("00001"))
-    val r1ConstantAssign = new LocalAssign(R1, constant1, Some("00002"))
-    val r2r0Assign = new LocalAssign(R2, R0, Some("00003"))
-    val r2r1Assign = new LocalAssign(R2, R1, Some("00004"))
-    val r1Reassign = new LocalAssign(R1, BitVecLiteral(2, 64), Some("00005"))
+    val r0ConstantAssign = LocalAssign(R0, constant1, Some("00001"))
+    val r1ConstantAssign = LocalAssign(R1, constant1, Some("00002"))
+    val r2r0Assign = LocalAssign(R2, R0, Some("00003"))
+    val r2r1Assign = LocalAssign(R2, R1, Some("00004"))
+    val r1Reassign = LocalAssign(R1, BitVecLiteral(2, 64), Some("00005"))
 
     var program: Program = prog(
       proc("main",
@@ -101,13 +94,12 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   def twoCallers(): Unit = {
-    import IRDSL._
 
     val constant1 = bv64(1)
-    val r0ConstantAssign = new LocalAssign(R0, constant1, Some("00001"))
-    val r0Reassign = new LocalAssign(R0, BitVecLiteral(2, 64), Some("00004"))
-    val r1Assign = new LocalAssign(R0, R1, Some("00002"))
-    val r2Assign = new LocalAssign(R0, R2, Some("00003"))
+    val r0ConstantAssign = LocalAssign(R0, constant1, Some("00001"))
+    val r0Reassign = LocalAssign(R0, BitVecLiteral(2, 64), Some("00004"))
+    val r1Assign = LocalAssign(R0, R1, Some("00002"))
+    val r2Assign = LocalAssign(R0, R2, Some("00003"))
 
     var program = prog(
       proc("main",
@@ -153,8 +145,6 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   def deadBeforeCall(): Unit = {
-    import IRDSL._
-
     var program = prog(
       proc("main",
         block("lmain",
@@ -179,10 +169,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   def simpleBranch(): Unit = {
-    import IRDSL._
-
-    val r1Assign = new LocalAssign(R0, R1, Some("00001"))
-    val r2Assign = new LocalAssign(R0, R2, Some("00002"))
+    val r1Assign = LocalAssign(R0, R1, Some("00001"))
+    val r2Assign = LocalAssign(R0, R2, Some("00002"))
 
     var program : Program = prog(
       proc(
@@ -218,7 +206,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   def recursionInfinite(): Unit = { // can't handle this infinite recursion case
-    import IRDSL._
+    import dsl._
     var program : Program = prog(
       proc("main",
         block(
@@ -243,7 +231,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   def recursionBaseCase(): Unit = {
-    import IRDSL._
+    import dsl._
     var program: Program = prog(
       proc("main",
         block("lmain",
@@ -306,7 +294,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   test("basic_arrays_write") {
-    val result: BasilResult = runExample("basic_arrays_write")
+    val result: BASILResult = runExample("basic_arrays_write")
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.blocks
 
@@ -315,7 +303,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   test("function") {
-    val result: BasilResult = runExample("function")
+    val result: BASILResult = runExample("function")
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.blocks
 
@@ -329,7 +317,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
 
 
   test("basic_function_call_caller") {
-    val result: BasilResult = runExample("basic_function_call_caller")
+    val result: BASILResult = runExample("basic_function_call_caller")
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.blocks
 
@@ -341,7 +329,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   test("function1") {
-    val result: BasilResult = runExample("function1")
+    val result: BASILResult = runExample("function1")
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.blocks
 
@@ -355,7 +343,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   test("ifbranches") {
-    val result: BasilResult = runExample("ifbranches")
+    val result: BASILResult = runExample("ifbranches")
     val analysisResults = result.analysis.get.interLiveVarsResults
     val blocks = result.ir.program.blocks
 

@@ -4,7 +4,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
 import analysis.BitVectorEval
-import intrusivelist.{IntrusiveList, IntrusiveListElement}
+import util.intrusive_list.*
 
 class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure,
               var initialMemory: ArrayBuffer[MemorySection],

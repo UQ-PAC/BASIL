@@ -12,8 +12,8 @@ import scala.collection.mutable
 case class SSAForm() {
 
   val varMaxTracker = new mutable.HashMap[String, Int]()
-  val blockBasedMappings = new mutable.HashMap[(Block, String), mutable.Set[Int]]().withDefault(_ => mutable.Set())
-  val context = new mutable.HashMap[(Procedure, String), mutable.Set[Int]]().withDefault(_ => mutable.Set())
+  private val blockBasedMappings = new mutable.HashMap[(Block, String), mutable.Set[Int]]().withDefault(_ => mutable.Set())
+  private val context = new mutable.HashMap[(Procedure, String), mutable.Set[Int]]().withDefault(_ => mutable.Set())
   def getMax(varName: String): Int =
     val ret = varMaxTracker.getOrElse(varName, 0)
     varMaxTracker(varName) = ret + 1
@@ -75,24 +75,20 @@ case class SSAForm() {
             }
           }
           currentBlock.jump match {
-            case directCall: DirectCall => {
+            case directCall: DirectCall =>
               // TODO: transfers the whole context but it could be using ANR and RNA to transfer only the relevant context
               varMaxTracker.keys.foreach(varr => {
                 //context((directCall.target, varr)) = context((directCall.target, varr)) ++ blockBasedMappings(block, varr)
                 context.getOrElseUpdate((directCall.target, varr), mutable.Set()) ++= blockBasedMappings((currentBlock, varr))
               })
-            }
-            case indirectCall: IndirectCall => {
+            case indirectCall: IndirectCall =>
               transformVariables(indirectCall.target.variables, currentBlock, proc)
-            }
-            case goTo: GoTo => {
+            case goTo: GoTo =>
               goTo.targets.foreach(b => {
                 varMaxTracker.keys.foreach(varr => {
                   blockBasedMappings((b, varr)) = blockBasedMappings(b, varr) ++ blockBasedMappings(currentBlock, varr)
                 })
               })
-            }
-            case _ => {}
           }
           // Push unvisited successors onto the stack
           stack.pushAll(currentBlock.nextBlocks)

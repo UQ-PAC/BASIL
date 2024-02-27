@@ -8,7 +8,7 @@ import specification.*
 import scala.collection.mutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
-import intrusivelist.IntrusiveList
+import util.intrusive_list.*
 
 class BAPToIR(var program: BAPProgram, mainAddress: Int) {
 

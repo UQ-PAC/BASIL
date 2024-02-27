@@ -3,7 +3,7 @@ import org.scalatest.Inside.inside
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import util.RunUtils
-import util.{BASILConfig, BoogieGeneratorConfig, BoogieMemoryAccessMode, ILLoadingConfig, StaticAnalysisConfig, BasilResult}
+import util.{BASILConfig, BoogieGeneratorConfig, BoogieMemoryAccessMode, ILLoadingConfig, StaticAnalysisConfig, BASILResult}
 
 import java.io.{File, OutputStream, PrintStream, PrintWriter}
 class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
@@ -23,9 +23,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
           relfFile = examplesPath + s"$name/$name.relf",
           specFile = None,
           dumpIL = None,
-          mainProcedureName = "main",
         ),
-        runInterpret = false,
         staticAnalysis =  Some(StaticAnalysisConfig()),
         boogieTranslation = BoogieGeneratorConfig(),
         outputPrefix = "boogie_out",

@@ -1,5 +1,5 @@
 package ir
-import intrusivelist.IntrusiveListElement
+import util.intrusive_list.IntrusiveListElement
 
 import collection.mutable
 

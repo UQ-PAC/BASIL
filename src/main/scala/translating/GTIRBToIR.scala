@@ -22,7 +22,7 @@ import java.nio.charset.*
 import scala.util.boundary
 import boundary.break
 import java.nio.ByteBuffer
-import intrusivelist.{IntrusiveList, IntrusiveListElement}
+import util.intrusive_list.*
 import util.Logger
 
 /**

@@ -9,11 +9,10 @@ import java.io.IOException
 import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 
+import ir.dsl.*
+
 class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAfter {
 
-  import IRDSL._
-
-  private val mem: Memory = Memory("mem", 64, 8)
   private val tempPath = System.getProperty("user.dir") + "/src/test/analysis/dump/"
 
   before {

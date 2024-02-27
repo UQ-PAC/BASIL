@@ -3,16 +3,12 @@ package ir
 import scala.collection.mutable
 import scala.collection.immutable.*
 import org.scalatest.funsuite.AnyFunSuite
-import intrusivelist.{IntrusiveList, IntrusiveListElement}
-import ir.IRDSL.R0
-
+import util.intrusive_list.*
+import ir.dsl.*
 
 class IRTest extends AnyFunSuite {
 
-
-  import IRDSL._
-
-  extension (p: Program)
+  extension (p: Program) {
     def procs: Map[String, Procedure] = p.collect {
       case b: Procedure => b.name -> b
     }.toMap
@@ -20,28 +16,6 @@ class IRTest extends AnyFunSuite {
     def blocks: Map[String, Block] = p.collect {
       case b: Block => b.label -> b
     }.toMap
-
-  def getProg(): Program = {
-    prog(
-      proc("main",
-        block("l_main",
-          LocalAssign(R0, bv64(10)),
-          LocalAssign(R1, bv64(10)),
-          goto("newblock")
-        ),
-        block("l_main_1",
-          LocalAssign(R0, bv64(22)),
-          call("p2", Some("returntarget"))
-        ),
-        block("returntarget",
-          ret
-        )
-      ),
-      proc("p2",
-        block("l_p2", LocalAssign(R0, bv64(10)), goto("l_p2_1")),
-        block("l_p2_1", ret)
-      )
-    )
   }
 
   test("blockintralinks") {
@@ -101,13 +75,12 @@ class IRTest extends AnyFunSuite {
       case b: Block => b.label -> b
     }.toMap
 
-    val b = p.procedures.head.removeBlocksInline(blocks("lmain1"))
+    p.procedures.head.removeBlocksInline(blocks("lmain1"))
 
     blocks("lmain").singleSuccessor.contains(blocks("lmain2"))
     blocks("lmain2").singlePredecessor.contains(blocks("lmain"))
 
   }
-
 
   test("simple replace jump") {
 
@@ -160,7 +133,26 @@ class IRTest extends AnyFunSuite {
   }
 
   test("aftercalls") {
-    val p = getProg()
+    val p = prog(
+      proc("main",
+        block("l_main",
+          LocalAssign(R0, bv64(10)),
+          LocalAssign(R1, bv64(10)),
+          goto("newblock")
+        ),
+        block("l_main_1",
+          LocalAssign(R0, bv64(22)),
+          call("p2", Some("returntarget"))
+        ),
+        block("returntarget",
+          ret
+        )
+      ),
+      proc("p2",
+        block("l_p2", LocalAssign(R0, bv64(10)), goto("l_p2_1")),
+        block("l_p2_1", ret)
+      )
+    )
 
     val blocks = p.collect {
       case b: Block => b.label -> b
@@ -186,14 +178,12 @@ class IRTest extends AnyFunSuite {
     }.toSet
     assert(aftercallGotos == Set(blocks("l_main_1").fallthrough.get))
 
-
     assert(1 == aftercallGotos.count(b => IntraProcIRCursor.pred(b).contains(blocks("l_main_1").jump)))
     assert(1 == aftercallGotos.count(b => IntraProcIRCursor.succ(b).contains(blocks("l_main_1").fallthrough.map(_.targets.head).head)))
 
     assert(afterCalls.forall(b => IntraProcBlockIRCursor.pred(b).contains(blocks("l_main_1"))))
 
   }
-
 
   test("addblocks") {
 
@@ -208,7 +198,6 @@ class IRTest extends AnyFunSuite {
           ret)
       )
     )
-
 
     val b2 = block("newblock2",
       LocalAssign(R0, bv64(22)),
@@ -265,8 +254,6 @@ class IRTest extends AnyFunSuite {
       LocalAssign(R0, bv64(22)),
       ret
     ).resolve(p)
-
-
 
     assert(p.mainProcedure eq p.procedures.find(_.name == "main").get)
     val called = p.procedures.find(_.name == "called").get
@@ -375,8 +362,6 @@ class IRTest extends AnyFunSuite {
     assert(InterProcIRCursor.pred(prevB).size == 1)
     assert(InterProcIRCursor.pred(prevB).head == p.blocks("l_main").fallthrough.get)
     assert(InterProcBlockIRCursor.pred(prevB).head == p.blocks("l_main"), p.procs("p1").returnBlock.get)
-
-
 
   }
 

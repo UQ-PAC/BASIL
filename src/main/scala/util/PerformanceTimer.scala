@@ -6,7 +6,7 @@ import scala.collection
 case class PerformanceTimer(timerName: String = "") {
   private var lastCheckpoint: Long = System.currentTimeMillis()
   private var end: Long = 0
-  private var checkpoints: mutable.Map[String, Long] = mutable.HashMap()
+  private val checkpoints: mutable.Map[String, Long] = mutable.HashMap()
 
   def checkPoint(name: String): Long = {
       val delta = elapsed()
@@ -15,7 +15,7 @@ case class PerformanceTimer(timerName: String = "") {
       Logger.info(s"PerformanceTimer $timerName [$name]: ${delta}ms")
       delta
   }
-  def elapsed() :  Long = {
+  private def elapsed() :  Long = {
       System.currentTimeMillis() - lastCheckpoint
   }
 

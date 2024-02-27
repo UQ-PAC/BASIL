@@ -2,7 +2,7 @@ package ir
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable
-import intrusivelist.IntrusiveList
+import util.intrusive_list.IntrusiveList
 
 abstract class Visitor {
 
