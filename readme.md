@@ -46,7 +46,7 @@ Installing [mill](https://mill-build.com/mill/Installation_IDE_Support.html) or 
 
 This can be done via [coursier](https://get-coursier.io/docs/cli-overview).
 
-A mill script is checked in at `./scripts/mill` so it does not need to be installed. 
+A mill script is checked in at `./mill` so it does not need to be installed. 
 
 #### IDE Support
 
@@ -60,16 +60,15 @@ command used to run mill.
 ```
 ~ rm -r .bsp
 ~ ./scripts/setup-bsp.sh 
-+ MILL_CMD=mill
 # create bsp config file
-+ mill mill.bsp.BSP/install
++ ./mill mill.bsp.BSP/install
 [2/2] mill.bsp.BSP.install 
 Creating BSP connection file: /home/am/Documents/programming/2023/bil-to-boogie-translator/.bsp/mill-bsp.json
 # fix config file 
 ++ perl -pe 's/"argv":\[".*?",/"argv":["$MILL_CMD",/g' .bsp/mill-bsp.json
-+ fixed='{"name":"mill-bsp","argv":["","--bsp","--disable-ticker","--color","false","--jobs","1"],"millVersion":"0.11.6","bspVersion":"2.1.0-M7","languages":["scala","java"]}'
-+ echo '{"name":"mill-bsp","argv":["","--bsp","--disable-ticker","--color","false","--jobs","1"],"millVersion":"0.11.6","bspVersion":"2.1.0-M7","languages":["scala","java"]}'
++ fixed='{"name":"mill-bsp","argv":["./mill","--bsp","--disable-ticker","--color","false","--jobs","1"],"millVersion":"0.11.6","bspVersion":"2.1.0-M7","languages":["scala","java"]}'
 ```
+More information is available [here](https://mill-build.com/mill/Installation_IDE_Support.html#_build_server_protocol_bsp).
 
 ### Note about using sbt with IntelliJ
 
