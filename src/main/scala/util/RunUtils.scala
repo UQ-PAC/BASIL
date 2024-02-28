@@ -57,7 +57,7 @@ case class StaticAnalysisContext(
     vsaResult: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
     interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElementLatticeEl]],
     paramResults: Map[Procedure, Set[Variable]],
-    steensgaardResults: Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]],
+    steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
     mmmResults: MemoryModelMap
 )
 
@@ -314,7 +314,7 @@ object IRTransform {
 
   def resolveIndirectCallsUsingPointsTo(
      cfg: ProgramCfg,
-     pointsTos: Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]],
+     pointsTos: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
      IRProgram: Program
    ): (Program, Boolean) = {
     var modified: Boolean = false
@@ -371,7 +371,7 @@ object IRTransform {
       pointsTos.get(variableWrapper) match {
         case Some(value) =>
           value.map {
-            case v: VariableWrapper => names.addAll(resolveAddresses(v.variable))
+            case v: RegisterVariableWrapper => names.addAll(resolveAddresses(v.variable))
             case m: MemoryRegion =>
               names.addAll(searchRegion(m))
           }
@@ -589,7 +589,7 @@ object StaticAnalysis {
     Logger.info("[!] Running Steensgaard")
     val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, globalOffsets)
     steensgaardSolver.analyze()
-    val steensgaardResults = steensgaardSolver.pointsTo().asInstanceOf[Map[RegisterVariableWrapper, Set[VariableWrapper | MemoryRegion]]]
+    val steensgaardResults = steensgaardSolver.pointsTo().asInstanceOf[Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]]]
 
     Logger.info("[!] Running VSA")
     val vsaSolver =

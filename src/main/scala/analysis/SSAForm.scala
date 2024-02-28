@@ -8,6 +8,8 @@ import scala.collection.mutable
 /** Set-Based SSA
  * - Each variable has a set of versions
  * - New assignments create new versions and replaces any new versions
+ *
+ * NOTE: This approach does not make an attempt to handle loops
  */
 class SSAForm(program: Program) {
 
@@ -62,7 +64,6 @@ class SSAForm(program: Program) {
                 varMaxTracker(localAssign.lhs.name) = blockBasedMappings((currentBlock, localAssign.lhs.name)).max + 1
 
               case memoryAssign: MemoryAssign =>
-                transformVariables(memoryAssign.lhs.variables, currentBlock, proc)
                 transformVariables(memoryAssign.rhs.variables, currentBlock, proc)
 
               case assume: Assume =>

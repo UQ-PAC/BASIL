@@ -2,33 +2,38 @@ package analysis
 
 import analysis.*
 import ir.{BitVecLiteral, Procedure}
+import util.Logger
 
 import scala.collection.mutable
 
 // Define a case class to represent a range
-case class RangeKey(var start: BigInt, var end: BigInt) extends Ordered[RangeKey]:
+class RangeKey(var start: BigInt, var end: BigInt) extends Ordered[RangeKey]:
   def size(): BigInt = end - start
   override def compare(that: RangeKey): Int = {
     if (start < that.start) -1
     else if (start > that.start) 1
     else 0
   }
+  override def hashCode(): Int = start.hashCode() * end.hashCode()
+  override def equals(obj: Any): Boolean = obj match {
+    case r: RangeKey => r.start == start && r.end == end
+    case _ => false
+  }
+  override def toString: String = s"Range[$start, $end]"
 
-case class RegionToRangesMap():
-  val stackMap: mutable.Map[RangeKey, StackRegion] = mutable.TreeMap()
-  val sharedStackMap: mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]] = mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]]()
-  val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.TreeMap()
-  val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.TreeMap()
 
 // Custom data structure for storing range-to-object mappings
 class MemoryModelMap {
-  //private val functions = scala.collection.mutable.Map[CfgFunctionExitNode, RegionToRangesMap]()
-  private val rangeMap = RegionToRangesMap()
   private val MAX_BIGINT: BigInt = BigInt(Long.MaxValue)
   private val contextStack = mutable.Stack.empty[List[StackRegion]]
   private val sharedContextStack = mutable.Stack.empty[List[StackRegion]]
   private val localStacks = mutable.Map[String, List[StackRegion]]()
-  private val sharedStacks = mutable.Map[String, List[StackRegion]]().withDefaultValue(List.empty[StackRegion])
+  private val sharedStacks = mutable.Map[String, List[StackRegion]]()
+
+  private val stackMap: mutable.Map[RangeKey, StackRegion] = mutable.TreeMap()
+  private val sharedStackMap: mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]] = mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]]()
+  private val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.TreeMap()
+  private val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.TreeMap()
 
   /** Add a range and object to the mapping
    *
@@ -40,23 +45,23 @@ class MemoryModelMap {
   def add(offset: BigInt, region: MemoryRegion, shared: Boolean = false): Unit = {
     region match {
       case s: StackRegion =>
-        var stackMap = rangeMap.stackMap
+        var currentStackMap = stackMap
         if (shared) {
-          stackMap = rangeMap.sharedStackMap.getOrElseUpdate(s.parent, mutable.TreeMap())
+          currentStackMap = sharedStackMap.getOrElseUpdate(s.parent, mutable.TreeMap())
         }
-        if (stackMap.isEmpty) {
-          stackMap(RangeKey(offset, MAX_BIGINT)) = s
+        if (currentStackMap.isEmpty) {
+          currentStackMap(RangeKey(offset, MAX_BIGINT)) = s
         } else {
-          stackMap.keys.maxBy(_.end).end = offset - 1
-          stackMap(RangeKey(offset, MAX_BIGINT)) = s
+          currentStackMap.keys.maxBy(_.end).end = offset - 1
+          currentStackMap(RangeKey(offset, MAX_BIGINT)) = s
         }
       case d: DataRegion =>
-        val dataMap = rangeMap.dataMap
-        if (dataMap.isEmpty) {
-          dataMap(RangeKey(offset, MAX_BIGINT)) = d
+        val currentDataMap = dataMap
+        if (currentDataMap.isEmpty) {
+          currentDataMap(RangeKey(offset, MAX_BIGINT)) = d
         } else {
-          dataMap.keys.maxBy(_.end).end = offset - 1
-          dataMap(RangeKey(offset, MAX_BIGINT)) = d
+          currentDataMap.keys.maxBy(_.end).end = offset - 1
+          currentDataMap(RangeKey(offset, MAX_BIGINT)) = d
         }
     }
   }
@@ -121,13 +126,16 @@ class MemoryModelMap {
   // TODO: push and pop could be optimised by caching the results
   def pushContext(funName: String): Unit = {
     contextStack.push(localStacks(funName))
-    rangeMap.stackMap.clear()
+    stackMap.clear()
     for (stackRgn <- contextStack.top) {
       add(stackRgn.start.value, stackRgn)
     }
 
+    if (!sharedStacks.contains(funName)) {
+      sharedStacks(funName) = List.empty
+    }
     sharedContextStack.push(sharedStacks(funName))
-    rangeMap.sharedStackMap.clear()
+    sharedStackMap.clear()
     for (stackRgn <- sharedContextStack.top) {
       add(stackRgn.start.value, stackRgn, true)
     }
@@ -136,7 +144,7 @@ class MemoryModelMap {
   def popContext(): Unit = {
     if (contextStack.size > 1) {
       contextStack.pop()
-      rangeMap.stackMap.clear()
+      stackMap.clear()
       for (stackRgn <- contextStack.top) {
         add(stackRgn.start.value, stackRgn)
       }
@@ -144,7 +152,7 @@ class MemoryModelMap {
 
     if (sharedContextStack.size > 1) {
       sharedContextStack.pop()
-      rangeMap.sharedStackMap.clear()
+      sharedStackMap.clear()
       for (stackRgn <- sharedContextStack.top) {
         add(stackRgn.start.value, stackRgn, true)
       }
@@ -153,49 +161,49 @@ class MemoryModelMap {
 
 
   def findStackObject(value: BigInt): Option[StackRegion] = 
-    rangeMap.stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
+    stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
 
   def findSharedStackObject(value: BigInt): Set[StackRegion] =
-    rangeMap.sharedStackMap.values.flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj}).toSet).toSet
+    sharedStackMap.values.flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj}).toSet).toSet
 
   def findDataObject(value: BigInt): Option[DataRegion] = 
-    rangeMap.dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
+    dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
 
   override def toString: String =
-    s"Stack: ${rangeMap.stackMap}\n Heap: ${rangeMap.heapMap}\n Data: ${rangeMap.dataMap}\n"
+    s"Stack: ${stackMap}\n Heap: ${heapMap}\n Data: ${dataMap}\n"
 
   def printRegionsContent(hideEmpty: Boolean = false): Unit = {
-    println("Stack:")
+    Logger.info("Stack:")
     for name <- localStacks.keys do
       popContext()
       pushContext(name)
-      println(s"  Function: $name")
-      if rangeMap.stackMap.nonEmpty then println(s"    Local:")
+      Logger.info(s"  Function: $name")
+      if stackMap.nonEmpty then Logger.info(s"    Local:")
       // must sort by ranges
-      for ((range, region) <- rangeMap.stackMap) {
+      for ((range, region) <- stackMap) {
         if (region.content.nonEmpty || !hideEmpty) {
-          println(s"       $range -> $region")
+          Logger.info(s"       $range -> $region")
         }
       }
-      if rangeMap.sharedStackMap.nonEmpty then println(s"    Shared:")
-      for ((parent, treeMap) <- rangeMap.sharedStackMap) {
-          println(s"        Parent: ${parent.name}")
+      if sharedStackMap.nonEmpty then Logger.info(s"    Shared:")
+      for ((parent, treeMap) <- sharedStackMap) {
+        Logger.info(s"        Parent: ${parent.name}")
             for ((range, region) <- treeMap) {
                 if (region.content.nonEmpty || !hideEmpty) {
-                println(s"           $range -> $region")
+                  Logger.info(s"           $range -> $region")
                 }
             }
       }
-    println("Heap:")
-    for ((range, region) <- rangeMap.heapMap) {
+    Logger.info("Heap:")
+    for ((range, region) <- heapMap) {
       if (region.content.nonEmpty || !hideEmpty) {
-        println(s"  $range -> $region")
+        Logger.info(s"  $range -> $region")
       }
     }
-    println("Data:")
-    for ((range, region) <- rangeMap.dataMap) {
+    Logger.info("Data:")
+    for ((range, region) <- dataMap) {
       if (region.content.nonEmpty || !hideEmpty) {
-        println(s"  $range -> $region")
+        Logger.info(s"  $range -> $region")
       }
     }
   }

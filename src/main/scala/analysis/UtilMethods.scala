@@ -98,11 +98,6 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariabl
     case e: Extract =>
       val result = evaluateExpressionWithSSA(e.body, constantPropResult)
       applySingle(BitVectorEval.boogie_extract(e.end, e.start, _: BitVecLiteral), result)
-    case registerVariableWrapper: RegisterVariableWrapper =>
-      constantPropResult.collect({
-        case (k, v) if k == registerVariableWrapper => v
-      }).flatten.toSet
-      constantPropResult(registerVariableWrapper)
     case variable: Variable =>
       val registerVariableWrapper = RegisterVariableWrapper(variable)
       constantPropResult.collect({
