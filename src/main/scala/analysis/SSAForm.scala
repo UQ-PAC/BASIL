@@ -9,17 +9,17 @@ import scala.collection.mutable
  * - Each variable has a set of versions
  * - New assignments create new versions and replaces any new versions
  */
-case class SSAForm() {
+class SSAForm(program: Program) {
 
-  val varMaxTracker = new mutable.HashMap[String, Int]()
-  private val blockBasedMappings = new mutable.HashMap[(Block, String), mutable.Set[Int]]().withDefault(_ => mutable.Set())
-  private val context = new mutable.HashMap[(Procedure, String), mutable.Set[Int]]().withDefault(_ => mutable.Set())
-  def getMax(varName: String): Int =
+  private val varMaxTracker = mutable.HashMap[String, Int]()
+  private val blockBasedMappings = mutable.HashMap[(Block, String), mutable.Set[Int]]().withDefault(_ => mutable.Set())
+  private val context = mutable.HashMap[(Procedure, String), mutable.Set[Int]]().withDefault(_ => mutable.Set())
+  private def getMax(varName: String): Int =
     val ret = varMaxTracker.getOrElse(varName, 0)
     varMaxTracker(varName) = ret + 1
     ret
 
-  def transformVariables(vars: Set[Variable], block: Block, proc: Procedure): Unit = {
+  private def transformVariables(vars: Set[Variable], block: Block, proc: Procedure): Unit = {
     vars.foreach(v => {
       if (context.contains((proc, v.name))) {
         v.sharedVariable = true
@@ -32,7 +32,7 @@ case class SSAForm() {
     })
   }
 
-  def applySSA(program: Program): Unit = {
+  def applySSA(): Unit = {
     for (proc <- program.procedures) {
       val visitedBlocks = mutable.Set[Block]()
       val stack = mutable.Stack[Block]()
@@ -51,7 +51,7 @@ case class SSAForm() {
           for (stmt <- currentBlock.statements) {
             println(stmt)
             stmt match {
-              case localAssign: LocalAssign => {
+              case localAssign: LocalAssign =>
                 transformVariables(localAssign.rhs.variables, currentBlock, proc)
                 val maxVal = varMaxTracker.getOrElseUpdate(localAssign.lhs.name, 0)
                 blockBasedMappings((currentBlock, localAssign.lhs.name)) = mutable.Set(maxVal)
@@ -60,17 +60,17 @@ case class SSAForm() {
                 localAssign.lhs.ssa_id.addAll(blockBasedMappings((currentBlock, localAssign.lhs.name)))
 
                 varMaxTracker(localAssign.lhs.name) = blockBasedMappings((currentBlock, localAssign.lhs.name)).max + 1
-              }
-              case memoryAssign: MemoryAssign => {
+
+              case memoryAssign: MemoryAssign =>
                 transformVariables(memoryAssign.lhs.variables, currentBlock, proc)
                 transformVariables(memoryAssign.rhs.variables, currentBlock, proc)
-              }
-              case assume: Assume => {
+
+              case assume: Assume =>
                 transformVariables(assume.body.variables, currentBlock, proc)
-              } // no required for analyses
-              case assert: Assert => {
+              // no required for analyses
+              case assert: Assert =>
                 transformVariables(assert.body.variables, currentBlock, proc)
-              } // no required for analyses
+              // no required for analyses
               case _ => throw new RuntimeException("No SSA form for " + stmt.getClass + " yet")
             }
           }

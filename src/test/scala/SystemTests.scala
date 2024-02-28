@@ -111,7 +111,7 @@ trait SystemTests extends AnyFunSuite {
     } else {
       info("Note: this test has not previously succeeded")
     }
-    val passed = !timedOut && (verified == shouldVerify) && (xor(verified, proveFailed))
+    val passed = !timedOut && (verified == shouldVerify) && xor(verified, proveFailed)
     val result = TestResult(passed, verified, shouldVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
     testResults.append((s"$name/$variation", result))
     if (!passed) fail(failureMsg)

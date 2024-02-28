@@ -15,12 +15,11 @@ trait HasParent[T]:
   def parent: T = {
     _parent match {
       case Some(p) => p
-      case None =>  {
+      case None =>
         val msg = s"Trying to get the parent of a node that is detached from the progam: $this. " +
           s"Node was last attached to: ${last_parent.map(_._1)}, detached at ${last_parent.map(x => x._2 + x._3 + "@" + x._4)} "
         Logger.error(msg)
         throw new RuntimeException(msg)
-      }
     }
   }
 

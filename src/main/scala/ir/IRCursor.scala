@@ -245,7 +245,7 @@ def toDot[T <: CFGPosition](
   }
 
   val dotNodes = mutable.Map[CFGPosition, DotNode]()
-  var dotArrows = mutable.ListBuffer[DotArrow]()
+  val dotArrows = mutable.ListBuffer[DotArrow]()
 
   def nodeText(node: CFGPosition): String = {
     var text = node match {

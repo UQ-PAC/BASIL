@@ -25,7 +25,6 @@ import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
-import SSAForm.*
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
@@ -497,7 +496,7 @@ object StaticAnalysis {
     }
 
     val mergedSubroutines = subroutines ++ externalAddresses
-    SSAForm().applySSA(IRProgram)
+    SSAForm(IRProgram).applySSA()
 
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
@@ -574,7 +573,7 @@ object StaticAnalysis {
       )
 
       writeToFile(
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> (newCPResult(b).toString)).toMap),
+        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> newCPResult(b).toString).toMap),
         s"${s}_new_ir_constprop$iteration.dot"
       )
 
@@ -819,7 +818,7 @@ object RunUtils {
   def staticAnalysis(config: StaticAnalysisConfig, ctx: IRContext): StaticAnalysisContext = {
     var iteration = 1
     var modified: Boolean = true
-    var analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
+    val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
     while (modified) {
       var newIR = null
       Logger.info("[!] Running Static Analysis")

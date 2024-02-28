@@ -442,11 +442,10 @@ class ConvertToSingleProcedureReturn extends Visitor {
       case c: IndirectCall =>
         val returnBlock = node.parent.parent.returnBlock match {
           case Some(b) => b
-          case None => {
+          case None =>
             val b = Block.procedureReturn(node.parent.parent)
             node.parent.parent.returnBlock = b
             b
-          }
         }
         // if we are return outside the return block then replace with a goto to the return block
         if c.target.name == "R30" && c.returnTarget.isEmpty && !c.parent.isProcReturn then GoTo(Seq(returnBlock)) else node

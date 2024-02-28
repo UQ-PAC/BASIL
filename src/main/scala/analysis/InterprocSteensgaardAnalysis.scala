@@ -13,18 +13,18 @@ sealed trait VariableWrapper {
 
 /** Wrapper for variables so we can have Steensgaard-specific equals method indirectly */
 case class RegisterVariableWrapper(variable: Variable) extends VariableWrapper {
-    override def equals(obj: Any): Boolean = {
-        obj match {
-        case RegisterVariableWrapper(other) =>
-            variable == other && variable.ssa_id.intersect(other.ssa_id).nonEmpty
-        case _ =>
-            false
-        }
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case RegisterVariableWrapper(other) =>
+        variable == other && variable.ssa_id.intersect(other.ssa_id).nonEmpty
+      case _ =>
+        false
     }
+  }
 
-    override def hashCode(): Int = {
-        variable.hashCode()
-    }
+  override def hashCode(): Int = {
+    variable.hashCode()
+  }
 }
 
 /** Steensgaard-style pointer analysis. The analysis associates an [[StTerm]] with each variable declaration and
@@ -305,8 +305,8 @@ class InterprocSteensgaardAnalysis(
   def pointsTo(): PointsToGraph = {
     val solution = solver.solution()
     val unifications = solver.unifications()
-    Logger.info(s"Solution: \n${solution.mkString(",\n")}\n")
-    Logger.info(s"Sets: \n${unifications.values
+    Logger.debug(s"Solution: \n${solution.mkString(",\n")}\n")
+    Logger.debug(s"Sets: \n${unifications.values
       .map { s =>
         s"{ ${s.mkString(",")} }"
       }
@@ -322,7 +322,7 @@ class InterprocSteensgaardAnalysis(
         .toSet
       a + (v.id -> pt)
     }
-    Logger.info(s"\nPoints-to:\n${pointsto.map(p => s"${p._1} -> { ${p._2.mkString(",")} }").mkString("\n")}\n")
+    Logger.debug(s"\nPoints-to:\n${pointsto.map(p => s"${p._1} -> { ${p._2.mkString(",")} }").mkString("\n")}\n")
     pointsto
   }
 

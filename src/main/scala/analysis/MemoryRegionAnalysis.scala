@@ -17,7 +17,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                            val regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]) {
 
   var mallocCount: Int = 0
-  var stackCount: Int = 0
+  private var stackCount: Int = 0
   val stackMap: mutable.Map[Procedure, mutable.Map[Expr, StackRegion]] = mutable.Map()
 
   private def nextMallocCount() = {
@@ -38,7 +38,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
    * @param parent : the function entry node
    * @return the stack region corresponding to the offset
    */
-  def poolMaster(expr: BitVecLiteral, stackBase: Procedure): StackRegion = {
+  private def poolMaster(expr: BitVecLiteral, stackBase: Procedure): StackRegion = {
     val stackPool = stackMap.getOrElseUpdate(stackBase, mutable.HashMap())
     if (stackPool.contains(expr)) {
       stackPool(expr)
@@ -49,7 +49,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     }
   }
 
-  def stackDetection(stmt: Statement): Unit = {
+  private def stackDetection(stmt: Statement): Unit = {
     println("Stack detection")
     println(spList)
     stmt match {
@@ -87,7 +87,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
   private val spList = ListBuffer[Expr](stackPointer)
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
   // TODO: this could be used instead of regionAccesses in other analyses to reduce the Expr to region conversion
-  val registerToRegions: mutable.Map[RegisterVariableWrapper, mutable.Set[MemoryRegion]] = mutable.Map()
+  private val registerToRegions: mutable.Map[RegisterVariableWrapper, mutable.Set[MemoryRegion]] = mutable.Map()
   val procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]] = mutable.Map()
 
   def reducibleToRegion(binExpr: BinaryExpr, n: CfgCommandNode): Set[MemoryRegion] = {

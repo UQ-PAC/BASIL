@@ -164,7 +164,7 @@ class Procedure private (
                   var in: ArrayBuffer[Parameter],
                   var out: ArrayBuffer[Parameter],
                 ) {
-  private var _callers = mutable.HashSet[DirectCall]()
+  private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant
   require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
@@ -366,7 +366,7 @@ class Block private (
 
   def jump: Jump = _jump
 
-  def fallthrough = _fallthrough
+  def fallthrough: Option[GoTo] = _fallthrough
 
   def fallthrough_=(g: Option[GoTo]): Unit = {
     /*
@@ -386,15 +386,16 @@ class Block private (
     }
   }
 
-  def replaceJump(j: Jump) = {
+  def replaceJump(j: Jump): Block = {
     jump = j
     this
   }
 
   def incomingJumps: immutable.Set[GoTo] = _incomingJumps.toSet
 
-  def addIncomingJump(g: GoTo) = _incomingJumps.add(g)
-  def removeIncomingJump(g: GoTo) = {
+  def addIncomingJump(g: GoTo): Boolean = _incomingJumps.add(g)
+  
+  def removeIncomingJump(g: GoTo): Unit = {
     _incomingJumps.remove(g)
     assert(!incomingJumps.contains(g))
   }

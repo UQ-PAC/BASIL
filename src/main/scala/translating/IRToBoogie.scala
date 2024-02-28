@@ -297,7 +297,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
               (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
             }
           }
-          case BoogieMemoryAccessMode.LambdaStoreSelect => {
+          case BoogieMemoryAccessMode.LambdaStoreSelect =>
             if m.accesses == 1 then
               MapUpdate(memVar, indexVar, valueVar)
             else {
@@ -307,7 +307,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
                 BByteExtract(valueVar, BinaryBExpr(BVSUB, i, indexVar)),
                 MapAccess(memVar, i)))
             }
-          }
         }
 
         BFunction(m.fnName, in, out, Some(body), List(externAttr))

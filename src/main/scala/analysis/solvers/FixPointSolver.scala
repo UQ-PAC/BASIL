@@ -223,7 +223,7 @@ trait PushDownWorklistFixPointFunctions[N, T, L <: Lattice[T]] extends LinkedHas
   /** Propagates lattice element y to node m.
    * https://github.com/cs-au-dk/TIP/blob/master/src/tip/solvers/FixpointSolvers.scala#L286
    */
-  def propagate(y: T, m: N) = {
+  def propagate(y: T, m: N): Unit = {
     val xm = x(m)
     val t = lattice.sublattice.lub(xm, y)
     if (t != xm) {

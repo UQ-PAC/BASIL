@@ -48,7 +48,7 @@ class Loop(val header: CFGPosition) {
   def name: String = label(header)
 
   override def toString: String = {
-    s"Header: ${label(header)}, Body: ${edges}"
+    s"Header: ${label(header)}, Body: $edges"
   }
 }
 
@@ -57,14 +57,14 @@ class Loop(val header: CFGPosition) {
  */
 class LoopDetector(cfg: Program) {
   // Header -> Loop
-  val loops: mutable.HashMap[CFGPosition, Loop] = mutable.HashMap()
-  val headers: mutable.Set[CFGPosition] = mutable.Set()
+  private val loops: mutable.HashMap[CFGPosition, Loop] = mutable.HashMap()
+  private val headers: mutable.Set[CFGPosition] = mutable.Set()
 
   // Algorithm helpers
-  val visitedNodes: mutable.Set[CFGPosition] = mutable.Set()
-  val nodeDFSPpos: mutable.HashMap[CFGPosition, Int] = mutable.HashMap()
-  val iloopHeaders: mutable.HashMap[CFGPosition, CFGPosition] = mutable.HashMap()
-  val edgeStack: mutable.Stack[LoopEdge] = mutable.Stack()
+  private val visitedNodes: mutable.Set[CFGPosition] = mutable.Set()
+  private val nodeDFSPpos: mutable.HashMap[CFGPosition, Int] = mutable.HashMap()
+  private val iloopHeaders: mutable.HashMap[CFGPosition, CFGPosition] = mutable.HashMap()
+  private val edgeStack: mutable.Stack[LoopEdge] = mutable.Stack()
 
   /*
    * Returns the set of irreducible loops in the program.
@@ -280,7 +280,7 @@ class LoopTransform(loops: Set[Loop]) {
    *
    * Returns: A new reducible loop which is semantically equivalent to the input irreducible loop
    */
-  def llvm_transform_loop(loop: Loop, i: Int): Loop = {
+  private def llvm_transform_loop(loop: Loop, i: Int): Loop = {
     val entryEdges: Set[LoopEdge] = loop.entryEdges.union(loop.reentries).union(loop.backEdges).toSet
 
     val P_e: Set[LoopEdge] = entryEdges // N entry edges

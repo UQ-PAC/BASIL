@@ -28,10 +28,9 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
             case BVASHR => Some(BitVectorEval.smt_bvashr(l, r))
             case BVCOMP => Some(BitVectorEval.smt_bvcomp(l, r))
             case BVCONCAT => Some(BitVectorEval.smt_concat(l, r))
-            case x => {
+            case x =>
               Logger.error("Binary operation support not implemented: " + binOp.op)
               None
-            }
           }
         case _ => None
       }
@@ -94,15 +93,11 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariabl
           }
       }
     case extend: ZeroExtend =>
-      evaluateExpressionWithSSA(extend.body, constantPropResult) match {
-        case b: Set[BitVecLiteral] if b.nonEmpty => applySingle(BitVectorEval.smt_zero_extend(extend.extension, _: BitVecLiteral), b)
-        case _                => Set()
-      }
+      val result = evaluateExpressionWithSSA(extend.body, constantPropResult)
+      applySingle(BitVectorEval.smt_zero_extend(extend.extension, _: BitVecLiteral), result)
     case e: Extract =>
-      evaluateExpressionWithSSA(e.body, constantPropResult) match {
-        case b: Set[BitVecLiteral] if b.nonEmpty => applySingle(BitVectorEval.boogie_extract(e.end, e.start, _: BitVecLiteral), b)
-        case _               => Set()
-      }
+      val result = evaluateExpressionWithSSA(e.body, constantPropResult)
+      applySingle(BitVectorEval.boogie_extract(e.end, e.start, _: BitVecLiteral), result)
     case registerVariableWrapper: RegisterVariableWrapper =>
       constantPropResult.collect({
         case (k, v) if k == registerVariableWrapper => v
