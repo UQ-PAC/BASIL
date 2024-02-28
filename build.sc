@@ -55,17 +55,18 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
       for (e <- examples) {
         val variations = os.list(e).filter(os.isDir)
         for (v <- variations) {
-          val name = e.last
-          val outPath = v / (name + ".bpl")
-          val expectedPath = v / (name + ".expected")
-          val resultPath = v / (name + "_result.txt")
-          if (os.exists(resultPath)) {
-            val result = os.read(resultPath)
-            val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
-            if (verified == shouldVerify) {
-              if (os.exists(outPath) && !(os.exists(expectedPath) && filesContentEqual(outPath, expectedPath))) {
-                println(s"updated $expectedPath")
-                os.copy.over(outPath, expectedPath)
+          for (name <- Seq(e.last + "_gtirb", e.last + "_bap")) {
+            val outPath = v / (name + ".bpl")
+            val expectedPath = (v / (name + ".expected"))
+            val resultPath = v / (name + "_result.txt")
+            if (os.exists(resultPath)) {
+              val result = os.read(resultPath)
+              val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
+              if (verified == shouldVerify) {
+                if (os.exists(outPath) && !(os.exists(expectedPath) && filesContentEqual(outPath, expectedPath))) {
+                  println(s"updated $expectedPath")
+                  os.copy.over(outPath, expectedPath)
+                }
               }
             }
           }

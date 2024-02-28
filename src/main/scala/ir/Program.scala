@@ -171,6 +171,9 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
  * the return is replaced with a jump to the return block. When it is removed again 
  * it is again replaced by a return call.
  *
+ * A procedure containing only an entry and exit block (i.e. no innerBlocks) is considered 
+ * a stub without an implementation. 
+ *
  */
 class Procedure private (
                   var name: String,
@@ -192,10 +195,10 @@ class Procedure private (
       Block(s"${name}_basil_entry", None, List.empty, GoTo(firstBlock.toSet)),
       Block(s"${name}_basil_return", None, List.empty, Return()),
       mutable.LinkedHashSet.empty, ArrayBuffer.from(in), ArrayBuffer.from(out))
-    firstBlock.foreach(this.addBlock)
     this.entryBlock.parent = this
     this.returnBlock.parent = this
 
+    // For default entry block we make it jump to the return so it is always defined. 
     entryBlock.jump match
       case g: GoTo if g.targets.isEmpty => entryBlock.replaceJump(GoTo(Set(returnBlock)))
       case _ => ()

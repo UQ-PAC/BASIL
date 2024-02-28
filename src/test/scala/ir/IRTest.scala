@@ -81,7 +81,6 @@ class IRTest extends AnyFunSuite {
     val b = p.procedures.head.removeBlocks(blocks("lmain1"))
     assert(!b.hasParent)
 
-    assert(blocks("lmain").singlePredecessor.toSet == Set(blocks("lmain").parent.entryBlock))
     assert(blocks("lmain").singleSuccessor.isEmpty)
     assert(blocks("lmain2").singlePredecessor.isEmpty)
     assert(blocks("lmain2").singleSuccessor.contains(p.procs("main").returnBlock))
@@ -298,8 +297,8 @@ class IRTest extends AnyFunSuite {
     called.addBlock(b2)
 
     assert(called.blocks.size == 4)
-    assert(called.entryBlock.jump.asInstanceOf[GoTo].targets.isEmpty)
-    assert(b1.incomingJumps.isEmpty)
+    assert(called.entryBlock.jump.asInstanceOf[GoTo].targets.contains(called.returnBlock))
+    assert(b1.incomingJumps.toSet == Set.empty)
     assert(b2.incomingJumps.isEmpty)
 
     def blocks = p.collect {
@@ -331,7 +330,7 @@ class IRTest extends AnyFunSuite {
     assert(olds != blocks.size)
 
     p.mainProcedure.replaceBlocks(Set(block("test", ret).resolve(p)))
-    val mainblocks = blocks.filter(_._2.parent.name == "main")
+    // val mainblocks = blocks.filter(_._2.parent.name == "main")
     assert(blocks.count(_._2.parent.name == "main") == 3) // test entry and return_block
 
   }

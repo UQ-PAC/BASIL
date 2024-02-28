@@ -229,7 +229,7 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
 
   protected def isCall(call: CFGPosition): Boolean =
     call match
-      case directCall: DirectCall => directCall.parent.parent.hasImplementation
+      case directCall: DirectCall => directCall.target.hasImplementation
       case _ => false
 
   protected def isExit(exit: CFGPosition): Boolean =
@@ -264,7 +264,7 @@ abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program)
     call match
       case goto: GoTo if goto.isAfterCall =>
         goto.parent.jump match
-          case directCall: DirectCall => directCall.parent.parent.hasImplementation
+          case directCall: DirectCall => directCall.target.hasImplementation
           case _ => false
       case _ => false
 

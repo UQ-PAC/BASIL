@@ -140,6 +140,14 @@ class Return(override val label: Option[String] = None) extends Call {
   override def acceptVisit(visitor: Visitor): Return = this
 }
 
+/**
+ * A single-target goto that represents a return as a goto to the parent procedure's
+ * return block.
+ *
+ * It disallows adding or removing additional targets. 
+ *
+ * invariant: (returnBlock eq parent.parent.returnBlock)
+ */
 class GoToReturn(returnBlock: Block) extends GoTo(Set(returnBlock)) {
 
   override def addTarget(t: Block): Unit = {

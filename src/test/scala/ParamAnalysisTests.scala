@@ -64,7 +64,7 @@ class ParamAnalysisTests extends AnyFunSuite, TestUtil{
     val analysisResults = result.analysis.get.paramResults
     val procs = result.ir.program.procs
 
-    assert(analysisResults(procs("main")) == Set.empty)
+    assert(analysisResults.isEmpty)
   }
 
   test("jumptable") {
