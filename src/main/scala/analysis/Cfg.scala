@@ -582,6 +582,7 @@ class ProgramCfgFactory:
                 cfg.addEdge(noReturn, funcExitNode)
             }
           case r : Return =>
+            cfg.addEdge(precNode, jmpNode)
             val returnNode = CfgProcedureReturnNode()
             cfg.addEdge(jmpNode, returnNode)
             cfg.addEdge(returnNode, funcExitNode)

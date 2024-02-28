@@ -88,6 +88,7 @@ class SSAForm(program: Program) {
                   blockBasedMappings((b, varr)) = blockBasedMappings(b, varr) ++ blockBasedMappings(currentBlock, varr)
                 })
               })
+            case r: Return => ()
           }
           // Push unvisited successors onto the stack
           stack.pushAll(currentBlock.nextBlocks)
