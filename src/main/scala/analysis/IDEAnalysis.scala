@@ -1,6 +1,6 @@
 package analysis
 
-import ir.{CFGPosition, Command, DirectCall, GoTo, Procedure, Program}
+import ir.{CFGPosition, Command, DirectCall, GoTo, IndirectCall, Procedure, Program}
 
 final case class Lambda()
 
@@ -31,31 +31,30 @@ trait IDEAnalysis[E, EE, C, R, D, T, L <: Lattice[T]] {
   /**
    * The edge lattice.
    */
-  val edgelattice: EdgeFunctionLattice[T, valuelattice.type]
+  val edgelattice: EdgeFunctionLattice[T, L]
 
   /**
    * Edges for call-to-entry.
    */
-  def edgesCallToEntry(call: C, entry: E)(d: DL): Map[DL, edgelattice.Element]
+  def edgesCallToEntry(call: C, entry: E)(d: DL): Map[DL, EdgeFunction[T]]
 
   /**
    * Edges for exit-to-aftercall.
    */
-  def edgesExitToAfterCall(exit: EE, aftercall: R)(d: DL): Map[DL, edgelattice.Element]
+  def edgesExitToAfterCall(exit: EE, aftercall: R)(d: DL): Map[DL, EdgeFunction[T]]
 
   /**
    * Edges for call-to-aftercall.
    */
-  def edgesCallToAfterCall(call: C, aftercall: R)(d: DL): Map[DL, edgelattice.Element]
+  def edgesCallToAfterCall(call: C, aftercall: R)(d: DL): Map[DL, EdgeFunction[T]]
 
   /**
    * Edges for other CFG nodes.
    */
-  def edgesOther(n: CFGPosition)(d: DL): Map[DL, edgelattice.Element]
+  def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[T]]
 }
 
+// IndirectCall in these is because they are returns so that can be further tightened in future
+trait ForwardIDEAnalysis[D, T, L <: Lattice[T]] extends IDEAnalysis[Procedure, IndirectCall, DirectCall, GoTo, D, T, L]
 
-trait ForwardIDEAnalysis[D, T, L <: Lattice[T]] extends IDEAnalysis[Procedure, Command, DirectCall, GoTo, D, T, L]
-
-
-trait BackwardIDEAnalysis[D, T, L <: Lattice[T]] extends IDEAnalysis[Command, Procedure, GoTo, DirectCall, D, T, L]
+trait BackwardIDEAnalysis[D, T, L <: Lattice[T]] extends IDEAnalysis[IndirectCall, Procedure, GoTo, DirectCall, D, T, L]
