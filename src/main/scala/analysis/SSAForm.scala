@@ -2,6 +2,7 @@ package analysis
 
 import analysis.*
 import ir.{SignExtend, *}
+import util.Logger
 
 import scala.collection.mutable
 
@@ -51,7 +52,7 @@ class SSAForm(program: Program) {
           visitedBlocks.add(currentBlock)
 
           for (stmt <- currentBlock.statements) {
-            println(stmt)
+            Logger.debug(stmt)
             stmt match {
               case localAssign: LocalAssign =>
                 transformVariables(localAssign.rhs.variables, currentBlock, proc)

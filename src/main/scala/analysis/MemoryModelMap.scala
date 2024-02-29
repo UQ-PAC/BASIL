@@ -161,49 +161,58 @@ class MemoryModelMap {
 
 
   def findStackObject(value: BigInt): Option[StackRegion] = 
-    stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
+    stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {
+      obj.extent = Some(range)
+      obj
+    })
 
   def findSharedStackObject(value: BigInt): Set[StackRegion] =
-    sharedStackMap.values.flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj}).toSet).toSet
+    sharedStackMap.values.flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {
+      obj.extent = Some(range)
+      obj
+    }).toSet).toSet
 
   def findDataObject(value: BigInt): Option[DataRegion] = 
-    dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
+    dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {
+      obj.extent = Some(range)
+      obj
+    })
 
   override def toString: String =
     s"Stack: ${stackMap}\n Heap: ${heapMap}\n Data: ${dataMap}\n"
 
   def printRegionsContent(hideEmpty: Boolean = false): Unit = {
-    Logger.info("Stack:")
+    Logger.debug("Stack:")
     for name <- localStacks.keys do
       popContext()
       pushContext(name)
-      Logger.info(s"  Function: $name")
-      if stackMap.nonEmpty then Logger.info(s"    Local:")
+      Logger.debug(s"  Function: $name")
+      if stackMap.nonEmpty then Logger.debug(s"    Local:")
       // must sort by ranges
       for ((range, region) <- stackMap) {
         if (region.content.nonEmpty || !hideEmpty) {
-          Logger.info(s"       $range -> $region")
+          Logger.debug(s"       $range -> $region")
         }
       }
-      if sharedStackMap.nonEmpty then Logger.info(s"    Shared:")
+      if sharedStackMap.nonEmpty then Logger.debug(s"    Shared:")
       for ((parent, treeMap) <- sharedStackMap) {
-        Logger.info(s"        Parent: ${parent.name}")
-            for ((range, region) <- treeMap) {
-                if (region.content.nonEmpty || !hideEmpty) {
-                  Logger.info(s"           $range -> $region")
-                }
-            }
+        Logger.debug(s"        Parent: ${parent.name}")
+        for ((range, region) <- treeMap) {
+          if (region.content.nonEmpty || !hideEmpty) {
+            Logger.debug(s"           $range -> $region")
+          }
+        }
       }
-    Logger.info("Heap:")
+    Logger.debug("Heap:")
     for ((range, region) <- heapMap) {
       if (region.content.nonEmpty || !hideEmpty) {
-        Logger.info(s"  $range -> $region")
+        Logger.debug(s"  $range -> $region")
       }
     }
-    Logger.info("Data:")
+    Logger.debug("Data:")
     for ((range, region) <- dataMap) {
       if (region.content.nonEmpty || !hideEmpty) {
-        Logger.info(s"  $range -> $region")
+        Logger.debug(s"  $range -> $region")
       }
     }
   }

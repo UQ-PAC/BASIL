@@ -393,8 +393,8 @@ object IRTransform {
               return
             }
             val targetNames = resolveAddresses(indirectCall.target)
-            println(s"Points-To approximated call ${indirectCall.target} with $targetNames")
-            println(IRProgram.procedures)
+            Logger.debug(s"Points-To approximated call ${indirectCall.target} with $targetNames")
+            Logger.debug(IRProgram.procedures)
             val targets: mutable.Set[Procedure] = targetNames.map(name => IRProgram.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
 
             if (targets.size == 1) {

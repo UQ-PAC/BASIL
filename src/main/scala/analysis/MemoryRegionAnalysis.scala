@@ -50,8 +50,8 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
   }
 
   private def stackDetection(stmt: Statement): Unit = {
-    println("Stack detection")
-    println(spList)
+    Logger.debug("Stack detection")
+    Logger.debug(spList)
     stmt match {
       case localAssign: LocalAssign =>
         if (spList.contains(localAssign.rhs)) {
@@ -204,10 +204,11 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
           }
         case memAssign: MemoryAssign =>
           if (ignoreRegions.contains(memAssign.rhs.value)) {
-            return s
+            s
+          } else {
+            val result = eval(memAssign.rhs.index, s, cmd)
+            regionLattice.lub(s, result)
           }
-          val result = eval(memAssign.rhs.index, s, cmd)
-          regionLattice.lub(s, result)
         case localAssign: LocalAssign =>
           stackDetection(localAssign)
           var m = s
