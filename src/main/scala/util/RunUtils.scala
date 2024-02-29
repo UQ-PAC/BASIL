@@ -589,7 +589,7 @@ object StaticAnalysis {
     Logger.info("[!] Running Steensgaard")
     val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, globalOffsets)
     steensgaardSolver.analyze()
-    val steensgaardResults = steensgaardSolver.pointsTo().asInstanceOf[Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]]]
+    val steensgaardResults = steensgaardSolver.pointsTo()
 
     Logger.info("[!] Running VSA")
     val vsaSolver =

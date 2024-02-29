@@ -164,7 +164,7 @@ trait ConstantPropagationWithSSA(val cfg: ProgramCfg) {
           // assignments
           case la: LocalAssign =>
             if (s.contains(RegisterVariableWrapper(la.lhs))) {
-                s + (RegisterVariableWrapper(la.lhs) -> s(RegisterVariableWrapper(la.lhs)).union(eval(la.rhs, s)))
+              s + (RegisterVariableWrapper(la.lhs) -> s(RegisterVariableWrapper(la.lhs)).union(eval(la.rhs, s)))
             } else {
               s + (RegisterVariableWrapper(la.lhs) -> eval(la.rhs, s))
             }

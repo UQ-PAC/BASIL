@@ -26,17 +26,18 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
 
   /** Default implementation of eval.
    */
-  def eval(cmd: Command, constants:  Map[Variable, FlatElement[BitVecLiteral]], s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = {
+  def eval(cmd: Command, constants: Map[Variable, FlatElement[BitVecLiteral]], s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = {
     cmd match {
       case localAssign: LocalAssign =>
         localAssign.rhs match {
           case memoryLoad: MemoryLoad =>
-            s + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(memoryLoad).asInstanceOf[FlatElement[Expr]])
+            s + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(memoryLoad))
           case binaryExpr: BinaryExpr =>
             if (evaluateExpression(binaryExpr.arg1, constants).isEmpty) { // approximates Base + Offset
-              return s + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(binaryExpr).asInstanceOf[FlatElement[Expr]])
+              s + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(binaryExpr))
+            } else {
+              s
             }
-            s
           case _ => s
         }
       case _ =>
