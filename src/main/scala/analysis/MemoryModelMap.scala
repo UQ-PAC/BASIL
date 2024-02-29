@@ -115,7 +115,7 @@ class MemoryModelMap {
           localStacks(exitNode.data.name) = stackRgns
 
         case LiftedBottom =>
-    }
+      }
     )
     // add externalFunctionRgn to dataRgns and sort by value
     val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.value)
@@ -224,8 +224,8 @@ trait MemoryRegion {
   val content: mutable.Set[BitVecLiteral | MemoryRegion] = mutable.Set()
 }
 
-class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral, val parent: Procedure = null) extends MemoryRegion {
-  override def toString: String = s"Stack($regionIdentifier, $start, ${if parent != null then parent.name else "Null"}) -> $content"
+class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral, val parent: Procedure) extends MemoryRegion {
+  override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name}) -> $content"
   override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
   override def equals(obj: Any): Boolean = obj match {
     case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier
