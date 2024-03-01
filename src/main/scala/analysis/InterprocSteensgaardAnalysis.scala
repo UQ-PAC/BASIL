@@ -40,6 +40,10 @@ class InterprocSteensgaardAnalysis(
   var stackCount: Int = 0
   val stackMap: mutable.Map[Expr, StackRegion] = mutable.Map()
 
+  private val memoryRegionContents: mutable.Map[MemoryRegion, mutable.Set[BitVecLiteral | MemoryRegion]] = mutable.Map()
+
+  def getMemoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]] = memoryRegionContents.map((k, v) => k -> v.toSet).toMap
+
   private def nextMallocCount() = {
     mallocCount += 1
     s"malloc_$mallocCount"
@@ -275,8 +279,11 @@ class InterprocSteensgaardAnalysis(
             val alpha = FreshVariable()
             X1_star.foreach(x =>
               unify(ExpressionVariable(x), PointerRef(alpha))
-              x.content.addAll(X2)
-              x.content.addAll(possibleRegions.filter(r => r != x))
+              if (!memoryRegionContents.contains(x)) {
+                memoryRegionContents.addOne(x -> mutable.Set())
+              }
+              memoryRegionContents(x).addAll(X2)
+              memoryRegionContents(x).addAll(possibleRegions.filter(r => r != x))
             )
             X2.foreach(x => unify(alpha, ExpressionVariable(x)))
             possibleRegions.foreach(x => unify(alpha, ExpressionVariable(x)))

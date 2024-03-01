@@ -109,7 +109,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                 case Some(b: BitVecLiteral) =>
                   regions.foreach {
                     case stackRegion: StackRegion =>
-                      val nextOffset = BinaryExpr(op = BVADD, arg1 = stackRegion.start, arg2 = b)
+                      val nextOffset = BinaryExpr(BVADD, stackRegion.start, b)
                       evaluateExpression(nextOffset, constantProp(n)) match {
                         case Some(b2: BitVecLiteral) =>
                           reducedRegions = reducedRegions + poolMaster(b2, n.parent.data)
@@ -195,8 +195,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
           }
           if (directCall.target.name == "malloc") {
             evaluateExpression(mallocVariable, constantProp(n)) match {
-              case Some(b: BitVecLiteral) =>
-                regionLattice.lub(s, Set(HeapRegion(nextMallocCount(), b)))
+              case Some(b: BitVecLiteral) => regionLattice.lub(s, Set(HeapRegion(nextMallocCount(), b)))
               case None => s
             }
           } else {

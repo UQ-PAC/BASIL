@@ -58,7 +58,8 @@ case class StaticAnalysisContext(
     interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
     paramResults: Map[Procedure, Set[Variable]],
     steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
-    mmmResults: MemoryModelMap
+    mmmResults: MemoryModelMap,
+    memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]]
 )
 
 /** Results of the main program execution.
@@ -315,6 +316,7 @@ object IRTransform {
   def resolveIndirectCallsUsingPointsTo(
      cfg: ProgramCfg,
      pointsTos: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
+     regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
      IRProgram: Program
    ): (Program, Boolean) = {
     var modified: Boolean = false
@@ -335,19 +337,21 @@ object IRTransform {
       val result = mutable.Set[String]()
       region match {
         case stackRegion: StackRegion =>
-          for (c <- stackRegion.content) {
-            c match {
-              case bitVecLiteral: BitVecLiteral => ???
-              case memoryRegion: MemoryRegion =>
-                result.addAll(searchRegion(memoryRegion))
+          if (regionContents.contains(stackRegion)) {
+            for (c <- regionContents(stackRegion)) {
+              c match {
+                case bitVecLiteral: BitVecLiteral => ???
+                case memoryRegion: MemoryRegion =>
+                  result.addAll(searchRegion(memoryRegion))
+              }
             }
           }
           result
         case dataRegion: DataRegion =>
-          if (dataRegion.content.isEmpty) {
+          if (!regionContents.contains(dataRegion) || regionContents(dataRegion).isEmpty) {
             result.add(dataRegion.regionIdentifier)
           } else {
-            for (c <- dataRegion.content) {
+            for (c <- regionContents(dataRegion)) {
               c match {
                 case bitVecLiteral: BitVecLiteral => ???
                 case memoryRegion: MemoryRegion =>
@@ -590,6 +594,7 @@ object StaticAnalysis {
     val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, globalOffsets)
     steensgaardSolver.analyze()
     val steensgaardResults = steensgaardSolver.pointsTo()
+    val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
 
     Logger.info("[!] Running VSA")
     val vsaSolver =
@@ -609,8 +614,6 @@ object StaticAnalysis {
     Logger.info("[!] Running Parameter Analysis")
     val paramResults = ParamAnalysis(IRProgram).analyze()
 
-    //mmm.printRegionsContent(false)
-
     StaticAnalysisContext(
       cfg = cfg,
       constPropResult = constPropResult,
@@ -620,7 +623,8 @@ object StaticAnalysis {
       interLiveVarsResults = interLiveVarsResults,
       paramResults = paramResults,
       steensgaardResults = steensgaardResults,
-      mmmResults = mmm
+      mmmResults = mmm,
+      memoryRegionContents = memoryRegionContents
     )
   }
 
@@ -826,7 +830,7 @@ object RunUtils {
       analysisResult.append(result)
       Logger.info("[!] Replacing Indirect Calls")
       //val (ir, mod) = IRTransform.resolveIndirectCalls(result.cfg, result.vsaResult, ctx.program)
-      val (ir, mod) = IRTransform.resolveIndirectCallsUsingPointsTo(result.cfg, result.steensgaardResults, ctx.program)
+      val (ir, mod) = IRTransform.resolveIndirectCallsUsingPointsTo(result.cfg, result.steensgaardResults, result.memoryRegionContents, ctx.program)
       modified = mod
       if (modified) {
         iteration += 1
