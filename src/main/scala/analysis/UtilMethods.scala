@@ -2,8 +2,6 @@ package analysis
 import ir.*
 import util.Logger
 
-import scala.collection.mutable.ListBuffer
-
 /** Evaluate an expression in a hope of finding a global variable.
   *
   * @param exp
@@ -110,20 +108,20 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariabl
   }
 }
 
-def unwrapExpr(expr: Expr): ListBuffer[Expr] = {
-  val buffers = ListBuffer[Expr]()
+def unwrapExpr(expr: Expr): List[Expr] = {
+  val buffers = List[Expr]()
   expr match {
-    case e: Extract => unwrapExpr(e.body)
-    case e: SignExtend => unwrapExpr(e.body)
-    case e: ZeroExtend => unwrapExpr(e.body)
-    case repeat: Repeat => unwrapExpr(repeat.body)
-    case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
+    case e: Extract => buffers ++= unwrapExpr(e.body)
+    case e: SignExtend => buffers ++= unwrapExpr(e.body)
+    case e: ZeroExtend => buffers ++= unwrapExpr(e.body)
+    case repeat: Repeat => buffers ++= unwrapExpr(repeat.body)
+    case unaryExpr: UnaryExpr => buffers ++= unwrapExpr(unaryExpr.arg)
     case binaryExpr: BinaryExpr =>
-      unwrapExpr(binaryExpr.arg1)
-      unwrapExpr(binaryExpr.arg2)
+      buffers ++= unwrapExpr(binaryExpr.arg1)
+      buffers ++= unwrapExpr(binaryExpr.arg2)
     case memoryLoad: MemoryLoad =>
-      buffers.addOne(memoryLoad)
-      unwrapExpr(memoryLoad.index)
+      buffers += memoryLoad
+      buffers ++= unwrapExpr(memoryLoad.index)
     case _ =>
   }
   buffers

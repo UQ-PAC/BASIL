@@ -103,12 +103,12 @@ class InterprocSteensgaardAnalysis(
               } {
                 r match {
                   case stackRegion: StackRegion =>
-                    val nextOffset = BinaryExpr(BVADD, stackRegion.start, b)
+                    val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
                     evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach { b2 =>
-                      reducedRegions ++= exprToRegion(BinaryExpr(BVADD, stackPointer, b2), n)
+                      reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
                     }
                   case dataRegion: DataRegion =>
-                    val nextOffset = BinaryExpr(BVADD, relocatedBase(dataRegion.start), b)
+                    val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start), b)
                     evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach { b2 =>
                       reducedRegions ++= exprToRegion(b2, n)
                     }
