@@ -595,6 +595,7 @@ object StaticAnalysis {
     steensgaardSolver.analyze()
     val steensgaardResults = steensgaardSolver.pointsTo()
     val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
+    mmm.logRegions(steensgaardSolver.getMemoryRegionContents)
 
     Logger.info("[!] Running VSA")
     val vsaSolver =

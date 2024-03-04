@@ -175,7 +175,20 @@ class MemoryModelMap {
   override def toString: String =
     s"Stack: $stackMap\n Heap: $heapMap\n Data: $dataMap\n"
 
-  def printRegions(): Unit = {
+  def logRegions(content: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]] = Map.empty): Unit = {
+    def logRegion(range: RangeKey, region: MemoryRegion, shared: Boolean = false): Unit = {
+      // the spacing level is based on region type
+      val spacing = region match {
+          case _: StackRegion => if shared then "           " else "       "
+          case _: HeapRegion => "  "
+          case _: DataRegion => "  "
+      }
+      Logger.debug(s"$spacing$range -> $region")
+      if content.contains(region) then
+        if content.contains(region) then
+          for value <- content(region) do
+            Logger.debug(s"$spacing    $value")
+    }
     Logger.debug("Stack:")
     for name <- localStacks.keys do
       popContext()
@@ -184,22 +197,22 @@ class MemoryModelMap {
       if stackMap.nonEmpty then Logger.debug(s"    Local:")
       // must sort by ranges
       for ((range, region) <- stackMap) {
-        Logger.debug(s"       $range -> $region")
+        logRegion(range, region)
       }
       if sharedStackMap.nonEmpty then Logger.debug(s"    Shared:")
       for ((parent, treeMap) <- sharedStackMap) {
         Logger.debug(s"        Parent: ${parent.name}")
         for ((range, region) <- treeMap) {
-          Logger.debug(s"           $range -> $region")
+          logRegion(range, region, true)
         }
       }
     Logger.debug("Heap:")
     for ((range, region) <- heapMap) {
-      Logger.debug(s"  $range -> $region")
+      logRegion(range, region)
     }
     Logger.debug("Data:")
     for ((range, region) <- dataMap) {
-      Logger.debug(s"  $range -> $region")
+      logRegion(range, region)
     }
   }
 }

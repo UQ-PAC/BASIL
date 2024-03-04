@@ -56,7 +56,7 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
   }
 }
 
-def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariableWrapper, Set[BitVecLiteral]]): Set[BitVecLiteral] = {
+def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]): Set[BitVecLiteral] = {
   Logger.debug(s"evaluateExpression: $exp")
 
   def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
@@ -92,6 +92,15 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariabl
             case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
           }
       }
+    case unaryExpr: UnaryExpr =>
+      val result = evaluateExpressionWithSSA(unaryExpr.arg, constantPropResult)
+      unaryExpr.op match {
+        case BVNEG =>
+          applySingle(BitVectorEval.smt_bvneg, result)
+        case BVNOT =>
+          applySingle(BitVectorEval.smt_bvnot, result)
+        case _ => throw new RuntimeException("Unary operation support not implemented: " + unaryExpr.op)
+      }
     case extend: ZeroExtend =>
       val result = evaluateExpressionWithSSA(extend.body, constantPropResult)
       applySingle(BitVectorEval.smt_zero_extend(extend.extension, _: BitVecLiteral), result)
@@ -99,14 +108,10 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariabl
       val result = evaluateExpressionWithSSA(e.body, constantPropResult)
       applySingle(BitVectorEval.boogie_extract(e.end, e.start, _: BitVecLiteral), result)
     case variable: Variable =>
-      val registerVariableWrapper = RegisterVariableWrapper(variable)
-      constantPropResult.collect({
-        case (k, v) if k == registerVariableWrapper => v
-      }).flatten.toSet
-      constantPropResult(registerVariableWrapper)
+      constantPropResult(RegisterWrapperEqualSets(variable))
     case b: BitVecLiteral => Set(b)
-    case _ => //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
-      Set()
+    case _ => throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
+      //Set()
   }
 }
 

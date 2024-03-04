@@ -6,7 +6,9 @@ import util.Logger
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
 
-/** Wrapper for variables so we can have Steensgaard-specific equals method indirectly */
+/** Wrapper for variables so we can have Steensgaard-specific equals method indirectly
+ * Relies on the SSA sets intersection being non-empty
+ * */
 case class RegisterVariableWrapper(variable: Variable) {
   override def equals(obj: Any): Boolean = {
     obj match {
@@ -18,12 +20,26 @@ case class RegisterVariableWrapper(variable: Variable) {
   }
 }
 
+/** Wrapper for variables so we can have ConstantPropegation-specific equals method indirectly
+ * Relies on SSA sets being exactly the same
+ * */
+case class RegisterWrapperEqualSets(variable: Variable) {
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case RegisterWrapperEqualSets(other) =>
+        variable == other && variable.ssa_id == other.ssa_id
+      case _ =>
+        false
+    }
+  }
+}
+
 /** Steensgaard-style pointer analysis. The analysis associates an [[StTerm]] with each variable declaration and
   * expression node in the AST. It is implemented using [[analysis.solvers.UnionFindSolver]].
   */
 class InterprocSteensgaardAnalysis(
       cfg: ProgramCfg,
-      constantProp: Map[CfgNode, Map[RegisterVariableWrapper, Set[BitVecLiteral]]],
+      constantProp: Map[CfgNode, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
       regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
       mmm: MemoryModelMap,
       globalOffsets: Map[BigInt, BigInt]) extends Analysis[Any] {
