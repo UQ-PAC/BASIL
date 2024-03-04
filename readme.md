@@ -38,13 +38,11 @@ This is a Scala 3 project using the [mill](mill-build.com) build system, it can 
 ### Local Development 
 
 
-The tool is a Scala project, and is therefore OS-independent, but is only tested under linux. 
+The tool itself is a Scala project and is OS-independent.
 
-
-The protobuffer compiler is required to build the project (due to ddisasm), this can be installed as the apt `protobuf-compiler` package, or from [here](https://protobuf.dev/downloads/).
 
 Furthermore, lifting input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. 
-On Windows, WSL2 may be used to run any Linux-specific tasks, but it is less thoroughly tested.
+On Windows, WSL2 may be used to run any Linux-specific tasks.
 
 Installing [mill](https://mill-build.com/mill/Installation_IDE_Support.html) or [sbt](https://www.scala-sbt.org/download.html) and [JDK >= 17](https://openjdk.org/install/) is required.
 

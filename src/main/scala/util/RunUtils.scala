@@ -824,13 +824,11 @@ object RunUtils {
     var modified: Boolean = true
     val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
     while (modified) {
-      var newIR = null
       Logger.info("[!] Running Static Analysis")
       val result = StaticAnalysis.analyse(ctx, config, iteration)
       analysisResult.append(result)
       Logger.info("[!] Replacing Indirect Calls")
-      //val (ir, mod) = IRTransform.resolveIndirectCalls(result.cfg, result.vsaResult, ctx.program)
-      val (ir, mod) = IRTransform.resolveIndirectCallsUsingPointsTo(result.cfg, result.steensgaardResults, result.memoryRegionContents, ctx.program)
+      val (_, mod) = IRTransform.resolveIndirectCallsUsingPointsTo(result.cfg, result.steensgaardResults, result.memoryRegionContents, ctx.program)
       modified = mod
       if (modified) {
         iteration += 1

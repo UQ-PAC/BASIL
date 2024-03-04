@@ -346,8 +346,8 @@ class Parameter(var name: String, var size: Int, var value: Register) {
 
 
 class Block private (
-  var label: String,
- var address: Option[Int],
+  val label: String,
+ val address: Option[Int],
  val statements: IntrusiveList[Statement],
  private var _jump: Jump,
  private val _incomingJumps: mutable.HashSet[GoTo],
