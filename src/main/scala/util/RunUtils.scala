@@ -6,6 +6,7 @@ import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
 import spray.json.*
 import gtirb.*
+
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import java.io.{File, PrintWriter}
@@ -25,10 +26,10 @@ import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
+
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
-import analysis.CfgCommandNode
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -60,6 +61,7 @@ case class StaticAnalysisContext(
     steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
+    symbolicAccessess: Map[CFGPosition, Map[SymbolicAccess, TwoElement]],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]
 )
 
@@ -626,6 +628,44 @@ object StaticAnalysis {
     //val paramResults = ParamAnalysis(IRProgram).analyze()
     val paramResults = Map[Procedure, Set[Variable]]()
 
+    Logger.info("[!] Running PointerTypeAnalysis")
+    val pointerTypeResults = PointerTypeAnalysis(IRProgram).analyze()
+//    println("HEllow")
+//    println(pointerTypeResults)
+    config.analysisDotPath.foreach(s =>
+      writeToFile(toDot(IRProgram, pointerTypeResults.foldLeft(Map(): Map[CFGPosition, String]) {
+        (m, t) =>
+          m + (t._1 -> t._2.toString)
+      }), s"${s}_pointerType.dot")
+    )
+
+
+//    Logger.info("[!] Running Reaching Defs")
+//    val reachingDefs = PrePass(IRProgram, newCPResult, globals, globalAddresses, globalOffsets).analyze()
+//    config.analysisDotPath.foreach(s =>
+//      writeToFile(toDot(IRProgram, reachingDefs.foldLeft(Map():Map[CFGPosition, String]){
+//        (m, t) =>
+//          m + (t._1 -> t._2.toString)
+//      }), s"${s}_reaching.dot")
+//    )
+
+//    LocalDSA(IRProgram, IRProgram.mainProcedure, newCPResult, reachingDefs).analyze()
+
+//    println(globals)
+//    println(globalOffsets)
+//    println(globalAddresses)
+//    println(externalFunctions)
+//    println(externalAddresses)
+
+    Logger.info("[!] Running Symbolic Access Analysis")
+    val symResults: Map[CFGPosition, Map[SymbolicAccess, TwoElement]] = SymbolicAccessAnalysis(IRProgram, newCPResult).analyze()
+    config.analysisDotPath.foreach(s =>
+      writeToFile(toDot(IRProgram, symResults.foldLeft(Map():Map[CFGPosition, String]){
+        (m, t) =>
+          m + (t._1 -> t._2.toString)
+      }), s"${s}_reaching.dot")
+    )
+
     StaticAnalysisContext(
       cfg = cfg,
       constPropResult = constPropResult,
@@ -637,7 +677,8 @@ object StaticAnalysis {
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,
       memoryRegionContents = memoryRegionContents,
-      reachingDefs = reachingDefinitionsAnalysisResults
+      reachingDefs = reachingDefinitionsAnalysisResults,
+      symbolicAccessess = symResults
     )
   }
 
@@ -858,8 +899,12 @@ object RunUtils {
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
+    Logger.info("[!] Running Region Builder")
+    val regions = RegionBuilder(ctx.program, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions).analyze()
+
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last
+
   }
 }
 
