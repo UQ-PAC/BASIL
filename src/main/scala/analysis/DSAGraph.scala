@@ -15,7 +15,38 @@ type Value = Procedure | Expr
 class Graph(val procedure: Procedure) {
 
   val nodes: mutable.Set[Node] = mutable.Set()
-  val pointersToCells: mutable.Map[Expr, Cell]= mutable.Map()
+  val pointersToCells: mutable.Map[Expr, Cell] = mutable.Map()
+  // TODO refactor the one below
+  // If cells change i don't think this will work.
+  var pointsToRelations: mutable.Map[Cell, Cell] = mutable.Map()
+
+  /**
+   *
+   * @param node
+   * @return Set[(node, offset_i)_pointer, cell_pointee)
+   */
+  def getPointees(node: Node): Set[(Cell, Cell)] = {
+    node.cells.foldLeft(Set(): Set[(Cell, Cell)]) {
+      (s, c) => if c.pointee.isDefined then s.+((c, c.pointee.get)) else s
+    }
+  }
+
+  def getPointers(node: Node): Set[(Cell, Cell)] = {
+    pointsToRelations.foldLeft(Set(): Set[(Cell, Cell)]) {
+      (s, m) =>
+        m match
+          case (key, value) =>
+            if node.cells.contains(value) then s.+((key, value)) else s
+    }
+  }
+
+  def pointTo(pointer: Cell, pointee: Option[Cell]): Unit = {
+    pointer.pointTo(pointee)
+    pointee match
+      case Some(value) =>
+        pointsToRelations.put(pointer, value)
+      case None => pointsToRelations.remove(pointer)
+  }
 
 
   def makeNode(): Node = {
@@ -24,6 +55,10 @@ class Graph(val procedure: Procedure) {
     node
   }
 
+  def makeCell(): Cell = {
+    val node = makeNode()
+    node.makeCell()
+  }
 }
 
 
@@ -31,10 +66,14 @@ class Graph(val procedure: Procedure) {
  * DSA Node represents a memory object
  */
 class Node (val owner: Graph) {
-//  val links =
+  var cells: mutable.Set[Cell] = mutable.Set()
   private val flags: NodeFlags = NodeFlags()
   var size: Int = 0
 
+  def links: Set[Int] =
+    cells.foldLeft(Set(): Set[Int]){
+      (s, c) => s + c.offset
+    }
 
   def offsetHelper(offset1: Int, offset2: Int): Int = {
     if isCollapsed then
@@ -46,10 +85,40 @@ class Node (val owner: Graph) {
   }
 
   def redirectEdges(node: Node, offset: Int): Unit = {
+    owner.getPointers(this).foreach(
+      (pointer, pointee) =>
+        val newCell = node.makeCell(node.offsetHelper(offset, pointee.offset))
+        owner.pointTo(pointer, Some(newCell))
+        owner.pointersToCells.foreach(
+          (key, value) =>
+            if value.equals(pointee) then owner.pointersToCells.put(key, newCell)
+        )
+    )
 
+    owner.getPointees(this).foreach(
+      (pointer, pointee) =>
+        val newCell = node.makeCell(node.offsetHelper(offset, pointer.offset))
+        if owner.pointsToRelations.contains(newCell) then
+          pointee.unify(owner.pointsToRelations(newCell))
+        else
+          owner.pointTo(newCell, Some(pointee))
+    )
+
+    owner.nodes.remove(this)
+    owner.pointsToRelations =  owner.pointsToRelations.filter(
+      (key, value) => key.equals(this) && value.equals(this)
+    )
   }
   def collapseNode(): Unit = {
-
+    val cell = owner.makeCell()
+    cells.foreach(
+      c =>
+        cell.unify(c)
+        owner.pointTo(c, None)
+    )
+    size = 1
+    flags.collapsed = true
+    cells = mutable.Set(cell)
   }
 
   def collapse(node: Node, offset: Int): Unit = {
@@ -79,6 +148,12 @@ class Node (val owner: Graph) {
     redirectEdges(node, updatedOffset)
   }
 
+  def makeCell(offset: Int = 0): Cell = {
+    val cell = Cell(Some(this), offset)
+    cells.add(cell)
+    cell
+  }
+
 
   def isCollapsed = flags.collapsed
   def isSeq = flags.seq
@@ -99,7 +174,7 @@ class NodeFlags {
 /**
  * A memory cell (or a field). An offset into a memory object.
  */
-class Cell(var node: Option[Node] = None, var offset: Int = 0) {
+class Cell(val node: Option[Node] = None, val offset: Int = 0) {
 
   private var pointsTo: Option[Cell] = None
   private def n = node.get
@@ -134,6 +209,11 @@ class Cell(var node: Option[Node] = None, var offset: Int = 0) {
       n.unify(cell.n, 0)
   }
 
+  def pointTo(cell: Option[Cell] = None): Unit = {
+    pointsTo = cell
+  }
+
+  def pointee : Option[Cell] = pointsTo
 }
 
 /**
