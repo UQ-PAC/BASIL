@@ -1,9 +1,9 @@
-package intrusivelist
+package util.intrusive_list
 
 import org.scalatest.funsuite.AnyFunSuite
 
-case class Elem(val t: Float) extends IntrusiveListElement[Elem]
-class IntrusiveListElemTest  extends AnyFunSuite {
+class IntrusiveListTest extends AnyFunSuite {
+  case class Elem(t: Float) extends IntrusiveListElement[Elem]
 
   test("basic") {
     val x = IntrusiveList[Elem]()
@@ -15,7 +15,7 @@ class IntrusiveListElemTest  extends AnyFunSuite {
   }
 
   test("ListElem traversal") {
-    val x = Elem(10);
+    val x = Elem(10)
     val p1 = x.insertBefore(Elem(9))
     assert(p1.hasNext)
     assert(x.hasPrev)
@@ -66,9 +66,5 @@ class IntrusiveListElemTest  extends AnyFunSuite {
     assert(p0.last() == p3)
   }
 
-
-
   // test("IntrusiveList insertRemove")
-
-
 }

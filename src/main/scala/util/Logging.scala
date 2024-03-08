@@ -10,7 +10,7 @@ enum LogLevel(val id: Int):
   case ERROR extends LogLevel(3)
 
 object Logger:
-  private var level: LogLevel = LogLevel.DEBUG
+  private var level: LogLevel = LogLevel.INFO
   import LogLevel.*
 
   def write(
@@ -27,8 +27,21 @@ object Logger:
       case WARN  => AnsiColor.YELLOW
       case ERROR => AnsiColor.RED
 
+    val showPosition = (logLevel, level) match
+      case (_, DEBUG) => true 
+      case (ERROR, _) => true 
+      case (WARN, _) => true 
+      case (INFO, _) => false
+      case (DEBUG, _) => false
+
+    val position = if showPosition then s" [${name.value}@${file.value}:${line.value}]" else ""
+
+    val space = "  "
+    val prefix = s"[$colour$logLevel${AnsiColor.RESET}]$space"
+    val text = arg.toString().replace("\n", "\n " + (" " * (logLevel.toString).length()) + "  " + space )
+
     if (level.id <= logLevel.id) {
-      System.err.println(s"[$colour$logLevel${AnsiColor.RESET}]\t $arg [${name.value}@${file.value}:${line.value}]")
+      System.err.println(s"$prefix $text$position")
     }
   }
 

@@ -1,5 +1,5 @@
 package ir
-import intrusivelist.IntrusiveListElement
+import util.intrusive_list.IntrusiveListElement
 
 import collection.mutable
 
@@ -17,7 +17,7 @@ sealed trait Command extends HasParent[Block] {
 
 }
 
-sealed trait Statement extends Command, HasParent[Block], IntrusiveListElement[Statement] {
+sealed trait Statement extends Command, IntrusiveListElement[Statement] {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Statement = throw new Exception(
@@ -73,18 +73,16 @@ class Assume(var body: Expr, var comment: Option[String] = None, override val la
 object Assume:
   def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] = Some(a.body, a.comment, a.label, a.checkSecurity)
 
-sealed trait Jump extends Command, HasParent[Block]  {
+sealed trait Jump extends Command {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
   def calls: Set[Procedure] = Set()
   def acceptVisit(visitor: Visitor): Jump = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
+class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String]) extends Jump {
 
-
-class GoTo private (private var _targets: mutable.Set[Block], override val label: Option[String]) extends Jump {
-
-  def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.Set.from(targets), label)
+  def this(targets: Iterable[Block], label: Option[String] = None) = this(mutable.LinkedHashSet.from(targets), label)
 
   def this(target: Block) = this(mutable.Set(target), None)
 
@@ -101,7 +99,7 @@ class GoTo private (private var _targets: mutable.Set[Block], override val label
   }
 
   override def linkParent(b: Block): Unit = {
-    _targets.foreach(_.removeIncomingJump(this))
+    _targets.foreach(_.addIncomingJump(this))
   }
 
   override def unlinkParent(): Unit = {
@@ -115,10 +113,12 @@ class GoTo private (private var _targets: mutable.Set[Block], override val label
     if (_targets.remove(t)) {
       t.removeIncomingJump(this)
     }
+    assert(!_targets.contains(t))
+    assert(!t.incomingJumps.contains(this))
   }
 
 
-  override def toString: String = s"${labelStr}NonDetGoTo(${targets.map(_.label).mkString(", ")})"
+  override def toString: String = s"${labelStr}GoTo(${targets.map(_.label).mkString(", ")})"
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitGoTo(this)
 }
 
@@ -126,9 +126,38 @@ object GoTo:
   def unapply(g: GoTo): Option[(Set[Block], Option[String])] = Some(g.targets, g.label)
 
 
-sealed trait Call extends Jump
+sealed trait Call extends Jump {
+  private var _returnTarget: Option[Block] = None
 
-class DirectCall(val target: Procedure, var returnTarget: Option[Block],  override val label: Option[String] = None) extends Call {
+  // replacing the return target of a call
+  def returnTarget_=(b: Block): Unit = {
+    require(b.hasParent)
+
+    if (hasParent) {
+      // if we don't have a parent now, delay adding the fallthrough block until linking
+      parent.fallthrough = Some(GoTo(Set(b)))
+    }
+
+    _returnTarget = Some(b)
+  }
+
+  def returnTarget: Option[Block] = _returnTarget
+
+  // moving a call between blocks
+  override def linkParent(p: Block): Unit = {
+    returnTarget.foreach(t => parent.fallthrough = Some(GoTo(Set(t))))
+  }
+
+  override def unlinkParent(): Unit = {
+    parent.fallthrough = None
+  }
+}
+
+class DirectCall(val target: Procedure,
+                 private val _returnTarget: Option[Block] = None,
+                 override val label: Option[String] = None
+                ) extends Call {
+  _returnTarget.foreach(x => returnTarget = x)
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
@@ -138,16 +167,25 @@ class DirectCall(val target: Procedure, var returnTarget: Option[Block],  overri
   override def acceptVisit(visitor: Visitor): Jump = visitor.visitDirectCall(this)
 
   override def linkParent(p: Block): Unit = {
+    super.linkParent(p)
     target.addCaller(this)
   }
 
-  override def unlinkParent(): Unit = target.removeCaller(this)
+  override def unlinkParent(): Unit = {
+    super.unlinkParent()
+    target.removeCaller(this)
+  }
+
 }
 
 object DirectCall:
-  def unapply(i: DirectCall): Option[(Procedure,  Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
+  def unapply(i: DirectCall): Option[(Procedure, Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
 
-class IndirectCall(var target: Variable, var returnTarget: Option[Block], override val label: Option[String] = None) extends Call {
+class IndirectCall(var target: Variable,
+                   private val _returnTarget: Option[Block] = None,
+                   override val label: Option[String] = None
+                  ) extends Call {
+  _returnTarget.foreach(x => returnTarget = x)
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)

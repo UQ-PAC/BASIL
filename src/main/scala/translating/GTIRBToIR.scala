@@ -22,7 +22,7 @@ import java.nio.charset.*
 import scala.util.boundary
 import boundary.break
 import java.nio.ByteBuffer
-import intrusivelist.{IntrusiveList, IntrusiveListElement}
+import util.intrusive_list.*
 import util.Logger
 
 /**
@@ -276,7 +276,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     }
     uuidToBlock += (blockUUID -> block)
     if (blockUUID == entranceUUID) {
-      procedure.entryBlock = Some(block)
+      procedure.entryBlock = block
     }
     block
   }

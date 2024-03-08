@@ -26,10 +26,9 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
             case BVASHR => Some(BitVectorEval.smt_bvashr(l, r))
             case BVCOMP => Some(BitVectorEval.smt_bvcomp(l, r))
             case BVCONCAT => Some(BitVectorEval.smt_concat(l, r))
-            case x => {
+            case x =>
               Logger.error("Binary operation support not implemented: " + binOp.op)
               None
-            }
           }
         case _ => None
       }
@@ -53,4 +52,81 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
     case _ => //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
       None
   }
+}
+
+def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]): Set[BitVecLiteral] = {
+  Logger.debug(s"evaluateExpression: $exp")
+
+  def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
+    val res = for {
+      x <- a
+      y <- b
+    } yield op(x, y)
+    res
+
+  def applySingle(op: BitVecLiteral => BitVecLiteral, a: Set[BitVecLiteral]): Set[BitVecLiteral] =
+    val res = for {
+      x <- a
+    } yield op(x)
+    res
+
+
+  exp match {
+    case binOp: BinaryExpr =>
+      val lhs = evaluateExpressionWithSSA(binOp.arg1, constantPropResult)
+      val rhs = evaluateExpressionWithSSA(binOp.arg2, constantPropResult)
+
+      (lhs, rhs) match {
+        case (l: Set[BitVecLiteral], r: Set[BitVecLiteral]) =>
+          binOp.op match {
+            case BVADD => apply(BitVectorEval.smt_bvadd, lhs, rhs)
+            case BVSUB => apply(BitVectorEval.smt_bvsub, lhs, rhs)
+            case BVASHR => apply(BitVectorEval.smt_bvashr, lhs, rhs)
+            case BVCOMP => apply(BitVectorEval.smt_bvcomp, lhs, rhs)
+            case BVCONCAT => apply(BitVectorEval.smt_concat, lhs, rhs)
+            case BVLSHR => apply(BitVectorEval.smt_bvlshr, lhs, rhs)
+            case BVSHL => apply(BitVectorEval.smt_bvshl, lhs, rhs)
+            case BVOR => apply(BitVectorEval.smt_bvor, lhs, rhs)
+            case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
+          }
+      }
+    case unaryExpr: UnaryExpr =>
+      val result = evaluateExpressionWithSSA(unaryExpr.arg, constantPropResult)
+      unaryExpr.op match {
+        case BVNEG =>
+          applySingle(BitVectorEval.smt_bvneg, result)
+        case BVNOT =>
+          applySingle(BitVectorEval.smt_bvnot, result)
+        case _ => throw new RuntimeException("Unary operation support not implemented: " + unaryExpr.op)
+      }
+    case extend: ZeroExtend =>
+      val result = evaluateExpressionWithSSA(extend.body, constantPropResult)
+      applySingle(BitVectorEval.smt_zero_extend(extend.extension, _: BitVecLiteral), result)
+    case e: Extract =>
+      val result = evaluateExpressionWithSSA(e.body, constantPropResult)
+      applySingle(BitVectorEval.boogie_extract(e.end, e.start, _: BitVecLiteral), result)
+    case variable: Variable =>
+      constantPropResult(RegisterWrapperEqualSets(variable))
+    case b: BitVecLiteral => Set(b)
+    case _ => throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
+  }
+}
+
+def unwrapExpr(expr: Expr): Set[Expr] = {
+  var buffers: Set[Expr] = Set()
+  expr match {
+    case e: Extract => buffers ++= unwrapExpr(e.body)
+    case e: SignExtend => buffers ++= unwrapExpr(e.body)
+    case e: ZeroExtend => buffers ++= unwrapExpr(e.body)
+    case repeat: Repeat => buffers ++= unwrapExpr(repeat.body)
+    case unaryExpr: UnaryExpr => buffers ++= unwrapExpr(unaryExpr.arg)
+    case binaryExpr: BinaryExpr =>
+      buffers ++= unwrapExpr(binaryExpr.arg1)
+      buffers ++= unwrapExpr(binaryExpr.arg2)
+    case memoryLoad: MemoryLoad =>
+      buffers += memoryLoad
+      buffers ++= unwrapExpr(memoryLoad.index)
+    case _ =>
+  }
+  buffers
 }

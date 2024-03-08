@@ -1,11 +1,9 @@
-package ir
+package util.intrusive_list
 import org.scalatest.funsuite.AnyFunSuite
-import intrusivelist.{IntrusiveList, IntrusiveListElement}
 import scala.collection.mutable
 
-class Elem(val t: Int) extends IntrusiveListElement[Elem]
-
 class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
+  class Elem(val t: Int) extends IntrusiveListElement[Elem]
 
   def getSequentialList(elems: Int = 15) : IntrusiveList[Elem] = {
     val x = IntrusiveList[Elem]()
@@ -167,10 +165,10 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
     val l2 = l.splitOn(e)
     assert(l2.size == 2)
     assert(l.size == 2)
-    assert(l.find(_.t == 1).isDefined)
-    assert(l.find(_.t == 15).isDefined)
-    assert(l2.find(_.t == 16).isDefined)
-    assert(l2.find(_.t == 17).isDefined)
+    assert(l.exists(_.t == 1))
+    assert(l.exists(_.t == 15))
+    assert(l2.exists(_.t == 16))
+    assert(l2.exists(_.t == 17))
   }
 
 
@@ -204,12 +202,6 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
 
     assert(l4.size == 3)
 
-
-
-
-
   }
-
-
 
 }
