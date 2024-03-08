@@ -130,16 +130,15 @@ object GoTo:
 
 sealed trait Call extends Jump
 
-abstract trait FallThrough extends HasParent[Block]:
+trait FallThrough extends HasParent[Block] {
   /**
-   * Manages the fallthrough target for a call in the parent block.
-   */
+    * Manages the fallthrough target for a call in the parent block.
+    */
 
   private var _returnTarget: Option[Block] = None
 
-
   // replacing the return target of a call
-  def returnTarget_=(b: Block) : Unit = {
+  def returnTarget_=(b: Block): Unit = {
     require(b.hasParent)
 
     if (hasParent) {
@@ -147,7 +146,7 @@ abstract trait FallThrough extends HasParent[Block]:
       parent.fallthrough = Some(GoTo(Set(b)))
     }
 
-    _returnTarget = Some(b) 
+    _returnTarget = Some(b)
   }
 
   def returnTarget: Option[Block] = _returnTarget
@@ -160,9 +159,12 @@ abstract trait FallThrough extends HasParent[Block]:
   override def unlinkParent(): Unit = {
     parent.fallthrough = None
   }
+}
 
-
-class DirectCall(val target: Procedure, private val _returnTarget: Option[Block] = None,  override val label: Option[String] = None) extends Call with FallThrough {
+class DirectCall(val target: Procedure,
+                 private val _returnTarget: Option[Block] = None,
+                 override val label: Option[String] = None
+                ) extends Call with FallThrough {
   _returnTarget.foreach(x => returnTarget = x) 
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
@@ -187,7 +189,10 @@ class DirectCall(val target: Procedure, private val _returnTarget: Option[Block]
 object DirectCall:
   def unapply(i: DirectCall): Option[(Procedure,  Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
 
-class IndirectCall(var target: Variable, private val _returnTarget: Option[Block] = None, override val label: Option[String] = None) extends Call with FallThrough {
+class IndirectCall(var target: Variable,
+                   private val _returnTarget: Option[Block] = None,
+                   override val label: Option[String] = None
+                  ) extends Call with FallThrough {
   _returnTarget.foreach(x => returnTarget = x) 
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
