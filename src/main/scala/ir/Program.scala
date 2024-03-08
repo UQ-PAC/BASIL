@@ -123,7 +123,7 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
    * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
    * not guaranteed to be in any defined order. 
    */
-  class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
+  private class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
     private val stack = mutable.Stack[CFGPosition]()
     stack.addAll(begin.procedures)
 
@@ -132,14 +132,13 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     }
 
     override def next(): CFGPosition = {
-      val n: CFGPosition  = stack.pop()
+      val n: CFGPosition = stack.pop()
 
-      stack.pushAll(n match  {
-        case p : Procedure => p.blocks
+      stack.pushAll(n match {
+        case p: Procedure => p.blocks
         case b: Block => Seq() ++ b.statements ++ Seq(b.jump) ++ b.fallthrough.toSet
         case s: Command => Seq()
       })
-
       n
     }
 
@@ -346,12 +345,12 @@ class Parameter(var name: String, var size: Int, var value: Register) {
 
 
 class Block private (
-  val label: String,
+ val label: String,
  val address: Option[Int],
  val statements: IntrusiveList[Statement],
  private var _jump: Jump,
  private val _incomingJumps: mutable.HashSet[GoTo],
- var _fallthrough : Option[GoTo],
+ var _fallthrough: Option[GoTo],
 ) extends HasParent[Procedure] {
   _jump.setParent(this)
   statements.foreach(_.setParent(this))
@@ -420,9 +419,9 @@ class Block private (
   def nextBlocks: Iterable[Block] = {
     jump match {
       case c: GoTo => c.targets
-      case c: Call =>  fallthrough match {
-          case Some(x) => x.targets
-          case _ => Seq()
+      case c: Call => fallthrough match {
+        case Some(x) => x.targets
+        case _ => Seq()
       }
     }
   }
@@ -468,12 +467,11 @@ class Block private (
   }
 }
 
-object Block:
-
+object Block {
   def procedureReturn(from: Procedure): Block = {
-      new Block((from.name + "_basil_return"), None, List(), IndirectCall(Register("R30", BitVecType(64))))
+    Block(from.name + "_basil_return", None, List(), IndirectCall(Register("R30", BitVecType(64))))
   }
-
+}
 
 /**
   * @param name name

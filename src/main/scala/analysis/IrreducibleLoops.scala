@@ -72,7 +72,10 @@ class LoopDetector(cfg: Program) {
    */
   def irreducible_loops(): Set[Loop] = {
     val irreducibleLoops: Set[Loop] = loops.values.filter(l => !l.reducible).toSet
+    irreducibleLoops
 
+    /*
+    TODO is this supposed to be anything?
     if (irreducibleLoops.isEmpty) {
       irreducibleLoops
     } else {
@@ -81,7 +84,7 @@ class LoopDetector(cfg: Program) {
 
       irreducibleLoops
     }
-
+    */
   }
 
   /*

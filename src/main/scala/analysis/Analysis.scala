@@ -158,20 +158,24 @@ trait ConstantPropagationWithSSA(val cfg: ProgramCfg) {
   /** Transfer function for state lattice elements.
    */
   def localTransfer(n: CfgNode, s: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]): Map[RegisterWrapperEqualSets, Set[BitVecLiteral]] =
-    n match
+    n match {
       case r: CfgCommandNode =>
-        r.data match
+        r.data match {
           // assignments
           case la: LocalAssign =>
-            s.collect({
+            val lhsWrappers = s.collect {
               case (k, v) if RegisterVariableWrapper(k.variable) == RegisterWrapperEqualSets(la.lhs) => (k, v)
-            }) match {
-              case m if m.nonEmpty => s ++ m.map({ case (k, v) => (k, v.union(eval(la.rhs, s))) })
-              case _ => s + (RegisterWrapperEqualSets(la.lhs) -> eval(la.rhs, s))
+            }
+            if (lhsWrappers.nonEmpty) {
+              s ++ lhsWrappers.map((k, v) => (k, v.union(eval(la.rhs, s))))
+            } else {
+              s + (RegisterWrapperEqualSets(la.lhs) -> eval(la.rhs, s))
             }
           // all others: like no-ops
           case _ => s
+        }
       case _ => s
+    }
 
   /** The analysis lattice.
    */

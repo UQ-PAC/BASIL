@@ -189,7 +189,7 @@ object IRTransform {
       cfg: ProgramCfg,
       valueSets: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
       IRProgram: Program
-  ): (Program, Boolean) = {
+  ): Boolean = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
     cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
@@ -310,7 +310,7 @@ object IRTransform {
       functionNames
     }
 
-    (IRProgram, modified)
+    modified
   }
 
   def resolveIndirectCallsUsingPointsTo(
@@ -376,8 +376,7 @@ object IRTransform {
         case Some(value) =>
           value.map {
             case v: RegisterVariableWrapper => names.addAll(resolveAddresses(v.variable))
-            case m: MemoryRegion =>
-              names.addAll(searchRegion(m))
+            case m: MemoryRegion => names.addAll(searchRegion(m))
           }
           names
         case None => names
@@ -428,7 +427,7 @@ object IRTransform {
       case _ =>
     }
 
-    (IRProgram, modified)
+    modified
   }
 
   /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
@@ -829,8 +828,11 @@ object RunUtils {
       val result = StaticAnalysis.analyse(ctx, config, iteration)
       analysisResult.append(result)
       Logger.info("[!] Replacing Indirect Calls")
-      val (_, mod) = IRTransform.resolveIndirectCallsUsingPointsTo(result.cfg, result.steensgaardResults, result.memoryRegionContents, ctx.program)
-      modified = mod
+      modified = IRTransform.resolveIndirectCallsUsingPointsTo(result.cfg,
+        result.steensgaardResults,
+        result.memoryRegionContents,
+        ctx.program
+      )
       if (modified) {
         iteration += 1
         Logger.info(s"[!] Analysing again (iter $iteration)")
