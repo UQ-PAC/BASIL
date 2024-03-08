@@ -7,17 +7,12 @@ import util.Logger
 import scala.collection.mutable
 
 // Define a case class to represent a range
-class RangeKey(var start: BigInt, var end: BigInt) extends Ordered[RangeKey]:
-  def size(): BigInt = end - start
+case class RangeKey(start: BigInt, end: BigInt) extends Ordered[RangeKey]:
+  val size: BigInt = end - start
   override def compare(that: RangeKey): Int = {
     if (start < that.start) -1
     else if (start > that.start) 1
     else 0
-  }
-  override def hashCode(): Int = start.hashCode() * end.hashCode()
-  override def equals(obj: Any): Boolean = obj match {
-    case r: RangeKey => r.start == start && r.end == end
-    case _ => false
   }
   override def toString: String = s"Range[$start, $end]"
 
@@ -52,7 +47,11 @@ class MemoryModelMap {
         if (currentStackMap.isEmpty) {
           currentStackMap(RangeKey(offset, MAX_BIGINT)) = s
         } else {
-          currentStackMap.keys.maxBy(_.end).end = offset - 1
+          val currentMaxRange = currentStackMap.keys.maxBy(_.end)
+          val currentMaxRegion = currentStackMap(currentMaxRange)
+          currentStackMap.remove(currentMaxRange)
+          val updatedRange = RangeKey(currentMaxRange.start, offset - 1)
+          currentStackMap.addOne(updatedRange -> currentMaxRegion)
           currentStackMap(RangeKey(offset, MAX_BIGINT)) = s
         }
       case d: DataRegion =>
@@ -60,7 +59,11 @@ class MemoryModelMap {
         if (currentDataMap.isEmpty) {
           currentDataMap(RangeKey(offset, MAX_BIGINT)) = d
         } else {
-          currentDataMap.keys.maxBy(_.end).end = offset - 1
+          val currentMaxRange = currentDataMap.keys.maxBy(_.end)
+          val currentMaxRegion = currentDataMap(currentMaxRange)
+          currentDataMap.remove(currentMaxRange)
+          val updatedRange = RangeKey(currentMaxRange.start, offset - 1)
+          currentDataMap.addOne(updatedRange -> currentMaxRegion)
           currentDataMap(RangeKey(offset, MAX_BIGINT)) = d
         }
     }
@@ -115,7 +118,7 @@ class MemoryModelMap {
           localStacks(exitNode.data.name) = stackRgns
 
         case LiftedBottom =>
-    }
+      }
     )
     // add externalFunctionRgn to dataRgns and sort by value
     val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.value)
@@ -161,83 +164,71 @@ class MemoryModelMap {
 
 
   def findStackObject(value: BigInt): Option[StackRegion] = 
-    stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
+    stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => obj)
 
   def findSharedStackObject(value: BigInt): Set[StackRegion] =
-    sharedStackMap.values.flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj}).toSet).toSet
+    sharedStackMap.values.flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => obj)).toSet
 
   def findDataObject(value: BigInt): Option[DataRegion] = 
-    dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => {obj.extent = Some(range); obj});
+    dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => obj)
 
   override def toString: String =
-    s"Stack: ${stackMap}\n Heap: ${heapMap}\n Data: ${dataMap}\n"
+    s"Stack: $stackMap\n Heap: $heapMap\n Data: $dataMap\n"
 
-  def printRegionsContent(hideEmpty: Boolean = false): Unit = {
-    Logger.info("Stack:")
+  def logRegions(content: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]] = Map.empty): Unit = {
+    def logRegion(range: RangeKey, region: MemoryRegion, shared: Boolean = false): Unit = {
+      // the spacing level is based on region type
+      val spacing = region match {
+          case _: StackRegion => if shared then "           " else "       "
+          case _: HeapRegion => "  "
+          case _: DataRegion => "  "
+      }
+      Logger.debug(s"$spacing$range -> $region")
+      if content.contains(region) then
+        if content.contains(region) then
+          for value <- content(region) do
+            Logger.debug(s"$spacing    $value")
+    }
+    Logger.debug("Stack:")
     for name <- localStacks.keys do
       popContext()
       pushContext(name)
-      Logger.info(s"  Function: $name")
-      if stackMap.nonEmpty then Logger.info(s"    Local:")
+      Logger.debug(s"  Function: $name")
+      if stackMap.nonEmpty then Logger.debug(s"    Local:")
       // must sort by ranges
       for ((range, region) <- stackMap) {
-        if (region.content.nonEmpty || !hideEmpty) {
-          Logger.info(s"       $range -> $region")
+        logRegion(range, region)
+      }
+      if sharedStackMap.nonEmpty then Logger.debug(s"    Shared:")
+      for ((parent, treeMap) <- sharedStackMap) {
+        Logger.debug(s"        Parent: ${parent.name}")
+        for ((range, region) <- treeMap) {
+          logRegion(range, region, true)
         }
       }
-      if sharedStackMap.nonEmpty then Logger.info(s"    Shared:")
-      for ((parent, treeMap) <- sharedStackMap) {
-        Logger.info(s"        Parent: ${parent.name}")
-            for ((range, region) <- treeMap) {
-                if (region.content.nonEmpty || !hideEmpty) {
-                  Logger.info(s"           $range -> $region")
-                }
-            }
-      }
-    Logger.info("Heap:")
+    Logger.debug("Heap:")
     for ((range, region) <- heapMap) {
-      if (region.content.nonEmpty || !hideEmpty) {
-        Logger.info(s"  $range -> $region")
-      }
+      logRegion(range, region)
     }
-    Logger.info("Data:")
+    Logger.debug("Data:")
     for ((range, region) <- dataMap) {
-      if (region.content.nonEmpty || !hideEmpty) {
-        Logger.info(s"  $range -> $region")
-      }
+      logRegion(range, region)
     }
   }
 }
 
 trait MemoryRegion {
   val regionIdentifier: String
-  var extent: Option[RangeKey] = None
-  val content: mutable.Set[BitVecLiteral | MemoryRegion] = mutable.Set()
 }
 
-class StackRegion(override val regionIdentifier: String, val start: BitVecLiteral, val parent: Procedure = null) extends MemoryRegion {
-  override def toString: String = s"Stack($regionIdentifier, $start, ${if parent != null then parent.name else "Null"}) -> $content"
-  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
-  override def equals(obj: Any): Boolean = obj match {
-    case s: StackRegion => s.start == start && s.regionIdentifier == regionIdentifier
-    case _ => false
-  }
+case class StackRegion(override val regionIdentifier: String, start: BitVecLiteral, parent: Procedure) extends MemoryRegion {
+  override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name})"
 }
 
-class HeapRegion(override val regionIdentifier: String, val size: BitVecLiteral) extends MemoryRegion {
-  override def toString: String = s"Heap($regionIdentifier, $size) -> $content"
-  override def hashCode(): Int = regionIdentifier.hashCode()
-  override def equals(obj: Any): Boolean = obj match {
-    case h: HeapRegion => h.regionIdentifier.equals(regionIdentifier)
-    case _ => false
-  }
+case class HeapRegion(override val regionIdentifier: String, size: BitVecLiteral) extends MemoryRegion {
+  override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 
-class DataRegion(override val regionIdentifier: String, val start: BitVecLiteral) extends MemoryRegion {
-  override def toString: String = s"Data($regionIdentifier, $start) -> $content"
-  override def hashCode(): Int = regionIdentifier.hashCode() * start.hashCode()
-  override def equals(obj: Any): Boolean = obj match {
-    case d: DataRegion => d.start == start && d.regionIdentifier == regionIdentifier
-    case _ => false
-  }
+case class DataRegion(override val regionIdentifier: String, start: BitVecLiteral) extends MemoryRegion {
+  override def toString: String = s"Data($regionIdentifier, $start)"
 }

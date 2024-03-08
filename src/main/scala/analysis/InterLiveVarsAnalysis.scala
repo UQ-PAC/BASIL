@@ -13,29 +13,29 @@ import ir.{Assert, Assume, GoTo, CFGPosition, Command, DirectCall, IndirectCall,
  * Tip SPA IDE Slides include a short and clear explanation of microfunctions
  * https://cs.au.dk/~amoeller/spa/8-distributive.pdf
  */
-trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElementLatticeEl ,TwoElementLattice] {
+trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement, TwoElementLattice] {
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
-  val edgelattice: EdgeFunctionLattice[TwoElementLatticeEl, valuelattice.type ] = new EdgeFunctionLattice[TwoElementLatticeEl, valuelattice.type](valuelattice)
+  val edgelattice: EdgeFunctionLattice[TwoElement, TwoElementLattice] = EdgeFunctionLattice(valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
 
-  def edgesCallToEntry(call: GoTo, entry: Command)(d: DL): Map[DL, edgelattice.Element] = {
+  def edgesCallToEntry(call: GoTo, entry: IndirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     Map(d -> IdEdge())
   }
 
-  def edgesExitToAfterCall(exit: Procedure, aftercall: DirectCall)(d: DL): Map[DL, edgelattice.Element] = {
+  def edgesExitToAfterCall(exit: Procedure, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     Map(d -> IdEdge())
   }
 
-  def edgesCallToAfterCall(call: GoTo, aftercall: DirectCall)(d: DL): Map[DL, edgelattice.Element] = {
+  def edgesCallToAfterCall(call: GoTo, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match
       case Left(value) => Map() // maps all variables before the call to bottom
       case Right(_) => Map(d -> IdEdge())
   }
 
-  def edgesOther(n: CFGPosition)(d: DL): Map[DL, edgelattice.Element] = {
+  def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     n match
-      case LocalAssign(variable, expr, maybeString) => // (s - variable) ++ expr.variables
+      case LocalAssign(variable, expr, _) => // (s - variable) ++ expr.variables
         d match
           case Left(value) =>
             if value == variable then
@@ -43,45 +43,44 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
             else
               Map(d -> IdEdge())
 
-          case Right(_) => expr.variables.foldLeft(Map(d -> IdEdge()): Map[DL, edgelattice.Element]) {
+          case Right(_) => expr.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
             (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
           }
 
-      case MemoryAssign(memory, store, maybeString) => // s ++ store.index.variables ++ store.value.variables
+      case MemoryAssign(_, store, _) => // s ++ store.index.variables ++ store.value.variables
         d match
           case Left(value) => Map(d -> IdEdge())
           case Right(_) =>
-            (store.index.variables ++ store.value.variables).foldLeft(Map(d -> IdEdge()) : Map[DL, edgelattice.Element]) {
+            (store.index.variables ++ store.value.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
               (mp, storVar) => mp + (Left(storVar) -> ConstEdge(TwoElementTop))
             }
 
-      case Assume(expr, maybeString, maybeString1, bool) => // s ++ expr.variables
+      case Assume(expr, _, _, _) => // s ++ expr.variables
         d match
           case Left(value) => Map(d -> IdEdge())
           case Right(_) =>
-            expr.variables.foldLeft(Map(d -> IdEdge()): Map[DL, edgelattice.Element]) {
+            expr.variables.foldLeft(Map(d -> IdEdge()): Map[DL, EdgeFunction[TwoElement]]) {
               (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
             }
 
-      case Assert(expr, maybeString, maybeString1) => // s ++ expr.variables
+      case Assert(expr, _, _) => // s ++ expr.variables
         d match
           case Left(value) => Map(d -> IdEdge())
           case Right(_) =>
-            expr.variables.foldLeft(Map(d -> IdEdge()): Map[DL, edgelattice.Element]) {
+            expr.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
               (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
             }
-      case IndirectCall(variable, maybeBlock, maybeString) =>
+      case IndirectCall(variable, _, _) =>
         d match
           case Left(value) => if value != variable then Map(d -> IdEdge()) else Map()
           case Right(_) => Map(d -> IdEdge(), Left(variable) -> ConstEdge(TwoElementTop))
       case _ => Map(d -> IdEdge())
 
-
   }
 }
 
 class InterLiveVarsAnalysis(program: Program)
-  extends BackwardIDESolver[Variable, TwoElementLatticeEl ,TwoElementLattice](program), LiveVarsAnalysisFunctions
+  extends BackwardIDESolver[Variable, TwoElement, TwoElementLattice](program), LiveVarsAnalysisFunctions
 
 
 

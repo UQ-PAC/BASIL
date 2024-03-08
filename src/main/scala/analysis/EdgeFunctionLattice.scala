@@ -24,6 +24,7 @@ trait EdgeFunction[T] extends (T => T) {
   def joinWith(e: EdgeFunction[T]): EdgeFunction[T]
 }
 
+
 /**
   * The lattice of edge functions, used by [[IDEAnalysis]].
 * A map lattice, but maps are represent differently than in `MapLattice`.
@@ -33,18 +34,18 @@ class EdgeFunctionLattice[T, L <: Lattice[T]](val valuelattice: L) extends Latti
 
   val bottom: ConstEdge = ConstEdge(valuelattice.bottom)
 
-  def lub(x: Element, y: Element): Element = x.joinWith(y)
-  
+  def lub(x: EdgeFunction[T], y: EdgeFunction[T]): EdgeFunction[T] = x.joinWith(y)
+
   /**
-   * Edge labeled with identity function.
-   */
+    * Edge labeled with identity function.
+    */
   case class IdEdge() extends EdgeFunction[T] {
 
     def apply(x: T): T = x
 
-    def composeWith(e: Element): Element = e
+    def composeWith(e: EdgeFunction[T]): EdgeFunction[T] = e
 
-    def joinWith(e: Element): Element =
+    def joinWith(e: EdgeFunction[T]): EdgeFunction[T] =
       if (e == this) this
       else e.joinWith(this)
 
@@ -52,15 +53,15 @@ class EdgeFunctionLattice[T, L <: Lattice[T]](val valuelattice: L) extends Latti
   }
 
   /**
-   * Edge labeled with constant function.
-   */
+    * Edge labeled with constant function.
+    */
   case class ConstEdge(c: T) extends EdgeFunction[T] {
 
     def apply(x: T): T = c
 
-    def composeWith(e: Element): Element = this
+    def composeWith(e: EdgeFunction[T]): EdgeFunction[T] = this
 
-    def joinWith(e: Element): Element =
+    def joinWith(e: EdgeFunction[T]): EdgeFunction[T] =
       if (e == this || c == valuelattice.top) this
       else if (c == valuelattice.bottom) e
       else
@@ -72,4 +73,5 @@ class EdgeFunctionLattice[T, L <: Lattice[T]](val valuelattice: L) extends Latti
 
     override def toString = s"ConstEdge($c)"
   }
+
 }

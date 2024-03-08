@@ -71,20 +71,20 @@ class LiftLattice[T, +L <: Lattice[T]](val sublattice: L) extends Lattice[Lifted
   }
 }
 
-trait TwoElementLatticeEl
+trait TwoElement
 
-case object TwoElementTop extends TwoElementLatticeEl
-case object TwoElementBottom extends TwoElementLatticeEl
+case object TwoElementTop extends TwoElement
+case object TwoElementBottom extends TwoElement
 
 
 /**
  * A lattice with only top and bottom
  */
-class TwoElementLattice extends Lattice[TwoElementLatticeEl]:
-  override val bottom: TwoElementLatticeEl = TwoElementBottom
-  override val top: TwoElementLatticeEl = TwoElementTop
+class TwoElementLattice extends Lattice[TwoElement]:
+  override val bottom: TwoElement = TwoElementBottom
+  override val top: TwoElement = TwoElementTop
 
-  def lub(x: TwoElementLatticeEl, y: TwoElementLatticeEl): TwoElementLatticeEl = (x, y) match {
+  def lub(x: TwoElement, y: TwoElement): TwoElement = (x, y) match {
     case (TwoElementBottom, TwoElementBottom) => TwoElementBottom
     case _ => TwoElementTop
   }
@@ -190,49 +190,27 @@ class ConstantPropagationLatticeWithSSA extends PowersetLattice[BitVecLiteral] {
     res
 
   def bv(a: BitVecLiteral): Set[BitVecLiteral] = Set(a)
-
   def bvadd(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvadd, a, b)
-
   def bvsub(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvsub, a, b)
-
   def bvmul(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvmul, a, b)
-
   def bvudiv(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvudiv, a, b)
-
   def bvsdiv(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvsdiv, a, b)
-
   def bvsrem(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvsrem, a, b)
-
   def bvurem(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvurem, a, b)
-
   def bvsmod(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvsmod, a, b)
-
   def bvand(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvand, a, b)
-
   def bvor(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvor, a, b)
-
   def bvxor(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvxor, a, b)
-
   def bvnand(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvnand, a, b)
-
   def bvnor(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvnor, a, b)
-
   def bvxnor(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvxnor, a, b)
-
   def bvnot(a: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvnot, a)
-
   def bvneg(a: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvneg, a)
-
   def bvshl(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvshl, a, b)
-
   def bvlshr(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvlshr, a, b)
-
   def bvashr(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvashr, a, b)
-
   def bvcomp(a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_bvcomp, a, b)
-
   def zero_extend(width: Int, a: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_zero_extend(width, _: BitVecLiteral), a)
-
   def sign_extend(width: Int, a: Set[BitVecLiteral]): Set[BitVecLiteral] = apply(BitVectorEval.smt_sign_extend(width, _: BitVecLiteral), a)
 
   def extract(high: Int, low: Int, a: Set[BitVecLiteral]): Set[BitVecLiteral] =

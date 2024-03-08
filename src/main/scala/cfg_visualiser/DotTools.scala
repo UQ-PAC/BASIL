@@ -58,12 +58,12 @@ class DotNode(val id: String, val label: String) extends DotElement {
 /** Represents an edge between two nodes in a Graphviz dot file.
   */
  case class DotArrow(
-    val fromNode: DotNode,
+    fromNode: DotNode,
     arrow: String,
-    val toNode: DotNode,
-    val label: String,
-    val style: String = "solid",
-    val colour: String = "black"
+    toNode: DotNode,
+    label: String,
+    style: String = "solid",
+    colour: String = "black"
 ) extends DotElement {
 
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)

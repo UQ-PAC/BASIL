@@ -587,7 +587,7 @@ class ProgramCfgFactory:
             cfg.addEdge(jmpNode, returnNode)
             cfg.addEdge(returnNode, funcExitNode)
           case iCall: IndirectCall =>
-            Logger.info(s"Indirect call found: $iCall in ${proc.name}")
+            Logger.debug(s"Indirect call found: $iCall in ${proc.name}")
 
             // Branch to this call
             cfg.addEdge(precNode, jmpNode)

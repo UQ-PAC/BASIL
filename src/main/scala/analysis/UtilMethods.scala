@@ -2,8 +2,6 @@ package analysis
 import ir.*
 import util.Logger
 
-import scala.collection.mutable.ListBuffer
-
 /** Evaluate an expression in a hope of finding a global variable.
   *
   * @param exp
@@ -56,8 +54,8 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
   }
 }
 
-def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariableWrapper, Set[BitVecLiteral]]): Set[BitVecLiteral] = {
-  Logger.info(s"evaluateExpression: $exp")
+def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]): Set[BitVecLiteral] = {
+  Logger.debug(s"evaluateExpression: $exp")
 
   def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
     val res = for {
@@ -92,6 +90,15 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariabl
             case _ => throw new RuntimeException("Binary operation support not implemented: " + binOp.op)
           }
       }
+    case unaryExpr: UnaryExpr =>
+      val result = evaluateExpressionWithSSA(unaryExpr.arg, constantPropResult)
+      unaryExpr.op match {
+        case BVNEG =>
+          applySingle(BitVectorEval.smt_bvneg, result)
+        case BVNOT =>
+          applySingle(BitVectorEval.smt_bvnot, result)
+        case _ => throw new RuntimeException("Unary operation support not implemented: " + unaryExpr.op)
+      }
     case extend: ZeroExtend =>
       val result = evaluateExpressionWithSSA(extend.body, constantPropResult)
       applySingle(BitVectorEval.smt_zero_extend(extend.extension, _: BitVecLiteral), result)
@@ -99,31 +106,26 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterVariabl
       val result = evaluateExpressionWithSSA(e.body, constantPropResult)
       applySingle(BitVectorEval.boogie_extract(e.end, e.start, _: BitVecLiteral), result)
     case variable: Variable =>
-      val registerVariableWrapper = RegisterVariableWrapper(variable)
-      constantPropResult.collect({
-        case (k, v) if k == registerVariableWrapper => v
-      }).flatten.toSet
-      constantPropResult(registerVariableWrapper)
+      constantPropResult(RegisterWrapperEqualSets(variable))
     case b: BitVecLiteral => Set(b)
-    case _ => //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
-      Set()
+    case _ => throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
   }
 }
 
-def unwrapExpr(expr: Expr): ListBuffer[Expr] = {
-  val buffers = ListBuffer[Expr]()
+def unwrapExpr(expr: Expr): Set[Expr] = {
+  var buffers: Set[Expr] = Set()
   expr match {
-    case e: Extract => unwrapExpr(e.body)
-    case e: SignExtend => unwrapExpr(e.body)
-    case e: ZeroExtend => unwrapExpr(e.body)
-    case repeat: Repeat => unwrapExpr(repeat.body)
-    case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
+    case e: Extract => buffers ++= unwrapExpr(e.body)
+    case e: SignExtend => buffers ++= unwrapExpr(e.body)
+    case e: ZeroExtend => buffers ++= unwrapExpr(e.body)
+    case repeat: Repeat => buffers ++= unwrapExpr(repeat.body)
+    case unaryExpr: UnaryExpr => buffers ++= unwrapExpr(unaryExpr.arg)
     case binaryExpr: BinaryExpr =>
-      unwrapExpr(binaryExpr.arg1)
-      unwrapExpr(binaryExpr.arg2)
+      buffers ++= unwrapExpr(binaryExpr.arg1)
+      buffers ++= unwrapExpr(binaryExpr.arg2)
     case memoryLoad: MemoryLoad =>
-      buffers.addOne(memoryLoad)
-      unwrapExpr(memoryLoad.index)
+      buffers += memoryLoad
+      buffers ++= unwrapExpr(memoryLoad.index)
     case _ =>
   }
   buffers

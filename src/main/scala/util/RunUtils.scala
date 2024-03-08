@@ -55,10 +55,11 @@ case class StaticAnalysisContext(
     IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
     memoryRegionResult: Map[CfgNode, LiftedElement[Set[MemoryRegion]]],
     vsaResult: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
-    interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElementLatticeEl]],
+    interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
     paramResults: Map[Procedure, Set[Variable]],
     steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
-    mmmResults: MemoryModelMap
+    mmmResults: MemoryModelMap,
+    memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]]
 )
 
 /** Results of the main program execution.
@@ -188,7 +189,7 @@ object IRTransform {
       cfg: ProgramCfg,
       valueSets: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
       IRProgram: Program
-  ): (Program, Boolean) = {
+  ): Boolean = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
     cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
@@ -309,14 +310,15 @@ object IRTransform {
       functionNames
     }
 
-    (IRProgram, modified)
+    modified
   }
 
   def resolveIndirectCallsUsingPointsTo(
      cfg: ProgramCfg,
      pointsTos: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
+     regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
      IRProgram: Program
-   ): (Program, Boolean) = {
+   ): Boolean = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
     cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
@@ -335,19 +337,21 @@ object IRTransform {
       val result = mutable.Set[String]()
       region match {
         case stackRegion: StackRegion =>
-          for (c <- stackRegion.content) {
-            c match {
-              case bitVecLiteral: BitVecLiteral => ???
-              case memoryRegion: MemoryRegion =>
-                result.addAll(searchRegion(memoryRegion))
+          if (regionContents.contains(stackRegion)) {
+            for (c <- regionContents(stackRegion)) {
+              c match {
+                case bitVecLiteral: BitVecLiteral => ???
+                case memoryRegion: MemoryRegion =>
+                  result.addAll(searchRegion(memoryRegion))
+              }
             }
           }
           result
         case dataRegion: DataRegion =>
-          if (dataRegion.content.isEmpty) {
+          if (!regionContents.contains(dataRegion) || regionContents(dataRegion).isEmpty) {
             result.add(dataRegion.regionIdentifier)
           } else {
-            for (c <- dataRegion.content) {
+            for (c <- regionContents(dataRegion)) {
               c match {
                 case bitVecLiteral: BitVecLiteral => ???
                 case memoryRegion: MemoryRegion =>
@@ -372,8 +376,7 @@ object IRTransform {
         case Some(value) =>
           value.map {
             case v: RegisterVariableWrapper => names.addAll(resolveAddresses(v.variable))
-            case m: MemoryRegion =>
-              names.addAll(searchRegion(m))
+            case m: MemoryRegion => names.addAll(searchRegion(m))
           }
           names
         case None => names
@@ -393,8 +396,8 @@ object IRTransform {
               return
             }
             val targetNames = resolveAddresses(indirectCall.target)
-            println(s"Points-To approximated call ${indirectCall.target} with $targetNames")
-            println(IRProgram.procedures)
+            Logger.debug(s"Points-To approximated call ${indirectCall.target} with $targetNames")
+            Logger.debug(IRProgram.procedures)
             val targets: mutable.Set[Procedure] = targetNames.map(name => IRProgram.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
 
             if (targets.size == 1) {
@@ -424,7 +427,7 @@ object IRTransform {
       case _ =>
     }
 
-    (IRProgram, modified)
+    modified
   }
 
   /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
@@ -589,7 +592,9 @@ object StaticAnalysis {
     Logger.info("[!] Running Steensgaard")
     val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, globalOffsets)
     steensgaardSolver.analyze()
-    val steensgaardResults = steensgaardSolver.pointsTo().asInstanceOf[Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]]]
+    val steensgaardResults = steensgaardSolver.pointsTo()
+    val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
+    mmm.logRegions(steensgaardSolver.getMemoryRegionContents)
 
     Logger.info("[!] Running VSA")
     val vsaSolver =
@@ -609,8 +614,6 @@ object StaticAnalysis {
     Logger.info("[!] Running Parameter Analysis")
     val paramResults = ParamAnalysis(IRProgram).analyze()
 
-    //mmm.printRegionsContent(false)
-
     StaticAnalysisContext(
       cfg = cfg,
       constPropResult = constPropResult,
@@ -620,7 +623,8 @@ object StaticAnalysis {
       interLiveVarsResults = interLiveVarsResults,
       paramResults = paramResults,
       steensgaardResults = steensgaardResults,
-      mmmResults = mmm
+      mmmResults = mmm,
+      memoryRegionContents = memoryRegionContents
     )
   }
 
@@ -820,14 +824,15 @@ object RunUtils {
     var modified: Boolean = true
     val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
     while (modified) {
-      var newIR = null
       Logger.info("[!] Running Static Analysis")
       val result = StaticAnalysis.analyse(ctx, config, iteration)
       analysisResult.append(result)
       Logger.info("[!] Replacing Indirect Calls")
-      //val (ir, mod) = IRTransform.resolveIndirectCalls(result.cfg, result.vsaResult, ctx.program)
-      val (ir, mod) = IRTransform.resolveIndirectCallsUsingPointsTo(result.cfg, result.steensgaardResults, ctx.program)
-      modified = mod
+      modified = IRTransform.resolveIndirectCallsUsingPointsTo(result.cfg,
+        result.steensgaardResults,
+        result.memoryRegionContents,
+        ctx.program
+      )
       if (modified) {
         iteration += 1
         Logger.info(s"[!] Analysing again (iter $iteration)")

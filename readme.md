@@ -8,7 +8,7 @@ binaries that have been lifted to intermediate formats. Supported input formats 
 ### Example
 
 ```sh
-$ mill run --input src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write.relf --spec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl
+$ ./mill run --input src/test/correct/secret_write/clang/secret_write.adt --relf src/test/correct/secret_write/clang/secret_write.relf --spec src/test/correct/secret_write/secret_write.spec --output boogie_out.bpl
 [INFO]   [!] Loading Program
 [INFO]   [!] Removing external function calls
 [INFO]   [!] Stripping unreachable
@@ -37,20 +37,16 @@ This is a Scala 3 project using the [mill](mill-build.com) build system, it can 
 
 ### Local Development 
 
-
-The tool is a Scala project, and is therefore OS-independent, but is only tested under linux. 
-
-
-The protobuffer compiler is required to build the project (due to ddisasm), this can be installed as the apt `protobuf-compiler` package, or from [here](https://protobuf.dev/downloads/).
+The tool itself is a Scala project and is OS-independent.
 
 Furthermore, lifting input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. 
-On Windows, WSL2 may be used to run any Linux-specific tasks, but it is less thoroughly tested.
+On Windows, WSL2 may be used to run any Linux-specific tasks.
 
 Installing [mill](https://mill-build.com/mill/Installation_IDE_Support.html) or [sbt](https://www.scala-sbt.org/download.html) and [JDK >= 17](https://openjdk.org/install/) is required.
 
 This can be done via [coursier](https://get-coursier.io/docs/cli-overview).
 
-A mill script is checked in at `./mill` so it does not need to be installed. 
+A mill script is included at `./mill` so it does not need to be installed. For Windows, `./mill.bat` should be used instead.
 
 #### IDE Support
 
@@ -59,7 +55,7 @@ Mill supports the Metals language server and IntelliJ through Build Server Proto
 SBT has an intellij plugin in addition to BSP. 
 
 To use specifically Mill's bsp support, delete `.bsp`, run `mill mill.bsp.BSP/install`, and replace the first argument of `argv` in the resulting `.bsp/mill-bsp.json` with the 
-command used to run mill. 
+command used to run mill (`mill` if mill is installed, or the mill script, either `./mill` on Linux/OSX or `./mill.bat` on Windows). 
 
 ```
 ~ rm -r .bsp

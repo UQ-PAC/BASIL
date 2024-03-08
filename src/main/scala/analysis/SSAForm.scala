@@ -2,6 +2,7 @@ package analysis
 
 import analysis.*
 import ir.{SignExtend, *}
+import util.Logger
 
 import scala.collection.mutable
 
@@ -22,16 +23,14 @@ class SSAForm(program: Program) {
     ret
 
   private def transformVariables(vars: Set[Variable], block: Block, proc: Procedure): Unit = {
-    vars.foreach(v => {
+    vars.foreach { v =>
       if (context.contains((proc, v.name))) {
         v.sharedVariable = true
       }
       v.ssa_id.clear()
-      v.ssa_id.addAll(
-        blockBasedMappings.getOrElseUpdate((block, v.name),
-        context.getOrElseUpdate((proc, v.name), mutable.Set(getMax(v.name)))
-      ))
-    })
+      val contextResult = context.getOrElseUpdate((proc, v.name), mutable.Set(getMax(v.name)))
+      v.ssa_id.addAll(blockBasedMappings.getOrElseUpdate((block, v.name), contextResult))
+    }
   }
 
   def applySSA(): Unit = {
@@ -49,7 +48,7 @@ class SSAForm(program: Program) {
           visitedBlocks.add(currentBlock)
 
           for (stmt <- currentBlock.statements) {
-            println(stmt)
+            Logger.debug(stmt)
             stmt match {
               case localAssign: LocalAssign =>
                 transformVariables(localAssign.rhs.variables, currentBlock, proc)
@@ -76,19 +75,20 @@ class SSAForm(program: Program) {
           currentBlock.jump match {
             case directCall: DirectCall =>
               // TODO: transfers the whole context but it could be using ANR and RNA to transfer only the relevant context
-              varMaxTracker.keys.foreach(varr => {
+              varMaxTracker.keys.foreach { varr =>
                 //context((directCall.target, varr)) = context((directCall.target, varr)) ++ blockBasedMappings(block, varr)
                 context.getOrElseUpdate((directCall.target, varr), mutable.Set()) ++= blockBasedMappings((currentBlock, varr))
-              })
+              }
             case indirectCall: IndirectCall =>
               transformVariables(indirectCall.target.variables, currentBlock, proc)
             case goTo: GoTo =>
-              goTo.targets.foreach(b => {
-                varMaxTracker.keys.foreach(varr => {
-                  blockBasedMappings((b, varr)) = blockBasedMappings(b, varr) ++ blockBasedMappings(currentBlock, varr)
-                })
-              })
-            case r: Return => ()
+              for {
+                b <- goTo.targets
+                varr <- varMaxTracker.keys
+              } {
+                blockBasedMappings((b, varr)) ++= blockBasedMappings(currentBlock, varr)
+              }
+            case Return =>
           }
           // Push unvisited successors onto the stack
           stack.pushAll(currentBlock.nextBlocks)

@@ -1,6 +1,6 @@
 package analysis
 
-import ir._
+import ir.*
 import analysis.solvers._
 
 import scala.collection.immutable
@@ -59,9 +59,7 @@ trait ANRAnalysis(cfg: ProgramCfg) {
   def transfer(n: CfgNode, s: Set[Variable]): Set[Variable] = localTransfer(n, s)
 }
 
-class ANRAnalysisSolver(
-    cfg: ProgramCfg,
-) extends ANRAnalysis(cfg)
+class ANRAnalysisSolver(cfg: ProgramCfg) extends ANRAnalysis(cfg)
     with IntraproceduralForwardDependencies
     with Analysis[Map[CfgNode, Set[Variable]]]
     with SimpleWorklistFixpointSolver[CfgNode, Set[Variable], PowersetLattice[Variable]] {

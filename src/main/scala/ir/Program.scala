@@ -124,7 +124,7 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
    * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
    * not guaranteed to be in any defined order. 
    */
-  class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
+  private class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
     private val stack = mutable.Stack[CFGPosition]()
     stack.addAll(begin.procedures)
 
@@ -133,14 +133,13 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
     }
 
     override def next(): CFGPosition = {
-      val n: CFGPosition  = stack.pop()
+      val n: CFGPosition = stack.pop()
 
-      stack.pushAll(n match  {
-        case p : Procedure => p.blocks
+      stack.pushAll(n match {
+        case p: Procedure => p.blocks
         case b: Block => Seq() ++ b.statements ++ Seq(b.jump) ++ b.fallthrough.toSet
         case s: Command => Seq()
       })
-
       n
     }
 
@@ -157,22 +156,22 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 }
 
 /**
- * A procedure consists of a set of blocks between a beginning block and an end block. 
+ * A procedure consists of a set of blocks between a beginning block and an end block.
  *
  * For symmetry and to support DSA analyses which require a procedure entry and exit we have a
  * permanent entry and return block which are always before the first functional block
- * and after the last functional block in the procedure. 
+ * and after the last functional block in the procedure.
  *
- * The entry block has no statements and a goto to the next block in the program (by default, the return block), 
- * and the return block has no statements and a return call. Both the entry and return blocks are immutable 
- * and cannot be added or removed. 
+ * The entry block has no statements and a goto to the next block in the program (by default, the return block),
+ * and the return block has no statements and a return call. Both the entry and return blocks are immutable
+ * and cannot be added or removed.
  *
- * We maintain the invariant that when a block containing a return is added to the procedure, 
- * the return is replaced with a jump to the return block. When it is removed again 
+ * We maintain the invariant that when a block containing a return is added to the procedure,
+ * the return is replaced with a jump to the return block. When it is removed again
  * it is again replaced by a return call.
  *
- * A procedure containing only an entry and exit block (i.e. no innerBlocks) is considered 
- * a stub without an implementation. 
+ * A procedure containing only an entry and exit block (i.e. no innerBlocks) is considered
+ * a stub without an implementation.
  *
  */
 class Procedure private (
@@ -198,7 +197,7 @@ class Procedure private (
     this.entryBlock.parent = this
     this.returnBlock.parent = this
 
-    // For default entry block we make it jump to the return so it is always defined. 
+    // For default entry block we make it jump to the return so it is always defined.
     entryBlock.jump match
       case g: GoTo if g.targets.isEmpty => entryBlock.replaceJump(GoTo(Set(returnBlock)))
       case _ => ()
@@ -225,7 +224,7 @@ class Procedure private (
   /**
    * Get an immutable set of the internal blocks to this procedure (excluding entry and exit).
    */
-  def innerBlocks = _innerBlocks.iterator
+  def innerBlocks: Iterator[Block] = _innerBlocks.iterator
 
   /**
    * Returns true iff the procedure contains any implementation (inner) blocks, i.e. is not a stub.
@@ -241,7 +240,7 @@ class Procedure private (
   }
 
   /**
-   * Checks whether the block contains a return or indirectcall to R30 and replaces 
+   * Checks whether the block contains a return or indirectcall to R30 and replaces
    * it with a goto to this procedures return block.
    *
    * Assumes the block is a member of this procedure.
@@ -257,8 +256,8 @@ class Procedure private (
   }
 
   /**
-   * Canonical public interface to add a block to this procedure. 
-   * If the block ends in a return it is replaced with a jump to returnBlock. 
+   * Canonical public interface to add a block to this procedure.
+   * If the block ends in a return it is replaced with a jump to returnBlock.
    */
   def addBlock(block: Block): Block = {
     if (!_innerBlocks.contains(block)) {
@@ -273,7 +272,7 @@ class Procedure private (
   def addBlocks(blocks: Iterable[Block]): Unit = blocks.foreach(addBlock)
 
   /**
-   * Replace a block with another, linking the incoming control-flow.  
+   * Replace a block with another, linking the incoming control-flow.
    */
   def replaceBlock(oldBlock: Block, block: Block): Block = {
     require(_innerBlocks.contains(oldBlock))
@@ -388,12 +387,12 @@ class Parameter(var name: String, var size: Int, var value: Register) {
 
 
 class Block private (
-  var label: String,
- var address: Option[Int],
+ val label: String,
+ val address: Option[Int],
  val statements: IntrusiveList[Statement],
  private var _jump: Jump,
  private val _incomingJumps: mutable.HashSet[GoTo],
- var _fallthrough : Option[GoTo],
+ var _fallthrough: Option[GoTo],
 ) extends HasParent[Procedure] {
   _jump.setParent(this)
   statements.foreach(_.setParent(this))
@@ -461,9 +460,9 @@ class Block private (
   def nextBlocks: Iterable[Block] = {
     jump match {
       case c: GoTo => c.targets
-      case c: Call =>  fallthrough match {
-          case Some(x) => x.targets
-          case _ => Seq()
+      case c: Call => fallthrough match {
+        case Some(x) => x.targets
+        case _ => Seq()
       }
     }
   }
@@ -509,12 +508,11 @@ class Block private (
   }
 }
 
-object Block:
-
+object Block {
   def procedureReturn(from: Procedure): Block = {
-      new Block((from.name + "_basil_return"), None, List(),  Return())
+    Block(from.name + "_basil_return", None, List(), Return())
   }
-
+}
 
 /**
   * @param name name
