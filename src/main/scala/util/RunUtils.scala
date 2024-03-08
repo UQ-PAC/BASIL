@@ -318,7 +318,7 @@ object IRTransform {
      pointsTos: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
      regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
      IRProgram: Program
-   ): (Program, Boolean) = {
+   ): Boolean = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
     cfg.startNode.succIntra.union(cfg.startNode.succInter).foreach(node => worklist.addOne(node))
