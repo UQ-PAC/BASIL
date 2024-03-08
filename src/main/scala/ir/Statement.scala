@@ -17,7 +17,7 @@ sealed trait Command extends HasParent[Block] {
 
 }
 
-sealed trait Statement extends Command, HasParent[Block], IntrusiveListElement[Statement] {
+sealed trait Statement extends Command, IntrusiveListElement[Statement] {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Statement = throw new Exception(
@@ -73,14 +73,12 @@ class Assume(var body: Expr, var comment: Option[String] = None, override val la
 object Assume:
   def unapply(a: Assume): Option[(Expr, Option[String], Option[String], Boolean)] = Some(a.body, a.comment, a.label, a.checkSecurity)
 
-sealed trait Jump extends Command, HasParent[Block]  {
+sealed trait Jump extends Command {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
   def calls: Set[Procedure] = Set()
   def acceptVisit(visitor: Visitor): Jump = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
-
-
 
 class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String]) extends Jump {
 
@@ -128,13 +126,7 @@ object GoTo:
   def unapply(g: GoTo): Option[(Set[Block], Option[String])] = Some(g.targets, g.label)
 
 
-sealed trait Call extends Jump
-
-trait FallThrough extends HasParent[Block] {
-  /**
-    * Manages the fallthrough target for a call in the parent block.
-    */
-
+sealed trait Call extends Jump {
   private var _returnTarget: Option[Block] = None
 
   // replacing the return target of a call
@@ -164,8 +156,8 @@ trait FallThrough extends HasParent[Block] {
 class DirectCall(val target: Procedure,
                  private val _returnTarget: Option[Block] = None,
                  override val label: Option[String] = None
-                ) extends Call with FallThrough {
-  _returnTarget.foreach(x => returnTarget = x) 
+                ) extends Call {
+  _returnTarget.foreach(x => returnTarget = x)
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
@@ -187,13 +179,13 @@ class DirectCall(val target: Procedure,
 }
 
 object DirectCall:
-  def unapply(i: DirectCall): Option[(Procedure,  Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
+  def unapply(i: DirectCall): Option[(Procedure, Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
 
 class IndirectCall(var target: Variable,
                    private val _returnTarget: Option[Block] = None,
                    override val label: Option[String] = None
-                  ) extends Call with FallThrough {
-  _returnTarget.foreach(x => returnTarget = x) 
+                  ) extends Call {
+  _returnTarget.foreach(x => returnTarget = x)
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)
