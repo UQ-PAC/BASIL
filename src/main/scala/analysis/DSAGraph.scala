@@ -1,13 +1,13 @@
 package analysis
 
 import com.sun.org.apache.xalan.internal.xsltc.compiler.util.NodeType
-import ir.{Expr, Procedure}
+import ir.{Expr, Procedure, Variable}
 
 import scala.collection.mutable
 
 // need a type procedure
 
-type Value = Procedure | Expr
+type Prexpr = Procedure | Expr
 
 /**
  * DSA Graph
@@ -58,6 +58,19 @@ class Graph(val procedure: Procedure) {
   def makeCell(): Cell = {
     val node = makeNode()
     node.makeCell()
+  }
+
+  def unify(variable: Variable, cell: Cell): Unit = {
+    if !pointersToCells.contains(variable) then
+      pointersToCells.put(variable, cell)
+    else
+      pointersToCells(variable).unify(cell)
+  }
+
+  def collapsePointer(pointer: Variable): Unit = {
+    val cell = makeCell()
+    cell.node.get.collapseNode()
+    unify(pointer, cell)
   }
 }
 
@@ -154,6 +167,13 @@ class Node (val owner: Graph) {
     cell
   }
 
+  def updateSize(s: Int): Unit = {
+    if isSeq && size != s then
+      collapseNode()
+    else if (!isSeq && s > size) then
+      size = s
+  }
+
 
   def isCollapsed = flags.collapsed
   def isSeq = flags.seq
@@ -177,6 +197,8 @@ class NodeFlags {
 class Cell(val node: Option[Node] = None, val offset: Int = 0) {
 
   private var pointsTo: Option[Cell] = None
+
+  var size = 0 // TODO types and sizes of fields
   private def n = node.get
 
   def this(cell: Cell) = {
