@@ -50,9 +50,9 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
 
 //    x.foreach(println(_))
 
-    val y = x.head()
+    val y = x.head
     assert(y.t == 10)
-    assert(x.back().t == 14)
+    assert(x.back.t == 14)
   }
 
   test("Clear") {

@@ -4,7 +4,7 @@ import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.{Assert, Assume, Block, CFGPosition, Call, DirectCall, GoTo, IndirectCall, Jump, LocalAssign, MemoryAssign, NOP, Procedure, Program, Statement, Variable, Return}
 
 abstract class LivenessAnalysis(program: Program) extends Analysis[Any]:
-  val lattice: MapLattice[CFGPosition, Set[Variable], PowersetLattice[Variable]] = new MapLattice(new PowersetLattice())
+  val lattice: MapLattice[CFGPosition, Set[Variable], PowersetLattice[Variable]] = MapLattice(PowersetLattice())
   val domain: Set[CFGPosition] = Set.empty ++ program
 
   def transfer(n: CFGPosition, s: Set[Variable]): Set[Variable] = {
@@ -19,6 +19,7 @@ abstract class LivenessAnalysis(program: Program) extends Analysis[Any]:
       case c: DirectCall => s
       case g: GoTo => s
       case r: Return => s
+      case _ => s
     }
   }
 

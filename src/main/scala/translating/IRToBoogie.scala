@@ -274,7 +274,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         val in = List(memVar, indexVar, valueVar)
         val out = BParam(memType)
         val body: BExpr = config.memoryFunctionType match {
-          case BoogieMemoryAccessMode.SuccessiveStoreSelect => {
+          case BoogieMemoryAccessMode.SuccessiveStoreSelect =>
             val indices: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
               if (i == 0) {
                 indexVar
@@ -296,7 +296,6 @@ class IRToBoogie(var program: Program, var spec: Specification) {
             indiceValues.tail.foldLeft(MapUpdate(memVar, indices.head, valuesEndian.head)) {
               (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
             }
-          }
           case BoogieMemoryAccessMode.LambdaStoreSelect =>
             if m.accesses == 1 then
               MapUpdate(memVar, indexVar, valueVar)
@@ -632,7 +631,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     case g: GoTo =>
       // collects all targets of the goto with a branch condition that we need to check the security level for
       // and collects the variables for that
-      val conditions = g.targets.flatMap(_.statements.headOption()).collect { case a: Assume if a.checkSecurity => a }
+      val conditions = g.targets.flatMap(_.statements.headOption.collect { case a: Assume if a.checkSecurity => a })
       val conditionVariables = conditions.flatMap(_.body.variables)
       val gammas = conditionVariables.map(_.toGamma).toList.sorted
       val conditionAssert: List[BCmd] = if (gammas.size > 1) {

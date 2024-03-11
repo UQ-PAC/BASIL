@@ -95,7 +95,7 @@ trait SystemTests extends AnyFunSuite {
       (verified, shouldVerify, xor(verified, proveFailed)) match {
         case (true, true, true) => "Test passed"
         case (false, false, true) => "Test passed"
-        case (_, _, false) => "Prover error: unknown result"
+        case (_, _, false) => "Prover error: unknown result: " + boogieResult
         case (true, false, true) => "Expected verification failure, but got success."
         case (false, true, true) => "Expected verification success, but got failure."
       }

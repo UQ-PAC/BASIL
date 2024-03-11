@@ -1,4 +1,5 @@
 package util.intrusive_list
+import scala.annotation.tailrec
 import scala.collection.mutable
 
 // TODO: implement IterableOps
@@ -122,7 +123,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
    * @return The iterator
    */
   def iteratorFrom(elem: T, forward : Boolean = true): Iterator[T] = {
-    assert(elem.first() == firstElem.get)
+    assert(elem.first == firstElem.get)
     IntrusiveListIterator(Some(elem), forward)
   }
 
@@ -133,14 +134,14 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   /**
    * Unsafely return the first element of the list.
    */
-  override def head(): T = firstElem.get
+  override def head: T = firstElem.get
 
-  override def headOption(): Option[T] = firstElem
+  override def headOption: Option[T] = firstElem
 
   /**
    * Unsafely return the first element of the list.
    */
-  def begin(): T = firstElem.get
+  def begin: T = firstElem.get
 
   /**
    * Check whether the list contains the given element (by reference) by linear scan.
@@ -169,7 +170,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   /**
    * Unsafely return the last element of the list.
    */
-  def back(): T = lastElem.get
+  def back: T = lastElem.get
 
   /**
    * Add an element to the beginning of the list.
@@ -418,7 +419,7 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
    * @return Some(next) where next is the next element in the list this belongs to.
    *         None when this is the last element.
    */
-  def succ(): Option[this.type] = {
+  def succ: Option[this.type] = {
     next.map(_.asInstanceOf[this.type])
   }
 
@@ -426,16 +427,16 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
    * @return Some(prev) where prev is the previous element in the list this belongs to.
    *         None when this is the first element.
    */
-  def pred(): Option[this.type] = {
+  def pred: Option[this.type] = {
     prev.map(_.asInstanceOf[this.type])
   }
 
   private[intrusive_list] final def append(elem: T): T = {
-    last().insertAfter(elem)
+    last.insertAfter(elem)
   }
 
   private[intrusive_list] final def prepend(elem: T): T = {
-    first().insertBefore(elem)
+    first.insertBefore(elem)
   }
 
   private[intrusive_list] final def getNext: T = next.get
@@ -445,25 +446,27 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
   private[intrusive_list] final def hasNext: Boolean = next.isDefined
   private[intrusive_list] final def hasPrev: Boolean = prev.isDefined
 
-  private[intrusive_list] final def last(): T = {
+  @tailrec
+  private[intrusive_list] final def last: T = {
     next match {
-      case Some(n) => n.last()
+      case Some(n) => n.last
       case None    => this.asInstanceOf[T]
     }
   }
 
-  private[intrusive_list] final def first(): T = {
+  @tailrec
+  private[intrusive_list] final def first: T = {
     prev match {
-      case Some(n) => n.first()
+      case Some(n) => n.first
       case None    => this.asInstanceOf[T]
     }
   }
 
   private[intrusive_list] final def splice(at: T, insertBegin: T, insertEnd: T): Unit = {
-    assert(insertEnd.last() == insertEnd)
-    assert(insertBegin.last() == insertEnd)
-    assert(insertBegin.first() == insertBegin)
-    assert(insertEnd.first() == insertBegin)
+    assert(insertEnd.last == insertEnd)
+    assert(insertBegin.last == insertEnd)
+    assert(insertBegin.first == insertBegin)
+    assert(insertEnd.first == insertBegin)
     assert(!at.contains(insertBegin))
 
     at.next.foreach(_.prev = Some(insertEnd))
@@ -473,9 +476,9 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
   }
 
   private[intrusive_list] final def contains(elem: T): Boolean = {
-    elem.first() == first()
+    elem.first == first
   }
 
   private[intrusive_list] final def containsRef(elem: T): Boolean = {
-    elem.first() eq first()
+    elem.first eq first
   }

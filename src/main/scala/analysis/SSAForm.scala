@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.*
-import ir.{SignExtend, *}
+import ir.*
 import util.Logger
 
 import scala.collection.mutable
@@ -88,7 +88,7 @@ class SSAForm(program: Program) {
               } {
                 blockBasedMappings((b, varr)) ++= blockBasedMappings(currentBlock, varr)
               }
-            case Return =>
+            case r: Return =>
           }
           // Push unvisited successors onto the stack
           stack.pushAll(currentBlock.nextBlocks)

@@ -355,7 +355,7 @@ sealed trait StTerm
   */
 case class AllocVariable(alloc: MemoryRegion) extends StTerm with Var[StTerm] {
 
-  override def toString: String = s"alloc{${alloc}}"
+  override def toString: String = s"alloc{$alloc}"
 }
 
 /** A term variable that represents an identifier in the program.

@@ -59,13 +59,12 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       // Set entry block to the block with the same address as the procedure or the first in sequence
       procedure.blocks.find(b => b.address == procedure.address) match 
         case Some(x) => procedure.entryBlock.replaceJump(GoTo(Set(x)))
-        case None => {
-          if (procedure.hasImplementation) then {
+        case None =>
+          if (procedure.hasImplementation) {
             // TODO maybe throw an exception if there is no block with the same address, to be safe?
             Logger.warn("No block with procedure's address found; using the first available block as the entry")
             procedure.innerBlocks.nextOption().foreach(b => procedure.entryBlock.replaceJump(GoTo(Set(b))))
           }
-        }
 
     }
 

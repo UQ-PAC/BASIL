@@ -334,6 +334,8 @@ class Procedure private (
         case c: Call =>
           // just remove statements, keep call
           elem.statements.clear()
+        case r: Return =>
+          elem.statements.clear()
       }
     }
   }
@@ -464,6 +466,7 @@ class Block private (
         case Some(x) => x.targets
         case _ => Seq()
       }
+      case r: Return => Seq()
     }
   }
 

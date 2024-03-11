@@ -10,7 +10,7 @@ class IntrusiveListTest extends AnyFunSuite {
     val toInsert = Elem(10)
     val f: IntrusiveListElement[Elem] = x.append(toInsert)
     assert(x.size == 1)
-    assert(f.last() == f)
+    assert(f.last == f)
     assert(f eq toInsert)
   }
 
@@ -28,20 +28,20 @@ class IntrusiveListTest extends AnyFunSuite {
     assert(p1.getPrev eq p2)
     val p3 = p2.insertBefore(Elem(7))
 
-    assert(x.last() == x)
-    assert(p3.first() == p3)
+    assert(x.last == x)
+    assert(p3.first == p3)
 
     assert(p3.getNext eq p2)
     assert(p2.getPrev eq p3)
 
-    assert(x.first() eq p3)
-    assert(p3.last() eq x)
+    assert(x.first eq p3)
+    assert(p3.last eq x)
 
     p2.insertAfter(Elem(8.5))
-    assert(p3.last() eq x)
+    assert(p3.last eq x)
 
     p3.insertAfter(Elem(7.5))
-    assert(x.first() eq p3)
+    assert(x.first eq p3)
   }
 
   test("ListElem remove") {
@@ -51,8 +51,8 @@ class IntrusiveListTest extends AnyFunSuite {
     val p3 = p2.insertAfter(Elem(7))
 
     p2.remove()
-    assert(p3.first() == p0)
-    assert(p0.last() == p3)
+    assert(p3.first == p0)
+    assert(p0.last == p3)
   }
 
   test("ListElem remove2") {
@@ -62,8 +62,8 @@ class IntrusiveListTest extends AnyFunSuite {
     val p3 = p2.insertAfter(Elem(7))
 
     p2.remove()
-    assert(p3.first() == p0)
-    assert(p0.last() == p3)
+    assert(p3.first == p0)
+    assert(p0.last == p3)
   }
 
   // test("IntrusiveList insertRemove")

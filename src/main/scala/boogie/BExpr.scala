@@ -614,7 +614,7 @@ case class LOp(memoryType: BType, indexType: BType) extends FunctionOp
  * Utility to extract a particular byte from a bitvector.
  */
 case class ByteExtract(valueSize: Int, offsetSize: Int) extends FunctionOp {
-  val fnName: String = s"byte_extract${valueSize}_${offsetSize}"
+  val fnName: String = s"byte_extract${valueSize}_$offsetSize"
 }
 
 case class BByteExtract(value: BExpr, offset: BExpr) extends BExpr {
@@ -630,7 +630,7 @@ case class BByteExtract(value: BExpr, offset: BExpr) extends BExpr {
     case _              => throw new Exception(s"ByteExtract does not have Bitvector type: $this")
   }
 
-  val fnName: String = s"byte_extract${valueSize}_${offsetSize}"
+  val fnName: String = s"byte_extract${valueSize}_$offsetSize"
 
   override val getType: BType = BitVecBType(8)
   override def functionOps: Set[FunctionOp] =
