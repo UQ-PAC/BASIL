@@ -49,14 +49,14 @@ class Graph(val procedure: Procedure) {
   }
 
 
-  def makeNode(): Node = {
-    val node = Node(this)
+  def makeNode(memoryRegion2: MemoryRegion2): Node = {
+    val node = Node(memoryRegion2, this)
     nodes.add(node)
     node
   }
 
-  def makeCell(): Cell = {
-    val node = makeNode()
+  def makeCell(memoryRegion2: MemoryRegion2): Cell = {
+    val node = makeNode(memoryRegion2)
     node.makeCell()
   }
 
@@ -67,8 +67,8 @@ class Graph(val procedure: Procedure) {
       pointersToCells(variable).unify(cell)
   }
 
-  def collapsePointer(pointer: Variable): Unit = {
-    val cell = makeCell()
+  def collapsePointer(pointer: Variable, memoryRegion2: MemoryRegion2): Unit = {
+    val cell = makeCell(memoryRegion2)
     cell.node.get.collapseNode()
     unify(pointer, cell)
   }
@@ -78,17 +78,19 @@ class Graph(val procedure: Procedure) {
 /**
  * DSA Node represents a memory object
  */
-class Node (val owner: Graph) {
+class Node (val memoryRegion2: MemoryRegion2, val owner: Graph) {
   var cells: mutable.Set[Cell] = mutable.Set()
   private val flags: NodeFlags = NodeFlags()
-  var size: Int = 0
+  var size: BigInt = memoryRegion2 match
+    case region: HeapRegion2 => region.size.value
+    case _ => 0
 
-  def links: Set[Int] =
-    cells.foldLeft(Set(): Set[Int]){
+  def links: Set[BigInt] =
+    cells.foldLeft(Set(): Set[BigInt]){
       (s, c) => s + c.offset
     }
 
-  def offsetHelper(offset1: Int, offset2: Int): Int = {
+  def offsetHelper(offset1: BigInt, offset2: BigInt): BigInt = {
     if isCollapsed then
       0
     else if isSeq then
@@ -97,7 +99,7 @@ class Node (val owner: Graph) {
       offset1 + offset2
   }
 
-  def redirectEdges(node: Node, offset: Int): Unit = {
+  def redirectEdges(node: Node, offset: BigInt): Unit = {
     owner.getPointers(this).foreach(
       (pointer, pointee) =>
         val newCell = node.makeCell(node.offsetHelper(offset, pointee.offset))
@@ -123,7 +125,7 @@ class Node (val owner: Graph) {
     )
   }
   def collapseNode(): Unit = {
-    val cell = owner.makeCell()
+    val cell = owner.makeCell(this.memoryRegion2)
     cells.foreach(
       c =>
         cell.unify(c)
@@ -134,11 +136,11 @@ class Node (val owner: Graph) {
     cells = mutable.Set(cell)
   }
 
-  def collapse(node: Node, offset: Int): Unit = {
+  def collapse(node: Node, offset: BigInt): Unit = {
     node.collapseNode()
     redirectEdges(node, offset)
   }
-  def unify(node: Node, offset: Int): Unit = {
+  def unify(node: Node, offset: BigInt): Unit = {
     val updatedOffset = offsetHelper(offset, 0)
     if (isCollapsed && !node.isCollapsed) {
       collapse(node, updatedOffset)
@@ -161,13 +163,13 @@ class Node (val owner: Graph) {
     redirectEdges(node, updatedOffset)
   }
 
-  def makeCell(offset: Int = 0): Cell = {
+  def makeCell(offset: BigInt = 0): Cell = {
     val cell = Cell(Some(this), offset)
     cells.add(cell)
     cell
   }
 
-  def updateSize(s: Int): Unit = {
+  def updateSize(s: BigInt): Unit = {
     if isSeq && size != s then
       collapseNode()
     else if (!isSeq && s > size) then
@@ -177,6 +179,10 @@ class Node (val owner: Graph) {
 
   def isCollapsed = flags.collapsed
   def isSeq = flags.seq
+
+  def setSeq(value: Boolean = true): Unit = {
+    flags.seq = value
+  }
 
 }
 
@@ -194,11 +200,9 @@ class NodeFlags {
 /**
  * A memory cell (or a field). An offset into a memory object.
  */
-class Cell(val node: Option[Node] = None, val offset: Int = 0) {
+class Cell(val node: Option[Node] = None, val offset: BigInt = 0) {
 
   private var pointsTo: Option[Cell] = None
-
-  var size = 0 // TODO types and sizes of fields
   private def n = node.get
 
   def this(cell: Cell) = {
@@ -206,12 +210,12 @@ class Cell(val node: Option[Node] = None, val offset: Int = 0) {
     pointsTo = cell.pointsTo
   }
 
-  def this(cell: Cell, offset: Int) = {
+  def this(cell: Cell, offset: BigInt) = {
     this(cell.node, cell.offset + offset)
     pointsTo = cell.pointsTo
   }
 
-  def this(node: Node, offset : Int) = {
+  def this(node: Node, offset : BigInt) = {
     this(Some(node), offset)
   }
 

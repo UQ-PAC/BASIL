@@ -614,6 +614,16 @@ object StaticAnalysis {
     Logger.info("[!] Running Parameter Analysis")
     val paramResults = ParamAnalysis(IRProgram).analyze()
 
+
+    Logger.info("[!] Running Reaching Defs")
+    val reachingDefs = PrePass(IRProgram, newCPResult).analyze()
+    config.analysisDotPath.foreach(s =>
+      writeToFile(toDot(IRProgram, reachingDefs.foldLeft(Map():Map[CFGPosition, String]){
+        (m, t) =>
+          m + (t._1 -> t._2.toString)
+      }), s"${s}_reaching.dot")
+    )
+
     StaticAnalysisContext(
       cfg = cfg,
       constPropResult = constPropResult,
