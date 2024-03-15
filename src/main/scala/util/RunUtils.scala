@@ -562,6 +562,12 @@ object StaticAnalysis {
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResultWithSSA, true), Output.dotIder), s"${s}_constpropWithSSA$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResultWithSSA, iteration), s"${s}_constpropWithSSA$iteration.txt"))
 
+    val reachingDefinitionsAnalysisSolver = ReachingDefinitionsAnalysisSolver(cfg)
+    val reachingDefinitionsAnalysisResults = reachingDefinitionsAnalysisSolver.analyze()
+
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(reachingDefinitionsAnalysisResults, true), Output.dotIder), s"${s}_reachingDefinitions$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, reachingDefinitionsAnalysisResults, iteration), s"${s}_reachingDefinitions$iteration.txt"))
+
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults)
     val mraResult = mraSolver.analyze()

@@ -113,6 +113,24 @@ class FlatLattice[X] extends Lattice[FlatElement[X]] {
   }
 }
 
+class TupleLattice[L1 <: Lattice[T1], L2 <: Lattice[T2], T1, T2](val lattice1: L1, val lattice2: L2) extends Lattice[(T1, T2)] {
+  override val bottom: (T1, T2) = (lattice1.bottom, lattice2.bottom)
+
+  override def lub(x: (T1, T2), y: (T1, T2)): (T1, T2) = {
+    val (x1, x2) = x
+    val (y1, y2) = y
+    (lattice1.lub(x1, y1), lattice2.lub(x2, y2))
+  }
+
+  override def leq(x: (T1, T2), y: (T1, T2)): Boolean = {
+    val (x1, x2) = x
+    val (y1, y2) = y
+    lattice1.leq(x1, y1) && lattice2.leq(x2, y2)
+  }
+
+  override def top: (T1, T2) = (lattice1.top, lattice2.top)
+}
+
 
 /** A lattice of maps from a set of elements of type `A` to a lattice with element `L'. Bottom is the default value.
   */
