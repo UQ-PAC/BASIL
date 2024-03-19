@@ -76,7 +76,7 @@ object ReadELFLoader {
   }
 
   def visitSymbolTableRow(ctx: SymbolTableRowContext): Option[SpecGlobal] = {
-    if (ctx.entrytype.getText == "OBJECT" && ctx.bind.getText == "GLOBAL" && ctx.vis.getText == "DEFAULT") {
+    if ((ctx.entrytype.getText == "OBJECT" || ctx.entrytype.getText == "FUNC") && ctx.bind.getText == "GLOBAL" && ctx.vis.getText == "DEFAULT") {
       val name = ctx.name.getText
       if (name.forall(allowedChars.contains)) {
         Some(SpecGlobal(name, ctx.size.getText.toInt * 8, None, hexToBigInt(ctx.value.getText)))

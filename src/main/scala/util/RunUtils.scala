@@ -616,13 +616,15 @@ object StaticAnalysis {
 
 
     Logger.info("[!] Running Reaching Defs")
-    val reachingDefs = PrePass(IRProgram, newCPResult).analyze()
+    val reachingDefs = PrePass(IRProgram, newCPResult, globals, globalAddresses, globalOffsets).analyze()
     config.analysisDotPath.foreach(s =>
       writeToFile(toDot(IRProgram, reachingDefs.foldLeft(Map():Map[CFGPosition, String]){
         (m, t) =>
           m + (t._1 -> t._2.toString)
       }), s"${s}_reaching.dot")
     )
+
+    LocalDSA(IRProgram, IRProgram.mainProcedure, newCPResult, reachingDefs).analyze()
 
     StaticAnalysisContext(
       cfg = cfg,
