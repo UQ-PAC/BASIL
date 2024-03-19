@@ -51,6 +51,29 @@ case class ReachingDefinitionsAnalysis(cfg: ProgramCfg) {
           acc + (v -> rhsDef)
       }
       (s._1 + (lhs -> Set(localAssign)), rhsUseDefs)
+    case assert: Assert =>
+      assert.body.variables.foldLeft(s) {
+        case (acc, v) =>
+          val rhsDef = s._1.getOrElse(v, Set.empty)
+          (acc._1, acc._2 + (v -> rhsDef))
+      }
+    case memoryAssign: MemoryAssign =>
+      memoryAssign.rhs.variables.foldLeft(s) {
+        case (acc, v) =>
+          val rhsDef = s._1.getOrElse(v, Set.empty)
+          (acc._1, acc._2 + (v -> rhsDef))
+      }
+      memoryAssign.lhs.variables.foldLeft(s) {
+        case (acc, v) =>
+          val rhsDef = s._1.getOrElse(v, Set.empty)
+          (acc._1, acc._2 + (v -> rhsDef))
+      }
+    case assume: Assume =>
+      assume.body.variables.foldLeft(s) {
+        case (acc, v) =>
+          val rhsDef = s._1.getOrElse(v, Set.empty)
+          (acc._1, acc._2 + (v -> rhsDef))
+      }
     case _ => s
   }
 }
