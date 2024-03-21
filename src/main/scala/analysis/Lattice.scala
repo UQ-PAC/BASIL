@@ -32,6 +32,15 @@ class PowersetLattice[A] extends Lattice[Set[A]] {
   def lub(x: Set[A], y: Set[A]): Set[A] = x.union(y)
 }
 
+// Single element lattice (using Option)
+class SingleElementLattice[T] extends Lattice[Option[T]] {
+  val bottom: Option[T] = None
+  def lub(x: Option[T], y: Option[T]): Option[T] = (x, y) match {
+    case (None, None) => None
+    case _ => Some(x.getOrElse(y.get))
+  }
+}
+
 trait LiftedElement[+T]
 case class Lift[T](el: T) extends LiftedElement[T] {
   override def toString = s"Lift($el)"

@@ -59,7 +59,8 @@ case class StaticAnalysisContext(
     paramResults: Map[Procedure, Set[Variable]],
     steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
     mmmResults: MemoryModelMap,
-    memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]]
+    memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
+    reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]
 )
 
 /** Results of the main program execution.
@@ -317,6 +318,7 @@ object IRTransform {
      cfg: ProgramCfg,
      pointsTos: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
      regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
+     reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])],
      IRProgram: Program
    ): Boolean = {
     var modified: Boolean = false
@@ -340,7 +342,7 @@ object IRTransform {
           if (regionContents.contains(stackRegion)) {
             for (c <- regionContents(stackRegion)) {
               c match {
-                case bitVecLiteral: BitVecLiteral => ???
+                case bitVecLiteral: BitVecLiteral => println("hi: " + bitVecLiteral)//???
                 case memoryRegion: MemoryRegion =>
                   result.addAll(searchRegion(memoryRegion))
               }
@@ -353,7 +355,7 @@ object IRTransform {
           } else {
             for (c <- regionContents(dataRegion)) {
               c match {
-                case bitVecLiteral: BitVecLiteral => ???
+                case bitVecLiteral: BitVecLiteral => println("hi: " + bitVecLiteral)//???
                 case memoryRegion: MemoryRegion =>
                   result.addAll(searchRegion(memoryRegion))
               }
@@ -369,13 +371,13 @@ object IRTransform {
       newProcedure
     }
 
-    def resolveAddresses(variable: Variable): mutable.Set[String] = {
+    def resolveAddresses(variable: Variable, n: CfgNode): mutable.Set[String] = {
       val names = mutable.Set[String]()
-      val variableWrapper = RegisterVariableWrapper(variable)
+      val variableWrapper = RegisterVariableWrapper(variable, getDefs(variable, n, reachingDefs))
       pointsTos.get(variableWrapper) match {
         case Some(value) =>
           value.map {
-            case v: RegisterVariableWrapper => names.addAll(resolveAddresses(v.variable))
+            case v: RegisterVariableWrapper => names.addAll(resolveAddresses(v.variable, n))
             case m: MemoryRegion => names.addAll(searchRegion(m))
           }
           names
@@ -395,7 +397,7 @@ object IRTransform {
               // We want to replace all possible indirect calls based on this CFG, before regenerating it from the IR
               return
             }
-            val targetNames = resolveAddresses(indirectCall.target)
+            val targetNames = resolveAddresses(indirectCall.target, n)
             Logger.debug(s"Points-To approximated call ${indirectCall.target} with $targetNames")
             Logger.debug(IRProgram.procedures)
             val targets: mutable.Set[Procedure] = targetNames.map(name => IRProgram.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
@@ -499,7 +501,6 @@ object StaticAnalysis {
     }
 
     val mergedSubroutines = subroutines ++ externalAddresses
-    SSAForm(IRProgram).applySSA()
 
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
@@ -548,28 +549,28 @@ object StaticAnalysis {
       writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_constprop$iteration.txt")
     )
 
-    Logger.info("[!] Running RegToMemAnalysisSolver")
-    val regionAccessesAnalysisSolver = RegionAccessesAnalysisSolver(cfg, constPropResult)
-    val regionAccessesAnalysisResults = regionAccessesAnalysisSolver.analyze()
-
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(regionAccessesAnalysisResults, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, regionAccessesAnalysisResults, iteration), s"${s}_RegTo$iteration.txt"))
-
-    Logger.info("[!] Running Constant Propagation with SSA")
-    val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(cfg)
-    val constPropResultWithSSA = constPropSolverWithSSA.analyze()
-
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResultWithSSA, true), Output.dotIder), s"${s}_constpropWithSSA$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResultWithSSA, iteration), s"${s}_constpropWithSSA$iteration.txt"))
-
     val reachingDefinitionsAnalysisSolver = ReachingDefinitionsAnalysisSolver(cfg)
     val reachingDefinitionsAnalysisResults = reachingDefinitionsAnalysisSolver.analyze()
 
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(reachingDefinitionsAnalysisResults, true), Output.dotIder), s"${s}_reachingDefinitions$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, reachingDefinitionsAnalysisResults, iteration), s"${s}_reachingDefinitions$iteration.txt"))
 
+    Logger.info("[!] Running RegToMemAnalysisSolver")
+    val regionAccessesAnalysisSolver = RegionAccessesAnalysisSolver(cfg, constPropResult, reachingDefinitionsAnalysisResults)
+    val regionAccessesAnalysisResults = regionAccessesAnalysisSolver.analyze()
+
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(regionAccessesAnalysisResults, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, regionAccessesAnalysisResults, iteration), s"${s}_RegTo$iteration.txt"))
+
+    Logger.info("[!] Running Constant Propagation with SSA")
+    val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(cfg, reachingDefinitionsAnalysisResults)
+    val constPropResultWithSSA = constPropSolverWithSSA.analyze()
+
+    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResultWithSSA, true), Output.dotIder), s"${s}_constpropWithSSA$iteration.dot"))
+    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResultWithSSA, iteration), s"${s}_constpropWithSSA$iteration.txt"))
+
     Logger.info("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults)
+    val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults)
     val mraResult = mraSolver.analyze()
 
     config.analysisDotPath.foreach(s => {
@@ -596,11 +597,11 @@ object StaticAnalysis {
     mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, mraSolver.procedureToSharedRegions)
 
     Logger.info("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, globalOffsets)
+    val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
     steensgaardSolver.analyze()
     val steensgaardResults = steensgaardSolver.pointsTo()
     val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
-    mmm.logRegions(steensgaardSolver.getMemoryRegionContents)
+    mmm.logRegions(memoryRegionContents)
 
     Logger.info("[!] Running VSA")
     val vsaSolver =
@@ -630,7 +631,8 @@ object StaticAnalysis {
       paramResults = paramResults,
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,
-      memoryRegionContents = memoryRegionContents
+      memoryRegionContents = memoryRegionContents,
+      reachingDefs = reachingDefinitionsAnalysisResults
     )
   }
 
@@ -837,6 +839,7 @@ object RunUtils {
       modified = IRTransform.resolveIndirectCallsUsingPointsTo(result.cfg,
         result.steensgaardResults,
         result.memoryRegionContents,
+        result.reachingDefs,
         ctx.program
       )
       if (modified) {

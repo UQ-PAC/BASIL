@@ -54,7 +54,7 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
   }
 }
 
-def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]): Set[BitVecLiteral] = {
+def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CfgNode, reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[BitVecLiteral] = {
   Logger.debug(s"evaluateExpression: $exp")
 
   def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
@@ -73,8 +73,8 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
 
   exp match {
     case binOp: BinaryExpr =>
-      val lhs = evaluateExpressionWithSSA(binOp.arg1, constantPropResult)
-      val rhs = evaluateExpressionWithSSA(binOp.arg2, constantPropResult)
+      val lhs = evaluateExpressionWithSSA(binOp.arg1, constantPropResult, n, reachingDefs)
+      val rhs = evaluateExpressionWithSSA(binOp.arg2, constantPropResult, n, reachingDefs)
 
       (lhs, rhs) match {
         case (l: Set[BitVecLiteral], r: Set[BitVecLiteral]) =>
@@ -91,7 +91,7 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
           }
       }
     case unaryExpr: UnaryExpr =>
-      val result = evaluateExpressionWithSSA(unaryExpr.arg, constantPropResult)
+      val result = evaluateExpressionWithSSA(unaryExpr.arg, constantPropResult, n, reachingDefs)
       unaryExpr.op match {
         case BVNEG =>
           applySingle(BitVectorEval.smt_bvneg, result)
@@ -100,16 +100,26 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
         case _ => throw new RuntimeException("Unary operation support not implemented: " + unaryExpr.op)
       }
     case extend: ZeroExtend =>
-      val result = evaluateExpressionWithSSA(extend.body, constantPropResult)
+      val result = evaluateExpressionWithSSA(extend.body, constantPropResult, n, reachingDefs)
       applySingle(BitVectorEval.smt_zero_extend(extend.extension, _: BitVecLiteral), result)
     case e: Extract =>
-      val result = evaluateExpressionWithSSA(e.body, constantPropResult)
+      val result = evaluateExpressionWithSSA(e.body, constantPropResult, n, reachingDefs)
       applySingle(BitVectorEval.boogie_extract(e.end, e.start, _: BitVecLiteral), result)
     case variable: Variable =>
-      constantPropResult(RegisterWrapperEqualSets(variable))
+      constantPropResult(RegisterWrapperEqualSets(variable, getDefs(variable, n, reachingDefs)))
     case b: BitVecLiteral => Set(b)
     case _ => throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
   }
+}
+
+def getUses(variable: Variable, node: CfgNode, reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Option[LocalAssign] = {
+  val (in, _) = reachingDefs(node)
+  in(variable)
+}
+
+def getDefs(variable: Variable, node: CfgNode, reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[LocalAssign] = {
+  val (_, out) = reachingDefs(node)
+  out(variable)
 }
 
 def unwrapExpr(expr: Expr): Set[Expr] = {

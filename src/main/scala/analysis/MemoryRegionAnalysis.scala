@@ -14,7 +14,8 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
                            val constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
                            val ANRResult: Map[CfgNode, Set[Variable]],
                            val RNAResult: Map[CfgNode, Set[Variable]],
-                           val regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]) {
+                           val regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
+                           reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]) {
 
   var mallocCount: Int = 0
   private var stackCount: Int = 0
@@ -94,7 +95,7 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
       case variable: Variable =>
-        val reg = RegisterVariableWrapper(variable)
+        val reg = RegisterVariableWrapper(variable, getDefs(variable, n, reachingDefs))
         val ctx = regionAccesses(n)
         if (ctx.contains(reg)) {
           ctx(reg) match {
@@ -182,14 +183,14 @@ trait MemoryRegionAnalysis(val cfg: ProgramCfg,
           val parameters = RNA.intersect(ANR)
           val ctx = regionAccesses(n)
           for (elem <- parameters) {
-            if (ctx.contains(RegisterVariableWrapper(elem))) {
-              ctx(RegisterVariableWrapper(elem)) match {
+            if (ctx.contains(RegisterVariableWrapper(elem, getDefs(elem, n, reachingDefs)))) {
+              ctx(RegisterVariableWrapper(elem, getDefs(elem, n, reachingDefs))) match {
                 case FlatEl(al) =>
                   val regions = eval(al, s, cmd)
                   //val targetMap = stackMap(directCall.target)
                   //cfg.funEntries.filter(fn => fn.data == directCall.target).head
                   procedureToSharedRegions.getOrElseUpdate(directCall.target, mutable.Set.empty).addAll(regions)
-                  registerToRegions.getOrElseUpdate(RegisterVariableWrapper(elem), mutable.Set.empty).addAll(regions)
+                  registerToRegions.getOrElseUpdate(RegisterVariableWrapper(elem, getDefs(elem, n, reachingDefs)), mutable.Set.empty).addAll(regions)
               }
             }
           }
@@ -234,8 +235,9 @@ class MemoryRegionAnalysisSolver(
     constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
     ANRResult: Map[CfgNode, Set[Variable]],
     RNAResult: Map[CfgNode, Set[Variable]],
-    regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]
-  ) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, regionAccesses)
+    regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
+    reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]
+  ) extends MemoryRegionAnalysis(cfg, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, regionAccesses, reachingDefs)
   with IntraproceduralForwardDependencies
   with Analysis[Map[CfgNode, LiftedElement[Set[MemoryRegion]]]]
   with WorklistFixpointSolverWithReachability[CfgNode, Set[MemoryRegion], PowersetLattice[MemoryRegion]] {

@@ -14,7 +14,7 @@ import scala.collection.immutable
  *
  * Both in which constant propagation mark as TOP which is not useful.
  */
-trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]) {
+trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]], reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]) {
 
   val mapLattice: MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]] = MapLattice(FlatLattice[_root_.ir.Expr]())
 
@@ -26,15 +26,15 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
 
   /** Default implementation of eval.
    */
-  def eval(cmd: Command, constants: Map[Variable, FlatElement[BitVecLiteral]], s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = {
-    cmd match {
+  def eval(cmd: CfgCommandNode, constants: Map[Variable, FlatElement[BitVecLiteral]], s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = {
+    cmd.data match {
       case localAssign: LocalAssign =>
         localAssign.rhs match {
           case memoryLoad: MemoryLoad =>
-            s + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(memoryLoad))
+            s + (RegisterVariableWrapper(localAssign.lhs, Set(getUses(localAssign.lhs, cmd, reachingDefs).get)) -> FlatEl(memoryLoad))
           case binaryExpr: BinaryExpr =>
             if (evaluateExpression(binaryExpr.arg1, constants).isEmpty) { // approximates Base + Offset
-              s + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(binaryExpr))
+              s + (RegisterVariableWrapper(localAssign.lhs, Set(getUses(localAssign.lhs, cmd, reachingDefs).get)) -> FlatEl(binaryExpr))
             } else {
               s
             }
@@ -49,7 +49,7 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
    */
   def localTransfer(n: CfgNode, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = n match {
     case cmd: CfgCommandNode =>
-      eval(cmd.data, constantProp(n), s)
+      eval(cmd, constantProp(n), s)
     case _ => s // ignore other kinds of nodes
   }
 
@@ -61,7 +61,8 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
 class RegionAccessesAnalysisSolver(
                          cfg: ProgramCfg,
                          constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
-                       ) extends RegionAccessesAnalysis(cfg, constantProp)
+                         reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])],
+                       ) extends RegionAccessesAnalysis(cfg, constantProp, reachingDefs)
   with InterproceduralForwardDependencies
   with Analysis[Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]]
   with SimpleWorklistFixpointSolver[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] {
