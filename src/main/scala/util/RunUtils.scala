@@ -60,7 +60,7 @@ case class StaticAnalysisContext(
     steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-    reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]
+    reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]
 )
 
 /** Results of the main program execution.
@@ -318,7 +318,7 @@ object IRTransform {
      cfg: ProgramCfg,
      pointsTos: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
      regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-     reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])],
+     reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
      IRProgram: Program
    ): Boolean = {
     var modified: Boolean = false
@@ -373,7 +373,7 @@ object IRTransform {
 
     def resolveAddresses(variable: Variable, n: CfgNode): mutable.Set[String] = {
       val names = mutable.Set[String]()
-      val variableWrapper = RegisterVariableWrapper(variable, getDefs(variable, n, reachingDefs))
+      val variableWrapper = RegisterVariableWrapper(variable, getUse(variable, n.asInstanceOf[CfgCommandNode].data, reachingDefs))
       pointsTos.get(variableWrapper) match {
         case Some(value) =>
           value.map {
@@ -549,11 +549,16 @@ object StaticAnalysis {
       writeToFile(printAnalysisResults(IRProgram, cfg, constPropResult), s"${s}_constprop$iteration.txt")
     )
 
-    val reachingDefinitionsAnalysisSolver = ReachingDefinitionsAnalysisSolver(cfg)
+    val reachingDefinitionsAnalysisSolver = ReachingDefinitionsAnalysisSolver(IRProgram)
     val reachingDefinitionsAnalysisResults = reachingDefinitionsAnalysisSolver.analyze()
 
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(reachingDefinitionsAnalysisResults, true), Output.dotIder), s"${s}_reachingDefinitions$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, reachingDefinitionsAnalysisResults, iteration), s"${s}_reachingDefinitions$iteration.txt"))
+    config.analysisDotPath.foreach(s => {
+      writeToFile(
+        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> reachingDefinitionsAnalysisResults(b).toString).toMap),
+        s"${s}_reachingDefinitions$iteration.dot"
+      )
+    })
+
 
     Logger.info("[!] Running RegToMemAnalysisSolver")
     val regionAccessesAnalysisSolver = RegionAccessesAnalysisSolver(cfg, constPropResult, reachingDefinitionsAnalysisResults)

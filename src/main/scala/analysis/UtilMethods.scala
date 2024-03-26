@@ -54,7 +54,7 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
   }
 }
 
-def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CfgNode, reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[BitVecLiteral] = {
+def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[BitVecLiteral] = {
   Logger.debug(s"evaluateExpression: $exp")
 
   def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
@@ -106,18 +106,22 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
       val result = evaluateExpressionWithSSA(e.body, constantPropResult, n, reachingDefs)
       applySingle(BitVectorEval.boogie_extract(e.end, e.start, _: BitVecLiteral), result)
     case variable: Variable =>
-      constantPropResult(RegisterWrapperEqualSets(variable, getDefs(variable, n, reachingDefs)))
+      println("Variable: " + variable)
+      println("node: " + n)
+      println("reachingDefs: " + reachingDefs(n))
+      println("getUse: " + getUse(variable, n, reachingDefs))
+      constantPropResult(RegisterWrapperEqualSets(variable, getUse(variable, n, reachingDefs)))
     case b: BitVecLiteral => Set(b)
     case _ => throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
   }
 }
 
-def getUses(variable: Variable, node: CfgNode, reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Option[LocalAssign] = {
+def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[LocalAssign] = {
   val (in, _) = reachingDefs(node)
   in(variable)
 }
 
-def getDefs(variable: Variable, node: CfgNode, reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[LocalAssign] = {
+def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[LocalAssign] = {
   val (_, out) = reachingDefs(node)
   out(variable)
 }

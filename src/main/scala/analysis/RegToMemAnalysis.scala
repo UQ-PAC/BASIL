@@ -14,7 +14,7 @@ import scala.collection.immutable
  *
  * Both in which constant propagation mark as TOP which is not useful.
  */
-trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]], reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])]) {
+trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]], reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]) {
 
   val mapLattice: MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]] = MapLattice(FlatLattice[_root_.ir.Expr]())
 
@@ -31,10 +31,12 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
       case localAssign: LocalAssign =>
         localAssign.rhs match {
           case memoryLoad: MemoryLoad =>
-            s + (RegisterVariableWrapper(localAssign.lhs, Set(getUses(localAssign.lhs, cmd, reachingDefs).get)) -> FlatEl(memoryLoad))
+            s + (RegisterVariableWrapper(localAssign.lhs, getDefinition(localAssign.lhs, cmd.data, reachingDefs)) -> FlatEl(memoryLoad))
           case binaryExpr: BinaryExpr =>
             if (evaluateExpression(binaryExpr.arg1, constants).isEmpty) { // approximates Base + Offset
-              s + (RegisterVariableWrapper(localAssign.lhs, Set(getUses(localAssign.lhs, cmd, reachingDefs).get)) -> FlatEl(binaryExpr))
+              println(s"Approximating ${localAssign} in $binaryExpr")
+              println(s"Reaching defs: ${reachingDefs(cmd.data)}")
+              s + (RegisterVariableWrapper(localAssign.lhs, getDefinition(localAssign.lhs, cmd.data, reachingDefs)) -> FlatEl(binaryExpr))
             } else {
               s
             }
@@ -61,7 +63,7 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
 class RegionAccessesAnalysisSolver(
                          cfg: ProgramCfg,
                          constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
-                         reachingDefs: Map[CfgNode, (Map[Variable, Option[LocalAssign]], Map[Variable, Set[LocalAssign]])],
+                         reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
                        ) extends RegionAccessesAnalysis(cfg, constantProp, reachingDefs)
   with InterproceduralForwardDependencies
   with Analysis[Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]]
