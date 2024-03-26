@@ -118,12 +118,12 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
 
 def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[LocalAssign] = {
   val (in, _) = reachingDefs(node)
-  in(variable)
+  in.getOrElse(variable, Set())
 }
 
 def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[LocalAssign] = {
   val (_, out) = reachingDefs(node)
-  out(variable)
+  out.getOrElse(variable, Set())
 }
 
 def unwrapExpr(expr: Expr): Set[Expr] = {

@@ -414,7 +414,9 @@ object IRTransform {
               val newBlocks = ArrayBuffer[Block]()
               // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
               for (t <- targets) {
-                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
+                println(targets)
+                // TODO: getOrElse 0 is a hack may not be correct
+                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.getOrElse(0), 64)))
                 val newLabel: String = block.label + t.name
                 val directCall = DirectCall(t, indirectCall.returnTarget)
                 directCall.parent = indirectCall.parent
@@ -568,11 +570,8 @@ object StaticAnalysis {
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, regionAccessesAnalysisResults, iteration), s"${s}_RegTo$iteration.txt"))
 
     Logger.info("[!] Running Constant Propagation with SSA")
-    val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(cfg, reachingDefinitionsAnalysisResults)
+    val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(IRProgram, reachingDefinitionsAnalysisResults)
     val constPropResultWithSSA = constPropSolverWithSSA.analyze()
-
-    config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(constPropResultWithSSA, true), Output.dotIder), s"${s}_constpropWithSSA$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, constPropResultWithSSA, iteration), s"${s}_constpropWithSSA$iteration.txt"))
 
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(cfg, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults)
@@ -602,7 +601,7 @@ object StaticAnalysis {
     mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, mraSolver.procedureToSharedRegions)
 
     Logger.info("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(cfg, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
+    val steensgaardSolver = InterprocSteensgaardAnalysis(IRProgram, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
     steensgaardSolver.analyze()
     val steensgaardResults = steensgaardSolver.pointsTo()
     val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
@@ -624,7 +623,8 @@ object StaticAnalysis {
     val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
 
     Logger.info("[!] Running Parameter Analysis")
-    val paramResults = ParamAnalysis(IRProgram).analyze()
+    //val paramResults = ParamAnalysis(IRProgram).analyze()
+    val paramResults = Map[Procedure, Set[Variable]]()
 
     StaticAnalysisContext(
       cfg = cfg,
