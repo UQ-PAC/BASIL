@@ -22,7 +22,7 @@ trait Analysis[+R]:
 
 /** Base class for value analysis with simple (non-lifted) lattice.
   */
-trait ConstantPropagation(val cfg: ProgramCfg) {
+trait ConstantPropagation(val program: Program) {
   /** The lattice of abstract states.
     */
 
@@ -75,10 +75,10 @@ trait ConstantPropagation(val cfg: ProgramCfg) {
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] =
+  def localTransfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] =
     n match
-      case r: CfgCommandNode =>
-        r.data match
+      case r: Command =>
+        r match
           // assignments
           case la: LocalAssign =>
             s + (la.lhs -> eval(la.rhs, s))
@@ -88,19 +88,19 @@ trait ConstantPropagation(val cfg: ProgramCfg) {
 
   /** The analysis lattice.
     */
-  val lattice: MapLattice[CfgNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]] = MapLattice(statelattice)
+  val lattice: MapLattice[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]] = MapLattice(statelattice)
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
+  val domain: Set[CFGPosition] = Set.empty ++ program
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transfer(n: CfgNode, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = localTransfer(n, s)
+  def transfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = localTransfer(n, s)
 }
 
-class ConstantPropagationSolver(cfg: ProgramCfg) extends ConstantPropagation(cfg)
-    with SimplePushDownWorklistFixpointSolver[CfgNode, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
-    with IntraproceduralForwardDependencies
-    with Analysis[Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]]
+class ConstantPropagationSolver(program: Program) extends ConstantPropagation(program)
+    with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
+    with IRIntraproceduralForwardDependencies
+    with Analysis[Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]]
 
 /** Base class for value analysis with simple (non-lifted) lattice.
  */

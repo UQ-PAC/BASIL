@@ -104,12 +104,15 @@ class InterprocSteensgaardAnalysis(
       case variable: Variable =>
         val ctx = getUse(variable, n, reachingDefs)
         for (i <- ctx) {
+          if (i != n) { // handles loops (ie. R19 = R19 + 1) %00000662 in jumptable2
             val regions = i.rhs match {
               case loadL: MemoryLoad =>
                 exprToRegion(loadL.index, i)
               case _: BitVecLiteral =>
                 Set.empty[MemoryRegion]
               case _ =>
+                println(s"Unknown expression: ${i}")
+                println(ctx)
                 exprToRegion(i.rhs, i)
             }
             val results = evaluateExpressionWithSSA(binExpr.arg2, constantProp(n), n, reachingDefs)
@@ -132,6 +135,7 @@ class InterprocSteensgaardAnalysis(
               }
             }
           }
+        }
         evaluateExpressionWithSSA(binExpr, constantProp(n), n, reachingDefs).foreach { b =>
           val region = mmm.findDataObject(b.value)
           reducedRegions = reducedRegions ++ region
@@ -153,7 +157,7 @@ class InterprocSteensgaardAnalysis(
   def exprToRegion(expr: Expr, n: Command): Set[MemoryRegion] = {
     var res = Set[MemoryRegion]()
     mmm.popContext()
-    mmm.pushContext(n.parent.parent.name)
+    mmm.pushContext(IRWalk.procedure(n).name)
     expr match { // TODO: Stack detection here should be done in a better way or just merged with data
       case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
         evaluateExpressionWithSSA(binOp.arg2, constantProp(n), n, reachingDefs).foreach { b =>

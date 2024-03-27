@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.*
-import ir.{BitVecLiteral, Procedure}
+import ir.*
 import util.Logger
 
 import scala.collection.mutable
@@ -96,26 +96,27 @@ class MemoryModelMap {
     DataRegion(name, BitVecLiteral(tableAddress, 64))
   }
 
-  def convertMemoryRegions(memoryRegions: Map[CfgNode, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
+  def convertMemoryRegions(memoryRegions: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
     val externalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(name, BitVecLiteral(offset, 64), globalOffsets))
 
     // we should collect all data regions otherwise the ordering might be wrong
     var dataRgns: Set[DataRegion] = Set.empty
     // get all function exit node
-    val exitNodes = memoryRegions.keys.collect { case e: CfgFunctionExitNode => e }
+    val exitNodes = memoryRegions.keys.collect { case p: CFGPosition if IRWalk.procedure(p).end == p => p }
+
     exitNodes.foreach(exitNode =>
       memoryRegions(exitNode) match {
         case Lift(node) =>
-          if (procedureToSharedRegions.contains(exitNode.data)) {
-            val sharedRegions = procedureToSharedRegions(exitNode.data)
-            sharedStacks(exitNode.data.name) = sharedRegions.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
+          if (procedureToSharedRegions.contains(IRWalk.procedure(exitNode))) {
+            val sharedRegions = procedureToSharedRegions(IRWalk.procedure(exitNode))
+            sharedStacks(IRWalk.procedure(exitNode).name) = sharedRegions.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
           }
           // for each function exit node we get the memory region and add it to the mapping
           val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
           dataRgns = dataRgns ++ node.collect { case r: DataRegion => r }
 
-          localStacks(exitNode.data.name) = stackRgns
+          localStacks(IRWalk.procedure(exitNode).name) = stackRgns
 
         case LiftedBottom =>
       }

@@ -10,15 +10,13 @@ import scala.collection.immutable
  * This helps to identify the set of variables that are read from memory before they have been initialised.
  * This could be used on callee side to identify what parameters where passed to the function.
  */
-trait RNAAnalysis(cfg: ProgramCfg) {
+trait RNAAnalysis(program: Program) {
 
   val powersetLattice: PowersetLattice[Variable] = PowersetLattice()
 
-  val lattice: MapLattice[CfgNode, Set[Variable], PowersetLattice[Variable]] = MapLattice(powersetLattice)
+  val lattice: MapLattice[CFGPosition, Set[Variable], PowersetLattice[Variable]] = MapLattice(powersetLattice)
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
-
-  val first: Set[CfgNode] = Set(cfg.startNode)
+  val domain: Set[CFGPosition] = Set.empty ++ program
 
   private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
@@ -50,21 +48,21 @@ trait RNAAnalysis(cfg: ProgramCfg) {
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: Set[Variable]): Set[Variable] = n match {
-    case cmd: CfgCommandNode =>
-      eval(cmd.data, s)
+  def localTransfer(n: CFGPosition, s: Set[Variable]): Set[Variable] = n match {
+    case cmd: Command =>
+      eval(cmd, s)
     case _ => s // ignore other kinds of nodes
   }
 
   /** Transfer function for state lattice elements.
       */
-  def transfer(n: CfgNode, s: Set[Variable]): Set[Variable] = localTransfer(n, s)
+  def transfer(n: CFGPosition, s: Set[Variable]): Set[Variable] = localTransfer(n, s)
 }
 
 class RNAAnalysisSolver(
-    cfg: ProgramCfg,
-) extends RNAAnalysis(cfg)
-    with IntraproceduralBackwardDependencies
-    with Analysis[Map[CfgNode, Set[Variable]]]
-    with SimpleWorklistFixpointSolver[CfgNode, Set[Variable], PowersetLattice[Variable]] {
+    program: Program,
+) extends RNAAnalysis(program)
+    with IRIntraproceduralBackwardDependencies
+    with Analysis[Map[CFGPosition, Set[Variable]]]
+    with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]] {
 }

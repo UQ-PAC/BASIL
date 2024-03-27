@@ -29,13 +29,13 @@ case class LiteralValue(expr: BitVecLiteral) extends Value {
   override def toString: String = "Literal(" + expr + ")"
 }
 
-trait ValueSetAnalysis(cfg: ProgramCfg,
+trait ValueSetAnalysis(program: Program,
                         globals: Map[BigInt, String],
                         externalFunctions: Map[BigInt, String],
                         globalOffsets: Map[BigInt, BigInt],
                         subroutines: Map[BigInt, String],
                         mmm: MemoryModelMap,
-                        constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]) {
+                        constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) {
 
   val powersetLattice: PowersetLattice[Value] = PowersetLattice()
 
@@ -43,11 +43,11 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   val liftedLattice: LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type] = LiftLattice(mapLattice)
 
-  val lattice: MapLattice[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]], LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type]] = MapLattice(liftedLattice)
+  val lattice: MapLattice[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]], LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type]] = MapLattice(liftedLattice)
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
+  val domain: Set[CFGPosition] = Set.empty ++ program
 
-  val first: Set[CfgNode] = Set(cfg.startNode)
+  val first: Set[CFGPosition] = Set.empty ++ program
 
   private val stackPointer = Register("R31", BitVecType(64))
   private val linkRegister = Register("R30", BitVecType(64))
@@ -69,7 +69,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
     }
   }
 
-  def exprToRegion(expr: Expr, n: CfgNode): Option[MemoryRegion] = {
+  def exprToRegion(expr: Expr, n: CFGPosition): Option[MemoryRegion] = {
     expr match {
       case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
         evaluateExpression(binOp.arg2, constantProp(n)) match {
@@ -100,7 +100,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   /** Default implementation of eval.
     */
-  def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]], n: CfgNode): Map[Variable | MemoryRegion, Set[Value]] = {
+  def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]], n: CFGPosition): Map[Variable | MemoryRegion, Set[Value]] = {
     Logger.debug(s"eval: $cmd")
     Logger.debug(s"state: $s")
     Logger.debug(s"node: $n")
@@ -168,40 +168,41 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CfgNode, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = n match {
-    case entry: CfgFunctionEntryNode =>
-      mmm.pushContext(entry.data.name)
+  def localTransfer(n: CFGPosition, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] =
+    if (IRWalk.procedure(n) == n) {
+      mmm.pushContext(n.asInstanceOf[Procedure].name)
       s
-    case _: CfgFunctionExitNode =>
+    } else if (IRWalk.procedure(n).end == n) {
       mmm.popContext()
       s
-    case cmd: CfgCommandNode =>
-      eval(cmd.data, s, n)
-    case _ => s // ignore other kinds of nodes
-  }
+    } else n match
+      case command: Command =>
+        eval(command, s, n)
+      case _ =>
+        s
 
   /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def transferUnlifted(n: CfgNode, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = localTransfer(n, s)
+  def transferUnlifted(n: CFGPosition, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = localTransfer(n, s)
 }
 
 class ValueSetAnalysisSolver(
-    cfg: ProgramCfg,
+    program: Program,
     globals: Map[BigInt, String],
     externalFunctions: Map[BigInt, String],
     globalOffsets: Map[BigInt, BigInt],
     subroutines: Map[BigInt, String],
     mmm: MemoryModelMap,
-    constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
-) extends ValueSetAnalysis(cfg, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
-    with InterproceduralForwardDependencies
-    with Analysis[Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
-    with WorklistFixpointSolverWithReachability[CfgNode, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]] {
+    constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+) extends ValueSetAnalysis(program, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
+    with IRInterproceduralForwardDependencies
+    with Analysis[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
+    with WorklistFixpointSolverWithReachability[CFGPosition, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]] {
 
-  override def funsub(n: CfgNode, x: Map[CfgNode, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]): LiftedElement[Map[Variable | MemoryRegion, Set[Value]]] = {
+  override def funsub(n: CFGPosition, x: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]): LiftedElement[Map[Variable | MemoryRegion, Set[Value]]] = {
     n match {
       // function entry nodes are always reachable as this is intraprocedural
-      case _: CfgFunctionEntryNode => liftedLattice.lift(mapLattice.bottom)
+      case _: Procedure => liftedLattice.lift(mapLattice.bottom)
       // all other nodes are processed with join+transfer
       case _ => super.funsub(n, x)
     }

@@ -14,7 +14,7 @@ import scala.collection.immutable
  *
  * Both in which constant propagation mark as TOP which is not useful.
  */
-trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]], reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]) {
+trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]) {
 
   val mapLattice: MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]] = MapLattice(FlatLattice[_root_.ir.Expr]())
 
@@ -51,7 +51,7 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
    */
   def localTransfer(n: CfgNode, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = n match {
     case cmd: CfgCommandNode =>
-      eval(cmd, constantProp(n), s)
+      eval(cmd, constantProp(cmd.data), s)
     case _ => s // ignore other kinds of nodes
   }
 
@@ -62,7 +62,7 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
 
 class RegionAccessesAnalysisSolver(
                          cfg: ProgramCfg,
-                         constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
+                         constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
                          reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
                        ) extends RegionAccessesAnalysis(cfg, constantProp, reachingDefs)
   with InterproceduralForwardDependencies
