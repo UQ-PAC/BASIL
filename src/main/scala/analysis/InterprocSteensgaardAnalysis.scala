@@ -283,10 +283,10 @@ class InterprocSteensgaardAnalysis(
           val X1_star = exprToRegion(memoryAssign.rhs.index, cmd)
           val X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(cmd), cmd, reachingDefs)
           var possibleRegions = Set[MemoryRegion]()
-          if (X2.isEmpty) {
-            Logger.debug("Maybe a region: " + exprToRegion(memoryAssign.rhs.value, cmd))
-            possibleRegions = exprToRegion(memoryAssign.rhs.value, cmd)
-          }
+          Logger.debug("Maybe a region: " + exprToRegion(memoryAssign.rhs.value, cmd))
+          // TODO: This is risky as it tries to coerce every value to a region (needed for functionpointer example)
+          possibleRegions = exprToRegion(memoryAssign.rhs.value, cmd)
+
           Logger.debug("Memory assign: " + memoryAssign)
           Logger.debug("X2 is: " + X2)
           Logger.debug("PossibleRegions instead of X2 " + possibleRegions)
