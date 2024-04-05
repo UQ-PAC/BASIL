@@ -195,7 +195,7 @@ trait MemoryRegionAnalysis(val program: Program,
 //          }
           if (directCall.target.name == "malloc") {
             evaluateExpression(mallocVariable, constantProp(n)) match {
-              case Some(b: BitVecLiteral) => regionLattice.lub(s, Set(HeapRegion(nextMallocCount(), b)))
+              case Some(b: BitVecLiteral) => regionLattice.lub(s, Set(HeapRegion(nextMallocCount(), b, IRWalk.procedure(n))))
               case None => s
             }
           } else {

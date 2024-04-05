@@ -234,7 +234,7 @@ class InterprocSteensgaardAnalysis(
         case directCall: DirectCall =>
           // X = alloc P:  [[X]] = ↑[[alloc-i]]
           if (directCall.target.name == "malloc") {
-            val alloc = HeapRegion(nextMallocCount(), BitVecLiteral(BigInt(0), 0))
+            val alloc = HeapRegion(nextMallocCount(), BitVecLiteral(BigInt(0), 0), IRWalk.procedure(cmd))
             unify(IdentifierVariable(RegisterVariableWrapper(mallocVariable, getUse(mallocVariable, cmd, reachingDefs))), PointerRef(AllocVariable(alloc)))
           }
 

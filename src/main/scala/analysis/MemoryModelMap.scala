@@ -96,6 +96,48 @@ class MemoryModelMap {
     DataRegion(name, BitVecLiteral(tableAddress, 64))
   }
 
+  /**
+   * Get the mapping of procedures to memory regions
+   * Gets the regions from each CFGPosition and maps them to the corresponding procedure based on the
+   * parent field of the StackRegion
+   * No shared regions here
+   * @param memoryRegions
+   * @return
+   */
+  def getProceduresToRegionsMapping(memoryRegions: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]]): mutable.Map[Procedure, mutable.Set[MemoryRegion]] = {
+    val procedureToRegions = mutable.Map[Procedure, mutable.Set[MemoryRegion]]()
+    for ((position, regions) <- memoryRegions) {
+      regions match {
+        case Lift(node) =>
+          for (region <- node) {
+            region match {
+              case stackRegion: StackRegion =>
+                val procedure = stackRegion.parent
+                if (!procedureToRegions.contains(procedure)) {
+                  procedureToRegions(procedure) = mutable.Set()
+                }
+                procedureToRegions(procedure) += stackRegion
+              case heapRegion: HeapRegion =>
+                val procedure = heapRegion.parent
+                if (!procedureToRegions.contains(procedure)) {
+                  procedureToRegions(procedure) = mutable.Set()
+                }
+                procedureToRegions(procedure) += heapRegion
+              case _ =>
+            }
+          }
+        case LiftedBottom =>
+      }
+    }
+    // make sure all procedures have results otherwise make them empty
+    memoryRegions.keys.collect {case procedure: Procedure => procedure}.foreach(procedure => {
+      if (!procedureToRegions.contains(procedure)) {
+        procedureToRegions(procedure) = mutable.Set()
+      }
+    })
+    procedureToRegions
+  }
+
   def convertMemoryRegions(memoryRegions: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
     val externalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(name, BitVecLiteral(offset, 64), globalOffsets))
@@ -103,23 +145,19 @@ class MemoryModelMap {
     // we should collect all data regions otherwise the ordering might be wrong
     var dataRgns: Set[DataRegion] = Set.empty
     // get all function exit node
-    val exitNodes = memoryRegions.keys.collect { case p: CFGPosition if IRWalk.procedure(p).end == p => p }
+    val regionsPerProcedure = getProceduresToRegionsMapping(memoryRegions)
+    val exitNodes = regionsPerProcedure.keys.collect { case procedure: Procedure => procedure }
 
     exitNodes.foreach(exitNode =>
-      memoryRegions(exitNode) match {
-        case Lift(node) =>
-          if (procedureToSharedRegions.contains(IRWalk.procedure(exitNode))) {
-            val sharedRegions = procedureToSharedRegions(IRWalk.procedure(exitNode))
-            sharedStacks(IRWalk.procedure(exitNode).name) = sharedRegions.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
-          }
-          // for each function exit node we get the memory region and add it to the mapping
-          val stackRgns = node.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
-          dataRgns = dataRgns ++ node.collect { case r: DataRegion => r }
-
-          localStacks(IRWalk.procedure(exitNode).name) = stackRgns
-
-        case LiftedBottom =>
+      if (procedureToSharedRegions.contains(exitNode)) {
+        val sharedRegions = procedureToSharedRegions(exitNode)
+        sharedStacks(exitNode.name) = sharedRegions.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
       }
+      // for each function exit node we get the memory region and add it to the mapping
+      val stackRgns = regionsPerProcedure(exitNode).collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
+      dataRgns = dataRgns ++ regionsPerProcedure(exitNode).collect { case r: DataRegion => r }
+
+      localStacks(exitNode.name) = stackRgns
     )
     // add externalFunctionRgn to dataRgns and sort by value
     val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.value)
@@ -226,7 +264,7 @@ case class StackRegion(override val regionIdentifier: String, start: BitVecLiter
   override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name})"
 }
 
-case class HeapRegion(override val regionIdentifier: String, size: BitVecLiteral) extends MemoryRegion {
+case class HeapRegion(override val regionIdentifier: String, size: BitVecLiteral, parent: Procedure) extends MemoryRegion {
   override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 
