@@ -1,18 +1,19 @@
 package util
 
-import java.io.{File, PrintWriter, FileInputStream, BufferedWriter, FileWriter, IOException}
+import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
 import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
 import spray.json.*
 import gtirb.*
+
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import java.io.{File, PrintWriter}
 import java.io.{BufferedWriter, FileWriter, IOException}
 import scala.jdk.CollectionConverters.*
 import analysis.solvers.*
-import analysis.*
+import analysis.{CfgCommandNode, *}
 import cfg_visualiser.Output
 import bap.*
 import ir.*
@@ -25,10 +26,10 @@ import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
 import translating.*
 import util.Logger
+
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
-import analysis.CfgCommandNode
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -614,17 +615,37 @@ object StaticAnalysis {
     Logger.info("[!] Running Parameter Analysis")
     val paramResults = ParamAnalysis(IRProgram).analyze()
 
-
-    Logger.info("[!] Running Reaching Defs")
-    val reachingDefs = PrePass(IRProgram, newCPResult, globals, globalAddresses, globalOffsets).analyze()
+    Logger.info("[!] Running PointerTypeAnalysis")
+    val pointerTypeResults = PointerTypeAnalysis(IRProgram).analyze()
+    println("HEllow")
+    println(pointerTypeResults)
     config.analysisDotPath.foreach(s =>
-      writeToFile(toDot(IRProgram, reachingDefs.foldLeft(Map():Map[CFGPosition, String]){
+      writeToFile(toDot(IRProgram, pointerTypeResults.foldLeft(Map(): Map[CFGPosition, String]) {
+        (m, t) =>
+          m + (t._1 -> t._2.toString)
+      }), s"${s}_pointerType.dot")
+    )
+
+
+//    Logger.info("[!] Running Reaching Defs")
+//    val reachingDefs = PrePass(IRProgram, newCPResult, globals, globalAddresses, globalOffsets).analyze()
+//    config.analysisDotPath.foreach(s =>
+//      writeToFile(toDot(IRProgram, reachingDefs.foldLeft(Map():Map[CFGPosition, String]){
+//        (m, t) =>
+//          m + (t._1 -> t._2.toString)
+//      }), s"${s}_reaching.dot")
+//    )
+
+//    LocalDSA(IRProgram, IRProgram.mainProcedure, newCPResult, reachingDefs).analyze()
+
+    Logger.info("[!] Running Symbolic Access Analysis")
+    val symResults: Map[CFGPosition, Map[SymbolicAccess, TwoElement]] = SymbolicAccessAnalysis(IRProgram, newCPResult).analyze()
+    config.analysisDotPath.foreach(s =>
+      writeToFile(toDot(IRProgram, symResults.foldLeft(Map():Map[CFGPosition, String]){
         (m, t) =>
           m + (t._1 -> t._2.toString)
       }), s"${s}_reaching.dot")
     )
-
-    LocalDSA(IRProgram, IRProgram.mainProcedure, newCPResult, reachingDefs).analyze()
 
     StaticAnalysisContext(
       cfg = cfg,

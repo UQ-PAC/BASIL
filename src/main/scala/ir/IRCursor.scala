@@ -253,7 +253,7 @@ def toDot[T <: CFGPosition](
       case s        => s.toString
     }
     if (labels.contains(node)) {
-      text += "\n" ++ labels(node)
+      text = labels(node) ++ "\n" ++ text
     }
     text
   }

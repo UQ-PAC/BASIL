@@ -74,6 +74,19 @@ class Graph(val procedure: Procedure) {
     getVariablePointee(variable).unify(cell)
   }
 
+  def validateGraph(): Unit = {
+    pointersToCells.values.toSet.union(pointsToRelations.keys.toSet.union(pointsToRelations.values.toSet)).foreach(validateCell)
+  }
+
+  def validateCell(cell: Cell): Unit = {
+    assert(cell.node.isDefined)
+    val node = cell.node.get
+    println(cell)
+    assert(nodes.contains(node))
+    assert(node.cells.contains(cell.offset))
+    assert(node.cells(cell.offset).equals(cell))
+  }
+
   def collapsePointer(pointer: Variable): Unit = {
     val cell = makeCell()
     cell.node.get.collapseNode()
@@ -111,8 +124,8 @@ class Node (var memoryRegion2: Option[MemoryRegion2], val owner: Graph) {
     case Some(value) => // TODO get sizes of data regions and stack regions
       value match
         case DataRegion2(regionIdentifier, start) => 8
-        case HeapRegion2(regionIdentifier, size) => size.value
-        case StackRegion2(regionIdentifier, parent, size) => size.value
+        case HeapRegion2(regionIdentifier, proc, size) => size.value
+        case StackRegion2(regionIdentifier, proc, size) => size.value
         case _ => 8
     case None => 8
 
@@ -161,12 +174,14 @@ class Node (var memoryRegion2: Option[MemoryRegion2], val owner: Graph) {
     owner.pointsToRelations =  owner.pointsToRelations.filter(
       (key, value) => !(key.equals(this) && value.equals(this))
     )
+
+
   }
   def collapseNode(): Unit = {
     val cell = owner.makeCell(None)
     cells.foreach(
       (offset, c) =>
-        cell.unify(c)
+        cell.unify(owner.getCellPointee(c))
         owner.pointTo(c, None)
     )
     size = 1
@@ -179,28 +194,32 @@ class Node (var memoryRegion2: Option[MemoryRegion2], val owner: Graph) {
     redirectEdges(node, offset)
   }
 
-  def unify(node: Node, offset: BigInt): Unit = {
+  def unify(node: Node, offset: BigInt = 0): Unit = {
+//    owner.validateGraph()
+    println(node)
+    println(this)
     this.memoryRegion2 = node.memoryRegion2
     val updatedOffset = offsetHelper(offset, 0)
     if (isCollapsed && !node.isCollapsed) {
-      collapse(node, updatedOffset)
+      return collapse(node, updatedOffset)
     } else if (!isCollapsed && !node.isCollapsed) {
       if (isSeq && !node.isSeq) {
-        if updatedOffset == 0 then node.unify(this, 0) else collapse(node, updatedOffset)
+        if updatedOffset == 0 then node.unify(this) else return collapse(node, updatedOffset)
       } else if (!isSeq && node.isSeq) {
         if size % node.size == 0 then
           flags.seq = true
-          unify(node, offset)
+          return unify(node, offset)
         else if size + updatedOffset > node.size then
            return collapse(node, updatedOffset)
       } else if (isSeq && node.isSeq) {
-        if size < node.size then node.unify(this, 0)
+        if size < node.size then return node.unify(this, 0)
         else if node.size % size != 0 || offsetHelper(offset, 0) > 0 then return collapse(node, updatedOffset)
       }
     }
 
     if this.equals(node) && updatedOffset > 0 then return node.collapseNode()
     redirectEdges(node, updatedOffset)
+//    owner.validateGraph()
   }
 
 
@@ -248,26 +267,26 @@ class NodeFlags {
 /**
  * A memory cell (or a field). An offset into a memory object.
  */
-class Cell(val node: Option[Node] = None, val offset: BigInt = 0) {
+class Cell(var node: Option[Node] = None, val offset: BigInt = 0) {
 
 //  private var pointsTo: Option[Cell] = None
   private def n = node.get
 
   override def toString: String = s"Cell($node, $offset)"
 
-  def this(cell: Cell) = {
-    this(cell.node, cell.offset)
-//    pointsTo = cell.pointsTo
-  }
-
-  def this(cell: Cell, offset: BigInt) = {
-    this(cell.node, cell.offset + offset)
-//    pointsTo = cell.pointsTo
-  }
-
-  def this(node: Node, offset : BigInt) = {
-    this(Some(node), offset)
-  }
+//  def this(cell: Cell) = {
+//    this(cell.node, cell.offset)
+////    pointsTo = cell.pointsTo
+//  }
+//
+//  def this(cell: Cell, offset: BigInt) = {
+//    this(cell.node, cell.offset + offset)
+////    pointsTo = cell.pointsTo
+//  }
+//
+//  def this(node: Node, offset : BigInt) = {
+//    this(Some(node), offset)
+//  }
 
 
   override def equals(obj: Any): Boolean = {
@@ -282,14 +301,9 @@ class Cell(val node: Option[Node] = None, val offset: BigInt = 0) {
     else if (cell.offset < offset) then
       cell.n.unify(n, offset-cell.offset)
     else
-      n.unify(cell.n, 0)
+      n.unify(cell.n)
   }
 
-//  def pointTo(cell: Option[Cell] = None): Unit = {
-//    pointsTo = cell
-//  }
-//
-//  def pointee : Option[Cell] = pointsTo
 }
 
 /**

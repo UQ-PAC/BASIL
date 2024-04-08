@@ -61,23 +61,23 @@ class LocalDSA(val program: Program, val procedure: Procedure, constantProp: Map
             val node = graph.makeNode(Some(symbolicAccesses(n)(variable).head.symbolicBase))
             val cell = node.cell()
             graph.unify(variable, cell)
-          case BinaryExpr(op, arg1: Variable, arg2) if symbolicAccesses(n).contains(arg1) && evaluateExpression(arg2, constantProp(n)).isDefined => // what TODO if can't evaluate arg2
-            // variable = arg1 + (c = 0 * m) + arg2
-            val offset: BigInt = evaluateExpression(arg2, constantProp(n)).get.value
-            visitBinaryLocalAssign(variable, op, arg1, offset)
-          case vari: Variable if symbolicAccesses(n).contains(vari) => // TODO actually check if q is a pointer
-            // p = q
-            val cell = graph.getVariablePointee(vari)
-            val node = cell.node.get
-            if node.isCollapsed then
-              graph.collapsePointer(variable) // TODO ensure passing right memory region here
-            else if !node.isSeq then
-              val size = cell.offset + 8 // assume all sizes are the same for now since we don't know sizes of everything
-              node.updateSize(size)
-              graph.unify(variable, cell)
-            else
-              node.setSeq()
-              graph.unify(variable, cell) // c is zero here
+//          case BinaryExpr(op, arg1: Variable, arg2) if symbolicAccesses(n).contains(arg1) && evaluateExpression(arg2, constantProp(n)).isDefined => // what TODO if can't evaluate arg2
+//            // variable = arg1 + (c = 0 * m) + arg2
+//            val offset: BigInt = evaluateExpression(arg2, constantProp(n)).get.value
+//            visitBinaryLocalAssign(variable, op, arg1, offset)
+//          case vari: Variable if symbolicAccesses(n).contains(vari) => // TODO actually check if q is a pointer
+//            // p = q
+//            val cell = graph.getVariablePointee(vari)
+//            val node = cell.node.get
+//            if node.isCollapsed then
+//              graph.collapsePointer(variable) // TODO ensure passing right memory region here
+//            else if !node.isSeq then
+//              val size = cell.offset + 8 // assume all sizes are the same for now since we don't know sizes of everything
+//              node.updateSize(size)
+//              graph.unify(variable, cell)
+//            else
+//              node.setSeq()
+//              graph.unify(variable, cell) // c is zero here
           case MemoryLoad(mem, index, endian, size) =>
               // q = *p
             index match
