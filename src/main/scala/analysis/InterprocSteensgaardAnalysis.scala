@@ -102,6 +102,13 @@ class InterprocSteensgaardAnalysis(
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
       case variable: Variable =>
+        evaluateExpressionWithSSA(binExpr, constantProp(n), n, reachingDefs).foreach { b =>
+          val region = mmm.findDataObject(b.value)
+          reducedRegions = reducedRegions ++ region
+        }
+        if (reducedRegions.nonEmpty) {
+          return reducedRegions
+        }
         val ctx = getUse(variable, n, reachingDefs)
         for (i <- ctx) {
           if (i != n) { // handles loops (ie. R19 = R19 + 1) %00000662 in jumptable2
@@ -135,10 +142,6 @@ class InterprocSteensgaardAnalysis(
               }
             }
           }
-        }
-        evaluateExpressionWithSSA(binExpr, constantProp(n), n, reachingDefs).foreach { b =>
-          val region = mmm.findDataObject(b.value)
-          reducedRegions = reducedRegions ++ region
         }
       case _ =>
     }
@@ -282,10 +285,8 @@ class InterprocSteensgaardAnalysis(
           // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
           val X1_star = exprToRegion(memoryAssign.rhs.index, cmd)
           val X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(cmd), cmd, reachingDefs)
-          var possibleRegions = Set[MemoryRegion]()
-          Logger.debug("Maybe a region: " + exprToRegion(memoryAssign.rhs.value, cmd))
           // TODO: This is risky as it tries to coerce every value to a region (needed for functionpointer example)
-          possibleRegions = exprToRegion(memoryAssign.rhs.value, cmd)
+          val possibleRegions = exprToRegion(memoryAssign.rhs.value, cmd)
 
           Logger.debug("I am at stmt: " + cmd.label)
           Logger.debug("Memory assign: " + memoryAssign)
