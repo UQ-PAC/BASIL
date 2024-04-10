@@ -287,6 +287,7 @@ class InterprocSteensgaardAnalysis(
           // TODO: This is risky as it tries to coerce every value to a region (needed for functionpointer example)
           possibleRegions = exprToRegion(memoryAssign.rhs.value, cmd)
 
+          Logger.debug("I am at stmt: " + cmd.label)
           Logger.debug("Memory assign: " + memoryAssign)
           Logger.debug("X2 is: " + X2)
           Logger.debug("PossibleRegions instead of X2 " + possibleRegions)

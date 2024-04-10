@@ -43,6 +43,13 @@ case class ReachingDefinitionsAnalysis(program: Program) {
     case _ => s
   }
 
+  def transformUses(vars: Set[Variable], s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) = {
+    vars.foldLeft((s._1, Map.empty[Variable, Set[Definition]])) {
+      case ((state, acc), v) =>
+        (state, acc + (v -> state(v)))
+    }
+  }
+
   def eval(cmd: Command, s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])
   ): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) = cmd match {
     case localAssign: LocalAssign =>
@@ -57,29 +64,13 @@ case class ReachingDefinitionsAnalysis(program: Program) {
       }
       (s._1 + (lhs -> Set(localAssign)), rhsUseDefs)
     case assert: Assert =>
-      assert.body.variables.foldLeft(s) {
-        case (acc, v) =>
-          (acc._1, acc._2 + (v -> s._1(v)))
-      }
+      transformUses(assert.body.variables, s)
     case memoryAssign: MemoryAssign =>
-      memoryAssign.rhs.index.variables.foldLeft(s) {
-        case (acc, v) =>
-          (acc._1, acc._2 + (v -> s._1(v)))
-      }
-      memoryAssign.rhs.value.variables.foldLeft(s) {
-        case (acc, v) =>
-          (acc._1, acc._2 + (v -> s._1(v)))
-      }
+      transformUses(memoryAssign.rhs.variables, s)
     case assume: Assume =>
-      assume.body.variables.foldLeft(s) {
-        case (acc, v) =>
-          (acc._1, acc._2 + (v -> s._1(v)))
-      }
+      transformUses(assume.body.variables, s)
     case indirectCall: IndirectCall =>
-      Set(indirectCall.target).foldLeft(s) {
-        case (acc, v) =>
-          (acc._1, acc._2 + (v -> s._1(v)))
-      }
+      transformUses(indirectCall.target.variables, s)
     case _ => s
   }
 }

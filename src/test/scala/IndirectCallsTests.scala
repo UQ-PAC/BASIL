@@ -136,6 +136,52 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
     }
   }
 
+  test("jumptable_example") {
+    val testName = "jumptable"
+    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
+    val basilConfig = BASILConfig(
+      loading = ILLoadingConfig(inputFile = examplePath + testName + ".adt",
+        relfFile = examplePath + testName + ".relf",
+        dumpIL = Some(tempPath + testName),
+      ),
+      outputPrefix = tempPath + testName,
+      staticAnalysis = Some(StaticAnalysisConfig(None, None, None)),
+    )
+    val result = loadAndTranslate(basilConfig)
+    // Traverse the program to find the main function
+    result.ir.program.procedures.find(_.name == "main").foreach { mainFunction =>
+      /* in this example we must find:
+         -- IndirectCall to R0 %00000595
+         ++ DirectCall to add_two
+
+         -- IndirectCall to R0 %000005a4
+         ++ DirectCall to add_six
+
+         -- IndirectCall to R0 %000005b3
+         ++ DirectCall to sub_seven
+       */
+      val expectedCallTransform = mutable.Map(
+        "%00000595" -> ("add_two", "R0"),
+        "%000005a4" -> ("add_six", "R0"),
+        "%000005b3" -> ("sub_seven", "R0")
+      )
+
+
+      // Traverse the statements in the main function
+      mainFunction.blocks.foreach {
+        case block: Block =>
+          block.jump match {
+            case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+              val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
+              assert(callTransform._1 == directCall.target.name)
+              expectedCallTransform.remove(directCall.label.getOrElse(""))
+            case _ =>
+          }
+      }
+      assert(expectedCallTransform.isEmpty)
+    }
+  }
+
   test("functionpointer_example") {
     val testName = "functionpointer"
     val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"

@@ -353,6 +353,7 @@ object IRTransform {
           if (!regionContents.contains(dataRegion) || regionContents(dataRegion).isEmpty) {
             result.add(dataRegion.regionIdentifier)
           } else {
+            result.add(dataRegion.regionIdentifier) // TODO: may need to investigate if we should add the parent region
             for (c <- regionContents(dataRegion)) {
               c match {
                 case bitVecLiteral: BitVecLiteral => println("hi: " + bitVecLiteral)//???
@@ -594,7 +595,8 @@ object StaticAnalysis {
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
     Logger.info("[!] Running Interprocedural Live Variables Analysis")
-    val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
+    //val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
+    val interLiveVarsResults = Map[CFGPosition, Map[Variable, TwoElement]]()
 
     Logger.info("[!] Running Parameter Analysis")
     //val paramResults = ParamAnalysis(IRProgram).analyze()
