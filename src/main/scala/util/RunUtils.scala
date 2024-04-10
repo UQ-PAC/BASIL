@@ -60,7 +60,8 @@ case class StaticAnalysisContext(
     paramResults: Map[Procedure, Set[Variable]],
     steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
     mmmResults: MemoryModelMap,
-    memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]]
+    memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
+    symbolicAccessess: Map[CFGPosition, Map[SymbolicAccess, TwoElement]]
 )
 
 /** Results of the main program execution.
@@ -617,8 +618,8 @@ object StaticAnalysis {
 
     Logger.info("[!] Running PointerTypeAnalysis")
     val pointerTypeResults = PointerTypeAnalysis(IRProgram).analyze()
-    println("HEllow")
-    println(pointerTypeResults)
+//    println("HEllow")
+//    println(pointerTypeResults)
     config.analysisDotPath.foreach(s =>
       writeToFile(toDot(IRProgram, pointerTypeResults.foldLeft(Map(): Map[CFGPosition, String]) {
         (m, t) =>
@@ -637,6 +638,12 @@ object StaticAnalysis {
 //    )
 
 //    LocalDSA(IRProgram, IRProgram.mainProcedure, newCPResult, reachingDefs).analyze()
+
+//    println(globals)
+//    println(globalOffsets)
+//    println(globalAddresses)
+//    println(externalFunctions)
+//    println(externalAddresses)
 
     Logger.info("[!] Running Symbolic Access Analysis")
     val symResults: Map[CFGPosition, Map[SymbolicAccess, TwoElement]] = SymbolicAccessAnalysis(IRProgram, newCPResult).analyze()
@@ -657,7 +664,8 @@ object StaticAnalysis {
       paramResults = paramResults,
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,
-      memoryRegionContents = memoryRegionContents
+      memoryRegionContents = memoryRegionContents,
+      symbolicAccessess = symResults
     )
   }
 
@@ -877,8 +885,12 @@ object RunUtils {
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
+    Logger.info("[!] Running Region Builder")
+    val regions = RegionBuilder(ctx.program, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions).analyze()
+
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last
+
   }
 }
 

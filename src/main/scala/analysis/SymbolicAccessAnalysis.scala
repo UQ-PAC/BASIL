@@ -16,15 +16,15 @@ trait MemoryRegion2 {
   override def toString: String = s"MemoryRegion($regionIdentifier)"
 }
 
-case class StackRegion2(override val regionIdentifier: String, proc: Procedure, size: BitVecLiteral) extends MemoryRegion2 {
+case class StackRegion2(override val regionIdentifier: String, proc: Procedure, size: BigInt) extends MemoryRegion2 {
   override def toString: String = s"Stack($regionIdentifier,  $size)"
 }
 
-case class HeapRegion2(override val regionIdentifier: String, proc: Procedure, size: BitVecLiteral) extends MemoryRegion2 {
+case class HeapRegion2(override val regionIdentifier: String, proc: Procedure, size: BigInt) extends MemoryRegion2 {
   override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 
-case class DataRegion2(override val regionIdentifier: String, start: BitVecLiteral) extends MemoryRegion2 {
+case class DataRegion2(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryRegion2 {
   override def toString: String = s"Data($regionIdentifier, $start)"
 }
 
@@ -48,7 +48,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
   var unknownCount: Int = 0
   private def nextunknownCount = {
     unknownCount += 1
-    s"malloc_$unknownCount"
+    s"unknown_$unknownCount"
   }
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
@@ -94,7 +94,10 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
       case Left(value) =>
         value.symbolicBase match
           case StackRegion2(regionIdentifier, parent, size) => Map()
-          case _ => Map(d -> IdEdge())
+          case _ =>
+            if value.accessor.name == "R29" then
+              Map()
+            else Map(d -> IdEdge())
       case Right(_) => Map(d -> IdEdge())
 
   def edgesCallToAfterCall(call: DirectCall, aftercall: GoTo)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
@@ -106,7 +109,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
       case Right(_) => Map(d -> IdEdge())
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
-    val bitvecnegative: BigInt = new BigInt(new BigInteger("9223372036854775808")) //"18446744073709551615"
+    val bitvecnegative: BigInt = new BigInt(new BigInteger("9223372036854775808")) // negative 64 bit integer
 
     n match
       case LocalAssign(variable, expr, maybeString) =>
@@ -118,7 +121,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
               case Left(value) => Map(d -> IdEdge())
               case Right(_) =>
                 val size = twosComplementToDec(decToBinary(evaluateExpression(arg2, constProp(n)).get.value))
-                Map(d -> IdEdge(), Left(SymbolicAccess(variable, StackRegion2(s"Stack_${procedure(n).name}", procedure(n), BitVecLiteral(-size.intValue, 64)), 0)) -> ConstEdge(TwoElementTop))
+                Map(d -> IdEdge(), Left(SymbolicAccess(variable, StackRegion2(s"Stack_${procedure(n).name}", procedure(n), -size), 0)) -> ConstEdge(TwoElementTop))
           case BinaryExpr(op, arg1: Variable, arg2) if evaluateExpression(arg2, constProp(n)).isDefined =>
             d match
               case Left(value) if value.accessor == arg1 =>
@@ -144,7 +147,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
             d match
               case Left(value) if value.accessor == variable => Map()
               case Left(value) => Map(d -> IdEdge())
-              case Right(_) => Map(d -> IdEdge(), Left(SymbolicAccess(variable, UnknownRegion2(s"Unknown_$nextunknownCount", procedure(n)), 0)) -> ConstEdge(TwoElementTop))
+              case Right(_) => Map(d -> IdEdge(), Left(SymbolicAccess(variable, UnknownRegion2(nextunknownCount, procedure(n)), 0)) -> ConstEdge(TwoElementTop))
           case _ =>
             d match
               case Left(value) if value.accessor == variable => Map()
@@ -154,10 +157,10 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
           case Left(value) if value.accessor == mallocVariable => Map()
           case Left(value) => Map(d -> IdEdge())
           case Right(value) =>
-            val size = evaluateExpression(mallocVariable, constProp(n)) match
-              case Some(value) => value
-              case None => BitVecLiteral(-1, 64)
-            Map(d -> IdEdge(), Left(SymbolicAccess(mallocVariable, HeapRegion2(s"Malloc_$nextMallocCount", procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
+            val size: BigInt = evaluateExpression(mallocVariable, constProp(n)) match
+              case Some(value) => value.value
+              case None => -1
+            Map(d -> IdEdge(), Left(SymbolicAccess(mallocVariable, HeapRegion2(nextMallocCount, procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
       case _ => Map(d -> IdEdge())
 }
 
