@@ -149,7 +149,7 @@ trait MemoryRegionAnalysis(val program: Program,
           case _: LocalVar =>
             env
           case reg: Register if spList.contains(reg) =>
-            env
+            eval(BitVecLiteral(0, 64), env, n)
           case _ =>
             evaluateExpression(variable, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
@@ -161,8 +161,8 @@ trait MemoryRegionAnalysis(val program: Program,
       case memoryLoad: MemoryLoad =>
         eval(memoryLoad.index, env, n)
       // ignore case where it could be a global region (loaded later in MMM from relf)
-      case _: BitVecLiteral =>
-        env
+      case b: BitVecLiteral =>
+        Set(poolMaster(b, IRWalk.procedure(n)))
       // we cannot evaluate this to a concrete value, we need VSA for this
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")

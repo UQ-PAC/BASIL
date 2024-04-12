@@ -69,11 +69,18 @@ class InterprocSteensgaardAnalysis(
   /**
    * In expressions that have accesses within a region, we need to relocate
    * the base address to the actual address using the relocation table.
+   * MUST RELOCATE because MMM iterate to find the lowest address
+   * TODO: May need to iterate over the relocation table to find the actual address
+   *
    * @param address
    * @return BitVecLiteral: the relocated address
    */
   def relocatedBase(address: BitVecLiteral): BitVecLiteral = {
     val tableAddress = globalOffsets.getOrElse(address.value, address.value)
+    // this condition checks if the address is not layered and returns if it is not
+    if (tableAddress != address.value && !globalOffsets.contains(tableAddress)) {
+      return address
+    }
     BitVecLiteral(tableAddress, address.size)
   }
 
@@ -114,7 +121,25 @@ class InterprocSteensgaardAnalysis(
           if (i != n) { // handles loops (ie. R19 = R19 + 1) %00000662 in jumptable2
             val regions = i.rhs match {
               case loadL: MemoryLoad =>
-                exprToRegion(loadL.index, i)
+                val foundRegions = exprToRegion(loadL.index, i)
+                val toReturn = mutable.Set[MemoryRegion]().addAll(foundRegions)
+                for {
+                  f <- foundRegions
+                } {
+                  if (memoryRegionContents.contains(f)) {
+                    memoryRegionContents(f).foreach {
+                      case b: BitVecLiteral =>
+//                        val region = mmm.findDataObject(b.value)
+//                        if (region.isDefined) {
+//                          toReturn.addOne(region.get)
+//                        }
+                      case r: MemoryRegion =>
+                        toReturn.addOne(r)
+                        toReturn.remove(f)
+                    }
+                  }
+                }
+                toReturn.toSet
               case _: BitVecLiteral =>
                 Set.empty[MemoryRegion]
               case _ =>
@@ -134,6 +159,8 @@ class InterprocSteensgaardAnalysis(
                     reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
                   }
                 case dataRegion: DataRegion =>
+                  println(s"Hey, I'm a data region: ${dataRegion}")
+                  println(s"Hey, I'm a offset: ${b}")
                   val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start), b)
                   evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
                     reducedRegions ++= exprToRegion(b2, n)
@@ -181,7 +208,9 @@ class InterprocSteensgaardAnalysis(
       case binaryExpr: BinaryExpr =>
         res ++= reducibleToRegion(binaryExpr, n)
         res
-
+      case v: Variable if v == stackPointer =>
+        res ++= mmm.findStackObject(0)
+        res
       case v: Variable =>
         evaluateExpressionWithSSA(expr, constantProp(n), n, reachingDefs).foreach { b =>
           Logger.debug("BitVecLiteral: " + b)
