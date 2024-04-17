@@ -445,4 +445,109 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
       }
       assert(expectedCallTransform.isEmpty)
   }
+
+  test("arrays_example") {
+    val testName = "arrays"
+    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
+    val basilConfig = BASILConfig(
+      loading = ILLoadingConfig(inputFile = examplePath + testName + ".adt",
+        relfFile = examplePath + testName + ".relf",
+        dumpIL = Some(tempPath + testName),
+      ),
+      outputPrefix = tempPath + testName,
+      staticAnalysis = Some(StaticAnalysisConfig(None, None, None)),
+    )
+    val result = loadAndTranslate(basilConfig)
+    /* in this example we must find:
+       -- IndirectCall to R0 %00000662
+       ++ DirectCall to __stack_chk_fail
+     */
+    val expectedCallTransform = mutable.Map(
+      "%00000662" -> ("__stack_chk_fail", "R0"),
+    )
+
+
+    // Traverse the statements in the main function
+    result.ir.program.mainProcedure.blocks.foreach {
+      block =>
+        block.jump match {
+          case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+            val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
+            assert(callTransform._1 == directCall.target.name)
+            expectedCallTransform.remove(directCall.label.getOrElse(""))
+          case _ =>
+        }
+    }
+    assert(expectedCallTransform.isEmpty)
+  }
+
+  test("arrays_simple_example") {
+    val testName = "arrays_simple"
+    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
+    val basilConfig = BASILConfig(
+      loading = ILLoadingConfig(inputFile = examplePath + testName + ".adt",
+        relfFile = examplePath + testName + ".relf",
+        dumpIL = Some(tempPath + testName),
+      ),
+      outputPrefix = tempPath + testName,
+      staticAnalysis = Some(StaticAnalysisConfig(None, None, None)),
+    )
+    val result = loadAndTranslate(basilConfig)
+    /* in this example we must find:
+       -- IndirectCall to R0 %00000607
+       ++ DirectCall to __stack_chk_fail
+     */
+    val expectedCallTransform = mutable.Map(
+      "%00000607" -> ("__stack_chk_fail", "R0"),
+    )
+
+
+    // Traverse the statements in the main function
+    result.ir.program.mainProcedure.blocks.foreach {
+      block =>
+        block.jump match {
+          case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+            val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
+            assert(callTransform._1 == directCall.target.name)
+            expectedCallTransform.remove(directCall.label.getOrElse(""))
+          case _ =>
+        }
+    }
+    assert(expectedCallTransform.isEmpty)
+  }
+
+  test("function_got_example") {
+    val testName = "function_got"
+    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
+    val basilConfig = BASILConfig(
+      loading = ILLoadingConfig(inputFile = examplePath + testName + ".adt",
+        relfFile = examplePath + testName + ".relf",
+        dumpIL = Some(tempPath + testName),
+      ),
+      outputPrefix = tempPath + testName,
+      staticAnalysis = Some(StaticAnalysisConfig(None, None, None)),
+    )
+    val result = loadAndTranslate(basilConfig)
+    /* in this example we must find:
+       -- IndirectCall to R0 %000003ed
+       ++ DirectCall to get_two
+     */
+    val expectedCallTransform = mutable.Map(
+      "%000003ed" -> ("get_two", "R0"),
+    )
+
+
+    // Traverse the statements in the main function
+    result.ir.program.mainProcedure.blocks.foreach {
+      block =>
+        block.jump match {
+          case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+            val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
+            assert(callTransform._1 == directCall.target.name)
+            expectedCallTransform.remove(directCall.label.getOrElse(""))
+          case _ =>
+        }
+    }
+    assert(expectedCallTransform.isEmpty)
+  }
 }

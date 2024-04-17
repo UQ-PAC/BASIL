@@ -4,7 +4,6 @@ import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
 import ir.*
 import util.Logger
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 
 /** Wrapper for variables so we can have Steensgaard-specific equals method indirectly
  * Relies on the SSA sets intersection being non-empty
