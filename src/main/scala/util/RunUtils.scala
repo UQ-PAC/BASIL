@@ -900,7 +900,15 @@ object RunUtils {
     }
 
     Logger.info("[!] Running Region Builder")
-    val regions = RegionBuilder(ctx.program, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions).analyze()
+    val writesTo = WriteToAnalysis(ctx.program).analyze()
+    val reachingDefs = ReachingDefsAnalysis(ctx.program, writesTo).analyze()
+    config.analysisDotPath.foreach(
+      s =>
+        writeToFile(toDot(ctx.program), s"${s}_ct.dot")
+    )
+//    val graph = DSG(ctx.program.mainProcedure, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo)
+    val b = Local(ctx.program.mainProcedure, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo).analyze()
+//    val regions = RegionBuilder(ctx.program, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions).analyze()
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last

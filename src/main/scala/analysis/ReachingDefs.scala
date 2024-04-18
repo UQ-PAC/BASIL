@@ -1,23 +1,30 @@
 package analysis
 
 import analysis.solvers.SimpleWorklistFixpointSolver
-import ir.{Assert, Assume, BitVecType, Call, DirectCall, Expr, GoTo, IndirectCall, LocalAssign, MemoryAssign, NOP, Register, Variable}
+import ir.{Assert, Assume, BitVecType, CFGPosition, Call, DirectCall, Expr, GoTo, IndirectCall, InterProcIRCursor, IntraProcIRCursor, LocalAssign, MemoryAssign, NOP, Procedure, Program, Register, Variable, computeDomain}
 
-abstract class ReachingDefs(cfg: ProgramCfg) extends Analysis[Any] {
+abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Register]]) extends Analysis[Map[CFGPosition, Map[Variable, Set[CFGPosition]]]] {
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
-  val lattice: MapLattice[CfgNode, Set[CfgStatementNode], PowersetLattice[CfgStatementNode]] = new MapLattice(new PowersetLattice[CfgStatementNode]())
+  val mallocRegister = Register("R0", BitVecType(64))
+  val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, program.procedures).toSet
+  val lattice: MapLattice[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]] = new MapLattice(new MapLattice(new PowersetLattice[CFGPosition]()))
 
-  def transfer(n: CfgNode, s: Set[CfgStatementNode]): Set[CfgStatementNode] = {
+  def transfer(n: CFGPosition, s: Map[Variable, Set[CFGPosition]]): Map[Variable, Set[CFGPosition]] =
     n match
-      case statementNode: CfgStatementNode =>
-        statementNode.data match
-          case LocalAssign(variable, expr, maybeString) => (s -- s.filter(cfgStatementNode =>
-            cfgStatementNode.data.asInstanceOf[LocalAssign].lhs == variable)) + statementNode
-          case _ => s
+      case loc:LocalAssign =>
+        s + (loc.lhs -> Set(n))
+      case DirectCall(proc, target, label) if proc.name == "malloc" =>
+        s + (mallocRegister -> Set(n))
+      case DirectCall(proc, target, label) if writesTo.contains(proc) =>
+        val result: Map[Variable, Set[CFGPosition]] = writesTo(proc).foldLeft(Map[Variable, Set[CFGPosition]]()){
+          (m, register) =>
+            m + (register -> Set(n))
+        }
+        s ++ result
       case _ => s
-  }
+
 }
 
-class ReachingDefsAnalysis(cfg: ProgramCfg) extends ReachingDefs(cfg),  IntraproceduralForwardDependencies,
-  SimpleWorklistFixpointSolver[CfgNode, Set[CfgStatementNode], PowersetLattice[CfgStatementNode]]
+class ReachingDefsAnalysis(program: Program, writesTo:  Map[Procedure, Set[Register]]) extends ReachingDefs(program, writesTo),  IRInterproceduralForwardDependencies,
+  SimpleWorklistFixpointSolver[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]]
+
