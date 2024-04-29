@@ -1,6 +1,6 @@
 package analysis
 
-import analysis.solvers.SimpleWorklistFixpointSolver
+import analysis.solvers.SimplePushDownWorklistFixpointSolver
 import ir.{Assert, Assume, BitVecType, CFGPosition, Call, DirectCall, Expr, GoTo, IndirectCall, InterProcIRCursor, IntraProcIRCursor, LocalAssign, MemoryAssign, NOP, Procedure, Program, Register, Variable, computeDomain}
 
 abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Register]]) extends Analysis[Map[CFGPosition, Map[Variable, Set[CFGPosition]]]] {
@@ -28,5 +28,5 @@ abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Regis
 }
 
 class ReachingDefsAnalysis(program: Program, writesTo:  Map[Procedure, Set[Register]]) extends ReachingDefs(program, writesTo),  IRIntraproceduralForwardDependencies,
-  SimpleWorklistFixpointSolver[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]]
+  SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]]
 
