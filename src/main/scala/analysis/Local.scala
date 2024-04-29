@@ -5,6 +5,7 @@ import specification.{ExternalFunction, SpecGlobal}
 
 import scala.util.control.Breaks.{break, breakable}
 import java.math.BigInteger
+import scala.collection.mutable
 
 class Local(
              proc: Procedure,
@@ -36,6 +37,89 @@ class Local(
       outerMap + (position -> innerMap)
   }
 
+  val stackMapping: Map[BigInt, DSN] =
+    computeDomain(IntraProcIRCursor, Set(proc)).foldLeft(Map[BigInt, DSN]()) {
+      (results, pos) => stackBuilder(pos, results)
+    }
+
+  def stackBuilder(pos: CFGPosition, m: Map[BigInt, DSN]): Map[BigInt, DSN] = {
+    pos match
+      case LocalAssign(variable: Variable, expr: Expr, _) =>
+        expr match
+          case MemoryLoad(mem, index, endian, size) =>
+            val byteSize = (size.toDouble/8).ceil.toInt
+            index match
+              case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) &&  varToSym(pos).contains(arg1) &&
+                evaluateExpression(arg2, constProp(pos)).isDefined  =>
+                  var offset = evaluateExpression(arg2, constProp(pos)).get.value
+                  varToSym(pos)(arg1).foldLeft(m){
+                    (m, sym) =>
+                      sym match
+                        case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), symOffset) =>
+                          offset = offset + symOffset
+                          if m.contains(offset) then
+                            m(offset).addCell(0, byteSize)
+                            m
+                          else
+                            val node = DSN(Some(graph), Some(StackRegion2(pos.toShortString, proc, byteSize)))
+                            node.addCell(0, byteSize)
+                            m + (offset -> node)
+                        case _=> m
+                  }
+              case arg: Variable if varToSym.contains(pos) &&  varToSym(pos).contains(arg) =>
+                varToSym(pos)(arg).foldLeft(m){
+                  (m, sym) =>
+                    sym match
+                      case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), offset) =>
+                        if m.contains(offset) then
+                          m(offset).addCell(0, byteSize)
+                          m
+                        else 
+                          val node = DSN(Some(graph), Some(StackRegion2(pos.toShortString, proc, byteSize)))
+                          node.addCell(0, byteSize)
+                          m + (offset -> node)
+                      case _=> m
+                }
+              case _ => m
+          case _ => m
+      case MemoryAssign(mem, MemoryStore(mem2, index, value, endian, size), label) =>
+        val byteSize = (size.toDouble / 8).ceil.toInt
+        index match
+          case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
+            evaluateExpression(arg2, constProp(pos)).isDefined =>
+            var offset = evaluateExpression(arg2, constProp(pos)).get.value
+            varToSym(pos)(arg1).foldLeft(m) {
+              (m, sym) =>
+                sym match
+                  case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), symOffset) =>
+                    offset = offset + symOffset
+                    if m.contains(offset) then
+                      m(offset).addCell(0, byteSize)
+                      m
+                    else
+                      val node = DSN(Some(graph), Some(StackRegion2(pos.toShortString, proc, byteSize)))
+                      node.addCell(0, byteSize)
+                      m + (offset -> node)
+                  case _ => m
+            }
+          case arg: Variable if varToSym.contains(pos) && varToSym(pos).contains(arg) =>
+            varToSym(pos)(arg).foldLeft(m) {
+              (m, sym) =>
+                sym match
+                  case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), offset) =>
+                    if m.contains(offset) then
+                      m(offset).addCell(0, byteSize)
+                      m
+                    else
+                      val node = DSN(Some(graph), Some(StackRegion2(pos.toShortString, proc, byteSize)))
+                      node.addCell(0, byteSize)
+                      m + (offset -> node)
+                  case _ => m
+            }
+          case _ => m
+      case _ => m
+
+  }
   def decToBinary(n: BigInt): Array[Int] = {
     val binaryNum: Array[Int] = new Array[Int](64)
     var i = 0
@@ -98,8 +182,8 @@ class Local(
   def getNodes(pos: CFGPosition, arg: Variable): Set[DSN] =
     if reachingDefs(pos).contains(arg) then
       reachingDefs(pos)(arg).foldLeft(Set[DSN]()){
-        (s, defintion) =>
-          s + graph.varToCell(defintion)(arg).node.get
+        (s, definition) =>
+          s + graph.varToCell(definition)(arg).node.get
       }
     else
       Set(graph.formals(arg).node.get)
@@ -130,7 +214,7 @@ class Local(
               graph.nodes.add(node)
               val cell = graph.mergeCells(lhsCell, node.cells(0))
               graph.varToCell(n).update(variable, cell)
-            case BinaryExpr(op, arg1: Variable, arg2) if varToSym(n).contains(arg1) && evaluateExpression(arg2, constProp(n)).isDefined =>
+            case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(n) &&  varToSym(n).contains(arg1) && evaluateExpression(arg2, constProp(n)).isDefined =>
               val offset = evaluateExpression(arg2, constProp(n)).get.value
               val nodes: Set[DSN] = getNodes(n, arg1)
               nodes.foreach(_.addCell(offset, 0))
@@ -189,7 +273,7 @@ class Local(
               breakable {
                 var containsPointer = false
                 for (v <- expr.variables) {
-                  if varToSym(n).contains(v) then
+                  if varToSym.contains(n) && varToSym(n).contains(v) then
                     containsPointer = true
                     break
                 }
@@ -256,6 +340,7 @@ class Local(
   }
   def analyze(): Any =
     val domain = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).reverse
+    println(domain)
 
 //    println(domain)
     domain.foreach(visit)

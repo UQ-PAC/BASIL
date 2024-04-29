@@ -10,6 +10,8 @@ abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Regis
   val lattice: MapLattice[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]] = new MapLattice(new MapLattice(new PowersetLattice[CFGPosition]()))
 
   def transfer(n: CFGPosition, s: Map[Variable, Set[CFGPosition]]): Map[Variable, Set[CFGPosition]] =
+    if n.isInstanceOf[LocalAssign] && n.asInstanceOf[LocalAssign].label.get.startsWith("%000004f4") then
+      print("")
     n match
       case loc:LocalAssign =>
         s + (loc.lhs -> Set(n))
@@ -25,6 +27,6 @@ abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Regis
 
 }
 
-class ReachingDefsAnalysis(program: Program, writesTo:  Map[Procedure, Set[Register]]) extends ReachingDefs(program, writesTo),  IRInterproceduralForwardDependencies,
+class ReachingDefsAnalysis(program: Program, writesTo:  Map[Procedure, Set[Register]]) extends ReachingDefs(program, writesTo),  IRIntraproceduralForwardDependencies,
   SimpleWorklistFixpointSolver[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]]
 

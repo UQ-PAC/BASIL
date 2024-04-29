@@ -19,7 +19,7 @@ object NodeCounter {
 
 
 
-class DSG(proc: Procedure,
+class DSG(val proc: Procedure,
           constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
           globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt],
           externalFunctions: Set[ExternalFunction],
@@ -31,6 +31,8 @@ class DSG(proc: Procedure,
 
   val mallocRegister = Register("R0", BitVecType(64))
   val stackPointer = Register("R31", BitVecType(64))
+
+  
 
 
   // make all globals
@@ -93,12 +95,7 @@ class DSG(proc: Procedure,
   def collapseNode(node: DSN): Unit =
     val collapedCell = DSC(Option(node), 0, true)
     val e = DSC(None, 0)
-
-    if node.id == 20 then
-      print("")
-
-
-
+    
     val cell = node.cells.foldLeft(e) {
       (c, field) =>
 
@@ -244,33 +241,9 @@ class DSG(proc: Procedure,
   }
 
 
-//  def coolMergeCells(cell1: DSC, cell2: DSC): DSC =
-//    val changedFormals = formals.foldLeft(Set[Variable]()) {
-//      (s, f) =>
-//        if f._2 == cell1 then
-//          s + f._1
-//        else
-//          s
-//    }
-//
-//    val changedVars = varToCell.foldLeft(Map[CFGPosition, Set[Variable]]()) {
-//
-//    }
-//
-//    cell1
-
-
-
 
 
   def addNode(memoryRegion2: MemoryRegion2, offset: BigInt, size: Int): DSN = ???
-//    if nodes.contains(memoryRegion2) then
-//      nodes(memoryRegion2).addCell(offset, size)
-//    else
-//      val node = DSN(Some(this), Some(memoryRegion2))
-//      nodes.update(memoryRegion2, node)
-//      node.addCell(offset, size)
-//    nodes(memoryRegion2)
 }
 
 class DSN(val graph: Option[DSG], var region: Option[MemoryRegion2]) {
