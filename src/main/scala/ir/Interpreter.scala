@@ -100,6 +100,10 @@ class Interpreter() {
         Logger.debug(s"\tMemoryStore(mem:${ms.mem}, index:0x${index.toHexString}, value:0x${value.value
           .toString(16)}[u${value.size}], size:${ms.size})")
         setMemory(index, ms.size, ms.endian, value, mems)
+
+      case u: UninterpretedFunction =>
+        Logger.debug(s"\t$u")
+        ???
     }
   }
 

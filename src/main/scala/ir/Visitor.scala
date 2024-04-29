@@ -127,6 +127,10 @@ abstract class Visitor {
 
   def visitLiteral(node: Literal): Literal = node
 
+  def visitUninterpretedFunction(node: UninterpretedFunction): UninterpretedFunction = {
+    node.copy(params = node.params.map(visitExpr))
+  }
+
 }
 
 abstract class ReadOnlyVisitor extends Visitor {
@@ -238,6 +242,13 @@ abstract class ReadOnlyVisitor extends Visitor {
   override def visitProgram(node: Program): Program = {
     for (i <- node.procedures) {
       visitProcedure(i)
+    }
+    node
+  }
+
+  override def visitUninterpretedFunction(node: UninterpretedFunction): UninterpretedFunction = {
+    for (i <- node.params) {
+      visitExpr(i)
     }
     node
   }

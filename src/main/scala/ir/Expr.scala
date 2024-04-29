@@ -337,6 +337,12 @@ case class MemoryLoad(mem: Memory, index: Expr, endian: Endian, size: Int) exten
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemoryLoad(this)
 }
 
+case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType) extends Expr {
+  override def getType: IRType = returnType
+  override def toBoogie: BFunctionCall = BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie)
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
+}
+
 sealed trait Global
 
 case class Memory(name: String, addressSize: Int, valueSize: Int) extends Expr with Global {
