@@ -133,10 +133,6 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
       val result = evaluateExpressionWithSSA(e.body, constantPropResult, n, reachingDefs)
       applySingle(BitVectorEval.boogie_extract(e.end, e.start, _: BitVecLiteral), result)
     case variable: Variable =>
-      Logger.debug("Variable: " + variable)
-      Logger.debug("node: " + n)
-      Logger.debug("reachingDefs: " + reachingDefs(n))
-      Logger.debug("getUse: " + getUse(variable, n, reachingDefs))
       constantPropResult(RegisterWrapperEqualSets(variable, getUse(variable, n, reachingDefs)))
     case b: BitVecLiteral => Set(b)
     case _ => throw RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
@@ -152,6 +148,25 @@ def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition,
   val (_, out) = reachingDefs(node)
   out.getOrElse(variable, Set())
 }
+
+///**
+// * In expressions that have accesses within a region, we need to relocate
+// * the base address to the actual address using the relocation table.
+// * MUST RELOCATE because MMM iterate to find the lowest address
+// * TODO: May need to iterate over the relocation table to find the actual address
+// *
+// * @param address
+// * @param globalOffsets
+// * @return BitVecLiteral: the relocated address
+// */
+//def relocatedBase(address: BitVecLiteral, globalOffsets: Map[BigInt, BigInt]): BitVecLiteral = {
+//  val tableAddress = globalOffsets.getOrElse(address.value, address.value)
+//  // this condition checks if the address is not layered and returns if it is not
+//  if (tableAddress != address.value && !globalOffsets.contains(tableAddress)) {
+//    return address
+//  }
+//  BitVecLiteral(tableAddress, address.size)
+//}
 
 def unwrapExpr(expr: Expr): Set[Expr] = {
   var buffers: Set[Expr] = Set()
