@@ -14,8 +14,6 @@ object NodeCounter {
 
   def getCounter: Int =
     counter = counter + 1
-    if counter == 64 then
-      print("")
     counter
 
 
@@ -41,81 +39,52 @@ class DSG(val proc: Procedure,
       (results, pos) => stackBuilder(pos, results)
     }.to(collection.mutable.Map)
 
-  def stackBuilder(pos: CFGPosition, m: Map[BigInt, DSN]): Map[BigInt, DSN] = {
+  private def visitStackAccess(pos: CFGPosition, index: Expr, size: Int, m: Map[BigInt, DSN]) : Map[BigInt, DSN] =
+    val byteSize = (size.toDouble / 8).ceil.toInt
+    index match
+      case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
+        evaluateExpression(arg2, constProp(pos)).isDefined =>
+        var offset = evaluateExpression(arg2, constProp(pos)).get.value
+        varToSym(pos)(arg1).foldLeft(m) {
+          (m, sym) =>
+            sym match
+              case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), symOffset) =>
+                offset = offset + symOffset
+                if m.contains(offset) then
+                  m(offset).addCell(0, byteSize)
+                  assert(m(offset).cells(0).accessedSizes.size <= 1)
+                  m
+                else
+                  val node = DSN(Some(this), Some(StackRegion2(pos.toShortString, proc, byteSize)))
+                  node.addCell(0, byteSize)
+                  m + (offset -> node)
+              case _ => m
+        }
+      case arg: Variable if varToSym.contains(pos) && varToSym(pos).contains(arg) =>
+        varToSym(pos)(arg).foldLeft(m) {
+          (m, sym) =>
+            sym match
+              case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), offset) =>
+                if m.contains(offset) then
+                  m(offset).addCell(0, byteSize)
+                  assert(m(offset).cells(0).accessedSizes.size <= 1)
+                  m
+                else
+                  val node = DSN(Some(this), Some(StackRegion2(pos.toShortString, proc, byteSize)))
+                  node.addCell(0, byteSize)
+                  m + (offset -> node)
+              case _ => m
+        }
+      case _ => m
+  private def stackBuilder(pos: CFGPosition, m: Map[BigInt, DSN]): Map[BigInt, DSN] = {
     pos match
       case LocalAssign(variable: Variable, expr: Expr, _) =>
         expr match
           case MemoryLoad(mem, index, endian, size) =>
-            val byteSize = (size.toDouble / 8).ceil.toInt
-            index match
-              case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
-                evaluateExpression(arg2, constProp(pos)).isDefined =>
-                var offset = evaluateExpression(arg2, constProp(pos)).get.value
-                varToSym(pos)(arg1).foldLeft(m) {
-                  (m, sym) =>
-                    sym match
-                      case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), symOffset) =>
-                        offset = offset + symOffset
-                        if m.contains(offset) then
-                          m(offset).addCell(0, byteSize)
-                          m
-                        else
-                          val node = DSN(Some(this), Some(StackRegion2(pos.toShortString, proc, byteSize)))
-                          node.addCell(0, byteSize)
-                          m + (offset -> node)
-                      case _ => m
-                }
-              case arg: Variable if varToSym.contains(pos) && varToSym(pos).contains(arg) =>
-                varToSym(pos)(arg).foldLeft(m) {
-                  (m, sym) =>
-                    sym match
-                      case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), offset) =>
-                        if m.contains(offset) then
-                          m(offset).addCell(0, byteSize)
-                          m
-                        else
-                          val node = DSN(Some(this), Some(StackRegion2(pos.toShortString, proc, byteSize)))
-                          node.addCell(0, byteSize)
-                          m + (offset -> node)
-                      case _ => m
-                }
-              case _ => m
+            visitStackAccess(pos, index, size, m)
           case _ => m
       case MemoryAssign(mem, MemoryStore(mem2, index, value, endian, size), label) =>
-        val byteSize = (size.toDouble / 8).ceil.toInt
-        index match
-          case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
-            evaluateExpression(arg2, constProp(pos)).isDefined =>
-            var offset = evaluateExpression(arg2, constProp(pos)).get.value
-            varToSym(pos)(arg1).foldLeft(m) {
-              (m, sym) =>
-                sym match
-                  case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), symOffset) =>
-                    offset = offset + symOffset
-                    if m.contains(offset) then
-                      m(offset).addCell(0, byteSize)
-                      m
-                    else
-                      val node = DSN(Some(this), Some(StackRegion2(pos.toShortString, proc, byteSize)))
-                      node.addCell(0, byteSize)
-                      m + (offset -> node)
-                  case _ => m
-            }
-          case arg: Variable if varToSym.contains(pos) && varToSym(pos).contains(arg) =>
-            varToSym(pos)(arg).foldLeft(m) {
-              (m, sym) =>
-                sym match
-                  case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), offset) =>
-                    if m.contains(offset) then
-                      m(offset).addCell(0, byteSize)
-                      m
-                    else
-                      val node = DSN(Some(this), Some(StackRegion2(pos.toShortString, proc, byteSize)))
-                      node.addCell(0, byteSize)
-                      m + (offset -> node)
-                  case _ => m
-            }
-          case _ => m
+        visitStackAccess(pos, index, size, m)
       case _ => m
 
   }
@@ -128,7 +97,7 @@ class DSG(val proc: Procedure,
       var address: BigInt = global.address
       if swappedOffsets.contains(address) then
         address = swappedOffsets(address)
-      m + ((address, address + global.size) -> DSN(Some(this), Some(DataRegion2(global.name, address, global.size))))
+      m + ((address, address + global.size/8) -> DSN(Some(this), Some(DataRegion2(global.name, address, global.size))))
   }
   externalFunctions.foreach(
     external =>
@@ -193,12 +162,7 @@ class DSG(val proc: Procedure,
       pointTo.update(cell, node.cells(0))
     pointTo(cell)
 
-
-//  private def earlyCollapse(node: DSN): Unit =
-//    node.collapsed = true
-//    node.cells.clear()
-//
-//    node.addCell(0, 0)
+  
 
   def collapseNode(node: DSN): Unit =
     val collapedCell = DSC(Option(node), 0, true)
@@ -235,18 +199,22 @@ class DSG(val proc: Procedure,
     if cell.node.isDefined then
       pointTo.update(node.cells(0), cell)
 
+  def coolMergeCells(cell1: DSC, cell2: DSC): DSC = ???
+
+
+
 
   def mergeCells(cell1: DSC, cell2: DSC): DSC =
-    if cell2.node.get.id  == 31 then
-      print("")
     if (cell1 == cell2) {
       return cell1
     }
     if (incompatibleTypes(cell1, cell2)) then
       collapseNode(cell2.node.get)
-
+    
     if cell1.node.isDefined then
       cell2.node.get.allocationRegions.addAll(cell1.node.get.allocationRegions)
+      if cell1.node.get.region.isDefined && cell1.node.get.region.get.isInstanceOf[DataRegion2] then
+        cell2.node.get.region = cell1.node.get.region
 
 
     if cell2.node.get.collapsed then
@@ -259,8 +227,6 @@ class DSG(val proc: Procedure,
               else
                 pointTo.update(cell2.node.get.cells(0), getPointee(cell))
               pointTo.remove(cell)
-//            replaceInPointTo(cell, cell2.node.get.cells(0))
-//            replaceInEV(cell, cell2.node.get.cells(0))
             replace(cell, cell2.node.get.cells(0))
         }
         cell2.node.get.cells(0)
@@ -271,8 +237,6 @@ class DSG(val proc: Procedure,
           else
             pointTo.update(cell2.node.get.cells(0), getPointee(cell1))
           pointTo.remove(cell1)
-//        replaceInPointTo(cell1, cell2.node.get.cells(0))
-//        replaceInEV(cell1, cell2.node.get.cells(0))
           replace(cell1, cell2.node.get.cells(0))
         cell2.node.get.cells(0)
     else
@@ -283,9 +247,7 @@ class DSG(val proc: Procedure,
               mergeCells(getPointee(cell), getPointee(cell2.node.get.cells(offset)))
             else
               pointTo.update(cell2.node.get.cells(offset), getPointee(cell))
-          pointTo.remove(cell)
-//          replaceInPointTo(cell, cell2.node.get.cells(offset))
-//          replaceInEV(cell, cell2.node.get.cells(offset))
+            pointTo.remove(cell)
             replace(cell, cell2.node.get.cells(offset))
       }
       cell2
@@ -317,8 +279,6 @@ class DSG(val proc: Procedure,
     (m, pos) =>
       pos match
         case LocalAssign(variable, value , label) =>
-          if pos.asInstanceOf[LocalAssign].label.get.startsWith("%0000044f") then
-            print("")
           value.variables.foreach(
             v =>
               if isFormal(pos, v) then
@@ -361,9 +321,6 @@ class DSG(val proc: Procedure,
 class DSN(val graph: Option[DSG], var region: Option[MemoryRegion2]) {
 
   val id: Int = NodeCounter.getCounter
-
-  if id == 31 then
-    print("")
 
   var collapsed = false
 

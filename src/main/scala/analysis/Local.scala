@@ -21,6 +21,7 @@ class Local(
   val mallocRegister = Register("R0", BitVecType(64))
   val stackPointer = Register("R31", BitVecType(64))
 
+  private val visited: mutable.Set[CFGPosition] = mutable.Set()
 
 
   val varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAccess]]] = symResults.foldLeft(Map[CFGPosition, Map[Variable, Set[SymbolicAccess]]]()) {
@@ -131,7 +132,42 @@ class Local(
     else
       Set(graph.formals(arg).node.get)
 
+  /**
+   * Handles unification for instructions of the form R_x = R_y [+ offset] where R_y is a pointer and [+ offset] is optional
+   * @param position the cfg position being visited (note this might be a local assign of the form R_x = R_y [+ offset]
+   *                 or it might be memory load/store where the index is of the form R_y [+ offset]
+   * @param lhs Ev(R_x) if position is local assign or a cell from an empty node if R_y [+ offset] is the index of a memoryAssign
+   * @param rhs R_y, reachingDefs(position)(R_y) can be used to find the set of SSA variables that may define R_x
+   * @param pointee if false, the position is local pointer arithmetic therefore Ev(R_y [+ offset]) is merged with lhs
+   *                else, the position is a memory read/write therefore E(Ev(R_y [+ offset])) is merged with lhs
+   * @param offset offset if [+ offset] is present
+   * @return the cell resulting from the unification
+   */
+  private def visitPointerArithmeticOperation(position: CFGPosition, lhs: DSC, rhs: Variable, pointee: Boolean = false,  offset: BigInt = 0) : DSC =
+    // visit all the defining pointer operation on rhs variable first
+    reachingDefs(position)(rhs).foreach(visit)
+    // get the cells of all the SSA variables in the set
+    val cells: Set[DSC] = getCells(position, rhs)
+    // merge the cells or their pointees with lhs
+    cells.foldLeft(lhs) {
+      (c, cell) =>
+        if offset != 0 then // it's R_x = R_y + offset
+          val node = cell.node.get // get the node of R_y
+          var field = offset + cell.offset // calculate the total offset
+          node.addCell(field, 0) // add cell there if doesn't already exists
+          if node.collapsed then
+            field = 0
+          graph.mergeCells(c, if pointee then graph.getPointee(node.cells(field)) else node.cells(field))
+        else
+          graph.mergeCells(c, if pointee then graph.getPointee(cell) else cell)
+    }
+
+
   def visit(n: CFGPosition): Unit = {
+    if visited.contains(n) then
+      return
+    else
+      visited.add(n)
     n match
       case DirectCall(proc, target, label) if proc.name == "malloc" =>
         val size: BigInt = evaluateExpression(mallocRegister, constProp(n)) match
@@ -139,23 +175,16 @@ class Local(
           case None => 0
         val node = DSN(Some(graph), Some(HeapRegion2(nextMallocCount, proc, size)))
         graph.nodes.add(node)
-        val cell = graph.mergeCells(graph.varToCell(n)(mallocRegister), node.cells(0))
-        graph.varToCell(n).update(mallocRegister, cell)
+        graph.mergeCells(graph.varToCell(n)(mallocRegister), node.cells(0))
 
       case LocalAssign(variable, expr, maybeString) =>
         val lhsCell = graph.varToCell(n)(variable)
-        if maybeString.get.startsWith("%0000031f") then
-          print("")
-        if maybeString.get.startsWith("%00000325") then
-          print("")
         if isGlobal(expr, n).isDefined then
           val global = isGlobal(expr, n).get
-          val result = graph.mergeCells(lhsCell, global)
-          graph.varToCell(n).update(variable, result)
+          graph.mergeCells(lhsCell, global)
         else if isStack(expr, n).isDefined then // just in case stack can't be recognised in after this assignment
           val stack = isStack(expr, n).get
-          val result = graph.mergeCells(lhsCell, stack)
-          graph.varToCell(n).update(variable, result)
+          graph.mergeCells(lhsCell, stack)
         else
           expr match
             case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) && arg1.equals(stackPointer)
@@ -163,66 +192,32 @@ class Local(
               val size = twosComplementToDec(decToBinary(evaluateExpression(arg2, constProp(n)).get.value))
               val node = DSN(Some(graph), Some(StackRegion2("Stack_"+proc.name, proc, -size)))
               graph.nodes.add(node)
-              val cell = graph.mergeCells(lhsCell, node.cells(0))
-              graph.varToCell(n).update(variable, cell)
+              graph.mergeCells(lhsCell, node.cells(0))
+
             case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(n) &&  varToSym(n).contains(arg1) && evaluateExpression(arg2, constProp(n)).isDefined =>
               val offset = evaluateExpression(arg2, constProp(n)).get.value
-              val nodes: Set[DSN] = getNodes(n, arg1)
-              nodes.foreach(_.addCell(offset, 0))
-              val cell = nodes.foldLeft(lhsCell){
-                (c, node) =>
-                  var field = offset
-                  node.addCell(offset, 0)
-                  if node.collapsed then
-                    field = 0
-                  graph.mergeCells(c, node.cells(field)) // TODO this causing everything to collapse
-              }
-              graph.varToCell(n).update(variable, cell)
+              visitPointerArithmeticOperation(n, lhsCell, arg1, false, offset)
 
             case arg: Variable if varToSym(n).contains(arg) =>
-              val cells = getCells(n, arg)
-
-              val cell = cells.foldLeft(lhsCell){
-                (c, p) =>
-                  graph.mergeCells(c, p) // TODO this causing everything to collapse
-              }
-              graph.varToCell(n).update(variable, cell)
+             visitPointerArithmeticOperation(n, lhsCell, arg)
 
             case MemoryLoad(mem, index, endian, size) =>
               val byteSize = (size.toDouble/8).ceil.toInt
               if isGlobal(index, n, byteSize).isDefined then
                 val global = isGlobal(index, n, byteSize).get
-                val result = graph.mergeCells(lhsCell, graph.getPointee(global))
-                graph.varToCell(n).update(variable, result)
+                graph.mergeCells(lhsCell, graph.getPointee(global))
               else if isStack(index, n).isDefined then
                 val stack = isStack(index, n).get
-                val result = graph.mergeCells(lhsCell, graph.getPointee(stack))
-                graph.varToCell(n).update(variable, result)
+                graph.mergeCells(lhsCell, graph.getPointee(stack))
               else
                 index match
                   case BinaryExpr(op, arg1: Variable, arg2) if evaluateExpression(arg2, constProp(n)).isDefined =>
                     assert(varToSym(n).contains(arg1))
                     val offset = evaluateExpression(arg2, constProp(n)).get.value
-                    val nodes: Set[DSN] = getNodes(n, arg1)
-                    nodes.foreach(_.addCell(offset, byteSize))
-                    val cell = nodes.foldLeft(lhsCell){
-                      (c, node) =>
-                        var field = offset
-                        node.addCell(offset, byteSize)
-                        if node.collapsed then
-                          field = 0
-                        graph.mergeCells(c, graph.getPointee(node.cells(field))) // TODO this causing everything to collapse
-                    }
-                    graph.varToCell(n).update(variable, cell)
+                    visitPointerArithmeticOperation(n, lhsCell, arg1, true, offset)
                   case arg: Variable =>
                     assert(varToSym(n).contains(arg))
-                    val cells: Set[DSC] = getCells(n, arg)
-
-                    val cell = cells.foldLeft(lhsCell){
-                      (c, p) =>
-                        graph.mergeCells(c, graph.getPointee(p)) // TODO this causing everything to collapse
-                    }
-                    graph.varToCell(n).update(variable, cell)
+                    visitPointerArithmeticOperation(n, lhsCell, arg, true)
                   case _ => ???
             case _ =>
               breakable {
@@ -246,64 +241,37 @@ class Local(
                   graph.collapseNode(node)
                   graph.varToCell(n).update(variable, node.cells(0))
               }
+
       case MemoryAssign(memory, MemoryStore(mem, index, value: Variable, endian, size), label) =>
-        if n.isInstanceOf[MemoryAssign] && n.asInstanceOf[MemoryAssign].label.get.startsWith("%00000318") then
-          print("")
         val byteSize = (size.toDouble/8).ceil.toInt
-        val addressCell: DSC =
+        val addressPointee: DSC =
           if isGlobal(index, n, byteSize).isDefined then
-            isGlobal(index, n, byteSize).get
+            graph.getPointee(isGlobal(index, n, byteSize).get)
           else if isStack(index, n).isDefined then
-            isStack(index, n).get
+            graph.getPointee(isStack(index, n).get)
           else
             index match
             case BinaryExpr(op, arg1: Variable, arg2) if evaluateExpression(arg2, constProp(n)).isDefined =>
               assert(varToSym(n).contains(arg1))
               val offset = evaluateExpression(arg2, constProp(n)).get.value
-              val nodes: Set[DSN] = getNodes(n, arg1)
-              nodes.foreach(_.addCell(offset, byteSize))
-              val cell = nodes.foldLeft(DSN(Some(graph), None).cells(0)) {
-                (c, node) =>
-                  var field = offset
-                  node.addCell(offset, byteSize)
-                  if node.collapsed then
-                    field = 0
-                  graph.mergeCells(c, node.cells(field)) // TODO this causing everything to collapse
-              }
-              cell
+              visitPointerArithmeticOperation(n, DSN(Some(graph), None).cells(0), arg1, true, offset)
             case arg: Variable =>
               assert(varToSym(n).contains(arg))
-              val cells: Set[DSC] = getCells(n, arg)
-              val cell = cells.foldLeft(DSN(Some(graph), None).cells(0)) {
-                (c, p) =>
-                  graph.mergeCells(c, p) // TODO this causing everything to collapse
-              }
-              cell
+              visitPointerArithmeticOperation(n, DSN(Some(graph), None).cells(0), arg, true)
             case _ => ???
 
         val valueCells = getCells(n, value)
-        val result = valueCells.foldLeft(graph.getPointee(addressCell)) {
+        val result = valueCells.foldLeft(addressPointee) {
           (c, p) =>
             graph.mergeCells(p, c)
         }
-
-        if reachingDefs(n).contains(value) then
-          reachingDefs(n)(value).foreach (
-            definition =>
-              graph.varToCell(definition).update(value, result)
-          )
-        else
-         graph.formals.update(value, result)
 
       case _ =>
   }
   def analyze(): Any =
     val domain = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).reverse
-      
-
 
     domain.foreach(visit)
-
 
     println(graph.formals)
     val results = graph.varToCell.keys.toSeq.sortBy(_.toShortString)
