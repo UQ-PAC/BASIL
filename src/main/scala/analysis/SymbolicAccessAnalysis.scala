@@ -2,7 +2,7 @@ package analysis
 
 import analysis.solvers.ForwardIDESolver
 import ir.IRWalk.procedure
-import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Extract, GoTo, IndirectCall, Literal, LocalAssign, Memory, MemoryLoad, MemoryStore, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend}
+import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, GoTo, IndirectCall, Literal, LocalAssign, Memory, MemoryLoad, MemoryStore, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend}
 
 import java.math.BigInteger
 
@@ -81,6 +81,12 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
     result
   }
 
+  def unwrapPaddingAndSlicing(expr: Expr): Expr =
+    expr match
+      case Extract(end, start, body) if start == 0 && end == 32 => unwrapPaddingAndSlicing(body)
+      case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
+      case _ => expr
+
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
     d match
       case Left(value) =>
@@ -112,7 +118,8 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
     val bitvecnegative: BigInt = new BigInt(new BigInteger("9223372036854775808")) // negative 64 bit integer
 
     n match
-      case LocalAssign(variable, expr, maybeString) =>
+      case LocalAssign(variable, rhs, maybeString) =>
+        val expr = unwrapPaddingAndSlicing(rhs)
         expr match
           case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) && arg1.equals(stackPointer)
             && evaluateExpression(arg2, constProp(n)).isDefined && evaluateExpression(arg2, constProp(n)).get.value >= bitvecnegative =>

@@ -28,7 +28,6 @@ import util.Logger
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
-import analysis.CfgCommandNode
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -60,7 +59,9 @@ case class StaticAnalysisContext(
     steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+    symbolicAccessess: Map[CFGPosition, Map[SymbolicAccess, TwoElement]],
+    dsg: Option[DSG]
 )
 
 /** Results of the main program execution.
@@ -708,7 +709,9 @@ object StaticAnalysis {
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,
       memoryRegionContents = memoryRegionContents,
-      reachingDefs = reachingDefinitionsAnalysisResults
+      reachingDefs = reachingDefinitionsAnalysisResults,
+      symbolicAccessess = symResults,
+      dsg = None,
     )
   }
 
@@ -948,8 +951,31 @@ object RunUtils {
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
+    Logger.info("[!] Running Region Builder")
+    val writesTo = WriteToAnalysis(ctx.program).analyze()
+    val reachingDefs = ReachingDefsAnalysis(ctx.program, writesTo).analyze()
+    config.analysisDotPath.foreach(
+      s =>
+        writeToFile(toDot(ctx.program), s"${s}_ct.dot")
+    )
+    val b = Local(ctx.program.mainProcedure, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo).analyze()
+
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
-    analysisResult.last
+    StaticAnalysisContext(
+      cfg = analysisResult.last.cfg,
+      constPropResult = analysisResult.last.constPropResult,
+      IRconstPropResult = analysisResult.last.IRconstPropResult,
+      memoryRegionResult = analysisResult.last.memoryRegionResult,
+      vsaResult = analysisResult.last.vsaResult,
+      interLiveVarsResults = analysisResult.last.interLiveVarsResults,
+      paramResults = analysisResult.last.paramResults,
+      steensgaardResults = analysisResult.last.steensgaardResults,
+      mmmResults = analysisResult.last.mmmResults,
+      memoryRegionContents = analysisResult.last.memoryRegionContents,
+      symbolicAccessess = analysisResult.last.symbolicAccessess,
+      dsg = Some(b),
+      reachingDefs = analysisResult.last.reachingDefs
+    )
   }
 }
 
