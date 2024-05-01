@@ -198,6 +198,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         BitVecType(r.size.getText.toInt)
       case c: TypeConstructorContext => c.str.getText.match {
         case "FPRounding" => BitVecType(3)
+        case "integer" => BitVecType(64)
         case _ => throw Exception(s"unknown type ${ctx.getText}")
       }
       case _ => throw Exception(s"unknown type ${ctx.getText}")

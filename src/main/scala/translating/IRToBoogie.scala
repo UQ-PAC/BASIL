@@ -407,6 +407,9 @@ class IRToBoogie(var program: Program, var spec: Specification) {
         val wrap = BinaryBExpr(BVULE, baseVar, end)
         val body = IfThenElse(wrap, BinaryBExpr(BoolAND, above, below), BinaryBExpr(BoolOR, above, below))
         BFunction(b.fnName, in, out, Some(body), List(inlineAttr))
+
+      case u: BUninterpreted =>
+        BFunction(u.name, u.in.map(BParam(_)), BParam(u.out), None)
     }
   }
 
