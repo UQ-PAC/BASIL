@@ -34,8 +34,6 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CFGPosition, Map
             s + (RegisterVariableWrapper(localAssign.lhs, getDefinition(localAssign.lhs, cmd.data, reachingDefs)) -> FlatEl(memoryLoad))
           case binaryExpr: BinaryExpr =>
             if (evaluateExpression(binaryExpr.arg1, constants).isEmpty) { // approximates Base + Offset
-              println(s"Approximating ${localAssign} in $binaryExpr")
-              println(s"Reaching defs: ${reachingDefs(cmd.data)}")
               s + (RegisterVariableWrapper(localAssign.lhs, getDefinition(localAssign.lhs, cmd.data, reachingDefs)) -> FlatEl(binaryExpr))
             } else {
               s
