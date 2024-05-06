@@ -358,9 +358,8 @@ class Block private (
   statements.onInsert = x => x.setParent(this)
   statements.onRemove = x => x.deParent()
 
-
   def this(label: String, address: Option[Int] = None, statements: IterableOnce[Statement] = Set.empty, jump: Jump = GoTo(Set.empty)) = {
-    this(label, address, IntrusiveList.from(statements), jump,  mutable.HashSet.empty, None)
+    this(label, address, IntrusiveList.from(statements), jump, mutable.HashSet.empty, None)
   }
 
   def jump: Jump = _jump

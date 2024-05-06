@@ -1,5 +1,6 @@
 package util.intrusive_list
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 // TODO: implement IterableOps
 //   So need iterablefactory https://docs.scala-lang.org/overviews/core/custom-collections.html
@@ -90,7 +91,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     elem
   }
 
-  class IntrusiveListIterator(var elem: Option[T], forward: Boolean) extends Iterator[T] {
+  private class IntrusiveListIterator(var elem: Option[T], forward: Boolean) extends Iterator[T] {
     override def hasNext: Boolean = elem.isDefined
     override def next: T = {
       val t = elem.get
@@ -133,14 +134,14 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   /**
    * Unsafely return the first element of the list.
    */
-  override def head(): T = firstElem.get
+  override def head: T = firstElem.get
 
-  override def headOption(): Option[T] = firstElem
+  override def headOption: Option[T] = firstElem
 
   /**
    * Unsafely return the first element of the list.
    */
-  def begin(): T = firstElem.get
+  def begin: T = firstElem.get
 
   /**
    * Check whether the list contains the given element (by reference) by linear scan.
@@ -169,7 +170,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   /**
    * Unsafely return the last element of the list.
    */
-  def back(): T = lastElem.get
+  def back: T = lastElem.get
 
   /**
    * Add an element to the beginning of the list.
@@ -232,19 +233,19 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   }
 
   /**
-   * Split the list into two lists, the first retains all elements up to to and including the provided element,
-   * and and returns the second list from the element until the end.
+   * Removes all elements after the provided element n and returns an ArrayBuffer containing the removed elements,
+   * maintaining the ordering.
    *
    * @param n The element to split on, remains in the first list.
-   * @return A list containing all elements after n.
+   * @return An ArrayBuffer containing all elements after n.
    */
-  def splitOn(n: T): IntrusiveList[T] = {
+  def splitOn(n: T): ArrayBuffer[T] = {
     require(!lastElem.contains(n))
     require(containsRef(n))
 
     val ne = n.next
 
-    val newlist = new IntrusiveList[T]()
+    val newlist = ArrayBuffer[T]()
     var next = n.next
     while (next.isDefined) {
       remove(next.get)
@@ -355,9 +356,6 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
   }
 
 object IntrusiveList {
-
-  def from[T <: IntrusiveListElement[T]](it: IntrusiveList[T]): IntrusiveList[T] = it
-
   def from[T <: IntrusiveListElement[T]](it: IterableOnce[T]): IntrusiveList[T] = IntrusiveList[T]().addAll(it)
 
   def empty[T <: IntrusiveListElement[T]]: IntrusiveList[T] = new IntrusiveList[T]()
@@ -381,8 +379,6 @@ trait IntrusiveListElement[T <: IntrusiveListElement[T]]:
     elem.next = Some(this.asInstanceOf[T])
     elem
   }
-
-
 
   private[intrusive_list] final def unitary: Boolean = next.isEmpty && prev.isEmpty
 

@@ -184,8 +184,7 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
 
   test("construct") {
     val l = getSequentialList(3)
-
-
+    
     val l2 = IntrusiveList.from(l)
     assert(l2.size == 3)
 
