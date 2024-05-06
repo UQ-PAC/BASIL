@@ -376,7 +376,8 @@ class Block private (
     _fallthrough = g
   }
 
-  def jump_=(j: Jump): Unit = {
+  private def jump_=(j: Jump): Unit = {
+    require(!j.hasParent)
     if (j ne _jump) {
       _jump.deParent()
       _jump = j
@@ -385,6 +386,11 @@ class Block private (
   }
 
   def replaceJump(j: Jump): Block = {
+    if (j.hasParent) {
+      val parent = j.parent
+      j.deParent()
+      parent.jump = GoTo(Set.empty)
+    }
     jump = j
     this
   }
