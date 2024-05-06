@@ -51,8 +51,7 @@ class DSG(val proc: Procedure,
               case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), symOffset) =>
                 offset = offset + symOffset
                 if m.contains(offset) then
-                  m(offset).addCell(0, byteSize)
-                  assert(m(offset).cells(0).accessedSizes.size <= 1)
+                  assert(!m(offset).cells(0).growSize(byteSize))
                   m
                 else
                   val node = DSN(Some(this), Some(StackRegion2(pos.toShortString, proc, byteSize)))
@@ -66,8 +65,7 @@ class DSG(val proc: Procedure,
             sym match
               case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), offset) =>
                 if m.contains(offset) then
-                  m(offset).addCell(0, byteSize)
-                  assert(m(offset).cells(0).accessedSizes.size <= 1)
+                  assert(!m(offset).cells(0).growSize(byteSize))
                   m
                 else
                   val node = DSN(Some(this), Some(StackRegion2(pos.toShortString, proc, byteSize)))
@@ -92,24 +90,24 @@ class DSG(val proc: Procedure,
 
   // make all globals
   private val swappedOffsets = globalOffsets.map(_.swap)
-  val globalMapping: mutable.Map[(BigInt, BigInt), DSN] = globals.foldLeft(mutable.Map[(BigInt, BigInt), DSN]()) {
+  val globalMapping: mutable.Map[(BigInt, BigInt), (DSN, BigInt)] = globals.foldLeft(mutable.Map[(BigInt, BigInt), (DSN, BigInt)]()) {
     (m, global) =>
       var address: BigInt = global.address
       if swappedOffsets.contains(address) then
         address = swappedOffsets(address)
-      m + ((address, address + global.size/8) -> DSN(Some(this), Some(DataRegion2(global.name, address, global.size))))
+      m + ((address, address + global.size/8) -> (DSN(Some(this), Some(DataRegion2(global.name, address, global.size))), 0))
   }
   externalFunctions.foreach(
     external =>
       var address: BigInt = external.offset
       if swappedOffsets.contains(address) then
         address = swappedOffsets(address)
-      globalMapping.update((address, address), DSN(Some(this), Some(DataRegion2(external.name, address, 0))))
+      globalMapping.update((address, address), (DSN(Some(this), Some(DataRegion2(external.name, address, 0))), 0))
   )
 
 
   // determine if an address is a global and return the corresponding global if it is.
-  def isGlobal(address: BigInt): Option[DSN] =
+  def isGlobal(address: BigInt): Option[(DSN, BigInt)] =
     for (elem <- globalMapping) {
       val range = elem._1
       if address >= range._1 && address <= range._2 then
@@ -117,15 +115,21 @@ class DSG(val proc: Procedure,
     }
     None
 
-  private def replaceInEV(oldCell: DSC, newCell: DSC) =
+  private def replaceInEV(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
     varToCell.foreach(
       (pos, m) =>
-        m.foreach(
-          (variable, cell) =>
-            if cell.equals(oldCell) then
-              m.update(variable, newCell)
-        )
+        m.foreach {
+          case (variable, (cell, offset)) =>
+          if cell.equals(oldCell) then
+            m.update(variable, (newCell, offset + internalOffsetChange))
+        }
     )
+
+    formals.foreach{
+      case (variable, (cell, offset)) =>
+        if cell.equals(oldCell) then
+          formals.update(variable, (newCell, offset + internalOffsetChange))
+    }
 
   private def replaceInPointTo(oldCell: DSC, newCell: DSC) =
     pointTo.foreach {
@@ -137,9 +141,11 @@ class DSG(val proc: Procedure,
   private def replaceInGlobals(oldCell: DSC, newCell: DSC) =
     if oldCell.node.isDefined then
       globalMapping.foreach {
-        case (key, node) =>
+        case (key, tuple) =>
+          val node = tuple._1
+          val offset = tuple._2
           if node.equals(oldCell.node.get) then
-            globalMapping.update(key, newCell.node.get)
+            globalMapping.update(key, (newCell.node.get, offset))
       }
 
   private def replaceInStack(oldCell: DSC, newCell: DSC) =
@@ -150,22 +156,22 @@ class DSG(val proc: Procedure,
             stackMapping.update(offset, newCell.node.get)
       }
       
-  private def replace(oldCell: DSC, newCell: DSC) =
-    replaceInEV(oldCell, newCell)
+  private def replace(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
+    replaceInEV(oldCell, newCell, internalOffsetChange)
     replaceInPointTo(oldCell, newCell)
     replaceInGlobals(oldCell, newCell)
     replaceInStack(oldCell, newCell)
 
   def getPointee(cell: DSC): DSC =
     if !pointTo.contains(cell) then
-      val node = DSN(None, None)
+      val node = DSN(Some(this), None)
       pointTo.update(cell, node.cells(0))
     pointTo(cell)
 
   
 
   def collapseNode(node: DSN): Unit =
-    val collapedCell = DSC(Option(node), 0, true)
+    val collapedCell = DSC(Option(node), 0)
     val e = DSC(None, 0)
 
     val cell = node.cells.foldLeft(e) {
@@ -182,7 +188,7 @@ class DSG(val proc: Procedure,
 
     node.cells.values.foreach(
       cell =>
-        replace(cell, collapedCell)
+        replace(cell, collapedCell, 0)
         pointTo.foreach {
           case (pointer, pointee) =>
             if pointer.equals(cell) then
@@ -199,83 +205,162 @@ class DSG(val proc: Procedure,
     if cell.node.isDefined then
       pointTo.update(node.cells(0), cell)
 
-  def coolMergeCells(cell1: DSC, cell2: DSC): DSC = ???
+  def optionalCollapse(node: DSN): Unit = {
+    var lastOffset: BigInt = -1
+    var lastAccess: BigInt = -1
+    val removed = mutable.Set[BigInt]()
+    node.cells.toSeq.sortBy(_._1).foreach {
+      case (offset: BigInt, cell: DSC) =>
+        if lastOffset + lastAccess > offset then
+          val result = mergeNeighbours(node.cells(lastOffset), cell)
+          removed.add(offset)
+          lastAccess = result.largestAccessedSize
+        else
+          lastOffset = offset
+          lastAccess = cell.largestAccessedSize
+    }
+    removed.foreach(node.cells.remove)
+  }
 
-
+  def mergeNeighbours(cell1: DSC, cell2: DSC): DSC =
+    require(cell1.node.equals(cell2.node) && cell1.offset < cell2.offset)
+    if pointTo.contains(cell2) then
+      if pointTo.contains(cell1) then
+        mergeCells(getPointee(cell1), getPointee(cell2))
+      else
+        pointTo.update(cell1, getPointee(cell2))
+      pointTo.remove(cell2)
+    val internalOffsetChange = cell2.offset - cell1.offset
+    replace(cell2, cell1, internalOffsetChange)
+    cell1.growSize(cell2.offset + cell2.largestAccessedSize) // might cause another collapse
+    cell1
 
 
   def mergeCells(cell1: DSC, cell2: DSC): DSC =
-    if (cell1 == cell2) {
-      return cell1
-    }
-    if (incompatibleTypes(cell1, cell2)) then
-      collapseNode(cell2.node.get)
-    
-    if cell1.node.isDefined then
-      cell2.node.get.allocationRegions.addAll(cell1.node.get.allocationRegions)
-      if cell1.node.get.region.isDefined && cell1.node.get.region.get.isInstanceOf[DataRegion2] then
-        cell2.node.get.region = cell1.node.get.region
 
-
-    if cell2.node.get.collapsed then
-      if cell1.node.isDefined then
-        cell1.node.get.cells.foreach {
-          case (offset, cell) =>
-            if pointTo.contains(cell) then
-              if pointTo.contains(cell2.node.get.cells(0)) then
-                mergeCells(getPointee(cell), getPointee(cell2.node.get.cells(0)))
-              else
-                pointTo.update(cell2.node.get.cells(0), getPointee(cell))
-              pointTo.remove(cell)
-            replace(cell, cell2.node.get.cells(0))
-        }
-        cell2.node.get.cells(0)
-      else
-        if pointTo.contains(cell1) then
-          if pointTo.contains(cell2.node.get.cells(0)) then
-            mergeCells(getPointee(cell1), getPointee(cell2.node.get.cells(0)))
-          else
-            pointTo.update(cell2.node.get.cells(0), getPointee(cell1))
-          pointTo.remove(cell1)
-          replace(cell1, cell2.node.get.cells(0))
-        cell2.node.get.cells(0)
-    else
-      cell1.node.get.cells.foreach {
-        case (offset, cell) =>
-          if pointTo.contains(cell) then
-            if pointTo.contains(cell2.node.get.cells(offset)) then
-              mergeCells(getPointee(cell), getPointee(cell2.node.get.cells(offset)))
-            else
-              pointTo.update(cell2.node.get.cells(offset), getPointee(cell))
-            pointTo.remove(cell)
-            replace(cell, cell2.node.get.cells(offset))
-      }
+    if cell1.equals(cell2) then
+      cell1
+    else if cell1.node.isDefined && cell1.node.equals(cell2.node) then
+      collapseNode(cell1.node.get)
+      cell1.node.get.cells(0)
+    else if cell1.node.isEmpty then
+      replace(cell1, cell2, 0)
       cell2
-
-
-  private def incompatibleTypes(cell1: DSC, cell2: DSC): Boolean =
-    if cell2.node.get.collapsed then
-      return false
-    else if cell1.node.isEmpty || (cell1.collapsedCell && !cell2.collapsedCell) then
-      return true // TODO not sure about this
-    else if cell1.offset != cell2.offset then
-      return true
-    else if cell1.node.get.cells.size != cell2.node.get.cells.size then
-      return true
+    else if cell1.node.get.collapsed || cell2.node.get.collapsed then
+      val node1 = cell1.node.get
+      val node2 = cell2.node.get
+      collapseNode(node1)
+      collapseNode(node2)
+      node2.allocationRegions.addAll(node1.allocationRegions)
+      if node2.region.isEmpty then
+        node2.region = node1.region
+      if pointTo.contains(node1.cells(0)) then
+        if pointTo.contains(node2.cells(0)) then
+          pointTo.update(node2.cells(0), mergeCells(getPointee(node1.cells(0)), getPointee(node2.cells(0))))
+        else 
+          pointTo.update(node2.cells(0), getPointee(node1.cells(0)))
+      pointTo.remove(node1.cells(0))
+      replace(node1.cells(0), node2.cells(0), 0)
+      node2.cells(0)
+    else if cell1.node.get.allocationRegions.isEmpty && cell1.offset == 0 && cell1.node.get.cells.size == 1 && cell1.largestAccessedSize == 0 && //
+      !pointTo.contains(cell1) && pointTo.values.foldLeft(true) {
+      (condition, cell) => cell != cell1 && condition
+    } then
+      replace(cell1, cell2, 0)
+      cell2
     else
-      (cell1.node.get.cells zip cell2.node.get.cells).foreach { //TODO remove unaccessed cells from type matching/allow unaccessed fields to merge with an accessed field
-        case ((o1, c1), (o2, c2)) =>
-          if o1 != o2 || !c1.accessedSizes.equals(c2.accessedSizes) then
-            return true
+      
+      var delta = cell1.offset - cell2.offset
+      var node1 = cell1.node.get
+      var node2 = cell2.node.get
+      if cell1.offset < cell2.offset then
+        delta = cell2.offset - cell1.offset
+        node1 = cell2.node.get
+        node2 = cell1.node.get
+
+
+      val cells : Seq[(BigInt, DSC)] = (node1.cells.toSeq ++ node2.cells.foldLeft(Seq[(BigInt, DSC)]()){
+        (s, tuple) =>
+          val offset = tuple._1
+          val cell = tuple._2
+          s:+ ((offset + delta, cell))
+      }).sortBy(_._1)
+
+      var lastOffset: BigInt = -1
+      var lastAccess: BigInt = -1
+      val resultNode = DSN(Some(this), node1.region)
+      resultNode.allocationRegions.addAll(node1.allocationRegions ++ node2.allocationRegions)
+      if node1.region.isDefined then 
+        resultNode.region = node1.region
+      else if node2.region.isDefined then
+        resultNode.region = node2.region
+        if node2.region.get.isInstanceOf[DataRegion2] then
+          globalMapping.foreach{
+            case ((start: BigInt, end: BigInt), (node:DSN, offset: BigInt)) =>
+              if node.equals(node2) then
+                globalMapping.update((start, end), (node, offset + delta))
+          }
+      val resultCells: mutable.Map[BigInt, (Set[DSC], BigInt)] = mutable.Map()
+      cells.foreach {
+        case (offset: BigInt, cell: DSC) =>
+          if (lastOffset + lastAccess > offset) || lastOffset == offset then // includes this cell
+            if (offset - lastOffset) + cell.largestAccessedSize > lastAccess then
+              lastAccess = (offset - lastOffset) + cell.largestAccessedSize
+            resultCells.update(offset, (resultCells(offset)._1 + cell, lastAccess))
+          else
+            lastOffset = offset
+            lastAccess = cell.largestAccessedSize
+            resultCells.update(lastOffset, (Set(cell), lastAccess))
       }
-    false
+
+      resultCells.foreach {
+        case (offset: BigInt, (cells: Set[DSC], largestAccess: BigInt)) =>
+          val collapsedCell = resultNode.addCell(offset, largestAccess)._1
+          val outgoing: Set[DSC] = cells.foldLeft(Set()){
+            (set, cell) =>
+              // replace incoming edges
+              if cell.node.get.equals(node2) then
+                replace(cell, collapsedCell, delta + cell.offset - offset) // TODO reconsider offsets
+              else
+                assert(cell.node.get.equals(node1))
+                replace(cell, collapsedCell, cell.offset - offset)
+
+              // collect outgoing edges
+              if pointTo.contains(cell) then
+                val pointee = getPointee(cell)
+                pointTo.remove(cell)
+                set + pointee
+              else
+                set
+          }
+          // replace outgoing edges TODO might have to move this out after all cells have been processed 
+          if outgoing.size == 1 then
+            pointTo.update(collapsedCell, outgoing.head)
+          else if outgoing.size > 1 then
+            val result = outgoing.tail.foldLeft(outgoing.head){
+              (result, cell) =>
+                mergeCells(result, cell)
+            }
+            pointTo.update(collapsedCell, result)
+      }
+      
+      if cell1.offset >= cell2.offset then
+        resultNode.cells(cell1.offset)
+      else
+        resultNode.cells(cell2.offset)
 
 
   private def isFormal(pos: CFGPosition, variable: Variable): Boolean =
     variable != stackPointer && !reachingDefs(pos).contains(variable)
 
-  val formals: mutable.Map[Variable, DSC] = mutable.Map()
-  val varToCell: Map[CFGPosition, mutable.Map[Variable, DSC]] = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(Map[CFGPosition, mutable.Map[Variable, DSC]]()) {
+  def unwrapPaddingAndSlicing(expr: Expr): Expr =
+    expr match
+      case Extract(end, start, body) if start == 0 && end == 32 => unwrapPaddingAndSlicing(body)
+      case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
+      case _ => expr
+      
+  val formals: mutable.Map[Variable, (DSC, BigInt)] = mutable.Map()
+  val varToCell: Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]] = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]]()) {
     (m, pos) =>
       pos match
         case LocalAssign(variable, value , label) =>
@@ -285,34 +370,33 @@ class DSG(val proc: Procedure,
                 val node = DSN(Some(this), None)
                 node.rep = "formal"
                 nodes.add(node)
-                formals.update(v, node.cells(0))
+                formals.update(v, (node.cells(0), 0))
           )
           val node = DSN(Some(this), None)
           node.rep = "ssa"
-          m + (pos -> mutable.Map(variable -> node.cells(0)))
+          m + (pos -> mutable.Map(variable -> (node.cells(0), 0)))
         case DirectCall(proc, target, label) if proc.name == "malloc" =>
           val node = DSN(Some(this), None)
           node.rep = "ssa"
-           m + (pos -> mutable.Map(mallocRegister -> node.cells(0)))
+           m + (pos -> mutable.Map(mallocRegister -> (node.cells(0), 0)))
         case DirectCall(proc, target, label) if writesTo.contains(proc) =>
-          val result: Map[Variable, DSC] = writesTo(proc).foldLeft(Map[Variable, DSC]()){
+          val result: Map[Variable, (DSC, BigInt)] = writesTo(proc).foldLeft(Map[Variable, (DSC, BigInt)]()){
             (n, variable) =>
               val node = DSN(Some(this), None)
               node.rep = "ssa"
-              n + (variable -> node.cells(0))
+              n + (variable -> (node.cells(0), 0))
           }
           m + (pos -> result.to(mutable.Map))
-        case MemoryAssign(memory, MemoryStore(mem, index, value: Variable, endian, size), label) =>
+        case MemoryAssign(memory, MemoryStore(mem, index, expr: Expr, endian, size), label) if unwrapPaddingAndSlicing(expr).isInstanceOf[Variable] =>
+          val value: Variable = unwrapPaddingAndSlicing(expr).asInstanceOf[Variable]
           if isFormal(pos, value) then
             val node = DSN(Some(this), None)
             node.rep = "formal"
             nodes.add(node)
-            formals.update(value, node.cells(0))
+            formals.update(value, (node.cells(0), 0))
           m
         case _ => m
   }
-
-
 
 
   def addNode(memoryRegion2: MemoryRegion2, offset: BigInt, size: Int): DSN = ???
@@ -345,16 +429,24 @@ class DSN(val graph: Option[DSG], var region: Option[MemoryRegion2]) {
 
     if newSize > size then
       size = newSize
-  def addCell(offset: BigInt, size: Int) =
+
+  def addCell(offset: BigInt, size: BigInt) : (DSC, BigInt) =
     this.updateSize(offset + size)
     if !cells.contains(offset) then
+      cells.foreach{
+        case (start:BigInt, cell:DSC) =>
+          if start < offset && offset < (start + cell.largestAccessedSize) then
+            val internalOffset = offset - start
+            cell.growSize(internalOffset + size)
+            return (cell, internalOffset)
+      }
       val cell = DSC(Some(this), offset)
       cells.update(offset, cell)
-      cell.addAccessedSize(size)
+      cell.growSize(size)
+      (cell, 0)
     else
-      cells(offset).addAccessedSize(size)
-      if cells(offset).accessedSizes.size > 1 then
-        graph.get.collapseNode(this)
+      cells(offset).growSize(size)
+      (cells(offset), 0)
 
 
   override def equals(obj: Any): Boolean =
@@ -366,32 +458,20 @@ class DSN(val graph: Option[DSG], var region: Option[MemoryRegion2]) {
   override def toString: String = s"Node($id, $allocationRegions ${if collapsed then ", collapsed" else ""})"
 }
 
-case class DSC(node: Option[DSN], offset: BigInt, collapsedCell: Boolean = false)
+case class DSC(node: Option[DSN], offset: BigInt)
 {
-  val accessedSizes: mutable.Set[Int] = mutable.Set()
-  def addAccessedSize(size: Int): Unit =
-    if size != 0 then accessedSizes.add(size)
+  var largestAccessedSize: BigInt = 0
+
+
+  def growSize(size: BigInt): Boolean =
+    if size > largestAccessedSize then
+      largestAccessedSize = size
+      true
+    else false
 
 
   override def toString: String = s"Cell(${if node.isDefined then node.get.toString else "NONE"}, $offset)"
 }
 
-class SimulationMapper
-{
 
-}
-
-class Field {}
-
-
-class Offset
-{}
-
-class Alloc
-{}
-
-class CallSite
-{
-
-}
 

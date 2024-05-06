@@ -62,6 +62,7 @@ case class StaticAnalysisContext(
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
     symbolicAccessess: Map[CFGPosition, Map[SymbolicAccess, TwoElement]],
+    dsg: Option[DSG],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]
 )
 
@@ -630,8 +631,7 @@ object StaticAnalysis {
 
     Logger.info("[!] Running PointerTypeAnalysis")
     val pointerTypeResults = PointerTypeAnalysis(IRProgram).analyze()
-//    println("HEllow")
-//    println(pointerTypeResults)
+
     config.analysisDotPath.foreach(s =>
       writeToFile(toDot(IRProgram, pointerTypeResults.foldLeft(Map(): Map[CFGPosition, String]) {
         (m, t) =>
@@ -639,23 +639,6 @@ object StaticAnalysis {
       }), s"${s}_pointerType.dot")
     )
 
-
-//    Logger.info("[!] Running Reaching Defs")
-//    val reachingDefs = PrePass(IRProgram, newCPResult, globals, globalAddresses, globalOffsets).analyze()
-//    config.analysisDotPath.foreach(s =>
-//      writeToFile(toDot(IRProgram, reachingDefs.foldLeft(Map():Map[CFGPosition, String]){
-//        (m, t) =>
-//          m + (t._1 -> t._2.toString)
-//      }), s"${s}_reaching.dot")
-//    )
-
-//    LocalDSA(IRProgram, IRProgram.mainProcedure, newCPResult, reachingDefs).analyze()
-
-//    println(globals)
-//    println(globalOffsets)
-//    println(globalAddresses)
-//    println(externalFunctions)
-//    println(externalAddresses)
 
     Logger.info("[!] Running Symbolic Access Analysis")
     val symResults: Map[CFGPosition, Map[SymbolicAccess, TwoElement]] = SymbolicAccessAnalysis(IRProgram, newCPResult).analyze()
@@ -677,8 +660,9 @@ object StaticAnalysis {
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,
       memoryRegionContents = memoryRegionContents,
+      symbolicAccessess = symResults,
+      dsg = None,
       reachingDefs = reachingDefinitionsAnalysisResults,
-      symbolicAccessess = symResults
     )
   }
 
@@ -906,13 +890,24 @@ object RunUtils {
       s =>
         writeToFile(toDot(ctx.program), s"${s}_ct.dot")
     )
-//    val graph = DSG(ctx.program.mainProcedure, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo)
     val b = Local(ctx.program.mainProcedure, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo).analyze()
-//    val regions = RegionBuilder(ctx.program, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions).analyze()
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
-    analysisResult.last
-
+    StaticAnalysisContext(
+      cfg = analysisResult.last.cfg,
+      constPropResult = analysisResult.last.constPropResult,
+      IRconstPropResult = analysisResult.last.IRconstPropResult,
+      memoryRegionResult = analysisResult.last.memoryRegionResult,
+      vsaResult = analysisResult.last.vsaResult,
+      interLiveVarsResults = analysisResult.last.interLiveVarsResults,
+      paramResults = analysisResult.last.paramResults,
+      steensgaardResults = analysisResult.last.steensgaardResults,
+      mmmResults = analysisResult.last.mmmResults,
+      memoryRegionContents = analysisResult.last.memoryRegionContents,
+      symbolicAccessess = analysisResult.last.symbolicAccessess,
+      dsg = Some(b),
+      reachingDefs = analysisResult.last.reachingDefs
+    )
   }
 }
 

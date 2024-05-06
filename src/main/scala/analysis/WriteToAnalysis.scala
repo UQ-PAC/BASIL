@@ -45,6 +45,6 @@ class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[Regi
   }
 
   def analyze(): Map[Procedure, Set[Register]] =
-    program.procedures.foreach(proc => getWritesTos)
+    program.procedures.foreach(getWritesTos)
     writesTo.toMap
 }
