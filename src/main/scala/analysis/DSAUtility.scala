@@ -232,7 +232,7 @@ class DSG(val proc: Procedure,
       pointTo.remove(cell2)
     val internalOffsetChange = cell2.offset - cell1.offset
     replace(cell2, cell1, internalOffsetChange)
-    cell1.growSize(cell2.offset + cell2.largestAccessedSize) // might cause another collapse
+    cell1.growSize((cell2.offset - cell1.offset) + cell2.largestAccessedSize) // might cause another collapse
     cell1
 
 
@@ -315,7 +315,7 @@ class DSG(val proc: Procedure,
 
       resultCells.foreach {
         case (offset: BigInt, (cells: Set[DSC], largestAccess: BigInt)) =>
-          val collapsedCell = resultNode.addCell(offset, largestAccess)._1
+          val collapsedCell = resultNode.addCell(offset, largestAccess)
           val outgoing: Set[DSC] = cells.foldLeft(Set()){
             (set, cell) =>
               // replace incoming edges
@@ -398,13 +398,9 @@ class DSG(val proc: Procedure,
         case _ => m
   }
 
-
-  def addNode(memoryRegion2: MemoryRegion2, offset: BigInt, size: Int): DSN = ???
 }
 
-class DSN(val graph: Option[DSG], var region: Option[MemoryRegion2]) {
-
-  val id: Int = NodeCounter.getCounter
+class DSN(val graph: Option[DSG], var region: Option[MemoryRegion2], val id: Int =  NodeCounter.getCounter) {
 
   var collapsed = false
 
@@ -430,23 +426,43 @@ class DSN(val graph: Option[DSG], var region: Option[MemoryRegion2]) {
     if newSize > size then
       size = newSize
 
-  def addCell(offset: BigInt, size: BigInt) : (DSC, BigInt) =
-    this.updateSize(offset + size)
-    if !cells.contains(offset) then
-      cells.foreach{
-        case (start:BigInt, cell:DSC) =>
+  def getCell(offset: BigInt): DSC =
+    if collapsed then
+      cells(0)
+    else if !cells.contains(offset) then
+      var result: Option[DSC] = None
+      cells.foreach {
+        case (start: BigInt, cell: DSC) =>
           if start < offset && offset < (start + cell.largestAccessedSize) then
-            val internalOffset = offset - start
-            cell.growSize(internalOffset + size)
-            return (cell, internalOffset)
+            result = Some(cell)
       }
+      result match
+        case Some(value) => value
+        case None =>
+          ???
+    else
+      cells(offset)
+      
+      
+  def addCell(offset: BigInt, size: BigInt) : DSC =
+    this.updateSize(offset + size)
+    if collapsed then
+      cells(0)
+    else if !cells.contains(offset) then
+//      cells.foreach{
+//        case (start:BigInt, cell:DSC) =>
+//          if start < offset && offset < (start + cell.largestAccessedSize) then
+//            val internalOffset = offset - start
+//            cell.growSize(internalOffset + size)
+//            return (cell, internalOffset)
+//      }
       val cell = DSC(Some(this), offset)
       cells.update(offset, cell)
       cell.growSize(size)
-      (cell, 0)
+      cell
     else
       cells(offset).growSize(size)
-      (cells(offset), 0)
+      cells(offset)
 
 
   override def equals(obj: Any): Boolean =
@@ -454,6 +470,8 @@ class DSN(val graph: Option[DSG], var region: Option[MemoryRegion2]) {
       case node: DSN =>
         this.id == node.id
       case _ => false
+
+  override def hashCode(): Int = id
 
   override def toString: String = s"Node($id, $allocationRegions ${if collapsed then ", collapsed" else ""})"
 }
@@ -468,7 +486,6 @@ case class DSC(node: Option[DSN], offset: BigInt)
       largestAccessedSize = size
       true
     else false
-
 
   override def toString: String = s"Cell(${if node.isDefined then node.get.toString else "NONE"}, $offset)"
 }

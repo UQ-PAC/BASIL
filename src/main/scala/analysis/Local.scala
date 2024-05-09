@@ -111,7 +111,7 @@ class Local(
       if node.collapsed then
         Some(node.cells(0))
       else
-        Some(node.addCell(internal + offset, 0)._1)
+        Some(node.getCell(internal + offset))
     else
       None
 
@@ -151,28 +151,46 @@ class Local(
     // get the cells of all the SSA variables in the set
     val cells: Set[(DSC, BigInt)] = getCells(position, rhs)
     // merge the cells or their pointees with lhs
-    cells.foldLeft(lhs) {
+    var result = cells.foldLeft(lhs) {
       (c, t) =>
         val cell = t._1
         val internalOffset = t._2
-        if offset != 0 then // it's R_x = R_y + offset
+        if !collapse then  // offset != 0 then // it's R_x = R_y + offset
           val node = cell.node.get // get the node of R_y
           var field = offset + cell.offset + internalOffset // calculate the total offset
           node.addCell(field, size) // add cell there if doesn't already exists
-          graph.optionalCollapse(node)
+//          graph.optionalCollapse(node)
           if node.collapsed then
             field = 0
-          graph.mergeCells(c, if pointee then graph.getPointee(node.addCell(field, 0)._1) else node.addCell(field, 0)._1)
+          graph.mergeCells(c, if pointee then graph.getPointee(node.getCell(field)) else node.getCell(field))
         else
-          if collapse then
+//          if collapse then
             val node = cell.node.get
             graph.collapseNode(node)
             graph.mergeCells(c, if pointee then graph.getPointee(node.cells(0)) else node.cells(0))
-          else
-            cell.node.get.addCell(cell.offset, size) //update the size of the cell
-            graph.optionalCollapse(cell.node.get)
-            graph.mergeCells(c, if pointee then graph.getPointee(cell.node.get.addCell(cell.offset, 0)._1) else cell.node.get.addCell(cell.offset, 0)._1)
+//          else
+//            cell.node.get.addCell(cell.offset + internalOffset, size) //update the size of the cell
+////            graph.optionalCollapse(cell.node.get)
+//            graph.mergeCells(c, if pointee then graph.getPointee(cell.node.get.getCell(cell.offset + internalOffset)) else cell.node.get.getCell(cell.offset + internalOffset))
     }
+    if pointee then
+      cells.foreach(
+        t =>
+          val offset = t._1.offset
+          val internalOffset = t._2
+          val node = t._1.node.get
+          val cell = node.getCell(offset + internalOffset)
+          if graph.pointTo.contains(cell) && graph.pointTo(cell).equals(result) then
+            graph.optionalCollapse(node)
+            assert(graph.pointTo.contains(node.getCell(offset)))
+            result = graph.getPointee(node.getCell(offset))
+          else
+            graph.optionalCollapse(node)
+      )
+    val resultOffset = result.offset
+    graph.optionalCollapse(result.node.get)
+    result.node.get.getCell(result.offset)
+
 
 
   def visit(n: CFGPosition): Unit = {
@@ -285,7 +303,7 @@ class Local(
       case _ =>
   }
   def analyze(): DSG =
-    val domain = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString)
+    val domain = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).reverse
 
     domain.foreach(visit)
 
