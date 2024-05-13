@@ -25,16 +25,16 @@ class LocalTest extends AnyFunSuite, TestUtil {
     )
     val dsg = results.analysis.get.dsg.get
     assert(dsg.pointTo.size == 9)
-    val framePointer = DSC(Some(DSN(None, None, 1)), 0) // R31
+    val framePointer = DSC(Some(DSN(None, 0, 1)), 0) // R31
     assert(dsg.pointTo(framePointer).equals(dsg.formals(R29)._1))
-    val stack8 = DSC(Some(DSN(None, None, 2)), 0) // R31 + 8
+    val stack8 = DSC(Some(DSN(None, 0, 2)), 0) // R31 + 8
     assert(dsg.pointTo(stack8).equals(dsg.formals(R30)._1))
-    val stack40 = DSC(Some(DSN(None, None, 3)), 0) // R31 + 40
-    val stack32 = DSC(Some(DSN(None, None, 5)), 0) // R31 + 32
+    val stack40 = DSC(Some(DSN(None, 0, 3)), 0) // R31 + 40
+    val stack32 = DSC(Some(DSN(None, 0, 5)), 0) // R31 + 32
     val stack24 = dsg.pointTo(stack32) // R31 + 24 and Malloc
     assert(stack24.node.get.collapsed)
     assert(dsg.pointTo(stack24).equals(stack24))
-    assert(dsg.pointTo(stack40).equals(dsg.getPointee(dsg.getPointee(DSC(Some(DSN(None, None, 12)), 0)))))
+    assert(dsg.pointTo(stack40).equals(dsg.getPointee(dsg.getPointee(DSC(Some(DSN(None,0, 12)), 0)))))
 
 //    assert(dsg.pointTo.contains(framePointer))
   }

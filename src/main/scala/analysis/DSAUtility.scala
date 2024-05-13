@@ -24,11 +24,14 @@ class DSG(val proc: Procedure,
           varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAccess]]],
           globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt],
           externalFunctions: Set[ExternalFunction],
-          reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
-          writesTo: Map[Procedure, Set[Register]]) {
+          val reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
+          val writesTo: Map[Procedure, Set[Register]],
+          val params: Map[Procedure, Set[Variable]]
+         ) {
   // DSNodes owned by this graph
   val nodes: mutable.Set[DSN] = mutable.Set()
   val pointTo: mutable.Map[DSC, DSC] = mutable.Map()
+  val callsites: mutable.Set[CallSite] = mutable.Set()
 
   val mallocRegister = Register("R0", BitVecType(64))
   val stackPointer = Register("R31", BitVecType(64))
@@ -54,7 +57,9 @@ class DSG(val proc: Procedure,
                   assert(!m(offset).cells(0).growSize(byteSize))
                   m
                 else
-                  val node = DSN(Some(this), Some(StackRegion2(pos.toShortString, proc, byteSize)))
+                  val node = DSN(Some(this), byteSize)
+                  node.allocationRegions.add(StackRegion2(pos.toShortString, proc, byteSize))
+                  node.flags.stack = true
                   node.addCell(0, byteSize)
                   m + (offset -> node)
               case _ => m
@@ -68,7 +73,9 @@ class DSG(val proc: Procedure,
                   assert(!m(offset).cells(0).growSize(byteSize))
                   m
                 else
-                  val node = DSN(Some(this), Some(StackRegion2(pos.toShortString, proc, byteSize)))
+                  val node = DSN(Some(this), byteSize)
+                  node.allocationRegions.add(StackRegion2(pos.toShortString, proc, byteSize))
+                  node.flags.stack = true
                   node.addCell(0, byteSize)
                   m + (offset -> node)
               case _ => m
@@ -95,23 +102,32 @@ class DSG(val proc: Procedure,
       var address: BigInt = global.address
       if swappedOffsets.contains(address) then
         address = swappedOffsets(address)
-      m + ((address, address + global.size/8) -> (DSN(Some(this), Some(DataRegion2(global.name, address, global.size))), 0))
+      val node = DSN(Some(this), global.size)
+      node.allocationRegions.add(DataRegion2(global.name, address, global.size))
+      node.flags.global = true
+      node.flags.incomplete = true
+      m + ((address, address + global.size/8) -> (node, 0))
+
   }
   externalFunctions.foreach(
     external =>
       var address: BigInt = external.offset
       if swappedOffsets.contains(address) then
         address = swappedOffsets(address)
-      globalMapping.update((address, address), (DSN(Some(this), Some(DataRegion2(external.name, address, 0))), 0))
+      val node = DSN(Some(this))
+      node.allocationRegions.add(DataRegion2(external.name, address, 0))
+      node.flags.global = true
+      node.flags.incomplete = true
+      globalMapping.update((address, address), (node, 0))
   )
 
 
   // determine if an address is a global and return the corresponding global if it is.
-  def isGlobal(address: BigInt): Option[(DSN, BigInt)] =
+  def isGlobal(address: BigInt): Option[((BigInt, BigInt), (DSN, BigInt))] =
     for (elem <- globalMapping) {
       val range = elem._1
       if address >= range._1 && address <= range._2 then
-        return Some(elem._2)
+        return Some(elem)
     }
     None
 
@@ -164,7 +180,7 @@ class DSG(val proc: Procedure,
 
   def getPointee(cell: DSC): DSC =
     if !pointTo.contains(cell) then
-      val node = DSN(Some(this), None)
+      val node = DSN(Some(this))
       pointTo.update(cell, node.cells(0))
     pointTo(cell)
 
@@ -197,7 +213,7 @@ class DSG(val proc: Procedure,
         }
     )
 
-    node.collapsed = true
+    node.flags.collapsed = true
 
 
     node.cells.clear()
@@ -252,8 +268,7 @@ class DSG(val proc: Procedure,
       collapseNode(node1)
       collapseNode(node2)
       node2.allocationRegions.addAll(node1.allocationRegions)
-      if node2.region.isEmpty then
-        node2.region = node1.region
+      node2.flags.join(node1.flags)
       if pointTo.contains(node1.cells(0)) then
         if pointTo.contains(node2.cells(0)) then
           pointTo.update(node2.cells(0), mergeCells(getPointee(node1.cells(0)), getPointee(node2.cells(0))))
@@ -288,18 +303,16 @@ class DSG(val proc: Procedure,
 
       var lastOffset: BigInt = -1
       var lastAccess: BigInt = -1
-      val resultNode = DSN(Some(this), node1.region)
+      val resultNode = DSN(Some(this))
       resultNode.allocationRegions.addAll(node1.allocationRegions ++ node2.allocationRegions)
-      if node1.region.isDefined then 
-        resultNode.region = node1.region
-      else if node2.region.isDefined then
-        resultNode.region = node2.region
-        if node2.region.get.isInstanceOf[DataRegion2] then
-          globalMapping.foreach{
-            case ((start: BigInt, end: BigInt), (node:DSN, offset: BigInt)) =>
-              if node.equals(node2) then
-                globalMapping.update((start, end), (node, offset + delta))
-          }
+      resultNode.flags.join(node1.flags)
+      resultNode.flags.join(node2.flags)
+      if node2.flags.global then
+        globalMapping.foreach{
+          case ((start: BigInt, end: BigInt), (node:DSN, offset: BigInt)) =>
+            if node.equals(node2) then
+              globalMapping.update((start, end), (node, offset + delta))
+        }
       val resultCells: mutable.Map[BigInt, (Set[DSC], BigInt)] = mutable.Map()
       cells.foreach {
         case (offset: BigInt, cell: DSC) =>
@@ -351,13 +364,8 @@ class DSG(val proc: Procedure,
 
 
   private def isFormal(pos: CFGPosition, variable: Variable): Boolean =
-    variable != stackPointer && !reachingDefs(pos).contains(variable)
+    !reachingDefs(pos).contains(variable)
 
-  def unwrapPaddingAndSlicing(expr: Expr): Expr =
-    expr match
-      case Extract(end, start, body) if start == 0 && end == 32 => unwrapPaddingAndSlicing(body)
-      case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
-      case _ => expr
       
   val formals: mutable.Map[Variable, (DSC, BigInt)] = mutable.Map()
   val varToCell: Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]] = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]]()) {
@@ -367,22 +375,23 @@ class DSG(val proc: Procedure,
           value.variables.foreach(
             v =>
               if isFormal(pos, v) then
-                val node = DSN(Some(this), None)
+                val node = DSN(Some(this))
+                node.flags.incomplete = true
                 node.rep = "formal"
                 nodes.add(node)
                 formals.update(v, (node.cells(0), 0))
           )
-          val node = DSN(Some(this), None)
+          val node = DSN(Some(this))
           node.rep = "ssa"
           m + (pos -> mutable.Map(variable -> (node.cells(0), 0)))
         case DirectCall(proc, target, label) if proc.name == "malloc" =>
-          val node = DSN(Some(this), None)
+          val node = DSN(Some(this))
           node.rep = "ssa"
            m + (pos -> mutable.Map(mallocRegister -> (node.cells(0), 0)))
         case DirectCall(proc, target, label) if writesTo.contains(proc) =>
           val result: Map[Variable, (DSC, BigInt)] = writesTo(proc).foldLeft(Map[Variable, (DSC, BigInt)]()){
             (n, variable) =>
-              val node = DSN(Some(this), None)
+              val node = DSN(Some(this))
               node.rep = "ssa"
               n + (variable -> (node.cells(0), 0))
           }
@@ -390,7 +399,8 @@ class DSG(val proc: Procedure,
         case MemoryAssign(memory, MemoryStore(mem, index, expr: Expr, endian, size), label) if unwrapPaddingAndSlicing(expr).isInstanceOf[Variable] =>
           val value: Variable = unwrapPaddingAndSlicing(expr).asInstanceOf[Variable]
           if isFormal(pos, value) then
-            val node = DSN(Some(this), None)
+            val node = DSN(Some(this))
+            node.flags.incomplete = true
             node.rep = "formal"
             nodes.add(node)
             formals.update(value, (node.cells(0), 0))
@@ -400,23 +410,46 @@ class DSG(val proc: Procedure,
 
 }
 
-class DSN(val graph: Option[DSG], var region: Option[MemoryRegion2], val id: Int =  NodeCounter.getCounter) {
-
+class Flags() {
   var collapsed = false
+  var stack = false
+  var heap = false
+  var global = false
+  var unknown = false
+  var read = false
+  var modified = false
+  var incomplete = false
+  var foreign = false
 
-  val allocationRegions: mutable.Set[MemoryRegion2] = region match
-    case Some(value) => mutable.Set(value)
-    case None => mutable.Set()
+  def join(other: Flags): Unit =
+    collapsed = collapsed || other.collapsed
+    stack = other.stack || stack
+    heap = other.heap || heap
+    global = other.global || global
+    unknown =other.unknown || unknown
+    read = other.read || read
+    modified = other.modified || modified
+    incomplete = other.incomplete || incomplete
+    foreign = other.foreign && foreign
+}
+
+class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCounter.getCounter) {
+
+//  var collapsed = false
+  var flags = Flags()
+  def collapsed = flags.collapsed
+
+  val allocationRegions: mutable.Set[MemoryRegion2] = mutable.Set()
 
   var rep: String = ""
 
-  var size: BigInt = region match
-    case Some(value) => value match
-      case DataRegion2(regionIdentifier, start, size) => size
-      case HeapRegion2(regionIdentifier, proc, size) => size
-      case StackRegion2(regionIdentifier, proc, size) => size
-      case UnknownRegion2(regionIdentifier, proc) => 0
-    case None => 0
+//  var size: BigInt = region match
+//    case Some(value) => value match
+//      case DataRegion2(regionIdentifier, start, size) => size
+//      case HeapRegion2(regionIdentifier, proc, size) => size
+//      case StackRegion2(regionIdentifier, proc, size) => size
+//      case UnknownRegion2(regionIdentifier, proc) => 0
+//    case None => 0
 
   val cells: mutable.Map[BigInt, DSC] = mutable.Map()
   this.addCell(0, 0)
@@ -449,13 +482,6 @@ class DSN(val graph: Option[DSG], var region: Option[MemoryRegion2], val id: Int
     if collapsed then
       cells(0)
     else if !cells.contains(offset) then
-//      cells.foreach{
-//        case (start:BigInt, cell:DSC) =>
-//          if start < offset && offset < (start + cell.largestAccessedSize) then
-//            val internalOffset = offset - start
-//            cell.growSize(internalOffset + size)
-//            return (cell, internalOffset)
-//      }
       val cell = DSC(Some(this), offset)
       cells.update(offset, cell)
       cell.growSize(size)
@@ -480,7 +506,6 @@ case class DSC(node: Option[DSN], offset: BigInt)
 {
   var largestAccessedSize: BigInt = 0
 
-
   def growSize(size: BigInt): Boolean =
     if size > largestAccessedSize then
       largestAccessedSize = size
@@ -489,6 +514,56 @@ case class DSC(node: Option[DSN], offset: BigInt)
 
   override def toString: String = s"Cell(${if node.isDefined then node.get.toString else "NONE"}, $offset)"
 }
+
+class CallSite(val call: DirectCall, val graph: DSG) {
+  val proc = call.target
+  val paramCells: Map[Variable, DSC] = graph.params(proc).foldLeft(Map[Variable, DSC]()) {
+    (m, reg) =>
+      val node = DSN(Some(graph))
+      node.flags.incomplete = true
+      m + (reg -> node.cells(0))
+  }
+  val returnCells: Map[Variable, DSC] = graph.writesTo(proc).foldLeft(Map[Variable, DSC]()) {
+    (m, reg) =>
+      val node = DSN(Some(graph))
+      node.flags.incomplete = true
+      m + (reg -> node.cells(0))
+  }
+}
+
+def unwrapPaddingAndSlicing(expr: Expr): Expr =
+  expr match
+    case Extract(end, start, body) if start == 0 && end == 32 => unwrapPaddingAndSlicing(body)
+    case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
+    case _ => expr
+
+def decToBinary(n: BigInt): Array[Int] = {
+  val binaryNum: Array[Int] = new Array[Int](64)
+  var i = 0
+  var num = n
+  while (num > 0) {
+    binaryNum(i) = (num % BigInt(2)).intValue
+    num = num / 2
+    i += 1
+  }
+  binaryNum
+}
+
+def twosComplementToDec(binary: Array[Int]): BigInt = {
+  var result: BigInt = BigInt(0)
+  var counter: Int = 0
+  binary.foreach(
+    n =>
+      if counter == binary.length - 1 && n == 1 then
+        result = result - BigInt(2).pow(counter)
+      else if n == 1 then
+        result = result + BigInt(2).pow(counter)
+      counter += 1
+  )
+  result
+}
+
+val BITVECNEGATIVE: BigInt = new BigInt(new BigInteger("9223372036854775808"))
 
 
 

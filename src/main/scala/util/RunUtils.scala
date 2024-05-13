@@ -958,7 +958,8 @@ object RunUtils {
       s =>
         writeToFile(toDot(ctx.program), s"${s}_ct.dot")
     )
-    val b = Local(ctx.program.mainProcedure, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo).analyze()
+    val b = Local(ctx.program.mainProcedure, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults).analyze()
+    val c = DSA(ctx.program, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults).analyze()
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
     StaticAnalysisContext(
