@@ -76,8 +76,7 @@ class Local(
   def isGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[DSC] =
     if evaluateExpression(expr, constProp(pos)).isDefined && graph.isGlobal(evaluateExpression(expr, constProp(pos)).get.value).isDefined then
       val address = evaluateExpression(expr, constProp(pos)).get.value
-      val (node: DSN, internal: BigInt) = graph.isGlobal(evaluateExpression(expr, constProp(pos)).get.value).get
-      val baseAddress = node.region.get.asInstanceOf[DataRegion2].start
+      val ((baseAddress: BigInt, end: BigInt), (node: DSN, internal: BigInt)) = graph.isGlobal(evaluateExpression(expr, constProp(pos)).get.value).get
       val offset = address - baseAddress
       node.addCell(internal + offset, size)
       graph.optionalCollapse(node)
@@ -164,7 +163,9 @@ class Local(
         val size: BigInt = evaluateExpression(mallocRegister, constProp(n)) match
           case Some(value) => value.value
           case None => 0
-        val node = DSN(Some(graph), Some(HeapRegion2(nextMallocCount, proc, size)))
+        val node = DSN(Some(graph), size)
+        node.allocationRegions.add(HeapRegion2(nextMallocCount, proc, size))
+        node.flags.heap = true
         graph.mergeCells(graph.varToCell(n)(mallocRegister)._1, node.cells(0))
       case call: DirectCall if params.contains(call.target) =>
         val cs = CallSite(call, graph)
@@ -192,7 +193,9 @@ class Local(
             case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) && arg1.equals(stackPointer)
               && evaluateExpression(arg2, constProp(n)).isDefined && evaluateExpression(arg2, constProp(n)).get.value >= BITVECNEGATIVE =>
               val size = twosComplementToDec(decToBinary(evaluateExpression(arg2, constProp(n)).get.value))
-              val node = DSN(Some(graph), Some(StackRegion2("Stack_"+proc.name, proc, -size)))
+              val node = DSN(Some(graph))
+              node.allocationRegions.add(StackRegion2("Stack_"+proc.name, proc, -size))
+              node.flags.stack = true
               graph.mergeCells(lhsCell, node.cells(0))
 
             case BinaryExpr(op, arg1: Variable, arg2) if /*varToSym.contains(n) &&  varToSym(n).contains(arg1) && */ evaluateExpression(arg2, constProp(n)).isDefined =>
@@ -204,6 +207,7 @@ class Local(
 
             case MemoryLoad(mem, index, endian, size) =>
               val byteSize = (size.toDouble/8).ceil.toInt
+              lhsCell.node.get.flags.read  = true
               if isGlobal(index, n, byteSize).isDefined then
                 val global = isGlobal(index, n, byteSize).get
                 graph.mergeCells(lhsCell, graph.getPointee(global))
@@ -243,6 +247,7 @@ class Local(
                     }
                 }
                 val node = cell.node.get
+                node.flags.unknown = true
                 graph.collapseNode(node)
 
       case MemoryAssign(memory, MemoryStore(mem, index, expr: Expr, endian, size), label) if unwrapPaddingAndSlicing(expr).isInstanceOf[Variable] => // if value is a literal ignore it
@@ -258,12 +263,13 @@ class Local(
             case BinaryExpr(op, arg1: Variable, arg2) if evaluateExpression(arg2, constProp(n)).isDefined =>
 //              assert(varToSym(n).contains(arg1))
               val offset = evaluateExpression(arg2, constProp(n)).get.value
-              visitPointerArithmeticOperation(n, DSN(Some(graph), None).cells(0), arg1, byteSize, true, offset)
+              visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, offset)
             case arg: Variable =>
 //              assert(varToSym(n).contains(arg))
-              visitPointerArithmeticOperation(n, DSN(Some(graph), None).cells(0), arg, byteSize, true)
+              visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg, byteSize, true)
             case _ => ???
 
+        addressPointee.node.get.flags.modified = true
         val valueCells = getCells(n, value)
         val result = valueCells.foldLeft(addressPointee) {
           (c, p) =>
