@@ -24,11 +24,14 @@ class DSG(val proc: Procedure,
           varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAccess]]],
           globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt],
           externalFunctions: Set[ExternalFunction],
-          reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
-          writesTo: Map[Procedure, Set[Register]]) {
+          val reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
+          val writesTo: Map[Procedure, Set[Register]],
+          val params: Map[Procedure, Set[Variable]]
+         ) {
   // DSNodes owned by this graph
   val nodes: mutable.Set[DSN] = mutable.Set()
   val pointTo: mutable.Map[DSC, DSC] = mutable.Map()
+  val callsites: mutable.Set[CallSite] = mutable.Set()
 
   val mallocRegister = Register("R0", BitVecType(64))
   val stackPointer = Register("R31", BitVecType(64))
@@ -351,13 +354,8 @@ class DSG(val proc: Procedure,
 
 
   private def isFormal(pos: CFGPosition, variable: Variable): Boolean =
-    variable != stackPointer && !reachingDefs(pos).contains(variable)
+    !reachingDefs(pos).contains(variable)
 
-  def unwrapPaddingAndSlicing(expr: Expr): Expr =
-    expr match
-      case Extract(end, start, body) if start == 0 && end == 32 => unwrapPaddingAndSlicing(body)
-      case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
-      case _ => expr
       
   val formals: mutable.Map[Variable, (DSC, BigInt)] = mutable.Map()
   val varToCell: Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]] = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]]()) {
@@ -449,13 +447,6 @@ class DSN(val graph: Option[DSG], var region: Option[MemoryRegion2], val id: Int
     if collapsed then
       cells(0)
     else if !cells.contains(offset) then
-//      cells.foreach{
-//        case (start:BigInt, cell:DSC) =>
-//          if start < offset && offset < (start + cell.largestAccessedSize) then
-//            val internalOffset = offset - start
-//            cell.growSize(internalOffset + size)
-//            return (cell, internalOffset)
-//      }
       val cell = DSC(Some(this), offset)
       cells.update(offset, cell)
       cell.growSize(size)
@@ -480,7 +471,6 @@ case class DSC(node: Option[DSN], offset: BigInt)
 {
   var largestAccessedSize: BigInt = 0
 
-
   def growSize(size: BigInt): Boolean =
     if size > largestAccessedSize then
       largestAccessedSize = size
@@ -489,6 +479,52 @@ case class DSC(node: Option[DSN], offset: BigInt)
 
   override def toString: String = s"Cell(${if node.isDefined then node.get.toString else "NONE"}, $offset)"
 }
+
+class CallSite(val call: DirectCall, val graph: DSG) {
+  val proc = call.target
+  val paramCells: Map[Variable, DSC] = graph.params(proc).foldLeft(Map[Variable, DSC]()) {
+    (m, reg) =>
+      m + (reg -> DSN(Some(graph), None).cells(0))
+  }
+  val returnCells: Map[Variable, DSC] = graph.writesTo(proc).foldLeft(Map[Variable, DSC]()) {
+    (m, reg) =>
+      m + (reg -> DSN(Some(graph), None).cells(0))
+  }
+}
+
+def unwrapPaddingAndSlicing(expr: Expr): Expr =
+  expr match
+    case Extract(end, start, body) if start == 0 && end == 32 => unwrapPaddingAndSlicing(body)
+    case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
+    case _ => expr
+
+def decToBinary(n: BigInt): Array[Int] = {
+  val binaryNum: Array[Int] = new Array[Int](64)
+  var i = 0
+  var num = n
+  while (num > 0) {
+    binaryNum(i) = (num % BigInt(2)).intValue
+    num = num / 2
+    i += 1
+  }
+  binaryNum
+}
+
+def twosComplementToDec(binary: Array[Int]): BigInt = {
+  var result: BigInt = BigInt(0)
+  var counter: Int = 0
+  binary.foreach(
+    n =>
+      if counter == binary.length - 1 && n == 1 then
+        result = result - BigInt(2).pow(counter)
+      else if n == 1 then
+        result = result + BigInt(2).pow(counter)
+      counter += 1
+  )
+  result
+}
+
+val BITVECNEGATIVE: BigInt = new BigInt(new BigInteger("9223372036854775808"))
 
 
 

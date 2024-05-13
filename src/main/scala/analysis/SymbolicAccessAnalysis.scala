@@ -55,37 +55,6 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
   val edgelattice: EdgeFunctionLattice[TwoElement, TwoElementLattice] = EdgeFunctionLattice(valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
 
-  def decToBinary(n: BigInt): Array[Int] = {
-    val binaryNum: Array[Int] = new Array[Int](64)
-    var i = 0
-    var num = n
-    while (num > 0) {
-      binaryNum(i) = (num % BigInt(2)).intValue
-      num = num / 2
-      i += 1
-    }
-    binaryNum
-  }
-
-  def twosComplementToDec(binary: Array[Int]): BigInt = {
-    var result: BigInt = BigInt(0)
-    var counter: Int = 0
-    binary.foreach(
-      n =>
-        if counter == binary.length - 1 && n == 1 then
-          result = result - BigInt(2).pow(counter)
-        else if n == 1 then
-          result = result + BigInt(2).pow(counter)
-        counter += 1
-    )
-    result
-  }
-
-  def unwrapPaddingAndSlicing(expr: Expr): Expr =
-    expr match
-      case Extract(end, start, body) if start == 0 && end == 32 => unwrapPaddingAndSlicing(body)
-      case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
-      case _ => expr
 
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
     d match
@@ -115,14 +84,12 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
       case Right(_) => Map(d -> IdEdge())
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
-    val bitvecnegative: BigInt = new BigInt(new BigInteger("9223372036854775808")) // negative 64 bit integer
-
     n match
       case LocalAssign(variable, rhs, maybeString) =>
         val expr = unwrapPaddingAndSlicing(rhs)
         expr match
           case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) && arg1.equals(stackPointer)
-            && evaluateExpression(arg2, constProp(n)).isDefined && evaluateExpression(arg2, constProp(n)).get.value >= bitvecnegative =>
+            && evaluateExpression(arg2, constProp(n)).isDefined && evaluateExpression(arg2, constProp(n)).get.value >= BITVECNEGATIVE =>
             d match
               case Left(value) if value.accessor == variable => Map()
               case Left(value) => Map(d -> IdEdge())
