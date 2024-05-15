@@ -171,12 +171,29 @@ class DSG(val proc: Procedure,
           if node.equals(oldCell.node.get) then
             stackMapping.update(offset, newCell.node.get)
       }
+
+  private def replaceInCallSites(oldCell: DSC, newCell: DSC) =
+    callsites.foreach(
+      callSite =>
+        callSite.returnCells.foreach{
+          case (variable: Variable, cell: DSC) =>
+            if cell.equals(oldCell) then
+              callSite.returnCells.update(variable, newCell)
+        }
+
+        callSite.paramCells.foreach{
+          case (variable: Variable, cell: DSC) =>
+            if cell.equals(oldCell) then
+              callSite.paramCells.update(variable, newCell)
+        }
+    )
       
   private def replace(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
     replaceInEV(oldCell, newCell, internalOffsetChange)
     replaceInPointTo(oldCell, newCell)
     replaceInGlobals(oldCell, newCell)
     replaceInStack(oldCell, newCell)
+    replaceInCallSites(oldCell, newCell)
 
   def getPointee(cell: DSC): DSC =
     if !pointTo.contains(cell) then
@@ -184,7 +201,14 @@ class DSG(val proc: Procedure,
       pointTo.update(cell, node.cells(0))
     pointTo(cell)
 
-  
+  def getCells(pos: CFGPosition, arg: Variable): Set[(DSC, BigInt)] =
+    if reachingDefs(pos).contains(arg) then
+      reachingDefs(pos)(arg).foldLeft(Set[(DSC, BigInt)]()) {
+        (s, defintion) =>
+          s + varToCell(defintion)(arg)
+      }
+    else
+      Set(formals(arg))
 
   def collapseNode(node: DSN): Unit =
     val collapedCell = DSC(Option(node), 0)
@@ -408,6 +432,75 @@ class DSG(val proc: Procedure,
         case _ => m
   }
 
+  def cloneSelf(): DSG =
+    val newGraph = DSG(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
+    assert(formals.size == newGraph.formals.size)
+    val idToNode: mutable.Map[Int, DSN] = mutable.Map()
+    formals.foreach{
+      case (variable: Variable, (cell: DSC, internalOffset: BigInt)) =>
+        assert(newGraph.formals.contains(variable))
+        val node = cell.node.get
+        if !idToNode.contains(node.id) then
+          val newNode = node.cloneSelf(newGraph)
+          idToNode.update(node.id, newNode)
+        newGraph.formals.update(variable, (idToNode(node.id).cells(cell.offset), internalOffset))
+    }
+
+    varToCell.foreach {
+      case (position: CFGPosition, values: mutable.Map[Variable, (DSC, BigInt)]) =>
+        assert(newGraph.varToCell.contains(position))
+        values.foreach{
+          case (variable: Variable, (cell: DSC, internalOffset: BigInt)) =>
+            assert(newGraph.varToCell(position).contains(variable))
+            val node = cell.node.get
+            if !idToNode.contains(node.id) then
+              val newNode = node.cloneSelf(newGraph)
+              idToNode.update(node.id, newNode)
+            newGraph.varToCell(position).update(variable, (idToNode(node.id).cells(cell.offset), internalOffset))
+        }
+    }
+
+    stackMapping.foreach{
+      case (offset, node) =>
+        assert(newGraph.stackMapping.contains(offset))
+        if !idToNode.contains(node.id) then
+          val newNode = node.cloneSelf(newGraph)
+          idToNode.update(node.id, newNode)
+        newGraph.stackMapping.update(offset, idToNode(node.id))
+    }
+
+    globalMapping.foreach {
+      case ((start: BigInt, end: BigInt), (node: DSN, internalOffset: BigInt)) =>
+        assert(newGraph.globalMapping.contains((start, end)))
+        if !idToNode.contains(node.id) then
+          val newNode = node.cloneSelf(newGraph)
+          idToNode.update(node.id, newNode)
+        newGraph.globalMapping.update((start, end), (idToNode(node.id), internalOffset))
+    }
+
+    callsites.foreach(
+      callSite =>
+        val cs = CallSite(callSite.call, newGraph)
+        newGraph.callsites.add(cs)
+        assert(cs.paramCells.keySet.equals(callSite.paramCells.keySet))
+        callSite.paramCells.foreach{
+          case (variable: Variable, cell: DSC) =>
+            assert(cs.paramCells.contains(variable))
+            val id = cell.node.get.id
+            cs.paramCells.update(variable, idToNode(id).cells(cell.offset))
+        }
+
+        callSite.returnCells.foreach{
+          case (variable: Variable, cell: DSC) =>
+            assert(cs.returnCells.contains(variable))
+            val id = cell.node.get.id
+            cs.returnCells.update(variable, idToNode(id).cells(cell.offset))
+        }
+    )
+
+    newGraph.nodes.addAll(idToNode.values)
+    newGraph
+
 }
 
 class Flags() {
@@ -490,6 +583,27 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
       cells(offset).growSize(size)
       cells(offset)
 
+  def cloneSelf(graph: DSG) : DSN =
+    val node = DSN(Some(graph), this.size)
+    node.allocationRegions.addAll(this.allocationRegions)
+    node.flags.join(this.flags)
+    cells.foreach{
+      case (offset: BigInt, cell: DSC) =>
+        node.addCell(offset, cell.largestAccessedSize)
+    }
+    node
+
+  def cloneNode(from: DSG, to: DSG): Unit =
+    assert(from.equals(graph.get))
+    if !to.nodes.contains(this) then
+      to.nodes.add(this)
+      cells.foreach {
+        case (offset: BigInt, cell: DSC) =>
+        if from.pointTo.contains(cell) then
+          val pointee = from.getPointee(cell)
+          pointee.node.get.cloneNode(to,from)
+          to.pointTo.update(cell, pointee)
+      }
 
   override def equals(obj: Any): Boolean =
     obj match
@@ -517,23 +631,23 @@ case class DSC(node: Option[DSN], offset: BigInt)
 
 class CallSite(val call: DirectCall, val graph: DSG) {
   val proc = call.target
-  val paramCells: Map[Variable, DSC] = graph.params(proc).foldLeft(Map[Variable, DSC]()) {
+  val paramCells: mutable.Map[Variable, DSC] = graph.params(proc).foldLeft(mutable.Map[Variable, DSC]()) {
     (m, reg) =>
       val node = DSN(Some(graph))
       node.flags.incomplete = true
-      m + (reg -> node.cells(0))
+      m += (reg -> node.cells(0))
   }
-  val returnCells: Map[Variable, DSC] = graph.writesTo(proc).foldLeft(Map[Variable, DSC]()) {
+  val returnCells: mutable.Map[Variable, DSC] = graph.writesTo(proc).foldLeft(mutable.Map[Variable, DSC]()) {
     (m, reg) =>
       val node = DSN(Some(graph))
       node.flags.incomplete = true
-      m + (reg -> node.cells(0))
+      m += (reg -> node.cells(0))
   }
 }
 
 def unwrapPaddingAndSlicing(expr: Expr): Expr =
   expr match
-    case Extract(end, start, body) if start == 0 && end == 32 => unwrapPaddingAndSlicing(body)
+    case Extract(end, start, body) /*if start == 0 && end == 32*/ => unwrapPaddingAndSlicing(body) // this may make it unsound
     case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
     case _ => expr
 

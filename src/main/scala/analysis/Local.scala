@@ -87,14 +87,14 @@ class Local(
     else
       None
 
-  def getCells(pos: CFGPosition, arg: Variable): Set[(DSC, BigInt)] =
-    if reachingDefs(pos).contains(arg) then
-      reachingDefs(pos)(arg).foldLeft(Set[(DSC, BigInt)]()) {
-        (s, defintion) =>
-          s + graph.varToCell(defintion)(arg)
-      }
-    else
-      Set(graph.formals(arg))
+//  def getCells(pos: CFGPosition, arg: Variable): Set[(DSC, BigInt)] =
+//    if reachingDefs(pos).contains(arg) then
+//      reachingDefs(pos)(arg).foldLeft(Set[(DSC, BigInt)]()) {
+//        (s, defintion) =>
+//          s + graph.varToCell(defintion)(arg)
+//      }
+//    else
+//      Set(graph.formals(arg))
 
 
 
@@ -114,7 +114,7 @@ class Local(
     // visit all the defining pointer operation on rhs variable first
     reachingDefs(position)(rhs).foreach(visit)
     // get the cells of all the SSA variables in the set
-    val cells: Set[(DSC, BigInt)] = getCells(position, rhs)
+    val cells: Set[(DSC, BigInt)] = graph.getCells(position, rhs)
     // merge the cells or their pointees with lhs
     var result = cells.foldLeft(lhs) {
       (c, t) =>
@@ -179,6 +179,7 @@ class Local(
             val returnArgument  = graph.varToCell(n)(variable)._1
             graph.mergeCells(returnArgument, cell)
         }
+        print("")
       case LocalAssign(variable, rhs, maybeString) =>
         val expr: Expr = unwrapPaddingAndSlicing(rhs)
         val lhsCell = graph.varToCell(n)(variable)._1
@@ -239,7 +240,7 @@ class Local(
               if containsPointer then
                 val cell = expr.variables.foldLeft(lhsCell) {
                   (c, v) =>
-                    val cells: Set[(DSC, BigInt)] = getCells(n, v)
+                    val cells: Set[(DSC, BigInt)] = graph.getCells(n, v)
 
                     cells.foldLeft(c) {
                       (c, p) =>
@@ -270,7 +271,7 @@ class Local(
             case _ => ???
 
         addressPointee.node.get.flags.modified = true
-        val valueCells = getCells(n, value)
+        val valueCells = graph.getCells(n, value)
         val result = valueCells.foldLeft(addressPointee) {
           (c, p) =>
             graph.mergeCells(p._1, c)
@@ -279,21 +280,28 @@ class Local(
       case _ =>
   }
   def analyze(): DSG =
-    val domain = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).reverse
+    val domain = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString)
 
     domain.foreach(visit)
 
-    println(graph.formals)
-    val results = graph.varToCell.keys.toSeq.sortBy(_.toShortString)
-    results.foreach {
-      pos =>
-        println(pos)
-        val tab = "    "
-        graph.varToCell(pos).foreach {
-          case (variable, cell) =>
-            println(tab + variable.toString + " -> " + cell.toString)
-        }
-    }
-    println(graph.pointTo)
+//    println(graph.formals)
+//    val results = graph.varToCell.keys.toSeq.sortBy(_.toShortString)
+//    results.foreach {
+//      pos =>
+//        println(pos)
+//        val tab = "    "
+//        graph.varToCell(pos).foreach {
+//          case (variable, cell) =>
+//            println(tab + variable.toString + " -> " + cell.toString)
+//        }
+//    }
+//    println(graph.pointTo)
+//    // collect the nodes in the dsg
+    graph.nodes.addAll(graph.formals.values.map(_._1.node.get))
+    graph.varToCell.values.foreach(
+      value => graph.nodes.addAll(value.values.map(_._1.node.get))
+    )
+    graph.nodes.addAll(graph.stackMapping.values)
+    graph.nodes.addAll(graph.globalMapping.values.map(_._1))
     graph
 }
