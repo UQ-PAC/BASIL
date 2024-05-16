@@ -478,6 +478,21 @@ class DSG(val proc: Procedure,
         newGraph.globalMapping.update((start, end), (idToNode(node.id), internalOffset))
     }
 
+    pointTo.foreach {
+      case (cell1: DSC, cell2: DSC) =>
+        val node1 = cell1.node.get
+        val node2 = cell2.node.get
+        if !idToNode.contains(node1.id) then
+          val newNode1 = node1.cloneSelf(newGraph)
+          idToNode.update(node1.id, newNode1)
+
+        if !idToNode.contains(node2.id) then
+          val newNode2 = node2.cloneSelf(newGraph)
+          idToNode.update(node2.id, newNode2)
+
+        newGraph.pointTo.update(idToNode(node1.id).cells(cell1.offset), idToNode(node2.id).cells(cell2.offset))
+    }
+
     callsites.foreach(
       callSite =>
         val cs = CallSite(callSite.call, newGraph)
@@ -497,6 +512,8 @@ class DSG(val proc: Procedure,
             cs.returnCells.update(variable, idToNode(id).cells(cell.offset))
         }
     )
+
+
 
     newGraph.nodes.addAll(idToNode.values)
     newGraph
@@ -594,14 +611,14 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
     node
 
   def cloneNode(from: DSG, to: DSG): Unit =
-    assert(from.equals(graph.get))
+    assert(from.nodes.contains(this))
     if !to.nodes.contains(this) then
       to.nodes.add(this)
       cells.foreach {
         case (offset: BigInt, cell: DSC) =>
         if from.pointTo.contains(cell) then
           val pointee = from.getPointee(cell)
-          pointee.node.get.cloneNode(to,from)
+          pointee.node.get.cloneNode(from, to)
           to.pointTo.update(cell, pointee)
       }
 

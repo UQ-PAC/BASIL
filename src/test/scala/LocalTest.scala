@@ -23,20 +23,66 @@ class LocalTest extends AnyFunSuite, TestUtil {
         outputPrefix = "boogie_out",
       )
     )
-    val dsg = results.analysis.get.dsg.get
+    val program = results.ir.program
+    val dsg = results.analysis.get.locals.get(program.mainProcedure)
+    println(dsg.stackMapping)
     assert(dsg.pointTo.size == 9)
-    val framePointer = DSC(Some(DSN(None, 0, 1)), 0) // R31
+    val framePointer = dsg.stackMapping(0).cells(0) // R31
     assert(dsg.pointTo(framePointer).equals(dsg.formals(R29)._1))
-    val stack8 = DSC(Some(DSN(None, 0, 2)), 0) // R31 + 8
+    val stack8 = dsg.stackMapping(8).cells(0) //  R31 + 8
     assert(dsg.pointTo(stack8).equals(dsg.formals(R30)._1))
-    val stack40 = DSC(Some(DSN(None, 0, 3)), 0) // R31 + 40
-    val stack32 = DSC(Some(DSN(None, 0, 5)), 0) // R31 + 32
-    val stack24 = dsg.pointTo(stack32) // R31 + 24 and Malloc
+    val stack40 = dsg.stackMapping(40).cells(0) //  R31 + 40
+    val stack32 = dsg.stackMapping(32).cells(0) //  R31 + 32
+    val stack24 = dsg.stackMapping(24).cells(0) //  R31 + 24 and Malloc
+    assert(dsg.pointTo(stack32).equals(stack24))
     assert(stack24.node.get.collapsed)
     assert(dsg.pointTo(stack24).equals(stack24))
-    assert(dsg.pointTo(stack40).equals(dsg.getPointee(dsg.getPointee(DSC(Some(DSN(None,0, 12)), 0)))))
 
-//    assert(dsg.pointTo.contains(framePointer))
+    assert(dsg.pointTo(stack40).equals(dsg.getPointee(dsg.getPointee(dsg.globalMapping((69600, 69600))._1.cells(0)))))
+
+  }
+
+  test("interproc pointer arithmetic main") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.locals.get(program.mainProcedure)
+
+  }
+
+  test("interproc pointer arithmetic callee") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.locals.get(program.procs("callee"))
+    val stack8 = dsg.stackMapping(8).cells(0) //  R31 + 8
+    val stack24 = dsg.stackMapping(24).cells(0) //  R31 + 24
+    assert(dsg.pointTo.size == 2)
+    assert(dsg.getPointee(stack8).equals(dsg.formals(R0)._1))
+    assert(dsg.getPointee(stack24).equals(dsg.formals(R0)._1.node.get.cells(16)))
+
   }
 
 
@@ -61,7 +107,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     program = returnUnifier.visitProgram(program)
 
     val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Map.empty, Specification(Set(), Map(), List(), List(), List(), Set()), program))
-    val dsg: DSG = results.dsg.get
+    val dsg: DSG = results.locals.get(program.mainProcedure)
     assert(dsg.formals(R1).equals(dsg.formals(R2)))
     assert(dsg.varToCell(locAssign1)(R6)._1.equals(dsg.varToCell(locAssign2)(R7)._1))
     assert(dsg.varToCell(locAssign1)(R6)._2 == 0)
@@ -95,7 +141,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     program = returnUnifier.visitProgram(program)
 
     val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Map.empty, Specification(Set(), Map(), List(), List(), List(), Set()), program))
-    val dsg: DSG = results.dsg.get
+    val dsg: DSG = results.locals.get(program.mainProcedure)
     assert(dsg.varToCell(locAssign3)(R5)._1.offset == 13)
   }
 
@@ -123,7 +169,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     program = returnUnifier.visitProgram(program)
 
     val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Map.empty, Specification(Set(), Map(), List(), List(), List(), Set()), program))
-    val dsg: DSG = results.dsg.get
+    val dsg: DSG = results.locals.get(program.mainProcedure)
     assert(dsg.formals(R1).equals(dsg.formals(R2)))
     assert(dsg.varToCell(locAssign1)(R6)._1.equals(dsg.varToCell(locAssign2)(R7)._1))
     assert(dsg.varToCell(locAssign1)(R6)._1.equals(dsg.varToCell(locAssign3)(R5)._1))
@@ -159,7 +205,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     program = returnUnifier.visitProgram(program)
 
     val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Map.empty, Specification(Set(), Map(), List(), List(), List(), Set()), program))
-    val dsg: DSG = results.dsg.get
+    val dsg: DSG = results.locals.get(program.mainProcedure)
     assert(dsg.varToCell(locAssign2)(R7).equals(dsg.varToCell(locAssign3)(R5)))
   }
 }

@@ -62,7 +62,9 @@ case class StaticAnalysisContext(
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
     symbolicAccessess: Map[CFGPosition, Map[SymbolicAccess, TwoElement]],
-    dsg: Option[DSG],
+    locals: Option[Map[Procedure, DSG]],
+    bus: Option[Map[Procedure, DSG]],
+    tds: Option[Map[Procedure, DSG]],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]
 )
 
@@ -661,8 +663,10 @@ object StaticAnalysis {
       mmmResults = mmm,
       memoryRegionContents = memoryRegionContents,
       symbolicAccessess = symResults,
-      dsg = None,
-      reachingDefs = reachingDefinitionsAnalysisResults,
+      locals = None,
+      bus = None,
+      tds = None,
+      reachingDefs = reachingDefinitionsAnalysisResults
     )
   }
 
@@ -890,8 +894,9 @@ object RunUtils {
       s =>
         writeToFile(toDot(ctx.program), s"${s}_ct.dot")
     )
-    val b = Local(ctx.program.mainProcedure, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults).analyze()
-    val c = DSA(ctx.program, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults).analyze()
+//    val b = Local(ctx.program.mainProcedure, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults).analyze()
+    val dsa = DSA(ctx.program, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults)
+    dsa.analyze()
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
     StaticAnalysisContext(
@@ -906,7 +911,9 @@ object RunUtils {
       mmmResults = analysisResult.last.mmmResults,
       memoryRegionContents = analysisResult.last.memoryRegionContents,
       symbolicAccessess = analysisResult.last.symbolicAccessess,
-      dsg = Some(b),
+      locals = Some(dsa.locals.toMap),
+      bus = Some(dsa.bu.toMap),
+      tds = Some(dsa.td.toMap),
       reachingDefs = analysisResult.last.reachingDefs
     )
   }

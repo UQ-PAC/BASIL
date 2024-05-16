@@ -13,10 +13,11 @@ class DSA(program: Program,
             reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
             writesTo: Map[Procedure, Set[Register]],
             params:  Map[Procedure, Set[Variable]]
-         ) extends Analysis[Any] {
+         ) extends Analysis[Map[Procedure, DSG]] {
 
   val locals : mutable.Map[Procedure, DSG] = mutable.Map()
   val bu: mutable.Map[Procedure, DSG] = mutable.Map()
+  val td: mutable.Map[Procedure, DSG] = mutable.Map()
 
   val stackPointer = Register("R31", BitVecType(64))
   val returnPointer = Register("R30", BitVecType(64))
@@ -32,18 +33,11 @@ class DSA(program: Program,
         (s, proc) => s ++ findLeaf(proc)
       }
 
-  def getCells(pos: CFGPosition, arg: Variable, graph: DSG): Set[(DSC, BigInt)] =
-    if reachingDefs(pos).contains(arg) then
-      reachingDefs(pos)(arg).foldLeft(Set[(DSC, BigInt)]()) {
-        (s, defintion) =>
-          s + graph.varToCell(defintion)(arg)
-      }
-    else
-      Set(graph.formals(arg))
 
   var visited = Set[Procedure]()
   val queue = mutable.Queue[Procedure]()
-  override def analyze(): Any = {
+
+  override def analyze(): Map[Procedure, DSG] = {
     val domain = computeDomain(CallGraph, Set(program.mainProcedure))
     domain.foreach(
       proc =>
@@ -58,12 +52,14 @@ class DSA(program: Program,
       proc =>
         assert(locals(proc).callsites.isEmpty)
         visited += proc
-        val preds = CallGraph.pred(proc)
         queue.enqueueAll(CallGraph.pred(proc).diff(visited))
+//        CallGraph.pred(proc).foreach(buildBUQueue)
     )
 
     while queue.nonEmpty do
       val proc = queue.dequeue()
+      visited += proc
+      queue.enqueueAll(CallGraph.pred(proc).diff(visited))
       val buGraph = bu(proc)
       buGraph.callsites.foreach( // clone all the nodes first
         callSite =>
@@ -109,10 +105,58 @@ class DSA(program: Program,
                   buGraph.mergeCells(c, cell)
               }
           )
+      )
+    // bottom up phase finished
+    // clone bu graphs to top-down graphs
+    domain.foreach(
+      proc =>
+        td.update(proc, bu(proc).cloneSelf())
+    )
 
+    queue.enqueue(program.mainProcedure)
+    visited = Set()
+    while queue.nonEmpty do
+      val proc = queue.dequeue()
+      visited += proc
+      queue.enqueueAll(CallGraph.succ(proc).diff(visited))
+      val callersGraph = td(proc)
+      callersGraph.callsites.foreach(
+        callSite =>
+          val callee = callSite.proc
+          val calleesGraph = td(callee)
+          callSite.paramCells.foreach{
+            case (variable: Variable, cell: DSC) =>
+              val node = cell.node.get
+              node.cloneNode(callersGraph, calleesGraph)
+          }
+
+          callSite.returnCells.foreach{
+            case (variable: Variable, cell: DSC) =>
+              val node = cell.node.get
+              node.cloneNode(callersGraph, callersGraph)
+          }
       )
 
+      callersGraph.callsites.foreach(
+        callSite =>
+          val callee = callSite.proc
+          val calleesGraph = td(callee)
+          callSite.paramCells.foreach {
+            case (variable: Variable, cell: DSC) =>
+              calleesGraph.mergeCells(cell, calleesGraph.formals(variable)._1)
+          }
 
-    println(bu)
+          callSite.returnCells.foreach {
+            case (variable: Variable, cell: DSC) =>
+              val returnCells = calleesGraph.getCells(end(callee), variable)
+              returnCells.foldLeft(cell){
+                case (c: DSC, (retCell: DSC, internal: BigInt)) =>
+                  calleesGraph.mergeCells(c, retCell)
+              }
+          }
+      )
+
+    td.toMap
+
   }
 }

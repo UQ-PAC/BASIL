@@ -253,6 +253,7 @@ class Local(
 
       case MemoryAssign(memory, MemoryStore(mem, index, expr: Expr, endian, size), label) if unwrapPaddingAndSlicing(expr).isInstanceOf[Variable] => // if value is a literal ignore it
         val value: Variable = unwrapPaddingAndSlicing(expr).asInstanceOf[Variable]
+        reachingDefs(n)(value).foreach(visit)
         val byteSize = (size.toDouble/8).ceil.toInt
         val addressPointee: DSC =
           if isGlobal(index, n, byteSize).isDefined then
