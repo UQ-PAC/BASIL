@@ -715,7 +715,7 @@ object StaticAnalysis {
     println(s"Finished ConstProp with SSA at ${(System.nanoTime() - before) / 1000000} ms")
 
     Logger.info("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults)
+    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults, maxDepth = 3)
     val mraResult = mraSolver.analyze()
 
     Logger.info("[!] Running MMM")
