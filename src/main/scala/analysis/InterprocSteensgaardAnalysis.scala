@@ -90,7 +90,8 @@ class InterprocSteensgaardAnalysis(
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
       case variable: Variable =>
-        evaluateExpressionWithSSA(binExpr, constantProp(n), n, reachingDefs).foreach { b =>
+        val a = evaluateExpressionWithSSA(binExpr, constantProp(n), n, reachingDefs)
+          a.foreach { b =>
           val region = mmm.findDataObject(b.value)
           reducedRegions = reducedRegions ++ region
         }
@@ -135,9 +136,11 @@ class InterprocSteensgaardAnalysis(
             } {
               r match {
                 case stackRegion: StackRegion =>
-                  val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
-                  evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
-                    reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
+                  if (b.size == stackRegion.start.size) {
+                    val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
+                    evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
+                      reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
+                    }
                   }
                 case dataRegion: DataRegion =>
                   val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start, globalOffsets), b)

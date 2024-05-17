@@ -90,9 +90,13 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             } {
               r match {
                 case stackRegion: StackRegion =>
-                  val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
-                  evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
-                    reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
+                  println(s"StackRegion: ${stackRegion.start}")
+                  println(s"BitVecLiteral: ${b}")
+                  if (b.size == stackRegion.start.size) {
+                    val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
+                    evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
+                      reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
+                    }
                   }
                 case dataRegion: DataRegion =>
                   val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start, globalOffsets), b)
@@ -159,7 +163,6 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
                 res ++= exprToRegion(load.index, i)
               case binaryExpr: BinaryExpr =>
                 res ++= reducibleToRegion(binaryExpr, i)
-                res ++= exprToRegion(i.rhs, i)
               case _ => // also treat as a region (for now) even if just Base + Offset without memLoad
                 res ++= exprToRegion(i.rhs, i)
             }
@@ -205,6 +208,7 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             Logger.warn(s"Multiple regions found for memory store: ${regions}")
             expr
         } else {
+            Logger.warn(s"MemStore is: ${cmd}")
             Logger.warn(s"No region found for memory store")
             expr
         }
@@ -218,6 +222,7 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
           Logger.warn(s"Multiple regions found for memory load: ${regions}")
           expr
         } else {
+          Logger.warn(s"MemLoad is: ${cmd}")
           Logger.warn(s"No region found for memory load")
           expr
         }
