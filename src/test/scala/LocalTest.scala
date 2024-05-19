@@ -1,4 +1,4 @@
-import analysis.{DSC, DSG, DSN}
+import analysis.{DSC, DSG, DSN, DataRegion2, HeapRegion2}
 import ir.Endian.BigEndian
 import ir.{BVADD, BinaryExpr, BitVecLiteral, ConvertToSingleProcedureReturn, DirectCall, LocalAssign, Memory, MemoryAssign, MemoryLoad, MemoryStore}
 import org.scalatest.funsuite.AnyFunSuite
@@ -28,18 +28,56 @@ class LocalTest extends AnyFunSuite, TestUtil {
     println(dsg.stackMapping)
     assert(dsg.pointTo.size == 9)
     val framePointer = dsg.stackMapping(0).cells(0) // R31
-    assert(dsg.pointTo(framePointer).equals(dsg.formals(R29)._1))
+    assert(dsg.pointTo(framePointer)._1.equals(dsg.formals(R29)._1))
     val stack8 = dsg.stackMapping(8).cells(0) //  R31 + 8
-    assert(dsg.pointTo(stack8).equals(dsg.formals(R30)._1))
+    assert(dsg.pointTo(stack8)._1.equals(dsg.formals(R30)._1))
     val stack40 = dsg.stackMapping(40).cells(0) //  R31 + 40
     val stack32 = dsg.stackMapping(32).cells(0) //  R31 + 32
     val stack24 = dsg.stackMapping(24).cells(0) //  R31 + 24 and Malloc
-    assert(dsg.pointTo(stack32).equals(stack24))
+    assert(dsg.pointTo(stack32)._1.equals(stack24))
     assert(stack24.node.get.collapsed)
-    assert(dsg.pointTo(stack24).equals(stack24))
+    assert(dsg.pointTo(stack24)._1.equals(stack24))
 
-    assert(dsg.pointTo(stack40).equals(dsg.getPointee(dsg.getPointee(dsg.globalMapping((69600, 69600))._1.cells(0)))))
+    assert(dsg.pointTo(stack40)._1.equals(dsg.getPointee(dsg.getPointee(dsg.globalMapping((69600, 69600))._1.cells(0))._1)._1))
 
+  }
+
+  test("unsafe pointer arithmetic") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic.adt",
+          relfFile = "examples/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.locals.get(program.mainProcedure)
+    val stack0 = dsg.stackMapping(0).cells(0)
+    val stack8 = dsg.stackMapping(8).cells(0)
+    val stack24 = dsg.stackMapping(24).cells(0)
+    val stack32 = dsg.stackMapping(32).cells(0)
+    val stack40 = dsg.stackMapping(40).cells(0)
+    val stack48 = dsg.stackMapping(48).cells(0)
+    val stack56 = dsg.stackMapping(56).cells(0)
+    assert(dsg.pointTo.size==9)
+    assert(dsg.pointTo(stack0).equals(dsg.formals(R29)))
+    assert(dsg.pointTo(stack8).equals(dsg.formals(R30)))
+    assert(dsg.pointTo(stack24).equals(dsg.pointTo(stack32)))
+    assert(dsg.pointTo(stack24)._2 == 0)
+    assert(dsg.pointTo(stack24)._1.node.get.allocationRegions.size == 1)
+    assert(dsg.pointTo(stack24)._1.node.get.allocationRegions.head.asInstanceOf[HeapRegion2].size == 20)
+    assert(dsg.pointTo(stack40)._1.node.get.allocationRegions.size == 1)
+    assert(dsg.pointTo(stack48)._1.node.get.allocationRegions.head.asInstanceOf[HeapRegion2].size == 8)
+    assert(dsg.pointTo(dsg.pointTo(stack48)._1.node.get.cells(0)).equals(dsg.pointTo(stack40)))
+    assert(dsg.pointTo(dsg.pointTo(stack48)._1.node.get.cells(0)).equals(dsg.pointTo(stack56)))
+    assert(dsg.pointTo(stack24)._1.equals(dsg.pointTo(stack40)._1))
+    assert(dsg.pointTo(stack40)._2 == 1)
   }
 
   test("interproc pointer arithmetic main") {
@@ -80,9 +118,8 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val stack8 = dsg.stackMapping(8).cells(0) //  R31 + 8
     val stack24 = dsg.stackMapping(24).cells(0) //  R31 + 24
     assert(dsg.pointTo.size == 2)
-    assert(dsg.getPointee(stack8).equals(dsg.formals(R0)._1))
-    assert(dsg.getPointee(stack24).equals(dsg.formals(R0)._1.node.get.cells(16)))
-
+    assert(dsg.getPointee(stack8)._1.equals(dsg.formals(R0)._1))
+    assert(dsg.getPointee(stack24)._1.equals(dsg.formals(R0)._1.node.get.cells(16)))
   }
 
 
@@ -113,7 +150,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(dsg.varToCell(locAssign1)(R6)._2 == 0)
     assert(dsg.varToCell(locAssign2)(R7)._2 == 1)
     assert(dsg.pointTo.contains(dsg.varToCell(locAssign1)(R6)._1))
-    assert(dsg.pointTo(dsg.varToCell(locAssign1)(R6)._1).equals(dsg.formals(R1)._1))
+    assert(dsg.pointTo(dsg.varToCell(locAssign1)(R6)._1)._1.equals(dsg.formals(R1)._1))
     assert(dsg.pointTo.size == 1)
 
   }
@@ -177,7 +214,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(dsg.varToCell(locAssign2)(R7)._2 == 1)
     assert(dsg.varToCell(locAssign3)(R5)._2 == 8)
     assert(dsg.pointTo.contains(dsg.varToCell(locAssign1)(R6)._1))
-    assert(dsg.pointTo(dsg.varToCell(locAssign1)(R6)._1).equals(dsg.formals(R1)._1))
+    assert(dsg.pointTo(dsg.varToCell(locAssign1)(R6)._1)._1.equals(dsg.formals(R1)._1))
     assert(dsg.pointTo.size == 1)
   }
 
