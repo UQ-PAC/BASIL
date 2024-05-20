@@ -176,17 +176,25 @@ class Local(
         val cs = CallSite(call, graph)
         graph.callsites.add(cs)
         cs.paramCells.foreach{
-          case (variable: Variable, cell: DSC) =>
-            visitPointerArithmeticOperation(call, cell, variable, 0)
+          case (variable: Variable, (cell: DSC, internal: BigInt)) =>
+            // TODO assert(false)
+            val node = cell.node.get
+            val adjusted = node.addCell(cell.offset + internal, 0)
+            visitPointerArithmeticOperation(call, adjusted, variable, 0)
         }
         cs.returnCells.foreach{
-          case (variable: Variable, cell: DSC) =>
+          case (variable: Variable, (cell: DSC, internal: BigInt)) =>
             val returnArgument  = graph.varToCell(n)(variable)._1
-            graph.mergeCells(returnArgument, cell)
+            val returnArgumenetInternal = graph.varToCell(n)(variable)._2
+            val returnArgumentNode = returnArgument.node.get
+            val adjustedReturnArgument = returnArgumentNode.addCell(returnArgument.offset + returnArgumenetInternal, 0)
+            val node = cell.node.get
+            val adjustedCell = node.addCell(cell.offset + internal, 0)
+            graph.mergeCells(adjustedReturnArgument, adjustedCell)
         }
       case LocalAssign(variable, rhs, maybeString) =>
         val expr: Expr = unwrapPaddingAndSlicing(rhs)
-        val lhsCell = graph.varToCell(n)(variable)._1
+        val lhsCell = adjust(graph.varToCell(n)(variable))
         if isGlobal(expr, n).isDefined then
           val global = isGlobal(expr, n).get
           graph.mergeCells(lhsCell, global)
@@ -278,10 +286,8 @@ class Local(
         addressPointee.node.get.flags.modified = true
         val valueCells = graph.getCells(n, value)
         val result = valueCells.foldLeft(addressPointee) {
-          (c, p) =>
-            val node = p._1.node.get
-            val cell = node.addCell(p._1.offset + p._2, 0)
-            graph.mergeCells(cell, c)
+          (c, slice) =>
+            graph.mergeCells(adjust(slice), c)
         }
 
       case _ =>

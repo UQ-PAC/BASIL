@@ -136,21 +136,24 @@ class DSG(val proc: Procedure,
       (pos, m) =>
         m.foreach {
           case (variable, (cell, offset)) =>
-          if cell.equals(oldCell) then
-            m.update(variable, (newCell, offset + internalOffsetChange))
+            if cell.equals(oldCell) then
+//            if cell.node.equals(oldCell.node) && cell.offset + offset == oldCell.offset then
+              m.update(variable, (newCell, offset + internalOffsetChange))
         }
     )
 
     formals.foreach{
       case (variable, (cell, offset)) =>
         if cell.equals(oldCell) then
+//        if cell.node.equals(oldCell.node) && cell.offset + offset == oldCell.offset then
           formals.update(variable, (newCell, offset + internalOffsetChange))
     }
 
   private def replaceInPointTo(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
     pointTo.foreach {
-      case (pointer, (pointeeCell: DSC, pointeeInternal: BigInt)) =>
-        if pointeeCell.equals(oldCell) then
+      case (pointer, (cell: DSC, pointeeInternal: BigInt)) =>
+        if cell.equals(oldCell) then
+//        if cell.node.equals(oldCell.node) && cell.offset + pointeeInternal == oldCell.offset then
           pointTo.update(pointer, (newCell, pointeeInternal + internalOffsetChange))
     }
 
@@ -172,19 +175,21 @@ class DSG(val proc: Procedure,
             stackMapping.update(offset, newCell.node.get)
       }
 
-  private def replaceInCallSites(oldCell: DSC, newCell: DSC) =
+  private def replaceInCallSites(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
     callsites.foreach(
       callSite =>
         callSite.returnCells.foreach{
-          case (variable: Variable, cell: DSC) =>
+          case (variable: Variable, (cell: DSC, internal: BigInt)) =>
             if cell.equals(oldCell) then
-              callSite.returnCells.update(variable, newCell)
+//            if cell.node.equals(oldCell.node) && cell.offset + internal == oldCell.offset then
+              callSite.returnCells.update(variable, (newCell, internal + internalOffsetChange))
         }
 
         callSite.paramCells.foreach{
-          case (variable: Variable, cell: DSC) =>
+          case (variable: Variable, (cell: DSC, internal: BigInt)) =>
             if cell.equals(oldCell) then
-              callSite.paramCells.update(variable, newCell)
+//            if cell.node.equals(oldCell.node) && cell.offset + internal == oldCell.offset then
+              callSite.paramCells.update(variable, (newCell, internal + internalOffsetChange))
         }
     )
       
@@ -193,7 +198,7 @@ class DSG(val proc: Procedure,
     replaceInPointTo(oldCell, newCell, internalOffsetChange)
     replaceInGlobals(oldCell, newCell)
     replaceInStack(oldCell, newCell)
-    replaceInCallSites(oldCell, newCell)
+    replaceInCallSites(oldCell, newCell, internalOffsetChange)
 
   def getPointee(cell: DSC): (DSC, BigInt) =
     if !pointTo.contains(cell) then
@@ -202,11 +207,8 @@ class DSG(val proc: Procedure,
     pointTo(cell)
 
   def getPointeeAdjusted(cell:DSC): DSC =
-    val (pointeeCell: DSC, internalOffset: BigInt) = getPointee(cell)
-    val node = pointeeCell.node.get
-    val adjusted = node.addCell(pointeeCell.offset + internalOffset, 0)
-    pointTo.update(cell, (adjusted, 0))
-    adjusted
+    val pointee = getPointee(cell)
+    adjust(pointee)
 
   def getCells(pos: CFGPosition, arg: Variable): Set[(DSC, BigInt)] =
     if reachingDefs(pos).contains(arg) then
@@ -522,17 +524,17 @@ class DSG(val proc: Procedure,
         newGraph.callsites.add(cs)
         assert(cs.paramCells.keySet.equals(callSite.paramCells.keySet))
         callSite.paramCells.foreach{
-          case (variable: Variable, cell: DSC) =>
+          case (variable: Variable, (cell: DSC, internal: BigInt)) =>
             assert(cs.paramCells.contains(variable))
             val id = cell.node.get.id
-            cs.paramCells.update(variable, idToNode(id).cells(cell.offset))
+            cs.paramCells.update(variable, (idToNode(id).cells(cell.offset), internal))
         }
 
         callSite.returnCells.foreach{
-          case (variable: Variable, cell: DSC) =>
+          case (variable: Variable, (cell: DSC, internal: BigInt)) =>
             assert(cs.returnCells.contains(variable))
             val id = cell.node.get.id
-            cs.returnCells.update(variable, idToNode(id).cells(cell.offset))
+            cs.returnCells.update(variable, (idToNode(id).cells(cell.offset), internal))
         }
     )
 
@@ -671,17 +673,17 @@ case class DSC(node: Option[DSN], offset: BigInt)
 
 class CallSite(val call: DirectCall, val graph: DSG) {
   val proc = call.target
-  val paramCells: mutable.Map[Variable, DSC] = graph.params(proc).foldLeft(mutable.Map[Variable, DSC]()) {
+  val paramCells: mutable.Map[Variable, (DSC, BigInt)] = graph.params(proc).foldLeft(mutable.Map[Variable, (DSC, BigInt)]()) {
     (m, reg) =>
       val node = DSN(Some(graph))
       node.flags.incomplete = true
-      m += (reg -> node.cells(0))
+      m += (reg -> (node.cells(0), 0))
   }
-  val returnCells: mutable.Map[Variable, DSC] = graph.writesTo(proc).foldLeft(mutable.Map[Variable, DSC]()) {
+  val returnCells: mutable.Map[Variable, (DSC, BigInt)] = graph.writesTo(proc).foldLeft(mutable.Map[Variable, (DSC, BigInt)]()) {
     (m, reg) =>
       val node = DSN(Some(graph))
       node.flags.incomplete = true
-      m += (reg -> node.cells(0))
+      m += (reg -> (node.cells(0), 0))
   }
 }
 
@@ -716,6 +718,15 @@ def twosComplementToDec(binary: Array[Int]): BigInt = {
   )
   result
 }
+
+def adjust(cell: DSC, internalOffset: BigInt): DSC =
+  val node = cell.node.get
+  node.addCell(cell.offset+internalOffset, 0)
+
+def adjust(tuple: (DSC, BigInt)): DSC =
+  val cell = tuple._1
+  val internal = tuple._2
+  adjust(cell, internal)
 
 val BITVECNEGATIVE: BigInt = new BigInt(new BigInteger("9223372036854775808"))
 

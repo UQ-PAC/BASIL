@@ -92,17 +92,17 @@ class DSA(program: Program,
           val callee = callSite.proc
           val calleeGraph = locals(callee).cloneSelf()
           calleeGraph.formals.foreach{
-            case (variable: Variable, (cell: DSC, internalOffset: BigInt)) if !ignoreRegisters.contains(variable)  =>
-                buGraph.mergeCells(cell, callSite.paramCells(variable))
+            case (variable: Variable, formal) if !ignoreRegisters.contains(variable)  =>
+                buGraph.mergeCells(adjust(formal), adjust(callSite.paramCells(variable)))
             case _ =>
           }
           writesTo(callee).foreach(
             reg =>
               val returnCells = calleeGraph.getCells(end(callee), reg)
 //              assert(returnCells.nonEmpty)
-              returnCells.foldLeft(callSite.returnCells(reg)){
-                case (c: DSC, (cell: DSC, internalOffset: BigInt)) =>
-                  buGraph.mergeCells(c, cell)
+              returnCells.foldLeft(adjust(callSite.returnCells(reg))){
+                case (c: DSC, ret) =>
+                  buGraph.mergeCells(c, adjust(ret))
               }
           )
       )
@@ -125,13 +125,13 @@ class DSA(program: Program,
           val callee = callSite.proc
           val calleesGraph = td(callee)
           callSite.paramCells.foreach{
-            case (variable: Variable, cell: DSC) =>
+            case (variable: Variable, (cell: DSC, internalOffset: BigInt)) =>
               val node = cell.node.get
               node.cloneNode(callersGraph, calleesGraph)
           }
 
           callSite.returnCells.foreach{
-            case (variable: Variable, cell: DSC) =>
+            case (variable: Variable, (cell: DSC, internalOffset: BigInt)) =>
               val node = cell.node.get
               node.cloneNode(callersGraph, callersGraph)
           }
@@ -142,16 +142,16 @@ class DSA(program: Program,
           val callee = callSite.proc
           val calleesGraph = td(callee)
           callSite.paramCells.foreach {
-            case (variable: Variable, cell: DSC) =>
-              calleesGraph.mergeCells(cell, calleesGraph.formals(variable)._1)
+            case (variable: Variable, cell) =>
+              calleesGraph.mergeCells(adjust(cell), adjust(calleesGraph.formals(variable)))
           }
 
           callSite.returnCells.foreach {
-            case (variable: Variable, cell: DSC) =>
+            case (variable: Variable, cell: (DSC, BigInt)) =>
               val returnCells = calleesGraph.getCells(end(callee), variable)
-              returnCells.foldLeft(cell){
-                case (c: DSC, (retCell: DSC, internal: BigInt)) =>
-                  calleesGraph.mergeCells(c, retCell)
+              returnCells.foldLeft(adjust(cell)){
+                case (c: DSC, retCell: (DSC, BigInt)) =>
+                  calleesGraph.mergeCells(c, adjust(retCell))
               }
           }
       )

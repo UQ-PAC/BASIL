@@ -96,6 +96,19 @@ class LocalTest extends AnyFunSuite, TestUtil {
     )
     val program = results.ir.program
     val dsg = results.analysis.get.locals.get(program.mainProcedure)
+    val stack0 = dsg.stackMapping(0).cells(0)
+    val stack8 = dsg.stackMapping(8).cells(0)
+    val stack24 = dsg.stackMapping(24).cells(0)
+    val stack32 = dsg.stackMapping(32).cells(0)
+    val stack40 = dsg.stackMapping(40).cells(0)
+    assert(dsg.pointTo.size == 8)
+    assert(dsg.pointTo(stack0).equals(dsg.formals(R29)))
+    assert(dsg.pointTo(stack8).equals(dsg.formals(R30)))
+    assert(dsg.pointTo(stack24)._1.node.get.equals(dsg.pointTo(stack32)._1.node.get))
+    assert(dsg.pointTo(stack24)._1.offset == 0)
+    assert(dsg.pointTo(stack32)._1.offset == 16)
+    assert(dsg.pointTo.contains(dsg.pointTo(stack40)._1))
+
 
   }
 
