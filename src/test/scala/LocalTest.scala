@@ -9,6 +9,7 @@ import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, IRContext, Run
 
 class LocalTest extends AnyFunSuite, TestUtil {
 
+  // Local DSA tests
   test("basic pointer") {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
@@ -108,8 +109,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(dsg.pointTo(stack24)._1.offset == 0)
     assert(dsg.pointTo(stack32)._1.offset == 16)
     assert(dsg.pointTo.contains(dsg.pointTo(stack40)._1))
-
-
+    assert(!dsg.pointTo(stack40)._1.node.get.equals(dsg.pointTo(stack24)._1.node.get))
   }
 
   test("interproc pointer arithmetic callee") {
@@ -131,7 +131,8 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val stack8 = dsg.stackMapping(8).cells(0) //  R31 + 8
     val stack24 = dsg.stackMapping(24).cells(0) //  R31 + 24
     assert(dsg.pointTo.size == 2)
-    assert(dsg.getPointee(stack8)._1.equals(dsg.formals(R0)._1))
+    assert(dsg.getPointee(stack8).equals(dsg.formals(R0)))
+    assert(dsg.getPointee(stack8)._1.offset == 0)
     assert(dsg.getPointee(stack24)._1.equals(dsg.formals(R0)._1.node.get.cells(16)))
   }
 
@@ -258,4 +259,131 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg: DSG = results.locals.get(program.mainProcedure)
     assert(dsg.varToCell(locAssign2)(R7).equals(dsg.varToCell(locAssign3)(R5)))
   }
+
+  // bottom up tests
+  test("bottom up interproc pointer arithmetic callee") {
+    // same as interproc pointer arithmetic callee's local graph (no changes should have been made)
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.bus.get(program.procs("callee"))
+    val stack8 = dsg.stackMapping(8).cells(0) //  R31 + 8
+    val stack24 = dsg.stackMapping(24).cells(0) //  R31 + 24
+    assert(dsg.pointTo.size == 2)
+    assert(dsg.getPointee(stack8).equals(dsg.formals(R0)))
+    assert(dsg.getPointee(stack8)._1.offset == 0)
+    assert(dsg.getPointee(stack24)._1.equals(dsg.formals(R0)._1.node.get.cells(16)))
+  }
+
+
+  test("bottom up interproc pointer arithmetic main") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.bus.get(program.mainProcedure)
+    val stack0 = dsg.stackMapping(0).cells(0)
+    val stack8 = dsg.stackMapping(8).cells(0)
+    val stack24 = dsg.stackMapping(24).cells(0)
+    val stack32 = dsg.stackMapping(32).cells(0)
+    val stack40 = dsg.stackMapping(40).cells(0)
+    assert(dsg.pointTo.size == 8)
+    assert(dsg.pointTo(stack0).equals(dsg.formals(R29)))
+    assert(dsg.pointTo(stack8).equals(dsg.formals(R30)))
+    assert(dsg.pointTo(stack24)._1.node.get.equals(dsg.pointTo(stack32)._1.node.get))
+    assert(dsg.pointTo(stack24)._1.offset == 0)
+    assert(dsg.pointTo(stack32)._1.offset == 16)
+    assert(dsg.pointTo.contains(dsg.pointTo(stack40)._1))
+    assert(dsg.pointTo(stack40)._1.node.get.equals(dsg.pointTo(stack24)._1.node.get))
+    assert(dsg.pointTo(stack40)._1.offset == 32)
+    assert(dsg.pointTo(stack40)._2 == 0)
+    assert(dsg.pointTo(stack32)._2 == 0)
+    assert(dsg.pointTo(stack24)._2 == 0)
+  }
+
+
+  // top down tests
+  test("top down interproc pointer arithmetic callee") {
+    // same as interproc pointer arithmetic callee's local graph (no changes should have been made)
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.tds.get(program.procs("callee"))
+    val stack8 = dsg.stackMapping(8).cells(0) //  R31 + 8
+    val stack24 = dsg.stackMapping(24).cells(0) //  R31 + 24
+    assert(dsg.pointTo.size == 5)
+    assert(dsg.getPointee(stack8).equals(dsg.formals(R0)))
+    assert(dsg.getPointee(stack8)._1.offset == 16)
+    assert(dsg.getPointee(stack24)._1.equals(dsg.formals(R0)._1.node.get.cells(32)))
+  }
+
+
+  // top down phase should be the same as bu phase
+  test("top down interproc pointer arithmetic main") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.tds.get(program.mainProcedure)
+    val stack0 = dsg.stackMapping(0).cells(0)
+    val stack8 = dsg.stackMapping(8).cells(0)
+    val stack24 = dsg.stackMapping(24).cells(0)
+    val stack32 = dsg.stackMapping(32).cells(0)
+    val stack40 = dsg.stackMapping(40).cells(0)
+    assert(dsg.pointTo.size == 8)
+    assert(dsg.pointTo(stack0).equals(dsg.formals(R29)))
+    assert(dsg.pointTo(stack8).equals(dsg.formals(R30)))
+    assert(dsg.pointTo(stack24)._1.node.get.equals(dsg.pointTo(stack32)._1.node.get))
+    assert(dsg.pointTo(stack24)._1.offset == 0)
+    assert(dsg.pointTo(stack32)._1.offset == 16)
+    assert(dsg.pointTo.contains(dsg.pointTo(stack40)._1))
+    assert(dsg.pointTo(stack40)._1.node.get.equals(dsg.pointTo(stack24)._1.node.get))
+    assert(dsg.pointTo(stack40)._1.offset == 32)
+    assert(dsg.pointTo(stack40)._2 == 0)
+    assert(dsg.pointTo(stack32)._2 == 0)
+    assert(dsg.pointTo(stack24)._2 == 0)
+  }
+
 }

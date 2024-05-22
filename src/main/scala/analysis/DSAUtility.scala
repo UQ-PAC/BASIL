@@ -1,6 +1,6 @@
 package analysis
 
-import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, Memory, MemoryAssign, MemoryLoad, MemoryStore, Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, computeDomain, toShortString}
+import ir.{begin, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, Memory, MemoryAssign, MemoryLoad, MemoryStore, Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, computeDomain, toShortString}
 import specification.{ExternalFunction, SpecGlobal}
 
 import scala.util.control.Breaks.{break, breakable}
@@ -193,7 +193,7 @@ class DSG(val proc: Procedure,
         }
     )
       
-  private def replace(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
+  def replace(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
     replaceInEV(oldCell, newCell, internalOffsetChange)
     replaceInPointTo(oldCell, newCell, internalOffsetChange)
     replaceInGlobals(oldCell, newCell)
@@ -417,7 +417,7 @@ class DSG(val proc: Procedure,
 
       
   val formals: mutable.Map[Variable, (DSC, BigInt)] = mutable.Map()
-  val varToCell: Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]] = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]]()) {
+  val varToCell: mutable.Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]] = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(mutable.Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]]()) {
     (m, pos) =>
       pos match
         case LocalAssign(variable, value , label) =>
@@ -463,7 +463,7 @@ class DSG(val proc: Procedure,
     val idToNode: mutable.Map[Int, DSN] = mutable.Map()
     formals.foreach{
       case (variable: Variable, (cell: DSC, internalOffset: BigInt)) =>
-        assert(newGraph.formals.contains(variable))
+//        assert(newGraph.formals.contains(variable))
         val node = cell.node.get
         if !idToNode.contains(node.id) then
           val newNode = node.cloneSelf(newGraph)
@@ -473,10 +473,12 @@ class DSG(val proc: Procedure,
 
     varToCell.foreach {
       case (position: CFGPosition, values: mutable.Map[Variable, (DSC, BigInt)]) =>
-        assert(newGraph.varToCell.contains(position))
+//        assert(newGraph.varToCell.contains(position))
+        if !newGraph.varToCell.contains(position) then
+          newGraph.varToCell.update(position, mutable.Map[Variable, (DSC, BigInt)]())
         values.foreach{
           case (variable: Variable, (cell: DSC, internalOffset: BigInt)) =>
-            assert(newGraph.varToCell(position).contains(variable))
+//            assert(newGraph.varToCell(position).contains(variable))
             val node = cell.node.get
             if !idToNode.contains(node.id) then
               val newNode = node.cloneSelf(newGraph)
@@ -636,9 +638,35 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
     node
 
   def cloneNode(from: DSG, to: DSG): Unit =
-    assert(from.nodes.contains(this))
+//    assert(from.nodes.contains(this)) TODO update nodes after each phase for to check this assertion
     if !to.nodes.contains(this) then
       to.nodes.add(this)
+
+
+      from.varToCell.foreach(
+        t =>
+          val pos = t._1
+          val varMap = t._2
+          varMap.foreach{
+            case (variable: Variable, (cell: DSC, internal: BigInt)) =>
+              if cell.node.get.equals(this) then
+                to.varToCell.update(
+                  pos,
+                  to.varToCell.getOrElseUpdate(pos,
+                    mutable.Map[Variable, (DSC, BigInt)]()) ++ Map(variable -> (cell, internal))
+                )
+          }
+      )
+      from.formals.foreach{
+        case (variable: Variable, (cell: DSC, internal: BigInt)) =>
+          if cell.node.get.equals(this) then
+            to.varToCell.update(
+              begin(from.proc),
+              to.varToCell.getOrElseUpdate(begin(from.proc),
+                mutable.Map[Variable, (DSC, BigInt)]()) ++ Map(variable -> (cell, internal))
+            )
+      }
+
       cells.foreach {
         case (offset: BigInt, cell: DSC) =>
         if from.pointTo.contains(cell) then

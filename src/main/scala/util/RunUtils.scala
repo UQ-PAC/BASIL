@@ -631,15 +631,15 @@ object StaticAnalysis {
     //val paramResults = ParamAnalysis(IRProgram).analyze()
     val paramResults = Map[Procedure, Set[Variable]]()
 
-    Logger.info("[!] Running PointerTypeAnalysis")
-    val pointerTypeResults = PointerTypeAnalysis(IRProgram).analyze()
-
-    config.analysisDotPath.foreach(s =>
-      writeToFile(toDot(IRProgram, pointerTypeResults.foldLeft(Map(): Map[CFGPosition, String]) {
-        (m, t) =>
-          m + (t._1 -> t._2.toString)
-      }), s"${s}_pointerType.dot")
-    )
+//    Logger.info("[!] Running PointerTypeAnalysis")
+//    val pointerTypeResults = PointerTypeAnalysis(IRProgram).analyze()
+//
+//    config.analysisDotPath.foreach(s =>
+//      writeToFile(toDot(IRProgram, pointerTypeResults.foldLeft(Map(): Map[CFGPosition, String]) {
+//        (m, t) =>
+//          m + (t._1 -> t._2.toString)
+//      }), s"${s}_pointerType.dot")
+//    )
 
 
     Logger.info("[!] Running Symbolic Access Analysis")
