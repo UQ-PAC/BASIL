@@ -87,17 +87,6 @@ class Local(
     else
       None
 
-//  def getCells(pos: CFGPosition, arg: Variable): Set[(DSC, BigInt)] =
-//    if reachingDefs(pos).contains(arg) then
-//      reachingDefs(pos)(arg).foldLeft(Set[(DSC, BigInt)]()) {
-//        (s, defintion) =>
-//          s + graph.varToCell(defintion)(arg)
-//      }
-//    else
-//      Set(graph.formals(arg))
-
-
-
 
   /**
    * Handles unification for instructions of the form R_x = R_y [+ offset] where R_y is a pointer and [+ offset] is optional
@@ -176,30 +165,22 @@ class Local(
         val cs = CallSite(call, graph)
         graph.callsites.add(cs)
         cs.paramCells.foreach{
-          case (variable: Variable, (cell: DSC, internal: BigInt)) =>
-            // TODO assert(false)
-            val node = cell.node.get
-            val adjusted = node.addCell(cell.offset + internal, 0)
-            visitPointerArithmeticOperation(call, adjusted, variable, 0)
+          case (variable: Variable, slice: (DSC, BigInt)) =>
+            visitPointerArithmeticOperation(call, adjust(slice), variable, 0)
         }
         cs.returnCells.foreach{
-          case (variable: Variable, (cell: DSC, internal: BigInt)) =>
-            val returnArgument  = graph.varToCell(n)(variable)._1
-            val returnArgumenetInternal = graph.varToCell(n)(variable)._2
-            val returnArgumentNode = returnArgument.node.get
-            val adjustedReturnArgument = returnArgumentNode.addCell(returnArgument.offset + returnArgumenetInternal, 0)
-            val node = cell.node.get
-            val adjustedCell = node.addCell(cell.offset + internal, 0)
-            graph.mergeCells(adjustedReturnArgument, adjustedCell)
+          case (variable: Variable, slice: (DSC,BigInt)) =>
+            val returnArgument  = graph.varToCell(n)(variable)
+            graph.mergeCells(adjust(returnArgument), adjust(slice))
         }
       case LocalAssign(variable, rhs, maybeString) =>
         val expr: Expr = unwrapPaddingAndSlicing(rhs)
         val lhsCell = adjust(graph.varToCell(n)(variable))
-        if isGlobal(expr, n).isDefined then
-          val global = isGlobal(expr, n).get
+        if isGlobal(rhs, n).isDefined then
+          val global = isGlobal(rhs, n).get
           graph.mergeCells(lhsCell, global)
-        else if isStack(expr, n).isDefined then // just in case stack can't be recognised in after this assignment
-          val stack = isStack(expr, n).get
+        else if isStack(rhs, n).isDefined then // just in case stack can't be recognised in after this assignment
+          val stack = isStack(rhs, n).get
           graph.mergeCells(lhsCell, stack)
         else
           expr match
@@ -263,25 +244,30 @@ class Local(
                 node.flags.unknown = true
                 graph.collapseNode(node)
 
-      case MemoryAssign(memory, MemoryStore(mem, index, expr: Expr, endian, size), label) if unwrapPaddingAndSlicing(expr).isInstanceOf[Variable] => // if value is a literal ignore it
+      case MemoryAssign(memory, MemoryStore(mem, ind, expr: Expr, endian, size), label) if unwrapPaddingAndSlicing(expr).isInstanceOf[Variable] => // if value is a literal ignore it
         val value: Variable = unwrapPaddingAndSlicing(expr).asInstanceOf[Variable]
+        val index: Expr = unwrapPaddingAndSlicing(ind)
         reachingDefs(n)(value).foreach(visit)
         val byteSize = (size.toDouble/8).ceil.toInt
         val addressPointee: DSC =
-          if isGlobal(index, n, byteSize).isDefined then
-            graph.getPointeeAdjusted(isGlobal(index, n, byteSize).get)
-          else if isStack(index, n).isDefined then
-            graph.getPointeeAdjusted(isStack(index, n).get)
+          if isGlobal(ind, n, byteSize).isDefined then
+            graph.getPointeeAdjusted(isGlobal(ind, n, byteSize).get)
+          else if isStack(ind, n).isDefined then
+            graph.getPointeeAdjusted(isStack(ind, n).get)
           else
             index match
-            case BinaryExpr(op, arg1: Variable, arg2) if evaluateExpression(arg2, constProp(n)).isDefined =>
-//              assert(varToSym(n).contains(arg1))
-              val offset = evaluateExpression(arg2, constProp(n)).get.value
-              visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, offset)
-            case arg: Variable =>
-//              assert(varToSym(n).contains(arg))
-              visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg, byteSize, true)
-            case _ => ???
+              case BinaryExpr(op, arg1: Variable, arg2) if evaluateExpression(arg2, constProp(n)).isDefined =>
+//                assert(varToSym(n).contains(arg1))
+                val offset = evaluateExpression(arg2, constProp(n)).get.value
+                visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, offset)
+              case BinaryExpr(op, arg1: Variable, arg2) if evaluateExpression(arg2, constProp(n)).isEmpty=>
+//                assert(varToSym(n).contains(arg1))
+                visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, 0, true)
+              case arg: Variable =>
+//                assert(varToSym(n).contains(arg))
+                visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg, byteSize, true)
+              case _ =>
+                ???
 
         addressPointee.node.get.flags.modified = true
         val valueCells = graph.getCells(n, value)
@@ -293,28 +279,10 @@ class Local(
       case _ =>
   }
   def analyze(): DSG =
-    val domain = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).reverse
+    val domain = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString)
 
     domain.foreach(visit)
 
-//    println(graph.formals)
-//    val results = graph.varToCell.keys.toSeq.sortBy(_.toShortString)
-//    results.foreach {
-//      pos =>
-//        println(pos)
-//        val tab = "    "
-//        graph.varToCell(pos).foreach {
-//          case (variable, cell) =>
-//            println(tab + variable.toString + " -> " + cell.toString)
-//        }
-//    }
-//    println(graph.pointTo)
-//    // collect the nodes in the dsg
-    graph.nodes.addAll(graph.formals.values.map(_._1.node.get))
-    graph.varToCell.values.foreach(
-      value => graph.nodes.addAll(value.values.map(_._1.node.get))
-    )
-    graph.nodes.addAll(graph.stackMapping.values)
-    graph.nodes.addAll(graph.globalMapping.values.map(_._1))
+    graph.collectNodes
     graph
 }

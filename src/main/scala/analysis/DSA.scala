@@ -38,10 +38,22 @@ class DSA(program: Program,
   val queue = mutable.Queue[Procedure]()
 
   override def analyze(): Map[Procedure, DSG] = {
-    val domain = computeDomain(CallGraph, Set(program.mainProcedure))
+    var domain : Set[Procedure] = Set(program.mainProcedure)
+    val stack : mutable.Stack[Procedure] = mutable.Stack()
+    stack.pushAll(program.mainProcedure.calls)
+
+    while stack.nonEmpty do
+      val current = stack.pop()
+      domain += current
+      stack.pushAll(current.calls.diff(domain))
+
+
+//      computeDomain(CallGraph, Set(program.mainProcedure))
     domain.foreach(
       proc =>
         val dsg = Local(proc, symResults, constProp, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params).analyze()
+//        println(s"Node Counter before local for ${proc.name} :  " + NodeCounter.counter)
+
         locals.update(proc, dsg)
         bu.update(proc, dsg.cloneSelf())
     )
@@ -52,10 +64,12 @@ class DSA(program: Program,
       proc =>
         assert(locals(proc).callsites.isEmpty)
         visited += proc
-        queue.enqueueAll(CallGraph.pred(proc).diff(visited))
+        val preds : Set[Procedure] = CallGraph.pred(proc)
+        queue.enqueueAll(CallGraph.pred(proc).diff(visited).intersect(domain))
 //        CallGraph.pred(proc).foreach(buildBUQueue)
     )
 
+//    println("Node Counter before bottom up:  " +  NodeCounter.counter)
     while queue.nonEmpty do
       val proc = queue.dequeue()
       visited += proc
@@ -66,7 +80,14 @@ class DSA(program: Program,
         callSite =>
           val callee = callSite.proc
           val calleeGraph = locals(callee) //.cloneSelf()
+          assert(buGraph.globalMapping.keySet.equals(calleeGraph.globalMapping.keySet))
           assert(calleeGraph.formals.keySet.diff(ignoreRegisters).equals(callSite.paramCells.keySet))
+
+          calleeGraph.globalMapping.foreach {
+            case (range: (BigInt, BigInt), (node: DSN, internal: BigInt)) =>
+              node.cloneNode(calleeGraph, buGraph)
+          }
+
           calleeGraph.formals.foreach{
             case (variable: Variable, (cell: DSC, internalOffset: BigInt)) if !ignoreRegisters.contains(variable)  =>
               assert(callSite.paramCells.contains(variable))
@@ -88,8 +109,15 @@ class DSA(program: Program,
               }
           )
 
-          // TODO
 //          assert(calleeGraph.formals.isEmpty || buGraph.varToCell(begin(callee)).equals(calleeGraph.formals))
+          val globalNodes: mutable.Map[Int, DSN] = mutable.Map()
+          calleeGraph.globalMapping.foreach {
+            case (range: (BigInt, BigInt), (node: DSN, internal: BigInt)) =>
+              buGraph.mergeCells(buGraph.globalMapping(range)._1.getCell(buGraph.globalMapping(range)._2),
+                node.getCell(internal))
+//              node.cloneNode(calleeGraph, buGraph)
+          }
+
           buGraph.varToCell.getOrElse(begin(callee), Map.empty).foreach{
             case (variable: Variable, formal) if !ignoreRegisters.contains(variable)  =>
               buGraph.mergeCells(adjust(formal), adjust(callSite.paramCells(variable)))
@@ -104,34 +132,9 @@ class DSA(program: Program,
                 case (c: DSC, ret) =>
                   buGraph.mergeCells(c, adjust(ret))
               }
-
-              returnCells.foreach{
-                case (cell: DSC, offset: BigInt) =>
-                  calleeGraph.replace(cell, result, 0)
-              }
           )
       )
-//      buGraph.callsites.foreach(//unify nodes
-//        callSite =>
-//          val callee = callSite.proc
-//          val calleeGraph = locals(callee) //.cloneSelf()
-//          calleeGraph.formals.foreach{
-//            case (variable: Variable, formal) if !ignoreRegisters.contains(variable)  =>
-//              // TODO merges here should update the node in the callee
-//                buGraph.mergeCells(adjust(formal), adjust(callSite.paramCells(variable)))
-//            case _ =>
-//          }
-//          writesTo(callee).foreach(
-//            reg =>
-//              val returnCells = calleeGraph.getCells(end(callee), reg)
-////              assert(returnCells.nonEmpty)
-//              returnCells.foldLeft(adjust(callSite.returnCells(reg))){
-//                //
-//                case (c: DSC, ret) =>
-//                  buGraph.mergeCells(c, adjust(ret))
-//              }
-//          )
-//      )
+      buGraph.collectNodes
     // bottom up phase finished
     // clone bu graphs to top-down graphs
     domain.foreach(
@@ -141,6 +144,9 @@ class DSA(program: Program,
 
     queue.enqueue(program.mainProcedure)
     visited = Set()
+
+//    println("Node Counter before top down:  " + NodeCounter.counter)
+
     while queue.nonEmpty do
       val proc = queue.dequeue()
       visited += proc
@@ -150,6 +156,14 @@ class DSA(program: Program,
         callSite =>
           val callee = callSite.proc
           val calleesGraph = td(callee)
+          assert(callersGraph.globalMapping.keySet.equals(calleesGraph.globalMapping.keySet))
+
+          callersGraph.globalMapping.foreach {
+            case (range: (BigInt, BigInt), (node: DSN, internal: BigInt)) =>
+              node.cloneNode(callersGraph, calleesGraph)
+          }
+
+
           callSite.paramCells.foreach{
             case (variable: Variable, (cell: DSC, internalOffset: BigInt)) =>
               val node = cell.node.get
@@ -160,6 +174,14 @@ class DSA(program: Program,
             case (variable: Variable, (cell: DSC, internalOffset: BigInt)) =>
               val node = cell.node.get
               node.cloneNode(callersGraph, callersGraph)
+          }
+
+
+          callersGraph.globalMapping.foreach {
+            case (range: (BigInt, BigInt), (node: DSN, internal: BigInt)) =>
+              calleesGraph.mergeCells(calleesGraph.globalMapping(range)._1.getCell(calleesGraph.globalMapping(range)._2),
+                node.getCell(internal))
+            //              node.cloneNode(calleeGraph, buGraph)
           }
 
           callSite.paramCells.keySet.foreach(
@@ -180,26 +202,7 @@ class DSA(program: Program,
               }
           }
       )
-
-//      callersGraph.callsites.foreach(
-//        callSite =>
-//          val callee = callSite.proc
-//          val calleesGraph = td(callee)
-//          callSite.paramCells.foreach {
-//            case (variable: Variable, cell) =>
-//              calleesGraph.mergeCells(adjust(cell), adjust(calleesGraph.formals(variable)))
-//          }
-//
-//          callSite.returnCells.foreach {
-//            case (variable: Variable, cell: (DSC, BigInt)) =>
-//              val returnCells = calleesGraph.getCells(end(callee), variable)
-//              returnCells.foldLeft(adjust(cell)){
-//                case (c: DSC, retCell: (DSC, BigInt)) =>
-//                  calleesGraph.mergeCells(c, adjust(retCell))
-//              }
-//          }
-//      )
-
+      callersGraph.collectNodes
     td.toMap
 
   }

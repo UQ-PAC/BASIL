@@ -25,7 +25,7 @@ case class HeapRegion2(override val regionIdentifier: String, proc: Procedure, s
 }
 
 case class DataRegion2(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryRegion2 {
-  override def toString: String = s"Data($regionIdentifier, $start)"
+  override def toString: String = s"Data($regionIdentifier, $start, $size)"
 }
 
 case class UnknownRegion2(override val regionIdentifier: String, proc: Procedure) extends MemoryRegion2 {
@@ -85,7 +85,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
     n match
-      case LocalAssign(variable, rhs, maybeString) =>
+      case LocalAssign(variable, rhs, maybeString: Option[String]) =>
         val expr = unwrapPaddingAndSlicing(rhs)
         expr match
           case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) && arg1.equals(stackPointer)

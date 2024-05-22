@@ -1,6 +1,6 @@
 package util
 
-import java.io.{File, PrintWriter, FileInputStream, BufferedWriter, FileWriter, IOException}
+import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
 import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
@@ -706,13 +706,13 @@ object StaticAnalysis {
       IRconstPropResult = newCPResult,
       memoryRegionResult = mraResult,
       vsaResult = vsaResult,
-      interLiveVarsResults = interLiveVarsResults,
-      paramResults = paramResults,
+      interLiveVarsResults = Map.empty,
+      paramResults = Map.empty,
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,
       memoryRegionContents = memoryRegionContents,
+      symbolicAccessess = Map.empty,
       reachingDefs = reachingDefinitionsAnalysisResults,
-      symbolicAccessess = symResults,
       locals = None,
       bus = None,
       tds = None,
@@ -956,15 +956,30 @@ object RunUtils {
       writeToFile(newCFG.toDot(x => x.toString, Output.dotIder), s"${s}_resolvedCFG.dot")
     }
 
-    Logger.info("[!] Running Region Builder")
+    Logger.info("[!] Running Writes To")
     val writesTo = WriteToAnalysis(ctx.program).analyze()
     val reachingDefs = ReachingDefsAnalysis(ctx.program, writesTo).analyze()
     config.analysisDotPath.foreach(
       s =>
         writeToFile(toDot(ctx.program), s"${s}_ct.dot")
     )
-//    val b = Local(ctx.program.mainProcedure, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults).analyze()
-    val dsa = DSA(ctx.program, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults)
+
+    Logger.info("[!] Running Symbolic Access Analysis")
+    val symResults: Map[CFGPosition, Map[SymbolicAccess, TwoElement]] =
+      SymbolicAccessAnalysis(ctx.program, analysisResult.last.IRconstPropResult).analyze()
+    config.analysisDotPath.foreach(s =>
+      writeToFile(toDot(ctx.program, symResults.foldLeft(Map(): Map[CFGPosition, String]) {
+        (m, t) =>
+          m + (t._1 -> t._2.toString)
+      }), s"${s}_saa.dot")
+    )
+
+
+    Logger.info("[!] Running Parameter Analysis")
+    val paramResults = ParamAnalysis(ctx.program).analyze()
+
+    Logger.info("[!] Running DSA Analysis")
+    val dsa = DSA(ctx.program, symResults, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, paramResults)
     dsa.analyze()
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
@@ -975,11 +990,11 @@ object RunUtils {
       memoryRegionResult = analysisResult.last.memoryRegionResult,
       vsaResult = analysisResult.last.vsaResult,
       interLiveVarsResults = analysisResult.last.interLiveVarsResults,
-      paramResults = analysisResult.last.paramResults,
+      paramResults = paramResults, //analysisResult.last.paramResults,
       steensgaardResults = analysisResult.last.steensgaardResults,
       mmmResults = analysisResult.last.mmmResults,
       memoryRegionContents = analysisResult.last.memoryRegionContents,
-      symbolicAccessess = analysisResult.last.symbolicAccessess,
+      symbolicAccessess = symResults, // analysisResult.last.symbolicAccessess,
       locals = Some(dsa.locals.toMap),
       bus = Some(dsa.bu.toMap),
       tds = Some(dsa.td.toMap),
