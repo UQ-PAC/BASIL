@@ -627,7 +627,7 @@ object StaticAnalysis {
     //val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
     val interLiveVarsResults = Map[CFGPosition, Map[Variable, TwoElement]]()
 
-    Logger.info("[!] Running Parameter Analysis")
+//    Logger.info("[!] Running Parameter Analysis")
     //val paramResults = ParamAnalysis(IRProgram).analyze()
     val paramResults = Map[Procedure, Set[Variable]]()
 
@@ -895,7 +895,10 @@ object RunUtils {
         writeToFile(toDot(ctx.program), s"${s}_ct.dot")
     )
 //    val b = Local(ctx.program.mainProcedure, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults).analyze()
-    val dsa = DSA(ctx.program, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults)
+    Logger.info("[!] Running Parameter Analysis")
+    val paramResults = ParamAnalysis(ctx.program).analyze()
+//    val paramResults = Map[Procedure, Set[Variable]]()
+    val dsa = DSA(ctx.program, analysisResult.last.symbolicAccessess, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, paramResults)
     dsa.analyze()
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")
@@ -906,7 +909,7 @@ object RunUtils {
       memoryRegionResult = analysisResult.last.memoryRegionResult,
       vsaResult = analysisResult.last.vsaResult,
       interLiveVarsResults = analysisResult.last.interLiveVarsResults,
-      paramResults = analysisResult.last.paramResults,
+      paramResults = paramResults, //analysisResult.last.paramResults,
       steensgaardResults = analysisResult.last.steensgaardResults,
       mmmResults = analysisResult.last.mmmResults,
       memoryRegionContents = analysisResult.last.memoryRegionContents,

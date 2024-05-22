@@ -97,36 +97,62 @@ class DSG(val proc: Procedure,
 
   // make all globals
   private val swappedOffsets = globalOffsets.map(_.swap)
-  val globalMapping: mutable.Map[(BigInt, BigInt), (DSN, BigInt)] = globals.foldLeft(mutable.Map[(BigInt, BigInt), (DSN, BigInt)]()) {
-    (m, global) =>
-      var address: BigInt = global.address
-      if swappedOffsets.contains(address) then
-        address = swappedOffsets(address)
+  val globalMapping: mutable.Map[(BigInt, BigInt), (DSN, BigInt)] = mutable.Map[(BigInt, BigInt), (DSN, BigInt)]()
+  globals.foreach(
+    global =>
       val node = DSN(Some(this), global.size)
-      node.allocationRegions.add(DataRegion2(global.name, address, global.size))
+      node.allocationRegions.add(DataRegion2(global.name, global.address, global.size/8))
       node.flags.global = true
       node.flags.incomplete = true
-      m + ((address, address + global.size/8) -> (node, 0))
+      globalMapping.update((global.address, global.address + global.size/8), (node, 0))
+  )
 
-  }
+  globals.foreach(
+    global =>
+      var address = global.address
+      breakable {
+        while swappedOffsets.contains(address) do
+          val relocatedAddress = swappedOffsets(address)
+          if relocatedAddress == address then
+            break
+
+          var field: BigInt = 0
+          val node: DSN = isGlobal(relocatedAddress) match
+            case Some(value) =>
+              field = relocatedAddress - value._1._1
+              val node = value._2._1
+              node.addCell(field, 8)
+              node
+
+            case None =>
+              val node = DSN(Some(this))
+              node.allocationRegions.add(DataRegion2(s"Relocated_$relocatedAddress", relocatedAddress, 8))
+              node.flags.global = true
+              node.flags.incomplete = true
+              globalMapping.update((relocatedAddress, relocatedAddress + 8), (node, 0))
+              node
+
+          pointTo.update(node.cells(field), (isGlobal(address).get._2._1.cells(0), 0))
+          address = relocatedAddress
+      }
+  )
+
   externalFunctions.foreach(
     external =>
-      var address: BigInt = external.offset
-      if swappedOffsets.contains(address) then
-        address = swappedOffsets(address)
       val node = DSN(Some(this))
-      node.allocationRegions.add(DataRegion2(external.name, address, 0))
+      node.allocationRegions.add(DataRegion2(external.name, external.offset, 0))
       node.flags.global = true
       node.flags.incomplete = true
-      globalMapping.update((address, address), (node, 0))
+      globalMapping.update((external.offset, external.offset), (node, 0))
   )
+
 
 
   // determine if an address is a global and return the corresponding global if it is.
   def isGlobal(address: BigInt): Option[((BigInt, BigInt), (DSN, BigInt))] =
     for (elem <- globalMapping) {
       val range = elem._1
-      if address >= range._1 && address <= range._2 then
+      if address >= range._1 && (address < range._2 || (range._1 == range._2 && range._2 == address)) then
         return Some(elem)
     }
     None
@@ -137,7 +163,6 @@ class DSG(val proc: Procedure,
         m.foreach {
           case (variable, (cell, offset)) =>
             if cell.equals(oldCell) then
-//            if cell.node.equals(oldCell.node) && cell.offset + offset == oldCell.offset then
               m.update(variable, (newCell, offset + internalOffsetChange))
         }
     )
@@ -145,7 +170,6 @@ class DSG(val proc: Procedure,
     formals.foreach{
       case (variable, (cell, offset)) =>
         if cell.equals(oldCell) then
-//        if cell.node.equals(oldCell.node) && cell.offset + offset == oldCell.offset then
           formals.update(variable, (newCell, offset + internalOffsetChange))
     }
 
@@ -153,7 +177,6 @@ class DSG(val proc: Procedure,
     pointTo.foreach {
       case (pointer, (cell: DSC, pointeeInternal: BigInt)) =>
         if cell.equals(oldCell) then
-//        if cell.node.equals(oldCell.node) && cell.offset + pointeeInternal == oldCell.offset then
           pointTo.update(pointer, (newCell, pointeeInternal + internalOffsetChange))
     }
 
@@ -181,14 +204,12 @@ class DSG(val proc: Procedure,
         callSite.returnCells.foreach{
           case (variable: Variable, (cell: DSC, internal: BigInt)) =>
             if cell.equals(oldCell) then
-//            if cell.node.equals(oldCell.node) && cell.offset + internal == oldCell.offset then
               callSite.returnCells.update(variable, (newCell, internal + internalOffsetChange))
         }
 
         callSite.paramCells.foreach{
           case (variable: Variable, (cell: DSC, internal: BigInt)) =>
             if cell.equals(oldCell) then
-//            if cell.node.equals(oldCell.node) && cell.offset + internal == oldCell.offset then
               callSite.paramCells.update(variable, (newCell, internal + internalOffsetChange))
         }
     )
@@ -283,7 +304,6 @@ class DSG(val proc: Procedure,
         val (cell2Pointee: DSC, pointee2Internal: BigInt) = getPointee(cell2)
         val result = mergeCells(getPointeeAdjusted(cell1), getPointeeAdjusted(cell2))
         assert(pointTo(cell1)._1.equals(result))
-        // TODO
         pointTo.update(cell1, (result,pointee2Internal.max(pointee1Internal)))
       else
         pointTo.update(cell1, getPointee(cell2))
@@ -322,12 +342,6 @@ class DSG(val proc: Procedure,
       pointTo.remove(node1.cells(0))
       replace(node1.cells(0), node2.cells(0), 0)
       node2.cells(0)
-//    else if cell1.node.get.allocationRegions.isEmpty && cell1.offset == 0 && cell1.node.get.cells.size == 1 && cell1.largestAccessedSize == 0 && //
-//      !pointTo.contains(cell1) && pointTo.values.foldLeft(true) {
-//      (condition, cell) => cell != cell1 && condition
-//    } then
-//      replace(cell1, cell2, 0)
-//      cell2
     else
       
       var delta = cell1.offset - cell2.offset
@@ -378,7 +392,7 @@ class DSG(val proc: Procedure,
             (set, cell) =>
               // replace incoming edges
               if cell.node.get.equals(node2) then
-                replace(cell, collapsedCell, delta + cell.offset - offset) // TODO reconsider offsets
+                replace(cell, collapsedCell, delta + cell.offset - offset)
               else
                 assert(cell.node.get.equals(node1))
                 replace(cell, collapsedCell, cell.offset - offset)
@@ -391,7 +405,7 @@ class DSG(val proc: Procedure,
               else
                 set
           }
-          // replace outgoing edges TODO might have to move this out after all cells have been processed 
+          // replace outgoing edges
           if outgoing.size == 1 then
             pointTo.update(collapsedCell, outgoing.head)
           else if outgoing.size > 1 then
@@ -505,6 +519,7 @@ class DSG(val proc: Procedure,
         newGraph.globalMapping.update((start, end), (idToNode(node.id), internalOffset))
     }
 
+    newGraph.pointTo.clear()
     pointTo.foreach {
       case (cell1: DSC, (cell2: DSC, internalOffset: BigInt)) =>
         val node1 = cell1.node.get
@@ -579,14 +594,6 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
   val allocationRegions: mutable.Set[MemoryRegion2] = mutable.Set()
 
   var rep: String = ""
-
-//  var size: BigInt = region match
-//    case Some(value) => value match
-//      case DataRegion2(regionIdentifier, start, size) => size
-//      case HeapRegion2(regionIdentifier, proc, size) => size
-//      case StackRegion2(regionIdentifier, proc, size) => size
-//      case UnknownRegion2(regionIdentifier, proc) => 0
-//    case None => 0
 
   val cells: mutable.Map[BigInt, DSC] = mutable.Map()
   this.addCell(0, 0)
@@ -717,6 +724,16 @@ class CallSite(val call: DirectCall, val graph: DSG) {
 
 def unwrapPaddingAndSlicing(expr: Expr): Expr =
   expr match
+    case literal: Literal => literal
+    case Repeat(repeats, body) => Repeat(repeats, unwrapPaddingAndSlicing(body))
+    case SignExtend(extension, body) => SignExtend(extension, unwrapPaddingAndSlicing(body))
+    case UnaryExpr(op, arg) => UnaryExpr(op, arg)
+    case BinaryExpr(op, arg1, arg2) => BinaryExpr(op, unwrapPaddingAndSlicing(arg1), unwrapPaddingAndSlicing(arg2))
+    case MemoryStore(mem, index, value, endian, size) =>
+      MemoryStore(mem, unwrapPaddingAndSlicing(index), unwrapPaddingAndSlicing(value), endian, size)
+    case MemoryLoad(mem, index, endian, size) => MemoryLoad(mem, unwrapPaddingAndSlicing(index), endian, size)
+    case Memory(name, addressSize, valueSize) => expr
+    case variable: Variable => variable
     case Extract(end, start, body) /*if start == 0 && end == 32*/ => unwrapPaddingAndSlicing(body) // this may make it unsound
     case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
     case _ => expr

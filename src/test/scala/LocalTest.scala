@@ -26,8 +26,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     )
     val program = results.ir.program
     val dsg = results.analysis.get.locals.get(program.mainProcedure)
-    println(dsg.stackMapping)
-    assert(dsg.pointTo.size == 9)
+    assert(dsg.pointTo.size == 12) // 12
     val framePointer = dsg.stackMapping(0).cells(0) // R31
     assert(dsg.pointTo(framePointer)._1.equals(dsg.formals(R29)._1))
     val stack8 = dsg.stackMapping(8).cells(0) //  R31 + 8
@@ -39,9 +38,102 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(stack24.node.get.collapsed)
     assert(dsg.pointTo(stack24)._1.equals(stack24))
 
-    assert(dsg.pointTo(stack40)._1.equals(dsg.getPointee(dsg.getPointee(dsg.globalMapping((69600, 69600))._1.cells(0))._1)._1))
+    assert(dsg.pointTo(stack40).equals(dsg.getPointee(dsg.getPointee(dsg.globalMapping((69600, 69600))._1.cells(0))._1)))
 
   }
+
+  test("local jumptable2_clang add_two") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/jumptable2/jumptable2_clang.adt",
+          relfFile = "examples/jumptable2/jumptable2_clang.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.locals.get(program.procs("add_two"))
+    assert(dsg.pointTo.size == 7)
+    assert(dsg.stackMapping.isEmpty)
+    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
+  }
+
+  test("local jumptable2_clang add_six") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/jumptable2/jumptable2_clang.adt",
+          relfFile = "examples/jumptable2/jumptable2_clang.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.locals.get(program.procs("add_six"))
+    assert(dsg.pointTo.size == 7)
+    assert(dsg.stackMapping.isEmpty)
+    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
+  }
+
+  test("local jumptable2_clang sub_seven") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/jumptable2/jumptable2_clang.adt",
+          relfFile = "examples/jumptable2/jumptable2_clang.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.locals.get(program.procs("sub_seven"))
+    assert(dsg.pointTo.size == 7)
+    assert(dsg.stackMapping.isEmpty)
+    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
+  }
+
+  test("local jumptable2_clang main") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/jumptable2/jumptable2_clang.adt",
+          relfFile = "examples/jumptable2/jumptable2_clang.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.locals.get(program.mainProcedure)
+    print("")
+//    assert(dsg.pointTo.size == 7)
+//    assert(dsg.stackMapping.isEmpty)
+//    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
+  }
+
+
+
+
+  ignore("interproc unsafe pointer arithmetic") {
+    // test interproc unification with points-to that have internal offsets into cells
+  }
+
 
   test("unsafe pointer arithmetic") {
     val results = RunUtils.loadAndTranslate(
@@ -66,7 +158,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val stack40 = dsg.stackMapping(40).cells(0)
     val stack48 = dsg.stackMapping(48).cells(0)
     val stack56 = dsg.stackMapping(56).cells(0)
-    assert(dsg.pointTo.size==9)
+    assert(dsg.pointTo.size==10)
     assert(dsg.pointTo(stack0).equals(dsg.formals(R29)))
     assert(dsg.pointTo(stack8).equals(dsg.formals(R30)))
     assert(dsg.pointTo(stack24).equals(dsg.pointTo(stack32)))
@@ -102,7 +194,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val stack24 = dsg.stackMapping(24).cells(0)
     val stack32 = dsg.stackMapping(32).cells(0)
     val stack40 = dsg.stackMapping(40).cells(0)
-    assert(dsg.pointTo.size == 8)
+    assert(dsg.pointTo.size == 9)
     assert(dsg.pointTo(stack0).equals(dsg.formals(R29)))
     assert(dsg.pointTo(stack8).equals(dsg.formals(R30)))
     assert(dsg.pointTo(stack24)._1.node.get.equals(dsg.pointTo(stack32)._1.node.get))
@@ -130,7 +222,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.locals.get(program.procs("callee"))
     val stack8 = dsg.stackMapping(8).cells(0) //  R31 + 8
     val stack24 = dsg.stackMapping(24).cells(0) //  R31 + 24
-    assert(dsg.pointTo.size == 2)
+    assert(dsg.pointTo.size == 3)
     assert(dsg.getPointee(stack8).equals(dsg.formals(R0)))
     assert(dsg.getPointee(stack8)._1.offset == 0)
     assert(dsg.getPointee(stack24)._1.equals(dsg.formals(R0)._1.node.get.cells(16)))
@@ -261,6 +353,68 @@ class LocalTest extends AnyFunSuite, TestUtil {
   }
 
   // bottom up tests
+  test("bottom-up jumptable2_clang add_two") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/jumptable2/jumptable2_clang.adt",
+          relfFile = "examples/jumptable2/jumptable2_clang.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.bus.get(program.procs("add_two"))
+    assert(dsg.pointTo.size == 7)
+    assert(dsg.stackMapping.isEmpty)
+    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
+  }
+
+  test("bottom-up jumptable2_clang add_six") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/jumptable2/jumptable2_clang.adt",
+          relfFile = "examples/jumptable2/jumptable2_clang.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.bus.get(program.procs("add_six"))
+    assert(dsg.pointTo.size == 7)
+    assert(dsg.stackMapping.isEmpty)
+    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
+  }
+
+  test("bottom-up jumptable2_clang sub_seven") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "examples/jumptable2/jumptable2_clang.adt",
+          relfFile = "examples/jumptable2/jumptable2_clang.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+    val program = results.ir.program
+    val dsg = results.analysis.get.bus.get(program.procs("sub_seven"))
+    assert(dsg.pointTo.size == 7)
+    assert(dsg.stackMapping.isEmpty)
+    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
+  }
   test("bottom up interproc pointer arithmetic callee") {
     // same as interproc pointer arithmetic callee's local graph (no changes should have been made)
     val results = RunUtils.loadAndTranslate(
@@ -280,7 +434,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.bus.get(program.procs("callee"))
     val stack8 = dsg.stackMapping(8).cells(0) //  R31 + 8
     val stack24 = dsg.stackMapping(24).cells(0) //  R31 + 24
-    assert(dsg.pointTo.size == 2)
+    assert(dsg.pointTo.size == 3)
     assert(dsg.getPointee(stack8).equals(dsg.formals(R0)))
     assert(dsg.getPointee(stack8)._1.offset == 0)
     assert(dsg.getPointee(stack24)._1.equals(dsg.formals(R0)._1.node.get.cells(16)))
@@ -308,7 +462,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val stack24 = dsg.stackMapping(24).cells(0)
     val stack32 = dsg.stackMapping(32).cells(0)
     val stack40 = dsg.stackMapping(40).cells(0)
-    assert(dsg.pointTo.size == 8)
+    assert(dsg.pointTo.size == 9)
     assert(dsg.pointTo(stack0).equals(dsg.formals(R29)))
     assert(dsg.pointTo(stack8).equals(dsg.formals(R30)))
     assert(dsg.pointTo(stack24)._1.node.get.equals(dsg.pointTo(stack32)._1.node.get))
@@ -343,7 +497,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.tds.get(program.procs("callee"))
     val stack8 = dsg.stackMapping(8).cells(0) //  R31 + 8
     val stack24 = dsg.stackMapping(24).cells(0) //  R31 + 24
-    assert(dsg.pointTo.size == 5)
+    assert(dsg.pointTo.size == 6)
     assert(dsg.getPointee(stack8).equals(dsg.formals(R0)))
     assert(dsg.getPointee(stack8)._1.offset == 16)
     assert(dsg.getPointee(stack24)._1.equals(dsg.formals(R0)._1.node.get.cells(32)))
@@ -372,7 +526,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val stack24 = dsg.stackMapping(24).cells(0)
     val stack32 = dsg.stackMapping(32).cells(0)
     val stack40 = dsg.stackMapping(40).cells(0)
-    assert(dsg.pointTo.size == 8)
+    assert(dsg.pointTo.size == 9)
     assert(dsg.pointTo(stack0).equals(dsg.formals(R29)))
     assert(dsg.pointTo(stack8).equals(dsg.formals(R30)))
     assert(dsg.pointTo(stack24)._1.node.get.equals(dsg.pointTo(stack32)._1.node.get))

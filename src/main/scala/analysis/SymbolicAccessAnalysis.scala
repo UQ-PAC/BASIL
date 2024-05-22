@@ -25,7 +25,7 @@ case class HeapRegion2(override val regionIdentifier: String, proc: Procedure, s
 }
 
 case class DataRegion2(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryRegion2 {
-  override def toString: String = s"Data($regionIdentifier, $start)"
+  override def toString: String = s"Data($regionIdentifier, $start, $size)"
 }
 
 case class UnknownRegion2(override val regionIdentifier: String, proc: Procedure) extends MemoryRegion2 {
