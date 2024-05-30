@@ -45,8 +45,15 @@ object Main {
       @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
       analysisResults: Option[String],
       @arg(name = "analysis-results-dot", doc = "Log analysis results in .dot form at specified path.")
-      analysisResultsDot: Option[String]
+      analysisResultsDot: Option[String],
+      @arg(name = "threads", short = 't', doc = "Separates threads into multiple .bpl files with given output filename as prefix (requires --analyse flag)")
+      threadSplit: Flag
   )
+
+  // need to parse thread split flag
+  // separate file names for each thread
+  // put method in runutils that splits threads if threads flag is true
+  // detect using the indirect call resolution stuff
 
   def main(args: Array[String]): Unit = {
     val parser = ParserForClass[Config]
@@ -78,9 +85,9 @@ object Main {
     val q = BASILConfig(
       loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth),
       runInterpret = conf.interpret.value,
-      staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot)) else None,
+      staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot, conf.threadSplit.value)) else None,
       boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect,
-        true, rely),
+        true, rely, conf.threadSplit.value),
       outputPrefix = conf.outFileName,
     )
 

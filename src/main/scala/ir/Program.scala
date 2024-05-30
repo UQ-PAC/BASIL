@@ -10,6 +10,8 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
               var initialMemory: ArrayBuffer[MemorySection],
               var readOnlyMemory: ArrayBuffer[MemorySection]) extends Iterable[CFGPosition] {
 
+  val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
+
   // This shouldn't be run before indirect calls are resolved
   def stripUnreachableFunctions(depth: Int = Int.MaxValue): Unit = {
     val procedureCalleeNames = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
@@ -151,6 +153,11 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
   def iterator: Iterator[CFGPosition] = {
     ILUnorderedIterator(this)
   }
+}
+
+
+// if creationSite == None then it is the initial thread
+class ProgramThread(val entry: Procedure, val procedures: mutable.Set[Procedure], val creationSite: Option[DirectCall]) {
 
 }
 
@@ -169,7 +176,7 @@ class Procedure private (
   require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
   require(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
-  def this(name: String, address: Option[Int] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
+  def this(name: String, address: Option[Int] = None, entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
     this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
   }
 
@@ -326,7 +333,7 @@ class Procedure private (
     }
   }
 
-  def clearBlocks() : Unit = {
+  def clearBlocks(): Unit = {
     // O(n) because we are careful to unlink the parents etc.
     removeBlocks(_blocks)
   }
@@ -335,6 +342,24 @@ class Procedure private (
   def incomingCalls(): Iterator[DirectCall] = _callers.iterator
 
   var modifies: mutable.Set[Global] = mutable.Set()
+
+  def reachableFrom: Set[Procedure] = {
+    val reachable = mutable.Set[Procedure](this)
+    val toVisit = mutable.Queue[Procedure]()
+    toVisit.enqueue(this)
+
+    while (toVisit.nonEmpty) {
+      val p = toVisit.dequeue()
+      val calledBy = p.calls
+      for (c <- p.calls) {
+        if (!reachable.contains(c)) {
+          reachable.add(c)
+          toVisit.enqueue(c)
+        }
+      }
+    }
+    reachable.toSet
+  }
 }
 
 class Parameter(var name: String, var size: Int, var value: Register) {

@@ -6,7 +6,7 @@ import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 
 import scala.collection.mutable.ArrayBuffer
 
-class IRToBoogie(var program: Program, var spec: Specification) {
+class IRToBoogie(var program: Program, var spec: Specification, var thread: Option[ProgramThread], val filename: String) {
   private val externAttr = BAttribute("extern")
   private val inlineAttr = BAttribute("inline")
   private val globals = spec.globals
@@ -56,7 +56,14 @@ class IRToBoogie(var program: Program, var spec: Specification) {
     config = boogieGeneratorConfig
     val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
 
-    val procedures = program.procedures.map(f => translateProcedure(f, readOnlyMemory))
+    val procedures = thread match {
+      case None =>
+        program.procedures.map(f => translateProcedure(f, readOnlyMemory))
+      case Some(t) =>
+        val translatedProcedures = ArrayBuffer[BProcedure]()
+        t.procedures.foreach(p => translatedProcedures.addOne(translateProcedure(p, readOnlyMemory)))
+        translatedProcedures
+    }
     val defaultGlobals = List(BVarDecl(mem, List(externAttr)), BVarDecl(Gamma_mem, List(externAttr)))
     val globalVars = procedures.flatMap(p => p.globals ++ p.freeRequires.flatMap(_.globals) ++ p.freeEnsures.flatMap(_.globals) ++ p.ensures.flatMap(_.globals) ++ p.requires.flatMap(_.globals))
     val globalDecls = (globalVars.map(b => BVarDecl(b, List(externAttr))) ++ defaultGlobals).distinct.sorted.toList
@@ -107,7 +114,7 @@ class IRToBoogie(var program: Program, var spec: Specification) {
 
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgLib ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
-    BProgram(declarations)
+    BProgram(declarations, filename)
   }
 
   def genRely(relies: List[BExpr], readOnlyMemory: List[BExpr]): List[BProcedure] = {
