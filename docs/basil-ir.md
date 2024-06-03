@@ -95,7 +95,7 @@ label, the dsl constructor will likely throw a match error.
 
 Some additional constants are defined for convenience, Eg. `R0 = Register(R0, 64)`, see [the source file](../src/main/scala/ir/dsl/DSL.scala) for the full list.
 
-### Abstract Interpretation
+### Static Analysis / Abstract Interpretation
 
 - For static analysis the Il-CFG-Iterator is the current well-supported way to iterate the IR.
   This currently uses the TIP framework, so you do not need to interact with the IR visitor directly. 
@@ -104,7 +104,7 @@ Some additional constants are defined for convenience, Eg. `R0 = Register(R0, 64
 
 ### Modifying and Visiting the IR with Visitor Pattern
 
-(src/main/scala/ir/Visitor.scala)[../src/main/scala/ir/Visitor.scala] defines visitors which can be used
+[src/main/scala/ir/Visitor.scala](../src/main/scala/ir/Visitor.scala) defines visitors which can be used
 for extracting specific features from an IR program. This is useful if you want to modify all instances of a specific 
 IR construct.
   

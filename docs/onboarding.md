@@ -37,7 +37,7 @@ flowchart LR
 ```
 
 BASIL works by translating a binary program to the Boogie Intermediate Verification Language. In doing so,
-it additionally inserts assertions and specifications to make boogie check the ${wp_{if}&{\cal R G}}$ information-flow
+it additionally inserts assertions and specifications to make boogie check the ${wp_{if}^{\cal R G}}$ information-flow
 security property.
 
 ### wpifRG
@@ -68,7 +68,7 @@ x := secret    |  x = ?, Gamma_x = high, secret = ?, Gamma_secret = high, L(x) =
 This program would not be secure if the classification was instead `L(x) = low`, since the assignment of 
 secret would be a violation of this classification.
 
-WpifRG checks the invariant that for all variables $v$ and program states $L(v) \ge \Gamma_v$. 
+WpifRG checks the invariant that for all variables $v$ and program states ${\cal L}(v) \ge \Gamma_v$. 
 The full description of this can be found in a paper available on request.
 
 ---
@@ -84,35 +84,35 @@ and "global" merely refers to their language scoping.
 
 ### BASIL Phases of translation
 
-1. Lifting 
-  The binary we analyse is disassembled and lifted. This involves two processes
-  1. The reconstruction of control flow. For this a disassembler is used, such as bap or ddisasm.
-  2. The extraction of instruction semantics, this is the responsibility of [aslp](https://github.com/UQ-PAC/aslp), 
-  as it is invoked by either a bap plugin or [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics). 
-  This operation is external to BASIL, and the details are available in the relevant code repositories. 
+1. Lifting. 
+    The binary we analyse is disassembled and lifted. This involves two processes
+    1. The reconstruction of control flow. For this a disassembler is used, such as bap or ddisasm.
+    2. The extraction of instruction semantics, this is the responsibility of [aslp](https://github.com/UQ-PAC/aslp), 
+    as it is invoked by either a bap plugin or [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics). 
+    This operation is external to BASIL, and the details are available in the relevant code repositories. 
+
 2. Parsing
-  - The lifted program is parsed into a **BASIL IR** program.
-  - The ELF symbol table data is loaded from the `.relf` text file and used to parse the `.spec` specification file
-  - The specifications are loaded from the spec file for use in stage 4.
+    - The lifted program is parsed into a **BASIL IR** program.
+    - The ELF symbol table data is loaded from the `.relf` text file and used to parse the `.spec` specification file
+    - The specifications are loaded from the spec file for use in stage 4.
 3. Analysis
-  - Static analysis over the BASIL IR collects information used for translation.
-  - The goal is to lift the program constructs present to constructs that afford more local reasoning.
+    - Static analysis over the BASIL IR collects information used for translation.
+    - The goal is to lift the program constructs present to constructs that afford more local reasoning.
 4. Translation & Verification condition generation 
-  - Verification conditions implementing the ${wp_{if}}^{\cal R G}$ logic, based on the function and rely/guarantee specifications 
-  from the `.spec` file are added to the program when it is translated to the **Boogie IR**.
+    - Verification conditions implementing the ${wp_{if}}^{\cal R G}$ logic, based on the function and rely/guarantee specifications 
+    from the `.spec` file are added to the program when it is translated to the **Boogie IR**.
 5. Verification
   - The Boogie IR program is serialised, and run through the boogie verifier.
 
 See [RunUtils.scala](../src/main/scala/util/RunUtils.scala) where this is organised, for more detail.
 
-### Internal Representation
+### Internal Representations
 
-- BASIL IR: Details can be found [here](il-cfg.md)
-- Boogie IR
-- BAP ADT AST: representation of the BAP frontent input program before translation to BASIL IR
+- BASIL IR: Details can be found [here](basil-ir.md)
+- Boogie IR: The Boogie AST represented within basil
+- BAP ADT AST: Representation of the BAP in BASIL's frontend, before translation to BASIL IR
 
-
-### Scala
+## Scala
 
 Basil is implemented in Scala 3.
 Scala is a mixed functional and object-oriented programming language implemented on the JVM. It is a very complicated 
@@ -130,7 +130,6 @@ Some general advice:
 - Prefer immutable case classes to regular classes wherever possible
 - Don't unneccessarily use generics or type aliases 
 - Correct code should not require explicit casts (`.asInstanceOf`)
-
 
 #### Code style
 
@@ -154,7 +153,7 @@ We do not have a strict code style however
 
 We use the [scalatest](https://www.scalatest.org/) unit testing framework. Example unit tests can be found in [src/test/scala](../src/test/scala/).
 
-The [dsl](basil-ir.md) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
+The [dsl](basil-ir.md#constructing-programs-in-code) can be used to construct simple example BASIL IR programs, which can then be fed through into the whole pipeline via `IRLoading.load()` in
 `RunUtils.scala`. Prefer to write tests that depend only on the single piece of code under test rather than the whole BASIL translation. 
 
 ### Integration tests
