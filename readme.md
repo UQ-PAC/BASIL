@@ -31,53 +31,6 @@ $ boogie boogie_out.bpl
 Boogie program verifier finished with 4 verified, 0 errors
 ```
 
-## Installation and use
-
-This is a Scala 3 project using the [mill](mill-build.com) build system, it can be run with `mill run`. 
-
-### Local Development 
-
-The tool itself is a Scala project and is OS-independent.
-
-Furthermore, lifting input files from a given AArch64 binary is Linux-specific, and all commands given are for Linux. 
-On Windows, WSL2 may be used to run any Linux-specific tasks.
-
-Installing [mill](https://mill-build.com/mill/Installation_IDE_Support.html) or [sbt](https://www.scala-sbt.org/download.html) and [JDK >= 17](https://openjdk.org/install/) is required.
-
-This can be done via [coursier](https://get-coursier.io/docs/cli-overview).
-
-A mill script is included at `./mill` so it does not need to be installed. For Windows, `./mill.bat` should be used instead.
-
-#### IDE Support
-
-Mill supports the Metals language server and IntelliJ through Build Server Protocol (BSP), which is the recommended use. 
-
-SBT has an intellij plugin in addition to BSP. 
-
-To use specifically Mill's bsp support, delete `.bsp`, run `mill mill.bsp.BSP/install`, and replace the first argument of `argv` in the resulting `.bsp/mill-bsp.json` with the 
-command used to run mill (`mill` if mill is installed, or the mill script, either `./mill` on Linux/OSX or `./mill.bat` on Windows). 
-
-```
-~ rm -r .bsp
-~ ./scripts/setup-bsp.sh 
-# create bsp config file
-+ ./mill mill.bsp.BSP/install
-[2/2] mill.bsp.BSP.install 
-Creating BSP connection file: /home/am/Documents/programming/2023/bil-to-boogie-translator/.bsp/mill-bsp.json
-# fix config file 
-++ perl -pe 's/"argv":\[".*?",/"argv":["$MILL_CMD",/g' .bsp/mill-bsp.json
-+ fixed='{"name":"mill-bsp","argv":["./mill","--bsp","--disable-ticker","--color","false","--jobs","1"],"millVersion":"0.11.6","bspVersion":"2.1.0-M7","languages":["scala","java"]}'
-```
-More information is available [here](https://mill-build.com/mill/Installation_IDE_Support.html#_build_server_protocol_bsp).
-However 
-### Note about using sbt with IntelliJ
-
-[See Also](https://github.com/UQ-PAC/bil-to-boogie-translator/wiki/Development)
-
-The project uses sbt to build the project. For the most part this should *just work*, and there are IntelliJ run files (located in the .run folder) which automatically compile and run the project.
-However, to prevent some issues in IntelliJ, it is necessary to unmark `target/scala-3.1.0/src_managed/` as a sources root folder, in the `File > Project Structure > Modules` dialog.
-
-
 ---
 
 The tool takes as inputs either a BAP ADT file (here denoted with `.adt`) or a `.gts` file produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics), as well as a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.

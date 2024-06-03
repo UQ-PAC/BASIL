@@ -47,7 +47,7 @@ Endian ::=&~ BigEndian ~|~ LittleEndian \\
 \end{align*}
 ```
 
-## Interaction with the IR
+## Interaction with BASIL IR
 
 ### Constructing Programs in Code
 
@@ -79,15 +79,15 @@ var program: Program = prog(
 As we can see, the syntax is
 
 ```
-program     :: prog ( procedure+ )
-procedure   :: proc (procname, block+)
-block       :: block(blocklabel, statement+, jump)
-statement   :: <BASIL IR Statement>
-jump        :: call_s | goto_s | ret
-call_s      :: call (procedurename, None | Some(blocklabel))  // target, fallthrough 
-goto_s      :: goto(blocklabel+)                              // targets
-procname    :: String
-blocklabel  :: String
+program     ::= prog ( procedure+ )
+procedure   ::= proc (procname, block+)
+block       ::= block(blocklabel, statement+, jump)
+statement   ::= <BASIL IR Statement>
+jump        ::= call_s | goto_s | ret
+call_s      ::= call (procedurename, None | Some(blocklabel))  // target, fallthrough 
+goto_s      ::= goto(blocklabel+)                              // targets
+procname    ::= String
+blocklabel  ::= String
 ```
 
 If a block or procedure name is referenced in a target position, but a block or procedure is not defined with that 
@@ -111,6 +111,4 @@ IR construct.
 ### CFG 
 
 The cfg is a control-flow graph constructed from the IR, it wraps each statement in a `Node`.
-
-
 
