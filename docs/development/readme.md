@@ -1,5 +1,11 @@
 # BASIL Development
 
+## Getting Started
+
+See [editor-setup](editor-setup.md).
+
+- TODO: project structure
+
 ## Scala
 
 Basil is implemented in Scala 3.
@@ -97,7 +103,7 @@ IntelliJ professional (which can be obtained for free by students) includes a pe
 
 Alternatively, [async-profiler](https://github.com/async-profiler/async-profiler) can be used to produce a 
 [flame graph](https://brendangregg.com/flamegraphs.html) showing the hot-spots in the program. Download the library from 
-the releases tab, compile a basil .jar and run the jar with the following arguments.
+the [releases tab](https://github.com/async-profiler/async-profiler/releases), compile a basil .jar with `mill assembly` and run the jar with the following arguments.
 
 Instructions for Linux and Mac:
 

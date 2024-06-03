@@ -41,10 +41,13 @@ We first list the requirements of specific development tasks, and secondly how t
     - [use nix derivation](https://github.com/katrinafyi/pac-nix?tab=readme-ov-file#usage)
     depends: nix
 - bap
+    -  [use nix derivation](https://github.com/katrinafyi/pac-nix?tab=readme-ov-file#usage).
+    depends: nix
     - Use `basil-dev` docker container.
     ```
     podman-compose run basil-dev
     ```
+    depends: podman, podman-compose
     - Compile from source
 - nix
     - Follow the single-user installation instructions [here](https://nixos.org/download/)  
@@ -62,9 +65,6 @@ We first list the requirements of specific development tasks, and secondly how t
     - [see also](../../docker/readme.md)
 - Podman / docker
     - `sudo apt-get install podman podman-compose`
-- bap 
-    -  [use nix derivation](https://github.com/katrinafyi/pac-nix?tab=readme-ov-file#usage).
-    depends: nix
 - clang
   - available from package repositories
 - gcc cross

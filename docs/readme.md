@@ -127,9 +127,7 @@ as constraint-based analyses.
 
 # Development
 
-- [Development Guide](development.md)
-- Getting started
-- Project Structure
+- [Development Guide](development)
 
 ## Prior Work
 
