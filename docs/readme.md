@@ -141,7 +141,8 @@ as constraint-based analyses.
 
 ## Prior Work
 
-Inasfar as BASIL is a program analysis tool written in Scala, that operates by translating programs to Boogie, there is Viper, and Vercors based on viper.
+Inasfar as BASIL is a program analysis tool written in Scala, that operates by translating programs to Boogie, there are also the analysis tools Viper and Vercors (based on Viper)
+which use Boogie as a verification back-end.
 
 - [Viper](http://viper.ethz.ch/tutorial/) -- ETH Z
 - [Vercors](https://github.com/utwente-fmt/vercors/wiki) -- U Twente 
