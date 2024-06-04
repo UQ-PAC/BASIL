@@ -48,7 +48,7 @@ x := secret    |  x = ?, Gamma_x = high, secret = ?, Gamma_secret = high, L(x) =
 This program would not be secure if the classification was instead `L(x) = low`, since the assignment of 
 secret would be a violation of this classification.
 
-WpifRG checks the invariant that for all variables $v$ and program states ${\cal L}(v) \ge \Gamma_v$. 
+$wp_{if}^{\cal R G}$ checks the invariant that for all variables $v$ and program states ${\cal L}(v) \ge \Gamma_v$. 
 The full description of this can be found in a paper available on request.
 
 ---
