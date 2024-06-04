@@ -54,7 +54,7 @@ The full description of this can be found in a paper available on request.
 ---
 
 Note that we precisely use the term "shared" to mean variables that may be shared between threads, 
-and "global" merely refers to their language scoping.
+and "global" merely refers to their language scoping (i.e., potentially shared between functions).
 
 ## BASIL tool overview
 
