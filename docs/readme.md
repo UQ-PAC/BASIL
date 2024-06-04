@@ -121,14 +121,14 @@ Basil uses static analysis over the BASIL IR, to "lift" the program to a more ab
 where we can make stronger assumptions about the code that make local reasoning more effective,
 and hence verification easier.
 
-This includes data-flow analyses based on the theory of Abstract Interpretation, as well 
+This includes data-flow analyses based on the theory of Abstract Interpretation (AbsInt), as well 
 as constraint-based analyses. 
 
 - SPA:  https://cs.au.dk/~amoeller/spa/spa.pdf
   - Course textbook for CSSE4630, has a good introduction to lattice theory and dataflow analyses, the later 
     chapters (Distributive and later) are less relevant. 
-- AI tutorial https://www-apr.lip6.fr/~mine/publi/article-mine-FTiPL17.pdf 
-- Lecture series on AI https://www.youtube.com/watch?v=FTcIE7uzehE&list=PLtjm-n_Ts-J-6EU1WfVIWLhl1BUUR-Sqm&index=27
+- AbsInt tutorial https://www-apr.lip6.fr/~mine/publi/article-mine-FTiPL17.pdf 
+- Lecture series on AbsInt https://www.youtube.com/watch?v=FTcIE7uzehE&list=PLtjm-n_Ts-J-6EU1WfVIWLhl1BUUR-Sqm&index=27
 - Scala tutorial for a toy language https://continuation.passing.style/blog/writing-abstract-interpreter-in-scala.html
 
 ### Internal Representations
