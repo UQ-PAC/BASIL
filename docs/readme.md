@@ -110,7 +110,7 @@ it additionally inserts assertions and specifications to make Boogie check infor
     - Verification conditions implementing the $wp_{if}^{\cal R G}$ logic, based on the function and rely/guarantee specifications 
     from the `.spec` file are added to the program when it is translated to the **Boogie IR**.
 5. Verification
-    - The Boogie IR program is serialised, and run through the boogie verifier.
+    - The Boogie IR program is serialised, and run through the Boogie verifier.
 
 See [RunUtils.scala](../src/main/scala/util/RunUtils.scala) where this is organised, for more detail.
 
@@ -141,7 +141,7 @@ as constraint-based analyses.
 
 ## Prior Work
 
-Inasfar as BASIL is a program analysis tool written in Scala, that operates by translating programs to boogie, there is Viper, and Vercors based on viper.
+Inasfar as BASIL is a program analysis tool written in Scala, that operates by translating programs to Boogie, there is Viper, and Vercors based on viper.
 
 - [Viper](http://viper.ethz.ch/tutorial/) -- ETH Z
 - [Vercors](https://github.com/utwente-fmt/vercors/wiki) -- U Twente 
