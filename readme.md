@@ -68,136 +68,23 @@ BASIL
   -v --verbose                    Show extra debugging logs.
 ```
 
-The sbt shell can also be used for multiple tasks with less overhead by executing `sbt` and then the relevant sbt commands.
+## Introduction
 
-To build a standalone `.jar` file, use the following command:
+See [docs](docs).
 
-`mill assembly`
+## Development Setup
 
-From `sbt` the resulting `.jar` is located at `target/scala-3.1.0/wptool-boogie-assembly-0.0.1.jar` and from 
-`mill` this is `out/assembly.dest/out.jar`.
+See [docs/development](docs/development)
 
-To compile the source without running it - this helps IntelliJ highlight things properly:
+## Getting started
 
-`mill compile`
-
-
-#### Running Tests
-
-The test suites use [ScalaTest](https://www.scalatest.org/), they can be run via.
+1. Install [scala](/docs/development/tool-installation.md)
+2. Install [boogie](/docs/development/tool-installation.md)
+3. To a single system test case :
 
 ```
-$ mill test
+./mill test.testOnly '*SystemTests*' -- -z secret_write -z secret_write 
 ```
-
-To run a single test suite, for example only the system tests (requires boogie):
-
-```
-$ mill.test.testOnly SystemTests
-```
-
-To run single tests in from the test suite:
-
-```
-$ mill test.testOnly SystemTests -- -z basic_arrays_read -z basic_arrays_write
-```
-
-To update the expected basil output files from the test results run
-
-```
-$ mill updateExpected
-```
-
-This is used to keep track of which tests have passed previously, as well as changes to the basil output.
-
-## Generating inputs (Lifting)
-
-Many lifted examples are already profiled in the tests directory: [src/test/correct](src/test/correct), these instructions
-are for if you want to lift new compiled binaries.
-
-The tool takes a `.adt` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.
-
-### Requirements
-
-- `bap` with the ASLp plugin
-- `readelf`
-- cross-compiliation toolchains, e.g.:
-    - `gcc-13-aarch64-linux-gnu`
-    - `clang`
-
-This can be installed using the [nix packages](https://github.com/katrinafyi/pac-nix).
-
-The `dev` podman container also contains these tools and can be used by mounting current directory into the container as described at [docker/readme.md](docker/readme.md). 
-
-[BAP](https://github.com/BinaryAnalysisPlatform/bap) can be installed by following the instructions in the link given.
-
-Given a AArch64/ARM64 binary file (`*.out`), the `.adt` file can be produced by running
-
-`bap *.out -d adt:*.adt`
-
-and the `.relf` file can be produced by running
-
-`aarch64-linux-gnu-readelf -s -r -W *.out > *.relf`.
-
-To cross-compile a C source file to a AArch64 binary, `gcc-aarch64-linux-gnu` must be installed. This can be done with the following commands on Ubuntu:
-
-`sudo apt-get update`
-
-`sudo apt-get install gcc-aarch64-linux-gnu`
-
-The binary (i.e `*.out`) can then be generated from a C source file using:
-
-`aarch64-linux-gnu-gcc *.c -o *.out`
-
-See [src/test/correct/liftone.sh](https://github.com/UQ-PAC/bil-to-boogie-translator/blob/main/src/test/correct/liftone.sh) for more examples
-for flag combinations that work. 
-
-## Verifying the generated Boogie file
-
-[Boogie](https://github.com/boogie-org/boogie#installation) can be installed by following the instructions in the given link.
-
-Boogie can be run on the output `*.bpl` file with the command `boogie \useArrayAxioms *.bpl`. 
-
-It is recommended to use Boogie version 3.0.4 and Z3 version 4.8.8 (which is recommended by Boogie). Other versions and combinations may not have been tested.
-
-The `\useArrayAxioms` flag is necessary for Boogie versions 2.16.8 and greater; for earlier versions it can be removed.
-
-### Installing boogie
-
-Boogie can be installed through dotnet and requires dotnet 6.
-
-```
-sudo apt-get install dotnet6
-dotnet install boogie
-```
-
-## Other useful commands 
-
-To compile a C file without the global offset table being used in address calculation, use the following command:
-
-`aarch64-linux-gnu-gcc -fno-plt -fno-pic *.c -o *.out`
-
-To produce assembly from the binary, use either of the following commands:
-
-`aarch64-linux-gnu-objdump -d *.out`
-
-`bap *.out -d asm`
-
-To view the hex dump of the data section of the binary:
-
-`readelf -x .data *.out`
-
-To produce a BIR (BAP Intermediate Representation) file (which contains similar information to the BAP ADT file but is more human-readable):
-
-`bap *.out -d:*.bir`
-
-To compile a C file with the stack guard turned off:
-
-`aarch64-linux-gnu-gcc -fno-stack-protector -fno-plt -fno-pic *.c -o *.out`
-
-To produce a translation to BIL (BAP Intermediate Language) for one instruction at a time:
-
-`bap objdump *.out --show-{memory,bil,insn}`
 
 ## Open Source License
 

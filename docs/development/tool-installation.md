@@ -1,6 +1,6 @@
 # Tool Installation
 
-This describes how to setup a development environment for various development tasks.
+This describes how to set up a development environment for various development tasks.
 
 We first list the requirements of specific development tasks, and secondly how to obtain them. 
 
@@ -9,31 +9,32 @@ We first list the requirements of specific development tasks, and secondly how t
 - Run BASIL integration tests
   - Scala, Boogie, Mill
 - Lift Integration test examples, add new test case
-  - ddisasm, gtirb_semantics, bap, clang-15, gcc-aarch64-linux-gnu
+  - ddisasm, gtirb_semantics, bap, clang-15, gcc-aarch64-linux-gnu, gnu make
 - Lift an example binary to gtirb
   - ddisam, gtirb_semantics
 
 ## Install instructions
 
 - Scala
+    - depends: java 20
     1. [Install coursier](https://get-coursier.io/docs/cli-installation#linux)
     2. `cs install scala`
-    - depends: java 20
 - Mill
-    - `cs install mill`
-    - `./mill` script in repo root
     - depends: Scala
+    1. `cs install mill`
+    2. `./mill` script in repo root
 - Dotnet6
     - usually available from system repositories
     ```
     sudo apt-get install dotnet-sdk-6.0
     ```
-    - https://dotnet.microsoft.com/en-us/download/dotnet/6.0
+    - OR https://dotnet.microsoft.com/en-us/download/dotnet/6.0
 - gtirb_semantics 
    - [use nix derivation](https://github.com/katrinafyi/pac-nix?tab=readme-ov-file#usage)
     depends: nix
 - Boogie
-    - depends: Dotnet6
+    - depends: Dotnet6, z3
+    It is recommended to use Boogie version 3.0.4 and Z3 version 4.8.8 (which is recommended by Boogie). Other versions and combinations may not have been tested.
     ```sh
     dotnet tool install --global Boogie [--version <version>]
     ```
@@ -43,7 +44,7 @@ We first list the requirements of specific development tasks, and secondly how t
 - bap
     -  [use nix derivation](https://github.com/katrinafyi/pac-nix?tab=readme-ov-file#usage).
     depends: nix
-    - Use `basil-dev` docker container.
+    - OR use `basil-dev` docker container. depends: podman, podman-compose
     ```
     podman-compose run basil-dev
     ```
@@ -64,17 +65,13 @@ We first list the requirements of specific development tasks, and secondly how t
     - depends: podman, podman-compose
     - [see also](../../docker/readme.md)
 - Podman / docker
-    - `sudo apt-get install podman podman-compose`
+    - Available from package repositories
+    ```
+    sudo apt-get install podman podman-compose
+    ```
 - clang
-  - available from package repositories
+    - available from package repositories
 - gcc cross
-  - Available from system repositories `gcc-aarch64-linux-gnu`
-
-
-
-
-
-
-
-
-
+    - Available from system repositories `gcc-aarch64-linux-gnu`
+- z3
+    - available from system repositories

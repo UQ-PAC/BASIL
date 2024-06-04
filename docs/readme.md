@@ -1,13 +1,28 @@
-# BASIL Onboarding
+# BASIL Overview
+
+
+## Introduction
+
+Below is an overview of the BASIL project and its theoretical background. 
+To get started on development, see [development](development).
+
+- [development](development/readme.md) Explanation of common development tasks
+    - [project-layout](development/project-layout.md) Organisation of the source code
+    - [editor-setup](development/editor-setup.md) Guide to basil development in IDEs 
+    - [tool-installation](development/tool-installation.md) Guide to lifter, etc. tool installation
+    - [cfg](development/cfg.md) Explanation of the old CFG datastructure 
+- [basil-ir](basil-ir.md) explanation of BASIL's intermediate representation
+- [compiler-explorer](compiler-explorer.md) guide to the compiler explorer basil interface
+- [il-cfg](il-cfg.md) explanation of the IL cfg iterator design
 
 ## Background
 
 BASIL is a program verification tool that operates on binaries. It implements a specific program logic
 for verifying information flow on concurrent code.
 
-### wpifRG
+### Program Logic 
 
-${wp_{if}^{\cal R G}}$ is the program logic BASIL implements for information flow verification. It is described in 
+$wp_{if}^{\cal R G}}$ is the program logic BASIL implements for information flow verification. It is described in 
 the paper by [Winter, Coughlin, Smith '21 in CSF](https://github.com/UQ-PAC/wpif_CSF21/blob/main/WinterCoughlinSmith_CSF2021.pdf).
 
 Broadly, we consider information leaks under shared memory communication of parallel processes.
@@ -73,7 +88,7 @@ flowchart LR
 ```
 
 BASIL works by translating a binary program to the Boogie Intermediate Verification Language. In doing so,
-it additionally inserts assertions and specifications to make boogie check the ${wp_{if}^{\cal R G}}$ information-flow
+it additionally inserts assertions and specifications to make boogie check the $wp_{if}^{\cal R G}$ information-flow
 security property.
 
 ### BASIL Phases of translation
@@ -93,7 +108,7 @@ security property.
     - Static analysis over the [BASIL IR](basil-ir.md) collects information used for translation.
     - The goal is to lift the program constructs present to constructs that afford more local reasoning.
 4. Translation & Verification condition generation 
-    - Verification conditions implementing the ${wp_{if}}^{\cal R G}$ logic, based on the function and rely/guarantee specifications 
+    - Verification conditions implementing the $wp_{if}^{\cal R G}$ logic, based on the function and rely/guarantee specifications 
     from the `.spec` file are added to the program when it is translated to the **Boogie IR**.
 5. Verification
     - The Boogie IR program is serialised, and run through the boogie verifier.
@@ -125,10 +140,6 @@ as constraint-based analyses.
   - The Boogie AST represented within BASIL's backend
 - BAP ADT AST: Representation of the BAP in BASIL's frontend, before translation to BASIL IR
 
-# Development
-
-- [Development Guide](development)
-
 ## Prior Work
 
 Inasfar as BASIL is a program analysis tool written in Scala, that operates by translating programs to boogie, there is Viper, and Vercors based on viper.
@@ -137,5 +148,3 @@ Inasfar as BASIL is a program analysis tool written in Scala, that operates by t
 - [Vercors](https://github.com/utwente-fmt/vercors/wiki) -- U Twente 
 - [TIP](https://github.com/cs-au-dk/TIP/tree/master) static analysis tool basil's static analyses are based on. It 
   is primarily an educational implementation, so is useful for understanding the algorithms but is not a performance baseline.
-
-

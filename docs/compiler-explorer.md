@@ -47,7 +47,7 @@ window.
 3. To view other tool outputs; go to the Tools dropdown in the assembly output window to add another tool 
   parented to this compiler/assembler. 
 
-![](godboltexample.png)
+![](img/godboltexample.png)
 
 The notable tools are:
 
@@ -70,7 +70,7 @@ The notable tools are:
     in the basil or boogie tools. The outputs available in the basil tool for example are `boogie, basil-il, adt, bir, relf`. 
 - If you revert a source or argument change to exactly the same as a previous state a cached output may be used. 
 
-![](args.png)
+![](img/args.png)
 
 #### Compiler Arguments
 
@@ -78,7 +78,7 @@ The notable tools are:
 - The tool does not work well unless the binary is compiled **and linked**. 
   You must have `Link to binary` checked in the output menu for it to work. 
 
-![](compileropts.png)
+![](img/compileropts.png)
 
 
 #### Running Boogie Directly
