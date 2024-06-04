@@ -66,7 +66,7 @@ flowchart LR
   (BAP IR)"]
   BASIL["BASIL"]
   specification["rely/guarantee
-  pre/post\nsecurity classification\nspecifications"]
+  pre/post\nspecifications\nsecurity classification"]
   annotated_boogie_program["annotated
   Boogie
   program"]
