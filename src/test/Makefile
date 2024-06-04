@@ -1,6 +1,6 @@
 TARGETSS := all verify clean cleanall cleanlift recompile json cleanjson cleangts gts
 
-SUBTARGETS = $(wildcard correct/*/ incorrect/*/)
+SUBTARGETS = $(wildcard correct/*/ incorrect/*/ correct_analyse/*/)
 .PHONY : $(TARGETSS) $(SUBTARGETS) correct incorrect
 
 $(TARGETSS): $(SUBTARGETS)

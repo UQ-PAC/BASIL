@@ -14,6 +14,9 @@ import scala.sys.process.*
 trait SystemTests extends AnyFunSuite {
   val testPath = "./src/test/"
   val correctPath = "./src/test/correct"
+  val correctAnalysePath = "./src/test/correct_analyse/"
+  val correctAnalysePrograms: Array[String] = getSubdirectories(correctAnalysePath)
+
   val correctPrograms: Array[String] = getSubdirectories(correctPath)
   val incorrectPath = "./src/test/incorrect"
   val incorrectPrograms: Array[String] = getSubdirectories(incorrectPath)
@@ -28,20 +31,21 @@ trait SystemTests extends AnyFunSuite {
 
   val testResults: mutable.ArrayBuffer[(String, TestResult)] = mutable.ArrayBuffer()
 
-  def runTests(programs: Array[String], path: String, name: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
+  def runTests(programs: Array[String], path: String, name: String, shouldVerify: Boolean, useADT: Boolean, analyse:Boolean): Unit = {
+    val adt = if useADT then ":BAP" else ":GTIRB"
     // get all variations of each program
     for (p <- programs) {
       val programPath = path + "/" + p
       val variations = getSubdirectories(programPath)
       variations.foreach(t =>
-        test(name + "/" + p + "/" + t) {
-          runTest(path, p, t, shouldVerify, useADT)
+        test(name + "/" + p + "/" + t + adt) {
+          runTest(path, p, t, shouldVerify, useADT, analyse)
         }
       )
     }
   }
 
-  def summary(): Unit = {
+  def summary(name:String): Unit = {
     val csv: String = "testCase," + TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r._1},${r._2.toCsv}").mkString(System.lineSeparator())
     log(csv, testPath + "testResults.csv")
 
@@ -61,10 +65,10 @@ trait SystemTests extends AnyFunSuite {
 
     val summaryHeader = "passedCount,failedCount,verifiedCount,counterexampleCount,timeoutCount,verifyTotalTime,counterexampleTotalTime"
     val summaryRow = s"$numSuccess,$numFail,$numVerified,${counterExamples.size},$numTimeout,${verifying.sum},${counterExamples.sum}"
-    log(summaryHeader + System.lineSeparator() + summaryRow, testPath + "summary.csv")
+    log(summaryHeader + System.lineSeparator() + summaryRow, name + testPath + "summary.csv")
   }
 
-  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
+  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean, analyse: Boolean): Unit = {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
@@ -76,6 +80,7 @@ trait SystemTests extends AnyFunSuite {
 
     val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath)
     if (File(specPath).exists) args ++= Seq("--spec", specPath)
+    if (analyse) args ++= Seq("--analyse")
 
     Main.main(args.toArray)
     val translateTime = timer.checkPoint("translate-boogie")
@@ -161,17 +166,21 @@ trait SystemTests extends AnyFunSuite {
 }
 
 class SystemTestsBAP extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", true, true)
-  runTests(incorrectPrograms, incorrectPath, "incorrect", false, true)
-  test("summary") {
-    summary()
+  runTests(correctPrograms, correctPath, "correct", true, true, false)
+  runTests(incorrectPrograms, incorrectPath, "incorrect", false, true, false)
+  runTests(correctAnalysePrograms, correctAnalysePath, "correct_analyse", true, true, true)
+  test("summary-bap") {
+    summary("bap-")
   }
 }
 
 class SystemTestsGTIRB extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", true, false)
-  runTests(incorrectPrograms, incorrectPath, "incorrect", false, false)
-  test("summary") {
-    summary()
+  runTests(correctPrograms, correctPath, "correct", true, false, false)
+  runTests(incorrectPrograms, incorrectPath, "incorrect", false, false, false)
+  runTests(correctAnalysePrograms, correctAnalysePath, "correct_analyse", true, false, true)
+  test("summary-gtirb") {
+    summary("gtirb-")
   }
 }
+
+
