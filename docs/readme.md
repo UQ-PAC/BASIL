@@ -22,7 +22,7 @@ for verifying information flow on concurrent code.
 
 ### Program Logic 
 
-$wp_{if}^{\cal R G}}$ is the program logic BASIL implements for information flow verification. It is described in 
+$wp_{if}^{\cal R G}$ is the program logic BASIL implements for information flow verification. It is described in 
 the paper by [Winter, Coughlin, Smith '21 in CSF](https://github.com/UQ-PAC/wpif_CSF21/blob/main/WinterCoughlinSmith_CSF2021.pdf).
 
 Broadly, we consider information leaks under shared memory communication of parallel processes.
