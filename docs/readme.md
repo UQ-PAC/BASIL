@@ -88,8 +88,7 @@ flowchart LR
 ```
 
 BASIL works by translating a binary program to the Boogie Intermediate Verification Language. In doing so,
-it additionally inserts assertions and specifications to make boogie check the $wp_{if}^{\cal R G}$ information-flow
-security property.
+it additionally inserts assertions and specifications to make Boogie check information-flow security as defined by $wp_{if}^{\cal R G}$.
 
 ### BASIL Phases of translation
 
