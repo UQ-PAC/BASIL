@@ -317,26 +317,6 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           } else {
             breakLoop = true
           }
-        // assignment to program counter not associated with an edge
-        // caused by indirect call that DDisasm fails to identify
-        // potentially requires splitting block
-        case l: LocalAssign if l.lhs == Register("_PC", BitVecType(64)) =>
-          val newBlocks = handleUnidentifiedIndirectCall(l, currentBlock, block.label, newBlockCount)
-          procedure.addBlocks(newBlocks)
-          newBlockCount += newBlocks.size
-
-          for (n <- newBlocks) {
-            if (n.statements.nonEmpty) {
-              queue.enqueue(n)
-            }
-          }
-
-          if (queue.nonEmpty) {
-            currentBlock = queue.dequeue()
-            currentStatement = currentBlock.statements.head()
-          } else {
-            breakLoop = true
-          }
         case _ =>
           if (currentBlock.statements.hasNext(currentStatement)) {
             currentStatement = currentBlock.statements.getNext(currentStatement)
@@ -348,60 +328,6 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           }
       }
     }
-  }
-
-  // Handles assignments to the program counter that are not related to edges in the GTIRB CFG
-  // These are likely blr instructions (which are indirect calls) that DDisasm failed to identify as branching
-  // If the PC assignment is mid-block, the block is split into two, and an indirect call is created at the end of the first block
-  // If the PC assignment is at the end of the block, an indirect call is added to the block
-  // The PC assignment is removed in all cases
-  // No other cases of unhandled program counter assignments have been identified yet
-  private def handleUnidentifiedIndirectCall(l: LocalAssign, currentBlock: Block, parentLabel: String, newBlockCountIn: Int): ArrayBuffer[Block] = {
-    val newBlocks = ArrayBuffer[Block]()
-    var newBlockCount = newBlockCountIn
-
-    val target = l.rhs match {
-      case r: Register => r
-      case _ => throw Exception(s"unhandled indirect call $l does not assign a register to __PC")
-    }
-    val returnTarget = if (currentBlock.statements.hasNext(l)) {
-      // unidentified indirect call is mid-block
-      val afterStatements = currentBlock.statements.splitOn(l)
-      val afterBlock = Block(parentLabel + "$__" + newBlockCount, None, afterStatements)
-      newBlockCount += 1
-      newBlocks.append(afterBlock)
-      afterBlock.replaceJump(currentBlock.jump)
-      // we are assuming this is a blr instruction and so R30 has been set to point to the next instruction
-      afterBlock
-    } else {
-      // unidentified indirect call is at end of block with fallthrough edge
-      currentBlock.jump match {
-        case g: GoTo if g.targets.nonEmpty =>
-          if (g.targets.size == 1) {
-            g.targets.head
-          } else {
-            // case where goto has multiple targets: create an extra block and point to that
-            val afterBlock = Block(parentLabel + "$__" + newBlockCount, None)
-            newBlockCount += 1
-            newBlocks.append(afterBlock)
-            afterBlock.replaceJump(currentBlock.jump)
-            afterBlock
-          }
-        case _ =>
-          throw Exception(s"unhandled indirect call $l is at end of block ${currentBlock.label} that ends in call ${currentBlock.jump}")
-      }
-    }
-    // check that R30 has been set by previous statement - if it did not then this is a case that requires further investigation
-    currentBlock.statements.getPrev(l) match {
-      case LocalAssign(Register("R30", BitVecType(64)), _, _) =>
-      case _ => throw Exception("unhandled assignment to PC did not set R30 beforehand")
-    }
-
-    val indirectCall = IndirectCall(target, Some(returnTarget))
-    currentBlock.replaceJump(indirectCall)
-    currentBlock.statements.remove(l)
-
-    newBlocks
   }
 
   // handles if statements that are not related to conditional edges in the GTIRB CFG
