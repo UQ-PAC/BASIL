@@ -226,6 +226,13 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     }
   }
 
+  private def getPCTarget(block: Block): Register = {
+    block.statements.last match {
+      case LocalAssign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
+      case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
+    }
+  }
+
   private def byteStringToString(byteString: ByteString): String = {
     Base64.getUrlEncoder.encodeToString(byteString.toByteArray)
   }
@@ -549,7 +556,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       IndirectCall(Register("R30", BitVecType(64)), None)
 
     } else if (edgeLabels.forall { (e: EdgeLabel) => !e.conditional && !e.direct && e.`type` == Type_Branch }) {
-      // resolved indirect call
+      // resolved indirect call with multiple blocks as targets
       val targets = mutable.Set[Block]()
       for (edge <- outgoingEdges) {
         if (uuidToBlock.contains(edge.targetUuid)) {
@@ -579,12 +586,11 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           handleDirectCallWithReturn(edge0, edge1, block)
         case (EdgeLabel(false, true, Type_Call, _), EdgeLabel(false, true, Type_Fallthrough, _)) =>
           handleDirectCallWithReturn(edge1, edge0, block)
-        /*
-        these are probably what blr should resolve to once that's fixed?
-      case (EdgeLabel(false, true, Type_Fallthrough, _), EdgeLabel(false, false, Type_Call, _)) =>
-      case (EdgeLabel(false, false, Type_Call, _), EdgeLabel(false, true, Type_Fallthrough, _)) =>
-        */
-
+        // indirect call with return target
+        case (EdgeLabel(false, true, Type_Fallthrough, _), EdgeLabel(false, false, Type_Call, _)) =>
+          handleIndirectCallWithReturn(edge0, edge1, block)
+        case (EdgeLabel(false, false, Type_Call, _), EdgeLabel(false, true, Type_Fallthrough, _)) =>
+          handleIndirectCallWithReturn(edge1, edge0, block)
         // conditional branch
         case (EdgeLabel(true, true, Type_Fallthrough, _), EdgeLabel(true, true, Type_Branch, _)) =>
           handleConditionalBranch(edge0, edge1, block, procedure)
@@ -595,6 +601,26 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       }
     } else {
       throw Exception(s"cannot resolve outgoing edges from block ${block.label}")
+    }
+  }
+
+  private def handleIndirectCallWithReturn(fallthrough: Edge, call: Edge, block: Block): Call = {
+    if (!uuidToBlock.contains(fallthrough.targetUuid)) {
+      throw Exception(s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block")
+    }
+    val returnTarget = uuidToBlock(fallthrough.targetUuid)
+
+    if (!entranceUUIDtoProcedure.contains(call.targetUuid)) {
+      // unresolved indirect call
+      val target = getPCTarget(block)
+      removePCAssign(block)
+
+      IndirectCall(target, Some(returnTarget))
+    } else {
+      // resolved indirect call
+      val target = entranceUUIDtoProcedure(call.targetUuid)
+      removePCAssign(block)
+      DirectCall(target, Some(returnTarget))
     }
   }
 
