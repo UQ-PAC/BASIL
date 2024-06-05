@@ -94,8 +94,8 @@ trait SystemTests extends AnyFunSuite {
     val failureMsg = if timedOut then "SMT Solver timed out" else
       (verified, shouldVerify, xor(verified, proveFailed)) match {
         case (true, true, true) => "Test passed"
-        case (false, false, true) => "Test passed"
-        case (_, _, false) => "Prover error: unknown result"
+        case (false , false, true) => "Test passed"
+        case (_, _, false) => "Prover error: unknown result: " + boogieResult
         case (true, false, true) => "Expected verification failure, but got success."
         case (false, true, true) => "Expected verification success, but got failure."
       }
@@ -111,7 +111,7 @@ trait SystemTests extends AnyFunSuite {
     } else {
       info("Note: this test has not previously succeeded")
     }
-    val passed = !timedOut && (verified == shouldVerify) && (xor(verified, proveFailed))
+    val passed = !timedOut && (verified == shouldVerify) && xor(verified, proveFailed)
     val result = TestResult(passed, verified, shouldVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
     testResults.append((s"$name/$variation", result))
     if (!passed) fail(failureMsg)

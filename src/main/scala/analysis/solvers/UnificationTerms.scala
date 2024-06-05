@@ -38,7 +38,7 @@ trait Cons[A] extends Term[A] {
 
   /** The arity of the constructor.
     */
-  def arity: Int = args.length
+  private def arity: Int = args.length
 
   lazy val fv: Set[Var[A]] = args.flatMap(_.fv).toSet
 

@@ -52,7 +52,7 @@ trait ILValueAnalysisMisc:
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CFGPosition, s: statelattice.Element): statelattice.Element =
+  def localTransfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] =
     n match
       case la: Assign =>
         s + (la.lhs -> eval(la.rhs, s))
@@ -66,11 +66,10 @@ object IRSimpleValueAnalysis:
   class Solver(prog: Program) extends ILValueAnalysisMisc
     with IRIntraproceduralForwardDependencies 
     with Analysis[Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]]
-    with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
-    :
+    with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]:
       /* Worklist initial set */
       //override val lattice: MapLattice[CFGPosition, statelattice.type] = MapLattice(statelattice)
       override val lattice: MapLattice[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]] = MapLattice(statelattice)
 
-      override val domain : Set[CFGPosition] = computeDomain(IntraProcIRCursor, prog.procedures).toSet
-      def transfer(n: CFGPosition, s: statelattice.Element): statelattice.Element = localTransfer(n, s)
+      override val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, prog.procedures).toSet
+      def transfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = localTransfer(n, s)

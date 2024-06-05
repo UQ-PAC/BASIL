@@ -1,6 +1,7 @@
 package ir
 
 import boogie._
+import scala.collection.mutable
 
 sealed trait Expr {
   def toBoogie: BExpr
@@ -327,6 +328,9 @@ sealed trait Global
 sealed trait Variable extends Expr {
   val name: String
   val irType: IRType
+  val ssa_id: mutable.Set[Int] = mutable.Set[Int]()
+  var sharedVariable: Boolean = false
+
   override def getType: IRType = irType
   override def variables: Set[Variable] = Set(this)
   override def gammas: Set[Expr] = Set(this)
@@ -345,7 +349,7 @@ sealed trait Variable extends Expr {
 case class Register(override val name: String, size: Int) extends Variable with Global {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Global)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
-  override def toString: String = s"Register($name, $irType)"
+  override def toString: String = s"Register(${name}_${ssa_id}_$sharedVariable, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitRegister(this)
   override val irType: BitVecType = BitVecType(size)
 }
@@ -354,7 +358,7 @@ case class Register(override val name: String, size: Int) extends Variable with 
 case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar($name, $irType)"
+  override def toString: String = s"LocalVar(${name}_${ssa_id}_$sharedVariable, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 

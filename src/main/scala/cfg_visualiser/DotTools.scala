@@ -15,14 +15,14 @@ def wrap(input: String, width: Integer = 20): String =
   if (input.length() <= width) {
     input
   } else {
-    var splitPoint = width;
+    var splitPoint = width
     while (input.charAt(splitPoint).isLetterOrDigit && splitPoint > width / 2) {
       // search backwards for a non alphanumeric charcter to split on
       splitPoint -= 1
     }
     if (input.charAt(splitPoint).isLetterOrDigit) {
       // didn't find a character to split on
-      splitPoint = width;
+      splitPoint = width
     }
     val line = input.substring(0, splitPoint)
     line + "\\l" + wrap(input.substring(splitPoint), width)
@@ -57,13 +57,13 @@ class DotNode(val id: String, val label: String) extends DotElement {
 
 /** Represents an edge between two nodes in a Graphviz dot file.
   */
-class DotArrow(
-    val fromNode: DotNode,
+ case class DotArrow(
+    fromNode: DotNode,
     arrow: String,
-    val toNode: DotNode,
-    val label: String,
-    val style: String = "solid",
-    val colour: String = "black"
+    toNode: DotNode,
+    label: String,
+    style: String = "solid",
+    colour: String = "black"
 ) extends DotElement {
 
   def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)

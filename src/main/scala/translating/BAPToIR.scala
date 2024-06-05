@@ -8,7 +8,7 @@ import specification.*
 import scala.collection.mutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
-import intrusivelist.IntrusiveList
+import util.intrusive_list.*
 
 class BAPToIR(var program: BAPProgram, mainAddress: Int) {
 
@@ -24,7 +24,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
         val block = Block(b.label, b.address)
         procedure.addBlocks(block)
         if (b.address.isDefined && b.address.isDefined && b.address.get == procedure.address.get) {
-          procedure.entryBlock = Some(block)
+          procedure.entryBlock = block
         }
         labelToBlock.addOne(b.label, block)
       }
@@ -51,11 +51,13 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
         val (jump, newBlocks) = translate(b.jumps, block)
         procedure.addBlocks(newBlocks)
         block.replaceJump(jump)
+        assert(jump.hasParent)
       }
 
       // Set entry block to the block with the same address as the procedure or the first in sequence
+      procedure.blocks.find(b => b.address == procedure.address).foreach(procedure.entryBlock = _)
+      if procedure.entryBlock.isEmpty then procedure.blocks.nextOption().foreach(procedure.entryBlock = _)
       // TODO maybe throw an exception if there is no block with the same address, to be safe?
-      if procedure.entryBlock.isEmpty then procedure.entryBlock = procedure.blocks.nextOption()
 
     }
 
@@ -120,7 +122,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
                   val conditionsIR = conditions.map(c => convertConditionBool(c, true))
                   conditionsIR.tail.foldLeft(currentCondition)((ands: Expr, next: Expr) => BinaryExpr(BoolAND, next, ands))
                 }
-                val newBlock = newBlockCondition(block, target, currentCondition)
+                val newBlock = newBlockCondition(block, target, condition)
                 newBlocks.append(newBlock)
                 targets.append(newBlock)
                 conditions.append(b.condition)

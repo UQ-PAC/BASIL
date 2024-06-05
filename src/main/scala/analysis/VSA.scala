@@ -57,7 +57,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
 
   private val mallocVariable = Register("R0", 64)
 
-  def resolveGlobalOffset(address: BigInt): String = {
+  private def resolveGlobalOffset(address: BigInt): String = {
     val tableAddress = globalOffsets(address)
     if (globals.contains(tableAddress)) {
       globals(tableAddress)
@@ -84,7 +84,7 @@ trait ValueSetAnalysis(cfg: ProgramCfg,
     }
   }
 
-  def getValueType(bitVecLiteral: BitVecLiteral): Value = {
+  private def getValueType(bitVecLiteral: BitVecLiteral): Value = {
     if (externalFunctions.contains(bitVecLiteral.value)) {
       LocalAddress(bitVecLiteral, externalFunctions(bitVecLiteral.value))
     } else if (globals.contains(bitVecLiteral.value)) {
