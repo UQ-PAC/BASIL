@@ -292,7 +292,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
   private def cleanUpIfPCAssign(block: Block, procedure: Procedure): Unit = {
     var newBlockCount = 0
     var currentBlock = block
-    var currentStatement = currentBlock.statements.head()
+    var currentStatement = currentBlock.statements.head
     var breakLoop = false
     val queue = mutable.Queue[Block]()
     while (!breakLoop) {
@@ -306,7 +306,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
           if (queue.nonEmpty) {
             currentBlock = queue.dequeue()
-            currentStatement = currentBlock.statements.head()
+            currentStatement = currentBlock.statements.head
           } else {
             breakLoop = true
           }
@@ -326,7 +326,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
           if (queue.nonEmpty) {
             currentBlock = queue.dequeue()
-            currentStatement = currentBlock.statements.head()
+            currentStatement = currentBlock.statements.head
           } else {
             breakLoop = true
           }
@@ -335,7 +335,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
             currentStatement = currentBlock.statements.getNext(currentStatement)
           } else if (queue.nonEmpty) {
             currentBlock = queue.dequeue()
-            currentStatement = currentBlock.statements.head()
+            currentStatement = currentBlock.statements.head
           } else {
             breakLoop = true
           }
@@ -374,7 +374,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
             g.targets.head
           } else {
             // case where goto has multiple targets: create an extra block and point to that
-            val afterBlock = Block(parentLabel + "$__" + newBlockCount, None)
+            val afterBlock = Block(parentLabel + "$__" + newBlockCount)
             newBlockCount += 1
             newBlocks.append(afterBlock)
             afterBlock.replaceJump(currentBlock.jump)

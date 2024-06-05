@@ -50,9 +50,9 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
 
 //    x.foreach(println(_))
 
-    val y = x.head()
+    val y = x.head
     assert(y.t == 10)
-    assert(x.back().t == 14)
+    assert(x.back.t == 14)
   }
 
   test("Clear") {
@@ -183,19 +183,9 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
   }
 
   test("construct") {
-    val l = getSequentialList(3)
-
-
-    val l2 = IntrusiveList.from(l)
-    assert(l2.size == 3)
-
-    assert(l.forall(x => l2.contains(x)))
-
-    assert (l eq l2)
-
     val l3 = mutable.ArrayBuffer(Elem(1), Elem(2), Elem(3))
 
-    val l4 = IntrusiveList.from(l3)
+    val l4 = IntrusiveList().addAll(l3)
 
     assert(l3 ne l4)
     assert(l3.forall(x => l4.contains(x)))

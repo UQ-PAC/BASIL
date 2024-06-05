@@ -46,8 +46,8 @@ object IRWalk:
 
   def commandBegin(pos: CFGPosition) : Option[Command] = {
     pos match {
-      case p: Procedure => p.entryBlock.map(b => b.statements.headOption().getOrElse(b.jump))
-      case b: Block => Some(b.statements.headOption().getOrElse(b.jump))
+      case p: Procedure => p.entryBlock.map(b => b.statements.headOption.getOrElse(b.jump))
+      case b: Block => Some(b.statements.headOption.getOrElse(b.jump))
       case c: Command => Some(c)
     }
   }
@@ -81,7 +81,7 @@ trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
   def succ(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
       case proc: Procedure => proc.entryBlock.toSet
-      case b: Block        => Set(b.statements.headOption().getOrElse(b.jump))
+      case b: Block        => Set(b.statements.headOption.getOrElse(b.jump))
       case s: Statement    =>  Set(s.succ().getOrElse(s.parent.jump))
       case n: GoTo         => n.targets.asInstanceOf[Set[CFGPosition]]
       case c: Call         => c.parent.fallthrough.toSet
