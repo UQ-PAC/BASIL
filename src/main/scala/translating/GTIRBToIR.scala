@@ -599,9 +599,54 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
         case _ =>
           throw Exception(s"cannot resolve outgoing edges from block ${block.label}")
       }
+    } else if (edgeLabels.forall { (e: EdgeLabel) => !e.conditional }) {
+      // resolved indirect call with multiple procedure targets and fallthrough?
+      val fallthroughs = ArrayBuffer[Edge]()
+      val indirectCallTargets = ArrayBuffer[Edge]()
+      for (edge <- outgoingEdges) {
+        edge.getLabel match {
+          case EdgeLabel(false, true, Type_Fallthrough, _) =>
+            fallthroughs.addOne(edge)
+          case EdgeLabel(false, false, Type_Call, _) =>
+            indirectCallTargets.addOne(edge)
+          case _ =>
+        }
+      }
+      // unhandled case if there is more than one fallthrough, no fallthrough, or no indirect call targets
+      if (fallthroughs.size != 1 || indirectCallTargets.isEmpty) {
+        throw Exception(s"cannot resolve outgoing edges from block ${block.label}")
+      }
+      handleIndirectCallMultipleResolvedTargets(fallthroughs.head, indirectCallTargets, block, procedure)
     } else {
       throw Exception(s"cannot resolve outgoing edges from block ${block.label}")
     }
+  }
+
+  private def handleIndirectCallMultipleResolvedTargets(fallthrough: Edge, indirectCallTargets: ArrayBuffer[Edge], block: Block, procedure: Procedure): GoTo = {
+    if (!uuidToBlock.contains(fallthrough.targetUuid)) {
+      throw Exception(s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block")
+    }
+    val returnTarget = uuidToBlock(fallthrough.targetUuid)
+
+    val newBlocks = ArrayBuffer[Block]()
+    val targetRegister = getPCTarget(block)
+
+    for (call <- indirectCallTargets) {
+      // it's odd if an indirect call is only partially resolved, so throw an exception for now because this case will require further investigation
+      if (!entranceUUIDtoProcedure.contains(call.targetUuid)) {
+        throw Exception(s"block ${block.label} has resolved indirect call edge to ${byteStringToString(call.targetUuid)} that does not point to a known procedure")
+      }
+
+      val target = entranceUUIDtoProcedure(call.targetUuid)
+      val resolvedCall = DirectCall(target, Some(returnTarget))
+
+      val assume = Assume(BinaryExpr(BVEQ, targetRegister, BitVecLiteral(target.address.get, 64)))
+      val label = block.label + "$" + target.name
+      newBlocks.append(Block(label, None, ArrayBuffer(assume), resolvedCall))
+    }
+    removePCAssign(block)
+    procedure.addBlocks(newBlocks)
+    GoTo(newBlocks)
   }
 
   private def handleIndirectCallWithReturn(fallthrough: Edge, call: Edge, block: Block): Call = {
