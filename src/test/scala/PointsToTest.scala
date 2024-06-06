@@ -47,7 +47,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
   }
 
   def getRegister(name: String): Register = {
-    Register(name, BitVecType(64))
+    Register(name, 64)
   }
 
   /**
@@ -57,11 +57,11 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
     var program: Program = prog(
       proc("main",
         block("0x0",
-          LocalAssign(getRegister("R6"), getRegister("R31")),
+          Assign(getRegister("R6"), getRegister("R31")),
           goto("0x1")
         ),
         block("0x1",
-          MemoryAssign(mem, MemoryStore(mem, BinaryExpr(BVADD, getRegister("R6"), bv64(4)), bv64(10), LittleEndian, 64)),
+          MemoryAssign(mem, BinaryExpr(BVADD, getRegister("R6"), bv64(4)), bv64(10), LittleEndian, 64),
           goto("returntarget")
         ),
         block("returntarget",
@@ -87,8 +87,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
     var program: Program = prog(
       proc("main",
         block("0x0",
-          LocalAssign(getRegister("R1"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
-          LocalAssign(getRegister("R3"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(4)), LittleEndian, 64)),
+          Assign(getRegister("R1"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
+          Assign(getRegister("R3"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(4)), LittleEndian, 64)),
           goto("0x1")
         ),
         block("0x1",
@@ -125,14 +125,14 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
 //    val program: Program = prog(
 //      proc("main",
 //        block("0x0",
-//          LocalAssign(getRegister("R1"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
-//          LocalAssign(getRegister("R3"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
-//          LocalAssign(getRegister("R4"), BinaryExpr(BVADD, getRegister("R31"), bv64(20))),
+//          Assign(getRegister("R1"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
+//          Assign(getRegister("R3"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
+//          Assign(getRegister("R4"), BinaryExpr(BVADD, getRegister("R31"), bv64(20))),
 //          goto("0x1")
 //        ),
 //        block("0x1",
 //          MemoryAssign(mem, MemoryStore(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(4)), bv64(4), LittleEndian, 64)),
-//          LocalAssign(getRegister("R6"), MemoryLoad(mem, getRegister("R3"), LittleEndian, 64)),
+//          Assign(getRegister("R6"), MemoryLoad(mem, getRegister("R3"), LittleEndian, 64)),
 //          MemoryAssign(mem, MemoryStore(mem, getRegister("R4"), bv64(3), LittleEndian, 64)),
 //          goto("returntarget")
 //        ),
@@ -163,8 +163,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
     var program: Program = prog(
       proc("main",
         block("0x0",
-          LocalAssign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
-          LocalAssign(getRegister("R1"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
+          Assign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
+          Assign(getRegister("R1"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
           goto("0x1")
         ),
         block("0x1",
@@ -176,8 +176,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       ),
       proc("p2",
         block("l_p2",
-          LocalAssign(getRegister("R3"), getRegister("R0")),
-          LocalAssign(getRegister("R2"), MemoryLoad(mem, getRegister("R1"), LittleEndian, 64)),
+          Assign(getRegister("R3"), getRegister("R0")),
+          Assign(getRegister("R2"), MemoryLoad(mem, getRegister("R1"), LittleEndian, 64)),
           goto("l_p2_1"),
         ),
         block("l_p2_1",
@@ -212,8 +212,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
     var program: Program = prog(
       proc("main",
         block("0x0",
-          LocalAssign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
-          LocalAssign(getRegister("R1"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
+          Assign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
+          Assign(getRegister("R1"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
           goto("0x1")
         ),
         block("0x1",
@@ -225,8 +225,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       ),
       proc("foo",
         block("l_foo",
-          LocalAssign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
-          LocalAssign(getRegister("R1"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
+          Assign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
+          Assign(getRegister("R1"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
           call("p2", Some("l_foo_1"))
         ),
         block("l_foo_1",
@@ -235,8 +235,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       ),
       proc("p2",
         block("l_p2",
-          LocalAssign(getRegister("R3"), getRegister("R0")),
-          LocalAssign(getRegister("R2"), MemoryLoad(mem, getRegister("R1"), LittleEndian, 64)),
+          Assign(getRegister("R3"), getRegister("R0")),
+          Assign(getRegister("R2"), MemoryLoad(mem, getRegister("R1"), LittleEndian, 64)),
           goto("l_p2_1"),
         ),
         block("l_p2_1",
@@ -282,8 +282,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
 //    val program: Program = prog(
 //      proc("main",
 //        block("0x0",
-//          LocalAssign(getRegister("R0"), bv64(400)),
-//          LocalAssign(getRegister("R1"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R0"), bv64(46)), LittleEndian, 64)),
+//          Assign(getRegister("R0"), bv64(400)),
+//          Assign(getRegister("R1"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R0"), bv64(46)), LittleEndian, 64)),
 //          call(getRegister("R1"), Some("returntarget"))
 //        ),
 //        block("returntarget",
@@ -292,7 +292,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
 //      ),
 //      proc("foo",
 //        block("l_foo",
-//          LocalAssign(getRegister("R3"), bv64(1)),
+//          Assign(getRegister("R3"), bv64(1)),
 //          goto("l_foo_1"),
 //        ),
 //        block("l_foo_1",

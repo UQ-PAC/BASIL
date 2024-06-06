@@ -162,14 +162,14 @@ trait ConstantPropagationWithSSA(val cfg: ProgramCfg) {
       case r: CfgCommandNode =>
         r.data match {
           // assignments
-          case la: LocalAssign =>
+          case a: Assign =>
             val lhsWrappers = s.collect {
-              case (k, v) if RegisterVariableWrapper(k.variable) == RegisterWrapperEqualSets(la.lhs) => (k, v)
+              case (k, v) if RegisterVariableWrapper(k.variable) == RegisterWrapperEqualSets(a.lhs) => (k, v)
             }
             if (lhsWrappers.nonEmpty) {
-              s ++ lhsWrappers.map((k, v) => (k, v.union(eval(la.rhs, s))))
+              s ++ lhsWrappers.map((k, v) => (k, v.union(eval(a.rhs, s))))
             } else {
-              s + (RegisterWrapperEqualSets(la.lhs) -> eval(la.rhs, s))
+              s + (RegisterWrapperEqualSets(a.lhs) -> eval(a.rhs, s))
             }
           // all others: like no-ops
           case _ => s

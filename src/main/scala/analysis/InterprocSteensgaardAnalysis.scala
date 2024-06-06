@@ -46,11 +46,11 @@ class InterprocSteensgaardAnalysis(
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
 
-  private val stackPointer = Register("R31", BitVecType(64))
-  private val linkRegister = Register("R30", BitVecType(64))
-  private val framePointer = Register("R29", BitVecType(64))
+  private val stackPointer = Register("R31", 64)
+  private val linkRegister = Register("R30", 64)
+  private val framePointer = Register("R29", 64)
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
-  private val mallocVariable = Register("R0", BitVecType(64))
+  private val mallocVariable = Register("R0", 64)
 
   var mallocCount: Int = 0
   var stackCount: Int = 0
@@ -239,19 +239,19 @@ class InterprocSteensgaardAnalysis(
               unify(IdentifierVariable(RegisterVariableWrapper(mallocVariable)), PointerRef(AllocVariable(alloc)))
             }
 
-          case localAssign: LocalAssign =>
-            localAssign.rhs match {
+          case assign:Assign =>
+            assign.rhs match {
               case binOp: BinaryExpr =>
                 // X1 = &X2: [[X1]] = ↑[[X2]]
                 exprToRegion(binOp, cmd).foreach(
-                  x => unify(IdentifierVariable(RegisterVariableWrapper(localAssign.lhs)), PointerRef(AllocVariable(x)))
+                  x => unify(IdentifierVariable(RegisterVariableWrapper(assign.lhs)), PointerRef(AllocVariable(x)))
                 )
               // TODO: should lookout for global base + offset case as well
               case _ =>
-                unwrapExpr(localAssign.rhs).foreach {
+                unwrapExpr(assign.rhs).foreach {
                   case memoryLoad: MemoryLoad =>
                     // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable
-                    val X1 = localAssign.lhs
+                    val X1 = assign.lhs
                     val X2_star = exprToRegion(memoryLoad.index, cmd)
                     val alpha = FreshVariable()
                     X2_star.foreach(
@@ -263,17 +263,17 @@ class InterprocSteensgaardAnalysis(
                     Logger.debug("Index: " + memoryLoad.index)
                     Logger.debug("X2_star: " + X2_star)
                     Logger.debug("X1: " + X1)
-                    Logger.debug("LocalAssign: " + localAssign)
+                    Logger.debug("LocalAssign: " + assign)
 
                     // TODO: This might not be correct for globals
                     // X1 = &X: [[X1]] = ↑[[X2]] (but for globals)
                     val $X2 = exprToRegion(memoryLoad.index, cmd)
                     $X2.foreach(
-                      x => unify(IdentifierVariable(RegisterVariableWrapper(localAssign.lhs)), PointerRef(AllocVariable(x)))
+                      x => unify(IdentifierVariable(RegisterVariableWrapper(assign.lhs)), PointerRef(AllocVariable(x)))
                     )
                   case variable: Variable =>
                     // X1 = X2: [[X1]] = [[X2]]
-                    val X1 = localAssign.lhs
+                    val X1 = assign.lhs
                     val X2 = variable
                     unify(IdentifierVariable(RegisterVariableWrapper(X1)), IdentifierVariable(RegisterVariableWrapper(X2)))
                   case _ => // do nothing
@@ -281,17 +281,17 @@ class InterprocSteensgaardAnalysis(
             }
           case memoryAssign: MemoryAssign =>
             // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
-            val X1_star = exprToRegion(memoryAssign.rhs.index, cmd)
-            val X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(n))
+            val X1_star = exprToRegion(memoryAssign.index, cmd)
+            val X2 = evaluateExpressionWithSSA(memoryAssign.value, constantProp(n))
             var possibleRegions = Set[MemoryRegion]()
             if (X2.isEmpty) {
-              Logger.debug("Maybe a region: " + exprToRegion(memoryAssign.rhs.value, cmd))
-              possibleRegions = exprToRegion(memoryAssign.rhs.value, cmd)
+              Logger.debug("Maybe a region: " + exprToRegion(memoryAssign.value, cmd))
+              possibleRegions = exprToRegion(memoryAssign.value, cmd)
             }
             Logger.debug("X2 is: " + X2)
-            Logger.debug("Evaluated: " + memoryAssign.rhs.value)
+            Logger.debug("Evaluated: " + memoryAssign.value)
             Logger.debug("Region " + X1_star)
-            Logger.debug("Index " + memoryAssign.rhs.index)
+            Logger.debug("Index " + memoryAssign.index)
             val alpha = FreshVariable()
             X1_star.foreach(x =>
               unify(ExpressionVariable(x), PointerRef(alpha))

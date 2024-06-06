@@ -471,7 +471,7 @@ class Block private (
 
 object Block {
   def procedureReturn(from: Procedure): Block = {
-    Block(from.name + "_basil_return", None, List(), IndirectCall(Register("R30", BitVecType(64))))
+    Block(from.name + "_basil_return", None, List(), IndirectCall(Register("R30", 64)))
   }
 }
 

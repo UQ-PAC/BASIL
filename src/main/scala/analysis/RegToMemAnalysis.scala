@@ -28,13 +28,13 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
    */
   def eval(cmd: Command, constants: Map[Variable, FlatElement[BitVecLiteral]], s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = {
     cmd match {
-      case localAssign: LocalAssign =>
-        localAssign.rhs match {
+      case assign: Assign =>
+        assign.rhs match {
           case memoryLoad: MemoryLoad =>
-            s + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(memoryLoad))
+            s + (RegisterVariableWrapper(assign.lhs) -> FlatEl(memoryLoad))
           case binaryExpr: BinaryExpr =>
             if (evaluateExpression(binaryExpr.arg1, constants).isEmpty) { // approximates Base + Offset
-              s + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(binaryExpr))
+              s + (RegisterVariableWrapper(assign.lhs) -> FlatEl(binaryExpr))
             } else {
               s
             }

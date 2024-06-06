@@ -52,18 +52,18 @@ class SSAForm(program: Program) {
           for (stmt <- currentBlock.statements) {
             Logger.debug(stmt)
             stmt match {
-              case localAssign: LocalAssign =>
-                transformVariables(localAssign.rhs.variables, currentBlock, proc)
-                val maxVal = varMaxTracker.getOrElseUpdate(localAssign.lhs.name, 0)
-                blockBasedMappings((currentBlock, localAssign.lhs.name)) = mutable.Set(maxVal)
+              case assign: Assign =>
+                transformVariables(assign.rhs.variables, currentBlock, proc)
+                val maxVal = varMaxTracker.getOrElseUpdate(assign.lhs.name, 0)
+                blockBasedMappings((currentBlock, assign.lhs.name)) = mutable.Set(maxVal)
 
-                localAssign.lhs.ssa_id.clear()
-                localAssign.lhs.ssa_id.addAll(blockBasedMappings((currentBlock, localAssign.lhs.name)))
+                assign.lhs.ssa_id.clear()
+                assign.lhs.ssa_id.addAll(blockBasedMappings((currentBlock, assign.lhs.name)))
 
-                varMaxTracker(localAssign.lhs.name) = blockBasedMappings((currentBlock, localAssign.lhs.name)).max + 1
+                varMaxTracker(assign.lhs.name) = blockBasedMappings((currentBlock, assign.lhs.name)).max + 1
 
               case memoryAssign: MemoryAssign =>
-                transformVariables(memoryAssign.rhs.variables, currentBlock, proc)
+                transformVariables(memoryAssign.index.variables, currentBlock, proc)
 
               case assume: Assume =>
                 transformVariables(assume.body.variables, currentBlock, proc)
