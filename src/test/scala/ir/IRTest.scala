@@ -369,13 +369,11 @@ class IRTest extends AnyFunSuite {
     val p = prog(
       proc("p1",
         block("b1",
-          LocalAssign(R0, bv64(10)),
           ret
         )
       ),
       proc("main",
         block("l_main",
-          LocalAssign(R0, bv64(10)),
           indirectCall(R1, Some("returntarget"))
         ),
         block("block2",
