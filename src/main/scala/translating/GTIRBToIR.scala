@@ -226,6 +226,13 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     }
   }
 
+  private def getPCTarget(block: Block): Register = {
+    block.statements.last match {
+      case Assign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
+      case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
+    }
+  }
+
   private def byteStringToString(byteString: ByteString): String = {
     Base64.getUrlEncoder.encodeToString(byteString.toByteArray)
   }
@@ -310,26 +317,6 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           } else {
             breakLoop = true
           }
-        // assignment to program counter not associated with an edge
-        // caused by indirect call that DDisasm fails to identify
-        // potentially requires splitting block
-        case l: Assign if l.lhs == Register("_PC", 64) =>
-          val newBlocks = handleUnidentifiedIndirectCall(l, currentBlock, block.label, newBlockCount)
-          procedure.addBlocks(newBlocks)
-          newBlockCount += newBlocks.size
-
-          for (n <- newBlocks) {
-            if (n.statements.nonEmpty) {
-              queue.enqueue(n)
-            }
-          }
-
-          if (queue.nonEmpty) {
-            currentBlock = queue.dequeue()
-            currentStatement = currentBlock.statements.head
-          } else {
-            breakLoop = true
-          }
         case _ =>
           if (currentBlock.statements.hasNext(currentStatement)) {
             currentStatement = currentBlock.statements.getNext(currentStatement)
@@ -341,60 +328,6 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           }
       }
     }
-  }
-
-  // Handles assignments to the program counter that are not related to edges in the GTIRB CFG
-  // These are likely blr instructions (which are indirect calls) that DDisasm failed to identify as branching
-  // If the PC assignment is mid-block, the block is split into two, and an indirect call is created at the end of the first block
-  // If the PC assignment is at the end of the block, an indirect call is added to the block
-  // The PC assignment is removed in all cases
-  // No other cases of unhandled program counter assignments have been identified yet
-  private def handleUnidentifiedIndirectCall(l: Assign, currentBlock: Block, parentLabel: String, newBlockCountIn: Int): ArrayBuffer[Block] = {
-    val newBlocks = ArrayBuffer[Block]()
-    var newBlockCount = newBlockCountIn
-
-    val target = l.rhs match {
-      case r: Register => r
-      case _ => throw Exception(s"unhandled indirect call $l does not assign a register to __PC")
-    }
-    val returnTarget = if (currentBlock.statements.hasNext(l)) {
-      // unidentified indirect call is mid-block
-      val afterStatements = currentBlock.statements.splitOn(l)
-      val afterBlock = Block(parentLabel + "$__" + newBlockCount, None, afterStatements)
-      newBlockCount += 1
-      newBlocks.append(afterBlock)
-      afterBlock.replaceJump(currentBlock.jump)
-      // we are assuming this is a blr instruction and so R30 has been set to point to the next instruction
-      afterBlock
-    } else {
-      // unidentified indirect call is at end of block with fallthrough edge
-      currentBlock.jump match {
-        case g: GoTo if g.targets.nonEmpty =>
-          if (g.targets.size == 1) {
-            g.targets.head
-          } else {
-            // case where goto has multiple targets: create an extra block and point to that
-            val afterBlock = Block(parentLabel + "$__" + newBlockCount)
-            newBlockCount += 1
-            newBlocks.append(afterBlock)
-            afterBlock.replaceJump(currentBlock.jump)
-            afterBlock
-          }
-        case _ =>
-          throw Exception(s"unhandled indirect call $l is at end of block ${currentBlock.label} that ends in call ${currentBlock.jump}")
-      }
-    }
-    // check that R30 has been set by previous statement - if it did not then this is a case that requires further investigation
-    currentBlock.statements.getPrev(l) match {
-      case Assign(Register("R30", 64), _, _) =>
-      case _ => throw Exception("unhandled assignment to PC did not set R30 beforehand")
-    }
-
-    val indirectCall = IndirectCall(target, Some(returnTarget))
-    currentBlock.replaceJump(indirectCall)
-    currentBlock.statements.remove(l)
-
-    newBlocks
   }
 
   // handles if statements that are not related to conditional edges in the GTIRB CFG
@@ -549,7 +482,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       IndirectCall(Register("R30", 64), None)
 
     } else if (edgeLabels.forall { (e: EdgeLabel) => !e.conditional && !e.direct && e.`type` == Type_Branch }) {
-      // resolved indirect call
+      // resolved indirect call with multiple blocks as targets
       val targets = mutable.Set[Block]()
       for (edge <- outgoingEdges) {
         if (uuidToBlock.contains(edge.targetUuid)) {
@@ -579,12 +512,11 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           handleDirectCallWithReturn(edge0, edge1, block)
         case (EdgeLabel(false, true, Type_Call, _), EdgeLabel(false, true, Type_Fallthrough, _)) =>
           handleDirectCallWithReturn(edge1, edge0, block)
-        /*
-        these are probably what blr should resolve to once that's fixed?
-      case (EdgeLabel(false, true, Type_Fallthrough, _), EdgeLabel(false, false, Type_Call, _)) =>
-      case (EdgeLabel(false, false, Type_Call, _), EdgeLabel(false, true, Type_Fallthrough, _)) =>
-        */
-
+        // indirect call with return target
+        case (EdgeLabel(false, true, Type_Fallthrough, _), EdgeLabel(false, false, Type_Call, _)) =>
+          handleIndirectCallWithReturn(edge0, edge1, block)
+        case (EdgeLabel(false, false, Type_Call, _), EdgeLabel(false, true, Type_Fallthrough, _)) =>
+          handleIndirectCallWithReturn(edge1, edge0, block)
         // conditional branch
         case (EdgeLabel(true, true, Type_Fallthrough, _), EdgeLabel(true, true, Type_Branch, _)) =>
           handleConditionalBranch(edge0, edge1, block, procedure)
@@ -593,8 +525,73 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
         case _ =>
           throw Exception(s"cannot resolve outgoing edges from block ${block.label}")
       }
+    } else if (edgeLabels.forall { (e: EdgeLabel) => !e.conditional }) {
+      // resolved indirect call with multiple procedure targets and fallthrough?
+      val fallthroughs = ArrayBuffer[Edge]()
+      val indirectCallTargets = ArrayBuffer[Edge]()
+      for (edge <- outgoingEdges) {
+        edge.getLabel match {
+          case EdgeLabel(false, true, Type_Fallthrough, _) =>
+            fallthroughs.addOne(edge)
+          case EdgeLabel(false, false, Type_Call, _) =>
+            indirectCallTargets.addOne(edge)
+          case _ =>
+        }
+      }
+      // unhandled case if there is more than one fallthrough, no fallthrough, or no indirect call targets
+      if (fallthroughs.size != 1 || indirectCallTargets.isEmpty) {
+        throw Exception(s"cannot resolve outgoing edges from block ${block.label}")
+      }
+      handleIndirectCallMultipleResolvedTargets(fallthroughs.head, indirectCallTargets, block, procedure)
     } else {
       throw Exception(s"cannot resolve outgoing edges from block ${block.label}")
+    }
+  }
+
+  private def handleIndirectCallMultipleResolvedTargets(fallthrough: Edge, indirectCallTargets: ArrayBuffer[Edge], block: Block, procedure: Procedure): GoTo = {
+    if (!uuidToBlock.contains(fallthrough.targetUuid)) {
+      throw Exception(s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block")
+    }
+    val returnTarget = uuidToBlock(fallthrough.targetUuid)
+
+    val newBlocks = ArrayBuffer[Block]()
+    val targetRegister = getPCTarget(block)
+
+    for (call <- indirectCallTargets) {
+      // it's odd if an indirect call is only partially resolved, so throw an exception for now because this case will require further investigation
+      if (!entranceUUIDtoProcedure.contains(call.targetUuid)) {
+        throw Exception(s"block ${block.label} has resolved indirect call edge to ${byteStringToString(call.targetUuid)} that does not point to a known procedure")
+      }
+
+      val target = entranceUUIDtoProcedure(call.targetUuid)
+      val resolvedCall = DirectCall(target, Some(returnTarget))
+
+      val assume = Assume(BinaryExpr(BVEQ, targetRegister, BitVecLiteral(target.address.get, 64)))
+      val label = block.label + "$" + target.name
+      newBlocks.append(Block(label, None, ArrayBuffer(assume), resolvedCall))
+    }
+    removePCAssign(block)
+    procedure.addBlocks(newBlocks)
+    GoTo(newBlocks)
+  }
+
+  private def handleIndirectCallWithReturn(fallthrough: Edge, call: Edge, block: Block): Call = {
+    if (!uuidToBlock.contains(fallthrough.targetUuid)) {
+      throw Exception(s"block ${block.label} has fallthrough edge to ${byteStringToString(fallthrough.targetUuid)} that does not point to a known block")
+    }
+    val returnTarget = uuidToBlock(fallthrough.targetUuid)
+
+    if (!entranceUUIDtoProcedure.contains(call.targetUuid)) {
+      // unresolved indirect call
+      val target = getPCTarget(block)
+      removePCAssign(block)
+
+      IndirectCall(target, Some(returnTarget))
+    } else {
+      // resolved indirect call
+      val target = entranceUUIDtoProcedure(call.targetUuid)
+      removePCAssign(block)
+      DirectCall(target, Some(returnTarget))
     }
   }
 
