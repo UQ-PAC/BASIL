@@ -75,21 +75,15 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
   }
 
   private def visitThrow(ctx: ThrowContext, label: Option[String] = None): Assert = {
-    val message = ctx.ID().asScala.map(_.getText).mkString(" ,")
+    val message = ctx.ident().asScala.map(visitIdent).mkString(" ,")
     Assert(FalseLiteral, Some(message), label)
   }
 
   private def visitTCall(ctx: TCallContext, label: Option[String] = None): Option[Statement] = {
-    val function = ctx.ID.getText
+    val function = visitIdent(ctx.ident)
 
-    val typeArgs = Option(ctx.tes) match {
-      case Some(e) => e.expr().asScala
-      case None => Nil
-    }
-    val args = Option(ctx.args) match {
-      case Some(e) => e.expr().asScala
-      case None => Nil
-    }
+    val typeArgs = Option(ctx.tes).toList.flatMap(_.expr.asScala)
+    val args = Option(ctx.args).toList.flatMap(_.expr.asScala)
 
     function match {
       case "Mem.set.0" =>
@@ -129,16 +123,16 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
   }
 
   private def parseInt(ctx: ExprContext) = ctx match {
-    case e: ExprLitIntContext => e.value.getText.toInt
+    case e: ExprLitIntContext => visitInteger(e.integer)
     case _ => throw Exception(s"expected ${ctx.getText} to be an integer literal")
   }
 
   private def visitIf(ctx: IfContext, label: Option[String] = None): Option[TempIf] = {
     val condition = visitExpr(ctx.cond)
-    val thenStmts = ctx.stmt().asScala.flatMap(visitStmt(_, label))
+    val thenStmts = ctx.thenStmts.stmt.asScala.flatMap(visitStmt(_, label))
 
-    val elseStmts = Option(ctx.elseStmt) match {
-      case Some(_) => ctx.elseStmt.stmt().asScala.flatMap(visitStmt(_, label))
+    val elseStmts = Option(ctx.elseStmts) match {
+      case Some(_) => ctx.elseStmts.stmt.asScala.flatMap(visitStmt(_, label))
       case None => mutable.Buffer()
     }
 
@@ -151,35 +145,28 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
   private def visitVarDeclsNoInit(ctx: VarDeclsNoInitContext): Unit = {
     val ty = visitType(ctx.`type`())
-    ctx.lvars.ID().asScala.foreach(lvar => varMap += (lvar.getText -> ty))
+    val newVars = ctx.lvars.ident.asScala.map(visitIdent(_) -> ty)
+    varMap ++= newVars
   }
 
   private def visitVarDecl(ctx: VarDeclContext, label: Option[String] = None): Option[LocalAssign] = {
     val ty = visitType(ctx.`type`())
-    val name = ctx.lvar.getText
+    val name = visitIdent(ctx.lvar)
     varMap += (name -> ty)
 
     val expr = visitExpr(ctx.expr())
-    if (expr.isDefined) {
-      Some(LocalAssign(LocalVar(name, ty), expr.get, label))
-    } else {
-      None
-    }
+    expr.map(LocalAssign(LocalVar(name, ty), _, label))
   }
 
   private def visitAssign(ctx: AssignContext, label: Option[String] = None): Option[LocalAssign] = {
     val lhs = visitLexpr(ctx.lexpr)
     val rhs = visitExpr(ctx.expr)
-    if (lhs.isDefined && rhs.isDefined) {
-      Some(LocalAssign(lhs.get, rhs.get, label))
-    } else {
-      None
-    }
+    lhs.zip(rhs).map((lhs, rhs) => LocalAssign(lhs, rhs, label))
   }
 
   private def visitConstDecl(ctx: ConstDeclContext, label: Option[String] = None): Option[LocalAssign] = {
     val ty = visitType(ctx.`type`())
-    val name = ctx.lvar.getText
+    val name = visitIdent(ctx.lvar)
     constMap += (name -> ty)
     val expr = visitExpr(ctx.expr)
     if (expr.isDefined) {
@@ -195,8 +182,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case r: TypeRegisterContext =>
         // this is a special register - not the same as a register in the IR
         // ignoring the register's fields for now
-        BitVecType(r.size.getText.toInt)
-      case c: TypeConstructorContext => c.str.getText.match {
+        BitVecType(visitInteger(r.size))
+      case c: TypeConstructorContext => visitIdent(c.str).match {
         case "FPRounding" => BitVecType(2)
         case _ => throw Exception(s"unknown type ${ctx.getText}")
       }
@@ -216,7 +203,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
   }
 
   private  def visitExprVar(ctx: ExprVarContext): Option[Expr] = {
-    val name = ctx.ID.getText
+    val name = visitIdent(ctx.ident)
     name match {
       case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
@@ -234,8 +221,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
   }
 
   private def visitExprTApply(ctx: ExprTApplyContext): Option[Expr] = {
-
-    val function = ctx.ID.getText
+    val function = visitIdent(ctx.ident)
 
     val typeArgs: mutable.Buffer[ExprContext] = Option(ctx.tes) match {
       case Some(e) => e.expr().asScala
@@ -434,17 +420,17 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
   private  def visitExprField(ctx: ExprFieldContext): LocalVar = {
     val name = ctx.expr match {
-      case e: ExprVarContext => e.ID.getText
+      case e: ExprVarContext => visitIdent(e.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an Expr_Var as first parameter")
     }
-    val field = ctx.field.getText
+    val field = visitIdent(ctx.field)
 
     resolveFieldExpr(name, field)
   }
 
   private  def visitExprArray(ctx: ExprArrayContext): Register = {
     val name = ctx.array match {
-      case e: ExprVarContext => e.ID.getText
+      case e: ExprVarContext => visitIdent(e.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an Expr_Var as first parameter")
     }
     val index = parseInt(ctx.index)
@@ -453,12 +439,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
   }
 
   private def visitExprLitBits(ctx: ExprLitBitsContext): BitVecLiteral = {
-    var num = BigInt(ctx.value.getText, 2)
-    val len = ctx.value.getText.length
-    if (num < 0) {
-      num = num + (BigInt(1) << len)
-    }
-    BitVecLiteral(num, len)
+    visitBits(ctx.bits)
   }
 
   private def visitLexpr(ctx: LexprContext): Option[Variable] = {
@@ -470,7 +451,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
   }
 
   private def visitLExprVar(ctx: LExprVarContext): Option[Variable] = {
-    val name = ctx.ID.getText
+    val name = visitIdent(ctx.ident)
     name match {
       case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
@@ -488,22 +469,40 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
   private def visitLExprField(ctx: LExprFieldContext): LocalVar = {
     val name = ctx.lexpr match {
-      case l: LExprVarContext => l.ID.getText
+      case l: LExprVarContext => visitIdent(l.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an LExpr_Var as first parameter")
     }
-    val field = ctx.field.getText
+    val field = visitIdent(ctx.field)
 
     resolveFieldExpr(name, field)
   }
 
   private def visitLExprArray(ctx: LExprArrayContext): Register = {
     val name = ctx.lexpr match {
-      case l: LExprVarContext => l.ID.getText
+      case l: LExprVarContext => visitIdent(l.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an LExpr_Var as first parameter")
     }
     val index = parseInt(ctx.index)
 
     resolveArrayExpr(name, index)
+  }
+
+  private def visitIdent(ctx: IdentContext): String = {
+    ctx.ID.getText.stripPrefix("\"").stripSuffix("\"")
+  }
+
+  private def visitInteger(ctx: IntegerContext): Int = {
+    ctx.DEC.getText.toInt
+  }
+
+  private def visitBits(ctx: BitsContext): BitVecLiteral = {
+    val str = ctx.BINARY.getText.stripPrefix("'").stripSuffix("'")
+    val width = str.length
+    var num = BigInt(str, 2)
+    if (num < 0) {
+      num = num + (BigInt(1) << width)
+    }
+    BitVecLiteral(num, width)
   }
 
   private def resolveFieldExpr(name: String, field: String): LocalVar = {
