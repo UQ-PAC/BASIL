@@ -40,7 +40,7 @@ log = logging.getLogger()
 notspace_re = re.compile(rb'\S')
 head_re = re.compile(rb'[^\s(]+')
 num_re = re.compile(rb'[_0-9xa-fA-F]+')
-string_re = re.compile(rb'"(?:[^"\\]|\\.)*"')
+string_re = re.compile(rb'''"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*\'''')
 
 @dataclasses.dataclass
 class Context:
@@ -79,8 +79,8 @@ def pretty(outfile, data: bytes, spaces: int):
       assert m
       outfile.write(m[0])
       i = m.end(0)
-    elif c == b',':
-      outfile.write(b',')
+    elif c in b',;':
+      outfile.write(c)
       i += 1
       if stack[-1].multiline:
         outfile.write(b'\n')
@@ -97,11 +97,14 @@ def pretty(outfile, data: bytes, spaces: int):
       outfile.write(c)
       i += 1
       islist = c == b'[' and ']' != chr(data[i])
-      multiline = islist or head in (b'Project', b'Def', b'Goto', b'Call', b'Sub', b'Blk', b'Arg')
+      multiline = islist or head in (b'Project', b'Def', b'Goto', b'Call', b'Sub', b'Blk', b'Arg') or head.startswith(b'Stmt_') or head in (b'Expr_TApply', b'Expr_Slices')
       if multiline:
         depth += 1
-        outfile.write(b'\n')
-        outfile.write(indent * depth)
+        if islist and stack and stack[-1].multiline:
+          outfile.write(indent[1:])
+        else:
+          outfile.write(b'\n')
+          outfile.write(indent * depth)
 
       stack.append(Context(i, flip[c], multiline))
     elif c in b')]':
@@ -115,7 +118,7 @@ def pretty(outfile, data: bytes, spaces: int):
         depth -= 1
       if not stack:
         outfile.write(b'\n')
-    elif c == b'"':
+    elif c in b'"\'':
       string = string_re.match(data, i)
       if not string:
         raise ValueError(f"unclosed string beginning at byte {i+1}.")

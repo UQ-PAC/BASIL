@@ -31,10 +31,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
         block("first_call",
           r0ConstantAssign,
           r1ConstantAssign,
-          call("callee1", Some("second_call"))
+          directCall("callee1", Some("second_call"))
         ),
         block("second_call",
-          call("callee2", Some("returnBlock"))
+          directCall("callee2", Some("returnBlock"))
         ),
         block("returnBlock",
           ret
@@ -69,10 +69,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
         block("first_call",
           r0ConstantAssign,
           r1ConstantAssign,
-          call("callee1", Some("second_call"))
+          directCall("callee1", Some("second_call"))
         ),
         block("second_call",
-          call("callee2", Some("returnBlock"))
+          directCall("callee2", Some("returnBlock"))
         ),
         block("returnBlock",
           ret
@@ -104,10 +104,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     var program = prog(
       proc("main",
         block("main_first_call",
-          call("wrapper1", Some("main_second_call"))
+          directCall("wrapper1", Some("main_second_call"))
         ),
         block("main_second_call",
-          call("wrapper2", Some("main_return"))
+          directCall("wrapper2", Some("main_return"))
         ),
         block("main_return", ret)
       ),
@@ -117,19 +117,19 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
       proc("wrapper1",
         block("wrapper1_first_call",
           LocalAssign(R1, constant1),
-          call("callee", Some("wrapper1_second_call"))
+          directCall("callee", Some("wrapper1_second_call"))
         ),
         block("wrapper1_second_call",
-          call("callee2", Some("wrapper1_return"))),
+          directCall("callee2", Some("wrapper1_return"))),
         block("wrapper1_return", ret)
       ),
       proc("wrapper2",
         block("wrapper2_first_call",
           LocalAssign(R2, constant1),
-          call("callee", Some("wrapper2_second_call"))
+          directCall("callee", Some("wrapper2_second_call"))
         ),
         block("wrapper2_second_call",
-          call("callee3", Some("wrapper2_return"))),
+          directCall("callee3", Some("wrapper2_return"))),
         block("wrapper2_return", ret)
       )
     )
@@ -148,7 +148,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     var program = prog(
       proc("main",
         block("lmain",
-          call("killer", Some("aftercall"))
+          directCall("killer", Some("aftercall"))
         ),
         block("aftercall",
           LocalAssign(R0, R1),
@@ -212,7 +212,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
         block(
           "lmain",
           LocalAssign(R0, R1),
-          call("main", Some("return"))
+          directCall("main", Some("return"))
         ),
         block("return",
           LocalAssign(R0, R2),
@@ -240,7 +240,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
         ),
         block(
           "recursion",
-          call("main", Some("assign"))
+          directCall("main", Some("assign"))
         ),
         block("assign",
           LocalAssign(R0, R2),

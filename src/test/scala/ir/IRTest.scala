@@ -142,7 +142,7 @@ class IRTest extends AnyFunSuite {
         ),
         block("l_main_1",
           LocalAssign(R0, bv64(22)),
-          call("p2", Some("returntarget"))
+          directCall("p2", Some("returntarget"))
         ),
         block("returntarget",
           ret
@@ -246,7 +246,7 @@ class IRTest extends AnyFunSuite {
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
       LocalAssign(R0, bv64(22)),
-      call("main", None)
+      directCall("main", None)
     ).resolve(p)
     val b2 = block("newblock1",
       LocalAssign(R0, bv64(22)),
@@ -271,7 +271,7 @@ class IRTest extends AnyFunSuite {
     assert(called.incomingCalls().isEmpty)
     val b3 = block("newblock3",
       LocalAssign(R0, bv64(22)),
-      call("called", None)
+      directCall("called", None)
     ).resolve(p)
 
     assert(b3.calls.toSet == Set(p.procs("called")))
@@ -333,7 +333,7 @@ class IRTest extends AnyFunSuite {
       proc("main",
         block("l_main",
           LocalAssign(R0, bv64(10)),
-          call("p1", Some("returntarget"))
+          directCall("p1", Some("returntarget"))
         ),
         block("returntarget",
           ret
@@ -363,6 +363,42 @@ class IRTest extends AnyFunSuite {
     assert(InterProcIRCursor.pred(prevB).head == p.blocks("l_main").fallthrough.get)
     assert(InterProcBlockIRCursor.pred(prevB).head == p.blocks("l_main"), p.procs("p1").returnBlock.get)
 
+  }
+
+  test("replace jump") {
+    val p = prog(
+      proc("p1",
+        block("b1",
+          LocalAssign(R0, bv64(10)),
+          ret
+        )
+      ),
+      proc("main",
+        block("l_main",
+          LocalAssign(R0, bv64(10)),
+          indirectCall(R1, Some("returntarget"))
+        ),
+        block("block2",
+          directCall("p1", Some("returntarget"))
+        ),
+        block("returntarget",
+          ret
+        )
+      ),
+    )
+
+    val main = p.blocks("l_main")
+    val p1 = p.procs("p1")
+    val block2 = p.blocks("block2")
+
+    val oldJump = main.jump
+    val newJump = block2.jump
+
+    main.replaceJump(newJump)
+
+    assert(newJump.parent == main)
+    assert(block2.jump.isInstanceOf[GoTo])
+    assert(block2.jump.asInstanceOf[GoTo].targets.isEmpty)
   }
 
 }
