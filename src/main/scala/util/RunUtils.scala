@@ -22,7 +22,7 @@ import Parsers.*
 import Parsers.SemanticsParser.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
-import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
+import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
 import util.Logger
 import java.util.Base64
@@ -114,18 +114,31 @@ object IRLoading {
 
     val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]])
 
-    def parse_insn(f: String): StmtContext = {
+    def parse_insn(line: String): StmtContext = {
+      val semanticsLexer = SemanticsLexer(CharStreams.fromString(line))
+      val tokens = CommonTokenStream(semanticsLexer)
+      val parser = SemanticsParser(tokens)
+      parser.setErrorHandler(BailErrorStrategy())
+      parser.setBuildParseTree(true)
+
       try {
-        val semanticsLexer = SemanticsLexer(CharStreams.fromString(f))
-        val tokens = CommonTokenStream(semanticsLexer)
-        val parser = SemanticsParser(tokens)
-        parser.setErrorHandler(BailErrorStrategy())
-        parser.setBuildParseTree(true)
         parser.stmt()
       } catch {
         case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
-          Logger.error(f)
-          throw RuntimeException(e)
+          val extra = e.getCause match {
+            case mismatch: org.antlr.v4.runtime.InputMismatchException =>
+              val token = mismatch.getOffendingToken
+              s"""
+                exn: ${mismatch}
+                offending token: ${token}
+
+              ${line.replace('\n', ' ')}
+              ${" " * token.getStartIndex}^ here!
+              """.stripIndent
+            case _ => ""
+          }
+          Logger.error(s"""Semantics parse error:\n  line: ${line}\n${extra}""")
+          throw e
       }
     }
 
