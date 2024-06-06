@@ -93,13 +93,9 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         val index = visitExpr(args.head)
         val value = visitExpr(args(3))
         val otherSize = parseInt(args(1)) * 8
-        val accessType = parseInt(args(2)) // AccType enum in ASLi
+        val accessType = parseInt(args(2)) // AccType enum in ASLi, not very relevant to us
         if (size != otherSize) {
           throw Exception(s"inconsistent size parameters in Mem.set.0: ${ctx.getText}")
-        }
-        // we expect this to be 0 'AccType_NORMAL' but if we encounter other values they may require further investigation
-        if (accessType != 0) {
-          Logger.info(s"Mem.set.0 with non-0 access type encountered: ${ctx.getText}")
         }
 
         // LittleEndian is an assumption
