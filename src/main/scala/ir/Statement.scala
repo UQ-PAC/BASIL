@@ -127,21 +127,7 @@ object GoTo:
 
 
 sealed trait Call extends Jump {
-  private var _returnTarget: Option[Block] = None
-
-  // replacing the return target of a call
-  def returnTarget_=(b: Block): Unit = {
-    require(b.hasParent)
-
-    if (hasParent) {
-      // if we don't have a parent now, delay adding the fallthrough block until linking
-      parent.fallthrough = Some(GoTo(Set(b)))
-    }
-
-    _returnTarget = Some(b)
-  }
-
-  def returnTarget: Option[Block] = _returnTarget
+  val returnTarget: Option[Block]
 
   // moving a call between blocks
   override def linkParent(p: Block): Unit = {
@@ -154,10 +140,9 @@ sealed trait Call extends Jump {
 }
 
 class DirectCall(val target: Procedure,
-                 private val _returnTarget: Option[Block] = None,
+                 override val returnTarget: Option[Block] = None,
                  override val label: Option[String] = None
                 ) extends Call {
-  _returnTarget.foreach(x => returnTarget = x)
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
@@ -182,10 +167,9 @@ object DirectCall:
   def unapply(i: DirectCall): Option[(Procedure, Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
 
 class IndirectCall(var target: Variable,
-                   private val _returnTarget: Option[Block] = None,
+                   override val returnTarget: Option[Block] = None,
                    override val label: Option[String] = None
                   ) extends Call {
-  _returnTarget.foreach(x => returnTarget = x)
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)
