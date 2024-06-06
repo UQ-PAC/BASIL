@@ -47,7 +47,10 @@ case class EventuallyIndirectCall(target: Variable, fallthrough: Option[DelayNam
 
 case class EventuallyCall(target: DelayNameResolve, fallthrough: Option[DelayNameResolve]) extends EventuallyJump {
   override def resolve(p: Program): DirectCall = {
-    val t = target.resolveProc(p).get
+    val t = target.resolveProc(p) match {
+      case Some(x) => x
+      case None => throw Exception("can't resolve proc " + p)
+    }
     val ft = fallthrough.flatMap(_.resolveBlock(p))
     DirectCall(t, ft)
   }
@@ -70,11 +73,9 @@ def goto(targets: List[String]): EventuallyGoto = {
   EventuallyGoto(targets.map(p => DelayNameResolve(p)))
 }
 
-def indirectCall(tgt: String, fallthrough: Option[String]): EventuallyCall = EventuallyCall(DelayNameResolve(tgt), fallthrough.map(x => DelayNameResolve(x)))
+def directCall(tgt: String, fallthrough: Option[String]): EventuallyCall = EventuallyCall(DelayNameResolve(tgt), fallthrough.map(x => DelayNameResolve(x)))
 
-def call(tgt: String, fallthrough: Option[String]): EventuallyCall = EventuallyCall(DelayNameResolve(tgt), fallthrough.map(x => DelayNameResolve(x)))
-
-def call(tgt: Variable, fallthrough: Option[String]): EventuallyIndirectCall = EventuallyIndirectCall(tgt, fallthrough.map(x => DelayNameResolve(x)))
+def indirectCall(tgt: Variable, fallthrough: Option[String]): EventuallyIndirectCall = EventuallyIndirectCall(tgt, fallthrough.map(x => DelayNameResolve(x)))
 // def directcall(tgt: String) = EventuallyCall(DelayNameResolve(tgt), None)
 
 

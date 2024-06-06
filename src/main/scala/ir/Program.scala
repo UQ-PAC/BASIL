@@ -360,9 +360,8 @@ class Block private (
   statements.onInsert = x => x.setParent(this)
   statements.onRemove = x => x.deParent()
 
-
   def this(label: String, address: Option[Int] = None, statements: IterableOnce[Statement] = Set.empty, jump: Jump = GoTo(Set.empty)) = {
-    this(label, address, IntrusiveList.from(statements), jump,  mutable.HashSet.empty, None)
+    this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty, None)
   }
 
   def jump: Jump = _jump
@@ -379,7 +378,8 @@ class Block private (
     _fallthrough = g
   }
 
-  def jump_=(j: Jump): Unit = {
+  private def jump_=(j: Jump): Unit = {
+    require(!j.hasParent)
     if (j ne _jump) {
       _jump.deParent()
       _jump = j
@@ -388,6 +388,11 @@ class Block private (
   }
 
   def replaceJump(j: Jump): Block = {
+    if (j.hasParent) {
+      val parent = j.parent
+      j.deParent()
+      parent.jump = GoTo(Set.empty)
+    }
     jump = j
     this
   }

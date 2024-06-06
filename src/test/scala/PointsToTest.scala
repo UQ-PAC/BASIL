@@ -168,7 +168,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
           goto("0x1")
         ),
         block("0x1",
-          call("p2", Some("returntarget"))
+          directCall("p2", Some("returntarget"))
         ),
         block("returntarget",
           ret
@@ -217,7 +217,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
           goto("0x1")
         ),
         block("0x1",
-          call("p2", Some("returntarget"))
+          directCall("p2", Some("returntarget"))
         ),
         block("returntarget",
           ret
@@ -227,7 +227,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
         block("l_foo",
           Assign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
           Assign(getRegister("R1"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
-          call("p2", Some("l_foo_1"))
+          directCall("p2", Some("l_foo_1"))
         ),
         block("l_foo_1",
           ret,
