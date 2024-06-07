@@ -430,8 +430,11 @@ object IRTransform {
               // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
               for (t <- targets) {
                 Logger.debug(targets)
-                // TODO: getOrElse 0 is a hack may not be correct
-                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.getOrElse(0), 64)))
+                val address = t.address.match {
+                  case Some(a) => a
+                  case None => throw Exception(s"resolved indirect call $indirectCall to procedure which does not have address: $t")
+                }
+                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(address, 64)))
                 val newLabel: String = block.label + t.name
                 val directCall = DirectCall(t, indirectCall.returnTarget)
                 directCall.parent = indirectCall.parent
