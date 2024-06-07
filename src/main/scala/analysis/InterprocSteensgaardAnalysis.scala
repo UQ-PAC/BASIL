@@ -142,8 +142,8 @@ class InterprocSteensgaardAnalysis(
               case _: BitVecLiteral =>
                 Set.empty[MemoryRegion]
               case _ =>
-                println(s"Unknown expression: ${i}")
-                println(ctx)
+                Logger.debug(s"Unknown expression: $i")
+                Logger.debug(ctx)
                 exprToRegion(i.rhs, i)
             }
             val results = evaluateExpressionWithSSA(binExpr.arg2, constantProp(n), n, reachingDefs)
@@ -158,8 +158,8 @@ class InterprocSteensgaardAnalysis(
                     reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
                   }
                 case dataRegion: DataRegion =>
-                  println(s"Hey, I'm a data region: ${dataRegion}")
-                  println(s"Hey, I'm a offset: ${b}")
+                  Logger.debug(s"Hey, I'm a data region: $dataRegion")
+                  Logger.debug(s"Hey, I'm a offset: $b")
                   val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start), b)
                   evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
                     reducedRegions ++= exprToRegion(b2, n)

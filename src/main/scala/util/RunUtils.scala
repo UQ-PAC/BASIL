@@ -355,7 +355,7 @@ object IRTransform {
           if (regionContents.contains(stackRegion)) {
             for (c <- regionContents(stackRegion)) {
               c match {
-                case bitVecLiteral: BitVecLiteral => println("hi: " + bitVecLiteral)//???
+                case bitVecLiteral: BitVecLiteral => Logger.debug("hi: " + bitVecLiteral)//???
                 case memoryRegion: MemoryRegion =>
                   result.addAll(searchRegion(memoryRegion))
               }
@@ -369,7 +369,7 @@ object IRTransform {
             result.add(dataRegion.regionIdentifier) // TODO: may need to investigate if we should add the parent region
             for (c <- regionContents(dataRegion)) {
               c match {
-                case bitVecLiteral: BitVecLiteral => println("hi: " + bitVecLiteral)//???
+                case bitVecLiteral: BitVecLiteral => Logger.debug("hi: " + bitVecLiteral)//???
                 case memoryRegion: MemoryRegion =>
                   result.addAll(searchRegion(memoryRegion))
               }
@@ -429,7 +429,7 @@ object IRTransform {
               val newBlocks = ArrayBuffer[Block]()
               // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
               for (t <- targets) {
-                println(targets)
+                Logger.debug(targets)
                 // TODO: getOrElse 0 is a hack may not be correct
                 val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.getOrElse(0), 64)))
                 val newLabel: String = block.label + t.name
