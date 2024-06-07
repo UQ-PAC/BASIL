@@ -403,7 +403,8 @@ object IRTransform {
       case c: CfgJumpNode =>
         val block = c.block
         c.data match
-          case indirectCall: IndirectCall =>
+          // don't try to resolve returns
+          case indirectCall: IndirectCall if indirectCall.target != Register("R30", BitVecType(64)) =>
             if (block.jump != indirectCall) {
               // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data
               // Hence if we have already processed this CFG node there will be no corresponding IndirectCall in the IR
