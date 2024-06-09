@@ -327,7 +327,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case "FPAdd.0" | "FPMul.0" | "FPDiv.0" | "FPMulX.0" | "FPMax.0" | "FPMin.0" | "FPMaxNum.0" | "FPMinNum.0" | "FPSub.0" |
         "FPMulAddH.0" |
         "FPMulAdd.0" |
-        "FPRecpX.0" | "FPSqrt.0" |
+        "FPRecpX.0" | "FPSqrt.0" | "FPRecipEstimate.0" |
         "FPRSqrtStepFused.0" | "FPRecipStepFused.0" |
         "FPRoundInt.0" =>
         val name = function.stripSuffix(".0")
@@ -381,7 +381,36 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name, argsIR, BitVecType(32)))
 
+      case "FPToFixedJS_impl.0" =>
+        val name = function.stripSuffix(".0")
+        val inSize = parseInt(typeArgs(0))
+        val outSize = parseInt(typeArgs(1))
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
+
+      case "FPRoundIntN.0" =>
+        val name = function.stripSuffix(".0")
+        val size = parseInt(typeArgs(0))
+        val argsIR = (for (i <- 0 to 3) yield {
+          if (i == 3) {
+            Some(IntLiteral(parseInt(args(i))))
+          } else {
+            visitExpr(args(i))
+          }
+        }).flatten
+        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
+
+      case "BFAdd.0" | "BFMul.0" =>
+        val name = function.stripSuffix(".0")
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name, argsIR, BitVecType(32)))
+
       case _ =>
+        // known ASLp methods not yet handled:
+        // FPRoundBase, BFRound - take asl type 'real' as input, need to see this in practice and requires consideration
+        // AArch64.MemTag.read, AArch64.MemTag.set - allocation tag operations, can't model as uninterpreted functions
+        // and will require some research into their semantics
+        // AtomicStart, AtomicEnd - can't model as uninterpreted functions, requires modelling atomic section
         Logger.debug(s"unidentified call to $function: ${ctx.getText}")
         None
     }
