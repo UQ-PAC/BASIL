@@ -194,7 +194,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case e: ExprSlicesContext => visitExprSlices(e)
       case e: ExprFieldContext => Some(visitExprField(e))
       case e: ExprArrayContext => Some(visitExprArray(e))
-      case e: ExprLitIntContext => None // we should not encounter this unless expected TODO replace with exception
+      case e: ExprLitIntContext => Some(IntLiteral(parseInt(e)))
       case e: ExprLitBitsContext => Some(visitExprLitBits(e))
     }
   }
@@ -319,29 +319,45 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         }
 
       case "FPCompareGT.0" | "FPCompareGE.0" | "FPCompareEQ.0" =>
+        checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + size, argsIR, BoolType))
 
-      case "FPAdd.0" | "FPMul.0" | "FPDiv.0" | "FPMulX.0" | "FPMax.0" | "FPMin.0" | "FPMaxNum.0" | "FPMinNum.0" | "FPSub.0" |
-        "FPMulAddH.0" |
-        "FPMulAdd.0" |
-        "FPRecpX.0" | "FPSqrt.0" | "FPRecipEstimate.0" |
-        "FPRSqrtStepFused.0" | "FPRecipStepFused.0" |
-        "FPRoundInt.0" =>
+      case "FPAdd.0" | "FPMul.0" | "FPDiv.0" | "FPMulX.0" | "FPMax.0" | "FPMin.0" | "FPMaxNum.0" | "FPMinNum.0" | "FPSub.0" =>
+        checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val size = parseInt(typeArgs(0))
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
+
+      case "FPMulAddH.0" | "FPMulAdd.0" |
+           "FPRoundInt.0" |
+           "FPRoundIntN.0" =>
+        checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val size = parseInt(typeArgs(0))
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
+
+      case "FPRecpX.0" | "FPSqrt.0" | "FPRecipEstimate.0" |
+           "FPRSqrtStepFused.0" | "FPRecipStepFused.0" =>
+        checkArgs(function, 1, 2, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
 
       case "FPCompare.0" =>
+        checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(4)))
 
       case "FPConvert.0" =>
+        checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val outSize = parseInt(typeArgs(0))
         val inSize = parseInt(typeArgs(1))
@@ -349,58 +365,39 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
 
       case "FPToFixed.0" =>
+        checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val outSize = parseInt(typeArgs(0))
         val inSize = parseInt(typeArgs(1))
         // need to specifically handle the integer parameter
-        val argsIR = (for (i <- 0 to 4) yield {
-          if (i == 1) {
-            Some(IntLiteral(parseInt(args(i))))
-          } else {
-            visitExpr(args(i))
-          }
-        }).flatten
+        val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
 
       case "FixedToFP.0" =>
+        checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val inSize = parseInt(typeArgs(0))
         val outSize = parseInt(typeArgs(1))
         // need to specifically handle the integer parameter
-        val argsIR = (for (i <- 0 to 4) yield {
-          if (i == 1) {
-            Some(IntLiteral(parseInt(args(i))))
-          } else {
-            visitExpr(args(i))
-          }
-        }).flatten
+        val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
 
       case "FPConvertBF.0" =>
+        checkArgs(function, 0, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name, argsIR, BitVecType(32)))
 
       case "FPToFixedJS_impl.0" =>
+        checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val inSize = parseInt(typeArgs(0))
         val outSize = parseInt(typeArgs(1))
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
 
-      case "FPRoundIntN.0" =>
-        val name = function.stripSuffix(".0")
-        val size = parseInt(typeArgs(0))
-        val argsIR = (for (i <- 0 to 3) yield {
-          if (i == 3) {
-            Some(IntLiteral(parseInt(args(i))))
-          } else {
-            visitExpr(args(i))
-          }
-        }).flatten
-        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
-
       case "BFAdd.0" | "BFMul.0" =>
+        checkArgs(function, 0, 2, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name, argsIR, BitVecType(32)))
