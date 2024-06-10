@@ -296,6 +296,22 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case "append_bits.0" =>
         resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText)
 
+      case "replicate_bits.0" =>
+        checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
+        val oldSize = parseInt(typeArgs(0))
+        val replications = parseInt(typeArgs(1))
+        val arg0 = visitExpr(args(0))
+        val arg1 = parseInt(args(1))
+        val newSize = oldSize * replications
+        if (arg1 != replications) {
+          Exception(s"inconsistent size parameters in replicate_bits.0: ${ctx.getText}")
+        }
+        if (arg0.isDefined) {
+          Some(Repeat(replications, arg0.get))
+        } else {
+          None
+        }
+
       case "ZeroExtend.0" =>
         checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
         val oldSize = parseInt(typeArgs(0))

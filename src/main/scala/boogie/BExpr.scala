@@ -88,7 +88,6 @@ case class BVExtract(end: Int, start: Int, body: BExpr) extends BExpr {
 case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
   override def getType: BitVecBType = BitVecBType(bodySize * repeats)
 
-
   private def bodySize: Int = body.getType match {
     case bv: BitVecBType => bv.size
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of extract: " + this)
