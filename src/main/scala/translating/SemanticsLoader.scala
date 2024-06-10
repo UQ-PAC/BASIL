@@ -277,7 +277,6 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case "mul_bits.0" => resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText)
       case "sdiv_bits.0" => resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText)
 
-      // have not yet encountered these two so need to be careful
       case "slt_bits.0" => resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText)
       case "sle_bits.0" => resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText)
 
