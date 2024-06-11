@@ -4,16 +4,15 @@ import analysis.solvers.{Cons, Term, UnionFindSolver, Var}
 import ir.*
 import util.Logger
 import scala.collection.mutable
-import scala.collection.mutable.ListBuffer
 
 /** Wrapper for variables so we can have Steensgaard-specific equals method indirectly
  * Relies on the SSA sets intersection being non-empty
  * */
-case class RegisterVariableWrapper(variable: Variable) {
+case class RegisterVariableWrapper(variable: Variable, assigns: Set[LocalAssign]) {
   override def equals(obj: Any): Boolean = {
     obj match {
-      case RegisterVariableWrapper(other) =>
-        variable == other && variable.ssa_id.intersect(other.ssa_id).nonEmpty
+      case RegisterVariableWrapper(other, otherAssigns) =>
+        variable == other && assigns.intersect(otherAssigns).nonEmpty
       case _ =>
         false
     }
@@ -23,11 +22,11 @@ case class RegisterVariableWrapper(variable: Variable) {
 /** Wrapper for variables so we can have ConstantPropegation-specific equals method indirectly
  * Relies on SSA sets being exactly the same
  * */
-case class RegisterWrapperEqualSets(variable: Variable) {
+case class RegisterWrapperEqualSets(variable: Variable, assigns: Set[LocalAssign]) {
   override def equals(obj: Any): Boolean = {
     obj match {
-      case RegisterWrapperEqualSets(other) =>
-        variable == other && variable.ssa_id == other.ssa_id
+      case RegisterWrapperEqualSets(other, otherAssigns) =>
+        variable == other && assigns == otherAssigns
       case _ =>
         false
     }
@@ -38,10 +37,11 @@ case class RegisterWrapperEqualSets(variable: Variable) {
   * expression node in the AST. It is implemented using [[analysis.solvers.UnionFindSolver]].
   */
 class InterprocSteensgaardAnalysis(
-      cfg: ProgramCfg,
-      constantProp: Map[CfgNode, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
+      program: Program,
+      constantProp: Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
       regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
       mmm: MemoryModelMap,
+      reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
       globalOffsets: Map[BigInt, BigInt]) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
@@ -68,11 +68,18 @@ class InterprocSteensgaardAnalysis(
   /**
    * In expressions that have accesses within a region, we need to relocate
    * the base address to the actual address using the relocation table.
+   * MUST RELOCATE because MMM iterate to find the lowest address
+   * TODO: May need to iterate over the relocation table to find the actual address
+   *
    * @param address
    * @return BitVecLiteral: the relocated address
    */
   def relocatedBase(address: BitVecLiteral): BitVecLiteral = {
     val tableAddress = globalOffsets.getOrElse(address.value, address.value)
+    // this condition checks if the address is not layered and returns if it is not
+    if (tableAddress != address.value && !globalOffsets.contains(tableAddress)) {
+      return address
+    }
     BitVecLiteral(tableAddress, address.size)
   }
 
@@ -97,45 +104,70 @@ class InterprocSteensgaardAnalysis(
    * @param n
    * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
    */
-  def reducibleToRegion(binExpr: BinaryExpr, n: CfgCommandNode): Set[MemoryRegion] = {
+  def reducibleToRegion(binExpr: BinaryExpr, n: Command): Set[MemoryRegion] = {
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
       case variable: Variable =>
-        val reg = RegisterVariableWrapper(variable)
-        val ctx = regionAccesses(n)
-        if (ctx.contains(reg)) {
-          ctx(reg) match {
-            case FlatEl(al) =>
-              val regions = al match {
-                case loadL: MemoryLoad =>
-                  exprToRegion(loadL.index, n)
-                case _ =>
-                  exprToRegion(al, n)
-              }
-              val results = evaluateExpressionWithSSA(binExpr.arg2, constantProp(n))
-              for {
-                b <- results
-                r <- regions
-              } {
-                r match {
-                  case stackRegion: StackRegion =>
-                    val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
-                    evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach { b2 =>
-                      reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
-                    }
-                  case dataRegion: DataRegion =>
-                    val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start), b)
-                    evaluateExpressionWithSSA(nextOffset, constantProp(n)).foreach { b2 =>
-                      reducedRegions ++= exprToRegion(b2, n)
-                    }
-                  case _ =>
-                }
-              }
-          }
-        }
-        evaluateExpressionWithSSA(binExpr, constantProp(n)).foreach { b =>
+        evaluateExpressionWithSSA(binExpr, constantProp(n), n, reachingDefs).foreach { b =>
           val region = mmm.findDataObject(b.value)
           reducedRegions = reducedRegions ++ region
+        }
+        if (reducedRegions.nonEmpty) {
+          return reducedRegions
+        }
+        val ctx = getUse(variable, n, reachingDefs)
+        for (i <- ctx) {
+          if (i != n) { // handles loops (ie. R19 = R19 + 1) %00000662 in jumptable2
+            val regions = i.rhs match {
+              case loadL: MemoryLoad =>
+                val foundRegions = exprToRegion(loadL.index, i)
+                val toReturn = mutable.Set[MemoryRegion]().addAll(foundRegions)
+                for {
+                  f <- foundRegions
+                } {
+                  if (memoryRegionContents.contains(f)) {
+                    memoryRegionContents(f).foreach {
+                      case b: BitVecLiteral =>
+//                        val region = mmm.findDataObject(b.value)
+//                        if (region.isDefined) {
+//                          toReturn.addOne(region.get)
+//                        }
+                      case r: MemoryRegion =>
+                        toReturn.addOne(r)
+                        toReturn.remove(f)
+                    }
+                  }
+                }
+                toReturn.toSet
+              case _: BitVecLiteral =>
+                Set.empty[MemoryRegion]
+              case _ =>
+                Logger.debug(s"Unknown expression: $i")
+                Logger.debug(ctx)
+                exprToRegion(i.rhs, i)
+            }
+            val results = evaluateExpressionWithSSA(binExpr.arg2, constantProp(n), n, reachingDefs)
+            for {
+              b <- results
+              r <- regions
+            } {
+              r match {
+                case stackRegion: StackRegion =>
+                  val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
+                  evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
+                    reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
+                  }
+                case dataRegion: DataRegion =>
+                  Logger.debug(s"Hey, I'm a data region: $dataRegion")
+                  Logger.debug(s"Hey, I'm a offset: $b")
+                  val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start), b)
+                  evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
+                    reducedRegions ++= exprToRegion(b2, n)
+                  }
+                case _ =>
+              }
+            }
+          }
         }
       case _ =>
     }
@@ -151,13 +183,13 @@ class InterprocSteensgaardAnalysis(
    * @param n
    * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
    */
-  def exprToRegion(expr: Expr, n: CfgCommandNode): Set[MemoryRegion] = {
+  def exprToRegion(expr: Expr, n: Command): Set[MemoryRegion] = {
     var res = Set[MemoryRegion]()
     mmm.popContext()
-    mmm.pushContext(n.parent.data.name)
+    mmm.pushContext(IRWalk.procedure(n).name)
     expr match { // TODO: Stack detection here should be done in a better way or just merged with data
       case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
-        evaluateExpressionWithSSA(binOp.arg2, constantProp(n)).foreach { b =>
+        evaluateExpressionWithSSA(binOp.arg2, constantProp(n), n, reachingDefs).foreach { b =>
           if binOp.arg2.variables.exists { v => v.sharedVariable } then {
             Logger.debug("Shared stack object: " + b)
             Logger.debug("Shared in: " + expr)
@@ -175,9 +207,11 @@ class InterprocSteensgaardAnalysis(
       case binaryExpr: BinaryExpr =>
         res ++= reducibleToRegion(binaryExpr, n)
         res
-
+      case v: Variable if v == stackPointer =>
+        res ++= mmm.findStackObject(0)
+        res
       case v: Variable =>
-        evaluateExpressionWithSSA(expr, constantProp(n)).foreach { b =>
+        evaluateExpressionWithSSA(expr, constantProp(n), n, reachingDefs).foreach { b =>
           Logger.debug("BitVecLiteral: " + b)
           val region = mmm.findDataObject(b.value)
           if (region.isDefined) {
@@ -185,26 +219,22 @@ class InterprocSteensgaardAnalysis(
           }
         }
         if (res.isEmpty) { // may be passed as param
-          val ctx = regionAccesses(n)
-          val wrapper = RegisterVariableWrapper(v)
-          if (ctx.contains(wrapper)) {
-            ctx(wrapper) match {
-              case FlatEl(al) =>
-                al match {
-                  case load: MemoryLoad => // treat as a region
-                    res ++= exprToRegion(load.index, n)
-                  case binaryExpr: BinaryExpr =>
-                    res ++= reducibleToRegion(binaryExpr, n)
-                    res ++= exprToRegion(al, n)
-                  case _ => // also treat as a region (for now) even if just Base + Offset without memLoad
-                    res ++= exprToRegion(al, n)
-                }
+          val ctx = getUse(v, n, reachingDefs)
+          for (i <- ctx) {
+            i.rhs match {
+              case load: MemoryLoad => // treat as a region
+                res ++= exprToRegion(load.index, i)
+              case binaryExpr: BinaryExpr =>
+                res ++= reducibleToRegion(binaryExpr, i)
+                res ++= exprToRegion(i.rhs, i)
+              case _ => // also treat as a region (for now) even if just Base + Offset without memLoad
+                res ++= exprToRegion(i.rhs, i)
             }
           }
         }
         res
       case _ =>
-        evaluateExpressionWithSSA(expr, constantProp(n)).foreach { b =>
+        evaluateExpressionWithSSA(expr, constantProp(n), n, reachingDefs).foreach { b =>
           Logger.debug("BitVecLiteral: " + b)
           val region = mmm.findDataObject(b.value)
           if (region.isDefined) {
@@ -219,7 +249,9 @@ class InterprocSteensgaardAnalysis(
     */
   def analyze(): Unit =
     // generate the constraints by traversing the AST and solve them on-the-fly
-    cfg.nodes.foreach(visit(_, ()))
+    program.procedures.foreach(p => {
+      p.blocks.foreach(b => b.statements.foreach(visit(_, ())))
+    })
 
   /** Generates the constraints for the given sub-AST.
     * @param node
@@ -227,87 +259,84 @@ class InterprocSteensgaardAnalysis(
     * @param arg
     *   unused for this visitor
     */
-  def visit(n: CfgNode, arg: Unit): Unit = {
+  def visit(cmd: Command, arg: Unit): Unit = {
 
-    n match {
-      case cmd: CfgCommandNode =>
-        cmd.data match {
-          case directCall: DirectCall =>
-            // X = alloc P:  [[X]] = ↑[[alloc-i]]
-            if (directCall.target.name == "malloc") {
-              val alloc = HeapRegion(nextMallocCount(), BitVecLiteral(BigInt(0), 0))
-              unify(IdentifierVariable(RegisterVariableWrapper(mallocVariable)), PointerRef(AllocVariable(alloc)))
-            }
+    cmd match {
+        case directCall: DirectCall =>
+          // X = alloc P:  [[X]] = ↑[[alloc-i]]
+          if (directCall.target.name == "malloc") {
+            val alloc = HeapRegion(nextMallocCount(), BitVecLiteral(BigInt(0), 0), IRWalk.procedure(cmd))
+            unify(IdentifierVariable(RegisterVariableWrapper(mallocVariable, getUse(mallocVariable, cmd, reachingDefs))), PointerRef(AllocVariable(alloc)))
+          }
 
-          case localAssign: LocalAssign =>
-            localAssign.rhs match {
-              case binOp: BinaryExpr =>
-                // X1 = &X2: [[X1]] = ↑[[X2]]
-                exprToRegion(binOp, cmd).foreach(
-                  x => unify(IdentifierVariable(RegisterVariableWrapper(localAssign.lhs)), PointerRef(AllocVariable(x)))
-                )
-              // TODO: should lookout for global base + offset case as well
-              case _ =>
-                unwrapExpr(localAssign.rhs).foreach {
-                  case memoryLoad: MemoryLoad =>
-                    // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable
-                    val X1 = localAssign.lhs
-                    val X2_star = exprToRegion(memoryLoad.index, cmd)
-                    val alpha = FreshVariable()
-                    X2_star.foreach(
-                      x => unify(ExpressionVariable(x), PointerRef(alpha))
-                    )
-                    unify(alpha, IdentifierVariable(RegisterVariableWrapper(X1)))
+        case localAssign: LocalAssign =>
+          localAssign.rhs match {
+            case binOp: BinaryExpr =>
+              // X1 = &X2: [[X1]] = ↑[[X2]]
+              exprToRegion(binOp, cmd).foreach(
+                x => unify(IdentifierVariable(RegisterVariableWrapper(localAssign.lhs, getDefinition(localAssign.lhs, cmd, reachingDefs))), PointerRef(AllocVariable(x)))
+              )
+            // TODO: should lookout for global base + offset case as well
+            case _ =>
+              unwrapExpr(localAssign.rhs).foreach {
+                case memoryLoad: MemoryLoad =>
+                  // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable
+                  val X1 = localAssign.lhs
+                  val X2_star = exprToRegion(memoryLoad.index, cmd)
+                  val alpha = FreshVariable()
+                  X2_star.foreach(
+                    x => unify(ExpressionVariable(x), PointerRef(alpha))
+                  )
+                  unify(alpha, IdentifierVariable(RegisterVariableWrapper(X1, getDefinition(X1, cmd, reachingDefs))))
 
-                    Logger.debug("Memory load: " + memoryLoad)
-                    Logger.debug("Index: " + memoryLoad.index)
-                    Logger.debug("X2_star: " + X2_star)
-                    Logger.debug("X1: " + X1)
-                    Logger.debug("LocalAssign: " + localAssign)
+                  Logger.debug("Memory load: " + memoryLoad)
+                  Logger.debug("Index: " + memoryLoad.index)
+                  Logger.debug("X2_star: " + X2_star)
+                  Logger.debug("X1: " + X1)
+                  Logger.debug("LocalAssign: " + localAssign)
 
-                    // TODO: This might not be correct for globals
-                    // X1 = &X: [[X1]] = ↑[[X2]] (but for globals)
-                    val $X2 = exprToRegion(memoryLoad.index, cmd)
-                    $X2.foreach(
-                      x => unify(IdentifierVariable(RegisterVariableWrapper(localAssign.lhs)), PointerRef(AllocVariable(x)))
-                    )
-                  case variable: Variable =>
-                    // X1 = X2: [[X1]] = [[X2]]
-                    val X1 = localAssign.lhs
-                    val X2 = variable
-                    unify(IdentifierVariable(RegisterVariableWrapper(X1)), IdentifierVariable(RegisterVariableWrapper(X2)))
-                  case _ => // do nothing
-                }
-            }
-          case memoryAssign: MemoryAssign =>
-            // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
-            val X1_star = exprToRegion(memoryAssign.rhs.index, cmd)
-            val X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(n))
-            var possibleRegions = Set[MemoryRegion]()
-            if (X2.isEmpty) {
-              Logger.debug("Maybe a region: " + exprToRegion(memoryAssign.rhs.value, cmd))
-              possibleRegions = exprToRegion(memoryAssign.rhs.value, cmd)
-            }
-            Logger.debug("X2 is: " + X2)
-            Logger.debug("Evaluated: " + memoryAssign.rhs.value)
-            Logger.debug("Region " + X1_star)
-            Logger.debug("Index " + memoryAssign.rhs.index)
-            val alpha = FreshVariable()
-            X1_star.foreach(x =>
-              unify(ExpressionVariable(x), PointerRef(alpha))
-              if (!memoryRegionContents.contains(x)) {
-                memoryRegionContents.addOne(x -> mutable.Set())
+                  // TODO: This might not be correct for globals
+                  // X1 = &X: [[X1]] = ↑[[X2]] (but for globals)
+                  val $X2 = exprToRegion(memoryLoad.index, cmd)
+                  $X2.foreach(
+                    x => unify(IdentifierVariable(RegisterVariableWrapper(localAssign.lhs, getDefinition(localAssign.lhs, cmd, reachingDefs))), PointerRef(AllocVariable(x)))
+                  )
+                case variable: Variable =>
+                  // X1 = X2: [[X1]] = [[X2]]
+                  val X1 = localAssign.lhs
+                  val X2 = variable
+                  unify(IdentifierVariable(RegisterVariableWrapper(X1, getDefinition(X1, cmd, reachingDefs))), IdentifierVariable(RegisterVariableWrapper(X2, getUse(X2, cmd, reachingDefs))))
+                case _ => // do nothing
               }
-              memoryRegionContents(x).addAll(X2)
-              memoryRegionContents(x).addAll(possibleRegions.filter(r => r != x))
-            )
-            X2.foreach(x => unify(alpha, ExpressionVariable(x)))
-            possibleRegions.foreach(x => unify(alpha, ExpressionVariable(x)))
-          case _ => // do nothing TODO: Maybe LocalVar too?
-        }
-      case _ => // do nothing
+          }
+        case memoryAssign: MemoryAssign =>
+          // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
+          val X1_star = exprToRegion(memoryAssign.rhs.index, cmd)
+          val X2 = evaluateExpressionWithSSA(memoryAssign.rhs.value, constantProp(cmd), cmd, reachingDefs)
+          // TODO: This is risky as it tries to coerce every value to a region (needed for functionpointer example)
+          val possibleRegions = exprToRegion(memoryAssign.rhs.value, cmd)
+
+          Logger.debug("I am at stmt: " + cmd.label)
+          Logger.debug("Memory assign: " + memoryAssign)
+          Logger.debug("X2 is: " + X2)
+          Logger.debug("PossibleRegions instead of X2 " + possibleRegions)
+          Logger.debug("Evaluated: " + memoryAssign.rhs.value)
+          Logger.debug("Region " + X1_star)
+          Logger.debug("Index " + memoryAssign.rhs.index)
+          val alpha = FreshVariable()
+          X1_star.foreach(x =>
+            unify(ExpressionVariable(x), PointerRef(alpha))
+            if (!memoryRegionContents.contains(x)) {
+              memoryRegionContents.addOne(x -> mutable.Set())
+            }
+            memoryRegionContents(x).addAll(X2)
+            memoryRegionContents(x).addAll(possibleRegions.filter(r => r != x))
+          )
+          X2.foreach(x => unify(alpha, ExpressionVariable(x)))
+          possibleRegions.foreach(x => unify(alpha, ExpressionVariable(x)))
+        case _ => // do nothing TODO: Maybe LocalVar too?
+      }
     }
-  }
 
   private def unify(t1: Term[StTerm], t2: Term[StTerm]): Unit = {
     //Logger.info(s"univfying constraint $t1 = $t2\n")
