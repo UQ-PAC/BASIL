@@ -10,7 +10,7 @@ The IR has a completely standard simple type system that is enforced at construc
 
 ```math
 \begin{align*}
-Program ::=&~ Procedure* \\ 
+Program ::=&~ Procedure* \\
 Procedure ::=&~ (name: ProcID) (entryBlock: Block) (returnBlock: Block) (blocks: Block*) \\
                &~ \text{Where }entryBlock, returnBlock \in blocks \\
 Block ::=&~ BlockID \; (Statement*)\; Jump \; (fallthrough: (GoTo | None))\\
@@ -26,22 +26,21 @@ DirectCall ::=&~ \text{call } ProcID \\
 IndirectCall ::=&~ \text{call } Expr \\
 \\
           &~ loads(e: Expr) = \{x |  x:MemoryLoad, x \in e \} \\
-          &~ stores(e: Expr) = \{x |  x:MemoryStore, x \in e \} \\
 \\
-MemoryAssign ::=&~ Memory := MemoryStore \\
+MemoryAssign ::=&~ MemoryAssign (mem: Memory) (addr: Expr) (val: Expr) (Endian) (size: Int) \\
+          &\text {Such that } loads(addr) = loads(val) = \emptyset \\
+\\
 LocalAssign ::=&~ Variable := Expr \\
 Assume ::=&~ \text{assume } body:Expr\\
-          &\text {Such that } loads(body) = stores(body) = \emptyset \\
+          &\text {Such that } loads(body) = \emptyset \\
 Assert ::=&~ \text{assert } body:Expr\\
-          &\text {Such that } loads(body) = stores(body) = \emptyset \\
+          &\text {Such that } loads(body) =  \emptyset \\
 \\
-Expr ::=&~ MemoryStore ~|~ MemoryLoad ~|~ Variable ~|~ Literal ~|~ Extract ~|~ Repeat \\
+Expr ::=&~ MemoryLoadExpr ~|~ Variable ~|~ Literal ~|~ Extract ~|~ Repeat \\
           &~ ~|~ ZeroExtend ~|~ SignExtend ~|~ UnaryExpr ~|~ BinaryExpr \\
 Variable ::=&~ Global ~|~ LocalVar \\
-MemoryStore ::=&~  (mem:Memory) (addr: Expr) (val: Expr) (Endian) (size: Int) \\
-          &\text {Such that } loads(addr) = loads(val) = stores(addr) = stores(val) = \emptyset \\
-MemoryLoad ::=&~  (mem:Memory)  (addr: Expr)  (Endian) (size: Int) \\
-          &\text {Such that } loads(addr) = stores(addr) = stores(val) = \emptyset \\
+MemoryLoadExpr ::=&~  MemoryLoad (mem:Memory)  (addr: Expr)  (Endian) (size: Int) \\
+          &\text {Such that } loads(addr) = \emptyset \\
 Memory ::=&~ Stack ~|~ Mem \\
 Endian ::=&~ BigEndian ~|~ LittleEndian \\
 \end{align*}
@@ -61,12 +60,12 @@ An example can be seen below:
 var program: Program = prog(
   proc("main",
     block("first_call",
-      r0ConstantAssign,
-      r1ConstantAssign,
-      call("callee1", Some("second_call"))
+      Assign(R0, bv64(1), None)
+      Assign(R1, bv64(1), None)
+      directCall("callee1", Some("second_call"))
     ),
     block("second_call",
-      call("callee2", Some("returnBlock"))
+      directCall("callee2", Some("returnBlock"))
     ),
     block("returnBlock",
       ret
@@ -84,7 +83,7 @@ procedure   ::= proc (procname, block+)
 block       ::= block(blocklabel, statement+, jump)
 statement   ::= <BASIL IR Statement>
 jump        ::= call_s | goto_s | ret
-call_s      ::= call (procedurename, None | Some(blocklabel))  // target, fallthrough 
+call_s      ::= directCall (procedurename, None | Some(blocklabel))  // target, fallthrough 
 goto_s      ::= goto(blocklabel+)                              // targets
 procname    ::= String
 blocklabel  ::= String
