@@ -170,9 +170,9 @@ implementation main()
     assert ((z_old != 0bv32) ==> (memory_load32_le(mem, $z_addr) != 0bv32));
     assume {:captureState "%00000343"} true;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
-    goto main_return;
-  main_return:
-    assume {:captureState "main_return"} true;
+    goto main_basil_return;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 

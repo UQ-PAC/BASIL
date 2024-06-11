@@ -107,9 +107,9 @@ implementation main()
     assert ((memory_load32_le(mem, $x_addr) == x_old) || (memory_load32_le(mem, $x_addr) == 5bv32));
     assume {:captureState "%000002d8"} true;
     R0, Gamma_R0 := 0bv64, true;
-    goto main_return;
-  main_return:
-    assume {:captureState "main_return"} true;
+    goto main_basil_return;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 

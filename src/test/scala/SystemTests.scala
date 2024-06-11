@@ -84,7 +84,7 @@ trait SystemTests extends AnyFunSuite {
     val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(outPath))
     val boogieResult = (Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath) ++ extraSpec).!!
     val verifyTime = timer.checkPoint("verify")
-    val resultPath = if useADT then variationPath + "bap_result.txt" else variationPath + "gtirb_result.txt"
+    val resultPath = if useADT then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
     log(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
     val proveFailed = boogieResult.contains("could not be proved")
