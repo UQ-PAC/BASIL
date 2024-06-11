@@ -40,11 +40,11 @@ gts: a.out
 json:
 	debug-gts.py $(NAME).gts > $(NAME).json
 
-$(NAME)bap_result.txt: $(NAME)_bap.bpl $(EXTRA_SPEC)
-	bash -c "time boogie $(NAME)_bap.bpl $(EXTRA_SPEC) $(BOOGIE_FLAGS) | tee $(NAME)_result.txt"
+$(NAME)_bap_result.txt: $(NAME)_bap.bpl $(EXTRA_SPEC)
+	bash -c "time boogie $(NAME)_bap.bpl $(EXTRA_SPEC) $(BOOGIE_FLAGS) | tee $(NAME)_bap_result.txt"
 
-$(NAME)gtirb_result.txt: $(NAME)_gtirb.bpl $(EXTRA_SPEC)
-	bash -c "time boogie $(NAME)_gtirb.bpl $(EXTRA_SPEC) $(BOOGIE_FLAGS) | tee $(NAME)_result.txt"
+$(NAME)_gtirb_result.txt: $(NAME)_gtirb.bpl $(EXTRA_SPEC)
+	bash -c "time boogie $(NAME)_gtirb.bpl $(EXTRA_SPEC) $(BOOGIE_FLAGS) | tee $(NAME)_gtirb_result.txt"
 
 cleanall: clean cleanlift cleanbin cleantest cleanjson
 
@@ -53,8 +53,8 @@ cleantest:
 	rm -rf $(NAME)_bap.bpl
 	rm -rf $(NAME)_gtirb.bpl
 	rm -rf $(NAME)_result.txt
-	rm -rf $(NAME)bap_result.txt
-	rm -rf $(NAME)gtirb_result.txt
+	rm -rf $(NAME)_bap_result.txt
+	rm -rf $(NAME)_gtirb_result.txt
 
 cleanbin:
 	rm -rf a.out
