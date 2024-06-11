@@ -93,13 +93,9 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         val index = visitExpr(args.head)
         val value = visitExpr(args(3))
         val otherSize = parseInt(args(1)) * 8
-        val accessType = parseInt(args(2)) // AccType enum in ASLi
+        val accessType = parseInt(args(2)) // AccType enum in ASLi, not very relevant to us
         if (size != otherSize) {
           throw Exception(s"inconsistent size parameters in Mem.set.0: ${ctx.getText}")
-        }
-        // we expect this to be 0 'AccType_NORMAL' but if we encounter other values they may require further investigation
-        if (accessType != 0) {
-          Logger.info(s"Mem.set.0 with non-0 access type encountered: ${ctx.getText}")
         }
 
         // LittleEndian is an assumption
@@ -183,7 +179,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         // ignoring the register's fields for now
         BitVecType(visitInteger(r.size))
       case c: TypeConstructorContext => visitIdent(c.str).match {
-        case "FPRounding" => BitVecType(2)
+        case "FPRounding" => BitVecType(3)
+        case "integer" => BitVecType(64)
         case _ => throw Exception(s"unknown type ${ctx.getText}")
       }
       case _ => throw Exception(s"unknown type ${ctx.getText}")
@@ -196,7 +193,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case e: ExprSlicesContext => visitExprSlices(e)
       case e: ExprFieldContext => Some(visitExprField(e))
       case e: ExprArrayContext => Some(visitExprArray(e))
-      case e: ExprLitIntContext => None // we should not encounter this unless expected TODO replace with exception
+      case e: ExprLitIntContext => Some(IntLiteral(parseInt(e)))
       case e: ExprLitBitsContext => Some(visitExprLitBits(e))
     }
   }
@@ -239,15 +236,10 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         val size = parseInt(typeArgs.head) * 8
 
         val otherSize = parseInt(args(1)) * 8
-        val accessType = parseInt(args(2)) // AccType enum in ASLi
+        val accessType = parseInt(args(2)) // AccType enum in ASLi - not too relevant
         if (size != otherSize) {
           throw Exception(s"inconsistent size parameters in Mem.read.0: ${ctx.getText}")
         }
-        // we expect this to be 0 'AccType_NORMAL' but if we encounter other values they may require further investigation
-        if (accessType != 0) {
-          Logger.info(s"Mem.set.0 with non-0 access type encountered: ${ctx.getText}")
-        }
-
 
         if (index.isDefined) {
           // LittleEndian is assumed
@@ -284,7 +276,6 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case "mul_bits.0" => resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText)
       case "sdiv_bits.0" => resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText)
 
-      // have not yet encountered these two so need to be careful
       case "slt_bits.0" => resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText)
       case "sle_bits.0" => resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText)
 
@@ -325,7 +316,96 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
           None
         }
 
+      case "FPCompareGT.0" | "FPCompareGE.0" | "FPCompareEQ.0" =>
+        checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val size = parseInt(typeArgs(0))
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + size, argsIR, BoolType))
+
+      case "FPAdd.0" | "FPMul.0" | "FPDiv.0" | "FPMulX.0" | "FPMax.0" | "FPMin.0" | "FPMaxNum.0" | "FPMinNum.0" | "FPSub.0" =>
+        checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val size = parseInt(typeArgs(0))
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
+
+      case "FPMulAddH.0" | "FPMulAdd.0" |
+           "FPRoundInt.0" |
+           "FPRoundIntN.0" =>
+        checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val size = parseInt(typeArgs(0))
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
+
+      case "FPRecpX.0" | "FPSqrt.0" | "FPRecipEstimate.0" |
+           "FPRSqrtStepFused.0" | "FPRecipStepFused.0" =>
+        checkArgs(function, 1, 2, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val size = parseInt(typeArgs(0))
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
+
+      case "FPCompare.0" =>
+        checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val size = parseInt(typeArgs(0))
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(4)))
+
+      case "FPConvert.0" =>
+        checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val outSize = parseInt(typeArgs(0))
+        val inSize = parseInt(typeArgs(1))
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
+
+      case "FPToFixed.0" =>
+        checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val outSize = parseInt(typeArgs(0))
+        val inSize = parseInt(typeArgs(1))
+        // need to specifically handle the integer parameter
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
+
+      case "FixedToFP.0" =>
+        checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val inSize = parseInt(typeArgs(0))
+        val outSize = parseInt(typeArgs(1))
+        // need to specifically handle the integer parameter
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
+
+      case "FPConvertBF.0" =>
+        checkArgs(function, 0, 3, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name, argsIR, BitVecType(32)))
+
+      case "FPToFixedJS_impl.0" =>
+        checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val inSize = parseInt(typeArgs(0))
+        val outSize = parseInt(typeArgs(1))
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
+
+      case "BFAdd.0" | "BFMul.0" =>
+        checkArgs(function, 0, 2, typeArgs.size, args.size, ctx.getText)
+        val name = function.stripSuffix(".0")
+        val argsIR = args.flatMap(visitExpr).toSeq
+        Some(UninterpretedFunction(name, argsIR, BitVecType(32)))
+
       case _ =>
+        // known ASLp methods not yet handled:
+        // FPRoundBase, BFRound - take asl type 'real' as input, need to see this in practice and requires consideration
+        // AArch64.MemTag.read, AArch64.MemTag.set - allocation tag operations, can't model as uninterpreted functions
+        // and will require some research into their semantics
+        // AtomicStart, AtomicEnd - can't model as uninterpreted functions, requires modelling atomic section
         Logger.debug(s"unidentified call to $function: ${ctx.getText}")
         None
     }

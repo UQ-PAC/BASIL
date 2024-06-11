@@ -95,7 +95,7 @@ case class BFunction(name: String, in: List[BVar], out: BVar, body: Option[BExpr
     with Ordered[BFunction] {
   override def compare(that: BFunction): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
-    val s = new StringWriter()
+    val s = StringWriter()
 
     val inString = in.map(_.withType).mkString(", ")
     val declString = s"function $attrString$name($inString) returns (${out.withType})"
