@@ -1,11 +1,15 @@
+## Writing and Running Tests
 
-Options specified in make/lift-directories.mk can be overriden using this file, for example to specify the lifting templates:
+See [../../docs/development/readme.md]
+
+## Lifting SystemTest examples
+
+Lifting options specified in make/lift-directories.mk can be overriden using this file, for example to specify the lifting templates:
 
 ```
 $ cat correct/test_name/config.mk
 ENABLED_COMPILERS = clang clang_pic gcc gcc_pic
 ```
-
 
 To force recompile and lift all:
 

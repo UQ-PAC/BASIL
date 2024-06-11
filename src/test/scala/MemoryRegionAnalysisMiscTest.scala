@@ -3,6 +3,7 @@ import org.scalatest.Inside.inside
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import util.RunUtils
+import ir.*
 import util.{BASILConfig, BoogieGeneratorConfig, BoogieMemoryAccessMode, ILLoadingConfig, StaticAnalysisConfig, BASILResult}
 
 import java.io.{File, OutputStream, PrintStream, PrintWriter}
@@ -15,7 +16,7 @@ class MemoryRegionAnalysisMiscTest extends AnyFunSuite with OneInstancePerTest {
   def runMain(name: String, dump: Boolean = false): Unit = {
     var expected = ""
     var actual = ""
-    var output: Map[CfgNode, LiftedElement[Set[MemoryRegion]]] = Map()
+    var output: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]] = Map()
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
