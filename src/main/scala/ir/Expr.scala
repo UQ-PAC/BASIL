@@ -320,6 +320,14 @@ case class MemoryLoad(mem: Memory, index: Expr, endian: Endian, size: Int) exten
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemoryLoad(this)
 }
 
+case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType) extends Expr {
+  override def getType: IRType = returnType
+  override def toBoogie: BFunctionCall = BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, true)
+  override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
+  override def gammas: Set[Expr] = params.flatMap(_.gammas).toSet
+  override def variables: Set[Variable] = params.flatMap(_.variables).toSet
+}
+
 // Means something has a global scope from the perspective of the IR and Boogie
 // Not the same as global in the sense of shared memory between threads
 sealed trait Global
