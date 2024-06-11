@@ -39,6 +39,10 @@ trait CILVisitorImpl:
   def vlvar(e: Variable): VisitAction[Variable] = VisitAction.DoChildren()
   def vlmem(e: Memory): VisitAction[Memory] = VisitAction.DoChildren()
 
+  def enter_scope(params: ArrayBuffer[Parameter]): Unit = ()
+  def leave_scope(outparam: ArrayBuffer[Parameter]) : Unit = ()
+
+
 class CILVisitor(val v: CILVisitorImpl) {
 
   def doVisitList[T](v: CILVisitorImpl, a: VisitAction[List[T]], n: T, continue: (CILVisitorImpl, T) => T): List[T] = {
@@ -163,11 +167,13 @@ class CILVisitor(val v: CILVisitorImpl) {
 
   def visit_proc(p: Procedure): List[Procedure] = {
     def continue(v: CILVisitorImpl, p: Procedure) = {
+      p.in = visit_parameters(p.in)
+      v.enter_scope(p.in)
       for (b <- p.blocks) {
         p.replaceBlock(b, visit_block(b))
       }
-      p.in = visit_parameters(p.in)
       p.out = visit_parameters(p.out)
+      v.leave_scope(p.out)
       p
     }
 
