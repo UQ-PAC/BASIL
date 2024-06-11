@@ -2,6 +2,7 @@ package analysis
 
 import ir.{MemoryLoad, *}
 import analysis.solvers.*
+import util.Logger
 
 import scala.collection.immutable
 
@@ -14,7 +15,7 @@ import scala.collection.immutable
  *
  * Both in which constant propagation mark as TOP which is not useful.
  */
-trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]]) {
+trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) {
 
   val mapLattice: MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]] = MapLattice(FlatLattice[_root_.ir.Expr]())
 
@@ -26,15 +27,17 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
 
   /** Default implementation of eval.
    */
-  def eval(cmd: Command, constants: Map[Variable, FlatElement[BitVecLiteral]], s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = {
-    cmd match {
-      case localAssign: LocalAssign =>
-        localAssign.rhs match {
+  def eval(cmd: CfgCommandNode, constants: Map[Variable, FlatElement[BitVecLiteral]], s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = {
+    cmd.data match {
+      case assign: Assign =>
+        assign.rhs match {
           case memoryLoad: MemoryLoad =>
-            s + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(memoryLoad))
+            s + (RegisterVariableWrapper(assign.lhs, getDefinition(assign.lhs, cmd.data, reachingDefs)) -> FlatEl(memoryLoad))
           case binaryExpr: BinaryExpr =>
             if (evaluateExpression(binaryExpr.arg1, constants).isEmpty) { // approximates Base + Offset
-              s + (RegisterVariableWrapper(localAssign.lhs) -> FlatEl(binaryExpr))
+              Logger.debug(s"Approximating $assign in $binaryExpr")
+              Logger.debug(s"Reaching defs: ${reachingDefs(cmd.data)}")
+              s + (RegisterVariableWrapper(assign.lhs, getDefinition(assign.lhs, cmd.data, reachingDefs)) -> FlatEl(binaryExpr))
             } else {
               s
             }
@@ -49,7 +52,7 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
    */
   def localTransfer(n: CfgNode, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = n match {
     case cmd: CfgCommandNode =>
-      eval(cmd.data, constantProp(n), s)
+      eval(cmd, constantProp(cmd.data), s)
     case _ => s // ignore other kinds of nodes
   }
 
@@ -60,8 +63,9 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CfgNode, Map[Var
 
 class RegionAccessesAnalysisSolver(
                          cfg: ProgramCfg,
-                         constantProp: Map[CfgNode, Map[Variable, FlatElement[BitVecLiteral]]],
-                       ) extends RegionAccessesAnalysis(cfg, constantProp)
+                         constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                         reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+                       ) extends RegionAccessesAnalysis(cfg, constantProp, reachingDefs)
   with InterproceduralForwardDependencies
   with Analysis[Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]]
   with SimpleWorklistFixpointSolver[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] {

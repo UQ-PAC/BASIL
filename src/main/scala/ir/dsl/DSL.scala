@@ -3,18 +3,18 @@ import ir.*
 import scala.collection.mutable
 import scala.collection.immutable.*
 
-val R0: Register = Register("R0", BitVecType(64))
-val R1: Register = Register("R1", BitVecType(64))
-val R2: Register = Register("R2", BitVecType(64))
-val R3: Register = Register("R3", BitVecType(64))
-val R4: Register = Register("R4", BitVecType(64))
-val R5: Register = Register("R5", BitVecType(64))
-val R6: Register = Register("R6", BitVecType(64))
-val R7: Register = Register("R7", BitVecType(64))
-val R29: Register = Register("R29", BitVecType(64))
-val R30: Register = Register("R30", BitVecType(64))
-val R31: Register = Register("R31", BitVecType(64))
-val ret: EventuallyIndirectCall = EventuallyIndirectCall(Register("R30", BitVecType(64)), None)
+val R0: Register = Register("R0", 64)
+val R1: Register = Register("R1", 64)
+val R2: Register = Register("R2", 64)
+val R3: Register = Register("R3", 64)
+val R4: Register = Register("R4", 64)
+val R5: Register = Register("R5", 64)
+val R6: Register = Register("R6", 64)
+val R7: Register = Register("R7", 64)
+val R29: Register = Register("R29", 64)
+val R30: Register = Register("R30", 64)
+val R31: Register = Register("R31", 64)
+val ret: EventuallyIndirectCall = EventuallyIndirectCall(Register("R30", 64), None)
 
 
 def bv32(i: Int): BitVecLiteral = BitVecLiteral(i, 32)
@@ -116,9 +116,9 @@ def proc(label: String, blocks: EventuallyBlock*): EventuallyProcedure = {
 }
 
 
-def mem: Memory = Memory("mem", 64, 8)
+def mem: SharedMemory = SharedMemory("mem", 64, 8)
 
-def stack: Memory = Memory("stack", 64, 8)
+def stack: SharedMemory = SharedMemory("stack", 64, 8)
 
 
 def prog(procedures: EventuallyProcedure*): Program = {

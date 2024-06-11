@@ -1,6 +1,6 @@
 import analysis.{InterLiveVarsAnalysis, TwoElementTop}
 import ir.dsl.*
-import ir.{BitVecLiteral, BitVecType, ConvertToSingleProcedureReturn, dsl, LocalAssign, LocalVar, Program, Register, Statement, Variable}
+import ir.{BitVecLiteral, BitVecType, ConvertToSingleProcedureReturn, dsl, Assign, LocalVar, Program, Register, Statement, Variable}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.TestUtil
 import util.BASILResult
@@ -21,10 +21,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
 
   def differentCalleesBothLive(): Unit = {
     val constant1 = bv64(1)
-    val r0ConstantAssign = LocalAssign(R0, constant1, Some("00001"))
-    val r1ConstantAssign = LocalAssign(R1, constant1, Some("00002"))
-    val r2r0Assign = LocalAssign(R2, R0, Some("00003"))
-    val r2r1Assign = LocalAssign(R2, R1, Some("00004"))
+    val r0ConstantAssign = Assign(R0, constant1, Some("00001"))
+    val r1ConstantAssign = Assign(R1, constant1, Some("00002"))
+    val r2r0Assign = Assign(R2, R0, Some("00003"))
+    val r2r1Assign = Assign(R2, R1, Some("00004"))
 
     var program: Program = prog(
       proc("main",
@@ -58,11 +58,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
 
   def differentCalleesOneAlive(): Unit = {
     val constant1 = bv64(1)
-    val r0ConstantAssign = LocalAssign(R0, constant1, Some("00001"))
-    val r1ConstantAssign = LocalAssign(R1, constant1, Some("00002"))
-    val r2r0Assign = LocalAssign(R2, R0, Some("00003"))
-    val r2r1Assign = LocalAssign(R2, R1, Some("00004"))
-    val r1Reassign = LocalAssign(R1, BitVecLiteral(2, 64), Some("00005"))
+    val r0ConstantAssign = Assign(R0, constant1, Some("00001"))
+    val r1ConstantAssign = Assign(R1, constant1, Some("00002"))
+    val r2r0Assign = Assign(R2, R0, Some("00003"))
+    val r2r1Assign = Assign(R2, R1, Some("00004"))
+    val r1Reassign = Assign(R1, BitVecLiteral(2, 64), Some("00005"))
 
     var program: Program = prog(
       proc("main",
@@ -96,10 +96,10 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   def twoCallers(): Unit = {
 
     val constant1 = bv64(1)
-    val r0ConstantAssign = LocalAssign(R0, constant1, Some("00001"))
-    val r0Reassign = LocalAssign(R0, BitVecLiteral(2, 64), Some("00004"))
-    val r1Assign = LocalAssign(R0, R1, Some("00002"))
-    val r2Assign = LocalAssign(R0, R2, Some("00003"))
+    val r0ConstantAssign = Assign(R0, constant1, Some("00001"))
+    val r0Reassign = Assign(R0, BitVecLiteral(2, 64), Some("00004"))
+    val r1Assign = Assign(R0, R1, Some("00002"))
+    val r2Assign = Assign(R0, R2, Some("00003"))
 
     var program = prog(
       proc("main",
@@ -116,7 +116,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
       createSimpleProc("callee3", Seq(r2Assign)),
       proc("wrapper1",
         block("wrapper1_first_call",
-          LocalAssign(R1, constant1),
+          Assign(R1, constant1),
           directCall("callee", Some("wrapper1_second_call"))
         ),
         block("wrapper1_second_call",
@@ -125,7 +125,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
       ),
       proc("wrapper2",
         block("wrapper2_first_call",
-          LocalAssign(R2, constant1),
+          Assign(R2, constant1),
           directCall("callee", Some("wrapper2_second_call"))
         ),
         block("wrapper2_second_call",
@@ -151,11 +151,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
           directCall("killer", Some("aftercall"))
         ),
         block("aftercall",
-          LocalAssign(R0, R1),
+          Assign(R0, R1),
           ret
         )
       ),
-      createSimpleProc("killer", Seq(LocalAssign(R1, bv64(1))))
+      createSimpleProc("killer", Seq(Assign(R1, bv64(1))))
     )
 
     val returnUnifier = ConvertToSingleProcedureReturn()
@@ -169,8 +169,8 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   def simpleBranch(): Unit = {
-    val r1Assign = LocalAssign(R0, R1, Some("00001"))
-    val r2Assign = LocalAssign(R0, R2, Some("00002"))
+    val r1Assign = Assign(R0, R1, Some("00001"))
+    val r2Assign = Assign(R0, R2, Some("00002"))
 
     var program : Program = prog(
       proc(
@@ -211,11 +211,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
       proc("main",
         block(
           "lmain",
-          LocalAssign(R0, R1),
+          Assign(R0, R1),
           directCall("main", Some("return"))
         ),
         block("return",
-          LocalAssign(R0, R2),
+          Assign(R0, R2),
           ret
         )
       )
@@ -235,7 +235,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     var program: Program = prog(
       proc("main",
         block("lmain",
-          LocalAssign(R0, R1),
+          Assign(R0, R1),
           goto("recursion", "non-recursion")
         ),
         block(
@@ -243,7 +243,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
           directCall("main", Some("assign"))
         ),
         block("assign",
-          LocalAssign(R0, R2),
+          Assign(R0, R2),
           goto("return")
         ),
         block(
@@ -350,9 +350,9 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     // block after branch
     assert(analysisResults(blocks("l00000342")) == Map(R30 -> TwoElementTop, R31 -> TwoElementTop))
     // branch blocks
-    assert(analysisResults(blocks("lmain_goto_l00000330")) == Map(LocalVar("ZF", BitVecType(1)) -> TwoElementTop,
+    assert(analysisResults(blocks("lmain_goto_l00000330")) == Map(Register("ZF", 1) -> TwoElementTop,
       R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("lmain_goto_l00000369")) == Map(LocalVar("ZF", BitVecType(1)) -> TwoElementTop,
+    assert(analysisResults(blocks("lmain_goto_l00000369")) == Map(Register("ZF", 1) -> TwoElementTop,
       R30 -> TwoElementTop, R31 -> TwoElementTop))
   }
 }

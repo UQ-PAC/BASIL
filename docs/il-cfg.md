@@ -1,7 +1,10 @@
 CFG Iterator Implementation
 ===========================
 
-This file explains the in-place CFG representation on top of the IL.
+Point of contact: @ailrst
+
+This file explains the in-place CFG representation on top of the IL. 
+It is a design doc, not a usage guide. 
 
 Motivations
 -----------

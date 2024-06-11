@@ -32,6 +32,15 @@ class PowersetLattice[A] extends Lattice[Set[A]] {
   def lub(x: Set[A], y: Set[A]): Set[A] = x.union(y)
 }
 
+// Single element lattice (using Option)
+class SingleElementLattice[T] extends Lattice[Option[T]] {
+  val bottom: Option[T] = None
+  def lub(x: Option[T], y: Option[T]): Option[T] = (x, y) match {
+    case (None, None) => None
+    case _ => Some(x.getOrElse(y.get))
+  }
+}
+
 trait LiftedElement[+T]
 case class Lift[T](el: T) extends LiftedElement[T] {
   override def toString = s"Lift($el)"
@@ -111,6 +120,24 @@ class FlatLattice[X] extends Lattice[FlatElement[X]] {
     case (_, Top) => Top
     case _ => Top
   }
+}
+
+class TupleLattice[L1 <: Lattice[T1], L2 <: Lattice[T2], T1, T2](val lattice1: L1, val lattice2: L2) extends Lattice[(T1, T2)] {
+  override val bottom: (T1, T2) = (lattice1.bottom, lattice2.bottom)
+
+  override def lub(x: (T1, T2), y: (T1, T2)): (T1, T2) = {
+    val (x1, x2) = x
+    val (y1, y2) = y
+    (lattice1.lub(x1, y1), lattice2.lub(x2, y2))
+  }
+
+  override def leq(x: (T1, T2), y: (T1, T2)): Boolean = {
+    val (x1, x2) = x
+    val (y1, y2) = y
+    lattice1.leq(x1, y1) && lattice2.leq(x2, y2)
+  }
+
+  override def top: (T1, T2) = (lattice1.top, lattice2.top)
 }
 
 

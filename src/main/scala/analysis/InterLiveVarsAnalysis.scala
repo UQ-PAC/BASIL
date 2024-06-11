@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.BackwardIDESolver
-import ir.{Assert, Assume, GoTo, CFGPosition, Command, DirectCall, IndirectCall, LocalAssign, MemoryAssign, Procedure, Program, Variable, toShortString}
+import ir.{Assert, Assume, GoTo, CFGPosition, Command, DirectCall, IndirectCall, Assign, MemoryAssign, Procedure, Program, Variable, toShortString}
 
 /**
  * Micro-transfer-functions for LiveVar analysis
@@ -35,7 +35,7 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     n match
-      case LocalAssign(variable, expr, _) => // (s - variable) ++ expr.variables
+      case Assign(variable, expr, _) => // (s - variable) ++ expr.variables
         d match
           case Left(value) =>
             if value == variable then
@@ -47,11 +47,11 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
             (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
           }
 
-      case MemoryAssign(_, store, _) => // s ++ store.index.variables ++ store.value.variables
+      case MemoryAssign(_, index, value, _, _, _) => // s ++ store.index.variables ++ store.value.variables
         d match
           case Left(value) => Map(d -> IdEdge())
           case Right(_) =>
-            (store.index.variables ++ store.value.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
+            (index.variables ++ value.variables).foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
               (mp, storVar) => mp + (Left(storVar) -> ConstEdge(TwoElementTop))
             }
 
