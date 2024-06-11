@@ -39,9 +39,9 @@ libraryDependencies ++= Seq(
 )
 libraryDependencies += "io.spray" %% "spray-json" % "1.3.6"
 
-lazy val updateExpected = taskKey[Unit]("updates .expected for test cases")
+lazy val updateExpectedBAP = taskKey[Unit]("updates .expected for BAP test cases")
 
-updateExpected := {
+updateExpectedBAP := {
   val correctPath = baseDirectory.value / "src" / "test" / "correct"
   val incorrectPath = baseDirectory.value / "src" / "test" / "incorrect"
 
@@ -52,7 +52,7 @@ updateExpected := {
       val variations = (e * "*") filter { _.isDirectory }
       for (v <- variations.get()) {
         val name = e.getName
-        val outPath = v / (name + ".bpl")
+        val outPath = v / (name + "_bap.bpl")
         val expectedPath = v / (name + ".expected")
         val resultPath = v / (name + "_result.txt")
         if (resultPath.exists()) {

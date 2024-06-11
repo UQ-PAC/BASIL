@@ -85,21 +85,10 @@ class Interpreter() {
           case BVNOT   => smt_bvnot(arg)
         }
 
-      case m: Memory =>
-        Logger.debug(s"\t$m")
-        ???
-
       case ml: MemoryLoad =>
         Logger.debug(s"\t$ml")
         val index: Int = eval(ml.index, env).value.toInt
         getMemory(index, ml.size, ml.endian, mems)
-
-      case ms: MemoryStore =>
-        val index: Int = eval(ms.index, env).value.toInt
-        val value: BitVecLiteral = eval(ms.value, env)
-        Logger.debug(s"\tMemoryStore(mem:${ms.mem}, index:0x${index.toHexString}, value:0x${value.value
-          .toString(16)}[u${value.size}], size:${ms.size})")
-        setMemory(index, ms.size, ms.endian, value, mems)
     }
   }
 
@@ -269,7 +258,7 @@ class Interpreter() {
           break
         case ic: IndirectCall =>
           Logger.debug(s"$ic")
-          if (ic.target == Register("R30", BitVecType(64)) && ic.returnTarget.isEmpty) {
+          if (ic.target == Register("R30", 64) && ic.returnTarget.isEmpty) {
             if (returnBlock.nonEmpty) {
               nextBlock = Some(returnBlock.pop())
             } else {
@@ -286,18 +275,26 @@ class Interpreter() {
 
   private def interpretStatement(s: Statement): Unit = {
     s match {
-      case assign: LocalAssign =>
+      case assign: Assign =>
         Logger.debug(s"LocalAssign ${assign.lhs} = ${assign.rhs}")
         val evalRight = eval(assign.rhs, regs)
         Logger.debug(s"LocalAssign ${assign.lhs} := 0x${evalRight.value.toString(16)}[u${evalRight.size}]\n")
         regs += (assign.lhs -> evalRight)
 
       case assign: MemoryAssign =>
-        Logger.debug(s"MemoryAssign ${assign.lhs} = ${assign.rhs}")
-        val evalRight = eval(assign.rhs, regs)
-        evalRight match {
+        Logger.debug(s"MemoryAssign ${assign.mem}[${assign.index}] = ${assign.value}")
+
+        val index: Int = eval(assign.index, regs).value.toInt
+        val value: BitVecLiteral = eval(assign.value, regs)
+        Logger.debug(s"\tMemoryStore(mem:${assign.mem}, index:0x${index.toHexString}, value:0x${
+          value.value
+            .toString(16)
+        }[u${value.size}], size:${assign.size})")
+
+        val evalStore = setMemory(index, assign.size, assign.endian, value, mems)
+        evalStore match {
           case BitVecLiteral(value, size) =>
-            Logger.debug(s"MemoryAssign ${assign.lhs} := 0x${value.toString(16)}[u$size]\n")
+            Logger.debug(s"MemoryAssign ${assign.mem} := 0x${value.toString(16)}[u$size]\n")
         }
       case _ : NOP =>
       case assert: Assert =>
@@ -327,9 +324,9 @@ class Interpreter() {
       }
 
     // Initial SP, FP and LR to regs
-    regs += (Register("R31", BitVecType(64)) -> SP)
-    regs += (Register("R29", BitVecType(64)) -> FP)
-    regs += (Register("R30", BitVecType(64)) -> LR)
+    regs += (Register("R31", 64) -> SP)
+    regs += (Register("R29", 64) -> FP)
+    regs += (Register("R30", 64) -> LR)
 
     // Program.Procedure
     interpretProcedure(IRProgram.mainProcedure)

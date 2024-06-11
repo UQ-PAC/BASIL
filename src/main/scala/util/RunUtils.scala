@@ -60,7 +60,7 @@ case class StaticAnalysisContext(
     steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]
+    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
 )
 
 /** Results of the main program execution.
@@ -224,7 +224,7 @@ object IRTransform {
         c.data match
 
         //We do not want to insert the VSA results into the IR like this
-          case localAssign: LocalAssign =>
+          case localAssign: Assign =>
             localAssign.rhs match
               case _: MemoryLoad =>
                 if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size == 1) {
@@ -331,7 +331,7 @@ object IRTransform {
      cfg: ProgramCfg,
      pointsTos: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
      regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-     reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
+     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
      IRProgram: Program
    ): Boolean = {
     var modified: Boolean = false
@@ -404,7 +404,7 @@ object IRTransform {
         val block = c.block
         c.data match
           // don't try to resolve returns
-          case indirectCall: IndirectCall if indirectCall.target != Register("R30", BitVecType(64)) =>
+          case indirectCall: IndirectCall if indirectCall.target != Register("R30", 64) =>
             if (block.jump != indirectCall) {
               // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data
               // Hence if we have already processed this CFG node there will be no corresponding IndirectCall in the IR

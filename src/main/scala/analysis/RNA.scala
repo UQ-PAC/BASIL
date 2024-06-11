@@ -18,9 +18,9 @@ trait RNAAnalysis(program: Program) {
 
   val domain: Set[CFGPosition] = Set.empty ++ program
 
-  private val stackPointer = Register("R31", BitVecType(64))
-  private val linkRegister = Register("R30", BitVecType(64))
-  private val framePointer = Register("R29", BitVecType(64))
+  private val stackPointer = Register("R31", 64)
+  private val linkRegister = Register("R30", 64)
+  private val framePointer = Register("R29", 64)
 
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer, stackPointer)
 
@@ -34,13 +34,13 @@ trait RNAAnalysis(program: Program) {
       case assert: Assert =>
         m.union(assert.body.variables.filter(!ignoreRegions.contains(_)))
       case memoryAssign: MemoryAssign =>
-        m.union((memoryAssign.lhs.variables ++ memoryAssign.rhs.variables).filter(!ignoreRegions.contains(_)))
+        m.union(memoryAssign.index.variables.filter(!ignoreRegions.contains(_)))
       case indirectCall: IndirectCall =>
         if (ignoreRegions.contains(indirectCall.target)) return m
         m + indirectCall.target
-      case localAssign: LocalAssign =>
-        m = m - localAssign.lhs
-        m.union(localAssign.rhs.variables.filter(!ignoreRegions.contains(_)))
+      case assign: Assign =>
+        m = m - assign.lhs
+        m.union(assign.rhs.variables.filter(!ignoreRegions.contains(_)))
       case _ =>
         m
     }

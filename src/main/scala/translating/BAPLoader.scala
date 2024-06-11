@@ -67,9 +67,10 @@ object BAPLoader {
 
   def visitImmVar(ctx: ImmVarContext): BAPVar = {
     val name = parseAllowed(visitQuoteString(ctx.name))
-    if (
-      (name.startsWith("R") || name
-        .startsWith("V")) && (name.length == 2 || name.length == 3) && name.substring(1).forall(_.isDigit)
+    if (((name.startsWith("R") || name.startsWith("V"))
+      && (name.length == 2 || name.length == 3)
+      && name.substring(1).forall(_.isDigit)) ||
+      (name == "NF" || name == "ZF" || name == "CF" || name == "VF")
     ) {
       BAPRegister(name, parseInt(ctx.size))
     } else {

@@ -88,7 +88,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     function match {
       case "Mem.set.0" =>
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
-        val mem = Memory("mem", 64, 8) // yanked from BAP
+        val mem = SharedMemory("mem", 64, 8) // yanked from BAP
         val size = parseInt(typeArgs.head) * 8
         val index = visitExpr(args.head)
         val value = visitExpr(args(3))
@@ -104,8 +104,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
         // LittleEndian is an assumption
         if (index.isDefined && value.isDefined) {
-          val memstore = MemoryStore(mem, index.get, value.get, Endian.LittleEndian, size)
-          Some(MemoryAssign(mem, memstore, label))
+          Some(MemoryAssign(mem, index.get, value.get, Endian.LittleEndian, size, label))
         } else {
           None
         }
@@ -149,28 +148,28 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     varMap ++= newVars
   }
 
-  private def visitVarDecl(ctx: VarDeclContext, label: Option[String] = None): Option[LocalAssign] = {
+  private def visitVarDecl(ctx: VarDeclContext, label: Option[String] = None): Option[Assign] = {
     val ty = visitType(ctx.`type`())
     val name = visitIdent(ctx.lvar)
     varMap += (name -> ty)
 
     val expr = visitExpr(ctx.expr())
-    expr.map(LocalAssign(LocalVar(name, ty), _, label))
+    expr.map(Assign(LocalVar(name, ty), _, label))
   }
 
-  private def visitAssign(ctx: AssignContext, label: Option[String] = None): Option[LocalAssign] = {
+  private def visitAssign(ctx: AssignContext, label: Option[String] = None): Option[Assign] = {
     val lhs = visitLexpr(ctx.lexpr)
     val rhs = visitExpr(ctx.expr)
-    lhs.zip(rhs).map((lhs, rhs) => LocalAssign(lhs, rhs, label))
+    lhs.zip(rhs).map((lhs, rhs) => Assign(lhs, rhs, label))
   }
 
-  private def visitConstDecl(ctx: ConstDeclContext, label: Option[String] = None): Option[LocalAssign] = {
+  private def visitConstDecl(ctx: ConstDeclContext, label: Option[String] = None): Option[Assign] = {
     val ty = visitType(ctx.`type`())
     val name = visitIdent(ctx.lvar)
     constMap += (name -> ty)
     val expr = visitExpr(ctx.expr)
     if (expr.isDefined) {
-      Some(LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label))
+      Some(Assign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label))
     } else {
       None
     }
@@ -207,11 +206,11 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     name match {
       case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
-      case "SP_EL0" => Some(Register("R31", BitVecType(64)))
-      case "_PC" => Some(Register("_PC", BitVecType(64)))
+      case "SP_EL0" => Some(Register("R31", 64))
+      case "_PC" => Some(Register("_PC", 64))
       case "TRUE" => Some(TrueLiteral)
       case "FALSE" => Some(FalseLiteral)
-      case "FPCR" => Some(LocalVar("FPCR", BitVecType(32)))
+      case "FPCR" => Some(Register("FPCR", 32))
       // ignore the following
       case "__BranchTaken" => None
       case "BTypeNext" => None
@@ -235,7 +234,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     function match {
       case "Mem.read.0" =>
         checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
-        val mem = Memory("mem", 64, 8)
+        val mem = SharedMemory("mem", 64, 8)
         val index = visitExpr(args.head)
         val size = parseInt(typeArgs.head) * 8
 
@@ -418,7 +417,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     }
   }
 
-  private  def visitExprField(ctx: ExprFieldContext): LocalVar = {
+  private  def visitExprField(ctx: ExprFieldContext): Register = {
     val name = ctx.expr match {
       case e: ExprVarContext => visitIdent(e.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an Expr_Var as first parameter")
@@ -455,8 +454,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     name match {
       case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
       case v if varMap.contains(v) => Some(LocalVar(v, varMap(v)))
-      case "SP_EL0" => Some(Register("R31", BitVecType(64)))
-      case "_PC" => Some(Register("_PC", BitVecType(64)))
+      case "SP_EL0" => Some(Register("R31", 64))
+      case "_PC" => Some(Register("_PC", 64))
       // ignore the following
       case "TRUE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
       case "FALSE" => throw Exception(s"Boolean literal $name in LExpr ${ctx.getText}")
@@ -467,7 +466,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     }
   }
 
-  private def visitLExprField(ctx: LExprFieldContext): LocalVar = {
+  private def visitLExprField(ctx: LExprFieldContext): Register = {
     val name = ctx.lexpr match {
       case l: LExprVarContext => visitIdent(l.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an LExpr_Var as first parameter")
@@ -505,18 +504,18 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     BitVecLiteral(num, width)
   }
 
-  private def resolveFieldExpr(name: String, field: String): LocalVar = {
+  private def resolveFieldExpr(name: String, field: String): Register = {
     name match {
       case "PSTATE" if field == "V" || field == "C" || field == "Z" || field == "N" =>
-          LocalVar(field + "F", BitVecType(1))
+          Register(field + "F", 1)
       case _ => throw Exception(s"unidentified Expr_Field ($name, $field)")
     }
   }
 
   private def resolveArrayExpr(name: String, index: Int): Register = {
     name match {
-      case "_R" => Register(s"R$index", BitVecType(64))
-      case "_Z" => Register(s"V$index", BitVecType(128))
+      case "_R" => Register(s"R$index", 64)
+      case "_Z" => Register(s"V$index", 128)
       case _ => throw Exception(s"unidentified Expr_Array ($name, $index)")
     }
   }

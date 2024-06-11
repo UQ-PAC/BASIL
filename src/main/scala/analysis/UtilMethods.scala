@@ -72,7 +72,7 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
   }
 }
 
-def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[BitVecLiteral] = {
+def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[BitVecLiteral] = {
   Logger.debug(s"evaluateExpression: $exp")
 
   def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = {
@@ -143,12 +143,12 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
   }
 }
 
-def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[LocalAssign] = {
+def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
   val (in, _) = reachingDefs(node)
   in.getOrElse(variable, Set())
 }
 
-def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[LocalAssign] = {
+def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
   val (_, out) = reachingDefs(node)
   out.getOrElse(variable, Set())
 }

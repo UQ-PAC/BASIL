@@ -80,7 +80,7 @@ trait ConstantPropagation(val program: Program) {
       case r: Command =>
         r match
           // assignments
-          case la: LocalAssign =>
+          case la: Assign =>
             s + (la.lhs -> eval(la.rhs, s))
           // all others: like no-ops
           case _ => s
@@ -104,7 +104,7 @@ class ConstantPropagationSolver(program: Program) extends ConstantPropagation(pr
 
 /** Base class for value analysis with simple (non-lifted) lattice.
  */
-trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]) {
+trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) {
   /** The lattice of abstract states.
    */
 
@@ -162,14 +162,14 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
       case r: Command =>
         r match {
           // assignments
-          case la: LocalAssign =>
+          case a: Assign =>
             val lhsWrappers = s.collect {
-              case (k, v) if RegisterVariableWrapper(k.variable, k.assigns) == RegisterVariableWrapper(la.lhs, getDefinition(la.lhs, r, reachingDefs)) => (k, v)
+              case (k, v) if RegisterVariableWrapper(k.variable, k.assigns) == RegisterVariableWrapper(a.lhs, getDefinition(a.lhs, r, reachingDefs)) => (k, v)
             }
             if (lhsWrappers.nonEmpty) {
-              s ++ lhsWrappers.map((k, v) => (k, v.union(eval(la.rhs, s, r))))
+              s ++ lhsWrappers.map((k, v) => (k, v.union(eval(a.rhs, s, r))))
             } else {
-              s + (RegisterWrapperEqualSets(la.lhs, getDefinition(la.lhs, r, reachingDefs)) -> eval(la.rhs, s, n))
+              s + (RegisterWrapperEqualSets(a.lhs, getDefinition(a.lhs, r, reachingDefs)) -> eval(a.rhs, s, n))
             }
           // all others: like no-ops
           case _ => s
@@ -188,7 +188,7 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
   def transfer(n: CFGPosition, s: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]): Map[RegisterWrapperEqualSets, Set[BitVecLiteral]] = localTransfer(n, s)
 }
 
-class ConstantPropagationSolverWithSSA(program: Program, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]) extends ConstantPropagationWithSSA(program, reachingDefs)
+class ConstantPropagationSolverWithSSA(program: Program, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) extends ConstantPropagationWithSSA(program, reachingDefs)
   with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], MapLattice[RegisterWrapperEqualSets, Set[BitVecLiteral], ConstantPropagationLatticeWithSSA]]
   with IRIntraproceduralForwardDependencies
   with Analysis[Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]]]
