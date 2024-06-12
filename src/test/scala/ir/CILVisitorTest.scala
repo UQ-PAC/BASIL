@@ -1,4 +1,3 @@
-
 package ir
 
 import scala.collection.mutable
@@ -8,36 +7,56 @@ import util.intrusive_list.*
 import ir.dsl.*
 import ir.cilvisitor.*
 
+class FindVars extends CILVisitorImpl {
+  val vars = mutable.ArrayBuffer[Variable]()
+
+  override def vvar(v: Variable) = {
+    vars.append(v)
+    VisitAction.SkipChildren()
+  }
+  override def vlvar(v: Variable) = {
+    vars.append(v)
+    VisitAction.SkipChildren()
+  }
+
+  def globals = vars.collect { case g: Global =>
+    g
+  }
+}
+
+def globals(e: Expr): List[Variable] = {
+  val v = FindVars()
+  visit_expr(v, e)
+  v.globals.toList
+}
+
+def gamma_v(l: Variable) = LocalVar("Gamma_" + l.name, BoolType)
+
+def gamma_e(e: Expr): Expr = {
+  globals(e) match {
+    case Nil       => TrueLiteral
+    case hd :: Nil => hd
+    case hd :: tl  => tl.foldLeft(hd: Expr)((l, r) => BinaryExpr(BoolAND, l, gamma_v(r)))
+  }
+}
+
+class AddGammas extends CILVisitorImpl {
+
+  override def vstmt(s: Statement) = {
+    s match {
+      case a: Assign => VisitAction.ChangeTo(List(a, Assign(gamma_v(a.lhs), gamma_e(a.rhs))))
+      case _         => VisitAction.SkipChildren()
+    }
+
+  }
+}
 
 class CILVisTest extends AnyFunSuite {
 
   def getRegister(name: String) = Register(name, 64)
-  val program: Program = prog(
-    proc("main",
-      block("0x0",
-        Assign(getRegister("R6"), getRegister("R31")),
-        goto("0x1")
-      ),
-      block("0x1",
-        MemoryAssign(mem, BinaryExpr(BVADD, getRegister("R6"), bv64(4)), bv64(10), Endian.LittleEndian, 64),
-        goto("returntarget")
-      ),
-      block("returntarget",
-        ret
-      )
-    )
-  )
   test("trace prog") {
     val p = prog(
-      proc("main",
-        block("lmain",
-          goto("lmain1")
-        ),
-        block("lmain1",
-          goto("lmain2")),
-        block("lmain2",
-          ret)
-      )
+      proc("main", block("lmain", goto("lmain1")), block("lmain1", goto("lmain2")), block("lmain2", ret))
     )
 
     class BlockTrace extends CILVisitorImpl {
@@ -50,9 +69,9 @@ class CILVisTest extends AnyFunSuite {
 
       override def vjump(b: Jump) = {
         b match {
-          case g: GoTo => res.addAll(g.targets.map(t => s"gt_${t.label}").toList)
+          case g: GoTo         => res.addAll(g.targets.map(t => s"gt_${t.label}").toList)
           case r: IndirectCall => res.append("indirect")
-          case r: DirectCall => res.append("direct")
+          case r: DirectCall   => res.append("direct")
         }
         VisitAction.DoChildren()
       }
@@ -60,21 +79,31 @@ class CILVisTest extends AnyFunSuite {
 
     val v = BlockTrace()
     visit_proc(v, p.procedures.head)
-    assert(v.res.toList == List("lmain", "gt_lmain1", "lmain1", "gt_lmain2",  "lmain2", "indirect"))
+    assert(v.res.toList == List("lmain", "gt_lmain1", "lmain1", "gt_lmain2", "lmain2", "indirect"))
   }
-
-
 
   test("visit exprs") {
 
+    val program: Program = prog(
+      proc(
+        "main",
+        block("0x0", Assign(getRegister("R6"), getRegister("R31")), goto("0x1")),
+        block(
+          "0x1",
+          MemoryAssign(mem, BinaryExpr(BVADD, getRegister("R6"), bv64(4)), bv64(10), Endian.LittleEndian, 64),
+          goto("returntarget")
+        ),
+        block("returntarget", ret)
+      )
+    )
 
     class ExprTrace extends CILVisitorImpl {
       val res = mutable.ArrayBuffer[String]()
 
       override def vlvar(e: Variable) = {
         e match {
-          case Register(n, _) => res.append(n); 
-          case _ => ???
+          case Register(n, _) => res.append(n);
+          case _              => ???
         }
         VisitAction.DoChildren()
       }
@@ -82,9 +111,9 @@ class CILVisTest extends AnyFunSuite {
       override def vexpr(e: Expr) = {
         e match {
           case BinaryExpr(op, l, r) => res.append(op.toString)
-          case Register(n, _) => res.append(n.toString)
-          case n: Literal => res.append(n.toString)
-          case _ => ()
+          case Register(n, _)       => res.append(n.toString)
+          case n: Literal           => res.append(n.toString)
+          case _                    => ()
         }
         VisitAction.DoChildren()
       }
@@ -97,29 +126,40 @@ class CILVisTest extends AnyFunSuite {
 
   test("rewrite exprs") {
 
+    val program: Program = prog(
+      proc(
+        "main",
+        block("0x0", Assign(getRegister("R6"), getRegister("R31")), goto("0x1")),
+        block(
+          "0x1",
+          MemoryAssign(mem, BinaryExpr(BVADD, getRegister("R6"), bv64(4)), bv64(10), Endian.LittleEndian, 64),
+          goto("returntarget")
+        ),
+        block("returntarget", ret)
+      )
+    )
     class VarTrace extends CILVisitorImpl {
       val res = mutable.ArrayBuffer[String]()
 
-      override def vlvar(e: Variable) = {res.append(e.name); VisitAction.SkipChildren()}
-      override def vvar(e: Variable) = {res.append(e.name); VisitAction.SkipChildren()}
+      override def vlvar(e: Variable) = { res.append(e.name); VisitAction.SkipChildren() }
+      override def vvar(e: Variable) = { res.append(e.name); VisitAction.SkipChildren() }
 
     }
-
 
     class RegReplace extends CILVisitorImpl {
       val res = mutable.ArrayBuffer[String]()
 
       override def vlvar(e: Variable) = {
         e match {
-          case Register(n, sz) => VisitAction.ChangeTo(LocalVar("l" + n, e.getType)); 
-          case _ => VisitAction.DoChildren()
+          case Register(n, sz) => VisitAction.ChangeTo(LocalVar("l" + n, e.getType));
+          case _               => VisitAction.DoChildren()
         }
       }
 
       override def vexpr(e: Expr) = {
         e match {
-          case Register(n, _) => VisitAction.ChangeTo(LocalVar("l" + n, e.getType)); 
-          case _ => VisitAction.DoChildren()
+          case Register(n, _) => VisitAction.ChangeTo(LocalVar("l" + n, e.getType));
+          case _              => VisitAction.DoChildren()
         }
       }
     }
@@ -129,18 +169,24 @@ class CILVisTest extends AnyFunSuite {
 
       override def vlvar(e: Variable) = {
         e match {
-          case LocalVar(n,_) => VisitAction.ChangeDoChildrenPost(LocalVar("e" + n, e.getType), e => {res.append(e.name); e}); 
+          case LocalVar(n, _) =>
+            VisitAction.ChangeDoChildrenPost(LocalVar("e" + n, e.getType), e => { res.append(e.name); e });
           case _ => VisitAction.DoChildren()
         }
       }
 
       override def vexpr(e: Expr) = {
         e match {
-          case LocalVar(n, _) => VisitAction.ChangeDoChildrenPost(LocalVar("e" + n, e.getType), e => {
-            res.append(e match {
-            case v: Variable => v.name
-            case _ => ??? 
-            }); e}); 
+          case LocalVar(n, _) =>
+            VisitAction.ChangeDoChildrenPost(
+              LocalVar("e" + n, e.getType),
+              e => {
+                res.append(e match {
+                  case v: Variable => v.name
+                  case _           => ???
+                }); e
+              }
+            );
           case _ => VisitAction.DoChildren()
         }
       }
@@ -158,8 +204,6 @@ class CILVisTest extends AnyFunSuite {
     visit_proc(v3, program.procedures.head)
     assert(v3.res.toList == List("elR31", "elR6", "elR6"))
 
-
   }
-
 
 }
