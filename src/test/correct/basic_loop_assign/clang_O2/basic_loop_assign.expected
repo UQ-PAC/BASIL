@@ -110,9 +110,9 @@ implementation main()
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R8, 52bv64), R9[32:0]), gamma_store32(Gamma_mem, bvadd64(R8, 52bv64), Gamma_R9);
     assert (((memory_load32_le(mem, $x_addr) == x_old) || ((memory_load32_le(mem, $x_addr) == 20bv32) && (x_old == 0bv32))) || ((memory_load32_le(mem, $x_addr) == 20bv32) && bvsle32(x_old, 10bv32)));
     assume {:captureState "%000002d3"} true;
-    goto main_return;
-  main_return:
-    assume {:captureState "main_return"} true;
+    goto main_basil_return;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 

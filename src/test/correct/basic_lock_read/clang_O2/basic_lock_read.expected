@@ -119,11 +119,11 @@ implementation main()
     assert (memory_load32_le(mem, $z_addr) == z_old);
     assume {:captureState "%000002eb"} true;
     R0, Gamma_R0 := 0bv64, true;
-    goto main_return;
+    goto main_basil_return;
   l000002f7:
     assume {:captureState "l000002f7"} true;
     R0, Gamma_R0 := 0bv64, true;
-    goto main_return;
+    goto main_basil_return;
   lmain_goto_l000002dc:
     assume {:captureState "lmain_goto_l000002dc"} true;
     assume (bvcomp32(R8[32:0], 0bv32) != 0bv1);
@@ -132,8 +132,8 @@ implementation main()
     assume {:captureState "lmain_goto_l000002f7"} true;
     assume (bvcomp32(R8[32:0], 0bv32) == 0bv1);
     goto l000002f7;
-  main_return:
-    assume {:captureState "main_return"} true;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 
