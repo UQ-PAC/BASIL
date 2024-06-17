@@ -12,7 +12,6 @@ import util.Logger
   *   The evaluated expression (e.g. 0x69632)
   */
 def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[BitVecLiteral]]): Option[BitVecLiteral] = {
-  Logger.debug(s"evaluateExpression: $exp")
   exp match {
     case binOp: BinaryExpr =>
       val lhs = evaluateExpression(binOp.arg1, constantPropResult)
@@ -57,8 +56,6 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
 }
 
 def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]): Set[BitVecLiteral] = {
-  Logger.debug(s"evaluateExpression: $exp")
-
   def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
     val res = for {
       x <- a
