@@ -625,11 +625,11 @@ object StaticAnalysis {
     // reducible loops
     val detector = LoopDetector(IRProgram)
     val foundLoops = detector.identify_loops()
-    foundLoops.foreach(l => Logger.info(s"Loop found: ${l.name}"))
+    foundLoops.foreach(l => Logger.info(s"Loop found: ${l}"))
 
     val transformer = LoopTransform(foundLoops)
     val newLoops = transformer.llvm_transform()
-    newLoops.foreach(l => Logger.info(s"Loop found: ${l.name}"))
+    newLoops.foreach(l => Logger.info(s"Loop found: ${l}"))
 
     println(s"Finished Loop Transform at ${(System.nanoTime() - before)/1000000} ms")
 
@@ -646,6 +646,11 @@ object StaticAnalysis {
     println(s"Finished CFG gen at ${(System.nanoTime() - before) / 1000000} ms")
 
     val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
+
+    config.analysisDotPath.foreach { s =>
+      writeToFile(cfg.toDot(x => x.toString, Output.dotIder), s"${s}_preCFG_${iteration}.dot")
+      writeToFile(printAnalysisResults(IRProgram, Map.empty), s"${s}_preCFG_$iteration.txt")
+    }
 
     Logger.info("[!] Running ANR")
     val ANRSolver = ANRAnalysisSolver(IRProgram)
@@ -752,10 +757,22 @@ object StaticAnalysis {
       )
     })
 
-    Logger.info("[!] Running VSA")
-    val vsaSolver =
-      ValueSetAnalysisSolver(IRProgram, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
-    val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
+//    Logger.info("[!] Running VSA")
+//    val vsaSolver =
+//      ValueSetAnalysisSolver(IRProgram, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
+//    val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
+
+    val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = Map()
+
+    val actualVSA = ActualVSA(IRProgram, constPropResult, reachingDefinitionsAnalysisResults, mmm)
+    val actualVSAResults: mutable.Map[CFGPosition, actualVSA.AbsEnv] = actualVSA.IntraProceduralVSA()
+
+    config.analysisDotPath.foreach(s => {
+      writeToFile(
+        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> actualVSAResults.withDefaultValue(actualVSA.AbsEnv(mutable.Map(), mutable.Map(), mutable.Map())).get(b).toString).toMap),
+        s"${s}_ActualVSA$iteration.dot"
+      )
+    })
 
     Logger.info("[!] Running Interprocedural Live Variables Analysis")
     //val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()

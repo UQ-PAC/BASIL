@@ -201,6 +201,9 @@ class MemoryModelMap {
     }
   }
 
+  def findStackPartialAccessesOnly(value: BigInt): Option[StackRegion] = {
+    stackMap.find((range, _) => range.start < value && value <= range.end).map((range, obj) => obj)
+  }
 
   def findStackObject(value: BigInt): Option[StackRegion] = 
     stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => obj)
