@@ -321,7 +321,7 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
 
   /**
    * Insert an element before another element in the list.
-   * @param intrusiveListElement The element in the list to insert after, or None to indicate the end of the list.
+   * @param intrusiveListElement The element in the list to insert before, or None to indicate the end of the list.
    * @param newElems The elements to insert. Must not be members of any other intrusive list(s).
    * @return the last inserted element, or the reference element
    */

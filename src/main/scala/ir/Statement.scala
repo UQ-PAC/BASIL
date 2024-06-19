@@ -179,4 +179,3 @@ class IndirectCall(var target: Variable,
 
 object IndirectCall:
   def unapply(i: IndirectCall): Option[(Variable, Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
-

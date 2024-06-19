@@ -9,28 +9,27 @@ import scala.collection.mutable.ArrayBuffer
   * CIL project (https://people.eecs.berkeley.edu/~necula/cil/)
   */
 
-enum VisitAction[T]:
-  case SkipChildren()
-  case DoChildren()
-  case ChangeTo(e: T)
-  // changes to e, then visits children of e, then applies f to the result
-  case ChangeDoChildrenPost(e: T, f: T => T)
+sealed trait VisitAction[T]
+case class SkipChildren[T]() extends VisitAction[T]
+case class DoChildren[T]() extends VisitAction[T]
+case class ChangeTo[T](e: T) extends VisitAction[T]
+// changes to e, then visits children of e, then applies f to the result
+case class ChangeDoChildrenPost[T](e: T, f: T => T) extends VisitAction[T]
 
-import VisitAction._
 
 trait CILVisitorImpl:
-  def vprog(e: Program): VisitAction[Program] = VisitAction.DoChildren()
-  def vproc(e: Procedure): VisitAction[List[Procedure]] = VisitAction.DoChildren()
-  def vparams(e: ArrayBuffer[Parameter]): VisitAction[ArrayBuffer[Parameter]] = VisitAction.DoChildren()
-  def vblock(e: Block): VisitAction[Block] = VisitAction.DoChildren()
+  def vprog(e: Program): VisitAction[Program] = DoChildren()
+  def vproc(e: Procedure): VisitAction[List[Procedure]] = DoChildren()
+  def vparams(e: ArrayBuffer[Parameter]): VisitAction[ArrayBuffer[Parameter]] = DoChildren()
+  def vblock(e: Block): VisitAction[Block] = DoChildren()
 
-  def vstmt(e: Statement): VisitAction[List[Statement]] = VisitAction.DoChildren()
-  def vjump(j: Jump): VisitAction[Jump] = VisitAction.DoChildren()
-  def vfallthrough(j: Option[GoTo]): VisitAction[Option[GoTo]] = VisitAction.DoChildren()
+  def vstmt(e: Statement): VisitAction[List[Statement]] = DoChildren()
+  def vjump(j: Jump): VisitAction[Jump] = DoChildren()
+  def vfallthrough(j: Option[GoTo]): VisitAction[Option[GoTo]] = DoChildren()
 
-  def vexpr(e: Expr): VisitAction[Expr] = VisitAction.DoChildren()
-  def vvar(e: Variable): VisitAction[Variable] = VisitAction.DoChildren()
-  def vmem(e: Memory): VisitAction[Memory] = VisitAction.DoChildren()
+  def vexpr(e: Expr): VisitAction[Expr] = DoChildren()
+  def vvar(e: Variable): VisitAction[Variable] = DoChildren()
+  def vmem(e: Memory): VisitAction[Memory] = DoChildren()
 
   def enter_scope(params: ArrayBuffer[Parameter]): Unit = ()
   def leave_scope(outparam: ArrayBuffer[Parameter]): Unit = ()
@@ -38,19 +37,19 @@ trait CILVisitorImpl:
 
 def doVisitList[T](v: CILVisitorImpl, a: VisitAction[List[T]], n: T, continue: (T) => T): List[T] = {
   a match {
-    case VisitAction.SkipChildren()             => List(n)
-    case VisitAction.ChangeTo(z)                => z
-    case VisitAction.DoChildren()               => List(continue(n))
-    case VisitAction.ChangeDoChildrenPost(x, f) => f(x.map(continue(_)))
+    case SkipChildren()             => List(n)
+    case ChangeTo(z)                => z
+    case DoChildren()               => List(continue(n))
+    case ChangeDoChildrenPost(x, f) => f(x.map(continue(_)))
   }
 }
 
 def doVisit[T](v: CILVisitorImpl, a: VisitAction[T], n: T, continue: (T) => T): T = {
   a match {
-    case VisitAction.SkipChildren()             => n
-    case VisitAction.DoChildren()               => continue(n)
-    case VisitAction.ChangeTo(z)                => z
-    case VisitAction.ChangeDoChildrenPost(x, f) => f(continue(x))
+    case SkipChildren()             => n
+    case DoChildren()               => continue(n)
+    case ChangeTo(z)                => z
+    case ChangeDoChildrenPost(x, f) => f(continue(x))
   }
 }
 
