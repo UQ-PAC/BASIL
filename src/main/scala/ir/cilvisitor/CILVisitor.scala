@@ -29,77 +29,58 @@ trait CILVisitorImpl:
   def vfallthrough(j: Option[GoTo]): VisitAction[Option[GoTo]] = VisitAction.DoChildren()
 
   def vexpr(e: Expr): VisitAction[Expr] = VisitAction.DoChildren()
-  // right-expressions
   def vvar(e: Variable): VisitAction[Variable] = VisitAction.DoChildren()
   def vmem(e: Memory): VisitAction[Memory] = VisitAction.DoChildren()
-  def vload(e: MemoryLoad): VisitAction[MemoryLoad] = VisitAction.DoChildren()
-
-  // left-expressions
-  // Somewhat confusing that these do not get visited by vexpr
-  def vlvar(e: Variable): VisitAction[Variable] = VisitAction.DoChildren()
-  def vlmem(e: Memory): VisitAction[Memory] = VisitAction.DoChildren()
 
   def enter_scope(params: ArrayBuffer[Parameter]): Unit = ()
-  def leave_scope(outparam: ArrayBuffer[Parameter]) : Unit = ()
+  def leave_scope(outparam: ArrayBuffer[Parameter]): Unit = ()
 
+
+def doVisitList[T](v: CILVisitorImpl, a: VisitAction[List[T]], n: T, continue: (T) => T): List[T] = {
+  a match {
+    case VisitAction.SkipChildren()             => List(n)
+    case VisitAction.ChangeTo(z)                => z
+    case VisitAction.DoChildren()               => List(continue(n))
+    case VisitAction.ChangeDoChildrenPost(x, f) => f(x.map(continue(_)))
+  }
+}
+
+def doVisit[T](v: CILVisitorImpl, a: VisitAction[T], n: T, continue: (T) => T): T = {
+  a match {
+    case VisitAction.SkipChildren()             => n
+    case VisitAction.DoChildren()               => continue(n)
+    case VisitAction.ChangeTo(z)                => z
+    case VisitAction.ChangeDoChildrenPost(x, f) => f(continue(x))
+  }
+}
 
 class CILVisitor(val v: CILVisitorImpl) {
 
-  def doVisitList[T](v: CILVisitorImpl, a: VisitAction[List[T]], n: T, continue: (CILVisitorImpl, T) => T): List[T] = {
-    a match {
-      case VisitAction.SkipChildren()             => List(n)
-      case VisitAction.ChangeTo(z)                => z
-      case VisitAction.DoChildren()               => List(continue(v, n))
-      case VisitAction.ChangeDoChildrenPost(x, f) => f(x.map(continue(v, _)))
-    }
-  }
-
-  def doVisit[T](v: CILVisitorImpl, a: VisitAction[T], n: T, continue: (CILVisitorImpl, T) => T): T = {
-    a match {
-      case VisitAction.SkipChildren()             => n
-      case VisitAction.DoChildren()               => continue(v, n)
-      case VisitAction.ChangeTo(z)                => z
-      case VisitAction.ChangeDoChildrenPost(x, f) => f(continue(v, x))
-    }
-  }
 
   def visit_parameters(p: ArrayBuffer[Parameter]): ArrayBuffer[Parameter] = {
-    doVisit(v, v.vparams(p), p, (_, n) => n)
-  }
-
-  def visit_load(n: MemoryLoad) = {
-    def continue(v: CILVisitorImpl, l: MemoryLoad): MemoryLoad = {
-      MemoryLoad(visit_mem(l.mem), visit_expr(l.index), l.endian, l.size)
-    }
-    doVisit(v, v.vload(n), n, continue)
+    doVisit(v, v.vparams(p), p, (n) => n)
   }
 
   def visit_var(n: Variable): Variable = {
-    doVisit(v, v.vvar(n), n, (_, n) => n)
+    doVisit(v, v.vvar(n), n, (n) => n)
   }
 
-  def visit_lvar(n: Variable): Variable = {
-    doVisit(v, v.vlvar(n), n, (_, n) => n)
-  }
 
   def visit_mem(n: Memory): Memory = {
-    doVisit(v, v.vmem(n), n, (_, n) => n)
+    doVisit(v, v.vmem(n), n, (n) => n)
   }
 
-  def visit_lmem(n: Memory): Memory = {
-    doVisit(v, v.vlmem(n), n, (_, n) => n)
-  }
 
   def visit_jump(j: Jump): Jump = {
-    doVisit(v, v.vjump(j), j, (_, j) => j)
+    doVisit(v, v.vjump(j), j, (j) => j)
   }
 
   def visit_fallthrough(j: Option[GoTo]): Option[GoTo] = {
-    doVisit(v, v.vfallthrough(j), j, (_, j) => j)
+    doVisit(v, v.vfallthrough(j), j, (j) => j)
   }
 
   def visit_expr(n: Expr): Expr = {
-    def continue(v: CILVisitorImpl, n: Expr): Expr = n match {
+    def continue(n: Expr): Expr = n match {
       case n: Literal                           => n
       case MemoryLoad(mem, index, endian, size) => MemoryLoad(visit_mem(mem), visit_expr(index), endian, size)
       case Extract(end, start, arg)             => Extract(end, start, visit_expr(arg))
@@ -115,16 +96,16 @@ class CILVisitor(val v: CILVisitorImpl) {
   }
 
   def visit_stmt(s: Statement): List[Statement] = {
-    def continue(v: CILVisitorImpl, n: Statement) = n match {
+    def continue(n: Statement) = n match {
       case m: MemoryAssign => {
-        m.mem = visit_lmem(m.mem)
+        m.mem = visit_mem(m.mem)
         m.index = visit_expr(m.index)
         m.value = visit_expr(m.value)
         m
       }
       case m: Assign => {
         m.rhs = visit_expr(m.rhs)
-        m.lhs = visit_lvar(m.lhs)
+        m.lhs = visit_var(m.lhs)
         m
       }
       case s: Assert => {
@@ -141,20 +122,14 @@ class CILVisitor(val v: CILVisitorImpl) {
   }
 
   def visit_block(b: Block): Block = {
-    def continue(v: CILVisitorImpl, b: Block) = {
+    def continue(b: Block) = {
       b.statements.foreach(s => {
         val r = visit_stmt(s)
         r match {
-          case Nil      => b.statements.remove(s)
-          case n :: Nil => b.statements.replace(s, n)
-          case n :: tl => {
+          case Nil => b.statements.remove(s)
+          case n :: tl =>
             b.statements.replace(s, n)
-            var p = n
-            for (i <- tl) {
-              b.statements.insertAfter(p, i)
-              p = i
-            }
-          }
+            b.statements.insertAllAfter(Some(n), tl)
         }
       })
       b.replaceJump(visit_jump(b.jump))
@@ -166,7 +141,7 @@ class CILVisitor(val v: CILVisitorImpl) {
   }
 
   def visit_proc(p: Procedure): List[Procedure] = {
-    def continue(v: CILVisitorImpl, p: Procedure) = {
+    def continue(p: Procedure) = {
       p.in = visit_parameters(p.in)
       v.enter_scope(p.in)
       for (b <- p.blocks) {
@@ -181,7 +156,7 @@ class CILVisitor(val v: CILVisitorImpl) {
   }
 
   def visit_proc(p: Program): Program = {
-    def continue(v: CILVisitorImpl, p: Program) = {
+    def continue(p: Program) = {
       p.procedures = p.procedures.flatMap(visit_proc)
       p
     }

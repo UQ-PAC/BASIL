@@ -14,10 +14,6 @@ class FindVars extends CILVisitorImpl {
     vars.append(v)
     VisitAction.SkipChildren()
   }
-  override def vlvar(v: Variable) = {
-    vars.append(v)
-    VisitAction.SkipChildren()
-  }
 
   def globals = vars.collect { case g: Global =>
     g
@@ -83,7 +79,6 @@ class CILVisTest extends AnyFunSuite {
   }
 
   test("visit exprs") {
-
     val program: Program = prog(
       proc(
         "main",
@@ -100,10 +95,10 @@ class CILVisTest extends AnyFunSuite {
     class ExprTrace extends CILVisitorImpl {
       val res = mutable.ArrayBuffer[String]()
 
-      override def vlvar(e: Variable) = {
+      override def vvar(e: Variable) = {
         e match {
           case Register(n, _) => res.append(n);
-          case _              => ???
+          case _              => ??? // only reg in source program
         }
         VisitAction.DoChildren()
       }
@@ -111,7 +106,6 @@ class CILVisTest extends AnyFunSuite {
       override def vexpr(e: Expr) = {
         e match {
           case BinaryExpr(op, l, r) => res.append(op.toString)
-          case Register(n, _)       => res.append(n.toString)
           case n: Literal           => res.append(n.toString)
           case _                    => ()
         }
@@ -141,7 +135,6 @@ class CILVisTest extends AnyFunSuite {
     class VarTrace extends CILVisitorImpl {
       val res = mutable.ArrayBuffer[String]()
 
-      override def vlvar(e: Variable) = { res.append(e.name); VisitAction.SkipChildren() }
       override def vvar(e: Variable) = { res.append(e.name); VisitAction.SkipChildren() }
 
     }
@@ -149,25 +142,19 @@ class CILVisTest extends AnyFunSuite {
     class RegReplace extends CILVisitorImpl {
       val res = mutable.ArrayBuffer[String]()
 
-      override def vlvar(e: Variable) = {
+      override def vvar(e: Variable) = {
         e match {
           case Register(n, sz) => VisitAction.ChangeTo(LocalVar("l" + n, e.getType));
           case _               => VisitAction.DoChildren()
         }
       }
 
-      override def vexpr(e: Expr) = {
-        e match {
-          case Register(n, _) => VisitAction.ChangeTo(LocalVar("l" + n, e.getType));
-          case _              => VisitAction.DoChildren()
-        }
-      }
     }
 
     class RegReplacePost extends CILVisitorImpl {
       val res = mutable.ArrayBuffer[String]()
 
-      override def vlvar(e: Variable) = {
+      override def vvar(e: Variable) = {
         e match {
           case LocalVar(n, _) =>
             VisitAction.ChangeDoChildrenPost(LocalVar("e" + n, e.getType), e => { res.append(e.name); e });
@@ -175,21 +162,6 @@ class CILVisTest extends AnyFunSuite {
         }
       }
 
-      override def vexpr(e: Expr) = {
-        e match {
-          case LocalVar(n, _) =>
-            VisitAction.ChangeDoChildrenPost(
-              LocalVar("e" + n, e.getType),
-              e => {
-                res.append(e match {
-                  case v: Variable => v.name
-                  case _           => ???
-                }); e
-              }
-            );
-          case _ => VisitAction.DoChildren()
-        }
-      }
     }
 
     val v = VarTrace()
