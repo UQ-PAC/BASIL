@@ -201,8 +201,74 @@ class MemoryModelMap {
     }
   }
 
-  def findStackPartialAccessesOnly(value: BigInt): Option[StackRegion] = {
-    stackMap.find((range, _) => range.start < value && value <= range.end).map((range, obj) => obj)
+  /* All regions that either:
+   * 1. starts at value but size less than region size
+   * 2. starts at value but size more than region size (add both regions ie. next region)
+   * 3. starts between regions (start, end) and (value + size) => end
+   * 4. starts between regions (start, end) and (value + size) < end (add both regions ie. next region)
+   */
+  def findStackPartialAccessesOnly(value: BigInt, size: BigInt): Set[StackRegion] = {
+    val matchingRegions = scala.collection.mutable.Set[StackRegion]()
+
+    stackMap.foreach { case (range, region) =>
+      // Condition 1: Starts at value but size less than region size
+      if (range.start == value && range.size > size) {
+        matchingRegions += region
+      }
+      // Condition 2: Starts at value but size more than region size (add subsequent regions)
+      else if (range.start == value && range.size < size) {
+        matchingRegions += region
+        var remainingSize = size - range.size
+        var nextStart = range.end
+        stackMap.toSeq.sortBy(_._1.start).dropWhile(_._1.start <= range.start).foreach { case (nextRange, nextRegion) =>
+          if (remainingSize > 0) {
+            matchingRegions += nextRegion
+            remainingSize -= nextRange.size
+            nextStart = nextRange.end
+          }
+        }
+      }
+      // Condition 3: Starts between regions (start, end) and (value + size) => end
+      else if (range.start < value && (value + size) <= range.end) {
+        matchingRegions += region
+      }
+      // Condition 4: Starts between regions (start, end) and (value + size) < end (add subsequent regions)
+      else if (range.start < value && (value + size) > range.end) {
+        matchingRegions += region
+        var remainingSize = (value + size) - range.end
+        var nextStart = range.end
+        stackMap.toSeq.sortBy(_._1.start).dropWhile(_._1.start <= range.start).foreach { case (nextRange, nextRegion) =>
+          if (remainingSize > 0) {
+            matchingRegions += nextRegion
+            remainingSize -= nextRange.size
+            nextStart = nextRange.end
+          }
+        }
+      }
+    }
+
+    matchingRegions.toSet
+  }
+
+  def getAllStackRegions: Set[StackRegion] = {
+    localStacks.values.toSet.flatten
+  }
+  
+  def getAllDataRegions: Set[DataRegion] = {
+    dataMap.values.toSet
+  }
+  
+  def getAllHeapRegions: Set[HeapRegion] = {
+      heapMap.values.toSet
+  }
+  
+  def getAllRegions: Set[MemoryRegion] = {
+    (getAllStackRegions ++ getAllDataRegions ++ getAllHeapRegions)
+  }
+
+  /* All regions that start at value and are exactly of length size */
+  def findStackFullAccessesOnly(value: BigInt, size: BigInt): Option[StackRegion] = {
+    stackMap.find((range, _) => range.start == value && range.size == size).map((range, obj) => obj)
   }
 
   def findStackObject(value: BigInt): Option[StackRegion] = 

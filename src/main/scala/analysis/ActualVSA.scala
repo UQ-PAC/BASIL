@@ -24,6 +24,15 @@ class ActualVSA(program: Program,
     case Maybe
   }
 
+  /**
+   * SI class that represents a strided interval
+   * s is the stride
+   * l is the lower bound
+   * u is the upper bound
+   * [l, u] is the interval
+   * [l, u] \ s is the set of values
+   * 0[l,l] represents the singleton set {l}
+   */
   case class StridedInterval(s: BitVecLiteral, lb: BitVecLiteral, ub: BitVecLiteral) {
     require(smt_bvule(lb, ub) == TrueLiteral, "Lower bound must be less than or equal to upper bound")
 
@@ -55,6 +64,14 @@ class ActualVSA(program: Program,
       val ubAnd = smt_bvand(this.ub, that.ub)
       StridedInterval(gcd(this.s, that.s), lbAnd, ubAnd)
     }
+    
+    // Intersection of two strided intervals
+    def intersect(that: StridedInterval): Option[StridedInterval] = {
+      val newLb = smt_max(this.lb, that.lb)
+      val newUb = smt_min(this.ub, that.ub)
+      val newS = smt_gcd(this.s, that.s)
+      if (smt_bvule(newLb, newUb) == TrueLiteral) Some(StridedInterval(newS, newLb, newUb)) else None
+    }
 
     // join of two or more strided intervals
     def join(that: StridedInterval): StridedInterval = {
@@ -70,15 +87,9 @@ class ActualVSA(program: Program,
     }
   }
 
-
   /**
-   * ValueSet class that represents a set of values.
-   * s is the stride
-   * l is the lower bound
-   * u is the upper bound
-   * [l, u] is the interval
-   * [l, u] \ s is the set of values
-   * 0[l,l] represents the singleton set {l}
+   * A single value set is a map from regions to strided intervals
+   * @param intervals
    */
   case class ValueSet(intervals: Set[StridedInterval]) {
 
@@ -96,17 +107,9 @@ class ActualVSA(program: Program,
       val newIntervals = for {
         a <- this.intervals
         b <- that.intervals
-        inter = intersectIntervals(a, b) if inter.isDefined
+        inter = a.intersect(b) if inter.isDefined
       } yield inter.get
       ValueSet(newIntervals)
-    }
-
-    // Intersection of two strided intervals
-    private def intersectIntervals(a: StridedInterval, b: StridedInterval): Option[StridedInterval] = {
-      val newLb = smt_max(a.lb, b.lb)
-      val newUb = smt_min(a.ub, b.ub)
-      val newS = smt_gcd(a.s, b.s)
-      if (smt_bvule(newLb, newUb) == TrueLiteral) Some(StridedInterval(newS, newLb, newUb)) else None
     }
 
     // Addition of value sets
@@ -130,15 +133,19 @@ class ActualVSA(program: Program,
   // top element of the lattice
   private object ValueSetLattice {
       val TOP: ValueSet = ValueSet(Set(StridedInterval(BitVecLiteral(BigInt(1), 64), BitVecLiteral(BigInt(0), 64), BitVecLiteral(BigInt(Long.MaxValue), 64))))
-      val BOTTOM: ValueSet = ValueSet(Set())
+      val BOTTOM: ValueSet = ValueSet(mmm.getAllRegions.map(r => Set())) // TODO: should be all regions mapped to empty set
   }
 
 
-  case class AlocEnv(R: MemoryRegion)
+  case class AlocEnv(allocs: Set[MemoryRegion]) {
+    def join(that: AlocEnv): AlocEnv = {
+      AlocEnv(this.allocs ++ that.allocs)
+    }
+  }
   //private type AbsEnv = mutable.Map[Variable | MemoryRegion, ValueSet] | mutable.Map[MemoryRegion, AlocEnv] | mutable.Map[Flag, Bool3]
   //private type AbsEnv = mutable.Map[Variable | MemoryRegion | Flag, ValueSet | AlocEnv | Bool3]
   case class AbsEnv(
-                     env1: mutable.Map[Variable | MemoryRegion, ValueSet],
+                     env1: mutable.Map[Variable, ValueSet],
                      env2: mutable.Map[MemoryRegion, AlocEnv],
                      env3: mutable.Map[Flag, Bool3]
                    ):
@@ -161,14 +168,13 @@ class ActualVSA(program: Program,
    * @param s
    * @return
    */
-  private def dereference(vsR2: ValueSet, s: Int): (Set[MemoryRegion], Set[MemoryRegion]) = {
-    // TODO: size of dereference s is ignored (maybe it can be used to check overflows?)
+  private def dereference(vsR2: ValueSet, s: BigInt): (Set[MemoryRegion], Set[MemoryRegion]) = {
     // TODO: Global memory size can be retrieved from the symbol table and are of size s
     // Map addresses to exact memory locations
-    val fullyAccessedLocations = vsR2.gamma.flatMap(address => mmm.findStackObject(address.value))
+    val fullyAccessedLocations = vsR2.gamma.flatMap(address => mmm.findStackFullAccessesOnly(address.value, s))
 
     // Identify partially accessed locations (if any)
-    val partiallyAccessedLocations = vsR2.gamma.flatMap(address => mmm.findStackPartialAccessesOnly(address.value))
+    val partiallyAccessedLocations = vsR2.gamma.flatMap(address => mmm.findStackPartialAccessesOnly(address.value, s))
 
     // Return the set of fully accessed locations and the set of partially accessed locations
     (fullyAccessedLocations.diff(partiallyAccessedLocations).asInstanceOf[Set[MemoryRegion]], partiallyAccessedLocations.asInstanceOf[Set[MemoryRegion]])
@@ -228,22 +234,24 @@ class ActualVSA(program: Program,
                             val R2 = binOp.arg1.asInstanceOf[Variable] // TODO: Is R2 always a variable?
                             val out = in
                             getDefinition(binOp.arg2.asInstanceOf[Variable], instruction, reachingDefs).foreach {
-                              case d: LocalAssign =>
+                              d =>
                                 d.rhs match
                                   case binOp2: BinaryExpr =>
                                     val c1 = evaluateExpression(binOp2.arg1, constantPropResult(instruction))
                                     val c2 = evaluateExpression(binOp2.arg2, constantPropResult(instruction))
                                     // R1 = *(R2 + c1) + c2
                                     val vs_R2: ValueSet = in.env1(R2)
-                                    val s = c2.get.size // TODO: s is the size of dereference performed by the instruction (I assume it is the same size as c2)
-                                    val (f: Set[MemoryRegion], p: Set[MemoryRegion]) = dereference(vs_R2 + c1.get, s)
+                                    val s = memoryLoad.size // s is the size of dereference performed by the instruction
+                                    val (f: Set[MemoryRegion], p: Set[MemoryRegion]) = dereference(vs_R2 + c1.get, BigInt(s))
+                                    println("VSA")
+                                    println(f)
                                     if (p.isEmpty) {
                                       val vs_rhs = f.map(in.env1(_)).reduce(joinValueSets)
                                       out.env1(R1) = vs_rhs + c2.get
                                     } else {
                                       out.env1(R1) = ValueSetLattice.TOP
                                     }
-                              case _ => out
+                                  case _ =>
                             }
                             out
                         } else {
@@ -282,12 +290,29 @@ class ActualVSA(program: Program,
   def IntraProceduralVSA(): mutable.Map[CFGPosition, AbsEnv] = {
     val worklist = new mutable.Queue[CFGPosition]()
     worklist.enqueue(program.mainProcedure)
-    val absEnv_enter = AbsEnv(mutable.Map().withDefault(_ => ValueSetLattice.BOTTOM), mutable.Map(), mutable.Map())
+    val allStackRegions: Set[StackRegion] = mmm.getAllStackRegions()
+    val allDataRegions: Set[DataRegion] = mmm.getAllDataRegions()
+    val allHeapRegions: Set[HeapRegion] = mmm.getAllHeapRegions()
+
+    val allocatedStackRegions = AlocEnv(allStackRegions)
+    val allocatedDataRegions = AlocEnv(allDataRegions)
+    val allocatedHeapRegions = AlocEnv(allHeapRegions)
+
+    val stackManyToOne = allStackRegions.map(r => r -> allocatedStackRegions).toMap
+    val dataManyToOne = allDataRegions.map(r => r -> allocatedDataRegions).toMap
+    val heapManyToOne = allHeapRegions.map(r => r -> allocatedHeapRegions).toMap
+
+    val combinedMap = stackManyToOne ++ dataManyToOne ++ heapManyToOne
+    val flagsToMaybe = Flag.values.map(f => f -> Bool3.Maybe).toMap
+
+    val absEnv_enter = AbsEnv(mutable.Map().withDefault(_ => ValueSetLattice.BOTTOM), mutable.Map() ++ combinedMap, mutable.Map() ++ flagsToMaybe)
     val abstractStates = mutable.Map[CFGPosition, AbsEnv](worklist.head -> absEnv_enter)
     while(worklist.nonEmpty) {
       val n: CFGPosition = worklist.dequeue()
       val m = IntraProcIRCursor.succ(n)
       for (succ <- m) {
+        mmm.popContext()
+        mmm.pushContext(IRWalk.procedure(n).name)
         val edge_amc = AbstractTransformer(abstractStates(n), succ)
         Propagate(succ, edge_amc)
       }
