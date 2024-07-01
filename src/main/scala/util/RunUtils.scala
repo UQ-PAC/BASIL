@@ -565,6 +565,7 @@ object StaticAnalysis {
       config: StaticAnalysisConfig,
       iteration: Int
   ): StaticAnalysisContext = {
+    val before = System.nanoTime()
     val IRProgram: Program = ctx.program
     val externalFunctions: Set[ExternalFunction] = ctx.externalFunctions
     val globals: Set[SpecGlobal] = ctx.globals
@@ -585,7 +586,6 @@ object StaticAnalysis {
     Logger.info("Subroutine Addresses:")
     Logger.info(subroutines)
 
-
     // reducible loops
     val detector = LoopDetector(IRProgram)
     val foundLoops = detector.identify_loops()
@@ -594,6 +594,7 @@ object StaticAnalysis {
     val transformer = LoopTransform(foundLoops)
     val newLoops = transformer.llvm_transform()
     newLoops.foreach(l => Logger.info(s"Loop found: ${l.name}"))
+
 
     config.analysisDotPath.foreach { s =>
       val newCFG = ProgramCfgFactory().fromIR(IRProgram)
@@ -605,22 +606,28 @@ object StaticAnalysis {
 
     val cfg = ProgramCfgFactory().fromIR(IRProgram)
 
+
     val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
 
     Logger.info("[!] Running ANR")
     val ANRSolver = ANRAnalysisSolver(IRProgram)
     val ANRResult = ANRSolver.analyze()
 
+
     Logger.info("[!] Running RNA")
     val RNASolver = RNAAnalysisSolver(IRProgram)
     val RNAResult = RNASolver.analyze()
+
 
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationSolver(IRProgram)
     val constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = constPropSolver.analyze()
 
+
+    Logger.info("[!] Running IR Simple Value Analysis")
     val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
     val newCPResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = ilcpsolver.analyze()
+
 
     config.analysisResultsPath.foreach(s =>
       writeToFile(printAnalysisResults(IRProgram, newCPResult), s"${s}_new_ir_constprop$iteration.txt")
@@ -631,8 +638,10 @@ object StaticAnalysis {
       writeToFile(toDot(dumpdomain, InterProcIRCursor, Map.empty), s"${f}_new_ir_intercfg$iteration.dot")
     })
 
+    Logger.info("[!] Running Reaching Definitions Analysis")
     val reachingDefinitionsAnalysisSolver = ReachingDefinitionsAnalysisSolver(IRProgram)
     val reachingDefinitionsAnalysisResults = reachingDefinitionsAnalysisSolver.analyze()
+
 
     config.analysisDotPath.foreach(s => {
       writeToFile(
@@ -646,6 +655,7 @@ object StaticAnalysis {
     val regionAccessesAnalysisSolver = RegionAccessesAnalysisSolver(cfg, constPropResult, reachingDefinitionsAnalysisResults)
     val regionAccessesAnalysisResults = regionAccessesAnalysisSolver.analyze()
 
+
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(regionAccessesAnalysisResults, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, regionAccessesAnalysisResults, iteration), s"${s}_RegTo$iteration.txt"))
 
@@ -653,9 +663,23 @@ object StaticAnalysis {
     val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(IRProgram, reachingDefinitionsAnalysisResults)
     val constPropResultWithSSA = constPropSolverWithSSA.analyze()
 
+
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults)
     val mraResult = mraSolver.analyze()
+
+    Logger.info("[!] Running MMM")
+    val mmm = MemoryModelMap()
+    mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, mraSolver.procedureToSharedRegions)
+    mmm.logRegions()
+    
+
+    Logger.info("[!] Running Steensgaard")
+    val steensgaardSolver = InterprocSteensgaardAnalysis(IRProgram, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
+    steensgaardSolver.analyze()
+    val steensgaardResults = steensgaardSolver.pointsTo()
+    val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
+    mmm.logRegions(memoryRegionContents)
 
     config.analysisDotPath.foreach(s => {
       writeToFile(dotCallGraph(IRProgram), s"${s}_callgraph$iteration.dot")
@@ -674,18 +698,6 @@ object StaticAnalysis {
         s"${s}_MRA$iteration.dot"
       )
     })
-
-    Logger.info("[!] Running MMM")
-    val mmm = MemoryModelMap()
-    mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, mraSolver.procedureToSharedRegions)
-    mmm.logRegions()
-
-    Logger.info("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(IRProgram, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
-    steensgaardSolver.analyze()
-    val steensgaardResults = steensgaardSolver.pointsTo()
-    val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
-    mmm.logRegions(memoryRegionContents)
 
     Logger.info("[!] Running VSA")
     val vsaSolver =
@@ -716,7 +728,6 @@ object StaticAnalysis {
       locals = None,
       bus = None,
       tds = None,
-      reachingDefs = reachingDefinitionsAnalysisResults
     )
   }
 

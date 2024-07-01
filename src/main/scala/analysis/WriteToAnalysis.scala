@@ -1,22 +1,22 @@
 package analysis
 
-import ir.{Assert, Assume, BitVecType, Call, DirectCall, GoTo, LocalAssign, MemoryAssign, NOP, Procedure, Program, Register}
+import ir.{Assert, Assume, BitVecType, Call, DirectCall, GoTo, Assign, MemoryAssign, NOP, Procedure, Program, Register}
 
 import scala.collection.mutable
 
 class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[Register]]] {
 
   val writesTo: mutable.Map[Procedure, Set[Register]] = mutable.Map()
-  val mallocRegister = Register("R0", BitVecType(64))
+  val mallocRegister = Register("R0", 64)
   val paramRegisters: Set[Register] = Set(
     mallocRegister,
-    Register("R1", BitVecType(64)),
-    Register("R2", BitVecType(64)),
-    Register("R3", BitVecType(64)),
-    Register("R4", BitVecType(64)),
-    Register("R5", BitVecType(64)),
-    Register("R6", BitVecType(64)),
-    Register("R7", BitVecType(64)),
+    Register("R1", 64),
+    Register("R2", 64),
+    Register("R3", 64),
+    Register("R4", 64),
+    Register("R5", 64),
+    Register("R6", 64),
+    Register("R7", 64),
   )
 
   def getWritesTos(proc: Procedure): Set[Register] = {
@@ -27,7 +27,7 @@ class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[Regi
       proc.blocks.foreach(
         block =>
           block.statements.foreach {
-            case LocalAssign(variable: Register, value, label) if paramRegisters.contains(variable) =>
+            case Assign(variable: Register, value, label) if paramRegisters.contains(variable) =>
               writtenTo.add(variable)
             case _ =>
           }

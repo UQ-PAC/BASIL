@@ -1,17 +1,17 @@
 package analysis
 
 import analysis.solvers.SimplePushDownWorklistFixpointSolver
-import ir.{Assert, Assume, BitVecType, CFGPosition, Call, DirectCall, Expr, GoTo, IndirectCall, InterProcIRCursor, IntraProcIRCursor, LocalAssign, MemoryAssign, NOP, Procedure, Program, Register, Variable, computeDomain}
+import ir.{Assert, Assume, BitVecType, CFGPosition, Call, DirectCall, Expr, GoTo, IndirectCall, InterProcIRCursor, IntraProcIRCursor, Assign, MemoryAssign, NOP, Procedure, Program, Register, Variable, computeDomain}
 
 abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Register]]) extends Analysis[Map[CFGPosition, Map[Variable, Set[CFGPosition]]]] {
 
-  val mallocRegister = Register("R0", BitVecType(64))
+  val mallocRegister = Register("R0", 64)
   val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, program.procedures).toSet
   val lattice: MapLattice[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]] = new MapLattice(new MapLattice(new PowersetLattice[CFGPosition]()))
 
   def transfer(n: CFGPosition, s: Map[Variable, Set[CFGPosition]]): Map[Variable, Set[CFGPosition]] =
     n match
-      case loc:LocalAssign =>
+      case loc:Assign =>
         s + (loc.lhs -> Set(n))
       case DirectCall(proc, target, label) if proc.name == "malloc" =>
         s + (mallocRegister -> Set(n))

@@ -2,42 +2,48 @@ package analysis
 
 import analysis.solvers.ForwardIDESolver
 import ir.IRWalk.procedure
-import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, GoTo, IndirectCall, Literal, LocalAssign, Memory, MemoryLoad, MemoryStore, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend}
+import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, GoTo, IndirectCall, Literal, Assign, Memory, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend}
 
 import java.math.BigInteger
 
-case class SymbolicAccess(accessor: Variable, symbolicBase: MemoryRegion2, offset: BigInt) {
+case class SymbolicAccess(accessor: Variable, symbolicBase: MemoryLocation, offset: BigInt) {
   override def toString: String = s"SymbolicAccess($accessor, $symbolicBase, $offset)"
 }
 
-trait MemoryRegion2 {
+trait MemoryLocation {
   val regionIdentifier: String
 
   override def toString: String = s"MemoryRegion($regionIdentifier)"
 }
 
-case class StackRegion2(override val regionIdentifier: String, proc: Procedure, size: BigInt) extends MemoryRegion2 {
+case class StackLocation(override val regionIdentifier: String, proc: Procedure, size: BigInt) extends MemoryLocation {
   override def toString: String = s"Stack($regionIdentifier,  $size)"
 }
 
-case class HeapRegion2(override val regionIdentifier: String, proc: Procedure, size: BigInt) extends MemoryRegion2 {
+case class HeapLocation(override val regionIdentifier: String, proc: Procedure, size: BigInt) extends MemoryLocation {
   override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 
-case class DataRegion2(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryRegion2 {
+case class DataLocation(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryLocation {
   override def toString: String = s"Data($regionIdentifier, $start, $size)"
 }
 
-case class UnknownRegion2(override val regionIdentifier: String, proc: Procedure) extends MemoryRegion2 {
+case class UnkownLocation(override val regionIdentifier: String, proc: Procedure) extends MemoryLocation {
   override def toString: String = s"Unknown($regionIdentifier)"
 }
 
+/**
+ * environment transformers for SAA or symbolic access analysis
+ * Combination of reaching definitions and constant propagation
+ * elements in D are symbolic accesses of the form (variable, symbolic base, concrete offset)
+ * lattice L is a binary lattice with top and bottom
+ */
 trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends ForwardIDEAnalysis[SymbolicAccess, TwoElement, TwoElementLattice] {
 
-  private val stackPointer = Register("R31", BitVecType(64))
-  private val linkRegister = Register("R30", BitVecType(64))
-  private val framePointer = Register("R29", BitVecType(64))
-  private val mallocVariable = Register("R0", BitVecType(64))
+  private val stackPointer = Register("R31", 64)
+  private val linkRegister = Register("R30", 64)
+  private val framePointer = Register("R29", 64)
+  private val mallocVariable = Register("R0", 64)
 
   var mallocCount: Int = 0
   private def nextMallocCount = {
@@ -60,7 +66,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
     d match
       case Left(value) =>
         value.symbolicBase match
-          case StackRegion2(regionIdentifier, parent, size) => Map()
+          case StackLocation(regionIdentifier, parent, size) => Map()
           case _ => Map(d -> IdEdge())
       case Right(_) => Map(d -> IdEdge())
 
@@ -68,7 +74,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
     d match
       case Left(value) =>
         value.symbolicBase match
-          case StackRegion2(regionIdentifier, parent, size) => Map()
+          case StackLocation(regionIdentifier, parent, size) => Map()
           case _ =>
             if value.accessor.name == "R29" then
               Map()
@@ -79,13 +85,13 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
     d match
       case Left(value) =>
         value.symbolicBase match
-          case StackRegion2(regionIdentifier, parent, size) => Map(d -> IdEdge())
+          case StackLocation(regionIdentifier, parent, size) => Map(d -> IdEdge())
           case _ => Map() // maps all variables before the call to bottom
       case Right(_) => Map(d -> IdEdge())
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
     n match
-      case LocalAssign(variable, rhs, maybeString: Option[String]) =>
+      case Assign(variable, rhs, maybeString: Option[String]) =>
         val expr = unwrapPaddingAndSlicing(rhs)
         expr match
           case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) && arg1.equals(stackPointer)
@@ -95,7 +101,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
               case Left(value) => Map(d -> IdEdge())
               case Right(_) =>
                 val size = twosComplementToDec(decToBinary(evaluateExpression(arg2, constProp(n)).get.value))
-                Map(d -> IdEdge(), Left(SymbolicAccess(variable, StackRegion2(s"Stack_${procedure(n).name}", procedure(n), -size), 0)) -> ConstEdge(TwoElementTop))
+                Map(d -> IdEdge(), Left(SymbolicAccess(variable, StackLocation(s"Stack_${procedure(n).name}", procedure(n), -size), 0)) -> ConstEdge(TwoElementTop))
           case BinaryExpr(op, arg1: Variable, arg2) if evaluateExpression(arg2, constProp(n)).isDefined =>
             d match
               case Left(value) if value.accessor == arg1 =>
@@ -121,7 +127,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
             d match
               case Left(value) if value.accessor == variable => Map()
               case Left(value) => Map(d -> IdEdge())
-              case Right(_) => Map(d -> IdEdge(), Left(SymbolicAccess(variable, UnknownRegion2(nextunknownCount, procedure(n)), 0)) -> ConstEdge(TwoElementTop))
+              case Right(_) => Map(d -> IdEdge(), Left(SymbolicAccess(variable, UnkownLocation(nextunknownCount, procedure(n)), 0)) -> ConstEdge(TwoElementTop))
           case _ =>
             d match
               case Left(value) if value.accessor == variable => Map()
@@ -134,7 +140,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
             val size: BigInt = evaluateExpression(mallocVariable, constProp(n)) match
               case Some(value) => value.value
               case None => -1
-            Map(d -> IdEdge(), Left(SymbolicAccess(mallocVariable, HeapRegion2(nextMallocCount, procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
+            Map(d -> IdEdge(), Left(SymbolicAccess(mallocVariable, HeapLocation(nextMallocCount, procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
       case _ => Map(d -> IdEdge())
 }
 

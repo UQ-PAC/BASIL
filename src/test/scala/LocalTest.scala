@@ -1,6 +1,6 @@
-import analysis.{DSC, DSG, DSN, DataRegion2, HeapRegion2}
+import analysis.{DSC, DSG, DSN, DataLocation, HeapLocation}
 import ir.Endian.BigEndian
-import ir.{BVADD, BinaryExpr, BitVecLiteral, ConvertToSingleProcedureReturn, DirectCall, LocalAssign, Memory, MemoryAssign, MemoryLoad, MemoryStore}
+import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, ConvertToSingleProcedureReturn, DirectCall, Memory, MemoryAssign, MemoryLoad, SharedMemory}
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.TestUtil
 import ir.dsl.*
@@ -41,69 +41,6 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(dsg.pointTo(stack40).equals(dsg.getPointee(dsg.getPointee(dsg.globalMapping((69600, 69600))._1.cells(0))._1)))
 
   }
-
-//  test("local jumptable2_clang add_two") {
-//    val results = RunUtils.loadAndTranslate(
-//      BASILConfig(
-//        loading = ILLoadingConfig(
-//          inputFile = "examples/jumptable2/jumptable2_clang.adt",
-//          relfFile = "examples/jumptable2/jumptable2_clang.relf",
-//          specFile = None,
-//          dumpIL = None,
-//        ),
-//        staticAnalysis = Some(StaticAnalysisConfig()),
-//        boogieTranslation = BoogieGeneratorConfig(),
-//        outputPrefix = "boogie_out",
-//      )
-//    )
-//    val program = results.ir.program
-//    val dsg = results.analysis.get.locals.get(program.procs("add_two"))
-//    assert(dsg.pointTo.size == 7)
-//    assert(dsg.stackMapping.isEmpty)
-//    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
-//  }
-//
-//  test("local jumptable2_clang add_six") {
-//    val results = RunUtils.loadAndTranslate(
-//      BASILConfig(
-//        loading = ILLoadingConfig(
-//          inputFile = "examples/jumptable2/jumptable2_clang.adt",
-//          relfFile = "examples/jumptable2/jumptable2_clang.relf",
-//          specFile = None,
-//          dumpIL = None,
-//        ),
-//        staticAnalysis = Some(StaticAnalysisConfig()),
-//        boogieTranslation = BoogieGeneratorConfig(),
-//        outputPrefix = "boogie_out",
-//      )
-//    )
-//    val program = results.ir.program
-//    val dsg = results.analysis.get.locals.get(program.procs("add_six"))
-//    assert(dsg.pointTo.size == 7)
-//    assert(dsg.stackMapping.isEmpty)
-//    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
-//  }
-//
-//  test("local jumptable2_clang sub_seven") {
-//    val results = RunUtils.loadAndTranslate(
-//      BASILConfig(
-//        loading = ILLoadingConfig(
-//          inputFile = "examples/jumptable2/jumptable2_clang.adt",
-//          relfFile = "examples/jumptable2/jumptable2_clang.relf",
-//          specFile = None,
-//          dumpIL = None,
-//        ),
-//        staticAnalysis = Some(StaticAnalysisConfig()),
-//        boogieTranslation = BoogieGeneratorConfig(),
-//        outputPrefix = "boogie_out",
-//      )
-//    )
-//    val program = results.ir.program
-//    val dsg = results.analysis.get.locals.get(program.procs("sub_seven"))
-//    assert(dsg.pointTo.size == 7)
-//    assert(dsg.stackMapping.isEmpty)
-//    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
-//  }
 
   test("local jumptable2 sub_seven") {
     val results = RunUtils.loadAndTranslate(
@@ -246,10 +183,6 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
 
 
-
-    //    assert(dsg.pointTo.size == 7)
-    //    assert(dsg.stackMapping.isEmpty)
-    //    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
   }
 
 
@@ -270,7 +203,6 @@ class LocalTest extends AnyFunSuite, TestUtil {
     )
     val program = results.ir.program
     val dsg = results.analysis.get.locals.get(program.mainProcedure)
-    print("")
 //    assert(dsg.pointTo.size == 7)
 //    assert(dsg.stackMapping.isEmpty)
 //    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
@@ -313,9 +245,9 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(dsg.pointTo(stack24).equals(dsg.pointTo(stack32)))
     assert(dsg.pointTo(stack24)._2 == 0)
     assert(dsg.pointTo(stack24)._1.node.get.allocationRegions.size == 1)
-    assert(dsg.pointTo(stack24)._1.node.get.allocationRegions.head.asInstanceOf[HeapRegion2].size == 20)
+    assert(dsg.pointTo(stack24)._1.node.get.allocationRegions.head.asInstanceOf[HeapLocation].size == 20)
     assert(dsg.pointTo(stack40)._1.node.get.allocationRegions.size == 1)
-    assert(dsg.pointTo(stack48)._1.node.get.allocationRegions.head.asInstanceOf[HeapRegion2].size == 8)
+    assert(dsg.pointTo(stack48)._1.node.get.allocationRegions.head.asInstanceOf[HeapLocation].size == 8)
     assert(dsg.pointTo(dsg.pointTo(stack48)._1.node.get.cells(0)).equals(dsg.pointTo(stack40)))
     assert(dsg.pointTo(dsg.pointTo(stack48)._1.node.get.cells(0)).equals(dsg.pointTo(stack56)))
     assert(dsg.pointTo(stack24)._1.equals(dsg.pointTo(stack40)._1))
@@ -379,17 +311,17 @@ class LocalTest extends AnyFunSuite, TestUtil {
 
 
   test("internal merge") {
-    val mem = Memory("mem", 10000, 10000)
-    val locAssign1 = LocalAssign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
-    val locAssign2 = LocalAssign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
+    val mem = SharedMemory("mem", 10000, 10000)
+    val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
+    val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
     var program = prog(
       proc("main",
         block("operations",
-//          LocalAssign(R0, MemoryLoad(mem, R0, BigEndian, 0), Some("00000")),
+//          Assign(R0, MemoryLoad(mem, R0, BigEndian, 0), Some("00000")),
           locAssign1,
           locAssign2,
-          MemoryAssign(mem, MemoryStore(mem, R7, R1, BigEndian, 64), Some("00003")),
-          MemoryAssign(mem, MemoryStore(mem, R6, R2, BigEndian, 64), Some("00004")),
+          MemoryAssign(mem,  R7, R1, BigEndian, 64, Some("00003")),
+          MemoryAssign(mem,  R6, R2, BigEndian, 64, Some("00004")),
           ret
         )
       )
@@ -411,18 +343,18 @@ class LocalTest extends AnyFunSuite, TestUtil {
   }
 
   test("offsetting from middle of cell to a new cell") {
-    val mem = Memory("mem", 10000, 10000)
-    val locAssign1 = LocalAssign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
-    val locAssign2 = LocalAssign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
-    val locAssign3 = LocalAssign(R5, BinaryExpr(BVADD, R7,  BitVecLiteral(8, 64)), Some("00005"))
+    val mem = SharedMemory("mem", 10000, 10000)
+    val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
+    val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
+    val locAssign3 = Assign(R5, BinaryExpr(BVADD, R7,  BitVecLiteral(8, 64)), Some("00005"))
 
     var program = prog(
       proc("main",
         block("operations",
           locAssign1,
           locAssign2,
-          MemoryAssign(mem, MemoryStore(mem, R7, R1, BigEndian, 64), Some("00003")),
-          MemoryAssign(mem, MemoryStore(mem, R6, R2, BigEndian, 64), Some("00004")),
+          MemoryAssign(mem, R7, R1, BigEndian, 64, Some("00003")),
+          MemoryAssign(mem, R6, R2, BigEndian, 64, Some("00004")),
           locAssign3,
           ret
         )
@@ -438,19 +370,19 @@ class LocalTest extends AnyFunSuite, TestUtil {
   }
 
   test("offsetting from middle of cell to the same cell") {
-    val mem = Memory("mem", 10000, 10000)
-    val locAssign1 = LocalAssign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
-    val locAssign2 = LocalAssign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
-    val locAssign3 = LocalAssign(R5, BinaryExpr(BVADD, R7, BitVecLiteral(7, 64)), Some("00005"))
+    val mem = SharedMemory("mem", 10000, 10000)
+    val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
+    val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
+    val locAssign3 = Assign(R5, BinaryExpr(BVADD, R7, BitVecLiteral(7, 64)), Some("00005"))
 
     var program = prog(
       proc("main",
         block("operations",
-          //          LocalAssign(R0, MemoryLoad(mem, R0, BigEndian, 0), Some("00000")),
+          //          Assign(R0, MemoryLoad(mem, R0, BigEndian, 0), Some("00000")),
           locAssign1,
           locAssign2,
-          MemoryAssign(mem, MemoryStore(mem, R7, R1, BigEndian, 64), Some("00003")),
-          MemoryAssign(mem, MemoryStore(mem, R6, R2, BigEndian, 64), Some("00004")),
+          MemoryAssign(mem,  R7, R1, BigEndian, 64, Some("00003")),
+          MemoryAssign(mem,  R6, R2, BigEndian, 64, Some("00004")),
           locAssign3,
           ret
         )
@@ -474,19 +406,19 @@ class LocalTest extends AnyFunSuite, TestUtil {
   }
 
   test("internal offset transfer") {
-    val mem = Memory("mem", 10000, 10000)
-    val locAssign1 = LocalAssign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
-    val locAssign2 = LocalAssign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
-    val locAssign3 = LocalAssign(R5, R7, Some("00005"))
+    val mem = SharedMemory("mem", 10000, 10000)
+    val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
+    val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
+    val locAssign3 = Assign(R5, R7, Some("00005"))
 
     var program = prog(
       proc("main",
         block("operations",
-          //          LocalAssign(R0, MemoryLoad(mem, R0, BigEndian, 0), Some("00000")),
+          //          Assign(R0, MemoryLoad(mem, R0, BigEndian, 0), Some("00000")),
           locAssign1,
           locAssign2,
-          MemoryAssign(mem, MemoryStore(mem, R7, R1, BigEndian, 64), Some("00003")),
-          MemoryAssign(mem, MemoryStore(mem, R6, R2, BigEndian, 64), Some("00004")),
+          MemoryAssign(mem,  R7, R1, BigEndian, 64, Some("00003")),
+          MemoryAssign(mem,  R6, R2, BigEndian, 64, Some("00004")),
           locAssign3,
           ret
         )
@@ -649,69 +581,6 @@ class LocalTest extends AnyFunSuite, TestUtil {
 
   }
 
-
-//  test("bottom-up jumptable2_clang add_two") {
-//    val results = RunUtils.loadAndTranslate(
-//      BASILConfig(
-//        loading = ILLoadingConfig(
-//          inputFile = "examples/jumptable2/jumptable2_clang.adt",
-//          relfFile = "examples/jumptable2/jumptable2_clang.relf",
-//          specFile = None,
-//          dumpIL = None,
-//        ),
-//        staticAnalysis = Some(StaticAnalysisConfig()),
-//        boogieTranslation = BoogieGeneratorConfig(),
-//        outputPrefix = "boogie_out",
-//      )
-//    )
-//    val program = results.ir.program
-//    val dsg = results.analysis.get.bus.get(program.procs("add_two"))
-//    assert(dsg.pointTo.size == 7)
-//    assert(dsg.stackMapping.isEmpty)
-//    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
-//  }
-//
-//  test("bottom-up jumptable2_clang add_six") {
-//    val results = RunUtils.loadAndTranslate(
-//      BASILConfig(
-//        loading = ILLoadingConfig(
-//          inputFile = "examples/jumptable2/jumptable2_clang.adt",
-//          relfFile = "examples/jumptable2/jumptable2_clang.relf",
-//          specFile = None,
-//          dumpIL = None,
-//        ),
-//        staticAnalysis = Some(StaticAnalysisConfig()),
-//        boogieTranslation = BoogieGeneratorConfig(),
-//        outputPrefix = "boogie_out",
-//      )
-//    )
-//    val program = results.ir.program
-//    val dsg = results.analysis.get.bus.get(program.procs("add_six"))
-//    assert(dsg.pointTo.size == 7)
-//    assert(dsg.stackMapping.isEmpty)
-//    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
-//  }
-//
-//  test("bottom-up jumptable2_clang sub_seven") {
-//    val results = RunUtils.loadAndTranslate(
-//      BASILConfig(
-//        loading = ILLoadingConfig(
-//          inputFile = "examples/jumptable2/jumptable2_clang.adt",
-//          relfFile = "examples/jumptable2/jumptable2_clang.relf",
-//          specFile = None,
-//          dumpIL = None,
-//        ),
-//        staticAnalysis = Some(StaticAnalysisConfig()),
-//        boogieTranslation = BoogieGeneratorConfig(),
-//        outputPrefix = "boogie_out",
-//      )
-//    )
-//    val program = results.ir.program
-//    val dsg = results.analysis.get.bus.get(program.procs("sub_seven"))
-//    assert(dsg.pointTo.size == 7)
-//    assert(dsg.stackMapping.isEmpty)
-//    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
-//  }
 
 
   test("bottom up interproc pointer arithmetic callee") {

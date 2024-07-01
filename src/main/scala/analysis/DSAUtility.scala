@@ -1,13 +1,10 @@
 package analysis
 
-import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, LocalAssign, Memory, MemoryAssign, MemoryLoad, MemoryStore, Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, begin, computeDomain, toShortString}
+import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, Assign, Memory, MemoryAssign, MemoryLoad,  Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, begin, computeDomain, toShortString}
 import specification.{ExternalFunction, SpecGlobal}
-import util.writeToFile
 
 import scala.util.control.Breaks.{break, breakable}
 import java.math.BigInteger
-import java.util.StringJoiner
-import scala.collection.mutable
 import scala.collection.mutable
 
 object NodeCounter {
@@ -18,6 +15,19 @@ object NodeCounter {
     counter
 }
 
+
+/**
+ * Data Structure Graph for DSA
+ * @param proc procedure of DSG
+ * @param constProp
+ * @param varToSym mapping flow-sensitive (position sensitive) mapping from registers to their set of symbolic accesses
+ * @param globals
+ * @param globalOffsets
+ * @param externalFunctions
+ * @param reachingDefs
+ * @param writesTo
+ * @param params
+ */
 class DSG(val proc: Procedure,
           constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
           varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAccess]]],
@@ -32,8 +42,8 @@ class DSG(val proc: Procedure,
   val pointTo: mutable.Map[DSC, (DSC, BigInt)] = mutable.Map()
   val callsites: mutable.Set[CallSite] = mutable.Set()
 
-  val mallocRegister = Register("R0", BitVecType(64))
-  val stackPointer = Register("R31", BitVecType(64))
+  val mallocRegister = Register("R0", 64)
+  val stackPointer = Register("R31", 64)
 
   // make stack nodes with
   val stackMapping: mutable.Map[BigInt, DSN] =
@@ -50,14 +60,14 @@ class DSG(val proc: Procedure,
         varToSym(pos)(arg1).foldLeft(m) {
           (m, sym) =>
             sym match
-              case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), symOffset) =>
+              case SymbolicAccess(accessor, StackLocation(regionIdentifier, proc, size), symOffset) =>
                 offset = offset + symOffset
                 if m.contains(offset) then
                   assert(!m(offset).cells(0).growSize(byteSize))
                   m
                 else
                   val node = DSN(Some(this), byteSize)
-                  node.allocationRegions.add(StackRegion2(pos.toShortString, proc, byteSize))
+                  node.allocationRegions.add(StackLocation(pos.toShortString, proc, byteSize))
                   node.flags.stack = true
                   node.addCell(0, byteSize)
                   m + (offset -> node)
@@ -67,13 +77,13 @@ class DSG(val proc: Procedure,
         varToSym(pos)(arg).foldLeft(m) {
           (m, sym) =>
             sym match
-              case SymbolicAccess(accessor, StackRegion2(regionIdentifier, proc, size), offset) =>
+              case SymbolicAccess(accessor, StackLocation(regionIdentifier, proc, size), offset) =>
                 if m.contains(offset) then
                   assert(!m(offset).cells(0).growSize(byteSize))
                   m
                 else
                   val node = DSN(Some(this), byteSize)
-                  node.allocationRegions.add(StackRegion2(pos.toShortString, proc, byteSize))
+                  node.allocationRegions.add(StackLocation(pos.toShortString, proc, byteSize))
                   node.flags.stack = true
                   node.addCell(0, byteSize)
                   m + (offset -> node)
@@ -82,12 +92,12 @@ class DSG(val proc: Procedure,
       case _ => m
   private def stackBuilder(pos: CFGPosition, m: Map[BigInt, DSN]): Map[BigInt, DSN] = {
     pos match
-      case LocalAssign(variable: Variable, expr: Expr, _) =>
+      case Assign(variable: Variable, expr: Expr, _) =>
         expr match
           case MemoryLoad(mem, index, endian, size) =>
             visitStackAccess(pos, index, size, m)
           case _ => m
-      case MemoryAssign(mem, MemoryStore(mem2, index, value, endian, size), label) =>
+      case MemoryAssign(mem, index: Expr, value: Expr, endian, size: Int, label) =>
         visitStackAccess(pos, index, size, m)
       case _ => m
 
@@ -100,7 +110,7 @@ class DSG(val proc: Procedure,
   globals.foreach(
     global =>
       val node = DSN(Some(this), global.size)
-      node.allocationRegions.add(DataRegion2(global.name, global.address, global.size/8))
+      node.allocationRegions.add(DataLocation(global.name, global.address, global.size/8))
       node.flags.global = true
       node.flags.incomplete = true
       globalMapping.update((global.address, global.address + global.size/8), (node, 0))
@@ -125,7 +135,7 @@ class DSG(val proc: Procedure,
 
             case None =>
               val node = DSN(Some(this))
-              node.allocationRegions.add(DataRegion2(s"Relocated_$relocatedAddress", relocatedAddress, 8))
+              node.allocationRegions.add(DataLocation(s"Relocated_$relocatedAddress", relocatedAddress, 8))
               node.flags.global = true
               node.flags.incomplete = true
               globalMapping.update((relocatedAddress, relocatedAddress + 8), (node, 0))
@@ -139,7 +149,7 @@ class DSG(val proc: Procedure,
   externalFunctions.foreach(
     external =>
       val node = DSN(Some(this))
-      node.allocationRegions.add(DataRegion2(external.name, external.offset, 0))
+      node.allocationRegions.add(DataLocation(external.name, external.offset, 0))
       node.flags.global = true
       node.flags.incomplete = true
       globalMapping.update((external.offset, external.offset), (node, 0))
@@ -149,12 +159,16 @@ class DSG(val proc: Procedure,
 
   // determine if an address is a global and return the corresponding global if it is.
   def isGlobal(address: BigInt): Option[((BigInt, BigInt), (DSN, BigInt))] =
-    for (elem <- globalMapping) {
-      val range = elem._1
-      if address >= range._1 && (address < range._2 || (range._1 == range._2 && range._2 == address)) then
-        return Some(elem)
+    var global: Option[((BigInt, BigInt), (DSN, BigInt))]  = None
+    breakable {
+      for (elem <- globalMapping) {
+        val range = elem._1
+        if address >= range._1 && (address < range._2 || (range._1 == range._2 && range._2 == address)) then
+          global = Some(elem)
+          break
+      }
     }
-    None
+    global
 
   private def replaceInEV(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
     varToCell.foreach(
@@ -441,37 +455,32 @@ class DSG(val proc: Procedure,
   val varToCell: mutable.Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]] = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(mutable.Map[CFGPosition, mutable.Map[Variable, (DSC, BigInt)]]()) {
     (m, pos) =>
       pos match
-        case LocalAssign(variable, value , label) =>
+        case Assign(variable, value , label) =>
           value.variables.foreach(
             v =>
               if isFormal(pos, v) then
                 val node = DSN(Some(this))
                 node.flags.incomplete = true
-                node.rep = "formal"
                 nodes.add(node)
                 formals.update(v, (node.cells(0), 0))
           )
           val node = DSN(Some(this))
-          node.rep = "ssa"
-          m + (pos -> mutable.Map(variable -> (node.cells(0), 0)))
+          m +=(pos -> mutable.Map(variable -> (node.cells(0), 0)))
         case DirectCall(proc, target, label) if proc.name == "malloc" =>
           val node = DSN(Some(this))
-          node.rep = "ssa"
-           m + (pos -> mutable.Map(mallocRegister -> (node.cells(0), 0)))
+           m += (pos -> mutable.Map(mallocRegister -> (node.cells(0), 0)))
         case DirectCall(proc, target, label) if writesTo.contains(proc) =>
           val result: Map[Variable, (DSC, BigInt)] = writesTo(proc).foldLeft(Map[Variable, (DSC, BigInt)]()){
             (n, variable) =>
               val node = DSN(Some(this))
-              node.rep = "ssa"
               n + (variable -> (node.cells(0), 0))
           }
-          m + (pos -> result.to(mutable.Map))
-        case MemoryAssign(memory, MemoryStore(mem, index, expr: Expr, endian, size), label) if unwrapPaddingAndSlicing(expr).isInstanceOf[Variable] =>
+          m += (pos -> result.to(mutable.Map))
+        case MemoryAssign(memory, index: Expr, expr: Expr, endian, size: Int, label) if unwrapPaddingAndSlicing(expr).isInstanceOf[Variable] =>
           val value: Variable = unwrapPaddingAndSlicing(expr).asInstanceOf[Variable]
           if isFormal(pos, value) then
             val node = DSN(Some(this))
             node.flags.incomplete = true
-            node.rep = "formal"
             nodes.add(node)
             formals.update(value, (node.cells(0), 0))
           m
@@ -598,9 +607,7 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
   var flags = Flags()
   def collapsed = flags.collapsed
 
-  val allocationRegions: mutable.Set[MemoryRegion2] = mutable.Set()
-
-  var rep: String = ""
+  val allocationRegions: mutable.Set[MemoryLocation] = mutable.Set()
 
   val cells: mutable.Map[BigInt, DSC] = mutable.Map()
   this.addCell(0, 0)
@@ -700,6 +707,11 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
   override def toString: String = s"Node($id, $allocationRegions ${if collapsed then ", collapsed" else ""})"
 }
 
+/**
+ * a cell in DSA
+ * @param node the node this cell belongs to
+ * @param offset the offset of the cell
+ */
 case class DSC(node: Option[DSN], offset: BigInt)
 {
   var largestAccessedSize: BigInt = 0
@@ -713,6 +725,11 @@ case class DSC(node: Option[DSN], offset: BigInt)
   override def toString: String = s"Cell(${if node.isDefined then node.get.toString else "NONE"}, $offset)"
 }
 
+/**
+ * represents a direct call in DSA
+ * @param call instance of the call
+ * @param graph caller's DSG
+ */
 class CallSite(val call: DirectCall, val graph: DSG) {
   val proc = call.target
   val paramCells: mutable.Map[Variable, (DSC, BigInt)] = graph.params(proc).foldLeft(mutable.Map[Variable, (DSC, BigInt)]()) {
@@ -736,10 +753,7 @@ def unwrapPaddingAndSlicing(expr: Expr): Expr =
     case SignExtend(extension, body) => SignExtend(extension, unwrapPaddingAndSlicing(body))
     case UnaryExpr(op, arg) => UnaryExpr(op, arg)
     case BinaryExpr(op, arg1, arg2) => BinaryExpr(op, unwrapPaddingAndSlicing(arg1), unwrapPaddingAndSlicing(arg2))
-    case MemoryStore(mem, index, value, endian, size) =>
-      MemoryStore(mem, unwrapPaddingAndSlicing(index), unwrapPaddingAndSlicing(value), endian, size)
     case MemoryLoad(mem, index, endian, size) => MemoryLoad(mem, unwrapPaddingAndSlicing(index), endian, size)
-    case Memory(name, addressSize, valueSize) => expr
     case variable: Variable => variable
     case Extract(end, start, body) /*if start == 0 && end == 32*/ => unwrapPaddingAndSlicing(body) // this may make it unsound
     case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
@@ -780,6 +794,7 @@ def adjust(tuple: (DSC, BigInt)): DSC =
   val internal = tuple._2
   adjust(cell, internal)
 
+// minimum  2's complement 64 bit negative integer
 val BITVECNEGATIVE: BigInt = new BigInt(new BigInteger("9223372036854775808"))
 
 

@@ -5,6 +5,20 @@ import specification.{ExternalFunction, SpecGlobal}
 
 import scala.collection.mutable
 
+/**
+ * Data Structure Analysis
+ * Performs all phases of DSA and stores the results in member variables
+ * local, bottom-up, top-down results in member variables locals, bu and td respectively.
+ * @param program program to be analysed
+ * @param symResults result of symbolic access analysis
+ * @param constProp
+ * @param globals
+ * @param globalOffsets
+ * @param externalFunctions
+ * @param reachingDefs
+ * @param writesTo mapping from procedures to registers they change
+ * @param params mapping from procedures to their parameters
+ */
 class DSA(program: Program,
             symResults: Map[CFGPosition, Map[SymbolicAccess, TwoElement]],
             constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
@@ -19,9 +33,9 @@ class DSA(program: Program,
   val bu: mutable.Map[Procedure, DSG] = mutable.Map()
   val td: mutable.Map[Procedure, DSG] = mutable.Map()
 
-  val stackPointer = Register("R31", BitVecType(64))
-  val returnPointer = Register("R30", BitVecType(64))
-  val framePointer = Register("R29", BitVecType(64))
+  val stackPointer = Register("R31", 64)
+  val returnPointer = Register("R30", 64)
+  val framePointer = Register("R29", 64)
 
   val ignoreRegisters: Set[Variable] = Set(stackPointer, returnPointer, framePointer)
 
@@ -48,11 +62,9 @@ class DSA(program: Program,
       stack.pushAll(current.calls.diff(domain))
 
 
-//      computeDomain(CallGraph, Set(program.mainProcedure))
     domain.foreach(
       proc =>
         val dsg = Local(proc, symResults, constProp, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params).analyze()
-//        println(s"Node Counter before local for ${proc.name} :  " + NodeCounter.counter)
 
         locals.update(proc, dsg)
         bu.update(proc, dsg.cloneSelf())
@@ -66,10 +78,8 @@ class DSA(program: Program,
         visited += proc
         val preds : Set[Procedure] = CallGraph.pred(proc)
         queue.enqueueAll(CallGraph.pred(proc).diff(visited).intersect(domain))
-//        CallGraph.pred(proc).foreach(buildBUQueue)
     )
 
-//    println("Node Counter before bottom up:  " +  NodeCounter.counter)
     while queue.nonEmpty do
       val proc = queue.dequeue()
       visited += proc
@@ -115,7 +125,6 @@ class DSA(program: Program,
             case (range: (BigInt, BigInt), (node: DSN, internal: BigInt)) =>
               buGraph.mergeCells(buGraph.globalMapping(range)._1.getCell(buGraph.globalMapping(range)._2),
                 node.getCell(internal))
-//              node.cloneNode(calleeGraph, buGraph)
           }
 
           buGraph.varToCell.getOrElse(begin(callee), Map.empty).foreach{
@@ -145,7 +154,6 @@ class DSA(program: Program,
     queue.enqueue(program.mainProcedure)
     visited = Set()
 
-//    println("Node Counter before top down:  " + NodeCounter.counter)
 
     while queue.nonEmpty do
       val proc = queue.dequeue()
@@ -181,7 +189,6 @@ class DSA(program: Program,
             case (range: (BigInt, BigInt), (node: DSN, internal: BigInt)) =>
               calleesGraph.mergeCells(calleesGraph.globalMapping(range)._1.getCell(calleesGraph.globalMapping(range)._2),
                 node.getCell(internal))
-            //              node.cloneNode(calleeGraph, buGraph)
           }
 
           callSite.paramCells.keySet.foreach(
@@ -200,6 +207,7 @@ class DSA(program: Program,
                 case (c: DSC, retCell: (DSC, BigInt)) =>
                   calleesGraph.mergeCells(c, adjust(retCell))
               }
+            case _ => ???
           }
       )
       callersGraph.collectNodes

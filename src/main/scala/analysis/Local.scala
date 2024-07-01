@@ -1,12 +1,24 @@
 package analysis
 
-import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor,  LocalAssign, MemoryAssign, MemoryLoad, MemoryStore, Procedure, Register,  Variable, ZeroExtend, computeDomain, toShortString}
+import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Endian, Expr, Extract, IntraProcIRCursor, Assign, MemoryAssign, MemoryLoad, Procedure, Register, Variable, ZeroExtend, computeDomain, toShortString}
 import specification.{ExternalFunction, SpecGlobal}
 
 import scala.util.control.Breaks.{break, breakable}
 import java.math.BigInteger
 import scala.collection.mutable
 
+/**
+ * The local phase of Data Structure Analysis
+ * @param proc procedure to be analysed
+ * @param symResults result of symbolic access analysis
+ * @param constProp
+ * @param globals
+ * @param globalOffsets
+ * @param externalFunctions
+ * @param reachingDefs
+ * @param writesTo mapping from procedures to registers they change
+ * @param params mapping from procedures to their parameters
+ */
 class Local(
              proc: Procedure,
              symResults: Map[CFGPosition, Map[SymbolicAccess, TwoElement]],
@@ -18,8 +30,8 @@ class Local(
              params:  Map[Procedure, Set[Variable]]
            ) extends Analysis[Any]{
 
-  private val mallocRegister = Register("R0", BitVecType(64))
-  private val stackPointer = Register("R31", BitVecType(64))
+  private val mallocRegister = Register("R0", 64)
+  private val stackPointer = Register("R31", 64)
 
   private val visited: mutable.Set[CFGPosition] = mutable.Set()
 
@@ -32,9 +44,9 @@ class Local(
           if m.contains(access._1.accessor) then
             // every variable pointing to a stack region ONLY has one symbolic access associated with it.
             m(access._1.accessor).foreach(
-              sym => assert(!sym.symbolicBase.isInstanceOf[StackRegion2])
+              sym => assert(!sym.symbolicBase.isInstanceOf[StackLocation])
             )
-            assert(!access._1.symbolicBase.isInstanceOf[StackRegion2])
+            assert(!access._1.symbolicBase.isInstanceOf[StackLocation])
             m + (access._1.accessor -> (m(access._1.accessor) + access._1))
           else
             m + (access._1.accessor -> Set(access._1))
@@ -46,7 +58,7 @@ class Local(
   def isStack(expr: Expr, pos: CFGPosition): Option[DSC] =
     expr match
       case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
-        varToSym(pos)(arg1).size == 1 && varToSym(pos)(arg1).head.symbolicBase.isInstanceOf[StackRegion2] &&
+        varToSym(pos)(arg1).size == 1 && varToSym(pos)(arg1).head.symbolicBase.isInstanceOf[StackLocation] &&
         evaluateExpression(arg2, constProp(pos)).isDefined =>
         val offset = evaluateExpression(arg2, constProp(pos)).get.value + varToSym(pos)(arg1).head.offset
         if graph.stackMapping.contains(offset) then
@@ -54,7 +66,7 @@ class Local(
         else
           None
       case arg: Variable if varToSym.contains(pos) && varToSym(pos).contains(arg) &&
-        varToSym(pos)(arg).size == 1 && varToSym(pos)(arg).head.symbolicBase.isInstanceOf[StackRegion2] =>
+        varToSym(pos)(arg).size == 1 && varToSym(pos)(arg).head.symbolicBase.isInstanceOf[StackLocation] =>
         val offset = varToSym(pos)(arg).head.offset
         if graph.stackMapping.contains(offset) then
           Some(graph.stackMapping(offset).cells(0))
@@ -158,7 +170,7 @@ class Local(
           case Some(value) => value.value
           case None => 0
         val node = DSN(Some(graph), size)
-        node.allocationRegions.add(HeapRegion2(nextMallocCount, proc, size))
+        node.allocationRegions.add(HeapLocation(nextMallocCount, proc, size))
         node.flags.heap = true
         graph.mergeCells(graph.varToCell(n)(mallocRegister)._1, node.cells(0))
       case call: DirectCall if params.contains(call.target) =>
@@ -173,7 +185,7 @@ class Local(
             val returnArgument  = graph.varToCell(n)(variable)
             graph.mergeCells(adjust(returnArgument), adjust(slice))
         }
-      case LocalAssign(variable, rhs, maybeString) =>
+      case Assign(variable: Variable, rhs: Expr, maybeString) =>
         val expr: Expr = unwrapPaddingAndSlicing(rhs)
         val lhsCell = adjust(graph.varToCell(n)(variable))
         if isGlobal(rhs, n).isDefined then
@@ -188,7 +200,7 @@ class Local(
               && evaluateExpression(arg2, constProp(n)).isDefined && evaluateExpression(arg2, constProp(n)).get.value >= BITVECNEGATIVE =>
               val size = twosComplementToDec(decToBinary(evaluateExpression(arg2, constProp(n)).get.value))
               val node = DSN(Some(graph))
-              node.allocationRegions.add(StackRegion2("Stack_"+proc.name, proc, -size))
+              node.allocationRegions.add(StackLocation("Stack_"+proc.name, proc, -size))
               node.flags.stack = true
               graph.mergeCells(lhsCell, node.cells(0))
 
@@ -244,7 +256,7 @@ class Local(
                 node.flags.unknown = true
                 graph.collapseNode(node)
 
-      case MemoryAssign(memory, MemoryStore(mem, ind, expr: Expr, endian, size), label) if unwrapPaddingAndSlicing(expr).isInstanceOf[Variable] => // if value is a literal ignore it
+      case MemoryAssign(memory,  ind: Expr, expr: Expr, endian: Endian, size: Int, label) if unwrapPaddingAndSlicing(expr).isInstanceOf[Variable] => // if value is a literal ignore it
         val value: Variable = unwrapPaddingAndSlicing(expr).asInstanceOf[Variable]
         val index: Expr = unwrapPaddingAndSlicing(ind)
         reachingDefs(n)(value).foreach(visit)
