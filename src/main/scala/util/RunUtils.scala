@@ -565,7 +565,6 @@ object StaticAnalysis {
       config: StaticAnalysisConfig,
       iteration: Int
   ): StaticAnalysisContext = {
-    val before = System.nanoTime()
     val IRProgram: Program = ctx.program
     val externalFunctions: Set[ExternalFunction] = ctx.externalFunctions
     val globals: Set[SpecGlobal] = ctx.globals

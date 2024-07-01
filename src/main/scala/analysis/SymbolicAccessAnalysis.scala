@@ -28,7 +28,7 @@ case class DataLocation(override val regionIdentifier: String, start: BigInt, si
   override def toString: String = s"Data($regionIdentifier, $start, $size)"
 }
 
-case class UnkownLocation(override val regionIdentifier: String, proc: Procedure) extends MemoryLocation {
+case class UnknownLocation(override val regionIdentifier: String, proc: Procedure) extends MemoryLocation {
   override def toString: String = s"Unknown($regionIdentifier)"
 }
 
@@ -94,25 +94,28 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
       case Assign(variable, rhs, maybeString: Option[String]) =>
         val expr = unwrapPaddingAndSlicing(rhs)
         expr match
-          case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) && arg1.equals(stackPointer)
-            && evaluateExpression(arg2, constProp(n)).isDefined && evaluateExpression(arg2, constProp(n)).get.value >= BITVECNEGATIVE =>
-            d match
-              case Left(value) if value.accessor == variable => Map()
-              case Left(value) => Map(d -> IdEdge())
-              case Right(_) =>
-                val size = twosComplementToDec(decToBinary(evaluateExpression(arg2, constProp(n)).get.value))
-                Map(d -> IdEdge(), Left(SymbolicAccess(variable, StackLocation(s"Stack_${procedure(n).name}", procedure(n), -size), 0)) -> ConstEdge(TwoElementTop))
-          case BinaryExpr(op, arg1: Variable, arg2) if evaluateExpression(arg2, constProp(n)).isDefined =>
-            d match
-              case Left(value) if value.accessor == arg1 =>
-                val offsetUpdate = evaluateExpression(arg2, constProp(n)).get.value
-                val result: Map[DL, EdgeFunction[TwoElement]] = Map(Left(SymbolicAccess(variable, value.symbolicBase, value.offset + offsetUpdate)) -> ConstEdge(TwoElementTop))
-                if value.accessor != variable then
-                  result + (d -> IdEdge())
+          case BinaryExpr(op, arg1: Variable, arg2) =>
+            evaluateExpression(arg2, constProp(n)) match
+              case Some(v) =>
+                if op.equals(BVADD) && arg1.equals(stackPointer) && v.value >= BITVECNEGATIVE then
+                  d match
+                    case Left(value) if value.accessor == variable => Map()
+                    case Left(value) => Map(d -> IdEdge())
+                    case Right(_) =>
+                      val size = twosComplementToDec(decToBinary(v.value))
+                      Map(d -> IdEdge(), Left(SymbolicAccess(variable, StackLocation(s"Stack_${procedure(n).name}", procedure(n), -size), 0)) -> ConstEdge(TwoElementTop))
                 else
-                  result
-              case Left(value) if value.accessor == variable => Map()
-              case _ => Map(d -> IdEdge())
+                  d match
+                    case Left(value) if value.accessor == arg1 =>
+                      val offsetUpdate = evaluateExpression(arg2, constProp(n)).get.value
+                      val result: Map[DL, EdgeFunction[TwoElement]] = Map(Left(SymbolicAccess(variable, value.symbolicBase, value.offset + offsetUpdate)) -> ConstEdge(TwoElementTop))
+                      if value.accessor != variable then
+                        result + (d -> IdEdge())
+                      else
+                        result
+                    case Left(value) if value.accessor == variable => Map()
+                    case _ => Map(d -> IdEdge())
+              case None => Map(d -> IdEdge())
           case arg:Variable =>
             d match
               case Left(value) if value.accessor == arg =>
@@ -127,7 +130,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
             d match
               case Left(value) if value.accessor == variable => Map()
               case Left(value) => Map(d -> IdEdge())
-              case Right(_) => Map(d -> IdEdge(), Left(SymbolicAccess(variable, UnkownLocation(nextunknownCount, procedure(n)), 0)) -> ConstEdge(TwoElementTop))
+              case Right(_) => Map(d -> IdEdge(), Left(SymbolicAccess(variable, UnknownLocation(nextunknownCount, procedure(n)), 0)) -> ConstEdge(TwoElementTop))
           case _ =>
             d match
               case Left(value) if value.accessor == variable => Map()

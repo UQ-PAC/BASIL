@@ -245,9 +245,7 @@ abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program)
 
   protected def callToReturn(call: GoTo): DirectCall = call.parent.jump.asInstanceOf[DirectCall]
 
-  protected def returnToCall(ret: DirectCall): GoTo = 
-    if ret.parent.fallthrough.isEmpty then
-      print("")
+  protected def returnToCall(ret: DirectCall): GoTo =
     ret.parent.fallthrough.get
 
   protected def getCallee(call: GoTo): IndirectCall = callToReturn(call).target.end.asInstanceOf[IndirectCall]
