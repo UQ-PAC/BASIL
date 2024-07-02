@@ -697,6 +697,17 @@ object StaticAnalysis {
     //val paramResults = ParamAnalysis(IRProgram).analyze()
     val paramResults = Map[Procedure, Set[Variable]]()
 
+    Logger.info("[!] Running Taint Analysis")
+    val taintResults = TaintAnalysis(IRProgram,
+        IRProgram.procedures.foldLeft(Map[CFGPosition, Set[Variable]]()) {
+          (m, p) => m + (p -> Set(Register("R0", 64)))
+        }
+      ).analyze()
+
+    config.analysisResultsPath.foreach(s =>
+      writeToFile(printAnalysisResults(IRProgram, taintResults), s"${s}_taint$iteration.txt")
+    )
+
     StaticAnalysisContext(
       cfg = cfg,
       constPropResult = constPropResult,
