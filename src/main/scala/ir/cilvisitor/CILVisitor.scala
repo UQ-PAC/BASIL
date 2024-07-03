@@ -17,7 +17,7 @@ case class ChangeTo[T](e: T) extends VisitAction[T]
 case class ChangeDoChildrenPost[T](e: T, f: T => T) extends VisitAction[T]
 
 
-trait CILVisitorImpl:
+trait CILVisitor:
   def vprog(e: Program): VisitAction[Program] = DoChildren()
   def vproc(e: Procedure): VisitAction[List[Procedure]] = DoChildren()
   def vparams(e: ArrayBuffer[Parameter]): VisitAction[ArrayBuffer[Parameter]] = DoChildren()
@@ -35,7 +35,7 @@ trait CILVisitorImpl:
   def leave_scope(outparam: ArrayBuffer[Parameter]): Unit = ()
 
 
-def doVisitList[T](v: CILVisitorImpl, a: VisitAction[List[T]], n: T, continue: (T) => T): List[T] = {
+def doVisitList[T](v: CILVisitor, a: VisitAction[List[T]], n: T, continue: (T) => T): List[T] = {
   a match {
     case SkipChildren()             => List(n)
     case ChangeTo(z)                => z
@@ -44,7 +44,7 @@ def doVisitList[T](v: CILVisitorImpl, a: VisitAction[List[T]], n: T, continue: (
   }
 }
 
-def doVisit[T](v: CILVisitorImpl, a: VisitAction[T], n: T, continue: (T) => T): T = {
+def doVisit[T](v: CILVisitor, a: VisitAction[T], n: T, continue: (T) => T): T = {
   a match {
     case SkipChildren()             => n
     case DoChildren()               => continue(n)
@@ -53,8 +53,7 @@ def doVisit[T](v: CILVisitorImpl, a: VisitAction[T], n: T, continue: (T) => T): 
   }
 }
 
-class CILVisitor(val v: CILVisitorImpl) {
-
+class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_parameters(p: ArrayBuffer[Parameter]): ArrayBuffer[Parameter] = {
     doVisit(v, v.vparams(p), p, (n) => n)
@@ -163,8 +162,8 @@ class CILVisitor(val v: CILVisitorImpl) {
   }
 }
 
-def visit_block(v: CILVisitorImpl, b: Block): Block = CILVisitor(v).visit_block(b)
-def visit_proc(v: CILVisitorImpl, b: Procedure): List[Procedure] = CILVisitor(v).visit_proc(b)
-def visit_stmt(v: CILVisitorImpl, e: Statement): List[Statement] = CILVisitor(v).visit_stmt(e)
-def visit_jump(v: CILVisitorImpl, e: Jump): Jump = CILVisitor(v).visit_jump(e)
-def visit_expr(v: CILVisitorImpl, e: Expr): Expr = CILVisitor(v).visit_expr(e)
+def visit_block(v: CILVisitor, b: Block): Block = CILVisitorImpl(v).visit_block(b)
+def visit_proc(v: CILVisitor, b: Procedure): List[Procedure] = CILVisitorImpl(v).visit_proc(b)
+def visit_stmt(v: CILVisitor, e: Statement): List[Statement] = CILVisitorImpl(v).visit_stmt(e)
+def visit_jump(v: CILVisitor, e: Jump): Jump = CILVisitorImpl(v).visit_jump(e)
+def visit_expr(v: CILVisitor, e: Expr): Expr = CILVisitorImpl(v).visit_expr(e)

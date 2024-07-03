@@ -7,7 +7,7 @@ import util.intrusive_list.*
 import ir.dsl.*
 import ir.cilvisitor.*
 
-class FindVars extends CILVisitorImpl {
+class FindVars extends CILVisitor {
   val vars = mutable.ArrayBuffer[Variable]()
 
   override def vvar(v: Variable) = {
@@ -36,7 +36,7 @@ def gamma_e(e: Expr): Expr = {
   }
 }
 
-class AddGammas extends CILVisitorImpl {
+class AddGammas extends CILVisitor {
 
   override def vstmt(s: Statement) = {
     s match {
@@ -55,7 +55,7 @@ class CILVisTest extends AnyFunSuite {
       proc("main", block("lmain", goto("lmain1")), block("lmain1", goto("lmain2")), block("lmain2", ret))
     )
 
-    class BlockTrace extends CILVisitorImpl {
+    class BlockTrace extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
 
       override def vblock(b: Block) = {
@@ -92,7 +92,7 @@ class CILVisTest extends AnyFunSuite {
       )
     )
 
-    class ExprTrace extends CILVisitorImpl {
+    class ExprTrace extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
 
       override def vvar(e: Variable) = {
@@ -132,14 +132,14 @@ class CILVisTest extends AnyFunSuite {
         block("returntarget", ret)
       )
     )
-    class VarTrace extends CILVisitorImpl {
+    class VarTrace extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
 
       override def vvar(e: Variable) = { res.append(e.name); SkipChildren() }
 
     }
 
-    class RegReplace extends CILVisitorImpl {
+    class RegReplace extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
 
       override def vvar(e: Variable) = {
@@ -151,7 +151,7 @@ class CILVisTest extends AnyFunSuite {
 
     }
 
-    class RegReplacePost extends CILVisitorImpl {
+    class RegReplacePost extends CILVisitor {
       val res = mutable.ArrayBuffer[String]()
 
       override def vvar(e: Variable) = {
