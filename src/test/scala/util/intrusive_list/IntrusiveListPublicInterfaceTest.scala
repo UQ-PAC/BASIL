@@ -194,4 +194,50 @@ class IntrusiveListPublicInterfaceTest extends AnyFunSuite {
 
   }
 
+  test("insertAllAfter") {
+    val x = IntrusiveList[Elem]()
+
+    x.append(Elem(9))
+    val first = Elem(10)
+    val f = x.append(first)
+    x.append(Elem(13))
+    // 9 10 13
+    assert(x.toList.map(_.t) == List(9, 10, 13))
+
+    val n = Elem(225)
+    val toInsert = List(Elem(11), Elem(12), n)
+
+    val r = x.insertAllAfter(Some(first), toInsert)
+    assert(r.get eq n)
+    assert(x.toList.map(_.t) == List(9, 10, 11, 12, 225, 13))
+
+    val l = Range(1, 4).map(x => Elem(x))
+    val rr = x.insertAllAfter(None, l)
+    assert(x.toList.map(_.t) == List(1, 2, 3, 9, 10, 11, 12, 225, 13))
+
+  }
+
+
+  test("insertAllBefore") {
+    val x = IntrusiveList[Elem]()
+
+    x.append(Elem(9))
+    val first = Elem(10)
+    val f = x.append(first)
+    x.append(Elem(13))
+    // 9 10 13
+    assert(x.toList.map(_.t) == List(9, 10, 13))
+
+    val n = Elem(11)
+    val toInsert = List(n, Elem(12), Elem(255))
+
+    val r = x.insertAllBefore(Some(first), toInsert)
+    assert(r.get eq n)
+    assert(x.toList.map(_.t) == List(9,11, 12, 255, 10, 13))
+
+    val l = Range(1, 4).map(x => Elem(x))
+    val rr = x.insertAllBefore(None, l)
+    assert(x.toList.map(_.t) == List(9, 11, 12, 255,10, 13, 1, 2, 3))
+  }
+
 }
