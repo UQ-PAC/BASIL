@@ -698,8 +698,8 @@ object StaticAnalysis {
     val paramResults = Map[Procedure, Set[Variable]]()
 
     Logger.info("[!] Running Taint Analysis")
-    val taintResults = TaintAnalysis(IRProgram,
-        IRProgram.procedures.foldLeft(Map[CFGPosition, Set[Variable]]()) {
+    val taintResults = TaintAnalysis(IRProgram, globalAddresses, globalOffsets, mmm, constPropResult,
+        IRProgram.procedures.foldLeft(Map[CFGPosition, Set[analysis.Taintable]]()) {
           (m, p) => m + (p -> Set(Register("R0", 64)))
         }
       ).analyze()
