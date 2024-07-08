@@ -501,7 +501,7 @@ object IRTransform {
                     case Some(proc) => proc
                     case None => throw Exception("could not find procedure with name " + data.regionIdentifier)
                   }
-                  val thread = ProgramThread(threadEntrance, mutable.Set(threadEntrance), Some(d))
+                  val thread = ProgramThread(threadEntrance, mutable.LinkedHashSet(threadEntrance), Some(d))
                   program.threads.addOne(thread)
                 case _ =>
                   throw Exception("unexpected non-data region " + threadTargets.head + " as PointsTo result for R2 at " + d)
@@ -513,16 +513,22 @@ object IRTransform {
     }
 
     if (program.threads.nonEmpty) {
-      val mainThread = ProgramThread(program.mainProcedure, mutable.Set(program.mainProcedure), None)
+      val mainThread = ProgramThread(program.mainProcedure, mutable.LinkedHashSet(program.mainProcedure), None)
       program.threads.addOne(mainThread)
 
-      val programProcs = program.procedures.toSet
+      val programProcs = program.procedures
 
       // do reachability for all threads
       for (thread <- program.threads) {
-        // TODO this will give the threads their procedures in a non-deterministic/fragile order and this should be changed to maintain the original order
-        val reachable = thread.entry.reachableFrom.intersect(programProcs)
-        thread.procedures.addAll(reachable)
+        val reachable = thread.entry.reachableFrom
+
+        // add procedures to thread in way that maintains original ordering
+        for (p <- programProcs) {
+          if (reachable.contains(p)) {
+            thread.procedures.add(p)
+          }
+        }
+
       }
     }
   }

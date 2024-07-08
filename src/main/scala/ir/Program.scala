@@ -6,7 +6,8 @@ import boogie.*
 import analysis.BitVectorEval
 import util.intrusive_list.*
 
-class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedure,
+class Program(var procedures: ArrayBuffer[Procedure],
+              var mainProcedure: Procedure,
               var initialMemory: ArrayBuffer[MemorySection],
               var readOnlyMemory: ArrayBuffer[MemorySection]) extends Iterable[CFGPosition] {
 
@@ -157,7 +158,9 @@ class Program(var procedures: ArrayBuffer[Procedure], var mainProcedure: Procedu
 
 
 // if creationSite == None then it is the initial thread
-class ProgramThread(val entry: Procedure, val procedures: mutable.Set[Procedure], val creationSite: Option[DirectCall]) {
+class ProgramThread(val entry: Procedure,
+                    val procedures: mutable.LinkedHashSet[Procedure],
+                    val creationSite: Option[DirectCall]) {
 
 }
 
@@ -385,7 +388,7 @@ class Block private (
 
 
   def this(label: String, address: Option[Int] = None, statements: IterableOnce[Statement] = Set.empty, jump: Jump = GoTo(Set.empty)) = {
-    this(label, address, IntrusiveList.from(statements), jump,  mutable.HashSet.empty, None)
+    this(label, address, IntrusiveList.from(statements), jump, mutable.HashSet.empty, None)
   }
 
   def jump: Jump = _jump
