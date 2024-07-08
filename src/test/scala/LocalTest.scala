@@ -330,7 +330,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Map.empty, Specification(Set(), Map(), List(), List(), List(), Set()), program))
+    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Set.empty, Map.empty, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program))
     val dsg: DSG = results.locals.get(program.mainProcedure)
     assert(dsg.formals(R1).equals(dsg.formals(R2)))
     assert(dsg.varToCell(locAssign1)(R6)._1.equals(dsg.varToCell(locAssign2)(R7)._1))
@@ -364,7 +364,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Map.empty, Specification(Set(), Map(), List(), List(), List(), Set()), program))
+    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Set.empty, Map.empty, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program))
     val dsg: DSG = results.locals.get(program.mainProcedure)
     assert(dsg.varToCell(locAssign3)(R5)._1.offset == 13)
   }
@@ -392,7 +392,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Map.empty, Specification(Set(), Map(), List(), List(), List(), Set()), program))
+    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Set.empty, Map.empty, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program))
     val dsg: DSG = results.locals.get(program.mainProcedure)
     assert(dsg.formals(R1).equals(dsg.formals(R2)))
     assert(dsg.varToCell(locAssign1)(R6)._1.equals(dsg.varToCell(locAssign2)(R7)._1))
@@ -428,7 +428,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Map.empty, Specification(Set(), Map(), List(), List(), List(), Set()), program))
+    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Set.empty, Map.empty, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program))
     val dsg: DSG = results.locals.get(program.mainProcedure)
     assert(dsg.varToCell(locAssign2)(R7).equals(dsg.varToCell(locAssign3)(R5)))
   }

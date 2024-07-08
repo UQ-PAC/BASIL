@@ -7,15 +7,17 @@ import util.ILLoadingConfig
 import scala.jdk.CollectionConverters.*
 
 object ReadELFLoader {
-  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
+  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], Int) = {
     val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableExtFunc(r)).toSet
     val relocationOffsets = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableOffsets(r)).toMap
-    val globalVariables = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toSet
+    val symbolTableEntries = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toSet
+    val globalVariables: Set[SpecGlobal] = symbolTableEntries.filter(_.isInstanceOf[SpecGlobal]).map(_.asInstanceOf[SpecGlobal])
+    val functionEntries: Set[FuncEntry] = symbolTableEntries.filter(_.isInstanceOf[FuncEntry]).map(_.asInstanceOf[FuncEntry])
     val mainAddress = ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, config.mainProcedureName))
     if (mainAddress.isEmpty) {
       throw Exception(s"no ${config.mainProcedureName} function in symbol table")
     }
-    (externalFunctions, globalVariables, relocationOffsets, mainAddress.head)
+    (externalFunctions, globalVariables, functionEntries, relocationOffsets, mainAddress.head)
   }
 
   def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {
@@ -49,7 +51,7 @@ object ReadELFLoader {
     }
   }
 
-  def visitSymbolTable(ctx: SymbolTableContext): Set[SpecGlobal] = {
+  def visitSymbolTable(ctx: SymbolTableContext): Set[SymbolTableEntry] = {
     if (ctx.symbolTableHeader.tableName.STRING.getText == ".symtab") {
       val rows = ctx.symbolTableRow.asScala
       rows.flatMap(r => visitSymbolTableRow(r)).toSet
@@ -75,11 +77,14 @@ object ReadELFLoader {
     }
   }
 
-  def visitSymbolTableRow(ctx: SymbolTableRowContext): Option[SpecGlobal] = {
+  def visitSymbolTableRow(ctx: SymbolTableRowContext): Option[SymbolTableEntry] = {
     if ((ctx.entrytype.getText == "OBJECT" || ctx.entrytype.getText == "FUNC") && ctx.bind.getText == "GLOBAL" && ctx.vis.getText == "DEFAULT") {
       val name = ctx.name.getText
       if (name.forall(allowedChars.contains)) {
-        Some(SpecGlobal(name, ctx.size.getText.toInt * 8, None, hexToBigInt(ctx.value.getText)))
+        ctx.entrytype.getText match
+          case "OBJECT" => Some(SpecGlobal(name, ctx.size.getText.toInt * 8, None, hexToBigInt(ctx.value.getText)))
+          case "FUNC" => Some(FuncEntry(name, ctx.size.getText.toInt * 8, hexToBigInt(ctx.value.getText)))
+          case _ => None
       } else {
         None
       }

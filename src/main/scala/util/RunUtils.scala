@@ -41,6 +41,7 @@ import scala.collection.mutable
 case class IRContext(
     externalFunctions: Set[ExternalFunction],
     globals: Set[SpecGlobal],
+    funcEntries: Set[FuncEntry],
     globalOffsets: Map[BigInt, BigInt],
     specification: Specification,
     program: Program // internally mutable
@@ -77,13 +78,13 @@ object IRLoading {
   /** Create a context from just an IR program.
     */
   def load(p: Program): IRContext = {
-    IRContext(Set.empty, Set.empty, Map.empty, IRLoading.loadSpecification(None, p, Set.empty), p)
+    IRContext(Set.empty, Set.empty, Set.empty, Map.empty, IRLoading.loadSpecification(None, p, Set.empty), p)
   }
 
   /** Load a program from files using the provided configuration.
     */
   def load(q: ILLoadingConfig): IRContext = {
-    val (externalFunctions, globals, globalOffsets, mainAddress) = IRLoading.loadReadELF(q.relfFile, q)
+    val (externalFunctions, globals, funcEntries, globalOffsets, mainAddress) = IRLoading.loadReadELF(q.relfFile, q)
 
     val program: Program = if (q.inputFile.endsWith(".adt")) {
       val bapProgram = loadBAP(q.inputFile)
@@ -97,7 +98,7 @@ object IRLoading {
 
     val specification = IRLoading.loadSpecification(q.specFile, program, globals)
 
-    IRContext(externalFunctions, globals, globalOffsets, specification, program)
+    IRContext(externalFunctions, globals, funcEntries, globalOffsets, specification, program)
   }
 
   def loadBAP(fileName: String): BAPProgram = {
@@ -155,7 +156,7 @@ object IRLoading {
   def loadReadELF(
       fileName: String,
       config: ILLoadingConfig
-  ): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
+  ): (Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], Int) = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)
@@ -172,7 +173,7 @@ object IRLoading {
         specParser.setBuildParseTree(true)
         val specLoader = SpecificationLoader(globals, program)
         specLoader.visitSpecification(specParser.specification())
-      case None => Specification(globals, Map(), List(), List(), List(), Set())
+      case None => Specification(Set(), globals, Map(), List(), List(), List(), Set())
     }
   }
 }
@@ -989,7 +990,8 @@ object RunUtils {
     val paramResults = ParamAnalysis(ctx.program).analyze()
 
     Logger.info("[!] Running DSA Analysis")
-    val dsa = DSA(ctx.program, symResults, analysisResult.last.IRconstPropResult, ctx.globals, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, paramResults)
+    val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
+    val dsa = DSA(ctx.program, symResults, analysisResult.last.IRconstPropResult, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, paramResults)
     dsa.analyze()
 
     Logger.info(s"[!] Finished indirect call resolution after $iteration iterations")

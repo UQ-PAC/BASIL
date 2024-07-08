@@ -1,7 +1,7 @@
 package analysis
 
-import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Endian, Expr, Extract, IntraProcIRCursor, Assign, MemoryAssign, MemoryLoad, Procedure, Register, Variable, ZeroExtend, computeDomain, toShortString}
-import specification.{ExternalFunction, SpecGlobal}
+import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Endian, Expr, Extract, IntraProcIRCursor, MemoryAssign, MemoryLoad, Procedure, Register, Variable, ZeroExtend, computeDomain, toShortString}
+import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
 
 import scala.util.control.Breaks.{break, breakable}
 import java.math.BigInteger
@@ -23,7 +23,7 @@ class Local(
              proc: Procedure,
              symResults: Map[CFGPosition, Map[SymbolicAccess, TwoElement]],
              constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-             globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt],
+             globals: Set[SymbolTableEntry], globalOffsets: Map[BigInt, BigInt],
              externalFunctions: Set[ExternalFunction],
              reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
              writesTo: Map[Procedure, Set[Register]],

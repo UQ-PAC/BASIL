@@ -1,7 +1,7 @@
 package analysis
 
-import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, Assign, Memory, MemoryAssign, MemoryLoad,  Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, begin, computeDomain, toShortString}
-import specification.{ExternalFunction, SpecGlobal}
+import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, Memory, MemoryAssign, MemoryLoad, Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, begin, computeDomain, toShortString}
+import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
 
 import scala.util.control.Breaks.{break, breakable}
 import java.math.BigInteger
@@ -31,7 +31,7 @@ object NodeCounter {
 class DSG(val proc: Procedure,
           constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
           varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAccess]]],
-          globals: Set[SpecGlobal], globalOffsets: Map[BigInt, BigInt],
+          globals: Set[SymbolTableEntry], globalOffsets: Map[BigInt, BigInt],
           externalFunctions: Set[ExternalFunction],
           val reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
           val writesTo: Map[Procedure, Set[Register]],
