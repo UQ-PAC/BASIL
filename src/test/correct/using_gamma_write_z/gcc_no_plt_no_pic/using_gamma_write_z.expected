@@ -113,9 +113,9 @@ implementation main()
     assert (Gamma_x_old ==> gamma_load32(Gamma_mem, $x_addr));
     assume {:captureState "%0000085b"} true;
     R0, Gamma_R0 := 0bv64, true;
-    goto main_return;
-  main_return:
-    assume {:captureState "main_return"} true;
+    goto main_basil_return;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 

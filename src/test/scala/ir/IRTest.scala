@@ -136,20 +136,20 @@ class IRTest extends AnyFunSuite {
     val p = prog(
       proc("main",
         block("l_main",
-          LocalAssign(R0, bv64(10)),
-          LocalAssign(R1, bv64(10)),
+          Assign(R0, bv64(10)),
+          Assign(R1, bv64(10)),
           goto("newblock")
         ),
         block("l_main_1",
-          LocalAssign(R0, bv64(22)),
-          call("p2", Some("returntarget"))
+          Assign(R0, bv64(22)),
+          directCall("p2", Some("returntarget"))
         ),
         block("returntarget",
           ret
         )
       ),
       proc("p2",
-        block("l_p2", LocalAssign(R0, bv64(10)), goto("l_p2_1")),
+        block("l_p2", Assign(R0, bv64(10)), goto("l_p2_1")),
         block("l_p2_1", ret)
       )
     )
@@ -200,15 +200,15 @@ class IRTest extends AnyFunSuite {
     )
 
     val b2 = block("newblock2",
-      LocalAssign(R0, bv64(22)),
-      LocalAssign(R0, bv64(22)),
-      LocalAssign(R0, bv64(22)),
+      Assign(R0, bv64(22)),
+      Assign(R0, bv64(22)),
+      Assign(R0, bv64(22)),
       goto("lmain2")
     ).resolve(p)
     val b1 = block("newblock1",
-      LocalAssign(R0, bv64(22)),
-      LocalAssign(R0, bv64(22)),
-      LocalAssign(R0, bv64(22)),
+      Assign(R0, bv64(22)),
+      Assign(R0, bv64(22)),
+      Assign(R0, bv64(22)),
       goto("lmain2")
     ).resolve(p)
 
@@ -243,15 +243,15 @@ class IRTest extends AnyFunSuite {
 
 
     val b1= block("newblock2",
-      LocalAssign(R0, bv64(22)),
-      LocalAssign(R0, bv64(22)),
-      LocalAssign(R0, bv64(22)),
-      call("main", None)
+      Assign(R0, bv64(22)),
+      Assign(R0, bv64(22)),
+      Assign(R0, bv64(22)),
+      directCall("main", None)
     ).resolve(p)
     val b2 = block("newblock1",
-      LocalAssign(R0, bv64(22)),
-      LocalAssign(R0, bv64(22)),
-      LocalAssign(R0, bv64(22)),
+      Assign(R0, bv64(22)),
+      Assign(R0, bv64(22)),
+      Assign(R0, bv64(22)),
       ret
     ).resolve(p)
 
@@ -270,8 +270,8 @@ class IRTest extends AnyFunSuite {
 
     assert(called.incomingCalls().isEmpty)
     val b3 = block("newblock3",
-      LocalAssign(R0, bv64(22)),
-      call("called", None)
+      Assign(R0, bv64(22)),
+      directCall("called", None)
     ).resolve(p)
 
     assert(b3.calls.toSet == Set(p.procs("called")))
@@ -301,8 +301,8 @@ class IRTest extends AnyFunSuite {
     val p = prog(
         proc("main",
           block("l_main",
-            LocalAssign(R0, bv64(10)),
-            LocalAssign(R1, bv64(10)),
+            Assign(R0, bv64(10)),
+            Assign(R1, bv64(10)),
             goto("returntarget")
           ),
           block("returntarget",
@@ -326,14 +326,14 @@ class IRTest extends AnyFunSuite {
     val p = prog(
       proc("p1",
         block("b1",
-          LocalAssign(R0, bv64(10)),
+          Assign(R0, bv64(10)),
           ret
         )
       ),
       proc("main",
         block("l_main",
-          LocalAssign(R0, bv64(10)),
-          call("p1", Some("returntarget"))
+          Assign(R0, bv64(10)),
+          directCall("p1", Some("returntarget"))
         ),
         block("returntarget",
           ret
@@ -363,6 +363,40 @@ class IRTest extends AnyFunSuite {
     assert(InterProcIRCursor.pred(prevB).head == p.blocks("l_main").fallthrough.get)
     assert(InterProcBlockIRCursor.pred(prevB).head == p.blocks("l_main"), p.procs("p1").returnBlock.get)
 
+  }
+
+  test("replace jump") {
+    val p = prog(
+      proc("p1",
+        block("b1",
+          ret
+        )
+      ),
+      proc("main",
+        block("l_main",
+          indirectCall(R1, Some("returntarget"))
+        ),
+        block("block2",
+          directCall("p1", Some("returntarget"))
+        ),
+        block("returntarget",
+          ret
+        )
+      ),
+    )
+
+    val main = p.blocks("l_main")
+    val p1 = p.procs("p1")
+    val block2 = p.blocks("block2")
+
+    val oldJump = main.jump
+    val newJump = block2.jump
+
+    main.replaceJump(newJump)
+
+    assert(newJump.parent == main)
+    assert(block2.jump.isInstanceOf[GoTo])
+    assert(block2.jump.asInstanceOf[GoTo].targets.isEmpty)
   }
 
 }

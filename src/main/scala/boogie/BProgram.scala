@@ -24,16 +24,16 @@ trait BDeclaration extends HasAttributes {
 
 case class BProcedure(
     name: String,
-    in: List[BVar],
-    out: List[BVar],
-    ensures: List[BExpr],
-    requires: List[BExpr],
-    ensuresDirect: List[String],
-    requiresDirect: List[String],
-    freeEnsures: List[BExpr],
-    freeRequires: List[BExpr],
-    modifies: Set[BVar],
-    body: List[BCmdOrBlock],
+    in: List[BVar] = Nil,
+    out: List[BVar] = Nil,
+    ensures: List[BExpr] = Nil,
+    requires: List[BExpr] = Nil,
+    ensuresDirect: List[String] = Nil,
+    requiresDirect: List[String] = Nil,
+    freeEnsures: List[BExpr] = Nil,
+    freeRequires: List[BExpr] = Nil,
+    modifies: Set[BVar] = Set(),
+    body: List[BCmdOrBlock] = Nil,
     override val attributes: List[BAttribute] = List()
 ) extends BDeclaration
     with Ordered[BProcedure] {
@@ -93,7 +93,7 @@ case class BFunction(name: String, in: List[BVar], out: BVar, body: Option[BExpr
     with Ordered[BFunction] {
   override def compare(that: BFunction): Int = name.compare(that.name)
   override def toBoogie: List[String] = {
-    val s = new StringWriter()
+    val s = StringWriter()
 
     val inString = in.map(_.withType).mkString(", ")
     val declString = s"function $attrString$name($inString) returns (${out.withType})"

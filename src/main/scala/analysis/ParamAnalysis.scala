@@ -22,9 +22,9 @@ class ParamAnalysis(val program: Program) extends Analysis[Any] {
         case _ => s
   }
 
-  private val stackPointer = Register("R31", BitVecType(64))
-  private val linkRegister = Register("R30", BitVecType(64))
-  private val framePointer = Register("R29", BitVecType(64))
+  private val stackPointer = Register("R31", 64)
+  private val linkRegister = Register("R30", 64)
+  private val framePointer = Register("R29", 64)
 
   private val ignoreRegisters: Set[Variable] = Set(linkRegister, framePointer, stackPointer)
 

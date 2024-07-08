@@ -119,9 +119,9 @@ implementation add_six()
     assert (L(mem, bvadd64(R1, 16bv64)) ==> Gamma_R0);
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R1, 16bv64), R0[32:0]), gamma_store32(Gamma_mem, bvadd64(R1, 16bv64), Gamma_R0);
     assume {:captureState "%00000252"} true;
-    goto add_six_return;
-  add_six_return:
-    assume {:captureState "add_six_return"} true;
+    goto add_six_basil_return;
+  add_six_basil_return:
+    assume {:captureState "add_six_basil_return"} true;
     return;
 }
 
@@ -156,9 +156,9 @@ implementation add_two()
     assert (L(mem, bvadd64(R1, 16bv64)) ==> Gamma_R0);
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R1, 16bv64), R0[32:0]), gamma_store32(Gamma_mem, bvadd64(R1, 16bv64), Gamma_R0);
     assume {:captureState "%00000233"} true;
-    goto add_two_return;
-  add_two_return:
-    assume {:captureState "add_two_return"} true;
+    goto add_two_basil_return;
+  add_two_basil_return:
+    assume {:captureState "add_two_basil_return"} true;
     return;
 }
 
@@ -237,9 +237,9 @@ implementation main()
     R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
     R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
-    goto main_return;
-  main_return:
-    assume {:captureState "main_return"} true;
+    goto main_basil_return;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 
@@ -274,9 +274,9 @@ implementation sub_seven()
     assert (L(mem, bvadd64(R1, 16bv64)) ==> Gamma_R0);
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R1, 16bv64), R0[32:0]), gamma_store32(Gamma_mem, bvadd64(R1, 16bv64), Gamma_R0);
     assume {:captureState "%00000275"} true;
-    goto sub_seven_return;
-  sub_seven_return:
-    assume {:captureState "sub_seven_return"} true;
+    goto sub_seven_basil_return;
+  sub_seven_basil_return:
+    assume {:captureState "sub_seven_basil_return"} true;
     return;
 }
 

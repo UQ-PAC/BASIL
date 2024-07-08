@@ -15,7 +15,7 @@ trait MemoryRegionAnalysis(val program: Program,
                            val ANRResult: Map[CFGPosition, Set[Variable]],
                            val RNAResult: Map[CFGPosition, Set[Variable]],
                            val regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
-                           reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]) {
+                           reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) {
 
   var mallocCount: Int = 0
   private var stackCount: Int = 0
@@ -54,14 +54,14 @@ trait MemoryRegionAnalysis(val program: Program,
     Logger.debug("Stack detection")
     Logger.debug(spList)
     stmt match {
-      case localAssign: LocalAssign =>
-        if (spList.contains(localAssign.rhs)) {
+      case assign: Assign =>
+        if (spList.contains(assign.rhs)) {
           // add lhs to spList
-          spList.addOne(localAssign.lhs)
+          spList.addOne(assign.lhs)
         } else {
           // remove lhs from spList
-          if spList.contains(localAssign.lhs) && localAssign.lhs != stackPointer then // TODO: This is a hack: it should check for stack ptr using the wrapper
-            spList.remove(spList.indexOf(localAssign.lhs))
+          if spList.contains(assign.lhs) && assign.lhs != stackPointer then // TODO: This is a hack: it should check for stack ptr using the wrapper
+            spList.remove(spList.indexOf(assign.lhs))
         }
       // TODO: should handle the store case (last case)
       case _ =>
@@ -81,10 +81,10 @@ trait MemoryRegionAnalysis(val program: Program,
 
   val first: Set[CFGPosition] = Set.empty ++ program.procedures
 
-  private val stackPointer = Register("R31", BitVecType(64))
-  private val linkRegister = Register("R30", BitVecType(64))
-  private val framePointer = Register("R29", BitVecType(64))
-  private val mallocVariable = Register("R0", BitVecType(64))
+  private val stackPointer = Register("R31", 64)
+  private val linkRegister = Register("R30", 64)
+  private val framePointer = Register("R29", 64)
+  private val mallocVariable = Register("R0", 64)
   private val spList = ListBuffer[Expr](stackPointer)
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
   // TODO: this could be used instead of regionAccesses in other analyses to reduce the Expr to region conversion
@@ -202,16 +202,16 @@ trait MemoryRegionAnalysis(val program: Program,
             s
           }
         case memAssign: MemoryAssign =>
-          if (ignoreRegions.contains(memAssign.rhs.value)) {
+          if (ignoreRegions.contains(memAssign.value)) {
             s
           } else {
-            val result = eval(memAssign.rhs.index, s, cmd)
+            val result = eval(memAssign.index, s, cmd)
             regionLattice.lub(s, result)
           }
-        case localAssign: LocalAssign =>
-          stackDetection(localAssign)
+        case assign: Assign =>
+          stackDetection(assign)
           var m = s
-          unwrapExpr(localAssign.rhs).foreach {
+          unwrapExpr(assign.rhs).foreach {
             case memoryLoad: MemoryLoad =>
               val result = eval(memoryLoad.index, s, cmd)
               m = regionLattice.lub(m, result)
@@ -235,7 +235,7 @@ class MemoryRegionAnalysisSolver(
     ANRResult: Map[CFGPosition, Set[Variable]],
     RNAResult: Map[CFGPosition, Set[Variable]],
     regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]
+    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
   ) extends MemoryRegionAnalysis(program, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, regionAccesses, reachingDefs)
   with IRIntraproceduralForwardDependencies
   with Analysis[Map[CFGPosition, LiftedElement[Set[MemoryRegion]]]]

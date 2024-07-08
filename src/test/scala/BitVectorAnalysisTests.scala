@@ -1,6 +1,7 @@
 import analysis.BitVectorEval.*
-import ir._
+import ir.*
 import org.scalatest.funsuite.AnyFunSuite
+import util.Logger
 
 import scala.runtime.stdLibPatches.Predef.assert
 
@@ -367,17 +368,17 @@ class BitVectorAnalysisTests extends AnyFunSuite {
   test("SMT - ConCat - should combine two numbers into a single number") {
     val result =
       smt_concat(BitVecLiteral(BigInt("AAAABBBBCCCCDDDD", 16), 64), BitVecLiteral(BigInt("EEEEFFFF", 16), 32))
-    println(result.value.toString(16))
+    Logger.debug(result.value.toString(16))
     assert(result == BitVecLiteral(BigInt("AAAABBBBCCCCDDDDEEEEFFFF", 16), 96))
   }
   test("SMT - ConCat - should combine two numbers into a single number, with first number being 0") {
     val result = smt_concat(BitVecLiteral(BigInt("0", 16), 64), BitVecLiteral(BigInt("EEEEFFFF", 16), 32))
-    println(result.value.toString(16))
+    Logger.debug(result.value.toString(16))
     assert(result == BitVecLiteral(BigInt("EEEEFFFF", 16), 96))
   }
   test("SMT - ConCat - should combine two numbers into a single number, with last number being 0") {
     val result = smt_concat(BitVecLiteral(BigInt("AAAABBBBCCCCDDDD", 16), 64), BitVecLiteral(BigInt("0", 16), 32))
-    println(result.value.toString(16))
+    Logger.debug(result.value.toString(16))
     assert(result == BitVecLiteral(BigInt("aaaabbbbccccdddd00000000", 16), 96))
   }
 

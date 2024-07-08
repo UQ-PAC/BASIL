@@ -114,9 +114,9 @@ implementation main()
     assert ((bvadd64(R1, 20bv64) == $z_addr) ==> (L(mem, $x_addr) ==> Gamma_x_old));
     assert (Gamma_x_old ==> gamma_load32(Gamma_mem, $x_addr));
     assume {:captureState "%000001bd"} true;
-    goto main_return;
-  main_return:
-    assume {:captureState "main_return"} true;
+    goto main_basil_return;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 

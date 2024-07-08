@@ -30,20 +30,21 @@ trait SystemTests extends AnyFunSuite {
 
   def runTests(programs: Array[String], path: String, name: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
     // get all variations of each program
+    val testSuffix = if useADT then ":BAP" else ":GTIRB"
     for (p <- programs) {
       val programPath = path + "/" + p
       val variations = getSubdirectories(programPath)
       variations.foreach(t =>
-        test(name + "/" + p + "/" + t) {
+        test(name + "/" + p + "/" + t + testSuffix) {
           runTest(path, p, t, shouldVerify, useADT)
         }
       )
     }
   }
 
-  def summary(): Unit = {
+  def summary(filename: String): Unit = {
     val csv: String = "testCase," + TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r._1},${r._2.toCsv}").mkString(System.lineSeparator())
-    log(csv, testPath + "testResults.csv")
+    log(csv, testPath + "full-" + filename)
 
     val numVerified = testResults.count(_._2.verified)
     val numCounterexample = testResults.count(x => !x._2.verified && !x._2.timedOut)
@@ -61,7 +62,7 @@ trait SystemTests extends AnyFunSuite {
 
     val summaryHeader = "passedCount,failedCount,verifiedCount,counterexampleCount,timeoutCount,verifyTotalTime,counterexampleTotalTime"
     val summaryRow = s"$numSuccess,$numFail,$numVerified,${counterExamples.size},$numTimeout,${verifying.sum},${counterExamples.sum}"
-    log(summaryHeader + System.lineSeparator() + summaryRow, testPath + "summary.csv")
+    log(summaryHeader + System.lineSeparator() + summaryRow, testPath + "summary-" + filename)
   }
 
   def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
@@ -83,7 +84,7 @@ trait SystemTests extends AnyFunSuite {
     val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(outPath))
     val boogieResult = (Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath) ++ extraSpec).!!
     val verifyTime = timer.checkPoint("verify")
-    val resultPath = if useADT then variationPath + "bap_result.txt" else variationPath + "gtirb_result.txt"
+    val resultPath = if useADT then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
     log(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
     val proveFailed = boogieResult.contains("could not be proved")
@@ -164,7 +165,7 @@ class SystemTestsBAP extends SystemTests  {
   runTests(correctPrograms, correctPath, "correct", true, true)
   runTests(incorrectPrograms, incorrectPath, "incorrect", false, true)
   test("summary") {
-    summary()
+    summary("testresult-BAP.csv")
   }
 }
 
@@ -172,6 +173,6 @@ class SystemTestsGTIRB extends SystemTests  {
   runTests(correctPrograms, correctPath, "correct", true, false)
   runTests(incorrectPrograms, incorrectPath, "incorrect", false, false)
   test("summary") {
-    summary()
+    summary("testresult-GTIRB.csv")
   }
 }

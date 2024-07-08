@@ -22,7 +22,7 @@ import Parsers.*
 import Parsers.SemanticsParser.*
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
-import org.antlr.v4.runtime.{CharStreams, CommonTokenStream}
+import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
 import util.Logger
 import java.util.Base64
@@ -60,7 +60,7 @@ case class StaticAnalysisContext(
     steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]
+    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
 )
 
 /** Results of the main program execution.
@@ -115,18 +115,31 @@ object IRLoading {
 
     val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]])
 
-    def parse_insn(f: String): StmtContext = {
+    def parse_insn(line: String): StmtContext = {
+      val semanticsLexer = SemanticsLexer(CharStreams.fromString(line))
+      val tokens = CommonTokenStream(semanticsLexer)
+      val parser = SemanticsParser(tokens)
+      parser.setErrorHandler(BailErrorStrategy())
+      parser.setBuildParseTree(true)
+
       try {
-        val semanticsLexer = SemanticsLexer(CharStreams.fromString(f))
-        val tokens = CommonTokenStream(semanticsLexer)
-        val parser = SemanticsParser(tokens)
-        parser.setErrorHandler(BailErrorStrategy())
-        parser.setBuildParseTree(true)
         parser.stmt()
       } catch {
         case e: org.antlr.v4.runtime.misc.ParseCancellationException =>
-          Logger.error(f)
-          throw RuntimeException(e)
+          val extra = e.getCause match {
+            case mismatch: org.antlr.v4.runtime.InputMismatchException =>
+              val token = mismatch.getOffendingToken
+              s"""
+                exn: ${mismatch}
+                offending token: ${token}
+
+              ${line.replace('\n', ' ')}
+              ${" " * token.getStartIndex}^ here!
+              """.stripIndent
+            case _ => ""
+          }
+          Logger.error(s"""Semantics parse error:\n  line: ${line}\n${extra}""")
+          throw e
       }
     }
 
@@ -219,7 +232,7 @@ object IRTransform {
         c.data match
 
         //We do not want to insert the VSA results into the IR like this
-          case localAssign: LocalAssign =>
+          case localAssign: Assign =>
             localAssign.rhs match
               case _: MemoryLoad =>
                 if (valueSets(n).contains(localAssign.lhs) && valueSets(n).get(localAssign.lhs).head.size == 1) {
@@ -326,7 +339,7 @@ object IRTransform {
      cfg: ProgramCfg,
      pointsTos: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
      regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-     reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
+     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
      IRProgram: Program
    ): Boolean = {
     var modified: Boolean = false
@@ -350,7 +363,7 @@ object IRTransform {
           if (regionContents.contains(stackRegion)) {
             for (c <- regionContents(stackRegion)) {
               c match {
-                case bitVecLiteral: BitVecLiteral => println("hi: " + bitVecLiteral)//???
+                case bitVecLiteral: BitVecLiteral => Logger.debug("hi: " + bitVecLiteral)//???
                 case memoryRegion: MemoryRegion =>
                   result.addAll(searchRegion(memoryRegion))
               }
@@ -364,7 +377,7 @@ object IRTransform {
             result.add(dataRegion.regionIdentifier) // TODO: may need to investigate if we should add the parent region
             for (c <- regionContents(dataRegion)) {
               c match {
-                case bitVecLiteral: BitVecLiteral => println("hi: " + bitVecLiteral)//???
+                case bitVecLiteral: BitVecLiteral => Logger.debug("hi: " + bitVecLiteral)//???
                 case memoryRegion: MemoryRegion =>
                   result.addAll(searchRegion(memoryRegion))
               }
@@ -398,7 +411,8 @@ object IRTransform {
       case c: CfgJumpNode =>
         val block = c.block
         c.data match
-          case indirectCall: IndirectCall =>
+          // don't try to resolve returns
+          case indirectCall: IndirectCall if indirectCall.target != Register("R30", 64) =>
             if (block.jump != indirectCall) {
               // We only replace the calls with DirectCalls in the IR, and don't replace the CommandNode.data
               // Hence if we have already processed this CFG node there will be no corresponding IndirectCall in the IR
@@ -423,9 +437,12 @@ object IRTransform {
               val newBlocks = ArrayBuffer[Block]()
               // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
               for (t <- targets) {
-                println(targets)
-                // TODO: getOrElse 0 is a hack may not be correct
-                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.getOrElse(0), 64)))
+                Logger.debug(targets)
+                val address = t.address.match {
+                  case Some(a) => a
+                  case None => throw Exception(s"resolved indirect call $indirectCall to procedure which does not have address: $t")
+                }
+                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(address, 64)))
                 val newLabel: String = block.label + t.name
                 val directCall = DirectCall(t, indirectCall.returnTarget)
                 directCall.parent = indirectCall.parent
@@ -471,7 +488,7 @@ object IRTransform {
   def splitThreads(program: Program,
                    pointsTo: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
                    regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-                   reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]
+                   reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
                   ): Unit = {
     
     // iterate over all commands - if call is to pthread_create, look up?
@@ -482,7 +499,7 @@ object IRTransform {
 
             // R2 should hold the function pointer of the function that begins the thread
             // look up R2 value using points to results
-            val R2 = Register("R2", BitVecType(64))
+            val R2 = Register("R2", 64)
             val b = reachingDefs(d)
             val R2Wrapper = RegisterVariableWrapper(R2, getDefinition(R2, d, reachingDefs))
             val threadTargets = pointsTo(R2Wrapper)

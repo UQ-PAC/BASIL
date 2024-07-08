@@ -17,9 +17,9 @@ trait ANRAnalysis(program: Program) {
 
   val domain: Set[CFGPosition] = Set.empty ++ program
 
-  private val stackPointer = Register("R31", BitVecType(64))
-  private val linkRegister = Register("R30", BitVecType(64))
-  private val framePointer = Register("R29", BitVecType(64))
+  private val stackPointer = Register("R31", 64)
+  private val linkRegister = Register("R30", 64)
+  private val framePointer = Register("R29", 64)
 
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer, stackPointer)
 
@@ -33,12 +33,12 @@ trait ANRAnalysis(program: Program) {
       case assert: Assert =>
         m.diff(assert.body.variables)
       case memoryAssign: MemoryAssign =>
-        m.diff(memoryAssign.lhs.variables ++ memoryAssign.rhs.variables)
+        m.diff(memoryAssign.index.variables)
       case indirectCall: IndirectCall =>
         m - indirectCall.target
-      case localAssign: LocalAssign =>
-        m = m.diff(localAssign.rhs.variables)
-        if ignoreRegions.contains(localAssign.lhs) then m else m + localAssign.lhs
+      case assign: Assign =>
+        m = m.diff(assign.rhs.variables)
+        if ignoreRegions.contains(assign.lhs) then m else m + assign.lhs
       case _ =>
         m
     }

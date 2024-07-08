@@ -1,16 +1,16 @@
 package analysis
 
-import ir._
+import ir.*
 import analysis.solvers.SimpleWorklistFixpointSolver
 
 case class ReachingDefinitionsAnalysis(program: Program) {
 
-  type Definition = LocalAssign // local assign is a definition because it is a statement and statements are assumed to be unique
+  type Definition = Assign // local assign is a definition because it is a statement and statements are assumed to be unique
   type TupleElement =
     TupleLattice[MapLattice[Variable, Set[Definition], PowersetLattice[Definition]], MapLattice[Variable, Set[Definition], PowersetLattice[Definition]], Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]]
 
-  val tupleLattice: TupleLattice[MapLattice[Variable, Set[Definition], PowersetLattice[Definition]], MapLattice[Variable, Set[LocalAssign], PowersetLattice[
-    LocalAssign]], Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]] =
+  val tupleLattice: TupleLattice[MapLattice[Variable, Set[Definition], PowersetLattice[Definition]], MapLattice[Variable, Set[Assign], PowersetLattice[
+    Assign]], Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]] =
     new TupleLattice(
       new MapLattice[Variable, Set[Definition], PowersetLattice[Definition]](new PowersetLattice[Definition]()),
       new MapLattice[Variable, Set[Definition], PowersetLattice[Definition]](new PowersetLattice[Definition]())
@@ -27,8 +27,8 @@ case class ReachingDefinitionsAnalysis(program: Program) {
    */
   private def generateUniqueDefinition(
       variable: Variable
-  ): LocalAssign = {
-    LocalAssign(variable, BitVecLiteral(0, 0))
+  ): Assign = {
+    Assign(variable, BitVecLiteral(0, 0))
   }
 
   def transfer(n: CFGPosition, s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) =
@@ -52,21 +52,21 @@ case class ReachingDefinitionsAnalysis(program: Program) {
 
   def eval(cmd: Command, s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])
   ): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) = cmd match {
-    case localAssign: LocalAssign =>
+    case assign: Assign =>
       // do the rhs first (should reset the values for this node to the empty set)
       // for each variable in the rhs, find the definitions from the lattice lhs and add them to the lattice rhs
       // for lhs, addOrReplace the definition
-      val rhs = localAssign.rhs.variables
-      val lhs = localAssign.lhs
+      val rhs = assign.rhs.variables
+      val lhs = assign.lhs
       val rhsUseDefs: Map[Variable, Set[Definition]] = rhs.foldLeft(Map.empty[Variable, Set[Definition]]) {
         case (acc, v) =>
           acc + (v -> s._1(v))
       }
-      (s._1 + (lhs -> Set(localAssign)), rhsUseDefs)
+      (s._1 + (lhs -> Set(assign)), rhsUseDefs)
     case assert: Assert =>
       transformUses(assert.body.variables, s)
     case memoryAssign: MemoryAssign =>
-      transformUses(memoryAssign.rhs.variables, s)
+      transformUses(memoryAssign.index.variables ++ memoryAssign.value.variables, s)
     case assume: Assume =>
       transformUses(assume.body.variables, s)
     case indirectCall: IndirectCall =>

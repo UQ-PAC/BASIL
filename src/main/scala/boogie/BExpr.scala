@@ -88,7 +88,6 @@ case class BVExtract(end: Int, start: Int, body: BExpr) extends BExpr {
 case class BVRepeat(repeats: Int, body: BExpr) extends BExpr {
   override def getType: BitVecBType = BitVecBType(bodySize * repeats)
 
-
   private def bodySize: Int = body.getType match {
     case bv: BitVecBType => bv.size
     case _ => throw new Exception("type mismatch, non bv expression: " + body + " in body of extract: " + this)
@@ -243,10 +242,17 @@ case class BMapVar(override val name: String, override val bType: MapBType, over
   override val getType: MapBType = bType
 }
 
-case class BFunctionCall(name: String, args: List[BExpr], bType: BType) extends BExpr {
-  override val getType: BType = bType
+case class BFunctionCall(name: String, args: List[BExpr], outType: BType, uninterpreted: Boolean = false) extends BExpr {
+  override val getType: BType = outType
   override def toString: String = s"$name(${args.mkString(", ")})"
-  override def functionOps: Set[FunctionOp] = args.flatMap(a => a.functionOps).toSet
+  override def functionOps: Set[FunctionOp] = {
+    val ops = args.flatMap(a => a.functionOps).toSet
+    if (uninterpreted) {
+      ops ++ Set(BUninterpreted(name, args.map(_.getType), outType))
+    } else {
+      ops
+    }
+  }
   override def locals: Set[BVar] = args.flatMap(a => a.locals).toSet
   override def globals: Set[BVar] = args.flatMap(a => a.globals).toSet
   override def specGlobals: Set[SpecGlobalOrAccess] = args.flatMap(a => a.specGlobals).toSet
@@ -653,6 +659,8 @@ case class InBounds(bits: Int, endian: Endian) extends FunctionOp {
     case Endian.BigEndian=> s"in_bounds${bits}_be"
   }
 }
+
+case class BUninterpreted(name: String, in: List[BType], out: BType) extends FunctionOp
 
 case class BInBounds(base: BExpr, len: BExpr, endian: Endian, i: BExpr) extends BExpr {
   override def toString: String = s"$fnName($base, $len, $i)"

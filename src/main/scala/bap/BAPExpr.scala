@@ -7,19 +7,6 @@ import ir._
 trait BAPExpr {
   def toIR: Expr
 
-  /* def toGamma: Expr = {
-    val gammaVars: Set[Expr] = gammas.map(_.toGamma)
-    if (gammaVars.isEmpty) {
-      TrueLiteral
-    } else if (gammaVars.size == 1) {
-      gammaVars.head
-    } else {
-      gammaVars.tail.foldLeft(gammaVars.head) { (join: Expr, next: Expr) =>
-        BinaryExpr(BoolAND, next, join)
-      }
-    }
-  }
-   */
   /*
    * The size of output of the given expression.
    *
@@ -239,7 +226,7 @@ trait BAPVar extends BAPVariable {
 }
 
 case class BAPRegister(override val name: String, override val size: Int) extends BAPVar {
-  override def toIR: Register = Register(s"$name", BitVecType(size))
+  override def toIR: Register = Register(s"$name", size)
 }
 
 case class BAPLocalVar(override val name: String, override val size: Int) extends BAPVar {
@@ -250,41 +237,18 @@ case class BAPLocalVar(override val name: String, override val size: Int) extend
   */
 case class BAPMemAccess(memory: BAPMemory, index: BAPExpr, endian: Endian, override val size: Int) extends BAPVariable {
   override def toString: String = s"${memory.name}[$index]"
-  override def toIR: MemoryLoad = MemoryLoad(memory.toIR, index.toIR, endian, size)
-}
-
-/*
-object BAPMemAccess {
-  // initialise to replace stack references
-  def init(memory: BAPMemory, index: BAPExpr, endian: Endian, size: Int): BAPMemAccess = {
-    if (index.locals.contains(BAPLocalVar("R31", 64))) {
-      BAPMemAccess(memory.copy(name = "stack"), index, endian, size)
-    } else {
-      BAPMemAccess(memory, index, endian, size)
-    }
+  override def toIR: MemoryLoad = {
+    MemoryLoad(memory.toIRMemory, index.toIR, endian, size)
   }
 }
- */
 
 case class BAPMemory(name: String, addressSize: Int, valueSize: Int) extends BAPVariable {
   override val size: Int = valueSize // should reconsider
-  override def toIR: Memory = Memory(name, addressSize, valueSize)
+  override def toIR: Expr = ??? // should not encounter
+  def toIRMemory: Memory = SharedMemory(name, addressSize, valueSize)
 }
 
 case class BAPStore(memory: BAPMemory, index: BAPExpr, value: BAPExpr, endian: Endian, size: Int) extends BAPExpr {
-  override def toIR: MemoryStore = MemoryStore(memory.toIR, index.toIR, value.toIR, endian, size)
+  override def toIR: Expr = ??? // should not encounter
   override def toString: String = s"${memory.name}[$index] := $value"
 }
-
-/*
-object BAPStore {
-  // initialise to replace stack references
-  def init(memory: BAPMemory, index: BAPExpr, value: BAPExpr, endian: Endian, size: Int): BAPStore = {
-    if (index.locals.contains(BAPLocalVar("R31", 64))) {
-      BAPStore(memory.copy(name = "stack"), index, value, endian, size)
-    } else {
-      BAPStore(memory, index, value, endian, size)
-    }
-  }
-}
- */
