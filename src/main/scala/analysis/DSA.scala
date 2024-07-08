@@ -99,9 +99,9 @@ class DSA(program: Program,
           }
 
           calleeGraph.formals.foreach{
-            case (variable: Variable, (cell: DSC, internalOffset: BigInt)) if !ignoreRegisters.contains(variable)  =>
+            case (variable: Variable, slice: Slice) if !ignoreRegisters.contains(variable)  =>
               assert(callSite.paramCells.contains(variable))
-              val node = cell.node.get
+              val node = slice.node
               node.cloneNode(calleeGraph, buGraph)
             case _ =>
           }
@@ -113,8 +113,8 @@ class DSA(program: Program,
               val returnCells = calleeGraph.getCells(end(callee), reg)
               assert(returnCells.nonEmpty)
               returnCells.foreach{
-                case (cell: DSC, internalOffset: BigInt) =>
-                  val node = cell.node.get
+                case slice: Slice =>
+                  val node = slice.node
                   node.cloneNode(calleeGraph, buGraph)
               }
           )
@@ -173,14 +173,14 @@ class DSA(program: Program,
 
 
           callSite.paramCells.foreach{
-            case (variable: Variable, (cell: DSC, internalOffset: BigInt)) =>
-              val node = cell.node.get
+            case (variable: Variable, slice: Slice) =>
+              val node = slice.node
               node.cloneNode(callersGraph, calleesGraph)
           }
 
           callSite.returnCells.foreach{
-            case (variable: Variable, (cell: DSC, internalOffset: BigInt)) =>
-              val node = cell.node.get
+            case (variable: Variable, slice: Slice) =>
+              val node = slice.node
               node.cloneNode(callersGraph, callersGraph)
           }
 
@@ -201,10 +201,10 @@ class DSA(program: Program,
           )
 
           calleesGraph.varToCell.getOrElse(callSite.call, Map.empty).foreach{
-            case (variable: Variable, cell: (DSC, BigInt)) =>
+            case (variable: Variable, cell: Slice) =>
               val returnCells = calleesGraph.getCells(end(callee), variable)
               returnCells.foldLeft(adjust(cell)){
-                case (c: DSC, retCell: (DSC, BigInt)) =>
+                case (c: DSC, retCell: Slice) =>
                   calleesGraph.mergeCells(c, adjust(retCell))
               }
             case _ => ???

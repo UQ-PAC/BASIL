@@ -122,7 +122,7 @@ class Local(
     // visit all the defining pointer operation on rhs variable first
     reachingDefs(position)(rhs).foreach(visit)
     // get the cells of all the SSA variables in the set
-    val cells: Set[(DSC, BigInt)] = graph.getCells(position, rhs)
+    val cells: Set[Slice] = graph.getCells(position, rhs)
     // merge the cells or their pointees with lhs
     var result = cells.foldLeft(lhs) {
       (c, t) =>
@@ -176,7 +176,7 @@ class Local(
     if containsPointer then
       val cell = expr.variables.foldLeft(lhsCell) {
         (c, v) =>
-          val cells: Set[(DSC, BigInt)] = graph.getCells(n, v)
+          val cells: Set[Slice] = graph.getCells(n, v)
 
           cells.foldLeft(c) {
             (c, p) =>
@@ -206,11 +206,11 @@ class Local(
         val cs = CallSite(call, graph)
         graph.callsites.add(cs)
         cs.paramCells.foreach{
-          case (variable: Variable, slice: (DSC, BigInt)) =>
+          case (variable: Variable, slice: Slice) =>
             visitPointerArithmeticOperation(call, adjust(slice), variable, 0)
         }
         cs.returnCells.foreach{
-          case (variable: Variable, slice: (DSC,BigInt)) =>
+          case (variable: Variable, slice: Slice) =>
             val returnArgument  = graph.varToCell(n)(variable)
             graph.mergeCells(adjust(returnArgument), adjust(slice))
         }
