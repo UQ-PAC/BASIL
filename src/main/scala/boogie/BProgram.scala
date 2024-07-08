@@ -1,13 +1,11 @@
 package boogie
 import java.io.{StringWriter, Writer}
 
-case class BProgram(declarations: List[BDeclaration]) {
+case class BProgram(declarations: List[BDeclaration], filename: String) {
   override def toString: String = declarations.flatMap(x => x.toBoogie).mkString(System.lineSeparator())
 
   def writeToString(w: Writer): Unit = {
-    declarations.foreach(x => {
-      x.writeToString(w)
-    })
+    declarations.foreach(x => x.writeToString(w))
   }
 }
 
