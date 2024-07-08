@@ -50,11 +50,6 @@ object Main {
       threadSplit: Flag
   )
 
-  // need to parse thread split flag
-  // separate file names for each thread
-  // put method in runutils that splits threads if threads flag is true
-  // detect using the indirect call resolution stuff
-
   def main(args: Array[String]): Unit = {
     val parser = ParserForClass[Config]
     val parsed = parser.constructEither(args.toSeq)
