@@ -448,8 +448,8 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     val modifiedPreserve = modifies.collect { case m: BVar if modifiedCheck.contains(m) => m }
     val modifiedPreserveEnsures: List[BExpr] = modifiedPreserve.map(m => BinaryBExpr(BoolEQ, m, Old(m))).toList
 
-    val procRequires: List[BExpr] = requires.getOrElse(p.name, List())
-    val procEnsures: List[BExpr] = ensures.getOrElse(p.name, List())
+    val procRequires: List[BExpr] = p.requires.toList ++ requires.getOrElse(p.name, List())
+    val procEnsures: List[BExpr] = p.ensures.toList ++ ensures.getOrElse(p.name, List())
 
     val procRequiresDirect: List[String] = requiresDirect.getOrElse(p.name, List())
     val procEnsuresDirect: List[String] = ensuresDirect.getOrElse(p.name, List())

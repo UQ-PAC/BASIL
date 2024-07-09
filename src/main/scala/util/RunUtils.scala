@@ -697,16 +697,38 @@ object StaticAnalysis {
     //val paramResults = ParamAnalysis(IRProgram).analyze()
     val paramResults = Map[Procedure, Set[Variable]]()
 
+
+
     Logger.info("[!] Running Taint Analysis")
-    val taintResults = TaintAnalysis(IRProgram, globalAddresses, globalOffsets, mmm, constPropResult,
+    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
+    val taintResults = TaintAnalysis(IRProgram, specGlobalAddresses, mmm, constPropResult,
         IRProgram.procedures.foldLeft(Map[CFGPosition, Set[analysis.Taintable]]()) {
-          (m, p) => m + (p -> Set(Register("R0", 64)))
+          //(m, p) => m + (p -> Set(Register("R30", 64)))
+          (m, p) => m + (p -> Set(analysis.UnknownMemory()))
         }
       ).analyze()
 
     config.analysisResultsPath.foreach(s =>
       writeToFile(printAnalysisResults(IRProgram, taintResults), s"${s}_taint$iteration.txt")
     )
+
+    // Need to know modifies clauses to generate summaries, but this is probably out of place
+    val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
+    ctx.program.setModifies(specModifies)
+
+    Logger.info("[!] Generating Function Summaries")
+    val summaryGenerator = SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, mmm, constPropResult)
+    IRProgram.procedures.filter {
+      p => p != IRProgram.mainProcedure
+    }.foreach {
+      procedure => {
+        Logger.info("Generating summary for " + procedure.name)
+        procedure.requires = summaryGenerator.generateRequires(procedure)
+        procedure.ensures = summaryGenerator.generateEnsures(procedure)
+      }
+    }
+
+
 
     StaticAnalysisContext(
       cfg = cfg,
