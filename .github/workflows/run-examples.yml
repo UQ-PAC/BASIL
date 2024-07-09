@@ -10,7 +10,6 @@ on:
 jobs:
   CompileAndTest:
     runs-on: ubuntu-latest
-    timeout-minutes: 10 
     container:
       # Requires repo to have action access in package settings
       image: ghcr.io/uq-pac/basil-dev:latest
@@ -35,7 +34,6 @@ jobs:
 
   SystemTests:
     runs-on: ubuntu-latest
-    timeout-minutes: 10 
     container:
       # Requires repo to have action access in package settings
       image: ghcr.io/uq-pac/basil-dev:latest
