@@ -51,3 +51,5 @@ jobs:
         with:
           name: testresult-${{ github.run_number }}
           path: src/test/*.csv
+
+      - run: tail -n+1 src/test/summary-*.csv
