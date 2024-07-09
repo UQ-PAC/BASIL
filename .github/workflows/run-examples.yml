@@ -28,7 +28,7 @@ jobs:
         run: ./mill test.testOnly BitVectorAnalysisTests
 
       - name: IntrusiveListTest
-        run: ./mill test.testOnly IntrusiveListPublicInterfaceTests
+        run: ./mill test.testOnly '*IntrusiveListPublicInterfaceTest'
 
       - name: System Tests
         run: ./mill test.testOnly *SystemTests -- -z basic_assign_increment/gcc_no_plt_no_pic -z basic_assign_increment/clang_no_plt_no_pic -z secret_write/gcc_no_plt_no_pic
