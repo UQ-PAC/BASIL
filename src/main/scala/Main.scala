@@ -15,9 +15,16 @@ import mainargs.{main, arg, ParserForClass, Flag}
 object Main {
 
   @main(name = "BASIL", doc=s"BASIL version ${BASILBuildVersion}")
+  case class Checks(
+      @arg(name = "version", doc = "Print the version string and exit.")
+      version: Flag,
+      @arg(name = "help", short = 'h', doc = "Show this help message.")
+      help: Flag,
+    )
+  @main(name = "BASIL", doc=s"BASIL version ${BASILBuildVersion}")
   case class Config(
       @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
-      inputFileName: String,
+      inputFileName: String, 
       @arg(name = "relf", short = 'r', doc = "Name of the file containing the output of 'readelf -s -r -W'.")
       relfFileName: String,
       @arg(name = "spec", short = 's', doc = "BASIL specification file.")
@@ -40,19 +47,42 @@ object Main {
       mainProcedureName: String = "main",
       @arg(name = "procedure-call-depth", doc = "Cull procedures beyond this call depth from the main function (defaults to Int.MaxValue)")
       procedureDepth: Int = Int.MaxValue,
-      @arg(name = "help", short = 'h', doc = "Show this help message.")
-      help: Flag,
       @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
       analysisResults: Option[String],
       @arg(name = "analysis-results-dot", doc = "Log analysis results in .dot form at specified path.")
       analysisResultsDot: Option[String],
       @arg(name = "threads", short = 't', doc = "Separates threads into multiple .bpl files with given output filename as prefix (requires --analyse flag)")
-      threadSplit: Flag
+      threadSplit: Flag,
+      // below exist just for help text, they are handled in the first pass
+      @arg(name = "version", doc = "Print the version string and exit.")
+      version: Flag,
+      @arg(name = "help", short = 'h', doc = "Show this help message.")
+      help: Flag,
   )
 
   def main(args: Array[String]): Unit = {
     val parser = ParserForClass[Config]
-    val parsed = parser.constructEither(args.toSeq)
+    val parseOpt = ParserForClass[Checks]
+    val optParsed = parseOpt.constructEither(args.toSeq, autoPrintHelpAndExit = None)
+
+    val check = optParsed match {
+      case Right(r) => r
+      case Left(l) => 
+        println(l)
+        return
+    }
+
+    if (check.help.value) {
+      println(parser.helpText(sorted = false))
+      return
+    }
+
+    if (check.version.value) {
+      println(BASILBuildVersion)
+      return
+    }
+
+    val parsed = parser.constructEither(args.toSeq, sorted=false)
 
     val conf = parsed match {
       case Right(r) => r
@@ -61,9 +91,6 @@ object Main {
         return
     }
 
-    if (conf.help.value) {
-      println(parser.helpText(sorted = false))
-    }
 
     Logger.setLevel(LogLevel.INFO)
     if (conf.verbose.value) {
