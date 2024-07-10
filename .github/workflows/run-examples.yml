@@ -52,4 +52,7 @@ jobs:
           name: testresult-${{ github.run_number }}
           path: src/test/*.csv
 
-      - run: tail -n+1 src/test/summary-*.csv
+      - run: |
+          tail -n+1 src/test/summary-*.csv
+          cat src/test/summary-*.md > $GITHUB_STEP_SUMMARY
+
