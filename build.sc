@@ -6,9 +6,7 @@ import os.Path
 import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 
-
-
-object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule{
+object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule {
   def scalaVersion = "3.3.1"
 
   val javaTests = ivy"com.novocode:junit-interface:0.11"
@@ -18,18 +16,61 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   val sourceCode = ivy"com.lihaoyi::sourcecode:0.3.0"
   val mainArgs = ivy"com.lihaoyi::mainargs:0.5.1"
   val sprayJson = ivy"io.spray::spray-json:1.3.6"
-  val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15" 
+  val scalapb = ivy"com.thesamet.scalapb::scalapb-runtime:0.11.15"
 
   def scalaPBVersion = "0.11.15"
 
-
   def mainClass = Some("Main")
 
-  override def scalaPBSources = T.sources {Seq(PathRef(this.millSourcePath / "main" / "protobuf"))}
+  override def scalaPBSources = T.sources { Seq(PathRef(this.millSourcePath / "main" / "protobuf")) }
   def millSourcePath = super.millSourcePath / "src"
   def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb)
-  def sources = T.sources {Seq(PathRef(this.millSourcePath / "main" / "scala" ))}
 
+  def getTryUpdateVersion() = {
+
+    /** Checks for presence of git binary and repository and then tries to update version files.
+      */
+
+    print("Checking for git version tag ... ")
+    val error =
+      try {
+        val r = os.proc("git", "status").spawn()
+        r.join(1000)
+        if (r.exitCode() != 0) {
+          Some("git repo not found.")
+        } else {
+          None
+        }
+      } catch {
+        case _: Throwable => Some("git binary not found.")
+      }
+
+    error match {
+      case None => updateVersion()
+      case Some(msg) => {
+        val declaredVersion = os.read(os.pwd / "VERSION")
+        writeVersionFiles(declaredVersion, declaredVersion)
+        println(msg + " using " + declaredVersion + ".")
+      }
+    }
+
+  }
+
+  /** declaredVersion: git tagged version in semver buildVersion: current build, as checked out in git, either
+    * declaredVersion or declaredVersion+shortSHA
+    */
+  def writeVersionFiles(declaredVersion: String, buildVersion: String) = {
+    val versionDecl = s"val BASILVersion = \"$declaredVersion\""
+    val buildVersionDecl = "val BASILBuildVersion = \"" + buildVersion + "\""
+    val wd = os.pwd
+    os.write.over(wd / "VERSION", declaredVersion)
+    os.write.over(wd / "src" / "main" / "scala" / "Version.scala", versionDecl + "\n" + buildVersionDecl)
+  }
+
+  def sources = T.sources {
+    getTryUpdateVersion()
+    Seq(PathRef(this.millSourcePath / "main" / "scala"))
+  }
 
   override def antlrPackage: Option[String] = Some("Parsers")
   override def antlrGenerateVisitor = true
@@ -37,15 +78,40 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     Seq(PathRef(millSourcePath / "main" / "antlr4"))
   }
 
-  object test extends ScalaTests with TestModule.ScalaTest  {
+  object test extends ScalaTests with TestModule.ScalaTest {
     def ivyDeps = Agg(scalaTests, javaTests)
-    def sources = T.sources {Seq(PathRef(this.millSourcePath / "scala" ))}
+    def sources = T.sources { Seq(PathRef(this.millSourcePath / "scala")) }
   }
 
+  /** Updates VERSION and Version.Scala files using the most recent git tagged version. Assumes `git` binary is
+    * available in PATH
+    */
+  def updateVersion() = T.command {
 
-  /**
-   * Updates the expected
-   */
+    val lastTaggedCommit = os.proc("git", "rev-list", "--tags", "--max-count=1").spawn().stdout.trim()
+    val head = os.proc("git", "rev-parse", "HEAD").spawn().stdout.trim()
+    val version = os.proc("git", "describe", "--tags", lastTaggedCommit).spawn().stdout.trim()
+    val shortHEAD = os.proc("git", "rev-parse", "--short", "HEAD").spawn().stdout.trim()
+
+    val wd = os.pwd
+    val declaredVersion = os.read(wd / "VERSION")
+    val nowAtVersion = head != lastTaggedCommit
+
+    if (declaredVersion != version) {
+      println(s"Updating VERISON file $declaredVersion to $version")
+      if (nowAtVersion) {
+        println("WARNING: HEAD not at tagged commit " + version + " : " + lastTaggedCommit)
+      }
+    } else {
+      println("No new version")
+    }
+
+    val buildVersion = version + (if (nowAtVersion) ("+" + shortHEAD) else "")
+    writeVersionFiles(version, buildVersion)
+  }
+
+  /** Updates the expected
+    */
 
   def updateExpectedBAP() = T.command {
     val correctPath = test.millSourcePath / "correct"

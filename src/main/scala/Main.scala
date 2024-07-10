@@ -14,7 +14,7 @@ import mainargs.{main, arg, ParserForClass, Flag}
 
 object Main {
 
-  @main(name = "BASIL")
+  @main(name = "BASIL", doc=s"BASIL version ${BASILBuildVersion}")
   case class Config(
       @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
       inputFileName: String,
