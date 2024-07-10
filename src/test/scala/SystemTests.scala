@@ -44,7 +44,7 @@ trait SystemTests extends AnyFunSuite {
 
   def summary(filename: String): Unit = {
     val csv: String = "testCase," + TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r._1},${r._2.toCsv}").mkString(System.lineSeparator())
-    log(csv, testPath + "full-" + filename)
+    log(csv, testPath + "full-" + filename + ".csv")
 
     val numVerified = testResults.count(_._2.verified)
     val numCounterexample = testResults.count(x => !x._2.verified && !x._2.timedOut)
@@ -60,9 +60,28 @@ trait SystemTests extends AnyFunSuite {
     if (counterExamples.nonEmpty)
       info(s"Average time to counterexample: ${counterExamples.sum / counterExamples.size}")
 
-    val summaryHeader = "passedCount,failedCount,verifiedCount,counterexampleCount,timeoutCount,verifyTotalTime,counterexampleTotalTime"
-    val summaryRow = s"$numSuccess,$numFail,$numVerified,${counterExamples.size},$numTimeout,${verifying.sum},${counterExamples.sum}"
-    log(summaryHeader + System.lineSeparator() + summaryRow, testPath + "summary-" + filename)
+    val summaryMap = collection.immutable.ListMap(
+      "passedCount" -> numSuccess,
+      "failedCount" -> numFail,
+      "verifiedCount" -> numVerified,
+      "counterexampleCount" -> counterExamples.size,
+      "timeoutCount" -> numTimeout,
+      "verifyTotalTime" -> verifying.sum,
+      "counterexampleTotalTime" -> counterExamples.sum,
+    )
+    val summaryHeader = summaryMap.keys.mkString(",") + System.lineSeparator
+    val summaryRow = summaryMap.values.mkString(",") + System.lineSeparator
+    log(summaryHeader + summaryRow, testPath + "summary-" + filename + ".csv")
+
+    val summaryMarkdown = s"""
+      |## $filename
+      |
+      || Metric | Value |
+      ||--------|-------|
+      |""".stripMargin
+      + summaryMap.map((k,v) => s"| $k | $v |${System.lineSeparator}").mkString
+
+    log(summaryMarkdown, testPath + "summary-" + filename + ".md")
   }
 
   def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
@@ -165,7 +184,7 @@ class SystemTestsBAP extends SystemTests  {
   runTests(correctPrograms, correctPath, "correct", true, true)
   runTests(incorrectPrograms, incorrectPath, "incorrect", false, true)
   test("summary") {
-    summary("testresult-BAP.csv")
+    summary("testresult-BAP")
   }
 }
 
@@ -173,6 +192,6 @@ class SystemTestsGTIRB extends SystemTests  {
   runTests(correctPrograms, correctPath, "correct", true, false)
   runTests(incorrectPrograms, incorrectPath, "incorrect", false, false)
   test("summary") {
-    summary("testresult-GTIRB.csv")
+    summary("testresult-GTIRB")
   }
 }
