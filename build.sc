@@ -87,26 +87,19 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     * available in PATH
     */
   def updateVersion() = T.command {
-
     val lastTaggedCommit = os.proc("git", "rev-list", "--tags", "--max-count=1").spawn().stdout.trim()
-    val head = os.proc("git", "rev-parse", "HEAD").spawn().stdout.trim()
     val version = os.proc("git", "describe", "--tags", lastTaggedCommit).spawn().stdout.trim()
-    val shortHEAD = os.proc("git", "rev-parse", "--short", "HEAD").spawn().stdout.trim()
+    val buildVersion = os.proc("git", "describe", "--tags").spawn().stdout.trim()
 
     val wd = os.pwd
     val declaredVersion = os.read(wd / "VERSION")
-    val nowAtVersion = head != lastTaggedCommit
 
     if (declaredVersion != version) {
-      println(s"Updating VERISON file $declaredVersion to $version")
-      if (nowAtVersion) {
-        println("WARNING: HEAD not at tagged commit " + version + " : " + lastTaggedCommit)
-      }
+      println(s"WARN: Updating VERSION file $declaredVersion to $version")
     } else {
       println("No new version")
     }
 
-    val buildVersion = version + (if (nowAtVersion) ("+" + shortHEAD) else "")
     writeVersionFiles(version, buildVersion)
   }
 
