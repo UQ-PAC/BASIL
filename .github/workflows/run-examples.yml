@@ -46,13 +46,13 @@ jobs:
 
       - name: System Tests
         run: ./mill test.testOnly '*SystemTests*' || true
-
       - uses: actions/upload-artifact@v4
         with:
           name: testresult-${{ github.run_number }}
-          path: src/test/*.csv
-
+          path: |
+            src/test/*.csv
+            src/test/*.svg
       - run: |
           tail -n+1 src/test/summary-*.csv
-          paste src/test/headers.md.part src/test/summary-*.md.part > $GITHUB_STEP_SUMMARY
+          paste src/test/headers.md.part src/test/summary-*.md.part | sed -s "s@HISTOtestresult-GTIRBHISTO@$(curl -F'file=@src/test/verifyTime-testresult-GTIRB.svg' -Fexpires=1920 http://0x0.st)@" | sed -s "s@HISTOtestresult-BAPHISTO@$(curl -F'file=@src/test/verifyTime-testresult-BAP.svg' -Fexpires=1920 http://0x0.st)@" > $GITHUB_STEP_SUMMARY
 

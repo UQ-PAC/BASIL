@@ -1,7 +1,7 @@
 import org.scalatest.funsuite.AnyFunSuite
 import util.{Logger, PerformanceTimer}
 
-
+import Numeric.Implicits._
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable
 import scala.io.Source
@@ -10,6 +10,8 @@ import scala.sys.process.*
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
+
+
 
 trait SystemTests extends AnyFunSuite {
   val testPath = "./src/test/"
@@ -49,6 +51,8 @@ trait SystemTests extends AnyFunSuite {
     val csv: String = "testCase," + TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r._1},${r._2.toCsv}").mkString(System.lineSeparator())
     log(csv, testPath + "full-" + filename + ".csv")
 
+    val verifTimes = testResults.map(_._2.verifyTime.toDouble)
+
     val numVerified = testResults.count(_._2.verified)
     val numCounterexample = testResults.count(x => !x._2.verified && !x._2.timedOut)
     val numSuccess = testResults.count(_._2.passed)
@@ -56,6 +60,10 @@ trait SystemTests extends AnyFunSuite {
     val numTimeout = testResults.count(_._2.timedOut)
     val verifying = testResults.filter(x => !x._2.timedOut && x._2.verified).map(_._2.verifyTime)
     val counterExamples = testResults.filter(x => !x._2.timedOut && !x._2.verified).map(_._2.verifyTime)
+    val medianVerifyTime = median(verifTimes)
+    val meanVerifyTime = mean(verifTimes)
+    val stdDevVerifyTime = stdDev(verifTimes)
+
 
     info(s"Test summary: $numSuccess succeeded, $numFail failed: $numVerified verified, $numCounterexample did not verify (including $numTimeout timeouts).")
     if (verifying.nonEmpty)
@@ -71,27 +79,41 @@ trait SystemTests extends AnyFunSuite {
       "timeoutCount" -> numTimeout,
       "verifyTotalTime" -> verifying.sum,
       "counterexampleTotalTime" -> counterExamples.sum,
+      "meanVerifyTime" -> meanVerifyTime.toInt,
+      "medianVerifyTime" -> medianVerifyTime.toInt,
+      "stdDevVerifyTime" -> stdDevVerifyTime.toInt,
     )
     val summaryHeader = summaryMap.keys.mkString(",") + System.lineSeparator
     val summaryRow = summaryMap.values.mkString(",") + System.lineSeparator
     log(summaryHeader + summaryRow, testPath + "summary-" + filename + ".csv")
 
+    // generates a verification time histogram
+    val minB = Seq(0, meanVerifyTime - 2.25 * stdDevVerifyTime, verifTimes.min).max
+    val maxB = Seq(meanVerifyTime + 2.25 * stdDevVerifyTime, verifTimes.max).min
+    val nbins = 50
+
+    val histo = mkHistogram(nbins, Some(minB, maxB))(verifTimes.toSeq)
+    val svgHistogram = histoToSvg(filename, 400,300, histo)
+    log(svgHistogram, testPath + "verifyTime-" + filename + ".svg")
+
+
     // generates a markdown table in separate parts.
     // the complete markdown file can be constructed by horizontal (line-wise)
     // concatenation of leftMarkdown and one or more partMarkdown.
-    val leftMarkdown =
+    val mdMap = summaryMap + ("VerifyTimeHistogram" -> ("![](" + "HISTO" + filename + "HISTO" + ")"))
+    val leftMarkdown = 
       s"""
       || Metric |
       ||--------|
       |""".stripMargin
-      + summaryMap.map((k,_) => s"| $k |${System.lineSeparator}").mkString
+      + mdMap.map((k,_) => s"| $k |${System.lineSeparator}").mkString
 
     val partMarkdown =
       s"""
       | $filename |
       |-------|
       |""".stripMargin
-      + summaryMap.map((k,v) => s" $v |${System.lineSeparator}").mkString
+      + mdMap.map((k,v) => s" $v |${System.lineSeparator}").mkString
 
     val summaryMarkdown = leftMarkdown.linesIterator
       .zip(partMarkdown.linesIterator)
@@ -202,6 +224,70 @@ trait SystemTests extends AnyFunSuite {
 
 }
 
+
+
+def histoToSvg(title: String, imgWidth: Int, imgHeight: Int, bins: List[((Double, Double), Int)]) : String = {
+  def template(width: Int = 300, height: Int = 130, content: String) = 
+    s""" <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    ${content}
+  </svg> """
+  def mkRect(width: Int, height: Int, x: Int, y: Int, crx: Int=0, cry: Int=0, fill: String="Black") = {
+    s"""<rect width="$width" height="$height" x="$x" y="$y" rx="$crx" ry="$cry" fill="$fill" />"""
+  }
+  def text(content: String, x: Int, y: Int, cssClass: String = "small") = {
+    s"""<text x="$x" y="$y" class="$cssClass">$content</text>"""
+  }
+
+
+  val leftMargin = 20
+  val histWidth = imgWidth - leftMargin
+  val bottomMargin = 20
+  val topMargin = 20
+  val histHeight = imgHeight - topMargin - bottomMargin
+  val maxHeight = bins.map(_._2).max
+  val binWidth : Double = (histWidth).doubleValue / bins.size
+  val heightScaling : Double =  (histHeight.doubleValue)/(maxHeight)
+  val binPos = (0 to bins.size).map(i => (leftMargin + i * binWidth, binWidth * (i + 1)))
+    .zip(bins.map((_, bh) => heightScaling * bh))
+
+  val rects = binPos.map((binXX, height) => 
+      mkRect(binWidth.ceil.intValue, height.intValue, binXX._1.floor.intValue, histHeight.intValue - height.intValue + topMargin))
+
+  val labels = {
+    (text(title, imgWidth / 8, topMargin - 5),
+    text("0", 0, histHeight + topMargin),
+    text(maxHeight.toInt.toString, 0, topMargin),
+    text(bins.head._1._1.toInt.toString, 0, imgHeight),
+    text(bins.last._1._2.toInt.toString, (binWidth*(bins.size)).intValue - leftMargin, imgHeight))
+  }
+
+  val bg = mkRect(imgWidth, imgHeight, 0, 0, fill="White")
+
+  val content = (Seq(bg) ++ rects ++ labels.toList).mkString("\n")
+  template(imgWidth, imgHeight, content)
+}
+
+
+def loadHisto() = {
+  val source = scala.io.Source.fromFile("src/test/full-testresult-GTIRB.csv").getLines().toList
+  val headers = source.head.split(",")
+
+  val res = headers.map(h => h -> mutable.ArrayBuffer[String]()).toMap[String, mutable.ArrayBuffer[String]]
+
+  source.tail.map(line => {
+    val cols = line.split(",")
+    headers.zip(cols).foreach((h,v) => res(h).append(v))
+  })
+
+  val timeValues = res("verifyTime").map(_.toDouble)
+  val histo = mkHistogram(50, Some(800.0, 1000.0))(timeValues.toSeq)
+
+
+  println(histoToSvg("test histogram", 500, 300, histo))
+}
+
+
+
 class SystemTestsBAP extends SystemTests  {
   runTests(correctPrograms, correctPath, "correct", true, true)
   runTests(incorrectPrograms, incorrectPath, "incorrect", false, true)
@@ -216,4 +302,29 @@ class SystemTestsGTIRB extends SystemTests  {
   test("summary") {
     summary("testresult-GTIRB")
   }
+}
+
+
+
+// https://stackoverflow.com/questions/39617213/scala-what-is-the-generic-way-to-calculate-standard-deviation
+def mean[T: Numeric](xs: Iterable[T]): Double = xs.sum.toDouble / xs.size
+
+def variance[T: Numeric](xs: Iterable[T]): Double = {
+  val avg = mean(xs)
+
+  xs.map(_.toDouble).map(a => math.pow(a - avg, 2)).sum / xs.size
+}
+
+def median(xs: Iterable[Double]) = xs.toArray.sorted.apply(xs.size / 2)
+
+def stdDev[T: Numeric](xs: Iterable[T]): Double = math.sqrt(variance(xs))
+
+// https://stackoverflow.com/questions/24536215/scala-simple-histogram 
+def mkHistogram(n_bins: Int, lowerUpperBound: Option[(Double, Double)] = None)(xs: Seq[Double]) : List[((Double, Double), Int)] = {
+  val (mn, mx) = lowerUpperBound getOrElse(xs.min, xs.max)
+  val epsilon = 0.0001
+  val binSize = (mx - mn) / n_bins * (1 + epsilon)
+  val bins = (0 to n_bins).map(mn + _ * binSize).sliding(2).map(xs => (xs(0), xs(1)))
+  def binContains(bin:(Double,Double),x: Double) = (x >= bin._1) && (x < bin._2)
+  bins.map(bin => (bin, xs.count(binContains(bin,_)))).toList
 }
