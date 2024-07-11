@@ -6,6 +6,74 @@ import boogie.*
 import util.Logger
 import specification.SpecGlobal
 
+/**
+ * A temporary copy of RNA analysis which works on Taintables.
+ */
+import analysis.solvers.SimpleWorklistFixpointSolver
+
+private trait RNATaintableAnalysis(
+  program: Program,
+  globals: Map[BigInt, String],
+  mmm: MemoryModelMap,
+  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+) {
+  val lattice: MapLattice[ir.CFGPosition, Set[Taintable], PowersetLattice[Taintable]] = MapLattice(PowersetLattice())
+
+  val domain: Set[CFGPosition] = Set.empty ++ program
+
+  private val stackPointer = Register("R31", 64)
+  private val linkRegister = Register("R30", 64)
+  private val framePointer = Register("R29", 64)
+
+  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer, stackPointer)
+
+  def eval(cmd: Command, s: Set[Taintable]): Set[Taintable] = {
+    var m = s
+    val exprs = cmd match {
+      case assume: Assume =>
+        Set(assume.body)
+      case assert: Assert =>
+        Set(assert.body)
+      case memoryAssign: MemoryAssign =>
+        m = m -- getMemoryVariable(cmd, memoryAssign.mem, memoryAssign.index, memoryAssign.size, constProp, globals)
+        Set(memoryAssign.index, memoryAssign.value)
+      case indirectCall: IndirectCall =>
+        if (ignoreRegions.contains(indirectCall.target)) return m
+        Set(indirectCall.target)
+      case assign: Assign =>
+        m = m - assign.lhs
+        Set(assign.rhs)
+      case _ => return m
+    }
+
+    exprs.foldLeft(m) {
+      (m, expr) => {
+        val vars = expr.variables.filter(!ignoreRegions.contains(_)).map { v => v: Taintable }
+        val memvars: Set[Taintable] = expr.loads.flatMap {
+          l => getMemoryVariable(cmd, l.mem, l.index, l.size, constProp, globals)
+        }
+        m.union(vars).union(memvars)
+      }
+    }
+  }
+
+  def transfer(n: CFGPosition, s: Set[Taintable]): Set[Taintable] = n match {
+    case cmd: Command =>
+      eval(cmd, s)
+    case _ => s // ignore other kinds of nodes
+  }
+}
+
+private class RNATaintableSolver(
+  program: Program,
+  globals: Map[BigInt, String],
+  mmm: MemoryModelMap,
+  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+) extends RNATaintableAnalysis(program, globals, mmm, constProp)
+    with IRIntraproceduralBackwardDependencies
+    with Analysis[Map[CFGPosition, Set[Taintable]]]
+    with SimpleWorklistFixpointSolver[CFGPosition, Set[Taintable], PowersetLattice[Taintable]]
+
 class SummaryGenerator(
     program: Program,
     specGlobals: Set[SpecGlobal],
@@ -13,9 +81,10 @@ class SummaryGenerator(
     mmm: MemoryModelMap,
     constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]
 ) {
+  val rnaResults = RNATaintableSolver(program, globals, mmm, constProp).analyze()
 
-  // TODO should the stack pointer propagate taint?
-  val variables: Set[analysis.Taintable] = (0 to 30).map { n =>
+  // TODO should the stack/return/frame pointers propagate taint?
+  val variables: Set[analysis.Taintable] = (0 to 28).map { n =>
     Register(s"R$n", 64)
   }.toSet ++ specGlobals.map { g =>
     analysis.GlobalVariable(dsl.mem, BitVecLiteral(g.address, 64), g.size, g.name)
@@ -83,8 +152,8 @@ class SummaryGenerator(
     }
 
     // `tainters` is a mapping from a relevant variable to all input variables (or globals) that have
-    // affected (tainted) it in the procedure.
-    val tainters = getTainters(procedure, variables + UnknownMemory()).filter { (variable, taints) =>
+    // affected (tainted) it in the procedure. We need the rnaResults to find stack function arguments
+    val tainters = getTainters(procedure, variables ++ rnaResults(procedure.begin) + UnknownMemory()).filter { (variable, taints) =>
       relevantVars.contains(variable)
     }
 

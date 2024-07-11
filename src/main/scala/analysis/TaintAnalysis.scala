@@ -35,6 +35,33 @@ case class UnknownMemory() {
   }
 }
 
+def getMemoryVariable(
+  n: CFGPosition, mem: Memory, expression: Expr, size: Int,
+  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  globals: Map[BigInt, String],
+): Option[GlobalVariable | LocalStackVariable] = {
+  val stackPointer = Register("R31", 64)
+
+  expression match
+    case BinaryExpr(BVADD, arg1, arg2) if arg1 == stackPointer => {
+      evaluateExpression(arg2, constProp(n)) match
+        // TODO This assumes that all stack variables are initialized local variables, which is not necessarily the case.
+        //      If a stack address is read, without being assigned a value in this procedure, it will be
+        //      assumed untainted, when in reality it may be UnknownMemory.
+        case Some(addr) => Some(LocalStackVariable(addr, size))
+        case None => None
+    }
+    case v: Variable if v == stackPointer => Some(LocalStackVariable(BitVecLiteral(0, 64), size))
+    case _ => {
+      evaluateExpression(expression, constProp(n)) match
+        case Some(addr) => globals.get(addr.value) match
+          case Some(global) => Some(GlobalVariable(mem, addr, size, global))
+          case None => None
+        case None => None
+    }
+}
+
+
 trait TaintAnalysisFunctions(
   globals: Map[BigInt, String],
   mmm: MemoryModelMap,
@@ -60,35 +87,13 @@ trait TaintAnalysisFunctions(
   }
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
-
-    def getMemoryVariable(mem: Memory, expression: Expr, size: Int): GlobalVariable | LocalStackVariable | UnknownMemory = {
-      // TODO use the mmm to check memory regions
-      expression match
-        // TODO this is (overly) assuming that stack variable accesses come from addition, and always use R31
-        case BinaryExpr(BVADD, arg1, arg2) if arg1 == stackPointer => {
-          evaluateExpression(arg2, constProp(n)) match
-            // TODO This assumes that all stack variables are initialized local variables, which is not necessarily the case.
-            //      If a stack address is read, without being assigned a value in this procedure, it will be
-            //      assumed untainted, when in reality it may be UnknownMemory.
-            case Some(addr) => LocalStackVariable(addr, size)
-            case None => UnknownMemory()
-        }
-        case _ => {
-          evaluateExpression(expression, constProp(n)) match
-            case Some(addr) => globals.get(addr.value) match
-              case Some(global) => GlobalVariable(mem, addr, size, global)
-              case None => UnknownMemory()
-            case None => UnknownMemory()
-        }
-    }
-
     def containsValue(expression: Expr, value: Taintable): Boolean = {
       value match {
         case (v: Variable) => expression.variables.contains(v)
         case v => {
           expression.loads.map {
             load => {
-              getMemoryVariable(load.mem, load.index, load.size)
+              getMemoryVariable(n, load.mem, load.index, load.size, constProp, globals).getOrElse(UnknownMemory())
             }
           }.contains(v)
         }
@@ -107,7 +112,7 @@ trait TaintAnalysisFunctions(
         }
       }
       case MemoryAssign(mem, index, expression, _, size, _) => {
-        val variable = getMemoryVariable(mem, index, size)
+        val variable = getMemoryVariable(n, mem, index, size, constProp, globals).getOrElse(UnknownMemory())
         d match {
           case Left(v) => {
             if containsValue(expression, v) then Map(d -> IdEdge(), Left(variable) -> IdEdge())
