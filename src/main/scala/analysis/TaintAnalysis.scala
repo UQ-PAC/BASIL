@@ -72,7 +72,7 @@ trait TaintAnalysisFunctions(
   val edgelattice = EdgeFunctionLattice(valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
 
-  val stackPointer = Register("R31", 64)
+  private val stackPointer = Register("R31", 64)
 
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     Map(d -> IdEdge())

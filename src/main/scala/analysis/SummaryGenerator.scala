@@ -108,6 +108,7 @@ class SummaryGenerator(
     }
   }
 
+  /*
   private def getTaints(procedure: Procedure, variables: Set[Taintable]): Map[Taintable, Set[Taintable]] = {
     variables.flatMap { variable =>
       {
@@ -138,11 +139,18 @@ class SummaryGenerator(
         }
       }
     }
+  }*/
+
+  private def getTainters(procedure: Procedure, variables: Set[Taintable]): Map[Taintable, Set[Taintable]] = {
+    VariableDependencyAnalysis(program, variables, globals, mmm, constProp, procedure).analyze().getOrElse(procedure.end, Map())
   }
 
   def generateRequires(procedure: Procedure): List[BExpr] = List()
 
   def generateEnsures(procedure: Procedure): List[BExpr] = {
+    // Don't generate summaries for procedures with no implementation
+    if procedure.blocks.isEmpty then return List()
+
     // We only need to make postconditions about the gammas of modified variables.
     val relevantVars = variables.filter { v =>
       v match {
@@ -160,7 +168,6 @@ class SummaryGenerator(
     tainters.toList
       .flatMap { (variable, taints) =>
         {
-          Logger.debug(variable)
           // If our variable was tainted by memory that we know nothing about, it is sound to assume that we
           // know nothing about its gamma in the post state.
           if taints.contains(UnknownMemory()) then None
@@ -224,12 +231,6 @@ class SummaryGenerator(
                 }
               }
             }
-        }
-      }
-      .map { expr =>
-        {
-          Logger.debug(s"Ensures DIRECT: \"$expr\"")
-          expr
         }
       }
   }
