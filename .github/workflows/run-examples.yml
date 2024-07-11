@@ -54,5 +54,5 @@ jobs:
 
       - run: |
           tail -n+1 src/test/summary-*.csv
-          cat src/test/summary-*.md > $GITHUB_STEP_SUMMARY
+          paste src/test/headers.md.part src/test/summary-*.md.part > $GITHUB_STEP_SUMMARY
 

@@ -42,6 +42,9 @@ trait SystemTests extends AnyFunSuite {
     }
   }
 
+  /**
+   * Writes test result data into .csv and .md files named according to given filename.
+   */
   def summary(filename: String): Unit = {
     val csv: String = "testCase," + TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r._1},${r._2.toCsv}").mkString(System.lineSeparator())
     log(csv, testPath + "full-" + filename + ".csv")
@@ -73,14 +76,30 @@ trait SystemTests extends AnyFunSuite {
     val summaryRow = summaryMap.values.mkString(",") + System.lineSeparator
     log(summaryHeader + summaryRow, testPath + "summary-" + filename + ".csv")
 
-    val summaryMarkdown = s"""
-      |## $filename
-      |
-      || Metric | Value |
-      ||--------|-------|
+    // generates a markdown table in separate parts.
+    // the complete markdown file can be constructed by horizontal (line-wise)
+    // concatenation of leftMarkdown and one or more partMarkdown.
+    val leftMarkdown =
+      s"""
+      || Metric |
+      ||--------|
       |""".stripMargin
-      + summaryMap.map((k,v) => s"| $k | $v |${System.lineSeparator}").mkString
+      + summaryMap.map((k,_) => s"| $k |${System.lineSeparator}").mkString
 
+    val partMarkdown =
+      s"""
+      | $filename |
+      |-------|
+      |""".stripMargin
+      + summaryMap.map((k,v) => s" $v |${System.lineSeparator}").mkString
+
+    val summaryMarkdown = leftMarkdown.linesIterator
+      .zip(partMarkdown.linesIterator)
+      .map(_++_)
+      .mkString("", System.lineSeparator, System.lineSeparator)
+
+    log(partMarkdown, testPath + "summary-" + filename + ".md.part")
+    log(leftMarkdown, testPath + "headers.md.part") // XXX likely not thread-safe
     log(summaryMarkdown, testPath + "summary-" + filename + ".md")
   }
 
@@ -168,7 +187,10 @@ trait SystemTests extends AnyFunSuite {
     * the names all subdirectories of the given parent directory
     */
   def getSubdirectories(directoryName: String): Array[String] = {
-    File(directoryName).listFiles.filter(_.isDirectory).map(_.getName)
+    Option(File(directoryName).listFiles(_.isDirectory)) match {
+      case None => throw java.io.IOException(s"failed to read directory '$directoryName'")
+      case Some(subdirs) => subdirs.map(_.getName)
+    }
   }
 
   def log(text: String, path: String): Unit = {
