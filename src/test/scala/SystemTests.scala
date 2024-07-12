@@ -12,6 +12,8 @@ import scala.sys.process.*
   */
 
 
+ case class TestConfig(val boogieFlags:Seq[String] = Seq("/timeLimit:10", "/useArrayAxioms"), val basilFlags:Seq[String] = Seq(), val useBAPFrontend: Boolean=true, val expectVerify: Boolean=true)
+
 
 trait SystemTests extends AnyFunSuite {
   val testPath = "./src/test/"
@@ -30,15 +32,15 @@ trait SystemTests extends AnyFunSuite {
 
   val testResults: mutable.ArrayBuffer[(String, TestResult)] = mutable.ArrayBuffer()
 
-  def runTests(programs: Array[String], path: String, name: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
+  def runTests(programs: Array[String], path: String, name: String, conf: TestConfig): Unit = {
     // get all variations of each program
-    val testSuffix = if useADT then ":BAP" else ":GTIRB"
+    val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
     for (p <- programs) {
       val programPath = path + "/" + p
       val variations = getSubdirectories(programPath)
       variations.foreach(t =>
         test(name + "/" + p + "/" + t + testSuffix) {
-          runTest(path, p, t, shouldVerify, useADT)
+          runTest(path, p, t, conf)
         }
       )
     }
@@ -125,26 +127,31 @@ trait SystemTests extends AnyFunSuite {
     log(summaryMarkdown, testPath + "summary-" + filename + ".md")
   }
 
-  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
+  def runTest(path: String, name: String, variation: String, conf: TestConfig): Unit = {
+    val shouldVerify = conf.expectVerify
+    val useBAPFrontend = conf.useBAPFrontend
+
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
-    val outPath = if useADT then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
-    val inputPath = if useADT then variationPath + ".adt" else variationPath + ".gts"
+    val outPath = if useBAPFrontend then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
+    val inputPath = if useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
     val RELFPath = variationPath + ".relf"
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")
 
-    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath)
+    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath) ++ conf.basilFlags
     if (File(specPath).exists) args ++= Seq("--spec", specPath)
 
     Main.main(args.toArray)
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(outPath + " done")
     val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(outPath))
-    val boogieResult = (Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath) ++ extraSpec).!!
+    val boogieCmd = (Seq("boogie", "/printVerifiedProceduresCount:0") ++ conf.boogieFlags ++ Seq(outPath) ++ extraSpec)
+    Logger.info(s"Verifying... ${boogieCmd.mkString(" ")}")
+    val boogieResult = boogieCmd.!!
     val verifyTime = timer.checkPoint("verify")
-    val resultPath = if useADT then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
+    val resultPath = if useBAPFrontend then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
     log(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
     val proveFailed = boogieResult.contains("could not be proved")
@@ -161,7 +168,7 @@ trait SystemTests extends AnyFunSuite {
         case (false, true, true) => "Expected verification success, but got failure."
       }
 
-    val expectedOutPath = if useADT then variationPath + ".expected" else variationPath + "_gtirb.expected"
+    val expectedOutPath = if useBAPFrontend then variationPath + ".expected" else variationPath + "_gtirb.expected"
     val hasExpected = File(expectedOutPath).exists
     var matchesExpected = true
     if (hasExpected) {
@@ -289,17 +296,17 @@ def loadHisto() = {
 
 
 class SystemTestsBAP extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", true, true)
-  runTests(incorrectPrograms, incorrectPath, "incorrect", false, true)
-  test("summary") {
+  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=true, expectVerify=true))
+  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=true, expectVerify=false))
+  test("summarybap") {
     summary("testresult-BAP")
   }
 }
 
 class SystemTestsGTIRB extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", true, false)
-  runTests(incorrectPrograms, incorrectPath, "incorrect", false, false)
-  test("summary") {
+  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=false, expectVerify=true))
+  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=false, expectVerify=false))
+  test("summarygtirb") {
     summary("testresult-GTIRB")
   }
 }
