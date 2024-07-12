@@ -35,33 +35,32 @@ trait VariableDependencyAnalysisFunctions(
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
     def getVars(expression: Expr): Set[Taintable] = {
-      val vars: Set[Taintable] = expression.variables.map { v => v: Taintable }
-      val loads: Set[Taintable] = expression.loads.map { l => getMemoryVariable(n, l.mem, l.index, l.size, constProp, globals).getOrElse(UnknownMemory()) }
-      vars ++ loads
+      expression.variables.map { v => v: Taintable } ++
+      expression.loads.map { l => getMemoryVariable(n, l.mem, l.index, l.size, constProp, globals).getOrElse(UnknownMemory()) }
     }
 
     if n == procedure then d match {
-      // At the start of the procedure, no variables should depend on anything.
+      // At the start of the procedure, no variables should depend on anything but themselves.
       case Left(_) => Map()
       case Right(_) => variables.foldLeft(Map(d -> IdEdge())) {
         (m: Map[DL, EdgeFunction[Set[Taintable]]], v) => m + (Left(v) -> ConstEdge(Set(v)))
       }
     } else n match {
-      case Assign(variable, expression, _) => {
+      case Assign(assigned, expression, _) => {
         val vars = getVars(expression)
         d match {
-          case Left(v) if vars.contains(v) => Map(d -> JoinEdge(vars), Left(variable) -> JoinEdge(vars))
-          case Left(v) if v == variable => Map()
+          case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> JoinEdge(vars)) // \l . l U vars
+          case Left(v) if v == assigned => Map()
           case _ => Map(d -> IdEdge())
         }
       }
       case MemoryAssign(mem, index, expression, _, size, _) => {
-        val variable = getMemoryVariable(n, mem, index, size, constProp, globals).getOrElse(UnknownMemory())
-        
+        val assigned = getMemoryVariable(n, mem, index, size, constProp, globals).getOrElse(UnknownMemory())
+
         val vars = getVars(expression)
         d match {
-          case Left(v) if vars.contains(v) => Map(d -> JoinEdge(vars), Left(variable) -> JoinEdge(vars))
-          case Left(v) if v == variable && v != UnknownMemory() => Map()
+          case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> JoinEdge(vars)) // \l . l U vars
+          case Left(v) if v == assigned && v != UnknownMemory() => Map()
           case _ => Map(d -> IdEdge())
         }
       }
@@ -71,7 +70,7 @@ trait VariableDependencyAnalysisFunctions(
 }
 
 /**
- * Calculates the set of variables that a variable has been affected by at each CFG node, starting at the given procedure.
+ * Calculates the set of "input variables" that a variable has been affected by at each CFG node, starting at the given procedure.
  */
 class VariableDependencyAnalysis(
   program: Program,

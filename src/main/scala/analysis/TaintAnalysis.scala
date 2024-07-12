@@ -5,30 +5,50 @@ import ir.*
 import boogie.*
 import util.Logger
 
+/**
+ * A value which can propogate taint/be tainted.
+ */
 type Taintable = Variable | GlobalVariable | LocalStackVariable | UnknownMemory
 
+// TODO global and stack variables should just be `Variable`s after an IL transformation, in the future they shouldn't need to be defined here.
+
+/**
+ * A global variable in memory.
+ */
 case class GlobalVariable(val mem: Memory, val address: BitVecLiteral, val size: Int, val identifier: String) {
   override def toString(): String = {
     s"GlobalVariable($mem, $identifier, $size, $address)"
   }
 
+  /**
+   * The security classification of this global variable as a boogie expression.
+   */
   def L: BExpr = {
     val bAddr = BVariable("$" + s"${identifier}_addr", BitVecBType(64), Scope.Const)
     BFunctionCall("L", List(mem.toBoogie, bAddr), BoolBType)
   }
 
+  /**
+   * The boogie expression corresponding to the gamma of this global variable.
+   */
   def toGamma: BExpr = {
     val bAddr = BVariable("$" + s"${identifier}_addr", BitVecBType(64), Scope.Const)
     GammaLoad(mem.toGamma, bAddr, size, size / mem.valueSize)
   }
 }
 
+/**
+ * A variable stored on the stack that was initialized in its own procedure (i.e. not a function argument).
+ */
 case class LocalStackVariable(val address: BitVecLiteral, val size: Int) {
   override def toString(): String = {
     s"StackVariable($address, $size)"
   }
 }
 
+/**
+ * Represents a memory address with no known information.
+ */
 case class UnknownMemory() {
   override def toString(): String = {
     "UnknownMemory"
@@ -40,9 +60,12 @@ def getMemoryVariable(
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
   globals: Map[BigInt, String],
 ): Option[GlobalVariable | LocalStackVariable] = {
+  // TODO unsoundly gets stack variable which can lead to unsound analysis
+
   val stackPointer = Register("R31", 64)
 
-  expression match
+  expression match {
+    // TODO assumes stack var accesses are all of the form R31 + n, or just R31, when in reality they could be more complex.
     case BinaryExpr(BVADD, arg1, arg2) if arg1 == stackPointer => {
       evaluateExpression(arg2, constProp(n)) match
         // TODO This assumes that all stack variables are initialized local variables, which is not necessarily the case.
@@ -53,14 +76,15 @@ def getMemoryVariable(
     }
     case v: Variable if v == stackPointer => Some(LocalStackVariable(BitVecLiteral(0, 64), size))
     case _ => {
+      // TOOD check that the global access has the right size
       evaluateExpression(expression, constProp(n)) match
         case Some(addr) => globals.get(addr.value) match
           case Some(global) => Some(GlobalVariable(mem, addr, size, global))
           case None => None
         case None => None
     }
+  }
 }
-
 
 trait TaintAnalysisFunctions(
   globals: Map[BigInt, String],
@@ -92,9 +116,7 @@ trait TaintAnalysisFunctions(
         case (v: Variable) => expression.variables.contains(v)
         case v => {
           expression.loads.map {
-            load => {
-              getMemoryVariable(n, load.mem, load.index, load.size, constProp, globals).getOrElse(UnknownMemory())
-            }
+            load => getMemoryVariable(n, load.mem, load.index, load.size, constProp, globals).getOrElse(UnknownMemory())
           }.contains(v)
         }
       }
@@ -123,16 +145,21 @@ trait TaintAnalysisFunctions(
         }
       }
       case _ => Map(d -> IdEdge())
-    }) ++ {
+    }) ++ (
       d match
         case Left(_) => Map()
         case Right(_) => tainted.getOrElse(n, Set()).foldLeft(Map[DL, EdgeFunction[TwoElement]]()) {
           (m, t) => m + (Left(t) -> ConstEdge(valuelattice.top))
         }
-    }
+    )
   }
 }
 
+/**
+ * Performs taint analysis on a program. Variables (`Taintable`s) are marked as tainted at points in the program as
+ * specified by `tainted`, and propogate their taint throughout the program. Assignments containing tainted variables
+ * mark the assigned value as tainted.
+ */
 class TaintAnalysis(
   program: Program,
   globals: Map[BigInt, String],
