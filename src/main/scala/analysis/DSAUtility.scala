@@ -769,32 +769,6 @@ def unwrapPaddingAndSlicing(expr: Expr): Expr =
     case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
     case _ => expr
 
-def decToBinary(n: BigInt): Array[Int] = {
-  val binaryNum: Array[Int] = new Array[Int](64)
-  var i = 0
-  var num = n
-  while (num > 0) {
-    binaryNum(i) = (num % BigInt(2)).intValue
-    num = num / 2
-    i += 1
-  }
-  binaryNum
-}
-
-def twosComplementToDec(binary: Array[Int]): BigInt = {
-  var result: BigInt = BigInt(0)
-  var counter: Int = 0
-  binary.foreach(
-    n =>
-      if counter == binary.length - 1 && n == 1 then
-        result = result - BigInt(2).pow(counter)
-      else if n == 1 then
-        result = result + BigInt(2).pow(counter)
-      counter += 1
-  )
-  result
-}
-
 def adjust(cell: DSC, internalOffset: BigInt): DSC =
   val node = cell.node.get
   node.addCell(cell.offset+internalOffset, 0)

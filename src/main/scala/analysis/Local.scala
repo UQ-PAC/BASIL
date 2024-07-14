@@ -1,5 +1,6 @@
 package analysis
 
+import analysis.BitVectorEval.bv2int
 import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Endian, Expr, Extract, IntraProcIRCursor, MemoryAssign, MemoryLoad, Procedure, Register, Variable, ZeroExtend, computeDomain, toShortString}
 import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
 
@@ -230,7 +231,7 @@ class Local(
 
               if op.equals(BVADD) && arg1.equals(stackPointer)
               && arg2Offset.isDefined && arg2Offset.get.value >= BITVECNEGATIVE then
-                val size = twosComplementToDec(decToBinary(evaluateExpression(arg2, constProp(n)).get.value))
+                val size = bv2int(arg2Offset.get)
                 val node = DSN(Some(graph))
                 node.allocationRegions.add(StackLocation("Stack_"+proc.name, proc, -size))
                 node.flags.stack = true

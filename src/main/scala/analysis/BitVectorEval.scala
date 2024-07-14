@@ -24,6 +24,32 @@ object BitVectorEval {
     */
   def bv2nat(b: BitVecLiteral): BigInt = b.value
 
+  /**
+   * Converts a bitvector value to its corresponding signed integer
+   */
+  def bv2int(b: BitVecLiteral): BigInt =
+    val binaryNum: Array[Int] = new Array[Int](b.size)
+    var i = 0
+    var num = b.value
+    while (num > 0) {
+      binaryNum(i) = (num % BigInt(2)).intValue
+      num = num / 2
+      i += 1
+    }
+
+    var result: BigInt = BigInt(0)
+    var counter: Int = 0
+    binaryNum.foreach(
+      n =>
+        if counter == binaryNum.length - 1 && n == 1 then
+          result = result - BigInt(2).pow(counter)
+        else if n == 1 then
+          result = result + BigInt(2).pow(counter)
+        counter += 1
+    )
+    result
+
+
   /** (bvadd (_ BitVec m) (_ BitVec m) (_ BitVec m))
     *   - addition modulo 2^m
     *

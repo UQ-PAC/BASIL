@@ -1,8 +1,9 @@
 package analysis
 
+import analysis.BitVectorEval.bv2int
 import analysis.solvers.ForwardIDESolver
 import ir.IRWalk.procedure
-import ir.{BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, GoTo, IndirectCall, Literal, Assign, Memory, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend}
+import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, GoTo, IndirectCall, Literal, Memory, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend}
 
 import java.math.BigInteger
 
@@ -102,7 +103,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
                     case Left(value) if value.accessor == variable => Map()
                     case Left(value) => Map(d -> IdEdge())
                     case Right(_) =>
-                      val size = twosComplementToDec(decToBinary(v.value))
+                      val size = bv2int(v)
                       Map(d -> IdEdge(), Left(SymbolicAccess(variable, StackLocation(s"Stack_${procedure(n).name}", procedure(n), -size), 0)) -> ConstEdge(TwoElementTop))
                 else
                   d match
