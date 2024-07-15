@@ -37,6 +37,8 @@ case class GlobalVariable(val mem: Memory, val address: BitVecLiteral, val size:
   }
 }
 
+// TODO this is does not account for different stack pointer indices. We could have two `LocalStackVariable`s from
+// different functions with the same offset, and they would compare to be equal, which leads to unsound analysis! :(
 /**
  * A variable stored on the stack that was initialized in its own procedure (i.e. not a function argument).
  */

@@ -17,6 +17,10 @@ trait VariableDependencyAnalysisFunctions(
   import edgelattice.{IdEdge, ConstEdge, JoinEdge}
 
   private val stackPointer = Register("R31", 64)
+  private val linkRegister = Register("R30", 64)
+  private val framePointer = Register("R29", 64)
+
+  private val ignoredRegisters = Set(stackPointer, linkRegister, framePointer)
 
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
     Map(d -> IdEdge())
@@ -47,9 +51,9 @@ trait VariableDependencyAnalysisFunctions(
       }
     } else n match {
       case Assign(assigned, expression, _) => {
-        val vars = getVars(expression)
+        val vars = getVars(expression) -- ignoredRegisters
         d match {
-          case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> JoinEdge(vars)) // \l . l U vars
+          case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
           case Left(v) if v == assigned => Map()
           case _ => Map(d -> IdEdge())
         }
@@ -57,9 +61,9 @@ trait VariableDependencyAnalysisFunctions(
       case MemoryAssign(mem, index, expression, _, size, _) => {
         val assigned = getMemoryVariable(n, mem, index, size, constProp, globals).getOrElse(UnknownMemory())
 
-        val vars = getVars(expression)
+        val vars = getVars(expression) -- ignoredRegisters
         d match {
-          case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> JoinEdge(vars)) // \l . l U vars
+          case Left(v) if vars.contains(v) => Map(d -> IdEdge(), Left(assigned) -> IdEdge())
           case Left(v) if v == assigned && v != UnknownMemory() => Map()
           case _ => Map(d -> IdEdge())
         }
