@@ -99,7 +99,7 @@ class SummaryGenerator(
       case variable: Register => Some(variable.toGamma)
       case variable: LocalVar => None
       case variable: GlobalVariable => Some(variable.toGamma)
-      case variable: LocalStackVariable => None
+      //case variable: LocalStackVariable => None
       case variable: UnknownMemory => Some(FalseBLiteral)
     }
   }

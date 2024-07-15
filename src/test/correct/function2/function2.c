@@ -1,8 +1,10 @@
+// noinline + -O2 to avoid using the stack (while still having a seperate procedure for f)
+
 int x;
 
 int c;
 
-int f(int a, int b) {
+__attribute((noinline)) int f(int a, int b) {
     if (c) {
         return a;
     } else {

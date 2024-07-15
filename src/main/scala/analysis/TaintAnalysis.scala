@@ -8,7 +8,7 @@ import util.Logger
 /**
  * A value which can propogate taint/be tainted.
  */
-type Taintable = Variable | GlobalVariable | LocalStackVariable | UnknownMemory
+type Taintable = Variable | GlobalVariable /*| LocalStackVariable*/ | UnknownMemory
 
 // TODO global and stack variables should just be `Variable`s after an IL transformation, in the future they shouldn't need to be defined here.
 
@@ -39,6 +39,7 @@ case class GlobalVariable(val mem: Memory, val address: BitVecLiteral, val size:
 
 // TODO this is does not account for different stack pointer indices. We could have two `LocalStackVariable`s from
 // different functions with the same offset, and they would compare to be equal, which leads to unsound analysis! :(
+/*
 /**
  * A variable stored on the stack that was initialized in its own procedure (i.e. not a function argument).
  */
@@ -46,7 +47,7 @@ case class LocalStackVariable(val address: BitVecLiteral, val size: Int) {
   override def toString(): String = {
     s"StackVariable($address, $size)"
   }
-}
+}*/
 
 /**
  * Represents a memory address with no known information.
@@ -61,7 +62,7 @@ def getMemoryVariable(
   n: CFGPosition, mem: Memory, expression: Expr, size: Int,
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
   globals: Map[BigInt, String],
-): Option[GlobalVariable | LocalStackVariable] = {
+): Option[GlobalVariable/*| LocalStackVariable*/] = {
   // TODO unsoundly gets stack variable which can lead to unsound analysis
 
   val stackPointer = Register("R31", 64)
@@ -73,10 +74,12 @@ def getMemoryVariable(
         // TODO This assumes that all stack variables are initialized local variables, which is not necessarily the case.
         //      If a stack address is read, without being assigned a value in this procedure, it will be
         //      assumed untainted, when in reality it may be UnknownMemory.
-        case Some(addr) => Some(LocalStackVariable(addr, size))
+        //case Some(addr) => Some(LocalStackVariable(addr, size))
+        case Some(addr) => None
         case None => None
     }
-    case v: Variable if v == stackPointer => Some(LocalStackVariable(BitVecLiteral(0, 64), size))
+    //case v: Variable if v == stackPointer => Some(LocalStackVariable(BitVecLiteral(0, 64), size))
+    case v: Variable if v == stackPointer => None
     case _ => {
       // TOOD check that the global access has the right size
       evaluateExpression(expression, constProp(n)) match
