@@ -65,7 +65,7 @@ case class StaticAnalysisContext(
 
 /** Results of the main program execution.
   */
-case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], boogie: BProgram)
+case class BASILResult(ir: IRContext, analysis: Option[StaticAnalysisContext], boogie: ArrayBuffer[BProgram])
 
 /** Tools for loading the IR program into an IRContext.
   */
@@ -187,7 +187,15 @@ object IRTransform {
     Logger.info("[!] Removing external function calls")
     // Remove external function references (e.g. @printf)
     val externalNames = ctx.externalFunctions.map(e => e.name)
-    val externalRemover = ExternalRemover(externalNames)
+    val externalNamesLibRemoved = mutable.Set[String]()
+    externalNamesLibRemoved.addAll(externalNames)
+
+    for (e <- externalNames) {
+      if (e.contains('@')) {
+        externalNamesLibRemoved.add(e.split('@')(0))
+      }
+    }
+    val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
     val renamer = Renamer(boogieReserved)
     val returnUnifier = ConvertToSingleProcedureReturn()
 
@@ -385,13 +393,13 @@ object IRTransform {
       newProcedure
     }
 
-    def resolveAddresses(variable: Variable, n: CfgNode): mutable.Set[String] = {
+    def resolveAddresses(variable: Variable, i: IndirectCall): mutable.Set[String] = {
       val names = mutable.Set[String]()
-      val variableWrapper = RegisterVariableWrapper(variable, getUse(variable, n.asInstanceOf[CfgCommandNode].data, reachingDefs))
+      val variableWrapper = RegisterVariableWrapper(variable, getUse(variable, i, reachingDefs))
       pointsTos.get(variableWrapper) match {
         case Some(value) =>
           value.map {
-            case v: RegisterVariableWrapper => names.addAll(resolveAddresses(v.variable, n))
+            case v: RegisterVariableWrapper => names.addAll(resolveAddresses(v.variable, i))
             case m: MemoryRegion => names.addAll(searchRegion(m))
           }
           names
@@ -412,7 +420,7 @@ object IRTransform {
               // We want to replace all possible indirect calls based on this CFG, before regenerating it from the IR
               return
             }
-            val targetNames = resolveAddresses(indirectCall.target, n)
+            val targetNames = resolveAddresses(indirectCall.target, indirectCall)
             Logger.debug(s"Points-To approximated call ${indirectCall.target} with $targetNames")
             Logger.debug(IRProgram.procedures)
             val targets: mutable.Set[Procedure] = targetNames.map(name => IRProgram.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
@@ -470,6 +478,76 @@ object IRTransform {
 
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
+  }
+
+  // identify calls to pthread_create
+  // use analysis result to determine the third parameter's value (the function pointer)
+  // split off that procedure into new thread
+  // do reachability analysis
+  // also need a bit in the IR where it creates separate files
+  def splitThreads(program: Program,
+                   pointsTo: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
+                   regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
+                   reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+                  ): Unit = {
+    
+    // iterate over all commands - if call is to pthread_create, look up?
+    for (p <- program.procedures) {
+      for (b <- p.blocks) {
+        b.jump match {
+          case d: DirectCall if d.target.name == "pthread_create" =>
+
+            // R2 should hold the function pointer of the function that begins the thread
+            // look up R2 value using points to results
+            val R2 = Register("R2", 64)
+            val b = reachingDefs(d)
+            val R2Wrapper = RegisterVariableWrapper(R2, getDefinition(R2, d, reachingDefs))
+            val threadTargets = pointsTo(R2Wrapper)
+
+            if (threadTargets.size > 1) {
+              // currently can't handle case where the thread created is ambiguous
+              throw Exception("can't handle thread creation with more than one possible target")
+            }
+
+            if (threadTargets.size == 1) {
+
+              // not trying to untangle the very messy region resolution at present, just dealing with simplest case
+              threadTargets.head match {
+                case data: DataRegion =>
+                  val threadEntrance = program.procedures.find(_.name == data.regionIdentifier) match {
+                    case Some(proc) => proc
+                    case None => throw Exception("could not find procedure with name " + data.regionIdentifier)
+                  }
+                  val thread = ProgramThread(threadEntrance, mutable.LinkedHashSet(threadEntrance), Some(d))
+                  program.threads.addOne(thread)
+                case _ =>
+                  throw Exception("unexpected non-data region " + threadTargets.head + " as PointsTo result for R2 at " + d)
+              }
+            }
+          case _ =>
+        }
+      }
+    }
+
+    if (program.threads.nonEmpty) {
+      val mainThread = ProgramThread(program.mainProcedure, mutable.LinkedHashSet(program.mainProcedure), None)
+      program.threads.addOne(mainThread)
+
+      val programProcs = program.procedures
+
+      // do reachability for all threads
+      for (thread <- program.threads) {
+        val reachable = thread.entry.reachableFrom
+
+        // add procedures to thread in way that maintains original ordering
+        for (p <- programProcs) {
+          if (reachable.contains(p)) {
+            thread.procedures.add(p)
+          }
+        }
+
+      }
+    }
   }
 
 }
@@ -640,7 +718,7 @@ object StaticAnalysis {
     * @param result
     *   The analysis result MapLattice
     * @tparam T
-    *   The anlaysis result type.
+    *   The analysis result type.
     * @return
     *   The new map analysis result.
     */
@@ -794,9 +872,11 @@ object RunUtils {
     val result = loadAndTranslate(q)
 
     Logger.info("[!] Writing file...")
-    val wr = BufferedWriter(FileWriter(q.outputPrefix))
-    result.boogie.writeToString(wr)
-    wr.close()
+    for (boogie <- result.boogie) {
+      val wr = BufferedWriter(FileWriter(boogie.filename))
+      boogie.writeToString(wr)
+      wr.close()
+    }
   }
 
   def loadAndTranslate(q: BASILConfig): BASILResult = {
@@ -817,10 +897,21 @@ object RunUtils {
     IRTransform.prepareForTranslation(q.loading, ctx)
 
     Logger.info("[!] Translating to Boogie")
-    val boogieTranslator = IRToBoogie(ctx.program, ctx.specification)
-    val boogieProgram = boogieTranslator.translate(q.boogieTranslation)
 
-    BASILResult(ctx, analysis, boogieProgram)
+    val boogiePrograms = if (q.boogieTranslation.threadSplit && ctx.program.threads.nonEmpty) {
+      val outPrograms = ArrayBuffer[BProgram]()
+      for (thread <- ctx.program.threads) {
+        val fileName = q.outputPrefix.stripSuffix(".bpl") + "_" + thread.entry.name + ".bpl"
+        val boogieTranslator = IRToBoogie(ctx.program, ctx.specification, Some(thread), fileName)
+        outPrograms.addOne(boogieTranslator.translate(q.boogieTranslation))
+      }
+      outPrograms
+    } else {
+      val boogieTranslator = IRToBoogie(ctx.program, ctx.specification, None, q.outputPrefix)
+      ArrayBuffer(boogieTranslator.translate(q.boogieTranslation))
+    }
+
+    BASILResult(ctx, analysis, boogiePrograms)
   }
 
   /** Use static analysis to resolve indirect calls and replace them in the IR until fixed point.
@@ -844,6 +935,12 @@ object RunUtils {
         iteration += 1
         Logger.info(s"[!] Analysing again (iter $iteration)")
       }
+    }
+
+    // should later move this to be inside while (modified) loop and have splitting threads cause further iterations
+
+    if (config.threadSplit) {
+      IRTransform.splitThreads(ctx.program, analysisResult.last.steensgaardResults, analysisResult.last.memoryRegionContents, analysisResult.last.reachingDefs)
     }
 
     config.analysisDotPath.foreach { s =>

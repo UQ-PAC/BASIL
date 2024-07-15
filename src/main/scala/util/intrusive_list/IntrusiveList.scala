@@ -298,6 +298,47 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     intrusiveListElement.insertAfter(newElem)
   }
 
+
+  /**
+   * Insert an element after another element in the list.
+   * @param intrusiveListElement The element in the list to insert after, or None to indicate the beginning.
+   * @param newElems The elements to insert. Must not be members of any other intrusive list(s).
+   * @return the last inserted element, or the reference element
+   */
+  def insertAllAfter(intrusiveListElement: Option[T], newElems: Iterable[T]): Option[T] = {
+    intrusiveListElement match {
+      case None => 
+        newElems.toList.reverse.map(prepend).headOption.orElse(intrusiveListElement)
+      case Some(n) => 
+        var p = n
+        for (i <- newElems) {
+          p = insertAfter(p, i)
+        }
+        Some(p)
+    }
+  }
+
+
+  /**
+   * Insert an element before another element in the list.
+   * @param intrusiveListElement The element in the list to insert before, or None to indicate the end of the list.
+   * @param newElems The elements to insert. Must not be members of any other intrusive list(s).
+   * @return the last inserted element, or the reference element
+   */
+  def insertAllBefore(intrusiveListElement: Option[T], newElems: Iterable[T]): Option[T] = {
+    intrusiveListElement match {
+      case None => 
+        newElems.map(append).lastOption.orElse(intrusiveListElement)
+      case Some(n) => 
+        var p = n
+        for (i <- newElems.toList.reverse) {
+          p = insertBefore(p, i)
+        }
+        Some(p)
+    }
+  }
+
+
   /**
    * Insert an element before another element in the list.
    *

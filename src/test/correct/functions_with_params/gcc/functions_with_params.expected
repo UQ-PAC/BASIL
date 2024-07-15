@@ -136,9 +136,9 @@ implementation main()
     R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
     R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
-    goto main_return;
-  main_return:
-    assume {:captureState "main_return"} true;
+    goto main_basil_return;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 
@@ -173,9 +173,9 @@ implementation plus_one()
     R0, Gamma_R0 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
     R0, Gamma_R0 := zero_extend32_32(bvadd32(R0[32:0], 1bv32)), Gamma_R0;
     R31, Gamma_R31 := bvadd64(R31, 16bv64), Gamma_R31;
-    goto plus_one_return;
-  plus_one_return:
-    assume {:captureState "plus_one_return"} true;
+    goto plus_one_basil_return;
+  plus_one_basil_return:
+    assume {:captureState "plus_one_basil_return"} true;
     return;
 }
 

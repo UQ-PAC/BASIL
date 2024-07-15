@@ -46,39 +46,58 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
   /**
    * Updates the expected
    */
-  def updateExpected() = T.command {
-    val correctPath = test.millSourcePath /  "correct"
+
+  def updateExpectedBAP() = T.command {
+    val correctPath = test.millSourcePath / "correct"
     val incorrectPath = test.millSourcePath / "incorrect"
 
-    def expectedUpdate(path: Path, shouldVerify: Boolean): Unit = {
-      val examples = os.list(path).filter(os.isDir)
-      for (e <- examples) {
-        val variations = os.list(e).filter(os.isDir)
-        for (v <- variations) {
-          val name = e.last
-          val outPath = v / (name + ".bpl")
-          val expectedPath = v / (name + ".expected")
-          val resultPath = v / (name + "_result.txt")
-          if (os.exists(resultPath)) {
-            val result = os.read(resultPath)
-            val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
-            if (verified == shouldVerify) {
-              if (os.exists(outPath) && !(os.exists(expectedPath) && filesContentEqual(outPath, expectedPath))) {
-                println(s"updated $expectedPath")
-                os.copy.over(outPath, expectedPath)
-              }
+    expectedUpdate(correctPath, true, true)
+    expectedUpdate(incorrectPath, false, true)
+  }
+
+  def updateExpectedGTIRB() = T.command {
+    val correctPath = test.millSourcePath / "correct"
+    val incorrectPath = test.millSourcePath / "incorrect"
+
+    expectedUpdate(correctPath, true, false)
+    expectedUpdate(incorrectPath, false, false)
+  }
+
+  def expectedUpdate(path: Path, shouldVerify: Boolean, BAPVariant: Boolean): Unit = {
+    val examples = os.list(path).filter(os.isDir)
+    for (e <- examples) {
+      val variations = os.list(e).filter(os.isDir)
+      for (v <- variations) {
+        val name = e.last
+        val suffix = if (BAPVariant) {
+          "_bap"
+        } else {
+          "_gtirb"
+        }
+        val expectedSuffix = if (BAPVariant) {
+          ""
+        } else {
+          "_gtirb"
+        }
+        val outPath = v / (name + suffix + ".bpl")
+        val expectedPath = v / (name + expectedSuffix + ".expected")
+        val resultPath = v / (name + suffix + "_result.txt")
+        if (os.exists(resultPath)) {
+          val result = os.read(resultPath)
+          val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
+          if (verified == shouldVerify) {
+            if (os.exists(outPath) && !(os.exists(expectedPath) && filesContentEqual(outPath, expectedPath))) {
+              println(s"updated $expectedPath")
+              os.copy.over(outPath, expectedPath)
             }
           }
         }
       }
     }
+  }
 
-    def filesContentEqual(path1: Path, path2: Path): Boolean = {
-      os.read(path1) == os.read(path2)
-    }
-
-    expectedUpdate(correctPath, true)
-    expectedUpdate(incorrectPath, false)
+  def filesContentEqual(path1: Path, path2: Path): Boolean = {
+    os.read.lines(path1) == os.read.lines(path2)
   }
 
 }

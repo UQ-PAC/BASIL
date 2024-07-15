@@ -123,7 +123,7 @@ implementation main()
   l000001bd:
     assume {:captureState "l000001bd"} true;
     R0, Gamma_R0 := 0bv64, true;
-    goto main_return;
+    goto main_basil_return;
   lmain_goto_l000001bd:
     assume {:captureState "lmain_goto_l000001bd"} true;
     assume (bvnot1(bvcomp32(R0[32:0], 0bv32)) != 0bv1);
@@ -132,8 +132,8 @@ implementation main()
     assume {:captureState "lmain_goto_l0000039c"} true;
     assume (bvnot1(bvcomp32(R0[32:0], 0bv32)) == 0bv1);
     goto l0000039c;
-  main_return:
-    assume {:captureState "main_return"} true;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 

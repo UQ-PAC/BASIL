@@ -106,11 +106,11 @@ implementation main()
     mem, Gamma_mem := memory_store32_le(mem, bvadd64(R8, 52bv64), R9[32:0]), gamma_store32(Gamma_mem, bvadd64(R8, 52bv64), Gamma_R9);
     assume {:captureState "%000002ec"} true;
     R0, Gamma_R0 := 0bv64, true;
-    goto main_return;
+    goto main_basil_return;
   l000002f8:
     assume {:captureState "l000002f8"} true;
     R0, Gamma_R0 := 0bv64, true;
-    goto main_return;
+    goto main_basil_return;
   lmain_goto_l000002dc:
     assume {:captureState "lmain_goto_l000002dc"} true;
     assume (bvcomp32(R9[32:0], 0bv32) != 0bv1);
@@ -119,8 +119,8 @@ implementation main()
     assume {:captureState "lmain_goto_l000002f8"} true;
     assume (bvcomp32(R9[32:0], 0bv32) == 0bv1);
     goto l000002f8;
-  main_return:
-    assume {:captureState "main_return"} true;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 

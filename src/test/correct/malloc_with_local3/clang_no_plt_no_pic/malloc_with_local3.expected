@@ -590,9 +590,9 @@ implementation main()
     R29, Gamma_R29 := memory_load64_le(stack, #7), gamma_load64(Gamma_stack, #7);
     R30, Gamma_R30 := memory_load64_le(stack, bvadd64(#7, 8bv64)), gamma_load64(Gamma_stack, bvadd64(#7, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 80bv64), Gamma_R31;
-    goto main_return;
-  main_return:
-    assume {:captureState "main_return"} true;
+    goto main_basil_return;
+  main_basil_return:
+    assume {:captureState "main_basil_return"} true;
     return;
 }
 
@@ -941,9 +941,9 @@ implementation printCharValue()
     R29, Gamma_R29 := memory_load64_le(stack, #6), gamma_load64(Gamma_stack, #6);
     R30, Gamma_R30 := memory_load64_le(stack, bvadd64(#6, 8bv64)), gamma_load64(Gamma_stack, bvadd64(#6, 8bv64));
     R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
-    goto printCharValue_return;
-  printCharValue_return:
-    assume {:captureState "printCharValue_return"} true;
+    goto printCharValue_basil_return;
+  printCharValue_basil_return:
+    assume {:captureState "printCharValue_basil_return"} true;
     return;
 }
 
