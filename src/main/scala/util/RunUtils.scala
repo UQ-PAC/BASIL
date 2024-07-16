@@ -699,7 +699,7 @@ object StaticAnalysis {
 
     Logger.info("[!] Running Taint Analysis")
     val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val taintResults = TaintAnalysis(IRProgram, specGlobalAddresses, mmm, constPropResult,
+    val taintResults = TaintAnalysis(IRProgram, specGlobalAddresses, constPropResult,
         IRProgram.procedures.foldLeft(Map[CFGPosition, Set[analysis.Taintable]]()) {
           (m, p) => m + (p -> Set(analysis.UnknownMemory()))
         }
@@ -714,7 +714,7 @@ object StaticAnalysis {
     ctx.program.setModifies(specModifies)
 
     Logger.info("[!] Generating Function Summaries")
-    val summaryGenerator = SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, mmm, constPropResult)
+    val summaryGenerator = SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult)
     IRProgram.procedures.filter {
       p => p != IRProgram.mainProcedure
     }.foreach {

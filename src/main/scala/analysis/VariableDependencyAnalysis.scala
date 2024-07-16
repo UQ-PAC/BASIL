@@ -8,7 +8,6 @@ import util.Logger
 trait VariableDependencyAnalysisFunctions(
   variables: Set[Taintable],
   globals: Map[BigInt, String],
-  mmm: MemoryModelMap,
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
   procedure: Procedure,
 ) extends ForwardIDEAnalysis[Taintable, Set[Taintable], PowersetLattice[Taintable]] {
@@ -46,8 +45,10 @@ trait VariableDependencyAnalysisFunctions(
     if n == procedure then d match {
       // At the start of the procedure, no variables should depend on anything but themselves.
       case Left(_) => Map()
-      case Right(_) => variables.foldLeft(Map(d -> IdEdge())) {
+      case Right(_) => {
+        variables.foldLeft(Map(d -> IdEdge())) {
         (m: Map[DL, EdgeFunction[Set[Taintable]]], v) => m + (Left(v) -> ConstEdge(Set(v)))
+      }
       }
     } else n match {
       case Assign(assigned, expression, _) => {
@@ -80,11 +81,10 @@ class VariableDependencyAnalysis(
   program: Program,
   variables: Set[Taintable],
   globals: Map[BigInt, String],
-  mmm: MemoryModelMap,
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
   procedure: Procedure,
 ) extends ForwardIDESolver[Taintable, Set[Taintable], PowersetLattice[Taintable]](program),
-    VariableDependencyAnalysisFunctions(variables, globals, mmm, constProp, procedure)
+    VariableDependencyAnalysisFunctions(variables, globals, constProp, procedure)
 {
   override def phase2Init: Set[Taintable] = Set(Register("R0", 64))
 }

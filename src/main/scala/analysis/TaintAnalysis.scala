@@ -93,7 +93,6 @@ def getMemoryVariable(
 
 trait TaintAnalysisFunctions(
   globals: Map[BigInt, String],
-  mmm: MemoryModelMap,
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
   tainted: Map[CFGPosition, Set[Taintable]],
 ) extends ForwardIDEAnalysis[Taintable, TwoElement, TwoElementLattice] {
@@ -168,8 +167,7 @@ trait TaintAnalysisFunctions(
 class TaintAnalysis(
   program: Program,
   globals: Map[BigInt, String],
-  mmm: MemoryModelMap,
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
   tainted: Map[CFGPosition, Set[Taintable]],
 ) extends ForwardIDESolver[Taintable, TwoElement, TwoElementLattice](program),
-    TaintAnalysisFunctions(globals, mmm, constProp, tainted)
+    TaintAnalysisFunctions(globals, constProp, tainted)
