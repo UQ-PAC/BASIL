@@ -17,6 +17,8 @@ trait SystemTests extends AnyFunSuite {
   val correctPrograms: Array[String] = getSubdirectories(correctPath)
   val incorrectPath = "./src/test/incorrect"
   val incorrectPrograms: Array[String] = getSubdirectories(incorrectPath)
+  val correctWithAnalysisPath = "./src/test/correct-analysis"
+  val correctWithAnalysisPrograms: Array[String] = getSubdirectories(correctWithAnalysisPath)
 
   case class TestResult(passed: Boolean, verified: Boolean, shouldVerify: Boolean, hasExpected: Boolean, timedOut: Boolean, matchesExpected: Boolean, translateTime: Long, verifyTime: Long) {
     val toCsv = s"$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
@@ -28,7 +30,7 @@ trait SystemTests extends AnyFunSuite {
 
   val testResults: mutable.ArrayBuffer[(String, TestResult)] = mutable.ArrayBuffer()
 
-  def runTests(programs: Array[String], path: String, name: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
+  def runTests(programs: Array[String], path: String, name: String, shouldVerify: Boolean, useADT: Boolean, analyse: Boolean): Unit = {
     // get all variations of each program
     val testSuffix = if useADT then ":BAP" else ":GTIRB"
     for (p <- programs) {
@@ -36,7 +38,7 @@ trait SystemTests extends AnyFunSuite {
       val variations = getSubdirectories(programPath)
       variations.foreach(t =>
         test(name + "/" + p + "/" + t + testSuffix) {
-          runTest(path, p, t, shouldVerify, useADT)
+          runTest(path, p, t, shouldVerify, useADT, analyse)
         }
       )
     }
@@ -65,7 +67,7 @@ trait SystemTests extends AnyFunSuite {
     log(summaryHeader + System.lineSeparator() + summaryRow, testPath + "summary-" + filename)
   }
 
-  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean): Unit = {
+  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean, analyse: Boolean): Unit = {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
@@ -75,7 +77,8 @@ trait SystemTests extends AnyFunSuite {
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")
 
-    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath, "--analyse")
+    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath)
+    if analyse then args += "--analyse"
     if (File(specPath).exists) args ++= Seq("--spec", specPath)
 
     Main.main(args.toArray)
@@ -162,16 +165,18 @@ trait SystemTests extends AnyFunSuite {
 }
 
 class SystemTestsBAP extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", true, true)
-  runTests(incorrectPrograms, incorrectPath, "incorrect", false, true)
+  runTests(correctPrograms, correctPath, "correct", true, true, false)
+  runTests(incorrectPrograms, incorrectPath, "incorrect", false, true, false)
+  runTests(correctWithAnalysisPrograms, correctWithAnalysisPath, "correct", true, true, true)
   test("summary") {
     summary("testresult-BAP.csv")
   }
 }
 
 class SystemTestsGTIRB extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", true, false)
-  runTests(incorrectPrograms, incorrectPath, "incorrect", false, false)
+  runTests(correctPrograms, correctPath, "correct", true, false, false)
+  runTests(incorrectPrograms, incorrectPath, "incorrect", false, false, false)
+  runTests(correctWithAnalysisPrograms, correctWithAnalysisPath, "correct", true, false, true)
   test("summary") {
     summary("testresult-GTIRB.csv")
   }
