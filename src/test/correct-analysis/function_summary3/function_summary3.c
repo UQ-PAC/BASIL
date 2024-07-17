@@ -1,13 +1,13 @@
 int x;
 
-int g(int a, int b) {
+__attribute((noinline)) int g(int a, int b) {
     return a + b;
 }
 
-int f(int a) {
+__attribute((noinline)) int f(int a) {
     return g(a, a);
 }
 
 int main() {
-    return f(x);
+    x = f(x);
 }

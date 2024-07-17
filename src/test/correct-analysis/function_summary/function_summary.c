@@ -6,6 +6,6 @@ int main() {
     y = get_two();
 }
 
-int get_two() {
+__attribute((noinline)) int get_two() {
     return 2;
 }
