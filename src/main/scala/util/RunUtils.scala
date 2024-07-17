@@ -550,6 +550,35 @@ object IRTransform {
     }
   }
 
+  def generateFunctionSummaries(
+    ctx: IRContext,
+    IRProgram: Program,
+    constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  ): Boolean = {
+    var modified = false
+    // Need to know modifies clauses to generate summaries, but this is probably out of place
+    val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
+    ctx.program.setModifies(specModifies)
+
+    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
+    val summaryGenerator = SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult)
+    IRProgram.procedures.filter {
+      p => p != IRProgram.mainProcedure
+    }.foreach {
+      procedure => {
+        val req = summaryGenerator.generateRequires(procedure)
+        modified = modified | procedure.requires != req
+        procedure.requires = req
+
+        val ens = summaryGenerator.generateEnsures(procedure)
+        modified = modified | procedure.ensures != ens
+        procedure.ensures = ens
+      }
+    }
+
+    modified
+  }
+
 }
 
 /** Methods relating to program static analysis.
@@ -697,8 +726,8 @@ object StaticAnalysis {
     //val paramResults = ParamAnalysis(IRProgram).analyze()
     val paramResults = Map[Procedure, Set[Variable]]()
 
+    /*
     Logger.info("[!] Running Taint Analysis")
-    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
     val taintResults = TaintAnalysis(IRProgram, specGlobalAddresses, constPropResult,
         IRProgram.procedures.foldLeft(Map[CFGPosition, Set[analysis.Taintable]]()) {
           (m, p) => m + (p -> Set(analysis.UnknownMemory()))
@@ -708,22 +737,7 @@ object StaticAnalysis {
     config.analysisResultsPath.foreach(s =>
       writeToFile(printAnalysisResults(IRProgram, taintResults), s"${s}_taint$iteration.txt")
     )
-
-    // Need to know modifies clauses to generate summaries, but this is probably out of place
-    val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
-    ctx.program.setModifies(specModifies)
-
-    Logger.info("[!] Generating Function Summaries")
-    val summaryGenerator = SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult)
-    IRProgram.procedures.filter {
-      p => p != IRProgram.mainProcedure
-    }.foreach {
-      procedure => {
-        Logger.info("Generating summary for " + procedure.name)
-        procedure.requires = summaryGenerator.generateRequires(procedure)
-        procedure.ensures = summaryGenerator.generateEnsures(procedure)
-      }
-    }
+    */
 
     StaticAnalysisContext(
       cfg = cfg,
@@ -959,6 +973,8 @@ object RunUtils {
         result.reachingDefs,
         ctx.program
       )
+      Logger.info("[!] Generating Function Summaries")
+      modified = modified | IRTransform.generateFunctionSummaries(ctx, ctx.program, result.constPropResult)
       if (modified) {
         iteration += 1
         Logger.info(s"[!] Analysing again (iter $iteration)")
