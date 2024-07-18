@@ -80,12 +80,13 @@ class SummaryGenerator(
     program: Program,
     specGlobals: Set[SpecGlobal],
     globals: Map[BigInt, String],
-    constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]
+    constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
 ) {
   val rnaResults = RNATaintableSolver(program, globals, constProp).analyze()
 
   // TODO should the stack/link/frame pointers propagate taint?
-  val variables: Set[analysis.Taintable] = (0 to 28).map { n =>
+  val variables: Set[analysis.Taintable] = 0.to(28).map { n =>
     Register(s"R$n", 64)
   }.toSet ++ specGlobals.map { g =>
     analysis.GlobalVariable(dsl.mem, BitVecLiteral(g.address, 64), g.size, g.name)
@@ -112,7 +113,7 @@ class SummaryGenerator(
    * Get a map of variables to variables which have tainted it in the procedure.
    */
   private def getTainters(procedure: Procedure, variables: Set[Taintable]): Map[Taintable, Set[Taintable]] = {
-    VariableDependencyAnalysis(program, variables, globals, constProp, procedure).analyze().getOrElse(procedure.end, Map())
+    varDepsSummaries.getOrElse(procedure, Map())
   }
 
   /**

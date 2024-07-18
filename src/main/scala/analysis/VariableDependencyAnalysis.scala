@@ -4,11 +4,15 @@ import analysis.solvers.ForwardIDESolver
 import ir.*
 import boogie.*
 import util.Logger
+import specification.SpecGlobal
 
-trait VariableDependencyAnalysisFunctions(
+import scala.collection.mutable
+
+trait ProcVariableDependencyAnalysisFunctions(
   variables: Set[Taintable],
   globals: Map[BigInt, String],
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
   procedure: Procedure,
 ) extends ForwardIDEAnalysis[Taintable, Set[Taintable], PowersetLattice[Taintable]] {
   val valuelattice = PowersetLattice()
@@ -21,17 +25,21 @@ trait VariableDependencyAnalysisFunctions(
 
   private val ignoredRegisters = Set(stackPointer, linkRegister, framePointer)
 
+  private val reachable = procedure.reachableFrom
+
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
-    Map(d -> IdEdge())
+    if varDepsSummaries.contains(entry) then Map() else Map(d -> IdEdge())
   }
 
   def edgesExitToAfterCall(exit: IndirectCall, aftercall: GoTo)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
-    Map(d -> IdEdge())
+    if reachable.contains(aftercall.parent.parent) then Map(d -> IdEdge()) else Map()
   }
 
   def edgesCallToAfterCall(call: DirectCall, aftercall: GoTo)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
     d match {
-      case Left(_) => Map()
+      case Left(v) => varDepsSummaries.get(call.target).flatMap(_.get(v).map( _.foldLeft(Map[DL, EdgeFunction[Set[Taintable]]]()) {
+        (m, d) => m + (Left(d) -> IdEdge())
+      })).getOrElse(Map())
       case Right(_) => Map(d -> IdEdge())
     }
   }
@@ -47,8 +55,8 @@ trait VariableDependencyAnalysisFunctions(
       case Left(_) => Map()
       case Right(_) => {
         variables.foldLeft(Map(d -> IdEdge())) {
-        (m: Map[DL, EdgeFunction[Set[Taintable]]], v) => m + (Left(v) -> ConstEdge(Set(v)))
-      }
+          (m: Map[DL, EdgeFunction[Set[Taintable]]], v) => m + (Left(v) -> ConstEdge(Set(v)))
+        }
       }
     } else n match {
       case Assign(assigned, expression, _) => {
@@ -77,14 +85,53 @@ trait VariableDependencyAnalysisFunctions(
 /**
  * Calculates the set of "input variables" that a variable has been affected by at each CFG node, starting at the given procedure.
  */
-class VariableDependencyAnalysis(
+class ProcVariableDependencyAnalysis(
   program: Program,
   variables: Set[Taintable],
   globals: Map[BigInt, String],
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
   procedure: Procedure,
 ) extends ForwardIDESolver[Taintable, Set[Taintable], PowersetLattice[Taintable]](program),
-    VariableDependencyAnalysisFunctions(variables, globals, constProp, procedure)
+    ProcVariableDependencyAnalysisFunctions(variables, globals, constProp, varDepsSummaries, procedure)
 {
   override def phase2Init: Set[Taintable] = Set(Register("R0", 64))
+
+  override val startNode: CFGPosition = procedure
+}
+
+class VariableDependencyAnalysis(
+  program: Program,
+  specGlobals: Set[SpecGlobal],
+  globals: Map[BigInt, String],
+  constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  poOrder: mutable.ListBuffer[Procedure],
+) {
+  val varDepVariables: Set[analysis.Taintable] = 0.to(28).map { n =>
+    Register(s"R$n", 64)
+  }.toSet ++ specGlobals.map { g =>
+    analysis.GlobalVariable(dsl.mem, BitVecLiteral(g.address, 64), g.size, g.name)
+  }
+
+  def analyze(): Map[Procedure, Map[Taintable, Set[Taintable]]] = {
+    var varDepsSummaries = Map[Procedure, Map[Taintable, Set[Taintable]]]()
+    var varDepsSummariesTransposed = Map[Procedure, Map[Taintable, Set[Taintable]]]()
+    poOrder.foreach {
+      procedure => {
+        Logger.info("Generating variable dependencies for " + procedure)
+        val varDepResults = ProcVariableDependencyAnalysis(program, varDepVariables, globals, constProp, varDepsSummariesTransposed, procedure).analyze()
+        val varDepMap = varDepResults.getOrElse(procedure.end, Map())
+        varDepsSummaries += procedure -> varDepMap
+        varDepsSummariesTransposed += procedure -> varDepMap.foldLeft(Map[Taintable, Set[Taintable]]()) {
+          (m, p) => {
+            val (v, s) = p
+            s.foldLeft(m) {
+              (m, d) => m + (d -> (m.getOrElse(d, Set()) + v))
+            }
+          }
+        }
+      }
+    }
+    varDepsSummaries
+  }
 }

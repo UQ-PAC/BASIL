@@ -60,7 +60,8 @@ case class StaticAnalysisContext(
     steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
 )
 
 /** Results of the main program execution.
@@ -554,6 +555,7 @@ object IRTransform {
     ctx: IRContext,
     IRProgram: Program,
     constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
   ): Boolean = {
     var modified = false
     // Need to know modifies clauses to generate summaries, but this is probably out of place
@@ -561,7 +563,7 @@ object IRTransform {
     ctx.program.setModifies(specModifies)
 
     val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    val summaryGenerator = SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult)
+    val summaryGenerator = SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, varDepsSummaries)
     IRProgram.procedures.filter {
       p => p != IRProgram.mainProcedure
     }.foreach {
@@ -644,6 +646,11 @@ object StaticAnalysis {
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationSolver(IRProgram)
     val constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = constPropSolver.analyze()
+
+    Logger.info("[!] Variable dependency summaries")
+    val poOrder = stronglyConnectedSubcomponentsOrder(CallGraph, List(IRProgram.mainProcedure))
+    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
+    var varDepsSummaries = VariableDependencyAnalysis(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, poOrder).analyze()
 
     val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
     val newCPResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = ilcpsolver.analyze()
@@ -750,7 +757,8 @@ object StaticAnalysis {
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,
       memoryRegionContents = memoryRegionContents,
-      reachingDefs = reachingDefinitionsAnalysisResults
+      reachingDefs = reachingDefinitionsAnalysisResults,
+      varDepsSummaries = varDepsSummaries,
     )
   }
 
@@ -974,7 +982,7 @@ object RunUtils {
         ctx.program
       )
       Logger.info("[!] Generating Function Summaries")
-      modified = modified | IRTransform.generateFunctionSummaries(ctx, ctx.program, result.constPropResult)
+      modified = modified | IRTransform.generateFunctionSummaries(ctx, ctx.program, result.constPropResult, result.varDepsSummaries)
       if (modified) {
         iteration += 1
         Logger.info(s"[!] Analysing again (iter $iteration)")

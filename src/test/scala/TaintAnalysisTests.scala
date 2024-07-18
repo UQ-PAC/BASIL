@@ -14,10 +14,10 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
   def getVarDepResults(program: Program, procedure: Procedure): Map[CFGPosition, Map[Taintable, Set[Taintable]]] = {
     val constPropResults = ConstantPropagationSolver(program).analyze()
     val variables = registers
-    VariableDependencyAnalysis(program, variables, Map(), constPropResults, procedure).analyze()
+    ProcVariableDependencyAnalysis(program, variables, Map(), constPropResults, Map(), procedure).analyze()
   }
 
-  val registers = (0 to 28).map { n => Register(s"R$n", 64): Taintable }.toSet
+  val registers = 0.to(28).map { n => Register(s"R$n", 64): Taintable }.toSet
   val baseRegisterMap = registers.map { r => (r, Set(r)) }.toMap
 
   test("constantLiteral") {
