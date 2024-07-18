@@ -105,7 +105,7 @@ class VariableDependencyAnalysis(
   specGlobals: Set[SpecGlobal],
   globals: Map[BigInt, String],
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-  poOrder: mutable.ListBuffer[Procedure],
+  scc: mutable.ListBuffer[mutable.Set[Procedure]],
 ) {
   val varDepVariables: Set[analysis.Taintable] = 0.to(28).map { n =>
     Register(s"R$n", 64)
@@ -116,7 +116,7 @@ class VariableDependencyAnalysis(
   def analyze(): Map[Procedure, Map[Taintable, Set[Taintable]]] = {
     var varDepsSummaries = Map[Procedure, Map[Taintable, Set[Taintable]]]()
     var varDepsSummariesTransposed = Map[Procedure, Map[Taintable, Set[Taintable]]]()
-    poOrder.foreach {
+    scc.flatten.foreach {
       procedure => {
         Logger.info("Generating variable dependencies for " + procedure)
         val varDepResults = ProcVariableDependencyAnalysis(program, varDepVariables, globals, constProp, varDepsSummariesTransposed, procedure).analyze()
