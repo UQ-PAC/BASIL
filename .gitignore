@@ -24,3 +24,4 @@ src/test/scala/dump/
 src/test/analysis/dump/
 *.gtirb
 *.json
+src/main/scala/Version.scala
