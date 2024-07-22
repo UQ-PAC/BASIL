@@ -211,6 +211,54 @@ def computeDomain[T <: CFGPosition, O <: T](walker: IRWalk[T, O], initial: Itera
   domain
 }
 
+/** Compute the set of strongly connected subcomponents (flattened) in a topological sort order using
+ *  Tarjan's strongly connected components algorithm
+ */
+def stronglyConnectedComponents[T <: CFGPosition, O <: T](walker: IRWalk[T, O], initial: IterableOnce[O]): mutable.ListBuffer[mutable.Set[O]] = {
+  var index = 0;
+  var stack = mutable.Stack[O]()
+  var vIndex = mutable.Map[O, Int]()
+  var vLowLink = mutable.Map[O, Int]()
+  var vOnStack = mutable.Map[O, Boolean]()
+  var out = mutable.ListBuffer[mutable.Set[O]]()
+
+  for (proc <- computeDomain(walker, initial)) {
+    if (!vIndex.contains(proc)) {
+      strongconnect(proc)
+    }
+  }
+
+  def strongconnect(cur: O): Unit = {
+    vIndex(cur) = index
+    vLowLink(cur) = index
+    index += 1
+    stack.push(cur)
+    vOnStack(cur) = true
+
+    for (next <- walker.succ(cur)) {
+      if (!vIndex.contains(next)) {
+        strongconnect(next)
+        vLowLink(cur) = vLowLink(cur).min(vLowLink(next))
+      } else {
+        vLowLink(cur) = vLowLink(cur).min(vIndex(next))
+      }
+    }
+
+    if (vLowLink(cur) == vIndex(cur)) {
+      var component = mutable.Set[O]()
+      while { // do {
+        val next = stack.pop()
+        vOnStack(next) = false
+        component += next
+        next != cur // } while (next != cur)
+      } do ()
+      out += component
+    }
+  }
+
+  out
+}
+
 def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty): String = {
   val domain = computeDomain[CFGPosition, CFGPosition](IntraProcIRCursor, program.procedures)
   toDot[CFGPosition](domain, IntraProcIRCursor, labels)
