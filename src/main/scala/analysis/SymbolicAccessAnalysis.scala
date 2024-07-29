@@ -1,6 +1,6 @@
 package analysis
 
-import analysis.BitVectorEval.bv2int
+import analysis.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.solvers.ForwardIDESolver
 import ir.IRWalk.procedure
 import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, GoTo, IndirectCall, Literal, Memory, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend}
@@ -98,12 +98,12 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
           case BinaryExpr(op, arg1: Variable, arg2) =>
             evaluateExpression(arg2, constProp(n)) match
               case Some(v) =>
-                if op.equals(BVADD) && arg1.equals(stackPointer) && v.value >= BITVECNEGATIVE then
+                if op.equals(BVADD) && arg1.equals(stackPointer) && isNegative(v) then
                   d match
                     case Left(value) if value.accessor == variable => Map()
                     case Left(value) => Map(d -> IdEdge())
                     case Right(_) =>
-                      val size = bv2int(v)
+                      val size = bv2SignedInt(v)
                       Map(d -> IdEdge(), Left(SymbolicAccess(variable, StackLocation(s"Stack_${procedure(n).name}", procedure(n), -size), 0)) -> ConstEdge(TwoElementTop))
                 else
                   d match

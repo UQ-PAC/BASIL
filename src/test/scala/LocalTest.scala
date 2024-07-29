@@ -1,4 +1,4 @@
-import analysis.{DSC, DSG, DSN, DataLocation, HeapLocation}
+import analysis.{AddressRange, DSC, DSG, DSN, DataLocation, HeapLocation}
 import ir.Endian.BigEndian
 import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, ConvertToSingleProcedureReturn, DirectCall, Memory, MemoryAssign, MemoryLoad, SharedMemory}
 import org.scalatest.funsuite.AnyFunSuite
@@ -38,7 +38,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(stack24.node.get.collapsed)
     assert(dsg.pointTo(stack24)._1.equals(stack24))
 
-    assert(dsg.pointTo(stack40).equals(dsg.getPointee(dsg.getPointee(dsg.globalMapping((69600, 69600))._1.cells(0))._1)))
+    assert(dsg.pointTo(stack40).equals(dsg.getPointee(dsg.getPointee(dsg.globalMapping(AddressRange(69600, 69600))._1.cells(0))._1)))
 
   }
 
@@ -60,19 +60,19 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.locals.get(program.procs("sub_seven"))
     assert(dsg.pointTo.size == 9)
     assert(dsg.stackMapping.isEmpty)
-    println(dsg.globalMapping((69648, 69652))._1.cells(0))
-    assert(dsg.pointTo(dsg.globalMapping((69648, 69652))._1.cells(0))._1.node.get.collapsed)
+    println(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))._1.node.get.collapsed)
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
   }
 
@@ -94,18 +94,18 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.locals.get(program.procs("add_six"))
     assert(dsg.pointTo.size == 9)
     assert(dsg.stackMapping.isEmpty)
-    assert(dsg.pointTo(dsg.globalMapping((69648, 69652))._1.cells(0))._1.node.get.collapsed)
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))._1.node.get.collapsed)
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
   }
 
@@ -127,19 +127,19 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.locals.get(program.procs("add_two"))
     assert(dsg.pointTo.size == 9)
     assert(dsg.stackMapping.isEmpty)
-    println(dsg.globalMapping((69648, 69652))._1.cells(0))
-    assert(dsg.pointTo(dsg.globalMapping((69648, 69652))._1.cells(0))._1.node.get.collapsed)
+    println(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))._1.node.get.collapsed)
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
   }
 
@@ -172,15 +172,15 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(dsg.pointTo(stack28).equals(dsg.formals(R0)))
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
 
   }
@@ -205,7 +205,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.locals.get(program.mainProcedure)
 //    assert(dsg.pointTo.size == 7)
 //    assert(dsg.stackMapping.isEmpty)
-//    assert(dsg.pointTo(dsg.globalMapping((69680, 69684))._1.cells(0))._1.node.get.collapsed)
+//    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69680, 69684))._1.cells(0))._1.node.get.collapsed)
   }
 
 
@@ -452,19 +452,19 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.bus.get(program.procs("sub_seven"))
     assert(dsg.pointTo.size == 9)
     assert(dsg.stackMapping.isEmpty)
-    println(dsg.globalMapping((69648, 69652))._1.cells(0))
-    assert(dsg.pointTo(dsg.globalMapping((69648, 69652))._1.cells(0))._1.node.get.collapsed)
+    println(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))._1.node.get.collapsed)
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
 
   }
@@ -487,19 +487,19 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.bus.get(program.procs("add_six"))
     assert(dsg.pointTo.size == 9)
     assert(dsg.stackMapping.isEmpty)
-    println(dsg.globalMapping((69648, 69652))._1.cells(0))
-    assert(dsg.pointTo(dsg.globalMapping((69648, 69652))._1.cells(0))._1.node.get.collapsed)
+    println(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))._1.node.get.collapsed)
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
   }
 
@@ -521,19 +521,19 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.bus.get(program.procs("add_two"))
     assert(dsg.pointTo.size == 9)
     assert(dsg.stackMapping.isEmpty)
-    println(dsg.globalMapping((69648, 69652))._1.cells(0))
-    assert(dsg.pointTo(dsg.globalMapping((69648, 69652))._1.cells(0))._1.node.get.collapsed)
+    println(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))._1.node.get.collapsed)
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
   }
 
@@ -566,18 +566,18 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(dsg.pointTo(stack28).equals(dsg.formals(R0)))
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
     // bu
-    assert(dsg.pointTo(dsg.globalMapping((69648, 69648 + 4))._1.cells(0))._1.node.get.collapsed)
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))._1.node.get.collapsed)
 
   }
 
@@ -674,18 +674,18 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(dsg.pointTo(stack28).equals(dsg.formals(R0)))
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
     // bu
-    assert(dsg.pointTo(dsg.globalMapping((69648, 69648 + 4))._1.cells(0))._1.node.get.collapsed)
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))._1.node.get.collapsed)
   }
 
   test("top down jumptable2 sub_seven") {
@@ -706,19 +706,19 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.tds.get(program.procs("sub_seven"))
     assert(dsg.pointTo.size == 9)
     assert(dsg.stackMapping.isEmpty)
-    println(dsg.globalMapping((69648, 69652))._1.cells(0))
-    assert(dsg.pointTo(dsg.globalMapping((69648, 69652))._1.cells(0))._1.node.get.collapsed)
+    println(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))._1.node.get.collapsed)
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
 
   }
@@ -741,19 +741,19 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.tds.get(program.procs("add_six"))
     assert(dsg.pointTo.size == 9)
     assert(dsg.stackMapping.isEmpty)
-    println(dsg.globalMapping((69648, 69652))._1.cells(0))
-    assert(dsg.pointTo(dsg.globalMapping((69648, 69652))._1.cells(0))._1.node.get.collapsed)
+    println(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))._1.node.get.collapsed)
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
   }
 
@@ -775,19 +775,19 @@ class LocalTest extends AnyFunSuite, TestUtil {
     val dsg = results.analysis.get.tds.get(program.procs("add_two"))
     assert(dsg.pointTo.size == 9)
     assert(dsg.stackMapping.isEmpty)
-    println(dsg.globalMapping((69648, 69652))._1.cells(0))
-    assert(dsg.pointTo(dsg.globalMapping((69648, 69652))._1.cells(0))._1.node.get.collapsed)
+    println(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0))._1.node.get.collapsed)
 
     // initial global mappings
-    assert(dsg.pointTo(dsg.globalMapping((69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping((2136, 2136 + 124))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping((1948, 1948 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping((69656, 69656 + 24))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping((2056, 2056 + 76))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping((1984, 1984 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping((2264, 2268))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping((2020, 2020 + 36))._1.cells(0)))
-    assert(dsg.pointTo(dsg.globalMapping((69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping((69648, 69648 + 4))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8))._1.equals(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16))._1.equals(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0)))
+    assert(dsg.pointTo(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0))._1.equals(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)))
 
   }
 

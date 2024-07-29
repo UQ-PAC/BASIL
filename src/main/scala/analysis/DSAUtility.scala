@@ -15,7 +15,6 @@ object NodeCounter {
     counter
 }
 
-
 /**
  * Data Structure Graph for DSA
  * @param proc procedure of DSG
@@ -37,40 +36,46 @@ class DSG(val proc: Procedure,
           val writesTo: Map[Procedure, Set[Register]],
           val params: Map[Procedure, Set[Variable]]
          ) {
-  // DSNodes owned by this graph
+
+  // DSNodes owned by this graph, only updated once analysis is done,
   val nodes: mutable.Set[DSN] = mutable.Set()
+
+  // this is mapping of point-relations in the graph
   val pointTo: mutable.Map[DSC, Slice] = mutable.Map()
+
+  // represent callees in proc
   val callsites: mutable.Set[CallSite] = mutable.Set()
 
   val mallocRegister = Register("R0", 64)
   val stackPointer = Register("R31", 64)
 
-  // make stack nodes with
+  // this is the mapping from offsets/positions on the stack to their representative DS nodes
   val stackMapping: mutable.Map[BigInt, DSN] =
     computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(Map[BigInt, DSN]()) {
       (results, pos) => stackBuilder(pos, results)
     }.to(collection.mutable.Map)
 
+
+  /**
+   * this function takes a stackMapping and updates it based on a memory load and memory store
+   * @param pos memory load or store IL position
+   * @param index memory location of load or store
+   * @param size size of the load or store
+   * @param m stack mapping
+   * @return updated stack mapping
+   */
   private def visitStackAccess(pos: CFGPosition, index: Expr, size: Int, m: Map[BigInt, DSN]) : Map[BigInt, DSN] =
     val byteSize = (size.toDouble / 8).ceil.toInt
     index match
       case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
         evaluateExpression(arg2, constProp(pos)).isDefined =>
         var offset = evaluateExpression(arg2, constProp(pos)).get.value
-        varToSym(pos)(arg1).foldLeft(m) {
+        varToSym(pos)(arg1).foldLeft(m) { // go through all the symbolic accesses tied to arg1 at pos
           (m, sym) =>
             sym match
-              case SymbolicAccess(accessor, StackLocation(regionIdentifier, proc, size), symOffset) =>
+              case SymbolicAccess(accessor, StackLocation(regionIdentifier, proc, size), symOffset) => // only consider stack accesses
                 offset = offset + symOffset
-                if m.contains(offset) then
-                  assert(!m(offset).cells(0).growSize(byteSize))
-                  m
-                else
-                  val node = DSN(Some(this), byteSize)
-                  node.allocationRegions.add(StackLocation(pos.toShortString, proc, byteSize))
-                  node.flags.stack = true
-                  node.addCell(0, byteSize)
-                  m + (offset -> node)
+                createStackMapping(pos.toShortString, offset, m, byteSize)
               case _ => m
         }
       case arg: Variable if varToSym.contains(pos) && varToSym(pos).contains(arg) =>
@@ -78,18 +83,11 @@ class DSG(val proc: Procedure,
           (m, sym) =>
             sym match
               case SymbolicAccess(accessor, StackLocation(regionIdentifier, proc, size), offset) =>
-                if m.contains(offset) then
-                  assert(!m(offset).cells(0).growSize(byteSize))
-                  m
-                else
-                  val node = DSN(Some(this), byteSize)
-                  node.allocationRegions.add(StackLocation(pos.toShortString, proc, byteSize))
-                  node.flags.stack = true
-                  node.addCell(0, byteSize)
-                  m + (offset -> node)
+                createStackMapping(pos.toShortString, offset, m, byteSize)
               case _ => m
         }
       case _ => m
+
   private def stackBuilder(pos: CFGPosition, m: Map[BigInt, DSN]): Map[BigInt, DSN] = {
     pos match
       case Assign(variable: Variable, expr: Expr, _) =>
@@ -103,19 +101,33 @@ class DSG(val proc: Procedure,
 
   }
 
+  private def createStackMapping(label: String, offset: BigInt, m:  Map[BigInt, DSN], byteSize: Int) :  Map[BigInt, DSN]=
+    if m.contains(offset) then
+      assert(!m(offset).cells(0).growSize(byteSize))
+      m
+    else
+      val node = DSN(Some(this), byteSize)
+      node.allocationRegions.add(StackLocation(label, proc, byteSize))
+      node.flags.stack = true
+      node.addCell(0, byteSize)
+      m + (offset -> node)
 
-  // make all globals
+
   private val swappedOffsets = globalOffsets.map(_.swap)
-  val globalMapping: mutable.Map[(BigInt, BigInt), (DSN, BigInt)] = mutable.Map[(BigInt, BigInt), (DSN, BigInt)]()
+
+  // creates the globals from the symbol tables
+  val globalMapping: mutable.Map[AddressRange, Field] = mutable.Map[AddressRange, Field]()
   globals.foreach(
     global =>
       val node = DSN(Some(this), global.size)
       node.allocationRegions.add(DataLocation(global.name, global.address, global.size/8))
       node.flags.global = true
       node.flags.incomplete = true
-      globalMapping.update((global.address, global.address + global.size/8), (node, 0))
+      globalMapping.update(AddressRange(global.address, global.address + global.size/8), Field(node, 0))
   )
 
+  // creates a global for each relocation entry in the symbol table
+  // the global corresponding to the relocated address points to the global corresponding to the original address
   globals.foreach(
     global =>
       var address = global.address
@@ -138,7 +150,7 @@ class DSG(val proc: Procedure,
               node.allocationRegions.add(DataLocation(s"Relocated_$relocatedAddress", relocatedAddress, 8))
               node.flags.global = true
               node.flags.incomplete = true
-              globalMapping.update((relocatedAddress, relocatedAddress + 8), (node, 0))
+              globalMapping.update(AddressRange(relocatedAddress, relocatedAddress + 8), Field(node, 0))
               node
 
           pointTo.update(node.cells(field), Slice(isGlobal(address).get._2._1.cells(0), 0))
@@ -152,18 +164,18 @@ class DSG(val proc: Procedure,
       node.allocationRegions.add(DataLocation(external.name, external.offset, 0))
       node.flags.global = true
       node.flags.incomplete = true
-      globalMapping.update((external.offset, external.offset), (node, 0))
+      globalMapping.update(AddressRange(external.offset, external.offset), Field(node, 0))
   )
 
 
 
   // determine if an address is a global and return the corresponding global if it is.
-  def isGlobal(address: BigInt): Option[((BigInt, BigInt), (DSN, BigInt))] =
-    var global: Option[((BigInt, BigInt), (DSN, BigInt))]  = None
+  def isGlobal(address: BigInt): Option[(AddressRange, Field)] =
+    var global: Option[(AddressRange, Field)]  = None
     breakable {
       for (elem <- globalMapping) {
-        val range = elem._1
-        if address >= range._1 && (address < range._2 || (range._1 == range._2 && range._2 == address)) then
+        val range = elem._1 // TODO
+        if address >= range.start && (address < range.end || (range.start == range.end && range.end == address)) then
           global = Some(elem)
           break
       }
@@ -196,11 +208,9 @@ class DSG(val proc: Procedure,
   private def replaceInGlobals(oldCell: DSC, newCell: DSC) =
     if oldCell.node.isDefined then
       globalMapping.foreach {
-        case (key, tuple) =>
-          val node = tuple._1
-          val offset = tuple._2
+        case (key, Field(node, offset)) =>
           if node.equals(oldCell.node.get) then
-            globalMapping.update(key, (newCell.node.get, offset))
+            globalMapping.update(key, Field(newCell.node.get, offset))
       }
 
   private def replaceInStack(oldCell: DSC, newCell: DSC) =
@@ -226,7 +236,10 @@ class DSG(val proc: Procedure,
               callSite.paramCells.update(variable, Slice(newCell, slice.internalOffset + internalOffsetChange))
         }
     )
-      
+
+
+  // replaces an old cell with a new cell in all the mappings and updates their slice offset if applicable
+  // This is inefficient looking to replace it with a union-find approach
   def replace(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
     replaceInEV(oldCell, newCell, internalOffsetChange)
     replaceInPointTo(oldCell, newCell, internalOffsetChange)
@@ -253,6 +266,9 @@ class DSG(val proc: Procedure,
     else
       Set(formals(arg))
 
+  /**
+   * collects all the nodes that are currently in the DSG and updates nodes member variable
+   */
   def collectNodes =
     nodes.clear()
     nodes.addAll(formals.values.map(_._1.node.get))
@@ -261,6 +277,10 @@ class DSG(val proc: Procedure,
     )
     nodes.addAll(stackMapping.values)
     nodes.addAll(globalMapping.values.map(_._1))
+
+  /**
+   * Collapses the node causing it to lose field sensitivity
+   */
   def collapseNode(node: DSN): Unit =
     val collapedCell = DSC(Option(node), 0)
     val e = DSC(None, 0)
@@ -300,7 +320,11 @@ class DSG(val proc: Procedure,
     if cell.node.isDefined then
       pointTo.update(node.cells(0), Slice(cell, pointeeInternalOffset))
 
-  def optionalCollapse(node: DSN): Unit = {
+  /**
+   * this function merges all the overlapping cells in the given node
+   * The node DOESN'T lose field sensitivity after this
+   */
+  def selfCollapse(node: DSN): Unit = {
     var lastOffset: BigInt = -1
     var lastAccess: BigInt = -1
     val removed = mutable.Set[BigInt]()
@@ -317,6 +341,9 @@ class DSG(val proc: Procedure,
     removed.foreach(node.cells.remove)
   }
 
+  /**
+   * merges two neighbouring cells into one
+   */
   def mergeNeighbours(cell1: DSC, cell2: DSC): DSC =
     require(cell1.node.equals(cell2.node) && cell1.offset < cell2.offset)
     if pointTo.contains(cell2) then
@@ -335,24 +362,30 @@ class DSG(val proc: Procedure,
     cell1
 
 
+  /**
+   * merges two cells and unifies their nodes
+   * @param cell1
+   * @param cell2
+   * @return the resulting cell in the unified node
+   */
   def mergeCells(cell1: DSC, cell2: DSC): DSC =
 
-    if cell1.equals(cell2) then
+    if cell1.equals(cell2) then // same cell no action required
       cell1
-    else if cell1.node.isDefined && cell1.node.equals(cell2.node) then
+    else if cell1.node.isDefined && cell1.node.equals(cell2.node) then // same node different cells causes collapse
       collapseNode(cell1.node.get)
       cell1.node.get.cells(0)
     else if cell1.node.isEmpty then
       replace(cell1, cell2, 0)
       cell2
-    else if cell1.node.get.collapsed || cell2.node.get.collapsed then
+    else if cell1.node.get.collapsed || cell2.node.get.collapsed then // a collapsed node
       val node1 = cell1.node.get
       val node2 = cell2.node.get
-      collapseNode(node1)
+      collapseNode(node1) // collapse the other node
       collapseNode(node2)
-      node2.allocationRegions.addAll(node1.allocationRegions)
+      node2.allocationRegions.addAll(node1.allocationRegions) // add regions and flags of node 1 to node 2
       node2.flags.join(node1.flags)
-      if pointTo.contains(node1.cells(0)) then
+      if pointTo.contains(node1.cells(0)) then // merge the pointees of the two collapsed (single cell) nodes
         if pointTo.contains(node2.cells(0)) then
           val slice1 = getPointee(node1.cells(0))
           val slice2 = getPointee(node2.cells(0))
@@ -363,8 +396,9 @@ class DSG(val proc: Procedure,
       pointTo.remove(node1.cells(0))
       replace(node1.cells(0), node2.cells(0), 0)
       node2.cells(0)
-    else
-      
+    else // standard merge
+
+      // node 1 is the cell with the higher offset
       var delta = cell1.offset - cell2.offset
       var node1 = cell1.node.get
       var node2 = cell2.node.get
@@ -374,25 +408,32 @@ class DSG(val proc: Procedure,
         node2 = cell1.node.get
 
 
+      // create a seq of all cells from both nodes in order of their offsets in the resulting unified node
       val cells : Seq[(BigInt, DSC)] = (node1.cells.toSeq ++ node2.cells.foldLeft(Seq[(BigInt, DSC)]()){
         (s, tuple) =>
           val offset = tuple._1
           val cell = tuple._2
-          s:+ ((offset + delta, cell))
+          s:+ ((offset + delta, cell)) // cells from nodes two are adjusted by the difference between cell1 and cell2 offsets
       }).sortBy(_._1)
 
       var lastOffset: BigInt = -1
       var lastAccess: BigInt = -1
+      // create a new node to represent the unified node
       val resultNode = DSN(Some(this))
+      // add nodes flags and regions to the resulting node
       resultNode.allocationRegions.addAll(node1.allocationRegions ++ node2.allocationRegions)
       resultNode.flags.join(node1.flags)
       resultNode.flags.join(node2.flags)
-      if node2.flags.global then
-        globalMapping.foreach{
-          case ((start: BigInt, end: BigInt), (node:DSN, offset: BigInt)) =>
+      if node2.flags.global then // node 2 may have been adjusted depending on cell1 and cell2 offsets
+        globalMapping.foreach{ // update global mapping if node 2 was global
+          case (range: AddressRange, Field(node, offset))=>
             if node.equals(node2) then
-              globalMapping.update((start, end), (node, offset + delta))
+              globalMapping.update(range, Field(node, offset + delta))
         }
+
+      // compute the cells present in the resulting unified node
+      // a mapping from offsets to the set of old cells which are merged to form a cell in the new unified node
+      // values in the mapping also include the largest access size so far computed for each resulting cell
       val resultCells: mutable.Map[BigInt, (Set[DSC], BigInt)] = mutable.Map()
       cells.foreach {
         case (offset: BigInt, cell: DSC) =>
@@ -447,11 +488,14 @@ class DSG(val proc: Procedure,
         resultNode.getCell(cell2.offset)
 
 
+
   private def isFormal(pos: CFGPosition, variable: Variable): Boolean =
     !reachingDefs(pos).contains(variable)
 
-      
+  // formal arguments to this function
   val formals: mutable.Map[Variable, Slice] = mutable.Map()
+
+  //  mapping from each SSA variable (position, variable) to a slice
   val varToCell: mutable.Map[CFGPosition, mutable.Map[Variable, Slice]] = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(mutable.Map[CFGPosition, mutable.Map[Variable, Slice]]()) {
     (m, pos) =>
       pos match
@@ -486,6 +530,7 @@ class DSG(val proc: Procedure,
           m
         case _ => m
   }
+
 
   def cloneSelf(): DSG =
     val newGraph = DSG(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
@@ -527,12 +572,12 @@ class DSG(val proc: Procedure,
     }
 
     globalMapping.foreach {
-      case ((start: BigInt, end: BigInt), (node: DSN, internalOffset: BigInt)) =>
-        assert(newGraph.globalMapping.contains((start, end)))
+      case (range: AddressRange, Field(node, offset)) =>
+        assert(newGraph.globalMapping.contains(range))
         if !idToNode.contains(node.id) then
           val newNode = node.cloneSelf(newGraph)
           idToNode.update(node.id, newNode)
-        newGraph.globalMapping.update((start, end), (idToNode(node.id), internalOffset))
+        newGraph.globalMapping.update(range, Field(idToNode(node.id), offset))
     }
 
     newGraph.pointTo.clear()
@@ -601,6 +646,9 @@ class Flags() {
     foreign = other.foreign && foreign
 }
 
+/**
+ * a Data structure Node
+ */
 class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCounter.getCounter) {
 
 //  var collapsed = false
@@ -755,7 +803,13 @@ class CallSite(val call: DirectCall, val graph: DSG) {
   }
 }
 
+// global address range
+case class AddressRange(start: BigInt, end: BigInt)
 
+// a node, offset pair, difference to a cell is that it doesn't represent a DSG construct,
+case class Field(node: DSN, offset: BigInt)
+
+// unwraps internal padding and slicing and returns the expression
 def unwrapPaddingAndSlicing(expr: Expr): Expr =
   expr match
     case literal: Literal => literal
@@ -778,8 +832,6 @@ def adjust(slice: Slice): DSC =
   val internal = slice.internalOffset
   adjust(cell, internal)
 
-// minimum  2's complement 64 bit negative integer
-val BITVECNEGATIVE: BigInt = new BigInt(new BigInteger("9223372036854775808"))
 
 
 

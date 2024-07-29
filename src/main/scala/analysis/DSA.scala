@@ -56,12 +56,14 @@ class DSA(program: Program,
     val stack : mutable.Stack[Procedure] = mutable.Stack()
     stack.pushAll(program.mainProcedure.calls)
 
+    // calculate the procedures used in the program
     while stack.nonEmpty do
       val current = stack.pop()
       domain += current
       stack.pushAll(current.calls.diff(domain))
 
 
+    // perform local analysis on all procs
     domain.foreach(
       proc =>
         val dsg = Local(proc, symResults, constProp, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params).analyze()
@@ -80,13 +82,14 @@ class DSA(program: Program,
         queue.enqueueAll(CallGraph.pred(proc).diff(visited).intersect(domain))
     )
 
+    // bottom up phase
     while queue.nonEmpty do
       val proc = queue.dequeue()
       visited += proc
       queue.enqueueAll(CallGraph.pred(proc).diff(visited))
       val buGraph = bu(proc)
-      // it should be fine
-      buGraph.callsites.foreach( // clone all the nodes first
+
+      buGraph.callsites.foreach(
         callSite =>
           val callee = callSite.proc
           val calleeGraph = locals(callee) //.cloneSelf()
@@ -94,7 +97,7 @@ class DSA(program: Program,
           assert(calleeGraph.formals.keySet.diff(ignoreRegisters).equals(callSite.paramCells.keySet))
 
           calleeGraph.globalMapping.foreach {
-            case (range: (BigInt, BigInt), (node: DSN, internal: BigInt)) =>
+            case (range: AddressRange, Field(node, offset)) =>
               node.cloneNode(calleeGraph, buGraph)
           }
 
@@ -122,9 +125,9 @@ class DSA(program: Program,
 //          assert(calleeGraph.formals.isEmpty || buGraph.varToCell(begin(callee)).equals(calleeGraph.formals))
           val globalNodes: mutable.Map[Int, DSN] = mutable.Map()
           calleeGraph.globalMapping.foreach {
-            case (range: (BigInt, BigInt), (node: DSN, internal: BigInt)) =>
+            case (range: AddressRange, Field(node: DSN, offset: BigInt)) =>
               buGraph.mergeCells(buGraph.globalMapping(range)._1.getCell(buGraph.globalMapping(range)._2),
-                node.getCell(internal))
+                node.getCell(offset))
           }
 
           buGraph.varToCell.getOrElse(begin(callee), Map.empty).foreach{
@@ -155,6 +158,7 @@ class DSA(program: Program,
     visited = Set()
 
 
+    // top-down phase
     while queue.nonEmpty do
       val proc = queue.dequeue()
       visited += proc
@@ -167,7 +171,7 @@ class DSA(program: Program,
           assert(callersGraph.globalMapping.keySet.equals(calleesGraph.globalMapping.keySet))
 
           callersGraph.globalMapping.foreach {
-            case (range: (BigInt, BigInt), (node: DSN, internal: BigInt)) =>
+            case (range: AddressRange, Field(node, offset)) =>
               node.cloneNode(callersGraph, calleesGraph)
           }
 
@@ -186,7 +190,7 @@ class DSA(program: Program,
 
 
           callersGraph.globalMapping.foreach {
-            case (range: (BigInt, BigInt), (node: DSN, internal: BigInt)) =>
+            case (range: AddressRange, Field(node, internal)) =>
               calleesGraph.mergeCells(calleesGraph.globalMapping(range)._1.getCell(calleesGraph.globalMapping(range)._2),
                 node.getCell(internal))
           }
