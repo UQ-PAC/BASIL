@@ -1,5 +1,6 @@
 package analysis
 
+import analysis.solvers.{DSAUnionFindSolver, UnionFindSolver, Var}
 import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, Memory, MemoryAssign, MemoryLoad, Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, begin, computeDomain, toShortString}
 import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
 
@@ -362,6 +363,26 @@ class DSG(val proc: Procedure,
     cell1
 
 
+  //  private val parent = mutable.Map[DSC, DSC]()
+  val solver: DSAUnionFindSolver[UniTerm] = DSAUnionFindSolver()
+
+
+//  val offsets = mutable.Map[DSN, BigInt]()
+
+//  private def findOffset(current: DSN, result: DSN): BigInt =
+//    if current == result then
+//      0
+//    else
+//      current.offset + findOffset(current.embeddedIn.get, result)
+//
+//
+//  def resolve(cell: DSC): DSC =
+//    val node = cell.node.get
+//    val result: DSN = solver.find(Derm(node)).asInstanceOf[Derm].node
+//    val offset = findOffset(node, result)
+//    result.getCell(offset)
+
+
   /**
    * merges two cells and unifies their nodes
    * @param cell1
@@ -381,8 +402,11 @@ class DSG(val proc: Procedure,
     else if cell1.node.get.collapsed || cell2.node.get.collapsed then // a collapsed node
       val node1 = cell1.node.get
       val node2 = cell2.node.get
+      solver.unify(node1.term, node2.term, 0)
       collapseNode(node1) // collapse the other node
       collapseNode(node2)
+      node2.children.addAll(node1.children)
+      node2.children += (node1 -> 0)
       node2.allocationRegions.addAll(node1.allocationRegions) // add regions and flags of node 1 to node 2
       node2.flags.join(node1.flags)
       if pointTo.contains(node1.cells(0)) then // merge the pointees of the two collapsed (single cell) nodes
@@ -424,6 +448,10 @@ class DSG(val proc: Procedure,
       resultNode.allocationRegions.addAll(node1.allocationRegions ++ node2.allocationRegions)
       resultNode.flags.join(node1.flags)
       resultNode.flags.join(node2.flags)
+      resultNode.children.addAll(node1.children)
+      resultNode.children += (node1 -> 0)
+      resultNode.children.addAll(node2.children.map(f => (f._1, f._2 + delta)))
+      resultNode.children += (node2 -> delta)
       if node2.flags.global then // node 2 may have been adjusted depending on cell1 and cell2 offsets
         globalMapping.foreach{ // update global mapping if node 2 was global
           case (range: AddressRange, Field(node, offset))=>
@@ -481,7 +509,9 @@ class DSG(val proc: Procedure,
             }
             pointTo.update(collapsedCell, Slice(result, internal))
       }
-      
+
+      solver.unify(node1.term, resultNode.term, 0)
+      solver.unify(node2.term, resultNode.term, delta)
       if cell1.offset >= cell2.offset then
         resultNode.getCell(cell1.offset)
       else
@@ -651,6 +681,8 @@ class Flags() {
  */
 class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCounter.getCounter) {
 
+  val term = Derm(this)
+  val children : mutable.Map[DSN, BigInt] = mutable.Map()
 //  var collapsed = false
   var flags = Flags()
   def collapsed = flags.collapsed
@@ -831,6 +863,17 @@ def adjust(slice: Slice): DSC =
   val cell = slice.cell
   val internal = slice.internalOffset
   adjust(cell, internal)
+
+/** Terms used in unification.
+ */
+sealed trait UniTerm
+
+/** A term variable in the solver
+ */
+case class Derm(node: DSN) extends UniTerm with Var[UniTerm] {
+
+  override def toString: String = s"Term{${node}}"
+}
 
 
 

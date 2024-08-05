@@ -332,6 +332,15 @@ class Local(
 
     domain.foreach(visit)
 
+    val b = graph.solver.solution()
     graph.collectNodes
+    graph.nodes.foreach(node =>
+      node.children.foreach(
+        child =>
+          assert(graph.solver.find(child._1.term)._1.equals(node.term))
+          assert(graph.solver.find(child._1.term)._2.equals(child._2))
+
+      )
+    )
     graph
 }
