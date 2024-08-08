@@ -94,8 +94,8 @@ trait SystemTests extends AnyFunSuite {
     val maxB = Seq(meanVerifyTime + 2.25 * stdDevVerifyTime, verifTimes.max).min
     val nbins = 50
 
-    val histo = mkHistogram(nbins, Some(minB, maxB))(verifTimes.toSeq)
-    val svgHistogram = histoToSvg(filename, 400,300, histo)
+    val histo = histogram(nbins, Some(minB, maxB))(verifTimes.toSeq)
+    val svgHistogram = histoToSvg(filename, 400,300, histo, minB, maxB)
     log(svgHistogram, testPath + "verifyTime-" + filename + ".svg")
 
 
@@ -233,7 +233,7 @@ trait SystemTests extends AnyFunSuite {
 
 
 
-def histoToSvg(title: String, imgWidth: Int, imgHeight: Int, bins: List[((Double, Double), Int)]) : String = {
+def histoToSvg(title: String, imgWidth: Int, imgHeight: Int, bins: List[Int], minBin: Double, maxBin: Double) : String = {
   def template(width: Int = 300, height: Int = 130, content: String) = 
     s""" <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
     ${content}
@@ -251,11 +251,11 @@ def histoToSvg(title: String, imgWidth: Int, imgHeight: Int, bins: List[((Double
   val bottomMargin = 20
   val topMargin = 20
   val histHeight = imgHeight - topMargin - bottomMargin
-  val maxHeight = bins.map(_._2).max
+  val maxHeight = bins.max
   val binWidth : Double = (histWidth).doubleValue / bins.size
   val heightScaling : Double =  (histHeight.doubleValue)/(maxHeight)
   val binPos = (0 to bins.size).map(i => (leftMargin + i * binWidth, binWidth * (i + 1)))
-    .zip(bins.map((_, bh) => heightScaling * bh))
+    .zip(bins.map(bh => heightScaling * bh))
 
   val rects = binPos.map((binXX, height) => 
       mkRect(binWidth.ceil.intValue, height.intValue, binXX._1.floor.intValue, histHeight.intValue - height.intValue + topMargin))
@@ -264,8 +264,8 @@ def histoToSvg(title: String, imgWidth: Int, imgHeight: Int, bins: List[((Double
     (text(title, imgWidth / 8, topMargin - 5),
     text("0", 0, histHeight + topMargin),
     text(maxHeight.toInt.toString, 0, topMargin),
-    text(bins.head._1._1.toInt.toString, 0, imgHeight),
-    text(bins.last._1._2.toInt.toString, (binWidth*(bins.size)).intValue - leftMargin, imgHeight))
+    text(minBin.toInt.toString, 0, imgHeight),
+    text(maxBin.toInt.toString, (binWidth*(bins.size)).intValue - leftMargin, imgHeight))
   }
 
   val bg = mkRect(imgWidth, imgHeight, 0, 0, fill="White")
@@ -287,10 +287,8 @@ def loadHisto() = {
   })
 
   val timeValues = res("verifyTime").map(_.toDouble)
-  val histo = mkHistogram(50, Some(800.0, 1000.0))(timeValues.toSeq)
-
-
-  println(histoToSvg("test histogram", 500, 300, histo))
+  val histo = histogram(50, Some(800.0, 1000.0))(timeValues.toSeq)
+  println(histoToSvg("test histogram", 500, 300, histo, 800.0, 1000.0))
 }
 
 
@@ -312,26 +310,24 @@ class SystemTestsGTIRB extends SystemTests  {
 }
 
 
+def mean(xs: Iterable[Double]): Double = xs.sum.toDouble / xs.size
 
-// https://stackoverflow.com/questions/39617213/scala-what-is-the-generic-way-to-calculate-standard-deviation
-def mean[T: Numeric](xs: Iterable[T]): Double = xs.sum.toDouble / xs.size
-
-def variance[T: Numeric](xs: Iterable[T]): Double = {
+def variance(xs: Iterable[Double]): Double = {
   val avg = mean(xs)
 
-  xs.map(_.toDouble).map(a => math.pow(a - avg, 2)).sum / xs.size
+  xs.map(a => math.pow(a - avg, 2)).sum / xs.size
 }
 
 def median(xs: Iterable[Double]) = xs.toArray.sorted.apply(xs.size / 2)
 
-def stdDev[T: Numeric](xs: Iterable[T]): Double = math.sqrt(variance(xs))
+def stdDev(xs: Iterable[Double]): Double = math.sqrt(variance(xs))
 
-// https://stackoverflow.com/questions/24536215/scala-simple-histogram 
-def mkHistogram(n_bins: Int, lowerUpperBound: Option[(Double, Double)] = None)(xs: Seq[Double]) : List[((Double, Double), Int)] = {
-  val (mn, mx) = lowerUpperBound getOrElse(xs.min, xs.max)
-  val epsilon = 0.0001
-  val binSize = (mx - mn) / n_bins * (1 + epsilon)
-  val bins = (0 to n_bins).map(mn + _ * binSize).sliding(2).map(xs => (xs(0), xs(1)))
-  def binContains(bin:(Double,Double),x: Double) = (x >= bin._1) && (x < bin._2)
-  bins.map(bin => (bin, xs.count(binContains(bin,_)))).toList
+
+def histogram(numBins: Int, bounds: Option[(Double, Double)] = None)(xs: Seq[Double]) : List[Int] = {
+  val (mn, mx) = bounds.getOrElse(xs.min, xs.max)
+  val binSize = ((mx - mn) / numBins) * (1.000001)
+  val counts = (0 to numBins).map(x => (mn + x * binSize, mn + (x + 1) * binSize))
+    .map((left, right) => xs.count(x => x >= left && x < right))
+    .toList
+  counts
 }
