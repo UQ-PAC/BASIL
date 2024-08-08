@@ -42,7 +42,7 @@ class DSG(val proc: Procedure,
   val nodes: mutable.Set[DSN] = mutable.Set()
 
   // this is mapping of point-relations in the graph
-  val pointTo: mutable.Map[DSC, Slice] = mutable.Map()
+//  val pointTo: mutable.Map[DSC, Slice] = mutable.Map()
 
   // represent callees in proc
   val callsites: mutable.Set[CallSite] = mutable.Set()
@@ -154,7 +154,7 @@ class DSG(val proc: Procedure,
               globalMapping.update(AddressRange(relocatedAddress, relocatedAddress + 8), Field(node, 0))
               node
 
-          pointTo.update(node.cells(field), Slice(isGlobal(address).get._2._1.cells(0), 0))
+          node.cells(field)._pointee = Some(Slice(isGlobal(address).get._2._1.cells(0), 0))
           address = relocatedAddress
       }
   )
@@ -183,80 +183,80 @@ class DSG(val proc: Procedure,
     }
     global
 
-  private def replaceInEV(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
-    varToCell.foreach(
-      (pos, m) =>
-        m.foreach {
-          case (variable, slice) =>
-            if slice.cell.equals(oldCell) then
-              m.update(variable, Slice(newCell, slice.internalOffset + internalOffsetChange))
-        }
-    )
-
-    formals.foreach{
-      case (variable, slice) =>
-        if slice.cell.equals(oldCell) then
-          formals.update(variable, Slice(newCell, slice.internalOffset + internalOffsetChange))
-    }
-
-  private def replaceInPointTo(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
-    pointTo.foreach {
-      case (pointer, slice: Slice) =>
-        if slice.cell.equals(oldCell) then
-          pointTo.update(pointer, Slice(newCell, slice.internalOffset + internalOffsetChange))
-    }
-
-  private def replaceInGlobals(oldCell: DSC, newCell: DSC) =
-    if oldCell.node.isDefined then
-      globalMapping.foreach {
-        case (key, Field(node, offset)) =>
-          if node.equals(oldCell.node.get) then
-            globalMapping.update(key, Field(newCell.node.get, offset))
-      }
-
-  private def replaceInStack(oldCell: DSC, newCell: DSC) =
-    if oldCell.node.isDefined then
-      stackMapping.foreach{
-        case (offset, node) =>
-          if node.equals(oldCell.node.get) then
-            stackMapping.update(offset, newCell.node.get)
-      }
-
-  private def replaceInCallSites(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
-    callsites.foreach(
-      callSite =>
-        callSite.returnCells.foreach{
-          case (variable: Variable, slice: Slice) =>
-            if slice.cell.equals(oldCell) then
-              callSite.returnCells.update(variable, Slice(newCell, slice.internalOffset + internalOffsetChange))
-        }
-
-        callSite.paramCells.foreach{
-          case (variable: Variable, slice: Slice) =>
-            if slice.cell.equals(oldCell) then
-              callSite.paramCells.update(variable, Slice(newCell, slice.internalOffset + internalOffsetChange))
-        }
-    )
+//  private def replaceInEV(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
+//    varToCell.foreach(
+//      (pos, m) =>
+//        m.foreach {
+//          case (variable, slice) =>
+//            if slice.cell.equals(oldCell) then
+//              m.update(variable, Slice(newCell, slice.internalOffset + internalOffsetChange))
+//        }
+//    )
+//
+//    formals.foreach{
+//      case (variable, slice) =>
+//        if slice.cell.equals(oldCell) then
+//          formals.update(variable, Slice(newCell, slice.internalOffset + internalOffsetChange))
+//    }
+//
+//  private def replaceInPointTo(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
+//    pointTo.foreach {
+//      case (pointer, slice: Slice) =>
+//        if slice.cell.equals(oldCell) then
+//          pointTo.update(pointer, Slice(newCell, slice.internalOffset + internalOffsetChange))
+//    }
+//
+//  private def replaceInGlobals(oldCell: DSC, newCell: DSC) =
+//    if oldCell.node.isDefined then
+//      globalMapping.foreach {
+//        case (key, Field(node, offset)) =>
+//          if node.equals(oldCell.node.get) then
+//            globalMapping.update(key, Field(newCell.node.get, offset))
+//      }
+//
+//  private def replaceInStack(oldCell: DSC, newCell: DSC) =
+//    if oldCell.node.isDefined then
+//      stackMapping.foreach{
+//        case (offset, node) =>
+//          if node.equals(oldCell.node.get) then
+//            stackMapping.update(offset, newCell.node.get)
+//      }
+//
+//  private def replaceInCallSites(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
+//    callsites.foreach(
+//      callSite =>
+//        callSite.returnCells.foreach{
+//          case (variable: Variable, slice: Slice) =>
+//            if slice.cell.equals(oldCell) then
+//              callSite.returnCells.update(variable, Slice(newCell, slice.internalOffset + internalOffsetChange))
+//        }
+//
+//        callSite.paramCells.foreach{
+//          case (variable: Variable, slice: Slice) =>
+//            if slice.cell.equals(oldCell) then
+//              callSite.paramCells.update(variable, Slice(newCell, slice.internalOffset + internalOffsetChange))
+//        }
+//    )
 
 
   // replaces an old cell with a new cell in all the mappings and updates their slice offset if applicable
   // This is inefficient looking to replace it with a union-find approach
-  def replace(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
-    replaceInEV(oldCell, newCell, internalOffsetChange)
-    replaceInPointTo(oldCell, newCell, internalOffsetChange)
-    replaceInGlobals(oldCell, newCell)
-    replaceInStack(oldCell, newCell)
-    replaceInCallSites(oldCell, newCell, internalOffsetChange)
+//  def replace(oldCell: DSC, newCell: DSC, internalOffsetChange: BigInt) =
+//    replaceInEV(oldCell, newCell, internalOffsetChange)
+//    replaceInPointTo(oldCell, newCell, internalOffsetChange)
+//    replaceInGlobals(oldCell, newCell)
+//    replaceInStack(oldCell, newCell)
+//    replaceInCallSites(oldCell, newCell, internalOffsetChange)
 
-  def getPointee(cell: DSC): Slice =
-    if !pointTo.contains(cell) then
-      val node = DSN(Some(this))
-      pointTo.update(cell, Slice(node.cells(0), 0))
-    pointTo(cell)
-
-  def getPointeeAdjusted(cell:DSC): DSC =
-    val pointee = getPointee(cell)
-    adjust(pointee)
+//  def getPointee(cell: DSC): Slice =
+//    if !pointTo.contains(cell) then
+//      val node = DSN(Some(this))
+//      pointTo.update(cell, Slice(node.cells(0), 0))
+//    pointTo(cell)
+//
+//  def getPointeeAdjusted(cell:DSC): DSC =
+//    val pointee = getPointee(cell)
+//    adjust(pointee)
 
   def getCells(pos: CFGPosition, arg: Variable): Set[Slice] =
     if reachingDefs(pos).contains(arg) then
@@ -282,36 +282,40 @@ class DSG(val proc: Procedure,
   /**
    * Collapses the node causing it to lose field sensitivity
    */
-  def collapseNode(node: DSN): Unit =
-    val collapedCell = DSC(Option(node), 0)
-    val e = DSC(None, 0)
+  def collapseNode(n: DSN): Unit =
+    val (term, offset) = solver.find(n.term)
+    val node = term.asInstanceOf[Derm].node
+    val collapedCell = DSC(Some(node), 0)
+
 
     var pointeeInternalOffset: BigInt = 0
-    val cell = node.cells.foldLeft(e) {
+    val cell = node.cells.tail.foldLeft(adjust(node.cells.head._2.getPointee)) {
       (c, field) =>
-
-        if pointTo.contains(field._2) && pointTo(field._2) == field._2 then
-          pointTo.update(field._2, Slice(collapedCell, 0))
+        val cell = field._2
+        if cell._pointee.isDefined && cell.getPointee.cell == cell then
+          cell._pointee = Some(Slice(collapedCell, 0))
+//          collapedCell._pointee = Some(Slice(collapedCell, 0))
           c
-        else if pointTo.contains(field._2) then
-          val slice = getPointee(field._2)
+        else if cell._pointee.isDefined then
+          val slice = cell.getPointee
           if slice.internalOffset > pointeeInternalOffset then
             pointeeInternalOffset = slice.internalOffset
-          mergeCells(c, getPointeeAdjusted(field._2))
+          mergeCells(c, adjust(slice))
         else
           c
     }
 
-    node.cells.values.foreach(
-      cell =>
-        replace(cell, collapedCell, 0)
-        pointTo.foreach {
-          case (pointer, pointee) =>
-            if pointer.equals(cell) then
-              pointTo.remove(pointer)
-              pointTo.update(collapedCell, pointee)
-        }
-    )
+//    node.cells.values.foreach(
+//      cell =>
+////        replace(cell, collapedCell, 0) TODO check that this works by just ignoring the replace
+//
+//        pointTo.foreach {
+//          case (pointer, pointee) =>
+//            if pointer.equals(cell) then
+//              pointTo.remove(pointer)
+//              pointTo.update(collapedCell, pointee)
+//        }
+//    )
 
     node.flags.collapsed = true
 
@@ -319,7 +323,7 @@ class DSG(val proc: Procedure,
     node.cells.clear()
     node.cells.addOne(0, collapedCell)
     if cell.node.isDefined then
-      pointTo.update(node.cells(0), Slice(cell, pointeeInternalOffset))
+      node.cells(0)._pointee = Some(Slice(cell, pointeeInternalOffset))
 
   /**
    * this function merges all the overlapping cells in the given node
@@ -347,24 +351,36 @@ class DSG(val proc: Procedure,
    */
   def mergeNeighbours(cell1: DSC, cell2: DSC): DSC =
     require(cell1.node.equals(cell2.node) && cell1.offset < cell2.offset)
-    if pointTo.contains(cell2) then
-      if pointTo.contains(cell1) then
-        val slice1 = getPointee(cell1)
-        val slice2 = getPointee(cell2)
-        val result = mergeCells(getPointeeAdjusted(cell1), getPointeeAdjusted(cell2))
-        assert(pointTo(cell1)._1.equals(result))
-        pointTo.update(cell1, Slice(result, slice2.internalOffset.max(slice1.internalOffset)))
+    if cell2._pointee.isDefined then
+      if cell1._pointee.isDefined then
+        val slice1 = cell1.getPointee
+        val slice2 = cell2.getPointee
+        val result = mergeCells(adjust(slice1), adjust(slice2))
+//        assert(pointTo(cell1)._1.equals(result))
+        cell1._pointee = Some(Slice(result, slice2.internalOffset.max(slice1.internalOffset)))
       else
-        pointTo.update(cell1, getPointee(cell2))
-      pointTo.remove(cell2)
+        cell1._pointee = cell2._pointee
+//      cell2._pointee = None
     val internalOffsetChange = cell2.offset - cell1.offset
-    replace(cell2, cell1, internalOffsetChange)
+    cell2.node.get.cells.remove(cell2.offset)
+//    replace(cell2, cell1, internalOffsetChange)
     cell1.growSize((cell2.offset - cell1.offset) + cell2.largestAccessedSize) // might cause another collapse
     cell1
 
 
   //  private val parent = mutable.Map[DSC, DSC]()
   val solver: DSAUnionFindSolver[UniTerm] = DSAUnionFindSolver()
+
+  def find(node: DSN) : Field =
+    val (n, offset) = solver.find(node.term)
+    val resultNode = n.asInstanceOf[Derm].node
+    Field(resultNode, offset)
+
+  def find(cell: DSC) : DSC =
+    val node = cell.node.get
+    val offset = cell.offset
+    val parent: Field = find(node)
+    parent.node.addCell(cell.offset + parent.offset, cell.largestAccessedSize)
 
 
 //  val offsets = mutable.Map[DSN, BigInt]()
@@ -389,7 +405,15 @@ class DSG(val proc: Procedure,
    * @param cell2
    * @return the resulting cell in the unified node
    */
-  def mergeCells(cell1: DSC, cell2: DSC): DSC =
+  def mergeCells(c1: DSC, c2: DSC): DSC =
+
+    var cell1 = c1
+    var cell2 = c2
+    if c1.node.isDefined then
+      cell1 = find(c1)
+
+    if c2.node.isDefined then
+      cell2 = find(c2)
 
     if cell1.equals(cell2) then // same cell no action required
       cell1
@@ -397,32 +421,38 @@ class DSG(val proc: Procedure,
       collapseNode(cell1.node.get)
       cell1.node.get.cells(0)
     else if cell1.node.isEmpty then
-      replace(cell1, cell2, 0)
+      ??? // not sure how to handle this yet TODO possibly take it out of the merge?
+//      replace(cell1, cell2, 0)
       cell2
     else if cell1.node.get.collapsed || cell2.node.get.collapsed then // a collapsed node
+
       val node1 = cell1.node.get
       val node2 = cell2.node.get
-      solver.unify(node1.term, node2.term, 0)
+
+      assert(node1.collapsed || node2.collapsed)
+
       collapseNode(node1) // collapse the other node
       collapseNode(node2)
       node2.children.addAll(node1.children)
       node2.children += (node1 -> 0)
       node2.allocationRegions.addAll(node1.allocationRegions) // add regions and flags of node 1 to node 2
       node2.flags.join(node1.flags)
-      if pointTo.contains(node1.cells(0)) then // merge the pointees of the two collapsed (single cell) nodes
-        if pointTo.contains(node2.cells(0)) then
-          val slice1 = getPointee(node1.cells(0))
-          val slice2 = getPointee(node2.cells(0))
-          val result = mergeCells(getPointeeAdjusted(node1.cells(0)), getPointeeAdjusted(node2.cells(0)))
-          pointTo.update(node2.cells(0), Slice(result, slice1.internalOffset.max(slice2.internalOffset)))
+      if node1.cells(0)._pointee.isDefined then // merge the pointees of the two collapsed (single cell) nodes
+        if node2.cells(0)._pointee.isDefined then
+          val slice1 = node1.cells(0).getPointee
+          val slice2 = node2.cells(0).getPointee
+          val result = mergeCells(adjust(slice1), adjust(slice2))
+          node2.cells(0)._pointee = Some(Slice(result, slice1.internalOffset.max(slice2.internalOffset)))
         else 
-          pointTo.update(node2.cells(0), getPointee(node1.cells(0)))
-      pointTo.remove(node1.cells(0))
-      replace(node1.cells(0), node2.cells(0), 0)
+          node2.cells(0)._pointee = node1.cells(0)._pointee
+//      node1.cells(0)._pointee = None
+//      replace(node1.cells(0), node2.cells(0), 0)
+      solver.unify(node1.term, node2.term, 0)
       node2.cells(0)
     else // standard merge
 
       // node 1 is the cell with the higher offset
+
       var delta = cell1.offset - cell2.offset
       var node1 = cell1.node.get
       var node2 = cell2.node.get
@@ -481,23 +511,23 @@ class DSG(val proc: Procedure,
           val outgoing: Set[Slice] = cells.foldLeft(Set[Slice]()){
             (set, cell) =>
               // replace incoming edges
-              if cell.node.get.equals(node2) then
-                replace(cell, collapsedCell, delta + cell.offset - offset)
-              else
-                assert(cell.node.get.equals(node1))
-                replace(cell, collapsedCell, cell.offset - offset)
+//              if cell.node.get.equals(node2) then
+//                replace(cell, collapsedCell, delta + cell.offset - offset)
+//              else
+//                assert(cell.node.get.equals(node1))
+//                replace(cell, collapsedCell, cell.offset - offset)
 
               // collect outgoing edges
-              if pointTo.contains(cell) then
-                val pointee = getPointee(cell)
-                pointTo.remove(cell)
+              if cell._pointee.isDefined then
+                val pointee = cell.getPointee
+//                cell._pointee = None
                 set + pointee
               else
                 set
           }
           // replace outgoing edges
           if outgoing.size == 1 then
-            pointTo.update(collapsedCell, outgoing.head)
+            collapsedCell._pointee = Some(outgoing.head)
           else if outgoing.size > 1 then
             var internal = outgoing.head._2
             val result = outgoing.tail.foldLeft(outgoing.head._1){
@@ -507,7 +537,7 @@ class DSG(val proc: Procedure,
                 internal = internal.max(pointeeInternal)
                 mergeCells(result, cell)
             }
-            pointTo.update(collapsedCell, Slice(result, internal))
+            collapsedCell._pointee = Some(Slice(result, internal))
       }
 
       solver.unify(node1.term, resultNode.term, 0)
@@ -518,6 +548,16 @@ class DSG(val proc: Procedure,
         resultNode.getCell(cell2.offset)
 
 
+  def adjust(cell: DSC, internalOffset: BigInt): DSC =
+    val link = solver.find(cell.node.get.term)
+    val node = link._1.asInstanceOf[Derm].node
+    val linkOffset = link._2
+    node.addCell(cell.offset + internalOffset + linkOffset, 0)
+
+  def adjust(slice: Slice, offset: BigInt = 0): DSC =
+    val cell = slice.cell
+    val internal = slice.internalOffset
+    adjust(cell, internal + offset)
 
   private def isFormal(pos: CFGPosition, variable: Variable): Boolean =
     !reachingDefs(pos).contains(variable)
@@ -610,21 +650,21 @@ class DSG(val proc: Procedure,
         newGraph.globalMapping.update(range, Field(idToNode(node.id), offset))
     }
 
-    newGraph.pointTo.clear()
-    pointTo.foreach {
-      case (cell1: DSC, slice: Slice) =>
-        val node1 = cell1.node.get
-        val node2 = slice.node
-        if !idToNode.contains(node1.id) then
-          val newNode1 = node1.cloneSelf(newGraph)
-          idToNode.update(node1.id, newNode1)
-
-        if !idToNode.contains(node2.id) then
-          val newNode2 = node2.cloneSelf(newGraph)
-          idToNode.update(node2.id, newNode2)
-
-        newGraph.pointTo.update(idToNode(node1.id).cells(cell1.offset), Slice(idToNode(node2.id).cells(slice.offset), slice.internalOffset))
-    }
+//    newGraph.pointTo.clear()
+//    pointTo.foreach {
+//      case (cell1: DSC, slice: Slice) =>
+//        val node1 = cell1.node.get
+//        val node2 = slice.node
+//        if !idToNode.contains(node1.id) then
+//          val newNode1 = node1.cloneSelf(newGraph)
+//          idToNode.update(node1.id, newNode1)
+//
+//        if !idToNode.contains(node2.id) then
+//          val newNode2 = node2.cloneSelf(newGraph)
+//          idToNode.update(node2.id, newNode2)
+//
+//        newGraph.pointTo.update(idToNode(node1.id).cells(cell1.offset), Slice(idToNode(node2.id).cells(slice.offset), slice.internalOffset))
+//    }
 
     callsites.foreach(
       callSite =>
@@ -704,7 +744,7 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
       var result: Option[DSC] = None
       cells.foreach {
         case (start: BigInt, cell: DSC) =>
-          if start < offset && offset < (start + cell.largestAccessedSize) then
+          if start <= offset && offset < (start + cell.largestAccessedSize) then
             result = Some(cell)
       }
       result match
@@ -768,13 +808,13 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
             )
       }
 
-      cells.foreach {
-        case (offset: BigInt, cell: DSC) =>
-        if from.pointTo.contains(cell) then
-          val pointee = from.getPointee(cell)
-          pointee._1.node.get.cloneNode(from, to)
-          to.pointTo.update(cell, pointee)
-      }
+//      cells.foreach {
+//        case (offset: BigInt, cell: DSC) =>
+//        if from.pointTo.contains(cell) then
+//          val pointee = from.getPointee(cell)
+//          pointee._1.node.get.cloneNode(from, to)
+//          to.pointTo.update(cell, pointee)
+//      }
 
   override def equals(obj: Any): Boolean =
     obj match
@@ -785,6 +825,8 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
   override def hashCode(): Int = id
 
   override def toString: String = s"Node($id, $allocationRegions ${if collapsed then ", collapsed" else ""})"
+
+
 }
 
 /**
@@ -795,6 +837,23 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
 case class DSC(node: Option[DSN], offset: BigInt)
 {
   var largestAccessedSize: BigInt = 0
+
+  var _pointee : Option[Slice] = None
+
+  def getPointee : Slice =
+    if _pointee.isEmpty then
+      val node = DSN(Some(this.node.get.graph.get))
+      _pointee = Some(Slice(node.cells(0), 0))
+    else
+      val slice = _pointee.get
+      var node = slice.node
+      val graph = node.graph.get
+      val link = graph.solver.find(node.term)
+      node = link._1.asInstanceOf[Derm].node
+      val offset = link._2
+      val cell = node.addCell(offset + slice.cell.offset, slice.cell.largestAccessedSize)
+      _pointee = Some(Slice(cell, slice.internalOffset))
+    _pointee.get
 
   def growSize(size: BigInt): Boolean =
     if size > largestAccessedSize then
@@ -855,14 +914,7 @@ def unwrapPaddingAndSlicing(expr: Expr): Expr =
     case ZeroExtend(extension, body) => unwrapPaddingAndSlicing(body)
     case _ => expr
 
-def adjust(cell: DSC, internalOffset: BigInt): DSC =
-  val node = cell.node.get
-  node.addCell(cell.offset+internalOffset, 0)
 
-def adjust(slice: Slice): DSC =
-  val cell = slice.cell
-  val internal = slice.internalOffset
-  adjust(cell, internal)
 
 /** Terms used in unification.
  */

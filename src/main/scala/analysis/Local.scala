@@ -147,14 +147,14 @@ class Local(
             field = 0
           graph.mergeCells(c,
             if pointee then
-              graph.getPointeeAdjusted(node.getCell(field))
+              graph.adjust(node.getCell(field).getPointee)
             else
               node.getCell(field)
           )
         else
           val node = cell.node.get
           graph.collapseNode(node)
-          graph.mergeCells(c, if pointee then graph.getPointeeAdjusted(node.cells(0)) else node.cells(0))
+          graph.mergeCells(c, if pointee then graph.adjust(node.cells(0).getPointee) else node.cells(0))
 
     }
     if pointee then
@@ -163,11 +163,11 @@ class Local(
           val offset = t._1.offset
           val internalOffset = t._2
           val node = t._1.node.get
-          val cell = node.getCell(offset + internalOffset)
-          if graph.pointTo.contains(cell) && graph.pointTo(cell)._1.equals(result) then
+          val cell = graph.find(node.getCell(offset + internalOffset))
+          if cell._pointee.isDefined && graph.find(cell.getPointee._1).equals(result) then
             graph.selfCollapse(node)
-            assert(graph.pointTo.contains(node.getCell(offset)))
-            result = graph.getPointee(node.getCell(offset))._1
+//            assert(graph.pointTo.contains(node.getCell(offset))) TODO
+            result = graph.find(graph.find(node.getCell(offset)).getPointee._1)
           else
             graph.selfCollapse(node)
       )
@@ -222,16 +222,16 @@ class Local(
         graph.callsites.add(cs)
         cs.paramCells.foreach{
           case (variable: Variable, slice: Slice) =>
-            visitPointerArithmeticOperation(call, adjust(slice), variable, 0)
+            visitPointerArithmeticOperation(call, graph.adjust(slice), variable, 0)
         }
         cs.returnCells.foreach{
           case (variable: Variable, slice: Slice) =>
             val returnArgument  = graph.varToCell(n)(variable)
-            graph.mergeCells(adjust(returnArgument), adjust(slice))
+            graph.mergeCells(graph.adjust(returnArgument), graph.adjust(slice))
         }
       case Assign(variable: Variable, rhs: Expr, maybeString) =>
         val expr: Expr = unwrapPaddingAndSlicing(rhs)
-        val lhsCell = adjust(graph.varToCell(n)(variable))
+        val lhsCell = graph.adjust(graph.varToCell(n)(variable))
         var global = isGlobal(rhs, n)
         var stack = isStack(rhs, n)
         if global.isDefined then // Rx = global address
@@ -267,9 +267,9 @@ class Local(
               global = isGlobal(index, n, byteSize)
               stack = isStack(index, n)
               if global.isDefined then
-                graph.mergeCells(lhsCell, graph.getPointeeAdjusted(global.get))
+                graph.mergeCells(lhsCell,graph.adjust(graph.find(global.get).getPointee))
               else if stack.isDefined then
-                graph.mergeCells(lhsCell, graph.getPointeeAdjusted(stack.get))
+                graph.mergeCells(lhsCell, graph.adjust(graph.find(stack.get).getPointee))
               else
                 index match
                   case BinaryExpr(op, arg1: Variable, arg2) =>
@@ -298,9 +298,9 @@ class Local(
         val stack = isStack(index, n)
         val addressPointee: DSC =
           if global.isDefined then
-            graph.getPointeeAdjusted(global.get)
+            graph.adjust(graph.find(global.get).getPointee)
           else if stack.isDefined then
-            graph.getPointeeAdjusted(stack.get)
+            graph.adjust(graph.find(stack.get).getPointee)
           else
             index match
               case BinaryExpr(op, arg1: Variable, arg2) =>
@@ -322,8 +322,10 @@ class Local(
         val valueCells = graph.getCells(n, value)
         val result = valueCells.foldLeft(addressPointee) {
           (c, slice) =>
-            graph.mergeCells(adjust(slice), c)
+            graph.mergeCells(graph.adjust(slice), c)
         }
+
+        print("")
 
       case _ =>
   }
