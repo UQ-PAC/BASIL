@@ -46,10 +46,32 @@ jobs:
 
       - name: System Tests
         run: ./mill test.testOnly '*SystemTests*' || true
-
       - uses: actions/upload-artifact@v4
         with:
           name: testresult-${{ github.run_number }}
-          path: src/test/*.csv
+          path: |
+            src/test/*.csv
+            src/test/*.svg
+      - run: |
+          pushd src/test
+          tail -n+1 summary-*.csv
+          pasted="$(paste headers.md.part summary-*.md.part)"
+          for part in summary-*.md.part; do
+            # basename, then everything after "summary-", then everything before ".md.part" (via two rev passes)
+            testname="$(basename $part | cut -d- -f2- | rev | cut -d. -f3- | rev)"
+            [[ -n "$testname" ]]
 
-      - run: tail -n+1 src/test/summary-*.csv
+            svg="verifyTime-$testname.svg"
+            ls -l "$svg"
+
+            # 1920 hours = 80 days
+            url="$(curl -F"file=@$svg" -Fexpires=1920 http://0x0.st)"
+            [[ -n "$url" ]]
+
+            pasted="$(echo "$pasted" | sed "s#HISTO${testname}HISTO#$url#g")"
+          done
+          popd
+
+          echo "$pasted" > $GITHUB_STEP_SUMMARY
+        shell: "bash -xe {0}"
+
