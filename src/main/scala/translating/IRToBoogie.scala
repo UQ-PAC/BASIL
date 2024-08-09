@@ -650,7 +650,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       val jump = GoToCmd(g.targets.map(_.label).toSeq)
       conditionAssert :+ jump
     case r: Return => List(ReturnCmd)
-    case r: Halt => List(BAssume(FalseBLiteral))
+    case r: Unreachable => List(BAssume(FalseBLiteral))
   }
 
   def translate(j: Call): List[BCmd] = j match {

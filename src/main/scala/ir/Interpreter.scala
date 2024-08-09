@@ -248,8 +248,8 @@ class Interpreter() {
         case r: Return => {
           nextCmd = Some(returnCmd.pop())
         }
-        case h: Halt => {
-          Logger.debug("Halt")
+        case h: Unreachable => {
+          Logger.debug("Unreachable")
           nextCmd = None
         }
       }

@@ -136,11 +136,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       jumps.head match {
         case b: BAPDirectCall =>
           val call = Some(DirectCall(nameToProcedure(b.target),Some(b.line)))
-          val ft = (b.returnTarget.map(t => labelToBlock(t))).map(x => GoTo(Set(x))).getOrElse(Halt())
+          val ft = (b.returnTarget.map(t => labelToBlock(t))).map(x => GoTo(Set(x))).getOrElse(Unreachable())
           (call, ft, ArrayBuffer())
         case b: BAPIndirectCall =>
           val call = IndirectCall(b.target.toIR, Some(b.line))
-          val ft = (b.returnTarget.map(t => labelToBlock(t))).map(x => GoTo(Set(x))).getOrElse(Halt())
+          val ft = (b.returnTarget.map(t => labelToBlock(t))).map(x => GoTo(Set(x))).getOrElse(Unreachable())
           (Some(call), ft, ArrayBuffer())
         case b: BAPGoTo =>
           val target = labelToBlock(b.target)

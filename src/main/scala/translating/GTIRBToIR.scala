@@ -364,7 +364,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       // need to copy jump as it can't have multiple parents
       val jumpCopy = currentBlock.jump match {
         case GoTo(targets, label) => GoTo(targets, label)
-        case h: Halt => Halt()
+        case h: Unreachable => Unreachable()
         case r: Return => Return() 
         case _ => throw Exception("this shouldn't be reachable")
       }
@@ -392,7 +392,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
               case _ => throw Exception(s"no assignment to program counter found before indirect call in block ${block.label}")
             }
             block.statements.remove(block.statements.last) // remove _PC assignment
-            (Some(IndirectCall(target)), Halt())
+            (Some(IndirectCall(target)), Unreachable())
           } else if (proxySymbols.size > 1) {
             // TODO requires further consideration once encountered
             throw Exception(s"multiple uuidToSymbol ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${byteStringToString(edge.targetUuid)}, target of indirect call from block ${block.label}")
@@ -408,7 +408,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
               proc
             }
             removePCAssign(block)
-            (Some(DirectCall(target)), Halt())
+            (Some(DirectCall(target)), Unreachable())
           }
         } else if (uuidToBlock.contains(edge.targetUuid)) {
           // resolved indirect jump
@@ -428,7 +428,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           val jump = if (procedure == targetProc) {
             (None, GoTo(mutable.Set(uuidToBlock(edge.targetUuid))))
           } else {
-            (Some(DirectCall(targetProc)), Halt())
+            (Some(DirectCall(targetProc)), Unreachable())
           }
           removePCAssign(block)
           jump
@@ -450,7 +450,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           // probably doesn't actually happen in practice since it seems to be after brk instructions?
           val targetProc = entranceUUIDtoProcedure(edge.targetUuid)
           // assuming fallthrough won't fall through to start of own procedure
-          (Some(DirectCall(targetProc)), Halt())
+          (Some(DirectCall(targetProc)), Unreachable())
         } else if (uuidToBlock.contains(edge.targetUuid)) {
           val target = uuidToBlock(edge.targetUuid)
           (None, GoTo(mutable.Set(target)))
@@ -463,7 +463,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
         if (entranceUUIDtoProcedure.contains(edge.targetUuid)) {
           val target = entranceUUIDtoProcedure(edge.targetUuid)
           removePCAssign(block)
-          (Some(DirectCall(target)), Halt())
+          (Some(DirectCall(target)), Unreachable())
         } else {
           throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known procedure entrance")
         }

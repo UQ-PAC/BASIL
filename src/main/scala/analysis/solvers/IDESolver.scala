@@ -1,7 +1,7 @@
 package analysis.solvers
 
 import analysis.{BackwardIDEAnalysis, Dependencies, EdgeFunction, EdgeFunctionLattice, ForwardIDEAnalysis, IDEAnalysis, IRInterproceduralBackwardDependencies, IRInterproceduralForwardDependencies, Lambda, Lattice, MapLattice}
-import ir.{CFGPosition, Command, DirectCall, GoTo, IRWalk, IndirectCall, Return, InterProcIRCursor, Procedure, Program, isAfterCall, Halt, Statement, Jump}
+import ir.{CFGPosition, Command, DirectCall, GoTo, IRWalk, IndirectCall, Return, InterProcIRCursor, Procedure, Program, isAfterCall, Unreachable, Statement, Jump}
 import util.Logger
 
 import scala.collection.immutable.Map
@@ -213,7 +213,7 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
 
   protected def entryToExit(entry: Procedure): Return = IRWalk.lastInProc(entry).asInstanceOf[Return]
 
-  protected def exitToEntry(exit: IndirectCall): Procedure = IRWalk.procedure(exit)
+  protected def exitToEntry(exit: Return): Procedure = IRWalk.procedure(exit)
 
   protected def callToReturn(call: DirectCall): Command = call.successor
 
@@ -229,13 +229,13 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
 
   protected def isCall(call: CFGPosition): Boolean =
     call match
-      case directCall: DirectCall if (!directCall.successor.isInstanceOf[Halt]) => true
+      case directCall: DirectCall if (!directCall.successor.isInstanceOf[Unreachable]) => true
       case _ => false
 
   protected def isExit(exit: CFGPosition): Boolean =
     exit match
       // only looking at functions with statements
-      case command: Command => IRWalk.lastInProc(IRWalk.procedure(command)) == command
+      case command: Return => true
       case _ => false
 
   protected def getAfterCalls(exit: IndirectCall): Set[Command] =
@@ -268,12 +268,19 @@ abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program)
 
   protected def isCall(call: CFGPosition): Boolean =
     call match
-      case c : Command => isAfterCall(c) && IRWalk.prevCommandInBlock(c).map(_.isInstanceOf[DirectCall]).getOrElse(false)
+      case c: Unreachable => false /* don't process non-returning calls */
+      case c : Command => {
+        val call = IRWalk.prevCommandInBlock(c)
+        call match {
+          case Some(d: DirectCall) if d.target.returnBlock.isDefined => true
+          case _ => false
+        }
+      }
       case _ => false
 
   protected def isExit(exit: CFGPosition): Boolean =
     exit match
-      case procedure: Procedure => true
+      case procedure: Procedure => procedure.blocks.nonEmpty
       case _ => false
 
   protected def getAfterCalls(exit: Procedure): Set[DirectCall] = exit.incomingCalls().toSet

@@ -82,7 +82,7 @@ sealed trait Jump extends Command {
   def acceptVisit(visitor: Visitor): Jump = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
-class Halt(override val label: Option[String] = None) extends Jump {
+class Unreachable(override val label: Option[String] = None) extends Jump {
   /* Terminate / No successors / assume false */
   override def acceptVisit(visitor: Visitor): Jump = this
 }
@@ -139,7 +139,7 @@ object GoTo:
 
 sealed trait Call extends Statement {
   def returnTarget: Option[Command] = successor match {
-    case h: Halt => None
+    case h: Unreachable => None
     case o => Some(o)
   }
 }

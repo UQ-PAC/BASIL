@@ -11,7 +11,6 @@ import util.Logger
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
-import analysis.CfgCommandNode
 import scala.collection.mutable
 import cilvisitor._
 
