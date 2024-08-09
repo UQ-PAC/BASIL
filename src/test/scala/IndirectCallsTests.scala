@@ -42,9 +42,10 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
   def runAnalyses(program: Program,
                   externalFunctions: Set[ExternalFunction] = Set.empty,
                   globals: Set[SpecGlobal] = Set.empty,
+                  funcEntries: Set[FuncEntry] = Set.empty,
                   globalOffsets: Map[BigInt, BigInt] = Map.empty): StaticAnalysisContext = {
 
-    val ctx = IRContext(externalFunctions, globals, globalOffsets, Specification(Set(), Map(), List(), List(), List(), Set()), program)
+    val ctx = IRContext(externalFunctions, globals, funcEntries, globalOffsets, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program)
     StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 1)
   }
 

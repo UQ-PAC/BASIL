@@ -27,7 +27,7 @@ class IrreducibleLoop extends AnyFunSuite {
 
   def load(conf: ILLoadingConfig) : Program = {
     val bapProgram = IRLoading.loadBAP(conf.inputFile)
-    val (externalFunctions, globals, globalOffsets, mainAddress) = IRLoading.loadReadELF(conf.relfFile, conf)
+    val (externalFunctions, globals, funcEntries, globalOffsets, mainAddress) = IRLoading.loadReadELF(conf.relfFile, conf)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     val IRProgram = IRTranslator.translate
     IRProgram
