@@ -223,7 +223,7 @@ class IRTest extends AnyFunSuite {
       Assign(R0, bv64(22)),
       Assign(R0, bv64(22)),
       directCall("main"),
-      halt
+      unreachable 
     ).resolve(p)
     val b2 = block("newblock1",
       Assign(R0, bv64(22)),
@@ -249,7 +249,7 @@ class IRTest extends AnyFunSuite {
     val b3 = block("newblock3",
       Assign(R0, bv64(22)),
       directCall("called"),
-      halt
+      unreachable
     ).resolve(p)
 
     assert(b3.calls.toSet == Set(p.procs("called")))

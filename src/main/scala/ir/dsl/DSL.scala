@@ -73,8 +73,8 @@ case class EventuallyGoto(targets: List[DelayNameResolve]) extends EventuallyJum
 case class EventuallyReturn() extends EventuallyJump {
   override def resolve(p: Program) = Return()
 }
-case class EventuallyHalt() extends EventuallyJump  {
-  override def resolve(p: Program) = Halt()
+case class EventuallyUnreachable() extends EventuallyJump  {
+  override def resolve(p: Program) = Unreachable()
 }
 
 def goto(): EventuallyGoto = EventuallyGoto(List.empty)
@@ -84,7 +84,7 @@ def goto(targets: String*): EventuallyGoto = {
 }
 
 def ret: EventuallyReturn = EventuallyReturn()
-def halt: EventuallyHalt= EventuallyHalt()
+def unreachable: EventuallyUnreachable= EventuallyUnreachable()
 
 def goto(targets: List[String]): EventuallyGoto = {
   EventuallyGoto(targets.map(p => DelayNameResolve(p)))
@@ -111,8 +111,6 @@ def block(label: String, sl: (Statement | EventuallyStatement | EventuallyJump)*
   val statements : Seq[EventuallyStatement] = sl.flatMap {
     case s: Statement => Some(ResolvableStatement(s))
     case o: EventuallyStatement => Some(o)
-    case o: EventuallyCall => Some(o)
-    case o: EventuallyIndirectCall => Some(o)
     case g: EventuallyJump => None
   }
   val jump = sl.collectFirst {

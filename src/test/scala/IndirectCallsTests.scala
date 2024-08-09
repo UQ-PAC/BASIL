@@ -84,7 +84,6 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
                   case _ => 
                 }
         }
-        println(result.ir.program)
         assert(expectedCallTransform.isEmpty)
   }
 
@@ -122,7 +121,6 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
             case _ =>
           }
       }
-      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -160,7 +158,6 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
             case _ =>
           }
       }
-      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -204,7 +201,6 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
             case _ =>
           }
       }
-      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -248,7 +244,6 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
             case _ =>
           }
       }
-      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -291,7 +286,6 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
             case _ =>
           }
       }
-      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -335,7 +329,6 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
             case _ =>
           }
       }
-      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -363,7 +356,6 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
         "l000004f3set_seven" -> ("set_seven", "R0")
       )
 
-    println("prev " + result.ir.program)
       // Traverse the statements in the main function
     result.ir.program.mainProcedure.blocks.foreach {
         block =>
@@ -375,7 +367,6 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
             case _ =>
           }
       }
-      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -414,7 +405,6 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
             case _ =>
           }
       }
-      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -453,7 +443,6 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
         }
 
       // Traverse the statements in the main function
-      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 

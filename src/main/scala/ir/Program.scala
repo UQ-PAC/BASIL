@@ -18,40 +18,6 @@ class Program(var procedures: ArrayBuffer[Procedure],
     serialiseIL(this)
   }
 
-  // This shouldn't be run before indirect calls are resolved
-  def stripUnreachableFunctions(depth: Int = Int.MaxValue): Unit = {
-    val procedureCalleeNames = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
-
-    val toVisit: mutable.LinkedHashSet[(Int, String)] = mutable.LinkedHashSet((0, mainProcedure.name))
-    var reachableFound = true
-    val reachableNames = mutable.HashMap[String, Int]()
-    while (toVisit.nonEmpty) {
-      val next = toVisit.head
-      toVisit.remove(next)
-
-      if (next._1 <= depth) {
-
-        def addName(depth: Int, name: String): Unit = {
-          val oldDepth = reachableNames.getOrElse(name, Integer.MAX_VALUE)
-          reachableNames.put(next._2, if depth < oldDepth then depth else oldDepth)
-        }
-        addName(next._1, next._2)
-
-        val callees = procedureCalleeNames(next._2)
-
-        toVisit.addAll(callees.diff(reachableNames.keySet).map(c => (next._1 + 1, c)))
-        callees.foreach(c => addName(next._1 + 1, c))
-      }
-    }
-    procedures = procedures.filter(f => reachableNames.keySet.contains(f.name))
-
-    for (elem <- procedures.filter(c => c.calls.exists(s => !procedures.contains(s)))) {
-      // last layer is analysed only as specifications so we remove the body for anything that calls
-      // a function we have removed
-
-      elem.clearBlocks()
-    }
-  }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
     val procToCalls: mutable.Map[Procedure, Set[Procedure]] = mutable.Map()
@@ -229,7 +195,6 @@ class Procedure private (
   }
 
   def addBlocks(block: Block): Block = {
-    block.parent = this
     if (!_blocks.contains(block)) {
       block.parent = this
       _blocks.add(block)
@@ -318,7 +283,8 @@ class Procedure private (
 
   def clearBlocks(): Unit = {
     // O(n) because we are careful to unlink the parents etc.
-    removeBlocks(_blocks)
+    // .toList to avoid modifying our own iterator
+    removeBlocksDisconnect(_blocks.toList)
   }
 
   def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).toSet[Procedure]
@@ -369,6 +335,7 @@ class Block private (
     this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
   }
 
+  def isReturn: Boolean = parent.returnBlock.contains(this)
   def isEntry: Boolean = parent.entryBlock.contains(this)
 
   def jump: Jump = _jump

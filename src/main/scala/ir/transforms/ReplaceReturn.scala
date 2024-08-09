@@ -13,7 +13,7 @@ class ReplaceReturns extends CILVisitor {
     j match {
       case IndirectCall(Register("R30", _), _) => {
         assert(j.parent.statements.lastOption.contains(j))
-        if (j.parent.jump.isInstanceOf[Halt | Return]) {
+        if (j.parent.jump.isInstanceOf[Unreachable | Return]) {
           j.parent.replaceJump(Return())
           ChangeTo(List())
         } else {
@@ -32,7 +32,6 @@ def addReturnBlocks(p: Program, toAll: Boolean = false) = {
   p.procedures.foreach(p => {
     val containsReturn = p.blocks.map(_.jump).find(_.isInstanceOf[Return]).isDefined
     if (toAll && p.blocks.isEmpty && p.entryBlock.isEmpty && p.returnBlock.isEmpty) {
-      Logger.info(s"proc ${p.name} ${p.entryBlock}, ${p.returnBlock}")
       p.returnBlock = (Block(label=p.name + "_basil_return",jump=Return()))
       p.entryBlock = (Block(label=p.name + "_basil_entry",jump=GoTo(p.returnBlock.get)))
     } else if (p.returnBlock.isEmpty && (toAll || containsReturn)) {

@@ -61,7 +61,12 @@ private class ILSerialiser extends ReadOnlyVisitor {
   }
 
   override def visitJump(node: Jump): Jump = {
-    node.acceptVisit(this)
+    node match {
+      case j: GoTo => program ++= s"goTo(${j.targets.map(_.label).mkString(", ")})" 
+      case h: Unreachable => program ++= "halt"
+      case h: Return => program ++= "return"
+    }
+
     node
   }
 
@@ -77,7 +82,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
   override def visitDirectCall(node: DirectCall): Statement = {
     program ++= "DirectCall("
     program ++= procedureIdentifier(node.target)
-    program ++= ", "
     program ++= ")" // DirectCall
     node
   }
@@ -95,7 +99,10 @@ private class ILSerialiser extends ReadOnlyVisitor {
     program ++= "Block(" + blockIdentifier(node) + ",\n"
     indentLevel += 1
     program ++= getIndent()
-    program ++= "statements(\n"
+    program ++= "statements("
+    if (node.statements.size > 0) {
+      program ++= "\n"
+    }
     indentLevel += 1
 
     for (s <- node.statements) {
@@ -105,8 +112,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
     }
     indentLevel -= 1
     program ++= getIndent() + "),\n"
-    program ++= getIndent() + "jumps(\n"
-    program ++= getIndent()
+    program ++= getIndent() + "jump("
     visitJump(node.jump)
     program ++= ")\n"
     indentLevel -= 1

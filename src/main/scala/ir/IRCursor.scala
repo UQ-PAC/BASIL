@@ -96,7 +96,7 @@ trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
       case proc: Procedure => proc.entryBlock.toSet
       case b: Block        => b.statements.headOption.orElse(Some(b.jump)).toSet
       case n: GoTo         => n.targets.asInstanceOf[Set[CFGPosition]]
-      case h: Halt         => Set()
+      case h: Unreachable         => Set()
       case h: Return       => Set()
       case c: Statement    => IRWalk.nextCommandInBlock(c).toSet
     }
@@ -150,7 +150,6 @@ trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
     IntraProcIRCursor.succ(pos) ++
       (pos match
         case c: DirectCall if c.target.blocks.nonEmpty => Set(c.target)
-        // case c: IndirectCall if c.parent.isProcReturn => c.parent.parent.incomingCalls().map(_.successor).toSet
         case c: Return => c.parent.parent.incomingCalls().map(_.successor).toSet
         case _         => Set.empty
       )
@@ -159,7 +158,13 @@ trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
   final def pred(pos: CFGPosition): Set[CFGPosition] = {
     IntraProcIRCursor.pred(pos) ++
       (pos match
-        case d: DirectCall if d.target.blocks.nonEmpty => d.target.returnBlock.toSet
+        case c: Command => {
+          IRWalk.prevCommandInBlock(c) match {
+            case Some(d: DirectCall) if d.target.blocks.nonEmpty => d.target.returnBlock.toSet
+            case o            => o.toSet
+          }
+
+        }
         case c: Procedure                              => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
         case _                                         => Set.empty
       )

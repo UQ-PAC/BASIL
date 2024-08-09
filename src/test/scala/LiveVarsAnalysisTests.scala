@@ -115,10 +115,12 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     var program = prog(
       proc("main",
         block("main_first_call",
-          directCall("wrapper1"), goto("main_second_call")
+          directCall("wrapper1"), 
+          goto("main_second_call")
         ),
         block("main_second_call",
-          directCall("wrapper2"), goto("main_return")
+          directCall("wrapper2"), 
+          goto("main_return")
         ),
         block("main_return", ret)
       ),
@@ -128,10 +130,12 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
       proc("wrapper1",
         block("wrapper1_first_call",
           Assign(R1, constant1),
-          directCall("callee"), goto("wrapper1_second_call")
+          directCall("callee"), 
+          goto("wrapper1_second_call")
         ),
         block("wrapper1_second_call",
-          directCall("callee2"), goto("wrapper1_return")),
+          directCall("callee2"), 
+          goto("wrapper1_return")),
         block("wrapper1_return", ret)
       ),
       proc("wrapper2",
@@ -349,12 +353,11 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
     val blocks = result.ir.program.blocks
 
     // main has no parameters, get_two has three and a return
-    assert(analysisResults(blocks("lmain").jump) == Map(R29 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("l000003ec").jump) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // get_two aftercall
-    assert(analysisResults(blocks("l00000430").jump) == Map(R31 -> TwoElementTop)) // printf aftercall
-    assert(analysisResults(blocks("main_basil_return").jump) == Map(R30 -> TwoElementTop))
-    assert(analysisResults(blocks("lget_two").jump) == Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R2 -> TwoElementTop, R30 -> TwoElementTop, R31 -> TwoElementTop))
-    assert(analysisResults(blocks("get_two_basil_return").jump) == Map(R0 -> TwoElementTop,  R30 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("lmain")) == Map(R29 -> TwoElementTop, R31 -> TwoElementTop, R30 -> TwoElementTop))
+    assert(analysisResults(blocks("l000003ec")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop)) // get_two aftercall
+    assert(analysisResults(blocks("l00000430")) == Map(R31 -> TwoElementTop)) // printf aftercall
+    assert(analysisResults(blocks("lget_two")) == Map(R0 -> TwoElementTop, R1 -> TwoElementTop, R2 -> TwoElementTop, R31 -> TwoElementTop))
+    assert(analysisResults(blocks("get_two_basil_return")) == Map(R0 -> TwoElementTop, R31 -> TwoElementTop))
   }
 
   test("ifbranches") {

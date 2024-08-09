@@ -1,4 +1,4 @@
-import analysis.{CfgNode, LiftedElement, MemoryRegion}
+import analysis.{LiftedElement, MemoryRegion}
 import org.scalatest.Inside.inside
 import org.scalatest.*
 import org.scalatest.funsuite.*
