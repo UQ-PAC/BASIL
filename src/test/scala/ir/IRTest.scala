@@ -4,7 +4,9 @@ import scala.collection.mutable
 import scala.collection.immutable.*
 import org.scalatest.funsuite.AnyFunSuite
 import util.intrusive_list.*
+import translating.serialiseIL
 import ir.dsl.*
+import ir._
 
 class IRTest extends AnyFunSuite {
 
@@ -54,31 +56,6 @@ class IRTest extends AnyFunSuite {
     assert(blocks("lmain").singleSuccessor.isEmpty)
     assert(blocks("lmain2").singlePredecessor.isEmpty)
     assert(blocks("lmain2").singleSuccessor.isEmpty)
-
-  }
-
-  test("removeblockinline") {
-
-    val p = prog(
-      proc("main",
-        block("lmain",
-          goto("lmain1")
-        ),
-        block("lmain1",
-          goto("lmain2")),
-        block("lmain2",
-          ret)
-      )
-    )
-
-    val blocks = p.collect {
-      case b: Block => b.label -> b
-    }.toMap
-
-    p.procedures.head.removeBlocksInline(blocks("lmain1"))
-
-    blocks("lmain").singleSuccessor.contains(blocks("lmain2"))
-    blocks("lmain2").singlePredecessor.contains(blocks("lmain"))
 
   }
 
@@ -142,7 +119,8 @@ class IRTest extends AnyFunSuite {
         ),
         block("l_main_1",
           Assign(R0, bv64(22)),
-          directCall("p2", Some("returntarget"))
+          directCall("p2"), 
+          goto("returntarget")
         ),
         block("returntarget",
           ret
@@ -154,34 +132,32 @@ class IRTest extends AnyFunSuite {
       )
     )
 
+
     val blocks = p.collect {
       case b: Block => b.label -> b
     }.toMap
-
 
     val directcalls = p.collect {
       case c: DirectCall => c
     }
 
-    assert(blocks("l_main_1").fallthrough.nonEmpty)
-    assert(p.toSet.contains(blocks("l_main_1").fallthrough.get))
-    assert(directcalls.forall(c => IntraProcIRCursor.succ(c).count(_.asInstanceOf[GoTo].isAfterCall) == 1))
-    assert(directcalls.forall(c => IntraProcBlockIRCursor.succ(c).count(_.isAfterCall) == 1))
+    assert(p.toSet.contains(blocks("l_main_1").jump))
+    assert(directcalls.forall(c => IntraProcIRCursor.succ(c).count(c => isAfterCall(c.asInstanceOf[Command])) == 1))
 
     val afterCalls = p.collect {
-      case b: Block if b.isAfterCall => b
+      case b: Command if isAfterCall(b) => b
     }.toSet
 
-    assert(afterCalls.toSet == Set(blocks("returntarget")))
+    assert(afterCalls.toSet == Set(blocks("l_main_1").jump))
     val aftercallGotos = p.collect {
-      case c: Jump if c.isAfterCall => c
+      case c: Command if isAfterCall(c) => c
     }.toSet
-    assert(aftercallGotos == Set(blocks("l_main_1").fallthrough.get))
+    // assert(aftercallGotos == Set(blocks("l_main_1").fallthrough.get))
 
     assert(1 == aftercallGotos.count(b => IntraProcIRCursor.pred(b).contains(blocks("l_main_1").jump)))
-    assert(1 == aftercallGotos.count(b => IntraProcIRCursor.succ(b).contains(blocks("l_main_1").fallthrough.map(_.targets.head).head)))
-
-    assert(afterCalls.forall(b => IntraProcBlockIRCursor.pred(b).contains(blocks("l_main_1"))))
+    assert(1 == aftercallGotos.count(b => IntraProcIRCursor.succ(b).contains(blocks("l_main_1").jump match {
+      case GoTo(targets, _) => targets.head
+    })))
 
   }
 
@@ -246,7 +222,8 @@ class IRTest extends AnyFunSuite {
       Assign(R0, bv64(22)),
       Assign(R0, bv64(22)),
       Assign(R0, bv64(22)),
-      directCall("main", None)
+      directCall("main"),
+      halt
     ).resolve(p)
     val b2 = block("newblock1",
       Assign(R0, bv64(22)),
@@ -271,7 +248,8 @@ class IRTest extends AnyFunSuite {
     assert(called.incomingCalls().isEmpty)
     val b3 = block("newblock3",
       Assign(R0, bv64(22)),
-      directCall("called", None)
+      directCall("called"),
+      halt
     ).resolve(p)
 
     assert(b3.calls.toSet == Set(p.procs("called")))
@@ -283,11 +261,11 @@ class IRTest extends AnyFunSuite {
     assert(!oldb.hasParent)
     assert(oldb.incomingJumps.isEmpty)
     assert(!blocks("lmain").jump.asInstanceOf[GoTo].targets.contains(oldb))
-    assert(called.incomingCalls().toSet == Set(b3.jump))
+    assert(called.incomingCalls().toSet == Set(b3.statements.last))
     assert(called.incomingCalls().map(_.parent.parent).toSet == called.callers().toSet)
     val olds = blocks.size
     p.mainProcedure.replaceBlock(b3, b3)
-    assert(called.incomingCalls().toSet == Set(b3.jump))
+    assert(called.incomingCalls().toSet == Set(b3.statements.last))
     assert(olds == blocks.size)
     p.mainProcedure.addBlocks(block("test", ret).resolve(p))
     assert(olds != blocks.size)
@@ -333,35 +311,35 @@ class IRTest extends AnyFunSuite {
       proc("main",
         block("l_main",
           Assign(R0, bv64(10)),
-          directCall("p1", Some("returntarget"))
+          directCall("p1"), goto("returntarget")
         ),
         block("returntarget",
           ret
         )
       ),
     )
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    returnUnifier.visitProgram(p)
+
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), p)
+    transforms.addReturnBlocks(p)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), p)
 
     val next = InterProcIRCursor.succ(p.blocks("l_main").jump)
     val prev = InterProcIRCursor.pred(p.blocks("returntarget"))
 
     assert(prev.size == 1 && prev.collect {
-      case c : GoTo => (c.parent == p.blocks("l_main")) && c.isAfterCall
+      case c : GoTo => (c.parent == p.blocks("l_main"))
     }.contains(true))
 
-    assert(next == Set(p.procs("p1"), p.blocks("l_main").fallthrough.get))
+    // assert(next == Set(p.procs("p1"), p.blocks("l_main").fallthrough.get))
 
-    val prevB: Block = (p.blocks("l_main").jump match
-      case c: IndirectCall => c.returnTarget
-      case c: DirectCall => c.returnTarget
-      case _ => None
+    val prevB: Command = (p.blocks("l_main").statements.lastOption match
+      case Some(c: IndirectCall) => c.returnTarget
+      case Some(c: DirectCall) => c.returnTarget
+      case o => None
     ).get
 
-    assert(prevB.isAfterCall)
+    assert(isAfterCall(prevB))
     assert(InterProcIRCursor.pred(prevB).size == 1)
-    assert(InterProcIRCursor.pred(prevB).head == p.blocks("l_main").fallthrough.get)
-    assert(InterProcBlockIRCursor.pred(prevB).head == p.blocks("l_main"), p.procs("p1").returnBlock.get)
 
   }
 
@@ -374,10 +352,10 @@ class IRTest extends AnyFunSuite {
       ),
       proc("main",
         block("l_main",
-          indirectCall(R1, Some("returntarget"))
+          indirectCall(R1), goto("returntarget")
         ),
         block("block2",
-          directCall("p1", Some("returntarget"))
+          directCall("p1"), goto("returntarget")
         ),
         block("returntarget",
           ret

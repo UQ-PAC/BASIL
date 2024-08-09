@@ -70,8 +70,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
@@ -99,8 +99,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
         )
       )
     )
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
@@ -168,7 +168,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
           goto("0x1")
         ),
         block("0x1",
-          directCall("p2", Some("returntarget"))
+          directCall("p2"), goto("returntarget")
         ),
         block("returntarget",
           ret
@@ -186,8 +186,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
@@ -217,7 +217,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
           goto("0x1")
         ),
         block("0x1",
-          directCall("p2", Some("returntarget"))
+          directCall("p2"), goto("returntarget")
         ),
         block("returntarget",
           ret
@@ -227,7 +227,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
         block("l_foo",
           Assign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
           Assign(getRegister("R1"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
-          directCall("p2", Some("l_foo_1"))
+          directCall("p2"), goto("l_foo_1")
         ),
         block("l_foo_1",
           ret,
@@ -245,8 +245,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")

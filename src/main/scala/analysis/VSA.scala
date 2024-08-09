@@ -121,7 +121,7 @@ trait ValueSetAnalysis(program: Program,
                     m = m + (localAssign.lhs -> m(r))
                     m
               case None =>
-                Logger.warn("could not find region for " + localAssign)
+                Logger.debug("could not find region for " + localAssign)
                 m
           case e: Expr =>
             evaluateExpression(e, constantProp(n)) match {
@@ -129,7 +129,7 @@ trait ValueSetAnalysis(program: Program,
                 m = m + (localAssign.lhs -> Set(getValueType(bv)))
                 m
               case None =>
-                Logger.warn("could not evaluate expression" + e)
+                Logger.debug("could not evaluate expression" + e)
                 m
             }
       case memAssign: MemoryAssign =>
@@ -154,11 +154,11 @@ trait ValueSetAnalysis(program: Program,
                         m = m + (r -> m(v))
                         m
                       case _ =>
-                        Logger.warn(s"Too Complex: $storeValue") // do nothing
+                        Logger.debug(s"Too Complex: $storeValue") // do nothing
                         m
                     }
               case None =>
-                Logger.warn("could not find region for " + memAssign)
+                Logger.debug("could not find region for " + memAssign)
                 m
           case _ =>
             m
@@ -172,7 +172,7 @@ trait ValueSetAnalysis(program: Program,
     if (IRWalk.procedure(n) == n) {
       mmm.pushContext(n.asInstanceOf[Procedure].name)
       s
-    } else if (IRWalk.procedure(n).end == n) {
+    } else if (IRWalk.lastInProc(IRWalk.procedure(n)) == n) {
       mmm.popContext()
       s
     } else n match

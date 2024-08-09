@@ -22,26 +22,6 @@ trait Dependencies[N]:
     */
   def indep(n: N): Set[N]
 
-trait InterproceduralForwardDependencies extends Dependencies[CfgNode] {
-  override def outdep(n: CfgNode): Set[CfgNode] = n.succInter.toSet
-  override def indep(n: CfgNode): Set[CfgNode] = n.predInter.toSet
-}
-
-trait IntraproceduralForwardDependencies extends Dependencies[CfgNode] {
-  override def outdep(n: CfgNode): Set[CfgNode] = n.succIntra.toSet
-  override def indep(n: CfgNode): Set[CfgNode] = n.predIntra.toSet
-}
-
-trait InterproceduralBackwardDependencies extends Dependencies[CfgNode] {
-  override def outdep(n: CfgNode): Set[CfgNode] = n.predInter.toSet
-  override def indep(n: CfgNode): Set[CfgNode] = n.succInter.toSet
-}
-
-trait IntraproceduralBackwardDependencies extends Dependencies[CfgNode] {
-  override def outdep(n: CfgNode): Set[CfgNode] = n.predIntra.toSet
-  override def indep(n: CfgNode): Set[CfgNode] = n.succIntra.toSet
-}
-
 trait IRInterproceduralForwardDependencies extends Dependencies[CFGPosition] {
   override def outdep(n: CFGPosition): Set[CFGPosition] = InterProcIRCursor.succ(n)
   override def indep(n: CFGPosition): Set[CFGPosition] = InterProcIRCursor.pred(n)
