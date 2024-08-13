@@ -210,6 +210,9 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
       case literal: Literal => literal // ignore literals
       case Extract(end, start, body) =>
         Extract(end, start, eval(body, cmd))
+      case UninterpretedFunction(name, params, returnType) =>
+        val newParams = params.map { p => eval(p, cmd) }
+        UninterpretedFunction(name, newParams, returnType)
       case Repeat(repeats, body) =>
         Repeat(repeats, eval(body, cmd))
       case ZeroExtend(extension, body) =>
@@ -233,9 +236,9 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
       Logger.warn(s"Region found for mem: ${regions.head}")
       regions.head match {
         case stackRegion: StackRegion =>
-          StackMemory(stackRegion.regionIdentifier, mem.addressSize, mem.valueSize)
+          return StackMemory(stackRegion.regionIdentifier, mem.addressSize, mem.valueSize)
         case dataRegion: DataRegion =>
-          SharedMemory(dataRegion.regionIdentifier, mem.addressSize, mem.valueSize)
+          return SharedMemory(dataRegion.regionIdentifier, mem.addressSize, mem.valueSize)
         case _ =>
       }
     } else if (regions.size > 1) {
@@ -243,9 +246,9 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
       Logger.warn(s"Multiple regions found for mem: ${regions}")
       mmm.mergeRegions(regions) match {
         case stackRegion: StackRegion =>
-          StackMemory(stackRegion.regionIdentifier, mem.addressSize, mem.valueSize)
+          return StackMemory(stackRegion.regionIdentifier, mem.addressSize, mem.valueSize)
         case dataRegion: DataRegion =>
-          SharedMemory(dataRegion.regionIdentifier, mem.addressSize, mem.valueSize)
+          return SharedMemory(dataRegion.regionIdentifier, mem.addressSize, mem.valueSize)
         case _ =>
       }
     } else {
@@ -293,7 +296,7 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             newArrayBuffer += mem
             Logger.warn(s"No region found for memory section ${mem.address}")
           }
-        case _ =>
+        case null =>
       }
     }
     newArrayBuffer
