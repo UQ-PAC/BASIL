@@ -4,11 +4,13 @@ import ir.*
 import util.Logger
 import scala.collection.immutable
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * Replaces the region access with the calculated memory region.
  */
 class RegionInjector(domain: mutable.Set[CFGPosition],
+                     program: Program,
                      constantProp: Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
                      mmm: MemoryModelMap,
                      reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
@@ -17,6 +19,8 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
 
   def nodeVisitor(): Unit = {
     for (elem <- domain) {localTransfer(elem)}
+    program.initialMemory = transformMemorySections(program.initialMemory)
+    program.readOnlyMemory = transformMemorySections(program.readOnlyMemory)
   }
 
   /**
@@ -206,7 +210,7 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
         } else if (regions.size > 1) {
             Logger.warn(s"MemStore is: ${cmd}")
             Logger.warn(s"Multiple regions found for memory store: ${regions}")
-            expr
+            MemoryStore(Memory(mmm.mergeRegions(regions).regionIdentifier, mem.addressSize, mem.valueSize), eval(index, cmd), eval(value, cmd), endian, size)
         } else {
             Logger.warn(s"MemStore is: ${cmd}")
             Logger.warn(s"No region found for memory store")
@@ -220,7 +224,7 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
         } else if (regions.size > 1) {
           Logger.warn(s"MemLoad is: ${cmd}")
           Logger.warn(s"Multiple regions found for memory load: ${regions}")
-          expr
+          MemoryLoad(Memory(mmm.mergeRegions(regions).regionIdentifier, mem.addressSize, mem.valueSize), eval(index, cmd), endian, size)
         } else {
           Logger.warn(s"MemLoad is: ${cmd}")
           Logger.warn(s"No region found for memory load")
@@ -253,5 +257,24 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             case call: DirectCall => // ignore DirectCall
             case call: IndirectCall => // ignore IndirectCall
     case _ => // ignore other kinds of nodes
+  }
+
+  def transformMemorySections(memorySegment: ArrayBuffer[MemorySection]): ArrayBuffer[MemorySection] = {
+    val newArrayBuffer = ArrayBuffer.empty[MemorySection]
+    for (elem <- memorySegment) {
+      elem match {
+        case mem: MemorySection =>
+          val regions = mmm.findDataObject(mem.address)
+          if (regions.size == 1) {
+            newArrayBuffer += MemorySection(regions.head.regionIdentifier, mem.address, mem.size, mem.bytes)
+            Logger.warn(s"Region ${regions.get.regionIdentifier} found for memory section ${mem.address}")
+          } else {
+            newArrayBuffer += mem
+            Logger.warn(s"No region found for memory section ${mem.address}")
+          }
+        case _ =>
+      }
+    }
+    newArrayBuffer
   }
 }
