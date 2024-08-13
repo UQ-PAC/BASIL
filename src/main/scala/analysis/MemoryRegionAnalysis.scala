@@ -202,12 +202,8 @@ trait MemoryRegionAnalysis(val program: Program,
             s
           }
         case memAssign: MemoryAssign =>
-          if (ignoreRegions.contains(memAssign.value)) {
-            s
-          } else {
-            val result = eval(memAssign.index, s, cmd)
-            regionLattice.lub(s, result)
-          }
+          val result = eval(memAssign.index, s, cmd)
+          regionLattice.lub(s, result)
         case assign: Assign =>
           stackDetection(assign)
           var m = s
