@@ -30,6 +30,8 @@ class MemoryModelMap {
   private val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.TreeMap()
   private val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.TreeMap()
 
+  private val uf = new UnionFind()
+
   /** Add a range and object to the mapping
    *
    * @param offset the offset of the range
@@ -65,6 +67,15 @@ class MemoryModelMap {
           val updatedRange = RangeKey(currentMaxRange.start, offset - 1)
           currentDataMap.addOne(updatedRange -> currentMaxRegion)
           currentDataMap(RangeKey(offset, MAX_BIGINT)) = d
+        }
+      case h: HeapRegion =>
+        val currentHeapMap = heapMap
+        if (currentHeapMap.isEmpty) {
+          currentHeapMap(RangeKey(offset, offset + h.size.value - 1)) = h
+        } else {
+          val currentMaxRange = currentHeapMap.keys.maxBy(_.end)
+          val currentMaxRegion = currentHeapMap(currentMaxRange)
+          currentHeapMap(RangeKey(currentMaxRange.start + 1, h.size.value - 1)) = h
         }
     }
   }
@@ -164,6 +175,22 @@ class MemoryModelMap {
     for (dataRgn <- allDataRgns) {
       add(dataRgn.start.value, dataRgn)
     }
+
+    // add heap regions
+    val rangeStart = 0
+    for ((position, regions) <- memoryRegions) {
+      regions match {
+        case Lift(node) =>
+          for (region <- node) {
+            region match {
+              case heapRegion: HeapRegion =>
+                add(BigInt(0), heapRegion)
+              case _ =>
+            }
+          }
+        case LiftedBottom =>
+      }
+    }
   }
   // TODO: push and pop could be optimised by caching the results
   def pushContext(funName: String): Unit = {
@@ -247,38 +274,93 @@ class MemoryModelMap {
       }
     }
 
-    matchingRegions.toSet
+    matchingRegions.toSet.map(returnRegion)
+  }
+
+  def getRegionsWithSize(size: BigInt, function: String, negateCondition: Boolean = false): Set[MemoryRegion] = {
+    val matchingRegions = scala.collection.mutable.Set[MemoryRegion]()
+
+    pushContext(function)
+    stackMap.foreach {
+      case (range, region) =>
+        if (negateCondition) {
+          if (range.size != size) {
+            matchingRegions += region
+          }
+        } else if (range.size == size) {
+          matchingRegions += region
+        }
+    }
+    popContext()
+
+    heapMap.foreach { case (range, region) =>
+      if (negateCondition) {
+        if (range.size != size) {
+          matchingRegions += region
+        }
+      } else if (range.size == size) {
+        matchingRegions += region
+      }
+    }
+
+    dataMap.foreach { case (range, region) =>
+      if (negateCondition) {
+        if (range.size != size) {
+          matchingRegions += region
+        }
+      } else if (range.size == size) {
+        matchingRegions += region
+      }
+    }
+
+    matchingRegions.toSet.map(returnRegion)
+  }
+
+  def getAllocsPerProcedure: Map[String, Set[StackRegion]] = {
+    localStacks.map((name, stackRegions) => (name, stackRegions.toSet.map(returnRegion))).toMap
   }
 
   def getAllStackRegions: Set[StackRegion] = {
-    localStacks.values.toSet.flatten
+    localStacks.values.toSet.flatten.map(returnRegion)
   }
-  
+
   def getAllDataRegions: Set[DataRegion] = {
-    dataMap.values.toSet
+    dataMap.values.toSet.map(returnRegion)
   }
-  
+
   def getAllHeapRegions: Set[HeapRegion] = {
-      heapMap.values.toSet
+      heapMap.values.toSet.map(returnRegion)
+  }
+
+  def getAllRegions: Set[MemoryRegion] = {
+    getAllStackRegions ++ getAllDataRegions ++ getAllHeapRegions
   }
   
-  def getAllRegions: Set[MemoryRegion] = {
-    (getAllStackRegions ++ getAllDataRegions ++ getAllHeapRegions)
+  def getEnd(memoryRegion: MemoryRegion): BigInt = { // TODO: This would return a list of ends
+    val range = memoryRegion match {
+      case stackRegion: StackRegion =>
+        stackMap.find((_, obj) => obj == stackRegion).map((range, _) => range).getOrElse(RangeKey(0, 0))
+      case heapRegion: HeapRegion =>
+        heapMap.find((_, obj) => obj == heapRegion).map((range, _) => range).getOrElse(RangeKey(0, 0))
+      case dataRegion: DataRegion =>
+        dataMap.find((_, obj) => obj == dataRegion).map((range, _) => range).getOrElse(RangeKey(0, 0))
+    }
+    range.end
   }
 
   /* All regions that start at value and are exactly of length size */
   def findStackFullAccessesOnly(value: BigInt, size: BigInt): Option[StackRegion] = {
-    stackMap.find((range, _) => range.start == value && range.size == size).map((range, obj) => obj)
+    stackMap.find((range, _) => range.start == value && range.size == size).map((range, obj) => returnRegion(obj))
   }
 
   def findStackObject(value: BigInt): Option[StackRegion] = 
-    stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => obj)
+    stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => returnRegion(obj))
 
   def findSharedStackObject(value: BigInt): Set[StackRegion] =
-    sharedStackMap.values.flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => obj)).toSet
+    sharedStackMap.values.flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => returnRegion(obj))).toSet
 
   def findDataObject(value: BigInt): Option[DataRegion] = 
-    dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => obj)
+    dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => returnRegion(obj))
 
   override def toString: String =
     s"Stack: $stackMap\n Heap: $heapMap\n Data: $dataMap\n"
@@ -323,6 +405,29 @@ class MemoryModelMap {
       logRegion(range, region)
     }
   }
+
+  def mergeRegions(regions: Set[MemoryRegion]): MemoryRegion = {
+    // assert regions are of the same type
+    regions.foreach(uf.makeSet)
+    regions.foreach(uf.union(regions.head, _))
+    uf.find(regions.head)
+  }
+
+  private def returnRegion(region: MemoryRegion): MemoryRegion = {
+    uf.find(region)
+  }
+
+  private def returnRegion(region: StackRegion): StackRegion = {
+    uf.find(region.asInstanceOf[MemoryRegion]).asInstanceOf[StackRegion]
+  }
+
+  private def returnRegion(region: DataRegion): DataRegion = {
+    uf.find(region.asInstanceOf[MemoryRegion]).asInstanceOf[DataRegion]
+  }
+
+  private def returnRegion(region: HeapRegion): HeapRegion = {
+    uf.find(region.asInstanceOf[MemoryRegion]).asInstanceOf[HeapRegion]
+  }
 }
 
 trait MemoryRegion {
@@ -339,4 +444,51 @@ case class HeapRegion(override val regionIdentifier: String, size: BitVecLiteral
 
 case class DataRegion(override val regionIdentifier: String, start: BitVecLiteral) extends MemoryRegion {
   override def toString: String = s"Data($regionIdentifier, $start)"
+}
+
+class UnionFind {
+  // Map to store the parent of each region
+  private val parent: mutable.Map[MemoryRegion, MemoryRegion] = mutable.Map()
+
+  // Map to store the size of each set, used for union by rank
+  private val size: mutable.Map[MemoryRegion, Int] = mutable.Map()
+
+  // Initialise each region to be its own parent and set size to 1
+  def makeSet(region: MemoryRegion): Unit = {
+    parent(region) = region
+    size(region) = 1
+  }
+
+  // Find operation with path compression
+  def find(region: MemoryRegion): MemoryRegion = {
+    if (!parent.contains(region)) {
+      makeSet(region)
+    }
+
+    if (parent(region) != region) {
+      parent(region) = find(parent(region)) // Path compression
+    }
+    parent(region)
+  }
+
+  // Union operation with union by rank
+  def union(region1: MemoryRegion, region2: MemoryRegion): Unit = {
+    val root1 = find(region1)
+    val root2 = find(region2)
+
+    if (root1 != root2) {
+      if (size(root1) < size(root2)) {
+        parent(root1) = root2
+        size(root2) += size(root1)
+      } else {
+        parent(root2) = root1
+        size(root1) += size(root2)
+      }
+    }
+  }
+
+  // Check if two regions are in the same set
+  def connected(region1: MemoryRegion, region2: MemoryRegion): Boolean = {
+    find(region1) == find(region2)
+  }
 }
