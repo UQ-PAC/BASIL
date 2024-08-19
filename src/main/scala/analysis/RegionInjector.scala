@@ -1,7 +1,9 @@
 package analysis
 
+import analysis.BitVectorEval.isNegative
 import ir.*
 import util.Logger
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -156,19 +158,22 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             Logger.debug("found: " + regions)
             res ++= regions
           } else {
+            if (isNegative(b)) {
+              val region = mmm.findStackObject(0)
+              if (region.isDefined) {
+                res = res + region.get
+              }
+            }
             val region = mmm.findStackObject(b.value)
             if (region.isDefined) {
               res = res + region.get
             }
           }
         }
-        res
       case binaryExpr: BinaryExpr =>
         res ++= reducibleToRegion(binaryExpr, n)
-        res
       case v: Variable if v == stackPointer =>
         res ++= mmm.findStackObject(0)
-        res
       case v: Variable =>
         evaluateExpressionWithSSA(expr, constantProp(n), n, reachingDefs).foreach { b =>
           Logger.debug("BitVecLiteral: " + b)
@@ -177,6 +182,17 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             res += region.get
           }
         }
+        if (res.isEmpty) {
+          val ctx = getDefinition(v, n, reachingDefs)
+          for (i <- ctx) {
+            i.rhs match {
+              case be: BinaryExpr =>
+                res = res ++ exprToRegion(eval(i.rhs, i), n)
+              case _ =>
+            }
+          }
+        }
+
         if (res.isEmpty) { // may be passed as param
           val ctx = getUse(v, n, reachingDefs)
           for (i <- ctx) {
@@ -190,7 +206,8 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             }
           }
         }
-        res
+      case load: MemoryLoad => // treat as a region
+        res ++= exprToRegion(load.index, n)
       case _ =>
         evaluateExpressionWithSSA(expr, constantProp(n), n, reachingDefs).foreach { b =>
           Logger.debug("BitVecLiteral: " + b)
@@ -199,8 +216,8 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             res += region.get
           }
         }
-        res
     }
+    res
   }
 
   /** Default implementation of eval.

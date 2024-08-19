@@ -1,5 +1,6 @@
 package analysis
 
+import analysis.BitVectorEval.isNegative
 import analysis.solvers.WorklistFixpointSolverWithReachability
 import ir.*
 import util.Logger
@@ -94,7 +95,7 @@ trait MemoryRegionAnalysis(val program: Program,
   def reducibleToRegion(binExpr: BinaryExpr, n: Command): Set[MemoryRegion] = {
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
-      case variable: Variable =>
+      case variable: Variable if !spList.contains(variable) =>
         val ctx = getUse(variable, n, reachingDefs)
         for (i <- ctx) {
           val regions = i.rhs match {
@@ -121,8 +122,23 @@ trait MemoryRegionAnalysis(val program: Program,
           }
         }
       case _ =>
+        eval(binExpr, Set.empty, n)
     }
     reducedRegions
+  }
+
+  def reducibleVariable(variable: Variable, n: Command): Set[MemoryRegion] = {
+    var regions = Set.empty[MemoryRegion]
+    val ctx = getDefinition(variable, n, reachingDefs)
+    for (i <- ctx) {
+      i.rhs match {
+        case binaryExpr: BinaryExpr =>
+          regions = regions ++ reducibleToRegion(binaryExpr, i)
+        case _ =>
+          //regions = regions ++ eval(i.rhs, Set.empty, i)
+      }
+    }
+    regions
   }
 
   def eval(exp: Expr, env: Set[MemoryRegion], n: Command): Set[MemoryRegion] = {
@@ -133,7 +149,12 @@ trait MemoryRegionAnalysis(val program: Program,
       case binOp: BinaryExpr =>
         if (spList.contains(binOp.arg1)) {
           evaluateExpression(binOp.arg2, constantProp(n)) match {
-            case Some(b: BitVecLiteral) => Set(poolMaster(b, IRWalk.procedure(n)))
+            case Some(b: BitVecLiteral) =>
+              if (isNegative(b)) {
+                Set(poolMaster(BitVecLiteral(0, 64), IRWalk.procedure(n)))
+              } else {
+                Set(poolMaster(b, IRWalk.procedure(n)))
+              }
             case None => env
           }
         } else if (reducibleToRegion(binOp, n).nonEmpty) {
@@ -146,8 +167,6 @@ trait MemoryRegionAnalysis(val program: Program,
         }
       case variable: Variable =>
         variable match {
-          case _: LocalVar =>
-            env
           case reg: Register if spList.contains(reg) =>
             eval(BitVecLiteral(0, 64), env, n)
           case _ =>
@@ -155,7 +174,7 @@ trait MemoryRegionAnalysis(val program: Program,
               case Some(b: BitVecLiteral) =>
                 eval(b, env, n)
               case _ =>
-                env // we cannot evaluate this to a concrete value, we need VSA for this
+                reducibleVariable(variable, n)
             }
         }
       case memoryLoad: MemoryLoad =>

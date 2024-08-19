@@ -1,11 +1,12 @@
 package util
 
-import java.io.{File, PrintWriter, FileInputStream, BufferedWriter, FileWriter, IOException}
+import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
 import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
 import spray.json.*
 import gtirb.*
+
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import java.io.{File, PrintWriter}
@@ -25,6 +26,7 @@ import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
 import util.Logger
+
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
@@ -32,6 +34,7 @@ import analysis.CfgCommandNode
 
 import scala.annotation.tailrec
 import scala.collection.mutable
+import scala.sys.exit
 
 /** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.
   */
