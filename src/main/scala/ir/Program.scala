@@ -3,9 +3,9 @@ package ir
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
-import analysis.BitVectorEval
 import util.intrusive_list.*
 import translating.serialiseIL
+import eval.BitVectorEval
 
 class Program(var procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
