@@ -149,7 +149,7 @@ implementation main()
     NF, Gamma_NF := Cse0__5$11$1[32:31], Gamma_Cse0__5$11$1;
     R8, Gamma_R8 := zero_extend32_32(Cse0__5$11$1), Gamma_Cse0__5$11$1;
     assert Gamma_ZF;
-    goto $main$__3__$2Rc30R6uT9qoFwMECXfo8w$__1, $main$__3__$2Rc30R6uT9qoFwMECXfo8w$__0;
+    goto $main$__3__$2Rc30R6uT9qoFwMECXfo8w$__0, $main$__3__$2Rc30R6uT9qoFwMECXfo8w$__1;
   $main$__4__$jv~bq1DRSXOoajRSR5k4QQ:
     assume {:captureState "$main$__4__$jv~bq1DRSXOoajRSR5k4QQ"} true;
     goto $main$__5__$oK1nnrErSJC2bd7An54Mig;
