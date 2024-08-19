@@ -1,7 +1,7 @@
 package analysis.solvers
 
 import analysis.{BackwardIDEAnalysis, Dependencies, EdgeFunction, EdgeFunctionLattice, ForwardIDEAnalysis, IDEAnalysis, IRInterproceduralBackwardDependencies, IRInterproceduralForwardDependencies, Lambda, Lattice, MapLattice}
-import ir.{CFGPosition, Command, DirectCall, GoTo, IRWalk, IndirectCall, InterProcIRCursor, Procedure, Program, end, isAfterCall, Halt, Statement, Jump}
+import ir.{CFGPosition, Command, DirectCall, GoTo, IRWalk, IndirectCall, Return, InterProcIRCursor, Procedure, Program, isAfterCall, Halt, Statement, Jump}
 import util.Logger
 
 import scala.collection.immutable.Map
@@ -204,10 +204,10 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
 
 
 abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
-  extends IDESolver[Procedure, IndirectCall, DirectCall, Command, D, T, L](program, program.mainProcedure),
+  extends IDESolver[Procedure, Return, DirectCall, Command, D, T, L](program, program.mainProcedure),
     ForwardIDEAnalysis[D, T, L], IRInterproceduralForwardDependencies {
 
-  protected def entryToExit(entry: Procedure): IndirectCall = entry.end.asInstanceOf[IndirectCall]
+  protected def entryToExit(entry: Procedure): Return = IRWalk.lastInProc(entry).asInstanceOf[Return]
 
   protected def exitToEntry(exit: IndirectCall): Procedure = IRWalk.procedure(exit)
 
@@ -218,7 +218,10 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
     case r: Jump => ret.parent.statements.last.asInstanceOf[DirectCall]
   }
 
-  protected def getCallee(call: DirectCall): Procedure = call.target
+  protected def getCallee(call: DirectCall): Procedure = {
+    require(isCall(call))
+    call.target
+  }
 
   protected def isCall(call: CFGPosition): Boolean =
     call match
@@ -228,41 +231,46 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
   protected def isExit(exit: CFGPosition): Boolean =
     exit match
       // only looking at functions with statements
-      case command: Command => IRWalk.procedure(command).end == command
+      case command: Command => IRWalk.lastInProc(IRWalk.procedure(command)) == command
       case _ => false
 
   protected def getAfterCalls(exit: IndirectCall): Set[Command] =
     InterProcIRCursor.succ(exit).filter(_.isInstanceOf[Command]).map(_.asInstanceOf[Command])
-
 }
 
 
 abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program)
-  extends IDESolver[IndirectCall, Procedure, Command, DirectCall, D, T, L](program, program.mainProcedure.end),
+  extends IDESolver[Return, Procedure, Command, DirectCall, D, T, L](program, IRWalk.lastInProc(program.mainProcedure)),
     BackwardIDEAnalysis[D, T, L], IRInterproceduralBackwardDependencies {
 
-  protected def entryToExit(entry: IndirectCall): Procedure = IRWalk.procedure(entry)
+  protected def entryToExit(entry: Return): Procedure = IRWalk.procedure(entry)
 
-  protected def exitToEntry(exit: Procedure): IndirectCall = exit.end.asInstanceOf[IndirectCall]
+  protected def exitToEntry(exit: Procedure): Return = exit.returnBlock.get.jump.asInstanceOf[Return]
 
-  protected def callToReturn(call: Command): DirectCall = call match {
-    case ret: Statement => ret.parent.statements.getPrev(ret).asInstanceOf[DirectCall]
-    case r: Jump => r.parent.statements.last.asInstanceOf[DirectCall]
+  protected def callToReturn(call: Command): DirectCall =  {
+    IRWalk.prevCommandInBlock(call) match {
+      case Some(x : DirectCall) => x
+      case p => throw Exception(s"Not a return/aftercall node $call  .... prev = $p")
+    }
   }
 
   protected def returnToCall(ret: DirectCall): Command = ret.successor
 
-  protected def getCallee(call: Command): IndirectCall = callToReturn(call: Command).target.end.asInstanceOf[IndirectCall]
+  protected def getCallee(call: Command): Return = {
+    require(isCall(call))
+    val procCalled = callToReturn(call).target
+    procCalled.returnBlock.getOrElse(throw Exception(s"No return node for procedure ${procCalled}")).jump.asInstanceOf[Return]
+  }
 
   protected def isCall(call: CFGPosition): Boolean =
     call match
-      case directCall: DirectCall => (!directCall.successor.isInstanceOf[Halt])
+      case c : Command => isAfterCall(c) && IRWalk.prevCommandInBlock(c).map(_.isInstanceOf[DirectCall]).getOrElse(false)
       case _ => false
 
   protected def isExit(exit: CFGPosition): Boolean =
     exit match
-      case procedure: Procedure => procedure.blocks.nonEmpty
+      case procedure: Procedure => true
       case _ => false
 
-  protected def getAfterCalls(exit: Procedure): Set[DirectCall] = InterProcIRCursor.pred(exit).filter(_.isInstanceOf[DirectCall]).map(_.asInstanceOf[DirectCall])
+  protected def getAfterCalls(exit: Procedure): Set[DirectCall] = exit.incomingCalls().toSet
 }

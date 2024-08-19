@@ -83,6 +83,7 @@ sealed trait Jump extends Command {
 }
 
 class Halt(override val label: Option[String] = None) extends Jump {
+  /* Terminate / No successors / assume false */
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
@@ -136,7 +137,12 @@ object GoTo:
   def unapply(g: GoTo): Option[(Set[Block], Option[String])] = Some(g.targets, g.label)
 
 
-sealed trait Call extends Statement
+sealed trait Call extends Statement {
+  def returnTarget: Option[Command] = successor match {
+    case h: Halt => None
+    case o => Some(o)
+  }
+}
 
 class DirectCall(val target: Procedure,
                  override val label: Option[String] = None

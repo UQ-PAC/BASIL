@@ -1,6 +1,6 @@
 package analysis
 
-import ir.{CFGPosition, Command, DirectCall, GoTo, IndirectCall, Procedure, Program}
+import ir.{CFGPosition, Command, DirectCall, GoTo, Return, IndirectCall, Procedure, Program}
 
 final case class Lambda()
 
@@ -55,6 +55,6 @@ trait IDEAnalysis[E, EE, C, R, D, T, L <: Lattice[T]] {
 }
 
 // IndirectCall in these is because they are returns so that can be further tightened in future
-trait ForwardIDEAnalysis[D, T, L <: Lattice[T]] extends IDEAnalysis[Procedure, IndirectCall, DirectCall, Command, D, T, L]
+trait ForwardIDEAnalysis[D, T, L <: Lattice[T]] extends IDEAnalysis[Procedure, Return, DirectCall, Command, D, T, L]
 
-trait BackwardIDEAnalysis[D, T, L <: Lattice[T]] extends IDEAnalysis[IndirectCall, Procedure, Command, DirectCall, D, T, L]
+trait BackwardIDEAnalysis[D, T, L <: Lattice[T]] extends IDEAnalysis[Return, Procedure, Command, DirectCall, D, T, L]

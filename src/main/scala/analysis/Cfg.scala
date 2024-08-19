@@ -502,7 +502,7 @@ class ProgramCfgFactory:
             val targetProc: Procedure = dCall.target
             funcEntryNode.callers.add(procToCfg(targetProc)._1)
 
-            val callNode = CfgJumpNode(dCall, block, funcEntryNode)
+            val callNode : CfgJumpNode = s.asInstanceOf[CfgJumpNode]
 
             // Branch to this call
             cfg.addEdge(precNode, callNode)
@@ -523,7 +523,7 @@ class ProgramCfgFactory:
             Logger.debug(s"Indirect call found: $iCall in ${proc.name}")
             var precNode = prevNode
 
-            val jmpNode = CfgJumpNode(iCall, block, funcEntryNode)
+            val jmpNode = s.asInstanceOf[CfgJumpNode]
             // Branch to this call
             cfg.addEdge(precNode, jmpNode)
 

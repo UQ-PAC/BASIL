@@ -3,7 +3,7 @@ import ir.Endian.LittleEndian
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
-import util.{BASILConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext}
+import util.{BASILConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext, BASILResult}
 
 import java.io.IOException
 import java.nio.file.*
@@ -76,14 +76,15 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
         // Traverse the statements in the main function
         result.ir.program.mainProcedure.blocks.foreach {
             block =>
-                block.jump match {
-                  case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+                block.statements.lastOption match {
+                  case Some(directCall: DirectCall) if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
                       val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
                       assert(callTransform._1 == directCall.target.name)
                       expectedCallTransform.remove(directCall.label.getOrElse(""))
-                  case _ =>
+                  case _ => 
                 }
         }
+        println(result.ir.program)
         assert(expectedCallTransform.isEmpty)
   }
 
@@ -113,14 +114,15 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
       // Traverse the statements in the main function
       result.ir.program.mainProcedure.blocks.foreach {
         block =>
-          block.jump match {
-            case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+          block.statements.lastOption match {
+            case Some(directCall: DirectCall) if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
               val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
               assert(callTransform._1 == directCall.target.name)
               expectedCallTransform.remove(directCall.label.getOrElse(""))
             case _ =>
           }
       }
+      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -150,14 +152,15 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
       // Traverse the statements in the main function
     result.ir.program.mainProcedure.blocks.foreach {
         block =>
-          block.jump match {
-            case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+          block.statements.lastOption match {
+            case Some(directCall: DirectCall) if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
               val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
               assert(callTransform._1 == directCall.target.name)
               expectedCallTransform.remove(directCall.label.getOrElse(""))
             case _ =>
           }
       }
+      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -193,14 +196,15 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
       // Traverse the statements in the main function
     result.ir.program.mainProcedure.blocks.foreach {
         block =>
-          block.jump match {
-            case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+          block.statements.lastOption match {
+            case Some(directCall: DirectCall) if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
               val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
               assert(callTransform._1 == directCall.target.name)
               expectedCallTransform.remove(directCall.label.getOrElse(""))
             case _ =>
           }
       }
+      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -236,14 +240,15 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
       // Traverse the statements in the main function
       result.ir.program.mainProcedure.blocks.foreach {
         block =>
-          block.jump match {
-            case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+          block.statements.lastOption match {
+            case Some(directCall: DirectCall) if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
               val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
               assert(callTransform._1 == directCall.target.name)
               expectedCallTransform.remove(directCall.label.getOrElse(""))
             case _ =>
           }
       }
+      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -278,14 +283,15 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
       // Traverse the statements in the main function
     result.ir.program.mainProcedure.blocks.foreach {
         block =>
-          block.jump match {
-            case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+          block.statements.lastOption match {
+            case Some(directCall: DirectCall) if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
               val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
               assert(callTransform._1 == directCall.target.name)
               expectedCallTransform.remove(directCall.label.getOrElse(""))
             case _ =>
           }
       }
+      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -321,14 +327,15 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
       // Traverse the statements in the main function
       result.ir.program.mainProcedure.blocks.foreach {
         block =>
-          block.jump match {
-            case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+          block.statements.lastOption match {
+            case Some(directCall: DirectCall) if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
               val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
               assert(callTransform._1 == directCall.target.name)
               expectedCallTransform.remove(directCall.label.getOrElse(""))
             case _ =>
           }
       }
+      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -341,7 +348,7 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
         dumpIL = Some(tempPath + testName),
       ),
       outputPrefix = tempPath + testName,
-      staticAnalysis = Some(StaticAnalysisConfig(None, None, None)),
+      staticAnalysis = Some(StaticAnalysisConfig(Some("functionpointer"), None, None)),
     )
     val result = loadAndTranslate(basilConfig)
       /* in this example we must find:
@@ -356,17 +363,19 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
         "l000004f3set_seven" -> ("set_seven", "R0")
       )
 
+    println("prev " + result.ir.program)
       // Traverse the statements in the main function
     result.ir.program.mainProcedure.blocks.foreach {
         block =>
-          block.jump match {
-            case directCall: DirectCall if expectedCallTransform.contains(block.label) =>
+          block.statements.lastOption match {
+            case Some(directCall: DirectCall) if expectedCallTransform.contains(block.label) =>
               val callTransform = expectedCallTransform(block.label)
               assert(callTransform._1 == directCall.target.name)
               expectedCallTransform.remove(block.label)
             case _ =>
           }
       }
+      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -397,14 +406,15 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
       // Traverse the statements in the main function
     result.ir.program.mainProcedure.blocks.foreach {
         block =>
-          block.jump match {
-            case directCall: DirectCall if expectedCallTransform.contains(block.label) =>
+          block.statements.lastOption match {
+            case Some(directCall: DirectCall) if expectedCallTransform.contains(block.label) =>
               val callTransform = expectedCallTransform(block.label)
               assert(callTransform._1 == directCall.target.name)
               expectedCallTransform.remove(block.label)
             case _ =>
           }
       }
+      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -431,18 +441,19 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
         "l0000044dset_two" -> ("set_two", "R0"),
         "l0000044dset_seven" -> ("set_seven", "R0")
       )
+      result.ir.program.mainProcedure.blocks.foreach {
+          block =>
+            block.statements.lastOption match {
+              case Some(directCall: DirectCall) if expectedCallTransform.contains(block.label) =>
+                val callTransform = expectedCallTransform(block.label)
+                assert(callTransform._1 == directCall.target.name)
+                expectedCallTransform.remove(block.label)
+              case _ =>
+            }
+        }
 
       // Traverse the statements in the main function
-      result.ir.program.mainProcedure.blocks.foreach {
-        block =>
-          block.jump match {
-            case directCall: DirectCall if expectedCallTransform.contains(block.label) =>
-              val callTransform = expectedCallTransform(block.label)
-              assert(callTransform._1 == directCall.target.name)
-              expectedCallTransform.remove(block.label)
-            case _ =>
-          }
-      }
+      println(result.ir.program)
       assert(expectedCallTransform.isEmpty)
   }
 
@@ -470,8 +481,8 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
     // Traverse the statements in the main function
     result.ir.program.mainProcedure.blocks.foreach {
       block =>
-        block.jump match {
-          case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+        block.statements.lastOption match {
+          case Some(directCall: DirectCall) if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
             val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
             assert(callTransform._1 == directCall.target.name)
             expectedCallTransform.remove(directCall.label.getOrElse(""))
@@ -505,8 +516,8 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
     // Traverse the statements in the main function
     result.ir.program.mainProcedure.blocks.foreach {
       block =>
-        block.jump match {
-          case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+        block.statements.lastOption match {
+          case Some(directCall: DirectCall) if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
             val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
             assert(callTransform._1 == directCall.target.name)
             expectedCallTransform.remove(directCall.label.getOrElse(""))
@@ -540,8 +551,8 @@ class IndirectCallsTests extends AnyFunSuite with OneInstancePerTest with Before
     // Traverse the statements in the main function
     result.ir.program.mainProcedure.blocks.foreach {
       block =>
-        block.jump match {
-          case directCall: DirectCall if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
+        block.statements.lastOption match {
+          case Some(directCall: DirectCall) if expectedCallTransform.contains(directCall.label.getOrElse("")) =>
             val callTransform = expectedCallTransform(directCall.label.getOrElse(""))
             assert(callTransform._1 == directCall.target.name)
             expectedCallTransform.remove(directCall.label.getOrElse(""))

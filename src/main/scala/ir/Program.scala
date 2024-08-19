@@ -5,6 +5,7 @@ import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
 import analysis.BitVectorEval
 import util.intrusive_list.*
+import translating.serialiseIL
 
 class Program(var procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
@@ -12,6 +13,10 @@ class Program(var procedures: ArrayBuffer[Procedure],
               var readOnlyMemory: ArrayBuffer[MemorySection]) extends Iterable[CFGPosition] {
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
+
+  override def toString(): String = {
+    serialiseIL(this)
+  }
 
   // This shouldn't be run before indirect calls are resolved
   def stripUnreachableFunctions(depth: Int = Int.MaxValue): Unit = {
@@ -141,7 +146,7 @@ class Program(var procedures: ArrayBuffer[Procedure],
 
       stack.pushAll(n match {
         case p: Procedure => p.blocks
-        case b: Block => Seq() ++ b.statements ++ Seq(b.jump)
+        case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
         case s: Command => Seq()
       })
       n
@@ -209,7 +214,7 @@ class Procedure private (
 
   def returnBlock_=(value: Block): Unit = {
     if (!returnBlock.contains(value)) {
-      removeBlocks(_returnBlock)
+      _returnBlock.foreach(removeBlocks(_))
       _returnBlock = Some(addBlocks(value))
     }
   }
@@ -218,7 +223,7 @@ class Procedure private (
 
   def entryBlock_=(value: Block): Unit = {
     if (!entryBlock.contains(value)) {
-      removeBlocks(_entryBlock)
+      _entryBlock.foreach(removeBlocks(_))
       _entryBlock = Some(addBlocks(value))
     }
   }
@@ -228,9 +233,6 @@ class Procedure private (
     if (!_blocks.contains(block)) {
       block.parent = this
       _blocks.add(block)
-      if (entryBlock.isEmpty) {
-        entryBlock = block
-      }
     }
     block
   }
@@ -289,28 +291,6 @@ class Procedure private (
     block
   }
 
-// unused
-//   /**
-//    * Remove blocks with the semantics of replacing them with a noop. The incoming jumps to this are replaced
-//    * with a jump(s) to this blocks jump target(s). If this block ends in a call then only its statements are removed.
-//    * @param blocks the block/blocks to remove
-//    */
-//   def removeBlocksInline(blocks: Iterable[Block]): Unit = {
-//     for (elem <- blocks) {
-//       elem.jump match {
-//         case g: GoTo =>
-//           // rewrite all the jumps to include our jump targets
-//           elem.incomingJumps.foreach(_.removeTarget(elem))
-//           elem.incomingJumps.foreach(_.addAllTargets(g.targets))
-//           removeBlocks(elem)
-//       }
-//     }
-//   }
-// 
-// 
-//   def removeBlocksInline(blocks: Block*): Unit = {
-//     removeBlocksInline(blocks.toSeq)
-//   }
 
   /**
    * Remove block(s) and all jumps that target it
@@ -388,6 +368,8 @@ class Block private (
   def this(label: String, address: Option[Int] = None, statements: IterableOnce[Statement] = Set.empty, jump: Jump = GoTo(Set.empty)) = {
     this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
   }
+
+  def isEntry: Boolean = parent.entryBlock.contains(this)
 
   def jump: Jump = _jump
 

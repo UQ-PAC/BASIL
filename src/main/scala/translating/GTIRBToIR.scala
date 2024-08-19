@@ -364,6 +364,8 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       // need to copy jump as it can't have multiple parents
       val jumpCopy = currentBlock.jump match {
         case GoTo(targets, label) => GoTo(targets, label)
+        case h: Halt => Halt()
+        case r: Return => Return() 
         case _ => throw Exception("this shouldn't be reachable")
       }
       trueBlock.replaceJump(currentBlock.jump)
@@ -440,7 +442,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       case EdgeLabel(false, _, Type_Return, _) =>
         // return statement, value of 'direct' is just whether DDisasm has resolved the return target
         removePCAssign(block)
-        (Some(IndirectCall(Register("R30", 64), None)), Halt())
+        (None, Return())
       case EdgeLabel(false, true, Type_Fallthrough, _) =>
         // end of block that doesn't end in a control flow instruction and falls through to next
         if (entranceUUIDtoProcedure.contains(edge.targetUuid)) {
