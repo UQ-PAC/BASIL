@@ -1,7 +1,7 @@
 import org.scalatest.funsuite.AnyFunSuite
 import util.{Logger, PerformanceTimer}
 
-
+import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable
 import scala.io.Source
@@ -10,6 +10,14 @@ import scala.sys.process.*
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
+
+
+ case class TestConfig(boogieFlags:Seq[String] = Seq("/timeLimit:10", "/useArrayAxioms"),
+                       BASILFlags:Seq[String] = Seq(),
+                       useBAPFrontend: Boolean,
+                       expectVerify: Boolean,
+                      )
+
 
 trait SystemTests extends AnyFunSuite {
   val testPath = "./src/test/"
@@ -28,23 +36,28 @@ trait SystemTests extends AnyFunSuite {
 
   val testResults: mutable.ArrayBuffer[(String, TestResult)] = mutable.ArrayBuffer()
 
-  def runTests(programs: Array[String], path: String, name: String, shouldVerify: Boolean, useADT: Boolean, analyse: Boolean, procedureSummaries: Boolean): Unit = {
+  def runTests(programs: Array[String], path: String, name: String, conf: TestConfig): Unit = {
     // get all variations of each program
-    val testSuffix = if useADT then ":BAP" else ":GTIRB"
+    val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
     for (p <- programs) {
       val programPath = path + "/" + p
       val variations = getSubdirectories(programPath)
       variations.foreach(t =>
         test(name + "/" + p + "/" + t + testSuffix) {
-          runTest(path, p, t, shouldVerify, useADT, analyse, procedureSummaries)
+          runTest(path, p, t, conf)
         }
       )
     }
   }
 
+  /**
+   * Writes test result data into .csv and .md files named according to given filename.
+   */
   def summary(filename: String): Unit = {
     val csv: String = "testCase," + TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r._1},${r._2.toCsv}").mkString(System.lineSeparator())
-    log(csv, testPath + "full-" + filename)
+    log(csv, testPath + "full-" + filename + ".csv")
+
+    val verifTimes = testResults.map(_._2.verifyTime.toDouble)
 
     val numVerified = testResults.count(_._2.verified)
     val numCounterexample = testResults.count(x => !x._2.verified && !x._2.timedOut)
@@ -53,6 +66,10 @@ trait SystemTests extends AnyFunSuite {
     val numTimeout = testResults.count(_._2.timedOut)
     val verifying = testResults.filter(x => !x._2.timedOut && x._2.verified).map(_._2.verifyTime)
     val counterExamples = testResults.filter(x => !x._2.timedOut && !x._2.verified).map(_._2.verifyTime)
+    val medianVerifyTime = median(verifTimes)
+    val meanVerifyTime = mean(verifTimes)
+    val stdDevVerifyTime = stdDev(verifTimes)
+
 
     info(s"Test summary: $numSuccess succeeded, $numFail failed: $numVerified verified, $numCounterexample did not verify (including $numTimeout timeouts).")
     if (verifying.nonEmpty)
@@ -60,33 +77,85 @@ trait SystemTests extends AnyFunSuite {
     if (counterExamples.nonEmpty)
       info(s"Average time to counterexample: ${counterExamples.sum / counterExamples.size}")
 
-    val summaryHeader = "passedCount,failedCount,verifiedCount,counterexampleCount,timeoutCount,verifyTotalTime,counterexampleTotalTime"
-    val summaryRow = s"$numSuccess,$numFail,$numVerified,${counterExamples.size},$numTimeout,${verifying.sum},${counterExamples.sum}"
-    log(summaryHeader + System.lineSeparator() + summaryRow, testPath + "summary-" + filename)
+    val summaryMap = collection.immutable.ListMap(
+      "passedCount" -> numSuccess,
+      "failedCount" -> numFail,
+      "verifiedCount" -> numVerified,
+      "counterexampleCount" -> counterExamples.size,
+      "timeoutCount" -> numTimeout,
+      "verifyTotalTime" -> verifying.sum,
+      "counterexampleTotalTime" -> counterExamples.sum,
+      "meanVerifyTime" -> meanVerifyTime.toInt,
+      "medianVerifyTime" -> medianVerifyTime.toInt,
+      "stdDevVerifyTime" -> stdDevVerifyTime.toInt,
+    )
+    val summaryHeader = summaryMap.keys.mkString(",") + System.lineSeparator
+    val summaryRow = summaryMap.values.mkString(",") + System.lineSeparator
+    log(summaryHeader + summaryRow, testPath + "summary-" + filename + ".csv")
+
+    // generates a verification time histogram
+    val minB = Seq(0, meanVerifyTime - 2.25 * stdDevVerifyTime, verifTimes.min).max
+    val maxB = Seq(meanVerifyTime + 2.25 * stdDevVerifyTime, verifTimes.max).min
+    val nbins = 50
+
+    val histo = histogram(nbins, Some(minB, maxB))(verifTimes.toSeq)
+    val svgHistogram = histoToSvg(filename, 400,300, histo, minB, maxB)
+    log(svgHistogram, testPath + "verifyTime-" + filename + ".svg")
+
+
+    // generates a markdown table in separate parts.
+    // the complete markdown file can be constructed by horizontal (line-wise)
+    // concatenation of leftMarkdown and one or more partMarkdown.
+    val mdMap = summaryMap + ("VerifyTimeHistogram" -> ("![](" + "HISTO" + filename + "HISTO" + ")"))
+    val leftMarkdown =
+      s"""
+      || Metric |
+      ||--------|
+      |""".stripMargin
+      + mdMap.map((k,_) => s"| $k |${System.lineSeparator}").mkString
+
+    val partMarkdown =
+      s"""
+      | $filename |
+      |-------|
+      |""".stripMargin
+      + mdMap.map((k,v) => s" $v |${System.lineSeparator}").mkString
+
+    val summaryMarkdown = leftMarkdown.linesIterator
+      .zip(partMarkdown.linesIterator)
+      .map(_++_)
+      .mkString("", System.lineSeparator, System.lineSeparator)
+
+    log(partMarkdown, testPath + "summary-" + filename + ".md.part")
+    log(leftMarkdown, testPath + "headers.md.part") // XXX likely not thread-safe
+    log(summaryMarkdown, testPath + "summary-" + filename + ".md")
   }
 
-  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean, analyse: Boolean, procedureSummaries: Boolean): Unit = {
+  def runTest(path: String, name: String, variation: String, conf: TestConfig): Unit = {
+    val shouldVerify = conf.expectVerify
+    val useBAPFrontend = conf.useBAPFrontend
+
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
-    val outPath = if useADT then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
-    val inputPath = if useADT then variationPath + ".adt" else variationPath + ".gts"
+    val outPath = if useBAPFrontend then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
+    val inputPath = if useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
     val RELFPath = variationPath + ".relf"
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")
 
-    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath)
-    if analyse then args += "--analyse"
-    if procedureSummaries then args += "--summarise-procedures"
+    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath) ++ conf.basilFlags
     if (File(specPath).exists) args ++= Seq("--spec", specPath)
 
     Main.main(args.toArray)
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(outPath + " done")
     val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(outPath))
-    val boogieResult = (Seq("boogie", "/timeLimit:10", "/printVerifiedProceduresCount:0", "/useArrayAxioms", outPath) ++ extraSpec).!!
+    val boogieCmd = (Seq("boogie", "/printVerifiedProceduresCount:0") ++ conf.boogieFlags ++ Seq(outPath) ++ extraSpec)
+    Logger.info(s"Verifying... ${boogieCmd.mkString(" ")}")
+    val boogieResult = boogieCmd.!!
     val verifyTime = timer.checkPoint("verify")
-    val resultPath = if useADT then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
+    val resultPath = if useBAPFrontend then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
     log(boogieResult, resultPath)
     val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
     val proveFailed = boogieResult.contains("could not be proved")
@@ -103,7 +172,7 @@ trait SystemTests extends AnyFunSuite {
         case (false, true, true) => "Expected verification success, but got failure."
       }
 
-    val expectedOutPath = if useADT then variationPath + ".expected" else variationPath + "_gtirb.expected"
+    val expectedOutPath = if useBAPFrontend then variationPath + ".expected" else variationPath + "_gtirb.expected"
     val hasExpected = File(expectedOutPath).exists
     var matchesExpected = true
     if (hasExpected) {
@@ -152,7 +221,10 @@ trait SystemTests extends AnyFunSuite {
     * the names all subdirectories of the given parent directory
     */
   def getSubdirectories(directoryName: String): Array[String] = {
-    File(directoryName).listFiles.filter(_.isDirectory).map(_.getName)
+    Option(File(directoryName).listFiles(_.isDirectory)) match {
+      case None => throw java.io.IOException(s"failed to read directory '$directoryName'")
+      case Some(subdirs) => subdirs.map(_.getName)
+    }
   }
 
   def log(text: String, path: String): Unit = {
@@ -164,19 +236,19 @@ trait SystemTests extends AnyFunSuite {
 
 }
 
-class SystemTestsBAP extends SystemTests {
-  runTests(correctPrograms, correctPath, "correct", true, true, false, false)
-  runTests(incorrectPrograms, incorrectPath, "incorrect", false, true, false, false)
-  test("summary") {
-    summary("testresult-BAP.csv")
+class SystemTestsBAP extends SystemTests  {
+  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=true, expectVerify=true))
+  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=true, expectVerify=false))
+  test("summary-BAP") {
+    summary("testresult-BAP")
   }
 }
 
-class SystemTestsGTIRB extends SystemTests {
-  runTests(correctPrograms, correctPath, "correct", true, false, false, false)
-  runTests(incorrectPrograms, incorrectPath, "incorrect", false, false, false, false)
-  test("summary") {
-    summary("testresult-GTIRB.csv")
+class SystemTestsGTIRB extends SystemTests  {
+  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=false, expectVerify=true))
+  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=false, expectVerify=false))
+  test("summary-GTIRB") {
+    summary("testresult-GTIRB")
   }
 }
 
@@ -185,9 +257,90 @@ class ProcedureSummaryTests extends SystemTests {
   // this is due to BASIL's currently limited handling of non-returning calls
   private val procedureSummaryPath = "./src/test/analysis/procedure-summaries"
   private val procedureSummaryPrograms = getSubdirectories(procedureSummaryPath)
-  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", true, true, true, true)
-  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", true, false, true, true)
-  test("summary") {
-    summary("procedureSummaryTestResult.csv")
+  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", TestConfig(BASILFlags = Seq("--analyse", "--summarise-procedures"),
+    useBAPFrontend=true, expectVerify=true))
+  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", TestConfig(BASILFlags = Seq("--analyse", "--summarise-procedures"),
+    useBAPFrontend = false, expectVerify = true))
+  test("summary-procedureSummary") {
+    summary("proceduresummary-testresult")
   }
+}
+
+def mean(xs: Iterable[Double]): Double = xs.sum.toDouble / xs.size
+
+def variance(xs: Iterable[Double]): Double = {
+  val avg = mean(xs)
+
+  xs.map(a => math.pow(a - avg, 2)).sum / xs.size
+}
+
+def median(xs: Iterable[Double]) = xs.toArray.sorted.apply(xs.size / 2)
+
+def stdDev(xs: Iterable[Double]): Double = math.sqrt(variance(xs))
+
+def histogram(numBins: Int, bounds: Option[(Double, Double)] = None)(xs: Seq[Double]) : List[Int] = {
+  val (mn, mx) = bounds.getOrElse(xs.min, xs.max)
+  val binSize = ((mx - mn) / numBins) * (1.000001)
+  val counts = (0 to numBins).map(x => (mn + x * binSize, mn + (x + 1) * binSize))
+    .map((left, right) => xs.count(x => x >= left && x < right))
+    .toList
+  counts
+}
+
+def histoToSvg(title: String, imgWidth: Int, imgHeight: Int, bins: List[Int], minBin: Double, maxBin: Double) : String = {
+  def template(width: Int = 300, height: Int = 130, content: String) =
+    s""" <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+    ${content}
+  </svg> """
+  def mkRect(width: Int, height: Int, x: Int, y: Int, crx: Int=0, cry: Int=0, fill: String="Black") = {
+    s"""<rect width="$width" height="$height" x="$x" y="$y" rx="$crx" ry="$cry" fill="$fill" />"""
+  }
+  def text(content: String, x: Int, y: Int, cssClass: String = "small") = {
+    s"""<text x="$x" y="$y" class="$cssClass">$content</text>"""
+  }
+
+
+  val leftMargin = 20
+  val histWidth = imgWidth - leftMargin
+  val bottomMargin = 20
+  val topMargin = 20
+  val histHeight = imgHeight - topMargin - bottomMargin
+  val maxHeight = bins.max
+  val binWidth : Double = (histWidth).doubleValue / bins.size
+  val heightScaling : Double =  (histHeight.doubleValue)/(maxHeight)
+  val binPos = (0 to bins.size).map(i => (leftMargin + i * binWidth, binWidth * (i + 1)))
+    .zip(bins.map(bh => heightScaling * bh))
+
+  val rects = binPos.map((binXX, height) =>
+    mkRect(binWidth.ceil.intValue, height.intValue, binXX._1.floor.intValue, histHeight.intValue - height.intValue + topMargin))
+
+  val labels = {
+    (text(title, imgWidth / 8, topMargin - 5),
+      text("0", 0, histHeight + topMargin),
+      text(maxHeight.toInt.toString, 0, topMargin),
+      text(minBin.toInt.toString, 0, imgHeight),
+      text(maxBin.toInt.toString, (binWidth*(bins.size)).intValue - leftMargin, imgHeight))
+  }
+
+  val bg = mkRect(imgWidth, imgHeight, 0, 0, fill="White")
+
+  val content = (Seq(bg) ++ rects ++ labels.toList).mkString("\n")
+  template(imgWidth, imgHeight, content)
+}
+
+
+def loadHisto() = {
+  val source = scala.io.Source.fromFile("src/test/full-testresult-GTIRB.csv").getLines().toList
+  val headers = source.head.split(",")
+
+  val res = headers.map(h => h -> mutable.ArrayBuffer[String]()).toMap[String, mutable.ArrayBuffer[String]]
+
+  source.tail.map(line => {
+    val cols = line.split(",")
+    headers.zip(cols).foreach((h,v) => res(h).append(v))
+  })
+
+  val timeValues = res("verifyTime").map(_.toDouble)
+  val histo = histogram(50, Some(800.0, 1000.0))(timeValues.toSeq)
+  println(histoToSvg("test histogram", 500, 300, histo, 800.0, 1000.0))
 }

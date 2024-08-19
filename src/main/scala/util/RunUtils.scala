@@ -437,21 +437,29 @@ object IRTransform {
               val procedure = c.parent.data
               val newBlocks = ArrayBuffer[Block]()
               // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
+              var addressExprs = List[BinaryExpr]()
               for (t <- targets) {
                 Logger.debug(targets)
+                // TODO handle external procedures without a set address but this requires more information than the analysis gives at present
                 val address = t.address.match {
                   case Some(a) => a
                   case None => throw Exception(s"resolved indirect call $indirectCall to procedure which does not have address: $t")
                 }
-                val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(address, 64)))
+                val addressExpr = BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(address, 64))
+                addressExprs ::= addressExpr
+                val assume = Assume(addressExpr)
                 val newLabel: String = block.label + t.name
                 val directCall = DirectCall(t, indirectCall.returnTarget)
                 directCall.parent = indirectCall.parent
-
                 newBlocks.append(Block(newLabel, None, ArrayBuffer(assume), directCall))
               }
               procedure.addBlocks(newBlocks)
               val newCall = GoTo(newBlocks, indirectCall.label)
+              val addressExprOr = addressExprs.tail.foldLeft(addressExprs.head) {
+                (a: BinaryExpr, b: BinaryExpr) => BinaryExpr(BoolOR, a, b)
+              }
+              val assert = Assert(addressExprOr, Some("check indirect call underapproximation"))
+              block.statements.append(assert)
               block.replaceJump(newCall)
             }
           case _ =>
