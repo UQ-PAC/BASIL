@@ -172,7 +172,7 @@ trait ValueSetAnalysis(program: Program,
     if (IRWalk.procedure(n) == n) {
       mmm.pushContext(n.asInstanceOf[Procedure].name)
       s
-    } else if (IRWalk.procedure(n).end == n) {
+    } else if (IRWalk.lastInProc(IRWalk.procedure(n)) == n) {
       mmm.popContext()
       s
     } else n match
