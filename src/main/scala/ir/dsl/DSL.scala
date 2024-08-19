@@ -35,24 +35,31 @@ case class DelayNameResolve(ident: String) {
   }
 }
 
+trait EventuallyStatement {
+  def resolve(p: Program): Statement
+}
+
+case class ResolvableStatement(s: Statement) extends EventuallyStatement {
+  override def resolve(p: Program) = s
+}
+
 trait EventuallyJump {
   def resolve(p: Program): Jump
 }
 
-case class EventuallyIndirectCall(target: Variable, fallthrough: Option[DelayNameResolve]) extends EventuallyJump {
+case class EventuallyIndirectCall(target: Variable, fallthrough: Option[DelayNameResolve]) extends EventuallyStatement {
   override def resolve(p: Program): IndirectCall = {
-    IndirectCall(target, fallthrough.flatMap(_.resolveBlock(p)))
+    IndirectCall(target)
   }
 }
 
-case class EventuallyCall(target: DelayNameResolve, fallthrough: Option[DelayNameResolve]) extends EventuallyJump {
+case class EventuallyCall(target: DelayNameResolve, fallthrough: Option[DelayNameResolve]) extends EventuallyStatement {
   override def resolve(p: Program): DirectCall = {
     val t = target.resolveProc(p) match {
       case Some(x) => x
       case None => throw Exception("can't resolve proc " + p)
     }
-    val ft = fallthrough.flatMap(_.resolveBlock(p))
-    DirectCall(t, ft)
+    DirectCall(t)
   }
 }
 
@@ -79,18 +86,20 @@ def indirectCall(tgt: Variable, fallthrough: Option[String]): EventuallyIndirect
 // def directcall(tgt: String) = EventuallyCall(DelayNameResolve(tgt), None)
 
 
-case class EventuallyBlock(label: String, sl: Seq[Statement], j: EventuallyJump) {
-  val tempBlock: Block = Block(label, None, sl, GoTo(List.empty))
+case class EventuallyBlock(label: String, sl: Seq[EventuallyStatement], j: EventuallyJump) {
+  val tempBlock: Block = Block(label, None, List(), GoTo(List.empty))
 
   def resolve(prog: Program): Block = {
+    tempBlock.statements.addAll(sl.map(_.resolve(prog)))
     tempBlock.replaceJump(j.resolve(prog))
     tempBlock
   }
 }
 
-def block(label: String, sl: (Statement | EventuallyJump)*): EventuallyBlock = {
-  val statements = sl.collect {
-    case s: Statement => s
+def block(label: String, sl: (Statement | EventuallyStatement | EventuallyJump)*): EventuallyBlock = {
+  val statements : Seq[EventuallyStatement] = sl.collect {
+    case s: Statement => ResolvableStatement(s)
+    case o: EventuallyStatement => o
   }
   val jump = sl.collectFirst {
     case j: EventuallyJump => j

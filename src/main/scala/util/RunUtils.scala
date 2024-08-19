@@ -29,6 +29,7 @@ import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import analysis.CfgCommandNode
+import cilvisitor._
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -197,11 +198,13 @@ object IRTransform {
     }
     val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
     val renamer = Renamer(boogieReserved)
-    val returnUnifier = ConvertToSingleProcedureReturn()
+
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), ctx.program)
+    transforms.addReturnBlocks(ctx.program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
 
     externalRemover.visitProgram(ctx.program)
     renamer.visitProgram(ctx.program)
-    returnUnifier.visitProgram(ctx.program)
     ctx
   }
 
@@ -274,8 +277,8 @@ object IRTransform {
                   modified = true
 
                   // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
-                  val newCall = DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label)
-                  block.replaceJump(newCall)
+                  val newCall = DirectCall(targets.head, indirectCall.label)
+                  block.statements.replace(indirectCall, newCall) 
                 } else if (targets.size > 1) {
                   modified = true
                   val procedure = c.parent.data
@@ -283,10 +286,14 @@ object IRTransform {
                   for (t <- targets) {
                     val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(t.address.get, 64)))
                     val newLabel: String = block.label + t.name
-                    val directCall = DirectCall(t, indirectCall.returnTarget)
+                    val directCall = DirectCall(t)
                     directCall.parent = indirectCall.parent
 
-                    newBlocks.append(Block(newLabel, None, ArrayBuffer(assume), directCall))
+                    // assume indircall is the last statement in block
+                    assert(indirectCall.parent.statements.lastOption.contains(indirectCall))
+                    val fallthrough = indirectCall.parent.jump
+
+                    newBlocks.append(Block(newLabel, None, ArrayBuffer(assume, directCall), fallthrough))
                   }
                   procedure.addBlocks(newBlocks)
                   val newCall = GoTo(newBlocks, indirectCall.label)
@@ -429,8 +436,8 @@ object IRTransform {
               modified = true
 
               // indirectCall.parent.parent.removeBlocks(indirectCall.returnTarget)
-              val newCall = DirectCall(targets.head, indirectCall.returnTarget, indirectCall.label)
-              block.replaceJump(newCall)
+              val newCall = DirectCall(targets.head, indirectCall.label)
+              block.statements.replace(indirectCall, newCall)
             } else if (targets.size > 1) {
               modified = true
               val procedure = c.parent.data
@@ -448,17 +455,20 @@ object IRTransform {
                 addressExprs ::= addressExpr
                 val assume = Assume(addressExpr)
                 val newLabel: String = block.label + t.name
-                val directCall = DirectCall(t, indirectCall.returnTarget)
+                val directCall = DirectCall(t)
                 directCall.parent = indirectCall.parent
-                newBlocks.append(Block(newLabel, None, ArrayBuffer(assume), directCall))
+
+                assert(indirectCall.parent.statements.lastOption.contains(indirectCall))
+                val fallthrough = indirectCall.parent.jump
+                newBlocks.append(Block(newLabel, None, ArrayBuffer(assume, directCall), fallthrough))
               }
               procedure.addBlocks(newBlocks)
               val newCall = GoTo(newBlocks, indirectCall.label)
               val addressExprOr = addressExprs.tail.foldLeft(addressExprs.head) {
                 (a: BinaryExpr, b: BinaryExpr) => BinaryExpr(BoolOR, a, b)
               }
-              val assert = Assert(addressExprOr, Some("check indirect call underapproximation"))
-              block.statements.append(assert)
+              val assertion = Assert(addressExprOr, Some("check indirect call underapproximation"))
+              block.statements.append(assertion)
               block.replaceJump(newCall)
             }
           case _ =>
@@ -500,42 +510,40 @@ object IRTransform {
                   ): Unit = {
     
     // iterate over all commands - if call is to pthread_create, look up?
-    for (p <- program.procedures) {
-      for (b <- p.blocks) {
-        b.jump match {
-          case d: DirectCall if d.target.name == "pthread_create" =>
+    program.foreach(c =>
+      c match {
+        case d: DirectCall if d.target.name == "pthread_create" =>
 
-            // R2 should hold the function pointer of the function that begins the thread
-            // look up R2 value using points to results
-            val R2 = Register("R2", 64)
-            val b = reachingDefs(d)
-            val R2Wrapper = RegisterVariableWrapper(R2, getDefinition(R2, d, reachingDefs))
-            val threadTargets = pointsTo(R2Wrapper)
+          // R2 should hold the function pointer of the function that begins the thread
+          // look up R2 value using points to results
+          val R2 = Register("R2", 64)
+          val b = reachingDefs(d)
+          val R2Wrapper = RegisterVariableWrapper(R2, getDefinition(R2, d, reachingDefs))
+          val threadTargets = pointsTo(R2Wrapper)
 
-            if (threadTargets.size > 1) {
-              // currently can't handle case where the thread created is ambiguous
-              throw Exception("can't handle thread creation with more than one possible target")
+          if (threadTargets.size > 1) {
+            // currently can't handle case where the thread created is ambiguous
+            throw Exception("can't handle thread creation with more than one possible target")
+          }
+
+          if (threadTargets.size == 1) {
+
+            // not trying to untangle the very messy region resolution at present, just dealing with simplest case
+            threadTargets.head match {
+              case data: DataRegion =>
+                val threadEntrance = program.procedures.find(_.name == data.regionIdentifier) match {
+                  case Some(proc) => proc
+                  case None => throw Exception("could not find procedure with name " + data.regionIdentifier)
+                }
+                val thread = ProgramThread(threadEntrance, mutable.LinkedHashSet(threadEntrance), Some(d))
+                program.threads.addOne(thread)
+              case _ =>
+                throw Exception("unexpected non-data region " + threadTargets.head + " as PointsTo result for R2 at " + d)
             }
-
-            if (threadTargets.size == 1) {
-
-              // not trying to untangle the very messy region resolution at present, just dealing with simplest case
-              threadTargets.head match {
-                case data: DataRegion =>
-                  val threadEntrance = program.procedures.find(_.name == data.regionIdentifier) match {
-                    case Some(proc) => proc
-                    case None => throw Exception("could not find procedure with name " + data.regionIdentifier)
-                  }
-                  val thread = ProgramThread(threadEntrance, mutable.LinkedHashSet(threadEntrance), Some(d))
-                  program.threads.addOne(thread)
-                case _ =>
-                  throw Exception("unexpected non-data region " + threadTargets.head + " as PointsTo result for R2 at " + d)
-              }
-            }
-          case _ =>
-        }
-      }
-    }
+          }
+        case _ =>
+      })
+  
 
     if (program.threads.nonEmpty) {
       val mainThread = ProgramThread(program.mainProcedure, mutable.LinkedHashSet(program.mainProcedure), None)

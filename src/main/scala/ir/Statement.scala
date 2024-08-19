@@ -23,6 +23,9 @@ sealed trait Statement extends Command, IntrusiveListElement[Statement] {
   def acceptVisit(visitor: Visitor): Statement = throw new Exception(
     "visitor " + visitor + " unimplemented for: " + this
   )
+
+  def successor: Command = parent.statements.nextOption(this).getOrElse(parent.jump)
+
 }
 
 // invariant: rhs contains at most one MemoryLoad
@@ -76,9 +79,17 @@ object Assume:
 sealed trait Jump extends Command {
   def modifies: Set[Global] = Set()
   //def locals: Set[Variable] = Set()
-  def calls: Set[Procedure] = Set()
   def acceptVisit(visitor: Visitor): Jump = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
+
+class Halt(override val label: Option[String] = None) extends Jump {
+  override def acceptVisit(visitor: Visitor): Jump = this
+}
+
+class Return(override val label: Option[String] = None) extends Jump {
+  override def acceptVisit(visitor: Visitor): Jump = this
+}
+
 
 class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String]) extends Jump {
 
@@ -125,30 +136,18 @@ object GoTo:
   def unapply(g: GoTo): Option[(Set[Block], Option[String])] = Some(g.targets, g.label)
 
 
-sealed trait Call extends Jump {
-  val returnTarget: Option[Block]
-
-  // moving a call between blocks
-  override def linkParent(p: Block): Unit = {
-    returnTarget.foreach(t => parent.fallthrough = Some(GoTo(Set(t))))
-  }
-
-  override def unlinkParent(): Unit = {
-    parent.fallthrough = None
-  }
-}
+sealed trait Call extends Statement
 
 class DirectCall(val target: Procedure,
-                 override val returnTarget: Option[Block] = None,
                  override val label: Option[String] = None
                 ) extends Call {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
     case None => Set()
   } */
-  override def calls: Set[Procedure] = Set(target)
-  override def toString: String = s"${labelStr}DirectCall(${target.name}, ${returnTarget.map(_.label)})"
-  override def acceptVisit(visitor: Visitor): Jump = visitor.visitDirectCall(this)
+  def calls: Set[Procedure] = Set(target)
+  override def toString: String = s"${labelStr}DirectCall(${target.name})"
+  override def acceptVisit(visitor: Visitor): Statement = visitor.visitDirectCall(this)
 
   override def linkParent(p: Block): Unit = {
     super.linkParent(p)
@@ -163,19 +162,18 @@ class DirectCall(val target: Procedure,
 }
 
 object DirectCall:
-  def unapply(i: DirectCall): Option[(Procedure, Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
+  def unapply(i: DirectCall): Option[(Procedure, Option[String])] = Some(i.target, i.label)
 
 class IndirectCall(var target: Variable,
-                   override val returnTarget: Option[Block] = None,
                    override val label: Option[String] = None
                   ) extends Call {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals + target
     case None => Set(target)
   } */
-  override def toString: String = s"${labelStr}IndirectCall($target, ${returnTarget.map(_.label)})"
-  override def acceptVisit(visitor: Visitor): Jump = visitor.visitIndirectCall(this)
+  override def toString: String = s"${labelStr}IndirectCall($target)"
+  override def acceptVisit(visitor: Visitor): Statement = visitor.visitIndirectCall(this)
 }
 
 object IndirectCall:
-  def unapply(i: IndirectCall): Option[(Variable, Option[Block], Option[String])] = Some(i.target, i.returnTarget, i.label)
+  def unapply(i: IndirectCall): Option[(Variable, Option[String])] = Some(i.target, i.label)
