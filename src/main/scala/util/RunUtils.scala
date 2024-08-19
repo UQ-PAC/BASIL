@@ -551,7 +551,7 @@ object IRTransform {
     }
   }
 
-  def generateFunctionSummaries(
+  def generateProcedureSummaries(
     ctx: IRContext,
     IRProgram: Program,
     constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
@@ -732,19 +732,6 @@ object StaticAnalysis {
     Logger.info("[!] Running Parameter Analysis")
     //val paramResults = ParamAnalysis(IRProgram).analyze()
     val paramResults = Map[Procedure, Set[Variable]]()
-
-    /*
-    Logger.info("[!] Running Taint Analysis")
-    val taintResults = TaintAnalysis(IRProgram, specGlobalAddresses, constPropResult,
-        IRProgram.procedures.foldLeft(Map[CFGPosition, Set[analysis.Taintable]]()) {
-          (m, p) => m + (p -> Set(analysis.UnknownMemory()))
-        }
-      ).analyze()
-
-    config.analysisResultsPath.foreach(s =>
-      writeToFile(printAnalysisResults(IRProgram, taintResults), s"${s}_taint$iteration.txt")
-    )
-    */
 
     StaticAnalysisContext(
       cfg = cfg,
@@ -982,7 +969,9 @@ object RunUtils {
         ctx.program
       )
       Logger.info("[!] Generating Function Summaries")
-      modified = modified | IRTransform.generateFunctionSummaries(ctx, ctx.program, result.constPropResult, result.varDepsSummaries)
+      if (config.summariseProcedures) {
+        IRTransform.generateFunctionSummaries(ctx, ctx.program, result.constPropResult, result.varDepsSummaries)
+      }
       if (modified) {
         iteration += 1
         Logger.info(s"[!] Analysing again (iter $iteration)")

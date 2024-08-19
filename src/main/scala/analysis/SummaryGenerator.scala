@@ -16,7 +16,7 @@ private trait RNATaintableAnalysis(
   globals: Map[BigInt, String],
   constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
 ) {
-  val lattice: MapLattice[ir.CFGPosition, Set[Taintable], PowersetLattice[Taintable]] = MapLattice(PowersetLattice())
+  val lattice: MapLattice[CFGPosition, Set[Taintable], PowersetLattice[Taintable]] = MapLattice(PowersetLattice())
 
   val domain: Set[CFGPosition] = Set.empty ++ program
 
@@ -83,10 +83,11 @@ class SummaryGenerator(
     constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
     varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
 ) {
-  val rnaResults = RNATaintableSolver(program, globals, constProp).analyze()
+  private val rnaResults = RNATaintableSolver(program, globals, constProp).analyze()
 
-  // TODO should the stack/link/frame pointers propagate taint?
-  val variables: Set[analysis.Taintable] = 0.to(28).map { n =>
+  // registers R19 to R29 and R31 must be preserved by a procedure call, so we only need summaries for R0-R18 and R30
+  // TODO support R30? the analysis currently ignores it?
+  val variables: Set[Taintable] = 0.to(18).map { n =>
     Register(s"R$n", 64)
   }.toSet ++ specGlobals.map { g =>
     analysis.GlobalVariable(dsl.mem, BitVecLiteral(g.address, 64), g.size, g.name)
@@ -137,6 +138,7 @@ class SummaryGenerator(
       }
     }
 
+    // TODO further explanation of this would help
     // Use rnaResults to find stack function arguments
     val tainters = relevantVars.map {
       v => (v, Set())
@@ -144,14 +146,13 @@ class SummaryGenerator(
       relevantVars.contains(variable)
     }
 
-    tainters.toList
-      .flatMap { (variable, taints) =>
-      {
+    tainters.toList.flatMap {
+      (variable, taints) => {
         // If our variable was tainted by memory that we know nothing about, it is sound to assume that we
         // know nothing about its gamma in the post state.
         if taints.contains(UnknownMemory()) then None
-        else toGamma(variable).flatMap
-          { varGamma => {
+        else toGamma(variable).flatMap {
+          varGamma => {
             if taints.isEmpty then {
               // If the variable is tainted by nothing, it must have been set to some constant value, meaning
               // its gamma is low. Note that if a variable was unchanged, it would be tainted by itself.
@@ -170,7 +171,7 @@ class SummaryGenerator(
                 }
               }
 
-              if equations.size > 0 then {
+              if equations.nonEmpty then {
                 Some(equations.foldLeft(varGamma) { (expr, eq) =>
                   BinaryBExpr(BoolOR, expr, eq)
                 })

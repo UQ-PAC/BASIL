@@ -249,9 +249,7 @@ trait PushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends MapLatticeSo
   def process(n: N): Unit =
     val xn = x(n)
     val y = transfer(n, xn)
-    if (y != xn) {
-      for succ <- outdep(n) do propagate(y, succ)
-    }
+    for succ <- outdep(n) do propagate(y, succ)
 
 
 /** Worklist-based fixpoint solver.
