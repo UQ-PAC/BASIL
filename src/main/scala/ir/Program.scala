@@ -174,6 +174,8 @@ class Procedure private (
                   private val _blocks: mutable.LinkedHashSet[Block],
                   var in: ArrayBuffer[Parameter],
                   var out: ArrayBuffer[Parameter],
+                  var requires: List[BExpr],
+                  var ensures: List[BExpr],
                 ) {
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
@@ -181,8 +183,8 @@ class Procedure private (
   require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
   require(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
-  def this(name: String, address: Option[Int] = None, entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer()) = {
-    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out))
+  def this(name: String, address: Option[Int] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer(), requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
+    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out), List.from(requires), List.from(ensures))
   }
 
   override def toString: String = {

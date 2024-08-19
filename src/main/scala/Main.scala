@@ -47,7 +47,9 @@ object Main {
       @arg(name = "analysis-results-dot", doc = "Log analysis results in .dot form at specified path.")
       analysisResultsDot: Option[String],
       @arg(name = "threads", short = 't', doc = "Separates threads into multiple .bpl files with given output filename as prefix (requires --analyse flag)")
-      threadSplit: Flag
+      threadSplit: Flag,
+      @arg(name = "summarise-procedures", doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)")
+      summariseProcedures: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -80,7 +82,7 @@ object Main {
     val q = BASILConfig(
       loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth),
       runInterpret = conf.interpret.value,
-      staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot, conf.threadSplit.value)) else None,
+      staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot, conf.threadSplit.value, conf.summariseProcedures.value)) else None,
       boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect,
         true, rely, conf.threadSplit.value),
       outputPrefix = conf.outFileName,
