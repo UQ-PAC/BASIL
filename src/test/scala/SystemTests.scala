@@ -17,8 +17,6 @@ trait SystemTests extends AnyFunSuite {
   val correctPrograms: Array[String] = getSubdirectories(correctPath)
   val incorrectPath = "./src/test/incorrect"
   val incorrectPrograms: Array[String] = getSubdirectories(incorrectPath)
-  val correctWithAnalysisPath = "./src/test/correct-analysis"
-  val correctWithAnalysisPrograms: Array[String] = getSubdirectories(correctWithAnalysisPath)
 
   case class TestResult(passed: Boolean, verified: Boolean, shouldVerify: Boolean, hasExpected: Boolean, timedOut: Boolean, matchesExpected: Boolean, translateTime: Long, verifyTime: Long) {
     val toCsv = s"$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
@@ -30,7 +28,7 @@ trait SystemTests extends AnyFunSuite {
 
   val testResults: mutable.ArrayBuffer[(String, TestResult)] = mutable.ArrayBuffer()
 
-  def runTests(programs: Array[String], path: String, name: String, shouldVerify: Boolean, useADT: Boolean, analyse: Boolean): Unit = {
+  def runTests(programs: Array[String], path: String, name: String, shouldVerify: Boolean, useADT: Boolean, analyse: Boolean, procedureSummaries: Boolean): Unit = {
     // get all variations of each program
     val testSuffix = if useADT then ":BAP" else ":GTIRB"
     for (p <- programs) {
@@ -38,7 +36,7 @@ trait SystemTests extends AnyFunSuite {
       val variations = getSubdirectories(programPath)
       variations.foreach(t =>
         test(name + "/" + p + "/" + t + testSuffix) {
-          runTest(path, p, t, shouldVerify, useADT, analyse)
+          runTest(path, p, t, shouldVerify, useADT, analyse, procedureSummaries)
         }
       )
     }
@@ -67,7 +65,7 @@ trait SystemTests extends AnyFunSuite {
     log(summaryHeader + System.lineSeparator() + summaryRow, testPath + "summary-" + filename)
   }
 
-  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean, analyse: Boolean): Unit = {
+  def runTest(path: String, name: String, variation: String, shouldVerify: Boolean, useADT: Boolean, analyse: Boolean, procedureSummaries: Boolean): Unit = {
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
     val specPath = directoryPath + name + ".spec"
@@ -79,6 +77,7 @@ trait SystemTests extends AnyFunSuite {
 
     val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath)
     if analyse then args += "--analyse"
+    if procedureSummaries then args += "--summarise-procedures"
     if (File(specPath).exists) args ++= Seq("--spec", specPath)
 
     Main.main(args.toArray)
@@ -117,7 +116,8 @@ trait SystemTests extends AnyFunSuite {
     }
     val passed = !timedOut && (verified == shouldVerify) && xor(verified, proveFailed)
     val result = TestResult(passed, verified, shouldVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
-    testResults.append((s"$name/$variation", result))
+    val testSuffix = if useADT then ":BAP" else ":GTIRB"
+    testResults.append((s"$name/$variation$testSuffix", result))
     if (!passed) fail(failureMsg)
   }
 
@@ -164,20 +164,30 @@ trait SystemTests extends AnyFunSuite {
 
 }
 
-class SystemTestsBAP extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", true, true, false)
-  runTests(incorrectPrograms, incorrectPath, "incorrect", false, true, false)
-  runTests(correctWithAnalysisPrograms, correctWithAnalysisPath, "correct", true, true, true)
+class SystemTestsBAP extends SystemTests {
+  runTests(correctPrograms, correctPath, "correct", true, true, false, false)
+  runTests(incorrectPrograms, incorrectPath, "incorrect", false, true, false, false)
   test("summary") {
     summary("testresult-BAP.csv")
   }
 }
 
-class SystemTestsGTIRB extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", true, false, false)
-  runTests(incorrectPrograms, incorrectPath, "incorrect", false, false, false)
-  runTests(correctWithAnalysisPrograms, correctWithAnalysisPath, "correct", true, false, true)
+class SystemTestsGTIRB extends SystemTests {
+  runTests(correctPrograms, correctPath, "correct", true, false, false, false)
+  runTests(incorrectPrograms, incorrectPath, "incorrect", false, false, false, false)
   test("summary") {
     summary("testresult-GTIRB.csv")
+  }
+}
+
+class ProcedureSummaryTests extends SystemTests {
+  // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
+  // this is due to BASIL's currently limited handling of non-returning calls
+  private val procedureSummaryPath = "./src/test/analysis/procedure-summaries"
+  private val procedureSummaryPrograms = getSubdirectories(procedureSummaryPath)
+  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", true, true, true, true)
+  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", true, false, true, true)
+  test("summary") {
+    summary("procedureSummaryTestResult.csv")
   }
 }

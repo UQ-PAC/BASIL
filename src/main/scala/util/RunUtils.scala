@@ -968,9 +968,9 @@ object RunUtils {
         result.reachingDefs,
         ctx.program
       )
-      Logger.info("[!] Generating Function Summaries")
+      Logger.info("[!] Generating Procedure Summaries")
       if (config.summariseProcedures) {
-        IRTransform.generateFunctionSummaries(ctx, ctx.program, result.constPropResult, result.varDepsSummaries)
+        IRTransform.generateProcedureSummaries(ctx, ctx.program, result.constPropResult, result.varDepsSummaries)
       }
       if (modified) {
         iteration += 1
