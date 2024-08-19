@@ -95,6 +95,11 @@ class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_stmt(s: Statement): List[Statement] = {
     def continue(n: Statement) = n match {
+      case d: DirectCall => d
+      case i: IndirectCall => {
+        i.target = visit_var(i.target)
+        i
+      }
       case m: MemoryAssign => {
         m.mem = visit_mem(m.mem)
         m.index = visit_expr(m.index)
@@ -131,7 +136,6 @@ class CILVisitorImpl(val v: CILVisitor) {
         }
       })
       b.replaceJump(visit_jump(b.jump))
-      b.fallthrough = visit_fallthrough(b.fallthrough)
       b
     }
 
@@ -153,7 +157,7 @@ class CILVisitorImpl(val v: CILVisitor) {
     doVisitList(v, v.vproc(p), p, continue)
   }
 
-  def visit_proc(p: Program): Program = {
+  def visit_prog(p: Program): Program = {
     def continue(p: Program) = {
       p.procedures = p.procedures.flatMap(visit_proc)
       p
@@ -164,6 +168,7 @@ class CILVisitorImpl(val v: CILVisitor) {
 
 def visit_block(v: CILVisitor, b: Block): Block = CILVisitorImpl(v).visit_block(b)
 def visit_proc(v: CILVisitor, b: Procedure): List[Procedure] = CILVisitorImpl(v).visit_proc(b)
+def visit_prog(v: CILVisitor, b: Program): Program = CILVisitorImpl(v).visit_prog(b)
 def visit_stmt(v: CILVisitor, e: Statement): List[Statement] = CILVisitorImpl(v).visit_stmt(e)
 def visit_jump(v: CILVisitor, e: Jump): Jump = CILVisitorImpl(v).visit_jump(e)
 def visit_expr(v: CILVisitor, e: Expr): Expr = CILVisitorImpl(v).visit_expr(e)

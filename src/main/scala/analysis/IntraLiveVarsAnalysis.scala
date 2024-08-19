@@ -15,7 +15,7 @@ abstract class LivenessAnalysis(program: Program) extends Analysis[Any]:
       case MemoryAssign(_, index, value, _, _, _) => s ++ index.variables ++ value.variables
       case Assume(expr, _, _, _) => s ++ expr.variables
       case Assert(expr, _, _) => s ++ expr.variables
-      case IndirectCall(variable, _, _) => s + variable
+      case IndirectCall(variable, _) => s + variable
       case c: DirectCall => s
       case g: GoTo => s
       case _ => ???

@@ -632,39 +632,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       }
     )
   }
-
   def translate(j: Jump): List[BCmd] = j match {
-    case d: DirectCall =>
-      val call = BProcedureCall(d.target.name)
-      val returnTarget = d.returnTarget match {
-        case Some(r) => GoToCmd(Seq(r.label))
-        case None => BAssume(FalseBLiteral, Some("no return target"))
-      }
-
-      (config.procedureRely match {
-        case Some(ProcRelyVersion.Function) =>
-          if (libRelies.contains(d.target.name) && libGuarantees.contains(d.target.name) && libRelies(d.target.name).nonEmpty && libGuarantees(d.target.name).nonEmpty) {
-            val invCall1 = BProcedureCall(d.target.name + "$inv", List(mem_inv1, Gamma_mem_inv1), List(mem, Gamma_mem))
-            val invCall2 = BProcedureCall("rely$inv", List(mem_inv2, Gamma_mem_inv2), List(mem_inv1, Gamma_mem_inv1))
-            val libRGAssert = libRelies(d.target.name).map(r => BAssert(r.resolveSpecInv))
-            List(invCall1, invCall2) ++ libRGAssert
-          } else {
-            List()
-          }
-        case Some(ProcRelyVersion.IfCommandContradiction) => relyfun(d.target.name).toList
-        case None => List()
-      }) ++ List(call, returnTarget)
-    case i: IndirectCall =>
-      // TODO put this elsewhere
-      if (i.target.name == "R30") {
-        List(ReturnCmd)
-      } else {
-        val unresolved: List[BCmd] = List(Comment(s"UNRESOLVED: call ${i.target.name}"), BAssert(FalseBLiteral))
-        i.returnTarget match {
-          case Some(r) => unresolved :+ GoToCmd(Seq(r.label))
-          case None    => unresolved ++ List(Comment("no return target"), BAssume(FalseBLiteral))
-        }
-      }
     case g: GoTo =>
       // collects all targets of the goto with a branch condition that we need to check the security level for
       // and collects the variables for that
@@ -681,9 +649,32 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       }
       val jump = GoToCmd(g.targets.map(_.label).toSeq)
       conditionAssert :+ jump
+    case r: Return => List(ReturnCmd)
+    case r: Halt => List(BAssert(FalseBLiteral))
+  }
+
+  def translate(j: Call): List[BCmd] = j match {
+    case d: DirectCall =>
+      val call = BProcedureCall(d.target.name)
+
+      (config.procedureRely match {
+        case Some(ProcRelyVersion.Function) =>
+          if (libRelies.contains(d.target.name) && libGuarantees.contains(d.target.name) && libRelies(d.target.name).nonEmpty && libGuarantees(d.target.name).nonEmpty) {
+            val invCall1 = BProcedureCall(d.target.name + "$inv", List(mem_inv1, Gamma_mem_inv1), List(mem, Gamma_mem))
+            val invCall2 = BProcedureCall("rely$inv", List(mem_inv2, Gamma_mem_inv2), List(mem_inv1, Gamma_mem_inv1))
+            val libRGAssert = libRelies(d.target.name).map(r => BAssert(r.resolveSpecInv))
+            List(invCall1, invCall2) ++ libRGAssert
+          } else {
+            List()
+          }
+        case Some(ProcRelyVersion.IfCommandContradiction) => relyfun(d.target.name).toList
+        case None => List()
+      }) ++ List(call)
+    case i: IndirectCall => List(Comment(s"UNRESOLVED: call ${i.target.name}"), BAssert(FalseBLiteral))
   }
 
   def translate(s: Statement): List[BCmd] = s match {
+    case d: Call => translate(d)
     case m: NOP => List.empty
     case m: MemoryAssign =>
       val lhs = m.mem.toBoogie

@@ -74,7 +74,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
   }
 
 
-  override def visitDirectCall(node: DirectCall): Jump = {
+  override def visitDirectCall(node: DirectCall): Statement = {
     program ++= "DirectCall("
     program ++= procedureIdentifier(node.target)
     program ++= ", "
@@ -82,7 +82,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node
   }
 
-  override def visitIndirectCall(node: IndirectCall): Jump = {
+  override def visitIndirectCall(node: IndirectCall): Statement = {
     program ++= "IndirectCall("
     visitVariable(node.target)
     program ++= ", "

@@ -174,7 +174,7 @@ class CfgStatementNode(
 /** CFG's representation of a jump. This is used as a general jump node, for both indirect and direct calls.
   */
 class CfgJumpNode(
-    val data: Jump,
+    val data: Jump | DirectCall | IndirectCall,
     val block: Block,
     val parent: CfgFunctionEntryNode
 ) extends CfgCommandNode:
@@ -486,6 +486,72 @@ class ProgramCfgFactory:
         cfg.addEdge(prevNode, firstNode)
         visitedBlocks += (block -> firstNode) // This is guaranteed to be entrance to block if we are here
 
+        val statements = List.from(stmts).map(s => s match {
+          case d: DirectCall => CfgJumpNode(d, block, funcEntryNode)
+          case d: IndirectCall => CfgJumpNode(d, block, funcEntryNode)
+          case o => CfgStatementNode(o, block, funcEntryNode)
+        })
+        val succs = if (statements.nonEmpty) then statements.zip(statements.tail ++ List(CfgJumpNode(statements.head.data.parent.jump, block, funcEntryNode))) else List()
+
+        for ((s,nexts) <- succs) {
+          s.data match {
+          case dCall: DirectCall =>
+
+            var precNode = prevNode
+
+            val targetProc: Procedure = dCall.target
+            funcEntryNode.callers.add(procToCfg(targetProc)._1)
+
+            val callNode = CfgJumpNode(dCall, block, funcEntryNode)
+
+            // Branch to this call
+            cfg.addEdge(precNode, callNode)
+
+            procToCalls(proc) += callNode
+            procToCallers(targetProc) += callNode
+            callToNodes(funcEntryNode) += callNode
+
+            // Record call association
+
+            // Jump to return location
+            val returnTarget = nexts
+                // Add intermediary return node (split call into call and return)
+            val callRet = CfgCallReturnNode()
+            cfg.addEdge(callNode, callRet)
+            cfg.addEdge(callRet, returnTarget)
+          case iCall: IndirectCall =>
+            Logger.debug(s"Indirect call found: $iCall in ${proc.name}")
+            var precNode = prevNode
+
+            val jmpNode = CfgJumpNode(iCall, block, funcEntryNode)
+            // Branch to this call
+            cfg.addEdge(precNode, jmpNode)
+
+            // Record call association
+            procToCalls(proc) += jmpNode
+            callToNodes(funcEntryNode) += jmpNode
+
+            // R30 is the link register - this stores the address to return to.
+            //  For now just add a node expressing that we are to return to the previous context.
+            if (iCall.target == Register("R30", 64)) {
+              val returnNode = CfgProcedureReturnNode()
+              cfg.addEdge(jmpNode, returnNode)
+              cfg.addEdge(returnNode, funcExitNode)
+            }
+
+            val callRet = CfgCallReturnNode()
+            cfg.addEdge(jmpNode, callRet)
+            val returnTarget = nexts
+            cfg.addEdge(callRet, jmpNode)
+          case h: Halt =>  {
+            assert(false);
+            // not possible since s is only Statement.
+          }
+          case _ => ()
+          }
+        }
+
+
         if (stmts.size == 1) {
           return firstNode
         }
@@ -548,42 +614,10 @@ class ProgramCfgFactory:
                 visitBlock(targetBlock, precNode)
               }
             }
-          case dCall: DirectCall =>
-            val targetProc: Procedure = dCall.target
-            funcEntryNode.callers.add(procToCfg(targetProc)._1)
-
-            val callNode = CfgJumpNode(dCall, block, funcEntryNode)
-
-            // Branch to this call
-            cfg.addEdge(precNode, callNode)
-
-            procToCalls(proc) += callNode
-            procToCallers(targetProc) += callNode
-            callToNodes(funcEntryNode) += callNode
-
-            // Record call association
-
-            // Jump to return location
-            dCall.returnTarget match {
-              case Some(retBlock) =>
-                // Add intermediary return node (split call into call and return)
-                val callRet = CfgCallReturnNode()
-
-                cfg.addEdge(callNode, callRet)
-                if (visitedBlocks.contains(retBlock)) {
-                  val retBlockEntry: CfgCommandNode = visitedBlocks(retBlock)
-                  cfg.addEdge(callRet, retBlockEntry)
-                } else {
-                  visitBlock(retBlock, callRet)
-                }
-              case None =>
-                val noReturn = CfgCallNoReturnNode()
-                cfg.addEdge(callNode, noReturn)
-                cfg.addEdge(noReturn, funcExitNode)
-            }
-          case iCall: IndirectCall =>
-            Logger.debug(s"Indirect call found: $iCall in ${proc.name}")
-
+          case h: Halt =>  {
+            cfg.addEdge(jmpNode, funcExitNode)
+          }
+          case r: Return => 
             // Branch to this call
             cfg.addEdge(precNode, jmpNode)
 
@@ -591,32 +625,9 @@ class ProgramCfgFactory:
             procToCalls(proc) += jmpNode
             callToNodes(funcEntryNode) += jmpNode
 
-            // R30 is the link register - this stores the address to return to.
-            //  For now just add a node expressing that we are to return to the previous context.
-            if (iCall.target == Register("R30", 64)) {
-              val returnNode = CfgProcedureReturnNode()
-              cfg.addEdge(jmpNode, returnNode)
-              cfg.addEdge(returnNode, funcExitNode)
-              return
-            }
-
-            // Jump to return location
-            iCall.returnTarget match {
-              case Some(retBlock) => // Add intermediary return node (split call into call and return)
-                val callRet = CfgCallReturnNode()
-                cfg.addEdge(jmpNode, callRet)
-
-                if (visitedBlocks.contains(retBlock)) {
-                  val retBlockEntry = visitedBlocks(retBlock)
-                  cfg.addEdge(callRet, retBlockEntry)
-                } else {
-                  visitBlock(retBlock, callRet)
-                }
-              case None =>
-                val noReturn = CfgCallNoReturnNode()
-                cfg.addEdge(jmpNode, noReturn)
-                cfg.addEdge(noReturn, funcExitNode)
-            }
+            val returnNode = CfgProcedureReturnNode()
+            cfg.addEdge(jmpNode, returnNode)
+            cfg.addEdge(returnNode, funcExitNode)
         } // `jmps.head` match
       } // `visitJumps` function
     } // `visitBlocks` function
