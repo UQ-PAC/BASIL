@@ -267,6 +267,7 @@ class DSG(val proc: Procedure,
     else
       Set(formals(arg))
 
+
   /**
    * collects all the nodes that are currently in the DSG and updates nodes member variable
    */
@@ -282,48 +283,65 @@ class DSG(val proc: Procedure,
   /**
    * Collapses the node causing it to lose field sensitivity
    */
-  def collapseNode(n: DSN): Unit =
+  def collapseNode(n: DSN): DSN =
+
+
     val (term, offset) = solver.find(n.term)
-    val node = term.asInstanceOf[Derm].node
-    val collapedCell = DSC(Some(node), 0)
+    val node: DSN = term.asInstanceOf[Derm].node
+
+    if  !(n.collapsed || find(n).node.collapsed) then
+
+      val collapsedNode: DSN = DSN(n.graph)
+      val collapedCell = DSC(Some(collapsedNode), 0)
+
+      n.flags.collapsed = true
+      collapsedNode.flags.collapsed = true
+
+      var pointeeInternalOffset: BigInt = 0
+      var pointToItself = false
+      var cell = node.cells.tail.foldLeft(adjust(node.cells.head._2.getPointee)) {
+        (c, field) =>
+          val cell = field._2
+          val pointee = cell._pointee
+          if pointee.isDefined && adjust(cell.getPointee) == cell then
+  //          cell._pointee = Some(Slice(collapedCell, 0))
+            pointToItself = true
+  //          collapedCell._pointee = Some(Slice(collapedCell, 0))
+            c
+          else if pointee.isDefined then
+            val slice = cell.getPointee
+            if slice.internalOffset > pointeeInternalOffset then
+              pointeeInternalOffset = slice.internalOffset
+            mergeCells(c, adjust(slice))
+          else
+            c
+      }
+
+      if pointToItself then
+        cell = mergeCells(cell, collapedCell)
 
 
-    var pointeeInternalOffset: BigInt = 0
-    val cell = node.cells.tail.foldLeft(adjust(node.cells.head._2.getPointee)) {
-      (c, field) =>
-        val cell = field._2
-        if cell._pointee.isDefined && cell.getPointee.cell == cell then
-          cell._pointee = Some(Slice(collapedCell, 0))
-//          collapedCell._pointee = Some(Slice(collapedCell, 0))
-          c
-        else if cell._pointee.isDefined then
-          val slice = cell.getPointee
-          if slice.internalOffset > pointeeInternalOffset then
-            pointeeInternalOffset = slice.internalOffset
-          mergeCells(c, adjust(slice))
-        else
-          c
-    }
+      collapedCell._pointee = Some(Slice(collapedCell, 0))
 
-//    node.cells.values.foreach(
-//      cell =>
-////        replace(cell, collapedCell, 0) TODO check that this works by just ignoring the replace
-//
-//        pointTo.foreach {
-//          case (pointer, pointee) =>
-//            if pointer.equals(cell) then
-//              pointTo.remove(pointer)
-//              pointTo.update(collapedCell, pointee)
-//        }
-//    )
-
-    node.flags.collapsed = true
+      assert(collapsedNode.cells.size == 1)
 
 
-    node.cells.clear()
-    node.cells.addOne(0, collapedCell)
-    if cell.node.isDefined then
-      node.cells(0)._pointee = Some(Slice(cell, pointeeInternalOffset))
+      collapsedNode.children.addAll(node.children)
+      collapsedNode.children += (node -> 0)
+      collapsedNode.allocationRegions.addAll(node.allocationRegions) // add regions and flags of node 1 to node 2
+      collapsedNode.flags.join(node.flags)
+
+
+      solver.unify(n.term, collapsedNode.term, 0)
+
+      collapsedNode
+    else
+      assert(find(n).node.collapsed)
+      find(n).node
+//    node.cells.clear()
+//    node.cells.addOne(0, collapedCell)
+//    if cell.node.isDefined then
+//      node.cells(0)._pointee = Some(Slice(cell, pointeeInternalOffset))
 
   /**
    * this function merges all the overlapping cells in the given node
@@ -418,21 +436,21 @@ class DSG(val proc: Procedure,
     if cell1.equals(cell2) then // same cell no action required
       cell1
     else if cell1.node.isDefined && cell1.node.equals(cell2.node) then // same node different cells causes collapse
-      collapseNode(cell1.node.get)
-      cell1.node.get.cells(0)
+      val ne = collapseNode(cell1.node.get)
+      ne.cells(0)
     else if cell1.node.isEmpty then
       ??? // not sure how to handle this yet TODO possibly take it out of the merge?
 //      replace(cell1, cell2, 0)
       cell2
     else if cell1.node.get.collapsed || cell2.node.get.collapsed then // a collapsed node
 
-      val node1 = cell1.node.get
-      val node2 = cell2.node.get
+      var node1 = cell1.node.get
+      var node2 = cell2.node.get
 
       assert(node1.collapsed || node2.collapsed)
 
-      collapseNode(node1) // collapse the other node
-      collapseNode(node2)
+      node1 = collapseNode(node1) // collapse the other node
+      node2 = collapseNode(node2)
       node2.children.addAll(node1.children)
       node2.children += (node1 -> 0)
       node2.allocationRegions.addAll(node1.allocationRegions) // add regions and flags of node 1 to node 2

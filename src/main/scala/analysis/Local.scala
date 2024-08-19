@@ -133,7 +133,10 @@ class Local(
     // visit all the defining pointer operation on rhs variable first
     reachingDefs(position)(rhs).foreach(visit)
     // get the cells of all the SSA variables in the set
-    val cells: Set[Slice] = graph.getCells(position, rhs)
+    val cells: Set[Slice] = graph.getCells(position, rhs).foldLeft(Set[Slice]()) {
+      (col, slice) =>
+        col + Slice(graph.find(slice.cell), slice.internalOffset)
+    }
     // merge the cells or their pointees with lhs
     var result = cells.foldLeft(lhs) {
       (c, t) =>
@@ -152,8 +155,8 @@ class Local(
               node.getCell(field)
           )
         else
-          val node = cell.node.get
-          graph.collapseNode(node)
+          var node = cell.node.get
+          node = graph.collapseNode(node)
           graph.mergeCells(c, if pointee then graph.adjust(node.cells(0).getPointee) else node.cells(0))
 
     }
@@ -199,7 +202,7 @@ class Local(
       }
       val node = cell.node.get
       node.flags.unknown = true
-      graph.collapseNode(node)
+      val test = graph.collapseNode(node)
   }
 
   def visit(n: CFGPosition): Unit = {
@@ -339,7 +342,7 @@ class Local(
     graph.nodes.foreach(node =>
       node.children.foreach(
         child =>
-          assert(graph.solver.find(child._1.term)._1.equals(node.term))
+          assert(graph.solver.find(child._1.term).equals(graph.solver.find(node.term)))
           assert(graph.solver.find(child._1.term)._2.equals(child._2))
 
       )
