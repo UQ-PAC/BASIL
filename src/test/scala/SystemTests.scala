@@ -144,7 +144,7 @@ trait SystemTests extends AnyFunSuite {
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")
 
-    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath) ++ conf.basilFlags
+    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath) ++ conf.BASILFlags
     if (File(specPath).exists) args ++= Seq("--spec", specPath)
 
     Main.main(args.toArray)
@@ -185,7 +185,7 @@ trait SystemTests extends AnyFunSuite {
     }
     val passed = !timedOut && (verified == shouldVerify) && xor(verified, proveFailed)
     val result = TestResult(passed, verified, shouldVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
-    val testSuffix = if useADT then ":BAP" else ":GTIRB"
+    val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
     testResults.append((s"$name/$variation$testSuffix", result))
     if (!passed) fail(failureMsg)
   }
@@ -262,7 +262,7 @@ class ProcedureSummaryTests extends SystemTests {
   runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", TestConfig(BASILFlags = Seq("--analyse", "--summarise-procedures"),
     useBAPFrontend = false, expectVerify = true))
   test("summary-procedureSummary") {
-    summary("proceduresummary-testresult")
+    summary("procedureSummary-testResult")
   }
 }
 
