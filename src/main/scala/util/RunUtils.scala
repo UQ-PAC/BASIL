@@ -466,18 +466,20 @@ object IRTransform {
   /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
     * add in modifies from the spec.
     */
-  def prepareForTranslation(config: ILLoadingConfig, ctx: IRContext): Unit = {
+  def prepareForTranslation(config: BASILConfig, ctx: IRContext): Unit = {
     ctx.program.determineRelevantMemory(ctx.globalOffsets)
 
     Logger.info("[!] Stripping unreachable")
     val before = ctx.program.procedures.size
-    ctx.program.stripUnreachableFunctions(config.procedureTrimDepth)
+    ctx.program.stripUnreachableFunctions(config.loading.procedureTrimDepth)
     Logger.info(
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
 
-    val stackIdentification = StackSubstituter()
-    stackIdentification.visitProgram(ctx.program)
+    if (config.staticAnalysis.isEmpty) {
+      val stackIdentification = StackSubstituter()
+      stackIdentification.visitProgram(ctx.program)
+    }
 
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
@@ -901,7 +903,7 @@ object RunUtils {
       interpreter.interpret(ctx.program)
     }
 
-    IRTransform.prepareForTranslation(q.loading, ctx)
+    IRTransform.prepareForTranslation(q, ctx)
 
     Logger.info("[!] Translating to Boogie")
 
