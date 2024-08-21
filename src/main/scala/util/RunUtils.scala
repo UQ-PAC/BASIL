@@ -34,7 +34,6 @@ import analysis.CfgCommandNode
 
 import scala.annotation.tailrec
 import scala.collection.mutable
-import scala.sys.exit
 
 /** This file contains the main program execution. See RunUtils.loadAndTranslate for the high-level process.
   */

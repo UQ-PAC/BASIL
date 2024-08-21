@@ -302,18 +302,14 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
 
   def transformMemorySections(memorySegment: ArrayBuffer[MemorySection]): ArrayBuffer[MemorySection] = {
     val newArrayBuffer = ArrayBuffer.empty[MemorySection]
-    for (elem <- memorySegment) {
-      elem match {
-        case mem: MemorySection =>
-          val regions = mmm.findDataObject(mem.address)
-          if (regions.size == 1) {
-            newArrayBuffer += MemorySection(regions.head.regionIdentifier, mem.address, mem.size, mem.bytes)
-            Logger.warn(s"Region ${regions.get.regionIdentifier} found for memory section ${mem.address}")
-          } else {
-            newArrayBuffer += mem
-            Logger.warn(s"No region found for memory section ${mem.address}")
-          }
-        case null =>
+    for (mem <- memorySegment) {
+      val regions = mmm.findDataObject(mem.address)
+      if (regions.size == 1) {
+        newArrayBuffer += MemorySection(regions.head.regionIdentifier, mem.address, mem.size, mem.bytes)
+        Logger.warn(s"Region ${regions.get.regionIdentifier} found for memory section ${mem.address}")
+      } else {
+        newArrayBuffer += mem
+        Logger.warn(s"No region found for memory section ${mem.address}")
       }
     }
     newArrayBuffer
