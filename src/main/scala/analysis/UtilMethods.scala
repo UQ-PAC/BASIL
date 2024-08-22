@@ -71,8 +71,20 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
   }
 }
 
-def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[BitVecLiteral] = {
-  def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = {
+/**
+ * Evaluate an expression in a hope of finding bitVector values for a global variable.
+ * If exactEquality is true, then the evaluation is done with exact equality.
+ * By default, exactEquality is true.
+ * Disabling exactEquality will allow for loose (intersection) equality and thus assist with interprocedural analysis.
+ * @param exp
+ * @param constantPropResult
+ * @param n
+ * @param reachingDefs
+ * @param exactEquality
+ * @return
+ */
+def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])], exactEquality: Boolean = true): Set[BitVecLiteral] = {
+  def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
     val res = for {
       x <- a
       y <- b
@@ -89,8 +101,8 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
 
   exp match {
     case binOp: BinaryExpr =>
-      val lhs = evaluateExpressionWithSSA(binOp.arg1, constantPropResult, n, reachingDefs)
-      val rhs = evaluateExpressionWithSSA(binOp.arg2, constantPropResult, n, reachingDefs)
+      val lhs = evaluateExpressionWithSSA(binOp.arg1, constantPropResult, n, reachingDefs, exactEquality)
+      val rhs = evaluateExpressionWithSSA(binOp.arg2, constantPropResult, n, reachingDefs, exactEquality)
       binOp.op match {
         case BVADD => apply(BitVectorEval.smt_bvadd, lhs, rhs)
         case BVSUB => apply(BitVectorEval.smt_bvsub, lhs, rhs)
@@ -114,23 +126,26 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
         case _ => throw RuntimeException("Binary operation support not implemented: " + binOp.op)
       }
     case unaryExpr: UnaryExpr =>
-      val result = evaluateExpressionWithSSA(unaryExpr.arg, constantPropResult, n, reachingDefs)
+      val result = evaluateExpressionWithSSA(unaryExpr.arg, constantPropResult, n, reachingDefs, exactEquality)
       unaryExpr.op match {
         case BVNEG => applySingle(BitVectorEval.smt_bvneg, result)
         case BVNOT => applySingle(BitVectorEval.smt_bvnot, result)
         case _ => throw RuntimeException("Unary operation support not implemented: " + unaryExpr.op)
       }
     case extend: ZeroExtend =>
-      val result = evaluateExpressionWithSSA(extend.body, constantPropResult, n, reachingDefs)
+      val result = evaluateExpressionWithSSA(extend.body, constantPropResult, n, reachingDefs, exactEquality)
       applySingle(BitVectorEval.smt_zero_extend(extend.extension, _: BitVecLiteral), result)
-    case extend: SignExtend =>
-      val result = evaluateExpressionWithSSA(extend.body, constantPropResult, n, reachingDefs)
-      applySingle(BitVectorEval.smt_sign_extend(extend.extension, _: BitVecLiteral), result)
+    case se: SignExtend =>
+      val result = evaluateExpressionWithSSA(se.body, constantPropResult, n, reachingDefs, exactEquality)
+      applySingle(BitVectorEval.smt_sign_extend(se.extension, _: BitVecLiteral), result)
     case e: Extract =>
-      val result = evaluateExpressionWithSSA(e.body, constantPropResult, n, reachingDefs)
+      val result = evaluateExpressionWithSSA(e.body, constantPropResult, n, reachingDefs, exactEquality)
       applySingle(BitVectorEval.boogie_extract(e.end, e.start, _: BitVecLiteral), result)
     case variable: Variable =>
-      constantPropResult(RegisterWrapperEqualSets(variable, getUse(variable, n, reachingDefs)))
+      if exactEquality then
+        constantPropResult(RegisterWrapperEqualSets(variable, getUse(variable, n, reachingDefs)))
+      else
+        constantPropResult.asInstanceOf[Map[RegisterWrapperPartialEquality, Set[BitVecLiteral]]](RegisterWrapperPartialEquality(variable, getUse(variable, n, reachingDefs)))
     case b: BitVecLiteral => Set(b)
     case _ => throw RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
   }

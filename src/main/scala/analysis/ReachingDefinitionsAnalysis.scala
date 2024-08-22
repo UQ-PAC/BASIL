@@ -28,7 +28,7 @@ case class ReachingDefinitionsAnalysis(program: Program) {
   private def generateUniqueDefinition(
       variable: Variable
   ): Assign = {
-    Assign(variable, BitVecLiteral(0, 0))
+    Assign(variable, Register("Unique", BitVecLiteral(0, 0)))
   }
 
   def transfer(n: CFGPosition, s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) =
@@ -71,6 +71,15 @@ case class ReachingDefinitionsAnalysis(program: Program) {
       transformUses(assume.body.variables, s)
     case indirectCall: IndirectCall =>
       transformUses(indirectCall.target.variables, s)
+    case directCall: DirectCall if directCall.target.name == "malloc" =>
+      // assume R0 has been assigned, generate a fake definition
+      val mallocVar = Register("R0", BitVecType(64))
+      val mallocDef = generateUniqueDefinition(mallocVar)
+      val mallocUseDefs: Map[Variable, Set[Definition]] = Set(mallocVar).foldLeft(Map.empty[Variable, Set[Definition]]) {
+        case (acc, v) =>
+          acc + (v -> s._1(v))
+      }
+      (s._1 + (Register("R0", BitVecType(64)) -> Set(mallocDef)), mallocUseDefs)
     case _ => s
   }
 }
@@ -79,3 +88,8 @@ class ReachingDefinitionsAnalysisSolver(program: Program)
   extends ReachingDefinitionsAnalysis(program)
     with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[ReachingDefinitionsAnalysis#Definition]], Map[Variable, Set[ReachingDefinitionsAnalysis#Definition]]), ReachingDefinitionsAnalysis#TupleElement]
     with IRIntraproceduralForwardDependencies
+
+class InterprocReachingDefinitionsAnalysisSolver(program: Program)
+  extends ReachingDefinitionsAnalysis(program)
+    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[ReachingDefinitionsAnalysis#Definition]], Map[Variable, Set[ReachingDefinitionsAnalysis#Definition]]), ReachingDefinitionsAnalysis#TupleElement]
+    with IRInterproceduralForwardDependencies

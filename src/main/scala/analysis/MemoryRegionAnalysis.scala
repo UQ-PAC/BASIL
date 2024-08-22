@@ -11,14 +11,15 @@ trait MemoryRegionAnalysis(val program: Program,
                            val globals: Map[BigInt, String],
                            val globalOffsets: Map[BigInt, BigInt],
                            val subroutines: Map[BigInt, String],
-                           val constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                           val constantProp: Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
                            val ANRResult: Map[CFGPosition, Set[Variable]],
                            val RNAResult: Map[CFGPosition, Set[Variable]],
-                           val regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
-                           reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-                           val maxDepth: Int) {
+                           val regionAccesses: Map[CfgNode, Map[RegisterWrapperPartialEquality, FlatElement[Expr]]],
+                           val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+                           val maxDepth: Int,
+                           val exactMatch: Boolean) {
 
-  var mallocCount: Int = 0
+  private var mallocCount: Int = 0
   private var stackCount: Int = 0
   val stackMap: mutable.Map[Procedure, mutable.Map[Expr, StackRegion]] = mutable.Map()
 
@@ -89,7 +90,7 @@ trait MemoryRegionAnalysis(val program: Program,
   private val spList = ListBuffer[Expr](stackPointer)
   private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
   // TODO: this could be used instead of regionAccesses in other analyses to reduce the Expr to region conversion
-  private val registerToRegions: mutable.Map[RegisterVariableWrapper, mutable.Set[MemoryRegion]] = mutable.Map()
+  private val registerToRegions: mutable.Map[RegisterWrapperPartialEquality, mutable.Set[MemoryRegion]] = mutable.Map()
   val procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]] = mutable.Map()
   var depthMap: mutable.Map[CFGPosition, Int] = mutable.Map()
 
@@ -118,19 +119,21 @@ trait MemoryRegionAnalysis(val program: Program,
               println(s"Unreducible: $i")
               eval(i.rhs, Set.empty, i)
           }
-          evaluateExpression(binExpr.arg2, constantProp(n)) match {
-            case Some(b: BitVecLiteral) =>
-              regions.foreach {
-                case stackRegion: StackRegion =>
-                  val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
-                  evaluateExpression(nextOffset, constantProp(n)) match {
-                    case Some(b2: BitVecLiteral) =>
-                      reducedRegions = reducedRegions + poolMaster(b2, IRWalk.procedure(n))
-                    case None =>
-                  }
-                case _ =>
-              }
-            case None =>
+          for (elem <- evaluateExpressionWithSSA(binExpr.arg2, constantProp(n), n, reachingDefs, exactMatch)) {
+            elem match {
+              case b: BitVecLiteral =>
+                regions.foreach {
+                  case stackRegion: StackRegion =>
+                    val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
+                    for (elem <- evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs, exactMatch)) {
+                      elem match {
+                        case b2: BitVecLiteral =>
+                          reducedRegions = reducedRegions + poolMaster(b2, IRWalk.procedure(n))
+                      }
+                    }
+                  case _ =>
+                }
+            }
           }
         }
       case _ =>
@@ -140,66 +143,72 @@ trait MemoryRegionAnalysis(val program: Program,
 
   def eval(exp: Expr, env: Set[MemoryRegion], n: Command): Set[MemoryRegion] = {
     println(s"Asked to evaluate: $exp at ${n.label}")
+    val regionsToReturn = mutable.Set[MemoryRegion]()
     exp match {
       case binOp: BinaryExpr =>
         if (spList.contains(binOp.arg1)) {
-          evaluateExpression(binOp.arg2, constantProp(n)) match {
-            case Some(b: BitVecLiteral) => Set(poolMaster(b, IRWalk.procedure(n)))
-            case None => throw RuntimeException(s"This should be reducible: $exp")
+          for (elem <- evaluateExpressionWithSSA(binOp.arg2, constantProp(n), n, reachingDefs, exactMatch)) {
+            elem match {
+              case b: BitVecLiteral => regionsToReturn.addAll(Set(poolMaster(b, IRWalk.procedure(n))))
+            }
           }
         } else {
           val reduced = reducibleToRegion(binOp, n)
           if (reduced.nonEmpty) {
             println(s"Reducible: exp $exp")
-            reduced
+            regionsToReturn.addAll(reduced)
           } else {
-            evaluateExpression(binOp, constantProp(n)) match {
-              case Some(b: BitVecLiteral) => eval(b, env, n)
-              case None => eval(binOp.arg1, env, n) ++ eval(binOp.arg2, env, n)
+            val elems = evaluateExpressionWithSSA(binOp, constantProp(n), n, reachingDefs, exactMatch)
+            for (elem <- elems) {
+              elem match {
+                case b: BitVecLiteral => regionsToReturn.addAll(eval(b, env, n))
+              }
+            }
+            if (elems.isEmpty) {
+              regionsToReturn.addAll(eval(binOp.arg1, env, n) ++ eval(binOp.arg2, env, n))
             }
           }
         }
       case variable: Variable =>
         variable match {
           case _: LocalVar =>
-            env
           case reg: Register if spList.contains(reg) =>
-            Set(poolMaster(BitVecLiteral(0, 64), IRWalk.procedure(n)))
+            regionsToReturn.addAll(Set(poolMaster(BitVecLiteral(0, 64), IRWalk.procedure(n))))
           case _ =>
-            evaluateExpression(variable, constantProp(n)) match {
-              case Some(b: BitVecLiteral) =>
-                eval(b, env, n)
-              case _ =>
-                env // we cannot evaluate this to a concrete value, we need VSA for this
+            for (elem <- evaluateExpressionWithSSA(variable, constantProp(n), n, reachingDefs, exactMatch)) {
+              elem match {
+                case b: BitVecLiteral =>
+                  regionsToReturn.addAll(eval(b, env, n))
+              }
             }
         }
       case memoryLoad: MemoryLoad =>
-        eval(memoryLoad.index, env, n)
+        regionsToReturn.addAll(eval(memoryLoad.index, env, n))
       // ignore case where it could be a global region (loaded later in MMM from relf)
       case b: BitVecLiteral =>
-        env
       case literal: Literal => // ignore literals other than BitVectors
-        env
       case extract: Extract =>
-        eval(extract.body, env, n)
+        regionsToReturn.addAll(eval(extract.body, env, n))
       case repeat: Repeat =>
-        eval(repeat.body, env, n)
+        regionsToReturn.addAll(eval(repeat.body, env, n))
       case zeroExtend: ZeroExtend =>
-        eval(zeroExtend.body, env, n)
+        regionsToReturn.addAll(eval(zeroExtend.body, env, n))
       case signExtend: SignExtend =>
-        eval(signExtend.body, env, n)
+        regionsToReturn.addAll(eval(signExtend.body, env, n))
       case unaryExpr: UnaryExpr =>
-        eval(unaryExpr.arg, env, n)
+        regionsToReturn.addAll(eval(unaryExpr.arg, env, n))
       case memoryStore: MemoryAssign =>
-        eval(memoryStore.index, env, n) ++ eval(memoryStore.value, env, n)
+        regionsToReturn.addAll(eval(memoryStore.index, env, n) ++ eval(memoryStore.value, env, n))
       case memory: Memory =>
-        env
     }
+    regionsToReturn.toSet
   }
 
   /** Transfer function for state lattice elements.
    */
-  def localTransfer(n: CFGPosition, s: Set[MemoryRegion]): Set[MemoryRegion] = n match {
+  def localTransfer(n: CFGPosition, s: Set[MemoryRegion]): Set[MemoryRegion] =
+    var m = s
+    n match {
     case cmd: Command =>
       println(s"N: $n")
       cmd match {
@@ -222,41 +231,69 @@ trait MemoryRegionAnalysis(val program: Program,
 //            }
 //          }
           if (directCall.target.name == "malloc") {
-            evaluateExpression(mallocVariable, constantProp(n)) match {
-              case Some(b: BitVecLiteral) => regionLattice.lub(s, Set(HeapRegion(nextMallocCount(), b, IRWalk.procedure(n))))
-              case None => s
+            for (elem <- evaluateExpressionWithSSA(mallocVariable, constantProp(n), n, reachingDefs, exactMatch)) {
+              elem match {
+                case b: BitVecLiteral => m = regionLattice.lub(m, Set(HeapRegion(nextMallocCount(), b, IRWalk.procedure(n))))
+              }
             }
-          } else {
-            s
           }
         case memAssign: MemoryAssign =>
-          val result = eval(memAssign.index, s, cmd)
-          regionLattice.lub(s, result)
+          val result = eval(memAssign.rhs.index, m, cmd)
+          m = regionLattice.lub(m, result)
         case localAssign: Assign =>
           stackDetection(localAssign)
-          val result = eval(localAssign.rhs, s, cmd)
-          regionLattice.lub(s, result)
-        case _ => s
+          val result = eval(localAssign.rhs, m, cmd)
+          m = regionLattice.lub(m, result)
+        case _ =>
       }
-    case _ => s // ignore other kinds of nodes
+    case _ => // ignore other kinds of nodes
   }
+    m
 
   def transferUnlifted(n: CFGPosition, s: Set[MemoryRegion]): Set[MemoryRegion] = localTransfer(n, s)
 }
 
 class MemoryRegionAnalysisSolver(
-    program: Program,
-    globals: Map[BigInt, String],
-    globalOffsets: Map[BigInt, BigInt],
-    subroutines: Map[BigInt, String],
-    constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    ANRResult: Map[CFGPosition, Set[Variable]],
-    RNAResult: Map[CFGPosition, Set[Variable]],
-    regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-    maxDepth: Int
-  ) extends MemoryRegionAnalysis(program, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, regionAccesses, reachingDefs, maxDepth)
+                                  program: Program,
+                                  globals: Map[BigInt, String],
+                                  globalOffsets: Map[BigInt, BigInt],
+                                  subroutines: Map[BigInt, String],
+                                  constantProp: Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
+                                  ANRResult: Map[CFGPosition, Set[Variable]],
+                                  RNAResult: Map[CFGPosition, Set[Variable]],
+                                  regionAccesses: Map[CfgNode, Map[RegisterWrapperPartialEquality, FlatElement[Expr]]],
+                                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+                                  maxDepth: Int,
+                                  exactMatch: Boolean = true
+  ) extends MemoryRegionAnalysis(program, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, regionAccesses, reachingDefs, maxDepth, exactMatch)
   with IRIntraproceduralForwardDependencies
+  with Analysis[Map[CFGPosition, LiftedElement[Set[MemoryRegion]]]]
+  with WorklistFixpointSolverWithReachability[CFGPosition, Set[MemoryRegion], PowersetLattice[MemoryRegion]] {
+
+  override def funsub(n: CFGPosition, x: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]]): LiftedElement[Set[MemoryRegion]] = {
+    n match {
+      // function entry nodes are always reachable as this is intraprocedural
+      case _: Procedure => liftedLattice.lift(regionLattice.bottom)
+      // all other nodes are processed with join+transfer
+      case _ => super.funsub(n, x)
+    }
+  }
+}
+
+class InterprocMemoryRegionAnalysisSolver(
+                                  program: Program,
+                                  globals: Map[BigInt, String],
+                                  globalOffsets: Map[BigInt, BigInt],
+                                  subroutines: Map[BigInt, String],
+                                  constantProp: Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
+                                  ANRResult: Map[CFGPosition, Set[Variable]],
+                                  RNAResult: Map[CFGPosition, Set[Variable]],
+                                  regionAccesses: Map[CfgNode, Map[RegisterWrapperPartialEquality, FlatElement[Expr]]],
+                                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
+                                  maxDepth: Int,
+                                  exactMatch: Boolean = false
+                                ) extends MemoryRegionAnalysis(program, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, regionAccesses, reachingDefs, maxDepth, exactMatch)
+  with IRInterproceduralForwardDependencies
   with Analysis[Map[CFGPosition, LiftedElement[Set[MemoryRegion]]]]
   with WorklistFixpointSolverWithReachability[CFGPosition, Set[MemoryRegion], PowersetLattice[MemoryRegion]] {
 

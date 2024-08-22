@@ -335,25 +335,7 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
     }
   }
 
-  def sub(s: StridedWrappedInterval, t: StridedWrappedInterval): StridedWrappedInterval = {
-    (s, t) match {
-      case (SIBottom, _) => SIBottom // TODO: is this correct?
-      case (_, SIBottom) => SIBottom // TODO: is this correct?
-      case (SI(ss, a, b, w1), SI(st, c, d, w2)) if (cardinalityFunction(s, w1) + cardinalityFunction(t, w2)) <= BigInt(2).pow(w1.toInt) =>
-        assert(w1 == w2)
-        return SI(ss.gcd(st), modularMinus(a, d, w1), modularMinus(b, c, w1), w1)
-      case _ => SITop
-    }
-  }
 
-  def sub(s: StridedWrappedInterval, t: BigInt, w: BigInt): StridedWrappedInterval = {
-    (s, t) match {
-      case (SIBottom, _) => SIBottom // TODO: is this correct?
-      case (SI(ss, a, b, w1), t) =>
-        return sub(s, singletonSI(t, w))
-      case _ => SITop
-    }
-  }
 
 
 //  /** S1[L1, U1] meet S2[L2, U2] -> gcd(S1, S2)[max(L1, L2), min(U1, U2)] */
@@ -452,23 +434,23 @@ class SASILattice extends Lattice[StridedWrappedInterval] {
 //  }
 }
 
-sealed trait ValueSet[T]
+trait ValueSet[+T]
 
 case class VS[T](m: Map[T, StridedWrappedInterval]) extends ValueSet[T] {
   override def toString: String = m.toString
 }
 
+case object VSBottom extends ValueSet[Nothing] {
+  override def toString = "VSBot"
+}
+
+case object VSTop extends ValueSet[Nothing] {
+  override def toString = "VSTop"
+}
+
 /** The lattice of integers with the standard ordering.
  */
 class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
-
-  case object VSBottom extends ValueSet[T] {
-    override def toString = "VSBot"
-  }
-
-  case object VSTop extends ValueSet[T] {
-    override def toString = "VSTop"
-  }
 
   override val bottom: ValueSet[T] = VSBottom
   override def top: ValueSet[T] = VSTop
@@ -507,70 +489,6 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
 //    }
 //  }
 
-  def applyOp(op: BinOp, lhs: ValueSet[T], rhs: Either[ValueSet[T], BitVecLiteral]): ValueSet[T] = {
-    op match
-      case bvOp: BVBinOp =>
-        bvOp match
-          case BVAND => ???
-          case BVOR => ???
-          case BVADD => rhs match
-            case Left(vs) => add(lhs, vs)
-            case Right(bitVecLiteral) => add(lhs, bitVecLiteral)
-          case BVMUL => ???
-          case BVUDIV => ???
-          case BVUREM => ???
-          case BVSHL => ???
-          case BVLSHR => ???
-          case BVULT => ???
-          case BVNAND => ???
-          case BVNOR => ???
-          case BVXOR => ???
-          case BVXNOR => ???
-          case BVCOMP => ???
-          case BVSUB =>  rhs match
-            case Left(vs) => sub(lhs, vs)
-            case Right(bitVecLiteral) => sub(lhs, bitVecLiteral)
-          case BVSDIV => ???
-          case BVSREM => ???
-          case BVSMOD => ???
-          case BVASHR => ???
-          case BVULE => ???
-          case BVUGT => ???
-          case BVUGE => ???
-          case BVSLT => ???
-          case BVSLE => ???
-          case BVSGT => ???
-          case BVSGE => ???
-          case BVEQ => ???
-          case BVNEQ => ???
-          case BVCONCAT => ???
-      case boolOp: BoolBinOp =>
-        boolOp match
-          case BoolEQ => applyOp(BVEQ, lhs, rhs)
-          case BoolNEQ => applyOp(BVNEQ, lhs, rhs)
-          case BoolAND => applyOp(BVAND, lhs, rhs)
-          case BoolOR => applyOp(BVOR, lhs, rhs)
-          case BoolIMPLIES => ???
-          case BoolEQUIV => ???
-      case intOp: IntBinOp =>
-        applyOp(intOp.toBV, lhs, rhs)
-      case _ => ???
-  }
-
-  def applyOp(op: UnOp, rhs: ValueSet[T]): ValueSet[T] = {
-    op match
-      case bvOp: BVUnOp =>
-        bvOp match
-          case BVNOT => ???
-          case BVNEG => ???
-      case boolOp: BoolUnOp =>
-        boolOp match
-          case BoolNOT => ???
-      case intOp: IntUnOp =>
-        applyOp(intOp.toBV, rhs)
-      case _ => ???
-  }
-
   def add(x: ValueSet[T], y: ValueSet[T]): ValueSet[T] = {
     (x, y) match {
       case (VSBottom, t) => t
@@ -598,45 +516,21 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
     }
   }
 
-  def sub(x: ValueSet[T], y: ValueSet[T]): ValueSet[T] = {
-    (x, y) match {
-      case (VSBottom, t) => VSBottom
-      case (t, VSBottom) => t
+  def widen(vs1: ValueSet[T], vs2: ValueSet[T]): ValueSet[T] = {
+    (vs1, vs2) match {
+      case (VSBottom, t) => ???
+      case (t, VSBottom) => ???
+      case (VSTop, _) => VSTop
+      case (_, VSTop) => VSTop
       case (VS(m1), VS(m2)) =>
         VS(m1.keys.foldLeft(m2) {
           case (acc, k) =>
             val v1 = m1(k)
             val v2 = m2(k)
-            acc + (k -> lattice.sub(v1, v2))
+            acc + (k -> lattice.widen(v1, v2))
         })
     }
   }
-
-  def sub(x: ValueSet[T], y: BitVecLiteral): ValueSet[T] = {
-    x match {
-      case VSBottom => VSBottom
-      case VS(m) =>
-        VS(m.map {
-          case (k, s) => k -> lattice.sub(s, y.value, y.size) // TODO: is the size correct here?
-        })
-    }
-  }
-
-//  def widen(vs1: ValueSet[T], vs2: ValueSet[T]): ValueSet[T] = {
-//    (vs1, vs2) match {
-//      case (VSBottom, t) => ???
-//      case (t, VSBottom) => ???
-//      case (VSTop, _) => VSTop
-//      case (_, VSTop) => VSTop
-//      case (VS(m1), VS(m2)) =>
-//        VS(m1.keys.foldLeft(m2) {
-//          case (acc, k) =>
-//            val v1 = m1(k)
-//            val v2 = m2(k)
-//            acc + (k -> lattice.widen(v1, v2))
-//        })
-//    }
-//  }
 
   def removeLowerBounds(vs: ValueSet[T]): ValueSet[T] = {
     vs match {
@@ -660,17 +554,6 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
     }
   }
 
-  extension (r: DataRegion | StackRegion)
-    def start: BigInt = r match {
-      case d: DataRegion => d.start.value
-      case s: StackRegion => s.start.value
-    }
-
-    def end(mmm: MemoryModelMap): BigInt = r match {
-      case d: DataRegion => mmm.getEnd(d)
-      case s: StackRegion => mmm.getEnd(s)
-    }
-
   /**
    * ∗(vs, s): Returns a pair of sets (F, P). F represents the set of “fully accessed” a-locs: it
    * consists of the a-locs that are of size s and whose starting addresses are in vs. P represents
@@ -683,8 +566,6 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
    * @return
    */
   def dereference(s: BigInt, vs: ValueSet[String], mmm: MemoryModelMap): (Set[MemoryRegion], Set[MemoryRegion]) = {
-    var fullyAccessedLocations = Set[MemoryRegion]()
-    var partiallyAccessedLocations = Set[MemoryRegion]()
     vs match {
       case VSBottom => VSBottom
       case VSTop => ??? //TODO: should this return everything?
@@ -692,126 +573,26 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
         for (elem <- m) {
           if (elem._2 != lattice.bottom) { // region SI defined
             elem._2 match {
-                case SI(stride, lower, upper, w) =>
+                case SI(stride, lower, upper) =>
+                  val gamma: Set[BitVecLiteral] = lattice.gamma(SI(stride, lower, upper))
                   // TODO: Global memory size can be retrieved from the symbol table and are of size s
                   // Map addresses to exact memory locations
-                  val regionsWithSize = mmm.getRegionsWithSize(s, elem._1)
-                  fullyAccessedLocations = fullyAccessedLocations ++ regionsWithSize.filter(region => (region.isInstanceOf[DataRegion | StackRegion] && region.asInstanceOf[DataRegion | StackRegion].start >= lower && region.asInstanceOf[DataRegion | StackRegion].start <= upper) || region.isInstanceOf[HeapRegion]) // TODO: THIS IS NOT THE RIGHT WAY TO CHECK IF ADDRESS IS IN SI
+                  val fullyAccessedLocations = gamma.toList.flatMap(address => mmm.findStackFullAccessesOnly(address.value, s))
 
-                  // Identify partially accessed locations (if any)
-                  val notOfSize = mmm.getRegionsWithSize(s, elem._1, true)
-                  // start or end must be in SI
-                  partiallyAccessedLocations = partiallyAccessedLocations ++ regionsWithSize.filter(region => region.asInstanceOf[DataRegion | StackRegion].start >= lower && region.asInstanceOf[DataRegion | StackRegion].start <= upper || ((region.asInstanceOf[DataRegion | StackRegion].end(mmm) >= lower) && region.asInstanceOf[DataRegion | StackRegion].end(mmm) <= upper))
+                    // Identify partially accessed locations (if any)
+                  val partiallyAccessedLocations = gamma.toList.flatMap(address => mmm.findStackPartialAccessesOnly(address.value, s))
+
+                    // Return the set of fully accessed locations and the set of partially accessed locations
+                  return (fullyAccessedLocations.diff(partiallyAccessedLocations).asInstanceOf[Set[MemoryRegion]], partiallyAccessedLocations.asInstanceOf[Set[MemoryRegion]])
                 case _ => ???
             }
           }
         }
     }
-    // Return the set of fully accessed locations and the set of partially accessed locations
-    (fullyAccessedLocations, partiallyAccessedLocations)
+    (Set.empty, Set.empty)
   }
 }
 
-trait Bool3
-
-case object BOTTOM_BOOL3 extends Bool3 {
-  override def toString = "BOTTOM"
-}
-
-case object FALSE_BOOL3 extends Bool3 {
-  override def toString = "FALSE"
-}
-
-case object TURE_BOOL3 extends Bool3 {
-  override def toString = "TRUE"
-}
-
-case object MAYBE_BOOL3 extends Bool3 {
-  override def toString = "MAYBE"
-}
-
-/** The lattice of booleans with the standard ordering.
- */
-class Bool3Lattice extends Lattice[Bool3] {
-
-  override val bottom: Bool3 = BOTTOM_BOOL3
-
-  override def top: Bool3 = MAYBE_BOOL3
-
-  override def lub(x: Bool3, y: Bool3): Bool3 = {
-    (x, y) match {
-      case (BOTTOM_BOOL3, t) => t
-      case (t, BOTTOM_BOOL3) => t
-      case (TURE_BOOL3, FALSE_BOOL3) => MAYBE_BOOL3
-      case (FALSE_BOOL3, TURE_BOOL3) => MAYBE_BOOL3
-      case _ => x
-    }
-  }
-}
-
-enum Flags {
-  case CF // Carry Flag
-  case ZF // Zero Flag
-  case SF // Sign Flag
-  case PF // Parity Flag
-  case AF // Auxiliary Flag
-  case OF // Overflow Flag
-}
-
-/**
- * case CF // Carry Flag
- * case ZF // Zero Flag
- * case SF // Sign Flag
- * case PF // Parity Flag
- * case AF // Auxiliary Flag
- * case OF // Overflow Flag
- */
-trait Flag
-
-case object BOTTOM_Flag extends Flag {
-  override def toString = "BOTTOM_FLAG"
-}
-
-case class FlagMap(m: Map[Flags, Bool3]) extends Flag {
-  override def toString: String = m.toString
-}
-
-
-/** The lattice of booleans with the standard ordering.
- */
-class FlagLattice extends Lattice[Flag] {
-
-  override val bottom: Flag = BOTTOM_Flag
-
-  override def top: Flag = FlagMap(Map(
-    Flags.CF -> MAYBE_BOOL3,
-    Flags.ZF -> MAYBE_BOOL3,
-    Flags.SF -> MAYBE_BOOL3,
-    Flags.PF -> MAYBE_BOOL3,
-    Flags.AF -> MAYBE_BOOL3,
-    Flags.OF -> MAYBE_BOOL3
-  ))
-
-  val lattice: Bool3Lattice = Bool3Lattice()
-
-  override def lub(x: Flag, y: Flag): Flag = {
-    (x, y) match {
-      case (BOTTOM_Flag, t) => t
-      case (t, BOTTOM_Flag) => t
-      case (FlagMap(m1), FlagMap(m2)) =>
-        FlagMap(m1.keys.foldLeft(m2) {
-          case (acc, k) =>
-            val v1 = m1(k)
-            val v2 = m2(k)
-            acc + (k -> lattice.lub(v1, v2))
-        })
-    }
-  }
-
-  def setFlag(flag: Flags, value: Bool3): Flag = {
-      FlagMap(Map(flag -> value))
-  }
-}
 
 
 /** The powerset lattice of a set of elements of type `A` with subset ordering.
