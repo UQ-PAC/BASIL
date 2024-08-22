@@ -50,17 +50,17 @@ case class IRContext(
 /** Stores the results of the static analyses.
   */
 case class StaticAnalysisContext(
-    cfg: ProgramCfg,
-    constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    memoryRegionResult: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]],
-    vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
-    interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
-    paramResults: Map[Procedure, Set[Variable]],
-    steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
-    mmmResults: MemoryModelMap,
-    memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]
+                                  cfg: ProgramCfg,
+                                  constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                                  IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                                  memoryRegionResult: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]],
+                                  vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
+                                  interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
+                                  paramResults: Map[Procedure, Set[Variable]],
+                                  steensgaardResults: Map[RegisterWrapperPartialEquality, Set[RegisterWrapperPartialEquality | MemoryRegion]],
+                                  mmmResults: MemoryModelMap,
+                                  memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
+                                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]
 )
 
 /** Results of the main program execution.
@@ -315,11 +315,11 @@ object IRTransform {
   }
 
   def resolveIndirectCallsUsingPointsTo(
-     cfg: ProgramCfg,
-     pointsTos: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
-     regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-     reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
-     IRProgram: Program
+                                         cfg: ProgramCfg,
+                                         pointsTos: Map[RegisterWrapperPartialEquality, Set[RegisterWrapperPartialEquality | MemoryRegion]],
+                                         regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
+                                         reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
+                                         IRProgram: Program
    ): Boolean = {
     var modified: Boolean = false
     val worklist = ListBuffer[CfgNode]()
@@ -374,11 +374,11 @@ object IRTransform {
 
     def resolveAddresses(variable: Variable, n: CfgNode): mutable.Set[String] = {
       val names = mutable.Set[String]()
-      val variableWrapper = RegisterVariableWrapper(variable, getUse(variable, n.asInstanceOf[CfgCommandNode].data, reachingDefs))
+      val variableWrapper = RegisterWrapperPartialEquality(variable, getUse(variable, n.asInstanceOf[CfgCommandNode].data, reachingDefs))
       pointsTos.get(variableWrapper) match {
         case Some(value) =>
           value.map {
-            case v: RegisterVariableWrapper => names.addAll(resolveAddresses(v.variable, n))
+            case v: RegisterWrapperPartialEquality => names.addAll(resolveAddresses(v.variable, n))
             case m: MemoryRegion => names.addAll(searchRegion(m))
           }
           names
@@ -552,7 +552,7 @@ object StaticAnalysis {
     })
 
     Logger.info("[!] Running Reaching Definitions Analysis")
-    val reachingDefinitionsAnalysisSolver = ReachingDefinitionsAnalysisSolver(IRProgram)
+    val reachingDefinitionsAnalysisSolver = InterprocReachingDefinitionsAnalysisSolver(IRProgram)
     val reachingDefinitionsAnalysisResults = reachingDefinitionsAnalysisSolver.analyze()
 
     println(s"Finished reaching definitions at ${(System.nanoTime() - before) / 1000000} ms")
@@ -581,7 +581,7 @@ object StaticAnalysis {
     println(s"Finished ConstProp with SSA at ${(System.nanoTime() - before) / 1000000} ms")
 
     Logger.info("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults, maxDepth = 3)
+    val mraSolver = InterprocMemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constPropResultWithSSA, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults, maxDepth = 3)
     val mraResult = mraSolver.analyze()
 
     Logger.info("[!] Running MMM")
@@ -590,7 +590,7 @@ object StaticAnalysis {
     mmm.logRegions()
 
     Logger.info("[!] Injecting regions")
-    val regionInjector = RegionInjector(domain, constPropResultWithSSA, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
+    val regionInjector = RegionInjector(domain, IRProgram, constPropResultWithSSA, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
     regionInjector.nodeVisitor()
 
     Logger.info("[!] Running Steensgaard")
@@ -613,6 +613,11 @@ object StaticAnalysis {
       )
 
       writeToFile(
+        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> constPropResultWithSSA(b).toString).toMap),
+        s"${s}_new_ir_constpropWithSSA$iteration.dot"
+      )
+
+      writeToFile(
         toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> mraResult(b).toString).toMap),
         s"${s}_MRA$iteration.dot"
       )
@@ -623,17 +628,19 @@ object StaticAnalysis {
 //      ValueSetAnalysisSolver(IRProgram, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
 //    val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
+
+
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = Map()
-
-    val actualVSA = ActualVSA(IRProgram, constPropResult, reachingDefinitionsAnalysisResults, mmm)
-    val actualVSAResults: mutable.Map[CFGPosition, actualVSA.AbsEnv] = actualVSA.IntraProceduralVSA()
-
-    config.analysisDotPath.foreach(s => {
-      writeToFile(
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> actualVSAResults.withDefaultValue(actualVSA.AbsEnv(mutable.Map(), mutable.Map(), mutable.Map())).get(b).toString).toMap),
-        s"${s}_ActualVSA$iteration.dot"
-      )
-    })
+//
+//    val actualVSA = ActualVSA(IRProgram, constPropResult, reachingDefinitionsAnalysisResults, mmm)
+//    val actualVSAResults: mutable.Map[CFGPosition, actualVSA.AbsEnv] = actualVSA.IntraProceduralVSA()
+//
+//    config.analysisDotPath.foreach(s => {
+//      writeToFile(
+//        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> actualVSAResults.withDefaultValue(actualVSA.AbsEnv()).get(b).toString).toMap),
+//        s"${s}_ActualVSA$iteration.dot"
+//      )
+//    })
 
     Logger.info("[!] Running Interprocedural Live Variables Analysis")
     //val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()

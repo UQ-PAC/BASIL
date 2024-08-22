@@ -164,10 +164,10 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
           // assignments
           case la: LocalAssign =>
             val lhsWrappers = s.collect {
-              case (k, v) if RegisterVariableWrapper(k.variable, k.assigns) == RegisterVariableWrapper(la.lhs, getDefinition(la.lhs, r, reachingDefs)) => (k, v)
+              case (k, v) if RegisterWrapperPartialEquality(k.variable, k.assigns) == RegisterWrapperPartialEquality(la.lhs, getDefinition(la.lhs, r, reachingDefs)) => (k, v)
             }
             if (lhsWrappers.nonEmpty) {
-              s ++ lhsWrappers.map((k, v) => (k, v.union(eval(la.rhs, s, r))))
+              s ++ lhsWrappers.map((k, v) => (RegisterWrapperEqualSets(k.variable, k.assigns ++ getDefinition(la.lhs, r, reachingDefs)), v.union(eval(la.rhs, s, r))))
             } else {
               s + (RegisterWrapperEqualSets(la.lhs, getDefinition(la.lhs, r, reachingDefs)) -> eval(la.rhs, s, n))
             }
@@ -190,5 +190,5 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
 
 class ConstantPropagationSolverWithSSA(program: Program, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])]) extends ConstantPropagationWithSSA(program, reachingDefs)
   with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], MapLattice[RegisterWrapperEqualSets, Set[BitVecLiteral], ConstantPropagationLatticeWithSSA]]
-  with IRIntraproceduralForwardDependencies
+  with IRInterproceduralForwardDependencies
   with Analysis[Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]]]

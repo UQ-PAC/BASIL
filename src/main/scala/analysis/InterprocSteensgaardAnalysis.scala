@@ -5,14 +5,21 @@ import ir.*
 import util.Logger
 import scala.collection.mutable
 
+trait RegisterEquality:
+  def variable: Variable
+  def assigns: Set[LocalAssign]
+
 /** Wrapper for variables so we can have Steensgaard-specific equals method indirectly
  * Relies on the SSA sets intersection being non-empty
  * */
-case class RegisterVariableWrapper(variable: Variable, assigns: Set[LocalAssign]) {
+case class RegisterWrapperPartialEquality(variable: Variable, assigns: Set[LocalAssign]) extends RegisterEquality {
   override def equals(obj: Any): Boolean = {
     obj match {
-      case RegisterVariableWrapper(other, otherAssigns) =>
+      case RegisterWrapperPartialEquality(other, otherAssigns) =>
         variable == other && assigns.intersect(otherAssigns).nonEmpty
+      case RegisterWrapperEqualSets(other, otherAssigns) =>
+        // treat it as Partial Equality
+        RegisterWrapperPartialEquality(variable, assigns) == RegisterWrapperPartialEquality(other, otherAssigns)
       case _ =>
         false
     }
@@ -22,11 +29,14 @@ case class RegisterVariableWrapper(variable: Variable, assigns: Set[LocalAssign]
 /** Wrapper for variables so we can have ConstantPropegation-specific equals method indirectly
  * Relies on SSA sets being exactly the same
  * */
-case class RegisterWrapperEqualSets(variable: Variable, assigns: Set[LocalAssign]) {
+case class RegisterWrapperEqualSets(variable: Variable, assigns: Set[LocalAssign]) extends RegisterEquality {
   override def equals(obj: Any): Boolean = {
     obj match {
       case RegisterWrapperEqualSets(other, otherAssigns) =>
         variable == other && assigns == otherAssigns
+      case RegisterWrapperPartialEquality(other, otherAssigns) =>
+        // treat it as Partial Equality
+        RegisterWrapperPartialEquality(variable, assigns) == RegisterWrapperPartialEquality(other, otherAssigns)
       case _ =>
         false
     }
@@ -37,12 +47,12 @@ case class RegisterWrapperEqualSets(variable: Variable, assigns: Set[LocalAssign
   * expression node in the AST. It is implemented using [[analysis.solvers.UnionFindSolver]].
   */
 class InterprocSteensgaardAnalysis(
-      program: Program,
-      constantProp: Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
-      regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
-      mmm: MemoryModelMap,
-      reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
-      globalOffsets: Map[BigInt, BigInt]) extends Analysis[Any] {
+                                    program: Program,
+                                    constantProp: Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
+                                    regionAccesses: Map[CfgNode, Map[RegisterWrapperPartialEquality, FlatElement[Expr]]],
+                                    mmm: MemoryModelMap,
+                                    reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
+                                    globalOffsets: Map[BigInt, BigInt]) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
 
@@ -249,7 +259,7 @@ class InterprocSteensgaardAnalysis(
           // X = alloc P:  [[X]] = ↑[[alloc-i]]
           if (directCall.target.name == "malloc") {
             val alloc = HeapRegion(nextMallocCount(), BitVecLiteral(BigInt(0), 0), IRWalk.procedure(cmd))
-            unify(IdentifierVariable(RegisterVariableWrapper(mallocVariable, getUse(mallocVariable, cmd, reachingDefs))), PointerRef(AllocVariable(alloc)))
+            unify(IdentifierVariable(RegisterWrapperPartialEquality(mallocVariable, getUse(mallocVariable, cmd, reachingDefs))), PointerRef(AllocVariable(alloc)))
           }
 
         case localAssign: LocalAssign =>
@@ -257,7 +267,7 @@ class InterprocSteensgaardAnalysis(
             case binOp: BinaryExpr =>
               // X1 = &X2: [[X1]] = ↑[[X2]]
               exprToRegion(binOp, cmd).foreach(
-                x => unify(IdentifierVariable(RegisterVariableWrapper(localAssign.lhs, getDefinition(localAssign.lhs, cmd, reachingDefs))), PointerRef(AllocVariable(x)))
+                x => unify(IdentifierVariable(RegisterWrapperPartialEquality(localAssign.lhs, getDefinition(localAssign.lhs, cmd, reachingDefs))), PointerRef(AllocVariable(x)))
               )
             // TODO: should lookout for global base + offset case as well
             case _ =>
@@ -270,7 +280,7 @@ class InterprocSteensgaardAnalysis(
                   X2_star.foreach(
                     x => unify(ExpressionVariable(x), PointerRef(alpha))
                   )
-                  unify(alpha, IdentifierVariable(RegisterVariableWrapper(X1, getDefinition(X1, cmd, reachingDefs))))
+                  unify(alpha, IdentifierVariable(RegisterWrapperPartialEquality(X1, getDefinition(X1, cmd, reachingDefs))))
 
                   Logger.debug("Memory load: " + memoryLoad)
                   Logger.debug("Index: " + memoryLoad.index)
@@ -282,13 +292,13 @@ class InterprocSteensgaardAnalysis(
                   // X1 = &X: [[X1]] = ↑[[X2]] (but for globals)
                   val $X2 = exprToRegion(memoryLoad.index, cmd)
                   $X2.foreach(
-                    x => unify(IdentifierVariable(RegisterVariableWrapper(localAssign.lhs, getDefinition(localAssign.lhs, cmd, reachingDefs))), PointerRef(AllocVariable(x)))
+                    x => unify(IdentifierVariable(RegisterWrapperPartialEquality(localAssign.lhs, getDefinition(localAssign.lhs, cmd, reachingDefs))), PointerRef(AllocVariable(x)))
                   )
                 case variable: Variable =>
                   // X1 = X2: [[X1]] = [[X2]]
                   val X1 = localAssign.lhs
                   val X2 = variable
-                  unify(IdentifierVariable(RegisterVariableWrapper(X1, getDefinition(X1, cmd, reachingDefs))), IdentifierVariable(RegisterVariableWrapper(X2, getUse(X2, cmd, reachingDefs))))
+                  unify(IdentifierVariable(RegisterWrapperPartialEquality(X1, getDefinition(X1, cmd, reachingDefs))), IdentifierVariable(RegisterWrapperPartialEquality(X2, getUse(X2, cmd, reachingDefs))))
                 case _ => // do nothing
               }
           }
@@ -329,16 +339,16 @@ class InterprocSteensgaardAnalysis(
 
   /** @inheritdoc
     */
-  def pointsTo(): Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]] = {
+  def pointsTo(): Map[RegisterWrapperPartialEquality, Set[RegisterWrapperPartialEquality | MemoryRegion]] = {
     val solution = solver.solution()
     val unifications = solver.unifications()
     Logger.debug(s"Solution: \n${solution.mkString(",\n")}\n")
     Logger.debug(s"Sets: \n${unifications.values.map { s => s"{ ${s.mkString(",")} }"}.mkString(", ")}")
 
     val vars = solution.keys.collect { case id: IdentifierVariable => id }
-    val emptyMap = Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]]()
+    val emptyMap = Map[RegisterWrapperPartialEquality, Set[RegisterWrapperPartialEquality | MemoryRegion]]()
     val pointsto = vars.foldLeft(emptyMap) { (a, v: IdentifierVariable) =>
-      val pt: Set[RegisterVariableWrapper | MemoryRegion] = unifications(solution(v)).collect {
+      val pt: Set[RegisterWrapperPartialEquality | MemoryRegion] = unifications(solution(v)).collect {
         case PointerRef(IdentifierVariable(id)) => id
         case PointerRef(AllocVariable(alloc))   => alloc
       }.toSet
@@ -350,9 +360,9 @@ class InterprocSteensgaardAnalysis(
 
   /** @inheritdoc
     */
-  def mayAlias(): (RegisterVariableWrapper, RegisterVariableWrapper) => Boolean = {
+  def mayAlias(): (RegisterWrapperPartialEquality, RegisterWrapperPartialEquality) => Boolean = {
     val solution = solver.solution()
-    (id1: RegisterVariableWrapper, id2: RegisterVariableWrapper) =>
+    (id1: RegisterWrapperPartialEquality, id2: RegisterWrapperPartialEquality) =>
       val sol1 = solution(IdentifierVariable(id1))
       val sol2 = solution(IdentifierVariable(id2))
       sol1 == sol2 && sol1.isInstanceOf[PointerRef] // same equivalence class, and it contains a reference
@@ -372,7 +382,7 @@ case class AllocVariable(alloc: MemoryRegion) extends StTerm with Var[StTerm] {
 
 /** A term variable that represents an identifier in the program.
   */
-case class IdentifierVariable(id: RegisterVariableWrapper) extends StTerm with Var[StTerm] {
+case class IdentifierVariable(id: RegisterWrapperPartialEquality) extends StTerm with Var[StTerm] {
 
   override def toString: String = s"$id"
 }
