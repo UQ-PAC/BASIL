@@ -32,12 +32,19 @@ case class InterpreterSummary(
     val memory: Map[Int, BitVecLiteral]
 )
 
-enum BasilValue(val irType: IRType):
-  case Scalar(val value: Literal) extends BasilValue(value.getType)
-  // Erase the type of basil values and enforce the invariant that
-  // \exists i . \forall v \in value.keys , v.irType = i  and
-  // \exists j . \forall v \in value.values, v.irType = j
-  case MapValue(val value: Map[BasilValue, BasilValue], override val irType: MapType) extends BasilValue(irType)
+sealed trait BasilValue(val irType: IRType)
+case class Scalar(val value: Literal) extends BasilValue(value.getType) {
+  override def toString = value match {
+    case b: BitVecLiteral => "0x%x:bv%d".format(b.value, b.size)
+    case c                => c.toString
+  }
+}
+// Erase the type of basil values and enforce the invariant that
+// \exists i . \forall v \in value.keys , v.irType = i  and
+// \exists j . \forall v \in value.values, v.irType = j
+case class MapValue(val value: Map[BasilValue, BasilValue], override val irType: MapType) extends BasilValue(irType) {
+  override def toString = s"MapValue : $irType"
+}
 
 case object BasilValue:
 
@@ -177,7 +184,7 @@ case class MemoryState(
   /* Define a variable in the scope specified
    * ignoring whether it may already be defined
    */
-  def defVar(name: String, s: Scope , value: BasilValue): MemoryState = {
+  def defVar(name: String, s: Scope, value: BasilValue): MemoryState = {
     val frame = s match {
       case Scope.Global => globalFrame
       case _            => activations.head
@@ -225,26 +232,90 @@ case class MemoryState(
   }
 
   /* Map variable accessing ; load and store operations */
-
-  /* canonical load operation */
-  def load(vname: String, addr: Scalar, endian: Endian, count: Int): List[BasilValue] = {
+  def doLoad(vname: String, addr: List[BasilValue]): List[BasilValue] = {
     val (frame, mem) = findVar(vname)
-
     val mapv: MapValue = mem match {
       case m @ MapValue(innerMap, ty) => m
-      case _                          => throw InterpreterError(Errored("Load from nonmap"))
+      case m                          => throw InterpreterError(TypeError(s"Load from nonmap ${m.irType}"))
     }
 
+    addr.map(k =>
+      mapv.value.get(k).getOrElse(throw InterpreterError(MemoryError(s"Read from uninitialised $vname[$k]")))
+    )
+  }
+
+  /** typecheck and some fields of a map variable */
+  def doStore(vname: String, values: Map[BasilValue, BasilValue]) = {
+    val (frame, mem) = findVar(vname)
+
+    val (mapval, keytype, valtype) = mem match {
+      case m @ MapValue(_, MapType(kt, vt)) => (m, kt, vt)
+      case v => throw InterpreterError(TypeError(s"Invalid map store operation to $vname : ${v.irType}"))
+    }
+
+    (values.find((k, v) => k.irType != keytype || v.irType != valtype)) match {
+      case Some(v) =>
+        throw InterpreterError(
+          TypeError(
+            s"Invalid addr or value type (${v._1.irType}, ${v._2.irType}) does not match map type $vname : ($keytype, $valtype)"
+          )
+        )
+      case None => ()
+    }
+
+    val nmap = MapValue(mapval.value ++ values, mapval.irType)
+    setVar(frame, vname, nmap)
+  }
+}
+
+case object Eval {
+  def getVar[T <: Effects[T]](s: T)(v: Variable): Option[Literal] = s.loadVar(v.name) match {
+    case Scalar(l) => Some(l)
+    case _         => None
+  }
+
+  def doLoad[T <: Effects[T]](s: T)(m: Memory, addr: Expr, endian: Endian, sz: Int): Option[Literal] = {
+    addr match {
+      case l: Literal if sz == 1 => (
+        loadSingle(s, m.name, Scalar(l)) match {
+          case Scalar(v) => Some(v)
+          case _         => None
+        }
+      )
+      case l: Literal => Some(loadBV(s, m.name, Scalar(l), endian, sz))
+      case _          => None
+    }
+  }
+
+  def evalBV[T <: Effects[T]](s: T, e: Expr): BitVecLiteral = {
+    ir.eval.evalBVExpr(e, Eval.getVar(s), Eval.doLoad(s)) match {
+      case Right(e) => e
+      case Left(e)  => throw InterpreterError(Errored(s"Eval BV residual $e"))
+    }
+  }
+
+  def evalInt[T <: Effects[T]](s: T, e: Expr): BigInt = {
+    ir.eval.evalIntExpr(e, Eval.getVar(s), Eval.doLoad(s)) match {
+      case Right(e) => e
+      case Left(e)  => throw InterpreterError(Errored(s"Eval int residual $e"))
+    }
+  }
+
+  def evalBool[T <: Effects[T]](s: T, e: Expr): Boolean = {
+    ir.eval.evalLogExpr(e, Eval.getVar(s), Eval.doLoad(s)) match {
+      case Right(e) => e
+      case Left(e)  => throw InterpreterError(Errored(s"Eval bool residual $e"))
+    }
+  }
+
+  /** Load helpers * */
+  def load[T <: Effects[T]](s: T, vname: String, addr: Scalar, endian: Endian, count: Int): List[BasilValue] = {
     if (count == 0) {
       throw InterpreterError(Errored(s"Attempted fractional load"))
     }
 
     val keys = (0 until count).map(i => BasilValue.unsafeAdd(addr, i))
-
-    val values = keys.map(k =>
-      mapv.value.get(k).getOrElse(throw InterpreterError(MemoryError(s"Read from uninitialised $vname[$k]")))
-    )
-
+    val values = s.loadMem(vname, keys.toList)
     val vals = endian match {
       case Endian.LittleEndian => values.reverse
       case Endian.BigEndian    => values
@@ -254,21 +325,22 @@ case class MemoryState(
   }
 
   /** Load and concat bitvectors */
-  def loadBV(vname: String, addr: Scalar, endian: Endian, size: Int): BitVecLiteral = {
-    val (frame, mem) = findVar(vname)
+  def loadBV[T <: Effects[T]](s: T, vname: String, addr: Scalar, endian: Endian, size: Int): BitVecLiteral = {
+    val mem = s.loadVar(vname)
 
     val (valsize, mapv) = mem match {
       case mapv @ MapValue(_, MapType(_, BitVecType(sz))) => (sz, mapv)
       case _ => throw InterpreterError(Errored("Trued to load-concat non bv"))
     }
 
-    val cells = size / BasilValue.size(mapv.irType.result)
+    val cells = size / valsize
 
     val bvs: List[BitVecLiteral] = {
-      val res = load(vname, addr, endian, cells)
+      val res = load(s, vname, addr, endian, cells)
       val rr = res.map {
         case Scalar(bv @ BitVecLiteral(v, sz)) if sz == valsize => bv
-        case _ => throw InterpreterError(Errored(s"Loaded value that did not match expected type bv$valsize"))
+        case c =>
+          throw InterpreterError(TypeError(s"Loaded value of type ${c.irType} did not match expected type bv$valsize"))
       }
       rr
     }
@@ -278,13 +350,16 @@ case class MemoryState(
     bvres
   }
 
-  def loadSingle(vname: String, addr: Scalar): BasilValue = {
-    load(vname, addr, Endian.LittleEndian, 1).head
+  def loadSingle[T <: Effects[T]](s: T, vname: String, addr: Scalar): BasilValue = {
+    load(s, vname, addr, Endian.LittleEndian, 1).head
   }
 
-  /** Canonical store operation */
-  def store(vname: String, addr: BasilValue, values: List[BasilValue], endian: Endian) = {
-    val (frame, mem) = findVar(vname)
+  /** State modifying helpers, e.g. store
+    */
+
+  /* Expand addr for number of values to store */
+  def store[T <: Effects[T]](st: T, vname: String, addr: BasilValue, values: List[BasilValue], endian: Endian): T = {
+    val mem = st.loadVar(vname)
 
     val (mapval, keytype, valtype) = mem match {
       case m @ MapValue(_, MapType(kt, vt)) if kt == addr.irType && values.forall(v => v.irType == vt) => (m, kt, vt)
@@ -296,13 +371,12 @@ case class MemoryState(
       case Endian.BigEndian    => values
     }
 
-    val nmap = MapValue(mapval.value ++ keys.zip(vals), mapval.irType)
-    setVar(frame, vname, nmap)
+    st.storeMem(vname, keys.zip(vals).toMap)
   }
 
   /** Extract bitvec to bytes and store bytes */
-  def storeBV(vname: String, addr: BasilValue, value: BitVecLiteral, endian: Endian) = {
-    val (frame, mem) = findVar(vname)
+  def storeBV[T <: Effects[T]](st: T, vname: String, addr: BasilValue, value: BitVecLiteral, endian: Endian): T = {
+    val mem = st.loadVar(vname)
     val (mapval, vsize) = mem match {
       case m @ MapValue(_, MapType(kt, BitVecType(size))) if kt == addr.irType => (m, size)
       case v =>
@@ -320,59 +394,19 @@ case class MemoryState(
     val extractVals = (0 until cells).map(i => BitVectorEval.boogie_extract((i + 1) * vsize, i * vsize, value)).toList
 
     val vs = endian match {
-      case Endian.LittleEndian => extractVals.reverse.map(Scalar(_))
-      case Endian.BigEndian    => extractVals.map(Scalar(_))
+      case Endian.LittleEndian => extractVals.map(Scalar(_))
+      case Endian.BigEndian    => extractVals.reverse.map(Scalar(_))
     }
 
-    store(vname, addr, vs, endian)
+    val keys = (0 until cells).map(i => BasilValue.unsafeAdd(addr, i))
+    st.storeMem(vname, keys.zip(vs).toMap)
   }
 
-  def storeSingle(vname: String, addr: BasilValue, value: BasilValue) = {
-    store(vname, addr, List(value), Endian.LittleEndian)
+  def storeSingle[T <: Effects[T]](st: T, vname: String, addr: BasilValue, value: BasilValue): T = {
+    st.storeMem(vname, Map((addr -> value)))
   }
 
 }
-
-case object Eval {
-
-  def getVar(s: MemoryState)(v: Variable) = s.getVarLiteralOpt(v)
-
-  def doLoad(s: MemoryState)(m: Memory, addr: Expr, endian: Endian, sz: Int): Option[Literal] = {
-    addr match {
-      case l: Literal if sz == 1 => (
-        s.loadSingle(m.name, Scalar(l)) match {
-          case Scalar(v) => Some(v)
-          case _         => None
-        }
-      )
-      case l: Literal => Some(s.loadBV(m.name, Scalar(l), endian, sz))
-      case _          => None
-    }
-  }
-
-  def evalBV(s: MemoryState, e: Expr): BitVecLiteral = {
-    ir.eval.evalBVExpr(e, Eval.getVar(s), Eval.doLoad(s)) match {
-      case Right(e) => e
-      case Left(e)  => throw InterpreterError(Errored(s"Eval BV residual $e"))
-    }
-  }
-
-  def evalInt(s: MemoryState, e: Expr): BigInt = {
-    ir.eval.evalIntExpr(e, Eval.getVar(s), Eval.doLoad(s)) match {
-      case Right(e) => e
-      case Left(e)  => throw InterpreterError(Errored(s"Eval int residual $e"))
-    }
-  }
-
-  def evalBool(s: MemoryState, e: Expr): Boolean = {
-    ir.eval.evalLogExpr(e, Eval.getVar(s), Eval.doLoad(s)) match {
-      case Right(e) => e
-      case Left(e)  => throw InterpreterError(Errored(s"Eval bool residual $e"))
-    }
-  }
-
-}
-
 
 sealed trait Effects[T <: Effects[T]] {
   /* evaluation (may side-effect via InterpreterException on evaluation failure) */
@@ -381,6 +415,10 @@ sealed trait Effects[T <: Effects[T]] {
   def evalInt(e: Expr): BigInt
 
   def evalBool(e: Expr): Boolean
+
+  def loadVar(v: String): BasilValue
+
+  def loadMem(v: String, addrs: List[BasilValue]): List[BasilValue]
 
   /** effects * */
   def setNext(c: ExecutionContinuation): T
@@ -391,57 +429,56 @@ sealed trait Effects[T <: Effects[T]] {
 
   def storeVar(v: String, scope: Scope, value: BasilValue): T
 
-  def storeMem(vname: String, addr: BitVecLiteral, value: BitVecLiteral, endian: Endian, size: Int): T
+  def storeMem(vname: String, update: Map[BasilValue, BasilValue]): T
 
-  def storeMultiMem(vname: String, addr: Literal, value: List[Literal], endian: Endian): T
 }
 
+enum Effect:
+  case Call(target: String, begin: ExecutionContinuation, returnTo: ExecutionContinuation)
+  case SetNext(c: ExecutionContinuation)
+  case Return
+  case StoreVar(v: String, s: Scope, value: BasilValue)
+  case StoreMem(vname: String, update: Map[BasilValue, BasilValue])
 
+case class TracingInterpreter(
+    val s: InterpreterState,
+    val trace: List[Effect]
+) extends Effects[TracingInterpreter] {
 
-// enum Effect:
-//   case Call(c: DirectCall)
-//   case SetNext(c: ExecutionContinuation)
-//   case Return
-//   case StoreVar(v: Variable, value: Literal)
-//   case StoreMem(vname: String, addr: BitVecLiteral, value: BitVecLiteral, endian: Endian, size: Int)
-//   case StoreMultiMem(vname: String, addr: Literal, value: List[Literal], endian: Endian)
-// 
-// case class TracingInterpreter(
-//     val s: InterpreterState,
-//     val trace: List[Effect]
-// ) extends Effects[TracingInterpreter] {
-// 
-// 
-//   def evalBV(e: Expr): BitVecLiteral = s.evalBV(e)
-//   def evalInt(e: Expr): BigInt = s.evalInt(e)
-//   def evalBool(e: Expr): Boolean = s.evalBool(e)
-// 
-//   /** effects * */
-//   def setNext(c: ExecutionContinuation) = {
-//     TracingInterpreter(s.setNext(c), Effect.SetNext(c)::trace)
-//   }
-// 
-//   def call(c: DirectCall) = {
-//     TracingInterpreter(s.call(c), Effect.Call(c)::trace)
-//   }
-// 
-//   def doReturn() = {
-//     TracingInterpreter(s.doReturn(), Effect.Return::trace)
-//   }
-// 
-//   def storeVar(v: Variable, value: Literal) = {
-//     TracingInterpreter(s.storeVar(v, value), Effect.StoreVar(v,value)::trace)
-//   }
-// 
-//   def storeMem(vname: String, addr: BitVecLiteral, value: BitVecLiteral, endian: Endian, size: Int) = {
-//     TracingInterpreter(s.storeMem(vname, addr, value, endian, size), Effect.StoreMem(vname,addr,value,endian,size)::trace)
-//   }
-// 
-//   def storeMultiMem(vname: String, addr: Literal, value: List[Literal], endian: Endian) = {
-//     TracingInterpreter(s.storeMultiMem(vname, addr, value, endian), Effect.StoreMultiMem(vname,addr,value,endian)::trace)
-//   }
-// 
-// }
+  def evalBV(e: Expr): BitVecLiteral = s.evalBV(e)
+  def evalInt(e: Expr): BigInt = s.evalInt(e)
+  def evalBool(e: Expr): Boolean = s.evalBool(e)
+
+  def loadVar(v: String): BasilValue = s.loadVar(v)
+  def loadMem(v: String, addrs: List[BasilValue]) = s.loadMem(v, addrs)
+
+  /** effects * */
+  def setNext(c: ExecutionContinuation) = {
+    Logger.debug(s"    eff : DONEXT $c")
+    TracingInterpreter(s.setNext(c), Effect.SetNext(c)::trace)
+  }
+
+  def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = {
+    Logger.debug(s"    eff : CALL $target")
+    TracingInterpreter(s.call(target, beginFrom, returnTo), Effect.Call(target, beginFrom, returnTo)::trace)
+  }
+
+  def doReturn() = {
+    Logger.debug(s"    eff : RETURN")
+    TracingInterpreter(s.doReturn(), Effect.Return::trace)
+  }
+
+  def storeVar(v: String, c: Scope,  value: BasilValue) = {
+    Logger.debug(s"    eff : SET $v := $value")
+    TracingInterpreter(s.storeVar(v, c, value), Effect.StoreVar(v, c, value)::trace)
+  }
+
+  def storeMem(vname: String, update: Map[BasilValue, BasilValue])  = {
+    Logger.debug(s"    eff : STORE $vname <- $update")
+    TracingInterpreter(s.storeMem(vname, update), Effect.StoreMem(vname, update)::trace)
+  }
+
+}
 
 case class InterpreterState(
     val nextCmd: ExecutionContinuation = Stopped(),
@@ -449,12 +486,16 @@ case class InterpreterState(
     val memoryState: MemoryState = MemoryState()
 ) extends Effects[InterpreterState] {
 
-  /** eval * */
-  def evalBV(e: Expr): BitVecLiteral = Eval.evalBV(memoryState, e)
+  /* eval */
+  def evalBV(e: Expr): BitVecLiteral = Eval.evalBV(this, e)
 
-  def evalInt(e: Expr): BigInt = Eval.evalInt(memoryState, e)
+  def evalInt(e: Expr): BigInt = Eval.evalInt(this, e)
 
-  def evalBool(e: Expr): Boolean = Eval.evalBool(memoryState, e)
+  def evalBool(e: Expr): Boolean = Eval.evalBool(this, e)
+
+  def loadVar(v: String): BasilValue = memoryState.getVar(v)
+
+  def loadMem(v: String, addrs: List[BasilValue]): List[BasilValue] = memoryState.doLoad(v, addrs)
 
   /** effects * */
   def setNext(c: ExecutionContinuation): InterpreterState = {
@@ -462,7 +503,6 @@ case class InterpreterState(
   }
 
   def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation): InterpreterState = {
-    Logger.debug(s"    eff : CALL $target")
     InterpreterState(
       beginFrom,
       returnTo :: callStack,
@@ -474,36 +514,17 @@ case class InterpreterState(
     callStack match {
       case Nil => InterpreterState(Stopped(), Nil, memoryState)
       case h :: tl => {
-        Logger.debug(s"    eff : RETURN $h")
         InterpreterState(h, tl, memoryState.popStackFrame())
       }
     }
   }
 
-  def storeVar(v: String, scope: Scope, value: BasilValue)  = {
-    Logger.debug(s"    eff : SET $v := $value")
+  def storeVar(v: String, scope: Scope, value: BasilValue) = {
     InterpreterState(nextCmd, callStack, memoryState.defVar(v, scope, value))
   }
 
-  def storeMem(
-      vname: String,
-      addr: BitVecLiteral,
-      value: BitVecLiteral,
-      endian: Endian,
-      size: Int
-  ): InterpreterState = {
-    Logger.debug(s"    eff : STORE $vname[$addr..$addr + $size] := $value ($endian)")
-    InterpreterState(nextCmd, callStack, memoryState.storeBV(vname, Scalar(addr), value, endian))
-  }
-
-  def storeMultiMem(
-      vname: String,
-      addr: Literal,
-      value: List[Literal],
-      endian: Endian
-  ): InterpreterState = {
-    Logger.debug(s"    eff : STOREMULTI $vname[$addr] := $value ($endian)")
-    InterpreterState(nextCmd, callStack, memoryState.store(vname, Scalar(addr), value.map(Scalar(_)), endian))
+  def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = {
+    InterpreterState(nextCmd, callStack, memoryState.doStore(vname, update))
   }
 
 }
@@ -515,20 +536,27 @@ case object InterpFuns {
     val FP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
     val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
 
-    s.storeVar("mem",   Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
-     .storeVar("stack", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
-     .storeVar("R31",   Scope.Global, Scalar(SP))
-     .storeVar("R29",   Scope.Global, Scalar(FP))
-     .storeVar("R30",   Scope.Global, Scalar(LR))
+    s.storeVar("mem", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+      .storeVar("stack", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+      .storeVar("R31", Scope.Global, Scalar(SP))
+      .storeVar("R29", Scope.Global, Scalar(FP))
+      .storeVar("R30", Scope.Global, Scalar(LR))
   }
 
   def initialiseProgram[T <: Effects[T]](p: Program, s: T): T = {
     val mem = p.initialMemory.foldLeft(initialState(s))((s, memory) => {
-      s.storeMultiMem("mem", BitVecLiteral(memory.address, 64), memory.bytes.toList, Endian.LittleEndian)
-      s.storeMultiMem(
+      val s1 = Eval.store(
+        s,
+        "mem",
+        Scalar(BitVecLiteral(memory.address, 64)),
+        memory.bytes.toList.map(Scalar(_)),
+        Endian.LittleEndian
+      )
+      Eval.store(
+        s1,
         "stack",
-        BitVecLiteral(memory.address, 64),
-        memory.bytes.toList,
+        Scalar(BitVecLiteral(memory.address, 64)),
+        memory.bytes.toList.map(Scalar(_)),
         Endian.LittleEndian
       )
     })
@@ -555,7 +583,6 @@ case object InterpFuns {
           case h :: Nil => h
           case h :: tl  => throw InterpreterError(Errored(s"More than one jump guard satisfied $gt"))
         }
-        Logger.debug(s"Goto ${chosen._1.parent.label}")
 
         s.setNext(Run(chosen._1.successor))
       case r: Return      => s.doReturn()
@@ -572,15 +599,14 @@ case object InterpFuns {
       case assign: MemoryAssign => {
         val index: BitVecLiteral = st.evalBV(assign.index)
         val value: BitVecLiteral = st.evalBV(assign.value)
-        st.storeMem(assign.mem.name, index, value, assign.endian, assign.size).setNext(Run(s.successor))
-
+        // st.storeMem(assign.mem.name, index, value, assign.endian, assign.size).setNext(Run(s.successor))
+        Eval.storeBV(st, assign.mem.name, Scalar(index), value, assign.endian).setNext(Run(s.successor))
       }
       case assert: Assert => {
         if (!st.evalBool(assert.body)) then {
           st.setNext(FailedAssertion(assert))
         } else {
           st.setNext(Run(s.successor))
-
         }
       }
       case assume: Assume =>
