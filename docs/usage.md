@@ -2,6 +2,8 @@
 
 This document covers using the BASIL pipeline to lift and verify binaries,
 from the perspective of a user of the tool.
+It may also be useful for BASIL developers as a reference for how to lift
+new binaries for manual testing.
 
 ## Lifting a single binary
 
@@ -25,7 +27,7 @@ and run BASIL.
 
 ### Requirements
 
-- AArch64 cross-compililation toolchain (e.g. GCC or clang)
+- AArch64 cross-compilation toolchain (e.g. GCC or clang)
 - AArch64 readelf (e.g. `aarch64-linux-gnu-readelf`)
 - ddisasm, for disassembling binary files
 - gtirb-semantics, to combine ddisasm's output with ASLp's instruction semantics
@@ -33,6 +35,7 @@ and run BASIL.
 
 To install the AArch64 compilers and binutils, we suggest using your operating system's package manager.
 On Ubuntu, the packages are _gcc-aarch64-linux-gnu_ and _binutils-aarch64-linux-gnu_.
+For more complex examples, you may also need the AArch64 libc.
 
 For ddisasm, gtirb-semantics and BASIL, we recommend installing these via our [pac-nix](https://github.com/katrinafyi/pac-nix) repository.
 First, set up the Nix package manager according to the pac-nix instructions, then install the packages with:
@@ -73,9 +76,10 @@ and [development: building](development/readme.md#building)
    This produces a GTIRB protobuffer file.
    You can inspect its contents, as JSON, with the proto-json.py tool
    (available in the gtirb-semantics repository and automatically installed by the gtirb-semantics Nix package).
-   ```bash-session
+   ```console
    $ proto-json.py a.gtirb --seek 8 | jq
          [...]
+
          "uuid": "j+onQhA3SSqXO8biANpjIw=="
        }
      ],
@@ -93,8 +97,8 @@ and [development: building](development/readme.md#building)
    (also installed alongside gtirb-semantics).
    This maps GTIRB basic blocks to source functions and displays instruction semantics
    alongside the assembly mnemonic.
-   ```bash-session
-   debug-gts.py a.gts
+   ```console
+   $ debug-gts.py a.gts
 
    "cwoEFvsGRRm4Myu2pkmWFA==": {
      "name": "main [entry] [1/1]",
@@ -134,7 +138,7 @@ basil --input a.gts --relf a.relf -o out.bpl
 Optionally add a specification file with `--spec`.)
 
 
-## Verifying the generated Boogie file
+### Verifying the Boogie file
 
 Boogie requires .NET 6 (best installed through through your system packages).
 Once .NET is available, Boogie can be installed with:
@@ -166,7 +170,7 @@ To compile a C file without the global offset table being used in address calcul
 aarch64-linux-gnu-gcc -fno-plt -fno-pic *.c -o *.out
 ```
 
-To produce assembly from the binary, use either of the following commands:
+To produce assembly from the binary, use:
 ```bash
 aarch64-linux-gnu-objdump -d *.out
 ```
