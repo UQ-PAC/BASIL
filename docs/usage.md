@@ -58,12 +58,12 @@ and [development: building](development/readme.md#building)
 
 1. Compile a C program into an Aarch64 binary, for example:
    
-   ```bash-session
+   ```bash
    aarch64-suse-linux-gcc x.c
    ```
 
    You can double-check the produced file with:
-   ```
+   ```console
    $ file a.out
    a.out: ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-aarch64.so.1, BuildID[sha1]=ee0d9393526251c23d98f784b86fb3ad694e3517, for GNU/Linux 3.7.0, with debug_info, not stripped
    ```
