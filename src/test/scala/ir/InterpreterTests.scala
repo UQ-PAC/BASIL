@@ -10,6 +10,18 @@ import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
 import util.ILLoadingConfig
 
+def initialMem(): MemoryState = {
+  val SP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
+  val FP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
+  val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
+
+  MemoryState()
+    .setVar(globalFrame, "mem", MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+    .setVar(globalFrame, "stack", MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+    .setVar(globalFrame, "R31", Scalar(SP))
+    .setVar(globalFrame, "R29", Scalar(FP))
+    .setVar(globalFrame, "R30", Scalar(LR))
+}
 
 def load[T <: Effects[T]](s: T, global: SpecGlobal) : Option[BitVecLiteral] = {
  //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
@@ -91,12 +103,12 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       BitVecLiteral(BigInt("0B", 16), 8),
       BitVecLiteral(BigInt("0A", 16), 8))
 
-    val s = initialState().store("mem", Scalar(BitVecLiteral(0, 64)), ts.map(Scalar(_)), Endian.LittleEndian)
+    val s = initialMem().store("mem", Scalar(BitVecLiteral(0, 64)), ts.map(Scalar(_)), Endian.LittleEndian)
     val expected: BitVecLiteral = BitVecLiteral(BigInt("0D0C0B0A", 16), 32)
     val actual: BitVecLiteral = s.loadBV("mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
     assert(actual == expected)
 
-    val s2 = initialState().storeBV("mem", Scalar(BitVecLiteral(0, 64)), expected, Endian.LittleEndian)
+    val s2 = initialMem().storeBV("mem", Scalar(BitVecLiteral(0, 64)), expected, Endian.LittleEndian)
     val actual2: BitVecLiteral = s.loadBV("mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
     assert(actual2 == actual)
 
@@ -110,7 +122,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       BitVecLiteral(BigInt("0B", 16), 8),
       BitVecLiteral(BigInt("0A", 16), 8))
 
-    val s = initialState().store("mem", Scalar(BitVecLiteral(0, 64)), ts.map(Scalar(_)), Endian.LittleEndian)
+    val s = initialMem().store("mem", Scalar(BitVecLiteral(0, 64)), ts.map(Scalar(_)), Endian.LittleEndian)
     val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
     val actual: BitVecLiteral = s.loadBV("mem", Scalar(BitVecLiteral(0, 64)), Endian.BigEndian , 32)
     assert(actual == expected)
@@ -123,8 +135,8 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     (BitVecLiteral(1, 64) , BitVecLiteral(BigInt("0C", 16), 8)),
     (BitVecLiteral(2, 64) , BitVecLiteral(BigInt("0B", 16), 8)),
     (BitVecLiteral(3, 64) , BitVecLiteral(BigInt("0A", 16), 8)))
-    val s = ts.foldLeft(initialState())((m, v) => m.storeSingle("mem", Scalar(v._1), Scalar(v._2)))
-    // val s = initialState().store("mem")
+    val s = ts.foldLeft(initialMem())((m, v) => m.storeSingle("mem", Scalar(v._1), Scalar(v._2)))
+    // val s = initialMem().store("mem")
     // val r = s.loadBV("mem", BitVecLiteral(0, 64))
 
     val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
@@ -138,7 +150,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   test("StoreBV = LoadBV LE ") {
     val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
 
-    val s = initialState().storeBV("mem", Scalar(BitVecLiteral(0, 64)), expected, Endian.LittleEndian)
+    val s = initialMem().storeBV("mem", Scalar(BitVecLiteral(0, 64)), expected, Endian.LittleEndian)
     val actual: BitVecLiteral = s.loadBV("mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
     println(s"${actual.value.toInt.toHexString} == ${expected.value.toInt.toHexString}")
     assert(actual == expected)

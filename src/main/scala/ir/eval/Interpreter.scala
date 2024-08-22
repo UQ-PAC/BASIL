@@ -9,22 +9,20 @@ import scala.collection.mutable
 import scala.collection.immutable
 import scala.util.control.Breaks.{break, breakable}
 
-
 sealed trait ExecutionContinuation
 case class FailedAssertion(a: Assert) extends ExecutionContinuation
-case class Stopped() extends ExecutionContinuation
 
-/** Normal stop * */
-case class Run(val next: Command) extends ExecutionContinuation
-case class EscapedControlFlow(val call: Jump | Call) extends ExecutionContinuation
+case class Stopped() extends ExecutionContinuation /* normal program stop  */
+case class Run(val next: Command) extends ExecutionContinuation /* continue by executing next command */
 
-/** controlflow has reached somewhere eunrecoverable */
+case class EscapedControlFlow(val call: Jump | Call)
+    extends ExecutionContinuation /* controlflow has reached somewhere eunrecoverable */
+
 case class Errored(val message: String = "") extends ExecutionContinuation
 case class TypeError(val message: String = "") extends ExecutionContinuation /* type mismatch appeared */
 case class EvalError(val message: String = "")
     extends ExecutionContinuation /* failed to evaluate an expression to a concrete value */
-case class MemoryError(val message: String = "")
-    extends ExecutionContinuation /* failed to evaluate an expression to a concrete value */
+case class MemoryError(val message: String = "") extends ExecutionContinuation /* An error to do with memory */
 
 case class InterpreterError(continue: ExecutionContinuation) extends Exception()
 
@@ -41,15 +39,6 @@ enum BasilValue(val irType: IRType):
   // \exists j . \forall v \in value.values, v.irType = j
   case MapValue(val value: Map[BasilValue, BasilValue], override val irType: MapType) extends BasilValue(irType)
 
-given Conversion[BitVecLiteral, Scalar] with
-  def apply(b: BitVecLiteral): Scalar = new Scalar(b)
-
-given Conversion[IntLiteral, Scalar] with
-  def apply(b: IntLiteral): Scalar = new Scalar(b)
-
-given Conversion[BoolLit, Scalar] with
-  def apply(b: BoolLit): Scalar = new Scalar(b)
-
 case object BasilValue:
 
   def size(v: IRType): Int = {
@@ -63,6 +52,7 @@ case object BasilValue:
 
   def unsafeAdd(l: BasilValue, vr: Int): BasilValue = {
     l match {
+      case _ if vr == 0              => l
       case Scalar(IntLiteral(vl))    => Scalar(IntLiteral(vl + vr))
       case Scalar(b1: BitVecLiteral) => Scalar(eval.evalBVBinExpr(BVADD, b1, BitVecLiteral(vr, b1.size)))
       case _                         => throw InterpreterError(TypeError(s"Operation add $vr undefined on $l"))
@@ -172,28 +162,30 @@ case class MemoryState(
 
   /* Variable retrieval and setting */
 
+  /* Set variable in a given frame */
   def setVar(frame: StackFrameID, varname: String, value: BasilValue): MemoryState = {
     val nv = stackFrames + (frame -> (stackFrames(frame) + (varname -> value)))
     MemoryState(nv, activations, activationCount)
   }
 
+  /* Find variable definition scope and set it in the correct frame  */
   def setVar(v: String, value: BasilValue): MemoryState = {
     val frame = findVarOpt(v).map(_._1).getOrElse(activations.head)
     setVar(frame, v, value)
   }
 
-  def setVar(v: String, value: Literal): MemoryState = {
-    setVar(v, Scalar(value))
-  }
-
-  def defVar(v: Variable, value: Literal): MemoryState = {
-    val frame = v.toBoogie.scope match {
+  /* Define a variable in the scope specified
+   * ignoring whether it may already be defined
+   */
+  def defVar(name: String, s: Scope , value: BasilValue): MemoryState = {
+    val frame = s match {
       case Scope.Global => globalFrame
       case _            => activations.head
     }
-    setVar(frame, v.name, Scalar(value))
+    setVar(frame, name, value)
   }
 
+  /* Lookup the value of a variable */
   def findVarOpt(name: String): Option[(StackFrameID, BasilValue)] = {
     val searchScopes = globalFrame :: activations.headOption.toList
     searchScopes.foldRight(None: Option[(StackFrameID, BasilValue)])((r, acc) =>
@@ -296,7 +288,7 @@ case class MemoryState(
 
     val (mapval, keytype, valtype) = mem match {
       case m @ MapValue(_, MapType(kt, vt)) if kt == addr.irType && values.forall(v => v.irType == vt) => (m, kt, vt)
-      case _ => throw InterpreterError(Errored("Invalid map store operation."))
+      case v => throw InterpreterError(TypeError(s"Invalid map store operation to $vname : ${v.irType}"))
     }
     val keys = (0 until values.size).map(i => BasilValue.unsafeAdd(addr, i))
     val vals = endian match {
@@ -308,16 +300,21 @@ case class MemoryState(
     setVar(frame, vname, nmap)
   }
 
-  /** Store extract bitvec to bytes and store bytes */
+  /** Extract bitvec to bytes and store bytes */
   def storeBV(vname: String, addr: BasilValue, value: BitVecLiteral, endian: Endian) = {
     val (frame, mem) = findVar(vname)
     val (mapval, vsize) = mem match {
       case m @ MapValue(_, MapType(kt, BitVecType(size))) if kt == addr.irType => (m, size)
-      case _ => throw InterpreterError(Errored("Tried to extract-store non to bv map"))
+      case v =>
+        throw InterpreterError(
+          TypeError(
+            s"Invalid map store operation to $vname : ${v.irType} (expect [${addr.irType}] <- ${value.getType})"
+          )
+        )
     }
     val cells = value.size / vsize
     if (cells < 1) {
-      throw InterpreterError(Errored("Tried to execute fractional store"))
+      throw InterpreterError(MemoryError("Tried to execute fractional store"))
     }
 
     val extractVals = (0 until cells).map(i => BitVectorEval.boogie_extract((i + 1) * vsize, i * vsize, value)).toList
@@ -376,18 +373,6 @@ case object Eval {
 
 }
 
-def initialState(): MemoryState = {
-  val SP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
-  val FP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
-  val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
-
-  MemoryState()
-    .setVar(globalFrame, "mem", MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
-    .setVar(globalFrame, "stack", MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
-    .setVar(globalFrame, "R31", Scalar(SP))
-    .setVar(globalFrame, "R29", Scalar(FP))
-    .setVar(globalFrame, "R30", Scalar(LR))
-}
 
 sealed trait Effects[T <: Effects[T]] {
   /* evaluation (may side-effect via InterpreterException on evaluation failure) */
@@ -400,22 +385,69 @@ sealed trait Effects[T <: Effects[T]] {
   /** effects * */
   def setNext(c: ExecutionContinuation): T
 
-  def call(c: DirectCall): T
+  def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation): T
 
   def doReturn(): T
 
-  def storeVar(v: Variable, value: Literal): T
+  def storeVar(v: String, scope: Scope, value: BasilValue): T
 
   def storeMem(vname: String, addr: BitVecLiteral, value: BitVecLiteral, endian: Endian, size: Int): T
 
-  def initialiseProgram(p: Program): T
+  def storeMultiMem(vname: String, addr: Literal, value: List[Literal], endian: Endian): T
 }
 
-case class InterpreterCFState(
+
+
+// enum Effect:
+//   case Call(c: DirectCall)
+//   case SetNext(c: ExecutionContinuation)
+//   case Return
+//   case StoreVar(v: Variable, value: Literal)
+//   case StoreMem(vname: String, addr: BitVecLiteral, value: BitVecLiteral, endian: Endian, size: Int)
+//   case StoreMultiMem(vname: String, addr: Literal, value: List[Literal], endian: Endian)
+// 
+// case class TracingInterpreter(
+//     val s: InterpreterState,
+//     val trace: List[Effect]
+// ) extends Effects[TracingInterpreter] {
+// 
+// 
+//   def evalBV(e: Expr): BitVecLiteral = s.evalBV(e)
+//   def evalInt(e: Expr): BigInt = s.evalInt(e)
+//   def evalBool(e: Expr): Boolean = s.evalBool(e)
+// 
+//   /** effects * */
+//   def setNext(c: ExecutionContinuation) = {
+//     TracingInterpreter(s.setNext(c), Effect.SetNext(c)::trace)
+//   }
+// 
+//   def call(c: DirectCall) = {
+//     TracingInterpreter(s.call(c), Effect.Call(c)::trace)
+//   }
+// 
+//   def doReturn() = {
+//     TracingInterpreter(s.doReturn(), Effect.Return::trace)
+//   }
+// 
+//   def storeVar(v: Variable, value: Literal) = {
+//     TracingInterpreter(s.storeVar(v, value), Effect.StoreVar(v,value)::trace)
+//   }
+// 
+//   def storeMem(vname: String, addr: BitVecLiteral, value: BitVecLiteral, endian: Endian, size: Int) = {
+//     TracingInterpreter(s.storeMem(vname, addr, value, endian, size), Effect.StoreMem(vname,addr,value,endian,size)::trace)
+//   }
+// 
+//   def storeMultiMem(vname: String, addr: Literal, value: List[Literal], endian: Endian) = {
+//     TracingInterpreter(s.storeMultiMem(vname, addr, value, endian), Effect.StoreMultiMem(vname,addr,value,endian)::trace)
+//   }
+// 
+// }
+
+case class InterpreterState(
     val nextCmd: ExecutionContinuation = Stopped(),
-    val callStack: List[DirectCall] = List.empty,
+    val callStack: List[ExecutionContinuation] = List.empty,
     val memoryState: MemoryState = MemoryState()
-) extends Effects[InterpreterCFState] {
+) extends Effects[InterpreterState] {
 
   /** eval * */
   def evalBV(e: Expr): BitVecLiteral = Eval.evalBV(memoryState, e)
@@ -425,36 +457,32 @@ case class InterpreterCFState(
   def evalBool(e: Expr): Boolean = Eval.evalBool(memoryState, e)
 
   /** effects * */
-  def setNext(c: ExecutionContinuation): InterpreterCFState = {
-    InterpreterCFState(c, callStack, memoryState)
+  def setNext(c: ExecutionContinuation): InterpreterState = {
+    InterpreterState(c, callStack, memoryState)
   }
 
-  def call(c: DirectCall): InterpreterCFState = {
-    Logger.debug(s"    eff : CALL $c")
-    c.target.entryBlock match {
-      case Some(block) =>
-        InterpreterCFState(
-          Run(block.statements.headOption.getOrElse(block.jump)),
-          c :: callStack,
-          memoryState.pushStackFrame(c.target.name)
-        )
-      case None => setNext(Run(c.successor))
-    }
+  def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation): InterpreterState = {
+    Logger.debug(s"    eff : CALL $target")
+    InterpreterState(
+      beginFrom,
+      returnTo :: callStack,
+      memoryState.pushStackFrame(target)
+    )
   }
 
-  def doReturn(): InterpreterCFState = {
+  def doReturn(): InterpreterState = {
     callStack match {
-      case Nil => InterpreterCFState(Stopped(), Nil, memoryState)
+      case Nil => InterpreterState(Stopped(), Nil, memoryState)
       case h :: tl => {
         Logger.debug(s"    eff : RETURN $h")
-        InterpreterCFState(Run(h.successor), tl, memoryState.popStackFrame())
+        InterpreterState(h, tl, memoryState.popStackFrame())
       }
     }
   }
 
-  def storeVar(v: Variable, value: Literal) = {
+  def storeVar(v: String, scope: Scope, value: BasilValue)  = {
     Logger.debug(s"    eff : SET $v := $value")
-    InterpreterCFState(nextCmd, callStack, memoryState.defVar(v, value))
+    InterpreterState(nextCmd, callStack, memoryState.defVar(v, scope, value))
   }
 
   def storeMem(
@@ -463,31 +491,50 @@ case class InterpreterCFState(
       value: BitVecLiteral,
       endian: Endian,
       size: Int
-  ): InterpreterCFState = {
+  ): InterpreterState = {
     Logger.debug(s"    eff : STORE $vname[$addr..$addr + $size] := $value ($endian)")
-    InterpreterCFState(nextCmd, callStack, memoryState.storeBV(vname, Scalar(addr), value, endian))
+    InterpreterState(nextCmd, callStack, memoryState.storeBV(vname, Scalar(addr), value, endian))
   }
 
-  def initialiseProgram(p: Program): InterpreterCFState = {
-    val mem = p.initialMemory.foldLeft(initialState())((s, memory) => {
-      s.store("mem", Scalar(BitVecLiteral(memory.address, 64)), memory.bytes.map(Scalar(_)).toList, Endian.LittleEndian)
-      s.store(
+  def storeMultiMem(
+      vname: String,
+      addr: Literal,
+      value: List[Literal],
+      endian: Endian
+  ): InterpreterState = {
+    Logger.debug(s"    eff : STOREMULTI $vname[$addr] := $value ($endian)")
+    InterpreterState(nextCmd, callStack, memoryState.store(vname, Scalar(addr), value.map(Scalar(_)), endian))
+  }
+
+}
+
+case object InterpFuns {
+
+  def initialState[T <: Effects[T]](s: T): T = {
+    val SP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
+    val FP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
+    val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
+
+    s.storeVar("mem",   Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+     .storeVar("stack", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+     .storeVar("R31",   Scope.Global, Scalar(SP))
+     .storeVar("R29",   Scope.Global, Scalar(FP))
+     .storeVar("R30",   Scope.Global, Scalar(LR))
+  }
+
+  def initialiseProgram[T <: Effects[T]](p: Program, s: T): T = {
+    val mem = p.initialMemory.foldLeft(initialState(s))((s, memory) => {
+      s.storeMultiMem("mem", BitVecLiteral(memory.address, 64), memory.bytes.toList, Endian.LittleEndian)
+      s.storeMultiMem(
         "stack",
-        Scalar(BitVecLiteral(memory.address, 64)),
-        memory.bytes.map(Scalar(_)).toList,
+        BitVecLiteral(memory.address, 64),
+        memory.bytes.toList,
         Endian.LittleEndian
       )
     })
 
-    InterpreterCFState(
-      Run(IRWalk.firstInBlock(p.mainProcedure.entryBlock.get)),
-      callStack,
-      mem.pushStackFrame(p.mainProcedure.name)
-    )
+    mem.call(p.mainProcedure.name, Run(IRWalk.firstInBlock(p.mainProcedure.entryBlock.get)), Stopped())
   }
-}
-
-case object InterpFuns {
 
   def interpretJump[T <: Effects[T]](s: T, j: Jump): T = {
     j match {
@@ -520,8 +567,7 @@ case object InterpFuns {
     s match {
       case assign: Assign => {
         val rhs = st.evalBV(assign.rhs)
-        st.storeVar(assign.lhs, rhs).setNext(Run(s.successor))
-
+        st.storeVar(assign.lhs.name, assign.lhs.toBoogie.scope, Scalar(rhs)).setNext(Run(s.successor))
       }
       case assign: MemoryAssign => {
         val index: BitVecLiteral = st.evalBV(assign.index)
@@ -545,7 +591,12 @@ case object InterpFuns {
 
         }
       case dc: DirectCall =>
-        st.call(dc)
+        if (dc.target.entryBlock.isDefined) {
+          val block = dc.target.entryBlock.get
+          st.call(dc.target.name, Run(block.statements.headOption.getOrElse(block.jump)), Run(dc.successor))
+        } else {
+          st.setNext(Run(dc.successor))
+        }
       case ic: IndirectCall =>
         if (ic.target == Register("R30", 64)) {
           st.doReturn()
@@ -565,12 +616,12 @@ case object InterpFuns {
   }
 
   @tailrec
-  def interpret(s: InterpreterCFState): InterpreterCFState = {
+  def interpret(s: InterpreterState): InterpreterState = {
     Logger.debug(s"interpret ${s.nextCmd}")
     s.nextCmd match {
       case Run(c: Statement) =>
         interpret(
-          protect[InterpreterCFState](
+          protect[InterpreterState](
             () => interpretStatement(s, c),
             {
               case InterpreterError(e)         => s.setNext(e)
@@ -580,7 +631,7 @@ case object InterpFuns {
         )
       case Run(c: Jump) =>
         interpret(
-          protect[InterpreterCFState](
+          protect[InterpreterState](
             () => interpretJump(s, c),
             {
               case InterpreterError(e)         => s.setNext(e)
@@ -593,8 +644,8 @@ case object InterpFuns {
     }
   }
 
-  def interpretProg(p: Program): InterpreterCFState = {
-    var s = InterpreterCFState().initialiseProgram(p)
+  def interpretProg(p: Program): InterpreterState = {
+    var s = initialiseProgram(p, InterpreterState())
     interpret(s)
   }
 
