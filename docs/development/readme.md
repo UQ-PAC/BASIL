@@ -165,7 +165,7 @@ sudo sysctl kernel.kptr_restrict=0
 
 ## Lifting a single example
 
-Many lifted examples are already profiled in the tests directory: [src/test/correct](src/test/correct), these instructions
+Many lifted examples are already profiled in the tests directory: [src/test/correct](/src/test/correct), these instructions
 are for if you want to lift new compiled binaries.
 
 The tool takes a `.adt` or `.gts` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.
