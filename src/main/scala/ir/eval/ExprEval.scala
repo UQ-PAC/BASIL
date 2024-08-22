@@ -4,11 +4,10 @@ import ir._
 
 /**
  * We generalise the expression evaluator to a partial evaluator to simplify evaluating casts.
- * This is not as nice or type-safe as we would like. 
  *
  * - Program state is taken via a function from var -> value and for loads a function from (mem,addr,endian,size) -> value. 
  * - For conrete evaluators we prefer low-level representations (bool vs BoolLit) and wrap them at the expression eval level 
- * - Avoid using default cases so we have some idea of complete coverage
+ * - Avoid using any default cases so we have some idea of complete coverage
  *
  */
 
@@ -128,7 +127,7 @@ def evalUnOp(op: UnOp, body: Literal) : Expr = {
   }
 }
 
-def partialEvalExpr(exp: Expr, variableAssignment: Variable => Option[Expr], memory: (Memory, Expr, Endian, Int) => Option[BitVecLiteral] = ((a,b,c,d) => None)): Expr = {
+def partialEvalExpr(exp: Expr, variableAssignment: Variable => Option[Expr], memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c,d) => None)): Expr = {
   exp match {
     case f: UninterpretedFunction => f
     case unOp: UnaryExpr => {
@@ -198,21 +197,21 @@ def partialEvalExpr(exp: Expr, variableAssignment: Variable => Option[Expr], mem
   }
 }
 
-def evalIntExpr(exp: Expr, variableAssignment: Variable => Option[BitVecLiteral], memory: (Memory, Expr, Endian, Int) => Option[BitVecLiteral] = ((a,b,c,d) => None)): Either[Expr, BigInt] = {
+def evalIntExpr(exp: Expr, variableAssignment: Variable => Option[Literal], memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c,d) => None)): Either[Expr, BigInt] = {
   partialEvalExpr(exp, variableAssignment, memory) match {
     case i: IntLiteral => Right(i.value)
     case o => Left(o) 
   }
 }
 
-def evalBVExpr(exp: Expr, variableAssignment: Variable => Option[BitVecLiteral], memory: (Memory, Expr, Endian, Int) => Option[BitVecLiteral] = ((a,b,c,d) => None)): Either[Expr, BitVecLiteral] = {
+def evalBVExpr(exp: Expr, variableAssignment: Variable => Option[Literal], memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c,d) => None)): Either[Expr, BitVecLiteral] = {
   partialEvalExpr(exp, variableAssignment, memory) match {
     case b: BitVecLiteral => Right(b)
     case o => Left(o) 
   }
 }
 
-def evalLogExpr(exp: Expr, variableAssignment: Variable => Option[BitVecLiteral], memory: (Memory, Expr, Endian, Int) => Option[BitVecLiteral] = ((a,b,c, d) => None)): Either[Expr, Boolean] = {
+def evalLogExpr(exp: Expr, variableAssignment: Variable => Option[Literal], memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c, d) => None)): Either[Expr, Boolean] = {
   partialEvalExpr(exp, variableAssignment, memory) match {
     case TrueLiteral => Right(true)
     case FalseLiteral => Right(false)
@@ -220,7 +219,7 @@ def evalLogExpr(exp: Expr, variableAssignment: Variable => Option[BitVecLiteral]
   }
 }
 
-def evalExpr(exp: Expr, variableAssignment: Variable => Option[BitVecLiteral], memory: (Memory, Expr, Endian, Int) => Option[BitVecLiteral] = ((d, a,b,c) => None)): Option[Literal] = {
+def evalExpr(exp: Expr, variableAssignment: Variable => Option[Literal], memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((d, a,b,c) => None)): Option[Literal] = {
   partialEvalExpr match {
     case l: Literal => Some(l)
     case _ => None

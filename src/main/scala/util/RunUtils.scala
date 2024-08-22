@@ -461,8 +461,8 @@ object RunUtils {
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-after-analysis.il"))
 
     if (q.runInterpret) {
-      val interpreter = Interpreter()
-      interpreter.interpret(ctx.program)
+      // val interpreter = eval.Interpreter()
+      eval.interpret(ctx.program)
     }
 
     IRTransform.prepareForTranslation(q.loading, ctx)

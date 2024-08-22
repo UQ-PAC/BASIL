@@ -1,6 +1,6 @@
 package ir
 
-import ir.eval.*
+import ir.eval._
 import ir.dsl._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.BeforeAndAfter
@@ -10,13 +10,30 @@ import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
 import util.ILLoadingConfig
 
+
+def load[T <: Effects[T]](s: T, global: SpecGlobal) : Option[BitVecLiteral] = {
+ //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
+  // m.evalBV("mem", BitVecLiteral(64, global.address), Endian.LittleEndian, global.size) //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
+  
+  try {
+    Some(s.evalBV(MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size)))
+  } catch {
+    case e : InterpreterError => None
+  }
+}
+
+
+def mems[T <: Effects[T]](m: MemoryState) : Map[BigInt, BitVecLiteral] = {
+  m.getMem("mem").map((k,v) => k.value -> v)
+}
+
 class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
-  var i: Interpreter = Interpreter()
+  // var i: Interpreter = Interpreter()
   Logger.setLevel(LogLevel.DEBUG)
 
-  def getProgram(name: String): (Program, Set[SpecGlobal]) = {
 
+  def getProgram(name: String): (Program, Set[SpecGlobal]) = {
 
     val loading = ILLoadingConfig(
       inputFile = s"examples/$name/$name.adt",
@@ -41,7 +58,8 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   def testInterpret(name: String, expected: Map[String, Int]): Unit = {
     val (program, globals) = getProgram(name)
-    val regs = i.interpret(program)
+    val fstate = interpret(program)
+    val regs = fstate.memoryState.getGlobalVals
 
     // Show interpreted result
     Logger.info("Registers:")
@@ -50,67 +68,113 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     }
 
     Logger.info("Globals:")
+    //  def loadBV(vname: String, addr: BasilValue, valueSize: Int, endian: Endian, size: Int): List[BitVecLiteral] = {
     globals.foreach { global =>
-      val mem = i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
-      Logger.info(s"$global := $mem")
+      val mem = load(fstate, global)
+      mem.foreach(mem => Logger.info(s"$global := $mem"))
     }
 
     // Test expected value
-    expected.foreach { (name, expected) =>
-      globals.find(_.name == name) match {
-        case Some(global) =>
-          val actual = i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems).value.toInt
-          assert(actual == expected)
-        case None => assert("None" == name)
-      }
-    }
+    val actual : Map[String, Int] = expected.flatMap ( (name, expected) =>
+      globals.find(_.name == name).flatMap(global =>
+          load(fstate, global).map(gv => name -> gv.value.toInt)
+      )
+    )
+    assert(expected == actual)
   }
 
-  before {
-    i = Interpreter()
+
+  test("Store = Load LittleEndian") {
+    val ts = List(
+      BitVecLiteral(BigInt("0D", 16), 8),
+      BitVecLiteral(BigInt("0C", 16), 8),
+      BitVecLiteral(BigInt("0B", 16), 8),
+      BitVecLiteral(BigInt("0A", 16), 8))
+
+    val s = initialState().store("mem", Scalar(BitVecLiteral(0, 64)), ts.map(Scalar(_)), Endian.LittleEndian)
+    val expected: BitVecLiteral = BitVecLiteral(BigInt("0D0C0B0A", 16), 32)
+    val actual: BitVecLiteral = s.loadBV("mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
+    assert(actual == expected)
+
+    val s2 = initialState().storeBV("mem", Scalar(BitVecLiteral(0, 64)), expected, Endian.LittleEndian)
+    val actual2: BitVecLiteral = s.loadBV("mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
+    assert(actual2 == actual)
+
+  }
+
+
+  test("Store = Load BigEndian") {
+    val ts = List(
+      BitVecLiteral(BigInt("0D", 16), 8),
+      BitVecLiteral(BigInt("0C", 16), 8),
+      BitVecLiteral(BigInt("0B", 16), 8),
+      BitVecLiteral(BigInt("0A", 16), 8))
+
+    val s = initialState().store("mem", Scalar(BitVecLiteral(0, 64)), ts.map(Scalar(_)), Endian.LittleEndian)
+    val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
+    val actual: BitVecLiteral = s.loadBV("mem", Scalar(BitVecLiteral(0, 64)), Endian.BigEndian , 32)
+    assert(actual == expected)
+
+
   }
 
   test("getMemory in LittleEndian") {
-    i.mems(0) = BitVecLiteral(BigInt("0D", 16), 8)
-    i.mems(1) = BitVecLiteral(BigInt("0C", 16), 8)
-    i.mems(2) = BitVecLiteral(BigInt("0B", 16), 8)
-    i.mems(3) = BitVecLiteral(BigInt("0A", 16), 8)
+    val ts = List((BitVecLiteral(0, 64), BitVecLiteral(BigInt("0D", 16), 8)),
+    (BitVecLiteral(1, 64) , BitVecLiteral(BigInt("0C", 16), 8)),
+    (BitVecLiteral(2, 64) , BitVecLiteral(BigInt("0B", 16), 8)),
+    (BitVecLiteral(3, 64) , BitVecLiteral(BigInt("0A", 16), 8)))
+    val s = ts.foldLeft(initialState())((m, v) => m.storeSingle("mem", Scalar(v._1), Scalar(v._2)))
+    // val s = initialState().store("mem")
+    // val r = s.loadBV("mem", BitVecLiteral(0, 64))
+
     val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
-    val actual: BitVecLiteral = i.getMemory(0, 32, Endian.LittleEndian, i.mems)
+
+  // def loadBV(vname: String, addr: Scalar, endian: Endian, size: Int): BitVecLiteral = {
+     val actual: BitVecLiteral = s.loadBV("mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
     assert(actual == expected)
   }
 
-  test("getMemory in BigEndian") {
-    i.mems(0) = BitVecLiteral(BigInt("0A", 16), 8)
-    i.mems(1) = BitVecLiteral(BigInt("0B", 16), 8)
-    i.mems(2) = BitVecLiteral(BigInt("0C", 16), 8)
-    i.mems(3) = BitVecLiteral(BigInt("0D", 16), 8)
+
+  test("StoreBV = LoadBV LE ") {
     val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
-    val actual: BitVecLiteral = i.getMemory(0, 32, Endian.BigEndian, i.mems)
+
+    val s = initialState().storeBV("mem", Scalar(BitVecLiteral(0, 64)), expected, Endian.LittleEndian)
+    val actual: BitVecLiteral = s.loadBV("mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
+    println(s"${actual.value.toInt.toHexString} == ${expected.value.toInt.toHexString}")
     assert(actual == expected)
   }
 
-  test("setMemory in LittleEndian") {
-    i.mems(0) = BitVecLiteral(BigInt("FF", 16), 8)
-    i.mems(1) = BitVecLiteral(BigInt("FF", 16), 8)
-    i.mems(2) = BitVecLiteral(BigInt("FF", 16), 8)
-    i.mems(3) = BitVecLiteral(BigInt("FF", 16), 8)
-    val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
-    i.setMemory(0, 32, Endian.LittleEndian, expected, i.mems)
-    val actual: BitVecLiteral = i.getMemory(0, 32, Endian.LittleEndian, i.mems)
-    assert(actual == expected)
-  }
+  // test("getMemory in BigEndian") {
+  //   i.mems(0) = BitVecLiteral(BigInt("0A", 16), 8)
+  //   i.mems(1) = BitVecLiteral(BigInt("0B", 16), 8)
+  //   i.mems(2) = BitVecLiteral(BigInt("0C", 16), 8)
+  //   i.mems(3) = BitVecLiteral(BigInt("0D", 16), 8)
+  //   val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
+  //   val actual: BitVecLiteral = i.getMemory(0, 32, Endian.BigEndian, i.mems)
+  //   assert(actual == expected)
+  // }
 
-  test("setMemory in BigEndian") {
-    i.mems(0) = BitVecLiteral(BigInt("FF", 16), 8)
-    i.mems(1) = BitVecLiteral(BigInt("FF", 16), 8)
-    i.mems(2) = BitVecLiteral(BigInt("FF", 16), 8)
-    i.mems(3) = BitVecLiteral(BigInt("FF", 16), 8)
-    val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
-    i.setMemory(0, 32, Endian.BigEndian, expected, i.mems)
-    val actual: BitVecLiteral = i.getMemory(0, 32, Endian.BigEndian, i.mems)
-    assert(actual == expected)
-  }
+  // test("setMemory in LittleEndian") {
+  //   i.mems(0) = BitVecLiteral(BigInt("FF", 16), 8)
+  //   i.mems(1) = BitVecLiteral(BigInt("FF", 16), 8)
+  //   i.mems(2) = BitVecLiteral(BigInt("FF", 16), 8)
+  //   i.mems(3) = BitVecLiteral(BigInt("FF", 16), 8)
+  //   val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
+  //   i.setMemory(0, 32, Endian.LittleEndian, expected, i.mems)
+  //   val actual: BitVecLiteral = i.getMemory(0, 32, Endian.LittleEndian, i.mems)
+  //   assert(actual == expected)
+  // }
+
+  // test("setMemory in BigEndian") {
+  //   i.mems(0) = BitVecLiteral(BigInt("FF", 16), 8)
+  //   i.mems(1) = BitVecLiteral(BigInt("FF", 16), 8)
+  //   i.mems(2) = BitVecLiteral(BigInt("FF", 16), 8)
+  //   i.mems(3) = BitVecLiteral(BigInt("FF", 16), 8)
+  //   val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
+  //   i.setMemory(0, 32, Endian.BigEndian, expected, i.mems)
+  //   val actual: BitVecLiteral = i.getMemory(0, 32, Endian.BigEndian, i.mems)
+  //   assert(actual == expected)
+  // }
 
   test("basic_arrays_read") {
     val expected = Map(
@@ -204,57 +268,69 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   }
 
   test("fibonacci") {
-    val fib = prog(
-      proc("begin", 
-        block("entry",
-          Assign(R8, Register("R31", 64)),
-          Assign(R0, bv64(8)),
-          directCall("fib"),
-          goto("done")
-        ),
-        block("done",
-          Assert(BinaryExpr(BVEQ, R0, bv64(21))),
-          ret
-        )),
-      proc("fib",
-        block("base", goto("base1", "base2", "dofib")),
-        block("base1", 
-          Assume(BinaryExpr(BVEQ, R0, bv64(0))),
-          ret),
-        block("base2", 
-          Assume(BinaryExpr(BVEQ, R0, bv64(1))),
-          ret),
-        block("dofib",
-          Assume(BinaryExpr(BoolAND, BinaryExpr(BVNEQ, R0, bv64(0)), BinaryExpr(BVNEQ, R0, bv64(1)))),
-          // R8 stack pointer preserved across calls
-          Assign(R7, BinaryExpr(BVADD, R8, bv64(8))),  
-          MemoryAssign(stack, R7, R8, Endian.LittleEndian, 64), // sp
-          Assign(R8, R7),
-          Assign(R8, BinaryExpr(BVADD, R8, bv64(8))),  // sp + 8
-          MemoryAssign(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 8] = arg0
-          Assign(R0, BinaryExpr(BVSUB, R0, bv64(1))),
-          directCall("fib"),
-          Assign(R2, R8), // sp + 8
-          Assign(R8, BinaryExpr(BVADD, R8, bv64(8))),  // sp + 16
-          MemoryAssign(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 16] = r1
-          Assign(R0, MemoryLoad(stack, R2, Endian.LittleEndian, 64)), // [sp + 8]
-          Assign(R0, BinaryExpr(BVSUB, R0, bv64(2))),
-          directCall("fib"),
-          Assign(R2, MemoryLoad(stack, R8, Endian.LittleEndian, 64)), // [sp + 16] (r1)
-          Assign(R0, BinaryExpr(BVADD, R0, R2)),
-          Assign(R8, MemoryLoad(stack, BinaryExpr(BVSUB, R8, bv64(16)), Endian.LittleEndian, 64)),
-          ret
+
+    def fibonacciProg(n: Int) = {
+      def expected(n: Int) : Int = {
+        n match {
+          case 0 => 0
+          case 1 => 1
+          case n => expected(n - 1) + expected(n - 2)
+        }
+      }
+      prog(
+        proc("begin", 
+          block("entry",
+            Assign(R8, Register("R31", 64)),
+            Assign(R0, bv64(n)),
+            directCall("fib"),
+            goto("done")
+          ),
+          block("done",
+            Assert(BinaryExpr(BVEQ, R0, bv64(expected(n)))),
+            ret
+          )),
+        proc("fib",
+          block("base", goto("base1", "base2", "dofib")),
+          block("base1", 
+            Assume(BinaryExpr(BVEQ, R0, bv64(0))),
+            ret),
+          block("base2", 
+            Assume(BinaryExpr(BVEQ, R0, bv64(1))),
+            ret),
+          block("dofib",
+            Assume(BinaryExpr(BoolAND, BinaryExpr(BVNEQ, R0, bv64(0)), BinaryExpr(BVNEQ, R0, bv64(1)))),
+            // R8 stack pointer preserved across calls
+            Assign(R7, BinaryExpr(BVADD, R8, bv64(8))),  
+            MemoryAssign(stack, R7, R8, Endian.LittleEndian, 64), // sp
+            Assign(R8, R7),
+            Assign(R8, BinaryExpr(BVADD, R8, bv64(8))),  // sp + 8
+            MemoryAssign(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 8] = arg0
+            Assign(R0, BinaryExpr(BVSUB, R0, bv64(1))),
+            directCall("fib"),
+            Assign(R2, R8), // sp + 8
+            Assign(R8, BinaryExpr(BVADD, R8, bv64(8))),  // sp + 16
+            MemoryAssign(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 16] = r1
+            Assign(R0, MemoryLoad(stack, R2, Endian.LittleEndian, 64)), // [sp + 8]
+            Assign(R0, BinaryExpr(BVSUB, R0, bv64(2))),
+            directCall("fib"),
+            Assign(R2, MemoryLoad(stack, R8, Endian.LittleEndian, 64)), // [sp + 16] (r1)
+            Assign(R0, BinaryExpr(BVADD, R0, R2)),
+            Assign(R8, MemoryLoad(stack, BinaryExpr(BVSUB, R8, bv64(16)), Endian.LittleEndian, 64)),
+            ret
+            )
           )
         )
-      )
+    }
 
-    val regs = i.interpret(fib)
 
+    val fib = fibonacciProg(8)
+    val r = interpret(fib)
+    assert(r.nextCmd == Stopped())
     // Show interpreted result
     Logger.info("Registers:")
-    regs.foreach { (key, value) =>
-      Logger.info(s"$key := $value")
-    }
+    // r.regs.foreach { (key, value) =>
+    //   Logger.info(s"$key := $value")
+    // }
 
   }
 }
