@@ -165,7 +165,7 @@ This makes the most difference in SAT (non-verifying) cases.
 We don't have reason to believe array extensionality is necessary for any of our proofs.
 
 If using the built-in array theories, Z3's array extensionality reasoning can be disabled by 
-passing the `smt.array.extansional=false` configuration to Z3 through Boogie's CLI:
+passing the `smt.array.extensional=false` configuration to Z3 through Boogie's CLI:
 
 ```
 boogie example.bpl /proverOpt:O:smt.array.extensional=false
