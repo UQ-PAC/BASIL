@@ -83,14 +83,13 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
  * @param exactEquality
  * @return
  */
-def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])], exactEquality: Boolean = true): Set[BitVecLiteral] = {
+def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], exactEquality: Boolean = true): Set[BitVecLiteral] = {
   def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] =
     val res = for {
       x <- a
       y <- b
     } yield op(x, y)
     res
-  }
 
   def applySingle(op: BitVecLiteral => BitVecLiteral, a: Set[BitVecLiteral]): Set[BitVecLiteral] = {
     val res = for {
@@ -161,24 +160,24 @@ def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition,
   out.getOrElse(variable, Set())
 }
 
-///**
-// * In expressions that have accesses within a region, we need to relocate
-// * the base address to the actual address using the relocation table.
-// * MUST RELOCATE because MMM iterate to find the lowest address
-// * TODO: May need to iterate over the relocation table to find the actual address
-// *
-// * @param address
-// * @param globalOffsets
-// * @return BitVecLiteral: the relocated address
-// */
-//def relocatedBase(address: BitVecLiteral, globalOffsets: Map[BigInt, BigInt]): BitVecLiteral = {
-//  val tableAddress = globalOffsets.getOrElse(address.value, address.value)
-//  // this condition checks if the address is not layered and returns if it is not
-//  if (tableAddress != address.value && !globalOffsets.contains(tableAddress)) {
-//    return address
-//  }
-//  BitVecLiteral(tableAddress, address.size)
-//}
+/**
+ * In expressions that have accesses within a region, we need to relocate
+ * the base address to the actual address using the relocation table.
+ * MUST RELOCATE because MMM iterate to find the lowest address
+ * TODO: May need to iterate over the relocation table to find the actual address
+ *
+ * @param address
+ * @param globalOffsets
+ * @return BitVecLiteral: the relocated address
+ */
+def relocatedBase(address: BitVecLiteral, globalOffsets: Map[BigInt, BigInt]): BitVecLiteral = {
+  val tableAddress = globalOffsets.getOrElse(address.value, address.value)
+  // this condition checks if the address is not layered and returns if it is not
+  if (tableAddress != address.value && !globalOffsets.contains(tableAddress)) {
+    return address
+  }
+  BitVecLiteral(tableAddress, address.size)
+}
 
 def unwrapExpr(expr: Expr): Set[Expr] = {
   var buffers: Set[Expr] = Set()

@@ -238,7 +238,7 @@ trait MemoryRegionAnalysis(val program: Program,
             }
           }
         case memAssign: MemoryAssign =>
-          val result = eval(memAssign.rhs.index, m, cmd)
+          val result = eval(memAssign.index, m, cmd)
           m = regionLattice.lub(m, result)
         case localAssign: Assign =>
           stackDetection(localAssign)
@@ -289,7 +289,7 @@ class InterprocMemoryRegionAnalysisSolver(
                                   ANRResult: Map[CFGPosition, Set[Variable]],
                                   RNAResult: Map[CFGPosition, Set[Variable]],
                                   regionAccesses: Map[CfgNode, Map[RegisterWrapperPartialEquality, FlatElement[Expr]]],
-                                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[LocalAssign]], Map[Variable, Set[LocalAssign]])],
+                                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
                                   maxDepth: Int,
                                   exactMatch: Boolean = false
                                 ) extends MemoryRegionAnalysis(program, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, regionAccesses, reachingDefs, maxDepth, exactMatch)

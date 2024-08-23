@@ -495,7 +495,7 @@ object IRTransform {
   // do reachability analysis
   // also need a bit in the IR where it creates separate files
   def splitThreads(program: Program,
-                   pointsTo: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
+                   pointsTo: Map[RegisterWrapperPartialEquality, Set[RegisterWrapperPartialEquality | MemoryRegion]],
                    regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
                    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
                   ): Unit = {
@@ -510,7 +510,7 @@ object IRTransform {
             // look up R2 value using points to results
             val R2 = Register("R2", 64)
             val b = reachingDefs(d)
-            val R2Wrapper = RegisterVariableWrapper(R2, getDefinition(R2, d, reachingDefs))
+            val R2Wrapper = RegisterWrapperPartialEquality(R2, getDefinition(R2, d, reachingDefs))
             val threadTargets = pointsTo(R2Wrapper)
 
             if (threadTargets.size > 1) {
@@ -729,8 +729,8 @@ object StaticAnalysis {
     mmm.logRegions()
 
     Logger.info("[!] Injecting regions")
-    val regionInjector = RegionInjector(domain, IRProgram, constPropResultWithSSA, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
-    regionInjector.nodeVisitor()
+//    val regionInjector = RegionInjector(domain, IRProgram, constPropResultWithSSA, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
+//    regionInjector.nodeVisitor()
 
     Logger.info("[!] Running Steensgaard")
     val steensgaardSolver = InterprocSteensgaardAnalysis(IRProgram, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, reachingDefinitionsAnalysisResults, globalOffsets)

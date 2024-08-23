@@ -28,7 +28,7 @@ case class ReachingDefinitionsAnalysis(program: Program) {
   private def generateUniqueDefinition(
       variable: Variable
   ): Assign = {
-    Assign(variable, Register("Unique", BitVecLiteral(0, 0)))
+    Assign(variable, Register("Unique", 0))
   }
 
   def transfer(n: CFGPosition, s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) =
@@ -73,13 +73,13 @@ case class ReachingDefinitionsAnalysis(program: Program) {
       transformUses(indirectCall.target.variables, s)
     case directCall: DirectCall if directCall.target.name == "malloc" =>
       // assume R0 has been assigned, generate a fake definition
-      val mallocVar = Register("R0", BitVecType(64))
+      val mallocVar = Register("R0", 64)
       val mallocDef = generateUniqueDefinition(mallocVar)
       val mallocUseDefs: Map[Variable, Set[Definition]] = Set(mallocVar).foldLeft(Map.empty[Variable, Set[Definition]]) {
         case (acc, v) =>
           acc + (v -> s._1(v))
       }
-      (s._1 + (Register("R0", BitVecType(64)) -> Set(mallocDef)), mallocUseDefs)
+      (s._1 + (Register("R0", 64) -> Set(mallocDef)), mallocUseDefs)
     case _ => s
   }
 }

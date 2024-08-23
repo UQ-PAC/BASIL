@@ -287,7 +287,7 @@ class InterprocSteensgaardAnalysis(
             case binOp: BinaryExpr =>
               // X1 = &X2: [[X1]] = ↑[[X2]]
               exprToRegion(binOp, cmd).foreach(
-                x => unify(IdentifierVariable(RegisterWrapperPartialEquality(localAssign.lhs, getDefinition(assign.lhs, cmd, reachingDefs))), PointerRef(AllocVariable(x)))
+                x => unify(IdentifierVariable(RegisterWrapperPartialEquality(assign.lhs, getDefinition(assign.lhs, cmd, reachingDefs))), PointerRef(AllocVariable(x)))
               )
             // TODO: should lookout for global base + offset case as well
             case _ =>
