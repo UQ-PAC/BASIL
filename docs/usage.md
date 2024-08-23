@@ -7,8 +7,9 @@ new binaries for manual testing.
 
 ## Lifting a single binary
 
-Many lifted examples are provided in the [tests directory][tests].
-These instructions are for if you want to use the BASIL tool with new binary files.
+Many lifted examples are provided in the [tests directory][tests],
+instructions are given [here](development/readme.md) as to how to add new tests.
+The instructions instructions are for if you want to use the BASIL tool with new binary files.
 
 BASIL takes as input:
 - a .gts file, containing the ddisasm CFG and the ASLp semantics, 
@@ -52,14 +53,14 @@ You can also, of course, build any of these tools manually.
 
 See also: [tool-installation](development/tool-installation.md)
 and [development: building](development/readme.md#building)
-(primarily if you are interested in buliding BASIL manually).
+(primarily if you are interested in building BASIL manually).
 
 ### Preparation
 
 1. Compile a C program into an Aarch64 binary, for example:
    
    ```bash
-   aarch64-suse-linux-gcc x.c
+   aarch64-linux-gnu-gcc x.c
    ```
 
    You can double-check the produced file with:
@@ -134,7 +135,7 @@ This generates a Boogie file in out.bpl.
 ```
 basil --input a.gts --relf a.relf -o out.bpl
 ```
-(If using BASIL in-repo, substitute `./mill run` in place of `basil`.
+(If using BASIL compiled from source, substitute `./mill run` in place of `basil`.
 Optionally add a specification file with `--spec`.)
 
 
@@ -156,7 +157,12 @@ boogie /useArrayAxioms out.bpl
 The `/useArrayAxioms` flag is necessary for Boogie versions 2.16.8 and greater;
 for earlier versions it can be removed.
 This improves the verification speed, by using Boogie's axiomatic encoding of arrays rather than Z3's. 
-This encoding does not support extensionality, array extensionality can be disabled on newer versions of Boogie with:
+The axiomatic encoding is faster (1) because it does not support extensionality, and (2) because it sacrifices completeness. 
+This makes the most difference in SAT (non-verifying) cases. 
+We don't have reason to believe array extensionality is necessary for any of our proofs.
+
+If using the built-in array theories, Z3's array extensionality reasoning can be disabled by 
+passing the `smt.array.extansional=false` configuration to Z3 through boogie's CLI:
 
 ```
 boogie example.bpl /proverOpt:O:smt.array.extensional=false
