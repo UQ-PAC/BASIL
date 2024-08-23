@@ -1,5 +1,6 @@
 package analysis
 
+import analysis.BitVectorEval.isNegative
 import ir.*
 import util.Logger
 import scala.collection.immutable
@@ -138,6 +139,12 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             Logger.debug("found: " + regions)
             res ++= regions
           } else {
+            if (isNegative(b)) {
+              val region = mmm.findStackObject(0)
+              if (region.isDefined) {
+                res = res + region.get
+              }
+            }
             val region = mmm.findStackObject(b.value)
             if (region.isDefined) {
               res = res + region.get
@@ -159,6 +166,17 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             res += region.get
           }
         }
+        if (res.isEmpty) {
+          val ctx = getDefinition(v, n, reachingDefs)
+          for (i <- ctx) {
+            i.rhs match {
+              case be: BinaryExpr =>
+                res = res ++ exprToRegion(eval(i.rhs, i), n)
+              case _ =>
+            }
+          }
+        }
+
         if (res.isEmpty) { // may be passed as param
           val ctx = getUse(v, n, reachingDefs)
           for (i <- ctx) {
@@ -172,7 +190,8 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             }
           }
         }
-        res
+      case load: MemoryLoad => // treat as a region
+        res ++= exprToRegion(load.index, n)
       case _ =>
         evaluateExpressionWithSSA(expr, constantProp(n), n, reachingDefs).foreach { b =>
           Logger.debug("BitVecLiteral: " + b)
@@ -181,8 +200,8 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
             res += region.get
           }
         }
-        res
     }
+    res
   }
 
   /** Default implementation of eval.
@@ -192,6 +211,9 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
       case literal: Literal => literal // ignore literals
       case Extract(end, start, body) =>
         Extract(end, start, eval(body, cmd))
+      case UninterpretedFunction(name, params, returnType) =>
+        val newParams = params.map { p => eval(p, cmd) }
+        UninterpretedFunction(name, newParams, returnType)
       case Repeat(repeats, body) =>
         Repeat(repeats, eval(body, cmd))
       case ZeroExtend(extension, body) =>
@@ -202,37 +224,39 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
         UnaryExpr(op, eval(arg, cmd))
       case BinaryExpr(op, arg1, arg2) =>
         BinaryExpr(op, eval(arg1, cmd), eval(arg2, cmd))
-      case MemoryAssign(mem, index, value, endian, size) =>
-        // TODO: index should be replaced region
-        val regions = exprToRegion(eval(index, cmd), cmd)
-        if (regions.size == 1) {
-          MemoryAssign(Memory(regions.head.regionIdentifier, mem.addressSize, mem.valueSize), eval(index, cmd), eval(value, cmd), endian, size)
-        } else if (regions.size > 1) {
-            Logger.warn(s"MemStore is: ${cmd}")
-            Logger.warn(s"Multiple regions found for memory store: ${regions}")
-          MemoryAssign(Memory(mmm.mergeRegions(regions).regionIdentifier, mem.addressSize, mem.valueSize), eval(index, cmd), eval(value, cmd), endian, size)
-        } else {
-            Logger.warn(s"MemStore is: ${cmd}")
-            Logger.warn(s"No region found for memory store")
-            expr
-        }
       case MemoryLoad(mem, index, endian, size) =>
         // TODO: index should be replaced region
-        val regions = exprToRegion(eval(index, cmd), cmd)
-        if (regions.size == 1) {
-          MemoryLoad(Memory(regions.head.regionIdentifier, mem.addressSize, mem.valueSize), eval(index, cmd), endian, size)
-        } else if (regions.size > 1) {
-          Logger.warn(s"MemLoad is: ${cmd}")
-          Logger.warn(s"Multiple regions found for memory load: ${regions}")
-          MemoryLoad(Memory(mmm.mergeRegions(regions).regionIdentifier, mem.addressSize, mem.valueSize), eval(index, cmd), endian, size)
-        } else {
-          Logger.warn(s"MemLoad is: ${cmd}")
-          Logger.warn(s"No region found for memory load")
-          expr
-        }
-      case Memory(name, addressSize, valueSize) =>
-        expr // ignore memory
+        MemoryLoad(renameMemory(mem, index, cmd), eval(index, cmd), endian, size)
       case variable: Variable => variable // ignore variables
+  }
+
+  def renameMemory(mem: Memory, expr: Expr, cmd : Command): Memory = {
+    val regions = exprToRegion(eval(expr, cmd), cmd)
+    if (regions.size == 1) {
+      Logger.warn(s"Mem CMD is: ${cmd}")
+      Logger.warn(s"Region found for mem: ${regions.head}")
+      regions.head match {
+        case stackRegion: StackRegion =>
+          return StackMemory(stackRegion.regionIdentifier, mem.addressSize, mem.valueSize)
+        case dataRegion: DataRegion =>
+          return SharedMemory(dataRegion.regionIdentifier, mem.addressSize, mem.valueSize)
+        case _ =>
+      }
+    } else if (regions.size > 1) {
+      Logger.warn(s"Mem CMD is: ${cmd}")
+      Logger.warn(s"Multiple regions found for mem: ${regions}")
+      mmm.mergeRegions(regions) match {
+        case stackRegion: StackRegion =>
+          return StackMemory(stackRegion.regionIdentifier, mem.addressSize, mem.valueSize)
+        case dataRegion: DataRegion =>
+          return SharedMemory(dataRegion.regionIdentifier, mem.addressSize, mem.valueSize)
+        case _ =>
+      }
+    } else {
+      Logger.warn(s"Mem CMD is: ${cmd}")
+      Logger.warn(s"No region found for mem")
+    }
+    mem
   }
 
   /** Transfer function for state lattice elements.
@@ -244,7 +268,7 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
           case assign: Assign =>
             assign.rhs = eval(assign.rhs, cmd)
           case mAssign: MemoryAssign =>
-            mAssign.mem = eval(mAssign.mem, cmd).asInstanceOf[Memory]
+            mAssign.mem = renameMemory(mAssign.mem, mAssign.index, cmd)
             mAssign.index = eval(mAssign.index, cmd)
             mAssign.value = eval(mAssign.value, cmd)
           case nop: NOP => // ignore NOP

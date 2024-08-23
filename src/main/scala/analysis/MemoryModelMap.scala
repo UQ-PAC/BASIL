@@ -88,11 +88,11 @@ class MemoryModelMap {
    * @param name
    * @param address
    * @param globalOffsets
-   * @return DataRegion: a DataRegion representing the actual address
+   * @return BitVector: a BitVector representing the actual address
    */
-  private def resolveInverseGlobalOffset(name: String, address: BitVecLiteral, globalOffsets: Map[BigInt, BigInt]): DataRegion = {
+  private def resolveInverseGlobalOffset(name: String, address: BigInt, globalOffsets: Map[BigInt, BigInt]): BigInt = {
     val inverseGlobalOffsets = globalOffsets.map(_.swap)
-    var tableAddress = inverseGlobalOffsets.getOrElse(address.value, address.value)
+    var tableAddress = inverseGlobalOffsets.getOrElse(address, address)
     // addresses may be layered as in jumptable2 example for which recursive search is required
     var exitLoop = false
     while (inverseGlobalOffsets.contains(tableAddress) && !exitLoop) {
@@ -104,7 +104,7 @@ class MemoryModelMap {
       }
     }
 
-    DataRegion(name, BitVecLiteral(tableAddress, 64))
+    tableAddress
   }
 
   /**
@@ -149,9 +149,12 @@ class MemoryModelMap {
     procedureToRegions
   }
 
-  def convertMemoryRegions(memoryRegions: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
+  def convertMemoryRegions(memoryRegions: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
-    val externalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(name, BitVecLiteral(offset, 64), globalOffsets))
+    val reversedExternalFunctionRgns = (externalFunctions ++ globalAddresses).map((offset, name) => resolveInverseGlobalOffset(name, offset, globalOffsets) -> name)
+    val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => reversedExternalFunctionRgns.contains(offset))
+
+    val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64)))
 
     // we should collect all data regions otherwise the ordering might be wrong
     var dataRgns: Set[DataRegion] = Set.empty

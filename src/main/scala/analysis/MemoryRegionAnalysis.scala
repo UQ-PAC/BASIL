@@ -1,5 +1,6 @@
 package analysis
 
+import analysis.BitVectorEval.isNegative
 import analysis.solvers.WorklistFixpointSolverWithReachability
 import ir.*
 import util.Logger
@@ -106,7 +107,7 @@ trait MemoryRegionAnalysis(val program: Program,
     }
     depthMap(n) += 1
     binExpr.arg1 match {
-      case variable: Variable =>
+      case variable: Variable if !spList.contains(variable) =>
         val ctx = getUse(variable, n, reachingDefs)
         for (i <- ctx) {
           val regions = i.rhs match {
@@ -137,8 +138,23 @@ trait MemoryRegionAnalysis(val program: Program,
           }
         }
       case _ =>
+        eval(binExpr, Set.empty, n)
     }
     reducedRegions
+  }
+
+  def reducibleVariable(variable: Variable, n: Command): Set[MemoryRegion] = {
+    var regions = Set.empty[MemoryRegion]
+    val ctx = getDefinition(variable, n, reachingDefs)
+    for (i <- ctx) {
+      i.rhs match {
+        case binaryExpr: BinaryExpr =>
+          regions = regions ++ reducibleToRegion(binaryExpr, i)
+        case _ =>
+          //regions = regions ++ eval(i.rhs, Set.empty, i)
+      }
+    }
+    regions
   }
 
   def eval(exp: Expr, env: Set[MemoryRegion], n: Command): Set[MemoryRegion] = {
@@ -149,7 +165,12 @@ trait MemoryRegionAnalysis(val program: Program,
         if (spList.contains(binOp.arg1)) {
           for (elem <- evaluateExpressionWithSSA(binOp.arg2, constantProp(n), n, reachingDefs, exactMatch)) {
             elem match {
-              case b: BitVecLiteral => regionsToReturn.addAll(Set(poolMaster(b, IRWalk.procedure(n))))
+              case b: BitVecLiteral =>
+                if (isNegative(b)) {
+                  regionsToReturn.addAll(Set(poolMaster(BitVecLiteral(0, 64), IRWalk.procedure(n))))
+                } else {
+                  regionsToReturn.addAll(Set(poolMaster(b, IRWalk.procedure(n))))
+                }
             }
           }
         } else {
@@ -177,8 +198,8 @@ trait MemoryRegionAnalysis(val program: Program,
           case _ =>
             for (elem <- evaluateExpressionWithSSA(variable, constantProp(n), n, reachingDefs, exactMatch)) {
               elem match {
-                case b: BitVecLiteral =>
-                  regionsToReturn.addAll(eval(b, env, n))
+                case b: BitVecLiteral => regionsToReturn.addAll(eval(b, env, n))
+                case _ => reducibleVariable(variable, n)
               }
             }
         }
@@ -210,7 +231,6 @@ trait MemoryRegionAnalysis(val program: Program,
     var m = s
     n match {
     case cmd: Command =>
-      println(s"N: $n")
       cmd match {
         case directCall: DirectCall =>
           val ANR = ANRResult(cmd)
