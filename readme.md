@@ -62,6 +62,8 @@ BASIL
   --analyse                       Run static analysis pass.
   --analysis-results <str>        Log analysis results in files at specified path.
   --analysis-results-dot <str>    Log analysis results in .dot form at specified path.
+  --boogie-procedure-rg <str>     Switch version of procedure rely/guarantee checks to emit.
+                                  (function|ifblock)
   --boogie-use-lambda-stores      Use lambda representation of store operations.
   --dump-il <str>                 Dump the Intermediate Language to text.
   -h --help                       Show this help message.
@@ -73,8 +75,14 @@ BASIL
                                   (defaults to Int.MaxValue)
   -r --relf <str>                 Name of the file containing the output of 'readelf -s -r -W'.
   -s --spec <str>                 BASIL specification file.
+  --summarise-procedures          Generates summaries of procedures which are used in
+                                  pre/post-conditions (requires --analyse flag)
+  -t --threads                    Separates threads into multiple .bpl files with given output
+                                  filename as prefix (requires --analyse flag)
   -v --verbose                    Show extra debugging logs.
 ```
+
+For more information see [docs/usage](docs/usage.md).
 
 ## Introduction
 
