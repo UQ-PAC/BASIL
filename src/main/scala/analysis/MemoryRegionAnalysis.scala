@@ -15,7 +15,7 @@ trait MemoryRegionAnalysis(val program: Program,
                            val constantProp: Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
                            val ANRResult: Map[CFGPosition, Set[Variable]],
                            val RNAResult: Map[CFGPosition, Set[Variable]],
-                           val regionAccesses: Map[CfgNode, Map[RegisterWrapperPartialEquality, FlatElement[Expr]]],
+                           val regionAccesses: Map[CFGPosition, Map[RegisterWrapperPartialEquality, FlatElement[Expr]]],
                            val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
                            val maxDepth: Int,
                            val exactMatch: Boolean) {
@@ -239,19 +239,19 @@ trait MemoryRegionAnalysis(val program: Program,
           val RNA = RNAResult(program.procedures.filter(fn => fn == directCall.target).head)
           val parameters = RNA.intersect(ANR)
           // TODO: Re-enable when ReachingDef has interprocedural option
-//          val ctx = regionAccesses(cmd)
-//          for (elem <- parameters) {
-//            if (ctx.contains(RegisterVariableWrapper(elem, getUse(elem, cmd.data, reachingDefs)))) {
-//              ctx(RegisterVariableWrapper(elem, getUse(elem, cmd.data, reachingDefs))) match {
-//                case FlatEl(al) =>
-//                  val regions = eval(al, s, cmd)
-//                  //val targetMap = stackMap(directCall.target)
-//                  //cfg.funEntries.filter(fn => fn.data == directCall.target).head
-//                  procedureToSharedRegions.getOrElseUpdate(directCall.target, mutable.Set.empty).addAll(regions)
-//                  registerToRegions.getOrElseUpdate(RegisterVariableWrapper(elem, getUse(elem, cmd.data, reachingDefs)), mutable.Set.empty).addAll(regions)
-//              }
-//            }
-//          }
+          val ctx = regionAccesses(cmd)
+          for (elem <- parameters) {
+            if (ctx.contains(RegisterWrapperPartialEquality(elem, getUse(elem, cmd, reachingDefs)))) {
+              ctx(RegisterWrapperPartialEquality(elem, getUse(elem, cmd, reachingDefs))) match {
+                case FlatEl(al) =>
+                  val regions = eval(al, s, cmd)
+                  //val targetMap = stackMap(directCall.target)
+                  //cfg.funEntries.filter(fn => fn.data == directCall.target).head
+                  procedureToSharedRegions.getOrElseUpdate(directCall.target, mutable.Set.empty).addAll(regions)
+                  registerToRegions.getOrElseUpdate(RegisterWrapperPartialEquality(elem, getUse(elem, cmd, reachingDefs)), mutable.Set.empty).addAll(regions)
+              }
+            }
+          }
           if (directCall.target.name == "malloc") {
             for (elem <- evaluateExpressionWithSSA(mallocVariable, constantProp(n), n, reachingDefs, exactMatch)) {
               elem match {
@@ -283,7 +283,7 @@ class MemoryRegionAnalysisSolver(
                                   constantProp: Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
                                   ANRResult: Map[CFGPosition, Set[Variable]],
                                   RNAResult: Map[CFGPosition, Set[Variable]],
-                                  regionAccesses: Map[CfgNode, Map[RegisterWrapperPartialEquality, FlatElement[Expr]]],
+                                  regionAccesses: Map[CFGPosition, Map[RegisterWrapperPartialEquality, FlatElement[Expr]]],
                                   reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
                                   maxDepth: Int,
                                   exactMatch: Boolean = true
@@ -324,7 +324,7 @@ class InterprocMemoryRegionAnalysisSolver(
                                   constantProp: Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
                                   ANRResult: Map[CFGPosition, Set[Variable]],
                                   RNAResult: Map[CFGPosition, Set[Variable]],
-                                  regionAccesses: Map[CfgNode, Map[RegisterWrapperPartialEquality, FlatElement[Expr]]],
+                                  regionAccesses: Map[CFGPosition, Map[RegisterWrapperPartialEquality, FlatElement[Expr]]],
                                   reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
                                   maxDepth: Int,
                                   exactMatch: Boolean = false
