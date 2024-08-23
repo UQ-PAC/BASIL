@@ -28,6 +28,9 @@ and run BASIL.
 
 ### Requirements
 
+These instructions assume a Linux-GNU OS, BASIL itself will happily run on Windows, 
+and the lifting machinery is known to work under WSL. 
+
 - AArch64 cross-compilation toolchain (e.g. GCC or clang)
 - AArch64 readelf (e.g. `aarch64-linux-gnu-readelf`)
 - ddisasm, for disassembling binary files
@@ -126,7 +129,7 @@ and [development: building](development/readme.md#building)
    
 4. Obtain the symbol table with readelf.
    ```
-   aarch64-suse-linux-readelf -s -r -W a.out > a.relf
+   aarch64-linux-gnu-readelf -s -r -W a.out > a.relf
    ```
 
 ### Using BASIL to generate Boogie
@@ -156,13 +159,13 @@ boogie /useArrayAxioms out.bpl
 
 The `/useArrayAxioms` flag is necessary for Boogie versions 2.16.8 and greater;
 for earlier versions it can be removed.
-This improves the verification speed, by using Boogie's axiomatic encoding of arrays rather than Z3's. 
+This improves the verification speed by using Boogie's axiomatic encoding of arrays rather than Z3's. 
 The axiomatic encoding is faster (1) because it does not support extensionality, and (2) because it sacrifices completeness. 
 This makes the most difference in SAT (non-verifying) cases. 
 We don't have reason to believe array extensionality is necessary for any of our proofs.
 
 If using the built-in array theories, Z3's array extensionality reasoning can be disabled by 
-passing the `smt.array.extansional=false` configuration to Z3 through boogie's CLI:
+passing the `smt.array.extansional=false` configuration to Z3 through Boogie's CLI:
 
 ```
 boogie example.bpl /proverOpt:O:smt.array.extensional=false
