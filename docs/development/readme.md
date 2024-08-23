@@ -3,19 +3,28 @@
 - [project-layout](project-layout.md) Organisation of the source code
 - [editor-setup](editor-setup.md) Guide to basil development in IDEs 
 - [tool-installation](tool-installation.md) Guide to lifter, etc. tool installation
+- [scala](scala.md) Advice on Scala programming.
 - [cfg](cfg.md) Explanation of the old CFG datastructure 
 
 
 ## Scala
 
 Basil is implemented in Scala 3.
+
+See also: [Scala Gotchas](scala.md).
+
 Scala is a mixed functional and object-oriented programming language implemented on the JVM. It is a very complicated 
 language with a lot of depth, so it is important to carefully chose the implementation complexity introduced. 
 
-Generally, this means favouring simple standard solutions and choosing functional programming in the small scale 
-(use filter and map rather than loops), and object-oriented programming in the large scale.
+Generally, this means favouring simple standard solutions and choosing functional programming over stateful object oriented style 
+(use filter and map rather than loops), prefer immutable case classes and enums to regular mutable classes, etc.
+
+ADTs and functions between ADTs are all you need to solve most problems. Most
+things more complicated than this make the code unnecessarily difficult to maintain. 
 
 It is recommended to explore the [Scala documentation](https://docs.scala-lang.org/scala3/book/introduction.html).
+There is also the incomplete [Scala 3 language specification](https://github.com/scala/scala3/tree/main/docs/_spec), 
+which contains details not present in the documentation, but is not completely updated from Scala 2.
 
 Some general advice:
 
