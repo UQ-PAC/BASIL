@@ -9,7 +9,7 @@ new binaries for manual testing.
 
 Many lifted examples are provided in the [tests directory][tests],
 instructions are given [here](development/readme.md) as to how to add new tests.
-The instructions instructions are for if you want to use the BASIL tool with new binary files.
+The instructions below are for if you want to use the BASIL tool with new binary files.
 
 BASIL takes as input:
 - a .gts file, containing the ddisasm CFG and the ASLp semantics, 
