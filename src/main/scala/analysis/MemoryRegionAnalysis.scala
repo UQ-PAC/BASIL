@@ -99,7 +99,7 @@ trait MemoryRegionAnalysis(val program: Program,
     var reducedRegions = Set.empty[MemoryRegion]
     if (depthMap.contains(n)) {
       if (depthMap(n) > maxDepth) {
-        depthMap += (n -> 0)
+        //depthMap += (n -> 0)
         return reducedRegions
       }
     } else {
@@ -196,11 +196,14 @@ trait MemoryRegionAnalysis(val program: Program,
           case reg: Register if spList.contains(reg) =>
             regionsToReturn.addAll(Set(poolMaster(BitVecLiteral(0, 64), IRWalk.procedure(n))))
           case _ =>
-            for (elem <- evaluateExpressionWithSSA(variable, constantProp(n), n, reachingDefs, exactMatch)) {
+            val ssaEval = evaluateExpressionWithSSA(variable, constantProp(n), n, reachingDefs, exactMatch)
+            for (elem <- ssaEval) {
               elem match {
                 case b: BitVecLiteral => regionsToReturn.addAll(eval(b, env, n))
-                case _ => reducibleVariable(variable, n)
               }
+            }
+            if (ssaEval.isEmpty) {
+              regionsToReturn.addAll(reducibleVariable(variable, n))
             }
         }
       case memoryLoad: MemoryLoad =>
@@ -218,9 +221,8 @@ trait MemoryRegionAnalysis(val program: Program,
         regionsToReturn.addAll(eval(signExtend.body, env, n))
       case unaryExpr: UnaryExpr =>
         regionsToReturn.addAll(eval(unaryExpr.arg, env, n))
-      case memoryStore: MemoryAssign =>
-        regionsToReturn.addAll(eval(memoryStore.index, env, n) ++ eval(memoryStore.value, env, n))
-      case memory: Memory =>
+      case uninterpretedFunction: UninterpretedFunction =>
+        uninterpretedFunction.params.foreach(unExpr => regionsToReturn.addAll(eval(unExpr, env, n)))
     }
     regionsToReturn.toSet
   }
@@ -258,7 +260,7 @@ trait MemoryRegionAnalysis(val program: Program,
             }
           }
         case memAssign: MemoryAssign =>
-          val result = eval(memAssign.index, m, cmd)
+          val result = eval(memAssign.index, m, cmd) ++ eval(memAssign.value, m, cmd)
           m = regionLattice.lub(m, result)
         case localAssign: Assign =>
           stackDetection(localAssign)
@@ -300,6 +302,20 @@ class MemoryRegionAnalysisSolver(
   }
 }
 
+/**
+ *
+ * @param program
+ * @param globals
+ * @param globalOffsets
+ * @param subroutines
+ * @param constantProp
+ * @param ANRResult
+ * @param RNAResult
+ * @param regionAccesses
+ * @param reachingDefs
+ * @param maxDepth: Used in a case of a loop unfolding for MRA purposes only because addresses created in a loop could be infinite
+ * @param exactMatch: If true, SSA variables are matched by matching exact set of definitions. Otherwise, loose match by overlapping sets is used
+ */
 class InterprocMemoryRegionAnalysisSolver(
                                   program: Program,
                                   globals: Map[BigInt, String],
