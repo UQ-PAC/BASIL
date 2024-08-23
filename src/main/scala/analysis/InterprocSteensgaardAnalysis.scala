@@ -76,24 +76,6 @@ class InterprocSteensgaardAnalysis(
   }
 
   /**
-   * In expressions that have accesses within a region, we need to relocate
-   * the base address to the actual address using the relocation table.
-   * MUST RELOCATE because MMM iterate to find the lowest address
-   * TODO: May need to iterate over the relocation table to find the actual address
-   *
-   * @param address
-   * @return BitVecLiteral: the relocated address
-   */
-  def relocatedBase(address: BitVecLiteral): BitVecLiteral = {
-    val tableAddress = globalOffsets.getOrElse(address.value, address.value)
-    // this condition checks if the address is not layered and returns if it is not
-    if (tableAddress != address.value && !globalOffsets.contains(tableAddress)) {
-      return address
-    }
-    BitVecLiteral(tableAddress, address.size)
-  }
-
-  /**
    * Used to reduce an expression that may be a sub-region of a memory region.
    * Pointer reduction example:
    * R2 = R31 + 20
@@ -173,7 +155,7 @@ class InterprocSteensgaardAnalysis(
                 case dataRegion: DataRegion =>
                   Logger.debug(s"Hey, I'm a data region: $dataRegion")
                   Logger.debug(s"Hey, I'm a offset: $b")
-                  val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start), b)
+                  val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start, globalOffsets), b)
                   evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
                     reducedRegions ++= exprToRegion(b2, n)
                   }
