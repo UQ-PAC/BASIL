@@ -431,6 +431,8 @@ sealed trait Effects[T <: Effects[T]] {
 
   def storeMem(vname: String, update: Map[BasilValue, BasilValue]): T
 
+  def getNext : ExecutionContinuation 
+
 }
 
 enum Effect:
@@ -454,29 +456,31 @@ case class TracingInterpreter(
 
   /** effects * */
   def setNext(c: ExecutionContinuation) = {
-    Logger.debug(s"    eff : DONEXT $c")
-    TracingInterpreter(s.setNext(c), Effect.SetNext(c)::trace)
+    // Logger.debug(s"    eff : DONEXT $c")
+     TracingInterpreter(s.setNext(c), trace)
   }
 
   def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = {
-    Logger.debug(s"    eff : CALL $target")
+    //Logger.debug(s"    eff : CALL $target")
     TracingInterpreter(s.call(target, beginFrom, returnTo), Effect.Call(target, beginFrom, returnTo)::trace)
   }
 
   def doReturn() = {
-    Logger.debug(s"    eff : RETURN")
+    //Logger.debug(s"    eff : RETURN")
     TracingInterpreter(s.doReturn(), Effect.Return::trace)
   }
 
   def storeVar(v: String, c: Scope,  value: BasilValue) = {
-    Logger.debug(s"    eff : SET $v := $value")
+    //Logger.debug(s"    eff : SET $v := $value")
     TracingInterpreter(s.storeVar(v, c, value), Effect.StoreVar(v, c, value)::trace)
   }
 
   def storeMem(vname: String, update: Map[BasilValue, BasilValue])  = {
-    Logger.debug(s"    eff : STORE $vname <- $update")
+    //Logger.debug(s"    eff : STORE $vname <- $update")
     TracingInterpreter(s.storeMem(vname, update), Effect.StoreMem(vname, update)::trace)
   }
+
+  def getNext = s.getNext
 
 }
 
@@ -496,6 +500,8 @@ case class InterpreterState(
   def loadVar(v: String): BasilValue = memoryState.getVar(v)
 
   def loadMem(v: String, addrs: List[BasilValue]): List[BasilValue] = memoryState.doLoad(v, addrs)
+
+  def getNext = nextCmd
 
   /** effects * */
   def setNext(c: ExecutionContinuation): InterpreterState = {
@@ -642,12 +648,12 @@ case object InterpFuns {
   }
 
   @tailrec
-  def interpret(s: InterpreterState): InterpreterState = {
-    Logger.debug(s"interpret ${s.nextCmd}")
-    s.nextCmd match {
+  def interpret[T <: Effects[T]](s: T): T = {
+    Logger.debug(s"interpret ${s.getNext}")
+    s.getNext match {
       case Run(c: Statement) =>
         interpret(
-          protect[InterpreterState](
+          protect[T](
             () => interpretStatement(s, c),
             {
               case InterpreterError(e)         => s.setNext(e)
@@ -657,7 +663,7 @@ case object InterpFuns {
         )
       case Run(c: Jump) =>
         interpret(
-          protect[InterpreterState](
+          protect[T](
             () => interpretJump(s, c),
             {
               case InterpreterError(e)         => s.setNext(e)
@@ -670,13 +676,19 @@ case object InterpFuns {
     }
   }
 
-  def interpretProg(p: Program): InterpreterState = {
-    var s = initialiseProgram(p, InterpreterState())
+  def interpretProg[T <: Effects[T]](p: Program, i: T): T = {
+    var s = initialiseProgram(p, i)
     interpret(s)
   }
 
 }
 
-def interpret(IRProgram: Program) = {
-  InterpFuns.interpretProg(IRProgram)
+def interpret(IRProgram: Program) : InterpreterState = {
+  InterpFuns.interpretProg(IRProgram, InterpreterState())
 }
+
+def interpretTrace(IRProgram: Program) :  TracingInterpreter = {
+  val s : TracingInterpreter = InterpFuns.interpretProg(IRProgram, TracingInterpreter(InterpreterState(), List()))
+  s
+}
+

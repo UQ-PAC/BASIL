@@ -286,61 +286,61 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     testInterpret("no_interference_update_y", expected)
   }
 
-  test("fibonacci") {
 
-    def fibonacciProg(n: Int) = {
-      def expected(n: Int) : Int = {
-        n match {
-          case 0 => 0
-          case 1 => 1
-          case n => expected(n - 1) + expected(n - 2)
-        }
+  def fibonacciProg(n: Int) = {
+    def expected(n: Int) : Int = {
+      n match {
+        case 0 => 0
+        case 1 => 1
+        case n => expected(n - 1) + expected(n - 2)
       }
-      prog(
-        proc("begin", 
-          block("entry",
-            Assign(R8, Register("R31", 64)),
-            Assign(R0, bv64(n)),
-            directCall("fib"),
-            goto("done")
-          ),
-          block("done",
-            Assert(BinaryExpr(BVEQ, R0, bv64(expected(n)))),
-            ret
-          )),
-        proc("fib",
-          block("base", goto("base1", "base2", "dofib")),
-          block("base1", 
-            Assume(BinaryExpr(BVEQ, R0, bv64(0))),
-            ret),
-          block("base2", 
-            Assume(BinaryExpr(BVEQ, R0, bv64(1))),
-            ret),
-          block("dofib",
-            Assume(BinaryExpr(BoolAND, BinaryExpr(BVNEQ, R0, bv64(0)), BinaryExpr(BVNEQ, R0, bv64(1)))),
-            // R8 stack pointer preserved across calls
-            Assign(R7, BinaryExpr(BVADD, R8, bv64(8))),  
-            MemoryAssign(stack, R7, R8, Endian.LittleEndian, 64), // sp
-            Assign(R8, R7),
-            Assign(R8, BinaryExpr(BVADD, R8, bv64(8))),  // sp + 8
-            MemoryAssign(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 8] = arg0
-            Assign(R0, BinaryExpr(BVSUB, R0, bv64(1))),
-            directCall("fib"),
-            Assign(R2, R8), // sp + 8
-            Assign(R8, BinaryExpr(BVADD, R8, bv64(8))),  // sp + 16
-            MemoryAssign(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 16] = r1
-            Assign(R0, MemoryLoad(stack, R2, Endian.LittleEndian, 64)), // [sp + 8]
-            Assign(R0, BinaryExpr(BVSUB, R0, bv64(2))),
-            directCall("fib"),
-            Assign(R2, MemoryLoad(stack, R8, Endian.LittleEndian, 64)), // [sp + 16] (r1)
-            Assign(R0, BinaryExpr(BVADD, R0, R2)),
-            Assign(R8, MemoryLoad(stack, BinaryExpr(BVSUB, R8, bv64(16)), Endian.LittleEndian, 64)),
-            ret
-            )
+    }
+    prog(
+      proc("begin", 
+        block("entry",
+          Assign(R8, Register("R31", 64)),
+          Assign(R0, bv64(n)),
+          directCall("fib"),
+          goto("done")
+        ),
+        block("done",
+          Assert(BinaryExpr(BVEQ, R0, bv64(expected(n)))),
+          ret
+        )),
+      proc("fib",
+        block("base", goto("base1", "base2", "dofib")),
+        block("base1", 
+          Assume(BinaryExpr(BVEQ, R0, bv64(0))),
+          ret),
+        block("base2", 
+          Assume(BinaryExpr(BVEQ, R0, bv64(1))),
+          ret),
+        block("dofib",
+          Assume(BinaryExpr(BoolAND, BinaryExpr(BVNEQ, R0, bv64(0)), BinaryExpr(BVNEQ, R0, bv64(1)))),
+          // R8 stack pointer preserved across calls
+          Assign(R7, BinaryExpr(BVADD, R8, bv64(8))),  
+          MemoryAssign(stack, R7, R8, Endian.LittleEndian, 64), // sp
+          Assign(R8, R7),
+          Assign(R8, BinaryExpr(BVADD, R8, bv64(8))),  // sp + 8
+          MemoryAssign(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 8] = arg0
+          Assign(R0, BinaryExpr(BVSUB, R0, bv64(1))),
+          directCall("fib"),
+          Assign(R2, R8), // sp + 8
+          Assign(R8, BinaryExpr(BVADD, R8, bv64(8))),  // sp + 16
+          MemoryAssign(stack, R8, R0, Endian.LittleEndian, 64), // [sp + 16] = r1
+          Assign(R0, MemoryLoad(stack, R2, Endian.LittleEndian, 64)), // [sp + 8]
+          Assign(R0, BinaryExpr(BVSUB, R0, bv64(2))),
+          directCall("fib"),
+          Assign(R2, MemoryLoad(stack, R8, Endian.LittleEndian, 64)), // [sp + 16] (r1)
+          Assign(R0, BinaryExpr(BVADD, R0, R2)),
+          Assign(R8, MemoryLoad(stack, BinaryExpr(BVSUB, R8, bv64(16)), Endian.LittleEndian, 64)),
+          ret
           )
         )
-    }
+      )
+  }
 
+  test("fibonacci") {
 
     val fib = fibonacciProg(8)
     val r = interpret(fib)
@@ -352,4 +352,17 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     // }
 
   }
+
+
+  test("fibonacci Trace") {
+
+    val fib = fibonacciProg(8)
+    val r = interpretTrace(fib)
+    assert(r.getNext == Stopped())
+    // Show interpreted result
+    //
+    info(r.trace.reverse.mkString("\n"))
+
+  }
+
 }
