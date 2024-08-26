@@ -547,15 +547,17 @@ class DSG(val proc: Procedure,
           if outgoing.size == 1 then
             collapsedCell._pointee = Some(outgoing.head)
           else if outgoing.size > 1 then
-            var internal = outgoing.head._2
-            val result = outgoing.tail.foldLeft(outgoing.head._1){
+//            var internal = outgoing.head._2
+            val result = outgoing.tail.foldLeft(adjust(outgoing.head)){
               (result, pointee) =>
-                val cell = pointee._1
-                val pointeeInternal = pointee._2
-                internal = internal.max(pointeeInternal)
-                mergeCells(result, cell)
+//                val cell = pointee._1
+//                val pointeeInternal = pointee._2
+//                internal = internal.max(pointeeInternal)
+                mergeCells(result, adjust(pointee))
             }
-            collapsedCell._pointee = Some(Slice(result, internal))
+
+
+            collapsedCell._pointee = Some(deadjust(result))
       }
 
       solver.unify(node1.term, resultNode.term, 0)
@@ -576,6 +578,15 @@ class DSG(val proc: Procedure,
     val cell = slice.cell
     val internal = slice.internalOffset
     adjust(cell, internal + offset)
+
+  def deadjust(cell: DSC) : Slice =
+    val node = cell.node.get
+    val offset = cell.offset
+    selfCollapse(node)
+    val newCell = node.getCell(offset)
+    assert(offset >= newCell.offset)
+    Slice(newCell, offset - newCell.offset)
+
 
   private def isFormal(pos: CFGPosition, variable: Variable): Boolean =
     !reachingDefs(pos).contains(variable)
@@ -863,14 +874,23 @@ case class DSC(node: Option[DSN], offset: BigInt)
       val node = DSN(Some(this.node.get.graph.get))
       _pointee = Some(Slice(node.cells(0), 0))
     else
-      val slice = _pointee.get
-      var node = slice.node
-      val graph = node.graph.get
-      val link = graph.solver.find(node.term)
-      node = link._1.asInstanceOf[Derm].node
-      val offset = link._2
-      val cell = node.addCell(offset + slice.cell.offset, slice.cell.largestAccessedSize)
-      _pointee = Some(Slice(cell, slice.internalOffset))
+
+//      val node = cell.node.get
+//      val offset = cell.offset
+//      val parent: Field = find(node)
+//      parent.node.addCell(cell.offset + parent.offset, cell.largestAccessedSize)
+
+
+//      val slice = _pointee.get
+//      var node = slice.node
+      val graph = _pointee.get.node.graph.get
+      val resolvedPointee = graph.find(graph.adjust(_pointee.get))
+
+//      val link = graph.solver.find(node.term)
+//      node = link._1.asInstanceOf[Derm].node
+//      val offset = link._2
+//      val cell = node.addCell(offset + slice.cell.offset, slice.cell.largestAccessedSize)
+      _pointee = Some(graph.deadjust(resolvedPointee))
     _pointee.get
 
   def growSize(size: BigInt): Boolean =

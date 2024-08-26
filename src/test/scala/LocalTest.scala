@@ -249,8 +249,12 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(stack48.node.get.allocationRegions.head.asInstanceOf[HeapLocation].size == 8)
     assert(dsg.adjust(stack48.getPointee).equals(stack40))
     assert(dsg.adjust(stack48.getPointee).equals(stack56))
-    assert(stack24.equals(stack40))
-    assert(stack40.offset == 1) // todo check
+    println(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
+    println(dsg.find(dsg.stackMapping(40).cells(0)).getPointee)
+    assert(dsg.deadjust(stack24).cell.equals(dsg.deadjust(stack40).cell)) // these are pointees, they should point to the same cell at different offsets
+    assert(dsg.deadjust(stack40).internalOffset == 1) // todo check
+    assert(dsg.deadjust(stack24).internalOffset == 0)
+    assert(dsg.deadjust(stack24).offset == 0)
   }
 //
 //  test("interproc pointer arithmetic main") {
