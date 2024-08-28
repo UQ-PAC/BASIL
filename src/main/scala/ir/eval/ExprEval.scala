@@ -1,5 +1,6 @@
 package ir.eval
 import ir.eval.BitVectorEval
+import util.functional.State
 import ir._
 
 /**
@@ -159,17 +160,13 @@ def evalExpr(exp: Expr, variableAssignment: Variable => Option[Literal], memory:
 }
 
 
-def mkSt[S, F](f: () => F): State[S, F] = for {
-    n <- get((s:S) => f())
-  } yield (n)
-
 /**
  * typeclass defining variable and memory laoding from state S
  */
 trait Loader[S] {
-  def getVariable(v: Variable) : State[S, Option[Expr]]
+  def getVariable(v: Variable) : State[S, Option[Literal]]
   def loadMemory(m: Memory, addr: Expr, endian: Endian, size: Int) : State[S, Option[Literal]] = {
-    mkSt(() => None)
+    State.pure(None)
   }
 }
 
@@ -177,7 +174,7 @@ trait Loader[S] {
 def statePartialEvalExpr[S](l: Loader[S])(exp: Expr): State[S, Expr] = {
   val eval = statePartialEvalExpr(l)
   exp match {
-    case f: UninterpretedFunction => mkSt(() => f)
+    case f: UninterpretedFunction => State.pure(f)
     case unOp: UnaryExpr => for {
       body <- eval(unOp.arg)
     } yield (
@@ -244,26 +241,26 @@ def statePartialEvalExpr[S](l: Loader[S])(exp: Expr): State[S, Expr] = {
         case o => r.copy(body=o)
     })
     case variable: Variable => for {
-      v <- l.getVariable(variable)
+      v : Option[Literal] <- l.getVariable(variable)
     } yield (v.getOrElse(variable))
     case ml: MemoryLoad => for {
       addr <- eval(ml.index)
       mem <- l.loadMemory(ml.mem, addr, ml.endian, ml.size)
     }  yield (mem.getOrElse(ml))
-    case b: BitVecLiteral => mkSt(() => b)
-    case b: IntLiteral => mkSt(() => b)
-    case b: BoolLit => mkSt(() => b)
+    case b: BitVecLiteral => State.pure(b)
+    case b: IntLiteral => State.pure(b)
+    case b: BoolLit => State.pure(b)
   }
 }
 
 
-class StatelessLoader(getVar: Variable => Option[Expr], loadMem: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c,d) => None)) extends Loader[Unit] {
-  def getVariable(v: Variable) : State[Unit, Option[Expr]] = mkSt(() => getVar(v))
-  override def loadMemory(m: Memory, addr: Expr, endian: Endian, size: Int) : State[Unit, Option[Literal]] = mkSt(() => loadMem(m, addr, endian, size))
+class StatelessLoader(getVar: Variable => Option[Literal], loadMem: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c,d) => None)) extends Loader[Unit] {
+  def getVariable(v: Variable) : State[Unit, Option[Literal]] = State.pure(getVar(v))
+  override def loadMemory(m: Memory, addr: Expr, endian: Endian, size: Int) : State[Unit, Option[Literal]] = State.pure(loadMem(m, addr, endian, size))
 }
 
 
-def partialEvalExpr(exp: Expr, variableAssignment: Variable => Option[Expr], memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c,d) => None)): Expr = {
+def partialEvalExpr(exp: Expr, variableAssignment: Variable => Option[Literal], memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c,d) => None)): Expr = {
   val l = StatelessLoader(variableAssignment, memory)
   statePartialEvalExpr(l)(exp).f(())._2
 }

@@ -1,5 +1,6 @@
 package ir
 
+import util.functional._
 import ir.eval._
 import ir.dsl._
 import org.scalatest.funsuite.AnyFunSuite
@@ -27,7 +28,8 @@ import util.ILLoadingConfig
 // def initialMem() = InterpFuns.initialState(InterpreterState(), List())
 
 def load(s: InterpreterState, global: SpecGlobal) : Option[BitVecLiteral] = {
-  val f = NormalInterpreter()
+  println(s)
+  val f = NormalInterpreter
  //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
   // m.evalBV("mem", BitVecLiteral(64, global.address), Endian.LittleEndian, global.size) //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
   
@@ -96,25 +98,54 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
           load(fstate, global).map(gv => name -> gv.value.toInt)
       )
     )
+    assert(fstate.nextCmd == Stopped())
     assert(expected == actual)
   }
 
+  test("initialise") {
 
-//   test("Store = Load LittleEndian") {
-//     val ts = List(
-//       BitVecLiteral(BigInt("0D", 16), 8),
-//       BitVecLiteral(BigInt("0C", 16), 8),
-//       BitVecLiteral(BigInt("0B", 16), 8),
-//       BitVecLiteral(BigInt("0A", 16), 8))
-// 
-//     val s = Eval.store(initialMem(), "mem", Scalar(BitVecLiteral(0, 64)), ts.map(Scalar(_)), Endian.LittleEndian)
-//     val expected: BitVecLiteral = BitVecLiteral(BigInt("0D0C0B0A", 16), 32)
-//     val actual: BitVecLiteral = Eval.loadBV(s, "mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
-//     assert(actual == expected)
-// 
-// 
-//   }
-// 
+    val init = InterpFuns.initialState(NormalInterpreter)
+
+    val s = State.execute(InterpreterState(), init)
+    assert(s.memoryState.getVarOpt("mem").isDefined)
+    assert(s.memoryState.getVarOpt("stack").isDefined)
+    assert(s.memoryState.getVarOpt("R31").isDefined)
+    assert(s.memoryState.getVarOpt("R29").isDefined)
+
+
+  }
+  test("var load store") {
+  val s = for {
+       s <- InterpFuns.initialState(NormalInterpreter)
+       v <- NormalInterpreter.loadVar("R31")
+   } yield (v)
+  val l = State.evaluate(InterpreterState(), s)
+
+  assert(l == Scalar(BitVecLiteral(4096 - 16, 64)))
+
+  }
+
+   test("Store = Load LittleEndian") {
+     val ts = List(
+       BitVecLiteral(BigInt("0D", 16), 8),
+       BitVecLiteral(BigInt("0C", 16), 8),
+       BitVecLiteral(BigInt("0B", 16), 8),
+       BitVecLiteral(BigInt("0A", 16), 8))
+ 
+     val loader = StVarLoader(NormalInterpreter)
+
+     val s = for {
+       _ <- InterpFuns.initialState(NormalInterpreter)
+       _ <- Eval.store(NormalInterpreter)("mem", Scalar(BitVecLiteral(0, 64)), ts.map(Scalar(_)), Endian.LittleEndian)
+       r <- loader.loadBV("mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
+     } yield(r)
+     val expected: BitVecLiteral = BitVecLiteral(BigInt("0D0C0B0A", 16), 32)
+     val actual: BitVecLiteral = State.evaluate(InterpreterState(), s)
+     assert(actual == expected)
+ 
+ 
+   }
+ 
 //   test("store bv = loadbv le") {
 //     val expected: BitVecLiteral = BitVecLiteral(BigInt("0D0C0B0A", 16), 32)
 //     val s2 = Eval.storeBV(initialMem(), "mem", Scalar(BitVecLiteral(0, 64)), expected, Endian.LittleEndian)

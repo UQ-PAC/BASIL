@@ -1,7 +1,9 @@
 package ir.eval
 import ir.eval.BitVectorEval.*
-import ir._
+import ir.*
 import util.Logger
+import util.functional.*
+import util.functional.State.*
 import boogie.Scope
 import scala.collection.WithFilter
 
@@ -11,58 +13,6 @@ import scala.collection.immutable
 import scala.util.control.Breaks.{break, breakable}
 
 
-case class State[S, +A](f: S => (S, A)) {// extends WithFilter[A, ({ type l[x] = State[S, x] })#l] {
-
-  def unit[A](a: A): State[S, A] = State(s => (s, a))
-
-  def foreach[U](f: A => U): Unit = ()
-
-  // def flatMap[B](f: A => IterableOnce[B]): ir.eval.State[S, B] = ???
-  def flatMap[B](f: A => State[S, B]): State[S, B] = State(s => {
-    val (s2, a) = this.f(s)
-    f(a).f(s2)
-  })
-
-  def map[B](f: A => B): State[S, B] = {
-    State(s => {
-      val (s2, a) = this.f(s)
-      (s2, f(a))
-    })
-  }
-
-  def withFilter(q : A => Boolean) = {
-    this
-  }
-}
-
-
-def stateCompose[S, A, B](s1: State[S, A], s2: State[S, B]) : State[S, B] = {
-  State((s: S) => s1.f(s) match {
-    case (s, _) => s2.f(s)
-  })
-}
-
-def pure[S, A](a: A) : State[S, A] = State((s:S) => (s, a))
-
-def sequence[S, V](xs: Iterable[State[S,V]]) : State[S,V] = {
-  xs.reduceRight(stateCompose) 
-}
-
-def sequence[V](xs: Iterable[Option[V]]) : Option[V] = {
-  xs.reduceRight((a, b) => a match {
-    case Some(x) => Some(x)
-    case None =>  b
-  }) 
-}
-
-def filterM[A, S](m : (A => State[S, Boolean]), xs: Iterable[A]): State[S, List[A]] = {
-  xs.foldRight(pure(List[A]()))((b,acc) => acc.flatMap(c => m(b).map(v => if v then b::c else c)))
-}
-
-
-def get[S,A](f: S => A) : State[S, A] = State(s => (s, f(s)))
-def modify[S](f: S => S) : State[S, Unit] = State(s => (f(s), ()))
-def execute[S, A](s: S, c: State[S,A]) = c.f(s)
 
 sealed trait ExecutionContinuation
 case class FailedAssertion(a: Assert) extends ExecutionContinuation
@@ -186,19 +136,6 @@ sealed trait Effects[T] {
 
  
 
-def evalToConst(
-    to: IRType,
-    exp: Expr,
-    variable: Variable => Option[Expr],
-    load: (Memory, Expr, Endian, Int) => Option[Literal]
-): BasilValue = {
-
-  val res: Expr = ir.eval.partialEvalExpr(exp, variable, load)
-  res match {
-    case e: Literal if e.getType == to => Scalar(e)
-    case res => throw InterpreterError(EvalError(s"Failed to evaluate expr to constant ${to} literal: residual $res"))
-  }
-}
 
 // case class BasilConstant(val basilType: BasilValue, val value: basilType.ReprType)
 
@@ -381,7 +318,7 @@ case class StVarLoader[S, F <: Effects[S]](f : F) extends Loader[S] {
 
       cells = size / valsize
 
-      res <- load(vname, addr, endian, cells)
+      res <- load(vname, addr, endian, cells) // actual load
       bvs: List[BitVecLiteral] = {
         val rr = res.map {
           case Scalar(bv @ BitVecLiteral(v, sz)) if sz == valsize => bv
@@ -390,10 +327,7 @@ case class StVarLoader[S, F <: Effects[S]](f : F) extends Loader[S] {
         }
         rr
       }
-
-      bvres = bvs.foldLeft(BitVecLiteral(0, 0))((acc, r) => eval.evalBVBinExpr(BVCONCAT, acc, r))
-      _ = {assert(bvres.size == size)}
-    } yield(bvres)
+    } yield(bvs.foldLeft(BitVecLiteral(0, 0))((acc, r) => eval.evalBVBinExpr(BVCONCAT, acc, r)))
 
   def loadSingle(vname: String, addr: Scalar): State[S, BasilValue] = {
     for {
@@ -401,14 +335,14 @@ case class StVarLoader[S, F <: Effects[S]](f : F) extends Loader[S] {
     } yield (m.head)
   }
 
-  def getVariable(v: Variable) : State[S, Option[Expr]] = {
+  def getVariable(v: Variable) : State[S, Option[Literal]] = {
     for {
       v <- f.loadVar(v.name)
     } yield (
-    v match {
+    (v match {
     case Scalar(l) => Some(l)
     case _         => None
-    })
+    }))
   }
 
   override def loadMemory(m: Memory, addr: Expr, endian: Endian, size: Int) : State[S, Option[Literal]] = {
@@ -452,7 +386,7 @@ case object Eval {
     for {
       res <- ir.eval.statePartialEvalExpr[S](ldr)(e)
     } yield (
-      e match {
+      res match {
         case l: BitVecLiteral => l
         case _  => throw InterpreterError(Errored(s"Eval BV residual $e"))
       })
@@ -463,7 +397,7 @@ case object Eval {
     for {
       res <- ir.eval.statePartialEvalExpr[S](ldr)(e)
     } yield (
-      e match {
+      res match {
         case l: IntLiteral => l.value
         case _  => throw InterpreterError(Errored(s"Eval BV residual $e"))
       })
@@ -474,7 +408,7 @@ case object Eval {
     for {
       res <- ir.eval.statePartialEvalExpr[S](ldr)(e)
     } yield (
-      e match {
+      res match {
         case l: BoolLit => l == TrueLiteral
         case _  => throw InterpreterError(Errored(s"Eval BV residual $e"))
       })
@@ -536,7 +470,8 @@ case object Eval {
     }
 
     keys = (0 until cells).map(i => BasilValue.unsafeAdd(addr, i))
-  } yield (f.storeMem(vname, keys.zip(vs).toMap))
+    s <- f.storeMem(vname, keys.zip(vs).toMap)
+  } yield (s)
 
   def storeSingle[S, T <: Effects[S]](f: T)(vname: String, addr: BasilValue, value: BasilValue): State[S, Unit] = {
     f.storeMem(vname, Map((addr -> value)))
@@ -600,28 +535,83 @@ case class InterpreterState(
     val memoryState: MemoryState = MemoryState()
 )
 
-case class NormalInterpreter() extends Effects[InterpreterState] {
+object NormalInterpreter extends Effects[InterpreterState] {
 
   /* eval */
-  def evalBV(e: Expr) = Eval.evalBV(this)(e)
+  def evalBV(e: Expr) = {
+    Eval.evalBV(this)(e)
+  }
 
-  def evalInt(e: Expr) = Eval.evalInt(this)(e)
+  def evalInt(e: Expr) = {
+    Eval.evalInt(this)(e)
+  }
 
-  def evalBool(e: Expr) = Eval.evalBool(this)(e)
+  def evalBool(e: Expr) = {
+    Eval.evalBool(this)(e)
+  }
 
-  def loadVar(v: String) = get((s: InterpreterState) => s.memoryState.getVar(v))
+  def loadVar(v: String) = {
+    State.get((s: InterpreterState) => {
+      s.memoryState.getVar(v)
+    })
+  }
 
-  def loadMem(v: String, addrs: List[BasilValue]) = get((s: InterpreterState) => s.memoryState.doLoad(v, addrs))
+  def formatStore(varname: String, update: Map[BasilValue, BasilValue]) = {
+    val ks = update.toList.sortWith((x,y) => {
+      def conv(v:BasilValue): BigInt = v match {
+        case (Scalar(b: BitVecLiteral)) => b.value
+        case (Scalar(b: IntLiteral)) => b.value
+        case _ => BigInt(0) 
+      }
+      conv(x._1) <= conv(y._1)
+    })
 
-  def getNext = get ((s: InterpreterState) => s.nextCmd)
+    val rs = ks.foldLeft(Some((None,List[BitVecLiteral]())): Option[(Option[BigInt], List[BitVecLiteral])])((acc, v) => 
+      v match {
+      case (Scalar(bv : BitVecLiteral), Scalar(bv2 : BitVecLiteral)) => {
+        acc match {
+          case None => None
+          case Some(None, l) => Some(Some(bv.value), bv2::l)
+          case Some(Some(v), l) if bv.value == v + 1 => Some(Some(bv.value), bv2::l)
+          case Some(Some(v), l) if bv.value != v + 1 => {
+            println(s"$v != ${bv.value} + 1")
+            None
+          }
+        }
+      }
+      case (bv, bv2) => None
+      }
+    )
+
+    rs match {
+      case Some(_, l) => {
+        val vs = Scalar(l.foldLeft(BitVecLiteral(0, 0))((acc, r) => eval.evalBVBinExpr(BVCONCAT, acc, r))).toString
+        s"$varname[${ks.head._1}] := $vs"
+      }
+      case None if ks.length < 8 => s"$varname[${ks.map(_._1).mkString(",")}] := ${ks.map(_._2).mkString(",")}"
+      case None => s"$varname[${ks.map(_._1).take(8).mkString(",")}...] := ${ks.map(_._2).take(8).mkString(", ")}... "
+    }
+
+  }
+
+  def loadMem(v: String, addrs: List[BasilValue]) = {
+    State.get((s: InterpreterState) => {
+      val r = s.memoryState.doLoad(v, addrs)
+      Logger.debug(s"    eff : LOAD ${addrs.head} x ${addrs.size}")
+      r
+    })
+  }
+
+  def getNext = State.get ((s: InterpreterState) => s.nextCmd)
 
   /** effects * */
-  def setNext(c: ExecutionContinuation) = modify ((s: InterpreterState) => {
+  def setNext(c: ExecutionContinuation) = State.modify ((s: InterpreterState) => {
+    // Logger.debug(s"    eff : setNext $c")
     InterpreterState(c, s.callStack, s.memoryState)
   })
 
   def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = modify ((s:InterpreterState) => {
-    Logger.info(s"    eff : CALL $target")
+    Logger.debug(s"    eff : CALL $target")
     InterpreterState(
       beginFrom,
       returnTo :: s.callStack,
@@ -630,6 +620,7 @@ case class NormalInterpreter() extends Effects[InterpreterState] {
   })
 
   def doReturn() = {
+    Logger.debug(s"    eff : RETURN")
     modify ((s: InterpreterState) => {s.callStack match {
       case Nil => InterpreterState(Stopped(), Nil, s.memoryState)
       case h :: tl => {
@@ -639,13 +630,13 @@ case class NormalInterpreter() extends Effects[InterpreterState] {
     })
   }
 
-  def storeVar(v: String, scope: Scope, value: BasilValue) = {
+  def storeVar(v: String, scope: Scope, value: BasilValue) : State[InterpreterState, Unit] = {
     Logger.debug(s"    eff : SET $v := $value")
-    modify ((s: InterpreterState) => InterpreterState(s.nextCmd, s.callStack, s.memoryState.defVar(v, scope, value)))
+    State.modify ((s: InterpreterState) => InterpreterState(s.nextCmd, s.callStack, s.memoryState.defVar(v, scope, value)))
   }
 
-  def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = modify ((s:InterpreterState) => {
-    Logger.debug(s"    eff : STORE $vname <- $update")
+  def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = State.modify ((s:InterpreterState) => {
+    Logger.debug(s"    eff : STORE ${formatStore(vname, update)}")
     InterpreterState(s.nextCmd, s.callStack, s.memoryState.doStore(vname, update))
   })
 
@@ -659,11 +650,11 @@ case object InterpFuns {
     val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
 
     for {
-      l <- s.storeVar("R30", Scope.Global, Scalar(LR))
       h <- s.storeVar("mem", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
       i <- s.storeVar("stack", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
       j <- s.storeVar("R31", Scope.Global, Scalar(SP))
       k <- s.storeVar("R29", Scope.Global, Scalar(FP))
+      l <- s.storeVar("R30", Scope.Global, Scalar(LR))
     } yield (l)
     // s.storeVar("mem", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
   }
@@ -671,13 +662,13 @@ case object InterpFuns {
   def initialiseProgram[S, T <: Effects[S]](f:T)(p: Program): State[S, Unit] = {
     for {
       d <- initialState(f)
-      mem <- sequence(p.initialMemory.map(memory => 
+      mem <- State.sequence(State.pure(()), p.initialMemory.map(memory => 
           Eval.store(f)(
           "mem",
           Scalar(BitVecLiteral(memory.address, 64)),
           memory.bytes.toList.map(Scalar(_)),
           Endian.LittleEndian)))
-      mem <- sequence(p.initialMemory.map(memory => 
+      mem <- State.sequence(State.pure(()), p.initialMemory.map(memory => 
           Eval.store(f)(
           "stack",
           Scalar(BitVecLiteral(memory.address, 64)),
@@ -764,41 +755,48 @@ case object InterpFuns {
     }
   }
 
-  def protect[T](x: () => T, fnly: PartialFunction[Exception, T]): T = {
-    try {
-      x()
-    } catch {
-      case e: Exception if fnly.isDefinedAt(e) => fnly(e)
+
+  def interpret[S, T <: Effects[S]](f: T, m: S): S = {
+    val next = State.evaluate(m, f.getNext)
+    next match {
+        case Run(c: Statement) => interpret(f, 
+          protect((() => execute(m, interpretStatement(f)(c))), 
+            {
+              case x @ InterpreterError(e) => {
+                Logger.error(s"${x.getStackTrace.mkString("\n")}")
+                execute(m, f.setNext(e))
+              }
+              case e: IllegalArgumentException => execute(m, f.setNext(Errored(e.toString)))
+            } 
+            ))
+        case Run(c: Jump) => interpret(f, 
+          protect((() => execute(m, interpretJump(f)(c))), 
+            {
+              case x @ InterpreterError(e) => {
+                Logger.error(s"${x.getStackTrace.mkString("\n")}")
+                execute(m, f.setNext(e))
+              }
+              case e: IllegalArgumentException => execute(m, f.setNext(Errored(e.toString)))
+            } 
+            ))
+        case Stopped() => m
+        case errorstop => m 
     }
   }
 
-  def interpret[S, T <: Effects[S]](f: T, m: State[S, Unit]): State[S, Unit] = {
-    for {
-      n <- f.getNext 
-      _ = {
-        Logger.debug(s"interpret ${n}")
-      }
-      c <- n match {
-        case Run(c: Statement) => interpret(f, interpretStatement(f)(c))
-        case Run(c: Jump) => interpret(f, interpretJump(f)(c))
-        case Stopped() => State((s:S) => (s,()))
-        case errorstop => State((s:S) => (s,()))
-      }
-    } yield(c)
-  }
-
   def interpretProg[S, T <: Effects[S]](f: T)(p: Program, is: S): S = {
-    val (fs: S,_) = execute[S, Unit](is, interpret(f, initialiseProgram(f)(p)))
-    fs
+    val begin = State.execute(is, initialiseProgram(f)(p))
+    // State.execute[S,Unit](is, )
+    interpret(f, begin)
   }
 
 }
 
 def interpret(IRProgram: Program): InterpreterState = {
-  InterpFuns.interpretProg(NormalInterpreter())(IRProgram, InterpreterState())
+  InterpFuns.interpretProg(NormalInterpreter)(IRProgram, InterpreterState())
 }
 
 // def interpretTrace(IRProgram: Program): TracingInterpreter = {
 //   val s: TracingInterpreter = InterpFuns.interpretProg(IRProgram, TracingInterpreter(InterpreterState(), List()))
 //   s
-// }
+//e
