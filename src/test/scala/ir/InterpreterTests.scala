@@ -1,5 +1,6 @@
 package ir
 
+import util.PerformanceTimer
 import util.functional._
 import ir.eval._
 import ir.dsl._
@@ -28,7 +29,6 @@ import util.ILLoadingConfig
 // def initialMem() = InterpFuns.initialState(InterpreterState(), List())
 
 def load(s: InterpreterState, global: SpecGlobal) : Option[BitVecLiteral] = {
-  println(s)
   val f = NormalInterpreter
  //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
   // m.evalBV("mem", BitVecLiteral(64, global.address), Endian.LittleEndian, global.size) //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
@@ -135,7 +135,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
      val s = for {
        _ <- InterpFuns.initialState(NormalInterpreter)
        _ <- Eval.store(NormalInterpreter)("mem", Scalar(BitVecLiteral(0, 64)), ts.map(Scalar(_)), Endian.LittleEndian)
-       r <- loader.loadBV("mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
+       r <- Eval.loadBV(NormalInterpreter)("mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
      } yield(r)
      val expected: BitVecLiteral = BitVecLiteral(BigInt("0D0C0B0A", 16), 32)
      val actual: BitVecLiteral = State.evaluate(InterpreterState(), s)
@@ -323,14 +323,15 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   }
 
 
-  def fibonacciProg(n: Int) = {
-    def expected(n: Int) : Int = {
-      n match {
-        case 0 => 0
-        case 1 => 1
-        case n => expected(n - 1) + expected(n - 2)
-      }
+  def fib(n: Int) : Int = {
+    n match {
+      case 0 => 0
+      case 1 => 1
+      case n => fib(n - 1) + fib(n - 2)
     }
+  }
+
+  def fibonacciProg(n: Int) = {
     prog(
       proc("begin", 
         block("entry",
@@ -340,7 +341,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
           goto("done")
         ),
         block("done",
-          Assert(BinaryExpr(BVEQ, R0, bv64(expected(n)))),
+          Assert(BinaryExpr(BVEQ, R0, bv64(fib(n)))),
           ret
         )),
       proc("fib",
@@ -378,27 +379,55 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   test("fibonacci") {
 
+    Logger.setLevel(LogLevel.ERROR)
     val fib = fibonacciProg(8)
     val r = interpret(fib)
     assert(r.nextCmd == Stopped())
     // Show interpreted result
-    Logger.info("Registers:")
     // r.regs.foreach { (key, value) =>
     //   Logger.info(s"$key := $value")
     // }
 
   }
 
+  test("fibonaccistress") {
 
-//   test("fibonacci Trace") {
-// 
-//     val fib = fibonacciProg(8)
-//     val r = interpretTrace(fib)
-//     assert(r.getNext == Stopped())
-//     // Show interpreted result
-//     //
-//     info(r.trace.reverse.mkString("\n"))
-// 
-//   }
+    Logger.setLevel(LogLevel.ERROR)
+    var res = List[(Int, Double, Double)]()
+
+    for (i <- 0 to 25) {
+      val prog = fibonacciProg(i)
+
+      val t = PerformanceTimer("native")
+      val r = fib(i)
+      val native = t.elapsed()
+
+      val intt = PerformanceTimer("interp")
+      val ir = interpret(prog)
+      val it = intt.elapsed()
+
+      res = (i,native,it)::res
+
+      println(s"${res.head}")
+    }
+
+    println(("fib number,native time,interp time"::(res.map(x => s"${x._1},${x._2},${x._3}"))).mkString("\n"))
+
+  }
+
+
+
+   test("fibonacci Trace") {
+
+     val fib = fibonacciProg(8)
+
+      val r = interpretTrace(fib)
+ 
+     assert(r._1.nextCmd == Stopped())
+     info(r._2.t.mkString("\n"))
+     // Show interpreted result
+     //
+ 
+   }
 
 }
