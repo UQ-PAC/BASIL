@@ -356,34 +356,7 @@ case object InterpFuns {
     val next = State.evaluate(m, f.getNext)
     Logger.debug(s"eval $next")
     next match {
-      case Run(c: Statement) =>
-        interpret(
-          f,
-          protect(
-            (() => execute(m, interpretStatement(f)(c))),
-            {
-              case x @ InterpreterError(e) => {
-                Logger.error(s"${x.getStackTrace.mkString("\n")}")
-                execute(m, f.setNext(e))
-              }
-              case e: IllegalArgumentException => execute(m, f.setNext(Errored(e.toString)))
-            }
-          )
-        )
-      case Run(c: Jump) =>
-        interpret(
-          f,
-          protect(
-            (() => execute(m, interpretJump(f)(c))),
-            {
-              case x @ InterpreterError(e) => {
-                Logger.error(s"${x.getStackTrace.mkString("\n")}")
-                execute(m, f.setNext(e))
-              }
-              case e: IllegalArgumentException => execute(m, f.setNext(Errored(e.toString)))
-            }
-          )
-        )
+      case Run(c) =>  interpret(f, State.execute(m, f.interpretOne))
       case Stopped() => m
       case errorstop => m
     }

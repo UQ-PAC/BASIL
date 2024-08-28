@@ -430,4 +430,16 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
  
    }
 
+   test("fib breakpoints") {
+
+     // Logger.setLevel(LogLevel.ERROR)
+     val fib = fibonacciProg(8)
+     val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get)
+     val interp = LayerInterpreter(NormalInterpreter, RememberBreakpoints(NormalInterpreter, Set(watch)))
+     val res = InterpFuns.interpretProg(interp)(fib, (InterpreterState(), List[(Command, InterpreterState)]()))
+     println(res)
+
+
+   }
+
 }

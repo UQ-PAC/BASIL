@@ -16,7 +16,6 @@ import scala.util.control.Breaks.{break, breakable}
 
 enum ExecEffect:
   case Call(target: String, begin: ExecutionContinuation, returnTo: ExecutionContinuation)
-  case SetNext(c: ExecutionContinuation)
   case Return
   case StoreVar(v: String, s: Scope, value: BasilValue)
   case LoadVar(v: String)
@@ -31,7 +30,6 @@ case object Trace {
     modify ((t: Trace) => Trace(t.t.appended(e)))
   }
 }
-
 
 object TraceGen extends Effects[Trace] {
   /** Values are discarded by ProductInterpreter so do not matter */
@@ -72,11 +70,23 @@ object TraceGen extends Effects[Trace] {
   def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = for {
     s <- Trace.add(ExecEffect.StoreMem(vname, update))
   } yield (())
+
+  def interpretOne = State.pure(())
 }
 
 def tracingInterpreter = ProductInterpreter(NormalInterpreter, TraceGen)
 
 def interpretTrace(p: Program) : (InterpreterState, Trace) = {
   InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
+}
+
+
+case class RememberBreakpoints[T, I <: Effects[T]](val f: I, val breaks: Set[Command]) extends NopEffects[(T, List[(Command, T)])] {
+  override def interpretOne = {
+    State.modify ((thisState, sl) => State.evaluate(thisState, f.getNext) match {
+      case Run(s) if breaks.contains(s) => (thisState, (s,thisState)::sl)
+      case _ => (thisState, sl)
+    }) 
+  }
 }
 

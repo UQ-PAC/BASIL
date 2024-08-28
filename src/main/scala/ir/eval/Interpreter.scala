@@ -89,6 +89,10 @@ case object BasilValue {
  * defined for the interpreter's concrete state T.
  */
 trait Effects[T] {
+
+  // perform an execution step
+  def interpretOne: State[T, Unit]
+
   /* evaluation (may side-effect on error) */
 
   def evalBV(e: Expr): State[T, BitVecLiteral]
@@ -124,6 +128,25 @@ trait Effects[T] {
   def storeMem(vname: String, update: Map[BasilValue, BasilValue]): State[T, Unit]
 }
 
+
+
+trait NopEffects[T] extends Effects[T] {
+  def interpretOne = State.pure(())
+  def evalBV(e: Expr) = State.pure(BitVecLiteral(0,0))
+  def evalInt(e: Expr) = State.pure(BigInt(0))
+  def evalBool(e: Expr) = State.pure(false)
+  def loadVar(v: String) = State.pure(Scalar(FalseLiteral))
+  def loadMem(v: String, addrs: List[BasilValue])  = State.pure(List())
+  def evalAddrToProc(addr: Int) = State.pure(None)
+  def getNext = State.pure(Stopped())
+  def setNext(c: ExecutionContinuation)  = State.pure(())
+
+  def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = State.pure(())
+  def doReturn() = State.pure(())
+
+  def storeVar(v: String, scope: Scope, value: BasilValue) = State.pure(())
+  def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = State.pure(())
+}
 
 /** -------------------------------------------------------------------------------- 
  * Definition of concrete state
@@ -418,6 +441,21 @@ object NormalInterpreter extends Effects[InterpreterState] {
     Logger.debug(s"    eff : STORE ${formatStore(vname, update)}")
     s.copy(memoryState = s.memoryState.doStore(vname, update))
   })
+
+  def interpretOne: State[InterpreterState, Unit] = for {
+    next <- getNext
+    _ <- try {
+      next match {
+        case Run(c: Statement) => InterpFuns.interpretStatement(this)(c)
+        case Run(c: Jump) => InterpFuns.interpretJump(this)(c)
+        case Stopped() => State.pure (()) 
+        case errorstop => State.pure (())
+      }
+    } catch {
+      case InterpreterError(e) => setNext(e)
+      case e: java.lang.IllegalArgumentException => setNext(Errored(e.getStackTrace.take(5).mkString("\n")))
+    }
+  } yield ()
 
 }
 
