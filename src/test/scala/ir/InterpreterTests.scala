@@ -66,9 +66,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     var IRProgram = IRTranslator.translate
     IRProgram = ExternalRemover(externalFunctions.map(e => e.name)).visitProgram(IRProgram)
     IRProgram = Renamer(Set("free")).visitProgram(IRProgram)
-    transforms.stripUnreachableFunctions(IRProgram)
-    val stackIdentification = StackSubstituter()
-    stackIdentification.visitProgram(IRProgram)
+    // transforms.stripUnreachableFunctions(IRProgram)
     IRProgram.setModifies(Map())
 
     (IRProgram, globals)
@@ -288,6 +286,12 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     )
     testInterpret("secret_write", expected)
   }
+
+  test("indirect_call") {
+    val expected = Map[String, Int]()
+    testInterpret("indirect_call_outparam", expected)
+  }
+
 
   test("ifglobal") {
     val expected = Map(

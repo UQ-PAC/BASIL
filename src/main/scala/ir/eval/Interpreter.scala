@@ -44,6 +44,9 @@ case class Scalar(val value: Literal) extends BasilValue(value.getType) {
     case c                => c.toString
   }
 }
+
+case class FunPointer(val addr: BitVecLiteral, val name: String, val call: ExecutionContinuation) extends BasilValue(addr.getType)
+
 // Erase the type of basil values and enforce the invariant that
 // \exists i . \forall v \in value.keys , v.irType = i  and
 // \exists j . \forall v \in value.values, v.irType = j
@@ -119,6 +122,8 @@ sealed trait Effects[T] {
   def loadVar(v: String): State[T, BasilValue]
 
   def loadMem(v: String, addrs: List[BasilValue]): State[T, List[BasilValue]]
+
+  def evalAddrToProc(addr: Int): State[T, Option[FunPointer]] 
 
   def getNext: State[T, ExecutionContinuation]
 
@@ -253,16 +258,27 @@ case class MemoryState(
   }
 
   /* Map variable accessing ; load and store operations */
-  def doLoad(vname: String, addr: List[BasilValue]): List[BasilValue] = {
+  def doLoadOpt(vname: String, addr: List[BasilValue]): Option[List[BasilValue]] = {
     val (frame, mem) = findVar(vname)
     val mapv: MapValue = mem match {
       case m @ MapValue(innerMap, ty) => m
       case m                          => throw InterpreterError(TypeError(s"Load from nonmap ${m.irType}"))
     }
 
-    addr.map(k =>
-      mapv.value.get(k).getOrElse(throw InterpreterError(MemoryError(s"Read from uninitialised $vname[$k]")))
-    )
+    val rs = addr.map(k => mapv.value.get(k))
+    if (rs.forall(_.isDefined)) {
+      Some(rs.map(_.get))
+    } else {
+      None
+    }
+  }
+  def doLoad(vname: String, addr: List[BasilValue]): List[BasilValue] = {
+    doLoadOpt(vname, addr) match {
+      case Some(vs) => vs
+      case None => {
+        throw InterpreterError(MemoryError(s"Read from uninitialised $vname[${addr.head} .. ${addr.last}]"))
+      }
+    }
   }
 
   /** typecheck and some fields of a map variable */
@@ -556,6 +572,18 @@ object NormalInterpreter extends Effects[InterpreterState] {
     })
   }
 
+  def evalAddrToProc(addr: Int): State[InterpreterState, Option[FunPointer]] = 
+    Logger.debug(s"    eff : FIND PROC $addr")
+    val load = StVarLoader(this)
+    for {
+      res <- get ((s: InterpreterState) => s.memoryState.doLoadOpt("funtable", List(Scalar(BitVecLiteral(addr, 64)))))
+  } yield {
+    res match {
+      case Some((f: FunPointer)::Nil) => Some(f)
+      case _ => None
+    }
+  }
+
   def formatStore(varname: String, update: Map[BasilValue, BasilValue]) = {
     val ks = update.toList.sortWith((x,y) => {
       def conv(v:BasilValue): BigInt = v match {
@@ -573,7 +601,7 @@ object NormalInterpreter extends Effects[InterpreterState] {
           case None => None
           case Some(None, l) => Some(Some(bv.value), bv2::l)
           case Some(Some(v), l) if bv.value == v + 1 => Some(Some(bv.value), bv2::l)
-          case Some(Some(v), l) if bv.value != v + 1 => {
+          case Some(Some(v), l) => {
             println(s"$v != ${bv.value} + 1")
             None
           }
@@ -607,37 +635,35 @@ object NormalInterpreter extends Effects[InterpreterState] {
   /** effects * */
   def setNext(c: ExecutionContinuation) = State.modify ((s: InterpreterState) => {
     // Logger.debug(s"    eff : setNext $c")
-    InterpreterState(c, s.callStack, s.memoryState)
+    s.copy(nextCmd = c)
   })
 
   def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = modify ((s:InterpreterState) => {
     Logger.debug(s"    eff : CALL $target")
-    InterpreterState(
-      beginFrom,
-      returnTo :: s.callStack,
-      s.memoryState.pushStackFrame(target)
+    s.copy(
+      nextCmd=beginFrom,
+      callStack=returnTo :: s.callStack,
+      memoryState=s.memoryState.pushStackFrame(target)
     )
   })
 
   def doReturn() = {
     Logger.debug(s"    eff : RETURN")
     modify ((s: InterpreterState) => {s.callStack match {
-      case Nil => InterpreterState(Stopped(), Nil, s.memoryState)
-      case h :: tl => {
-        InterpreterState(h, tl, s.memoryState.popStackFrame())
-      }
+      case Nil => s.copy(nextCmd=Stopped())
+      case h :: tl => s.copy(nextCmd=h,callStack=tl,memoryState=s.memoryState.popStackFrame())
     }
     })
   }
 
   def storeVar(v: String, scope: Scope, value: BasilValue) : State[InterpreterState, Unit] = {
     Logger.debug(s"    eff : SET $v := $value")
-    State.modify ((s: InterpreterState) => InterpreterState(s.nextCmd, s.callStack, s.memoryState.defVar(v, scope, value)))
+    State.modify ((s: InterpreterState) => s.copy(memoryState=s.memoryState.defVar(v, scope, value)))
   }
 
   def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = State.modify ((s:InterpreterState) => {
     Logger.debug(s"    eff : STORE ${formatStore(vname, update)}")
-    InterpreterState(s.nextCmd, s.callStack, s.memoryState.doStore(vname, update))
+    s.copy(memoryState=s.memoryState.doStore(vname, update))
   })
 
 }
@@ -650,30 +676,41 @@ case object InterpFuns {
     val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
 
     for {
+      h <- s.storeVar("funtable", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
       h <- s.storeVar("mem", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
       i <- s.storeVar("stack", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
       j <- s.storeVar("R31", Scope.Global, Scalar(SP))
       k <- s.storeVar("R29", Scope.Global, Scalar(FP))
       l <- s.storeVar("R30", Scope.Global, Scalar(LR))
     } yield (l)
-    // s.storeVar("mem", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
   }
 
   def initialiseProgram[S, T <: Effects[S]](f:T)(p: Program): State[S, Unit] = {
+    def initMemory(mem: String, mems: Iterable[MemorySection]) ={
+       for {
+         m <- State.sequence(State.pure(()), mems.filter(m => m.address != 0).map(memory => 
+          Eval.store(f)(
+          mem,
+          Scalar(BitVecLiteral(memory.address, 64)),
+          memory.bytes.toList.map(Scalar(_)),
+          Endian.LittleEndian)))
+      } yield ()
+    }
+
+    println(p.initialMemory)
+
     for {
       d <- initialState(f)
-      mem <- State.sequence(State.pure(()), p.initialMemory.map(memory => 
-          Eval.store(f)(
-          "mem",
-          Scalar(BitVecLiteral(memory.address, 64)),
-          memory.bytes.toList.map(Scalar(_)),
-          Endian.LittleEndian)))
-      mem <- State.sequence(State.pure(()), p.initialMemory.map(memory => 
-          Eval.store(f)(
-          "stack",
-          Scalar(BitVecLiteral(memory.address, 64)),
-          memory.bytes.toList.map(Scalar(_)),
-          Endian.LittleEndian)))
+      funs <- State.sequence(State.pure(()), p.procedures.filter(p => p.blocks.nonEmpty && p.address.isDefined).map((proc: Procedure) => 
+          Eval.storeSingle(f)(
+          "funtable",
+          Scalar(BitVecLiteral(proc.address.get, 64)),
+          FunPointer(BitVecLiteral(proc.address.get, 64), proc.name, Run(IRWalk.firstInBlock(proc.entryBlock.get)))
+        )))
+      mem <- initMemory("mem", p.initialMemory)
+      mem <- initMemory("stack", p.initialMemory)
+      mem <- initMemory("mem", p.readOnlyMemory)
+      mem <- initMemory("stack", p.readOnlyMemory)
       r <- f.call(p.mainProcedure.name, Run(IRWalk.firstInBlock(p.mainProcedure.entryBlock.get)), Stopped())
     } yield (r)
   }
@@ -716,7 +753,6 @@ case object InterpFuns {
       case assign: MemoryAssign => for {
         index : BitVecLiteral <- f.evalBV(assign.index)
         value : BitVecLiteral <- f.evalBV(assign.value)
-        // st.storeMem(assign.mem.name, index, value, assign.endian, assign.size).setNext(Run(s.successor))
         _ <- Eval.storeBV(f)(assign.mem.name, Scalar(index), value, assign.endian)
         n <- f.setNext(Run(s.successor))
       } yield (n)
@@ -744,13 +780,20 @@ case object InterpFuns {
           f.setNext(Run(dc.successor))
         }
       } yield (n)
-      case ic: IndirectCall => for {
-        n <- (if (ic.target == Register("R30", 64)) {
+      case ic: IndirectCall => {
+        if (ic.target == Register("R30", 64)) {
           f.doReturn()
         } else {
-          f.setNext(EscapedControlFlow(ic))
-        })
-      } yield (n)
+          for {
+           addr <- f.evalBV(ic.target)
+           fp <- f.evalAddrToProc(addr.value.toInt)
+           _ <- fp match {
+             case Some(fp) => f.call(fp.name, fp.call, Run(ic.successor))
+             case none => f.setNext(EscapedControlFlow(ic))
+           }
+          } yield ()
+        }
+      }
       case _: NOP => f.setNext(Run(s.successor))
     }
   }
@@ -758,6 +801,7 @@ case object InterpFuns {
 
   def interpret[S, T <: Effects[S]](f: T, m: S): S = {
     val next = State.evaluate(m, f.getNext)
+    Logger.debug(s"eval $next")
     next match {
         case Run(c: Statement) => interpret(f, 
           protect((() => execute(m, interpretStatement(f)(c))), 
