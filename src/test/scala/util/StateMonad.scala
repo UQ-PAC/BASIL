@@ -13,7 +13,7 @@ import util.IRLoading.{loadBAP, loadReadELF}
 import util.ILLoadingConfig
 
 
-def add: State[Int, Unit] = State(s => (s+1, ()))
+def add: State[Int, Unit, Unit] = State(s => (s+1, Right(())))
 
 class StateMonadTest extends AnyFunSuite {
 

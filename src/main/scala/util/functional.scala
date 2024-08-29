@@ -1,58 +1,58 @@
 package util.functional
 
-case class State[S, +A](f: S => (S, A)) {
+case class State[S, +A, E](f: S => (S, Either[E, A])) {
 
-  def unit[A](a: A): State[S, A] = State(s => (s, a))
+  def unit[A](a: A): State[S, A, E] = State(s => (s, Right(a)))
 
-
-  def flatMap[B](f: A => State[S, B]): State[S, B] = State(s => {
-    // println(s"flatmap ${this.f} $f")
+  def flatMap[B](f: A => State[S, B, E]): State[S, B, E] = State(s => {
     val (s2, a) = this.f(s)
-    f(a).f(s2)
+    val r  = a match {
+      case Left(l) => (s2, Left(l))
+      case Right(a) => f(a).f(s2)
+    }
+    r
   })
 
 
-  def map[B](f: A => B): State[S, B] = {
+  def map[B](f: A => B): State[S, B, E] = {
     State(s => {
       val (s2, a) = this.f(s)
-      (s2, f(a))
+      a match {
+        case Left(l) => (s2, Left(l))
+        case Right(a) => (s2, Right(f(a)))
+      }
     })
   }
 }
 
 
 object State {
-  def get[S,A](f: S => A) : State[S, A] = State(s => (s, f(s)))
-  def getS[S] : State[S,S] = State((s:S) => (s,s))
-  def putS[S](s: S) : State[S,_] = State((_) => (s,()))
-  def modify[S](f: S => S) : State[S, Unit] = State(s => (f(s), ()))
-  def execute[S, A](s: S, c: State[S,A]) : S = c.f(s)._1
-  def evaluate[S, A](s: S, c: State[S,A])  : A = c.f(s)._2
+  def get[S, A, E](f: S => A) : State[S, A, E] = State(s => (s, Right(f(s))))
+  def getS[S,E] : State[S,S,E] = State((s:S) => (s,Right(s)))
+  def putS[S,E](s: S) : State[S,Unit,E] = State((_) => (s,Right(())))
+  def modify[S, E](f: S => S) : State[S, Unit, E] = State(s => (f(s), Right(())))
+  def execute[S, A, E](s: S, c: State[S,A, E]) : S = c.f(s)._1
+  def evaluate[S, A, E](s: S, c: State[S,A, E])  : A = c.f(s)._2 match {
+    case Right(r) => r
+    case Left(l) => throw Exception(s"Wrong $l")
+  }
 
-  def pure[S, A](a: A) : State[S, A] = State((s:S) => (s, a))
+  def pure[S, A, E](a: A) : State[S, A, E] = State((s:S) => (s, Right(a)))
 
-  def sequence[S, V](ident: State[S,V], xs: Iterable[State[S,V]]) : State[S,V] = {
+  def sequence[S, V, E](ident: State[S,V, E], xs: Iterable[State[S,V, E]]) : State[S, V, E] = {
     xs.foldRight(ident)((l,r) => for {
       x <- l
       y <- r
     } yield(y)) 
   }
 
-  def sequence[V](xs: Iterable[Option[V]]) : Option[V] = {
-    xs.reduceRight((a, b) => a match {
-      case Some(x) => Some(x)
-      case None =>  b
-    }) 
-  }
-
-  def filterM[A, S](m : (A => State[S, Boolean]), xs: Iterable[A]): State[S, List[A]] = {
+  def filterM[A, S, E](m : (A => State[S, Boolean, E]), xs: Iterable[A]): State[S, List[A], E] = {
     xs.foldRight(pure(List[A]()))((b,acc) => acc.flatMap(c => m(b).map(v => if v then b::c else c)))
   }
 
-  def mapM[A, B, S](m : (A => State[S, B]), xs: Iterable[A]): State[S, List[B]] = {
+  def mapM[A, B, S, E](m : (A => State[S, B, E]), xs: Iterable[A]): State[S, List[B], E] = {
     xs.foldRight(pure(List[B]()))((b,acc) => acc.flatMap(c => m(b).map(v => v::c)))
   }
-
 
 }
 

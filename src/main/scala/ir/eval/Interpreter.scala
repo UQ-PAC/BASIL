@@ -17,6 +17,7 @@ import scala.util.control.Breaks.{break, breakable}
 sealed trait ExecutionContinuation
 case class FailedAssertion(a: Assert) extends ExecutionContinuation
 
+
 case class Stopped() extends ExecutionContinuation /* normal program stop  */
 case class Run(val next: Command) extends ExecutionContinuation /* continue by executing next command */
 
@@ -28,6 +29,9 @@ case class TypeError(val message: String = "") extends ExecutionContinuation /* 
 case class EvalError(val message: String = "")
     extends ExecutionContinuation /* failed to evaluate an expression to a concrete value */
 case class MemoryError(val message: String = "") extends ExecutionContinuation /* An error to do with memory */
+
+
+// type InterpreterError = EscapedControlFlow | Errored | TypeError | EvalError | MemoryError
 
 /** TODO: errors should be encapsualted in error monad, rather than mapping exceptions back into state transitions at
   * State.execute() */
@@ -88,41 +92,41 @@ case object BasilValue {
  * Minimal language defining all state transitions in the interpreter, 
  * defined for the interpreter's concrete state T.
  */
-trait Effects[T] {
+trait Effects[T, E] {
 
   // perform an execution step
-  def interpretOne: State[T, Unit]
+  def interpretOne: State[T, Unit, E]
 
-  def loadVar(v: String): State[T, BasilValue]
+  def loadVar(v: String): State[T, BasilValue, E]
 
-  def loadMem(v: String, addrs: List[BasilValue]): State[T, List[BasilValue]]
+  def loadMem(v: String, addrs: List[BasilValue]): State[T, List[BasilValue], E]
 
-  def evalAddrToProc(addr: Int): State[T, Option[FunPointer]]
+  def evalAddrToProc(addr: Int): State[T, Option[FunPointer], E]
 
-  def getNext: State[T, ExecutionContinuation]
+  def getNext: State[T, ExecutionContinuation, E]
 
   /** state effects */
 
   /* High-level implementation of a program counter that leverages the intrusive CFG. */
-  def setNext(c: ExecutionContinuation): State[T, Unit]
+  def setNext(c: ExecutionContinuation): State[T, Unit, E]
 
   /* Perform a call:
    *  target: arbitrary target name
    *  beginFrom: ExecutionContinuation which begins executing the procedure
    *  returnTo: ExecutionContinuation which begins executing after procedure return
    */
-  def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation): State[T, Unit]
+  def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation): State[T, Unit, E]
 
-  def doReturn(): State[T, Unit]
+  def doReturn(): State[T, Unit, E]
 
-  def storeVar(v: String, scope: Scope, value: BasilValue): State[T, Unit]
+  def storeVar(v: String, scope: Scope, value: BasilValue): State[T, Unit, E]
 
-  def storeMem(vname: String, update: Map[BasilValue, BasilValue]): State[T, Unit]
+  def storeMem(vname: String, update: Map[BasilValue, BasilValue]): State[T, Unit, E]
 }
 
 
 
-trait NopEffects[T] extends Effects[T] {
+trait NopEffects[T, E] extends Effects[T, E] {
   def interpretOne = State.pure(())
   def loadVar(v: String) = State.pure(Scalar(FalseLiteral))
   def loadMem(v: String, addrs: List[BasilValue])  = State.pure(List())
@@ -316,7 +320,7 @@ case class InterpreterState(
 
 /** Implementation of Effects for InterpreterState concrete state representation.
   */
-object NormalInterpreter extends Effects[InterpreterState] {
+object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
 
 
   def loadVar(v: String) = {
@@ -325,7 +329,7 @@ object NormalInterpreter extends Effects[InterpreterState] {
     })
   }
 
-  def evalAddrToProc(addr: Int): State[InterpreterState, Option[FunPointer]] =
+  def evalAddrToProc(addr: Int) =
     Logger.debug(s"    eff : FIND PROC $addr")
     for {
       res <- get((s: InterpreterState) => s.memoryState.doLoadOpt("funtable", List(Scalar(BitVecLiteral(addr, 64)))))
@@ -409,7 +413,7 @@ object NormalInterpreter extends Effects[InterpreterState] {
     })
   }
 
-  def storeVar(v: String, scope: Scope, value: BasilValue): State[InterpreterState, Unit] = {
+  def storeVar(v: String, scope: Scope, value: BasilValue): State[InterpreterState, Unit, InterpreterError] = {
     Logger.debug(s"    eff : SET $v := $value")
     State.modify((s: InterpreterState) => s.copy(memoryState = s.memoryState.defVar(v, scope, value)))
   }
@@ -419,7 +423,7 @@ object NormalInterpreter extends Effects[InterpreterState] {
     s.copy(memoryState = s.memoryState.doStore(vname, update))
   })
 
-  def interpretOne: State[InterpreterState, Unit] = for {
+  def interpretOne: State[InterpreterState, Unit, InterpreterError] = for {
     next <- getNext
     _ <- try {
       next match {

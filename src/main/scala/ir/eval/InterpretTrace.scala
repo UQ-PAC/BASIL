@@ -26,12 +26,12 @@ enum ExecEffect:
 case class Trace(val t: List[ExecEffect])
 
 case object Trace {
-  def add(e: ExecEffect) : State[Trace, Unit] = {
+  def add[E](e: ExecEffect) : State[Trace, Unit, E] = {
     State.modify ((t: Trace) => Trace(t.t.appended(e)))
   }
 }
 
-object TraceGen extends Effects[Trace] {
+case class TraceGen[E]() extends Effects[Trace, E] {
   /** Values are discarded by ProductInterpreter so do not matter */
   def evalBV(e: Expr) = State.pure(BitVecLiteral(0,0))
 
@@ -74,7 +74,7 @@ object TraceGen extends Effects[Trace] {
   def interpretOne = State.pure(())
 }
 
-def tracingInterpreter = ProductInterpreter(NormalInterpreter, TraceGen)
+def tracingInterpreter = ProductInterpreter(NormalInterpreter, TraceGen())
 
 def interpretTrace(p: Program) : (InterpreterState, Trace) = {
   InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))

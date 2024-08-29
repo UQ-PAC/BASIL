@@ -15,15 +15,15 @@ import scala.collection.immutable
 import scala.util.control.Breaks.{break, breakable}
 
 
-def doLeft[L, T, V](f: State[L, V]) : State[(L, T), V] = for {
-  f <- State[(L, T), V]((s: (L, T)) => {
+def doLeft[L, T, V, E](f: State[L, V, E]) : State[(L, T), V, E] = for {
+  f <- State[(L, T), V, E]((s: (L, T)) => {
     val r = f.f(s._1)
     ((r._1, s._2), r._2)
   })
 } yield (f)
 
-def doRight[L, T, V](f: State[T, V]) : State[(L, T), V] = for {
-  f <- State[(L, T), V]((s: (L, T)) => {
+def doRight[L, T, V, E](f: State[T, V, E]) : State[(L, T), V, E] = for {
+  f <- State[(L, T), V, E]((s: (L, T)) => {
     val r = f.f(s._2)
     ((s._1, r._1), r._2)
   })
@@ -32,7 +32,7 @@ def doRight[L, T, V](f: State[T, V]) : State[(L, T), V] = for {
 /**
  * Runs two interpreters "inner" and "before" simultaneously, returning the value from inner, and ignoring before
  */
-case class ProductInterpreter[L, T](val inner: Effects[L], val before: Effects[T]) extends Effects[(L, T)] {
+case class ProductInterpreter[L, T, E](val inner: Effects[L, E], val before: Effects[T, E]) extends Effects[(L, T), E] {
   def interpretOne = for {
     n <- doRight(before.interpretOne)
     f <- doLeft(inner.interpretOne)
@@ -86,7 +86,7 @@ case class ProductInterpreter[L, T](val inner: Effects[L], val before: Effects[T
 }
 
 
-case class LayerInterpreter[L, T](val inner: Effects[L], val before: Effects[(L, T)]) extends Effects[(L, T)] {
+case class LayerInterpreter[L, T, E](val inner: Effects[L, E], val before: Effects[(L, T), E]) extends Effects[(L, T), E] {
 
   def interpretOne = for {
     n <- (before.interpretOne)

@@ -34,14 +34,14 @@ def load(s: InterpreterState, global: SpecGlobal) : Option[BitVecLiteral] = {
   // m.evalBV("mem", BitVecLiteral(64, global.address), Endian.LittleEndian, global.size) //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
   
   try {
-    Some(Eval.evalBV(f)(MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size)).f(s)._2)
+    Some(State.evaluate(s, Eval.evalBV(f)(MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size))))
   } catch {
     case e : InterpreterError => None
   }
 }
 
 
-def mems[T <: Effects[T]](m: MemoryState) : Map[BigInt, BitVecLiteral] = {
+def mems[E, T <: Effects[T, E]](m: MemoryState) : Map[BigInt, BitVecLiteral] = {
   m.getMem("mem").map((k,v) => k.value -> v)
 }
 

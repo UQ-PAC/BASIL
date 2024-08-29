@@ -163,15 +163,15 @@ def evalExpr(exp: Expr, variableAssignment: Variable => Option[Literal], memory:
 /**
  * typeclass defining variable and memory laoding from state S
  */
-trait Loader[S] {
-  def getVariable(v: Variable) : State[S, Option[Literal]]
-  def loadMemory(m: Memory, addr: Expr, endian: Endian, size: Int) : State[S, Option[Literal]] = {
+trait Loader[S, E] {
+  def getVariable(v: Variable) : State[S, Option[Literal], E]
+  def loadMemory(m: Memory, addr: Expr, endian: Endian, size: Int) : State[S, Option[Literal], E] = {
     State.pure(None)
   }
 }
 
 
-def statePartialEvalExpr[S](l: Loader[S])(exp: Expr): State[S, Expr] = {
+def statePartialEvalExpr[S, E](l: Loader[S, E])(exp: Expr): State[S, Expr, E] = {
   val eval = statePartialEvalExpr(l)
   exp match {
     case f: UninterpretedFunction => State.pure(f)
@@ -254,14 +254,14 @@ def statePartialEvalExpr[S](l: Loader[S])(exp: Expr): State[S, Expr] = {
 }
 
 
-class StatelessLoader(getVar: Variable => Option[Literal], loadMem: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c,d) => None)) extends Loader[Unit] {
-  def getVariable(v: Variable) : State[Unit, Option[Literal]] = State.pure(getVar(v))
-  override def loadMemory(m: Memory, addr: Expr, endian: Endian, size: Int) : State[Unit, Option[Literal]] = State.pure(loadMem(m, addr, endian, size))
+class StatelessLoader[E](getVar: Variable => Option[Literal], loadMem: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c,d) => None)) extends Loader[Unit, E] {
+  def getVariable(v: Variable) : State[Unit, Option[Literal], E] = State.pure(getVar(v))
+  override def loadMemory(m: Memory, addr: Expr, endian: Endian, size: Int) : State[Unit, Option[Literal], E] = State.pure(loadMem(m, addr, endian, size))
 }
 
 
 def partialEvalExpr(exp: Expr, variableAssignment: Variable => Option[Literal], memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c,d) => None)): Expr = {
   val l = StatelessLoader(variableAssignment, memory)
-  statePartialEvalExpr(l)(exp).f(())._2
+  State.evaluate((), statePartialEvalExpr(l)(exp))
 }
 
