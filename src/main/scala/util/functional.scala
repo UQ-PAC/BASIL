@@ -1,6 +1,9 @@
 package util.functional
 
-case class State[S, +A, E](f: S => (S, Either[E, A])) {
+/*
+ * Flattened state monad with error. 
+ */
+case class State[S, A, E](f: S => (S, Either[E, A])) {
 
   def unit[A](a: A): State[S, A, E] = State(s => (s, Right(a)))
 
@@ -23,21 +26,39 @@ case class State[S, +A, E](f: S => (S, Either[E, A])) {
       }
     })
   }
+
+  def flatMapE(f: E => State[S, A, E]): State[S, A, E] = {
+    State(s => {
+      val (s2, a) = this.f(s)
+      a match {
+        case Left(l) => f(l).f(s2)
+        case Right(_) => (s2, a)
+      }
+    })
+  }
 }
 
 
 object State {
   def get[S, A, E](f: S => A) : State[S, A, E] = State(s => (s, Right(f(s))))
+  def getE[S, A, E](f: S => Either[E,A]) : State[S, A, E] = State(s => (s, f(s)))
   def getS[S,E] : State[S,S,E] = State((s:S) => (s,Right(s)))
   def putS[S,E](s: S) : State[S,Unit,E] = State((_) => (s,Right(())))
   def modify[S, E](f: S => S) : State[S, Unit, E] = State(s => (f(s), Right(())))
+  def modifyE[S, E](f: S => Either[E, S]) : State[S, Unit, E] = State(s => f(s) match {
+    case Right(ns) => (ns, Right(()))
+    case Left(e) => (s, Left(e))
+  })
   def execute[S, A, E](s: S, c: State[S,A, E]) : S = c.f(s)._1
   def evaluate[S, A, E](s: S, c: State[S,A, E])  : A = c.f(s)._2 match {
     case Right(r) => r
-    case Left(l) => throw Exception(s"Wrong $l")
+    case Left(l) => throw Exception(s"Evaluation error $l")
   }
 
+  def setError[S,A,E](e: E) : State[S,A,E] =  State(s => (s, Left(e)))
+
   def pure[S, A, E](a: A) : State[S, A, E] = State((s:S) => (s, Right(a)))
+  def pureE[S, A, E](a: Either[E, A]) : State[S, A, E] = State((s:S) => (s, a))
 
   def sequence[S, V, E](ident: State[S,V, E], xs: Iterable[State[S,V, E]]) : State[S, V, E] = {
     xs.foldRight(ident)((l,r) => for {

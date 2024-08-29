@@ -16,9 +16,9 @@ import scala.util.control.Breaks.{break, breakable}
 
 /** Abstraction for memload and variable lookup used by the expression evaluator.
   */
-case class StVarLoader[S, E, F <: Effects[S, E]](f: F) extends Loader[S, E] {
+case class StVarLoader[S, F <: Effects[S, InterpreterError]](f: F) extends Loader[S, InterpreterError] {
 
-  def getVariable(v: Variable): State[S, Option[Literal], E] = {
+  def getVariable(v: Variable): State[S, Option[Literal], InterpreterError] = {
     for {
       v <- f.loadVar(v.name)
     } yield ((v match {
@@ -27,7 +27,7 @@ case class StVarLoader[S, E, F <: Effects[S, E]](f: F) extends Loader[S, E] {
     }))
   }
 
-  override def loadMemory(m: Memory, addr: Expr, endian: Endian, size: Int): State[S, Option[Literal], E] = {
+  override def loadMemory(m: Memory, addr: Expr, endian: Endian, size: Int): State[S, Option[Literal], InterpreterError] = {
     for {
       r <- addr match {
         case l: Literal if size == 1 =>
@@ -57,55 +57,53 @@ case object Eval {
   /* Eval functions                                                                 */
   /*--------------------------------------------------------------------------------*/
 
-  def evalExpr[S, E, T <: Effects[S, E]](f: T)(e: Expr): State[S, Expr, E] = {
-    val ldr = StVarLoader[S, E, T](f)
+  def evalExpr[S, T <: Effects[S, InterpreterError]](f: T)(e: Expr): State[S, Expr, InterpreterError] = {
+    val ldr = StVarLoader[S, T](f)
     for {
-      res <- ir.eval.statePartialEvalExpr[S, E](ldr)(e)
+      res <- ir.eval.statePartialEvalExpr[S, InterpreterError](ldr)(e)
     } yield (res)
   }
 
-  def evalBV[S, E, T <: Effects[S, E]](f: T)(e: Expr): State[S, BitVecLiteral, E] = {
-    val ldr = StVarLoader[S, E, T](f)
+  def evalBV[S, T <: Effects[S, InterpreterError]](f: T)(e: Expr): State[S, BitVecLiteral, InterpreterError] = {
     for {
-      res <- ir.eval.statePartialEvalExpr[S, E](ldr)(e)
-    } yield (res match {
-      case l: BitVecLiteral => l
-      case _                => throw InterpreterError(Errored(s"Eval BV residual $e"))
+      res <- evalExpr(f)(e)
+      r <- State.pureE(res match {
+      case l: BitVecLiteral => Right(l)
+      case _                => Left(InterpreterError(Errored(s"Eval BV residual $e")))
     })
+    } yield (r)
   }
 
-  def evalInt[S, E, T <: Effects[S, E]](f: T)(e: Expr): State[S, BigInt, E] = {
-    val ldr = StVarLoader[S, E, T](f)
+  def evalInt[S, T <: Effects[S, InterpreterError]](f: T)(e: Expr): State[S, BigInt, InterpreterError] = {
     for {
-      res <- ir.eval.statePartialEvalExpr[S, E](ldr)(e)
-    } yield (res match {
-      case l: IntLiteral => l.value
-      case _             => throw InterpreterError(Errored(s"Eval BV residual $e"))
+      res <- evalExpr(f)(e)
+      r <- State.pureE(res match {
+      case l: IntLiteral => Right(l.value)
+      case _                => Left(InterpreterError(Errored(s"Eval Int residual $e")))
     })
+    } yield (r)
   }
 
-  def evalBool[S, E, T <: Effects[S, E]](f: T)(e: Expr): State[S, Boolean, E] = {
-    val ldr = StVarLoader[S, E, T](f)
+  def evalBool[S, T <: Effects[S, InterpreterError]](f: T)(e: Expr): State[S, Boolean, InterpreterError] = {
     for {
-      res <- ir.eval.statePartialEvalExpr[S, E](ldr)(e)
-    } yield (res match {
-      case l: BoolLit => l == TrueLiteral
-      case _          => throw InterpreterError(Errored(s"Eval BV residual $e"))
+      res <- evalExpr(f)(e)
+      r <- State.pureE(res match {
+      case l: BoolLit => Right(l == TrueLiteral)
+      case _                => Left(InterpreterError(Errored(s"Eval Bool residual $e")))
     })
+    } yield (r)
   }
 
   /*--------------------------------------------------------------------------------*/
   /* Load functions                                                                 */
   /*--------------------------------------------------------------------------------*/
 
-  def load[S, E, T <: Effects[S, E]](
+  def load[S, T <: Effects[S, InterpreterError]](
       f: T
-  )(vname: String, addr: Scalar, endian: Endian, count: Int): State[S, List[BasilValue], E] = {
-    if (count == 0) {
-      throw InterpreterError(Errored(s"Attempted fractional load"))
-    }
-    val keys = (0 until count).map(i => BasilValue.unsafeAdd(addr, i))
+  )(vname: String, addr: Scalar, endian: Endian, count: Int): State[S, List[BasilValue], InterpreterError] = {
     for {
+      _ <- if (count == 0) then State.setError(InterpreterError(Errored(s"Attempted fractional load"))) else State.pure(())
+      keys <- State.mapM(((i:Int) => State.pureE(BasilValue.unsafeAdd(addr, i))), (0 until count))
       values <- f.loadMem(vname, keys.toList)
       vals = endian match {
         case Endian.LittleEndian => values.reverse
@@ -115,29 +113,26 @@ case object Eval {
   }
 
   /** Load and concat bitvectors */
-  def loadBV[S, E, T <: Effects[S, E]](
+  def loadBV[S, T <: Effects[S, InterpreterError]](
       f: T
-  )(vname: String, addr: Scalar, endian: Endian, size: Int): State[S, BitVecLiteral, E] = for {
+  )(vname: String, addr: Scalar, endian: Endian, size: Int): State[S, BitVecLiteral, InterpreterError] = for {
     mem <- f.loadVar(vname)
-    (valsize, mapv) = mem match {
-      case mapv @ MapValue(_, MapType(_, BitVecType(sz))) => (sz, mapv)
-      case _ => throw InterpreterError(Errored("Trued to load-concat non bv"))
+    x <- mem match {
+      case mapv @ MapValue(_, MapType(_, BitVecType(sz))) => State.pure((sz, mapv))
+      case _ => State.setError(InterpreterError(Errored("Trued to load-concat non bv")))
     }
+    (valsize, mapv) = x
 
     cells = size / valsize
 
     res <- load(f)(vname, addr, endian, cells) // actual load
-    bvs: List[BitVecLiteral] = {
-      val rr = res.map {
-        case Scalar(bv @ BitVecLiteral(v, sz)) if sz == valsize => bv
-        case c =>
-          throw InterpreterError(TypeError(s"Loaded value of type ${c.irType} did not match expected type bv$valsize"))
-      }
-      rr
-    }
+    bvs: List[BitVecLiteral] <- (State.mapM ((c : BasilValue) => c match {
+        case Scalar(bv @ BitVecLiteral(v, sz)) if sz == valsize => State.pure(bv)
+        case c => State.setError(InterpreterError(TypeError(s"Loaded value of type ${c.irType} did not match expected type bv$valsize")))
+      },res))
   } yield (bvs.foldLeft(BitVecLiteral(0, 0))((acc, r) => eval.evalBVBinExpr(BVCONCAT, acc, r)))
 
-  def loadSingle[S, E, T <: Effects[S, E]](f: T)(vname: String, addr: Scalar): State[S, BasilValue, E] = {
+  def loadSingle[S, T <: Effects[S, InterpreterError]](f: T)(vname: String, addr: Scalar): State[S, BasilValue, InterpreterError] = {
     for {
       m <- load(f)(vname, addr, Endian.LittleEndian, 1)
     } yield (m.head)
@@ -148,18 +143,19 @@ case object Eval {
   /*--------------------------------------------------------------------------------*/
 
   /* Expand addr for number of values to store */
-  def store[S, E, T <: Effects[S, E]](f: T)(
+  def store[S, T <: Effects[S, InterpreterError]](f: T)(
       vname: String,
       addr: BasilValue,
       values: List[BasilValue],
       endian: Endian
-  ): State[S, Unit, E] = for {
+  ): State[S, Unit, InterpreterError] = for {
     mem <- f.loadVar(vname)
-    (mapval, keytype, valtype) = mem match {
-      case m @ MapValue(_, MapType(kt, vt)) if kt == addr.irType && values.forall(v => v.irType == vt) => (m, kt, vt)
-      case v => throw InterpreterError(TypeError(s"Invalid map store operation to $vname : $v"))
+    x <- mem match {
+      case m @ MapValue(_, MapType(kt, vt)) if kt == addr.irType && values.forall(v => v.irType == vt) => State.pure((m, kt, vt))
+      case v => State.setError(InterpreterError(TypeError(s"Invalid map store operation to $vname : $v")))
     }
-    keys = (0 until values.size).map(i => BasilValue.unsafeAdd(addr, i))
+    (mapval, keytype, valtype) = x
+    keys <- State.mapM((i: Int) => State.pureE(BasilValue.unsafeAdd(addr, i)), (0 until values.size))
     vals = endian match {
       case Endian.LittleEndian => values.reverse
       case Endian.BigEndian    => values
@@ -168,12 +164,12 @@ case object Eval {
   } yield (x)
 
   /** Extract bitvec to bytes and store bytes */
-  def storeBV[S, E, T <: Effects[S, E]](f: T)(
+  def storeBV[S, T <: Effects[S, InterpreterError]](f: T)(
       vname: String,
       addr: BasilValue,
       value: BitVecLiteral,
       endian: Endian
-  ): State[S, Unit, E] = for {
+  ): State[S, Unit, InterpreterError] = for {
     mem <- f.loadVar(vname)
     (mapval, vsize) = mem match {
       case m @ MapValue(_, MapType(kt, BitVecType(size))) if kt == addr.irType => (m, size)
@@ -197,7 +193,7 @@ case object Eval {
       case Endian.BigEndian    => extractVals.reverse.map(Scalar(_))
     }
 
-    keys = (0 until cells).map(i => BasilValue.unsafeAdd(addr, i))
+    keys <- State.mapM((i: Int) => State.pureE(BasilValue.unsafeAdd(addr, i)), (0 until cells))
     s <- f.storeMem(vname, keys.zip(vs).toMap)
   } yield (s)
 
@@ -228,7 +224,7 @@ case object InterpFuns {
     } yield (l)
   }
 
-  def initialiseProgram[S, E, T <: Effects[S, E]](f: T)(p: Program): State[S, Unit, E] = {
+  def initialiseProgram[S, T <: Effects[S, InterpreterError]](f: T)(p: Program): State[S, Unit, InterpreterError] = {
     def initMemory(mem: String, mems: Iterable[MemorySection]) = {
       for {
         m <- State.sequence(
@@ -269,7 +265,7 @@ case object InterpFuns {
     } yield (r)
   }
 
-  def interpretJump[S, E, T <: Effects[S, E]](f: T)(j: Jump): State[S, Unit, E] = {
+  def interpretJump[S, T <: Effects[S, InterpreterError]](f: T)(j: Jump): State[S, Unit, InterpreterError] = {
     j match {
       case gt: GoTo if gt.targets.size == 1 => {
         f.setNext(Run(IRWalk.firstInBlock(gt.targets.head)))
@@ -295,7 +291,7 @@ case object InterpFuns {
     }
   }
 
-  def interpretStatement[S, E, T <: Effects[S, E]](f: T)(s: Statement): State[S, Unit, E] = {
+  def interpretStatement[S, T <: Effects[S, InterpreterError]](f: T)(s: Statement): State[S, Unit, InterpreterError] = {
     s match {
       case assign: Assign => {
         for {
@@ -369,7 +365,7 @@ case object InterpFuns {
     }
   }
 
-  def interpretProg[S, E, T <: Effects[S, E]](f: T)(p: Program, is: S): S = {
+  def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: Program, is: S): S = {
     val begin = State.execute(is, initialiseProgram(f)(p))
     // State.execute[S,Unit](is, )
     interpret(f, begin)

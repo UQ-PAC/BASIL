@@ -17,7 +17,6 @@ import scala.util.control.Breaks.{break, breakable}
 sealed trait ExecutionContinuation
 case class FailedAssertion(a: Assert) extends ExecutionContinuation
 
-
 case class Stopped() extends ExecutionContinuation /* normal program stop  */
 case class Run(val next: Command) extends ExecutionContinuation /* continue by executing next command */
 
@@ -30,11 +29,11 @@ case class EvalError(val message: String = "")
     extends ExecutionContinuation /* failed to evaluate an expression to a concrete value */
 case class MemoryError(val message: String = "") extends ExecutionContinuation /* An error to do with memory */
 
-
 // type InterpreterError = EscapedControlFlow | Errored | TypeError | EvalError | MemoryError
 
 /** TODO: errors should be encapsualted in error monad, rather than mapping exceptions back into state transitions at
-  * State.execute() */
+  * State.execute()
+  */
 case class InterpreterError(continue: ExecutionContinuation) extends Exception()
 
 /* Concrete value type of the interpreter. */
@@ -68,30 +67,28 @@ case object BasilValue {
 
   def size(v: BasilValue): Int = size(v.irType)
 
-  def unsafeAdd(l: BasilValue, vr: Int): BasilValue = {
+  def unsafeAdd[S, E](l: BasilValue, vr: Int): Either[InterpreterError, BasilValue] = {
     l match {
-      case _ if vr == 0              => l
-      case Scalar(IntLiteral(vl))    => Scalar(IntLiteral(vl + vr))
-      case Scalar(b1: BitVecLiteral) => Scalar(eval.evalBVBinExpr(BVADD, b1, BitVecLiteral(vr, b1.size)))
-      case _                         => throw InterpreterError(TypeError(s"Operation add $vr undefined on $l"))
+      case _ if vr == 0              => Right(l)
+      case Scalar(IntLiteral(vl))    => Right(Scalar(IntLiteral(vl + vr)))
+      case Scalar(b1: BitVecLiteral) => Right(Scalar(eval.evalBVBinExpr(BVADD, b1, BitVecLiteral(vr, b1.size))))
+      case _ => Left(InterpreterError(TypeError(s"Operation add $vr undefined on $l")))
     }
   }
 
-  def add(l: BasilValue, r: BasilValue): BasilValue = {
-    (l, r) match {
-      case (Scalar(IntLiteral(vl)), Scalar(IntLiteral(vr)))       => Scalar(IntLiteral(vl + vr))
-      case (Scalar(b1: BitVecLiteral), Scalar(b2: BitVecLiteral)) => Scalar(eval.evalBVBinExpr(BVADD, b1, b2))
-      case (Scalar(b1: BoolLit), Scalar(b2: BoolLit)) =>
-        Scalar(if (b2.value || b2.value) then TrueLiteral else FalseLiteral)
-      case _ => throw InterpreterError(TypeError(s"Operation add undefined on $l $r"))
-    }
-  }
+  // def add(l: BasilValue, r: BasilValue): BasilValue = {
+  //   (l, r) match {
+  //     case (Scalar(IntLiteral(vl)), Scalar(IntLiteral(vr)))       => Scalar(IntLiteral(vl + vr))
+  //     case (Scalar(b1: BitVecLiteral), Scalar(b2: BitVecLiteral)) => Scalar(eval.evalBVBinExpr(BVADD, b1, b2))
+  //     case (Scalar(b1: BoolLit), Scalar(b2: BoolLit)) =>
+  //       Scalar(if (b2.value || b2.value) then TrueLiteral else FalseLiteral)
+  //     case _ => throw InterpreterError(TypeError(s"Operation add undefined on $l $r"))
+  //   }
+  // }
 }
 
-/**
- * Minimal language defining all state transitions in the interpreter, 
- * defined for the interpreter's concrete state T.
- */
+/** Minimal language defining all state transitions in the interpreter, defined for the interpreter's concrete state T.
+  */
 trait Effects[T, E] {
 
   // perform an execution step
@@ -124,15 +121,13 @@ trait Effects[T, E] {
   def storeMem(vname: String, update: Map[BasilValue, BasilValue]): State[T, Unit, E]
 }
 
-
-
 trait NopEffects[T, E] extends Effects[T, E] {
   def interpretOne = State.pure(())
   def loadVar(v: String) = State.pure(Scalar(FalseLiteral))
-  def loadMem(v: String, addrs: List[BasilValue])  = State.pure(List())
+  def loadMem(v: String, addrs: List[BasilValue]) = State.pure(List())
   def evalAddrToProc(addr: Int) = State.pure(None)
   def getNext = State.pure(Stopped())
-  def setNext(c: ExecutionContinuation)  = State.pure(())
+  def setNext(c: ExecutionContinuation) = State.pure(())
 
   def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = State.pure(())
   def doReturn() = State.pure(())
@@ -141,10 +136,9 @@ trait NopEffects[T, E] extends Effects[T, E] {
   def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = State.pure(())
 }
 
-/** -------------------------------------------------------------------------------- 
- * Definition of concrete state
- * -------------------------------------------------------------------------------- */
-
+/** -------------------------------------------------------------------------------- Definition of concrete state
+  * --------------------------------------------------------------------------------
+  */
 
 type StackFrameID = String
 val globalFrame: StackFrameID = "GLOBAL"
@@ -189,14 +183,17 @@ case class MemoryState(
     MemoryState(frames, frameName :: activations, counts)
   }
 
-  def popStackFrame(): MemoryState = {
-    val (frame, remactivs) = activations match {
-      case Nil                          => throw InterpreterError(Errored("No stack frame to pop"))
-      case h :: Nil if h == globalFrame => throw InterpreterError(Errored("tried to pop global scope"))
-      case h :: tl                      => (h, tl)
+  def popStackFrame(): Either[InterpreterError, MemoryState] = {
+    val hv = activations match {
+      case Nil                          => Left(InterpreterError(Errored("No stack frame to pop")))
+      case h :: Nil if h == globalFrame => Left(InterpreterError(Errored("tried to pop global scope")))
+      case h :: tl                      => Right((h, tl))
     }
-    val frames = stackFrames.removed(frame)
-    MemoryState(frames, remactivs, activationCount)
+    hv.map((hv) => {
+      val (frame, remactivs) = hv
+      val frames = stackFrames.removed(frame)
+      MemoryState(frames, remactivs, activationCount)
+    })
   }
 
   /* Variable retrieval and setting */
@@ -235,82 +232,87 @@ case class MemoryState(
     )
   }
 
-  def findVar(name: String): (StackFrameID, BasilValue) = {
-    findVarOpt(name: String).getOrElse(throw InterpreterError(Errored(s"Access to undefined variable $name")))
+  def findVar(name: String): Either[InterpreterError, (StackFrameID, BasilValue)] = {
+    findVarOpt(name: String)
+      .map(Right(_))
+      .getOrElse(Left(InterpreterError(Errored(s"Access to undefined variable $name"))))
   }
 
   def getVarOpt(name: String): Option[BasilValue] = findVarOpt(name).map(_._2)
 
-  def getVar(name: String): BasilValue = {
-    getVarOpt(name).getOrElse(throw InterpreterError(Errored(s"Access undefined variable $name")))
+  def getVar(name: String): Either[InterpreterError, BasilValue] = {
+    getVarOpt(name).map(Right(_)).getOrElse(Left(InterpreterError(Errored(s"Access undefined variable $name"))))
   }
 
-  def getVar(v: Variable): BasilValue = {
+  def getVar(v: Variable): Either[InterpreterError, BasilValue] = {
     val value = getVar(v.name)
     value match {
-      case dv: BasilValue if v.getType != dv.irType =>
-        throw InterpreterError(
-          Errored(s"Type mismatch on variable definition and load: defined ${dv.irType}, variable ${v.getType}")
-        )
-      case o => o
-    }
-  }
-
-  def getVarLiteralOpt(v: Variable): Option[Literal] = {
-    getVar(v) match {
-      case Scalar(v) => Some(v)
-      case _         => None
-    }
-  }
-
-  /* Map variable accessing ; load and store operations */
-  def doLoadOpt(vname: String, addr: List[BasilValue]): Option[List[BasilValue]] = {
-    val (frame, mem) = findVar(vname)
-    val mapv: MapValue = mem match {
-      case m @ MapValue(innerMap, ty) => m
-      case m                          => throw InterpreterError(TypeError(s"Load from nonmap ${m.irType}"))
-    }
-
-    val rs = addr.map(k => mapv.value.get(k))
-    if (rs.forall(_.isDefined)) {
-      Some(rs.map(_.get))
-    } else {
-      None
-    }
-  }
-  def doLoad(vname: String, addr: List[BasilValue]): List[BasilValue] = {
-    doLoadOpt(vname, addr) match {
-      case Some(vs) => vs
-      case None => {
-        throw InterpreterError(MemoryError(s"Read from uninitialised $vname[${addr.head} .. ${addr.last}]"))
-      }
-    }
-  }
-
-  /** typecheck and some fields of a map variable */
-  def doStore(vname: String, values: Map[BasilValue, BasilValue]) = {
-    val (frame, mem) = findVar(vname)
-
-    val (mapval, keytype, valtype) = mem match {
-      case m @ MapValue(_, MapType(kt, vt)) => (m, kt, vt)
-      case v => throw InterpreterError(TypeError(s"Invalid map store operation to $vname : ${v.irType}"))
-    }
-
-    (values.find((k, v) => k.irType != keytype || v.irType != valtype)) match {
-      case Some(v) =>
-        throw InterpreterError(
-          TypeError(
-            s"Invalid addr or value type (${v._1.irType}, ${v._2.irType}) does not match map type $vname : ($keytype, $valtype)"
+      case Right(dv: BasilValue) if v.getType != dv.irType =>
+        Left(
+          InterpreterError(
+            Errored(s"Type mismatch on variable definition and load: defined ${dv.irType}, variable ${v.getType}")
           )
         )
-      case None => ()
+      case Right(o) => Right(o)
+      case o        => o
+    }
+  }
+
+
+  /* Map variable accessing ; load and store operations */
+  def doLoad(vname: String, addr: List[BasilValue]): Either[InterpreterError, List[BasilValue]] = for {
+    v <- findVar(vname)
+    mapv: MapValue <- v._2 match {
+      case m @ MapValue(innerMap, ty) => Right(m)
+      case m                          => Left(InterpreterError(TypeError(s"Load from nonmap ${m.irType}")))
+    }
+    rs: List[Option[BasilValue]] = addr.map(k => mapv.value.get(k))
+    xs <-
+      (if (rs.forall(_.isDefined)) {
+         Right(rs.map(_.get))
+       } else {
+         Left(InterpreterError(MemoryError(s"Read from uninitialised $vname[${addr.head} .. ${addr.last}]")))
+       })
+  } yield (xs)
+
+  // def doLoad[S](vname: String, addr: List[BasilValue]): State[S, List[BasilValue], InterpreterError] = for {
+  //   v <- doLoadOpt(vname, addr)
+  //   r <- v match {
+  //     case Some(vs) => vs
+  //     case None => {
+  //       throw InterpreterError(MemoryError(s"Read from uninitialised "))
+  //     }
+  //   }
+  // }
+
+  /** typecheck and some fields of a map variable */
+  def doStore(vname: String, values: Map[BasilValue, BasilValue]): Either[InterpreterError, MemoryState] = for {
+    // val (frame, mem) = findVar(vname)
+    v <- findVar(vname)
+    (frame, mem) = v
+    // val (mapval, keytype, valtype) =
+    mapi <- mem match {
+      case m @ MapValue(_, MapType(kt, vt)) => Right((m, kt, vt))
+      case v => Left(InterpreterError(TypeError(s"Invalid map store operation to $vname : ${v.irType}")))
+    }
+    (mapval, keytype, valtype) = mapi
+
+    checkTypes <- (values.find((k, v) => k.irType != keytype || v.irType != valtype)) match {
+      case Some(v) =>
+        Left(
+          InterpreterError(
+            TypeError(
+              s"Invalid addr or value type (${v._1.irType}, ${v._2.irType}) does not match map type $vname : ($keytype, $valtype)"
+            )
+          )
+        )
+      case None => Right(())
     }
 
-    val nmap = MapValue(mapval.value ++ values, mapval.irType)
-    setVar(frame, vname, nmap)
-  }
+    nmap = MapValue(mapval.value ++ values, mapval.irType)
+    ms <- Right(setVar(frame, vname, nmap))
+  } yield (ms)
 }
-
 
 case class InterpreterState(
     val nextCmd: ExecutionContinuation = Stopped(),
@@ -322,9 +324,8 @@ case class InterpreterState(
   */
 object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
 
-
   def loadVar(v: String) = {
-    State.get((s: InterpreterState) => {
+    State.getE((s: InterpreterState) => {
       s.memoryState.getVar(v)
     })
   }
@@ -332,15 +333,17 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
   def evalAddrToProc(addr: Int) =
     Logger.debug(s"    eff : FIND PROC $addr")
     for {
-      res <- get((s: InterpreterState) => s.memoryState.doLoadOpt("funtable", List(Scalar(BitVecLiteral(addr, 64)))))
+      res: List[BasilValue] <- getE((s: InterpreterState) =>
+        s.memoryState.doLoad("funtable", List(Scalar(BitVecLiteral(addr, 64))))
+      )
     } yield {
       res match {
-        case Some((f: FunPointer) :: Nil) => Some(f)
-        case _                            => None
+        case ((f: FunPointer) :: Nil) => Some(f)
+        case _                        => None
       }
     }
 
-  def formatStore(varname: String, update: Map[BasilValue, BasilValue]) : String = {
+  def formatStore(varname: String, update: Map[BasilValue, BasilValue]): String = {
     val ks = update.toList.sortWith((x, y) => {
       def conv(v: BasilValue): BigInt = v match {
         case (Scalar(b: BitVecLiteral)) => b.value
@@ -378,7 +381,7 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
   }
 
   def loadMem(v: String, addrs: List[BasilValue]) = {
-    State.get((s: InterpreterState) => {
+    State.getE((s: InterpreterState) => {
       val r = s.memoryState.doLoad(v, addrs)
       Logger.debug(s"    eff : LOAD ${addrs.head} x ${addrs.size}")
       r
@@ -405,10 +408,12 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
 
   def doReturn() = {
     Logger.debug(s"    eff : RETURN")
-    modify((s: InterpreterState) => {
+    modifyE((s: InterpreterState) => {
       s.callStack match {
-        case Nil     => s.copy(nextCmd = Stopped())
-        case h :: tl => s.copy(nextCmd = h, callStack = tl, memoryState = s.memoryState.popStackFrame())
+        case Nil     => Right(s.copy(nextCmd = Stopped()))
+        case h :: tl => for {
+          ms <- s.memoryState.popStackFrame()
+        } yield (s.copy(nextCmd = h, callStack = tl, memoryState = ms))
       }
     })
   }
@@ -418,28 +423,29 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
     State.modify((s: InterpreterState) => s.copy(memoryState = s.memoryState.defVar(v, scope, value)))
   }
 
-  def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = State.modify((s: InterpreterState) => {
+  def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = 
+    State.modifyE((s: InterpreterState) => {
     Logger.debug(s"    eff : STORE ${formatStore(vname, update)}")
-    s.copy(memoryState = s.memoryState.doStore(vname, update))
+    for {
+      ms <- s.memoryState.doStore(vname, update)
+    } yield(s.copy(memoryState = ms))
   })
 
   def interpretOne: State[InterpreterState, Unit, InterpreterError] = for {
     next <- getNext
-    _ <- try {
-      next match {
-        case Run(c: Statement) => InterpFuns.interpretStatement(this)(c)
-        case Run(c: Jump) => InterpFuns.interpretJump(this)(c)
-        case Stopped() => State.pure (()) 
-        case errorstop => State.pure (())
-      }
-    } catch {
-      case InterpreterError(e) => setNext(e)
-      case e: java.lang.IllegalArgumentException => setNext(Errored(e.getStackTrace.take(5).mkString("\n")))
-    }
+    _ <- (next match {
+          case Run(c: Statement) => InterpFuns.interpretStatement(this)(c)
+          case Run(c: Jump)      => InterpFuns.interpretJump(this)(c)
+          case Stopped()         => State.pure(())
+          case errorstop         => State.pure(())
+      }).flatMapE((e: InterpreterError) => setNext(e.continue))
+      // } catch {
+      //   case InterpreterError(e)                   => setNext(e)
+      //   case e: java.lang.IllegalArgumentException => setNext(Errored(e.getStackTrace.take(5).mkString("\n")))
+      // }
   } yield ()
 
 }
-
 
 // def interpretTrace(IRProgram: Program): TracingInterpreter = {
 //   val s: TracingInterpreter = InterpFuns.interpretProg(IRProgram, TracingInterpreter(InterpreterState(), List()))
