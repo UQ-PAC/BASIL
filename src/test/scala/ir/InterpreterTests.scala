@@ -34,7 +34,7 @@ def load(s: InterpreterState, global: SpecGlobal) : Option[BitVecLiteral] = {
   // m.evalBV("mem", BitVecLiteral(64, global.address), Endian.LittleEndian, global.size) //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
   
   try {
-    Some(f.evalBV(MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size)).f(s)._2)
+    Some(Eval.evalBV(f)(MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size)).f(s)._2)
   } catch {
     case e : InterpreterError => None
   }
@@ -432,11 +432,12 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
    test("fib breakpoints") {
 
-     // Logger.setLevel(LogLevel.ERROR)
+     Logger.setLevel(LogLevel.WARN)
      val fib = fibonacciProg(8)
      val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get)
-     val interp = LayerInterpreter(NormalInterpreter, RememberBreakpoints(NormalInterpreter, Set(watch)))
-     val res = InterpFuns.interpretProg(interp)(fib, (InterpreterState(), List[(Command, InterpreterState)]()))
+     val bp = BreakPoint("Fibentry",  BreakPointLoc.CMDCond(watch, BinaryExpr(BVEQ, BitVecLiteral(5, 64), Register("R0", 64))), BreakPointAction(true, true, List(Register("R0", 64)), true))
+     val interp = LayerInterpreter(NormalInterpreter, RememberBreakpoints(NormalInterpreter, List(bp)))
+     val res = InterpFuns.interpretProg(interp)(fib, (InterpreterState(), List()))
      println(res)
 
 

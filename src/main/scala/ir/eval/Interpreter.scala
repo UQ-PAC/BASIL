@@ -93,14 +93,6 @@ trait Effects[T] {
   // perform an execution step
   def interpretOne: State[T, Unit]
 
-  /* evaluation (may side-effect on error) */
-
-  def evalBV(e: Expr): State[T, BitVecLiteral]
-
-  def evalInt(e: Expr): State[T, BigInt]
-
-  def evalBool(e: Expr): State[T, Boolean]
-
   def loadVar(v: String): State[T, BasilValue]
 
   def loadMem(v: String, addrs: List[BasilValue]): State[T, List[BasilValue]]
@@ -132,9 +124,6 @@ trait Effects[T] {
 
 trait NopEffects[T] extends Effects[T] {
   def interpretOne = State.pure(())
-  def evalBV(e: Expr) = State.pure(BitVecLiteral(0,0))
-  def evalInt(e: Expr) = State.pure(BigInt(0))
-  def evalBool(e: Expr) = State.pure(false)
   def loadVar(v: String) = State.pure(Scalar(FalseLiteral))
   def loadMem(v: String, addrs: List[BasilValue])  = State.pure(List())
   def evalAddrToProc(addr: Int) = State.pure(None)
@@ -329,18 +318,6 @@ case class InterpreterState(
   */
 object NormalInterpreter extends Effects[InterpreterState] {
 
-  /* eval */
-  def evalBV(e: Expr) = {
-    Eval.evalBV(this)(e)
-  }
-
-  def evalInt(e: Expr) = {
-    Eval.evalInt(this)(e)
-  }
-
-  def evalBool(e: Expr) = {
-    Eval.evalBool(this)(e)
-  }
 
   def loadVar(v: String) = {
     State.get((s: InterpreterState) => {

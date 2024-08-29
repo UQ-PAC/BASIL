@@ -57,6 +57,13 @@ case object Eval {
   /* Eval functions                                                                 */
   /*--------------------------------------------------------------------------------*/
 
+  def evalExpr[S, T <: Effects[S]](f: T)(e: Expr): State[S, Expr] = {
+    val ldr = StVarLoader[S, T](f)
+    for {
+      res <- ir.eval.statePartialEvalExpr[S](ldr)(e)
+    } yield (res)
+  }
+
   def evalBV[S, T <: Effects[S]](f: T)(e: Expr): State[S, BitVecLiteral] = {
     val ldr = StVarLoader[S, T](f)
     for {
@@ -275,7 +282,7 @@ case object InterpFuns {
           throw InterpreterError(Errored(s"Some goto target missing guard $gt"))
         }
         for {
-          chosen: List[Assume] <- filterM((a: Assume) => f.evalBool(a.body), assumes)
+          chosen: List[Assume] <- filterM((a: Assume) => Eval.evalBool(f)(a.body), assumes)
 
           res <- chosen match {
             case Nil      => f.setNext(Errored(s"No jump target satisfied $gt"))
@@ -292,21 +299,21 @@ case object InterpFuns {
     s match {
       case assign: Assign => {
         for {
-          rhs <- f.evalBV(assign.rhs)
+          rhs <- Eval.evalBV(f)(assign.rhs)
           st <- f.storeVar(assign.lhs.name, assign.lhs.toBoogie.scope, Scalar(rhs))
           n <- f.setNext(Run(s.successor))
         } yield (st)
       }
       case assign: MemoryAssign =>
         for {
-          index: BitVecLiteral <- f.evalBV(assign.index)
-          value: BitVecLiteral <- f.evalBV(assign.value)
+          index: BitVecLiteral <- Eval.evalBV(f)(assign.index)
+          value: BitVecLiteral <- Eval.evalBV(f)(assign.value)
           _ <- Eval.storeBV(f)(assign.mem.name, Scalar(index), value, assign.endian)
           n <- f.setNext(Run(s.successor))
         } yield (n)
       case assert: Assert =>
         for {
-          b <- f.evalBool(assert.body)
+          b <- Eval.evalBool(f)(assert.body)
           n <-
             (if (!b) then {
                f.setNext(FailedAssertion(assert))
@@ -316,7 +323,7 @@ case object InterpFuns {
         } yield (n)
       case assume: Assume =>
         for {
-          b <- f.evalBool(assume.body)
+          b <- Eval.evalBool(f)(assume.body)
           n <-
             (if (!b) {
                f.setNext(Errored(s"Assumption not satisfied: $assume"))
@@ -339,7 +346,7 @@ case object InterpFuns {
           f.doReturn()
         } else {
           for {
-            addr <- f.evalBV(ic.target)
+            addr <- Eval.evalBV(f)(ic.target)
             fp <- f.evalAddrToProc(addr.value.toInt)
             _ <- fp match {
               case Some(fp) => f.call(fp.name, fp.call, Run(ic.successor))

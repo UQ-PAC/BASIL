@@ -14,44 +14,29 @@ import scala.collection.mutable
 import scala.collection.immutable
 import scala.util.control.Breaks.{break, breakable}
 
+
+def doLeft[L, T, V](f: State[L, V]) : State[(L, T), V] = for {
+  f <- State[(L, T), V]((s: (L, T)) => {
+    val r = f.f(s._1)
+    ((r._1, s._2), r._2)
+  })
+} yield (f)
+
+def doRight[L, T, V](f: State[T, V]) : State[(L, T), V] = for {
+  f <- State[(L, T), V]((s: (L, T)) => {
+    val r = f.f(s._2)
+    ((s._1, r._1), r._2)
+  })
+} yield (f)
+
 /**
- * Runs two interpreters inner and before simultaneously, returning the value from inner, and ignoring before
+ * Runs two interpreters "inner" and "before" simultaneously, returning the value from inner, and ignoring before
  */
 case class ProductInterpreter[L, T](val inner: Effects[L], val before: Effects[T]) extends Effects[(L, T)] {
-  def doLeft[V](f: State[L, V]) : State[(L, T), V] = for {
-    f <- State[(L, T), V]((s: (L, T)) => {
-      val r = f.f(s._1)
-      ((r._1, s._2), r._2)
-    })
-  } yield (f)
-
-  def doRight[V](f: State[T, V]) : State[(L, T), V] = for {
-    f <- State[(L, T), V]((s: (L, T)) => {
-      val r = f.f(s._2)
-      ((s._1, r._1), r._2)
-    })
-  } yield (f)
-
-
   def interpretOne = for {
     n <- doRight(before.interpretOne)
     f <- doLeft(inner.interpretOne)
   } yield ()
-
-  def evalBV(e: Expr) = for {
-    n <- doRight(before.evalBV(e))
-    f <- doLeft(inner.evalBV(e))
-  } yield (f)
-
-  def evalInt(e: Expr) = for {
-    n <- doRight(before.evalBV(e))
-    f <- doLeft(inner.evalInt(e))
-  } yield (f)
-
-  def evalBool(e: Expr) = for {
-    n <- doRight(before.evalBool(e)) 
-    f <- doLeft(inner.evalBool(e))
-  } yield (f)
 
   def loadVar(v: String) = for {
     n <- doRight(before.loadVar(v))
@@ -102,39 +87,11 @@ case class ProductInterpreter[L, T](val inner: Effects[L], val before: Effects[T
 
 
 case class LayerInterpreter[L, T](val inner: Effects[L], val before: Effects[(L, T)]) extends Effects[(L, T)] {
-  def doLeft[V](f: State[L, V]) : State[(L, T), V] = for {
-    f <- State[(L, T), V]((s: (L, T)) => {
-      val r = f.f(s._1)
-      ((r._1, s._2), r._2)
-    })
-  } yield (f)
-
-  def doRight[V](f: State[T, V]) : State[(L, T), V] = for {
-    f <- State[(L, T), V]((s: (L, T)) => {
-      val r = f.f(s._2)
-      ((s._1, r._1), r._2)
-    })
-  } yield (f)
 
   def interpretOne = for {
     n <- (before.interpretOne)
     f <- doLeft(inner.interpretOne)
   } yield ()
-
-  def evalBV(e: Expr) = for {
-    n <- (before.evalBV(e))
-    f <- doLeft(inner.evalBV(e))
-  } yield (f)
-
-  def evalInt(e: Expr) = for {
-    n <- (before.evalBV(e))
-    f <- doLeft(inner.evalInt(e))
-  } yield (f)
-
-  def evalBool(e: Expr) = for {
-    n <- (before.evalBool(e)) 
-    f <- doLeft(inner.evalBool(e))
-  } yield (f)
 
   def loadVar(v: String) = for {
     n <- (before.loadVar(v))

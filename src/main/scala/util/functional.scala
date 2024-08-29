@@ -48,6 +48,12 @@ object State {
   def filterM[A, S](m : (A => State[S, Boolean]), xs: Iterable[A]): State[S, List[A]] = {
     xs.foldRight(pure(List[A]()))((b,acc) => acc.flatMap(c => m(b).map(v => if v then b::c else c)))
   }
+
+  def mapM[A, B, S](m : (A => State[S, B]), xs: Iterable[A]): State[S, List[B]] = {
+    xs.foldRight(pure(List[B]()))((b,acc) => acc.flatMap(c => m(b).map(v => v::c)))
+  }
+
+
 }
 
 def protect[T](x: () => T, fnly: PartialFunction[Exception, T]): T = {
