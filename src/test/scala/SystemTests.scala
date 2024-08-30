@@ -1,7 +1,7 @@
 import org.scalatest.funsuite.AnyFunSuite
 import util.{Logger, PerformanceTimer}
 
-import Numeric.Implicits._
+import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable
 import scala.io.Source
@@ -12,7 +12,11 @@ import scala.sys.process.*
   */
 
 
- case class TestConfig(val boogieFlags:Seq[String] = Seq("/timeLimit:10", "/useArrayAxioms"), val basilFlags:Seq[String] = Seq(), val useBAPFrontend: Boolean=true, val expectVerify: Boolean=true)
+ case class TestConfig(boogieFlags:Seq[String] = Seq("/timeLimit:10", "/useArrayAxioms"),
+                       BASILFlags:Seq[String] = Seq(),
+                       useBAPFrontend: Boolean,
+                       expectVerify: Boolean,
+                      )
 
 
 trait SystemTests extends AnyFunSuite {
@@ -103,7 +107,7 @@ trait SystemTests extends AnyFunSuite {
     // the complete markdown file can be constructed by horizontal (line-wise)
     // concatenation of leftMarkdown and one or more partMarkdown.
     val mdMap = summaryMap + ("VerifyTimeHistogram" -> ("![](" + "HISTO" + filename + "HISTO" + ")"))
-    val leftMarkdown = 
+    val leftMarkdown =
       s"""
       || Metric |
       ||--------|
@@ -140,7 +144,7 @@ trait SystemTests extends AnyFunSuite {
     Logger.info(outPath)
     val timer = PerformanceTimer(s"test $name/$variation")
 
-    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath) ++ conf.basilFlags
+    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath) ++ conf.BASILFlags
     if (File(specPath).exists) args ++= Seq("--spec", specPath)
 
     Main.main(args.toArray)
@@ -181,7 +185,8 @@ trait SystemTests extends AnyFunSuite {
     }
     val passed = !timedOut && (verified == shouldVerify) && xor(verified, proveFailed)
     val result = TestResult(passed, verified, shouldVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
-    testResults.append((s"$name/$variation", result))
+    val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
+    testResults.append((s"$name/$variation$testSuffix", result))
     if (!passed) fail(failureMsg)
   }
 
@@ -231,10 +236,59 @@ trait SystemTests extends AnyFunSuite {
 
 }
 
+class SystemTestsBAP extends SystemTests  {
+  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=true, expectVerify=true))
+  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=true, expectVerify=false))
+  test("summary-BAP") {
+    summary("testresult-BAP")
+  }
+}
 
+class SystemTestsGTIRB extends SystemTests  {
+  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=false, expectVerify=true))
+  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=false, expectVerify=false))
+  test("summary-GTIRB") {
+    summary("testresult-GTIRB")
+  }
+}
+
+class ProcedureSummaryTests extends SystemTests {
+  // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
+  // this is due to BASIL's currently limited handling of non-returning calls
+  private val procedureSummaryPath = "./src/test/analysis/procedure-summaries"
+  private val procedureSummaryPrograms = getSubdirectories(procedureSummaryPath)
+  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", TestConfig(BASILFlags = Seq("--analyse", "--summarise-procedures"),
+    useBAPFrontend=true, expectVerify=true))
+  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", TestConfig(BASILFlags = Seq("--analyse", "--summarise-procedures"),
+    useBAPFrontend = false, expectVerify = true))
+  test("summary-procedureSummary") {
+    summary("procedureSummary-testResult")
+  }
+}
+
+def mean(xs: Iterable[Double]): Double = xs.sum.toDouble / xs.size
+
+def variance(xs: Iterable[Double]): Double = {
+  val avg = mean(xs)
+
+  xs.map(a => math.pow(a - avg, 2)).sum / xs.size
+}
+
+def median(xs: Iterable[Double]) = xs.toArray.sorted.apply(xs.size / 2)
+
+def stdDev(xs: Iterable[Double]): Double = math.sqrt(variance(xs))
+
+def histogram(numBins: Int, bounds: Option[(Double, Double)] = None)(xs: Seq[Double]) : List[Int] = {
+  val (mn, mx) = bounds.getOrElse(xs.min, xs.max)
+  val binSize = ((mx - mn) / numBins) * (1.000001)
+  val counts = (0 to numBins).map(x => (mn + x * binSize, mn + (x + 1) * binSize))
+    .map((left, right) => xs.count(x => x >= left && x < right))
+    .toList
+  counts
+}
 
 def histoToSvg(title: String, imgWidth: Int, imgHeight: Int, bins: List[Int], minBin: Double, maxBin: Double) : String = {
-  def template(width: Int = 300, height: Int = 130, content: String) = 
+  def template(width: Int = 300, height: Int = 130, content: String) =
     s""" <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
     ${content}
   </svg> """
@@ -257,15 +311,15 @@ def histoToSvg(title: String, imgWidth: Int, imgHeight: Int, bins: List[Int], mi
   val binPos = (0 to bins.size).map(i => (leftMargin + i * binWidth, binWidth * (i + 1)))
     .zip(bins.map(bh => heightScaling * bh))
 
-  val rects = binPos.map((binXX, height) => 
-      mkRect(binWidth.ceil.intValue, height.intValue, binXX._1.floor.intValue, histHeight.intValue - height.intValue + topMargin))
+  val rects = binPos.map((binXX, height) =>
+    mkRect(binWidth.ceil.intValue, height.intValue, binXX._1.floor.intValue, histHeight.intValue - height.intValue + topMargin))
 
   val labels = {
     (text(title, imgWidth / 8, topMargin - 5),
-    text("0", 0, histHeight + topMargin),
-    text(maxHeight.toInt.toString, 0, topMargin),
-    text(minBin.toInt.toString, 0, imgHeight),
-    text(maxBin.toInt.toString, (binWidth*(bins.size)).intValue - leftMargin, imgHeight))
+      text("0", 0, histHeight + topMargin),
+      text(maxHeight.toInt.toString, 0, topMargin),
+      text(minBin.toInt.toString, 0, imgHeight),
+      text(maxBin.toInt.toString, (binWidth*(bins.size)).intValue - leftMargin, imgHeight))
   }
 
   val bg = mkRect(imgWidth, imgHeight, 0, 0, fill="White")
@@ -289,45 +343,4 @@ def loadHisto() = {
   val timeValues = res("verifyTime").map(_.toDouble)
   val histo = histogram(50, Some(800.0, 1000.0))(timeValues.toSeq)
   println(histoToSvg("test histogram", 500, 300, histo, 800.0, 1000.0))
-}
-
-
-
-class SystemTestsBAP extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=true, expectVerify=true))
-  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=true, expectVerify=false))
-  test("summarybap") {
-    summary("testresult-BAP")
-  }
-}
-
-class SystemTestsGTIRB extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=false, expectVerify=true))
-  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=false, expectVerify=false))
-  test("summarygtirb") {
-    summary("testresult-GTIRB")
-  }
-}
-
-
-def mean(xs: Iterable[Double]): Double = xs.sum.toDouble / xs.size
-
-def variance(xs: Iterable[Double]): Double = {
-  val avg = mean(xs)
-
-  xs.map(a => math.pow(a - avg, 2)).sum / xs.size
-}
-
-def median(xs: Iterable[Double]) = xs.toArray.sorted.apply(xs.size / 2)
-
-def stdDev(xs: Iterable[Double]): Double = math.sqrt(variance(xs))
-
-
-def histogram(numBins: Int, bounds: Option[(Double, Double)] = None)(xs: Seq[Double]) : List[Int] = {
-  val (mn, mx) = bounds.getOrElse(xs.min, xs.max)
-  val binSize = ((mx - mn) / numBins) * (1.000001)
-  val counts = (0 to numBins).map(x => (mn + x * binSize, mn + (x + 1) * binSize))
-    .map((left, right) => xs.count(x => x >= left && x < right))
-    .toList
-  counts
 }

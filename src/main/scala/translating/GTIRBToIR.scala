@@ -371,7 +371,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       trueBlock.replaceJump(currentBlock.jump)
       falseBlock.replaceJump(jumpCopy)
     }
-    currentBlock.replaceJump(GoTo(mutable.Set(trueBlock, falseBlock)))
+    currentBlock.replaceJump(GoTo(Seq(trueBlock, falseBlock)))
     currentBlock.statements.remove(i)
 
     newBlocks

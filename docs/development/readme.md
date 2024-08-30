@@ -3,19 +3,28 @@
 - [project-layout](project-layout.md) Organisation of the source code
 - [editor-setup](editor-setup.md) Guide to basil development in IDEs 
 - [tool-installation](tool-installation.md) Guide to lifter, etc. tool installation
+- [scala](scala.md) Advice on Scala programming.
 - [cfg](cfg.md) Explanation of the old CFG datastructure 
 
 
 ## Scala
 
 Basil is implemented in Scala 3.
+
+See also: [Scala Gotchas](scala.md).
+
 Scala is a mixed functional and object-oriented programming language implemented on the JVM. It is a very complicated 
 language with a lot of depth, so it is important to carefully chose the implementation complexity introduced. 
 
-Generally, this means favouring simple standard solutions and choosing functional programming in the small scale 
-(use filter and map rather than loops), and object-oriented programming in the large scale.
+Generally, this means favouring simple standard solutions and choosing functional programming over stateful object oriented style 
+(use filter and map rather than loops), prefer immutable case classes and enums to regular mutable classes, etc.
+
+ADTs and functions between ADTs are all you need to solve most problems. Most
+things more complicated than this make the code unnecessarily difficult to maintain. 
 
 It is recommended to explore the [Scala documentation](https://docs.scala-lang.org/scala3/book/introduction.html).
+There is also the incomplete [Scala 3 language specification](https://github.com/scala/scala3/tree/main/docs/_spec), 
+which contains details not present in the documentation, but is not completely updated from Scala 2.
 
 Some general advice:
 
@@ -163,90 +172,6 @@ sudo sysctl kernel.perf_event_paranoid=1
 sudo sysctl kernel.kptr_restrict=0
 ```
 
-## Lifting a single example
-
-Many lifted examples are already profiled in the tests directory: [src/test/correct](src/test/correct), these instructions
-are for if you want to lift new compiled binaries.
-
-The tool takes a `.adt` or `.gts` and a `.relf` file as inputs, which are produced by BAP and readelf, respectively.
-
-These instructions are automated in [lift_adt.sh](../../scripts/lift_adt.sh).
-
-### Requirements
-
-- `bap` with the ASLp plugin to produce `.adt`
-- or `ddisasm` and `gtirb_semantics` to produce `.gts`
-- `readelf`
-- cross-compiliation toolchains, e.g.:
-    - `gcc-13-aarch64-linux-gnu`
-    - `clang`
-
-See [tool-installation](tool-installation.md) for install instructions.
-
-[BAP](https://github.com/BinaryAnalysisPlatform/bap) can be installed by following the instructions in the link given.
-
-Given a AArch64/ARM64 binary file (`*.out`), the `.adt` file can be produced by running
-
-`bap *.out -d adt:*.adt`
-
-and the `.relf` file can be produced by running
-
-`aarch64-linux-gnu-readelf -s -r -W *.out > *.relf`.
-
-To cross-compile a C source file to a AArch64 binary, `gcc-aarch64-linux-gnu` must be installed. This can be done with the following commands on Ubuntu:
-
-`sudo apt-get update`
-
-`sudo apt-get install gcc-aarch64-linux-gnu`
-
-The binary (i.e `*.out`) can then be generated from a C source file using:
-
-`aarch64-linux-gnu-gcc *.c -o *.out`
-
-See [src/test/correct/liftone.sh](https://github.com/UQ-PAC/bil-to-boogie-translator/blob/main/src/test/correct/liftone.sh) for more examples
-for flag combinations that work. 
-
-## Verifying the generated Boogie file
-
-[Boogie can be installed through dotnet and requires dotnet 6](tool-installation.md)
-
-Boogie can be run on the output `*.bpl` file with the command `boogie \useArrayAxioms *.bpl`. 
-
-The `\useArrayAxioms` flag is necessary for Boogie versions 2.16.8 and greater; for earlier versions it can be removed.
-This improves the verification speed, by using Boogie's axiomatic encoding of arrays, rather than z3's. 
-This encoding does not support extensionality, array extensionality can be disabled on newer versions of boogie with:
-
-```
-boogie example.bpl /proverOpt:O:smt.array.extensional=false
-```
-
-## Other useful commands 
-
-To compile a C file without the global offset table being used in address calculation, use the following command:
-
-`aarch64-linux-gnu-gcc -fno-plt -fno-pic *.c -o *.out`
-
-To produce assembly from the binary, use either of the following commands:
-
-`aarch64-linux-gnu-objdump -d *.out`
-
-`bap *.out -d asm`
-
-To view the hex dump of the data section of the binary:
-
-`readelf -x .data *.out`
-
-To produce a BIR (BAP Intermediate Representation) file (which contains similar information to the BAP ADT file but is more human-readable):
-
-`bap *.out -d:*.bir`
-
-To compile a C file with the stack guard turned off:
-
-`aarch64-linux-gnu-gcc -fno-stack-protector -fno-plt -fno-pic *.c -o *.out`
-
-To produce a translation to BIL (BAP Intermediate Language) for one instruction at a time:
-
-`bap objdump *.out --show-{memory,bil,insn}`
 
 ## Managing docker containers
 

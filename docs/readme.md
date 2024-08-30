@@ -6,6 +6,7 @@
 Below is an overview of the BASIL project and its theoretical background. 
 To get started on development, see [development](development).
 
+- [usage](usage.md) Basil binary lifting & usage guide
 - [development](development/readme.md) Explanation of common development tasks
     - [project-layout](development/project-layout.md) Organisation of the source code
     - [editor-setup](development/editor-setup.md) Guide to basil development in IDEs 

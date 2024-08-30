@@ -24,6 +24,8 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
   protected def isExit(exit: CFGPosition): Boolean
   protected def getAfterCalls(exit: EE): Set[R]
 
+  def phase2Init = valuelattice.top
+
   /**
    * Phase 1 of the IDE algorithm.
    * Computes Path functions and Summary functions
@@ -150,7 +152,7 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
      */
     lazy val summaries: mutable.Map[Procedure, mutable.Map[DL, mutable.Map[DL, EdgeFunction[T]]]] = phase1.summaries()
 
-    def init: T = lattice.sublattice.top
+    def init: T = phase2Init
 
     def process(n: (CFGPosition, DL)): Unit = {
       val xnd = x(n)
@@ -162,9 +164,11 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
 
         edgesCallToEntry(call, entry)(d).foreach { (d2, e) =>
           propagate(e(xnd), (entry, d2))
-          summaries(IRWalk.procedure(entry))(d2).foreach { (d3, e2) =>
-            edgesExitToAfterCall(entryToExit(entry), ret)(d3).foreach { (d4, e3) =>
-              propagate(e3(e2(e(xnd))), (ret, d4))
+          summaries.get(IRWalk.procedure(entry)).foreach {
+            _(d2).foreach { (d3, e2) =>
+              edgesExitToAfterCall(entryToExit(entry), ret)(d3).foreach { (d4, e3) =>
+                propagate(e3(e2(e(xnd))), (ret, d4))
+              }
             }
           }
         }
@@ -207,7 +211,7 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
   extends IDESolver[Procedure, Return, DirectCall, Command, D, T, L](program, program.mainProcedure),
     ForwardIDEAnalysis[D, T, L], IRInterproceduralForwardDependencies {
 
-  protected def entryToExit(entry: Procedure): Return = IRWalk.lastInProc(entry).asInstanceOf[Return]
+  protected def entryToExit(entry: Procedure): Return = IRWalk.lastInProc(entry).get.asInstanceOf[Return]
 
   protected def exitToEntry(exit: Return): Procedure = IRWalk.procedure(exit)
 
@@ -225,7 +229,7 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
 
   protected def isCall(call: CFGPosition): Boolean =
     call match
-      case directCall: DirectCall if (!directCall.successor.isInstanceOf[Unreachable]) => true
+      case directCall: DirectCall if (!directCall.successor.isInstanceOf[Unreachable] && directCall.target.returnBlock.isDefined && directCall.target.entryBlock.isDefined) => true
       case _ => false
 
   protected def isExit(exit: CFGPosition): Boolean =
@@ -234,13 +238,13 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
       case command: Return => true
       case _ => false
 
-  protected def getAfterCalls(exit: IndirectCall): Set[Command] =
+  protected def getAfterCalls(exit: Return): Set[Command] =
     InterProcIRCursor.succ(exit).filter(_.isInstanceOf[Command]).map(_.asInstanceOf[Command])
 }
 
 
 abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program)
-  extends IDESolver[Return, Procedure, Command, DirectCall, D, T, L](program, IRWalk.lastInProc(program.mainProcedure)),
+  extends IDESolver[Return, Procedure, Command, DirectCall, D, T, L](program, IRWalk.lastInProc(program.mainProcedure).get),
     BackwardIDEAnalysis[D, T, L], IRInterproceduralBackwardDependencies {
 
   protected def entryToExit(entry: Return): Procedure = IRWalk.procedure(entry)

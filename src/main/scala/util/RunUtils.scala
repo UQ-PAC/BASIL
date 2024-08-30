@@ -58,7 +58,8 @@ case class StaticAnalysisContext(
     steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
 )
 
 /** Results of the main program execution.
@@ -193,15 +194,16 @@ object IRTransform {
         externalNamesLibRemoved.add(e.split('@')(0))
       }
     }
-    val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
-    val renamer = Renamer(boogieReserved)
 
     cilvisitor.visit_prog(transforms.ReplaceReturns(), ctx.program)
-    transforms.addReturnBlocks(ctx.program, true) // add return to all blocks because IDE solver expects it
+    transforms.addReturnBlocks(ctx.program)
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
 
+    val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
+    val renamer = Renamer(boogieReserved)
     externalRemover.visitProgram(ctx.program)
     renamer.visitProgram(ctx.program)
+
     ctx
   }
 
@@ -226,6 +228,35 @@ object IRTransform {
     assert(invariant.singleCallBlockEnd(ctx.program))
   }
 
+  def generateProcedureSummaries(
+    ctx: IRContext,
+    IRProgram: Program,
+    constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
+  ): Boolean = {
+    var modified = false
+    // Need to know modifies clauses to generate summaries, but this is probably out of place
+    val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
+    ctx.program.setModifies(specModifies)
+
+    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
+    val summaryGenerator = SummaryGenerator(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, varDepsSummaries)
+    IRProgram.procedures.filter {
+      p => p != IRProgram.mainProcedure
+    }.foreach {
+      procedure => {
+        val req = summaryGenerator.generateRequires(procedure)
+        modified = modified | procedure.requires != req
+        procedure.requires = req
+
+        val ens = summaryGenerator.generateEnsures(procedure)
+        modified = modified | procedure.ensures != ens
+        procedure.ensures = ens
+      }
+    }
+
+    modified
+  }
 
 }
 
@@ -289,6 +320,11 @@ object StaticAnalysis {
     Logger.info("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationSolver(IRProgram)
     val constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = constPropSolver.analyze()
+
+    Logger.info("[!] Variable dependency summaries")
+    val scc = stronglyConnectedComponents(CallGraph, List(IRProgram.mainProcedure))
+    val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
+    var varDepsSummaries = VariableDependencyAnalysis(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, scc).analyze()
 
     val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
     val newCPResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = ilcpsolver.analyze()
@@ -369,13 +405,19 @@ object StaticAnalysis {
     val vsaSolver = ValueSetAnalysisSolver(IRProgram, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
-    Logger.info("[!] Running Interprocedural Live Variables Analysis")
-    val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
-    // val interLiveVarsResults = Map[CFGPosition, Map[Variable, TwoElement]]()
+    var paramResults: Map[Procedure, Set[Variable]] = Map.empty
+    var interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = Map.empty
 
-    Logger.info("[!] Running Parameter Analysis")
-    val paramResults = ParamAnalysis(IRProgram).analyze()
-    // val paramResults = Map[Procedure, Set[Variable]]()
+    if (IRProgram.mainProcedure.blocks.nonEmpty) {
+      Logger.info("[!] Running Interprocedural Live Variables Analysis")
+      interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
+
+      Logger.info("[!] Running Parameter Analysis")
+      paramResults = ParamAnalysis(IRProgram).analyze()
+
+    } else {
+      Logger.warn(s"Disabling IDE solver tests due to external main procedure: ${IRProgram.mainProcedure.name}")
+    }
 
     StaticAnalysisContext(
       constPropResult = constPropResult,
@@ -387,7 +429,8 @@ object StaticAnalysis {
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,
       memoryRegionContents = memoryRegionContents,
-      reachingDefs = reachingDefinitionsAnalysisResults
+      reachingDefs = reachingDefinitionsAnalysisResults,
+      varDepsSummaries = varDepsSummaries,
     )
   }
 
@@ -503,6 +546,10 @@ object RunUtils {
         result.reachingDefs,
         ctx.program
       )
+      Logger.info("[!] Generating Procedure Summaries")
+      if (config.summariseProcedures) {
+        IRTransform.generateProcedureSummaries(ctx, ctx.program, result.constPropResult, result.varDepsSummaries)
+      }
       if (modified) {
         iteration += 1
         Logger.info(s"[!] Analysing again (iter $iteration)")

@@ -164,7 +164,7 @@ implementation main()
     R8, Gamma_R8 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 12bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 12bv64));
     R10, Gamma_R10 := zero_extend32_32(memory_load32_le(stack, bvadd64(R31, 8bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 8bv64));
     assert Gamma_R10;
-    goto $main$__0__$cbaW_N42Q0ecmUdVUz6rsw$__1, $main$__0__$cbaW_N42Q0ecmUdVUz6rsw$__0;
+    goto $main$__0__$cbaW_N42Q0ecmUdVUz6rsw$__0, $main$__0__$cbaW_N42Q0ecmUdVUz6rsw$__1;
   $main$__0__$cbaW_N42Q0ecmUdVUz6rsw$__0:
     assume {:captureState "$main$__0__$cbaW_N42Q0ecmUdVUz6rsw$__0"} true;
     assume (R10[32:0] == 0bv32);

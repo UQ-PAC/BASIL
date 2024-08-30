@@ -66,7 +66,9 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     var IRProgram = IRTranslator.translate
     IRProgram = ExternalRemover(externalFunctions.map(e => e.name)).visitProgram(IRProgram)
     IRProgram = Renamer(Set("free")).visitProgram(IRProgram)
-    // transforms.stripUnreachableFunctions(IRProgram)
+    //IRProgram.stripUnreachableFunctions()
+    val stackIdentification = StackSubstituter()
+    stackIdentification.visitProgram(IRProgram)
     IRProgram.setModifies(Map())
 
     (IRProgram, globals)
@@ -434,7 +436,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
      Logger.setLevel(LogLevel.WARN)
      val fib = fibonacciProg(8)
-     val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get)
+     val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get).get
      val bp = BreakPoint("Fibentry",  BreakPointLoc.CMDCond(watch, BinaryExpr(BVEQ, BitVecLiteral(5, 64), Register("R0", 64))), BreakPointAction(true, true, List(Register("R0", 64)), true))
      // val interp = LayerInterpreter(NormalInterpreter, RememberBreakpoints(NormalInterpreter, List(bp)))
      // val res = InterpFuns.interpretProg(interp)(fib, (InterpreterState(), List()))
