@@ -407,13 +407,20 @@ object StaticAnalysis {
     val vsaSolver = ValueSetAnalysisSolver(IRProgram, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
-    Logger.info("[!] Running Interprocedural Live Variables Analysis")
-    val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
-    // val interLiveVarsResults = Map[CFGPosition, Map[Variable, TwoElement]]()
 
-    Logger.info("[!] Running Parameter Analysis")
-    val paramResults = ParamAnalysis(IRProgram).analyze()
-    // val paramResults = Map[Procedure, Set[Variable]]()
+    var paramResults: Map[Procedure, Set[Variable]] = Map.empty
+    var interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = Map.empty
+
+    if (IRProgram.mainProcedure.blocks.nonEmpty) {
+      Logger.info("[!] Running Interprocedural Live Variables Analysis")
+      interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
+
+      Logger.info("[!] Running Parameter Analysis")
+      paramResults = ParamAnalysis(IRProgram).analyze()
+
+    } else {
+      Logger.warn(s"Disabling IDE solver tests due to external main procedure: ${IRProgram.mainProcedure.name}")
+    }
 
     StaticAnalysisContext(
       constPropResult = constPropResult,
