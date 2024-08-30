@@ -73,8 +73,9 @@ object IRWalk:
   def lastInBlock(p: Block): Command = p.jump
   def firstInBlock(p: Block): Command = p.statements.headOption.getOrElse(p.jump)
 
-  def firstInProc(p: Procedure): Command = firstInBlock(p.entryBlock.get)
-  def lastInProc(p: Procedure): Command = lastInBlock(p.returnBlock.get)
+  def firstInProc(p: Procedure): Option[Command] = p.entryBlock.map(firstInBlock)
+  def lastInProc(p: Procedure): Option[Command] = p.returnBlock.map(lastInBlock)
+
 
 // extension (p: Block)
 //   def isProcEntry: Boolean = p.parent.entryBlock.contains(p)

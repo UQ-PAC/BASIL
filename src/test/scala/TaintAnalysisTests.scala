@@ -47,11 +47,11 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R0))
     val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f)) == None)
+    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get) == None)
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f)) == Some(baseRegisterMap - R0))
+    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap - R0))
   }
 
   test("arguments") {
@@ -81,11 +81,11 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R0))
     val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f)) == Some(Set(R0)))
+    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get) == Some(Set(R0)))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f)) == Some(baseRegisterMap + (R0 -> Set(R0, R1))))
+    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap + (R0 -> Set(R0, R1))))
   }
 
   test("branching") {
@@ -122,11 +122,11 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R1))
     val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f)) == Some(Set(R0, R1)))
+    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get) == Some(Set(R0, R1)))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f)) == Some(baseRegisterMap + (R0 -> Set(R1, R2))))
+    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap + (R0 -> Set(R1, R2))))
   }
 
   test("interproc") {
@@ -174,11 +174,11 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R1))
     val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f)) == Some(Set(R0, R1)))
+    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get) == Some(Set(R0, R1)))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f)) == Some(baseRegisterMap + (R0 -> Set(R1, R2)) + (R1 -> Set(R1, R2))))
+    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap + (R0 -> Set(R1, R2)) + (R1 -> Set(R1, R2))))
   }
 
   test("loop") {
@@ -215,10 +215,10 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R1))
     val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f)) == Some(Set(R1)))
+    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get) == Some(Set(R1)))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f)) == Some(baseRegisterMap + (R0 -> Set(R2))))
+    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap + (R0 -> Set(R2))))
   }
 }

@@ -194,14 +194,16 @@ object IRTransform {
         externalNamesLibRemoved.add(e.split('@')(0))
       }
     }
+
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), ctx.program)
+    transforms.addReturnBlocks(ctx.program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
+
     val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
     val renamer = Renamer(boogieReserved)
     externalRemover.visitProgram(ctx.program)
     renamer.visitProgram(ctx.program)
 
-    cilvisitor.visit_prog(transforms.ReplaceReturns(), ctx.program)
-    transforms.addReturnBlocks(ctx.program, true) // add return to all blocks because IDE solver expects it
-    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
 
     ctx
   }

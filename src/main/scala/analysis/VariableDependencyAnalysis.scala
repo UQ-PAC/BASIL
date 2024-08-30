@@ -116,11 +116,11 @@ class VariableDependencyAnalysis(
   def analyze(): Map[Procedure, Map[Taintable, Set[Taintable]]] = {
     var varDepsSummaries = Map[Procedure, Map[Taintable, Set[Taintable]]]()
     var varDepsSummariesTransposed = Map[Procedure, Map[Taintable, Set[Taintable]]]()
-    scc.flatten.foreach {
+    scc.flatten.filter(_.blocks.nonEmpty).foreach {
       procedure => {
         Logger.info("Generating variable dependencies for " + procedure)
         val varDepResults = ProcVariableDependencyAnalysis(program, varDepVariables, globals, constProp, varDepsSummariesTransposed, procedure).analyze()
-        val varDepMap = varDepResults.getOrElse(IRWalk.lastInProc(procedure), Map())
+        val varDepMap = varDepResults.getOrElse(IRWalk.lastInProc(procedure).getOrElse(procedure), Map())
         varDepsSummaries += procedure -> varDepMap
         varDepsSummariesTransposed += procedure -> varDepMap.foldLeft(Map[Taintable, Set[Taintable]]()) {
           (m, p) => {
