@@ -229,7 +229,7 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
 
   protected def isCall(call: CFGPosition): Boolean =
     call match
-      case directCall: DirectCall if (!directCall.successor.isInstanceOf[Unreachable]) => true
+      case directCall: DirectCall if (!directCall.successor.isInstanceOf[Unreachable] && directCall.target.returnBlock.isDefined) => true
       case _ => false
 
   protected def isExit(exit: CFGPosition): Boolean =
@@ -238,7 +238,7 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
       case command: Return => true
       case _ => false
 
-  protected def getAfterCalls(exit: IndirectCall): Set[Command] =
+  protected def getAfterCalls(exit: Return): Set[Command] =
     InterProcIRCursor.succ(exit).filter(_.isInstanceOf[Command]).map(_.asInstanceOf[Command])
 }
 

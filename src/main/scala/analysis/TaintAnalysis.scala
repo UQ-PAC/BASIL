@@ -106,11 +106,11 @@ trait TaintAnalysisFunctions(
     Map(d -> IdEdge())
   }
 
-  def edgesExitToAfterCall(exit: IndirectCall, aftercall: GoTo)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
+  def edgesExitToAfterCall(exit: Return, aftercall: Command)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     Map(d -> IdEdge())
   }
 
-  def edgesCallToAfterCall(call: DirectCall, aftercall: GoTo)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
+  def edgesCallToAfterCall(call: DirectCall, aftercall: Command)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     Map(d -> IdEdge())
   }
 

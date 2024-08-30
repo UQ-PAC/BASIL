@@ -142,7 +142,7 @@ class SummaryGenerator(
     // Use rnaResults to find stack function arguments
     val tainters = relevantVars.map {
       v => (v, Set())
-    }.toMap ++ getTainters(procedure, variables ++ rnaResults(procedure.begin) + UnknownMemory()).filter { (variable, taints) =>
+    }.toMap ++ getTainters(procedure, variables ++ rnaResults(IRWalk.firstInProc(procedure)) + UnknownMemory()).filter { (variable, taints) =>
       relevantVars.contains(variable)
     }
 
