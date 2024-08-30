@@ -50,10 +50,11 @@ object State {
     case Left(e) => (s, Left(e))
   })
   def execute[S, A, E](s: S, c: State[S,A, E]) : S = c.f(s)._1
-  def evaluate[S, A, E](s: S, c: State[S,A, E])  : A = c.f(s)._2 match {
-    case Right(r) => r
-    case Left(l) => throw Exception(s"Evaluation error $l")
-  }
+  // def evaluate[S, A, E](s: S, c: State[S,A, E])  : A = c.f(s)._2 match {
+  //   case Right(r) => r
+  //   case Left(l) => throw Exception(s"Evaluation error $l")
+  // }
+  def evaluate[S, A, E](s: S, c: State[S,A, E])  : Either[E,A] = c.f(s)._2
 
   def setError[S,A,E](e: E) : State[S,A,E] =  State(s => (s, Left(e)))
 

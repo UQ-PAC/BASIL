@@ -18,11 +18,11 @@ enum BreakPointLoc:
   case CMD(c: Command)
   case CMDCond(c: Command, condition: Expr)
 
-case class BreakPointAction(saveState: Boolean = true, stop: Boolean = false, evalExprs: List[Expr] = List(), log: Boolean = false)
+case class BreakPointAction(saveState: Boolean = true, stop: Boolean = false, evalExprs: List[(String,Expr)] = List(), log: Boolean = false)
 
 case class BreakPoint(name: String = "", location: BreakPointLoc, action: BreakPointAction)
 
-case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, val breaks: List[BreakPoint]) extends NopEffects[(T, List[(BreakPoint, Option[T], List[(Expr, Expr)])]), InterpreterError] {
+case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, val breaks: List[BreakPoint]) extends NopEffects[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), InterpreterError] {
 
 
   def findBreaks[R](c: Command) : State[(T,R), List[BreakPoint], InterpreterError]  = {
@@ -33,18 +33,18 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, v
     }, breaks)
   }
 
-  override def interpretOne : State[(T, List[(BreakPoint, Option[T], List[(Expr, Expr)])]), Unit, InterpreterError] = for {
+  override def interpretOne : State[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), Unit, InterpreterError] = for {
     v : ExecutionContinuation <- doLeft(f.getNext)
     n <- v match {
       case Run(s) => for {
         breaks : List[BreakPoint] <- findBreaks(s)
-        res <- State.sequence[(T, List[(BreakPoint, Option[T], List[(Expr, Expr)])]), Unit, InterpreterError](State.pure(()), 
+        res <- State.sequence[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), Unit, InterpreterError](State.pure(()), 
           breaks.map((breakpoint: BreakPoint) => (breakpoint match {
             case breakpoint @ BreakPoint(name, stopcond, action) => (for {
                 saved <- doLeft(if action.saveState then State.getS[T, InterpreterError].map(s => Some(s)) else State.pure(None))
-                evals <- (State.mapM((e:Expr) => for {
-                  ev <- doLeft(Eval.evalExpr(f)(e))
-                  } yield (e, ev)
+                evals <- (State.mapM((e:(String, Expr)) => for {
+                  ev <- doLeft(Eval.evalExpr(f)(e._2))
+                  } yield (e._1, e._2, ev)
                 , action.evalExprs))
                 _ <- if action.stop then doLeft(f.setNext(Errored(s"Stopped at breakpoint ${name}"))) else doLeft(State.pure(()))
                 _ <- State.pure({
@@ -56,11 +56,11 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, v
                     }
                     val saving = if action.saveState then " stashing state, " else ""
                     val stopping = if action.stop then " stopping. " else ""
-                    val evalstr = evals.map(e => s"\n  eval(${e._1}) = ${e._2}").mkString("")
+                    val evalstr = evals.map(e => s"\n  ${e._1} : eval(${e._2}) = ${e._3}").mkString("")
                     Logger.warn(s"Breakpoint $bpn@$bpcond.$saving$stopping$evalstr")
                   }
                 })
-                _ <-  State.modify ((istate:(T, List[(BreakPoint, Option[T], List[(Expr, Expr)])])) => 
+                _ <-  State.modify ((istate:(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])])) => 
                     (istate._1, ((breakpoint, saved, evals)::istate._2)))
               } yield ()
               )
@@ -73,7 +73,9 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, v
 }
 
 
-def interpretWithBreakPoints[I](p: Program, breakpoints: List[BreakPoint], innerInterpreter: Effects[I, InterpreterError], innerInitialState: I) : (I, List[(BreakPoint, Option[I], List[(Expr, Expr)])]) = {
+def interpretWithBreakPoints[I](p: Program, breakpoints: List[BreakPoint], 
+  innerInterpreter: Effects[I, InterpreterError], 
+  innerInitialState: I) : (I, List[(BreakPoint, Option[I], List[(String, Expr, Expr)])]) = {
    val interp = LayerInterpreter(innerInterpreter, RememberBreakpoints(innerInterpreter, breakpoints))
    val res = InterpFuns.interpretProg(interp)(p, (innerInitialState, List()))
    res

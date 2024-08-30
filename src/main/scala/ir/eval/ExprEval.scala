@@ -262,6 +262,9 @@ class StatelessLoader[E](getVar: Variable => Option[Literal], loadMem: (Memory, 
 
 def partialEvalExpr(exp: Expr, variableAssignment: Variable => Option[Literal], memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a,b,c,d) => None)): Expr = {
   val l = StatelessLoader(variableAssignment, memory)
-  State.evaluate((), statePartialEvalExpr(l)(exp))
+  State.evaluate((), statePartialEvalExpr(l)(exp)) match {
+    case Right(e) => e
+    case Left(e) => throw Exception("Unable to evaluate expr : " + e.toString)
+  }
 }
 

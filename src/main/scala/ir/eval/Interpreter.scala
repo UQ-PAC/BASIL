@@ -334,7 +334,7 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
     Logger.debug(s"    eff : FIND PROC $addr")
     for {
       res: List[BasilValue] <- getE((s: InterpreterState) =>
-        s.memoryState.doLoad("funtable", List(Scalar(BitVecLiteral(addr, 64))))
+        s.memoryState.doLoad("ghost-funtable", List(Scalar(BitVecLiteral(addr, 64))))
       )
     } yield {
       res match {

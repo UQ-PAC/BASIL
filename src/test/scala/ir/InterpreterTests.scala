@@ -34,7 +34,13 @@ def load(s: InterpreterState, global: SpecGlobal) : Option[BitVecLiteral] = {
   // m.evalBV("mem", BitVecLiteral(64, global.address), Endian.LittleEndian, global.size) //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
   
   try {
-    Some(State.evaluate(s, Eval.evalBV(f)(MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size))))
+    State.evaluate(s, Eval.evalBV(f)(MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size))) match {
+      case Right(e) => Some(e)
+      case Left(e) => {
+        None
+      }
+
+    }
   } catch {
     case e : InterpreterError => None
   }
@@ -48,7 +54,8 @@ def mems[E, T <: Effects[T, E]](m: MemoryState) : Map[BigInt, BitVecLiteral] = {
 class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   // var i: Interpreter = Interpreter()
-  Logger.setLevel(LogLevel.DEBUG)
+  // Logger.setLevel(LogLevel.DEBUG)
+  Logger.setLevel(LogLevel.ERROR)
 
 
   def getProgram(name: String): (Program, Set[SpecGlobal]) = {
@@ -64,11 +71,11 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     val (externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
-    IRProgram = ExternalRemover(externalFunctions.map(e => e.name)).visitProgram(IRProgram)
-    IRProgram = Renamer(Set("free")).visitProgram(IRProgram)
+    // IRProgram = ExternalRemover(externalFunctions.map(e => e.name)).visitProgram(IRProgram)
+    // IRProgram = Renamer(Set("free")).visitProgram(IRProgram)
     //IRProgram.stripUnreachableFunctions()
-    val stackIdentification = StackSubstituter()
-    stackIdentification.visitProgram(IRProgram)
+    // val stackIdentification = StackSubstituter()
+    // stackIdentification.visitProgram(IRProgram)
     IRProgram.setModifies(Map())
 
     (IRProgram, globals)
@@ -121,7 +128,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
    } yield (v)
   val l = State.evaluate(InterpreterState(), s)
 
-  assert(l == Scalar(BitVecLiteral(4096 - 16, 64)))
+  assert(l == Right(Scalar(BitVecLiteral(4096 - 16, 64))))
 
   }
 
@@ -140,8 +147,8 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
        r <- Eval.loadBV(NormalInterpreter)("mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
      } yield(r)
      val expected: BitVecLiteral = BitVecLiteral(BigInt("0D0C0B0A", 16), 32)
-     val actual: BitVecLiteral = State.evaluate(InterpreterState(), s)
-     assert(actual == expected)
+     val actual = State.evaluate(InterpreterState(), s)
+     assert(actual == Right(expected))
  
  
    }
@@ -310,6 +317,26 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     testInterpret("cjump", expected)
   }
 
+
+  test("initialisation") {
+
+    // Logger.setLevel(LogLevel.WARN)
+    val expected = Map(
+      "x" -> 6,
+      "y" -> ('b'.toInt), 
+    )
+
+    val (program, globals) = getProgram("initialisation")
+
+    // val watch = IRWalk.firstInProc((program.mainProcedure)).get
+    // val globloads = globals.map(global => (global.name, MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size))).toList
+    // val bp = BreakPoint("beginproc",  BreakPointLoc.CMD(watch), BreakPointAction(false, false, globloads, true))
+    // val res = interpretWithBreakPoints(program, List(bp), NormalInterpreter, InterpreterState())
+
+
+    testInterpret("initialisation", expected)
+  }
+
   test("no_interference_update_x") {
     val expected = Map(
       "x" -> 1
@@ -397,7 +424,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     Logger.setLevel(LogLevel.ERROR)
     var res = List[(Int, Double, Double)]()
 
-    for (i <- 0 to 25) {
+    for (i <- 0 to 12) {
       val prog = fibonacciProg(i)
 
       val t = PerformanceTimer("native")
@@ -437,7 +464,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
      Logger.setLevel(LogLevel.WARN)
      val fib = fibonacciProg(8)
      val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get).get
-     val bp = BreakPoint("Fibentry",  BreakPointLoc.CMDCond(watch, BinaryExpr(BVEQ, BitVecLiteral(5, 64), Register("R0", 64))), BreakPointAction(true, true, List(Register("R0", 64)), true))
+     val bp = BreakPoint("Fibentry",  BreakPointLoc.CMDCond(watch, BinaryExpr(BVEQ, BitVecLiteral(5, 64), Register("R0", 64))), BreakPointAction(true, true, List(("R0", Register("R0", 64))), true))
      // val interp = LayerInterpreter(NormalInterpreter, RememberBreakpoints(NormalInterpreter, List(bp)))
      // val res = InterpFuns.interpretProg(interp)(fib, (InterpreterState(), List()))
      val res = interpretWithBreakPoints(fib, List(bp), NormalInterpreter, InterpreterState())

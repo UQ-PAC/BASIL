@@ -215,12 +215,14 @@ case object InterpFuns {
     val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
 
     for {
-      h <- s.storeVar("funtable", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
+      h <- s.storeVar("ghost-funtable", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
       h <- s.storeVar("mem", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
       i <- s.storeVar("stack", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
       j <- s.storeVar("R31", Scope.Global, Scalar(SP))
       k <- s.storeVar("R29", Scope.Global, Scalar(FP))
       l <- s.storeVar("R30", Scope.Global, Scalar(LR))
+      l <- s.storeVar("R0", Scope.Global, Scalar(BitVecLiteral(0, 64)))
+      l <- s.storeVar("R1", Scope.Global, Scalar(BitVecLiteral(0, 64)))
     } yield (l)
   }
 
@@ -236,7 +238,7 @@ case object InterpFuns {
                 mem,
                 Scalar(BitVecLiteral(memory.address, 64)),
                 memory.bytes.toList.map(Scalar(_)),
-                Endian.LittleEndian
+                Endian.BigEndian
               )
             )
         )
@@ -251,7 +253,7 @@ case object InterpFuns {
           .filter(p => p.blocks.nonEmpty && p.address.isDefined)
           .map((proc: Procedure) =>
             Eval.storeSingle(f)(
-              "funtable",
+              "ghost-funtable",
               Scalar(BitVecLiteral(proc.address.get, 64)),
               FunPointer(BitVecLiteral(proc.address.get, 64), proc.name, Run(IRWalk.firstInBlock(proc.entryBlock.get)))
             )
@@ -261,7 +263,10 @@ case object InterpFuns {
       mem <- initMemory("stack", p.initialMemory)
       mem <- initMemory("mem", p.readOnlyMemory)
       mem <- initMemory("stack", p.readOnlyMemory)
-      r <- f.call(p.mainProcedure.name, Run(IRWalk.firstInBlock(p.mainProcedure.entryBlock.get)), Stopped())
+      mainfun = {
+        p.mainProcedure
+      }
+      r <- f.call(mainfun.name, Run(IRWalk.firstInBlock(mainfun.entryBlock.get)), Stopped())
     } yield (r)
   }
 
@@ -334,7 +339,8 @@ case object InterpFuns {
               val block = dc.target.entryBlock.get
               f.call(dc.target.name, Run(block.statements.headOption.getOrElse(block.jump)), Run(dc.successor))
             } else {
-              f.setNext(Run(dc.successor))
+              f.setNext(EscapedControlFlow(dc))
+              //f.setNext(Run(dc.successor))
             }
         } yield (n)
       case ic: IndirectCall => {
@@ -356,12 +362,16 @@ case object InterpFuns {
   }
 
   def interpret[S, E, T <: Effects[S, E]](f: T, m: S): S = {
-    val next = State.evaluate(m, f.getNext)
-    Logger.debug(s"eval $next")
-    next match {
-      case Run(c) =>  interpret(f, State.execute(m, f.interpretOne))
-      case Stopped() => m
-      case errorstop => m
+    State.evaluate(m, f.getNext) match {
+      case Right(next) => {
+        Logger.debug(s"eval $next")
+        next match {
+          case Run(c) =>  interpret(f, State.execute(m, f.interpretOne))
+          case Stopped() => m
+          case errorstop => m
+        }
+      }
+      case Left(err) => m
     }
   }
 

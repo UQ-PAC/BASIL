@@ -31,47 +31,47 @@ case object Trace {
   }
 }
 
-case class TraceGen[E]() extends Effects[Trace, E] {
+case class TraceGen[E]() extends NopEffects[Trace, E] {
   /** Values are discarded by ProductInterpreter so do not matter */
-  def evalBV(e: Expr) = State.pure(BitVecLiteral(0,0))
+  //def evalBV(e: Expr) = State.pure(BitVecLiteral(0,0))
 
-  def evalInt(e: Expr) = State.pure(BigInt(0))
+  //def evalInt(e: Expr) = State.pure(BigInt(0))
 
-  def evalBool(e: Expr) = State.pure(false)
+  //def evalBool(e: Expr) = State.pure(false)
 
-  def loadVar(v: String) = for {
+  override def loadVar(v: String) = for {
     s <- Trace.add(ExecEffect.LoadVar(v))
   } yield (Scalar(FalseLiteral))
 
-  def loadMem(v: String, addrs: List[BasilValue])  = for {
+  override def loadMem(v: String, addrs: List[BasilValue])  = for {
     s <- Trace.add(ExecEffect.LoadMem(v, addrs))
   } yield (List())
 
-  def evalAddrToProc(addr: Int) = for {
-    s <- Trace.add(ExecEffect.FindProc(addr))
-  } yield (None)
+  //def evalAddrToProc(addr: Int) = for {
+  //  s <- Trace.add(ExecEffect.FindProc(addr))
+  //} yield (None)
 
-  def getNext = State.pure(Stopped())
+  // def getNext = State.pure(Stopped())
 
-  def setNext(c: ExecutionContinuation)  = State.pure(())
+  // def setNext(c: ExecutionContinuation)  = State.pure(())
 
-  def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = for {
+  override def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = for {
     s <- Trace.add(ExecEffect.Call(target, beginFrom, returnTo))
   } yield (())
 
-  def doReturn() = for {
+  override def doReturn() = for {
     s <- Trace.add(ExecEffect.Return)
   } yield (())
 
-  def storeVar(v: String, scope: Scope, value: BasilValue) = for {
+  override def storeVar(v: String, scope: Scope, value: BasilValue) = for {
     s <- Trace.add(ExecEffect.StoreVar(v, scope, value))
   } yield (())
 
-  def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = for {
-    s <- Trace.add(ExecEffect.StoreMem(vname, update))
+  override def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = for {
+    s <- if (!vname.startsWith("ghost")) Trace.add(ExecEffect.StoreMem(vname, update)) else State.pure(())
   } yield (())
 
-  def interpretOne = State.pure(())
+  // def interpretOne = State.pure(())
 }
 
 def tracingInterpreter = ProductInterpreter(NormalInterpreter, TraceGen())

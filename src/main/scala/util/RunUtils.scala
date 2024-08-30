@@ -215,13 +215,13 @@ object IRTransform {
 
     Logger.info("[!] Stripping unreachable")
     val before = ctx.program.procedures.size
-    transforms.stripUnreachableFunctions(ctx.program, config.procedureTrimDepth)
+    // transforms.stripUnreachableFunctions(ctx.program, config.procedureTrimDepth)
     Logger.info(
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
 
-    val stackIdentification = StackSubstituter()
-    stackIdentification.visitProgram(ctx.program)
+    // val stackIdentification = StackSubstituter()
+    // stackIdentification.visitProgram(ctx.program)
 
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
