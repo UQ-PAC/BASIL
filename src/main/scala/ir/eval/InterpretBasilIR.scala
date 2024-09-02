@@ -222,7 +222,7 @@ case object InterpFuns {
       val (offset, proc) = p
       val addr = proc.address match {
             case Some(x) => x
-            case None => println(s"No address for function ${proc.name} ${"%x".format(offset)}"); 0
+            case None => /* println(s"No address for function ${proc.name} ${"%x".format(offset)}"); */ 0
       }
       // im guessing proc.address will be undefined and we will have to choose one for our intrinsic libc funcs
       (offset, FunPointer(BitVecLiteral(addr, 64), proc.name, Run(DirectCall(proc)))) 
