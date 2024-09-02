@@ -1,5 +1,6 @@
 
 import ir.*
+import ir.eval._
 import java.io.{BufferedWriter, File, FileWriter}
 import ir.Endian.LittleEndian
 import org.scalatest.*
@@ -21,7 +22,7 @@ class DifferentialIndirectCall extends AnyFunSuite {
 
   Logger.setLevel(LogLevel.WARN)
 
-  def diffTest(initial: Program, transformed: Program) = {
+  def diffTest(initial: IRContext, transformed: IRContext) = {
     val (initialRes,traceInit) = interpretTrace(initial)
     val (result,traceRes) = interpretTrace(transformed)
 
@@ -61,8 +62,8 @@ class DifferentialIndirectCall extends AnyFunSuite {
     )
 
 
-    val program = loadAndTranslate(basilConfigNoAnalysis).ir.program
-    val compare = loadAndTranslate(basilConfig).ir.program
+    val program = loadAndTranslate(basilConfigNoAnalysis).ir
+    val compare = loadAndTranslate(basilConfig).ir
     diffTest(program, compare)
 
   }

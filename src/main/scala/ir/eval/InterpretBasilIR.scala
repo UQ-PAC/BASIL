@@ -2,6 +2,7 @@ package ir.eval
 import ir._
 import ir.eval.BitVectorEval.*
 import ir.*
+import util.IRContext
 import util.Logger
 import util.functional.*
 import util.functional.State.*
@@ -204,6 +205,42 @@ case object Eval {
 
 case object InterpFuns {
 
+
+  def initRelocTable[S, E, T <: Effects[S, E]](s: T)(p: Program, reladyn: Set[(BigInt, String)]): State[S, Unit, E] = {
+
+    val data = reladyn.toList.flatMap(r => {
+      val (offset, extfname) = r
+      p.procedures.find(proc => proc.name == extfname).map(p => (offset, p)).toList
+    })
+
+    // TODO: will have to store 
+    //  mem[rodata addr] = naddr
+    //  ghost-funtable[naddr] = FunPointer - to intrinsic function
+    // We could also dynamic link against something like musl, for things like string.h
+
+    val fptrs = data.map((p) => {
+      val (offset, proc) = p
+      val addr = proc.address match {
+            case Some(x) => x
+            case None => println(s"No address for function ${proc.name} ${"%x".format(offset)}"); 0
+      }
+      // im guessing proc.address will be undefined and we will have to choose one for our intrinsic libc funcs
+      (offset, FunPointer(BitVecLiteral(addr, 64), proc.name, Run(DirectCall(proc)))) 
+    })
+
+    val stores = fptrs.map((p) =>{
+      val (offset, fptr) = p
+      Eval.storeSingle[S,E,T](s)(
+        "mem",
+        Scalar(BitVecLiteral(offset, 64)),
+        fptr
+    )})
+
+    for {
+      _ <- State.sequence[S,Unit,E](State.pure(()), stores)
+    } yield ()
+  }
+
   /** Functions which compile BASIL IR down to the minimal interpreter effects.
     *
     * Each function takes as parameter an implementation of Effects[S]
@@ -339,7 +376,7 @@ case object InterpFuns {
               val block = dc.target.entryBlock.get
               f.call(dc.target.name, Run(block.statements.headOption.getOrElse(block.jump)), Run(dc.successor))
             } else {
-              f.setNext(EscapedControlFlow(dc))
+              State.setError(InterpreterError(EscapedControlFlow(dc)))
               //f.setNext(Run(dc.successor))
             }
         } yield (n)
@@ -352,7 +389,7 @@ case object InterpFuns {
             fp <- f.evalAddrToProc(addr.value.toInt)
             _ <- fp match {
               case Some(fp) => f.call(fp.name, fp.call, Run(ic.successor))
-              case none     => f.setNext(EscapedControlFlow(ic))
+              case none     => State.setError(InterpreterError(EscapedControlFlow(ic)))
             }
           } yield ()
         }
@@ -377,12 +414,26 @@ case object InterpFuns {
 
   def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: Program, is: S): S = {
     val begin = State.execute(is, initialiseProgram(f)(p))
-    // State.execute[S,Unit](is, )
+    interpret(f, begin)
+  }
+
+
+  def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext, is: S): S = {
+    val st = for {
+      _ <- initialiseProgram(f)(p.program)
+      _ <- InterpFuns.initRelocTable(f)(p.program, p.externalFunctions.map(f => (f.offset, f.name)))
+    } yield ()
+    val begin = State.execute(is, st)
     interpret(f, begin)
   }
 }
 
 def interpret(IRProgram: Program): InterpreterState = {
+  InterpFuns.interpretProg(NormalInterpreter)(IRProgram, InterpreterState())
+}
+
+
+def interpret(IRProgram: IRContext): InterpreterState = {
   InterpFuns.interpretProg(NormalInterpreter)(IRProgram, InterpreterState())
 }
 

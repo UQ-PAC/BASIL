@@ -2,6 +2,7 @@ package ir.eval
 import ir._
 import ir.eval.BitVectorEval.*
 import ir.*
+import util.IRContext
 import util.Logger
 import util.functional.*
 import util.functional.State.*
@@ -77,6 +78,11 @@ case class TraceGen[E]() extends NopEffects[Trace, E] {
 def tracingInterpreter = ProductInterpreter(NormalInterpreter, TraceGen())
 
 def interpretTrace(p: Program) : (InterpreterState, Trace) = {
+  InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
+}
+
+
+def interpretTrace(p: IRContext) : (InterpreterState, Trace) = {
   InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
 }
 

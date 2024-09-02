@@ -7,6 +7,7 @@ import util.ILLoadingConfig
 import scala.jdk.CollectionConverters.*
 
 object ReadELFLoader {
+  // TODO: load NOTYPE symbols, so we can get _bss_start ... _bss_end to zero-init in interpreter, as well as _end to find bottom of heap
   def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
     val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableExtFunc(r)).toSet
     val relocationOffsets = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableOffsets(r)).toMap

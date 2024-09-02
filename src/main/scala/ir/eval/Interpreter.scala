@@ -31,9 +31,6 @@ case class MemoryError(val message: String = "") extends ExecutionContinuation /
 
 // type InterpreterError = EscapedControlFlow | Errored | TypeError | EvalError | MemoryError
 
-/** TODO: errors should be encapsualted in error monad, rather than mapping exceptions back into state transitions at
-  * State.execute()
-  */
 case class InterpreterError(continue: ExecutionContinuation) extends Exception()
 
 /* Concrete value type of the interpreter. */
