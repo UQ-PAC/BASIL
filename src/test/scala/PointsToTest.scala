@@ -42,7 +42,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
                   globals: Set[SpecGlobal] = Set.empty,
                   globalOffsets: Map[BigInt, BigInt] = Map.empty): StaticAnalysisContext = {
 
-    val ctx = IRContext(externalFunctions, globals, globalOffsets, Specification(Set(), Map(), List(), List(), List(), Set()), program)
+    val ctx = IRContext(List.empty, externalFunctions, globals, globalOffsets, Specification(Set(), Map(), List(), List(), List(), Set()), program)
     StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 1)
   }
 
