@@ -69,6 +69,8 @@ def interpretTrace(p: Program) : (InterpreterState, Trace) = {
 
 
 def interpretTrace(p: IRContext) : (InterpreterState, Trace) = {
-  InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
+  val b = InterpFuns.initProgState(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
+  // Throw away the trace of program initialisation
+  InterpFuns.interpret(tracingInterpreter, (b._1, Trace(List())))
 }
 

@@ -7,7 +7,7 @@ import util.Logger
 import util.functional.*
 import util.functional.State.*
 import boogie.Scope
-import scala.collection.WithFilter
+import collection.mutable.ArrayBuffer
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -262,7 +262,8 @@ object InterpFuns {
       (offset, FunPointer(BitVecLiteral(addr, 64), proc.name, Run(DirectCall(proc))))
     })
 
-    val stores = fptrs.map((p) => {
+    // sort for deterministic trace
+    val stores = fptrs.sortBy(f => f._1).map((p) => {
       val (offset, fptr) = p
       Eval.storeSingle[S, E, T](s)(
         "mem",
@@ -297,7 +298,7 @@ object InterpFuns {
   }
 
   def initialiseProgram[S, T <: Effects[S, InterpreterError]](f: T)(p: Program): State[S, Unit, InterpreterError] = {
-    def initMemory(mem: String, mems: Iterable[MemorySection]) = {
+    def initMemory(mem: String, mems: ArrayBuffer[MemorySection]) = {
       for {
         m <- State.sequence(
           State.pure(()),
@@ -468,10 +469,14 @@ object InterpFuns {
     }
   }
 
-  def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext, is: S): S = {
+  def initProgState[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext, is: S): S = {
     val st = (initialiseProgram(f)(p.program) >> initBSS(f)(p))
       >> InterpFuns.initRelocTable(f)(p.program, p.externalFunctions.map(f => (f.offset, f.name)))
-    val begin = State.execute(is, st)
+    State.execute(is, st)
+  }
+
+  def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext, is: S): S = {
+    val begin = initProgState(f)(p, is)
     interpret(f, begin)
   }
 }

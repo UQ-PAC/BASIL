@@ -34,7 +34,7 @@ def evalBVBinExpr(b: BVBinOp, l: BitVecLiteral, r: BitVecLiteral): BitVecLiteral
     case BVCOMP   => BitVectorEval.smt_bvcomp(l, r)
     case BVCONCAT => BitVectorEval.smt_concat(l, r)
     case BVULE | BVULT | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE | BVEQ | BVNEQ =>
-      throw Exception("Did not expect logical op")
+      throw IllegalArgumentException("Did not expect logical op")
   }
 }
 
@@ -51,7 +51,7 @@ def evalBVLogBinExpr(b: BVBinOp, l: BitVecLiteral, r: BitVecLiteral): Boolean = 
   case BVNEQ => BitVectorEval.smt_bvneq(l, r)
   case BVADD | BVSUB | BVMUL | BVUDIV | BVSDIV | BVSREM | BVUREM | BVSMOD | BVAND | BVOR | BVXOR | BVNAND | BVNOR |
       BVXNOR | BVSHL | BVLSHR | BVASHR | BVCOMP | BVCONCAT =>
-    throw Exception("Did not expect non-logical op")
+    throw IllegalArgumentException("Did not expect non-logical op")
 }
 
 def evalIntLogBinExpr(b: IntBinOp, l: BigInt, r: BigInt): Boolean = b match {
@@ -61,21 +61,16 @@ def evalIntLogBinExpr(b: IntBinOp, l: BigInt, r: BigInt): Boolean = b match {
   case IntLE                                      => l <= r
   case IntGT                                      => l > r
   case IntGE                                      => l >= r
-  case IntADD | IntSUB | IntMUL | IntDIV | IntMOD => throw Exception("Did not expect non-logical op")
+  case IntADD | IntSUB | IntMUL | IntDIV | IntMOD => throw IllegalArgumentException("Did not expect non-logical op")
 }
 
 def evalIntBinExpr(b: IntBinOp, l: BigInt, r: BigInt): BigInt = b match {
-  case IntADD => l + r
-  case IntSUB => l - r
-  case IntMUL => l * r
-  case IntDIV => l / r
-  case IntMOD => l % r
-  case IntEQ  => throw Exception("Did not expect logical op")
-  case IntNEQ => throw Exception("Did not expect logical op")
-  case IntLT  => throw Exception("Did not expect logical op")
-  case IntLE  => throw Exception("Did not expect logical op")
-  case IntGT  => throw Exception("Did not expect logical op")
-  case IntGE  => throw Exception("Did not expect logical op")
+  case IntADD                                         => l + r
+  case IntSUB                                         => l - r
+  case IntMUL                                         => l * r
+  case IntDIV                                         => l / r
+  case IntMOD                                         => l % r
+  case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => throw IllegalArgumentException("Did not expect logical op")
 }
 
 def evalBoolLogBinExpr(b: BoolBinOp, l: Boolean, r: Boolean): Boolean = b match {
