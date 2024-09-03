@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 class DifferentialAnalysis extends AnyFunSuite {
 
-  Logger.setLevel(LogLevel.WARN)
+  Logger.setLevel(LogLevel.DEBUG)
 
   def diffTest(initial: IRContext, transformed: IRContext) = {
     val (initialRes,traceInit) = interpretTrace(initial)
@@ -29,11 +29,12 @@ class DifferentialAnalysis extends AnyFunSuite {
 
     def filterEvents(trace: List[ExecEffect]) = {
       trace.collect {
+        case e @ ExecEffect.Call(_, _, _) => e
         case e @ ExecEffect.StoreMem("mem", _) => e
         case e @ ExecEffect.LoadMem("mem", _) => e
       }
     }
-    // println(traceInit.t.mkString("\n    "))
+    println((traceInit.t).mkString("\n"))
     assert(initialRes.nextCmd == Stopped())
     assert(result.nextCmd == Stopped())
     assert(Set.empty == initialRes.memoryState.getMem("mem").toSet.diff(result.memoryState.getMem("mem").toSet))

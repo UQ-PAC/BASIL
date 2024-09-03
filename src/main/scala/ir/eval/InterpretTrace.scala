@@ -35,9 +35,9 @@ case object Trace {
 case class TraceGen[E]() extends NopEffects[Trace, E] {
   /** Values are discarded by ProductInterpreter so do not matter */
 
-  override def loadVar(v: String) = for {
-    s <- Trace.add(ExecEffect.LoadVar(v))
-  } yield (Scalar(FalseLiteral))
+  // override def loadVar(v: String) = for {
+  //   s <- Trace.add(ExecEffect.LoadVar(v))
+  // } yield (Scalar(FalseLiteral))
 
   override def loadMem(v: String, addrs: List[BasilValue])  = for {
     s <- Trace.add(ExecEffect.LoadMem(v, addrs))
@@ -52,7 +52,7 @@ case class TraceGen[E]() extends NopEffects[Trace, E] {
   } yield (())
 
   override def storeVar(v: String, scope: Scope, value: BasilValue) = for {
-    s <- Trace.add(ExecEffect.StoreVar(v, scope, value))
+    s <- if (!v.startsWith("ghost")) Trace.add(ExecEffect.StoreVar(v, scope, value)) else State.pure(())
   } yield (())
 
   override def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = for {
@@ -67,10 +67,7 @@ def interpretTrace(p: Program) : (InterpreterState, Trace) = {
   InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
 }
 
-
 def interpretTrace(p: IRContext) : (InterpreterState, Trace) = {
-  val b = InterpFuns.initProgState(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
-  // Throw away the trace of program initialisation
-  InterpFuns.interpret(tracingInterpreter, (b._1, Trace(List())))
+  InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
 }
 

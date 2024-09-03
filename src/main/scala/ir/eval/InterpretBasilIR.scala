@@ -228,26 +228,33 @@ case object Eval {
 
 object InterpFuns {
 
-  def initRelocTable[S, E, T <: Effects[S, E]](s: T)(p: Program, reladyn: Set[(BigInt, String)]): State[S, Unit, E] = {
+  def initRelocTable[S, T <: Effects[S, InterpreterError]](s: T)(ctx: IRContext): State[S, Unit, InterpreterError] = {
 
-    val data = reladyn.toList.flatMap(r => {
-      val (offset, extfname) = r
-      p.procedures.find(proc => proc.name == extfname).map(p => (offset, p)).toList
-    })
+    val p = ctx.program
 
-    // TODO: will have to store
-    //  mem[rodata addr] = naddr
-    //  ghost-funtable[naddr] = FunPointer - to intrinsic function
-    // We could also dynamic link against something like musl, for things like string.h
+    val base = ctx.symbols.find(_.name == "__end__").get
+    var addr = base.value
+    var done = false
+    var x = List[(String, FunPointer)]()
 
-    val fptrs = data.map((p) => {
-      val (offset, proc) = p
-      val addr = proc.address match {
-        case Some(x) => x
-        case None    => /* println(s"No address for function ${proc.name} ${"%x".format(offset)}"); */ 0
-      }
-      // proc.address will be undefined and we will have to choose one for our intrinsic libc funcs
-      (offset, FunPointer(BitVecLiteral(addr, 64), proc.name, Run(DirectCall(proc))))
+    def newAddr() : BigInt = {
+      addr += 8
+      addr
+    }
+
+    for ((fname, fun) <- LibcIntrinsic.intrinsics) {
+      val name = fname.takeWhile(c => c != '@')
+      println(name)
+      x = (name, FunPointer(BitVecLiteral(newAddr(), 64), name, CallIntrinsic(name))) :: x
+    }
+
+    val intrinsics = x.toMap
+
+    val procs = p.procedures.filter(proc => proc.address.isDefined)
+
+    val fptrs = ctx.externalFunctions.toList.sortBy(_.name).flatMap(f => {
+      intrinsics.get(f.name).map(fp => (f.offset, fp))
+        .orElse(procs.find(p => p.name == f.name).map(proc => (f.offset, FunPointer(BitVecLiteral(proc.address.getOrElse(newAddr().toInt), 64), proc.name, Run(DirectCall(proc))))))
     })
 
     // sort for deterministic trace
@@ -255,14 +262,16 @@ object InterpFuns {
       .sortBy(f => f._1)
       .map((p) => {
         val (offset, fptr) = p
-        Eval.storeSingle[S, E, T](s)(
+        Eval.storeSingle(s)("ghost-funtable", Scalar(fptr.addr), fptr)
+        >> (Eval.storeBV(s)(
           "mem",
           Scalar(BitVecLiteral(offset, 64)),
-          fptr
-        )
+          fptr.addr,
+          Endian.LittleEndian
+        ))
       })
 
-    State.sequence[S, Unit, E](State.pure(()), stores)
+    State.sequence(State.pure(()), stores)
   }
 
   /** Functions which compile BASIL IR down to the minimal interpreter effects.
@@ -462,7 +471,7 @@ object InterpFuns {
 
   def initProgState[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext, is: S): S = {
     val st = (initialiseProgram(f)(p.program) >> initBSS(f)(p))
-      >> InterpFuns.initRelocTable(f)(p.program, p.externalFunctions.map(f => (f.offset, f.name)))
+      >> InterpFuns.initRelocTable(f)(p)
     State.execute(is, st)
   }
 
