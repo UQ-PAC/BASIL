@@ -10,7 +10,7 @@ import specification.SpecGlobal
 import translating.BAPToIR
 import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
-import util.ILLoadingConfig
+import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform} 
 
 // def initialMem(): MemoryState = {
 //   val SP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
@@ -58,8 +58,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   Logger.setLevel(LogLevel.ERROR)
 
 
-  def getProgram(name: String): (Program, Set[SpecGlobal]) = {
-
+  def getProgram(name: String): IRContext = {
     val loading = ILLoadingConfig(
       inputFile = s"examples/$name/$name.adt",
       relfFile = s"examples/$name/$name.relf",
@@ -67,24 +66,29 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       dumpIL = None
     )
 
-    val bapProgram = loadBAP(loading.inputFile)
-    val (symbols, externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)
-    val IRTranslator = BAPToIR(bapProgram, mainAddress)
-    var IRProgram = IRTranslator.translate
+    val p = IRLoading.load(loading)
+    val ctx = IRTransform.doCleanup(p)
+    // val bapProgram = loadBAP(loading.inputFile)
+    // val (symbols, externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)
+    // val IRTranslator = BAPToIR(bapProgram, mainAddress)
+    // var IRProgram = IRTranslator.translate
     // IRProgram = ExternalRemover(externalFunctions.map(e => e.name)).visitProgram(IRProgram)
     // IRProgram = Renamer(Set("free")).visitProgram(IRProgram)
     //IRProgram.stripUnreachableFunctions()
     // val stackIdentification = StackSubstituter()
     // stackIdentification.visitProgram(IRProgram)
-    IRProgram.setModifies(Map())
+    ctx.program.setModifies(Map())
 
-    (IRProgram, globals)
+
+    // (IRProgram, globals)
+    ctx
   }
 
   def testInterpret(name: String, expected: Map[String, Int]): Unit = {
-    val (program, globals) = getProgram(name)
-    val fstate = interpret(program)
+    val ctx = getProgram(name)
+    val fstate = interpret(ctx)
     val regs = fstate.memoryState.getGlobalVals
+    val globals = ctx.globals
 
     // Show interpreted result
     Logger.info("Registers:")
@@ -326,7 +330,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       "y" -> ('b'.toInt), 
     )
 
-    val (program, globals) = getProgram("initialisation")
+    // val (program, globals) = getProgram("initialisation")
 
     // val watch = IRWalk.firstInProc((program.mainProcedure)).get
     // val globloads = globals.map(global => (global.name, MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size))).toList

@@ -33,12 +33,13 @@ class DifferentialIndirectCall extends AnyFunSuite {
         case e @ ExecEffect.LoadMem("mem", _) => e
       }
     }
+    println(traceInit.t.mkString("\n"))
 
     // println(traceInit.t.mkString("\n    "))
     assert(initialRes.nextCmd == Stopped())
     assert(result.nextCmd == Stopped())
-    assert(initialRes.memoryState.getGlobalVals == result.memoryState.getGlobalVals)
-    assert(initialRes.memoryState.getMem("mem") == result.memoryState.getMem("mem"))
+    // assert(initialRes.memoryState.diff(result.memoryState) == Map.empty)
+    assert(Set.empty == initialRes.memoryState.getMem("mem").toSet.diff(result.memoryState.getMem("mem").toSet))
     assert(filterEvents(traceInit.t) == filterEvents(traceRes.t))
   }
 

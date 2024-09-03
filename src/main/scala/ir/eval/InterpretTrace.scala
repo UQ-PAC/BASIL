@@ -34,11 +34,6 @@ case object Trace {
 
 case class TraceGen[E]() extends NopEffects[Trace, E] {
   /** Values are discarded by ProductInterpreter so do not matter */
-  //def evalBV(e: Expr) = State.pure(BitVecLiteral(0,0))
-
-  //def evalInt(e: Expr) = State.pure(BigInt(0))
-
-  //def evalBool(e: Expr) = State.pure(false)
 
   override def loadVar(v: String) = for {
     s <- Trace.add(ExecEffect.LoadVar(v))
@@ -47,14 +42,6 @@ case class TraceGen[E]() extends NopEffects[Trace, E] {
   override def loadMem(v: String, addrs: List[BasilValue])  = for {
     s <- Trace.add(ExecEffect.LoadMem(v, addrs))
   } yield (List())
-
-  //def evalAddrToProc(addr: Int) = for {
-  //  s <- Trace.add(ExecEffect.FindProc(addr))
-  //} yield (None)
-
-  // def getNext = State.pure(Stopped())
-
-  // def setNext(c: ExecutionContinuation)  = State.pure(())
 
   override def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = for {
     s <- Trace.add(ExecEffect.Call(target, beginFrom, returnTo))
@@ -72,7 +59,6 @@ case class TraceGen[E]() extends NopEffects[Trace, E] {
     s <- if (!vname.startsWith("ghost")) Trace.add(ExecEffect.StoreMem(vname, update)) else State.pure(())
   } yield (())
 
-  // def interpretOne = State.pure(())
 }
 
 def tracingInterpreter = ProductInterpreter(NormalInterpreter, TraceGen())
@@ -85,5 +71,4 @@ def interpretTrace(p: Program) : (InterpreterState, Trace) = {
 def interpretTrace(p: IRContext) : (InterpreterState, Trace) = {
   InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
 }
-
 

@@ -29,8 +29,6 @@ case class EvalError(val message: String = "")
     extends ExecutionContinuation /* failed to evaluate an expression to a concrete value */
 case class MemoryError(val message: String = "") extends ExecutionContinuation /* An error to do with memory */
 
-// type InterpreterError = EscapedControlFlow | Errored | TypeError | EvalError | MemoryError
-
 case class InterpreterError(continue: ExecutionContinuation) extends Exception()
 
 /* Concrete value type of the interpreter. */
@@ -42,13 +40,14 @@ case class Scalar(val value: Literal) extends BasilValue(value.getType) {
   }
 }
 
-/** Slightly hacky way of mapping addresses to function calls within the interpreter dynamic state */
+/* Slightly hacky way of mapping addresses to function calls within the interpreter dynamic state */
 case class FunPointer(val addr: BitVecLiteral, val name: String, val call: ExecutionContinuation)
     extends BasilValue(addr.getType)
 
-// Erase the type of basil values and enforce the invariant that
-// \exists i . \forall v \in value.keys , v.irType = i  and
-// \exists j . \forall v \in value.values, v.irType = j
+/* Erase the type of basil values and enforce the invariant that
+   \exists i . \forall v \in value.keys , v.irType = i  and
+   \exists j . \forall v \in value.values, v.irType = j
+ */
 case class MapValue(val value: Map[BasilValue, BasilValue], override val irType: MapType) extends BasilValue(irType) {
   override def toString = s"MapValue : $irType"
 }
@@ -69,19 +68,9 @@ case object BasilValue {
       case _ if vr == 0              => Right(l)
       case Scalar(IntLiteral(vl))    => Right(Scalar(IntLiteral(vl + vr)))
       case Scalar(b1: BitVecLiteral) => Right(Scalar(eval.evalBVBinExpr(BVADD, b1, BitVecLiteral(vr, b1.size))))
-      case _ => Left(InterpreterError(TypeError(s"Operation add $vr undefined on $l")))
+      case _                         => Left(InterpreterError(TypeError(s"Operation add $vr undefined on $l")))
     }
   }
-
-  // def add(l: BasilValue, r: BasilValue): BasilValue = {
-  //   (l, r) match {
-  //     case (Scalar(IntLiteral(vl)), Scalar(IntLiteral(vr)))       => Scalar(IntLiteral(vl + vr))
-  //     case (Scalar(b1: BitVecLiteral), Scalar(b2: BitVecLiteral)) => Scalar(eval.evalBVBinExpr(BVADD, b1, b2))
-  //     case (Scalar(b1: BoolLit), Scalar(b2: BoolLit)) =>
-  //       Scalar(if (b2.value || b2.value) then TrueLiteral else FalseLiteral)
-  //     case _ => throw InterpreterError(TypeError(s"Operation add undefined on $l $r"))
-  //   }
-  // }
 }
 
 /** Minimal language defining all state transitions in the interpreter, defined for the interpreter's concrete state T.
@@ -133,9 +122,9 @@ trait NopEffects[T, E] extends Effects[T, E] {
   def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = State.pure(())
 }
 
-/** -------------------------------------------------------------------------------- Definition of concrete state
-  * --------------------------------------------------------------------------------
-  */
+/*--------------------------------------------------------------------------------
+ * Definition of concrete state
+ *--------------------------------------------------------------------------------*/
 
 type StackFrameID = String
 val globalFrame: StackFrameID = "GLOBAL"
@@ -255,7 +244,6 @@ case class MemoryState(
     }
   }
 
-
   /* Map variable accessing ; load and store operations */
   def doLoad(vname: String, addr: List[BasilValue]): Either[InterpreterError, List[BasilValue]] = for {
     v <- findVar(vname)
@@ -271,16 +259,6 @@ case class MemoryState(
          Left(InterpreterError(MemoryError(s"Read from uninitialised $vname[${addr.head} .. ${addr.last}]")))
        })
   } yield (xs)
-
-  // def doLoad[S](vname: String, addr: List[BasilValue]): State[S, List[BasilValue], InterpreterError] = for {
-  //   v <- doLoadOpt(vname, addr)
-  //   r <- v match {
-  //     case Some(vs) => vs
-  //     case None => {
-  //       throw InterpreterError(MemoryError(s"Read from uninitialised "))
-  //     }
-  //   }
-  // }
 
   /** typecheck and some fields of a map variable */
   def doStore(vname: String, values: Map[BasilValue, BasilValue]): Either[InterpreterError, MemoryState] = for {
@@ -407,10 +385,11 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
     Logger.debug(s"    eff : RETURN")
     modifyE((s: InterpreterState) => {
       s.callStack match {
-        case Nil     => Right(s.copy(nextCmd = Stopped()))
-        case h :: tl => for {
-          ms <- s.memoryState.popStackFrame()
-        } yield (s.copy(nextCmd = h, callStack = tl, memoryState = ms))
+        case Nil => Right(s.copy(nextCmd = Stopped()))
+        case h :: tl =>
+          for {
+            ms <- s.memoryState.popStackFrame()
+          } yield (s.copy(nextCmd = h, callStack = tl, memoryState = ms))
       }
     })
   }
@@ -420,31 +399,22 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
     State.modify((s: InterpreterState) => s.copy(memoryState = s.memoryState.defVar(v, scope, value)))
   }
 
-  def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = 
+  def storeMem(vname: String, update: Map[BasilValue, BasilValue]) =
     State.modifyE((s: InterpreterState) => {
-    Logger.debug(s"    eff : STORE ${formatStore(vname, update)}")
-    for {
-      ms <- s.memoryState.doStore(vname, update)
-    } yield(s.copy(memoryState = ms))
-  })
+      Logger.debug(s"    eff : STORE ${formatStore(vname, update)}")
+      for {
+        ms <- s.memoryState.doStore(vname, update)
+      } yield (s.copy(memoryState = ms))
+    })
 
   def interpretOne: State[InterpreterState, Unit, InterpreterError] = for {
     next <- getNext
     _ <- (next match {
-          case Run(c: Statement) => InterpFuns.interpretStatement(this)(c)
-          case Run(c: Jump)      => InterpFuns.interpretJump(this)(c)
-          case Stopped()         => State.pure(())
-          case errorstop         => State.pure(())
-      }).flatMapE((e: InterpreterError) => setNext(e.continue))
-      // } catch {
-      //   case InterpreterError(e)                   => setNext(e)
-      //   case e: java.lang.IllegalArgumentException => setNext(Errored(e.getStackTrace.take(5).mkString("\n")))
-      // }
+      case Run(c: Statement) => InterpFuns.interpretStatement(this)(c)
+      case Run(c: Jump)      => InterpFuns.interpretJump(this)(c)
+      case Stopped()         => State.pure(())
+      case errorstop         => State.pure(())
+    }).flatMapE((e: InterpreterError) => setNext(e.continue))
   } yield ()
 
 }
-
-// def interpretTrace(IRProgram: Program): TracingInterpreter = {
-//   val s: TracingInterpreter = InterpFuns.interpretProg(IRProgram, TracingInterpreter(InterpreterState(), List()))
-//   s
-//e
