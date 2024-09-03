@@ -75,7 +75,7 @@ case object Eval {
       res <- evalExpr(f)(e)
       r <- State.pureE(res match {
         case l: BitVecLiteral => Right(l)
-        case _                => Left(InterpreterError(Errored(s"Eval BV residual $e")))
+        case _                => Left((Errored(s"Eval BV residual $e")))
       })
     } yield (r)
   }
@@ -85,7 +85,7 @@ case object Eval {
       res <- evalExpr(f)(e)
       r <- State.pureE(res match {
         case l: IntLiteral => Right(l.value)
-        case _             => Left(InterpreterError(Errored(s"Eval Int residual $e")))
+        case _             => Left((Errored(s"Eval Int residual $e")))
       })
     } yield (r)
   }
@@ -95,7 +95,7 @@ case object Eval {
       res <- evalExpr(f)(e)
       r <- State.pureE(res match {
         case l: BoolLit => Right(l == TrueLiteral)
-        case _          => Left(InterpreterError(Errored(s"Eval Bool residual $e")))
+        case _          => Left((Errored(s"Eval Bool residual $e")))
       })
     } yield (r)
   }
@@ -109,7 +109,7 @@ case object Eval {
   )(vname: String, addr: Scalar, endian: Endian, count: Int): State[S, List[BasilValue], InterpreterError] = {
     for {
       _ <-
-        if (count == 0) then State.setError(InterpreterError(Errored(s"Attempted fractional load"))) else State.pure(())
+        if (count == 0) then State.setError((Errored(s"Attempted fractional load"))) else State.pure(())
       keys <- State.mapM(((i: Int) => State.pureE(BasilValue.unsafeAdd(addr, i))), (0 until count))
       values <- f.loadMem(vname, keys.toList)
       vals = endian match {
@@ -126,7 +126,7 @@ case object Eval {
     mem <- f.loadVar(vname)
     x <- mem match {
       case mapv @ MapValue(_, MapType(_, BitVecType(sz))) => State.pure((sz, mapv))
-      case _ => State.setError(InterpreterError(Errored("Trued to load-concat non bv")))
+      case _                                              => State.setError((Errored("Trued to load-concat non bv")))
     }
     (valsize, mapv) = x
 
@@ -140,7 +140,7 @@ case object Eval {
             case Scalar(bv @ BitVecLiteral(v, sz)) if sz == valsize => State.pure(bv)
             case c =>
               State.setError(
-                InterpreterError(TypeError(s"Loaded value of type ${c.irType} did not match expected type bv$valsize"))
+                TypeError(s"Loaded value of type ${c.irType} did not match expected type bv$valsize")
               )
           },
         res
@@ -171,7 +171,7 @@ case object Eval {
     x <- mem match {
       case m @ MapValue(_, MapType(kt, vt)) if kt == addr.irType && values.forall(v => v.irType == vt) =>
         State.pure((m, kt, vt))
-      case v => State.setError(InterpreterError(TypeError(s"Invalid map store operation to $vname : $v")))
+      case v => State.setError((TypeError(s"Invalid map store operation to $vname : $v")))
     }
     (mapval, keytype, valtype) = x
     keys <- State.mapM((i: Int) => State.pureE(BasilValue.unsafeAdd(addr, i)), (0 until values.size))
@@ -190,19 +190,22 @@ case object Eval {
       endian: Endian
   ): State[S, Unit, InterpreterError] = for {
     mem <- f.loadVar(vname)
-    (mapval, vsize) = mem match {
-      case m @ MapValue(_, MapType(kt, BitVecType(size))) if kt == addr.irType => (m, size)
+    mr <- mem match {
+      case m @ MapValue(_, MapType(kt, BitVecType(size))) if kt == addr.irType => State.pure((m, size))
       case v =>
-        throw InterpreterError(
+        State.setError(
           TypeError(
             s"Invalid map store operation to $vname : ${v.irType} (expect [${addr.irType}] <- ${value.getType})"
           )
         )
     }
+    (mapval, vsize) = mr
     cells = value.size / vsize
     _ = {
       if (cells < 1) {
-        throw InterpreterError(MemoryError("Tried to execute fractional store"))
+        State.setError((MemoryError("Tried to execute fractional store")))
+      } else {
+        State.pure(())
       }
     }
 
@@ -220,21 +223,6 @@ case object Eval {
       f: T
   )(vname: String, addr: BasilValue, value: BasilValue): State[S, Unit, E] = {
     f.storeMem(vname, Map((addr -> value)))
-  }
-}
-
-object LibcIntrinsic {
-
-  def putc[S, E, T <: Effects[S, E]](s: T)(f: BitVecLiteral, c: BitVecLiteral): State[S, Unit, E] = {
-    State.pure(())
-  }
-
-  def puts[S, E, T <: Effects[S, E]](s: T)(f: BitVecLiteral, str: BitVecLiteral): State[S, Unit, E] = {
-    State.pure(())
-  }
-
-  def printf[S, E, T <: Effects[S, E]](s: T)(f: BitVecLiteral, str: BitVecLiteral): State[S, Unit, E] = {
-    State.pure(())
   }
 }
 
@@ -263,14 +251,16 @@ object InterpFuns {
     })
 
     // sort for deterministic trace
-    val stores = fptrs.sortBy(f => f._1).map((p) => {
-      val (offset, fptr) = p
-      Eval.storeSingle[S, E, T](s)(
-        "mem",
-        Scalar(BitVecLiteral(offset, 64)),
-        fptr
-      )
-    })
+    val stores = fptrs
+      .sortBy(f => f._1)
+      .map((p) => {
+        val (offset, fptr) = p
+        Eval.storeSingle[S, E, T](s)(
+          "mem",
+          Scalar(BitVecLiteral(offset, 64)),
+          fptr
+        )
+      })
 
     State.sequence[S, Unit, E](State.pure(()), stores)
   }
@@ -350,20 +340,23 @@ object InterpFuns {
         val assumes = gt.targets.flatMap(_.statements.headOption).collect { case a: Assume =>
           a
         }
-        if (assumes.size != gt.targets.size) {
-          throw InterpreterError(Errored(s"Some goto target missing guard $gt"))
-        }
         for {
+          _ <-
+            if (assumes.size != gt.targets.size) {
+              State.setError((Errored(s"Some goto target missing guard $gt")))
+            } else {
+              State.pure(())
+            }
           chosen: List[Assume] <- filterM((a: Assume) => Eval.evalBool(f)(a.body), assumes)
 
           res <- chosen match {
-            case Nil      => f.setNext(Errored(s"No jump target satisfied $gt"))
+            case Nil      => State.setError(Errored(s"No jump target satisfied $gt"))
             case h :: Nil => f.setNext(Run(h))
-            case h :: tl  => f.setNext(Errored(s"More than one jump guard satisfied $gt"))
+            case h :: tl  => State.setError(Errored(s"More than one jump guard satisfied $gt"))
           }
         } yield (res)
       case r: Return      => f.doReturn()
-      case h: Unreachable => f.setNext(EscapedControlFlow(h))
+      case h: Unreachable => State.setError(EscapedControlFlow(h))
     }
   }
 
@@ -398,7 +391,7 @@ object InterpFuns {
           b <- Eval.evalBool(f)(assume.body)
           n <-
             (if (!b) {
-               f.setNext(Errored(s"Assumption not satisfied: $assume"))
+               State.setError(Errored(s"Assumption not satisfied: $assume"))
              } else {
                f.setNext(Run(s.successor))
              })
@@ -409,9 +402,10 @@ object InterpFuns {
             if (dc.target.entryBlock.isDefined) {
               val block = dc.target.entryBlock.get
               f.call(dc.target.name, Run(block.statements.headOption.getOrElse(block.jump)), Run(dc.successor))
+            } else if (LibcIntrinsic.intrinsics.contains(dc.target.name)) {
+              f.call(dc.target.name, CallIntrinsic(dc.target.name), Run(dc.successor))
             } else {
-              State.setError(InterpreterError(EscapedControlFlow(dc)))
-              //f.setNext(Run(dc.successor))
+              State.setError(EscapedControlFlow(dc))
             }
         } yield (n)
       case ic: IndirectCall => {
@@ -423,7 +417,7 @@ object InterpFuns {
             fp <- f.evalAddrToProc(addr.value.toInt)
             _ <- fp match {
               case Some(fp) => f.call(fp.name, fp.call, Run(ic.successor))
-              case none     => State.setError(InterpreterError(EscapedControlFlow(ic)))
+              case none     => State.setError(EscapedControlFlow(ic))
             }
           } yield ()
         }
@@ -433,17 +427,14 @@ object InterpFuns {
   }
 
   def interpret[S, E, T <: Effects[S, E]](f: T, m: S): S = {
-    State.evaluate(m, f.getNext) match {
-      case Right(next) => {
-        Logger.debug(s"eval $next")
-        next match {
-          case Run(c)    => interpret(f, State.execute(m, f.interpretOne))
-          case Stopped() => m
-          case errorstop => m
-        }
-      }
-      case Left(err) => m
+    // run to fixed point
+    var o = m
+    var n = State.execute(o, f.interpretOne)
+    while (o != n) {
+      o = n
+      n = State.execute(o, f.interpretOne)
     }
+    n
   }
 
   def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: Program, is: S): S = {

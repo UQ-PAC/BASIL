@@ -18,18 +18,18 @@ sealed trait ExecutionContinuation
 case class FailedAssertion(a: Assert) extends ExecutionContinuation
 
 case class Stopped() extends ExecutionContinuation /* normal program stop  */
+case class ErrorStop(error: InterpreterError) extends ExecutionContinuation /* normal program stop  */
 case class Run(val next: Command) extends ExecutionContinuation /* continue by executing next command */
+case class CallIntrinsic(val name: String) extends ExecutionContinuation /* continue by executing next command */
 
+sealed trait InterpreterError
 case class EscapedControlFlow(val call: Jump | Call)
-    extends ExecutionContinuation /* controlflow has reached somewhere eunrecoverable */
-
-case class Errored(val message: String = "") extends ExecutionContinuation
-case class TypeError(val message: String = "") extends ExecutionContinuation /* type mismatch appeared */
+    extends InterpreterError /* controlflow has reached somewhere eunrecoverable */
+case class Errored(val message: String = "") extends InterpreterError
+case class TypeError(val message: String = "") extends InterpreterError /* type mismatch appeared */
 case class EvalError(val message: String = "")
-    extends ExecutionContinuation /* failed to evaluate an expression to a concrete value */
-case class MemoryError(val message: String = "") extends ExecutionContinuation /* An error to do with memory */
-
-case class InterpreterError(continue: ExecutionContinuation) extends Exception()
+    extends InterpreterError /* failed to evaluate an expression to a concrete value */
+case class MemoryError(val message: String = "") extends InterpreterError /* An error to do with memory */
 
 /* Concrete value type of the interpreter. */
 sealed trait BasilValue(val irType: IRType)
@@ -68,7 +68,7 @@ case object BasilValue {
       case _ if vr == 0              => Right(l)
       case Scalar(IntLiteral(vl))    => Right(Scalar(IntLiteral(vl + vr)))
       case Scalar(b1: BitVecLiteral) => Right(Scalar(eval.evalBVBinExpr(BVADD, b1, BitVecLiteral(vr, b1.size))))
-      case _                         => Left(InterpreterError(TypeError(s"Operation add $vr undefined on $l")))
+      case _                         => Left((TypeError(s"Operation add $vr undefined on $l")))
     }
   }
 }
@@ -171,8 +171,8 @@ case class MemoryState(
 
   def popStackFrame(): Either[InterpreterError, MemoryState] = {
     val hv = activations match {
-      case Nil                          => Left(InterpreterError(Errored("No stack frame to pop")))
-      case h :: Nil if h == globalFrame => Left(InterpreterError(Errored("tried to pop global scope")))
+      case Nil                          => Left((Errored("No stack frame to pop")))
+      case h :: Nil if h == globalFrame => Left((Errored("tried to pop global scope")))
       case h :: tl                      => Right((h, tl))
     }
     hv.map((hv) => {
@@ -221,24 +221,20 @@ case class MemoryState(
   def findVar(name: String): Either[InterpreterError, (StackFrameID, BasilValue)] = {
     findVarOpt(name: String)
       .map(Right(_))
-      .getOrElse(Left(InterpreterError(Errored(s"Access to undefined variable $name"))))
+      .getOrElse(Left((Errored(s"Access to undefined variable $name"))))
   }
 
   def getVarOpt(name: String): Option[BasilValue] = findVarOpt(name).map(_._2)
 
   def getVar(name: String): Either[InterpreterError, BasilValue] = {
-    getVarOpt(name).map(Right(_)).getOrElse(Left(InterpreterError(Errored(s"Access undefined variable $name"))))
+    getVarOpt(name).map(Right(_)).getOrElse(Left((Errored(s"Access undefined variable $name"))))
   }
 
   def getVar(v: Variable): Either[InterpreterError, BasilValue] = {
     val value = getVar(v.name)
     value match {
       case Right(dv: BasilValue) if v.getType != dv.irType =>
-        Left(
-          InterpreterError(
-            Errored(s"Type mismatch on variable definition and load: defined ${dv.irType}, variable ${v.getType}")
-          )
-        )
+        Left(Errored(s"Type mismatch on variable definition and load: defined ${dv.irType}, variable ${v.getType}"))
       case Right(o) => Right(o)
       case o        => o
     }
@@ -249,14 +245,14 @@ case class MemoryState(
     v <- findVar(vname)
     mapv: MapValue <- v._2 match {
       case m @ MapValue(innerMap, ty) => Right(m)
-      case m                          => Left(InterpreterError(TypeError(s"Load from nonmap ${m.irType}")))
+      case m                          => Left((TypeError(s"Load from nonmap ${m.irType}")))
     }
     rs: List[Option[BasilValue]] = addr.map(k => mapv.value.get(k))
     xs <-
       (if (rs.forall(_.isDefined)) {
          Right(rs.map(_.get))
        } else {
-         Left(InterpreterError(MemoryError(s"Read from uninitialised $vname[${addr.head} .. ${addr.last}]")))
+         Left((MemoryError(s"Read from uninitialised $vname[${addr.head} .. ${addr.last}]")))
        })
   } yield (xs)
 
@@ -268,17 +264,15 @@ case class MemoryState(
     // val (mapval, keytype, valtype) =
     mapi <- mem match {
       case m @ MapValue(_, MapType(kt, vt)) => Right((m, kt, vt))
-      case v => Left(InterpreterError(TypeError(s"Invalid map store operation to $vname : ${v.irType}")))
+      case v                                => Left((TypeError(s"Invalid map store operation to $vname : ${v.irType}")))
     }
     (mapval, keytype, valtype) = mapi
 
     checkTypes <- (values.find((k, v) => k.irType != keytype || v.irType != valtype)) match {
       case Some(v) =>
         Left(
-          InterpreterError(
-            TypeError(
-              s"Invalid addr or value type (${v._1.irType}, ${v._2.irType}) does not match map type $vname : ($keytype, $valtype)"
-            )
+          TypeError(
+            s"Invalid addr or value type (${v._1.irType}, ${v._2.irType}) does not match map type $vname : ($keytype, $valtype)"
           )
         )
       case None => Right(())
@@ -287,6 +281,25 @@ case class MemoryState(
     nmap = MapValue(mapval.value ++ values, mapval.irType)
     ms <- Right(setVar(frame, vname, nmap))
   } yield (ms)
+}
+
+object LibcIntrinsic {
+
+  def putc[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = {
+    s.doReturn()
+  }
+
+  def puts[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = {
+    s.doReturn()
+  }
+
+  def printf[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = {
+    s.doReturn()
+  }
+
+  def intrinsics[S, E, T <: Effects[S, E]] =
+    Map[String, T => State[S, Unit, E]]("putc" -> putc, "puts" -> puts, "printf" -> printf)
+
 }
 
 case class InterpreterState(
@@ -367,7 +380,6 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
 
   /** effects * */
   def setNext(c: ExecutionContinuation) = State.modify((s: InterpreterState) => {
-    // Logger.debug(s"    eff : setNext $c")
     s.copy(nextCmd = c)
   })
 
@@ -410,11 +422,12 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
   def interpretOne: State[InterpreterState, Unit, InterpreterError] = for {
     next <- getNext
     _ <- (next match {
-      case Run(c: Statement) => InterpFuns.interpretStatement(this)(c)
-      case Run(c: Jump)      => InterpFuns.interpretJump(this)(c)
-      case Stopped()         => State.pure(())
-      case errorstop         => State.pure(())
-    }).flatMapE((e: InterpreterError) => setNext(e.continue))
+      case CallIntrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(this)
+      case Run(c: Statement)  => InterpFuns.interpretStatement(this)(c)
+      case Run(c: Jump)       => InterpFuns.interpretJump(this)(c)
+      case Stopped()          => State.pure(())
+      case ErrorStop(e)       => State.pure(())
+    }).flatMapE((e: InterpreterError) => setNext(ErrorStop(e)))
   } yield ()
 
 }

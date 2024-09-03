@@ -46,7 +46,7 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, v
                   ev <- doLeft(Eval.evalExpr(f)(e._2))
                   } yield (e._1, e._2, ev)
                 , action.evalExprs))
-                _ <- if action.stop then doLeft(f.setNext(Errored(s"Stopped at breakpoint ${name}"))) else doLeft(State.pure(()))
+                _ <- if action.stop then doLeft(State.setError(Errored(s"Stopped at breakpoint ${name}"))) else doLeft(State.pure(()))
                 _ <- State.pure({
                   if (action.log) {
                     val bpn = breakpoint.name
