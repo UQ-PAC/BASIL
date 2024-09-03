@@ -7,6 +7,12 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
 
   def unit[A](a: A): State[S, A, E] = State(s => (s, Right(a)))
 
+  def >>(o: State[S,A,E]) = for {
+    _ <- this
+    _ <- o
+  } yield (())
+
+
   def flatMap[B](f: A => State[S, B, E]): State[S, B, E] = State(s => {
     val (s2, a) = this.f(s)
     val r  = a match {
@@ -50,10 +56,6 @@ object State {
     case Left(e) => (s, Left(e))
   })
   def execute[S, A, E](s: S, c: State[S,A, E]) : S = c.f(s)._1
-  // def evaluate[S, A, E](s: S, c: State[S,A, E])  : A = c.f(s)._2 match {
-  //   case Right(r) => r
-  //   case Left(l) => throw Exception(s"Evaluation error $l")
-  // }
   def evaluate[S, A, E](s: S, c: State[S,A, E])  : Either[E,A] = c.f(s)._2
 
   def setError[S,A,E](e: E) : State[S,A,E] =  State(s => (s, Left(e)))

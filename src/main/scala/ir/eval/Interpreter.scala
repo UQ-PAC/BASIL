@@ -418,3 +418,8 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
   } yield ()
 
 }
+
+// def interpretTrace(IRProgram: Program): TracingInterpreter = {
+//   val s: TracingInterpreter = InterpFuns.interpretProg(IRProgram, TracingInterpreter(InterpreterState(), List()))
+//   s
+//e

@@ -18,7 +18,7 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-class DifferentialIndirectCall extends AnyFunSuite {
+class DifferentialAnalysis extends AnyFunSuite {
 
   Logger.setLevel(LogLevel.WARN)
 
@@ -33,14 +33,11 @@ class DifferentialIndirectCall extends AnyFunSuite {
         case e @ ExecEffect.LoadMem("mem", _) => e
       }
     }
-    println(traceInit.t.mkString("\n"))
-
     // println(traceInit.t.mkString("\n    "))
     assert(initialRes.nextCmd == Stopped())
     assert(result.nextCmd == Stopped())
-    // assert(initialRes.memoryState.diff(result.memoryState) == Map.empty)
     assert(Set.empty == initialRes.memoryState.getMem("mem").toSet.diff(result.memoryState.getMem("mem").toSet))
-    assert(filterEvents(traceInit.t) == filterEvents(traceRes.t))
+    assert(filterEvents(traceInit.t).mkString("\n") == filterEvents(traceRes.t).mkString("\n"))
   }
 
   def testProgram(testName: String, examplePath: String) = {

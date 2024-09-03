@@ -223,7 +223,22 @@ case object Eval {
   }
 }
 
-case object InterpFuns {
+object LibcIntrinsic {
+
+  def putc[S, E, T <: Effects[S, E]](s: T)(f: BitVecLiteral, c: BitVecLiteral): State[S, Unit, E] = {
+    State.pure(())
+  }
+
+  def puts[S, E, T <: Effects[S, E]](s: T)(f: BitVecLiteral, str: BitVecLiteral): State[S, Unit, E] = {
+    State.pure(())
+  }
+
+  def printf[S, E, T <: Effects[S, E]](s: T)(f: BitVecLiteral, str: BitVecLiteral): State[S, Unit, E] = {
+    State.pure(())
+  }
+}
+
+object InterpFuns {
 
   def initRelocTable[S, E, T <: Effects[S, E]](s: T)(p: Program, reladyn: Set[(BigInt, String)]): State[S, Unit, E] = {
 
@@ -243,7 +258,7 @@ case object InterpFuns {
         case Some(x) => x
         case None    => /* println(s"No address for function ${proc.name} ${"%x".format(offset)}"); */ 0
       }
-      // im guessing proc.address will be undefined and we will have to choose one for our intrinsic libc funcs
+      // proc.address will be undefined and we will have to choose one for our intrinsic libc funcs
       (offset, FunPointer(BitVecLiteral(addr, 64), proc.name, Run(DirectCall(proc))))
     })
 
@@ -256,9 +271,7 @@ case object InterpFuns {
       )
     })
 
-    for {
-      _ <- State.sequence[S, Unit, E](State.pure(()), stores)
-    } yield ()
+    State.sequence[S, Unit, E](State.pure(()), stores)
   }
 
   /** Functions which compile BASIL IR down to the minimal interpreter effects.
@@ -450,21 +463,14 @@ case object InterpFuns {
     } yield (st)
 
     bss match {
-      case None => Logger.error("No BSS initialised"); State.pure(())
-      case Some(init) =>
-        for {
-          _ <- init("mem")
-          _ <- init("stack")
-        } yield ()
+      case None       => Logger.error("No BSS initialised"); State.pure(())
+      case Some(init) => init("mem") >> init("stack")
     }
   }
 
   def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext, is: S): S = {
-    val st = for {
-      _ <- initialiseProgram(f)(p.program)
-      _ <- initBSS(f)(p)
-      _ <- InterpFuns.initRelocTable(f)(p.program, p.externalFunctions.map(f => (f.offset, f.name)))
-    } yield ()
+    val st = (initialiseProgram(f)(p.program) >> initBSS(f)(p))
+      >> InterpFuns.initRelocTable(f)(p.program, p.externalFunctions.map(f => (f.offset, f.name)))
     val begin = State.execute(is, st)
     interpret(f, begin)
   }
