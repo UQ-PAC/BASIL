@@ -20,7 +20,7 @@ trait MemoryRegionAnalysis(val program: Program,
 
   var mallocCount: Int = 0
   private var stackCount: Int = 0
-  val stackMap: mutable.Map[Procedure, mutable.Map[Expr, StackRegion]] = mutable.Map()
+  val stackMap: mutable.Map[Procedure, mutable.Map[BigInt, StackRegion]] = mutable.Map()
 
   private def nextMallocCount() = {
     mallocCount += 1
@@ -40,7 +40,7 @@ trait MemoryRegionAnalysis(val program: Program,
    * @param parent : the function entry node
    * @return the stack region corresponding to the offset
    */
-  private def poolMaster(expr: BitVecLiteral, stackBase: Procedure): StackRegion = {
+  private def poolMaster(expr: BigInt, stackBase: Procedure): StackRegion = {
     val stackPool = stackMap.getOrElseUpdate(stackBase, mutable.HashMap())
     if (stackPool.contains(expr)) {
       stackPool(expr)
@@ -110,12 +110,8 @@ trait MemoryRegionAnalysis(val program: Program,
             case Some(b: BitVecLiteral) =>
               regions.foreach {
                 case stackRegion: StackRegion =>
-                  val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
-                  evaluateExpression(nextOffset, constantProp(n)) match {
-                    case Some(b2: BitVecLiteral) =>
-                      reducedRegions = reducedRegions + poolMaster(b2, IRWalk.procedure(n))
-                    case None =>
-                  }
+                  val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
+                  reducedRegions = reducedRegions + poolMaster(nextOffset, IRWalk.procedure(n))
                 case _ =>
               }
             case None =>
@@ -150,11 +146,8 @@ trait MemoryRegionAnalysis(val program: Program,
         if (spList.contains(binOp.arg1)) {
           evaluateExpression(binOp.arg2, constantProp(n)) match {
             case Some(b: BitVecLiteral) =>
-              if (isNegative(b)) {
-                Set(poolMaster(BitVecLiteral(0, 64), IRWalk.procedure(n)))
-              } else {
-                Set(poolMaster(b, IRWalk.procedure(n)))
-              }
+              val negB = if isNegative(b) then -b.value else b.value
+              Set(poolMaster(negB, IRWalk.procedure(n)))
             case None => env
           }
         } else if (reducibleToRegion(binOp, n).nonEmpty) {
@@ -167,7 +160,7 @@ trait MemoryRegionAnalysis(val program: Program,
         }
       case variable: Variable =>
         variable match {
-          case reg: Register if spList.contains(reg) =>
+          case reg: Register if spList.contains(reg) => // TODO: this is a hack
             eval(BitVecLiteral(0, 64), env, n)
           case _ =>
             evaluateExpression(variable, constantProp(n)) match {
@@ -181,7 +174,8 @@ trait MemoryRegionAnalysis(val program: Program,
         eval(memoryLoad.index, env, n)
       // ignore case where it could be a global region (loaded later in MMM from relf)
       case b: BitVecLiteral =>
-        Set(poolMaster(b, IRWalk.procedure(n)))
+        val negB = if isNegative(b) then -b.value else b.value
+        Set(poolMaster(negB, IRWalk.procedure(n)))
       // we cannot evaluate this to a concrete value, we need VSA for this
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")
@@ -214,7 +208,9 @@ trait MemoryRegionAnalysis(val program: Program,
 //          }
           if (directCall.target.name == "malloc") {
             evaluateExpression(mallocVariable, constantProp(n)) match {
-              case Some(b: BitVecLiteral) => regionLattice.lub(s, Set(HeapRegion(nextMallocCount(), b, IRWalk.procedure(n))))
+              case Some(b: BitVecLiteral) =>
+                val negB = if isNegative(b) then -b.value else b.value
+                regionLattice.lub(s, Set(HeapRegion(nextMallocCount(), negB, IRWalk.procedure(n))))
               case None => s
             }
           } else {

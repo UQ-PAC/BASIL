@@ -71,11 +71,11 @@ class MemoryModelMap {
       case h: HeapRegion =>
         val currentHeapMap = heapMap
         if (currentHeapMap.isEmpty) {
-          currentHeapMap(RangeKey(offset, offset + h.size.value - 1)) = h
+          currentHeapMap(RangeKey(offset, offset + h.size - 1)) = h
         } else {
           val currentMaxRange = currentHeapMap.keys.maxBy(_.end)
           val currentMaxRegion = currentHeapMap(currentMaxRange)
-          currentHeapMap(RangeKey(currentMaxRange.start + 1, h.size.value - 1)) = h
+          currentHeapMap(RangeKey(currentMaxRange.start + 1, h.size - 1)) = h
         }
     }
   }
@@ -154,7 +154,7 @@ class MemoryModelMap {
     val reversedExternalFunctionRgns = (externalFunctions ++ globalAddresses).map((offset, name) => resolveInverseGlobalOffset(name, offset, globalOffsets) -> name)
     val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => reversedExternalFunctionRgns.contains(offset))
 
-    val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, BitVecLiteral(offset, 64)))
+    val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset))
 
     // we should collect all data regions otherwise the ordering might be wrong
     var dataRgns: Set[DataRegion] = Set.empty
@@ -165,18 +165,18 @@ class MemoryModelMap {
     exitNodes.foreach(exitNode =>
       if (procedureToSharedRegions.contains(exitNode)) {
         val sharedRegions = procedureToSharedRegions(exitNode)
-        sharedStacks(exitNode.name) = sharedRegions.collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
+        sharedStacks(exitNode.name) = sharedRegions.collect { case r: StackRegion => r }.toList.sortBy(_.start)
       }
       // for each function exit node we get the memory region and add it to the mapping
-      val stackRgns = regionsPerProcedure(exitNode).collect { case r: StackRegion => r }.toList.sortBy(_.start.value)
+      val stackRgns = regionsPerProcedure(exitNode).collect { case r: StackRegion => r }.toList.sortBy(_.start)
       dataRgns = dataRgns ++ regionsPerProcedure(exitNode).collect { case r: DataRegion => r }
 
       localStacks(exitNode.name) = stackRgns
     )
     // add externalFunctionRgn to dataRgns and sort by value
-    val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start.value)
+    val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start)
     for (dataRgn <- allDataRgns) {
-      add(dataRgn.start.value, dataRgn)
+      add(dataRgn.start, dataRgn)
     }
 
     // add heap regions
@@ -200,7 +200,7 @@ class MemoryModelMap {
     contextStack.push(localStacks(funName))
     stackMap.clear()
     for (stackRgn <- contextStack.top) {
-      add(stackRgn.start.value, stackRgn)
+      add(stackRgn.start, stackRgn)
     }
 
     if (!sharedStacks.contains(funName)) {
@@ -209,7 +209,7 @@ class MemoryModelMap {
     sharedContextStack.push(sharedStacks(funName))
     sharedStackMap.clear()
     for (stackRgn <- sharedContextStack.top) {
-      add(stackRgn.start.value, stackRgn, true)
+      add(stackRgn.start, stackRgn, true)
     }
   }
 
@@ -218,7 +218,7 @@ class MemoryModelMap {
       contextStack.pop()
       stackMap.clear()
       for (stackRgn <- contextStack.top) {
-        add(stackRgn.start.value, stackRgn)
+        add(stackRgn.start, stackRgn)
       }
     }
 
@@ -226,7 +226,7 @@ class MemoryModelMap {
       sharedContextStack.pop()
       sharedStackMap.clear()
       for (stackRgn <- sharedContextStack.top) {
-        add(stackRgn.start.value, stackRgn, true)
+        add(stackRgn.start, stackRgn, true)
       }
     }
   }
@@ -435,17 +435,18 @@ class MemoryModelMap {
 
 trait MemoryRegion {
   val regionIdentifier: String
+  val subRegions: mutable.Set[MemoryRegion] = mutable.Set()
 }
 
-case class StackRegion(override val regionIdentifier: String, start: BitVecLiteral, parent: Procedure) extends MemoryRegion {
+case class StackRegion(override val regionIdentifier: String, start: BigInt, parent: Procedure) extends MemoryRegion {
   override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name})"
 }
 
-case class HeapRegion(override val regionIdentifier: String, size: BitVecLiteral, parent: Procedure) extends MemoryRegion {
+case class HeapRegion(override val regionIdentifier: String, size: BigInt, parent: Procedure) extends MemoryRegion {
   override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 
-case class DataRegion(override val regionIdentifier: String, start: BitVecLiteral) extends MemoryRegion {
+case class DataRegion(override val regionIdentifier: String, start: BigInt) extends MemoryRegion {
   override def toString: String = s"Data($regionIdentifier, $start)"
 }
 

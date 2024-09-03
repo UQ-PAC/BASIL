@@ -74,13 +74,13 @@ class InterprocSteensgaardAnalysis(
    * @param address
    * @return BitVecLiteral: the relocated address
    */
-  def relocatedBase(address: BitVecLiteral): BitVecLiteral = {
-    val tableAddress = globalOffsets.getOrElse(address.value, address.value)
+  def relocatedBase(address: BigInt): BitVecLiteral = {
+    val tableAddress = globalOffsets.getOrElse(address, address)
     // this condition checks if the address is not layered and returns if it is not
-    if (tableAddress != address.value && !globalOffsets.contains(tableAddress)) {
-      return address
+    if (tableAddress != address && !globalOffsets.contains(tableAddress)) {
+      return BitVecLiteral(address, 64)
     }
-    BitVecLiteral(tableAddress, address.size)
+    BitVecLiteral(tableAddress, 64)
   }
 
   /**
@@ -153,7 +153,7 @@ class InterprocSteensgaardAnalysis(
             } {
               r match {
                 case stackRegion: StackRegion =>
-                  val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
+                  val nextOffset = BinaryExpr(binExpr.op, BitVecLiteral(stackRegion.start, 64), b)
                   evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
                     reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
                   }
@@ -265,7 +265,7 @@ class InterprocSteensgaardAnalysis(
         case directCall: DirectCall =>
           // X = alloc P:  [[X]] = ↑[[alloc-i]]
           if (directCall.target.name == "malloc") {
-            val alloc = HeapRegion(nextMallocCount(), BitVecLiteral(BigInt(0), 0), IRWalk.procedure(cmd))
+            val alloc = HeapRegion(nextMallocCount(), 0, IRWalk.procedure(cmd))
             unify(IdentifierVariable(RegisterVariableWrapper(mallocVariable, getUse(mallocVariable, cmd, reachingDefs))), PointerRef(AllocVariable(alloc)))
           }
 

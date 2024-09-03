@@ -34,13 +34,13 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
    * @param globalOffsets
    * @return BitVecLiteral: the relocated address
    */
-  def relocatedBase(address: BitVecLiteral, globalOffsets: Map[BigInt, BigInt]): BitVecLiteral = {
-    val tableAddress = globalOffsets.getOrElse(address.value, address.value)
+  def relocatedBase(address: BigInt, globalOffsets: Map[BigInt, BigInt]): BitVecLiteral = {
+    val tableAddress = globalOffsets.getOrElse(address, address)
     // this condition checks if the address is not layered and returns if it is not
-    if (tableAddress != address.value && !globalOffsets.contains(tableAddress)) {
-      return address
+    if (tableAddress != address && !globalOffsets.contains(tableAddress)) {
+      return BitVecLiteral(address, 64)
     }
-    BitVecLiteral(tableAddress, address.size)
+    BitVecLiteral(tableAddress, 64)
   }
 
   /**
@@ -116,17 +116,14 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
                 case stackRegion: StackRegion =>
                   println(s"StackRegion: ${stackRegion.start}")
                   println(s"BitVecLiteral: ${b}")
-                  if (b.size == stackRegion.start.size) {
-                    val nextOffset = BinaryExpr(binExpr.op, stackRegion.start, b)
-                    evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
-                      reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
-                    }
-                  }
+                  //if (b.size == stackRegion.start.size) { TODO: Double check why this is needed
+                    val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
+                    reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, BitVecLiteral(nextOffset, 64)), n)
+                  //}
                 case dataRegion: DataRegion =>
-                  val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start, globalOffsets), b)
-                  evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
-                    reducedRegions ++= exprToRegion(b2, n)
-                  }
+                  //val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start, globalOffsets), b)
+                  val nextOffset = bitVectorOpToBigIntOp(binExpr.op, dataRegion.start, b.value)
+                  reducedRegions ++= exprToRegion(BitVecLiteral(nextOffset, 64), n)
                 case _ =>
               }
             }
