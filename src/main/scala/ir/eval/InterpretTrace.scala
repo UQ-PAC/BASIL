@@ -14,7 +14,6 @@ import scala.collection.mutable
 import scala.collection.immutable
 import scala.util.control.Breaks.{break, breakable}
 
-
 enum ExecEffect:
   case Call(target: String, begin: ExecutionContinuation, returnTo: ExecutionContinuation)
   case Return
@@ -27,19 +26,20 @@ enum ExecEffect:
 case class Trace(val t: List[ExecEffect])
 
 case object Trace {
-  def add[E](e: ExecEffect) : State[Trace, Unit, E] = {
-    State.modify ((t: Trace) => Trace(t.t.appended(e)))
+  def add[E](e: ExecEffect): State[Trace, Unit, E] = {
+    State.modify((t: Trace) => Trace(t.t.appended(e)))
   }
 }
 
 case class TraceGen[E]() extends NopEffects[Trace, E] {
+
   /** Values are discarded by ProductInterpreter so do not matter */
 
   // override def loadVar(v: String) = for {
   //   s <- Trace.add(ExecEffect.LoadVar(v))
   // } yield (Scalar(FalseLiteral))
 
-  override def loadMem(v: String, addrs: List[BasilValue])  = for {
+  override def loadMem(v: String, addrs: List[BasilValue]) = for {
     s <- Trace.add(ExecEffect.LoadMem(v, addrs))
   } yield (List())
 
@@ -63,11 +63,10 @@ case class TraceGen[E]() extends NopEffects[Trace, E] {
 
 def tracingInterpreter = ProductInterpreter(NormalInterpreter, TraceGen())
 
-def interpretTrace(p: Program) : (InterpreterState, Trace) = {
+def interpretTrace(p: Program): (InterpreterState, Trace) = {
   InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
 }
 
-def interpretTrace(p: IRContext) : (InterpreterState, Trace) = {
+def interpretTrace(p: IRContext): (InterpreterState, Trace) = {
   InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
 }
-

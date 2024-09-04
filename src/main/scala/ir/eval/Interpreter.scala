@@ -15,14 +15,13 @@ import scala.util.control.Breaks.{break, breakable}
 /** Interpreter status type, either stopped, run next command or error
   */
 sealed trait ExecutionContinuation
-case class FailedAssertion(a: Assert) extends ExecutionContinuation
-
 case class Stopped() extends ExecutionContinuation /* normal program stop  */
 case class ErrorStop(error: InterpreterError) extends ExecutionContinuation /* normal program stop  */
 case class Run(val next: Command) extends ExecutionContinuation /* continue by executing next command */
 case class CallIntrinsic(val name: String) extends ExecutionContinuation /* continue by executing next command */
 
 sealed trait InterpreterError
+case class FailedAssertion(a: Assert) extends InterpreterError
 case class EscapedControlFlow(val call: Jump | Call)
     extends InterpreterError /* controlflow has reached somewhere eunrecoverable */
 case class Errored(val message: String = "") extends InterpreterError

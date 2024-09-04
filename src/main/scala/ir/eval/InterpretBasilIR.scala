@@ -288,13 +288,12 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
       case assert: Assert =>
         for {
           b <- Eval.evalBool(f)(assert.body)
-          n <-
-            (if (!b) then {
-               f.setNext(FailedAssertion(assert))
+          _ <- (if (!b) then {
+               State.setError(FailedAssertion(assert))
              } else {
                f.setNext(Run(s.successor))
              })
-        } yield (n)
+        } yield ()
       case assume: Assume =>
         for {
           b <- Eval.evalBool(f)(assume.body)
