@@ -146,9 +146,9 @@ trait Loader[S, E] {
   }
 }
 
-def statePartialEvalExpr[S, E](l: Loader[S, E])(exp: Expr): State[S, Expr, E] = {
+def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S, Expr, InterpreterError] = {
   val eval = statePartialEvalExpr(l)
-  exp match {
+  val ns = exp match {
     case f: UninterpretedFunction => State.pure(f)
     case unOp: UnaryExpr =>
       for {
@@ -232,6 +232,13 @@ def statePartialEvalExpr[S, E](l: Loader[S, E])(exp: Expr): State[S, Expr, E] = 
     case b: IntLiteral    => State.pure(b)
     case b: BoolLit       => State.pure(b)
   }
+  State.protect(
+    () => ns,
+    { case e =>
+      Errored(e.toString)
+    }: PartialFunction[Exception, InterpreterError]
+  )
+
 }
 
 class StatelessLoader[E](
@@ -248,7 +255,7 @@ def partialEvalExpr(
     variableAssignment: Variable => Option[Literal],
     memory: (Memory, Expr, Endian, Int) => Option[Literal] = ((a, b, c, d) => None)
 ): Expr = {
-  val l = StatelessLoader(variableAssignment, memory)
+  val l = StatelessLoader[InterpreterError](variableAssignment, memory)
   State.evaluate((), statePartialEvalExpr(l)(exp)) match {
     case Right(e) => e
     case Left(e)  => throw Exception("Unable to evaluate expr : " + e.toString)

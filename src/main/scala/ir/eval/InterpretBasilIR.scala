@@ -66,7 +66,7 @@ case object Eval {
   def evalExpr[S, T <: Effects[S, InterpreterError]](f: T)(e: Expr): State[S, Expr, InterpreterError] = {
     val ldr = StVarLoader[S, T](f)
     for {
-      res <- ir.eval.statePartialEvalExpr[S, InterpreterError](ldr)(e)
+      res <- ir.eval.statePartialEvalExpr[S](ldr)(e)
     } yield (res)
   }
 

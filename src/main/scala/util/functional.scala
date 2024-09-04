@@ -78,6 +78,22 @@ object State {
     xs.foldRight(pure(List[B]()))((b,acc) => acc.flatMap(c => m(b).map(v => v::c)))
   }
 
+  def protect[S, V, E](f : () => State[S, V, E], fnly: PartialFunction[Exception, E]) : State[S, V, E] = {
+    State((s: S) => try {
+      f().f(s)
+    } catch {
+      case e: Exception if fnly.isDefinedAt(e) => (s, Left(fnly(e)))
+    })
+  }
+
+  def protectPure[S,V,E](f : () => V, fnly : PartialFunction[Exception, E]) : State[S, V, E] = {
+    State((s: S) => try {
+      (s, Right(f()))
+    } catch {
+      case e: Exception if fnly.isDefinedAt(e) => (s, Left(fnly(e)))
+    })
+  }
+
 }
 
 def protect[T](x: () => T, fnly: PartialFunction[Exception, T]): T = {
