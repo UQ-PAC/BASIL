@@ -34,11 +34,6 @@ case object Trace {
 case class TraceGen[E]() extends NopEffects[Trace, E] {
 
   /** Values are discarded by ProductInterpreter so do not matter */
-
-  // override def loadVar(v: String) = for {
-  //   s <- Trace.add(ExecEffect.LoadVar(v))
-  // } yield (Scalar(FalseLiteral))
-
   override def loadMem(v: String, addrs: List[BasilValue]) = for {
     s <- Trace.add(ExecEffect.LoadMem(v, addrs))
   } yield (List())
@@ -68,5 +63,7 @@ def interpretTrace(p: Program): (InterpreterState, Trace) = {
 }
 
 def interpretTrace(p: IRContext): (InterpreterState, Trace) = {
-  InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
+  val begin = InterpFuns.initProgState(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
+  // throw away initialisation trace
+  BASILInterpreter(tracingInterpreter).run((begin._1, Trace(List())))
 }

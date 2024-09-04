@@ -42,8 +42,8 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, v
   }
 
   override def getNext
-      : State[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), ExecutionContinuation, InterpreterError] =
-    for {
+      : State[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), ExecutionContinuation, InterpreterError] = {
+      for {
       v: ExecutionContinuation <- doLeft(f.getNext)
       n <- v match {
         case Run(s) =>
@@ -67,22 +67,23 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, v
                             } yield (e._1, e._2, ev),
                           action.evalExprs
                         ))
-                        _ <-
-                          if action.stop then doLeft(State.setError(Errored(s"Stopped at breakpoint ${name}")))
-                          else doLeft(State.pure(()))
                         _ <- State.pure({
                           if (action.log) {
                             val bpn = breakpoint.name
                             val bpcond = breakpoint.location match {
-                              case BreakPointLoc.CMD(c)        => c.toString
-                              case BreakPointLoc.CMDCond(c, e) => s"$c when $e"
+                              case BreakPointLoc.CMD(c)        => s"${c.parent.label}:$c"
+                              case BreakPointLoc.CMDCond(c, e) => s"${c.parent.label}:$c when $e"
                             }
                             val saving = if action.saveState then " stashing state, " else ""
                             val stopping = if action.stop then " stopping. " else ""
                             val evalstr = evals.map(e => s"\n  ${e._1} : eval(${e._2}) = ${e._3}").mkString("")
                             Logger.warn(s"Breakpoint $bpn@$bpcond.$saving$stopping$evalstr")
+                            //println(s"Breakpoint $bpn@$bpcond.$saving$stopping$evalstr")
                           }
                         })
+                        _ <-
+                          if action.stop then doLeft(State.setError(Errored(s"Stopped at breakpoint ${name}")))
+                          else doLeft(State.pure(()))
                         _ <- State.modify((istate: (T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])])) =>
                           (istate._1, ((breakpoint, saved, evals) :: istate._2))
                         )
@@ -95,7 +96,7 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, v
         case _ => State.pure(())
       }
     } yield (v)
-
+  }
 }
 
 def interpretWithBreakPoints[I](
