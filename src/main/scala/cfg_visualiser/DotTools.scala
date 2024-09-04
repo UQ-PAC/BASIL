@@ -136,3 +136,68 @@ class DotGraph(val title: String, val nodes: Iterable[DotNode], val edges: Itera
 
   def toDotString: String = "digraph " + title + " {\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
 }
+
+
+
+class DotStruct(val id: String, val details: String, val fields: Option[Iterable[String]], val verbose: Boolean = false) extends DotElement {
+  def equals(other: DotStruct): Boolean = toDotString.equals(other.toDotString)
+
+
+  val label = s"\"{<$id> ${if verbose then details else id} ${if fields.isDefined then  s" | {${fields.get.map(f => s"<$f> $f").mkString("|")}}" else "" }}\""
+  override def toString: String = toDotString
+
+  override def toDotString: String =
+    s"$id " + "[label=" + label + "]"
+}
+
+class DotStructElement(val id: String, val field: Option[String]) extends DotElement {
+  def equals(other: DotStruct): Boolean = toDotString.equals(other.toDotString)
+  override def toString: String = toDotString
+
+  override def toDotString: String =
+    s"$id${if field.isDefined then ":" + field.get else ""}"
+}
+
+case class StructArrow(
+                        from: DotStructElement,
+                        to: DotStructElement,
+                        label: String = "",
+                        arrow: String = "->",
+                        style: String = "solid",
+                        colour: String = "black") extends DotElement {
+
+  def equals(other: DotArrow): Boolean = toDotString.equals(other.toDotString)
+
+  def toDotString: String =
+    s"${from.toString} $arrow ${to.toString} [label=\"$label\", style=\"$style\", color=\"$colour\"]"
+}
+
+
+/** Represents a Graphviz dot graph.
+ */
+class StructDotGraph(val title: String, val nodes: Iterable[DotStruct], val edges: Iterable[StructArrow]) extends DotElement {
+
+  def this(nodes: List[DotStruct], edges: List[StructArrow]) = this("", nodes, edges)
+
+  def this(title: String) = this(title, List(), List())
+
+  def this() = this(List(), List())
+
+  def addGraph(g: StructDotGraph): StructDotGraph = {
+    val ng = g.nodes.foldLeft(this)((g, n) => g.addNode(n))
+    g.edges.foldLeft(ng)((g, e) => g.addEdge(e))
+  }
+
+  def addNode(n: DotStruct): StructDotGraph =
+    if (nodes.exists(a => n.equals(a))) this
+    else new StructDotGraph(title, nodes ++ List(n), edges)
+
+  def addEdge(e: StructArrow): StructDotGraph =
+    if (edges.exists(a => e.equals(a))) this
+    else new StructDotGraph(title, nodes, edges ++ List(e))
+
+  override def toString: String = toDotString
+
+  def toDotString: String = "digraph " + title + " {\nrankdir=\"LR\"\nnode [shape=record];\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
+}
+

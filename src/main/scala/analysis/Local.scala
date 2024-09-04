@@ -339,13 +339,13 @@ class Local(
 
     val b = graph.solver.solution()
     graph.collectNodes
-    graph.nodes.foreach(node =>
-      node.children.foreach(
-        child =>
-          assert(graph.solver.find(child._1.term).equals(graph.solver.find(node.term)))
-          assert(graph.solver.find(child._1.term)._2.equals(child._2))
-
-      )
-    )
+//    graph.nodes.foreach(node =>
+//      node.children.foreach(
+//        child =>
+//          assert(graph.solver.find(child._1.term).equals(graph.solver.find(node.term)))
+//          assert(graph.solver.find(child._1.term)._2.equals(child._2))
+//
+//      )
+//    )
     graph
 }

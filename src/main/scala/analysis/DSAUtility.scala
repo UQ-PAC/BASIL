@@ -1,6 +1,7 @@
 package analysis
 
 import analysis.solvers.{DSAUnionFindSolver, UnionFindSolver, Var}
+import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, Memory, MemoryAssign, MemoryLoad, Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, begin, computeDomain, toShortString}
 import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
 
@@ -198,12 +199,124 @@ class DSG(val proc: Procedure,
    */
   def collectNodes =
     nodes.clear()
-    nodes.addAll(formals.values.map(_._1.node.get))
+    nodes.addAll(formals.values.map(_._1.node.get).map(n => find(n).node))
     varToCell.values.foreach(
-      value => nodes.addAll(value.values.map(_._1.node.get))
+      value => nodes.addAll(value.values.map(_._1.node.get).map(n => find(n).node))
     )
-    nodes.addAll(stackMapping.values)
-    nodes.addAll(globalMapping.values.map(_._1))
+    nodes.addAll(stackMapping.values.map(n => find(n).node))
+    nodes.addAll(globalMapping.values.map(_._1).map(n => find(n).node))
+
+    val queue: mutable.Queue[DSN] = mutable.Queue()
+    queue.enqueueAll(nodes)
+    while queue.nonEmpty do
+      val cur = queue.dequeue()
+      cur.cells.foreach {
+        case (offset: BigInt, cell: DSC) if cell._pointee.isDefined =>
+          val node = find(cell.getPointee.node).node
+          if !nodes.contains(node) then
+            nodes.add(node)
+            queue.enqueue(node)
+        case _ =>
+      }
+
+  def toDot: String = {
+    collectNodes
+
+
+    var structs = nodes.foldLeft(Set[DotStruct]()) {
+      (s, n) =>
+        s + DotStruct(n.id.toString, n.toString, Some(n.cells.keys.map(o => o.toString)))
+    }
+
+    structs ++= formals.foldLeft(Set[DotStruct]()) {
+      (s, n) =>
+        val variable = n._1.name
+        s + DotStruct(s"Formal_$variable", s"Formal_$variable", None)
+    }
+
+    structs ++= varToCell.foldLeft(Set[DotStruct]()) {
+      (s, r) =>
+        val pos = r._1
+        val mapping = r._2
+        s ++ mapping.foldLeft(Set[DotStruct]()) {
+          (k, n) =>
+            val variable = n._1.name
+            k + DotStruct(s"SSA_${pos.toShortString.slice(1, 9)}_$variable", s"SSA_${pos}_$variable", None, false)
+        }
+    }
+
+
+    structs ++= globalMapping.foldLeft(Set[DotStruct]()) {
+      (s, n) =>
+        val range = n._1
+        s + DotStruct(s"Global_${range.start}_${range.end}", s"Global_$range", None)
+    }
+
+    structs ++= stackMapping.foldLeft(Set[DotStruct]()) {
+      (s, n) =>
+        val offset = n._1
+        s + DotStruct(s"Stack_$offset", s"Stack_$offset", None)
+    }
+
+    var arrows = nodes.foldLeft(Set[StructArrow]()) {
+      (s, node) =>
+        s ++ node.cells.foldLeft(Set[StructArrow]()) {
+          (k, c) =>
+            val offset = c._1
+            val cell = c._2
+            if cell._pointee.isDefined then
+              val pointee = find(cell.getPointee)
+              s + StructArrow(DotStructElement(node.id.toString, Some(offset.toString)), DotStructElement(pointee.node.id.toString, Some(pointee.cell.offset.toString)), pointee.internalOffset.toString)
+            else
+              s
+        }
+    }
+
+
+    arrows ++= formals.foldLeft(Set[StructArrow]()) {
+      (s, n) =>
+        val variable = n._1.name
+        val value = find(n._2)
+        s + StructArrow(DotStructElement(s"Formal_$variable", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString)
+    }
+
+    arrows ++= varToCell.foldLeft(Set[StructArrow]()) {
+      (s, r) =>
+        val pos = r._1
+        val mapping = r._2
+        s ++ mapping.foldLeft(Set[StructArrow]()) {
+          (k, n) =>
+            val variable = n._1.name
+            val value = find(n._2)
+            k + StructArrow(DotStructElement(s"SSA_${pos.toShortString.slice(1, 9)}_$variable", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString)
+        }
+    }
+
+
+    arrows ++= globalMapping.foldLeft(Set[StructArrow]()) {
+      (s, n) =>
+        val range = n._1
+        val node= find(n._2.node).node
+        val offset = n._2.offset + find(n._2.node).offset
+        val cellOffset = node.getCell(offset).offset
+        val internalOffset = offset - cellOffset
+        s + StructArrow(DotStructElement(s"Global_${range.start}_${range.end}", None), DotStructElement(node.id.toString, Some(cellOffset.toString)), internalOffset.toString)
+    }
+
+    arrows ++= stackMapping.foldLeft(Set[StructArrow]()) {
+      (s, n) =>
+        val offset = n._1
+        val node = find(n._2).node
+        val nodeOffset =  find(n._2).offset
+        val cellOffset = node.getCell(nodeOffset).offset
+        val internalOffset = nodeOffset - cellOffset
+        s + StructArrow(DotStructElement(s"Stack_$offset", None), DotStructElement(node.id.toString, Some(cellOffset.toString)), internalOffset.toString)
+    }
+
+
+    StructDotGraph(proc.name, structs, arrows).toDotString
+  }
+
 
   /**
    * Collapses the node causing it to lose field sensitivity

@@ -824,7 +824,7 @@ class LocalTest extends AnyFunSuite, TestUtil {
     assert(dsg.find(dsg.stackMapping(40).cells(0)).getPointee.internalOffset == 0)
     assert(dsg.find(dsg.stackMapping(32).cells(0)).getPointee.internalOffset == 0)
     assert(dsg.find(dsg.stackMapping(24).cells(0)).getPointee.internalOffset == 0)
-    
+
   }
 
 }
