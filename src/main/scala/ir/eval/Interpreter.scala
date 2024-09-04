@@ -255,6 +255,8 @@ case class MemoryState(
   /** typecheck and some fields of a map variable */
   def doStore(vname: String, values: Map[BasilValue, BasilValue]): Either[InterpreterError, MemoryState] = for {
     // val (frame, mem) = findVar(vname)
+    
+    _ <- if (values.size == 0) then Left(MemoryError("Tried to store size 0")) else Right(())
     v <- findVar(vname)
     (frame, mem) = v
     // val (mapval, keytype, valtype) =
@@ -356,7 +358,7 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
     rs match {
       case Some(_, l) => {
         val vs = Scalar(l.foldLeft(BitVecLiteral(0, 0))((acc, r) => eval.evalBVBinExpr(BVCONCAT, acc, r))).toString
-        s"$varname[${ks.head._1}] := $vs"
+        s"$varname[${ks.headOption.map(_._1).getOrElse("null")}] := $vs"
       }
       case None if ks.length < 8 => s"$varname[${ks.map(_._1).mkString(",")}] := ${ks.map(_._2).mkString(",")}"
       case None => s"$varname[${ks.map(_._1).take(8).mkString(",")}...] := ${ks.map(_._2).take(8).mkString(", ")}... "
@@ -418,20 +420,14 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
 
 trait Interpreter[S, E](val f: Effects[S, E]) {
 
-  def interpretOne: State[S, Unit, E]
+  /*
+   * Returns value deciding whether to continue.
+   */
+  def interpretOne: State[S, Boolean, E]
 
   @tailrec
   final def run(begin: S): S = {
-    val c = for {
-      _ <- interpretOne
-      x <- f.getNext
-      continue = x match {
-        case Stopped() | ErrorStop(_) => false 
-        case _ => true
-      }
-    } yield (continue) 
-
-    val (fs,cont) = c.f(begin)
+    val (fs,cont) = interpretOne.f(begin)
 
     if (cont.contains(true)) then {
       run(fs)

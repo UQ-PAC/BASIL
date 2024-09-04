@@ -226,19 +226,22 @@ case object Eval {
   }
 }
 
-
 class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S, InterpreterError](f) {
 
-  def interpretOne: State[S, Unit, InterpreterError] = for {
+  def interpretOne: State[S, Boolean, InterpreterError] = for {
     next <- f.getNext
-    _ <- (next match {
-      case CallIntrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(f)
-      case Run(c: Statement)  => interpretStatement(f)(c)
-      case Run(c: Jump)       => interpretJump(f)(c)
-      case Stopped()          => State.pure(())
-      case ErrorStop(e)       => State.pure(())
-    }).flatMapE((e: InterpreterError) => f.setNext(ErrorStop(e)))
-  } yield ()
+    _ <- State.pure(Logger.debug(s"$next"))
+    r: Boolean <- (next match {
+      case CallIntrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(f).map(_ => true)
+      case Run(c: Statement)  => interpretStatement(f)(c).map(_ => true)
+      case Run(c: Jump)       => interpretJump(f)(c).map(_ => true)
+      case Stopped()          => State.pure(false)
+      case ErrorStop(e)       => State.pure(false)
+    })
+      .flatMapE((e: InterpreterError) => {
+        f.setNext(ErrorStop(e)).map(_ => false)
+      })
+  } yield (r)
 
   def interpretJump[S, T <: Effects[S, InterpreterError]](f: T)(j: Jump): State[S, Unit, InterpreterError] = {
     j match {
@@ -288,7 +291,8 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
       case assert: Assert =>
         for {
           b <- Eval.evalBool(f)(assert.body)
-          _ <- (if (!b) then {
+          _ <-
+            (if (!b) then {
                State.setError(FailedAssertion(assert))
              } else {
                f.setNext(Run(s.successor))
@@ -346,7 +350,7 @@ object InterpFuns {
     var done = false
     var x = List[(String, FunPointer)]()
 
-    def newAddr() : BigInt = {
+    def newAddr(): BigInt = {
       addr += 8
       addr
     }
@@ -360,10 +364,27 @@ object InterpFuns {
 
     val procs = p.procedures.filter(proc => proc.address.isDefined)
 
-    val fptrs = ctx.externalFunctions.toList.sortBy(_.name).flatMap(f => {
-      intrinsics.get(f.name).map(fp => (f.offset, fp))
-        .orElse(procs.find(p => p.name == f.name).map(proc => (f.offset, FunPointer(BitVecLiteral(proc.address.getOrElse(newAddr().toInt), 64), proc.name, Run(DirectCall(proc))))))
-    })
+    val fptrs = ctx.externalFunctions.toList
+      .sortBy(_.name)
+      .flatMap(f => {
+        intrinsics
+          .get(f.name)
+          .map(fp => (f.offset, fp))
+          .orElse(
+            procs
+              .find(p => p.name == f.name)
+              .map(proc =>
+                (
+                  f.offset,
+                  FunPointer(
+                    BitVecLiteral(proc.address.getOrElse(newAddr().toInt), 64),
+                    proc.name,
+                    Run(DirectCall(proc))
+                  )
+                )
+              )
+          )
+      })
 
     // sort for deterministic trace
     val stores = fptrs
@@ -371,12 +392,12 @@ object InterpFuns {
       .map((p) => {
         val (offset, fptr) = p
         Eval.storeSingle(s)("ghost-funtable", Scalar(fptr.addr), fptr)
-        >> (Eval.storeBV(s)(
-          "mem",
-          Scalar(BitVecLiteral(offset, 64)),
-          fptr.addr,
-          Endian.LittleEndian
-        ))
+          >> (Eval.storeBV(s)(
+            "mem",
+            Scalar(BitVecLiteral(offset, 64)),
+            fptr.addr,
+            Endian.LittleEndian
+          ))
       })
 
     State.sequence(State.pure(()), stores)
@@ -388,11 +409,12 @@ object InterpFuns {
     */
 
   def initialState[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = {
-    val SP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
-    val FP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
-    val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
+    val SP: BitVecLiteral = BitVecLiteral(0x78000000, 64)
+    val FP: BitVecLiteral = SP
+    val LR: BitVecLiteral = BitVecLiteral(BigInt("78000000", 16), 64)
 
     for {
+      h <- State.pure(Logger.debug("DEFINE MEMORY REGIONS"))
       h <- s.storeVar("ghost-funtable", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
       h <- s.storeVar("mem", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
       i <- s.storeVar("stack", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
@@ -410,7 +432,7 @@ object InterpFuns {
         m <- State.sequence(
           State.pure(()),
           mems
-            .filter(m => m.address != 0)
+            .filter(m => m.address != 0 && m.bytes.size != 0)
             .map(memory =>
               Eval.store(f)(
                 mem,
@@ -426,7 +448,7 @@ object InterpFuns {
     for {
       d <- initialState(f)
       funs <- State.sequence(
-        State.pure(()),
+        State.pure(Logger.debug("INITIALISE FUNCTION ADDRESSES")),
         p.procedures
           .filter(p => p.blocks.nonEmpty && p.address.isDefined)
           .map((proc: Procedure) =>
@@ -437,6 +459,7 @@ object InterpFuns {
             )
           )
       )
+      _ <- State.pure(Logger.debug("INITIALISE MEMORY SECTIONS"))
       mem <- initMemory("mem", p.initialMemory)
       mem <- initMemory("stack", p.initialMemory)
       mem <- initMemory("mem", p.readOnlyMemory)

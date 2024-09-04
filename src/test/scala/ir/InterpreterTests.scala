@@ -34,7 +34,7 @@ def mems[E, T <: Effects[T, E]](m: MemoryState): Map[BigInt, BitVecLiteral] = {
 
 class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
-  Logger.setLevel(LogLevel.INFO)
+  Logger.setLevel(LogLevel.WARN)
 
   def getProgram(name: String): IRContext = {
     val loading = ILLoadingConfig(
@@ -415,6 +415,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   test("fib breakpoints") {
 
+    Logger.setLevel(LogLevel.INFO)
     val fib = fibonacciProg(8)
     val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get).get
     val bp = BreakPoint(
@@ -422,10 +423,12 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       BreakPointLoc.CMDCond(watch, BinaryExpr(BVEQ, BitVecLiteral(5, 64), Register("R0", 64))),
       BreakPointAction(true, true, List(("R0", Register("R0", 64))), true)
     )
-    // val bp2 = BreakPoint("Fibentry",  BreakPointLoc.CMD(watch), BreakPointAction(true, false, List(("R0", Register("R0", 64))), true))
+    val bp2 = BreakPoint("Fibentry",  BreakPointLoc.CMD(watch), BreakPointAction(true, true , List(("R0", Register("R0", 64))), true))
     // val interp = LayerInterpreter(NormalInterpreter, RememberBreakpoints(NormalInterpreter, List(bp)))
     // val res = InterpFuns.interpretProg(interp)(fib, (InterpreterState(), List()))
     val res = interpretWithBreakPoints(fib, List(bp), NormalInterpreter, InterpreterState())
+    assert(res._1.nextCmd.isInstanceOf[ErrorStop])
+    assert(res._2.nonEmpty)
   }
 
   test("Capture IllegalArg") {
