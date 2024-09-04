@@ -16,27 +16,23 @@ import scala.util.control.Breaks.{break, breakable}
 
 
 def doLeft[L, T, V, E](f: State[L, V, E]) : State[(L, T), V, E] = for {
-  f <- State[(L, T), V, E]((s: (L, T)) => {
+  n <- State[(L, T), V, E]((s: (L, T)) => {
     val r = f.f(s._1)
     ((r._1, s._2), r._2)
   })
-} yield (f)
+} yield (n)
 
 def doRight[L, T, V, E](f: State[T, V, E]) : State[(L, T), V, E] = for {
-  f <- State[(L, T), V, E]((s: (L, T)) => {
+  n <- State[(L, T), V, E]((s: (L, T)) => {
     val r = f.f(s._2)
     ((s._1, r._1), r._2)
   })
-} yield (f)
+} yield (n)
 
 /**
  * Runs two interpreters "inner" and "before" simultaneously, returning the value from inner, and ignoring before
  */
 case class ProductInterpreter[L, T, E](val inner: Effects[L, E], val before: Effects[T, E]) extends Effects[(L, T), E] {
-  def interpretOne = for {
-    n <- doRight(before.interpretOne)
-    f <- doLeft(inner.interpretOne)
-  } yield ()
 
   def loadVar(v: String) = for {
     n <- doRight(before.loadVar(v))
@@ -87,11 +83,6 @@ case class ProductInterpreter[L, T, E](val inner: Effects[L, E], val before: Eff
 
 
 case class LayerInterpreter[L, T, E](val inner: Effects[L, E], val before: Effects[(L, T), E]) extends Effects[(L, T), E] {
-
-  def interpretOne = for {
-    n <- (before.interpretOne)
-    f <- doLeft(inner.interpretOne)
-  } yield ()
 
   def loadVar(v: String) = for {
     n <- (before.loadVar(v))

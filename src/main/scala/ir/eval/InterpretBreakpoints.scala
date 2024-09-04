@@ -33,7 +33,7 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, v
     }, breaks)
   }
 
-  override def interpretOne : State[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), Unit, InterpreterError] = for {
+  override def getNext: State[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), ExecutionContinuation, InterpreterError] = for {
     v : ExecutionContinuation <- doLeft(f.getNext)
     n <- v match {
       case Run(s) => for {
@@ -68,7 +68,7 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, v
       } yield ()
       case _ => State.pure(())
       }
-    } yield ()
+    } yield (v)
 
 }
 

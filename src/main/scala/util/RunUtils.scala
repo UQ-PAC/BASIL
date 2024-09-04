@@ -213,20 +213,20 @@ object IRTransform {
     * add in modifies from the spec.
     */
   def prepareForTranslation(config: ILLoadingConfig, ctx: IRContext): Unit = {
-    ctx.program.determineRelevantMemory(ctx.globalOffsets)
+    // ctx.program.determineRelevantMemory(ctx.globalOffsets)
 
     Logger.info("[!] Stripping unreachable")
     val before = ctx.program.procedures.size
-    // transforms.stripUnreachableFunctions(ctx.program, config.procedureTrimDepth)
+    //transforms.stripUnreachableFunctions(ctx.program, config.procedureTrimDepth)
     Logger.info(
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
 
-    // val stackIdentification = StackSubstituter()
-    // stackIdentification.visitProgram(ctx.program)
+    //val stackIdentification = StackSubstituter()
+    //stackIdentification.visitProgram(ctx.program)
 
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
-    ctx.program.setModifies(specModifies)
+    // ctx.program.setModifies(specModifies)
     assert(invariant.singleCallBlockEnd(ctx.program))
   }
 
@@ -497,9 +497,8 @@ object RunUtils {
 
   def loadAndTranslate(q: BASILConfig): BASILResult = {
     Logger.info("[!] Loading Program")
-    val ctx = IRLoading.load(q.loading)
-
-    IRTransform.doCleanup(ctx)
+    var ctx = IRLoading.load(q.loading)
+    ctx = IRTransform.doCleanup(ctx)
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-before-analysis.il"))
     val analysis = q.staticAnalysis.map(conf => staticAnalysis(conf, ctx))

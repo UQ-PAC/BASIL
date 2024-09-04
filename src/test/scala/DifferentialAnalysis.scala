@@ -6,7 +6,7 @@ import ir.Endian.LittleEndian
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
-import util.{BASILConfig, IRLoading, ILLoadingConfig, IRContext, RunUtils, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext, BASILResult, Logger, LogLevel}
+import util.{BASILConfig, IRLoading, ILLoadingConfig, IRContext, RunUtils, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext, BASILResult, Logger, LogLevel, IRTransform}
 import ir.eval.{interpretTrace, interpret, ExecEffect, Stopped}
 
 
@@ -20,7 +20,7 @@ import scala.collection.mutable
 
 class DifferentialAnalysis extends AnyFunSuite {
 
-  Logger.setLevel(LogLevel.DEBUG)
+  Logger.setLevel(LogLevel.ERROR)
 
   def diffTest(initial: IRContext, transformed: IRContext) = {
     val (initialRes,traceInit) = interpretTrace(initial)
@@ -34,10 +34,11 @@ class DifferentialAnalysis extends AnyFunSuite {
         case e @ ExecEffect.LoadMem("mem", _) => e
       }
     }
-    println((traceInit.t).mkString("\n"))
-    assert(initialRes.nextCmd == Stopped())
     assert(result.nextCmd == Stopped())
+    assert(initialRes.nextCmd == Stopped())
     assert(Set.empty == initialRes.memoryState.getMem("mem").toSet.diff(result.memoryState.getMem("mem").toSet))
+    assert(traceInit.t.nonEmpty)
+    assert(traceRes.t.nonEmpty)
     assert(filterEvents(traceInit.t).mkString("\n") == filterEvents(traceRes.t).mkString("\n"))
   }
 
@@ -61,9 +62,11 @@ class DifferentialAnalysis extends AnyFunSuite {
     )
 
 
-    val program = loadAndTranslate(basilConfigNoAnalysis).ir
+    var ictx = IRLoading.load(basilConfigNoAnalysis.loading)
+    ictx = IRTransform.doCleanup(ictx)
+
     val compare = loadAndTranslate(basilConfig).ir
-    diffTest(program, compare)
+    diffTest(ictx, compare)
 
   }
 

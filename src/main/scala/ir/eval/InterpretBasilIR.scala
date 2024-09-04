@@ -226,119 +226,19 @@ case object Eval {
   }
 }
 
-object InterpFuns {
 
-  def initRelocTable[S, T <: Effects[S, InterpreterError]](s: T)(ctx: IRContext): State[S, Unit, InterpreterError] = {
+class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S, InterpreterError](f) {
 
-    val p = ctx.program
-
-    val base = ctx.symbols.find(_.name == "__end__").get
-    var addr = base.value
-    var done = false
-    var x = List[(String, FunPointer)]()
-
-    def newAddr() : BigInt = {
-      addr += 8
-      addr
-    }
-
-    for ((fname, fun) <- LibcIntrinsic.intrinsics) {
-      val name = fname.takeWhile(c => c != '@')
-      println(name)
-      x = (name, FunPointer(BitVecLiteral(newAddr(), 64), name, CallIntrinsic(name))) :: x
-    }
-
-    val intrinsics = x.toMap
-
-    val procs = p.procedures.filter(proc => proc.address.isDefined)
-
-    val fptrs = ctx.externalFunctions.toList.sortBy(_.name).flatMap(f => {
-      intrinsics.get(f.name).map(fp => (f.offset, fp))
-        .orElse(procs.find(p => p.name == f.name).map(proc => (f.offset, FunPointer(BitVecLiteral(proc.address.getOrElse(newAddr().toInt), 64), proc.name, Run(DirectCall(proc))))))
-    })
-
-    // sort for deterministic trace
-    val stores = fptrs
-      .sortBy(f => f._1)
-      .map((p) => {
-        val (offset, fptr) = p
-        Eval.storeSingle(s)("ghost-funtable", Scalar(fptr.addr), fptr)
-        >> (Eval.storeBV(s)(
-          "mem",
-          Scalar(BitVecLiteral(offset, 64)),
-          fptr.addr,
-          Endian.LittleEndian
-        ))
-      })
-
-    State.sequence(State.pure(()), stores)
-  }
-
-  /** Functions which compile BASIL IR down to the minimal interpreter effects.
-    *
-    * Each function takes as parameter an implementation of Effects[S]
-    */
-
-  def initialState[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = {
-    val SP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
-    val FP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
-    val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
-
-    for {
-      h <- s.storeVar("ghost-funtable", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
-      h <- s.storeVar("mem", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
-      i <- s.storeVar("stack", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
-      j <- s.storeVar("R31", Scope.Global, Scalar(SP))
-      k <- s.storeVar("R29", Scope.Global, Scalar(FP))
-      l <- s.storeVar("R30", Scope.Global, Scalar(LR))
-      l <- s.storeVar("R0", Scope.Global, Scalar(BitVecLiteral(0, 64)))
-      l <- s.storeVar("R1", Scope.Global, Scalar(BitVecLiteral(0, 64)))
-    } yield (l)
-  }
-
-  def initialiseProgram[S, T <: Effects[S, InterpreterError]](f: T)(p: Program): State[S, Unit, InterpreterError] = {
-    def initMemory(mem: String, mems: ArrayBuffer[MemorySection]) = {
-      for {
-        m <- State.sequence(
-          State.pure(()),
-          mems
-            .filter(m => m.address != 0)
-            .map(memory =>
-              Eval.store(f)(
-                mem,
-                Scalar(BitVecLiteral(memory.address, 64)),
-                memory.bytes.toList.map(Scalar(_)),
-                Endian.BigEndian
-              )
-            )
-        )
-      } yield ()
-    }
-
-    for {
-      d <- initialState(f)
-      funs <- State.sequence(
-        State.pure(()),
-        p.procedures
-          .filter(p => p.blocks.nonEmpty && p.address.isDefined)
-          .map((proc: Procedure) =>
-            Eval.storeSingle(f)(
-              "ghost-funtable",
-              Scalar(BitVecLiteral(proc.address.get, 64)),
-              FunPointer(BitVecLiteral(proc.address.get, 64), proc.name, Run(IRWalk.firstInBlock(proc.entryBlock.get)))
-            )
-          )
-      )
-      mem <- initMemory("mem", p.initialMemory)
-      mem <- initMemory("stack", p.initialMemory)
-      mem <- initMemory("mem", p.readOnlyMemory)
-      mem <- initMemory("stack", p.readOnlyMemory)
-      mainfun = {
-        p.mainProcedure
-      }
-      r <- f.call(mainfun.name, Run(IRWalk.firstInBlock(mainfun.entryBlock.get)), Stopped())
-    } yield (r)
-  }
+  def interpretOne: State[S, Unit, InterpreterError] = for {
+    next <- f.getNext
+    _ <- (next match {
+      case CallIntrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(f)
+      case Run(c: Statement)  => interpretStatement(f)(c)
+      case Run(c: Jump)       => interpretJump(f)(c)
+      case Stopped()          => State.pure(())
+      case ErrorStop(e)       => State.pure(())
+    }).flatMapE((e: InterpreterError) => f.setNext(ErrorStop(e)))
+  } yield ()
 
   def interpretJump[S, T <: Effects[S, InterpreterError]](f: T)(j: Jump): State[S, Unit, InterpreterError] = {
     j match {
@@ -434,21 +334,119 @@ object InterpFuns {
       case _: NOP => f.setNext(Run(s.successor))
     }
   }
+}
 
-  def interpret[S, E, T <: Effects[S, E]](f: T, m: S): S = {
-    // run to fixed point
-    var o = m
-    var n = State.execute(o, f.interpretOne)
-    while (o != n) {
-      o = n
-      n = State.execute(o, f.interpretOne)
+object InterpFuns {
+
+  def initRelocTable[S, T <: Effects[S, InterpreterError]](s: T)(ctx: IRContext): State[S, Unit, InterpreterError] = {
+
+    val p = ctx.program
+
+    val base = ctx.symbols.find(_.name == "__end__").get
+    var addr = base.value
+    var done = false
+    var x = List[(String, FunPointer)]()
+
+    def newAddr() : BigInt = {
+      addr += 8
+      addr
     }
-    n
+
+    for ((fname, fun) <- LibcIntrinsic.intrinsics) {
+      val name = fname.takeWhile(c => c != '@')
+      x = (name, FunPointer(BitVecLiteral(newAddr(), 64), name, CallIntrinsic(name))) :: x
+    }
+
+    val intrinsics = x.toMap
+
+    val procs = p.procedures.filter(proc => proc.address.isDefined)
+
+    val fptrs = ctx.externalFunctions.toList.sortBy(_.name).flatMap(f => {
+      intrinsics.get(f.name).map(fp => (f.offset, fp))
+        .orElse(procs.find(p => p.name == f.name).map(proc => (f.offset, FunPointer(BitVecLiteral(proc.address.getOrElse(newAddr().toInt), 64), proc.name, Run(DirectCall(proc))))))
+    })
+
+    // sort for deterministic trace
+    val stores = fptrs
+      .sortBy(f => f._1)
+      .map((p) => {
+        val (offset, fptr) = p
+        Eval.storeSingle(s)("ghost-funtable", Scalar(fptr.addr), fptr)
+        >> (Eval.storeBV(s)(
+          "mem",
+          Scalar(BitVecLiteral(offset, 64)),
+          fptr.addr,
+          Endian.LittleEndian
+        ))
+      })
+
+    State.sequence(State.pure(()), stores)
   }
 
-  def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: Program, is: S): S = {
-    val begin = State.execute(is, initialiseProgram(f)(p))
-    interpret(f, begin)
+  /** Functions which compile BASIL IR down to the minimal interpreter effects.
+    *
+    * Each function takes as parameter an implementation of Effects[S]
+    */
+
+  def initialState[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = {
+    val SP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
+    val FP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
+    val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
+
+    for {
+      h <- s.storeVar("ghost-funtable", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
+      h <- s.storeVar("mem", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+      i <- s.storeVar("stack", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+      j <- s.storeVar("R31", Scope.Global, Scalar(SP))
+      k <- s.storeVar("R29", Scope.Global, Scalar(FP))
+      l <- s.storeVar("R30", Scope.Global, Scalar(LR))
+      l <- s.storeVar("R0", Scope.Global, Scalar(BitVecLiteral(0, 64)))
+      l <- s.storeVar("R1", Scope.Global, Scalar(BitVecLiteral(0, 64)))
+    } yield (l)
+  }
+
+  def initialiseProgram[S, T <: Effects[S, InterpreterError]](f: T)(p: Program): State[S, Unit, InterpreterError] = {
+    def initMemory(mem: String, mems: ArrayBuffer[MemorySection]) = {
+      for {
+        m <- State.sequence(
+          State.pure(()),
+          mems
+            .filter(m => m.address != 0)
+            .map(memory =>
+              Eval.store(f)(
+                mem,
+                Scalar(BitVecLiteral(memory.address, 64)),
+                memory.bytes.toList.map(Scalar(_)),
+                Endian.BigEndian
+              )
+            )
+        )
+      } yield ()
+    }
+
+    for {
+      d <- initialState(f)
+      funs <- State.sequence(
+        State.pure(()),
+        p.procedures
+          .filter(p => p.blocks.nonEmpty && p.address.isDefined)
+          .map((proc: Procedure) =>
+            Eval.storeSingle(f)(
+              "ghost-funtable",
+              Scalar(BitVecLiteral(proc.address.get, 64)),
+              FunPointer(BitVecLiteral(proc.address.get, 64), proc.name, Run(IRWalk.firstInBlock(proc.entryBlock.get)))
+            )
+          )
+      )
+      mem <- initMemory("mem", p.initialMemory)
+      mem <- initMemory("stack", p.initialMemory)
+      mem <- initMemory("mem", p.readOnlyMemory)
+      mem <- initMemory("stack", p.readOnlyMemory)
+      mainfun = {
+        p.mainProcedure
+      }
+      r <- f.call(mainfun.name, Run(IRWalk.firstInBlock(mainfun.entryBlock.get)), Stopped())
+    } yield (r)
   }
 
   def initBSS[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext): State[S, Unit, InterpreterError] = {
@@ -475,9 +473,18 @@ object InterpFuns {
     State.execute(is, st)
   }
 
+  /* Intialise from ELF and Interpret program */
   def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext, is: S): S = {
     val begin = initProgState(f)(p, is)
-    interpret(f, begin)
+    val interp = BASILInterpreter(f)
+    interp.run(begin)
+  }
+
+  /* Interpret IR program */
+  def interpretProg[S, T <: Effects[S, InterpreterError]](f: T)(p: Program, is: S): S = {
+    val begin = State.execute(is, initialiseProgram(f)(p))
+    val interp = BASILInterpreter(f)
+    interp.run(begin)
   }
 }
 

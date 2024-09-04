@@ -76,9 +76,7 @@ case object BasilValue {
 /** Minimal language defining all state transitions in the interpreter, defined for the interpreter's concrete state T.
   */
 trait Effects[T, E] {
-
-  // perform an execution step
-  def interpretOne: State[T, Unit, E]
+  /* expression eval */
 
   def loadVar(v: String): State[T, BasilValue, E]
 
@@ -108,7 +106,6 @@ trait Effects[T, E] {
 }
 
 trait NopEffects[T, E] extends Effects[T, E] {
-  def interpretOne = State.pure(())
   def loadVar(v: String) = State.pure(Scalar(FalseLiteral))
   def loadMem(v: String, addrs: List[BasilValue]) = State.pure(List())
   def evalAddrToProc(addr: Int) = State.pure(None)
@@ -418,16 +415,29 @@ object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
         ms <- s.memoryState.doStore(vname, update)
       } yield (s.copy(memoryState = ms))
     })
+}
 
-  def interpretOne: State[InterpreterState, Unit, InterpreterError] = for {
-    next <- getNext
-    _ <- (next match {
-      case CallIntrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(this)
-      case Run(c: Statement)  => InterpFuns.interpretStatement(this)(c)
-      case Run(c: Jump)       => InterpFuns.interpretJump(this)(c)
-      case Stopped()          => State.pure(())
-      case ErrorStop(e)       => State.pure(())
-    }).flatMapE((e: InterpreterError) => setNext(ErrorStop(e)))
-  } yield ()
+trait Interpreter[S, E](val f: Effects[S, E]) {
 
+  def interpretOne: State[S, Unit, E]
+
+  @tailrec
+  final def run(begin: S): S = {
+    val c = for {
+      _ <- interpretOne
+      x <- f.getNext
+      continue = x match {
+        case Stopped() | ErrorStop(_) => false 
+        case _ => true
+      }
+    } yield (continue) 
+
+    val (fs,cont) = c.f(begin)
+
+    if (cont.contains(true)) then {
+      run(fs)
+    } else {
+      fs
+    }
+  }
 }
