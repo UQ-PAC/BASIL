@@ -123,3 +123,12 @@ def interpretWithBreakPoints[I](
   val res = InterpFuns.interpretProg(interp)(p, (innerInitialState, List()))
   res
 }
+
+def interpretBreakPoints(p: IRContext, breakpoints: List[BreakPoint]) = {
+  interpretWithBreakPoints(p, breakpoints, NormalInterpreter, InterpreterState())
+}
+
+
+def interpretBreakPoints(p: Program, breakpoints: List[BreakPoint]) = {
+  interpretWithBreakPoints(p, breakpoints, NormalInterpreter, InterpreterState())
+}

@@ -37,13 +37,13 @@ To see an example of this used to validate the constant prop analysis see [/src/
 
 #### BreakPoints
 
-Finally `interpretWithBreakPoints(p: IRContext, List[BreakPoint], interpreter, initialState)` is used to 
-run an interpreter, and perform additional work at specific code points. For example, this may be invoked such as:
+Finally `interpretBreakPoints(p: IRContext, breakpoints: List[BreakPoint])` is used to 
+run an interpreter and perform additional actions at specified code points. For example, this may be invoked such as:
 
 ```scala
 val watch = IRWalk.firstInProc((program.procedures.find(_.name == "main")).get).get
 val bp = BreakPoint("entrypoint",  BreakPointLoc.CMD(watch), BreakPointAction(saveState=true, stop=true, evalExprs=List(("R0", Register("R0", 64))), log=true))
-val res = interpretWithBreakPoints(program, List(bp), NormalInterpreter, InterpreterState())
+val res = interpretBreakPoints(program, List(bp))
 ```
 
 The structure of a breakpoint is as follows:

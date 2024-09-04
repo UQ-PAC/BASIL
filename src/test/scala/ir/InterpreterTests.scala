@@ -424,8 +424,6 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       BreakPointAction(true, true, List(("R0", Register("R0", 64))), true)
     )
     val bp2 = BreakPoint("Fibentry",  BreakPointLoc.CMD(watch), BreakPointAction(true, true , List(("R0", Register("R0", 64))), true))
-    // val interp = LayerInterpreter(NormalInterpreter, RememberBreakpoints(NormalInterpreter, List(bp)))
-    // val res = InterpFuns.interpretProg(interp)(fib, (InterpreterState(), List()))
     val res = interpretWithBreakPoints(fib, List(bp), NormalInterpreter, InterpreterState())
     assert(res._1.nextCmd.isInstanceOf[ErrorStop])
     assert(res._2.nonEmpty)

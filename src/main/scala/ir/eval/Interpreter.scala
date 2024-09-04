@@ -39,11 +39,11 @@ case class Scalar(val value: Literal) extends BasilValue(value.getType) {
   }
 }
 
-/* Slightly hacky way of mapping addresses to function calls within the interpreter dynamic state */
+/* Abstract callable function address */
 case class FunPointer(val addr: BitVecLiteral, val name: String, val call: ExecutionContinuation)
     extends BasilValue(addr.getType)
 
-/* Erase the type of basil values and enforce the invariant that
+/* We erase the type of basil values and enforce the invariant that
    \exists i . \forall v \in value.keys , v.irType = i  and
    \exists j . \forall v \in value.values, v.irType = j
  */

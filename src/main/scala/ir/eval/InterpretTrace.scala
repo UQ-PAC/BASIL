@@ -56,14 +56,22 @@ case class TraceGen[E]() extends NopEffects[Trace, E] {
 
 }
 
-def tracingInterpreter = ProductInterpreter(NormalInterpreter, TraceGen())
-
-def interpretTrace(p: Program): (InterpreterState, Trace) = {
-  InterpFuns.interpretProg(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
+def interpretWithTrace[I](p: Program, innerInterpreter: Effects[I, InterpreterError], innerInitialState: I): (I, Trace) = {
+  val tracingInterpreter = ProductInterpreter(innerInterpreter, TraceGen())
+  InterpFuns.interpretProg(tracingInterpreter)(p, (innerInitialState, Trace(List())))
 }
 
-def interpretTrace(p: IRContext): (InterpreterState, Trace) = {
-  val begin = InterpFuns.initProgState(tracingInterpreter)(p, (InterpreterState(), Trace(List())))
+def interpretWithTrace[I](p: IRContext, innerInterpreter: Effects[I, InterpreterError], innerInitialState: I): (I, Trace) = {
+  val tracingInterpreter = ProductInterpreter(innerInterpreter, TraceGen())
+  val begin = InterpFuns.initProgState(tracingInterpreter)(p, (innerInitialState, Trace(List())))
   // throw away initialisation trace
   BASILInterpreter(tracingInterpreter).run((begin._1, Trace(List())))
+}
+
+def interpretTrace(p: Program) = {
+  interpretWithTrace(p, NormalInterpreter, InterpreterState())
+}
+
+def interpretTrace(p: IRContext) = {
+  interpretWithTrace(p, NormalInterpreter, InterpreterState())
 }
