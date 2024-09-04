@@ -14,6 +14,7 @@ exited on a non-error stop state.
          StoreVar(#5,Local,0xfd0:bv64)
          StoreMem(mem,HashMap(0xfd0:bv64 -> 0xf0:bv8, 0xfd6:bv64 -> 0x0:bv8, 0xfd2:bv64 -> 0x0:bv8, 0xfd3:bv64 -> 0x0:bv8, 0xfd4:bv64 -> 0x0:bv8, 0xfd7:bv64 -> 0x0:bv8, 0xfd5:bv64 -> 0x0:bv8, 0xfd1
 ...
+[INFO]   Interpreter stopped normally.
 ```
 
 The `--verbose` flag can also be used, which may print interpreter trace events as they are executed, but not this may not correspond to the actual 
@@ -134,6 +135,27 @@ This means, `Effects` triggered by an inner `Effects[]` instance do not flow bac
 but only appear from when `Interpreter` above the `ProductInterpreter` interprets the program via effect calls. 
 For this reason if, for example, `NormalInterpreter` makes effect calls they will not appear in a trace emitted by `interptretTrace`. 
 
+### Note on memory space initialisation 
 
+Most of the interpret functions are overloaded such that there is a version taking a program `interpret(p: Program)`, 
+and a version taking `IRContext`. The variant taking IRContext uses the ELF symbol information to initialise the 
+memory before interpretation. If you are interpreting a real program (i.e. not a synthetic example created through 
+the DSL), this is most likely required.
+
+We initialise:
+
+- The general interpreter state, stack and memory regions, stack pointer, a symbolic mapping from addresses functions
+- The initial and readonly memory sections stored in Program
+- The `.bss` section to zero
+- The relocation table. Each listed offset is stored an address to either a real procedure in the program, or a 
+  location storing a symbolic function pointer to an intrinsic function.
+
+- `.bss` is generally the top of the initialised data, the ELF symbol `__bss_end__` being equal to the symbol `__end__`.
+  Above this we can somewhat choose arbitrarily where to put things, usually the heap is above, followed by 
+  dynamically linked symbols, then the stack. There is currently no stack overflow checking, or heap implemented in the 
+  interpreter.
+- Unfortunately these details are defined by the load-time linker and the system's linker script, and it is hard to find a good description
+  of their behaviour. Some details are described here https://refspecs.linuxfoundation.org/elf/elf.pdf, and here 
+  https://dl.acm.org/doi/abs/10.1145/2983990.2983996.
 
 
