@@ -12,26 +12,9 @@ import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}
 import util.{ILLoadingConfig, IRContext, IRLoading, IRTransform} 
 
-// def initialMem(): MemoryState = {
-//   val SP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
-//   val FP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
-//   val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
-// 
-//   MemoryState()
-//     .setVar(globalFrame, "mem", MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
-//     .setVar(globalFrame, "stack", MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
-//     .setVar(globalFrame, "R31", Scalar(SP))
-//     .setVar(globalFrame, "R29", Scalar(FP))
-//     .setVar(globalFrame, "R30", Scalar(LR))
-// }
-
-
-// def initialMem() = InterpFuns.initialState(InterpreterState(), List())
 
 def load(s: InterpreterState, global: SpecGlobal) : Option[BitVecLiteral] = {
   val f = NormalInterpreter
- //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
-  // m.evalBV("mem", BitVecLiteral(64, global.address), Endian.LittleEndian, global.size) //  i.getMemory(global.address.toInt, global.size, Endian.LittleEndian, i.mems)
   
   try {
     State.evaluate(s, Eval.evalBV(f)(MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size))) match {
@@ -53,9 +36,7 @@ def mems[E, T <: Effects[T, E]](m: MemoryState) : Map[BigInt, BitVecLiteral] = {
 
 class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
-  // var i: Interpreter = Interpreter()
-  // Logger.setLevel(LogLevel.DEBUG)
-  Logger.setLevel(LogLevel.ERROR)
+  Logger.setLevel(LogLevel.INFO)
 
 
   def getProgram(name: String): IRContext = {
@@ -78,9 +59,6 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     // val stackIdentification = StackSubstituter()
     // stackIdentification.visitProgram(IRProgram)
     ctx.program.setModifies(Map())
-
-
-    // (IRProgram, globals)
     ctx
   }
 
@@ -330,13 +308,6 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       "y" -> ('b'.toInt), 
     )
 
-    // val (program, globals) = getProgram("initialisation")
-
-    // val watch = IRWalk.firstInProc((program.mainProcedure)).get
-    // val globloads = globals.map(global => (global.name, MemoryLoad(SharedMemory("mem", 64, 8), BitVecLiteral(global.address, 64), Endian.LittleEndian, global.size))).toList
-    // val bp = BreakPoint("beginproc",  BreakPointLoc.CMD(watch), BreakPointAction(false, false, globloads, true))
-    // val res = interpretWithBreakPoints(program, List(bp), NormalInterpreter, InterpreterState())
-
 
     testInterpret("initialisation", expected)
   }
@@ -457,7 +428,6 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       val r = interpretTrace(fib)
  
      assert(r._1.nextCmd == Stopped())
-     info(r._2.t.mkString("\n"))
      // Show interpreted result
      //
  
@@ -465,14 +435,13 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
    test("fib breakpoints") {
 
-     Logger.setLevel(LogLevel.WARN)
      val fib = fibonacciProg(8)
      val watch = IRWalk.firstInProc((fib.procedures.find(_.name == "fib")).get).get
      val bp = BreakPoint("Fibentry",  BreakPointLoc.CMDCond(watch, BinaryExpr(BVEQ, BitVecLiteral(5, 64), Register("R0", 64))), BreakPointAction(true, true, List(("R0", Register("R0", 64))), true))
+     // val bp2 = BreakPoint("Fibentry",  BreakPointLoc.CMD(watch), BreakPointAction(true, false, List(("R0", Register("R0", 64))), true))
      // val interp = LayerInterpreter(NormalInterpreter, RememberBreakpoints(NormalInterpreter, List(bp)))
      // val res = InterpFuns.interpretProg(interp)(fib, (InterpreterState(), List()))
      val res = interpretWithBreakPoints(fib, List(bp), NormalInterpreter, InterpreterState())
-     println(res)
 
 
    }

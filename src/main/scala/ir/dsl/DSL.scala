@@ -17,6 +17,13 @@ val R30: Register = Register("R30", 64)
 val R31: Register = Register("R31", 64)
 
 
+def exprEq(l: Expr, r: Expr) : Expr = (l, r) match {
+  case (l, r) if l.getType != r.getType => FalseLiteral
+  case (l, r) if l.getType == BoolType => BinaryExpr(BoolEQ, l, r) 
+  case (l, r) if l.getType.isInstanceOf[BitVecType] => BinaryExpr(BVEQ, l, r) 
+  case (l, r) if l.getType == IntType => BinaryExpr(IntEQ, l, r) 
+  case _ => FalseLiteral
+}
 
 def bv32(i: Int): BitVecLiteral = BitVecLiteral(i, 32)
 
@@ -25,6 +32,8 @@ def bv64(i: Int): BitVecLiteral = BitVecLiteral(i, 64)
 def bv8(i: Int): BitVecLiteral = BitVecLiteral(i, 8)
 
 def bv16(i: Int): BitVecLiteral = BitVecLiteral(i, 16)
+
+def R(i: Int): Register = Register(s"R$i", 64)
 
 case class DelayNameResolve(ident: String) {
   def resolveProc(prog: Program): Option[Procedure] = prog.collectFirst {

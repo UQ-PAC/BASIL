@@ -3,6 +3,7 @@ import ir._
 import ir.eval.BitVectorEval.*
 import ir.*
 import util.Logger
+import util.IRContext
 import util.functional.*
 import util.functional.State.*
 import boogie.Scope
@@ -41,9 +42,12 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, v
     )
   }
 
-  override def getNext
-      : State[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), ExecutionContinuation, InterpreterError] = {
-      for {
+  override def getNext: State[
+    (T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]),
+    ExecutionContinuation,
+    InterpreterError
+  ] = {
+    for {
       v: ExecutionContinuation <- doLeft(f.getNext)
       n <- v match {
         case Run(s) =>
@@ -97,6 +101,17 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, v
       }
     } yield (v)
   }
+}
+
+def interpretWithBreakPoints[I](
+    p: IRContext,
+    breakpoints: List[BreakPoint],
+    innerInterpreter: Effects[I, InterpreterError],
+    innerInitialState: I
+): (I, List[(BreakPoint, Option[I], List[(String, Expr, Expr)])]) = {
+  val interp = LayerInterpreter(innerInterpreter, RememberBreakpoints(innerInterpreter, breakpoints))
+  val res = InterpFuns.interpretProg(interp)(p, (innerInitialState, List()))
+  res
 }
 
 def interpretWithBreakPoints[I](

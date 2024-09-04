@@ -34,8 +34,10 @@ class DifferentialAnalysis extends AnyFunSuite {
         case e @ ExecEffect.LoadMem("mem", _) => e
       }
     }
-    assert(result.nextCmd == Stopped())
+
+    Logger.info(traceInit.t.map(_.toString.take(80)).mkString("\n"))
     assert(initialRes.nextCmd == Stopped())
+    assert(result.nextCmd == Stopped())
     assert(Set.empty == initialRes.memoryState.getMem("mem").toSet.diff(result.memoryState.getMem("mem").toSet))
     assert(traceInit.t.nonEmpty)
     assert(traceRes.t.nonEmpty)
@@ -43,31 +45,20 @@ class DifferentialAnalysis extends AnyFunSuite {
   }
 
   def testProgram(testName: String, examplePath: String) = {
-    val basilConfig = BASILConfig(
-      loading = ILLoadingConfig(inputFile = examplePath + testName + ".adt",
-        relfFile = examplePath + testName + ".relf",
-        dumpIL = None,
-      ),
-      outputPrefix = "basil-test",
-      staticAnalysis = Some(StaticAnalysisConfig(None, None, None)),
+
+    val loading = ILLoadingConfig(inputFile = examplePath + testName + ".adt",
+      relfFile = examplePath + testName + ".relf",
+      dumpIL = None,
     )
 
-    val basilConfigNoAnalysis = BASILConfig(
-      loading = ILLoadingConfig(inputFile = examplePath + testName + ".adt",
-        relfFile = examplePath + testName + ".relf",
-        dumpIL = None,
-      ),
-      outputPrefix = "basil-test",
-      staticAnalysis = None,
-    )
-
-
-    var ictx = IRLoading.load(basilConfigNoAnalysis.loading)
+    var ictx = IRLoading.load(loading)
     ictx = IRTransform.doCleanup(ictx)
 
-    val compare = loadAndTranslate(basilConfig).ir
-    diffTest(ictx, compare)
+    var comparectx = IRLoading.load(loading)
+    comparectx = IRTransform.doCleanup(ictx)
+    val analysisres = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), comparectx)
 
+    diffTest(ictx, comparectx)
   }
 
   test("indirect_call_example") {
