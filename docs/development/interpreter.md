@@ -71,28 +71,28 @@ To see an example of this used to validate the constant prop analysis see [/src/
 ### Summary
 
 -  [Bitvector.scala](../../src/main/scala/ir/eval/Bitvector.scala)
-  - Evaluation of bitvector operations, throws `IllegalArgumentException` on violation of contract
-    (e.g negative divisor, type mismatch)
+    - Evaluation of bitvector operations, throws `IllegalArgumentException` on violation of contract
+      (e.g negative divisor, type mismatch)
 -  [ExprEval.scala] (../../src/main/scala/ir/eval/ExprEval.scala)
-  - Evaluation of expressions, defined in terms of partial evaluation down to a Literal
+    - Evaluation of expressions, defined in terms of partial evaluation down to a Literal
 -  [Interpreter.scala](../../src/main/scala/ir/eval/Interpreter.scala)
-  - Definition of core `Effects[S, E]` and `Interpreter[S, E]` types describing state transitions in 
-    the interpreter
-  - Instantiation/definition of `Effects` for concrete state `InterpreterState`
+    - Definition of core `Effects[S, E]` and `Interpreter[S, E]` types describing state transitions in 
+      the interpreter
+    - Instantiation/definition of `Effects` for concrete state `InterpreterState`
 -  [InterpreterProduct.scala](../../src/main/scala/ir/eval/InterpreterProduct.scala)
-  - Definition of product and layering composition of generic `Effects[S, E]`s interpreters
+    - Definition of product and layering composition of generic `Effects[S, E]`s interpreters
 -  [InterpretBasilIR.scala](../../src/main/scala/ir/eval/InterpretBasilIR.scala)
-  - Definition of ELF initialisation, and the interpreter for BASIL IR, using a generic 
+    - Definition of ELF initialisation, and the interpreter for BASIL IR, using a generic 
     `Effects` instance and concrete state.
 -  [InterpretBreakpoints.scala](../../src/main/scala/ir/eval/InterpretBreakpoints.scala)
-  - Definition of a generic interpreter with a breakpoint checker layered on top
+    - Definition of a generic interpreter with a breakpoint checker layered on top
 -  [InterpretTrace.scala](../../src/main/scala/ir/eval/InterpretTrace.scala)
-  - Definition of a generic interpreter which records a trace of calls to the `Effects[]` instance. 
+    - Definition of a generic interpreter which records a trace of calls to the `Effects[]` instance. 
 
 ### Explanation
 
 The interpreter is structured for compositionality, at its core is the `Effects[S, E]` type, defined in [Interpreter.scala](../../src/main/scala/ir/eval/Interpreter.scala). 
-This type defines a small set of functions which describe all the possible state transformations, over a concrete state `S`, and error type E (always `InterpreterError` in practice). 
+This type defines a small set of functions which describe all the possible state transformations, over a concrete state `S`, and error type `E` (always `InterpreterError` in practice). 
 
 This is implemented using the state Monad, `State[S,V,E]` where `S` is the state, `V` the value, and `E` the error type. 
 This is a flattened `State[S, Either[E]]`, defined in [util/functional.scala](../../src/main/scala/util/functional.scala).
@@ -126,6 +126,12 @@ case class LayerInterpreter[L, T, E](val inner: Effects[L, E], val before: Effec
 ```
 
 Examples of using these are in the `interpretTrace` and `interpretWithBreakPoints` interpreters respectively.
+
+Note, this only works by the aforementioned requirement that all effect calls come from outside the `Effects[]`
+instance itself. In the simple case, the `Interpreter` instance is the only object calling `Effects`. 
+This means, `Effects` triggered by an inner `Effects[]` instance do not flow back to the `ProductInterpreter`, 
+but only appear from when `Interpreter` above the `ProductInterpreter` interprets the program via effect calls. 
+For this reason if, for example, `NormalInterpreter` makes effect calls they will not appear in a trace emitted by `interptretTrace`. 
 
 
 
