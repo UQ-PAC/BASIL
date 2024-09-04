@@ -73,7 +73,7 @@ To see an example of this used to validate the constant prop analysis see [/src/
 -  [Bitvector.scala](../../src/main/scala/ir/eval/Bitvector.scala)
     - Evaluation of bitvector operations, throws `IllegalArgumentException` on violation of contract
       (e.g negative divisor, type mismatch)
--  [ExprEval.scala] (../../src/main/scala/ir/eval/ExprEval.scala)
+-  [ExprEval.scala](../../src/main/scala/ir/eval/ExprEval.scala)
     - Evaluation of expressions, defined in terms of partial evaluation down to a Literal
 -  [Interpreter.scala](../../src/main/scala/ir/eval/Interpreter.scala)
     - Definition of core `Effects[S, E]` and `Interpreter[S, E]` types describing state transitions in 
@@ -82,8 +82,9 @@ To see an example of this used to validate the constant prop analysis see [/src/
 -  [InterpreterProduct.scala](../../src/main/scala/ir/eval/InterpreterProduct.scala)
     - Definition of product and layering composition of generic `Effects[S, E]`s interpreters
 -  [InterpretBasilIR.scala](../../src/main/scala/ir/eval/InterpretBasilIR.scala)
-    - Definition of ELF initialisation, and the interpreter for BASIL IR, using a generic 
-    `Effects` instance and concrete state.
+    - Definition of `Eval` object defining expression evaluation in terms of `Effects[S, InterpreterError]`
+    - Definition of `Interpreter` instance for BASIL IR, using a generic `Effects` instance and concrete state.
+    - Definition of ELF initialisation in terms of generic `Effects[S, InterpreterError]`
 -  [InterpretBreakpoints.scala](../../src/main/scala/ir/eval/InterpretBreakpoints.scala)
     - Definition of a generic interpreter with a breakpoint checker layered on top
 -  [InterpretTrace.scala](../../src/main/scala/ir/eval/InterpretTrace.scala)
