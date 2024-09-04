@@ -5,6 +5,7 @@ import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
 import spray.json.*
+import ir.eval
 import gtirb.*
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
@@ -506,7 +507,14 @@ object RunUtils {
 
     if (q.runInterpret) {
       // val interpreter = eval.Interpreter()
-      eval.interpret(ctx.program)
+      val fs = eval.interpretTrace(ctx)
+      Logger.info("Interpreter Trace:\n" + fs._2.t.mkString("\n"))
+      val stopState = fs._1.nextCmd
+      if (stopState != eval.Stopped()) {
+        Logger.error(s"Interpreter exited with $stopState")
+      } else {
+        Logger.info("Interpreter stopped normally.")
+      }
     }
 
     IRTransform.prepareForTranslation(q.loading, ctx)
