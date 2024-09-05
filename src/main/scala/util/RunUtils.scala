@@ -214,7 +214,7 @@ object IRTransform {
     * add in modifies from the spec.
     */
   def prepareForTranslation(config: ILLoadingConfig, ctx: IRContext): Unit = {
-    // ctx.program.determineRelevantMemory(ctx.globalOffsets)
+    ctx.program.determineRelevantMemory(ctx.globalOffsets)
 
     Logger.info("[!] Stripping unreachable")
     val before = ctx.program.procedures.size
@@ -223,11 +223,11 @@ object IRTransform {
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
 
-    //val stackIdentification = StackSubstituter()
-    //stackIdentification.visitProgram(ctx.program)
+    val stackIdentification = StackSubstituter()
+    stackIdentification.visitProgram(ctx.program)
 
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
-    // ctx.program.setModifies(specModifies)
+    ctx.program.setModifies(specModifies)
     assert(invariant.singleCallBlockEnd(ctx.program))
   }
 
@@ -506,7 +506,6 @@ object RunUtils {
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-after-analysis.il"))
 
     if (q.runInterpret) {
-      // val interpreter = eval.Interpreter()
       val fs = eval.interpretTrace(ctx)
       Logger.info("Interpreter Trace:\n" + fs._2.t.mkString("\n"))
       val stopState = fs._1.nextCmd
