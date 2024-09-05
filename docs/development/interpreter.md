@@ -76,6 +76,7 @@ To see an example of this used to validate the constant prop analysis see [/src/
       (e.g negative divisor, type mismatch)
 -  [ExprEval.scala](../../src/main/scala/ir/eval/ExprEval.scala)
     - Evaluation of expressions, defined in terms of partial evaluation down to a Literal
+    - This can also be used to evaluate expressions in static analyses, by passing a function to query variable assignments and memory state from the value domain. 
 -  [Interpreter.scala](../../src/main/scala/ir/eval/Interpreter.scala)
     - Definition of core `Effects[S, E]` and `Interpreter[S, E]` types describing state transitions in 
       the interpreter
@@ -150,12 +151,36 @@ We initialise:
 - The relocation table. Each listed offset is stored an address to either a real procedure in the program, or a 
   location storing a symbolic function pointer to an intrinsic function.
 
-- `.bss` is generally the top of the initialised data, the ELF symbol `__bss_end__` being equal to the symbol `__end__`.
-  Above this we can somewhat choose arbitrarily where to put things, usually the heap is above, followed by 
-  dynamically linked symbols, then the stack. There is currently no stack overflow checking, or heap implemented in the 
-  interpreter.
-- Unfortunately these details are defined by the load-time linker and the system's linker script, and it is hard to find a good description
-  of their behaviour. Some details are described here https://refspecs.linuxfoundation.org/elf/elf.pdf, and here 
-  https://dl.acm.org/doi/abs/10.1145/2983990.2983996.
+`.bss` is generally the top of the initialised data, the ELF symbol `__bss_end__` being equal to the symbol `__end__`.
+Above this we can somewhat choose arbitrarily where to put things, usually the heap is above, followed by 
+dynamically linked symbols, then the stack. There is currently no stack overflow checking, or heap implemented in the 
+interpreter.
+
+Unfortunately these details are defined by the load-time linker and the system's linker script, and it is hard to find a good description
+of their behaviour. Some details are described here https://refspecs.linuxfoundation.org/elf/elf.pdf, and here 
+https://dl.acm.org/doi/abs/10.1145/2983990.2983996.
+
+### Missing features
+
+There is functionality to implement external function calls via intrinsics written in Scala code, but currently only 
+basic printf style functions are implemented as no-ops. These can be extended to use a file IO abstraction, where
+a memory region is created for each file (e.g. stdout), with a variable to keep track of the current write-point
+such that a file write operation stores to the write-point address, and increments it by the size of the store.
+
+Importantly, an implementation of malloc() and free() is needed, which can implement a simple greedy allocation 
+algorithm.
+
+Despite the presence of procedure parameters in the current IR, they are not used for by the boogie translation and 
+are hence similarly ignored in the interpreter.
+
+The interpreter's immutable state representation is motivated by the ability to easily implement a sound approach
+to non-determinism, e.g. to implement GoTos with guessing and rollback rather than look-ahead. This is more
+useful for checking specification constructs than executing real programs. 
+
+Finally, the trace does not clearly distinguish internal vs external calls, or observable 
+and non-observable behaviour.
+
+While the interpreter semantics supports memory regions, we do not initialise the memory regions (or the initial memory state) 
+based on those present in the program, we assume a flat `mem` memory model, possibly with `stack` as well.
 
 
