@@ -379,9 +379,9 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   test("fibonaccistress") {
 
     Logger.setLevel(LogLevel.ERROR)
-    var res = List[(Int, Double, Double)]()
+    var res = List[(Int, Double, Double, Int)]()
 
-    for (i <- 0 to 12) {
+    for (i <- 0 to 30) {
       val prog = fibonacciProg(i)
 
       val t = PerformanceTimer("native")
@@ -389,15 +389,15 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       val native = t.elapsed()
 
       val intt = PerformanceTimer("interp")
-      val ir = interpret(prog)
+      val ir = interpretRLimit(prog, 100000000)
       val it = intt.elapsed()
 
-      res = (i, native, it) :: res
+      res = (i, native, it, ir._2) :: res
 
       println(s"${res.head}")
     }
 
-    println(("fib number,native time,interp time" :: (res.map(x => s"${x._1},${x._2},${x._3}"))).mkString("\n"))
+    println(("fib number,native time,interp time,interp cycles" :: (res.map(x => s"${x._1},${x._2},${x._3},${x._4}"))).mkString("\n"))
 
   }
 

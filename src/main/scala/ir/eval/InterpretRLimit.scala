@@ -31,22 +31,22 @@ case class EffectsRLimit[T, E, I <: Effects[T, InterpreterError]](val limit: Int
   }
 }
 
-def interpretWithRLimit[I](p: Program, instructionLimit: Int, innerInterpreter: Effects[I, InterpreterError], innerInitialState: I): I = {
+def interpretWithRLimit[I](p: Program, instructionLimit: Int, innerInterpreter: Effects[I, InterpreterError], innerInitialState: I): (I, Int) = {
   val rlimitInterpreter = LayerInterpreter(innerInterpreter, EffectsRLimit(instructionLimit))
-  InterpFuns.interpretProg(rlimitInterpreter)(p, (innerInitialState, 0))._1
+  InterpFuns.interpretProg(rlimitInterpreter)(p, (innerInitialState, 0))
 }
 
-def interpretWithRLimit[I](p: IRContext, instructionLimit: Int, innerInterpreter: Effects[I, InterpreterError], innerInitialState: I): I = {
+def interpretWithRLimit[I](p: IRContext, instructionLimit: Int, innerInterpreter: Effects[I, InterpreterError], innerInitialState: I): (I, Int) = {
   val rlimitInterpreter = LayerInterpreter(innerInterpreter, EffectsRLimit(instructionLimit))
   val begin = InterpFuns.initProgState(rlimitInterpreter)(p, (innerInitialState, 0))
   // throw away initialisation trace
-  BASILInterpreter(rlimitInterpreter).run((begin._1, 0))._1
+  BASILInterpreter(rlimitInterpreter).run((begin._1, 0))
 }
 
-def interpretRLimit(p: Program, instructionLimit: Int) : InterpreterState = {
+def interpretRLimit(p: Program, instructionLimit: Int) : (InterpreterState, Int) = {
   interpretWithRLimit(p, instructionLimit, NormalInterpreter, InterpreterState())
 }
 
-def interpretRLimit(p: IRContext, instructionLimit: Int) : InterpreterState = {
+def interpretRLimit(p: IRContext, instructionLimit: Int) : (InterpreterState, Int) = {
   interpretWithRLimit(p, instructionLimit, NormalInterpreter, InterpreterState())
 }
