@@ -8,6 +8,7 @@ import org.scalatest.funsuite.*
 import specification.*
 import util.{BASILConfig, IRLoading, ILLoadingConfig, IRContext, RunUtils, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext, BASILResult, Logger, LogLevel, IRTransform}
 import ir.eval.{interpretTrace, interpret, ExecEffect, Stopped}
+import test_util.*
 
 
 import java.io.IOException
@@ -44,9 +45,9 @@ class DifferentialAnalysis extends AnyFunSuite {
     assert(filterEvents(traceInit.t).mkString("\n") == filterEvents(traceRes.t).mkString("\n"))
   }
 
-  def testProgram(testName: String, examplePath: String) = {
+  def testProgram(testName: String, examplePath: String, suffix: String =".adt") = {
 
-    val loading = ILLoadingConfig(inputFile = examplePath + testName + ".adt",
+    val loading = ILLoadingConfig(inputFile = examplePath + testName + suffix,
       relfFile = examplePath + testName + ".relf",
       dumpIL = None,
     )
@@ -67,17 +68,6 @@ class DifferentialAnalysis extends AnyFunSuite {
     testProgram(testName, examplePath)
   }
 
-  test("indirect_call_gcc_example") {
-    val testName = "indirect_call"
-    val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/gcc/"
-    testProgram(testName, examplePath)
-  }
-
-  test("indirect_call_clang_example") {
-    val testName = "indirect_call"
-    val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/clang/"
-    testProgram(testName, examplePath)
-  }
 
   test("jumptable2_example") {
     val testName = "jumptable2"
@@ -85,17 +75,6 @@ class DifferentialAnalysis extends AnyFunSuite {
     testProgram(testName, examplePath)
   }
 
-  test("jumptable2_gcc_example") {
-    val testName = "jumptable2"
-    val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/gcc/"
-    testProgram(testName, examplePath)
-  }
-
-  test("jumptable2_clang_example") {
-    val testName = "jumptable2"
-    val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/clang/"
-    testProgram(testName, examplePath)
-  }
 
   test("jumptable_example") {
     val testName = "jumptable"
@@ -109,17 +88,6 @@ class DifferentialAnalysis extends AnyFunSuite {
     testProgram(testName, examplePath)
   }
 
-  test("functionpointer_gcc_example") {
-    val testName = "functionpointer"
-    val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/gcc/"
-    testProgram(testName, examplePath)
-  }
-
-  test("functionpointer_clang_example") {
-    val testName = "functionpointer"
-    val examplePath = System.getProperty("user.dir") + s"/src/test/correct/$testName/clang/"
-    testProgram(testName, examplePath)
-  }
 
 
   test("function_got_example") {
@@ -127,4 +95,30 @@ class DifferentialAnalysis extends AnyFunSuite {
     val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
     testProgram(testName, examplePath)
   }
+
+
+  def runSystemTests(): Unit = {
+
+    val path = System.getProperty("user.dir") + s"/src/test/correct/"
+    val programs: Array[String] = getSubdirectories(path)
+
+    // get all variations of each program
+    for (p <- programs) {
+      val programPath = path + "/" + p
+      val variations = getSubdirectories(programPath)
+      println(variations.mkString("\n"))
+      variations.foreach(variation => {
+        test("analysis_differential:" + p + "/" + variation + ":BAP") {
+          testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".adt")
+        }
+        test("analysis_differential:" +  p + "/" + variation + ":GTIRB") {
+          testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".gts")
+        }
+      }
+      )
+    }
+  }
+
+
+  runSystemTests()
 }

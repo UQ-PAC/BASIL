@@ -1,4 +1,5 @@
 package test_util
+import java.io.{BufferedWriter, File, FileWriter}
 
 import ir.{Block, Procedure, Program}
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, RunUtils, StaticAnalysisConfig}
@@ -40,3 +41,24 @@ trait TestUtil {
     )
   }
 }
+
+
+/** @param directoryName
+  * of the parent directory
+  * @return
+  * the names all subdirectories of the given parent directory
+  */
+def getSubdirectories(directoryName: String): Array[String] = {
+  Option(File(directoryName).listFiles(_.isDirectory)) match {
+    case None => throw java.io.IOException(s"failed to read directory '$directoryName'")
+    case Some(subdirs) => subdirs.map(_.getName)
+  }
+}
+
+def log(text: String, path: String): Unit = {
+  val writer = BufferedWriter(FileWriter(path, false))
+  writer.write(text)
+  writer.flush()
+  writer.close()
+}
+

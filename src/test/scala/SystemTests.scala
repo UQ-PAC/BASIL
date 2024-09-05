@@ -1,5 +1,6 @@
 import org.scalatest.funsuite.AnyFunSuite
 import util.{Logger, PerformanceTimer}
+import test_util.*
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
@@ -213,25 +214,6 @@ trait SystemTests extends AnyFunSuite {
     source1.close
     source2.close
     true
-  }
-
-  /** @param directoryName
-    * of the parent directory
-    * @return
-    * the names all subdirectories of the given parent directory
-    */
-  def getSubdirectories(directoryName: String): Array[String] = {
-    Option(File(directoryName).listFiles(_.isDirectory)) match {
-      case None => throw java.io.IOException(s"failed to read directory '$directoryName'")
-      case Some(subdirs) => subdirs.map(_.getName)
-    }
-  }
-
-  def log(text: String, path: String): Unit = {
-    val writer = BufferedWriter(FileWriter(path, false))
-    writer.write(text)
-    writer.flush()
-    writer.close()
   }
 
 }

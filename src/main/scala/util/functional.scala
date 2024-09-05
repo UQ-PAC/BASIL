@@ -9,8 +9,8 @@ case class State[S, A, E](f: S => (S, Either[E, A])) {
 
   def >>(o: State[S,A,E]) = for {
     _ <- this
-    _ <- o
-  } yield (())
+    x <- o
+  } yield (x)
 
 
   def flatMap[B](f: A => State[S, B, E]): State[S, B, E] = State(s => {
