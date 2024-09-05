@@ -69,7 +69,7 @@ To see an example of this used to validate the constant prop analysis see [/src/
 
 ### Resource Limit
 
-This kills the interpreter in an error state once a specified instruction count is reached. 
+This kills the interpreter in an error state once a specified instruction count is reached, to avoid the interpreter running forever on infinite loops. 
 
 It can be used simply with the function `interptretRLimit`, this automatically ignores the initialisation instructions.
 
@@ -109,6 +109,8 @@ def interp(p: IRContext, instructionLimit: Int) : (InterpreterState, Trace) = {
     - Definition of ELF initialisation in terms of generic `Effects[S, InterpreterError]`
 -  [InterpretBreakpoints.scala](../../src/main/scala/ir/eval/InterpretBreakpoints.scala)
     - Definition of a generic interpreter with a breakpoint checker layered on top
+-  [interpretRLimit.scala](../../src/main/scala/ir/eval/InterpretRLimit.scala)
+    - Definition of layered interpreter which terminates after a specified cycle count
 -  [InterpretTrace.scala](../../src/main/scala/ir/eval/InterpretTrace.scala)
     - Definition of a generic interpreter which records a trace of calls to the `Effects[]` instance. 
 
@@ -182,25 +184,20 @@ https://dl.acm.org/doi/abs/10.1145/2983990.2983996.
 
 ### Missing features
 
-There is functionality to implement external function calls via intrinsics written in Scala code, but currently only 
-basic printf style functions are implemented as no-ops. These can be extended to use a file IO abstraction, where
-a memory region is created for each file (e.g. stdout), with a variable to keep track of the current write-point
-such that a file write operation stores to the write-point address, and increments it by the size of the store.
-
-Importantly, an implementation of malloc() and free() is needed, which can implement a simple greedy allocation 
-algorithm.
-
-Despite the presence of procedure parameters in the current IR, they are not used for by the boogie translation and 
-are hence similarly ignored in the interpreter.
-
-The interpreter's immutable state representation is motivated by the ability to easily implement a sound approach
-to non-determinism, e.g. to implement GoTos with guessing and rollback rather than look-ahead. This is more
-useful for checking specification constructs than executing real programs. 
-
-Finally, the trace does not clearly distinguish internal vs external calls, or observable 
-and non-observable behaviour.
-
-While the interpreter semantics supports memory regions, we do not initialise the memory regions (or the initial memory state) 
-based on those present in the program, we assume a flat `mem` memory model, possibly with `stack` as well.
+- There is functionality to implement external function calls via intrinsics written in Scala code, but currently only 
+  basic printf style functions are implemented as no-ops. These can be extended to use a file IO abstraction, where
+  a memory region is created for each file (e.g. stdout), with a variable to keep track of the current write-point
+  such that a file write operation stores to the write-point address, and increments it by the size of the store.
+  Importantly, an implementation of malloc() and free() is needed, which can implement a simple greedy allocation 
+  algorithm.
+- Despite the presence of procedure parameters in the current IR, they are not used for by the boogie translation and 
+  are hence similarly ignored in the interpreter.
+- The interpreter's immutable state representation is motivated by the ability to easily implement a sound approach
+  to non-determinism, e.g. to implement GoTos with guessing and rollback rather than look-ahead. This is more
+  useful for checking specification constructs than executing real programs, so is not yet implemented.
+- The trace does not clearly distinguish internal vs external calls, or observable 
+  and non-observable behaviour.
+- While the interpreter semantics supports memory regions, we do not initialise the memory regions (or the initial memory state) 
+  based on those present in the program, we simply assume a flat `mem` and `stack` memory partitioning.
 
 
