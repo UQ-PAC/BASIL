@@ -67,6 +67,26 @@ case class BreakPointAction(
 
 To see an example of this used to validate the constant prop analysis see [/src/test/scala/InterpretTestConstProp.scala](../../src/test/scala/InterpretTestConstProp.scala).
 
+### Resource Limit
+
+This kills the interpreter in an error state once a specified instruction count is reached. 
+
+It can be used simply with the function `interptretRLimit`, this automatically ignores the initialisation instructions.
+
+```scala
+def interpretRLimit(p: IRContext, instructionLimit: Int) : InterpreterState
+```
+
+It can also be combined with other interpreters as shown:
+
+```scala
+def interp(p: IRContext, instructionLimit: Int) : (InterpreterState, Trace) = {
+  val interpreter = LayerInterpreter(tracingInterpreter(NormalInterpreter), EffectsRLimit(instructionLimit))
+  val initialState = InterpFuns.initProgState(NormalInterpreter)(p, InterpreterState())
+  BASILInterpreter(interpreter).run((initialState, Trace(List())), 0)._1
+}
+```
+
 ## Implementation / Code Structure
 
 ### Summary
