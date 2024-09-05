@@ -265,11 +265,11 @@ class AnalysisSystemTestsGTIRB extends SystemTests {
 class ProcedureSummaryTests extends SystemTests {
   // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
   // this is due to BASIL's currently limited handling of non-returning calls
-  private val procedureSummaryPath = "./src/test/analysis/procedure-summaries"
+  private val procedureSummaryPath = "./src/test/procedure_summaries"
   private val procedureSummaryPrograms = getSubdirectories(procedureSummaryPath)
-  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", TestConfig(BASILFlags = Seq("--analyse", "--summarise-procedures"),
-    useBAPFrontend=true, expectVerify=true))
-  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", TestConfig(BASILFlags = Seq("--analyse", "--summarise-procedures"),
+  runTests(procedureSummaryPrograms, procedureSummaryPath, "procedure_summaries", TestConfig(BASILFlags = Seq("--analyse", "--summarise-procedures"),
+    useBAPFrontend = true, expectVerify = true))
+  runTests(procedureSummaryPrograms, procedureSummaryPath, "procedure_summaries", TestConfig(BASILFlags = Seq("--analyse", "--summarise-procedures"),
     useBAPFrontend = false, expectVerify = true))
   test("summary-procedureSummary") {
     summary("procedureSummary-testResult")

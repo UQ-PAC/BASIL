@@ -23,7 +23,7 @@ private def writeToFile(text: String, path: String): Unit = {
   * directory structure and file-name patterns.
   */
 class IrreducibleLoop extends AnyFunSuite {
-  val testPath = "./src/test/analysis/irreducible_loops"
+  val testPath = "./src/test/irreducible_loops"
 
   def load(conf: ILLoadingConfig) : Program = {
     val bapProgram = IRLoading.loadBAP(conf.inputFile)
