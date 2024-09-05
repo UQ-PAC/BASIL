@@ -40,15 +40,18 @@ trait MemoryRegionAnalysis(val program: Program,
    * @param parent : the function entry node
    * @return the stack region corresponding to the offset
    */
-  private def poolMaster(expr: BigInt, stackBase: Procedure): StackRegion = {
+  private def poolMaster(expr: BigInt, stackBase: Procedure, subAccess: BigInt): StackRegion = {
     val stackPool = stackMap.getOrElseUpdate(stackBase, mutable.HashMap())
+    var region: StackRegion = null
     if (stackPool.contains(expr)) {
-      stackPool(expr)
+      region = stackPool(expr)
     } else {
       val newRegion = StackRegion(nextStackCount(), expr, stackBase)
       stackPool += (expr -> newRegion)
-      newRegion
+      region = newRegion
     }
+    region.subAccesses.add(subAccess/8)
+    region
   }
 
   private def stackDetection(stmt: Statement): Unit = {
@@ -92,7 +95,7 @@ trait MemoryRegionAnalysis(val program: Program,
   private val registerToRegions: mutable.Map[RegisterVariableWrapper, mutable.Set[MemoryRegion]] = mutable.Map()
   val procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]] = mutable.Map()
 
-  def reducibleToRegion(binExpr: BinaryExpr, n: Command): Set[MemoryRegion] = {
+  def reducibleToRegion(binExpr: BinaryExpr, n: Command, subAccess: BigInt): Set[MemoryRegion] = {
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
       case variable: Variable if !spList.contains(variable) =>
@@ -100,36 +103,36 @@ trait MemoryRegionAnalysis(val program: Program,
         for (i <- ctx) {
           val regions = i.rhs match {
             case memoryLoad: MemoryLoad =>
-              eval(memoryLoad.index, Set.empty, i)
+              eval(memoryLoad.index, Set.empty, i, memoryLoad.size)
             case _: BitVecLiteral =>
               Set.empty
             case _ =>
-              eval(i.rhs, Set.empty, i)
+              eval(i.rhs, Set.empty, i, -1) // TODO: is the subAccess correct here?
           }
           evaluateExpression(binExpr.arg2, constantProp(n)) match {
             case Some(b: BitVecLiteral) =>
               regions.foreach {
                 case stackRegion: StackRegion =>
                   val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
-                  reducedRegions = reducedRegions + poolMaster(nextOffset, IRWalk.procedure(n))
+                  reducedRegions = reducedRegions + poolMaster(nextOffset, IRWalk.procedure(n), subAccess)
                 case _ =>
               }
             case None =>
           }
         }
       case _ =>
-        eval(binExpr, Set.empty, n)
+        eval(binExpr, Set.empty, n, subAccess)
     }
     reducedRegions
   }
 
-  def reducibleVariable(variable: Variable, n: Command): Set[MemoryRegion] = {
+  def reducibleVariable(variable: Variable, n: Command, subAccess: BigInt): Set[MemoryRegion] = {
     var regions = Set.empty[MemoryRegion]
     val ctx = getDefinition(variable, n, reachingDefs)
     for (i <- ctx) {
       i.rhs match {
         case binaryExpr: BinaryExpr =>
-          regions = regions ++ reducibleToRegion(binaryExpr, i)
+          regions = regions ++ reducibleToRegion(binaryExpr, i, subAccess)
         case _ =>
           //regions = regions ++ eval(i.rhs, Set.empty, i)
       }
@@ -137,7 +140,7 @@ trait MemoryRegionAnalysis(val program: Program,
     regions
   }
 
-  def eval(exp: Expr, env: Set[MemoryRegion], n: Command): Set[MemoryRegion] = {
+  def eval(exp: Expr, env: Set[MemoryRegion], n: Command, subAccess: BigInt): Set[MemoryRegion] = {
     Logger.debug(s"evaluating $exp")
     Logger.debug(s"env: $env")
     Logger.debug(s"n: $n")
@@ -147,35 +150,35 @@ trait MemoryRegionAnalysis(val program: Program,
           evaluateExpression(binOp.arg2, constantProp(n)) match {
             case Some(b: BitVecLiteral) =>
               val negB = if isNegative(b) then -b.value else b.value
-              Set(poolMaster(negB, IRWalk.procedure(n)))
+              Set(poolMaster(negB, IRWalk.procedure(n), subAccess))
             case None => env
           }
-        } else if (reducibleToRegion(binOp, n).nonEmpty) {
-          reducibleToRegion(binOp, n)
+        } else if (reducibleToRegion(binOp, n, subAccess).nonEmpty) {
+          reducibleToRegion(binOp, n, subAccess)
         } else {
           evaluateExpression(binOp, constantProp(n)) match {
-            case Some(b: BitVecLiteral) => eval(b, env, n)
+            case Some(b: BitVecLiteral) => eval(b, env, n, subAccess)
             case None => env
           }
         }
       case variable: Variable =>
         variable match {
           case reg: Register if spList.contains(reg) => // TODO: this is a hack
-            eval(BitVecLiteral(0, 64), env, n)
+            eval(BitVecLiteral(0, 64), env, n, subAccess)
           case _ =>
             evaluateExpression(variable, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
-                eval(b, env, n)
+                eval(b, env, n, subAccess)
               case _ =>
-                reducibleVariable(variable, n)
+                reducibleVariable(variable, n, subAccess)
             }
         }
       case memoryLoad: MemoryLoad =>
-        eval(memoryLoad.index, env, n)
+        eval(memoryLoad.index, env, n, memoryLoad.size)
       // ignore case where it could be a global region (loaded later in MMM from relf)
       case b: BitVecLiteral =>
         val negB = if isNegative(b) then -b.value else b.value
-        Set(poolMaster(negB, IRWalk.procedure(n)))
+        Set(poolMaster(negB, IRWalk.procedure(n), subAccess))
       // we cannot evaluate this to a concrete value, we need VSA for this
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")
@@ -217,14 +220,14 @@ trait MemoryRegionAnalysis(val program: Program,
             s
           }
         case memAssign: MemoryAssign =>
-          val result = eval(memAssign.index, s, cmd)
+          val result = eval(memAssign.index, s, cmd, memAssign.size)
           regionLattice.lub(s, result)
         case assign: Assign =>
           stackDetection(assign)
           var m = s
           unwrapExpr(assign.rhs).foreach {
             case memoryLoad: MemoryLoad =>
-              val result = eval(memoryLoad.index, s, cmd)
+              val result = eval(memoryLoad.index, s, cmd, memoryLoad.size)
               m = regionLattice.lub(m, result)
             case _ => m
           }

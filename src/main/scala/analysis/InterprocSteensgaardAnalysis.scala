@@ -153,10 +153,8 @@ class InterprocSteensgaardAnalysis(
             } {
               r match {
                 case stackRegion: StackRegion =>
-                  val nextOffset = BinaryExpr(binExpr.op, BitVecLiteral(stackRegion.start, 64), b)
-                  evaluateExpressionWithSSA(nextOffset, constantProp(n), n, reachingDefs).foreach { b2 =>
-                    reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, b2), n)
-                  }
+                  val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
+                  reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, BitVecLiteral(nextOffset, 64)), n)
                 case dataRegion: DataRegion =>
                   Logger.debug(s"Hey, I'm a data region: $dataRegion")
                   Logger.debug(s"Hey, I'm a offset: $b")

@@ -8,25 +8,27 @@ import scala.collection.mutable
 
 // Define a case class to represent a range
 case class RangeKey(start: BigInt, end: BigInt) extends Ordered[RangeKey]:
-  val size: BigInt = end - start
+  val size: BigInt = end - start + 1
   override def compare(that: RangeKey): Int = {
     if (start < that.start) -1
     else if (start > that.start) 1
     else 0
   }
-  override def toString: String = s"Range[$start, $end]"
+  override def toString: String = s"Range[$start, $end] (size: $size)"
 
 
 // Custom data structure for storing range-to-object mappings
 class MemoryModelMap {
   private val MAX_BIGINT: BigInt = BigInt(Long.MaxValue)
-  private val contextStack = mutable.Stack.empty[List[StackRegion]]
+  private val contextStack = mutable.Stack.empty[String]
   private val sharedContextStack = mutable.Stack.empty[List[StackRegion]]
   private val localStacks = mutable.Map[String, List[StackRegion]]()
   private val sharedStacks = mutable.Map[String, List[StackRegion]]()
 
   private val stackMap: mutable.Map[RangeKey, StackRegion] = mutable.TreeMap()
+  private val bufferedStackMap: mutable.Map[String, mutable.Map[RangeKey, StackRegion]] = mutable.Map()
   private val sharedStackMap: mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]] = mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]]()
+  private val bufferedSharedStackMap: mutable.Map[String, mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]]] = mutable.Map()
   private val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.TreeMap()
   private val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.TreeMap()
 
@@ -40,6 +42,21 @@ class MemoryModelMap {
    *                otherwise to the stackMap
    */
   def add(offset: BigInt, region: MemoryRegion, shared: Boolean = false): Unit = {
+    def maxSize(r: MemoryRegion): BigInt = {
+      r match
+        case DataRegion(regionIdentifier, start) => ???
+        case HeapRegion(regionIdentifier, size, parent) => ???
+        case StackRegion(regionIdentifier, start, parent) =>
+          if (r.subAccesses.nonEmpty) {
+            val max = start + r.subAccesses.max
+            r.fields ++= r.subAccesses.diff(Set(max)).map(_ + start)
+            max
+          } else {
+            ???
+          }
+        case _ => ???
+    }
+
     region match {
       case s: StackRegion =>
         var currentStackMap = stackMap
@@ -47,14 +64,21 @@ class MemoryModelMap {
           currentStackMap = sharedStackMap.getOrElseUpdate(s.parent, mutable.TreeMap())
         }
         if (currentStackMap.isEmpty) {
-          currentStackMap(RangeKey(offset, MAX_BIGINT)) = s
+          currentStackMap(RangeKey(offset, maxSize(region) - 1)) = s
         } else {
           val currentMaxRange = currentStackMap.keys.maxBy(_.end)
           val currentMaxRegion = currentStackMap(currentMaxRange)
-          currentStackMap.remove(currentMaxRange)
-          val updatedRange = RangeKey(currentMaxRange.start, offset - 1)
-          currentStackMap.addOne(updatedRange -> currentMaxRegion)
-          currentStackMap(RangeKey(offset, MAX_BIGINT)) = s
+          if (offset <= currentMaxRange.end) {
+            currentStackMap.remove(currentMaxRange)
+            currentMaxRegion.fields += offset
+            val updatedRange = RangeKey(currentMaxRange.start, offset + maxSize(region) - 1)
+            currentStackMap.addOne(updatedRange -> currentMaxRegion)
+            for (elem <- region.fields) {
+              currentMaxRegion.fields += offset + elem
+            }
+          } else {
+            currentStackMap(RangeKey(offset, maxSize(region) - 1)) = s
+          }
         }
       case d: DataRegion =>
         val currentDataMap = dataMap
@@ -197,10 +221,15 @@ class MemoryModelMap {
   }
   // TODO: push and pop could be optimised by caching the results
   def pushContext(funName: String): Unit = {
-    contextStack.push(localStacks(funName))
+    contextStack.push(funName)
     stackMap.clear()
-    for (stackRgn <- contextStack.top) {
-      add(stackRgn.start, stackRgn)
+    if (bufferedStackMap.contains(funName)) {
+      stackMap ++= bufferedStackMap(funName)
+    } else {
+      for (stackRgn <- localStacks(contextStack.top).sortBy(_.start)) {
+        add(stackRgn.start, stackRgn)
+      }
+      bufferedStackMap(funName) = stackMap.clone()
     }
 
     if (!sharedStacks.contains(funName)) {
@@ -208,8 +237,13 @@ class MemoryModelMap {
     }
     sharedContextStack.push(sharedStacks(funName))
     sharedStackMap.clear()
-    for (stackRgn <- sharedContextStack.top) {
-      add(stackRgn.start, stackRgn, true)
+    if (bufferedSharedStackMap.contains(funName)) {
+      sharedStackMap ++= bufferedSharedStackMap(funName)
+    } else {
+      for (stackRgn <- sharedContextStack.top.sortBy(_.start)) {
+        add(stackRgn.start, stackRgn, true)
+      }
+      bufferedSharedStackMap(funName) = sharedStackMap.clone()
     }
   }
 
@@ -217,16 +251,24 @@ class MemoryModelMap {
     if (contextStack.size > 1) {
       contextStack.pop()
       stackMap.clear()
-      for (stackRgn <- contextStack.top) {
-        add(stackRgn.start, stackRgn)
+      if (bufferedStackMap.contains(contextStack.top)) {
+        stackMap ++= bufferedStackMap(contextStack.top)
+      } else {
+        for (stackRgn <- localStacks(contextStack.top)) {
+          add(stackRgn.start, stackRgn)
+        }
       }
     }
 
     if (sharedContextStack.size > 1) {
       sharedContextStack.pop()
       sharedStackMap.clear()
-      for (stackRgn <- sharedContextStack.top) {
-        add(stackRgn.start, stackRgn, true)
+      if (bufferedSharedStackMap.contains(contextStack.top)) {
+        sharedStackMap ++= bufferedSharedStackMap(contextStack.top)
+      } else {
+        for (stackRgn <- sharedContextStack.top) {
+          add(stackRgn.start, stackRgn, true)
+        }
       }
     }
   }
@@ -435,11 +477,12 @@ class MemoryModelMap {
 
 trait MemoryRegion {
   val regionIdentifier: String
-  val subRegions: mutable.Set[MemoryRegion] = mutable.Set()
+  val subAccesses: mutable.Set[BigInt] = mutable.Set()
+  val fields: mutable.Set[BigInt] = mutable.Set()
 }
 
 case class StackRegion(override val regionIdentifier: String, start: BigInt, parent: Procedure) extends MemoryRegion {
-  override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name})"
+  override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name}, $subAccesses)"
 }
 
 case class HeapRegion(override val regionIdentifier: String, size: BigInt, parent: Procedure) extends MemoryRegion {
