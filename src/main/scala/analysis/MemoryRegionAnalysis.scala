@@ -149,7 +149,7 @@ trait MemoryRegionAnalysis(val program: Program,
         if (spList.contains(binOp.arg1)) {
           evaluateExpression(binOp.arg2, constantProp(n)) match {
             case Some(b: BitVecLiteral) =>
-              val negB = if isNegative(b) then -b.value else b.value
+              val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
               Set(poolMaster(negB, IRWalk.procedure(n), subAccess))
             case None => env
           }
@@ -163,7 +163,7 @@ trait MemoryRegionAnalysis(val program: Program,
         }
       case variable: Variable =>
         variable match {
-          case reg: Register if spList.contains(reg) => // TODO: this is a hack
+          case reg: Register if spList.contains(reg) => // TODO: this is a hack because spList is not comprehensive it needs to be a standalone analysis
             eval(BitVecLiteral(0, 64), env, n, subAccess)
           case _ =>
             evaluateExpression(variable, constantProp(n)) match {
@@ -177,7 +177,7 @@ trait MemoryRegionAnalysis(val program: Program,
         eval(memoryLoad.index, env, n, memoryLoad.size)
       // ignore case where it could be a global region (loaded later in MMM from relf)
       case b: BitVecLiteral =>
-        val negB = if isNegative(b) then -b.value else b.value
+        val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
         Set(poolMaster(negB, IRWalk.procedure(n), subAccess))
       // we cannot evaluate this to a concrete value, we need VSA for this
       case _ =>
@@ -212,7 +212,7 @@ trait MemoryRegionAnalysis(val program: Program,
           if (directCall.target.name == "malloc") {
             evaluateExpression(mallocVariable, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
-                val negB = if isNegative(b) then -b.value else b.value
+                val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
                 regionLattice.lub(s, Set(HeapRegion(nextMallocCount(), negB, IRWalk.procedure(n))))
               case None => s
             }
