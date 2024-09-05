@@ -23,7 +23,7 @@ private def writeToFile(text: String, path: String): Unit = {
   * directory structure and file-name patterns.
   */
 class IrreducibleLoop extends AnyFunSuite {
-  val testPath = "./src/test/analysis/"
+  val testPath = "./src/test/analysis/irreducible_loops"
 
   def load(conf: ILLoadingConfig) : Program = {
     val bapProgram = IRLoading.loadBAP(conf.inputFile)
@@ -69,16 +69,16 @@ class IrreducibleLoop extends AnyFunSuite {
   }
 
   test("irreducible 1") {
-    runTest(testPath + "/" +  "irreducible_loop", "irreducible")
+    runTest(testPath + "/irreducible_loop", "irreducible")
   }
 
   test("irreducible 2") {
-    runTest(testPath + "/" +  "irreducible_loop_2", "irreducible2")
+    runTest(testPath + "/irreducible_loop_2", "irreducible2")
   }
 
 
   test("testverify fail irreducible_loop") {
-    val path = "src/test/analysis/irreducible_loop/irreducible"
+    val path = testPath + "/irreducible_loop/irreducible"
     val outPath = s"$path.bpl"
     val args = Array("-o", s"$outPath", "-i", s"$path.adt", "-r", s"$path.relf", "-s", s"$path.spec")
 
@@ -92,7 +92,7 @@ class IrreducibleLoop extends AnyFunSuite {
   }
 
   test("testverify reduced irreducible_loop") {
-    val path = "src/test/analysis/irreducible_loop/irreducible"
+    val path = testPath + "/irreducible_loop/irreducible"
     val outPath = s"$path.bpl"
     val args = Array("-o", s"$outPath", "-i", s"$path.adt", "-r", s"$path.relf", "-s", s"$path.spec", "--analyse")
 
