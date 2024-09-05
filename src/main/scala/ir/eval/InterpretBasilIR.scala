@@ -228,20 +228,23 @@ case object Eval {
 
 class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S, InterpreterError](f) {
 
-  def interpretOne: State[S, Boolean, InterpreterError] = for {
-    next <- f.getNext
-    _ <- State.pure(Logger.debug(s"$next"))
-    r: Boolean <- (next match {
-      case CallIntrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(f).map(_ => true)
-      case Run(c: Statement)  => interpretStatement(f)(c).map(_ => true)
-      case Run(c: Jump)       => interpretJump(f)(c).map(_ => true)
-      case Stopped()          => State.pure(false)
-      case ErrorStop(e)       => State.pure(false)
-    })
-      .flatMapE((e: InterpreterError) => {
-        f.setNext(ErrorStop(e)).map(_ => false)
+  def interpretOne: State[S, Boolean, InterpreterError] = {
+    val next = for {
+      next <- f.getNext
+      _ <- State.pure(Logger.debug(s"$next"))
+      r: Boolean <- (next match {
+        case CallIntrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(f).map(_ => true)
+        case Run(c: Statement)  => interpretStatement(f)(c).map(_ => true)
+        case Run(c: Jump)       => interpretJump(f)(c).map(_ => true)
+        case Stopped()          => State.pure(false)
+        case ErrorStop(e)       => State.pure(false)
       })
-  } yield (r)
+    } yield (r)
+
+    next.flatMapE((e: InterpreterError) => {
+      f.setNext(ErrorStop(e)).map(_ => false)
+    })
+  }
 
   def interpretJump[S, T <: Effects[S, InterpreterError]](f: T)(j: Jump): State[S, Unit, InterpreterError] = {
     j match {

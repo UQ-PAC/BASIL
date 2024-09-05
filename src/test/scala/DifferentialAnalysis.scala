@@ -24,8 +24,17 @@ class DifferentialAnalysis extends AnyFunSuite {
   Logger.setLevel(LogLevel.ERROR)
 
   def diffTest(initial: IRContext, transformed: IRContext) = {
-    val (initialRes,traceInit) = interpretTrace(initial)
-    val (result,traceRes) = interpretTrace(transformed)
+
+    val instructionLimit = 100000 
+
+    def interp(p: IRContext) : (InterpreterState, Trace) = {
+      val interpreter = LayerInterpreter(tracingInterpreter(NormalInterpreter), EffectsRLimit(instructionLimit))
+      val initialState = InterpFuns.initProgState(NormalInterpreter)(p, InterpreterState())
+      BASILInterpreter(interpreter).run((initialState, Trace(List())), 0)._1
+    }
+
+    val (initialRes,traceInit) = interp(initial)
+    val (result,traceRes) = interp(transformed)
 
 
     def filterEvents(trace: List[ExecEffect]) = {
@@ -106,7 +115,6 @@ class DifferentialAnalysis extends AnyFunSuite {
     for (p <- programs) {
       val programPath = path + "/" + p
       val variations = getSubdirectories(programPath)
-      println(variations.mkString("\n"))
       variations.foreach(variation => {
         test("analysis_differential:" + p + "/" + variation + ":BAP") {
           testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".adt")
