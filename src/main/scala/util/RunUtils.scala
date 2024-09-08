@@ -576,6 +576,7 @@ object StaticAnalysis {
       .map(p => BigInt(p.address.get) -> p.name)
       .toMap
     val globalAddresses = globals.map(s => s.address -> s.name).toMap
+    val globalSizes = globals.map(s => s.name -> s.size).toMap
     val externalAddresses = externalFunctions.map(e => e.offset -> e.name).toMap
     Logger.info("Globals:")
     Logger.info(globalAddresses)
@@ -678,7 +679,7 @@ object StaticAnalysis {
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
-    mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, globalAddresses, mraSolver.procedureToSharedRegions)
+    mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, globalAddresses, globalSizes, mraSolver.procedureToSharedRegions)
     mmm.logRegions()
 
     Logger.info("[!] Injecting regions")

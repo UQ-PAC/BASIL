@@ -50,7 +50,7 @@ trait MemoryRegionAnalysis(val program: Program,
       stackPool += (expr -> newRegion)
       region = newRegion
     }
-    region.subAccesses.add(subAccess/8)
+    region.subAccesses.add((subAccess.toDouble/8).ceil.toInt)
     region
   }
 

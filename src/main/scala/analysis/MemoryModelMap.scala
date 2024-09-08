@@ -44,7 +44,7 @@ class MemoryModelMap {
   def add(offset: BigInt, region: MemoryRegion, shared: Boolean = false): Unit = {
     def maxSize(r: MemoryRegion): BigInt = {
       r match
-        case DataRegion(regionIdentifier, start) => ???
+        case DataRegion(regionIdentifier, start, size) => start + size
         case HeapRegion(regionIdentifier, size, parent) => ???
         case StackRegion(regionIdentifier, start, parent) =>
           if (r.subAccesses.nonEmpty) {
@@ -173,12 +173,12 @@ class MemoryModelMap {
     procedureToRegions
   }
 
-  def convertMemoryRegions(memoryRegions: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
+  def convertMemoryRegions(memoryRegions: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
     val reversedExternalFunctionRgns = (externalFunctions ++ globalAddresses).map((offset, name) => resolveInverseGlobalOffset(name, offset, globalOffsets) -> name)
     val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => reversedExternalFunctionRgns.contains(offset))
 
-    val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset))
+    val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, globalSizes.getOrElse(name, 0)))
 
     // we should collect all data regions otherwise the ordering might be wrong
     var dataRgns: Set[DataRegion] = Set.empty
@@ -489,7 +489,7 @@ case class HeapRegion(override val regionIdentifier: String, size: BigInt, paren
   override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 
-case class DataRegion(override val regionIdentifier: String, start: BigInt) extends MemoryRegion {
+case class DataRegion(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryRegion {
   override def toString: String = s"Data($regionIdentifier, $start)"
 }
 
