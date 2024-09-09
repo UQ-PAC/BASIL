@@ -411,7 +411,7 @@ object StaticAnalysis {
     var paramResults: Map[Procedure, Set[Variable]] = Map.empty
     var interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = Map.empty
 
-    if (IRProgram.mainProcedure.blocks.nonEmpty) {
+    if (IRProgram.mainProcedure.blocks.nonEmpty && IRProgram.mainProcedure.returnBlock.isDefined && IRProgram.mainProcedure.entryBlock.isDefined) {
       Logger.info("[!] Running Interprocedural Live Variables Analysis")
       interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
 
