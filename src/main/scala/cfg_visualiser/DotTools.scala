@@ -139,11 +139,11 @@ class DotGraph(val title: String, val nodes: Iterable[DotNode], val edges: Itera
 
 
 
-class DotStruct(val id: String, val details: String, val fields: Option[Iterable[String]], val verbose: Boolean = false) extends DotElement {
+class DotStruct(val id: String, val details: String, val fields: Option[Iterable[String]], val verbose: Boolean = true) extends DotElement {
   def equals(other: DotStruct): Boolean = toDotString.equals(other.toDotString)
 
 
-  val label = s"\"{<$id> ${if verbose then details else id} ${if fields.isDefined then  s" | {${fields.get.map(f => s"<$f> $f").mkString("|")}}" else "" }}\""
+  val label = s"\"{<$id> ${if verbose then wrap(details, 80) else id} ${if fields.isDefined then  s" | {${fields.get.map(f => s"<$f> $f").mkString("|")}}" else "" }}\""
   override def toString: String = toDotString
 
   override def toDotString: String =

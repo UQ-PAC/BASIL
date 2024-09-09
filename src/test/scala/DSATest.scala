@@ -7,7 +7,19 @@ import ir.dsl.*
 import specification.Specification
 import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig}
 
-class LocalTest extends AnyFunSuite, TestUtil {
+/**
+ * This is the test suite for testing DSA functionality
+ * The tests follow a general pattern of running BASIL analyses on a test program
+ * and then asserting properties about the Data Structure Graph (DSG) of the function produced at
+ * different levels
+ *
+ * DSA has three phases.
+ * BASILRESULT.analysis.get.local is the set of graphs from the end of the local phase
+ * BASILRESULT.analysis.get.bu is the set of graphs from the end of the bottom-up phase
+ * BASILRESULT.analysis.get.td is the set of graphs from the end of the top-down phase
+ *
+ */
+class DSATest extends AnyFunSuite, TestUtil {
 
   // Local DSA tests
   test("basic pointer") {
@@ -25,22 +37,31 @@ class LocalTest extends AnyFunSuite, TestUtil {
       )
     )
     val program = results.ir.program
-    val dsg = results.analysis.get.locals.get(program.mainProcedure)
-//    assert(dsg.pointTo.size == 12) // 12
 
-    val framePointer = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
+    // the dsg of the main procedure after the local phase
+    val dsg = results.analysis.get.locals.get(program.mainProcedure)
+
+
+
+    // dsg.formals(R29) is the slice representing formal R29
     val R29formal = dsg.adjust(dsg.formals(R29))
-    assert(framePointer.equals(R29formal))
+
+
+    // cells representing the stack at various offsets
+    val stack0 = dsg.find(dsg.stackMapping(0).cells(0)) // R31
     val stack8 = dsg.find(dsg.stackMapping(8).cells(0)) //  R31 + 8
-    assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30))))
     val stack40 = dsg.find(dsg.stackMapping(40).cells(0))//  R31 + 40
     val stack32 = dsg.find(dsg.stackMapping(32).cells(0)) //  R31 + 32
     val stack24 = dsg.find(dsg.stackMapping(24).cells(0)) //  R31 + 24 and Malloc
-    assert(dsg.adjust(stack32.getPointee).equals(stack24))
-    assert(stack24.node.get.collapsed)
+
+    assert(dsg.adjust(stack0.getPointee).equals(R29formal)) // R31 points to the frame pointer
+    assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
+    assert(dsg.adjust(stack32.getPointee).equals(stack24))  //
+    assert(stack24.node.get.collapsed) // stack24 is collapsed
     assert(dsg.adjust(stack24.getPointee).equals(stack24))
     assert(dsg.find(dsg.adjust(stack40.getPointee)).equals(dsg.find(dsg.adjust(dsg.find(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69600))._1.cells(0).getPointee)).getPointee))))
 
+    writeToFile(dsg.toDot, "test1.dot")
   }
 
   test("local jumptable2 sub_seven") {
@@ -198,8 +219,12 @@ class LocalTest extends AnyFunSuite, TestUtil {
         outputPrefix = "boogie_out",
       )
     )
+
+
     val program = results.ir.program
     val dsg = results.analysis.get.locals.get(program.mainProcedure)
+    writeToFile(dsg.toDot, "test2.dot")
+
     val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)

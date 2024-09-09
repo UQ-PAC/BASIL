@@ -418,11 +418,22 @@ class DSG(val proc: Procedure,
   //  private val parent = mutable.Map[DSC, DSC]()
   val solver: DSAUnionFindSolver[UniTerm] = DSAUnionFindSolver()
 
+  /**
+   * wrapper for find functionality of the union-find
+   * @param node the node to perform find on
+   * @return a field which is the tuple (parent node of the input node, starting offset of the input node in its parent)
+   */
   def find(node: DSN) : Field =
     val (n, offset) = solver.find(node.term)
     val resultNode = n.asInstanceOf[Derm].node
     Field(resultNode, offset)
 
+  /**
+   * wrapper for find functionality of the union-find
+   *
+   * @param cell the cell to perform find on
+   * @return the input cell's equivalent cell in the parent
+   */
   def find(cell: DSC) : DSC =
     val node = cell.node.get
     val offset = cell.offset
