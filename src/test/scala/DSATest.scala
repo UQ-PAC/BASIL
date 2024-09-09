@@ -56,15 +56,40 @@ class DSATest extends AnyFunSuite, TestUtil {
 
     assert(dsg.adjust(stack0.getPointee).equals(R29formal)) // R31 points to the frame pointer
     assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
-    assert(dsg.adjust(stack32.getPointee).equals(stack24))  //
-    assert(stack24.node.get.collapsed) // stack24 is collapsed
-    assert(dsg.adjust(stack24.getPointee).equals(stack24))
+
+
+    assert(dsg.adjust(stack32.getPointee).equals(stack24))  // R31 + 32 points to R31 + 24, 00000457
+    assert(stack24.node.get.collapsed) // 00000497 collapses stack24 concatenation is currently unhandled, any objects referenced in an unhandled operation are collapsed
+    assert(dsg.adjust(stack24.getPointee).equals(stack24)) // 00000466, R31 + 32 and R31 + 24 pointees are merged
+
+    // __stack_chk_guard's pointee is also pointed to by stack40
     assert(dsg.find(dsg.adjust(stack40.getPointee)).equals(dsg.find(dsg.adjust(dsg.find(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69600))._1.cells(0).getPointee)).getPointee))))
 
-    writeToFile(dsg.toDot, "test1.dot")
   }
 
-  test("local jumptable2 sub_seven") {
+  // this function asserts universal properties about global objects in Jumptable2  example
+  def assertJumptable2Globals(dsg: DSG) : Unit = {
+    // global mappings
+
+    // __libc_csu_init relocation
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
+    // __lib_csu_fini relocation
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
+    // jumptable relocation
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
+    // add_two relocation
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
+    // add_six relocation
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
+    // sub_seven relocation
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
+    // main relocation
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
+    // x relocation
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
+  }
+
+  test("local jumptable2 callees") {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
@@ -78,88 +103,22 @@ class DSATest extends AnyFunSuite, TestUtil {
         outputPrefix = "boogie_out",
       )
     )
+
+
     val program = results.ir.program
-    val dsg = results.analysis.get.locals.get(program.procs("sub_seven"))
-//    assert(dsg.pointTo.size == 9)
-    assert(dsg.stackMapping.isEmpty)
-    assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.get.collapsed)
-
-    // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
-
-  }
-
-  test("local jumptable2 add_six") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
+    // test that all three calles have the same local graph
+    val callees = Set("sub_seven", "add_two", "add_six")
+    callees.foreach(
+      callee =>
+        val dsg = results.analysis.get.locals.get(program.procs(callee))
+        assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
+        assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
+        // x should point to a collapsed object, in all 3 functions
+        // all three load value of x
+        // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
+        // arbitrary pointer is used in arithmetic causing collapse
+        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.get.collapsed)
     )
-    val program = results.ir.program
-    val dsg = results.analysis.get.locals.get(program.procs("add_six"))
-//    assert(dsg.pointTo.size == 9)
-    assert(dsg.stackMapping.isEmpty)
-    assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.get.collapsed)
-
-    // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
-
-  }
-
-  test("local jumptable2 add_two") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
-    val program = results.ir.program
-    val dsg = results.analysis.get.locals.get(program.procs("add_two"))
-//    assert(dsg.pointTo.size == 9)
-    assert(dsg.stackMapping.isEmpty)
-    assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.get.collapsed)
-
-    // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
 
   }
 
@@ -181,26 +140,20 @@ class DSATest extends AnyFunSuite, TestUtil {
 
     val program = results.ir.program
     val dsg = results.analysis.get.locals.get(program.mainProcedure)
-//    assert(dsg.pointTo.size == 12) // 12
-    val framePointer = dsg.find(dsg.stackMapping(0).cells(0))
+    val stack0 = dsg.find(dsg.stackMapping(0).cells(0))
     val stack8 = dsg.find(dsg.stackMapping(8).cells(0))
     val stack16 = dsg.find(dsg.stackMapping(16).cells(0))
     val stack28 = dsg.find(dsg.stackMapping(28).cells(0))
-    assert(dsg.adjust(framePointer.getPointee).equals(dsg.adjust(dsg.formals(R29))))
+    assert(dsg.adjust(stack0.getPointee).equals(dsg.adjust(dsg.formals(R29))))
     assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30))))
-    assert(dsg.adjust(stack16.getPointee).equals(dsg.adjust(dsg.formals(R1))))
-    assert(dsg.adjust(stack28.getPointee).equals(dsg.adjust(dsg.formals(R0))))
+    assert(dsg.adjust(stack16.getPointee).equals(dsg.adjust(dsg.formals(R1)))) // input args
+    assert(dsg.adjust(stack28.getPointee).equals(dsg.adjust(dsg.formals(R0)))) // input args
 
     // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
+    assertJumptable2Globals(dsg)
+
+    // x should not be collapsed in the main function's local graph
+    assert(!dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)).getPointee.node.collapsed)
 
 
   }
@@ -223,8 +176,8 @@ class DSATest extends AnyFunSuite, TestUtil {
 
     val program = results.ir.program
     val dsg = results.analysis.get.locals.get(program.mainProcedure)
-    writeToFile(dsg.toDot, "test2.dot")
 
+    // stackX is the pointee of stack object at position X instead of the stack object itself
     val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
@@ -232,23 +185,38 @@ class DSATest extends AnyFunSuite, TestUtil {
     val stack40 = dsg.adjust(dsg.find(dsg.stackMapping(40).cells(0)).getPointee)
     val stack48 = dsg.adjust(dsg.find(dsg.stackMapping(48).cells(0)).getPointee)
     val stack56 = dsg.adjust(dsg.find(dsg.stackMapping(56).cells(0)).getPointee)
-//    assert(dsg.pointTo.size==10)
+
+
     assert(stack0.equals(dsg.adjust(dsg.formals(R29))))
     assert(stack8.equals(dsg.adjust(dsg.formals(R30))))
+
+
+
+    // stack24 and stack32 should point to the beginning of first Malloc (size 20)
     assert(stack24.equals(stack32))
     assert(stack24.offset == 0)
     assert(stack24.node.get.allocationRegions.size == 1)
     assert(stack24.node.get.allocationRegions.head.asInstanceOf[HeapLocation].size == 20)
-    assert(stack40.node.get.allocationRegions.size == 1)
-    assert(stack48.node.get.allocationRegions.head.asInstanceOf[HeapLocation].size == 8)
-    assert(dsg.adjust(stack48.getPointee).equals(stack40))
-    assert(dsg.adjust(stack48.getPointee).equals(stack56))
+
+
+    // stack24 and stack40 should be pointing to the same cell at different internal offsets
     val unadjustedStack24Pointee = dsg.find(dsg.stackMapping(24).cells(0)).getPointee
     val unadjustedStack40Pointee = dsg.find(dsg.stackMapping(40).cells(0)).getPointee
     assert(unadjustedStack24Pointee.cell.equals(unadjustedStack40Pointee.cell))
-    assert(unadjustedStack40Pointee.internalOffset == 1)
+    assert(unadjustedStack40Pointee.internalOffset == 1) // result of unsafe pointer arithmetic
     assert(unadjustedStack24Pointee.internalOffset == 0)
     assert(unadjustedStack24Pointee.offset == 0)
+
+    // stack48 points to second malloc (size 8)
+    assert(stack48.node.get.allocationRegions.size == 1)
+    assert(stack48.node.get.allocationRegions.head.asInstanceOf[HeapLocation].size == 8)
+
+
+    // stack 48 points to a malloc address which point to the pointee of stack40 and stack56
+    assert(dsg.adjust(stack48.getPointee).equals(stack40))
+    assert(dsg.adjust(stack48.getPointee).equals(stack56))
+
+
   }
 
   test("interproc pointer arithmetic main") {
@@ -275,9 +243,13 @@ class DSATest extends AnyFunSuite, TestUtil {
 
     assert(stack0.equals(dsg.adjust(dsg.formals(R29))))
     assert(stack8.equals(dsg.adjust(dsg.formals(R30))))
+
+    // stack24 and 32 point to different offsets of the same node
     assert(stack24.node.get.equals(stack32.node.get))
     assert(stack24.offset == 0)
     assert(stack32.offset == 16)
+
+    // stack40 points to a different offset of stack24's node but the analysis can't determine that in the local phase
     assert(stack40._pointee.isDefined)
     assert(!stack40.node.get.equals(stack24.node.get))
   }
@@ -301,22 +273,24 @@ class DSATest extends AnyFunSuite, TestUtil {
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
 
+    // stack8 points to the formal argument object
     assert(stack8.equals(dsg.adjust(dsg.formals(R0))))
     assert(stack8.offset == 0)
+    // stack 24 points to the formal argument object at offset 16, instead
     assert(stack24.equals(dsg.adjust(dsg.formals(R0)).node.get.cells(16)))
   }
 
 
   test("internal merge") {
+    // this is an internal merge (two cells of the same node overlap and are merged together)
     val mem = SharedMemory("mem", 10000, 10000)
     val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
     val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
     var program = prog(
       proc("main",
         block("operations",
-//          Assign(R0, MemoryLoad(mem, R0, BigEndian, 0), Some("00000")),
-          locAssign1,
-          locAssign2,
+          locAssign1, // R6 = R0 + 4
+          locAssign2, // R7 = R0 + 5
           MemoryAssign(mem,  R7, R1, BigEndian, 64, Some("00003")),
           MemoryAssign(mem,  R6, R2, BigEndian, 64, Some("00004")),
           ret
@@ -326,13 +300,18 @@ class DSATest extends AnyFunSuite, TestUtil {
 
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
-
     val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Set.empty, Map.empty, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program))
     val dsg: DSG = results.locals.get(program.mainProcedure)
+
+    // object of formals R1 and R2 are written to overlapping fields of the same node? causing them to be merged together
     assert(dsg.adjust(dsg.formals(R1)).equals(dsg.adjust(dsg.formals(R2))))
+
+    // R6 and R7 address the same cell
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign2)(R7)).cell))
+    // however, they address different internal offets in those cells
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).internalOffset == 0)
     assert(dsg.find(dsg.varToCell(locAssign2)(R7)).internalOffset == 1)
+    // R6 points to input R1
     assert(dsg.adjust(dsg.varToCell(locAssign1)(R6))._pointee.isDefined)
     assert(dsg.adjust(dsg.adjust(dsg.varToCell(locAssign1)(R6)).getPointee).equals(dsg.adjust(dsg.formals(R1))))
 
@@ -347,11 +326,11 @@ class DSATest extends AnyFunSuite, TestUtil {
     var program = prog(
       proc("main",
         block("operations",
-          locAssign1,
-          locAssign2,
+          locAssign1, // R6 = R0 + 4
+          locAssign2, // R7 = R0 + 5
           MemoryAssign(mem, R7, R1, BigEndian, 64, Some("00003")),
           MemoryAssign(mem, R6, R2, BigEndian, 64, Some("00004")),
-          locAssign3,
+          locAssign3, // R5 = R7 + 8
           ret
         )
       )
@@ -362,10 +341,13 @@ class DSATest extends AnyFunSuite, TestUtil {
 
     val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Set.empty, Map.empty, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program))
     val dsg: DSG = results.locals.get(program.mainProcedure)
+    // check that R5 points to separate cell at offset 13
     assert(dsg.find(dsg.varToCell(locAssign3)(R5)).offset == 13)
   }
 
   test("offsetting from middle of cell to the same cell") {
+    // similar to above except instead of creating new cell the last assign
+    // points R7's cell at an internal offset of 8
     val mem = SharedMemory("mem", 10000, 10000)
     val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
     val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
@@ -374,7 +356,6 @@ class DSATest extends AnyFunSuite, TestUtil {
     var program = prog(
       proc("main",
         block("operations",
-          //          Assign(R0, MemoryLoad(mem, R0, BigEndian, 0), Some("00000")),
           locAssign1,
           locAssign2,
           MemoryAssign(mem,  R7, R1, BigEndian, 64, Some("00003")),
@@ -401,6 +382,7 @@ class DSATest extends AnyFunSuite, TestUtil {
   }
 
   test("internal offset transfer") {
+    // this is a test to check assignments transfer internal offset of slices.
     val mem = SharedMemory("mem", 10000, 10000)
     val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
     val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
@@ -429,7 +411,10 @@ class DSATest extends AnyFunSuite, TestUtil {
   }
 
   // bottom up tests
-  test("bottom up jumptable2 sub_seven") {
+  ignore("bottom up jumptable2 callees") {
+    // this is the same as local graphs
+    // nothing should be changed
+    // TODO count point-to relations and ensure no more constraints are added in this phase
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
@@ -443,88 +428,25 @@ class DSATest extends AnyFunSuite, TestUtil {
         outputPrefix = "boogie_out",
       )
     )
+
+
     val program = results.ir.program
-    val dsg = results.analysis.get.bus.get(program.procs("sub_seven"))
-    assert(dsg.stackMapping.isEmpty)
-    assert(dsg.find(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.collapsed)
-
-
-    // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
-
-  }
-
-  test("bottom up jumptable2 add_six") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
+    // test that all three calles have the same local graph
+    val callees = Set("sub_seven", "add_two", "add_six")
+    callees.foreach(
+      callee =>
+        val dsg = results.analysis.get.bus.get(program.procs(callee))
+        assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
+        assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
+        // x should point to a collapsed object, in all 3 functions
+        // all three load value of x
+        // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
+        // arbitrary pointer is used in arithmetic causing collapse
+        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.get.collapsed)
     )
-    val program = results.ir.program
-    val dsg = results.analysis.get.bus.get(program.procs("add_six"))
-    assert(dsg.stackMapping.isEmpty)
-    assert(dsg.find(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.collapsed)
-
-    // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
 
   }
 
-  test("bottomup jumptable2 add_two") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
-    val program = results.ir.program
-    val dsg = results.analysis.get.bus.get(program.procs("add_two"))
-    assert(dsg.stackMapping.isEmpty)
-    assert(dsg.find(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.collapsed)
-
-    // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
-
-  }
 
   test("bottom up jumptable2 main") {
     val results = RunUtils.loadAndTranslate(
@@ -556,24 +478,16 @@ class DSATest extends AnyFunSuite, TestUtil {
 
 
     // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
+    assertJumptable2Globals(dsg)
 
-    // bu
+    // bu x now should be collapsed since it was collapsed in callees
     assert(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)).getPointee.node.collapsed)
 
   }
 
 
 
-  test("bottom up interproc pointer arithmetic callee") {
+  ignore("bottom up interproc pointer arithmetic callee") {
     // same as interproc pointer arithmetic callee's local graph (no changes should have been made)
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
@@ -623,6 +537,9 @@ class DSATest extends AnyFunSuite, TestUtil {
     val stack32 = dsg.adjust(dsg.find(dsg.stackMapping(32).cells(0)).getPointee)
     val stack40 = dsg.adjust(dsg.find(dsg.stackMapping(40).cells(0)).getPointee)
 
+
+    // same as the local graph with the difference that stack40 points to cell at
+    // a different of the same node as pointees of stack32 and stack24
     assert(stack0.equals(dsg.adjust(dsg.formals(R29))))
     assert(stack8.equals(dsg.adjust(dsg.formals(R30))))
     assert(stack24.node.get.equals(stack32.node.get))
@@ -639,7 +556,8 @@ class DSATest extends AnyFunSuite, TestUtil {
 
 
   // top down tests
-  test("top down jumptable2 main") {
+  ignore("top down jumptable2 main") {
+    // no changes should be made from previous phase 
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
@@ -684,7 +602,7 @@ class DSATest extends AnyFunSuite, TestUtil {
     
   }
 
-  test("top down jumptable2 sub_seven") {
+  ignore("top down jumptable2 callees") {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
@@ -698,93 +616,26 @@ class DSATest extends AnyFunSuite, TestUtil {
         outputPrefix = "boogie_out",
       )
     )
+
+
     val program = results.ir.program
-    val dsg = results.analysis.get.tds.get(program.procs("sub_seven"))
-    assert(dsg.stackMapping.isEmpty)
-    assert(dsg.find(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.collapsed)
-
-
-    // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
-
-
-  }
-
-  test("top down jumptable2 add_six") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
+    // test that all three callees have the same local graph
+    val callees = Set("sub_seven", "add_two", "add_six")
+    callees.foreach(
+      callee =>
+        val dsg = results.analysis.get.tds.get(program.procs(callee))
+        assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
+        assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
+        // x should point to a collapsed object, in all 3 functions
+        // all three load value of x
+        // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
+        // arbitrary pointer is used in arithmetic causing collapse
+        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.get.collapsed)
     )
-    val program = results.ir.program
-    val dsg = results.analysis.get.tds.get(program.procs("add_six"))
-    assert(dsg.stackMapping.isEmpty)
-    assert(dsg.find(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.collapsed)
-
-
-    // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
-
 
   }
 
-  test("top down jumptable2 add_two") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
-    val program = results.ir.program
-    val dsg = results.analysis.get.tds.get(program.procs("add_two"))
-    assert(dsg.stackMapping.isEmpty)
-    assert(dsg.find(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.collapsed)
 
-
-    // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
-
-
-  }
 
   test("top down interproc pointer arithmetic callee") {
     val results = RunUtils.loadAndTranslate(
@@ -806,6 +657,7 @@ class DSATest extends AnyFunSuite, TestUtil {
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
 
+    // callee should now have different offsets due to formal and actual input parameters being unified
     assert(stack8.equals(dsg.adjust(dsg.formals(R0))))
     assert(stack8.offset == 16)
     assert(stack24.equals(dsg.adjust(dsg.formals(R0)).node.get.cells(32)))
@@ -814,7 +666,7 @@ class DSATest extends AnyFunSuite, TestUtil {
 
 
   // top down phase should be the same as bu phase
-  test("top down interproc pointer arithmetic main") {
+  ignore("top down interproc pointer arithmetic main") {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(

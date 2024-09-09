@@ -6,7 +6,6 @@ import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, Di
 import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
 
 import scala.util.control.Breaks.{break, breakable}
-import java.math.BigInteger
 import scala.collection.mutable
 
 object NodeCounter {
@@ -42,8 +41,6 @@ class DSG(val proc: Procedure,
   // DSNodes owned by this graph, only updated once analysis is done,
   val nodes: mutable.Set[DSN] = mutable.Set()
 
-  // this is mapping of point-relations in the graph
-//  val pointTo: mutable.Map[DSC, Slice] = mutable.Map()
 
   // represent callees in proc
   val callsites: mutable.Set[CallSite] = mutable.Set()
