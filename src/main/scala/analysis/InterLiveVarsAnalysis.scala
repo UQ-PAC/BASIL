@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.BackwardIDESolver
-import ir.{Assert, Assume, GoTo, CFGPosition, Command, DirectCall, IndirectCall, Assign, MemoryAssign, Procedure, Program, Variable, toShortString}
+import ir.{Assert, Assume, Block, GoTo, CFGPosition, Command, DirectCall, IndirectCall, Assign, MemoryAssign, Unreachable, Return, Procedure, Program, Variable, toShortString}
 
 /**
  * Micro-transfer-functions for LiveVar analysis
@@ -19,7 +19,7 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
   val edgelattice: EdgeFunctionLattice[TwoElement, TwoElementLattice] = EdgeFunctionLattice(valuelattice)
   import edgelattice.{IdEdge, ConstEdge}
 
-  def edgesCallToEntry(call: GoTo, entry: IndirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
+  def edgesCallToEntry(call: Command, entry: Return)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     Map(d -> IdEdge())
   }
 
@@ -27,7 +27,7 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
     Map(d -> IdEdge())
   }
 
-  def edgesCallToAfterCall(call: GoTo, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
+  def edgesCallToAfterCall(call: Command, aftercall: DirectCall)(d: DL): Map[DL, EdgeFunction[TwoElement]] = {
     d match
       case Left(value) => Map() // maps all variables before the call to bottom
       case Right(_) => Map(d -> IdEdge())
@@ -70,7 +70,7 @@ trait LiveVarsAnalysisFunctions extends BackwardIDEAnalysis[Variable, TwoElement
             expr.variables.foldLeft(Map[DL, EdgeFunction[TwoElement]](d -> IdEdge())) {
               (mp, expVar) => mp + (Left(expVar) -> ConstEdge(TwoElementTop))
             }
-      case IndirectCall(variable, _, _) =>
+      case IndirectCall(variable, _) =>
         d match
           case Left(value) => if value != variable then Map(d -> IdEdge()) else Map()
           case Right(_) => Map(d -> IdEdge(), Left(variable) -> ConstEdge(TwoElementTop))

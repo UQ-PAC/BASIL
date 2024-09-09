@@ -31,11 +31,11 @@ trait ProcVariableDependencyAnalysisFunctions(
     if varDepsSummaries.contains(entry) then Map() else Map(d -> IdEdge())
   }
 
-  def edgesExitToAfterCall(exit: IndirectCall, aftercall: GoTo)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
+  def edgesExitToAfterCall(exit: Return, aftercall: Command)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
     if reachable.contains(aftercall.parent.parent) then Map(d -> IdEdge()) else Map()
   }
 
-  def edgesCallToAfterCall(call: DirectCall, aftercall: GoTo)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
+  def edgesCallToAfterCall(call: DirectCall, aftercall: Command)(d: DL): Map[DL, EdgeFunction[Set[Taintable]]] = {
     d match {
       case Left(v) => varDepsSummaries.get(call.target).flatMap(_.get(v).map( _.foldLeft(Map[DL, EdgeFunction[Set[Taintable]]]()) {
         (m, d) => m + (Left(d) -> IdEdge())
@@ -116,11 +116,11 @@ class VariableDependencyAnalysis(
   def analyze(): Map[Procedure, Map[Taintable, Set[Taintable]]] = {
     var varDepsSummaries = Map[Procedure, Map[Taintable, Set[Taintable]]]()
     var varDepsSummariesTransposed = Map[Procedure, Map[Taintable, Set[Taintable]]]()
-    scc.flatten.foreach {
+    scc.flatten.filter(_.blocks.nonEmpty).foreach {
       procedure => {
         Logger.info("Generating variable dependencies for " + procedure)
         val varDepResults = ProcVariableDependencyAnalysis(program, varDepVariables, globals, constProp, varDepsSummariesTransposed, procedure).analyze()
-        val varDepMap = varDepResults.getOrElse(procedure.end, Map())
+        val varDepMap = varDepResults.getOrElse(IRWalk.lastInProc(procedure).getOrElse(procedure), Map())
         varDepsSummaries += procedure -> varDepMap
         varDepsSummariesTransposed += procedure -> varDepMap.foldLeft(Map[Taintable, Set[Taintable]]()) {
           (m, p) => {

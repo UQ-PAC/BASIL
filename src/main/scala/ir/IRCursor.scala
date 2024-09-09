@@ -14,12 +14,19 @@ import scala.annotation.tailrec
  */
 type CFGPosition = Procedure | Block | Command
 
+def isAfterCall(c: Command) = {
+  (IRWalk.prevCommandInBlock(c)) match {
+    case Some(c: Call) => true
+    case _             => false
+  }
+}
+
 extension (p: CFGPosition)
   def toShortString: String =
     p match
       case procedure: Procedure => procedure.toString
-      case block: Block => s"Block ${block.label}"
-      case command: Command => command.toString
+      case block: Block         => s"Block ${block.label}"
+      case command: Command     => command.toString
 
 // todo: we could just use the dependencies trait directly instead to avoid the instantiation issue
 trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] {
@@ -28,74 +35,80 @@ trait IRWalk[IN <: CFGPosition, NT <: CFGPosition & IN] {
 }
 
 object IRWalk:
-  def procedure(pos: CFGPosition) : Procedure = {
+
+  def prevCommandInBlock(c: Command): Option[Command] = c match {
+    case s: Statement => c.parent.statements.prevOption(s)
+    case j: Jump      => c.parent.statements.lastOption
+  }
+
+  def nextCommandInBlock(c: Command): Option[Command] = c match {
+    case s: Statement => Some(s.successor)
+    case j: Jump      => None
+  }
+
+  def procedure(pos: CFGPosition): Procedure = {
     pos match {
       case p: Procedure => p
-      case b: Block => b.parent
-      case c: Command => c.parent.parent
+      case b: Block     => b.parent
+      case c: Command   => c.parent.parent
     }
   }
 
-  def blockBegin(pos: CFGPosition) : Option[Block] = {
+  def blockBegin(pos: CFGPosition): Option[Block] = {
     pos match {
       case p: Procedure => p.entryBlock
-      case b: Block => Some(b)
-      case c: Command => Some(c.parent)
+      case b: Block     => Some(b)
+      case c: Command   => Some(c.parent)
     }
   }
 
-  def commandBegin(pos: CFGPosition) : Option[Command] = {
+  def commandBegin(pos: CFGPosition): Option[Command] = {
     pos match {
       case p: Procedure => p.entryBlock.map(b => b.statements.headOption.getOrElse(b.jump))
-      case b: Block => Some(b.statements.headOption.getOrElse(b.jump))
-      case c: Command => Some(c)
+      case b: Block     => Some(b.statements.headOption.getOrElse(b.jump))
+      case c: Command   => Some(c)
     }
   }
 
-extension (p: Jump)
-  def isAfterCall : Boolean = {
-    p match {
-      case g: GoTo => g.parent.fallthrough.contains(g)
-      case _ => false
-    }
-  }
+  def lastInBlock(p: Block): Command = p.jump
+  def firstInBlock(p: Block): Command = p.statements.headOption.getOrElse(p.jump)
 
-extension (p: Block) 
-  def isProcEntry : Boolean =  p.parent.entryBlock.contains(p)
-  def isProcReturn : Boolean = p.parent.returnBlock.contains(p)
-  // TODO: this method doesn't require aftercall blocks only have 1 incoming jump 
-  def isAfterCall : Boolean = p.incomingJumps.nonEmpty && p.incomingJumps.forall(_.isAfterCall)
+  def firstInProc(p: Procedure): Option[Command] = p.entryBlock.map(firstInBlock)
+  def lastInProc(p: Procedure): Option[Command] = p.returnBlock.map(lastInBlock)
 
-  def begin: CFGPosition = p
-  def end: CFGPosition = p.jump
 
-extension (p: Procedure)
-  def begin: CFGPosition = p
-  def end: CFGPosition = p.returnBlock.map(_.end).getOrElse(p)
+// extension (p: Block)
+//   def isProcEntry: Boolean = p.parent.entryBlock.contains(p)
+//   def isProcReturn: Boolean = p.parent.returnBlock.contains(p)
+// 
+//   def begin: CFGPosition = p
+//   def end: CFGPosition = p.jump
+// 
+// extension (p: Procedure)
+//   def begin: CFGPosition = p
+//   def end: CFGPosition = p.returnBlock.map(_.end).getOrElse(p)
 
-/**
- * Does not include edges between procedures.
- */
+/** Does not include edges between procedures.
+  */
 trait IntraProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
 
   def succ(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
       case proc: Procedure => proc.entryBlock.toSet
-      case b: Block        => Set(b.statements.headOption.getOrElse(b.jump))
-      case s: Statement    =>  Set(s.succ().getOrElse(s.parent.jump))
+      case b: Block        => b.statements.headOption.orElse(Some(b.jump)).toSet
       case n: GoTo         => n.targets.asInstanceOf[Set[CFGPosition]]
-      case c: Call         => c.parent.fallthrough.toSet
+      case h: Unreachable         => Set()
+      case h: Return       => Set()
+      case c: Statement    => IRWalk.nextCommandInBlock(c).toSet
     }
   }
 
   def pred(pos: CFGPosition): Set[CFGPosition] = {
     pos match {
-      case s: Statement => Set(s.pred().getOrElse(s.parent))
-      case j: GoTo if j.isAfterCall  => Set(j.parent.jump)
-      case j: Jump => Set(j.parent.statements.lastOption.getOrElse(j.parent))
-      case b: Block if b.isProcEntry => Set(b.parent)
-      case b: Block => b.incomingJumps.asInstanceOf[Set[CFGPosition]]
-      case proc: Procedure => Set() // intraproc
+      case c: Command                => Set(IRWalk.prevCommandInBlock(c).getOrElse(c.parent))
+      case b: Block if b.isEntry     => Set(b.parent)
+      case b: Block                  => b.incomingJumps.asInstanceOf[Set[CFGPosition]]
+      case proc: Procedure           => Set() // intraproc
     }
   }
 }
@@ -116,70 +129,49 @@ trait IntraProcBlockIRCursor extends IRWalk[CFGPosition, Block] {
   @tailrec
   final def pred(pos: CFGPosition): Set[Block] = {
     pos match {
-      case b: Block if b.isProcEntry => Set.empty
-      case b: Block  => b.incomingJumps.map(_.parent).toSet
-      case j: Command   => pred(j.parent)
-      case s: Procedure => Set.empty
+      case b: Block if b.isEntry     => Set.empty
+      case b: Block                  => b.incomingJumps.map(_.parent).toSet
+      case j: Command                => pred(j.parent)
+      case s: Procedure              => Set.empty
     }
   }
 }
 object IntraProcBlockIRCursor extends IntraProcBlockIRCursor
 
-/**
- * Includes all intraproc edges as well as edges between procedures.
- *
- * forwards:
- * Direct call -> target
- * return indirect Call -> the procedure return block for all possible direct-call sites
- *
- * backwards:
- * Procedure -> all possible direct-call sites
- * Call-return block -> return Call of the procedure called
- *
- */
+/** Includes all intraproc edges as well as edges between procedures.
+  *
+  * forwards: Direct call -> target return indirect Call -> the procedure return block for all possible direct-call
+  * sites
+  *
+  * backwards: Procedure -> all possible direct-call sites Call-return block -> return Call of the procedure called
+  */
 trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
 
   final def succ(pos: CFGPosition): Set[CFGPosition] = {
-  IntraProcIRCursor.succ(pos) ++
-    (pos match
-      case c: DirectCall if c.target.blocks.nonEmpty  => Set(c.target)
-      case c: IndirectCall if c.parent.isProcReturn => c.parent.parent.incomingCalls().flatMap(_.parent.fallthrough.toSet).toSet
-      case _ =>  Set.empty)
+    IntraProcIRCursor.succ(pos) ++
+      (pos match
+        case c: DirectCall if c.target.blocks.nonEmpty => Set(c.target)
+        case c: Return => c.parent.parent.incomingCalls().map(_.successor).toSet
+        case _         => Set.empty
+      )
   }
 
   final def pred(pos: CFGPosition): Set[CFGPosition] = {
     IntraProcIRCursor.pred(pos) ++
-    (pos match
-      case c: Procedure       => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
-      case b: GoTo if b.isAfterCall => b.parent.jump match {
-        case DirectCall(t,_, _) if t.blocks.nonEmpty => t.returnBlock.toSet
-        case _ => Set(b)
-      }
-      case _ => Set.empty)
+      (pos match
+        case c: Command => {
+          IRWalk.prevCommandInBlock(c) match {
+            case Some(d: DirectCall) if d.target.blocks.nonEmpty => d.target.returnBlock.toSet
+            case o            => o.toSet
+          }
+
+        }
+        case c: Procedure                              => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
+        case _                                         => Set.empty
+      )
   }
 }
 
-trait InterProcBlockIRCursor extends IRWalk[CFGPosition, Block] {
-
-  final def succ(pos: CFGPosition): Set[Block] = {
-    IntraProcBlockIRCursor.succ(pos) ++
-    (pos match {
-      case s: DirectCall if s.target.blocks.nonEmpty  => s.target.entryBlock.toSet
-      case b: Block if b.isProcReturn => b.parent.incomingCalls().map(_.parent).toSet
-      case _               => Set.empty 
-    })
-  }
-
-  final def pred(pos: CFGPosition): Set[Block] = {
-    IntraProcBlockIRCursor.pred(pos) ++
-    (pos match {
-      case b: Block if b.isAfterCall => b.incomingJumps.collect {_.parent.jump match 
-          case d: DirectCall => d.target }.flatMap(_.returnBlock).toSet
-      case b: Block if b.isProcEntry => b.parent.incomingCalls().map(_.parent).toSet
-      case _ => Set.empty 
-    })
-  }
-}
 object InterProcIRCursor extends InterProcIRCursor
 
 trait CallGraph extends IRWalk[Procedure, Procedure] {
@@ -190,7 +182,7 @@ trait CallGraph extends IRWalk[Procedure, Procedure] {
 
 object CallGraph extends CallGraph
 
-object InterProcBlockIRCursor extends InterProcBlockIRCursor
+// object InterProcBlockIRCursor extends InterProcBlockIRCursor
 
 /** Computes the reachability transitive closure of the CFGPositions in initial under the successor relation defined by
   * walker.
@@ -315,17 +307,17 @@ def toDot[T <: CFGPosition](
 
   def getArrow(s: CFGPosition, n: CFGPosition) = {
     if (IRWalk.procedure(n) eq IRWalk.procedure(s)) {
-      DotRegularArrow(dotNodes(s),dotNodes(n))
+      DotRegularArrow(dotNodes(s), dotNodes(n))
     } else {
-      DotInterArrow(dotNodes(s),dotNodes(n))
+      DotInterArrow(dotNodes(s), dotNodes(n))
     }
   }
 
   for (node <- domain) {
     node match {
       case s =>
-        iterator.succ(s).foreach(n => dotArrows.addOne(getArrow(s,n)))
- //       iterator.pred(s).foreach(n => dotArrows.addOne(getArrow(s,n)))
+        iterator.succ(s).foreach(n => dotArrows.addOne(getArrow(s, n)))
+      //       iterator.pred(s).foreach(n => dotArrows.addOne(getArrow(s,n)))
     }
   }
 
