@@ -70,6 +70,15 @@ case object BasilValue {
       case _                         => Left((TypeError(s"Operation add $vr undefined on $l")))
     }
   }
+
+  def add[S, E](l: BasilValue, r: BasilValue): Either[InterpreterError, BasilValue] = {
+    (l,r) match {
+      case (Scalar(IntLiteral(vl)), Scalar(IntLiteral(vr)))    => Right(Scalar(IntLiteral(vl + vr)))
+      case (Scalar(b1: BitVecLiteral), Scalar(b2: BitVecLiteral)) => Right(Scalar(eval.evalBVBinExpr(BVADD, b1, b2)))
+      case _                         => Left((TypeError(s"Operation add undefined  $l + $r")))
+    }
+  }
+
 }
 
 /** Minimal language defining all state transitions in the interpreter, defined for the interpreter's concrete state T.
@@ -97,6 +106,8 @@ trait Effects[T, E] {
    */
   def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation): State[T, Unit, E]
 
+  def callIntrinsic(name: String, args: List[BasilValue]) : State[T, Unit, E]
+
   def doReturn(): State[T, Unit, E]
 
   def storeVar(v: String, scope: Scope, value: BasilValue): State[T, Unit, E]
@@ -112,6 +123,7 @@ trait NopEffects[T, E] extends Effects[T, E] {
   def setNext(c: ExecutionContinuation) = State.pure(())
 
   def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = State.pure(())
+  def callIntrinsic(name: String, args: List[BasilValue]) = State.pure(()) 
   def doReturn() = State.pure(())
 
   def storeVar(v: String, scope: Scope, value: BasilValue) = State.pure(())
@@ -295,8 +307,33 @@ object LibcIntrinsic {
     s.doReturn()
   }
 
-  def intrinsics[S, E, T <: Effects[S, E]] =
-    Map[String, T => State[S, Unit, E]]("putc" -> putc, "puts" -> puts, "printf" -> printf)
+  def malloc[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
+    size <- s.loadVar("R0")
+    res <- s.callIntrinsic("malloc", List(size))
+    _ <- s.doReturn()
+  } yield (())
+
+  def free[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
+    ptr <- s.loadVar("R0")
+    res <- s.callIntrinsic("free", List(ptr))
+    _ <- s.doReturn()
+  } yield (())
+
+
+  def calloc[S, T <: Effects[S, InterpreterError]](s: T): State[S, Unit, InterpreterError] = for {
+    size <- s.loadVar("R0")
+    res <- s.callIntrinsic("malloc", List(size))
+    ptr <- s.loadVar("R0")
+    isize <- size match {
+      case Scalar(b: BitVecLiteral) => State.pure(b.value * 8)
+      case _ => State.setError(Errored("programmer error"))
+    }
+    cl <- Eval.storeBV(s)("mem", ptr, BitVecLiteral(0, isize.toInt), Endian.LittleEndian)
+    _ <- s.doReturn()
+  } yield (())
+
+  def intrinsics[S, T <: Effects[S, InterpreterError]] =
+    Map[String, T => State[S, Unit, InterpreterError]]("putc" -> putc, "puts" -> puts, "printf" -> printf, "malloc" -> malloc, "free" -> free, "#free" -> free, "calloc" -> calloc)
 
 }
 
@@ -309,6 +346,29 @@ case class InterpreterState(
 /** Implementation of Effects for InterpreterState concrete state representation.
   */
 object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
+
+  def callIntrinsic(name: String, args: List[BasilValue]) = {
+    name match {
+      case "malloc" => {
+        for {
+          size <- (args.headOption match {
+            case Some(x @ Scalar(_: BitVecLiteral)) => State.pure(x)
+            case Some(Scalar(x: IntLiteral)) => State.pure(Scalar(BitVecLiteral(x.value, 64)))
+            case _ => State.setError(Errored("illegal prim arg"))
+          })
+          x <- loadVar("ghost_malloc_top")
+          x_gap <- State.pureE(BasilValue.unsafeAdd(x, 128)) // put a gap around allocations to catch buffer overflows
+          x_end <- State.pureE(BasilValue.add(x_gap, size))
+          _ <- storeVar("ghost_malloc_top", Scope.Global, x_end)
+          _ <- storeVar("R0", Scope.Global, x_gap)
+        } yield (())
+      }
+      case "free" => {
+        State.pure(())
+      }
+      case _ => State.setError(Errored(s"Call undefined intrinsic $name"))
+    }
+  }
 
   def loadVar(v: String) = {
     State.getE((s: InterpreterState) => {

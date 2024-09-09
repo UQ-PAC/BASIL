@@ -403,7 +403,12 @@ object InterpFuns {
           ))
       })
 
-    State.sequence(State.pure(()), stores)
+
+      for {
+        _ <- State.sequence(State.pure(()), stores)
+        malloc_top = BitVecLiteral(newAddr() + 1024, 64)
+        _ <- s.storeVar("ghost_malloc_top", Scope.Global, Scalar(malloc_top))
+      } yield (())
   }
 
   /** Functions which compile BASIL IR down to the minimal interpreter effects.

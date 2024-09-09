@@ -62,6 +62,11 @@ case class ProductInterpreter[L, T, E](val inner: Effects[L, E], val before: Eff
     f <- doLeft(inner.call(target, beginFrom, returnTo))
   } yield (f)
 
+  def callIntrinsic(name: String, args: List[BasilValue]) = for {
+    n <- doRight(before.callIntrinsic(name, args))
+    f <- doLeft(inner.callIntrinsic(name, args))
+  } yield (f)
+
   def doReturn() = for {
     n <- doRight(before.doReturn())
     f <- doLeft(inner.doReturn())
@@ -110,6 +115,11 @@ case class LayerInterpreter[L, T, E](val inner: Effects[L, E], val before: Effec
   def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = for {
     n <- (before.call(target, beginFrom, returnTo))
     f <- doLeft(inner.call(target, beginFrom, returnTo))
+  } yield (f)
+
+  def callIntrinsic(name: String, args: List[BasilValue]) = for {
+    n <- before.callIntrinsic(name, args)
+    f <- doLeft(inner.callIntrinsic(name, args))
   } yield (f)
 
   def doReturn() = for {

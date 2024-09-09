@@ -25,7 +25,7 @@ class DifferentialAnalysis extends AnyFunSuite {
 
   def diffTest(initial: IRContext, transformed: IRContext) = {
 
-    val instructionLimit = 100000 
+    val instructionLimit = 1000000 
 
     def interp(p: IRContext) : (InterpreterState, Trace) = {
       val interpreter = LayerInterpreter(tracingInterpreter(NormalInterpreter), EffectsRLimit(instructionLimit))
