@@ -578,15 +578,16 @@ object StaticAnalysis {
     val globalAddresses = globals.map(s => s.address -> s.name).toMap
     val globalSizes = globals.map(s => s.name -> s.size).toMap
     val externalAddresses = externalFunctions.map(e => e.offset -> e.name).toMap
-    Logger.info("Globals:")
+    Logger.info("Globals: ")
     Logger.info(globalAddresses)
     Logger.info("Global Offsets: ")
     Logger.info(globalOffsets)
+    Logger.info("Global Sizes: ")
+    Logger.info(globalSizes)
     Logger.info("External: ")
     Logger.info(externalAddresses)
     Logger.info("Subroutine Addresses:")
     Logger.info(subroutines)
-
 
     // reducible loops
     val detector = LoopDetector(IRProgram)

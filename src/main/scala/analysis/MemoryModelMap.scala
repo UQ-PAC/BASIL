@@ -83,14 +83,16 @@ class MemoryModelMap {
       case d: DataRegion =>
         val currentDataMap = dataMap
         if (currentDataMap.isEmpty) {
-          currentDataMap(RangeKey(offset, MAX_BIGINT)) = d
+          currentDataMap(RangeKey(offset, maxSize(d) - 1)) = d
         } else {
           val currentMaxRange = currentDataMap.keys.maxBy(_.end)
           val currentMaxRegion = currentDataMap(currentMaxRange)
-          currentDataMap.remove(currentMaxRange)
-          val updatedRange = RangeKey(currentMaxRange.start, offset - 1)
-          currentDataMap.addOne(updatedRange -> currentMaxRegion)
-          currentDataMap(RangeKey(offset, MAX_BIGINT)) = d
+          if (offset <= currentMaxRange.end) {
+            currentDataMap.remove(currentMaxRange) // TODO: this removes previously overlapping parent region (jumptable2 example) which favours more fine grained regions
+            currentDataMap(RangeKey(offset, maxSize(d) - 1)) = d
+          } else {
+            currentDataMap(RangeKey(offset, maxSize(d) - 1)) = d
+          }
         }
       case h: HeapRegion =>
         val currentHeapMap = heapMap
@@ -178,7 +180,7 @@ class MemoryModelMap {
     val reversedExternalFunctionRgns = (externalFunctions ++ globalAddresses).map((offset, name) => resolveInverseGlobalOffset(name, offset, globalOffsets) -> name)
     val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => reversedExternalFunctionRgns.contains(offset))
 
-    val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, globalSizes.getOrElse(name, 0)))
+    val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, (globalSizes.getOrElse(name, 1).toDouble/8).ceil.toInt))
 
     // we should collect all data regions otherwise the ordering might be wrong
     var dataRgns: Set[DataRegion] = Set.empty
