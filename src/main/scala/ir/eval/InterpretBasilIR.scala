@@ -125,8 +125,8 @@ case object Eval {
   )(vname: String, addr: Scalar, endian: Endian, size: Int): State[S, BitVecLiteral, InterpreterError] = for {
     mem <- f.loadVar(vname)
     x <- mem match {
-      case mapv @ MapValue(_, MapType(_, BitVecType(sz))) => State.pure((sz, mapv))
-      case _                                              => State.setError((Errored("Trued to load-concat non bv")))
+      case mapv @ BasilMapValue(_, MapType(_, BitVecType(sz))) => State.pure((sz, mapv))
+      case _ => State.setError((Errored("Trued to load-concat non bv")))
     }
     (valsize, mapv) = x
 
@@ -169,7 +169,8 @@ case object Eval {
   ): State[S, Unit, InterpreterError] = for {
     mem <- f.loadVar(vname)
     x <- mem match {
-      case m @ MapValue(_, MapType(kt, vt)) if kt == addr.irType && values.forall(v => v.irType == vt) =>
+      case m @ BasilMapValue(_, MapType(kt, vt))
+          if Some(kt) == addr.irType && values.forall(v => v.irType == Some(vt)) =>
         State.pure((m, kt, vt))
       case v => State.setError((TypeError(s"Invalid map store operation to $vname : $v")))
     }
@@ -191,7 +192,7 @@ case object Eval {
   ): State[S, Unit, InterpreterError] = for {
     mem <- f.loadVar(vname)
     mr <- mem match {
-      case m @ MapValue(_, MapType(kt, BitVecType(size))) if kt == addr.irType => State.pure((m, size))
+      case m @ BasilMapValue(_, MapType(kt, BitVecType(size))) if Some(kt) == addr.irType => State.pure((m, size))
       case v =>
         State.setError(
           TypeError(
@@ -224,6 +225,28 @@ case object Eval {
   )(vname: String, addr: BasilValue, value: BasilValue): State[S, Unit, E] = {
     f.storeMem(vname, Map((addr -> value)))
   }
+
+  /** Helper functions * */
+
+  def getNullTerminatedString[S, T <: Effects[S, InterpreterError]](f: T)
+    (rgn: String, src: BasilValue, acc: List[BitVecLiteral] = List()): State[S, List[BitVecLiteral], InterpreterError] =
+    for {
+      srv: BitVecLiteral <- src match {
+        case Scalar(b: BitVecLiteral) => State.pure(b)
+        case _                        => State.setError(Errored(s"Not pointer : $src"))
+      }
+      c <- f.loadMem(rgn, List(src))
+      res <- c.head match {
+        case Scalar(BitVecLiteral(0, 8)) => State.pure(acc)
+        case Scalar(b: BitVecLiteral) => {
+          for {
+            nsrc <- State.pureE(BasilValue.unsafeAdd(src, 1))
+            r <- getNullTerminatedString(f)(rgn, nsrc, acc.appended(b))
+          } yield (r)
+        }
+        case _ => State.setError(Errored(s"not byte $c"))
+      }
+    } yield (res)
 }
 
 class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S, InterpreterError](f) {
@@ -233,11 +256,11 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
       next <- f.getNext
       _ <- State.pure(Logger.debug(s"$next"))
       r: Boolean <- (next match {
-        case CallIntrinsic(tgt) => LibcIntrinsic.intrinsics(tgt)(f).map(_ => true)
-        case Run(c: Statement)  => interpretStatement(f)(c).map(_ => true)
-        case Run(c: Jump)       => interpretJump(f)(c).map(_ => true)
-        case Stopped()          => State.pure(false)
-        case ErrorStop(e)       => State.pure(false)
+        case Intrinsic(tgt)    => LibcIntrinsic.intrinsics(tgt)(f).map(_ => true)
+        case Run(c: Statement) => interpretStatement(f)(c).map(_ => true)
+        case Run(c: Jump)      => interpretJump(f)(c).map(_ => true)
+        case Stopped()         => State.pure(false)
+        case ErrorStop(e)      => State.pure(false)
       })
     } yield (r)
 
@@ -311,18 +334,16 @@ class BASILInterpreter[S](f: Effects[S, InterpreterError]) extends Interpreter[S
                f.setNext(Run(s.successor))
              })
         } yield (n)
-      case dc: DirectCall =>
-        for {
-          n <-
-            if (dc.target.entryBlock.isDefined) {
-              val block = dc.target.entryBlock.get
-              f.call(dc.target.name, Run(block.statements.headOption.getOrElse(block.jump)), Run(dc.successor))
-            } else if (LibcIntrinsic.intrinsics.contains(dc.target.name)) {
-              f.call(dc.target.name, CallIntrinsic(dc.target.name), Run(dc.successor))
-            } else {
-              State.setError(EscapedControlFlow(dc))
-            }
-        } yield (n)
+      case dc: DirectCall => {
+        if (dc.target.entryBlock.isDefined) {
+          val block = dc.target.entryBlock.get
+          f.call(dc.target.name, Run(block.statements.headOption.getOrElse(block.jump)), Run(dc.successor))
+        } else if (LibcIntrinsic.intrinsics.contains(dc.target.name)) {
+          f.call(dc.target.name, Intrinsic(dc.target.name), Run(dc.successor))
+        } else {
+          State.setError(EscapedControlFlow(dc))
+        }
+      }
       case ic: IndirectCall => {
         if (ic.target == Register("R30", 64)) {
           f.doReturn()
@@ -360,7 +381,7 @@ object InterpFuns {
 
     for ((fname, fun) <- LibcIntrinsic.intrinsics) {
       val name = fname.takeWhile(c => c != '@')
-      x = (name, FunPointer(BitVecLiteral(newAddr(), 64), name, CallIntrinsic(name))) :: x
+      x = (name, FunPointer(BitVecLiteral(newAddr(), 64), name, Intrinsic(name))) :: x
     }
 
     val intrinsics = x.toMap
@@ -403,12 +424,11 @@ object InterpFuns {
           ))
       })
 
-
-      for {
-        _ <- State.sequence(State.pure(()), stores)
-        malloc_top = BitVecLiteral(newAddr() + 1024, 64)
-        _ <- s.storeVar("ghost_malloc_top", Scope.Global, Scalar(malloc_top))
-      } yield (())
+    for {
+      _ <- State.sequence(State.pure(()), stores)
+      malloc_top = BitVecLiteral(newAddr() + 1024, 64)
+      _ <- s.storeVar("ghost_malloc_top", Scope.Global, Scalar(malloc_top))
+    } yield (())
   }
 
   /** Functions which compile BASIL IR down to the minimal interpreter effects.
@@ -423,14 +443,19 @@ object InterpFuns {
 
     for {
       h <- State.pure(Logger.debug("DEFINE MEMORY REGIONS"))
-      h <- s.storeVar("ghost-funtable", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
-      h <- s.storeVar("mem", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
-      i <- s.storeVar("stack", Scope.Global, MapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+      h <- s.storeVar("mem", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+      i <- s.storeVar("stack", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
       j <- s.storeVar("R31", Scope.Global, Scalar(SP))
       k <- s.storeVar("R29", Scope.Global, Scalar(FP))
       l <- s.storeVar("R30", Scope.Global, Scalar(LR))
       l <- s.storeVar("R0", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R1", Scope.Global, Scalar(BitVecLiteral(0, 64)))
+      _ <- s.storeVar("ghost-funtable", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
+      _ <- s.storeVar("ghost-file-bookkeeping", Scope.Global, GenMapValue(Map.empty))
+      _ <- s.storeVar("ghost-fd-mapping", Scope.Global, GenMapValue(Map.empty))
+      _ <- s.storeMem("ghost-file-bookkeeping", Map(Symbol("$$filecount") -> Scalar(BitVecLiteral(0, 64))))
+      _ <- s.callIntrinsic("fopen", List(Symbol("stderr")))
+      _ <- s.callIntrinsic("fopen", List(Symbol("stdout")))
     } yield (l)
   }
 
@@ -500,7 +525,11 @@ object InterpFuns {
   def initProgState[S, T <: Effects[S, InterpreterError]](f: T)(p: IRContext, is: S): S = {
     val st = (initialiseProgram(f)(p.program) >> initBSS(f)(p))
       >> InterpFuns.initRelocTable(f)(p)
-    State.execute(is, st)
+    val (fs, v) = st.f(is)
+    v match {
+      case Right(r) => fs
+      case Left(e)  => throw Exception(s"Init failed $e")
+    }
   }
 
   /* Intialise from ELF and Interpret program */

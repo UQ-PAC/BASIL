@@ -16,9 +16,9 @@ import scala.util.control.Breaks.{break, breakable}
   */
 sealed trait ExecutionContinuation
 case class Stopped() extends ExecutionContinuation /* normal program stop  */
-case class ErrorStop(error: InterpreterError) extends ExecutionContinuation /* normal program stop  */
+case class ErrorStop(error: InterpreterError) extends ExecutionContinuation /* program stop in error state */
 case class Run(val next: Command) extends ExecutionContinuation /* continue by executing next command */
-case class CallIntrinsic(val name: String) extends ExecutionContinuation /* continue by executing next command */
+case class Intrinsic(val name: String) extends ExecutionContinuation /* a named intrinsic instruction */
 
 sealed trait InterpreterError
 case class FailedAssertion(a: Assert) extends InterpreterError
@@ -31,8 +31,8 @@ case class EvalError(val message: String = "")
 case class MemoryError(val message: String = "") extends InterpreterError /* An error to do with memory */
 
 /* Concrete value type of the interpreter. */
-sealed trait BasilValue(val irType: IRType)
-case class Scalar(val value: Literal) extends BasilValue(value.getType) {
+sealed trait BasilValue(val irType: Option[IRType])
+case class Scalar(val value: Literal) extends BasilValue(Some(value.getType)) {
   override def toString = value match {
     case b: BitVecLiteral => "0x%x:bv%d".format(b.value, b.size)
     case c                => c.toString
@@ -41,15 +41,27 @@ case class Scalar(val value: Literal) extends BasilValue(value.getType) {
 
 /* Abstract callable function address */
 case class FunPointer(val addr: BitVecLiteral, val name: String, val call: ExecutionContinuation)
-    extends BasilValue(addr.getType)
+    extends BasilValue(Some(addr.getType))
+
+sealed trait MapValue {
+  def value: Map[BasilValue, BasilValue]
+}
 
 /* We erase the type of basil values and enforce the invariant that
    \exists i . \forall v \in value.keys , v.irType = i  and
    \exists j . \forall v \in value.values, v.irType = j
  */
-case class MapValue(val value: Map[BasilValue, BasilValue], override val irType: MapType) extends BasilValue(irType) {
+case class BasilMapValue(val value: Map[BasilValue, BasilValue], val mapType: MapType)
+    extends MapValue
+    with BasilValue(Some(mapType)) {
   override def toString = s"MapValue : $irType"
 }
+
+case class GenMapValue(val value: Map[BasilValue, BasilValue]) extends BasilValue(None) with MapValue {
+  override def toString = s"GenMapValue : $irType"
+}
+
+case class Symbol(val value: String) extends BasilValue(None)
 
 case object BasilValue {
 
@@ -60,7 +72,12 @@ case object BasilValue {
     }
   }
 
-  def size(v: BasilValue): Int = size(v.irType)
+  def toBV[S, E](l: BasilValue): Either[InterpreterError, BitVecLiteral] = {
+    l match {
+      case Scalar(b1: BitVecLiteral) => Right(b1)
+      case _                         => Left((TypeError(s"Not a bitvector add $l")))
+    }
+  }
 
   def unsafeAdd[S, E](l: BasilValue, vr: Int): Either[InterpreterError, BasilValue] = {
     l match {
@@ -72,10 +89,10 @@ case object BasilValue {
   }
 
   def add[S, E](l: BasilValue, r: BasilValue): Either[InterpreterError, BasilValue] = {
-    (l,r) match {
-      case (Scalar(IntLiteral(vl)), Scalar(IntLiteral(vr)))    => Right(Scalar(IntLiteral(vl + vr)))
+    (l, r) match {
+      case (Scalar(IntLiteral(vl)), Scalar(IntLiteral(vr)))       => Right(Scalar(IntLiteral(vl + vr)))
       case (Scalar(b1: BitVecLiteral), Scalar(b2: BitVecLiteral)) => Right(Scalar(eval.evalBVBinExpr(BVADD, b1, b2)))
-      case _                         => Left((TypeError(s"Operation add undefined  $l + $r")))
+      case _ => Left((TypeError(s"Operation add undefined  $l + $r")))
     }
   }
 
@@ -106,7 +123,7 @@ trait Effects[T, E] {
    */
   def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation): State[T, Unit, E]
 
-  def callIntrinsic(name: String, args: List[BasilValue]) : State[T, Unit, E]
+  def callIntrinsic(name: String, args: List[BasilValue]): State[T, Option[BasilValue], E]
 
   def doReturn(): State[T, Unit, E]
 
@@ -123,7 +140,7 @@ trait NopEffects[T, E] extends Effects[T, E] {
   def setNext(c: ExecutionContinuation) = State.pure(())
 
   def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = State.pure(())
-  def callIntrinsic(name: String, args: List[BasilValue]) = State.pure(()) 
+  def callIntrinsic(name: String, args: List[BasilValue]) = State.pure(None)
   def doReturn() = State.pure(())
 
   def storeVar(v: String, scope: Scope, value: BasilValue) = State.pure(())
@@ -157,7 +174,7 @@ case class MemoryState(
 
   def getMem(name: String): Map[BitVecLiteral, BitVecLiteral] = {
     stackFrames(globalFrame)(name) match {
-      case MapValue(innerMap, MapType(BitVecType(ks), BitVecType(vs))) => {
+      case BasilMapValue(innerMap, MapType(BitVecType(ks), BitVecType(vs))) => {
         def unwrap(v: BasilValue): BitVecLiteral = v match {
           case Scalar(b: BitVecLiteral) => b
           case v => throw Exception(s"Failed to convert map value to bitvector: $v (interpreter type error somewhere)")
@@ -241,7 +258,7 @@ case class MemoryState(
   def getVar(v: Variable): Either[InterpreterError, BasilValue] = {
     val value = getVar(v.name)
     value match {
-      case Right(dv: BasilValue) if v.getType != dv.irType =>
+      case Right(dv: BasilValue) if Some(v.getType) != dv.irType =>
         Left(Errored(s"Type mismatch on variable definition and load: defined ${dv.irType}, variable ${v.getType}"))
       case Right(o) => Right(o)
       case o        => o
@@ -252,8 +269,8 @@ case class MemoryState(
   def doLoad(vname: String, addr: List[BasilValue]): Either[InterpreterError, List[BasilValue]] = for {
     v <- findVar(vname)
     mapv: MapValue <- v._2 match {
-      case m @ MapValue(innerMap, ty) => Right(m)
-      case m                          => Left((TypeError(s"Load from nonmap ${m.irType}")))
+      case m: MapValue => Right(m)
+      case m           => Left((TypeError(s"Load from nonmap ${m.irType}")))
     }
     rs: List[Option[BasilValue]] = addr.map(k => mapv.value.get(k))
     xs <-
@@ -266,46 +283,59 @@ case class MemoryState(
 
   /** typecheck and some fields of a map variable */
   def doStore(vname: String, values: Map[BasilValue, BasilValue]): Either[InterpreterError, MemoryState] = for {
-    // val (frame, mem) = findVar(vname)
-    
+
     _ <- if (values.size == 0) then Left(MemoryError("Tried to store size 0")) else Right(())
     v <- findVar(vname)
     (frame, mem) = v
-    // val (mapval, keytype, valtype) =
-    mapi <- mem match {
-      case m @ MapValue(_, MapType(kt, vt)) => Right((m, kt, vt))
-      case v                                => Left((TypeError(s"Invalid map store operation to $vname : ${v.irType}")))
+    mapval <- mem match {
+      case m @ BasilMapValue(_, MapType(kt, vt)) =>
+        for {
+          m <- (values.find((k, v) => k.irType != Some(kt) || v.irType != Some(vt))) match {
+            case Some(v) =>
+              Left(
+                TypeError(
+                  s"Invalid addr or value type (${v._1.irType}, ${v._2.irType}) does not match map type $vname : ($kt, $vt)"
+                )
+              )
+            case None => Right(m)
+          }
+          nm = BasilMapValue(m.value ++ values, m.mapType)
+        } yield (nm)
+      case m @ GenMapValue(_) => {
+        Right(GenMapValue(m.value ++ values))
+      }
+      case v => Left((TypeError(s"Invalid map store operation to $vname : ${v.irType}")))
     }
-    (mapval, keytype, valtype) = mapi
 
-    checkTypes <- (values.find((k, v) => k.irType != keytype || v.irType != valtype)) match {
-      case Some(v) =>
-        Left(
-          TypeError(
-            s"Invalid addr or value type (${v._1.irType}, ${v._2.irType}) does not match map type $vname : ($keytype, $valtype)"
-          )
-        )
-      case None => Right(())
-    }
-
-    nmap = MapValue(mapval.value ++ values, mapval.irType)
-    ms <- Right(setVar(frame, vname, nmap))
+    ms <- Right(setVar(frame, vname, mapval))
   } yield (ms)
 }
 
 object LibcIntrinsic {
 
-  def putc[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = {
-    s.doReturn()
-  }
+  def putc[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
+    c <- s.loadVar("R0")
+    _ <- s.callIntrinsic("putc", List(c))
+    _ <- s.doReturn()
+  } yield (())
 
-  def puts[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = {
-    s.doReturn()
-  }
+  def puts[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
+    dstr <- s.loadVar("R0")
+    _ <- s.callIntrinsic("puts", List(dstr))
+    _ <- s.doReturn()
+  } yield (())
 
-  def printf[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = {
-    s.doReturn()
-  }
+  def strlen[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
+    dstr <- s.loadVar("R0")
+    _ <- s.callIntrinsic("strlen", List(dstr))
+    _ <- s.doReturn()
+  } yield (())
+
+  def printf[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
+    dstr <- s.loadVar("R0")
+    _ <- s.callIntrinsic("print", List(dstr))
+    _ <- s.doReturn()
+  } yield (())
 
   def malloc[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
     size <- s.loadVar("R0")
@@ -319,21 +349,28 @@ object LibcIntrinsic {
     _ <- s.doReturn()
   } yield (())
 
-
   def calloc[S, T <: Effects[S, InterpreterError]](s: T): State[S, Unit, InterpreterError] = for {
     size <- s.loadVar("R0")
     res <- s.callIntrinsic("malloc", List(size))
     ptr <- s.loadVar("R0")
     isize <- size match {
       case Scalar(b: BitVecLiteral) => State.pure(b.value * 8)
-      case _ => State.setError(Errored("programmer error"))
+      case _                        => State.setError(Errored("programmer error"))
     }
     cl <- Eval.storeBV(s)("mem", ptr, BitVecLiteral(0, isize.toInt), Endian.LittleEndian)
     _ <- s.doReturn()
   } yield (())
 
   def intrinsics[S, T <: Effects[S, InterpreterError]] =
-    Map[String, T => State[S, Unit, InterpreterError]]("putc" -> putc, "puts" -> puts, "printf" -> printf, "malloc" -> malloc, "free" -> free, "#free" -> free, "calloc" -> calloc)
+    Map[String, T => State[S, Unit, InterpreterError]](
+      "putc" -> putc,
+      "puts" -> puts,
+      "printf" -> printf,
+      "malloc" -> malloc,
+      "free" -> free,
+      "#free" -> free,
+      "calloc" -> calloc
+    )
 
 }
 
@@ -347,25 +384,79 @@ case class InterpreterState(
   */
 object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
 
-  def callIntrinsic(name: String, args: List[BasilValue]) = {
+  def putc(arg: BasilValue): State[InterpreterState, Option[BasilValue], InterpreterError] = {
+    for {
+      addr <- loadMem("ghost-file-bookkeeping", List(Symbol("stdout-ptr")))
+      byte <- State.pureE(BasilValue.toBV(arg))
+      c <- Eval.evalBV(this)(Extract(8, 0, byte))
+      _ <- storeMem("stdout", Map(addr.head -> Scalar(c)))
+      naddr <- State.pureE(BasilValue.unsafeAdd(addr.head, 1))
+      _ <- storeMem("ghost-file-bookkeeping", Map(Symbol("stdout-ptr") -> naddr))
+    } yield (None)
+  }
+
+  def fopen(file: BasilValue): State[InterpreterState, Option[BasilValue], InterpreterError] = {
+    for {
+      fname <- file match {
+        case Symbol(name) => State.pure(name)
+        case _            => State.setError(Errored("Intrinsic fopen open not given filename"))
+      }
+      _ <- storeVar(fname, Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+      filecount <- loadMem("ghost-file-bookkeeping", List(Symbol("$$filecount")))
+      nfilecount <- State.pureE(BasilValue.unsafeAdd(filecount.head, 1))
+      _ <- storeMem("ghost-file-bookkeeping", Map(Symbol("$$filecount") -> nfilecount))
+      _ <- storeMem("ghost-file-bookkeeping", Map(Symbol(fname + "-ptr") -> Scalar(BitVecLiteral(0, 64))))
+      _ <- storeMem("ghost-fd-mapping", Map(nfilecount -> Symbol(fname + "-ptr")))
+      _ <- storeVar("R0", Scope.Global, nfilecount)
+    } yield (Some(nfilecount))
+  }
+
+  def print(strptr: BasilValue): State[InterpreterState, Option[BasilValue], InterpreterError] = {
+    for {
+      str <- Eval.getNullTerminatedString(this)("mem", strptr)
+      baseptr: List[BasilValue] <- loadMem("ghost-file-bookkeeping", List(Symbol("stdout-ptr")))
+      offs: List[BasilValue] <- State.mapM(
+        ((i: Int) => State.pureE(BasilValue.unsafeAdd(baseptr.head, i))),
+        (0 until (str.size + 1))
+      )
+      _ <- storeMem("stdout", offs.zip(str.map(Scalar(_))).toMap)
+      naddr <- State.pureE(BasilValue.unsafeAdd(baseptr.head, str.size))
+      _ <- storeMem("ghost-file-bookkeeping", Map(Symbol("stdout-ptr") -> naddr))
+    } yield (None)
+  }
+
+  def callIntrinsic(
+      name: String,
+      args: List[BasilValue]
+  ): State[InterpreterState, Option[BasilValue], InterpreterError] = {
     name match {
+      case "free" => {
+        State.pure(None)
+      }
       case "malloc" => {
         for {
           size <- (args.headOption match {
             case Some(x @ Scalar(_: BitVecLiteral)) => State.pure(x)
-            case Some(Scalar(x: IntLiteral)) => State.pure(Scalar(BitVecLiteral(x.value, 64)))
-            case _ => State.setError(Errored("illegal prim arg"))
+            case Some(Scalar(x: IntLiteral))        => State.pure(Scalar(BitVecLiteral(x.value, 64)))
+            case _                                  => State.setError(Errored("illegal prim arg"))
           })
           x <- loadVar("ghost_malloc_top")
           x_gap <- State.pureE(BasilValue.unsafeAdd(x, 128)) // put a gap around allocations to catch buffer overflows
           x_end <- State.pureE(BasilValue.add(x_gap, size))
           _ <- storeVar("ghost_malloc_top", Scope.Global, x_end)
           _ <- storeVar("R0", Scope.Global, x_gap)
-        } yield (())
+        } yield (Some(x_gap))
       }
-      case "free" => {
-        State.pure(())
-      }
+      case "fopen" => fopen(args.head)
+      case "putc"  => putc(args.head)
+      case "strlen" =>
+        for {
+          str <- Eval.getNullTerminatedString(this)("mem", args.head)
+          r = Scalar(BitVecLiteral(str.length, 64))
+          _ <- storeVar("R0", Scope.Global, r)
+        } yield (Some(r))
+      case "print" => print(args.head)
+      case "puts" =>  print(args.head) >> putc(Scalar(BitVecLiteral('\n'.toInt, 64)))
       case _ => State.setError(Errored(s"Call undefined intrinsic $name"))
     }
   }
@@ -487,7 +578,7 @@ trait Interpreter[S, E](val f: Effects[S, E]) {
 
   @tailrec
   final def run(begin: S): S = {
-    val (fs,cont) = interpretOne.f(begin)
+    val (fs, cont) = interpretOne.f(begin)
 
     if (cont.contains(true)) then {
       run(fs)

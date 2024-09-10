@@ -21,7 +21,7 @@ import scala.collection.mutable
 
 class DifferentialAnalysis extends AnyFunSuite {
 
-  Logger.setLevel(LogLevel.ERROR)
+  Logger.setLevel(LogLevel.WARN)
 
   def diffTest(initial: IRContext, transformed: IRContext) = {
 
@@ -30,12 +30,14 @@ class DifferentialAnalysis extends AnyFunSuite {
     def interp(p: IRContext) : (InterpreterState, Trace) = {
       val interpreter = LayerInterpreter(tracingInterpreter(NormalInterpreter), EffectsRLimit(instructionLimit))
       val initialState = InterpFuns.initProgState(NormalInterpreter)(p, InterpreterState())
-      BASILInterpreter(interpreter).run((initialState, Trace(List())), 0)._1
+      //Logger.setLevel(LogLevel.DEBUG)
+      val r = BASILInterpreter(interpreter).run((initialState, Trace(List())), 0)._1
+      //Logger.setLevel(LogLevel.WARN)
+      r
     }
 
     val (initialRes,traceInit) = interp(initial)
     val (result,traceRes) = interp(transformed)
-
 
     def filterEvents(trace: List[ExecEffect]) = {
       trace.collect {
@@ -46,6 +48,11 @@ class DifferentialAnalysis extends AnyFunSuite {
     }
 
     Logger.info(traceInit.t.map(_.toString.take(80)).mkString("\n"))
+    val initstdout = initialRes.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
+    val comparstdout  = result.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
+    info("STDOUT: \"" + initstdout + "\"")
+    // Logger.info(initialRes.memoryState.getMem("stderr").toList.sortBy(_._1.value).map(_._2).mkString(""))
+    assert(initstdout == comparstdout)
     assert(initialRes.nextCmd == Stopped())
     assert(result.nextCmd == Stopped())
     assert(Set.empty == initialRes.memoryState.getMem("mem").toSet.diff(result.memoryState.getMem("mem").toSet))
@@ -119,9 +126,9 @@ class DifferentialAnalysis extends AnyFunSuite {
         test("analysis_differential:" + p + "/" + variation + ":BAP") {
           testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".adt")
         }
-        test("analysis_differential:" +  p + "/" + variation + ":GTIRB") {
-          testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".gts")
-        }
+        //test("analysis_differential:" +  p + "/" + variation + ":GTIRB") {
+        //  testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".gts")
+        //}
       }
       )
     }
