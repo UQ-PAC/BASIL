@@ -228,6 +228,10 @@ case object Eval {
 
   /** Helper functions * */
 
+  /**
+   * Load all memory cells from pointer until reaching cell containing 0.
+   * Ptr -> List[Bitvector]
+   */
   def getNullTerminatedString[S, T <: Effects[S, InterpreterError]](f: T)
     (rgn: String, src: BasilValue, acc: List[BitVecLiteral] = List()): State[S, List[BitVecLiteral], InterpreterError] =
     for {
@@ -451,11 +455,7 @@ object InterpFuns {
       l <- s.storeVar("R0", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       l <- s.storeVar("R1", Scope.Global, Scalar(BitVecLiteral(0, 64)))
       _ <- s.storeVar("ghost-funtable", Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(64))))
-      _ <- s.storeVar("ghost-file-bookkeeping", Scope.Global, GenMapValue(Map.empty))
-      _ <- s.storeVar("ghost-fd-mapping", Scope.Global, GenMapValue(Map.empty))
-      _ <- s.storeMem("ghost-file-bookkeeping", Map(Symbol("$$filecount") -> Scalar(BitVecLiteral(0, 64))))
-      _ <- s.callIntrinsic("fopen", List(Symbol("stderr")))
-      _ <- s.callIntrinsic("fopen", List(Symbol("stdout")))
+      _ <- IntrinsicImpl.initFileGhostRegions(s)
     } yield (l)
   }
 

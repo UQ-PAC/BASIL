@@ -313,46 +313,22 @@ case class MemoryState(
 
 object LibcIntrinsic {
 
-  def putc[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
+  /**
+   * Part of the intrinsics implementation that lives above the Effects interface 
+   * (i.e. we are defining the observable part of the intrinsics behaviour)
+   */
+
+  def singleArg[S, E, T <: Effects[S, E]](name: String)(s: T): State[S, Unit, E] = for {
     c <- s.loadVar("R0")
-    _ <- s.callIntrinsic("putc", List(c))
-    _ <- s.doReturn()
-  } yield (())
-
-  def puts[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
-    dstr <- s.loadVar("R0")
-    _ <- s.callIntrinsic("puts", List(dstr))
-    _ <- s.doReturn()
-  } yield (())
-
-  def strlen[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
-    dstr <- s.loadVar("R0")
-    _ <- s.callIntrinsic("strlen", List(dstr))
-    _ <- s.doReturn()
-  } yield (())
-
-  def printf[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
-    dstr <- s.loadVar("R0")
-    _ <- s.callIntrinsic("print", List(dstr))
-    _ <- s.doReturn()
-  } yield (())
-
-  def malloc[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
-    size <- s.loadVar("R0")
-    res <- s.callIntrinsic("malloc", List(size))
-    _ <- s.doReturn()
-  } yield (())
-
-  def free[S, E, T <: Effects[S, E]](s: T): State[S, Unit, E] = for {
-    ptr <- s.loadVar("R0")
-    res <- s.callIntrinsic("free", List(ptr))
+    res <- s.callIntrinsic(name, List(c))
+    _ <- if res.isDefined then s.storeVar("R0", Scope.Global, res.get) else State.pure(())
     _ <- s.doReturn()
   } yield (())
 
   def calloc[S, T <: Effects[S, InterpreterError]](s: T): State[S, Unit, InterpreterError] = for {
     size <- s.loadVar("R0")
     res <- s.callIntrinsic("malloc", List(size))
-    ptr <- s.loadVar("R0")
+    ptr = res.get
     isize <- size match {
       case Scalar(b: BitVecLiteral) => State.pure(b.value * 8)
       case _                        => State.setError(Errored("programmer error"))
@@ -363,15 +339,87 @@ object LibcIntrinsic {
 
   def intrinsics[S, T <: Effects[S, InterpreterError]] =
     Map[String, T => State[S, Unit, InterpreterError]](
-      "putc" -> putc,
-      "puts" -> puts,
-      "printf" -> printf,
-      "malloc" -> malloc,
-      "free" -> free,
-      "#free" -> free,
+      "putc" -> singleArg("putc"),
+      "puts" -> singleArg("puts"),
+      "printf" -> singleArg("print"),
+      "malloc" -> singleArg("malloc"),
+      "free" -> singleArg("free"),
+      "#free" -> singleArg("free"),
       "calloc" -> calloc
     )
 
+}
+
+object IntrinsicImpl {
+
+  /** state initialisation for file modelling */
+  def initFileGhostRegions[S, E, T <: Effects[S, E]](f: T): State[S, Unit, E]  = for {
+      _ <- f.storeVar("ghost-file-bookkeeping", Scope.Global, GenMapValue(Map.empty))
+      _ <- f.storeVar("ghost-fd-mapping", Scope.Global, GenMapValue(Map.empty))
+      _ <- f.storeMem("ghost-file-bookkeeping", Map(Symbol("$$filecount") -> Scalar(BitVecLiteral(0, 64))))
+      _ <- f.callIntrinsic("fopen", List(Symbol("stderr")))
+      _ <- f.callIntrinsic("fopen", List(Symbol("stdout")))
+  } yield (())
+
+  /** Intrinsics defined over arbitrary effects 
+   *
+   * We call these from Effects[T, E] rather than the Interpreter so their implementation does not appear in the trace.
+   */
+  def putc[S, T <: Effects[S, InterpreterError]](f: T)(arg: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+    for {
+      addr <- f.loadMem("ghost-file-bookkeeping", List(Symbol("stdout-ptr")))
+      byte <- State.pureE(BasilValue.toBV(arg))
+      c <- Eval.evalBV(f)(Extract(8, 0, byte))
+      _ <- f.storeMem("stdout", Map(addr.head -> Scalar(c)))
+      naddr <- State.pureE(BasilValue.unsafeAdd(addr.head, 1))
+      _ <- f.storeMem("ghost-file-bookkeeping", Map(Symbol("stdout-ptr") -> naddr))
+    } yield (None)
+  }
+
+  def fopen[S, T <: Effects[S, InterpreterError]](f: T)(file: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+    for {
+      fname <- file match {
+        case Symbol(name) => State.pure(name)
+        case _            => State.setError(Errored("Intrinsic fopen open not given filename"))
+      }
+      _ <- f.storeVar(fname, Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
+      filecount <- f.loadMem("ghost-file-bookkeeping", List(Symbol("$$filecount")))
+      _ <- f.storeMem("ghost-file-bookkeeping", Map(Symbol(fname + "-ptr") -> Scalar(BitVecLiteral(0, 64))))
+      _ <- f.storeMem("ghost-fd-mapping", Map(filecount.head -> Symbol(fname + "-ptr")))
+      _ <- f.storeVar("R0", Scope.Global, filecount.head)
+      nfilecount <- State.pureE(BasilValue.unsafeAdd(filecount.head, 1))
+      _ <- f.storeMem("ghost-file-bookkeeping", Map(Symbol("$$filecount") -> nfilecount))
+    } yield (Some(filecount.head))
+  }
+
+  def print[S, T <: Effects[S, InterpreterError]](f: T)(strptr: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+    for {
+      str <- Eval.getNullTerminatedString(f)("mem", strptr)
+      baseptr: List[BasilValue] <- f.loadMem("ghost-file-bookkeeping", List(Symbol("stdout-ptr")))
+      offs: List[BasilValue] <- State.mapM(
+        ((i: Int) => State.pureE(BasilValue.unsafeAdd(baseptr.head, i))),
+        (0 until (str.size + 1))
+      )
+      _ <- f.storeMem("stdout", offs.zip(str.map(Scalar(_))).toMap)
+      naddr <- State.pureE(BasilValue.unsafeAdd(baseptr.head, str.size))
+      _ <- f.storeMem("ghost-file-bookkeeping", Map(Symbol("stdout-ptr") -> naddr))
+    } yield (None)
+  }
+
+  def malloc[S, T <: Effects[S, InterpreterError]](f: T)(size: BasilValue): State[S, Option[BasilValue], InterpreterError] = {
+    for {
+      size <- (size match {
+        case (x @ Scalar(_: BitVecLiteral)) => State.pure(x)
+        case (Scalar(x: IntLiteral))        => State.pure(Scalar(BitVecLiteral(x.value, 64)))
+        case _                              => State.setError(Errored("illegal prim arg"))
+      })
+      x <- f.loadVar("ghost_malloc_top")
+      x_gap <- State.pureE(BasilValue.unsafeAdd(x, 128)) // put a gap around allocations to catch buffer overflows
+      x_end <- State.pureE(BasilValue.add(x_gap, size))
+      _ <- f.storeVar("ghost_malloc_top", Scope.Global, x_end)
+      _ <- f.storeVar("R0", Scope.Global, x_gap)
+    } yield (Some(x_gap))
+  }
 }
 
 case class InterpreterState(
@@ -384,80 +432,25 @@ case class InterpreterState(
   */
 object NormalInterpreter extends Effects[InterpreterState, InterpreterError] {
 
-  def putc(arg: BasilValue): State[InterpreterState, Option[BasilValue], InterpreterError] = {
-    for {
-      addr <- loadMem("ghost-file-bookkeeping", List(Symbol("stdout-ptr")))
-      byte <- State.pureE(BasilValue.toBV(arg))
-      c <- Eval.evalBV(this)(Extract(8, 0, byte))
-      _ <- storeMem("stdout", Map(addr.head -> Scalar(c)))
-      naddr <- State.pureE(BasilValue.unsafeAdd(addr.head, 1))
-      _ <- storeMem("ghost-file-bookkeeping", Map(Symbol("stdout-ptr") -> naddr))
-    } yield (None)
-  }
-
-  def fopen(file: BasilValue): State[InterpreterState, Option[BasilValue], InterpreterError] = {
-    for {
-      fname <- file match {
-        case Symbol(name) => State.pure(name)
-        case _            => State.setError(Errored("Intrinsic fopen open not given filename"))
-      }
-      _ <- storeVar(fname, Scope.Global, BasilMapValue(Map.empty, MapType(BitVecType(64), BitVecType(8))))
-      filecount <- loadMem("ghost-file-bookkeeping", List(Symbol("$$filecount")))
-      nfilecount <- State.pureE(BasilValue.unsafeAdd(filecount.head, 1))
-      _ <- storeMem("ghost-file-bookkeeping", Map(Symbol("$$filecount") -> nfilecount))
-      _ <- storeMem("ghost-file-bookkeeping", Map(Symbol(fname + "-ptr") -> Scalar(BitVecLiteral(0, 64))))
-      _ <- storeMem("ghost-fd-mapping", Map(nfilecount -> Symbol(fname + "-ptr")))
-      _ <- storeVar("R0", Scope.Global, nfilecount)
-    } yield (Some(nfilecount))
-  }
-
-  def print(strptr: BasilValue): State[InterpreterState, Option[BasilValue], InterpreterError] = {
-    for {
-      str <- Eval.getNullTerminatedString(this)("mem", strptr)
-      baseptr: List[BasilValue] <- loadMem("ghost-file-bookkeeping", List(Symbol("stdout-ptr")))
-      offs: List[BasilValue] <- State.mapM(
-        ((i: Int) => State.pureE(BasilValue.unsafeAdd(baseptr.head, i))),
-        (0 until (str.size + 1))
-      )
-      _ <- storeMem("stdout", offs.zip(str.map(Scalar(_))).toMap)
-      naddr <- State.pureE(BasilValue.unsafeAdd(baseptr.head, str.size))
-      _ <- storeMem("ghost-file-bookkeeping", Map(Symbol("stdout-ptr") -> naddr))
-    } yield (None)
-  }
 
   def callIntrinsic(
       name: String,
       args: List[BasilValue]
   ): State[InterpreterState, Option[BasilValue], InterpreterError] = {
     name match {
-      case "free" => {
-        State.pure(None)
-      }
-      case "malloc" => {
-        for {
-          size <- (args.headOption match {
-            case Some(x @ Scalar(_: BitVecLiteral)) => State.pure(x)
-            case Some(Scalar(x: IntLiteral))        => State.pure(Scalar(BitVecLiteral(x.value, 64)))
-            case _                                  => State.setError(Errored("illegal prim arg"))
-          })
-          x <- loadVar("ghost_malloc_top")
-          x_gap <- State.pureE(BasilValue.unsafeAdd(x, 128)) // put a gap around allocations to catch buffer overflows
-          x_end <- State.pureE(BasilValue.add(x_gap, size))
-          _ <- storeVar("ghost_malloc_top", Scope.Global, x_end)
-          _ <- storeVar("R0", Scope.Global, x_gap)
-        } yield (Some(x_gap))
-      }
-      case "fopen" => fopen(args.head)
-      case "putc"  => putc(args.head)
+      case "free"   => State.pure(None)
+      case "malloc" => IntrinsicImpl.malloc(this)(args.head)
+      case "fopen"  => IntrinsicImpl.fopen(this)(args.head)
+      case "putc"   => IntrinsicImpl.putc(this)(args.head)
       case "strlen" =>
         for {
           str <- Eval.getNullTerminatedString(this)("mem", args.head)
           r = Scalar(BitVecLiteral(str.length, 64))
           _ <- storeVar("R0", Scope.Global, r)
         } yield (Some(r))
-      case "print" => print(args.head)
-      case "puts" =>  print(args.head) >> putc(Scalar(BitVecLiteral('\n'.toInt, 64)))
-      case _ => State.setError(Errored(s"Call undefined intrinsic $name"))
+      case "print" => IntrinsicImpl.print(this)(args.head)
+      case "puts"  => IntrinsicImpl.print(this)(args.head) >> IntrinsicImpl.putc(this)(Scalar(BitVecLiteral('\n'.toInt, 64)))
+      case _       => State.setError(Errored(s"Call undefined intrinsic $name"))
     }
   }
 
