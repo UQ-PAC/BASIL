@@ -108,7 +108,7 @@ object IRLoading {
     BAPLoader.visitProject(parser.project())
   }
 
-  def loadGTIRB(fileName: String, mainAddress: Int): Program = {
+  def loadGTIRB(fileName: String, mainAddress: BigInt): Program = {
     val fIn = FileInputStream(fileName)
     val ir = IR.parseFrom(fIn)
     val mods = ir.modules
@@ -153,7 +153,7 @@ object IRLoading {
   def loadReadELF(
       fileName: String,
       config: ILLoadingConfig
-  ): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
+  ): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], BigInt) = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)
@@ -915,7 +915,10 @@ object RunUtils {
 
   def run(q: BASILConfig): Unit = {
     val result = loadAndTranslate(q)
+    writeOutput(result)
+  }
 
+  def writeOutput(result: BASILResult): Unit = {
     Logger.info("[!] Writing file...")
     for (boogie <- result.boogie) {
       val wr = BufferedWriter(FileWriter(boogie.filename))

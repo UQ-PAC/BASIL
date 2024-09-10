@@ -7,7 +7,7 @@ import util.ILLoadingConfig
 import scala.jdk.CollectionConverters.*
 
 object ReadELFLoader {
-  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
+  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], BigInt) = {
     val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableExtFunc(r)).toSet
     val relocationOffsets = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableOffsets(r)).toMap
     val globalVariables = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toSet
@@ -58,16 +58,16 @@ object ReadELFLoader {
     }
   }
 
-  def getFunctionAddress(ctx: SymsContext, functionName: String): Option[Int] = {
+  def getFunctionAddress(ctx: SymsContext, functionName: String): Option[BigInt] = {
     ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, functionName)).headOption
   }
 
-  private def getFunctionAddress(ctx: SymbolTableContext, functionName: String): Option[Int] = {
+  private def getFunctionAddress(ctx: SymbolTableContext, functionName: String): Option[BigInt] = {
     if (ctx.symbolTableHeader.tableName.STRING.getText == ".symtab") {
       val rows = ctx.symbolTableRow.asScala
       val mainAddress = rows.collectFirst {
         case r if r.entrytype.getText == "FUNC" && r.bind.getText == "GLOBAL" && r.name.getText == functionName =>
-          Integer.parseInt(r.value.getText, 16)
+          hexToBigInt(r.value.getText)
       }
       mainAddress
     } else {
