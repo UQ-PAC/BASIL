@@ -18,7 +18,7 @@ case class BAPProgram(subroutines: List[BAPSubroutine], memorySections: List[BAP
 
 case class BAPSubroutine(
     name: String,
-    address: Int,
+    address: Option[BigInt],
     blocks: List[BAPBlock],
     in: List[BAPParameter],
     out: List[BAPParameter]
@@ -34,7 +34,7 @@ case class BAPSubroutine(
    */
 }
 
-case class BAPBlock(label: String, address: Option[Int], statements: List[BAPStatement], jumps: List[BAPJump]) {
+case class BAPBlock(label: String, address: Option[BigInt], statements: List[BAPStatement], jumps: List[BAPJump]) {
   override def toString: String = s"$label $address\n ${statements.mkString("\n")}"
   /*
   def modifies: Set[BAPMemory] = statements.flatMap(_.modifies).toSet
@@ -56,4 +56,4 @@ case class BAPParameter(name: String, size: Int, value: BAPVar) {
   }
 }
 
-case class BAPMemorySection(name: String, address: Int, size: Int, bytes: Seq[BAPLiteral])
+case class BAPMemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BAPLiteral])

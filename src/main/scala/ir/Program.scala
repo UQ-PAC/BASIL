@@ -516,4 +516,4 @@ object Block {
   * @param size number of bytes
   * @param bytes sequence of bytes represented by BitVecLiterals of size 8
   */
-case class MemorySection(name: String, address: Int, size: Int, bytes: Seq[BitVecLiteral])
+case class MemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BitVecLiteral])

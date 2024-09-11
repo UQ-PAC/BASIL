@@ -83,15 +83,15 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
   private val externalProcedures = mutable.Map[String, Procedure]()
 
   // maps block UUIDs to their address
-  private def createAddresses(): immutable.Map[ByteString, Int] = {
-    val blockAddresses: immutable.Map[ByteString, Int] = (for {
+  private def createAddresses(): immutable.Map[ByteString, BigInt] = {
+    val blockAddresses: immutable.Map[ByteString, BigInt] = (for {
       mod <- mods
       section <- mod.sections
       byteInterval <- section.byteIntervals
       block <- byteInterval.blocks
       if !block.getCode.uuid.isEmpty
     } yield {
-      block.getCode.uuid -> (byteInterval.address + block.offset).toInt
+      block.getCode.uuid -> BigInt(byteInterval.address + block.offset)
     }).toMap
 
     blockAddresses

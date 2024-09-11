@@ -608,7 +608,7 @@ object StaticAnalysis {
 
     val subroutines = IRProgram.procedures
       .filter(p => p.address.isDefined)
-      .map(p => BigInt(p.address.get) -> p.name)
+      .map(p => p.address.get -> p.name)
       .toMap
     val globalAddresses = globals.map(s => s.address -> s.name).toMap
     val externalAddresses = externalFunctions.map(e => e.offset -> e.name).toMap

@@ -21,7 +21,7 @@ object BAPLoader {
 
   def visitSection(ctx: SectionContext): BAPMemorySection = {
     val bytes = ctx.membyte.asScala.map(visitByte).toSeq
-    BAPMemorySection(visitQuoteString(ctx.name), parseInt(ctx.address), bytes.size, bytes)
+    BAPMemorySection(visitQuoteString(ctx.name), parseBigInt(ctx.address), bytes.size, bytes)
   }
 
   def visitByte(ctx: MembyteContext): BAPLiteral = {
@@ -170,24 +170,12 @@ object BAPLoader {
 
   def visitSub(ctx: SubContext): BAPSubroutine = {
     val inOut = ctx.args.arg.asScala.map { arg => visitArg(arg) }.unzip
-    val in = inOut._1.flatten
-    val out = inOut._2.flatten
-    /*
-    val alwaysIn = List(
-      BAPParameter("FP", 64, BAPLocalVar("R29", 64)),
-      BAPParameter("LR", 64, BAPLocalVar("R30", 64)),
-      BAPParameter("SP", 64, BAPLocalVar("R31", 64))
-    )
-    val alwaysOut = List(
-      BAPParameter("FP_out", 64, BAPLocalVar("R29", 64)),
-      BAPParameter("LR_out", 64, BAPLocalVar("R30", 64)),
-      BAPParameter("SP_out", 64, BAPLocalVar("R31", 64))
-    )
-     */
+    val in = inOut(0).flatten
+    val out = inOut(1).flatten
 
     val address = parseFromAttrs(ctx.attrs, "address") match {
-      case Some(x: String) => Integer.parseInt(x.stripPrefix("0x"), 16)
-      case None            => -1
+      case Some(x: String) => Some(BigInt(x.stripPrefix("0x"), 16))
+      case None            => None
     }
 
     BAPSubroutine(
@@ -222,7 +210,7 @@ object BAPLoader {
 
     val label = parseLabel(ctx.tid.name)
     val address = parseFromAttrs(ctx.attrs, "address") match {
-      case Some(x: String) => Some(Integer.parseInt(x.stripPrefix("0x"), 16))
+      case Some(x: String) => Some(BigInt(x.stripPrefix("0x"), 16))
       case None            => None
     }
 
@@ -242,14 +230,14 @@ object BAPLoader {
   def visitImmDef(ctx: ImmDefContext): BAPLocalAssign = {
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    val addr = parseFromAttrs(ctx.attrs, "address").map(x => Integer.parseInt(x.stripPrefix("0x"), 16))
+    val addr = parseFromAttrs(ctx.attrs, "address").map(x => BigInt(x.stripPrefix("0x"), 16))
     BAPLocalAssign(visitImmVar(ctx.lhs), visitExp(ctx.rhs), line, insn, addr)
   }
 
   def visitMemDef(ctx: MemDefContext): BAPMemAssign = {
     val line = visitQuoteString(ctx.tid.name)
     val insn = parseFromAttrs(ctx.attrs, "insn").getOrElse("")
-    val addr = parseFromAttrs(ctx.attrs, "address").map(x => Integer.parseInt(x.stripPrefix("0x"), 16))
+    val addr = parseFromAttrs(ctx.attrs, "address").map(x => BigInt(x.stripPrefix("0x"), 16))
     BAPMemAssign(visitMemVar(ctx.lhs), visitStore(ctx.rhs), line, insn, addr)
   }
 
@@ -281,8 +269,7 @@ object BAPLoader {
   val allowedChars: Set[Char] =
     Set('_', '\'', '~', '#', '$', '^', '_', '.', '?', '`') ++ ('A' to 'Z') ++ ('a' to 'z') ++ ('0' to '9')
 
-  class BAPCallConditionParsingException(message: String)
-    extends Exception(message) {
+  private class BAPCallConditionParsingException(message: String) extends Exception(message) {
 
     def this(message: String, cause: Throwable) = {
       this(message)

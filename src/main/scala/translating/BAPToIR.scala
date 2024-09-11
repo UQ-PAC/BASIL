@@ -10,7 +10,7 @@ import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 import util.intrusive_list.*
 
-class BAPToIR(var program: BAPProgram, mainAddress: Int) {
+class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
   private val nameToProcedure: mutable.Map[String, Procedure] = mutable.Map()
   private val labelToBlock: mutable.Map[String, Block] = mutable.Map()
@@ -19,7 +19,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     var mainProcedure: Option[Procedure] = None
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
     for (s <- program.subroutines) {
-      val procedure = Procedure(s.name, Some(s.address))
+      val procedure = Procedure(s.name, s.address)
       for (b <- s.blocks) {
         val block = Block(b.label, b.address)
         procedure.addBlocks(block)
@@ -34,7 +34,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       for (p <- s.out) {
         procedure.out.append(p.toIR)
       }
-      if (s.address == mainAddress) {
+      if (s.address.get == mainAddress) {
         mainProcedure = Some(procedure)
       }
       procedures.append(procedure)
