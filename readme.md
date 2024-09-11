@@ -100,11 +100,11 @@ See [docs/development](docs/development)
 
 Mac OS X / Linux: 
 ```
-./mill test.testOnly '*SystemTests*' -- -z secret_write -z secret_write 
+./mill test.testOnly 'SystemTestsBAP' -- -z correct/secret_write/clang:BAP
 ```
 Windows:
 ```
-./mill.bat test.testOnly '*SystemTests*' -- -z secret_write -z secret_write 
+./mill.bat test.testOnly 'SystemTestsBAP' -- -z correct/secret_write/clang:BAP
 ```
 
 ## Open Source License
