@@ -35,7 +35,7 @@ Boogie program verifier finished with 4 verified, 0 errors
 
 The tool takes as inputs either a BAP ADT file (here denoted with `.adt`) or a `.gts` file produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics), as well as a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.
 
-To build and run the tool use one of the the following commands:
+To build and run the tool use one of the following commands:
 
 sbt:
 ```
