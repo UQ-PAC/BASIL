@@ -101,9 +101,6 @@ trait ValueSetAnalysis(program: Program,
   /** Default implementation of eval.
     */
   def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]], n: CFGPosition): Map[Variable | MemoryRegion, Set[Value]] = {
-    Logger.debug(s"eval: $cmd")
-    Logger.debug(s"state: $s")
-    Logger.debug(s"node: $n")
     var m = s
     cmd match
       case localAssign: Assign =>

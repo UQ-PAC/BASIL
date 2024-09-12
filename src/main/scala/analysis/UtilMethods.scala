@@ -12,7 +12,6 @@ import util.Logger
   *   The evaluated expression (e.g. 0x69632)
   */
 def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[BitVecLiteral]]): Option[BitVecLiteral] = {
-  Logger.debug(s"evaluateExpression: $exp")
   exp match {
     case binOp: BinaryExpr =>
       val lhs = evaluateExpression(binOp.arg1, constantPropResult)
@@ -73,8 +72,6 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
 }
 
 def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[BitVecLiteral] = {
-  Logger.debug(s"evaluateExpression: $exp")
-
   def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = {
     val res = for {
       x <- a
@@ -143,14 +140,14 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
   }
 }
 
-def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
+def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFilter: Boolean = false): Set[Assign] = {
   val (in, _) = reachingDefs(node)
-  in.getOrElse(variable, Set())
+  if noFilter then in.getOrElse(variable, Set()) else in.getOrElse(variable, Set()).filterNot(_.rhs.variables.forall(_.name.contains("Unique")))
 }
 
-def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
+def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFiler: Boolean = false): Set[Assign] = {
   val (_, out) = reachingDefs(node)
-  out.getOrElse(variable, Set())
+  if noFiler then out.getOrElse(variable, Set()) else out.getOrElse(variable, Set()).filterNot(_.rhs.variables.forall(_.name.contains("Unique")))
 }
 
 def unwrapExpr(expr: Expr): Set[Expr] = {

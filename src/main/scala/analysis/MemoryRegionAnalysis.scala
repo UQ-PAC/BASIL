@@ -152,9 +152,6 @@ trait MemoryRegionAnalysis(val program: Program,
   }
 
   def eval(exp: Expr, env: Set[MemoryRegion], n: Command, subAccess: BigInt): Set[MemoryRegion] = {
-    Logger.debug(s"evaluating $exp")
-    Logger.debug(s"env: $env")
-    Logger.debug(s"n: $n")
     exp match {
       case binOp: BinaryExpr =>
         if (spList.contains(binOp.arg1)) {
