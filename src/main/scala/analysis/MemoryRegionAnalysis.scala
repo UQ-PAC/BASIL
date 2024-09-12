@@ -47,6 +47,7 @@ trait MemoryRegionAnalysis(val program: Program,
       region = stackPool(expr)
     } else {
       val newRegion = StackRegion(nextStackCount(), expr, stackBase)
+      addReturnStack(stackBase, newRegion)
       stackPool += (expr -> newRegion)
       region = newRegion
     }
@@ -94,6 +95,16 @@ trait MemoryRegionAnalysis(val program: Program,
   // TODO: this could be used instead of regionAccesses in other analyses to reduce the Expr to region conversion
   private val registerToRegions: mutable.Map[RegisterVariableWrapper, mutable.Set[MemoryRegion]] = mutable.Map()
   val procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]] = mutable.Map()
+  var procedureToStackRegions: mutable.Map[Procedure, mutable.Set[StackRegion]] = mutable.Map()
+  var procedureToHeapRegions: mutable.Map[DirectCall, HeapRegion] = mutable.Map()
+
+  def addReturnStack(procedure: Procedure, returnRegion: StackRegion): Unit = {
+    procedureToStackRegions.getOrElseUpdate(procedure, mutable.Set.empty).add(returnRegion)
+  }
+
+  def addReturnHeap(directCall: DirectCall, returnRegion: HeapRegion): Unit = {
+    procedureToHeapRegions.put(directCall, returnRegion)
+  }
 
   def reducibleToRegion(binExpr: BinaryExpr, n: Command, subAccess: BigInt): Set[MemoryRegion] = {
     var reducedRegions = Set.empty[MemoryRegion]
@@ -213,7 +224,9 @@ trait MemoryRegionAnalysis(val program: Program,
             evaluateExpression(mallocVariable, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
                 val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
-                regionLattice.lub(s, Set(HeapRegion(nextMallocCount(), negB, IRWalk.procedure(n))))
+                val newHeapRegion = HeapRegion(nextMallocCount(), negB, IRWalk.procedure(n))
+                addReturnHeap(directCall, newHeapRegion)
+                regionLattice.lub(s, Set(newHeapRegion))
               case None => s
             }
           } else {

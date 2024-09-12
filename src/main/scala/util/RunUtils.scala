@@ -680,7 +680,7 @@ object StaticAnalysis {
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
-    mmm.convertMemoryRegions(mraResult, mergedSubroutines, globalOffsets, globalAddresses, globalSizes, mraSolver.procedureToSharedRegions)
+    mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mergedSubroutines, globalOffsets, globalAddresses, globalSizes, mraSolver.procedureToSharedRegions)
     mmm.logRegions()
 
     Logger.info("[!] Injecting regions")

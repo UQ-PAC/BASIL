@@ -31,12 +31,13 @@ class MemoryModelMap {
   private val bufferedSharedStackMap: mutable.Map[String, mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]]] = mutable.Map()
   private val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.TreeMap()
   private val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.TreeMap()
+  private val heapCalls: mutable.Map[DirectCall, HeapRegion] = mutable.Map()
 
   private val uf = new UnionFind()
 
   /** Add a range and object to the mapping
    *
-   * @param offset the offset of the range
+   * @param offset the offset of the range, if a heap region is given, the offsets controls the shift of regions from the start
    * @param region the region to add
    * @param shared if the region is shared. When true, the region is added to the sharedStackMap
    *                otherwise to the stackMap
@@ -133,92 +134,33 @@ class MemoryModelMap {
     tableAddress
   }
 
-  /**
-   * Get the mapping of procedures to memory regions
-   * Gets the regions from each CFGPosition and maps them to the corresponding procedure based on the
-   * parent field of the StackRegion
-   * No shared regions here
-   * @param memoryRegions
-   * @return
-   */
-  def getProceduresToRegionsMapping(memoryRegions: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]]): mutable.Map[Procedure, mutable.Set[MemoryRegion]] = {
-    val procedureToRegions = mutable.Map[Procedure, mutable.Set[MemoryRegion]]()
-    for ((position, regions) <- memoryRegions) {
-      regions match {
-        case Lift(node) =>
-          for (region <- node) {
-            region match {
-              case stackRegion: StackRegion =>
-                val procedure = stackRegion.parent
-                if (!procedureToRegions.contains(procedure)) {
-                  procedureToRegions(procedure) = mutable.Set()
-                }
-                procedureToRegions(procedure) += stackRegion
-              case heapRegion: HeapRegion =>
-                val procedure = heapRegion.parent
-                if (!procedureToRegions.contains(procedure)) {
-                  procedureToRegions(procedure) = mutable.Set()
-                }
-                procedureToRegions(procedure) += heapRegion
-              case _ =>
-            }
-          }
-        case LiftedBottom =>
-      }
-    }
-    // make sure all procedures have results otherwise make them empty
-    memoryRegions.keys.collect {case procedure: Procedure => procedure}.foreach(procedure => {
-      if (!procedureToRegions.contains(procedure)) {
-        procedureToRegions(procedure) = mutable.Set()
-      }
-    })
-    procedureToRegions
-  }
-
-  def convertMemoryRegions(memoryRegions: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
+  def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]], heapRegions: mutable.Map[DirectCall, HeapRegion], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
     val reversedExternalFunctionRgns = (externalFunctions ++ globalAddresses).map((offset, name) => resolveInverseGlobalOffset(name, offset, globalOffsets) -> name)
     val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => reversedExternalFunctionRgns.contains(offset))
 
     val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, (globalSizes.getOrElse(name, 1).toDouble/8).ceil.toInt))
 
-    // we should collect all data regions otherwise the ordering might be wrong
-    var dataRgns: Set[DataRegion] = Set.empty
-    // get all function exit node
-    val regionsPerProcedure = getProceduresToRegionsMapping(memoryRegions)
-    val exitNodes = regionsPerProcedure.keys.collect { case procedure: Procedure => procedure }
-
-    exitNodes.foreach(exitNode =>
+    stackRegionsPerProcedure.keys.foreach(exitNode =>
       if (procedureToSharedRegions.contains(exitNode)) {
         val sharedRegions = procedureToSharedRegions(exitNode)
         sharedStacks(exitNode.name) = sharedRegions.collect { case r: StackRegion => r }.toList.sortBy(_.start)
       }
       // for each function exit node we get the memory region and add it to the mapping
-      val stackRgns = regionsPerProcedure(exitNode).collect { case r: StackRegion => r }.toList.sortBy(_.start)
-      dataRgns = dataRgns ++ regionsPerProcedure(exitNode).collect { case r: DataRegion => r }
-
+      val stackRgns = stackRegionsPerProcedure(exitNode).toList.sortBy(_.start)
       localStacks(exitNode.name) = stackRgns
     )
     // add externalFunctionRgn to dataRgns and sort by value
-    val allDataRgns = (dataRgns ++ externalFunctionRgns).toList.sortBy(_.start)
+    val allDataRgns = externalFunctionRgns.toList.sortBy(_.start)
     for (dataRgn <- allDataRgns) {
       add(dataRgn.start, dataRgn)
     }
 
+    heapCalls ++= heapRegions
     // add heap regions
     val rangeStart = 0
-    for ((position, regions) <- memoryRegions) {
-      regions match {
-        case Lift(node) =>
-          for (region <- node) {
-            region match {
-              case heapRegion: HeapRegion =>
-                add(BigInt(0), heapRegion)
-              case _ =>
-            }
-          }
-        case LiftedBottom =>
-      }
+    for (heapRegion <- heapRegions.values) {
+      add(rangeStart, heapRegion)
     }
   }
   // TODO: push and pop could be optimised by caching the results
@@ -474,6 +416,11 @@ class MemoryModelMap {
 
   private def returnRegion(region: HeapRegion): HeapRegion = {
     uf.find(region.asInstanceOf[MemoryRegion]).asInstanceOf[HeapRegion]
+  }
+
+  def getHeap(directCall: DirectCall): HeapRegion = {
+    require(directCall.target.name == "malloc", "Should be a malloc call")
+    heapCalls(directCall)
   }
 }
 
