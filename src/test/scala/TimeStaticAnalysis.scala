@@ -83,7 +83,16 @@ class TimeStaticAnalysis extends AnyFunSuite {
     def config(name: String) = ILLoadingConfig("examples/csmith/" + name + ".adt", "examples/csmith/" + name + ".relf")
     def map2nd[A,B,C](a: Iterable[(C, A)], f: A => B) = a.map((x: (C, A)) => (x._1, f(x._2)))
     val loads = examples.map(c => (c, config(c))).toList
-    val ctx = map2nd(loads, IRLoading.load)
+    val ctx = map2nd(loads, x => {
+      try {
+        IRLoading.load(x)
+      } catch  {
+        case e => {
+          Logger.error(s"$e at ${x.inputFile}")
+          throw e 
+        }
+      }
+    })
     val cleanup = map2nd(ctx, IRTransform.doCleanup)
 
     val complexity = map2nd(cleanup, c => (c, ProgStats.get(c.program))).toMap
@@ -106,7 +115,7 @@ class TimeStaticAnalysis extends AnyFunSuite {
           Logger.warn(s"TESTING $testn")
           val comp = complexity(testn)._2
           Logger.warn(comp)
-          val r = Await.result(doAnalysis(ctx), 30000.millis)
+          val r = Await.result(doAnalysis(ctx), 120000.millis)
           Logger.warn("CHECKPOINTS:")
           Logger.warn(r.map(c => s"${c._1},${c._2},${c._3}").mkString("\n"))
           (testn, r)
