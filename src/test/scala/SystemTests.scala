@@ -151,7 +151,7 @@ trait SystemTests extends AnyFunSuite {
     val translateTime = timer.checkPoint("translate-boogie")
     Logger.info(outPath + " done")
     val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(outPath))
-    val boogieCmd = (Seq("boogie", "/printVerifiedProceduresCount:0") ++ conf.boogieFlags ++ Seq(outPath) ++ extraSpec)
+    val boogieCmd = Seq("boogie", "/printVerifiedProceduresCount:0") ++ conf.boogieFlags ++ Seq(outPath) ++ extraSpec
     Logger.info(s"Verifying... ${boogieCmd.mkString(" ")}")
     val boogieResult = boogieCmd.!!
     val verifyTime = timer.checkPoint("verify")
