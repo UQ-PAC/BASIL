@@ -156,6 +156,14 @@ class Program(var procedures: ArrayBuffer[Procedure],
   def iterator: Iterator[CFGPosition] = {
     ILUnorderedIterator(this)
   }
+
+  def nameToProcedure: Map[String, Procedure] = {
+    procedures.view.map(p => p.name -> p).toMap
+  }
+
+  def labelToBlock: Map[String, Block] = {
+    procedures.view.flatMap(_.blocks.map((b: Block) => b.label -> b)).toMap
+  }
 }
 
 
@@ -367,6 +375,7 @@ class Procedure private (
     }
     reachable.toSet
   }
+
 }
 
 class Parameter(var name: String, var size: Int, var value: Register) {

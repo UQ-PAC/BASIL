@@ -11,13 +11,8 @@ import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.mutable
 import scala.io.Source
 import scala.sys.process.*
+import test_util.BASILTest.writeToFile
 
-private def writeToFile(text: String, path: String): Unit = {
-  val writer = BufferedWriter(FileWriter(path, false))
-  writer.write(text)
-  writer.flush()
-  writer.close()
-}
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
@@ -27,7 +22,7 @@ class IrreducibleLoop extends AnyFunSuite {
 
   def load(conf: ILLoadingConfig) : Program = {
     val bapProgram = IRLoading.loadBAP(conf.inputFile)
-    val (externalFunctions, globals, globalOffsets, mainAddress) = IRLoading.loadReadELF(conf.relfFile, conf)
+    val (_, _, _, mainAddress) = IRLoading.loadReadELF(conf.relfFile, conf)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     val IRProgram = IRTranslator.translate
     IRProgram
@@ -35,7 +30,6 @@ class IrreducibleLoop extends AnyFunSuite {
 
   def runTest(path: String, name: String): Unit = {
     val variationPath = path + "/" + name
-    val outPath = variationPath + ".bpl"
     val ADTPath = variationPath + ".adt"
     val RELFPath = variationPath + ".relf"
     Logger.info(variationPath)
@@ -44,7 +38,6 @@ class IrreducibleLoop extends AnyFunSuite {
 
     val detector = LoopDetector(program)
     val foundLoops = detector.identify_loops()
-    val oldn = foundLoops.count(_.reducible)
 
     writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${variationPath}_blockgraph-before-reduce.dot")
 

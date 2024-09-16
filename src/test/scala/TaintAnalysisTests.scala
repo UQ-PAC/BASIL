@@ -3,10 +3,10 @@ import boogie.*
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.TestUtil
+import test_util.BASILTest
 
-class TaintAnalysisTests extends AnyFunSuite, TestUtil {
-  def getTaintAnalysisResults(program: Program, procedure: Procedure, taint: Map[CFGPosition, Set[Taintable]]): Map[CFGPosition, Set[Taintable]] = {
+class TaintAnalysisTests extends AnyFunSuite, BASILTest {
+  def getTaintAnalysisResults(program: Program, taint: Map[CFGPosition, Set[Taintable]]): Map[CFGPosition, Set[Taintable]] = {
     val constPropResults = ConstantPropagationSolver(program).analyze()
     TaintAnalysis(program, Map(), constPropResults, taint).analyze().map { (c, m) => (c, m.map { (v, _) => v }.toSet)}
   }
@@ -17,8 +17,8 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     ProcVariableDependencyAnalysis(program, variables, Map(), constPropResults, Map(), procedure).analyze()
   }
 
-  val registers = 0.to(28).map { n => Register(s"R$n", 64): Taintable }.toSet
-  val baseRegisterMap = registers.map { r => (r, Set(r)) }.toMap
+  private val registers = 0.to(28).map { n => Register(s"R$n", 64): Taintable }.toSet
+  private val baseRegisterMap = registers.map { r => (r, Set(r)) }.toMap
 
   test("constantLiteral") {
     var program = prog(
@@ -41,15 +41,15 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val f = program.procs("f")
+    val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R0))
-    val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
+    val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(f.end) == None)
+    assert(!taintAnalysisResults.contains(f.end))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(f.end) == Some(baseRegisterMap - R0))
+    assert(varDepResults.get(f.end).contains(baseRegisterMap - R0))
   }
 
   test("arguments") {
@@ -73,15 +73,15 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val f = program.procs("f")
+    val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R0))
-    val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
+    val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(f.end) == Some(Set(R0)))
+    assert(taintAnalysisResults.get(f.end).contains(Set(R0)))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(f.end) == Some(baseRegisterMap + (R0 -> Set(R0, R1))))
+    assert(varDepResults.get(f.end).contains(baseRegisterMap + (R0 -> Set(R0, R1))))
   }
 
   test("branching") {
@@ -112,15 +112,15 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val f = program.procs("f")
+    val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R1))
-    val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
+    val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(f.end) == Some(Set(R0, R1)))
+    assert(taintAnalysisResults.get(f.end).contains(Set(R0, R1)))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(f.end) == Some(baseRegisterMap + (R0 -> Set(R1, R2))))
+    assert(varDepResults.get(f.end).contains(baseRegisterMap + (R0 -> Set(R1, R2))))
   }
 
   test("interproc") {
@@ -162,15 +162,15 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val f = program.procs("f")
+    val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R1))
-    val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
+    val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(f.end) == Some(Set(R0, R1)))
+    assert(taintAnalysisResults.get(f.end).contains(Set(R0, R1)))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(f.end) == Some(baseRegisterMap + (R0 -> Set(R1, R2)) + (R1 -> Set(R1, R2))))
+    assert(varDepResults.get(f.end).contains(baseRegisterMap + (R0 -> Set(R1, R2)) + (R1 -> Set(R1, R2))))
   }
 
   test("loop") {
@@ -201,14 +201,14 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     val returnUnifier = ConvertToSingleProcedureReturn()
     program = returnUnifier.visitProgram(program)
 
-    val f = program.procs("f")
+    val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R1))
-    val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
+    val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(f.end) == Some(Set(R1)))
+    assert(taintAnalysisResults.get(f.end).contains(Set(R1)))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(f.end) == Some(baseRegisterMap + (R0 -> Set(R2))))
+    assert(varDepResults.get(f.end).contains(baseRegisterMap + (R0 -> Set(R2))))
   }
 }

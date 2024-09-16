@@ -8,18 +8,7 @@ import ir.dsl.*
 
 class IRTest extends AnyFunSuite {
 
-  extension (p: Program) {
-    def procs: Map[String, Procedure] = p.collect {
-      case b: Procedure => b.name -> b
-    }.toMap
-
-    def blocks: Map[String, Block] = p.collect {
-      case b: Block => b.label -> b
-    }.toMap
-  }
-
   test("blockintralinks") {
-
     val p = prog(
       proc("main",
         block("lmain",
@@ -32,9 +21,7 @@ class IRTest extends AnyFunSuite {
       )
     )
 
-    val blocks = p.collect {
-      case b: Block => b.label -> b
-    }.toMap
+    val blocks = p.labelToBlock
 
     assert(blocks("lmain").nextBlocks.toSet == Set(blocks("lmain1")))
     assert(blocks("lmain1").nextBlocks.toSet == Set(blocks("lmain2")))
@@ -54,11 +41,9 @@ class IRTest extends AnyFunSuite {
     assert(blocks("lmain").singleSuccessor.isEmpty)
     assert(blocks("lmain2").singlePredecessor.isEmpty)
     assert(blocks("lmain2").singleSuccessor.isEmpty)
-
   }
 
   test("removeblockinline") {
-
     val p = prog(
       proc("main",
         block("lmain",
@@ -71,9 +56,7 @@ class IRTest extends AnyFunSuite {
       )
     )
 
-    val blocks = p.collect {
-      case b: Block => b.label -> b
-    }.toMap
+    val blocks = p.labelToBlock
 
     p.procedures.head.removeBlocksInline(blocks("lmain1"))
 
@@ -83,7 +66,6 @@ class IRTest extends AnyFunSuite {
   }
 
   test("simple replace jump") {
-
     val p = prog(
       proc("main",
         block("lmain",
@@ -96,9 +78,7 @@ class IRTest extends AnyFunSuite {
       )
     )
 
-    val blocks = p.collect {
-      case b: Block => b.label -> b
-    }.toMap
+    val blocks = p.labelToBlock
 
     assert(IntraProcIRCursor.succ(blocks("lmain").jump) == Set(blocks("lmain1")))
     assert(IntraProcIRCursor.succ(blocks("lmain1").jump) == Set(blocks("lmain2")))
@@ -129,7 +109,6 @@ class IRTest extends AnyFunSuite {
     assert(IntraProcIRCursor.pred(blocks("lmain2")) == Set(blocks("lmain").jump))
     assert(blocks("lmain2").prevBlocks.toSet == Set(blocks("lmain")))
     assert(blocks("lmain2").singlePredecessor.contains(blocks("lmain")))
-
   }
 
   test("aftercalls") {
@@ -154,10 +133,7 @@ class IRTest extends AnyFunSuite {
       )
     )
 
-    val blocks = p.collect {
-      case b: Block => b.label -> b
-    }.toMap
-
+    val blocks = p.labelToBlock
 
     val directcalls = p.collect {
       case c: DirectCall => c
@@ -172,7 +148,7 @@ class IRTest extends AnyFunSuite {
       case b: Block if b.isAfterCall => b
     }.toSet
 
-    assert(afterCalls.toSet == Set(blocks("returntarget")))
+    assert(afterCalls == Set(blocks("returntarget")))
     val aftercallGotos = p.collect {
       case c: Jump if c.isAfterCall => c
     }.toSet
@@ -182,11 +158,9 @@ class IRTest extends AnyFunSuite {
     assert(1 == aftercallGotos.count(b => IntraProcIRCursor.succ(b).contains(blocks("l_main_1").fallthrough.map(_.targets.head).head)))
 
     assert(afterCalls.forall(b => IntraProcBlockIRCursor.pred(b).contains(blocks("l_main_1"))))
-
   }
 
   test("addblocks") {
-
     val p = prog(
       proc("main",
         block("lmain",
@@ -214,20 +188,15 @@ class IRTest extends AnyFunSuite {
 
     p.procedures.head.addBlocks(Seq(b1, b2))
 
-    val blocks = p.collect {
-      case b: Block => b.label -> b
-    }.toMap
+    val blocks = p.labelToBlock
 
     assert(p.toSet.contains(b1))
     assert(p.toSet.contains(b2))
     assert(blocks("lmain2").incomingJumps.contains(b1.jump.asInstanceOf[GoTo]))
     assert(blocks("lmain2").incomingJumps.contains(b2.jump.asInstanceOf[GoTo]))
-
-
   }
 
   test("addblocks empty proc") {
-
     val p = prog(
       proc("main",
         block("lmain",
@@ -241,8 +210,7 @@ class IRTest extends AnyFunSuite {
       proc("called")
     )
 
-
-    val b1= block("newblock2",
+    val b1 = block("newblock2",
       Assign(R0, bv64(22)),
       Assign(R0, bv64(22)),
       Assign(R0, bv64(22)),
@@ -264,9 +232,8 @@ class IRTest extends AnyFunSuite {
     assert(called.entryBlock.contains(b1))
     assert(called.returnBlock.isEmpty)
 
-    def blocks = p.collect {
-      case b: Block => b.label -> b
-    }.toMap
+    var blocks = p.labelToBlock
+    val procs = p.nameToProcedure
 
     assert(called.incomingCalls().isEmpty)
     val b3 = block("newblock3",
@@ -274,11 +241,13 @@ class IRTest extends AnyFunSuite {
       directCall("called", None)
     ).resolve(p)
 
-    assert(b3.calls.toSet == Set(p.procs("called")))
+    blocks = p.labelToBlock
+
+    assert(b3.calls == Set(procs("called")))
     val oldb = blocks("lmain2")
     p.mainProcedure.replaceBlock(blocks("lmain2"), b3)
 
-    assert(p.mainProcedure.calls.toSet == Set(p.procs("called")))
+    assert(p.mainProcedure.calls == Set(procs("called")))
     assert(p.mainProcedure.calls.forall(_.callers().exists(_ == p.mainProcedure)))
     assert(!oldb.hasParent)
     assert(oldb.incomingJumps.isEmpty)
@@ -290,10 +259,12 @@ class IRTest extends AnyFunSuite {
     assert(called.incomingCalls().toSet == Set(b3.jump))
     assert(olds == blocks.size)
     p.mainProcedure.addBlocks(block("test", ret).resolve(p))
+    blocks = p.labelToBlock
     assert(olds != blocks.size)
 
     p.mainProcedure.replaceBlocks(Set(block("test", ret).resolve(p)))
-    assert(blocks.count(_._2.parent.name == "main") == 1)
+    blocks = p.labelToBlock
+    assert(blocks.count(_(1).parent.name == "main") == 1)
 
   }
 
@@ -311,14 +282,20 @@ class IRTest extends AnyFunSuite {
         ),
       )
 
-    assert(p.blocks.size > 1)
-    assert(p.procs("main").entryBlock.isDefined)
-    p.procs("main").returnBlock = block("retb", ret).resolve(p)
-    assert(p.procs("main").returnBlock.isDefined)
-    p.procs("main").clearBlocks()
-    assert(p.blocks.isEmpty)
-    assert(p.procs("main").entryBlock.isEmpty)
-    assert(p.procs("main").returnBlock.isEmpty)
+    var blocks = p.labelToBlock
+    var procs = p.nameToProcedure
+
+    assert(blocks.size > 1)
+    assert(procs("main").entryBlock.isDefined)
+    procs("main").returnBlock = block("retb", ret).resolve(p)
+    assert(procs("main").returnBlock.isDefined)
+    procs("main").clearBlocks()
+
+    blocks = p.labelToBlock
+    procs = p.nameToProcedure
+    assert(blocks.isEmpty)
+    assert(procs("main").entryBlock.isEmpty)
+    assert(procs("main").returnBlock.isEmpty)
   }
 
   test("interproc aftercall") {
@@ -343,16 +320,19 @@ class IRTest extends AnyFunSuite {
     val returnUnifier = ConvertToSingleProcedureReturn()
     returnUnifier.visitProgram(p)
 
-    val next = InterProcIRCursor.succ(p.blocks("l_main").jump)
-    val prev = InterProcIRCursor.pred(p.blocks("returntarget"))
+    val blocks = p.labelToBlock
+    val procs = p.nameToProcedure
+
+    val next = InterProcIRCursor.succ(blocks("l_main").jump)
+    val prev = InterProcIRCursor.pred(blocks("returntarget"))
 
     assert(prev.size == 1 && prev.collect {
-      case c : GoTo => (c.parent == p.blocks("l_main")) && c.isAfterCall
+      case c: GoTo => (c.parent == blocks("l_main")) && c.isAfterCall
     }.contains(true))
 
-    assert(next == Set(p.procs("p1"), p.blocks("l_main").fallthrough.get))
+    assert(next == Set(procs("p1"), blocks("l_main").fallthrough.get))
 
-    val prevB: Block = (p.blocks("l_main").jump match
+    val prevB: Block = (blocks("l_main").jump match
       case c: IndirectCall => c.returnTarget
       case c: DirectCall => c.returnTarget
       case _ => None
@@ -360,8 +340,8 @@ class IRTest extends AnyFunSuite {
 
     assert(prevB.isAfterCall)
     assert(InterProcIRCursor.pred(prevB).size == 1)
-    assert(InterProcIRCursor.pred(prevB).head == p.blocks("l_main").fallthrough.get)
-    assert(InterProcBlockIRCursor.pred(prevB).head == p.blocks("l_main"), p.procs("p1").returnBlock.get)
+    assert(InterProcIRCursor.pred(prevB).head == blocks("l_main").fallthrough.get)
+    assert(InterProcBlockIRCursor.pred(prevB).head == blocks("l_main"), procs("p1").returnBlock.get)
 
   }
 
@@ -385,11 +365,12 @@ class IRTest extends AnyFunSuite {
       ),
     )
 
-    val main = p.blocks("l_main")
-    val p1 = p.procs("p1")
-    val block2 = p.blocks("block2")
+    val blocks = p.labelToBlock
+    val procs = p.nameToProcedure
 
-    val oldJump = main.jump
+    val main = blocks("l_main")
+    val block2 = blocks("block2")
+
     val newJump = block2.jump
 
     main.replaceJump(newJump)

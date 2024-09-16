@@ -131,15 +131,15 @@ object IRLoading {
             case mismatch: org.antlr.v4.runtime.InputMismatchException =>
               val token = mismatch.getOffendingToken
               s"""
-                exn: ${mismatch}
-                offending token: ${token}
+                exn: $mismatch
+                offending token: $token
 
               ${line.replace('\n', ' ')}
               ${" " * token.getStartIndex}^ here!
               """.stripIndent
             case _ => ""
           }
-          Logger.error(s"""Semantics parse error:\n  line: ${line}\n${extra}""")
+          Logger.error(s"""Semantics parse error:\n  line: $line\n$extra""")
           throw e
       }
     }
@@ -658,7 +658,7 @@ object StaticAnalysis {
     Logger.info("[!] Variable dependency summaries")
     val scc = stronglyConnectedComponents(CallGraph, List(IRProgram.mainProcedure))
     val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
-    var varDepsSummaries = VariableDependencyAnalysis(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, scc).analyze()
+    val varDepsSummaries = VariableDependencyAnalysis(IRProgram, ctx.specification.globals, specGlobalAddresses, constPropResult, scc).analyze()
 
     val ilcpsolver = IRSimpleValueAnalysis.Solver(IRProgram)
     val newCPResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = ilcpsolver.analyze()
@@ -734,12 +734,10 @@ object StaticAnalysis {
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
     Logger.info("[!] Running Interprocedural Live Variables Analysis")
-    //val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
-    val interLiveVarsResults = Map[CFGPosition, Map[Variable, TwoElement]]()
+    val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
 
     Logger.info("[!] Running Parameter Analysis")
-    //val paramResults = ParamAnalysis(IRProgram).analyze()
-    val paramResults = Map[Procedure, Set[Variable]]()
+    val paramResults = ParamAnalysis(IRProgram).analyze()
 
     StaticAnalysisContext(
       cfg = cfg,

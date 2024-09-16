@@ -1,14 +1,15 @@
 import ir.{Block, Procedure, Program, GoTo, DirectCall}
 import org.scalatest.funsuite.*
 
-import scala.sys.process.*
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, Logger, PerformanceTimer, RunUtils, StaticAnalysisConfig}
 import scala.collection.mutable.ArrayBuffer
+import test_util.BASILTest
+import test_util.TestConfig
 
 import java.io.{BufferedWriter, File, FileWriter}
 
 
-class IndirectCallTests extends AnyFunSuite {
+class IndirectCallTests extends BASILTest {
   /**
     *
     * @param label - the label of the IndirectCall to be resolved
@@ -39,14 +40,13 @@ class IndirectCallTests extends AnyFunSuite {
     val specPath = directoryPath + name + ".spec"
     val RELFPath = variationPath + ".relf"
     val resultPath = if conf.useBAPFrontend then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
-    val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
 
     Logger.info(BPLPath)
-    val basilResult = runBASIL(inputPath, RELFPath, specPath, BPLPath, Some(StaticAnalysisConfig()))
+    val basilResult = runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, Some(StaticAnalysisConfig()))
     Logger.info(BPLPath + " done")
 
     val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
-    val boogieFailureMsg = checkVerify(boogieResult, resultPath, conf.expectVerify)
+    val (boogieFailureMsg, _, _) = checkVerify(boogieResult, resultPath, conf.expectVerify)
 
     val indirectResolutionFailureMsg = checkIndirectCallResolution(basilResult.ir.program, resolvedCalls)
 
@@ -58,61 +58,12 @@ class IndirectCallTests extends AnyFunSuite {
     }
   }
 
-  def runBASIL(inputPath: String, RELFPath: String, specPath: String, BPLPath: String, staticAnalysisConf: Option[StaticAnalysisConfig]): BASILResult = {
-    val config = BASILConfig(
-      loading = ILLoadingConfig(
-        inputFile = inputPath,
-        relfFile = RELFPath,
-        specFile = if File(specPath).exists then Some(specPath) else None,
-      ),
-      staticAnalysis = staticAnalysisConf,
-      outputPrefix = BPLPath
-    )
-    val result = RunUtils.loadAndTranslate(config)
-    RunUtils.writeOutput(result)
-    result
-  }
-
-  def runBoogie(directoryPath: String, bplPath: String, boogieFlags: Seq[String]): String = {
-    val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(bplPath))
-    val boogieCmd = Seq("boogie", "/printVerifiedProceduresCount:0") ++ boogieFlags ++ Seq(bplPath) ++ extraSpec
-    Logger.info(s"Verifying... ${boogieCmd.mkString(" ")}")
-    val boogieResult = boogieCmd.!!
-    boogieResult
-  }
-
-  /**
-    *
-    * @return None if passes, Some(failure message) if doesn't pass
-    */
-  def checkVerify(boogieResult: String, resultPath: String, shouldVerify: Boolean): Option[String] = {
-    writeToFile(boogieResult, resultPath)
-    val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
-    val proveFailed = boogieResult.contains("could not be proved")
-    val timedOut = boogieResult.strip().contains("timed out")
-
-    def xor(x: Boolean, y: Boolean): Boolean = (x || y) && !(x && y)
-
-    val failureMsg = if (timedOut) {
-      Some("SMT Solver timed out")
-    } else {
-      (verified, shouldVerify, xor(verified, proveFailed)) match {
-        case (true, true, true) => None
-        case (false, false, true) => None
-        case (_, _, false) => Some("Prover error: unknown result: " + boogieResult)
-        case (true, false, true) => Some("Expected verification failure, but got success.")
-        case (false, true, true) => Some("Expected verification success, but got failure.")
-      }
-    }
-    failureMsg
-  }
-
   /**
     *
     * @return None if passes, Some(failure message) if doesn't pass
     */
   def checkIndirectCallResolution(program: Program, resolutions: Seq[IndirectCallResolution]): Option[String] = {
-    val nameToProc: Map[String, Procedure] = program.procedures.map((p: Procedure) => p.name -> p).toMap
+    val nameToProc: Map[String, Procedure] = program.nameToProcedure
     val labelToResolution: Map[String, IndirectCallResolution] = resolutions.map(r => r.label -> r).toMap
     val procedures: Set[Procedure] = resolutions.map(r => nameToProc(r.labelProcedure)).toSet
 
@@ -157,7 +108,6 @@ class IndirectCallTests extends AnyFunSuite {
                   }
                 } else {
                   // fail - expected goto to have x targets
-                  val goToBlockAddresses = targets.map(_.address)
                   val failMsg = "resolved GoTo has incorrect number of targets: "  + b.jump.toString
                   IndirectCallResult(resolution, false, Some(failMsg))
                 }
@@ -233,80 +183,83 @@ class IndirectCallTests extends AnyFunSuite {
       None // test passed
     }
   }
+  
+  private val BAPConfig = TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true)
+  private val GTIRBConfig = TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = true)
 
   test("functionpointer/clang:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%0000045d", "main", Set("set_six", "set_two", "set_seven"), Set()))
-    runTest("functionpointer", "clang", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("functionpointer", "clang", BAPConfig, resolvedCalls)
   }
 
   test("functionpointer/clang_O2:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%000003f4", "main", Set("set_six", "set_two", "set_seven"), Set()))
-    runTest("functionpointer", "clang_O2", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("functionpointer", "clang_O2", BAPConfig, resolvedCalls)
   }
 
   test("functionpointer/clang_O2:GTIRB") {
     val resolvedCalls = Seq(IndirectCallResolution("1908$3", "main", Set("set_six", "set_two", "set_seven"), Set()))
-    runTest("functionpointer", "clang_O2", TestConfig(useBAPFrontend = false, expectVerify = true), resolvedCalls)
+    runTest("functionpointer", "clang_O2", GTIRBConfig, resolvedCalls)
   }
 
   test("functionpointer/clang_pic:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%0000047f", "main", Set("set_six", "set_two", "set_seven"), Set()))
-    runTest("functionpointer", "clang_pic", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("functionpointer", "clang_pic", BAPConfig, resolvedCalls)
   }
 
   test("functionpointer/gcc:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%00000451", "main", Set("set_six", "set_two", "set_seven"), Set()))
-    runTest("functionpointer", "gcc", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("functionpointer", "gcc", BAPConfig, resolvedCalls)
   }
 
   test("functionpointer/gcc_O2:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%00000274", "main", Set("set_six", "set_two", "set_seven"), Set()))
-    runTest("functionpointer", "gcc_O2", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("functionpointer", "gcc_O2", BAPConfig, resolvedCalls)
   }
 
   test("functionpointer/gcc_pic:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%00000455", "main", Set("set_six", "set_two", "set_seven"), Set()))
-    runTest("functionpointer", "gcc_pic", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("functionpointer", "gcc_pic", BAPConfig, resolvedCalls)
   }
 
   test("indirect_call/clang:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%000003b6", "main", Set("greet"), Set()))
-    runTest("indirect_call", "clang", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("indirect_call", "clang", BAPConfig, resolvedCalls)
   }
 
   test("indirect_call/clang_pic:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%000003b7", "main", Set("greet"), Set()))
-    runTest("indirect_call", "clang_pic", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("indirect_call", "clang_pic", BAPConfig, resolvedCalls)
   }
 
   test("indirect_call/gcc:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%00000392", "main", Set("greet"), Set()))
-    runTest("indirect_call", "gcc", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("indirect_call", "gcc", BAPConfig, resolvedCalls)
   }
 
   test("indirect_call/gcc_pic:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%00000393", "main", Set("greet"), Set()))
-    runTest("indirect_call", "gcc_pic", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("indirect_call", "gcc_pic", BAPConfig, resolvedCalls)
   }
 
   test("indirect_call_outparam/clang:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%0000037a", "main", Set("seven"), Set()))
-    runTest("indirect_call_outparam", "clang", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("indirect_call_outparam", "clang", BAPConfig, resolvedCalls)
   }
 
   test("indirect_call_outparam/clang:GTIRB") {
     val resolvedCalls = Seq(IndirectCallResolution("1880$3", "main", Set("seven"), Set()))
-    runTest("indirect_call_outparam", "clang", TestConfig(useBAPFrontend = false, expectVerify = true), resolvedCalls)
+    runTest("indirect_call_outparam", "clang", GTIRBConfig, resolvedCalls)
   }
 
   test("indirect_call_outparam/gcc:BAP") {
     val resolvedCalls = Seq(IndirectCallResolution("%000003c7", "main", Set("seven"), Set()))
-    runTest("indirect_call_outparam", "gcc", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("indirect_call_outparam", "gcc", BAPConfig, resolvedCalls)
   }
 
   test("indirect_call_outparam/gcc:GTIRB") {
     val resolvedCalls = Seq(IndirectCallResolution("2152$3", "main", Set("seven"), Set()))
-    runTest("indirect_call_outparam", "gcc", TestConfig(useBAPFrontend = false, expectVerify = true), resolvedCalls)
+    runTest("indirect_call_outparam", "gcc", GTIRBConfig, resolvedCalls)
   }
 
   test("jumptable/clang:BAP") {
@@ -315,7 +268,7 @@ class IndirectCallTests extends AnyFunSuite {
       IndirectCallResolution("%00000440", "main", Set("add_six"), Set()),
       IndirectCallResolution("%0000044f", "main", Set("sub_seven"), Set())
     )
-    runTest("jumptable", "clang", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("jumptable", "clang", BAPConfig, resolvedCalls)
   }
 
   test("jumptable/clang:GTIRB") {
@@ -323,7 +276,7 @@ class IndirectCallTests extends AnyFunSuite {
       IndirectCallResolution("1996$3", "main", Set("add_two"), Set()),
       IndirectCallResolution("2004$3", "main", Set("add_six"), Set())
     )
-    runTest("jumptable", "clang", TestConfig(useBAPFrontend = false, expectVerify = true), resolvedCalls)
+    runTest("jumptable", "clang", GTIRBConfig, resolvedCalls)
   }
 
   test("jumptable/gcc:BAP") {
@@ -332,7 +285,7 @@ class IndirectCallTests extends AnyFunSuite {
       IndirectCallResolution("%000004e4", "main", Set("add_six"), Set()),
       IndirectCallResolution("%000004f3", "main", Set("sub_seven"), Set())
     )
-    runTest("jumptable", "gcc", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("jumptable", "gcc", BAPConfig, resolvedCalls)
   }
 
   test("jumptable/gcc:GTIRB") {
@@ -341,7 +294,7 @@ class IndirectCallTests extends AnyFunSuite {
       IndirectCallResolution("2320$3", "main", Set("add_six"), Set()),
       IndirectCallResolution("2328$3", "main", Set("sub_seven"), Set())
     )
-    runTest("jumptable", "gcc", TestConfig(useBAPFrontend = false, expectVerify = true), resolvedCalls)
+    runTest("jumptable", "gcc", GTIRBConfig, resolvedCalls)
   }
 
   test("jumptable2/clang:BAP") {
@@ -350,7 +303,7 @@ class IndirectCallTests extends AnyFunSuite {
       IndirectCallResolution("%00000436", "main", Set("add_six"), Set()),
       IndirectCallResolution("%0000044c", "main", Set("sub_seven"), Set())
     )
-    runTest("jumptable2", "clang", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("jumptable2", "clang", BAPConfig, resolvedCalls)
   }
 
   test("jumptable2/clang_O2:BAP") {
@@ -359,7 +312,7 @@ class IndirectCallTests extends AnyFunSuite {
       IndirectCallResolution("%000003ca", "main", Set("add_six"), Set()),
       IndirectCallResolution("%000003d9", "main", Set("sub_seven"), Set())
     )
-    runTest("jumptable2", "clang_O2", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("jumptable2", "clang_O2", BAPConfig, resolvedCalls)
   }
 
   test("jumptable2/clang_pic:BAP") {
@@ -368,7 +321,7 @@ class IndirectCallTests extends AnyFunSuite {
       IndirectCallResolution("%0000044f", "main", Set("add_six"), Set()),
       IndirectCallResolution("%00000465", "main", Set("sub_seven"), Set())
     )
-    runTest("jumptable2", "clang_pic", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("jumptable2", "clang_pic", BAPConfig, resolvedCalls)
   }
 
   test("jumptable2/gcc:BAP") {
@@ -377,7 +330,7 @@ class IndirectCallTests extends AnyFunSuite {
       IndirectCallResolution("%00000456", "main", Set("add_six"), Set()),
       IndirectCallResolution("%00000470", "main", Set("sub_seven"), Set())
     )
-    runTest("jumptable2", "gcc", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("jumptable2", "gcc", BAPConfig, resolvedCalls)
   }
 
   test("jumptable2/gcc_O2:BAP") {
@@ -386,7 +339,7 @@ class IndirectCallTests extends AnyFunSuite {
       IndirectCallResolution("%00000243", "main", Set("add_six"), Set()),
       IndirectCallResolution("%00000252", "main", Set("sub_seven"), Set())
     )
-    runTest("jumptable2", "gcc_O2", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("jumptable2", "gcc_O2", BAPConfig, resolvedCalls)
   }
 
   test("jumptable2/gcc_pic:BAP") {
@@ -395,7 +348,7 @@ class IndirectCallTests extends AnyFunSuite {
       IndirectCallResolution("%0000045e", "main", Set("add_six"), Set()),
       IndirectCallResolution("%00000479", "main", Set("sub_seven"), Set())
     )
-    runTest("jumptable2", "gcc_pic", TestConfig(useBAPFrontend = true, expectVerify = true), resolvedCalls)
+    runTest("jumptable2", "gcc_pic", BAPConfig, resolvedCalls)
   }
 
   test("jumptable3/clang:GTIRB") {
@@ -413,7 +366,7 @@ class IndirectCallTests extends AnyFunSuite {
       BigInt(2044),
       BigInt(2066)
     )))
-    runTest("jumptable3", "clang", TestConfig(useBAPFrontend = false, expectVerify = true), resolvedCalls)
+    runTest("jumptable3", "clang", GTIRBConfig, resolvedCalls)
   }
 
   test("jumptable3/clang_O2:GTIRB") {
@@ -430,7 +383,7 @@ class IndirectCallTests extends AnyFunSuite {
       BigInt(2032),
       BigInt(2048)
     )))
-    runTest("jumptable3", "clang_O2", TestConfig(useBAPFrontend = false, expectVerify = true), resolvedCalls)
+    runTest("jumptable3", "clang_O2", GTIRBConfig, resolvedCalls)
   }
 
   test("switch2/clang:GTIRB") {
@@ -441,14 +394,7 @@ class IndirectCallTests extends AnyFunSuite {
       BigInt(1932),
       BigInt(1944)
     )))
-    runTest("switch2", "clang", TestConfig(useBAPFrontend = false, expectVerify = true), resolvedCalls)
+    runTest("switch2", "clang", GTIRBConfig, resolvedCalls)
   }
 
-}
-
-def writeToFile(text: String, path: String): Unit = {
-  val writer = BufferedWriter(FileWriter(path, false))
-  writer.write(text)
-  writer.flush()
-  writer.close()
 }
