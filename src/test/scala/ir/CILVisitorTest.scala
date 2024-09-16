@@ -66,8 +66,8 @@ class CILVisitorTest extends AnyFunSuite {
       override def vjump(b: Jump) = {
         b match {
           case g: GoTo         => res.addAll(g.targets.map(t => s"gt_${t.label}").toList)
-          case _: IndirectCall => res.append("indirect")
-          case _: DirectCall   => res.append("direct")
+          case _: Return => res.append("return")
+          case _: Unreachable   => res.append("direct")
         }
         DoChildren()
       }
@@ -75,7 +75,7 @@ class CILVisitorTest extends AnyFunSuite {
 
     val v = BlockTrace()
     visit_proc(v, p.procedures.head)
-    assert(v.res.toList == List("lmain", "gt_lmain1", "lmain1", "gt_lmain2", "lmain2", "indirect"))
+    assert(v.res.toList == List("lmain", "gt_lmain1", "lmain1", "gt_lmain2", "lmain2", "return"))
   }
 
   test("visit exprs") {
