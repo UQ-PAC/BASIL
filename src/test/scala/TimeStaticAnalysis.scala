@@ -74,67 +74,72 @@ class TimeStaticAnalysis extends AnyFunSuite {
       }
     }
 
+
     val examples = getFiles("examples/csmith").filter(c => c.endsWith(".adt")).map(_.stripSuffix(".adt"))
     Logger.setLevel(LogLevel.INFO)
 
 
-
     info("Config")
     def config(name: String) = ILLoadingConfig("examples/csmith/" + name + ".adt", "examples/csmith/" + name + ".relf")
+    // use filesize to approximate size of program and sort tests by size
     def map2nd[A,B,C](a: Iterable[(C, A)], f: A => B) = a.map((x: (C, A)) => (x._1, f(x._2)))
     val loads = examples.map(c => (c, config(c))).toList
-    val ctx = map2nd(loads, x => {
-      try {
-        IRLoading.load(x)
-      } catch  {
-        case e => {
-          Logger.error(s"$e at ${x.inputFile}")
-          throw e 
-        }
-      }
+
+    val loads2 = loads.map(x => {
+      val (c,cfg) = x
+      val chars = (File(cfg.inputFile)).length
+      (c,cfg,chars)
     })
-    val cleanup = map2nd(ctx, IRTransform.doCleanup)
+    val loads3 = loads2.sortBy(_._3).take(50).map(c => (c._1, c._2))
+    Logger.info(loads2.map(c => s"${c._2.inputFile} ${c._3}").mkString("\n"))
 
-    val complexity = map2nd(cleanup, c => (c, ProgStats.get(c.program))).toMap
-    val sorted = complexity.toList.sortBy(c => c._2._2.blocks)
-    Logger.warn(sorted.map(c => s"${c._1}, ${c._2._2}").mkString("\n"))
-    val sortedcontexts : List[(String, IRContext)] = sorted.map(c => (c._1, c._2._1))
+    val sorted = loads3
 
-    def doAnalysis(ctx: IRContext) : Future[List[(String, String, Long)]] = Future {
+    Logger.warn(sorted.map(c => s"${c._1}, ${c._2}").mkString("\n"))
+
+    def doAnalysis(ex: String) : Future[(ProgStats, List[(String, String, Long)])] = Future {
       blocking {
-        StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 0).timer.checkPoints()
+        // load again and analyse
+        val c = IRLoading.load(config(ex))
+        val ctx = IRTransform.doCleanup(c)
+        val comp = ProgStats.get(c.program)
+        (comp, StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 0).timer.checkPoints())
       }
     }
-    var stop = false
-    val result : List[(String, List[(String, String, Long)])] = sortedcontexts.map(v => {
-      val (testn,ctx) = v
+    // give up after \timeout_thresh consecutive timeouts
+    val timeout_thresh = 3
+    var timeouts = 0
+    val result : List[(String, ProgStats, List[(String, String, Long)])] = sorted.map(v => {
+      val (testn,cfg) = v
       try {
-        if stop then {
-          (testn, List((s"Timeout triggered stop", "", 0 : Long)))
+        if (timeouts >= timeout_thresh) then {
+          None
         } else {
           Logger.warn(s"TESTING $testn")
-          val comp = complexity(testn)._2
+          val (comp,r) = Await.result(doAnalysis(testn), 240000.millis)
           Logger.warn(comp)
-          val r = Await.result(doAnalysis(ctx), 120000.millis)
           Logger.warn("CHECKPOINTS:")
           Logger.warn(r.map(c => s"${c._1},${c._2},${c._3}").mkString("\n"))
-          (testn, r)
+          timeouts = 0
+          Some((testn, comp, r))
         }
       } catch {
         case e : scala.concurrent.TimeoutException => {
+          timeouts += 1
           Logger.error(e)
-          stop = true
-          (testn, List((s"$e", "", 0 : Long)))
+          None
         }
         case e => {
           Logger.error(e, e.getStackTrace.take(10).mkString("\n"))
-          (testn, List((s"$e", "", 0 : Long)))
+          None
         }
       }
-    }).toList
-    // test filename ,statements, blocks, procedures, checkpoint name, checkpoint loc , time delta 
-    val times = result.flatMap(x => x._2.map((checkpoint : (String,  String, Long)) =>  {
-      val comp = complexity(x._1)._2
+    }).collect {
+      case Some(x) => x
+    }.toList
+    // test filename , statements, blocks, procedures, checkpoint name, checkpoint loc , time delta 
+    val times = result.flatMap(x => x._3.map((checkpoint : (String,  String, Long)) =>  {
+      val comp = x._2
       (x._1, comp.statements,comp.blocks,comp.procedures,
       checkpoint._1,
       checkpoint._3
@@ -153,11 +158,14 @@ class TimeStaticAnalysis extends AnyFunSuite {
   }
 
   test("Getexamples") {
+    Logger.setLevel(LogLevel.WARN)
 
     val r = examples().sortBy(x => x._5)
     val grouped = r.groupBy(x => x._5).filter(i => !i._1.contains("Timeout") && !i._1.contains("Exception"))
 
-    var plotfile = "set terminal 'svg'; set output 'analysisres.svg' ; set xlabel \"statement count\" ; set ylabel \"analysis time (ms)\""
+    val outputPathPrefix = "src/test/analysisTiming"
+    var plotfile = s"set terminal 'svg' enhanced background rgb 'white'; set output '${outputPathPrefix}/analysisres.svg' ; set xlabel \"statement count (log scale)\" ; set ylabel \"analysis time (ms) (log scale)\"\nset logscale x 2\nset logscale y 2"
+
 
     var plotcmds = List[String]()
 
@@ -167,7 +175,7 @@ class TimeStaticAnalysis extends AnyFunSuite {
         val y = vs._6 // time
         s"$x $y"
       })).mkString("\n")
-      val pname = s"dat/${n}.dat"
+      val pname = s"${outputPathPrefix}/${n}.dat"
       log(pname, table)
       val plotcmd = s"'${pname}' title \"${n}\" with lines" 
       plotcmds = plotcmd::plotcmds
@@ -175,8 +183,8 @@ class TimeStaticAnalysis extends AnyFunSuite {
     val pl = s"plot ${plotcmds.mkString(", ")}"
     val gp = plotfile + "\n" + pl
     println(gp)
-    log("dat/plot.gp", gp)
-    Seq("gnuplot", "dat/plot.gp").!!
+    log(outputPathPrefix + "/plot.gp", gp)
+    Seq("gnuplot", outputPathPrefix + "/plot.gp").!!
 
 
     val csv = r.map(c => c.toList.mkString(",")).mkString("\n")
