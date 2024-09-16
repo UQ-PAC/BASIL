@@ -134,7 +134,7 @@ class MemoryModelMap {
     tableAddress
   }
 
-  def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]], heapRegions: mutable.Map[DirectCall, HeapRegion], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
+  def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]], heapRegions: mutable.Map[DirectCall, HeapRegion], mergeRegions: mutable.Set[Set[MemoryRegion]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
     val reversedExternalFunctionRgns = (externalFunctions ++ globalAddresses).map((offset, name) => resolveInverseGlobalOffset(name, offset, globalOffsets) -> name)
     val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => reversedExternalFunctionRgns.contains(offset))
@@ -161,6 +161,11 @@ class MemoryModelMap {
     val rangeStart = 0
     for (heapRegion <- heapRegions.values) {
       add(rangeStart, heapRegion)
+    }
+
+    // merge regions
+    for (regions <- mergeRegions) {
+      uf.bulkUnion(regions)
     }
   }
   // TODO: push and pop could be optimised by caching the results
@@ -385,6 +390,20 @@ class MemoryModelMap {
           logRegion(range, region, true)
         }
       }
+    Logger.debug("Stack Root:")
+    for name <- localStacks.keys do
+      popContext()
+      pushContext(name)
+      Logger.debug(s"  Function: $name")
+      var parentCount = 0
+      // get root regions
+      for ((range, region) <- stackMap) {
+        val root = uf.find(region)
+        if root == region then
+          logRegion(range, root)
+          parentCount += 1
+      }
+      if parentCount == 0 then Logger.debug("    No root regions") else Logger.debug(s"    Parents: $parentCount/${stackMap.size}")
     Logger.debug("Heap:")
     for ((range, region) <- heapMap) {
       logRegion(range, region)
@@ -479,6 +498,16 @@ class UnionFind {
       } else {
         parent(root2) = root1
         size(root1) += size(root2)
+      }
+    }
+  }
+
+  def bulkUnion(regions: Set[MemoryRegion]): Unit = {
+    val roots = regions.map(find)
+    val root = roots.head
+    for (region <- roots) {
+      if (region != root) {
+        union(root, region)
       }
     }
   }

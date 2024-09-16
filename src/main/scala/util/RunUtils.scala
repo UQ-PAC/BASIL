@@ -680,12 +680,8 @@ object StaticAnalysis {
 
     Logger.info("[!] Running MMM")
     val mmm = MemoryModelMap()
-    mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mergedSubroutines, globalOffsets, globalAddresses, globalSizes, mraSolver.procedureToSharedRegions)
+    mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mraSolver.mergeRegions, mergedSubroutines, globalOffsets, globalAddresses, globalSizes, mraSolver.procedureToSharedRegions)
     mmm.logRegions()
-
-    Logger.info("[!] Injecting regions")
-    val regionInjector = RegionInjector(domain, IRProgram, constPropResultWithSSA, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
-    regionInjector.nodeVisitor()
 
     Logger.info("[!] Running Steensgaard")
     val steensgaardSolver = InterprocSteensgaardAnalysis(IRProgram, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
@@ -693,6 +689,10 @@ object StaticAnalysis {
     val steensgaardResults = steensgaardSolver.pointsTo()
     val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
     mmm.logRegions(memoryRegionContents)
+
+    Logger.info("[!] Injecting regions")
+    val regionInjector = RegionInjector(domain, IRProgram, constPropResultWithSSA, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
+    regionInjector.nodeVisitor()
 
     Logger.info("[!] Running VSA")
     val vsaSolver =

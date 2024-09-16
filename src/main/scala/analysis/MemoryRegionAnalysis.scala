@@ -97,6 +97,12 @@ trait MemoryRegionAnalysis(val program: Program,
   val procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]] = mutable.Map()
   var procedureToStackRegions: mutable.Map[Procedure, mutable.Set[StackRegion]] = mutable.Map()
   var procedureToHeapRegions: mutable.Map[DirectCall, HeapRegion] = mutable.Map()
+  var memLoadToRegion: mutable.Map[MemoryLoad, MemoryRegion] = mutable.Map()
+  var mergeRegions: mutable.Set[Set[MemoryRegion]] = mutable.Set()
+
+  def addMergableRegions(regions: Set[MemoryRegion]): Unit = {
+    mergeRegions.add(regions)
+  }
 
   def addReturnStack(procedure: Procedure, returnRegion: StackRegion): Unit = {
     procedureToStackRegions.getOrElseUpdate(procedure, mutable.Set.empty).add(returnRegion)
@@ -104,6 +110,10 @@ trait MemoryRegionAnalysis(val program: Program,
 
   def addReturnHeap(directCall: DirectCall, returnRegion: HeapRegion): Unit = {
     procedureToHeapRegions.put(directCall, returnRegion)
+  }
+
+  def addMemLoadRegion(memoryLoad: MemoryLoad, memoryRegion: MemoryRegion): Unit = {
+    memLoadToRegion.put(memoryLoad, memoryRegion)
   }
 
   def reducibleToRegion(binExpr: BinaryExpr, n: Command, subAccess: BigInt): Set[MemoryRegion] = {
@@ -231,6 +241,10 @@ trait MemoryRegionAnalysis(val program: Program,
           }
         case memAssign: MemoryAssign =>
           val result = eval(memAssign.index, s, cmd, memAssign.size)
+          if (result.size > 1) {
+            //throw new Exception(s"Memory load resulted in multiple regions ${result} for mem load $memoryLoad")
+            addMergableRegions(result)
+          }
           regionLattice.lub(s, result)
         case assign: Assign =>
           stackDetection(assign)
@@ -238,6 +252,10 @@ trait MemoryRegionAnalysis(val program: Program,
           unwrapExpr(assign.rhs).foreach {
             case memoryLoad: MemoryLoad =>
               val result = eval(memoryLoad.index, s, cmd, memoryLoad.size)
+              if (result.size > 1) {
+                //throw new Exception(s"Memory load resulted in multiple regions ${result} for mem load $memoryLoad")
+                addMergableRegions(result)
+              }
               m = regionLattice.lub(m, result)
             case _ => m
           }
