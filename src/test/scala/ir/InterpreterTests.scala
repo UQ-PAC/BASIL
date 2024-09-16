@@ -24,12 +24,12 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     )
 
     val bapProgram = loadBAP(loading.inputFile)
-    val (externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)
+    val (symbols, externalFunctions, globals, _, mainAddress) = loadReadELF(loading.relfFile, loading)
     val IRTranslator = BAPToIR(bapProgram, mainAddress)
     var IRProgram = IRTranslator.translate
     IRProgram = ExternalRemover(externalFunctions.map(e => e.name)).visitProgram(IRProgram)
     IRProgram = Renamer(Set("free")).visitProgram(IRProgram)
-    IRProgram.stripUnreachableFunctions()
+    transforms.stripUnreachableFunctions(IRProgram)
     val stackIdentification = StackSubstituter()
     stackIdentification.visitProgram(IRProgram)
     IRProgram.setModifies(Map())

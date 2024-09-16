@@ -15,29 +15,29 @@ import scala.collection.immutable
  *
  * Both in which constant propagation mark as TOP which is not useful.
  */
-trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) {
+trait RegionAccessesAnalysis(program: Program, constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]], reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) {
 
   val mapLattice: MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]] = MapLattice(FlatLattice[_root_.ir.Expr]())
 
-  val lattice: MapLattice[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] = MapLattice(mapLattice)
+  val lattice: MapLattice[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] = MapLattice(mapLattice)
 
-  val domain: Set[CfgNode] = cfg.nodes.toSet
+  val domain: Set[CFGPosition] = program.toSet 
 
-  val first: Set[CfgNode] = Set(cfg.startNode)
+  val first: Set[CFGPosition] = program.procedures.toSet
 
   /** Default implementation of eval.
    */
-  def eval(cmd: CfgCommandNode, constants: Map[Variable, FlatElement[BitVecLiteral]], s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = {
-    cmd.data match {
+  def eval(cmd: Statement, constants: Map[Variable, FlatElement[BitVecLiteral]], s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = {
+    cmd match {
       case assign: Assign =>
         assign.rhs match {
           case memoryLoad: MemoryLoad =>
-            s + (RegisterVariableWrapper(assign.lhs, getDefinition(assign.lhs, cmd.data, reachingDefs)) -> FlatEl(memoryLoad))
+            s + (RegisterVariableWrapper(assign.lhs, getDefinition(assign.lhs, cmd, reachingDefs)) -> FlatEl(memoryLoad))
           case binaryExpr: BinaryExpr =>
             if (evaluateExpression(binaryExpr.arg1, constants).isEmpty) { // approximates Base + Offset
               Logger.debug(s"Approximating $assign in $binaryExpr")
-              Logger.debug(s"Reaching defs: ${reachingDefs(cmd.data)}")
-              s + (RegisterVariableWrapper(assign.lhs, getDefinition(assign.lhs, cmd.data, reachingDefs)) -> FlatEl(binaryExpr))
+              Logger.debug(s"Reaching defs: ${reachingDefs(cmd)}")
+              s + (RegisterVariableWrapper(assign.lhs, getDefinition(assign.lhs, cmd, reachingDefs)) -> FlatEl(binaryExpr))
             } else {
               s
             }
@@ -50,23 +50,23 @@ trait RegionAccessesAnalysis(cfg: ProgramCfg, constantProp: Map[CFGPosition, Map
 
   /** Transfer function for state lattice elements.
    */
-  def localTransfer(n: CfgNode, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = n match {
-    case cmd: CfgCommandNode =>
-      eval(cmd, constantProp(cmd.data), s)
+  def localTransfer(n: CFGPosition, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = n match {
+    case cmd: Statement =>
+      eval(cmd, constantProp(cmd), s)
     case _ => s // ignore other kinds of nodes
   }
 
   /** Transfer function for state lattice elements.
    */
-  def transfer(n: CfgNode, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = localTransfer(n, s)
+  def transfer(n: CFGPosition, s: Map[RegisterVariableWrapper, FlatElement[Expr]]): Map[RegisterVariableWrapper, FlatElement[Expr]] = localTransfer(n, s)
 }
 
 class RegionAccessesAnalysisSolver(
-                         cfg: ProgramCfg,
+                         program: Program,
                          constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
                          reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-                       ) extends RegionAccessesAnalysis(cfg, constantProp, reachingDefs)
-  with InterproceduralForwardDependencies
-  with Analysis[Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]]]
-  with SimpleWorklistFixpointSolver[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] {
+                       ) extends RegionAccessesAnalysis(program, constantProp, reachingDefs)
+  with IRInterproceduralForwardDependencies
+  with Analysis[Map[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]]]]
+  with SimpleWorklistFixpointSolver[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]], MapLattice[RegisterVariableWrapper, FlatElement[Expr], FlatLattice[Expr]]] {
 }

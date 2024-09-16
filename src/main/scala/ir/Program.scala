@@ -5,6 +5,7 @@ import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
 import analysis.BitVectorEval
 import util.intrusive_list.*
+import translating.serialiseIL
 
 class Program(var procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
@@ -13,39 +14,8 @@ class Program(var procedures: ArrayBuffer[Procedure],
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
 
-  // This shouldn't be run before indirect calls are resolved
-  def stripUnreachableFunctions(depth: Int = Int.MaxValue): Unit = {
-    val procedureCalleeNames = procedures.map(f => f.name -> f.calls.map(_.name)).toMap
-
-    val toVisit: mutable.LinkedHashSet[(Int, String)] = mutable.LinkedHashSet((0, mainProcedure.name))
-    var reachableFound = true
-    val reachableNames = mutable.HashMap[String, Int]()
-    while (toVisit.nonEmpty) {
-      val next = toVisit.head
-      toVisit.remove(next)
-
-      if (next._1 <= depth) {
-
-        def addName(depth: Int, name: String): Unit = {
-          val oldDepth = reachableNames.getOrElse(name, Integer.MAX_VALUE)
-          reachableNames.put(next._2, if depth < oldDepth then depth else oldDepth)
-        }
-        addName(next._1, next._2)
-
-        val callees = procedureCalleeNames(next._2)
-
-        toVisit.addAll(callees.diff(reachableNames.keySet).map(c => (next._1 + 1, c)))
-        callees.foreach(c => addName(next._1 + 1, c))
-      }
-    }
-    procedures = procedures.filter(f => reachableNames.keySet.contains(f.name))
-
-    for (elem <- procedures.filter(c => c.calls.exists(s => !procedures.contains(s)))) {
-      // last layer is analysed only as specifications so we remove the body for anything that calls
-      // a function we have removed
-
-      elem.clearBlocks()
-    }
+  override def toString(): String = {
+    serialiseIL(this)
   }
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
@@ -141,7 +111,7 @@ class Program(var procedures: ArrayBuffer[Procedure],
 
       stack.pushAll(n match {
         case p: Procedure => p.blocks
-        case b: Block => Seq() ++ b.statements ++ Seq(b.jump) ++ b.fallthrough.toSet
+        case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
         case s: Command => Seq()
       })
       n
@@ -219,7 +189,7 @@ class Procedure private (
 
   def returnBlock_=(value: Block): Unit = {
     if (!returnBlock.contains(value)) {
-      removeBlocks(_returnBlock)
+      _returnBlock.foreach(removeBlocks(_))
       _returnBlock = Some(addBlocks(value))
     }
   }
@@ -228,19 +198,15 @@ class Procedure private (
 
   def entryBlock_=(value: Block): Unit = {
     if (!entryBlock.contains(value)) {
-      removeBlocks(_entryBlock)
+      _entryBlock.foreach(removeBlocks(_))
       _entryBlock = Some(addBlocks(value))
     }
   }
 
   def addBlocks(block: Block): Block = {
-    block.parent = this
     if (!_blocks.contains(block)) {
       block.parent = this
       _blocks.add(block)
-      if (entryBlock.isEmpty) {
-        entryBlock = block
-      }
     }
     block
   }
@@ -299,30 +265,6 @@ class Procedure private (
     block
   }
 
-  /**
-   * Remove blocks with the semantics of replacing them with a noop. The incoming jumps to this are replaced
-   * with a jump(s) to this blocks jump target(s). If this block ends in a call then only its statements are removed.
-   * @param blocks the block/blocks to remove
-   */
-  def removeBlocksInline(blocks: Iterable[Block]): Unit = {
-    for (elem <- blocks) {
-      elem.jump match {
-        case g: GoTo =>
-          // rewrite all the jumps to include our jump targets
-          elem.incomingJumps.foreach(_.removeTarget(elem))
-          elem.incomingJumps.foreach(_.addAllTargets(g.targets))
-          removeBlocks(elem)
-        case c: Call =>
-          // just remove statements, keep call
-          elem.statements.clear()
-      }
-    }
-  }
-
-
-  def removeBlocksInline(blocks: Block*): Unit = {
-    removeBlocksInline(blocks.toSeq)
-  }
 
   /**
    * Remove block(s) and all jumps that target it
@@ -350,7 +292,8 @@ class Procedure private (
 
   def clearBlocks(): Unit = {
     // O(n) because we are careful to unlink the parents etc.
-    removeBlocks(_blocks)
+    // .toList to avoid modifying our own iterator
+    removeBlocksDisconnect(_blocks.toList)
   }
 
   def callers(): Iterable[Procedure] = _callers.map(_.parent.parent).toSet[Procedure]
@@ -375,7 +318,6 @@ class Procedure private (
     }
     reachable.toSet
   }
-
 }
 
 class Parameter(var name: String, var size: Int, var value: Register) {
@@ -391,7 +333,6 @@ class Block private (
  val statements: IntrusiveList[Statement],
  private var _jump: Jump,
  private val _incomingJumps: mutable.HashSet[GoTo],
- var _fallthrough: Option[GoTo],
 ) extends HasParent[Procedure] {
   _jump.setParent(this)
   statements.foreach(_.setParent(this))
@@ -400,22 +341,13 @@ class Block private (
   statements.onRemove = x => x.deParent()
 
   def this(label: String, address: Option[BigInt] = None, statements: IterableOnce[Statement] = Set.empty, jump: Jump = GoTo(Set.empty)) = {
-    this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty, None)
+    this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
   }
+
+  def isReturn: Boolean = parent.returnBlock.contains(this)
+  def isEntry: Boolean = parent.entryBlock.contains(this)
 
   def jump: Jump = _jump
-
-  def fallthrough: Option[GoTo] = _fallthrough
-
-  def fallthrough_=(g: Option[GoTo]): Unit = {
-    /*
-     * Fallthrough is only set if Jump is a call, this is maintained maintained at the 
-     * linkParent implementation on FallThrough of Call.
-     */
-    _fallthrough.foreach(_.deParent())
-    g.foreach(x => x.parent = this)
-    _fallthrough = g
-  }
 
   private def jump_=(j: Jump): Unit = {
     require(!j.hasParent)
@@ -445,7 +377,9 @@ class Block private (
     assert(!incomingJumps.contains(g))
   }
 
-  def calls: Set[Procedure] = _jump.calls
+  def calls: Set[Procedure] = statements.toSet.collect {
+    case d: DirectCall => d.target
+  }
 
   def modifies: Set[Global] = statements.flatMap(_.modifies).toSet
   //def locals: Set[Variable] = statements.flatMap(_.locals).toSet ++ jumps.flatMap(_.locals).toSet
@@ -465,10 +399,7 @@ class Block private (
   def nextBlocks: Iterable[Block] = {
     jump match {
       case c: GoTo => c.targets
-      case c: Call => fallthrough match {
-        case Some(x) => x.targets
-        case _ => Seq()
-      }
+      case _ => Seq()
     }
   }
 
@@ -515,7 +446,7 @@ class Block private (
 
 object Block {
   def procedureReturn(from: Procedure): Block = {
-    Block(from.name + "_basil_return", None, List(), IndirectCall(Register("R30", 64)))
+    Block(from.name + "_basil_return", None, List(), Return())
   }
 }
 

@@ -62,10 +62,10 @@ jobs:
             ls -l "$svg"
 
             # 1920 hours = 80 days
-            url="$(curl -F"file=@$svg" -Fexpires=1920 http://0x0.st)"
-            [[ -n "$url" ]]
+            #url="$(curl -F"file=@$svg" -Fexpires=1920 http://0x0.st)"
+            #[[ -n "$url" ]]
 
-            pasted="$(echo "$pasted" | sed "s#HISTO${testname}HISTO#$url#g")"
+            #pasted="$(echo "$pasted" | sed "s#HISTO${testname}HISTO#$url#g")"
           done
           popd
 
