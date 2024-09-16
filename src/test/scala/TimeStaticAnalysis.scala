@@ -13,6 +13,7 @@ import ExecutionContext.Implicits.global
 import ir.cilvisitor.*
 import scala.sys.process.*
 
+val ANALYSE_TIMEOUT : Duration = 240000.millis
 
 class TimeStaticAnalysis extends AnyFunSuite {
 
@@ -90,7 +91,7 @@ class TimeStaticAnalysis extends AnyFunSuite {
       val chars = (File(cfg.inputFile)).length
       (c,cfg,chars)
     })
-    val loads3 = loads2.sortBy(_._3).take(50).map(c => (c._1, c._2))
+    val loads3 = loads2.sortBy(_._3).map(c => (c._1, c._2))
     Logger.info(loads2.map(c => s"${c._2.inputFile} ${c._3}").mkString("\n"))
 
     val sorted = loads3
@@ -116,7 +117,7 @@ class TimeStaticAnalysis extends AnyFunSuite {
           None
         } else {
           Logger.warn(s"TESTING $testn")
-          val (comp,r) = Await.result(doAnalysis(testn), 240000.millis)
+          val (comp,r) = Await.result(doAnalysis(testn), ANALYSE_TIMEOUT)
           Logger.warn(comp)
           Logger.warn("CHECKPOINTS:")
           Logger.warn(r.map(c => s"${c._1},${c._2},${c._3}").mkString("\n"))
@@ -193,5 +194,7 @@ class TimeStaticAnalysis extends AnyFunSuite {
     val header = "test filename,statements,blocks,procedures,interval name,interval call loc,timedelta (ms)\n"
     val text = header + csv
     val path = "analysis-times.csv"
+    log(outputPathPrefix + "/analysis-times.csv", text)
+
   }
 }
