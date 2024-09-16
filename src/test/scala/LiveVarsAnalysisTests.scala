@@ -6,7 +6,6 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig}
 
-
 class LiveVarsAnalysisTests extends BASILTest {
   Logger.setLevel(LogLevel.ERROR)
   private val correctPath = "./src/test/correct/"
@@ -37,7 +36,7 @@ class LiveVarsAnalysisTests extends BASILTest {
     val r2r0Assign = Assign(R2, R0, Some("00003"))
     val r2r1Assign = Assign(R2, R1, Some("00004"))
 
-    var program: Program = prog(
+    val program: Program = prog(
       proc("main",
         block("first_call",
           r0ConstantAssign,
@@ -65,11 +64,6 @@ class LiveVarsAnalysisTests extends BASILTest {
 
     // fix for DSA pairs of results?
     val procs = program.nameToProcedure
-    println(liveVarAnalysisResults.filter((k,n) => k match {
-      case p => true
-      case _ => false
-    }))
-    // assert(liveVarAnalysisResults(procs("main")) == Map(R30 -> TwoElementTop))
     assert(liveVarAnalysisResults(procs("callee1")) == Map(R0 -> TwoElementTop, R1 -> TwoElementTop))
     assert(liveVarAnalysisResults(procs("callee2")) == Map(R1 -> TwoElementTop))
   }
@@ -83,7 +77,7 @@ class LiveVarsAnalysisTests extends BASILTest {
     val r2r1Assign = Assign(R2, R1, Some("00004"))
     val r1Reassign = Assign(R1, BitVecLiteral(2, 64), Some("00005"))
 
-    var program: Program = prog(
+    val program: Program = prog(
       proc("main",
         block("first_call",
           r0ConstantAssign,
@@ -114,13 +108,12 @@ class LiveVarsAnalysisTests extends BASILTest {
   }
 
   def twoCallers(): Unit = {
-
     val constant1 = bv64(1)
     val r0ConstantAssign = Assign(R0, constant1, Some("00001"))
     val r1Assign = Assign(R0, R1, Some("00002"))
     val r2Assign = Assign(R0, R2, Some("00003"))
 
-    var program = prog(
+    val program = prog(
       proc("main",
         block("main_first_call",
           directCall("wrapper1"),
@@ -169,7 +162,7 @@ class LiveVarsAnalysisTests extends BASILTest {
   }
 
   def deadBeforeCall(): Unit = {
-    var program = prog(
+    val program = prog(
       proc("main",
         block("lmain",
           directCall("killer"), goto("aftercall")
@@ -197,7 +190,7 @@ class LiveVarsAnalysisTests extends BASILTest {
     val r1Assign = Assign(R0, R1, Some("00001"))
     val r2Assign = Assign(R0, R2, Some("00002"))
 
-    var program : Program = prog(
+    val program : Program = prog(
       proc(
         "main",
         block(
@@ -232,8 +225,7 @@ class LiveVarsAnalysisTests extends BASILTest {
   }
 
   def recursionInfinite(): Unit = { // can't handle this infinite recursion case
-    import dsl._
-    var program : Program = prog(
+    val program : Program = prog(
       proc("main",
         block(
           "lmain",
@@ -257,8 +249,7 @@ class LiveVarsAnalysisTests extends BASILTest {
   }
 
   def recursionBaseCase(): Unit = {
-    import dsl._
-    var program: Program = prog(
+    val program: Program = prog(
       proc("main",
         block("lmain",
           Assign(R0, R1),
