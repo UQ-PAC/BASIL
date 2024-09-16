@@ -2,6 +2,7 @@ package analysis.solvers
 
 import analysis.*
 import ir.*
+import util.PerformanceTimer
 import scala.collection.immutable.ListSet
 import scala.collection.mutable.LinkedHashSet
 
