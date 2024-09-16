@@ -1,4 +1,4 @@
-import ir.{Block, Procedure, Program, GoTo, DirectCall}
+import ir.{Block, Procedure, Program, GoTo, DirectCall, Command, Statement}
 import org.scalatest.funsuite.*
 
 import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, Logger, PerformanceTimer, RunUtils, StaticAnalysisConfig}
@@ -75,92 +75,16 @@ class IndirectCallTests extends BASILTest {
     } {
       if (b.jump.label.isDefined && labelToResolution.contains(b.jump.label.get)) {
         val resolution = labelToResolution(b.jump.label.get)
-        assert((resolution.blockTargets.nonEmpty || resolution.procTargets.nonEmpty) && (resolution.blockTargets.isEmpty || resolution.procTargets.isEmpty))
-        val result: IndirectCallResult = if (resolution.blockTargets.nonEmpty) {
-          b.jump match {
-            case GoTo(targets, _) =>
-              if (resolution.blockTargets.size == 1) {
-                // only one block target -> jump should be a GoTo with the block as a target
-                val targetAddress = resolution.blockTargets.head
-                if (targets.size == 1 && targets.head.address.contains(targetAddress)) {
-                  IndirectCallResult(resolution, true, None)
-                } else {
-                  // fail - expected call to be resolved to goto to block with specified address
-                  val goToBlockAddresses = targets.map(_.address)
-                  val failMsg = "resolved to incorrect target: " + b.jump.toString + " with target address(es): [" + goToBlockAddresses.mkString(", ") + "]"
-                  IndirectCallResult(resolution, false, Some(failMsg))
-                }
-              } else {
-                // multiple block targets -> goto to blocks that contain jumps to the target blocks
-                if (targets.size == resolution.blockTargets.size) {
-                  val targetAddresses = targets.flatMap {
-                    _.jump match {
-                      case g: GoTo if g.targets.size == 1 => g.targets.head.address
-                      case _ => None
-                    }
-                  }
-                  if (targetAddresses == resolution.blockTargets) {
-                    IndirectCallResult(resolution, true, None)
-                  } else {
-                    // fail - expected targets to match
-                    val failMsg = "resolved GoTo target blocks do not have correct targets: " + b.jump.toString + " with target block jump address(es): [" + targetAddresses.mkString(", ") + "]"
-                    IndirectCallResult(resolution, false, Some(failMsg))
-                  }
-                } else {
-                  // fail - expected goto to have x targets
-                  val failMsg = "resolved GoTo has incorrect number of targets: "  + b.jump.toString
-                  IndirectCallResult(resolution, false, Some(failMsg))
-                }
-              }
-            case _ =>
-              // fail - expected call to be resolved to goto
-              val failMsg = "call not resolved to GoTo: " + b.jump.toString
-              IndirectCallResult(resolution, false, Some(failMsg))
-          }
-        } else {
-          // targetsProc is nonEmpty
-          if (resolution.procTargets.size == 1) {
-            // only one procedure target -> check if call is resolved to direct call
-            b.jump match {
-              case d: DirectCall if d.target.name == resolution.procTargets.head =>
-                IndirectCallResult(resolution, true, None)
-              case _ =>
-                // fail - expected call to be resolved to direct call with target x
-                val failMsg = "call not resolved to correct target: " + b.jump.toString
-                IndirectCallResult(resolution, false, Some(failMsg))
-            }
-          } else {
-            // multiple procedure targets -> should be resolved to goto to blocks that call each target
-            b.jump match {
-              case GoTo(targets, _) =>
-                if (targets.size == resolution.procTargets.size) {
-                  val targetNames = targets.flatMap {
-                    _.jump match {
-                      case DirectCall(target, _, _) => Some(target.name)
-                      case _ => None
-                    }
-                  }
-                  if (targetNames == resolution.procTargets) {
-                    IndirectCallResult(resolution, true, None)
-                  } else {
-                    // fail - expected goto to lead to blocks with direct calls to targets procedures
-                    val failMsg =  "resolved GoTo target blocks do not have correct targets: " + b.jump.toString + " with target block calls: [" + targetNames.mkString(", ") + "]"
-                    IndirectCallResult(resolution, false, Some(failMsg))
-                  }
-                } else {
-                  // fail - expected call to be resolved to goto with x targets
-                  val failMsg = "resolved GoTo has incorrect number of targets: "  + b.jump.toString
-                  IndirectCallResult(resolution, false, Some(failMsg))
-                }
-
-              case _ =>
-                // fail - expected call to be resolved to goto to blocks with direct calls to target procedures
-                val failMsg = "call not resolved to GoTo: " + b.jump.toString
-                IndirectCallResult(resolution, false, Some(failMsg))
-            }
-          }
-        }
+        val result: IndirectCallResult = checkCallSite(b.jump, resolution)
         results.append(result)
+      } else {
+        b.statements.lastElem match {
+          case Some(s: Statement) if s.label.isDefined && labelToResolution.contains(s.label.get) =>
+            val resolution = labelToResolution(s.label.get)
+            val result: IndirectCallResult = checkCallSite(s, resolution)
+            results.append(result)
+          case _ =>
+        }
       }
     }
 
@@ -181,6 +105,94 @@ class IndirectCallTests extends BASILTest {
       Some(failureStrings.mkString(System.lineSeparator()))
     } else {
       None // test passed
+    }
+  }
+
+  def checkCallSite(callSite: Command, resolution: IndirectCallResolution): IndirectCallResult = {
+    assert((resolution.blockTargets.nonEmpty || resolution.procTargets.nonEmpty) && (resolution.blockTargets.isEmpty || resolution.procTargets.isEmpty))
+    if (resolution.blockTargets.nonEmpty) {
+      callSite match {
+        case GoTo(targets, _) =>
+          if (resolution.blockTargets.size == 1) {
+            // only one block target -> jump should be a GoTo with the block as a target
+            val targetAddress = resolution.blockTargets.head
+            if (targets.size == 1 && targets.head.address.contains(targetAddress)) {
+              IndirectCallResult(resolution, true, None)
+            } else {
+              // fail - expected call to be resolved to goto to block with specified address
+              val goToBlockAddresses = targets.map(_.address)
+              val failMsg = "resolved to incorrect target: " + callSite.toString + " with target address(es): [" + goToBlockAddresses.mkString(", ") + "]"
+              IndirectCallResult(resolution, false, Some(failMsg))
+            }
+          } else {
+            // multiple block targets -> goto to blocks that contain jumps to the target blocks
+            if (targets.size == resolution.blockTargets.size) {
+              val targetAddresses = targets.flatMap {
+                _.jump match {
+                  case g: GoTo if g.targets.size == 1 => g.targets.head.address
+                  case _ => None
+                }
+              }
+              if (targetAddresses == resolution.blockTargets) {
+                IndirectCallResult(resolution, true, None)
+              } else {
+                // fail - expected targets to match
+                val failMsg = "resolved GoTo target blocks do not have correct targets: " + callSite.toString + " with target block jump address(es): [" + targetAddresses.mkString(", ") + "]"
+                IndirectCallResult(resolution, false, Some(failMsg))
+              }
+            } else {
+              // fail - expected goto to have x targets
+              val failMsg = "resolved GoTo has incorrect number of targets: " + callSite.toString
+              IndirectCallResult(resolution, false, Some(failMsg))
+            }
+          }
+        case _ =>
+          // fail - expected call to be resolved to goto
+          val failMsg = "call not resolved to GoTo: " + callSite.toString
+          IndirectCallResult(resolution, false, Some(failMsg))
+      }
+    } else {
+      // targetsProc is nonEmpty
+      if (resolution.procTargets.size == 1) {
+        // only one procedure target -> check if call is resolved to direct call
+        callSite match {
+          case d: DirectCall if d.target.name == resolution.procTargets.head =>
+            IndirectCallResult(resolution, true, None)
+          case _ =>
+            // fail - expected call to be resolved to direct call with target x
+            val failMsg = "call not resolved to correct target: " + callSite.toString
+            IndirectCallResult(resolution, false, Some(failMsg))
+        }
+      } else {
+        // multiple procedure targets -> should be resolved to goto to blocks that call each target
+        callSite match {
+          case GoTo(targets, _) =>
+            if (targets.size == resolution.procTargets.size) {
+              val targetNames = targets.flatMap {
+                _.statements.lastElem match {
+                  case Some(DirectCall(target, _)) => Some(target.name)
+                  case _ => None
+                }
+              }
+              if (targetNames == resolution.procTargets) {
+                IndirectCallResult(resolution, true, None)
+              } else {
+                // fail - expected goto to lead to blocks with direct calls to targets procedures
+                val failMsg = "resolved GoTo target blocks do not have correct targets: " + callSite.toString + " with target block calls: [" + targetNames.mkString(", ") + "]"
+                IndirectCallResult(resolution, false, Some(failMsg))
+              }
+            } else {
+              // fail - expected call to be resolved to goto with x targets
+              val failMsg = "resolved GoTo has incorrect number of targets: " + callSite.toString
+              IndirectCallResult(resolution, false, Some(failMsg))
+            }
+
+          case _ =>
+            // fail - expected call to be resolved to goto to blocks with direct calls to target procedures
+            val failMsg = "call not resolved to GoTo: " + callSite.toString
+            IndirectCallResult(resolution, false, Some(failMsg))
+        }
+      }
     }
   }
   
