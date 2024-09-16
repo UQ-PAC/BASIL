@@ -4,7 +4,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig}
 
-class ParamAnalysisTests extends AnyFunSuite, BASILTest {
+class ParamAnalysisTests extends BASILTest {
   private val correctPath = "./src/test/correct/"
 
   def runExample(name: String): BASILResult = {
@@ -66,8 +66,7 @@ class ParamAnalysisTests extends AnyFunSuite, BASILTest {
     assert(analysisResults(procs("main")) == Set.empty)
     assert(analysisResults(procs("plus_one")) == Set(R0))
   }
-
-
+  
   test("initialisation") {
     val result: BASILResult = runExample("initialisation")
     val analysisResults = result.analysis.get.paramResults
