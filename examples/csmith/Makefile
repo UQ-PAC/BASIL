@@ -6,14 +6,14 @@ ADTS=$(addsuffix .adt,$(SOURCENAMES))
 OUTS=$(addsuffix .out,$(SOURCENAMES))
 CHECKSUMS=$(addsuffix .checksum,$(SOURCENAMES))
 
-CSMITH_HEADER = "/nix/store/6rawnpny818v7wki6zlr3i0f3phmysyb-csmith-2.3.0/include/csmith-2.3.0/"
+CSMITH_HEADER = "/usr/include/csmith/"
+CC=clang -target aarch64-linux-gnu
 
 %.out : %.c
-	aarch64-suse-linux-gcc $< -w -I $(CSMITH_HEADER) -o $@
-
+	$(CC) $< -w -I $(CSMITH_HEADER) -o $@
 
 %.relf : %.out
-	aarch64-suse-linux-readelf -s -r -W $< > $@
+	readelf -s -r -w $< > $@
 
 %.adt: %.out
 	bap $< -d adt:$@
@@ -22,7 +22,6 @@ CSMITH_HEADER = "/nix/store/6rawnpny818v7wki6zlr3i0f3phmysyb-csmith-2.3.0/includ
 	clang -w -I $(CSMITH_HEADER) $< -o $<.out && ./$<.out || true
 
 default : $(ADTS) $(RELFS)
-
 
 .PHONY=checksum
 checksum: $(CHECKSUMS)
