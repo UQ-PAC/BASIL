@@ -7,7 +7,6 @@ import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig}
 
 class LiveVarsAnalysisTests extends BASILTest {
-  Logger.setLevel(LogLevel.ERROR)
   private val correctPath = "./src/test/correct/"
 
   def runExample(name: String): BASILResult = {

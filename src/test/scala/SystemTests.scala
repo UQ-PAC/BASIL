@@ -1,4 +1,4 @@
-import util.{Logger, PerformanceTimer, StaticAnalysisConfig}
+import util.{LogLevel, Logger, PerformanceTimer, StaticAnalysisConfig}
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
@@ -135,11 +135,11 @@ trait SystemTests extends BASILTest {
     val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
     val expectedOutPath = if conf.useBAPFrontend then variationPath + ".expected" else variationPath + "_gtirb.expected"
 
-    Logger.info(BPLPath)
+    Logger.info(s"$name/$variation$testSuffix")
     val timer = PerformanceTimer(s"test $name/$variation$testSuffix")
     runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, conf.staticAnalysisConfig)
     val translateTime = timer.checkPoint("translate-boogie")
-    Logger.info(BPLPath + " done")
+    Logger.info(s"$name/$variation$testSuffix DONE")
 
     val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
     val verifyTime = timer.checkPoint("verify")

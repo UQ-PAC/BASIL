@@ -32,7 +32,7 @@ class IrreducibleLoop extends AnyFunSuite {
     val variationPath = path + "/" + name
     val ADTPath = variationPath + ".adt"
     val RELFPath = variationPath + ".relf"
-    Logger.info(variationPath)
+    Logger.debug(variationPath)
 
     val program: Program = load(ILLoadingConfig(ADTPath, RELFPath))
 
@@ -41,14 +41,14 @@ class IrreducibleLoop extends AnyFunSuite {
 
     writeToFile(dotBlockGraph(program, program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${variationPath}_blockgraph-before-reduce.dot")
 
-    foundLoops.foreach(l => Logger.info(s"found loops${System.lineSeparator()}$l"))
+    foundLoops.foreach(l => Logger.debug(s"found loops${System.lineSeparator()}$l"))
 
     val loops_to_transform = detector.irreducible_loops()
     assert(loops_to_transform.forall(foundLoops.contains))
 
     val transformer = LoopTransform(foundLoops)
     val newLoops = transformer.llvm_transform()
-    newLoops.foreach(l => Logger.info(s"newloops${System.lineSeparator()}$l"))
+    newLoops.foreach(l => Logger.debug(s"newloops${System.lineSeparator()}$l"))
 
     val newDetect = LoopDetector(program)
 
@@ -58,7 +58,7 @@ class IrreducibleLoop extends AnyFunSuite {
     assert(foundLoops2.count(_.reducible) > foundLoops.count(_.reducible))
     assert(newDetect.irreducible_loops().isEmpty)
 
-    foundLoops2.foreach(l => Logger.info(s"updated found loops${System.lineSeparator()}$l"))
+    foundLoops2.foreach(l => Logger.debug(s"updated found loops${System.lineSeparator()}$l"))
   }
 
   test("irreducible 1") {
@@ -79,7 +79,7 @@ class IrreducibleLoop extends AnyFunSuite {
 
     val boogieResult = Seq("boogie", "/useArrayAxioms", outPath).!!
 
-    Logger.info("Boogie result: " + boogieResult)
+    Logger.debug("Boogie result: " + boogieResult)
 
     assert(boogieResult.contains("Irreducible flow graphs are unsupported."))
   }
@@ -93,7 +93,7 @@ class IrreducibleLoop extends AnyFunSuite {
 
     val boogieResult = Seq("boogie", "/smoke", "/useArrayAxioms", outPath).!!
 
-    Logger.info("Boogie result: " + boogieResult)
+    Logger.debug("Boogie result: " + boogieResult)
 
     assert(boogieResult.contains("Boogie program verifier finished with 2 verified, 0 errors"))
     assert(!boogieResult.contains("found unreachable code"))

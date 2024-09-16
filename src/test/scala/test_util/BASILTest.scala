@@ -40,7 +40,7 @@ trait BASILTest extends AnyFunSuite {
   def runBoogie(directoryPath: String, bplPath: String, boogieFlags: Seq[String]): String = {
     val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(bplPath))
     val boogieCmd = Seq("boogie", "/printVerifiedProceduresCount:0") ++ boogieFlags ++ Seq(bplPath) ++ extraSpec
-    Logger.info(s"Verifying... ${boogieCmd.mkString(" ")}")
+    Logger.debug(s"Verifying... ${boogieCmd.mkString(" ")}")
     val boogieResult = boogieCmd.!!
     boogieResult
   }

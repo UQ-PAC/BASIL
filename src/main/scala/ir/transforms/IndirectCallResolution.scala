@@ -104,7 +104,7 @@ def resolveIndirectCallsUsingPointsTo(
         targetNames.map(name => IRProgram.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
 
       if (targets.size > 1) {
-        Logger.info(s"Resolved indirect call $indirectCall")
+        Logger.debug(s"Resolved indirect call $indirectCall")
       }
 
       if (targets.size == 1) {
