@@ -136,6 +136,9 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
       Logger.debug("getUse: " + getUse(variable, n, reachingDefs))
       constantPropResult(RegisterWrapperEqualSets(variable, getUse(variable, n, reachingDefs)))
     case b: BitVecLiteral => Set(b)
+    case Repeat(repeats, body) => evaluateExpressionWithSSA(body, constantPropResult, n, reachingDefs)
+    case MemoryLoad(mem, index, endian, size) => Set.empty
+    case UninterpretedFunction(name, params, returnType) => Set.empty
     case _ => throw RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
   }
 }
