@@ -9,7 +9,7 @@ import test_util.TestConfig
 import java.io.{BufferedWriter, File, FileWriter}
 
 
-class IndirectCallTests extends BASILTest {
+class IndirectCallTests extends AnyFunSuite, BASILTest {
   /**
     *
     * @param label - the label of the IndirectCall to be resolved

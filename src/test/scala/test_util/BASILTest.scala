@@ -16,7 +16,7 @@ case class TestConfig(boogieFlags: Seq[String] = Seq("/timeLimit:10", "/useArray
                       logResults: Boolean = false
                      )
 
-trait BASILTest extends AnyFunSuite {
+trait BASILTest {
   def runBASIL(inputPath: String, RELFPath: String, specPath: Option[String], BPLPath: String, staticAnalysisConf: Option[StaticAnalysisConfig]): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
       specPath
@@ -69,20 +69,6 @@ trait BASILTest extends AnyFunSuite {
       }
     }
     (failureMsg, verified, timedOut)
-  }
-
-  def checkExpected(expectedOutPath: String, BPLPath: String): (Boolean, Boolean) = {
-    val hasExpected = File(expectedOutPath).exists
-    var matchesExpected = true
-    if (hasExpected) {
-      if (!BASILTest.compareFiles(expectedOutPath, BPLPath)) {
-        matchesExpected = false
-        info("Warning: Boogie file differs from expected")
-      }
-    } else {
-      info("Note: this test has not previously succeeded")
-    }
-    (hasExpected, matchesExpected)
   }
 }
 

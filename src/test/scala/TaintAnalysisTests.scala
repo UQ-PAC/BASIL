@@ -5,7 +5,7 @@ import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
 
-class TaintAnalysisTests extends BASILTest {
+class TaintAnalysisTests extends AnyFunSuite, BASILTest {
   def getTaintAnalysisResults(program: Program, taint: Map[CFGPosition, Set[Taintable]]): Map[CFGPosition, Set[Taintable]] = {
     val constPropResults = ConstantPropagationSolver(program).analyze()
     TaintAnalysis(program, Map(), constPropResults, taint).analyze().map { (c, m) => (c, m.map { (v, _) => v }.toSet)}
@@ -21,7 +21,7 @@ class TaintAnalysisTests extends BASILTest {
   private val baseRegisterMap = registers.map { r => (r, Set(r)) }.toMap
 
   test("constantLiteral") {
-    var program = prog(
+    val program = prog(
         proc("main",
           block("main",
             directCall("f"),
@@ -55,7 +55,7 @@ class TaintAnalysisTests extends BASILTest {
   }
 
   test("arguments") {
-    var program = prog(
+    val program = prog(
         proc("main",
           block("main",
             directCall("f"),
@@ -89,7 +89,7 @@ class TaintAnalysisTests extends BASILTest {
   }
 
   test("branching") {
-    var program = prog(
+    val program = prog(
         proc("main",
           block("main",
             directCall("f"),
@@ -130,7 +130,7 @@ class TaintAnalysisTests extends BASILTest {
   }
 
   test("interproc") {
-    var program = prog(
+    val program = prog(
         proc("main",
           block("main",
             directCall("f"),
@@ -182,7 +182,7 @@ class TaintAnalysisTests extends BASILTest {
   }
 
   test("loop") {
-    var program = prog(
+    val program = prog(
         proc("main",
           block("main",
             directCall("f"),

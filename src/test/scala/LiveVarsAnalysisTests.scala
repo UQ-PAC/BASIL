@@ -6,7 +6,7 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig}
 
-class LiveVarsAnalysisTests extends BASILTest {
+class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
   private val correctPath = "./src/test/correct/"
 
   def runExample(name: String): BASILResult = {

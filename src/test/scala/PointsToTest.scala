@@ -131,7 +131,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
    * Test that the analysis correctly collects shared regions and exposes only the shared ones
    */
   test("collects single function shared regions: MMM Stage") {
-    var program: Program = prog(
+    val program: Program = prog(
       proc("main",
         block("0x0",
           Assign(R0, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64)),
@@ -180,7 +180,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
    * Test that the analysis correctly collects shared regions from multiple functions
    */
   test("collects multiple functions shared regions: MMM Stage") {
-    var program: Program = prog(
+    val program: Program = prog(
       proc("main",
         block("0x0",
           Assign(R0, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64)),

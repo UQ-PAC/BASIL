@@ -1,3 +1,4 @@
+import org.scalatest.funsuite.AnyFunSuite
 import util.{LogLevel, Logger, PerformanceTimer, StaticAnalysisConfig}
 
 import Numeric.Implicits.*
@@ -15,7 +16,7 @@ import test_util.TestConfig
   * directory structure and file-name patterns.
   */
 
-trait SystemTests extends BASILTest {
+trait SystemTests extends AnyFunSuite, BASILTest {
   case class TestResult(passed: Boolean, verified: Boolean, shouldVerify: Boolean, hasExpected: Boolean, timedOut: Boolean, matchesExpected: Boolean, translateTime: Long, verifyTime: Long) {
     val toCsv = s"$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
   }
@@ -159,6 +160,20 @@ trait SystemTests extends BASILTest {
     if (!passed) fail(boogieFailureMsg.get)
   }
 
+  def checkExpected(expectedOutPath: String, BPLPath: String): (Boolean, Boolean) = {
+    val hasExpected = File(expectedOutPath).exists
+    var matchesExpected = true
+    if (hasExpected) {
+      if (!BASILTest.compareFiles(expectedOutPath, BPLPath)) {
+        matchesExpected = false
+        info("Warning: Boogie file differs from expected")
+      }
+    } else {
+      info("Note: this test has not previously succeeded")
+    }
+    (hasExpected, matchesExpected)
+  }
+
 }
 
 class SystemTestsBAP extends SystemTests {
@@ -194,6 +209,12 @@ class ProcedureSummaryTests extends SystemTests {
     useBAPFrontend = true, expectVerify = true))
   runTests("procedure_summaries", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(summariseProcedures = true)),
     useBAPFrontend = false, expectVerify = true))
+}
+
+// tests that require currently unimplemented functionality to pass
+class UnimplementedTests extends SystemTests {
+  runTests("unimplemented", TestConfig(useBAPFrontend = false, expectVerify = true))
+  runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))
 }
 
 def mean(xs: Iterable[Double]): Double = xs.sum / xs.size
