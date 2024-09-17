@@ -1,0 +1,1 @@
+ENABLED_COMPILERS = clang_O2

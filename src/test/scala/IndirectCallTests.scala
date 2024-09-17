@@ -399,6 +399,12 @@ class IndirectCallTests extends AnyFunSuite, BASILTest {
     runTest("jumptable3", "clang_O2", GTIRBConfig, resolvedCalls)
   }
 
+  test("syscall/clang_O2:BAP") {
+    // note that this is the external fork, not the bridging procedure
+    val resolvedCalls = Seq(IndirectCallResolution("%0000041a", "main", Set("fork"), Set()))
+    runTest("syscall", "clang_O2", BAPConfig, resolvedCalls)
+  }
+
   test("switch2/clang:GTIRB") {
     val resolvedCalls = Seq(IndirectCallResolution("1892$2", "main", Set(), Set(
       BigInt(1908),
