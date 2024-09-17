@@ -5,11 +5,10 @@ import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.immutable.ListMap
 import scala.collection.mutable
-import scala.io.Source
-import scala.util.{Try, Using}
 import scala.sys.process.*
 import test_util.BASILTest
 import test_util.BASILTest.*
+import test_util.Histogram
 import test_util.TestConfig
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
@@ -93,12 +92,8 @@ trait SystemTests extends AnyFunSuite, BASILTest {
     writeToFile(summaryHeader + summaryRow, testPath + "summary-" + filename + ".csv")
 
     // generates a verification time histogram
-    val minB = Seq(0, meanVerifyTime - 2.25 * stdDevVerifyTime, verifTimes.min).max
-    val maxB = Seq(meanVerifyTime + 2.25 * stdDevVerifyTime, verifTimes.max).min
-    val nbins = 50
-
-    val histo = histogram(nbins, Some(minB, maxB))(verifTimes.toSeq)
-    val svgHistogram = histoToSvg(filename, 400,300, histo, minB, maxB)
+    val histo = Histogram(50, verifTimes.toSeq)
+    val svgHistogram = histo.toSvg(filename, 400, 300)
     writeToFile(svgHistogram, testPath + "verifyTime-" + filename + ".svg")
 
     // generates a markdown table in separate parts.
@@ -219,83 +214,4 @@ class ProcedureSummaryTests extends SystemTests {
 class UnimplementedTests extends SystemTests {
   runTests("unimplemented", TestConfig(useBAPFrontend = false, expectVerify = true))
   runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))
-}
-
-def mean(xs: Iterable[Double]): Double = xs.sum / xs.size
-
-def variance(xs: Iterable[Double]): Double = {
-  val avg = mean(xs)
-
-  xs.map(a => math.pow(a - avg, 2)).sum / xs.size
-}
-
-def median(xs: Iterable[Double]): Double = xs.toArray.sorted.apply(xs.size / 2)
-
-def stdDev(xs: Iterable[Double]): Double = math.sqrt(variance(xs))
-
-def histogram(numBins: Int, bounds: Option[(Double, Double)] = None)(xs: Seq[Double]): List[Int] = {
-  val (mn, mx) = bounds.getOrElse(xs.min, xs.max)
-  val binSize = ((mx - mn) / numBins) * 1.000001
-  val counts = (0 to numBins).map(x => (mn + x * binSize, mn + (x + 1) * binSize))
-    .map((left, right) => xs.count(x => x >= left && x < right))
-    .toList
-  counts
-}
-
-def histoToSvg(title: String, imgWidth: Int, imgHeight: Int, bins: List[Int], minBin: Double, maxBin: Double) : String = {
-  def template(width: Int = 300, height: Int = 130, content: String) =
-    s""" <svg width="$width" height="$height" xmlns="http://www.w3.org/2000/svg">
-    $content
-  </svg> """
-  def mkRect(width: Int, height: Int, x: Int, y: Int, crx: Int=0, cry: Int=0, fill: String="Black") = {
-    s"""<rect width="$width" height="$height" x="$x" y="$y" rx="$crx" ry="$cry" fill="$fill" />"""
-  }
-  def text(content: String, x: Int, y: Int, cssClass: String = "small") = {
-    s"""<text x="$x" y="$y" class="$cssClass">$content</text>"""
-  }
-  
-  val leftMargin = 20
-  val histWidth = imgWidth - leftMargin
-  val bottomMargin = 20
-  val topMargin = 20
-  val histHeight = imgHeight - topMargin - bottomMargin
-  val maxHeight = bins.max
-  val binWidth: Double = histWidth.doubleValue / bins.size
-  val heightScaling: Double = histHeight.doubleValue / maxHeight
-  val binPos = (0 to bins.size).map(i => (leftMargin + i * binWidth, binWidth * (i + 1)))
-    .zip(bins.map(bh => heightScaling * bh))
-
-  val rects = binPos.map((binXX, height) =>
-    mkRect(binWidth.ceil.intValue, height.intValue, binXX(0).floor.intValue, histHeight.intValue - height.intValue + topMargin))
-
-  val labels = {
-    (text(title, imgWidth / 8, topMargin - 5),
-      text("0", 0, histHeight + topMargin),
-      text(maxHeight.toString, 0, topMargin),
-      text(minBin.toInt.toString, 0, imgHeight),
-      text(maxBin.toInt.toString, (binWidth*bins.size).intValue - leftMargin, imgHeight))
-  }
-
-  val bg = mkRect(imgWidth, imgHeight, 0, 0, fill="White")
-
-  val content = (Seq(bg) ++ rects ++ labels.toList).mkString("\n")
-  template(imgWidth, imgHeight, content)
-}
-
-
-def loadHisto(): Unit = {
-  Using(Source.fromFile("src/test/full-testresult-GTIRB.csv")) { source =>
-    val sourceList = source.getLines().toList
-    val headers = sourceList.head.split(",")
-
-    val res = headers.map(h => h -> mutable.ArrayBuffer[String]()).toMap[String, mutable.ArrayBuffer[String]]
-
-    sourceList.tail.foreach { line =>
-      val cols = line.split(",")
-      headers.zip(cols).foreach((h, v) => res(h).append(v))
-    }
-    val timeValues = res("verifyTime").map(_.toDouble)
-    val histo = histogram(50, Some(800.0, 1000.0))(timeValues.toSeq)
-    println(histoToSvg("test histogram", 500, 300, histo, 800.0, 1000.0))
-  }
 }

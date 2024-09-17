@@ -118,5 +118,17 @@ object BASILTest {
   }
 
   def xor(x: Boolean, y: Boolean): Boolean = (x || y) && !(x && y)
+
+  def mean(xs: Iterable[Double]): Double = xs.sum / xs.size
+
+  def variance(xs: Iterable[Double]): Double = {
+    val avg = mean(xs)
+
+    xs.map(a => math.pow(a - avg, 2)).sum / xs.size
+  }
+
+  def median(xs: Iterable[Double]): Double = xs.toArray.sorted.apply(xs.size / 2)
+
+  def stdDev(xs: Iterable[Double]): Double = math.sqrt(variance(xs))
 }
 
