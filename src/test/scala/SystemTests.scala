@@ -39,8 +39,12 @@ trait SystemTests extends AnyFunSuite, BASILTest {
       val programPath = path + "/" + p
       val variations = getSubdirectories(programPath)
       variations.foreach { t =>
-        test(folder + "/" + p + "/" + t + testSuffix) {
-          runTest(path, p, t, conf)
+        val variationPath = programPath + "/" + t + "/" + p
+        val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
+        if (File(inputPath).exists) {
+          test(folder + "/" + p + "/" + t + testSuffix) {
+            runTest(path, p, t, conf)
+          }
         }
       }
     }
