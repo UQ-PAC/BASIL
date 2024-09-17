@@ -1,1 +1,1 @@
-ENABLED_COMPILERS = clang gcc
+ENABLED_COMPILERS = clang
