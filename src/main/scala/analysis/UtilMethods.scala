@@ -143,12 +143,12 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
   }
 }
 
-def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFilter: Boolean = false): Set[Assign] = {
+def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFilter: Boolean = true): Set[Assign] = {
   val (in, _) = reachingDefs(node)
   if noFilter then in.getOrElse(variable, Set()) else in.getOrElse(variable, Set()).filterNot(_.rhs.variables.forall(_.name.contains("Unique")))
 }
 
-def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFiler: Boolean = false): Set[Assign] = {
+def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFiler: Boolean = true): Set[Assign] = {
   val (_, out) = reachingDefs(node)
   if noFiler then out.getOrElse(variable, Set()) else out.getOrElse(variable, Set()).filterNot(_.rhs.variables.forall(_.name.contains("Unique")))
 }

@@ -12,7 +12,7 @@ import scala.collection.mutable.ArrayBuffer
  */
 class RegionInjector(domain: mutable.Set[CFGPosition],
                      program: Program,
-                     constantProp: Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]],
+                     constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
                      mmm: MemoryModelMap,
                      reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
                      globalOffsets: Map[BigInt, BigInt]) {
@@ -68,8 +68,9 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
     var reducedRegions = Set.empty[MemoryRegion]
     binExpr.arg1 match {
       case variable: Variable =>
-        evaluateExpressionWithSSA(binExpr, constantProp(n), n, reachingDefs).foreach { b =>
-          val region = mmm.findDataObject(b.value)
+        val b = evaluateExpression(binExpr, constantProp(n))
+          if (b.isDefined) {
+          val region = mmm.findDataObject(b.get.value)
           reducedRegions = reducedRegions ++ region
         }
         if (reducedRegions.nonEmpty) {
@@ -107,24 +108,26 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
                 println(ctx)
                 exprToRegion(i.rhs, i)
             }
-            val results = evaluateExpressionWithSSA(binExpr.arg2, constantProp(n), n, reachingDefs)
-            for {
-              b <- results
-              r <- regions
-            } {
-              r match {
-                case stackRegion: StackRegion =>
-                  println(s"StackRegion: ${stackRegion.start}")
-                  println(s"BitVecLiteral: ${b}")
-                  //if (b.size == stackRegion.start.size) { TODO: Double check why this is needed
+            val result = evaluateExpression(binExpr.arg2, constantProp(n))
+            if (result.isDefined) {
+              val b = result.get
+              for {
+                r <- regions
+              } {
+                r match {
+                  case stackRegion: StackRegion =>
+                    println(s"StackRegion: ${stackRegion.start}")
+                    println(s"BitVecLiteral: ${b}")
+                    //if (b.size == stackRegion.start.size) { TODO: Double check why this is needed
                     val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
                     reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, BitVecLiteral(nextOffset, 64)), n)
                   //}
-                case dataRegion: DataRegion =>
-                  //val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start, globalOffsets), b)
-                  val nextOffset = bitVectorOpToBigIntOp(binExpr.op, dataRegion.start, b.value)
-                  reducedRegions ++= exprToRegion(BitVecLiteral(nextOffset, 64), n)
-                case _ =>
+                  case dataRegion: DataRegion =>
+                    //val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start, globalOffsets), b)
+                    val nextOffset = bitVectorOpToBigIntOp(binExpr.op, dataRegion.start, b.value)
+                    reducedRegions ++= exprToRegion(BitVecLiteral(nextOffset, 64), n)
+                  case _ =>
+                }
               }
             }
           }
@@ -147,21 +150,22 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
     mmm.pushContext(IRWalk.procedure(n).name)
     expr match { // TODO: Stack detection here should be done in a better way or just merged with data
       case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
-        evaluateExpressionWithSSA(binOp.arg2, constantProp(n), n, reachingDefs).foreach { b =>
+        val b = evaluateExpression(binOp.arg2, constantProp(n))
+        if (b.isDefined) {
           if binOp.arg2.variables.exists { v => v.sharedVariable } then {
             Logger.debug("Shared stack object: " + b)
             Logger.debug("Shared in: " + expr)
-            val regions = mmm.findSharedStackObject(b.value)
+            val regions = mmm.findSharedStackObject(b.get.value)
             Logger.debug("found: " + regions)
             res ++= regions
           } else {
-            if (isNegative(b)) {
+            if (isNegative(b.get)) {
               val region = mmm.findStackObject(0)
               if (region.isDefined) {
                 res = res + region.get
               }
             }
-            val region = mmm.findStackObject(b.value)
+            val region = mmm.findStackObject(b.get.value)
             if (region.isDefined) {
               res = res + region.get
             }
@@ -172,9 +176,10 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
       case v: Variable if v == stackPointer =>
         res ++= mmm.findStackObject(0)
       case v: Variable =>
-        evaluateExpressionWithSSA(expr, constantProp(n), n, reachingDefs).foreach { b =>
+        val b = evaluateExpression(expr, constantProp(n))
+        if (b.isDefined) {
           Logger.debug("BitVecLiteral: " + b)
-          val region = mmm.findDataObject(b.value)
+          val region = mmm.findDataObject(b.get.value)
           if (region.isDefined) {
             res += region.get
           }
@@ -206,9 +211,10 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
       case load: MemoryLoad => // treat as a region
         res ++= exprToRegion(load.index, n)
       case _ =>
-        evaluateExpressionWithSSA(expr, constantProp(n), n, reachingDefs).foreach { b =>
+        val b = evaluateExpression(expr, constantProp(n))
+        if (b.isDefined) {
           Logger.debug("BitVecLiteral: " + b)
-          val region = mmm.findDataObject(b.value)
+          val region = mmm.findDataObject(b.get.value)
           if (region.isDefined) {
             res += region.get
           }

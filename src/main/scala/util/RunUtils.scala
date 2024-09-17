@@ -652,10 +652,6 @@ object StaticAnalysis {
     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(regionAccessesAnalysisResults, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
     config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(cfg, regionAccessesAnalysisResults, iteration), s"${s}_RegTo$iteration.txt"))
 
-    Logger.info("[!] Running Constant Propagation with SSA")
-    val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(IRProgram, reachingDefinitionsAnalysisResults)
-    val constPropResultWithSSA = constPropSolverWithSSA.analyze()
-
     Logger.info("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults)
     val mraResult = mraSolver.analyze()
@@ -684,14 +680,14 @@ object StaticAnalysis {
     mmm.logRegions()
 
     Logger.info("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(IRProgram, constPropResultWithSSA, regionAccessesAnalysisResults, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
+    val steensgaardSolver = InterprocSteensgaardAnalysis(IRProgram, constPropResult, regionAccessesAnalysisResults, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
     steensgaardSolver.analyze()
     val steensgaardResults = steensgaardSolver.pointsTo()
     val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
     mmm.logRegions(memoryRegionContents)
 
     Logger.info("[!] Injecting regions")
-    val regionInjector = RegionInjector(domain, IRProgram, constPropResultWithSSA, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
+    val regionInjector = RegionInjector(domain, IRProgram, constPropResult, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
     regionInjector.nodeVisitor()
 
     Logger.info("[!] Running VSA")
