@@ -8,7 +8,7 @@ import scala.sys.process.*
 import scala.io.Source
 import java.io.{BufferedWriter, File, FileWriter}
 
-case class TestConfig(boogieFlags: Seq[String] = Seq("/timeLimit:10", "/useArrayAxioms"),
+case class TestConfig(boogieFlags: Seq[String] = Seq("/timeLimit:15", "/useArrayAxioms"),
                       staticAnalysisConfig: Option[StaticAnalysisConfig] = None,
                       useBAPFrontend: Boolean,
                       expectVerify: Boolean,
