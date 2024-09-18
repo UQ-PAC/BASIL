@@ -4,7 +4,7 @@ import util.{LogLevel, Logger, PerformanceTimer, StaticAnalysisConfig}
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
 import scala.collection.immutable.ListMap
-import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import scala.sys.process.*
 import test_util.BASILTest
 import test_util.BASILTest.*
@@ -16,15 +16,15 @@ import test_util.TestConfig
   */
 
 trait SystemTests extends AnyFunSuite, BASILTest {
-  case class TestResult(passed: Boolean, verified: Boolean, shouldVerify: Boolean, hasExpected: Boolean, timedOut: Boolean, matchesExpected: Boolean, translateTime: Long, verifyTime: Long) {
-    val toCsv = s"$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
+  case class TestResult(name: String, passed: Boolean, verified: Boolean, shouldVerify: Boolean, hasExpected: Boolean, timedOut: Boolean, matchesExpected: Boolean, translateTime: Long, verifyTime: Long) {
+    val toCsv = s"$name,$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
   }
 
   object TestResult {
-    val csvHeader = "passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"
+    val csvHeader = "testCase,passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"
   }
 
-  val testResults: mutable.ArrayBuffer[(String, TestResult)] = mutable.ArrayBuffer()
+  val testResults: ArrayBuffer[TestResult] = ArrayBuffer()
 
   private val testPath = "./src/test/"
 
@@ -53,18 +53,18 @@ trait SystemTests extends AnyFunSuite, BASILTest {
    * Writes test result data into .csv and .md files named according to given filename.
    */
   def summary(filename: String): Unit = {
-    val csv: String = "testCase," + TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r(0)},${r(1).toCsv}").mkString(System.lineSeparator())
+    val csv: String = TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r.toCsv}").mkString(System.lineSeparator())
     writeToFile(csv, testPath + "full-" + filename + ".csv")
 
-    val verifTimes = testResults.map(_(1).verifyTime.toDouble)
+    val verifTimes = testResults.map(_.verifyTime.toDouble)
 
-    val numVerified = testResults.count(_(1).verified)
-    val numCounterexample = testResults.count(x => !x(1).verified && !x(1).timedOut)
-    val numSuccess = testResults.count(_(1).passed)
-    val numFail = testResults.count(!_(1).passed)
-    val numTimeout = testResults.count(_(1).timedOut)
-    val verifying = testResults.filter(x => !x(1).timedOut && x(1).verified).map(_(1).verifyTime)
-    val counterExamples = testResults.filter(x => !x(1).timedOut && !x(1).verified).map(_(1).verifyTime)
+    val numVerified = testResults.count(_.verified)
+    val numCounterexample = testResults.count(x => !x.verified && !x.timedOut)
+    val numSuccess = testResults.count(_.passed)
+    val numFail = testResults.count(!_.passed)
+    val numTimeout = testResults.count(_.timedOut)
+    val verifying = testResults.filter(x => !x.timedOut && x.verified).map(_.verifyTime)
+    val counterExamples = testResults.filter(x => !x.timedOut && !x.verified).map(_.verifyTime)
     val medianVerifyTime = median(verifTimes)
     val meanVerifyTime = mean(verifTimes)
     val stdDevVerifyTime = stdDev(verifTimes)
@@ -153,8 +153,8 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 
     val passed = boogieFailureMsg.isEmpty
     if (conf.logResults) {
-      val result = TestResult(passed, verified, conf.expectVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
-      testResults.append((s"$name/$variation$testSuffix", result))
+      val result = TestResult(s"$name/$variation$testSuffix", passed, verified, conf.expectVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
+      testResults.append(result)
     }
     if (!passed) fail(boogieFailureMsg.get)
   }
