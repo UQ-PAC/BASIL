@@ -15,7 +15,7 @@ trait MemoryRegionAnalysis(val program: Program,
                            val constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
                            val ANRResult: Map[CFGPosition, Set[Variable]],
                            val RNAResult: Map[CFGPosition, Set[Variable]],
-                           val regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
+                           val regionAccesses: Map[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]]],
                            reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) {
 
   var mallocCount: Int = 0
@@ -276,7 +276,7 @@ class MemoryRegionAnalysisSolver(
     constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
     ANRResult: Map[CFGPosition, Set[Variable]],
     RNAResult: Map[CFGPosition, Set[Variable]],
-    regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
+    regionAccesses: Map[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]]],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
   ) extends MemoryRegionAnalysis(program, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, regionAccesses, reachingDefs)
   with IRIntraproceduralForwardDependencies

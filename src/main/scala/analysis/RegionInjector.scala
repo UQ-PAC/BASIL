@@ -104,8 +104,8 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
               case _: BitVecLiteral =>
                 Set.empty[MemoryRegion]
               case _ =>
-                println(s"Unknown expression: ${i}")
-                println(ctx)
+                //println(s"Unknown expression: ${i}")
+                //println(ctx)
                 exprToRegion(i.rhs, i)
             }
             val result = evaluateExpression(binExpr.arg2, constantProp(n))
@@ -116,8 +116,8 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
               } {
                 r match {
                   case stackRegion: StackRegion =>
-                    println(s"StackRegion: ${stackRegion.start}")
-                    println(s"BitVecLiteral: ${b}")
+                    //println(s"StackRegion: ${stackRegion.start}")
+                    //println(s"BitVecLiteral: ${b}")
                     //if (b.size == stackRegion.start.size) { TODO: Double check why this is needed
                     val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
                     reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, BitVecLiteral(nextOffset, 64)), n)
@@ -252,8 +252,8 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
   def renameMemory(mem: Memory, expr: Expr, cmd : Command): Memory = {
     val regions = exprToRegion(eval(expr, cmd), cmd)
     if (regions.size == 1) {
-      Logger.warn(s"Mem CMD is: ${cmd}")
-      Logger.warn(s"Region found for mem: ${regions.head}")
+      Logger.debug(s"Mem CMD is: ${cmd}")
+      Logger.debug(s"Region found for mem: ${regions.head}")
       regions.head match {
         case stackRegion: StackRegion =>
           return StackMemory(stackRegion.regionIdentifier, mem.addressSize, mem.valueSize)
@@ -271,8 +271,8 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
 //        case _ =>
 //      }
     } else {
-      Logger.warn(s"Mem CMD is: ${cmd}")
-      Logger.warn(s"No region found for expr ${expr} regions size is ${regions.size}")
+      Logger.debug(s"Mem CMD is: ${cmd}")
+      Logger.debug(s"No region found for expr ${expr} regions size is ${regions.size}")
     }
     mem
   }
@@ -280,25 +280,16 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
   /** Transfer function for state lattice elements.
    */
   def localTransfer(n: CFGPosition): Unit = n match {
-    case cmd: Command =>
-      cmd match
-        case statement: Statement => statement match
-          case assign: Assign =>
-            assign.rhs = eval(assign.rhs, cmd)
-          case mAssign: MemoryAssign =>
-            mAssign.mem = renameMemory(mAssign.mem, mAssign.index, cmd)
-            mAssign.index = eval(mAssign.index, cmd)
-            mAssign.value = eval(mAssign.value, cmd)
-          case nop: NOP => // ignore NOP
-          case assert: Assert =>
-            assert.body = eval(assert.body, cmd)
-          case assume: Assume =>
-            assume.body = eval(assume.body, cmd)
-        case jump: Jump => jump match
-          case to: GoTo => // ignore GoTo
-          case call: Call => call match
-            case call: DirectCall => // ignore DirectCall
-            case call: IndirectCall => // ignore IndirectCall
+    case assign: Assign =>
+      assign.rhs = eval(assign.rhs, assign)
+    case mAssign: MemoryAssign =>
+      mAssign.mem = renameMemory(mAssign.mem, mAssign.index, mAssign)
+      mAssign.index = eval(mAssign.index, mAssign)
+      mAssign.value = eval(mAssign.value, mAssign)
+    case assert: Assert =>
+      assert.body = eval(assert.body, assert)
+    case assume: Assume =>
+      assume.body = eval(assume.body, assume)
     case _ => // ignore other kinds of nodes
   }
 
@@ -308,10 +299,10 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
       val regions = mmm.findDataObject(mem.address)
       if (regions.size == 1) {
         newArrayBuffer += MemorySection(regions.head.regionIdentifier, mem.address, mem.size, mem.bytes)
-        Logger.warn(s"Region ${regions.get.regionIdentifier} found for memory section ${mem.address}")
+        Logger.debug(s"Region ${regions.get.regionIdentifier} found for memory section ${mem.address}")
       } else {
         newArrayBuffer += mem
-        Logger.warn(s"No region found for memory section ${mem.address}")
+        Logger.debug(s"No region found for memory section ${mem.address}")
       }
     }
     newArrayBuffer

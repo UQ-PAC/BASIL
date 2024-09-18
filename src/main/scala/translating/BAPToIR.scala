@@ -10,7 +10,7 @@ import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 import util.intrusive_list.*
 
-class BAPToIR(var program: BAPProgram, mainAddress: Int) {
+class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
   private val nameToProcedure: mutable.Map[String, Procedure] = mutable.Map()
   private val labelToBlock: mutable.Map[String, Block] = mutable.Map()
@@ -19,7 +19,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     var mainProcedure: Option[Procedure] = None
     val procedures: ArrayBuffer[Procedure] = ArrayBuffer()
     for (s <- program.subroutines) {
-      val procedure = Procedure(s.name, Some(s.address))
+      val procedure = Procedure(s.name, s.address)
       for (b <- s.blocks) {
         val block = Block(b.label, b.address)
         procedure.addBlocks(block)
@@ -34,7 +34,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
       for (p <- s.out) {
         procedure.out.append(p.toIR)
       }
-      if (s.address == mainAddress) {
+      if (s.address.get == mainAddress) {
         mainProcedure = Some(procedure)
       }
       procedures.append(procedure)
@@ -48,8 +48,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
         for (st <- b.statements) {
           block.statements.append(translate(st))
         }
-        val (jump, newBlocks) = translate(b.jumps, block)
+        val (call, jump, newBlocks) = translate(b.jumps, block)
         procedure.addBlocks(newBlocks)
+        call.foreach(c => block.statements.append(c))
         block.replaceJump(jump)
         assert(jump.hasParent)
       }
@@ -85,7 +86,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
     * Translates a list of jumps from BAP into a single Jump at the IR level by moving any conditions on jumps to
     * Assume statements in new blocks
     * */
-  private def translate(jumps: List[BAPJump], block: Block): (Jump, ArrayBuffer[Block]) = {
+  private def translate(jumps: List[BAPJump], block: Block): (Option[Call], Jump, ArrayBuffer[Block]) = {
     if (jumps.size > 1) {
       val targets = ArrayBuffer[Block]()
       val conditions = ArrayBuffer[BAPExpr]()
@@ -130,26 +131,28 @@ class BAPToIR(var program: BAPProgram, mainAddress: Int) {
           case _ => throw Exception("translation error, call where not expected: " + jumps.mkString(", "))
         }
       }
-      (GoTo(targets, Some(line)), newBlocks)
+      (None, GoTo(targets, Some(line)), newBlocks)
     } else {
       jumps.head match {
         case b: BAPDirectCall =>
-          val call = DirectCall(nameToProcedure(b.target), b.returnTarget.map(t => labelToBlock(t)), Some(b.line))
-          (call, ArrayBuffer())
+          val call = Some(DirectCall(nameToProcedure(b.target),Some(b.line)))
+          val ft = (b.returnTarget.map(t => labelToBlock(t))).map(x => GoTo(Set(x))).getOrElse(Unreachable())
+          (call, ft, ArrayBuffer())
         case b: BAPIndirectCall =>
-          val call = IndirectCall(b.target.toIR, b.returnTarget.map(t => labelToBlock(t)), Some(b.line))
-          (call, ArrayBuffer())
+          val call = IndirectCall(b.target.toIR, Some(b.line))
+          val ft = (b.returnTarget.map(t => labelToBlock(t))).map(x => GoTo(Set(x))).getOrElse(Unreachable())
+          (Some(call), ft, ArrayBuffer())
         case b: BAPGoTo =>
           val target = labelToBlock(b.target)
           b.condition match {
             // condition is true
             case l: BAPLiteral if l.value > BigInt(0) =>
-              (GoTo(ArrayBuffer(target), Some(b.line)), ArrayBuffer())
+              (None, GoTo(ArrayBuffer(target), Some(b.line)), ArrayBuffer())
             // non-true condition
             case _ =>
               val condition = convertConditionBool(b.condition, false)
               val newBlock = newBlockCondition(block, target, condition)
-              (GoTo(ArrayBuffer(newBlock), Some(b.line)), ArrayBuffer(newBlock))
+              (None, GoTo(ArrayBuffer(newBlock), Some(b.line)), ArrayBuffer(newBlock))
           }
       }
     }

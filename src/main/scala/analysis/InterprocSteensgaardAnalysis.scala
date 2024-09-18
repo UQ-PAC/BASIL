@@ -39,7 +39,7 @@ case class RegisterWrapperEqualSets(variable: Variable, assigns: Set[Assign]) {
 class InterprocSteensgaardAnalysis(
       program: Program,
       constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-      regionAccesses: Map[CfgNode, Map[RegisterVariableWrapper, FlatElement[Expr]]],
+      regionAccesses: Map[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]]],
       mmm: MemoryModelMap,
       reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
       globalOffsets: Map[BigInt, BigInt]) extends Analysis[Any] {

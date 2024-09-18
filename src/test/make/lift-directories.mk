@@ -27,7 +27,7 @@ BOOGIE_FLAGS ?= /useArrayAxioms
 
 LIFT_ARTEFACTS=$(NAME).adt $(NAME).bir $(NAME).relf $(NAME).gts
 
-ENABLED_COMPILERS ?= clang clang_O2 clang_pic clang_no_plt_no_pic gcc gcc_O2 gcc_no_plt_no_pic gcc_pic
+ENABLED_COMPILERS ?= clang clang_O2 clang_pic gcc gcc_O2 gcc_pic
 
 TARGETS := all verify clean cleanall cleanlift cleanjson cleangts cleantest recompile json gts
 .PHONY : $(TARGETS) $(ENABLED_COMPILERS)

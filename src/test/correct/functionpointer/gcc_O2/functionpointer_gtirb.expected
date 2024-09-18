@@ -186,7 +186,7 @@ implementation main()
     R1, Gamma_R1 := bvadd64(R1, 1984bv64), Gamma_R1;
     R0, Gamma_R0 := bvadd64(R0, 1952bv64), Gamma_R0;
     assert Gamma_ZF;
-    goto $main$__1__$ca5W8ecrTdSh_xILQFKWFg$__1, $main$__1__$ca5W8ecrTdSh_xILQFKWFg$__0;
+    goto $main$__1__$ca5W8ecrTdSh_xILQFKWFg$__0, $main$__1__$ca5W8ecrTdSh_xILQFKWFg$__1;
   $main$__2__$fEZ8GKsISKaOAJptXmofmg:
     assume {:captureState "$main$__2__$fEZ8GKsISKaOAJptXmofmg"} true;
     R30, Gamma_R30 := 1580bv64, true;

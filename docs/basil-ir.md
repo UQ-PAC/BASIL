@@ -3,6 +3,7 @@
 BASIL IR is the intermediate representation used during static analysis. 
 This is on contrast to Boogie IR which is used for specification annotation, and output to textual boogie syntax that can be run through the Boogie verifier. 
 
+
 The grammar is described below, note that the IR is a data-structure, without a concrete textual representation so the below grammar only represents the structure. 
 We omit the full description of the expression language because it is relatively standard.  
 
@@ -13,13 +14,16 @@ The IR has a completely standard simple type system that is enforced at construc
 Program ::=&~ Procedure* \\
 Procedure ::=&~ (name: ProcID) (entryBlock: Block) (returnBlock: Block) (blocks: Block*) \\
                &~ \text{Where }entryBlock, returnBlock \in blocks \\
-Block ::=&~ BlockID \; (Statement*)\; Jump \; (fallthrough: (GoTo | None))\\
-         &~ \text{Where $fallthough$ may be $GoTo$ IF $Jump$ is $Call$} \\
+Block_1 ::=&~ BlockID \; Statement*\; Call? \; Jump \; \\
+Block_2 ::=&~ BlockID \; (Statement | Call)*\; Jump \; \\
+\\
+&~ Block = Block_1 \text{ is a structural invariant that holds during all the early analysis/transform stages}
+\\
 Statement ::=&~ MemoryAssign ~|~ LocalAssign ~|~ Assume ~|~ Assert ~|~ NOP \\
 ProcID ::=&~ String \\
 BlockID ::=&~ String \\
 \\
-Jump ::=&~ Call ~|~ GoTo \\
+Jump ::=&~ GoTo ~|~ Unreachable ~|~ Return \\
 GoTo ::=&~ \text{goto } BlockID* \\
 Call ::=&~ DirectCall ~|~ IndirectCall  \\
 DirectCall ::=&~ \text{call } ProcID \\
@@ -46,6 +50,33 @@ Endian ::=&~ BigEndian ~|~ LittleEndian \\
 \end{align*}
 ```
 
+- The `GoTo` jump is a multi-target jump reprsenting non-deterministic choice between its targets. 
+  Conditional structures are represented by these with a guard (an assume statement) beginning each target. 
+- The `Unreachable` jump is used to signify the absence of successors, it has the semantics of `assume false`.
+- The `Return` jump passes control to the calling function, often this is over-approximated to all functions which call the statement's parent procedure.
+
+## Translation Phases
+
+#### IR With Returns
+
+- Immediately after loading the IR return statements may appear in any block, or may be represented by indirect calls. 
+  The transform pass below replaces all calls to the link register (R30) with return statements. 
+  In the future, more proof is required to implement this soundly.
+  
+```
+cilvisitor.visit_prog(transforms.ReplaceReturns(), ctx.program)
+transforms.addReturnBlocks(ctx.program, true) // add return to all blocks because IDE solver expects it
+cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
+```
+
+This ensures that all returning, non-stub procedures have exactly one return statement residing in their `returnBlock`.
+
+#### Calls appear only as the last statement in a block 
+
+- The structure of the IR allows a call may appear anywhere in the block but for all the analysis passes we hold the invariant that it 
+  only appears as the last statement. This is checked with the function `singleCallBlockEnd(p: Program)`.
+  And it means for any call statement `c` we may `assert(c.parent.statements.lastOption.contains(c))`.
+
 ## Interaction with BASIL IR
 
 ### Constructing Programs in Code
@@ -62,10 +93,12 @@ var program: Program = prog(
     block("first_call",
       Assign(R0, bv64(1), None)
       Assign(R1, bv64(1), None)
-      directCall("callee1", Some("second_call"))
+      directCall("callee1"),
+      goto("second_call"))
     ),
     block("second_call",
-      directCall("callee2", Some("returnBlock"))
+      directCall("callee2"),
+      goto("returnBlock")
     ),
     block("returnBlock",
       ret
@@ -82,7 +115,7 @@ program     ::= prog ( procedure+ )
 procedure   ::= proc (procname, block+)
 block       ::= block(blocklabel, statement+, jump)
 statement   ::= <BASIL IR Statement>
-jump        ::= call_s | goto_s | ret
+jump        ::= goto_s | ret | unreachable
 call_s      ::= directCall (procedurename, None | Some(blocklabel))  // target, fallthrough 
 goto_s      ::= goto(blocklabel+)                              // targets
 procname    ::= String

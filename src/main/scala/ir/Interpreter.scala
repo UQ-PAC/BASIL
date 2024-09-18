@@ -7,12 +7,12 @@ import scala.util.control.Breaks.{break, breakable}
 
 class Interpreter() {
   val regs: mutable.Map[Variable, BitVecLiteral] = mutable.Map()
-  val mems: mutable.Map[Int, BitVecLiteral] = mutable.Map()
+  val mems: mutable.Map[BigInt, BitVecLiteral] = mutable.Map()
   private val SP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
   private val FP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
   private val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
-  private var nextBlock: Option[Block] = None
-  private val returnBlock: mutable.Stack[Block] = mutable.Stack()
+  private var nextCmd: Option[Command] = None
+  private val returnCmd: mutable.Stack[Command] = mutable.Stack()
 
   def eval(exp: Expr, env: mutable.Map[Variable, BitVecLiteral]): BitVecLiteral = {
     exp match {
@@ -167,7 +167,7 @@ class Interpreter() {
     }
   }
 
-  def getMemory(index: Int, size: Int, endian: Endian, env: mutable.Map[Int, BitVecLiteral]): BitVecLiteral = {
+  def getMemory(index: BigInt, size: Int, endian: Endian, env: mutable.Map[BigInt, BitVecLiteral]): BitVecLiteral = {
     val end = index + size / 8 - 1
     val memoryChunks = (index to end).map(i => env.getOrElse(i, BitVecLiteral(0, 8)))
 
@@ -183,11 +183,11 @@ class Interpreter() {
   }
 
   def setMemory(
-      index: Int,
+      index: BigInt,
       size: Int,
       endian: Endian,
       value: BitVecLiteral,
-      env: mutable.Map[Int, BitVecLiteral]
+      env: mutable.Map[BigInt, BitVecLiteral]
   ): BitVecLiteral = {
     val binaryString: String = value.value.toString(2).reverse.padTo(size, '0').reverse
 
@@ -220,23 +220,15 @@ class Interpreter() {
 
     // Procedure.Block
     p.entryBlock match {
-      case Some(block) => nextBlock = Some(block)
-      case None        => nextBlock = Some(returnBlock.pop())
+      case Some(block) => nextCmd = Some(block.statements.headOption.getOrElse(block.jump))
+      case None        => nextCmd = Some(returnCmd.pop())
     }
   }
 
-  private def interpretBlock(b: Block): Unit = {
-    Logger.debug(s"Block:${b.label} ${b.address}")
-    // Block.Statement
-    for ((statement, index) <- b.statements.zipWithIndex) {
-      Logger.debug(s"statement[$index]:")
-      interpretStatement(statement)
-    }
-
-    // Block.Jump
+  private def interpretJump(j: Jump) : Unit = {
+    Logger.debug(s"jump:")
     breakable {
-      Logger.debug(s"jump:")
-      b.jump match {
+      j match {
         case gt: GoTo =>
           Logger.debug(s"$gt")
           for (g <- gt.targets) {
@@ -244,40 +236,28 @@ class Interpreter() {
             condition match {
               case Some(e) => evalBool(e, regs) match {
                 case TrueLiteral =>
-                  nextBlock = Some(g)
+                  nextCmd = Some(g.statements.headOption.getOrElse(g.jump))
                   break
                 case _ =>
               }
               case None =>
-                nextBlock = Some(g)
+                nextCmd = Some(g.statements.headOption.getOrElse(g.jump))
                 break
             }
           }
-        case dc: DirectCall =>
-          Logger.debug(s"$dc")
-          if (dc.returnTarget.isDefined) {
-            returnBlock.push(dc.returnTarget.get)
-          }
-          interpretProcedure(dc.target)
-          break
-        case ic: IndirectCall =>
-          Logger.debug(s"$ic")
-          if (ic.target == Register("R30", 64) && ic.returnTarget.isEmpty) {
-            if (returnBlock.nonEmpty) {
-              nextBlock = Some(returnBlock.pop())
-            } else {
-              //Exit Interpreter
-              nextBlock = None
-            }
-            break
-          } else {
-            ???
-          }
+        case r: Return => {
+          nextCmd = Some(returnCmd.pop())
+        }
+        case h: Unreachable => {
+          Logger.debug("Unreachable")
+          nextCmd = None
+        }
       }
     }
   }
 
   private def interpretStatement(s: Statement): Unit = {
+    Logger.debug(s"statement[$s]:")
     s match {
       case assign: Assign =>
         Logger.debug(s"LocalAssign ${assign.lhs} = ${assign.rhs}")
@@ -300,26 +280,54 @@ class Interpreter() {
           case BitVecLiteral(value, size) =>
             Logger.debug(s"MemoryAssign ${assign.mem} := 0x${value.toString(16)}[u$size]\n")
         }
-      case _ : NOP =>
+      case _ : NOP => ()
       case assert: Assert =>
-        Logger.debug(assert)
         // TODO
-
+        Logger.debug(assert)
+        evalBool(assert.body, regs) match {
+          case TrueLiteral => ()
+          case FalseLiteral => throw Exception(s"Assertion failed ${assert}")
+        }
       case assume: Assume =>
-        Logger.debug(assume)
         // TODO, but already taken into effect if it is a branch condition
+        Logger.debug(assume)
+        evalBool(assume.body, regs) match {
+          case TrueLiteral => ()
+          case FalseLiteral => {
+            nextCmd = None
+            Logger.debug(s"Assumption not satisfied: $assume")
+          }
+        }
+      case dc: DirectCall =>
+        Logger.debug(s"$dc")
+        returnCmd.push(dc.successor)
+        interpretProcedure(dc.target)
+        break
+      case ic: IndirectCall =>
+        Logger.debug(s"$ic")
+        if (ic.target == Register("R30", 64)) {
+          if (returnCmd.nonEmpty) {
+            nextCmd = Some(returnCmd.pop())
+          } else {
+            //Exit Interpreter
+            nextCmd = None
+          }
+          break
+        } else {
+          ???
+        }
     }
   }
 
   def interpret(IRProgram: Program): mutable.Map[Variable, BitVecLiteral] = {
     // initialize memory array from IRProgram
-    var currentAddress = 0
+    var currentAddress = BigInt(0)
     IRProgram.initialMemory
       .sortBy(_.address)
       .foreach { im =>
         if (im.address + im.size > currentAddress) {
           val start = im.address.max(currentAddress)
-          val data = if (im.address < currentAddress) im.bytes.slice(currentAddress - im.address, im.size) else im.bytes
+          val data = if (im.address < currentAddress) im.bytes.slice((currentAddress - im.address).toInt, im.size) else im.bytes
           data.zipWithIndex.foreach { (byte, index) =>
             mems(start + index) = byte
           }
@@ -334,8 +342,11 @@ class Interpreter() {
 
     // Program.Procedure
     interpretProcedure(IRProgram.mainProcedure)
-    while (nextBlock.isDefined) {
-      interpretBlock(nextBlock.get)
+    while (nextCmd.isDefined) {
+      nextCmd.get match  {
+        case c: Statement => interpretStatement(c) 
+        case c: Jump => interpretJump(c)
+      }
     }
 
     regs

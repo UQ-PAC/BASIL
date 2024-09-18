@@ -11,43 +11,15 @@ import java.nio.file.attribute.BasicFileAttributes
 
 import ir.dsl.*
 
-class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAfter {
-
-  private val tempPath = System.getProperty("user.dir") + "/src/test/analysis/dump/"
-
-  before {
-    clearOrCreateDirectory(tempPath)
-  }
-
-  def clearOrCreateDirectory(path: String): Unit = {
-    val directory = Paths.get(path)
-    if (Files.exists(directory)) {
-      Files.walkFileTree(directory, new SimpleFileVisitor[Path] {
-        override def visitFile(file: Path, attrs: BasicFileAttributes): FileVisitResult = {
-          Files.delete(file)
-          FileVisitResult.CONTINUE
-        }
-
-        override def postVisitDirectory(dir: Path, exc: IOException): FileVisitResult = {
-          Files.delete(dir)
-          FileVisitResult.CONTINUE
-        }
-      })
-    }
-    Files.createDirectories(directory)
-  }
+class PointsToTest extends AnyFunSuite with OneInstancePerTest {
 
   def runAnalyses(program: Program,
                   externalFunctions: Set[ExternalFunction] = Set.empty,
                   globals: Set[SpecGlobal] = Set.empty,
                   globalOffsets: Map[BigInt, BigInt] = Map.empty): StaticAnalysisContext = {
 
-    val ctx = IRContext(externalFunctions, globals, globalOffsets, Specification(Set(), Map(), List(), List(), List(), Set()), program)
+    val ctx = IRContext(List.empty, externalFunctions, globals, globalOffsets, Specification(Set(), Map(), List(), List(), List(), Set()), program)
     StaticAnalysis.analyse(ctx, StaticAnalysisConfig(), 1)
-  }
-
-  def getRegister(name: String): Register = {
-    Register(name, 64)
   }
 
   /**
@@ -57,11 +29,11 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
     var program: Program = prog(
       proc("main",
         block("0x0",
-          Assign(getRegister("R6"), getRegister("R31")),
+          Assign(R6, R31),
           goto("0x1")
         ),
         block("0x1",
-          MemoryAssign(mem, BinaryExpr(BVADD, getRegister("R6"), bv64(4)), bv64(10), LittleEndian, 64),
+          MemoryAssign(mem, BinaryExpr(BVADD, R6, bv64(4)), bv64(10), LittleEndian, 64),
           goto("returntarget")
         ),
         block("returntarget",
@@ -70,8 +42,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
@@ -87,8 +59,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
     var program: Program = prog(
       proc("main",
         block("0x0",
-          Assign(getRegister("R1"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
-          Assign(getRegister("R3"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(4)), LittleEndian, 64)),
+          Assign(R1, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64)),
+          Assign(R3, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(4)), LittleEndian, 64)),
           goto("0x1")
         ),
         block("0x1",
@@ -99,8 +71,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
         )
       )
     )
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
@@ -108,7 +80,6 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
     assert(results.mmmResults.findStackObject(BigInt(5)).isDefined)
     assert(results.mmmResults.findStackObject(BigInt(6)).isDefined)
     assert(results.mmmResults.findStackObject(BigInt(10)).isDefined)
-
 
     assert(results.mmmResults.findStackObject(BigInt(4)).get.start == BigInt(4))
     assert(results.mmmResults.findStackObject(BigInt(5)).get.start == BigInt(4))
@@ -125,15 +96,15 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
 //    val program: Program = prog(
 //      proc("main",
 //        block("0x0",
-//          Assign(getRegister("R1"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
-//          Assign(getRegister("R3"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
-//          Assign(getRegister("R4"), BinaryExpr(BVADD, getRegister("R31"), bv64(20))),
+//          Assign(R1, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64)),
+//          Assign(R3, BinaryExpr(BVADD, R31, bv64(10))),
+//          Assign(R4, BinaryExpr(BVADD, R31, bv64(20))),
 //          goto("0x1")
 //        ),
 //        block("0x1",
-//          MemoryAssign(mem, MemoryStore(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(4)), bv64(4), LittleEndian, 64)),
-//          Assign(getRegister("R6"), MemoryLoad(mem, getRegister("R3"), LittleEndian, 64)),
-//          MemoryAssign(mem, MemoryStore(mem, getRegister("R4"), bv64(3), LittleEndian, 64)),
+//          MemoryAssign(mem, MemoryStore(mem, BinaryExpr(BVADD, R31, bv64(4)), bv64(4), LittleEndian, 64)),
+//          Assign(R6, MemoryLoad(mem, R3, LittleEndian, 64)),
+//          MemoryAssign(mem, MemoryStore(mem, R4, bv64(3), LittleEndian, 64)),
 //          goto("returntarget")
 //        ),
 //        block("returntarget",
@@ -160,15 +131,15 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
    * Test that the analysis correctly collects shared regions and exposes only the shared ones
    */
   test("collects single function shared regions: MMM Stage") {
-    var program: Program = prog(
+    val program: Program = prog(
       proc("main",
         block("0x0",
-          Assign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
-          Assign(getRegister("R1"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
+          Assign(R0, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64)),
+          Assign(R1, BinaryExpr(BVADD, R31, bv64(10))),
           goto("0x1")
         ),
         block("0x1",
-          directCall("p2", Some("returntarget"))
+          directCall("p2"), goto("returntarget")
         ),
         block("returntarget",
           ret
@@ -176,8 +147,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       ),
       proc("p2",
         block("l_p2",
-          Assign(getRegister("R3"), getRegister("R0")),
-          Assign(getRegister("R2"), MemoryLoad(mem, getRegister("R1"), LittleEndian, 64)),
+          Assign(R3, R0),
+          Assign(R2, MemoryLoad(mem, R1, LittleEndian, 64)),
           goto("l_p2_1"),
         ),
         block("l_p2_1",
@@ -186,8 +157,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
@@ -209,15 +180,15 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
    * Test that the analysis correctly collects shared regions from multiple functions
    */
   test("collects multiple functions shared regions: MMM Stage") {
-    var program: Program = prog(
+    val program: Program = prog(
       proc("main",
         block("0x0",
-          Assign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
-          Assign(getRegister("R1"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
+          Assign(R0, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64)),
+          Assign(R1, BinaryExpr(BVADD, R31, bv64(10))),
           goto("0x1")
         ),
         block("0x1",
-          directCall("p2", Some("returntarget"))
+          directCall("p2"), goto("returntarget")
         ),
         block("returntarget",
           ret
@@ -225,9 +196,9 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       ),
       proc("foo",
         block("l_foo",
-          Assign(getRegister("R0"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R31"), bv64(6)), LittleEndian, 64)),
-          Assign(getRegister("R1"), BinaryExpr(BVADD, getRegister("R31"), bv64(10))),
-          directCall("p2", Some("l_foo_1"))
+          Assign(R0, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64)),
+          Assign(R1, BinaryExpr(BVADD, R31, bv64(10))),
+          directCall("p2"), goto("l_foo_1")
         ),
         block("l_foo_1",
           ret,
@@ -235,8 +206,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       ),
       proc("p2",
         block("l_p2",
-          Assign(getRegister("R3"), getRegister("R0")),
-          Assign(getRegister("R2"), MemoryLoad(mem, getRegister("R1"), LittleEndian, 64)),
+          Assign(R3, R0),
+          Assign(R2, MemoryLoad(mem, R1, LittleEndian, 64)),
           goto("l_p2_1"),
         ),
         block("l_p2_1",
@@ -245,8 +216,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
       )
     )
 
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
@@ -282,9 +253,9 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
 //    val program: Program = prog(
 //      proc("main",
 //        block("0x0",
-//          Assign(getRegister("R0"), bv64(400)),
-//          Assign(getRegister("R1"), MemoryLoad(mem, BinaryExpr(BVADD, getRegister("R0"), bv64(46)), LittleEndian, 64)),
-//          call(getRegister("R1"), Some("returntarget"))
+//          Assign(R0, bv64(400)),
+//          Assign(R1, MemoryLoad(mem, BinaryExpr(BVADD, R0, bv64(46)), LittleEndian, 64)),
+//          call(R1, Some("returntarget"))
 //        ),
 //        block("returntarget",
 //          ret
@@ -292,7 +263,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest with BeforeAndAft
 //      ),
 //      proc("foo",
 //        block("l_foo",
-//          Assign(getRegister("R3"), bv64(1)),
+//          Assign(R3, bv64(1)),
 //          goto("l_foo_1"),
 //        ),
 //        block("l_foo_1",

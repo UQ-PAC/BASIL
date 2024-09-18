@@ -108,7 +108,7 @@ implementation FUN_680()
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 4040bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 4040bv64)) || L(mem, bvadd64(R16, 4040bv64)));
     R16, Gamma_R16 := bvadd64(R16, 4040bv64), Gamma_R16;
     call #free();
-    assume false; //no return target
+    assume false;
 }
 
 procedure main();
@@ -206,7 +206,7 @@ implementation FUN_650()
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 4016bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 4016bv64)) || L(mem, bvadd64(R16, 4016bv64)));
     R16, Gamma_R16 := bvadd64(R16, 4016bv64), Gamma_R16;
     call malloc();
-    assume false; //no return target
+    assume false;
 }
 
 procedure #free();

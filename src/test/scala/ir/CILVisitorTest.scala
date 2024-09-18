@@ -47,7 +47,7 @@ class AddGammas extends CILVisitor {
   }
 }
 
-class CILVisTest extends AnyFunSuite {
+class CILVisitorTest extends AnyFunSuite {
 
   def getRegister(name: String) = Register(name, 64)
   test("trace prog") {
@@ -66,8 +66,8 @@ class CILVisTest extends AnyFunSuite {
       override def vjump(b: Jump) = {
         b match {
           case g: GoTo         => res.addAll(g.targets.map(t => s"gt_${t.label}").toList)
-          case r: IndirectCall => res.append("indirect")
-          case r: DirectCall   => res.append("direct")
+          case _: Return => res.append("return")
+          case _: Unreachable   => res.append("direct")
         }
         DoChildren()
       }
@@ -75,7 +75,7 @@ class CILVisTest extends AnyFunSuite {
 
     val v = BlockTrace()
     visit_proc(v, p.procedures.head)
-    assert(v.res.toList == List("lmain", "gt_lmain1", "lmain1", "gt_lmain2", "lmain2", "indirect"))
+    assert(v.res.toList == List("lmain", "gt_lmain1", "lmain1", "gt_lmain2", "lmain2", "return"))
   }
 
   test("visit exprs") {
@@ -105,7 +105,7 @@ class CILVisTest extends AnyFunSuite {
 
       override def vexpr(e: Expr) = {
         e match {
-          case BinaryExpr(op, l, r) => res.append(op.toString)
+          case BinaryExpr(op, _, _) => res.append(op.toString)
           case n: Literal           => res.append(n.toString)
           case _                    => ()
         }
@@ -140,11 +140,9 @@ class CILVisTest extends AnyFunSuite {
     }
 
     class RegReplace extends CILVisitor {
-      val res = mutable.ArrayBuffer[String]()
-
       override def vvar(e: Variable) = {
         e match {
-          case Register(n, sz) => ChangeTo(LocalVar("l" + n, e.getType));
+          case Register(n, _) => ChangeTo(LocalVar("l" + n, e.getType));
           case _               => DoChildren()
         }
       }

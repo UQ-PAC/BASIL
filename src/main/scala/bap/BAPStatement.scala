@@ -29,8 +29,8 @@ sealed trait BAPAssign(lhs: BAPVariable, rhs: BAPExpr, line: String, instruction
 
 /** Memory store
   */
-case class BAPMemAssign(lhs: BAPMemory, rhs: BAPStore, line: String, instruction: String, address: Option[Int] = None)
+case class BAPMemAssign(lhs: BAPMemory, rhs: BAPStore, line: String, instruction: String, address: Option[BigInt] = None)
     extends BAPAssign(lhs, rhs, line, instruction)
 
-case class BAPLocalAssign(lhs: BAPVar, rhs: BAPExpr, line: String, instruction: String, address: Option[Int] = None)
+case class BAPLocalAssign(lhs: BAPVar, rhs: BAPExpr, line: String, instruction: String, address: Option[BigInt] = None)
     extends BAPAssign(lhs, rhs, line, instruction)

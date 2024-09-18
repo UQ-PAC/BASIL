@@ -39,11 +39,11 @@ abstract class Visitor {
     node
   }
 
-  def visitDirectCall(node: DirectCall): Jump = {
+  def visitDirectCall(node: DirectCall): Statement = {
     node
   }
 
-  def visitIndirectCall(node: IndirectCall): Jump = {
+  def visitIndirectCall(node: IndirectCall): Statement = {
     node.target = visitVariable(node.target)
     node
   }
@@ -199,11 +199,11 @@ abstract class ReadOnlyVisitor extends Visitor {
     node
   }
 
-  override def visitDirectCall(node: DirectCall): Jump = {
+  override def visitDirectCall(node: DirectCall): Statement = {
     node
   }
 
-  override def visitIndirectCall(node: IndirectCall): Jump = {
+  override def visitIndirectCall(node: IndirectCall): Statement = {
     visitVariable(node.target)
     node
   }
@@ -281,14 +281,12 @@ abstract class IntraproceduralControlFlowVisitor extends Visitor {
     node
   }
 
-  override def visitDirectCall(node: DirectCall): Jump = {
-    node.returnTarget.foreach(visitBlock)
+  override def visitDirectCall(node: DirectCall): Statement = {
     node
   }
 
-  override def visitIndirectCall(node: IndirectCall): Jump = {
+  override def visitIndirectCall(node: IndirectCall): Statement = {
     node.target = visitVariable(node.target)
-    node.returnTarget.foreach(visitBlock)
     node
   }
 }
@@ -430,21 +428,4 @@ class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
     node
   }
 
-}
-
-class ConvertToSingleProcedureReturn extends Visitor {
-  override def visitJump(node: Jump): Jump = {
-    node match
-      case c: IndirectCall =>
-        val returnBlock = node.parent.parent.returnBlock match {
-          case Some(b) => b
-          case None =>
-            val b = Block.procedureReturn(node.parent.parent)
-            node.parent.parent.returnBlock = b
-            b
-        }
-        // if we are return outside the return block then replace with a goto to the return block
-        if c.target.name == "R30" && c.returnTarget.isEmpty && !c.parent.isProcReturn then GoTo(Seq(returnBlock)) else node
-      case _ => node
-  }
 }

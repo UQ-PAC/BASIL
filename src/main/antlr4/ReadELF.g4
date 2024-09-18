@@ -31,7 +31,7 @@ symbolTableHeader :
   'Symbol table' tableName 'contains' HEX 'entries:' NEWLINE
   'Num:' 'Value' 'Size' 'Type' 'Bind' 'Vis' 'Ndx' 'Name'  // Mainly a sanity check for the column order
   ;
-symbolTableRow : HEX ':' value=HEX size=HEX entrytype=STRING bind=STRING vis=STRING (HEX | STRING) name=(HEX | STRING)? STRING? NEWLINE;
+symbolTableRow : (num=HEX) ':' value=HEX size=HEX entrytype=STRING bind=STRING vis=STRING ndx=(HEX | STRING) name=(HEX | STRING)? STRING? NEWLINE;
 // symbolTableRow : HEX ':' HEX HEX symbolType bind vis ndx name? ;
 
 tableName : '\'' STRING '\'' ;
