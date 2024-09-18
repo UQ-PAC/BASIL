@@ -7,7 +7,7 @@ import scala.util.control.Breaks.{break, breakable}
 
 class Interpreter() {
   val regs: mutable.Map[Variable, BitVecLiteral] = mutable.Map()
-  val mems: mutable.Map[Int, BitVecLiteral] = mutable.Map()
+  val mems: mutable.Map[BigInt, BitVecLiteral] = mutable.Map()
   private val SP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
   private val FP: BitVecLiteral = BitVecLiteral(4096 - 16, 64)
   private val LR: BitVecLiteral = BitVecLiteral(BigInt("FF", 16), 64)
@@ -167,7 +167,7 @@ class Interpreter() {
     }
   }
 
-  def getMemory(index: Int, size: Int, endian: Endian, env: mutable.Map[Int, BitVecLiteral]): BitVecLiteral = {
+  def getMemory(index: BigInt, size: Int, endian: Endian, env: mutable.Map[BigInt, BitVecLiteral]): BitVecLiteral = {
     val end = index + size / 8 - 1
     val memoryChunks = (index to end).map(i => env.getOrElse(i, BitVecLiteral(0, 8)))
 
@@ -183,11 +183,11 @@ class Interpreter() {
   }
 
   def setMemory(
-      index: Int,
+      index: BigInt,
       size: Int,
       endian: Endian,
       value: BitVecLiteral,
-      env: mutable.Map[Int, BitVecLiteral]
+      env: mutable.Map[BigInt, BitVecLiteral]
   ): BitVecLiteral = {
     val binaryString: String = value.value.toString(2).reverse.padTo(size, '0').reverse
 
@@ -321,13 +321,13 @@ class Interpreter() {
 
   def interpret(IRProgram: Program): mutable.Map[Variable, BitVecLiteral] = {
     // initialize memory array from IRProgram
-    var currentAddress = 0
+    var currentAddress = BigInt(0)
     IRProgram.initialMemory
       .sortBy(_.address)
       .foreach { im =>
         if (im.address + im.size > currentAddress) {
           val start = im.address.max(currentAddress)
-          val data = if (im.address < currentAddress) im.bytes.slice(currentAddress - im.address, im.size) else im.bytes
+          val data = if (im.address < currentAddress) im.bytes.slice((currentAddress - im.address).toInt, im.size) else im.bytes
           data.zipWithIndex.foreach { (byte, index) =>
             mems(start + index) = byte
           }

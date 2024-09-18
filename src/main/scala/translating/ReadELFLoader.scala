@@ -35,14 +35,14 @@ enum ELFNDX:
 case class ELFSymbol(num: Int,  /* symbol number */
   value: BigInt, /* symbol address */
   size: Int,  /* symbol size (bytes) */
-  etype: ELFSymType,  
-  bind: ELFBind,  
+  etype: ELFSymType,
+  bind: ELFBind,
   vis: ELFVis,
   ndx: ELFNDX, /* The section containing the symbol */
   name: String)
 
 object ReadELFLoader {
-  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], Int) = {
+  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], BigInt) = {
     val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableExtFunc(r)).toSet
     val relocationOffsets = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableOffsets(r)).toMap
     val mainAddress = ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, config.mainProcedureName))
@@ -51,7 +51,7 @@ object ReadELFLoader {
     val globalVariables = (symbolTable.collect {
       case ELFSymbol(num, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name) if ndx != ELFNDX.UND =>  SpecGlobal(name, size * 8, None, value)
     }).toSet
-    
+
     if (mainAddress.isEmpty) {
       throw Exception(s"no ${config.mainProcedureName} function in symbol table")
     }
@@ -89,7 +89,6 @@ object ReadELFLoader {
     }
   }
 
-
   def visitSymbolTable(ctx: SymbolTableContext): List[ELFSymbol] = {
     if (ctx.symbolTableHeader.tableName.STRING.getText == ".symtab") {
       ctx.symbolTableRow.asScala.map(getSymbolTableRow).toList
@@ -98,16 +97,16 @@ object ReadELFLoader {
     }
   }
 
-  def getFunctionAddress(ctx: SymsContext, functionName: String): Option[Int] = {
+  def getFunctionAddress(ctx: SymsContext, functionName: String): Option[BigInt] = {
     ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, functionName)).headOption
   }
 
-  private def getFunctionAddress(ctx: SymbolTableContext, functionName: String): Option[Int] = {
+  private def getFunctionAddress(ctx: SymbolTableContext, functionName: String): Option[BigInt] = {
     if (ctx.symbolTableHeader.tableName.STRING.getText == ".symtab") {
       val rows = ctx.symbolTableRow.asScala
       val mainAddress = rows.collectFirst {
         case r if r.entrytype.getText == "FUNC" && r.bind.getText == "GLOBAL" && r.name.getText == functionName =>
-          Integer.parseInt(r.value.getText, 16)
+          hexToBigInt(r.value.getText)
       }
       mainAddress
     } else {
@@ -127,11 +126,11 @@ object ReadELFLoader {
     val num = ctx.num.getText.toInt
     val vis = ELFVis.valueOf(ctx.vis.getText)
 
-    val ndx = (ctx.ndx.getText match {
+    val ndx = ctx.ndx.getText match {
       case "ABS" => ELFNDX.ABS
       case "UND" => ELFNDX.UND
       case o => ELFNDX.Section(o.toInt)
-    })
+    }
 
     ELFSymbol(num, value, size, etype, bind, vis, ndx, name)
   }

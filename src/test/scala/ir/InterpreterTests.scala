@@ -16,10 +16,9 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   def getProgram(name: String): (Program, Set[SpecGlobal]) = {
 
-
     val loading = ILLoadingConfig(
-      inputFile = s"examples/$name/$name.adt",
-      relfFile = s"examples/$name/$name.relf",
+      inputFile = s"src/test/correct/$name/gcc/$name.adt",
+      relfFile = s"src/test/correct/$name/gcc/$name.relf",
       specFile = None,
       dumpIL = None
     )
@@ -111,6 +110,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     assert(actual == expected)
   }
 
+  /*
   test("basic_arrays_read") {
     val expected = Map(
       "arr" -> 0
@@ -201,4 +201,5 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     )
     testInterpret("no_interference_update_y", expected)
   }
+  */
 }

@@ -1,2 +1,5 @@
 *.txt
 *.csv
+*.md
+*.md.part
+*.svg

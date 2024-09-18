@@ -21,7 +21,7 @@ The steps below describe the dependencies required,
 then the steps to obtain these input files
 and run BASIL.
 
-<!-- These instructions are automated in [lift_adt.sh](../../scripts/lift_adt.sh). -->
+<!-- These instructions are automated in [lift.sh](../../scripts/lift.sh). -->
 
 [tests]: /src/test/correct
 [spec]: /src/test/correct/secret_write/secret_write.spec
@@ -171,13 +171,7 @@ passing the `smt.array.extensional=false` configuration to Z3 through Boogie's C
 boogie example.bpl /proverOpt:O:smt.array.extensional=false
 ```
 
-## Other useful tasks 
-
-To compile a C file without the global offset table being used in address calculation, use the following command:
-
-```bash
-aarch64-linux-gnu-gcc -fno-plt -fno-pic *.c -o *.out
-```
+## Other useful tasks
 
 To produce assembly from the binary, use:
 ```bash
@@ -187,11 +181,6 @@ aarch64-linux-gnu-objdump -d *.out
 To view the hex dump of the data section of the binary:
 ```bash
 readelf -x .data *.out
-```
-
-To compile a C file with the stack guard turned off:
-```bash
-aarch64-linux-gnu-gcc -fno-stack-protector -fno-plt -fno-pic *.c -o *.out
 ```
 
 To examine the ASLp semantics of a particular instruction,

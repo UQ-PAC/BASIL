@@ -22,7 +22,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
   val opcodeSize = 4
 
-  def visitBlock(blockUUID: ByteString, blockCountIn: Int, blockAddress: Option[Int]): ArrayBuffer[Statement] = {
+  def visitBlock(blockUUID: ByteString, blockCountIn: Int, blockAddress: Option[BigInt]): ArrayBuffer[Statement] = {
     blockCount = blockCountIn
     instructionCount = 0
     val instructions = parserMap(Base64.getEncoder.encodeToString(blockUUID.toByteArray))
@@ -35,7 +35,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
       for ((s, i) <- instruction.zipWithIndex) {
         
-        val label = blockAddress.map {(a: Int) => 
+        val label = blockAddress.map {(a: BigInt) =>
           val instructionAddress = a + (opcodeSize * instructionCount)
           instructionAddress.toString + "$" + i
         }
