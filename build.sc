@@ -63,6 +63,15 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
     expectedUpdate(incorrectPath, false, false)
   }
 
+  def updateExpectedExtraSpec() = T.command {
+    val correctPath = test.millSourcePath / "extraspec_correct"
+    val incorrectPath = test.millSourcePath / "extraspec_incorrect"
+    expectedUpdate(correctPath, true, true)
+    expectedUpdate(incorrectPath, false, true)
+    expectedUpdate(correctPath, true, false)
+    expectedUpdate(incorrectPath, false, false)
+  }
+
   def expectedUpdate(path: Path, shouldVerify: Boolean, BAPVariant: Boolean): Unit = {
     val examples = os.list(path).filter(os.isDir)
     for (e <- examples) {

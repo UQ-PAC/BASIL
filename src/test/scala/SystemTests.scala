@@ -191,6 +191,18 @@ class SystemTestsGTIRB extends SystemTests {
   }
 }
 
+class ExtraSpecTests extends SystemTests {
+  // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
+  val boogieFlags = Seq("/timeLimit:30", "/useArrayAxioms")
+  runTests("extraspec_correct", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
+  runTests("extraspec_correct", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = false, expectVerify = true, checkExpected = true, logResults = true))
+  runTests("extraspec_incorrect", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = true, expectVerify = false, checkExpected = true, logResults = true))
+  runTests("extraspec_incorrect", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = false, expectVerify = false, checkExpected = true, logResults = true))
+  test("summary-extraspec") {
+    summary("testresult-extraspec")
+  }
+}
+
 class AnalysisSystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true))
   runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = false))

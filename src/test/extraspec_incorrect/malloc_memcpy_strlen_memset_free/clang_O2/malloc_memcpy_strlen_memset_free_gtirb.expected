@@ -141,7 +141,7 @@ implementation FUN_790()
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 64bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 64bv64)) || L(mem, bvadd64(R16, 64bv64)));
     R16, Gamma_R16 := bvadd64(R16, 64bv64), Gamma_R16;
     call puts();
-    assume false; //no return target
+    assume false;
 }
 
 procedure main();
@@ -313,7 +313,7 @@ implementation FUN_710()
     R17, Gamma_R17 := memory_load64_le(mem, R16), (gamma_load64(Gamma_mem, R16) || L(mem, R16));
     R16, Gamma_R16 := R16, Gamma_R16;
     call memcpy();
-    assume false; //no return target
+    assume false;
 }
 
 procedure FUN_7a0();
@@ -344,7 +344,7 @@ implementation FUN_7a0()
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 72bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 72bv64)) || L(mem, bvadd64(R16, 72bv64)));
     R16, Gamma_R16 := bvadd64(R16, 72bv64), Gamma_R16;
     call #free();
-    assume false; //no return target
+    assume false;
 }
 
 procedure FUN_720();
@@ -375,7 +375,7 @@ implementation FUN_720()
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 8bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 8bv64)) || L(mem, bvadd64(R16, 8bv64)));
     R16, Gamma_R16 := bvadd64(R16, 8bv64), Gamma_R16;
     call strlen();
-    assume false; //no return target
+    assume false;
 }
 
 procedure FUN_750();
@@ -406,7 +406,7 @@ implementation FUN_750()
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 32bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 32bv64)) || L(mem, bvadd64(R16, 32bv64)));
     R16, Gamma_R16 := bvadd64(R16, 32bv64), Gamma_R16;
     call malloc();
-    assume false; //no return target
+    assume false;
 }
 
 procedure FUN_760();
@@ -437,7 +437,7 @@ implementation FUN_760()
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 40bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 40bv64)) || L(mem, bvadd64(R16, 40bv64)));
     R16, Gamma_R16 := bvadd64(R16, 40bv64), Gamma_R16;
     call memset();
-    assume false; //no return target
+    assume false;
 }
 
 procedure puts();
