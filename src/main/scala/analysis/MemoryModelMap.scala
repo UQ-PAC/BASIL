@@ -58,6 +58,10 @@ class MemoryModelMap {
         case _ => ???
     }
 
+    def regionsOverlap(r1: RangeKey, r2: RangeKey): Boolean = {
+      r1.start <= r2.end && r2.start <= r1.end
+    }
+
     region match {
       case s: StackRegion =>
         var currentStackMap = stackMap
@@ -87,8 +91,7 @@ class MemoryModelMap {
           currentDataMap(RangeKey(offset, maxSize(d) - 1)) = d
         } else {
           val currentMaxRange = currentDataMap.keys.maxBy(_.end)
-          val currentMaxRegion = currentDataMap(currentMaxRange)
-          if (offset <= currentMaxRange.end) {
+          if (regionsOverlap(currentMaxRange, RangeKey(offset, maxSize(d) - 1))) {
             currentDataMap.remove(currentMaxRange) // TODO: this removes previously overlapping parent region (jumptable2 example) which favours more fine grained regions
             currentDataMap(RangeKey(offset, maxSize(d) - 1)) = d
           } else {
@@ -136,7 +139,7 @@ class MemoryModelMap {
 
   def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]], heapRegions: mutable.Map[DirectCall, HeapRegion], mergeRegions: mutable.Set[Set[MemoryRegion]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
-    val reversedExternalFunctionRgns = (externalFunctions ++ globalAddresses).map((offset, name) => resolveInverseGlobalOffset(name, offset, globalOffsets) -> name)
+    val reversedExternalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(name, offset, globalOffsets) -> name)
     val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => reversedExternalFunctionRgns.contains(offset))
 
     val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, (globalSizes.getOrElse(name, 1).toDouble/8).ceil.toInt))
