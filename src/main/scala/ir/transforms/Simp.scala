@@ -16,6 +16,7 @@ trait AbstractDomain[L] {
   def bot: L
 }
 
+
 def doCopyPropTransform(
     p: Program,
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
@@ -267,6 +268,11 @@ def exprSimp(e: Expr): Expr = {
 
 object SSARename:
 
+
+// TODO: remove assigned and unread variables
+// TODO: Make procedure calls and returns assignments of all registers so they can become global and be ssa,
+//  and returned variables are not unread, and there is a clear modifies set across calls
+
   def concretiseSSA(p: Program, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) = {
     println("SSA conc ")
     val c = SSACollect(p, reachingDefs)
@@ -315,15 +321,15 @@ object SSARename:
 
   class SSACollect(p: Program, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) extends CILVisitor {
     val names = mutable.HashMap[Assign, Int]()
-    var count = 0
+    var count = mutable.HashMap[Variable, Int]().withDefaultValue(0)
     var statement : Statement = null
 
     override def vvar(v: Variable) =  {
       val assigns = getUse(v, statement, reachingDefs)
       if (assigns.size > 1) {
-        count += 1
+        count(v) = count(v) + 1
         for (a <- assigns) {
-          names(a) = count 
+          names(a) = count(v)
         }
       }
       DoChildren()
@@ -332,9 +338,11 @@ object SSARename:
     def initial() = {
       // give each definition a unique index
       for (c <- p) {
-        count += 1
         c match {
-          case a : Assign => names(a) = count
+          case a : Assign => {
+            count(a.lhs) = count(a.lhs) + 1
+            names(a) = count(a.lhs)
+          }
           case _ => ()
         }
       }
