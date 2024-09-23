@@ -20,7 +20,7 @@ import scala.collection.mutable
  * @param params mapping from procedures to their parameters
  */
 class DSA(program: Program,
-            symResults: Map[CFGPosition, Map[SymbolicAccess, TwoElement]],
+            symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
             constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
             globals: Set[SymbolTableEntry], globalOffsets: Map[BigInt, BigInt],
             externalFunctions: Set[ExternalFunction],

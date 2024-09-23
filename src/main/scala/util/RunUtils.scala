@@ -61,7 +61,7 @@ case class StaticAnalysisContext(
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-    symbolicAccessess: Map[CFGPosition, Map[SymbolicAccess, TwoElement]],
+    SymbolicAddressess: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
     locals: Option[Map[Procedure, DSG]],
     bus: Option[Map[Procedure, DSG]],
     tds: Option[Map[Procedure, DSG]],
@@ -723,7 +723,7 @@ object StaticAnalysis {
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,
       memoryRegionContents = memoryRegionContents,
-      symbolicAccessess = Map.empty,
+      SymbolicAddressess = Map.empty,
       reachingDefs = reachingDefinitionsAnalysisResults,
       locals = None,
       bus = None,
@@ -976,8 +976,8 @@ object RunUtils {
     )
 
     Logger.info("[!] Running Symbolic Access Analysis")
-    val symResults: Map[CFGPosition, Map[SymbolicAccess, TwoElement]] =
-      SymbolicAccessAnalysis(ctx.program, analysisResult.last.IRconstPropResult).analyze()
+    val symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]] =
+      SymbolicAddressAnalysis(ctx.program, analysisResult.last.IRconstPropResult).analyze()
     config.analysisDotPath.foreach(s =>
       writeToFile(toDot(ctx.program, symResults.foldLeft(Map(): Map[CFGPosition, String]) {
         (m, t) =>
@@ -1006,7 +1006,7 @@ object RunUtils {
       steensgaardResults = analysisResult.last.steensgaardResults,
       mmmResults = analysisResult.last.mmmResults,
       memoryRegionContents = analysisResult.last.memoryRegionContents,
-      symbolicAccessess = symResults, // analysisResult.last.symbolicAccessess,
+      SymbolicAddressess = symResults, // analysisResult.last.SymbolicAddressess,
       locals = Some(dsa.locals.toMap),
       bus = Some(dsa.bu.toMap),
       tds = Some(dsa.td.toMap),

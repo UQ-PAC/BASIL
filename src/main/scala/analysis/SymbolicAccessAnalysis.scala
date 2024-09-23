@@ -7,8 +7,8 @@ import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, Di
 
 import java.math.BigInteger
 
-case class SymbolicAccess(accessor: Variable, symbolicBase: MemoryLocation, offset: BigInt) {
-  override def toString: String = s"SymbolicAccess($accessor, $symbolicBase, $offset)"
+case class SymbolicAddress(accessor: Variable, symbolicBase: MemoryLocation, offset: BigInt) {
+  override def toString: String = s"SymbolicAddress($accessor, $symbolicBase, $offset)"
 }
 
 trait MemoryLocation {
@@ -39,7 +39,7 @@ case class UnknownLocation(override val regionIdentifier: String, proc: Procedur
  * elements in D are symbolic accesses of the form (variable, symbolic base, concrete offset)
  * lattice L is a binary lattice with top and bottom
  */
-trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends ForwardIDEAnalysis[SymbolicAccess, TwoElement, TwoElementLattice] {
+trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends ForwardIDEAnalysis[SymbolicAddress, TwoElement, TwoElementLattice] {
 
   private val stackPointer = Register("R31", 64)
   private val linkRegister = Register("R30", 64)
@@ -104,12 +104,12 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
                     case Left(value) => Map(d -> IdEdge())
                     case Right(_) =>
                       val size = bv2SignedInt(v)
-                      Map(d -> IdEdge(), Left(SymbolicAccess(variable, StackLocation(s"Stack_${procedure(n).name}", procedure(n), -size), 0)) -> ConstEdge(TwoElementTop))
+                      Map(d -> IdEdge(), Left(SymbolicAddress(variable, StackLocation(s"Stack_${procedure(n).name}", procedure(n), -size), 0)) -> ConstEdge(TwoElementTop))
                 else
                   d match
                     case Left(value) if value.accessor == arg1 =>
                       val offsetUpdate = evaluateExpression(arg2, constProp(n)).get.value
-                      val result: Map[DL, EdgeFunction[TwoElement]] = Map(Left(SymbolicAccess(variable, value.symbolicBase, value.offset + offsetUpdate)) -> ConstEdge(TwoElementTop))
+                      val result: Map[DL, EdgeFunction[TwoElement]] = Map(Left(SymbolicAddress(variable, value.symbolicBase, value.offset + offsetUpdate)) -> ConstEdge(TwoElementTop))
                       if value.accessor != variable then
                         result + (d -> IdEdge())
                       else
@@ -120,7 +120,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
           case arg:Variable =>
             d match
               case Left(value) if value.accessor == arg =>
-                val result: Map[DL, EdgeFunction[TwoElement]] = Map(Left(SymbolicAccess(variable, value.symbolicBase, value.offset)) -> ConstEdge(TwoElementTop))
+                val result: Map[DL, EdgeFunction[TwoElement]] = Map(Left(SymbolicAddress(variable, value.symbolicBase, value.offset)) -> ConstEdge(TwoElementTop))
                 if value.accessor != variable then
                   result + (d -> IdEdge())
                 else
@@ -131,7 +131,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
             d match
               case Left(value) if value.accessor == variable => Map()
               case Left(value) => Map(d -> IdEdge())
-              case Right(_) => Map(d -> IdEdge(), Left(SymbolicAccess(variable, UnknownLocation(nextunknownCount, procedure(n)), 0)) -> ConstEdge(TwoElementTop))
+              case Right(_) => Map(d -> IdEdge(), Left(SymbolicAddress(variable, UnknownLocation(nextunknownCount, procedure(n)), 0)) -> ConstEdge(TwoElementTop))
           case _ =>
             d match
               case Left(value) if value.accessor == variable => Map()
@@ -144,9 +144,9 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
             val size: BigInt = evaluateExpression(mallocVariable, constProp(n)) match
               case Some(value) => value.value
               case None => -1
-            Map(d -> IdEdge(), Left(SymbolicAccess(mallocVariable, HeapLocation(nextMallocCount, procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
+            Map(d -> IdEdge(), Left(SymbolicAddress(mallocVariable, HeapLocation(nextMallocCount, procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
       case _ => Map(d -> IdEdge())
 }
 
-class SymbolicAccessAnalysis(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]])
-  extends ForwardIDESolver[SymbolicAccess, TwoElement, TwoElementLattice](program), SymbolicAccessFunctions(constProp)
+class SymbolicAddressAnalysis(program: Program, constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]])
+  extends ForwardIDESolver[SymbolicAddress, TwoElement, TwoElementLattice](program), SymbolicAddressFunctions(constProp)

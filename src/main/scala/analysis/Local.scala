@@ -23,7 +23,7 @@ import scala.collection.mutable
  */
 class Local(
              proc: Procedure,
-             symResults: Map[CFGPosition, Map[SymbolicAccess, TwoElement]],
+             symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
              constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
              globals: Set[SymbolTableEntry], globalOffsets: Map[BigInt, BigInt],
              externalFunctions: Set[ExternalFunction],
@@ -40,10 +40,10 @@ class Local(
 
 
   // variables to symbolic access map for each cfg position
-  val varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAccess]]] = symResults.foldLeft(Map[CFGPosition, Map[Variable, Set[SymbolicAccess]]]()) {
+  val varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAddress]]] = symResults.foldLeft(Map[CFGPosition, Map[Variable, Set[SymbolicAddress]]]()) {
     (outerMap, syms) =>
       val position = syms._1
-      val innerMap = syms._2.foldLeft(Map[Variable, Set[SymbolicAccess]]()) {
+      val innerMap = syms._2.foldLeft(Map[Variable, Set[SymbolicAddress]]()) {
         (m, access) =>
           if m.contains(access._1.accessor) then
             // every variable pointing to a stack region ONLY has one symbolic access associated with it.

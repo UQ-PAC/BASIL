@@ -30,7 +30,7 @@ object NodeCounter {
  */
 class DSG(val proc: Procedure,
           constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-          varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAccess]]],
+          varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAddress]]],
           globals: Set[SymbolTableEntry], globalOffsets: Map[BigInt, BigInt],
           externalFunctions: Set[ExternalFunction],
           val reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
@@ -76,7 +76,7 @@ class DSG(val proc: Procedure,
         varToSym(pos)(arg1).foldLeft(m) { // go through all the symbolic accesses tied to arg1 at pos
           (m, sym) =>
             sym match
-              case SymbolicAccess(accessor, StackLocation(regionIdentifier, proc, size), symOffset) => // only consider stack accesses
+              case SymbolicAddress(accessor, StackLocation(regionIdentifier, proc, size), symOffset) => // only consider stack accesses
                 offset = offset + symOffset
                 createStackMapping(pos.toShortString, offset, m, byteSize)
               case _ => m
@@ -85,7 +85,7 @@ class DSG(val proc: Procedure,
         varToSym(pos)(arg).foldLeft(m) {
           (m, sym) =>
             sym match
-              case SymbolicAccess(accessor, StackLocation(regionIdentifier, proc, size), offset) =>
+              case SymbolicAddress(accessor, StackLocation(regionIdentifier, proc, size), offset) =>
                 createStackMapping(pos.toShortString, offset, m, byteSize)
               case _ => m
         }
