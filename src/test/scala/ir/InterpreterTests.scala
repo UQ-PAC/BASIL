@@ -299,7 +299,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       val ir = interpretRLimit(prog, 100000000)
       val it = intt.elapsed()
 
-      res = (i, native, it, ir._2) :: res
+      res = (i, native.toDouble, it.toDouble, ir._2) :: res
 
     }
 

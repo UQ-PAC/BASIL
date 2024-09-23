@@ -135,8 +135,8 @@ class IRTest extends AnyFunSuite {
     assert(1 == aftercallGotos.count(b => IntraProcIRCursor.pred(b).contains(blocks("l_main_1").jump)))
     assert(1 == aftercallGotos.count(b => IntraProcIRCursor.succ(b).contains(blocks("l_main_1").jump match {
       case GoTo(targets, _) => targets.head
+      case _ => throw Exception("unreachable")
     })))
-
   }
 
   test("addblocks") {
