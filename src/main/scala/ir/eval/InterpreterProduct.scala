@@ -29,7 +29,7 @@ def doRight[L, T, V, E](f: State[T, V, E]): State[(L, T), V, E] = for {
 
 /** Runs two interpreters "inner" and "before" simultaneously, returning the value from inner, and ignoring before
   */
-case class ProductInterpreter[L, T, E](val inner: Effects[L, E], val before: Effects[T, E]) extends Effects[(L, T), E] {
+case class ProductInterpreter[L, T, E](inner: Effects[L, E], before: Effects[T, E]) extends Effects[(L, T), E] {
 
   def loadVar(v: String) = for {
     n <- doRight(before.loadVar(v))
@@ -83,7 +83,7 @@ case class ProductInterpreter[L, T, E](val inner: Effects[L, E], val before: Eff
   } yield (f)
 }
 
-case class LayerInterpreter[L, T, E](val inner: Effects[L, E], val before: Effects[(L, T), E])
+case class LayerInterpreter[L, T, E](inner: Effects[L, E], before: Effects[(L, T), E])
     extends Effects[(L, T), E] {
 
   def loadVar(v: String) = for {

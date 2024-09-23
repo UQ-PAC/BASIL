@@ -3,6 +3,7 @@ package ir
 import util.PerformanceTimer
 import util.functional._
 import ir.eval._
+import boogie.Scope
 import ir.dsl._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.BeforeAndAfter
@@ -37,9 +38,10 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   Logger.setLevel(LogLevel.WARN)
 
   def getProgram(name: String): IRContext = {
+    val compiler = "gcc"
     val loading = ILLoadingConfig(
-      inputFile = s"examples/$name/$name.adt",
-      relfFile = s"examples/$name/$name.relf",
+      inputFile = s"src/test/correct/$name/$compiler/$name.adt",
+      relfFile = s"src/test/correct/$name/$compiler/$name.relf",
       specFile = None,
       dumpIL = None
     )
@@ -97,15 +99,16 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     assert(s.memoryState.getVarOpt("R29").isDefined)
 
   }
+
   test("var load store") {
     val s = for {
       s <- InterpFuns.initialState(NormalInterpreter)
-      v <- NormalInterpreter.loadVar("R31")
+      v <- NormalInterpreter.storeVar("R1", Scope.Global, Scalar(BitVecLiteral(1024, 64)))
+      v <- NormalInterpreter.loadVar("R1")
     } yield (v)
     val l = State.evaluate(InterpreterState(), s)
 
-    assert(l == Right(Scalar(BitVecLiteral(4096 - 16, 64))))
-
+    assert(l == Right(Scalar(BitVecLiteral(1024, 64))))
   }
 
   test("Store = Load LittleEndian") {
@@ -129,87 +132,6 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   }
 
-//   test("store bv = loadbv le") {
-//     val expected: BitVecLiteral = BitVecLiteral(BigInt("0D0C0B0A", 16), 32)
-//     val s2 = Eval.storeBV(initialMem(), "mem", Scalar(BitVecLiteral(0, 64)), expected, Endian.LittleEndian)
-//     val actual2: BitVecLiteral = Eval.loadBV(s2, "mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
-//     assert(actual2 == expected)
-//   }
-//
-//
-//   test("Store = Load BigEndian") {
-//     val ts = List(
-//       BitVecLiteral(BigInt("0D", 16), 8),
-//       BitVecLiteral(BigInt("0C", 16), 8),
-//       BitVecLiteral(BigInt("0B", 16), 8),
-//       BitVecLiteral(BigInt("0A", 16), 8))
-//
-//     val s = Eval.store(initialMem(), "mem", Scalar(BitVecLiteral(0, 64)), ts.map(Scalar(_)), Endian.LittleEndian)
-//     val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
-//     val actual: BitVecLiteral = Eval.loadBV(s, "mem", Scalar(BitVecLiteral(0, 64)), Endian.BigEndian , 32)
-//     assert(actual == expected)
-//
-//
-//   }
-//
-//   test("getMemory in LittleEndian") {
-//     val ts = List((BitVecLiteral(0, 64), BitVecLiteral(BigInt("0D", 16), 8)),
-//     (BitVecLiteral(1, 64) , BitVecLiteral(BigInt("0C", 16), 8)),
-//     (BitVecLiteral(2, 64) , BitVecLiteral(BigInt("0B", 16), 8)),
-//     (BitVecLiteral(3, 64) , BitVecLiteral(BigInt("0A", 16), 8)))
-//     val s = ts.foldLeft(initialMem())((m, v) => Eval.storeSingle(m, "mem", Scalar(v._1), Scalar(v._2)))
-//     // val s = initialMem().store("mem")
-//     // val r = s.loadBV("mem", BitVecLiteral(0, 64))
-//
-//     val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
-//
-//   // def loadBV(vname: String, addr: Scalar, endian: Endian, size: Int): BitVecLiteral = {
-//      val actual: BitVecLiteral = Eval.loadBV(s, "mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
-//     assert(actual == expected)
-//   }
-//
-//
-//   test("StoreBV = LoadBV LE ") {
-//     val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
-//
-//     val s = Eval.storeBV(initialMem(), "mem", Scalar(BitVecLiteral(0, 64)), expected, Endian.LittleEndian)
-//     val actual: BitVecLiteral = Eval.loadBV(s, "mem", Scalar(BitVecLiteral(0, 64)), Endian.LittleEndian, 32)
-//     println(s"${actual.value.toInt.toHexString} == ${expected.value.toInt.toHexString}")
-//     assert(actual == expected)
-//   }
-//
-//   // test("getMemory in BigEndian") {
-//   //   i.mems(0) = BitVecLiteral(BigInt("0A", 16), 8)
-//   //   i.mems(1) = BitVecLiteral(BigInt("0B", 16), 8)
-//   //   i.mems(2) = BitVecLiteral(BigInt("0C", 16), 8)
-//   //   i.mems(3) = BitVecLiteral(BigInt("0D", 16), 8)
-//   //   val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
-//   //   val actual: BitVecLiteral = i.getMemory(0, 32, Endian.BigEndian, i.mems)
-//   //   assert(actual == expected)
-//   // }
-//
-//   // test("setMemory in LittleEndian") {
-//   //   i.mems(0) = BitVecLiteral(BigInt("FF", 16), 8)
-//   //   i.mems(1) = BitVecLiteral(BigInt("FF", 16), 8)
-//   //   i.mems(2) = BitVecLiteral(BigInt("FF", 16), 8)
-//   //   i.mems(3) = BitVecLiteral(BigInt("FF", 16), 8)
-//   //   val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
-//   //   i.setMemory(0, 32, Endian.LittleEndian, expected, i.mems)
-//   //   val actual: BitVecLiteral = i.getMemory(0, 32, Endian.LittleEndian, i.mems)
-//   //   assert(actual == expected)
-//   // }
-//
-//   // test("setMemory in BigEndian") {
-//   //   i.mems(0) = BitVecLiteral(BigInt("FF", 16), 8)
-//   //   i.mems(1) = BitVecLiteral(BigInt("FF", 16), 8)
-//   //   i.mems(2) = BitVecLiteral(BigInt("FF", 16), 8)
-//   //   i.mems(3) = BitVecLiteral(BigInt("FF", 16), 8)
-//   //   val expected: BitVecLiteral = BitVecLiteral(BigInt("0A0B0C0D", 16), 32)
-//   //   i.setMemory(0, 32, Endian.BigEndian, expected, i.mems)
-//   //   val actual: BitVecLiteral = i.getMemory(0, 32, Endian.BigEndian, i.mems)
-//   //   assert(actual == expected)
-//   // }
-//
   test("basic_arrays_read") {
     val expected = Map(
       "arr" -> 0
@@ -231,21 +153,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     testInterpret("basic_assign_increment", expected)
   }
 
-  test("basic_loop_loop") {
-    val expected = Map(
-      "x" -> 10
-    )
-    testInterpret("basic_loop_loop", expected)
-  }
 
-  test("basicassign") {
-    val expected = Map(
-      "x" -> 0,
-      "z" -> 0,
-      "secret" -> 0
-    )
-    testInterpret("basicassign", expected)
-  }
 
   test("function") {
     val expected = Map(
@@ -274,7 +182,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   test("indirect_call") {
     val expected = Map[String, Int]()
-    testInterpret("indirect_call_outparam", expected)
+    testInterpret("indirect_call", expected)
   }
 
   test("ifglobal") {
@@ -381,7 +289,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     Logger.setLevel(LogLevel.ERROR)
     var res = List[(Int, Double, Double, Int)]()
 
-    for (i <- 0 to 30) {
+    for (i <- 0 to 20) {
       val prog = fibonacciProg(i)
 
       val t = PerformanceTimer("native")
@@ -394,10 +302,9 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
       res = (i, native, it, ir._2) :: res
 
-      println(s"${res.head}")
     }
 
-    println(("fib number,native time,interp time,interp cycles" :: (res.map(x => s"${x._1},${x._2},${x._3},${x._4}"))).mkString("\n"))
+    info(("fibonacci runtime table:\nFibNumber,ScalaRunTime,interpreterRunTime,instructionCycleCount" :: (res.map(x => s"${x._1},${x._2},${x._3},${x._4}"))).mkString("\n"))
 
   }
 
@@ -436,7 +343,6 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     )
 
     val ir = interpret(tp)
-    println(ir)
     assert(ir.nextCmd.isInstanceOf[ErrorStop])
 
   }

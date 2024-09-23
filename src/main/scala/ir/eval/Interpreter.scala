@@ -17,22 +17,22 @@ import scala.util.control.Breaks.{break, breakable}
 sealed trait ExecutionContinuation
 case class Stopped() extends ExecutionContinuation /* normal program stop  */
 case class ErrorStop(error: InterpreterError) extends ExecutionContinuation /* program stop in error state */
-case class Run(val next: Command) extends ExecutionContinuation /* continue by executing next command */
-case class Intrinsic(val name: String) extends ExecutionContinuation /* a named intrinsic instruction */
+case class Run(next: Command) extends ExecutionContinuation /* continue by executing next command */
+case class Intrinsic(name: String) extends ExecutionContinuation /* a named intrinsic instruction */
 
 sealed trait InterpreterError
 case class FailedAssertion(a: Assert) extends InterpreterError
-case class EscapedControlFlow(val call: Jump | Call)
+case class EscapedControlFlow(call: Jump | Call)
     extends InterpreterError /* controlflow has reached somewhere eunrecoverable */
-case class Errored(val message: String = "") extends InterpreterError
-case class TypeError(val message: String = "") extends InterpreterError /* type mismatch appeared */
-case class EvalError(val message: String = "")
+case class Errored(message: String = "") extends InterpreterError
+case class TypeError(message: String = "") extends InterpreterError /* type mismatch appeared */
+case class EvalError(message: String = "")
     extends InterpreterError /* failed to evaluate an expression to a concrete value */
-case class MemoryError(val message: String = "") extends InterpreterError /* An error to do with memory */
+case class MemoryError(message: String = "") extends InterpreterError /* An error to do with memory */
 
 /* Concrete value type of the interpreter. */
 sealed trait BasilValue(val irType: Option[IRType])
-case class Scalar(val value: Literal) extends BasilValue(Some(value.getType)) {
+case class Scalar(value: Literal) extends BasilValue(Some(value.getType)) {
   override def toString = value match {
     case b: BitVecLiteral => "0x%x:bv%d".format(b.value, b.size)
     case c                => c.toString
@@ -40,7 +40,7 @@ case class Scalar(val value: Literal) extends BasilValue(Some(value.getType)) {
 }
 
 /* Abstract callable function address */
-case class FunPointer(val addr: BitVecLiteral, val name: String, val call: ExecutionContinuation)
+case class FunPointer(addr: BitVecLiteral, name: String, call: ExecutionContinuation)
     extends BasilValue(Some(addr.getType))
 
 sealed trait MapValue {
@@ -51,7 +51,7 @@ sealed trait MapValue {
    \exists i . \forall v \in value.keys , v.irType = i  and
    \exists j . \forall v \in value.values, v.irType = j
  */
-case class BasilMapValue(val value: Map[BasilValue, BasilValue], val mapType: MapType)
+case class BasilMapValue(value: Map[BasilValue, BasilValue], mapType: MapType)
     extends MapValue
     with BasilValue(Some(mapType)) {
   override def toString = s"MapValue : $irType"

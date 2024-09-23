@@ -89,6 +89,7 @@ def evalUnOp(op: UnOp, body: Literal): Expr = {
     case (i: IntLiteral, IntNEG)   => IntLiteral(-i.value)
     case (FalseLiteral, BoolNOT)   => TrueLiteral
     case (TrueLiteral, BoolNOT)    => FalseLiteral
+    case (_, _)                    => throw Exception(s"Unreachable ${(body, op)}")
   }
 }
 

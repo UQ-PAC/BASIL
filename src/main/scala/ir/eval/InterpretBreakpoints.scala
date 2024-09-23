@@ -27,7 +27,7 @@ case class BreakPointAction(
 
 case class BreakPoint(name: String = "", location: BreakPointLoc, action: BreakPointAction)
 
-case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](val f: I, val breaks: List[BreakPoint])
+case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, breaks: List[BreakPoint])
     extends NopEffects[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), InterpreterError] {
 
   def findBreaks[R](c: Command): State[(T, R), List[BreakPoint], InterpreterError] = {
