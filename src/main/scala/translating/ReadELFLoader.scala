@@ -16,6 +16,7 @@ enum ELFSymType:
   case FILE
   case OBJECT
   case FUNC /* code function */
+  case TLS /* ??? */
 
 
 enum ELFBind:
@@ -26,6 +27,7 @@ enum ELFBind:
 enum ELFVis:
   case HIDDEN
   case DEFAULT
+  case PROTECTED
 
 enum ELFNDX:
   case Section(num: Int) /* Section containing the symbol */
@@ -43,8 +45,8 @@ case class ELFSymbol(num: Int,  /* symbol number */
 
 object ReadELFLoader {
   def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], BigInt) = {
-    val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableExtFunc(r)).toSet
-    val relocationOffsets = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableOffsets(r)).toMap
+    val externalFunctions = ctx.relocationTable.asScala.filter(_.relocationTableHeader != null).flatMap(r => visitRelocationTableExtFunc(r)).toSet
+    val relocationOffsets = ctx.relocationTable.asScala.filter(_.relocationTableHeader != null).flatMap(r => visitRelocationTableOffsets(r)).toMap
     val mainAddress = ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, config.mainProcedureName))
 
     val symbolTable = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toList
@@ -59,12 +61,16 @@ object ReadELFLoader {
   }
 
   def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {
-    val sectionName = ctx.relocationTableHeader.tableName.STRING.getText
-    if (sectionName == ".rela.plt" || sectionName == ".rela.dyn") {
-      val rows = ctx.relocationTableRow.asScala
-      rows.filter(r => r.name != null).map(r => visitRelocationTableRowExtFunc(r)).toSet
-    } else {
+    if (ctx.relocationTableHeader == null) {
       Set()
+    } else {
+      val sectionName = ctx.relocationTableHeader.tableName.STRING.getText
+      if (sectionName == ".rela.plt" || sectionName == ".rela.dyn") {
+        val rows = ctx.relocationTableRow.asScala
+        rows.filter(r => r.name != null).map(r => visitRelocationTableRowExtFunc(r)).toSet
+      } else {
+        Set()
+      }
     }
   }
 
