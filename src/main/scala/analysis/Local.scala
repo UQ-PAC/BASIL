@@ -3,6 +3,7 @@ package analysis
 import analysis.BitVectorEval.{bv2SignedInt, isNegative}
 import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Endian, Expr, Extract, IntraProcIRCursor, MemoryAssign, MemoryLoad, Procedure, Register, Variable, ZeroExtend, computeDomain, toShortString}
 import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
+import util.writeToFile
 
 import scala.util.control.Breaks.{break, breakable}
 import java.math.BigInteger
@@ -167,7 +168,7 @@ class Local(
           val internalOffset = t._2
           val node = t._1.node.get
           val cell = graph.find(node.getCell(offset + internalOffset))
-          if cell._pointee.isDefined && graph.find(cell.getPointee._1).equals(result) then
+          if cell.pointee.isDefined && graph.find(cell.getPointee._1).equals(result) then
             graph.selfCollapse(node)
 //            assert(graph.pointTo.contains(node.getCell(offset))) TODO
             result = graph.find(graph.find(node.getCell(offset)).getPointee._1)
@@ -328,9 +329,9 @@ class Local(
             graph.mergeCells(graph.adjust(slice), c)
         }
 
-        print("")
-
       case _ =>
+
+    writeToFile(graph.toDot, "test.dot")
   }
   def analyze(): DSG =
     val domain = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString)

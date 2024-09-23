@@ -58,7 +58,23 @@ class DSATest extends AnyFunSuite, TestUtil {
     assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
 
 
-    assert(dsg.adjust(stack32.getPointee).equals(stack24))  // R31 + 32 points to R31 + 24, 00000457
+    /*
+    Position 0000044F: tmp1 := R31 + 24 // Ev(tmp1) = new Node(R31 + 24).0
+    implicit normalisation: tmp2 := R31 + 32 // Ev(tmp2) = new Node(R31 + 32).0
+    Position 00000457: *tmp2 := tmp1 // merge(Ev(tmp1), E(Ev(tmp2)))
+    Therefore, Node(R31 + 32).0.pointee is merged with Node(R31 + 24).0, making E(Node(R31 + 32).0) == Node(R31 + 24).0
+    at position 00000446 Ev(R0) == Malloc_Node == E(Node(R31 + 24).0) we have
+    mem := mem with [R31 + 0x20, el]:u64 <- R0
+    *(R31 + 32) := R0
+    merge(Ev(R0), E(Ev(R31+ 32))
+    == merge(E(Node(R31 + 24).0), E(Node(R31 + 32).0))
+    == merge(E(Node(R31 + 24).0), Node(R31 + 24).0)
+    which merges make the stack + 24 point to itself
+     */
+
+
+    // R31 + 32 points to R31 + 24, later set to point to heap but it should point to both (
+    assert(dsg.adjust(stack32.getPointee).equals(stack24))
     assert(stack24.node.get.collapsed) // 00000497 collapses stack24 concatenation is currently unhandled, any objects referenced in an unhandled operation are collapsed
     assert(dsg.adjust(stack24.getPointee).equals(stack24)) // 00000466, R31 + 32 and R31 + 24 pointees are merged
 
@@ -250,7 +266,7 @@ class DSATest extends AnyFunSuite, TestUtil {
     assert(stack32.offset == 16)
 
     // stack40 points to a different offset of stack24's node but the analysis can't determine that in the local phase
-    assert(stack40._pointee.isDefined)
+    assert(stack40.pointee.isDefined)
     assert(!stack40.node.get.equals(stack24.node.get))
   }
 
@@ -283,7 +299,7 @@ class DSATest extends AnyFunSuite, TestUtil {
 
   test("internal merge") {
     // this is an internal merge (two cells of the same node overlap and are merged together)
-    val mem = SharedMemory("mem", 10000, 10000)
+    val mem = SharedMemory("mem", 64, 8)
     val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
     val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
     var program = prog(
@@ -291,8 +307,8 @@ class DSATest extends AnyFunSuite, TestUtil {
         block("operations",
           locAssign1, // R6 = R0 + 4
           locAssign2, // R7 = R0 + 5
-          MemoryAssign(mem,  R7, R1, BigEndian, 64, Some("00003")),
-          MemoryAssign(mem,  R6, R2, BigEndian, 64, Some("00004")),
+          MemoryAssign(mem,  R7, R1, BigEndian, 64, Some("00003")), // *R7 = R1, (*R6 + 1) = R1
+          MemoryAssign(mem,  R6, R2, BigEndian, 64, Some("00004")), // *R6 = R2
           ret
         )
       )
@@ -303,22 +319,27 @@ class DSATest extends AnyFunSuite, TestUtil {
     val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Set.empty, Map.empty, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program))
     val dsg: DSG = results.locals.get(program.mainProcedure)
 
-    // object of formals R1 and R2 are written to overlapping fields of the same node? causing them to be merged together
-    assert(dsg.adjust(dsg.formals(R1)).equals(dsg.adjust(dsg.formals(R2))))
 
-    // R6 and R7 address the same cell
+
+    // R6 and R7 address the same cell (overlapping cells in the same node that are merged)
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign2)(R7)).cell))
+
+    // outgoing edges of R6 and R7 are unified since the cells are merged
+    // object of formals R1 and R2 are written to overlapping fields of the same node (R6, R7); causing them to be merged together
+    assert(dsg.adjust(dsg.formals(R1)).equals(dsg.adjust(dsg.formals(R2))))
     // however, they address different internal offets in those cells
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).internalOffset == 0)
     assert(dsg.find(dsg.varToCell(locAssign2)(R7)).internalOffset == 1)
-    // R6 points to input R1
-    assert(dsg.adjust(dsg.varToCell(locAssign1)(R6))._pointee.isDefined)
+
+    // Since R6 and R7 are pointing to the same cell (R1 and R2)
+    // R6 (or R7)'s pointee should be the same as R1 and R2
+    assert(dsg.adjust(dsg.varToCell(locAssign1)(R6)).pointee.isDefined)
     assert(dsg.adjust(dsg.adjust(dsg.varToCell(locAssign1)(R6)).getPointee).equals(dsg.adjust(dsg.formals(R1))))
 
   }
 
   test("offsetting from middle of cell to a new cell") {
-    val mem = SharedMemory("mem", 10000, 10000)
+    val mem = SharedMemory("mem", 64, 8)
     val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
     val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
     val locAssign3 = Assign(R5, BinaryExpr(BVADD, R7,  BitVecLiteral(8, 64)), Some("00005"))
@@ -347,8 +368,8 @@ class DSATest extends AnyFunSuite, TestUtil {
 
   test("offsetting from middle of cell to the same cell") {
     // similar to above except instead of creating new cell the last assign
-    // points R7's cell at an internal offset of 8
-    val mem = SharedMemory("mem", 10000, 10000)
+    // points R5's cell at an internal offset of 8
+    val mem = SharedMemory("mem", 64, 8)
     val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
     val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
     val locAssign3 = Assign(R5, BinaryExpr(BVADD, R7, BitVecLiteral(7, 64)), Some("00005"))
@@ -377,13 +398,13 @@ class DSATest extends AnyFunSuite, TestUtil {
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).internalOffset == 0)
     assert(dsg.find(dsg.varToCell(locAssign2)(R7)).internalOffset == 1)
     assert(dsg.find(dsg.varToCell(locAssign3)(R5)).internalOffset == 8)
-    assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell._pointee.isDefined)
+    assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.pointee.isDefined)
     assert(dsg.find(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.getPointee).equals(dsg.find(dsg.formals(R1))))
   }
 
   test("internal offset transfer") {
     // this is a test to check assignments transfer internal offset of slices.
-    val mem = SharedMemory("mem", 10000, 10000)
+    val mem = SharedMemory("mem", 64, 8)
     val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
     val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
     val locAssign3 = Assign(R5, R7, Some("00005"))
@@ -545,7 +566,7 @@ class DSATest extends AnyFunSuite, TestUtil {
     assert(stack24.node.get.equals(stack32.node.get))
     assert(stack24.offset == 0)
     assert(stack32.offset == 16)
-    assert(stack40._pointee.isDefined)
+    assert(stack40.pointee.isDefined)
     assert(stack40.node.get.equals(stack24.node.get))
     assert(stack40.offset == 32)
     assert(dsg.find(dsg.stackMapping(40).cells(0)).getPointee.internalOffset == 0)
@@ -695,7 +716,7 @@ class DSATest extends AnyFunSuite, TestUtil {
     assert(stack24.node.get.equals(stack32.node.get))
     assert(stack24.offset == 0)
     assert(stack32.offset == 16)
-    assert(stack40._pointee.isDefined)
+    assert(stack40.pointee.isDefined)
     assert(stack40.node.get.equals(stack24.node.get))
     assert(stack40.offset == 32)
     assert(dsg.find(dsg.stackMapping(40).cells(0)).getPointee.internalOffset == 0)

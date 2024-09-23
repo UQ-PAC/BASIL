@@ -42,6 +42,9 @@ class DSG(val proc: Procedure,
   val nodes: mutable.Set[DSN] = mutable.Set()
 
 
+  // Points-to relations in this graph, only updated once the analysis is done,
+  val pointsto: mutable.Map[DSC, Slice] = mutable.Map()
+
   // represent callees in proc
   val callsites: mutable.Set[CallSite] = mutable.Set()
 
@@ -152,7 +155,7 @@ class DSG(val proc: Procedure,
               globalMapping.update(AddressRange(relocatedAddress, relocatedAddress + 8), Field(node, 0))
               node
 
-          node.cells(field)._pointee = Some(Slice(isGlobal(address).get._2._1.cells(0), 0))
+          node.cells(field).pointee = Some(Slice(isGlobal(address).get._2._1.cells(0), 0))
           address = relocatedAddress
       }
   )
@@ -173,7 +176,7 @@ class DSG(val proc: Procedure,
     var global: Option[(AddressRange, Field)]  = None
     breakable {
       for (elem <- globalMapping) {
-        val range = elem._1 // TODO
+        val range = elem._1
         if address >= range.start && (address < range.end || (range.start == range.end && range.end == address)) then
           global = Some(elem)
           break
@@ -196,6 +199,7 @@ class DSG(val proc: Procedure,
    */
   def collectNodes =
     nodes.clear()
+    pointsto.clear()
     nodes.addAll(formals.values.map(_._1.node.get).map(n => find(n).node))
     varToCell.values.foreach(
       value => nodes.addAll(value.values.map(_._1.node.get).map(n => find(n).node))
@@ -208,11 +212,13 @@ class DSG(val proc: Procedure,
     while queue.nonEmpty do
       val cur = queue.dequeue()
       cur.cells.foreach {
-        case (offset: BigInt, cell: DSC) if cell._pointee.isDefined =>
+        case (offset: BigInt, cell: DSC) if cell.pointee.isDefined =>
           val node = find(cell.getPointee.node).node
           if !nodes.contains(node) then
             nodes.add(node)
             queue.enqueue(node)
+          assert(!pointsto.contains(cell))
+          pointsto.update(cell, find(cell.getPointee))
         case _ =>
       }
 
@@ -238,7 +244,9 @@ class DSG(val proc: Procedure,
         s ++ mapping.foldLeft(Set[DotStruct]()) {
           (k, n) =>
             val variable = n._1.name
-            k + DotStruct(s"SSA_${pos.toShortString.slice(1, 9)}_$variable", s"SSA_${pos}_$variable", None, false)
+            k + DotStruct(s"SSA_${
+              if pos.toShortString.startsWith("%") then pos.toShortString.drop(1) else pos.toShortString
+            }_$variable", s"SSA_${pos}_$variable", None, false)
         }
     }
 
@@ -255,20 +263,14 @@ class DSG(val proc: Procedure,
         s + DotStruct(s"Stack_$offset", s"Stack_$offset", None)
     }
 
-    var arrows = nodes.foldLeft(Set[StructArrow]()) {
-      (s, node) =>
-        s ++ node.cells.foldLeft(Set[StructArrow]()) {
-          (k, c) =>
-            val offset = c._1
-            val cell = c._2
-            if cell._pointee.isDefined then
-              val pointee = find(cell.getPointee)
-              s + StructArrow(DotStructElement(node.id.toString, Some(offset.toString)), DotStructElement(pointee.node.id.toString, Some(pointee.cell.offset.toString)), pointee.internalOffset.toString)
-            else
-              s
-        }
-    }
+    var arrows =
+      pointsto.foldLeft(Set[StructArrow]()) {
+        case (s: Set[StructArrow], (cell: DSC, pointee: Slice)) =>
+          val pointerID = cell.node.get.id.toString
+          val pointerOffset = cell.offset.toString
 
+          s + StructArrow(DotStructElement(pointerID, Some(pointerOffset)), DotStructElement(pointee.node.id.toString, Some(pointee.cell.offset.toString)), pointee.internalOffset.toString)
+      }
 
     arrows ++= formals.foldLeft(Set[StructArrow]()) {
       (s, n) =>
@@ -285,7 +287,9 @@ class DSG(val proc: Procedure,
           (k, n) =>
             val variable = n._1.name
             val value = find(n._2)
-            k + StructArrow(DotStructElement(s"SSA_${pos.toShortString.slice(1, 9)}_$variable", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString)
+            k + StructArrow(DotStructElement(s"SSA_${
+              if pos.toShortString.startsWith("%") then pos.toShortString.drop(1) else pos.toShortString
+            }_$variable", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString)
         }
     }
 
@@ -337,7 +341,7 @@ class DSG(val proc: Procedure,
       var cell = node.cells.tail.foldLeft(adjust(node.cells.head._2.getPointee)) {
         (c, field) =>
           val cell = field._2
-          val pointee = cell._pointee
+          val pointee = cell.pointee
           if pointee.isDefined && adjust(cell.getPointee) == cell then
             pointToItself = true
             c
@@ -354,7 +358,7 @@ class DSG(val proc: Procedure,
         cell = mergeCells(cell, collapedCell)
 
 
-      collapedCell._pointee = Some(Slice(collapedCell, 0))
+      collapedCell.pointee = Some(Slice(collapedCell, 0))
 
       assert(collapsedNode.cells.size == 1)
 
@@ -398,14 +402,14 @@ class DSG(val proc: Procedure,
    */
   def mergeNeighbours(cell1: DSC, cell2: DSC): DSC =
     require(cell1.node.equals(cell2.node) && cell1.offset < cell2.offset)
-    if cell2._pointee.isDefined then
-      if cell1._pointee.isDefined then
+    if cell2.pointee.isDefined then
+      if cell1.pointee.isDefined then
         val slice1 = cell1.getPointee
         val slice2 = cell2.getPointee
         val result = mergeCells(adjust(slice1), adjust(slice2))
-        cell1._pointee = Some(Slice(result, slice2.internalOffset.max(slice1.internalOffset)))
+        cell1.pointee = Some(Slice(result, slice2.internalOffset.max(slice1.internalOffset)))
       else
-        cell1._pointee = cell2._pointee
+        cell1.pointee = cell2.pointee
     val internalOffsetChange = cell2.offset - cell1.offset
     cell2.node.get.cells.remove(cell2.offset)
     cell1.growSize((cell2.offset - cell1.offset) + cell2.largestAccessedSize) // might cause another collapse
@@ -477,15 +481,15 @@ class DSG(val proc: Procedure,
       node2.children += (node1 -> 0)
       node2.allocationRegions.addAll(node1.allocationRegions) // add regions and flags of node 1 to node 2
       node2.flags.join(node1.flags)
-      if node1.cells(0)._pointee.isDefined then // merge the pointees of the two collapsed (single cell) nodes
-        if node2.cells(0)._pointee.isDefined then
+      if node1.cells(0).pointee.isDefined then // merge the pointees of the two collapsed (single cell) nodes
+        if node2.cells(0).pointee.isDefined then
           val slice1 = node1.cells(0).getPointee
           val slice2 = node2.cells(0).getPointee
           val result = mergeCells(adjust(slice1), adjust(slice2))
-          node2.cells(0)._pointee = Some(Slice(result, slice1.internalOffset.max(slice2.internalOffset)))
+          node2.cells(0).pointee = Some(Slice(result, slice1.internalOffset.max(slice2.internalOffset)))
         else 
-          node2.cells(0)._pointee = node1.cells(0)._pointee
-//      node1.cells(0)._pointee = None
+          node2.cells(0).pointee = node1.cells(0).pointee
+//      node1.cells(0).pointee = None
 //      replace(node1.cells(0), node2.cells(0), 0)
       solver.unify(node1.term, node2.term, 0)
       node2.cells(0)
@@ -552,7 +556,7 @@ class DSG(val proc: Procedure,
             (set, cell) =>
 
               // collect outgoing edges
-              if cell._pointee.isDefined then
+              if cell.pointee.isDefined then
                 val pointee = cell.getPointee
                 set + pointee
               else
@@ -560,15 +564,13 @@ class DSG(val proc: Procedure,
           }
           // replace outgoing edges
           if outgoing.size == 1 then
-            collapsedCell._pointee = Some(outgoing.head)
+            collapsedCell.pointee = Some(outgoing.head)
           else if outgoing.size > 1 then
             val result = outgoing.tail.foldLeft(adjust(outgoing.head)){
               (result, pointee) =>
                 mergeCells(result, adjust(pointee))
             }
-
-
-            collapsedCell._pointee = Some(deadjust(result))
+            collapsedCell.pointee = Some(deadjust(result))
       }
 
       solver.unify(node1.term, resultNode.term, 0)
@@ -704,7 +706,7 @@ class DSG(val proc: Procedure,
 
       val node = queue.dequeue()
       node.cells.foreach {
-        case (offset: BigInt, cell: DSC) if cell._pointee.isDefined =>
+        case (offset: BigInt, cell: DSC) if cell.pointee.isDefined =>
           val id = cell.node.get.id
           val pointee = find(cell.getPointee)
           val pointeeId = pointee.node.id
@@ -712,7 +714,7 @@ class DSG(val proc: Procedure,
             queue.enqueue(pointee.node)
             val newNode = pointee.node.cloneSelf(newGraph)
             idToNode.update(pointeeId, newNode)
-          idToNode(id).cells(cell.offset)._pointee = Some(Slice(idToNode(pointeeId).cells(pointee.offset), pointee.internalOffset))
+          idToNode(id).cells(cell.offset).pointee = Some(Slice(idToNode(pointeeId).cells(pointee.offset), pointee.internalOffset))
 
 
         case _ =>
@@ -864,7 +866,7 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
 
       cells.foreach {
         case (offset: BigInt, cell: DSC) =>
-        if cell._pointee.isDefined then
+        if cell.pointee.isDefined then
           val pointee = cell.getPointee
           pointee.node.cloneNode(from, to)
 //          to.pointTo.update(cell, pointee) TODO check this is not necessary
@@ -888,29 +890,39 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
  * @param node the node this cell belongs to
  * @param offset the offset of the cell
  */
-case class DSC(node: Option[DSN], offset: BigInt)
+class DSC(val node: Option[DSN], val offset: BigInt)
 {
   var largestAccessedSize: BigInt = 0
 
-  var _pointee : Option[Slice] = None
+  // the cell's pointee
+  var pointee : Option[Slice] = None
 
+  // returns the cell's pointee if it has one.
+  // if not it will create a placeholder, set it as the pointee of this cell and return it
   def getPointee : Slice =
-    if _pointee.isEmpty then
+    if pointee.isEmpty then
       val node = DSN(Some(this.node.get.graph.get))
-      _pointee = Some(Slice(node.cells(0), 0))
+      pointee = Some(Slice(node.cells(0), 0))
     else
 
-      val graph = _pointee.get.node.graph.get
-      val resolvedPointee = graph.find(graph.adjust(_pointee.get))
+      val graph = pointee.get.node.graph.get
+      val resolvedPointee = graph.find(graph.adjust(pointee.get))
 
-      _pointee = Some(graph.deadjust(resolvedPointee))
-    _pointee.get
+      pointee = Some(graph.deadjust(resolvedPointee))
+    pointee.get
 
   def growSize(size: BigInt): Boolean =
     if size > largestAccessedSize then
       largestAccessedSize = size
       true
     else false
+
+
+  override def equals(obj: Any): Boolean =
+    obj match
+      case cell:DSC => this.node.equals(cell.node) && this.offset.equals(cell.offset)
+      case _ => false
+
 
   override def toString: String = s"Cell(${if node.isDefined then node.get.toString else "NONE"}, $offset)"
 }
