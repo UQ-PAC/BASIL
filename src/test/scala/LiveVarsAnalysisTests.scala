@@ -296,6 +296,7 @@ class LiveVarsAnalysisTests extends AnyFunSuite, TestUtil {
   test("basic_arrays_write") {
     val result: BASILResult = runExample("basic_arrays_write")
     val analysisResults = result.analysis.get.interLiveVarsResults
+    
     val blocks = result.ir.program.blocks
 
     // main has a parameter, R0 should be alive

@@ -105,7 +105,7 @@ class Local(
       val global = graph.isGlobal(value.get.value)
       if global.isDefined then
         val address = value.get.value
-        val (range: AddressRange, Field(node, internal)) = global.get
+        val DSAGlobal(range: AddressRange, Field(node, internal)) = global.get
         val offset = address - range.start
         node.addCell(internal + offset, size)
         graph.selfCollapse(node)
@@ -244,17 +244,13 @@ class Local(
           graph.mergeCells(lhsCell, stack.get)
         else
           expr match
-            case BinaryExpr(op, arg1: Variable, arg2) => // Rx = Rx + c
+            case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) => // Rx = Rx + c
               val arg2Offset = evaluateExpression(arg2, constProp(n))
               if op.equals(BVADD) && arg1.equals(stackPointer)
               && arg2Offset.isDefined && isNegative(arg2Offset.get) then
                 () // the stack is handled prior to this
-//                val size = bv2SignedInt(arg2Offset.get)
-//                val node = DSN(Some(graph))
-//                node.allocationRegions.add(StackLocation("Stack_"+proc.name, proc, -size))
-//                node.flags.stack = true
-//                graph.mergeCells(lhsCell, node.cells(0))
-              else if /*varToSym.contains(n) &&  varToSym(n).contains(arg1) && */ arg2Offset.isDefined then
+
+              else if /*varToSym.contains(n) &&  varToSym(n).contains(arg1) && */  arg2Offset.isDefined then
                 // merge lhs with cell(s) corresponding to (arg1 + arg2) where arg1 is cell and arg2 is an offset
                 val offset = evaluateExpression(arg2, constProp(n)).get.value
                 visitPointerArithmeticOperation(n, lhsCell, arg1, 0, false, offset)
@@ -266,7 +262,8 @@ class Local(
              visitPointerArithmeticOperation(n, lhsCell, arg, 0)
 
             case MemoryLoad(mem, index, endian, size) => // Rx = Mem[Ry], merge Rx and pointee of Ry (E(Ry))
-              val byteSize = (size.toDouble/8).ceil.toInt
+              assert(size % 8 == 0)
+              val byteSize = size/8
               lhsCell.node.get.flags.read  = true
               global = isGlobal(index, n, byteSize)
               stack = isStack(index, n)
@@ -276,7 +273,7 @@ class Local(
                 graph.mergeCells(lhsCell, graph.adjust(graph.find(stack.get).getPointee))
               else
                 index match
-                  case BinaryExpr(op, arg1: Variable, arg2) =>
+                  case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
                     evaluateExpression(arg2, constProp(n)) match
                       case Some(v) =>
 //                        assert(varToSym(n).contains(arg1))
@@ -284,6 +281,7 @@ class Local(
                         visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, offset)
                       case None =>
 //                        assert(varToSym(n).contains(arg1))
+                        // collapse the result
                         visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, 0, true)
                   case arg: Variable =>
 //                    assert(varToSym(n).contains(arg))
@@ -297,7 +295,8 @@ class Local(
         val value: Variable = unwrapPaddingAndSlicing(expr).asInstanceOf[Variable]
         val index: Expr = unwrapPaddingAndSlicing(ind)
         reachingDefs(n)(value).foreach(visit)
-        val byteSize = (size.toDouble/8).ceil.toInt
+        assert(size % 8 == 0)
+        val byteSize = size / 8
         val global = isGlobal(index, n, byteSize)
         val stack = isStack(index, n)
         val addressPointee: DSC =
@@ -307,7 +306,7 @@ class Local(
             graph.adjust(graph.find(stack.get).getPointee)
           else
             index match
-              case BinaryExpr(op, arg1: Variable, arg2) =>
+              case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
                 evaluateExpression(arg2, constProp(n)) match
                   case Some(v) =>
 //                    assert(varToSym(n).contains(arg1))
@@ -315,6 +314,7 @@ class Local(
                     visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, offset)
                   case None =>
 //                    assert(varToSym(n).contains(arg1))
+                    // collapse the results
                     visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, 0, true)
               case arg: Variable =>
 //                assert(varToSym(n).contains(arg))

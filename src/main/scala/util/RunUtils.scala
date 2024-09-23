@@ -705,8 +705,8 @@ object StaticAnalysis {
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
     Logger.info("[!] Running Interprocedural Live Variables Analysis")
-    //val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
-    val interLiveVarsResults = Map[CFGPosition, Map[Variable, TwoElement]]()
+    val interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
+//    val interLiveVarsResults = Map[CFGPosition, Map[Variable, TwoElement]]()
 
     Logger.info("[!] Running Parameter Analysis")
     //val paramResults = ParamAnalysis(IRProgram).analyze()
@@ -718,7 +718,7 @@ object StaticAnalysis {
       IRconstPropResult = newCPResult,
       memoryRegionResult = mraResult,
       vsaResult = vsaResult,
-      interLiveVarsResults = Map.empty,
+      interLiveVarsResults = interLiveVarsResults,
       paramResults = Map.empty,
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,

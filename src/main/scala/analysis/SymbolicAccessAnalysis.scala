@@ -95,7 +95,7 @@ trait SymbolicAccessFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElem
       case Assign(variable, rhs, maybeString: Option[String]) =>
         val expr = unwrapPaddingAndSlicing(rhs)
         expr match
-          case BinaryExpr(op, arg1: Variable, arg2) =>
+          case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
             evaluateExpression(arg2, constProp(n)) match
               case Some(v) =>
                 if op.equals(BVADD) && arg1.equals(stackPointer) && isNegative(v) then

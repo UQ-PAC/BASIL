@@ -1,4 +1,4 @@
-import analysis.{AddressRange, DSC, DSG, DSN, DataLocation, Derm, HeapLocation}
+import analysis.{AddressRange, DSC, DSG, DSN, DataLocation, HeapLocation}
 import ir.Endian.BigEndian
 import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, CFGPosition, ConvertToSingleProcedureReturn, DirectCall, Memory, MemoryAssign, MemoryLoad, Register, SharedMemory}
 import org.scalatest.funsuite.AnyFunSuite

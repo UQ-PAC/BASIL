@@ -1,6 +1,6 @@
 package analysis
 
-import analysis.solvers.{DSAUnionFindSolver, UnionFindSolver, Var}
+import analysis.solvers.{DSAUniTerm, DSAUnionFindSolver, UnionFindSolver, Var}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, Memory, MemoryAssign, MemoryLoad, Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, begin, computeDomain, toShortString}
 import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
@@ -67,7 +67,8 @@ class DSG(val proc: Procedure,
    * @return updated stack mapping
    */
   private def visitStackAccess(pos: CFGPosition, index: Expr, size: Int, m: Map[BigInt, DSN]) : Map[BigInt, DSN] =
-    val byteSize = (size.toDouble / 8).ceil.toInt
+    assert(size % 8 == 0)
+    val byteSize = size / 8
     index match
       case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
         evaluateExpression(arg2, constProp(pos)).isDefined =>
@@ -172,13 +173,14 @@ class DSG(val proc: Procedure,
 
 
   // determine if an address is a global and return the corresponding global if it is.
-  def isGlobal(address: BigInt): Option[(AddressRange, Field)] =
-    var global: Option[(AddressRange, Field)]  = None
+  def isGlobal(address: BigInt): Option[DSAGlobal] =
+    var global: Option[DSAGlobal]  = None
     breakable {
       for (elem <- globalMapping) {
         val range = elem._1
+        val field = elem._2
         if address >= range.start && (address < range.end || (range.start == range.end && range.end == address)) then
-          global = Some(elem)
+          global = Some(DSAGlobal(range, field))
           break
       }
     }
@@ -325,8 +327,8 @@ class DSG(val proc: Procedure,
   def collapseNode(n: DSN): DSN =
 
 
-    val (term, offset) = solver.find(n.term)
-    val node: DSN = term.asInstanceOf[Derm].node
+    val (term, offset) = solver.findWithOffset(n.term)
+    val node: DSN = term.node
 
     if  !(n.collapsed || find(n).node.collapsed) then
 
@@ -412,12 +414,12 @@ class DSG(val proc: Procedure,
         cell1.pointee = cell2.pointee
     val internalOffsetChange = cell2.offset - cell1.offset
     cell2.node.get.cells.remove(cell2.offset)
-    cell1.growSize((cell2.offset - cell1.offset) + cell2.largestAccessedSize) // might cause another collapse
+    cell1.growSize((cell2.offset - cell1.offset).toInt + cell2.largestAccessedSize) // might cause another collapse
     cell1
 
 
   //  private val parent = mutable.Map[DSC, DSC]()
-  val solver: DSAUnionFindSolver[UniTerm] = DSAUnionFindSolver()
+  val solver: DSAUnionFindSolver = DSAUnionFindSolver()
 
   /**
    * wrapper for find functionality of the union-find
@@ -425,8 +427,8 @@ class DSG(val proc: Procedure,
    * @return a field which is the tuple (parent node of the input node, starting offset of the input node in its parent)
    */
   def find(node: DSN) : Field =
-    val (n, offset) = solver.find(node.term)
-    val resultNode = n.asInstanceOf[Derm].node
+    val (n, offset) = solver.findWithOffset(node.term)
+    val resultNode = n.node
     Field(resultNode, offset)
 
   /**
@@ -515,7 +517,7 @@ class DSG(val proc: Procedure,
       }).sortBy(_._1)
 
       var lastOffset: BigInt = -1
-      var lastAccess: BigInt = -1
+      var lastAccess: Int = -1
       // create a new node to represent the unified node
       val resultNode = DSN(Some(this))
       // add nodes flags and regions to the resulting node
@@ -536,12 +538,12 @@ class DSG(val proc: Procedure,
       // compute the cells present in the resulting unified node
       // a mapping from offsets to the set of old cells which are merged to form a cell in the new unified node
       // values in the mapping also include the largest access size so far computed for each resulting cell
-      val resultCells: mutable.Map[BigInt, (Set[DSC], BigInt)] = mutable.Map()
+      val resultCells: mutable.Map[BigInt, (Set[DSC], Int)] = mutable.Map()
       cells.foreach {
         case (offset: BigInt, cell: DSC) =>
           if (lastOffset + lastAccess > offset) || lastOffset == offset then // includes this cell
             if (offset - lastOffset) + cell.largestAccessedSize > lastAccess then
-              lastAccess = (offset - lastOffset) + cell.largestAccessedSize
+              lastAccess = (offset - lastOffset).toInt + cell.largestAccessedSize
             resultCells.update(lastOffset, (resultCells(lastOffset)._1 + cell, lastAccess))
           else
             lastOffset = offset
@@ -550,7 +552,7 @@ class DSG(val proc: Procedure,
       }
 
       resultCells.foreach {
-        case (offset: BigInt, (cells: Set[DSC], largestAccess: BigInt)) =>
+        case (offset: BigInt, (cells: Set[DSC], largestAccess: Int)) =>
           val collapsedCell = resultNode.addCell(offset, largestAccess)
           val outgoing: Set[Slice] = cells.foldLeft(Set[Slice]()){
             (set, cell) =>
@@ -582,8 +584,8 @@ class DSG(val proc: Procedure,
 
 
   def adjust(cell: DSC, internalOffset: BigInt): DSC =
-    val link = solver.find(cell.node.get.term)
-    val node = link._1.asInstanceOf[Derm].node
+    val link = solver.findWithOffset(cell.node.get.term)
+    val node = link._1.node
     val linkOffset = link._2
     node.addCell(cell.offset + internalOffset + linkOffset, 0)
 
@@ -776,7 +778,7 @@ class Flags() {
  */
 class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCounter.getCounter) {
 
-  val term = Derm(this)
+  val term = DSAUniTerm(this)
   val children : mutable.Map[DSN, BigInt] = mutable.Map()
 //  var collapsed = false
   var flags = Flags()
@@ -810,7 +812,7 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
       cells(offset)
       
       
-  def addCell(offset: BigInt, size: BigInt) : DSC =
+  def addCell(offset: BigInt, size: Int) : DSC =
     this.updateSize(offset + size)
     if collapsed then
       cells(0)
@@ -892,7 +894,7 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
  */
 class DSC(val node: Option[DSN], val offset: BigInt)
 {
-  var largestAccessedSize: BigInt = 0
+  var largestAccessedSize: Int = 0
 
   // the cell's pointee
   var pointee : Option[Slice] = None
@@ -911,7 +913,7 @@ class DSC(val node: Option[DSN], val offset: BigInt)
       pointee = Some(graph.deadjust(resolvedPointee))
     pointee.get
 
-  def growSize(size: BigInt): Boolean =
+  def growSize(size: Int): Boolean =
     if size > largestAccessedSize then
       largestAccessedSize = size
       true
@@ -957,6 +959,15 @@ class CallSite(val call: DirectCall, val graph: DSG) {
   }
 }
 
+
+
+case class DSAGlobal(addressRange: AddressRange, field: Field) {
+  def start: BigInt = addressRange.start
+  def end: BigInt = addressRange.end
+  def node: DSN = field.node
+  def offset: BigInt = field.offset
+}
+
 // global address range
 case class AddressRange(start: BigInt, end: BigInt)
 
@@ -979,16 +990,6 @@ def unwrapPaddingAndSlicing(expr: Expr): Expr =
 
 
 
-/** Terms used in unification.
- */
-sealed trait UniTerm
-
-/** A term variable in the solver
- */
-case class Derm(node: DSN) extends UniTerm with Var[UniTerm] {
-
-  override def toString: String = s"Term{${node}}"
-}
 
 
 
