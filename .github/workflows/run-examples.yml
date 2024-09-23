@@ -29,9 +29,6 @@ jobs:
       - name: IntrusiveListTest
         run: ./mill test.testOnly '*IntrusiveListPublicInterfaceTest'
 
-      - name: System Tests
-        run: ./mill test.testOnly *SystemTests -- -z basic_assign_increment/gcc_no_plt_no_pic -z basic_assign_increment/clang_no_plt_no_pic -z secret_write/gcc_no_plt_no_pic
-
   SystemTests:
     runs-on: ubuntu-latest
     container:
@@ -45,7 +42,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: System Tests
-        run: ./mill test.testOnly '*SystemTests*' || true
+        run: ./mill test.testOnly 'SystemTests*'
       - uses: actions/upload-artifact@v4
         with:
           name: testresult-${{ github.run_number }}
@@ -65,10 +62,10 @@ jobs:
             ls -l "$svg"
 
             # 1920 hours = 80 days
-            url="$(curl -F"file=@$svg" -Fexpires=1920 http://0x0.st)"
-            [[ -n "$url" ]]
+            #url="$(curl -F"file=@$svg" -Fexpires=1920 http://0x0.st)"
+            #[[ -n "$url" ]]
 
-            pasted="$(echo "$pasted" | sed "s#HISTO${testname}HISTO#$url#g")"
+            #pasted="$(echo "$pasted" | sed "s#HISTO${testname}HISTO#$url#g")"
           done
           popd
 

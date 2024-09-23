@@ -117,7 +117,7 @@ implementation FUN_610()
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 4024bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 4024bv64)) || L(mem, bvadd64(R16, 4024bv64)));
     R16, Gamma_R16 := bvadd64(R16, 4024bv64), Gamma_R16;
     call fork();
-    assume false; //no return target
+    assume false;
 }
 
 procedure main();

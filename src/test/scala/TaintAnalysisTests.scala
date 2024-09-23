@@ -3,10 +3,10 @@ import boogie.*
 import ir.*
 import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.TestUtil
+import test_util.BASILTest
 
-class TaintAnalysisTests extends AnyFunSuite, TestUtil {
-  def getTaintAnalysisResults(program: Program, procedure: Procedure, taint: Map[CFGPosition, Set[Taintable]]): Map[CFGPosition, Set[Taintable]] = {
+class TaintAnalysisTests extends AnyFunSuite, BASILTest {
+  def getTaintAnalysisResults(program: Program, taint: Map[CFGPosition, Set[Taintable]]): Map[CFGPosition, Set[Taintable]] = {
     val constPropResults = ConstantPropagationSolver(program).analyze()
     TaintAnalysis(program, Map(), constPropResults, taint).analyze().map { (c, m) => (c, m.map { (v, _) => v }.toSet)}
   }
@@ -17,14 +17,14 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     ProcVariableDependencyAnalysis(program, variables, Map(), constPropResults, Map(), procedure).analyze()
   }
 
-  val registers = 0.to(28).map { n => Register(s"R$n", 64): Taintable }.toSet
-  val baseRegisterMap = registers.map { r => (r, Set(r)) }.toMap
+  private val registers = 0.to(28).map { n => Register(s"R$n", 64): Taintable }.toSet
+  private val baseRegisterMap = registers.map { r => (r, Set(r)) }.toMap
 
   test("constantLiteral") {
-    var program = prog(
+    val program = prog(
         proc("main",
           block("main",
-            directCall("f"), 
+            directCall("f"),
             goto("mainRet")
           ),
           block("mainRet", ret)
@@ -43,22 +43,22 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
-    val f = program.procs("f")
+    val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R0))
-    val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
+    val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get) == None)
+    assert(!taintAnalysisResults.contains(IRWalk.lastInProc(f).get))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap - R0))
+    assert(varDepResults.get(IRWalk.lastInProc(f).get).contains(baseRegisterMap - R0))
   }
 
   test("arguments") {
-    var program = prog(
+    val program = prog(
         proc("main",
           block("main",
-            directCall("f"), 
+            directCall("f"),
             goto("mainRet")
           ),
           block("mainRet", ret)
@@ -77,22 +77,22 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
-    val f = program.procs("f")
+    val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R0))
-    val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
+    val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get) == Some(Set(R0)))
+    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get).contains(Set(R0)))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap + (R0 -> Set(R0, R1))))
+    assert(varDepResults.get(IRWalk.lastInProc(f).get).contains(baseRegisterMap + (R0 -> Set(R0, R1))))
   }
 
   test("branching") {
-    var program = prog(
+    val program = prog(
         proc("main",
           block("main",
-            directCall("f"), 
+            directCall("f"),
             goto("mainRet")
           ),
           block("mainRet", ret)
@@ -118,11 +118,11 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
-    val f = program.procs("f")
+    val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R1))
-    val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
+    val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get) == Some(Set(R0, R1)))
+    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get).contains(Set(R0, R1)))
 
     val varDepResults = getVarDepResults(program, f)
 
@@ -130,10 +130,10 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
   }
 
   test("interproc") {
-    var program = prog(
+    val program = prog(
         proc("main",
           block("main",
-            directCall("f"), 
+            directCall("f"),
             goto("mainRet")
           ),
           block("mainRet", ret)
@@ -170,22 +170,22 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
-    val f = program.procs("f")
+    val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R1))
-    val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
+    val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get) == Some(Set(R0, R1)))
+    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get).contains(Set(R0, R1)))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap + (R0 -> Set(R1, R2)) + (R1 -> Set(R1, R2))))
+    assert(varDepResults.get(IRWalk.lastInProc(f).get).contains(baseRegisterMap + (R0 -> Set(R1, R2)) + (R1 -> Set(R1, R2))))
   }
 
   test("loop") {
-    var program = prog(
+    val program = prog(
         proc("main",
           block("main",
-            directCall("f"), 
+            directCall("f"),
             goto("mainRet")
           ),
           block("mainRet", ret)
@@ -211,14 +211,14 @@ class TaintAnalysisTests extends AnyFunSuite, TestUtil {
     transforms.addReturnBlocks(program, true) // add return to all blocks because IDE solver expects it
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
 
-    val f = program.procs("f")
+    val f = program.nameToProcedure("f")
     val taint: Map[CFGPosition, Set[Taintable]] = Map(f -> Set(R1))
-    val taintAnalysisResults = getTaintAnalysisResults(program, f, taint)
+    val taintAnalysisResults = getTaintAnalysisResults(program, taint)
 
-    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get) == Some(Set(R1)))
+    assert(taintAnalysisResults.get(IRWalk.lastInProc(f).get).contains(Set(R1)))
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap + (R0 -> Set(R2))))
+    assert(varDepResults.get(IRWalk.lastInProc(f).get).contains(baseRegisterMap + (R0 -> Set(R2))))
   }
 }

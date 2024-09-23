@@ -488,8 +488,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
         // If the memory section's size is not a multiple of 64-bits, the last part of it that cannot be coalesced into
         // a 64-bit representation will remain as an 8-bit representation
 
-        val aligned = s.address % 8
-        val alignedStart = s.address + aligned // first aligned address in the section
+        val aligned: Int = (s.address % 8).toInt
 
         val alignedSizeMultiple = (s.bytes.size - aligned) % 8
         // index of the byte that marks the end of the part that is a multiple of 64-bits

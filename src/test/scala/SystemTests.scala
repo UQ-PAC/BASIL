@@ -1,53 +1,51 @@
 import org.scalatest.funsuite.AnyFunSuite
-import util.{Logger, PerformanceTimer}
-import test_util.*
+import util.{LogLevel, Logger, PerformanceTimer, StaticAnalysisConfig}
 
 import Numeric.Implicits.*
 import java.io.{BufferedWriter, File, FileWriter}
-import scala.collection.mutable
-import scala.io.Source
+import scala.collection.immutable.ListMap
+import scala.collection.mutable.ArrayBuffer
 import scala.sys.process.*
+import test_util.BASILTest
+import test_util.BASILTest.*
+import test_util.Histogram
+import test_util.TestConfig
 
 /** Add more tests by simply adding them to the programs directory. Refer to the existing tests for the expected
   * directory structure and file-name patterns.
   */
 
-
- case class TestConfig(boogieFlags:Seq[String] = Seq("/timeLimit:10", "/useArrayAxioms"),
-                       BASILFlags:Seq[String] = Seq(),
-                       useBAPFrontend: Boolean,
-                       expectVerify: Boolean,
-                      )
-
-
-trait SystemTests extends AnyFunSuite {
-  val testPath = "./src/test/"
-  val correctPath = "./src/test/correct"
-  val correctPrograms: Array[String] = getSubdirectories(correctPath)
-  val incorrectPath = "./src/test/incorrect"
-  val incorrectPrograms: Array[String] = getSubdirectories(incorrectPath)
-
-  case class TestResult(passed: Boolean, verified: Boolean, shouldVerify: Boolean, hasExpected: Boolean, timedOut: Boolean, matchesExpected: Boolean, translateTime: Long, verifyTime: Long) {
-    val toCsv = s"$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
+trait SystemTests extends AnyFunSuite, BASILTest {
+  case class TestResult(name: String, passed: Boolean, verified: Boolean, shouldVerify: Boolean, hasExpected: Boolean, timedOut: Boolean, matchesExpected: Boolean, translateTime: Long, verifyTime: Long) {
+    val toCsv = s"$name,$passed,$verified,$shouldVerify,$hasExpected,$timedOut,$matchesExpected,$translateTime,$verifyTime"
   }
 
   object TestResult {
-    val csvHeader = "passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"
+    val csvHeader = "testCase,passed,verified,shouldVerify,hasExpected,timedOut,matchesExpected,translateTime,verifyTime"
   }
 
-  val testResults: mutable.ArrayBuffer[(String, TestResult)] = mutable.ArrayBuffer()
+  val testResults: ArrayBuffer[TestResult] = ArrayBuffer()
 
-  def runTests(programs: Array[String], path: String, name: String, conf: TestConfig): Unit = {
+  private val testPath = "./src/test/"
+
+  def runTests(folder: String, conf: TestConfig): Unit = {
+    val path = testPath + folder
+    val programs = getSubdirectories(path)
+
     // get all variations of each program
     val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
     for (p <- programs) {
       val programPath = path + "/" + p
       val variations = getSubdirectories(programPath)
-      variations.foreach(t =>
-        test(name + "/" + p + "/" + t + testSuffix) {
-          runTest(path, p, t, conf)
+      variations.foreach { t =>
+        val variationPath = programPath + "/" + t + "/" + p
+        val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
+        if (File(inputPath).exists) {
+          test(folder + "/" + p + "/" + t + testSuffix) {
+            runTest(path, p, t, conf)
+          }
         }
-      )
+      }
     }
   }
 
@@ -55,22 +53,21 @@ trait SystemTests extends AnyFunSuite {
    * Writes test result data into .csv and .md files named according to given filename.
    */
   def summary(filename: String): Unit = {
-    val csv: String = "testCase," + TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r._1},${r._2.toCsv}").mkString(System.lineSeparator())
-    log(csv, testPath + "full-" + filename + ".csv")
+    val csv: String = TestResult.csvHeader + System.lineSeparator() + testResults.map(r => s"${r.toCsv}").mkString(System.lineSeparator())
+    writeToFile(csv, testPath + "full-" + filename + ".csv")
 
-    val verifTimes = testResults.map(_._2.verifyTime.toDouble)
+    val verifTimes = testResults.map(_.verifyTime.toDouble)
 
-    val numVerified = testResults.count(_._2.verified)
-    val numCounterexample = testResults.count(x => !x._2.verified && !x._2.timedOut)
-    val numSuccess = testResults.count(_._2.passed)
-    val numFail = testResults.count(!_._2.passed)
-    val numTimeout = testResults.count(_._2.timedOut)
-    val verifying = testResults.filter(x => !x._2.timedOut && x._2.verified).map(_._2.verifyTime)
-    val counterExamples = testResults.filter(x => !x._2.timedOut && !x._2.verified).map(_._2.verifyTime)
+    val numVerified = testResults.count(_.verified)
+    val numCounterexample = testResults.count(x => !x.verified && !x.timedOut)
+    val numSuccess = testResults.count(_.passed)
+    val numFail = testResults.count(!_.passed)
+    val numTimeout = testResults.count(_.timedOut)
+    val verifying = testResults.filter(x => !x.timedOut && x.verified).map(_.verifyTime)
+    val counterExamples = testResults.filter(x => !x.timedOut && !x.verified).map(_.verifyTime)
     val medianVerifyTime = median(verifTimes)
     val meanVerifyTime = mean(verifTimes)
     val stdDevVerifyTime = stdDev(verifTimes)
-
 
     info(s"Test summary: $numSuccess succeeded, $numFail failed: $numVerified verified, $numCounterexample did not verify (including $numTimeout timeouts).")
     if (verifying.nonEmpty)
@@ -78,7 +75,7 @@ trait SystemTests extends AnyFunSuite {
     if (counterExamples.nonEmpty)
       info(s"Average time to counterexample: ${counterExamples.sum / counterExamples.size}")
 
-    val summaryMap = collection.immutable.ListMap(
+    val summaryMap = ListMap(
       "passedCount" -> numSuccess,
       "failedCount" -> numFail,
       "verifiedCount" -> numVerified,
@@ -92,17 +89,12 @@ trait SystemTests extends AnyFunSuite {
     )
     val summaryHeader = summaryMap.keys.mkString(",") + System.lineSeparator
     val summaryRow = summaryMap.values.mkString(",") + System.lineSeparator
-    log(summaryHeader + summaryRow, testPath + "summary-" + filename + ".csv")
+    writeToFile(summaryHeader + summaryRow, testPath + "summary-" + filename + ".csv")
 
     // generates a verification time histogram
-    val minB = Seq(0, meanVerifyTime - 2.25 * stdDevVerifyTime, verifTimes.min).max
-    val maxB = Seq(meanVerifyTime + 2.25 * stdDevVerifyTime, verifTimes.max).min
-    val nbins = 50
-
-    val histo = histogram(nbins, Some(minB, maxB))(verifTimes.toSeq)
-    val svgHistogram = histoToSvg(filename, 400,300, histo, minB, maxB)
-    log(svgHistogram, testPath + "verifyTime-" + filename + ".svg")
-
+    val histo = Histogram(50, verifTimes.toSeq)
+    val svgHistogram = histo.toSvg(filename, 400, 300)
+    writeToFile(svgHistogram, testPath + "verifyTime-" + filename + ".svg")
 
     // generates a markdown table in separate parts.
     // the complete markdown file can be constructed by horizontal (line-wise)
@@ -113,139 +105,121 @@ trait SystemTests extends AnyFunSuite {
       || Metric |
       ||--------|
       |""".stripMargin
-      + mdMap.map((k,_) => s"| $k |${System.lineSeparator}").mkString
+      + mdMap.map((k, _) => s"| $k |${System.lineSeparator}").mkString
 
     val partMarkdown =
       s"""
       | $filename |
       |-------|
       |""".stripMargin
-      + mdMap.map((k,v) => s" $v |${System.lineSeparator}").mkString
+      + mdMap.map((_, v) => s" $v |${System.lineSeparator}").mkString
 
     val summaryMarkdown = leftMarkdown.linesIterator
       .zip(partMarkdown.linesIterator)
       .map(_++_)
       .mkString("", System.lineSeparator, System.lineSeparator)
 
-    log(partMarkdown, testPath + "summary-" + filename + ".md.part")
-    log(leftMarkdown, testPath + "headers.md.part") // XXX likely not thread-safe
-    log(summaryMarkdown, testPath + "summary-" + filename + ".md")
+    writeToFile(partMarkdown, testPath + "summary-" + filename + ".md.part")
+    writeToFile(leftMarkdown, testPath + "headers.md.part") // XXX likely not thread-safe
+    writeToFile(summaryMarkdown, testPath + "summary-" + filename + ".md")
   }
 
   def runTest(path: String, name: String, variation: String, conf: TestConfig): Unit = {
-    val shouldVerify = conf.expectVerify
-    val useBAPFrontend = conf.useBAPFrontend
-
     val directoryPath = path + "/" + name + "/"
     val variationPath = directoryPath + variation + "/" + name
+    val inputPath = if conf.useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
+    val BPLPath = if conf.useBAPFrontend then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
     val specPath = directoryPath + name + ".spec"
-    val outPath = if useBAPFrontend then variationPath + "_bap.bpl" else variationPath + "_gtirb.bpl"
-    val inputPath = if useBAPFrontend then variationPath + ".adt" else variationPath + ".gts"
     val RELFPath = variationPath + ".relf"
-    Logger.info(outPath)
-    val timer = PerformanceTimer(s"test $name/$variation")
+    val resultPath = if conf.useBAPFrontend then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
+    val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
+    val expectedOutPath = if conf.useBAPFrontend then variationPath + ".expected" else variationPath + "_gtirb.expected"
 
-    val args = mutable.ArrayBuffer("--input", inputPath, "--relf", RELFPath, "--output", outPath) ++ conf.BASILFlags
-    if (File(specPath).exists) args ++= Seq("--spec", specPath)
-
-    Main.main(args.toArray)
+    Logger.info(s"$name/$variation$testSuffix")
+    val timer = PerformanceTimer(s"test $name/$variation$testSuffix")
+    runBASIL(inputPath, RELFPath, Some(specPath), BPLPath, conf.staticAnalysisConfig)
     val translateTime = timer.checkPoint("translate-boogie")
-    Logger.info(outPath + " done")
-    val extraSpec = List.from(File(directoryPath).listFiles()).map(_.toString).filter(_.endsWith(".bpl")).filterNot(_.endsWith(outPath))
-    val boogieCmd = (Seq("boogie", "/printVerifiedProceduresCount:0") ++ conf.boogieFlags ++ Seq(outPath) ++ extraSpec)
-    Logger.info(s"Verifying... ${boogieCmd.mkString(" ")}")
-    val boogieResult = boogieCmd.!!
+    Logger.info(s"$name/$variation$testSuffix DONE")
+
+    val boogieResult = runBoogie(directoryPath, BPLPath, conf.boogieFlags)
     val verifyTime = timer.checkPoint("verify")
-    val resultPath = if useBAPFrontend then variationPath + "_bap_result.txt" else variationPath + "_gtirb_result.txt"
-    log(boogieResult, resultPath)
-    val verified = boogieResult.strip().equals("Boogie program verifier finished with 0 errors")
-    val proveFailed = boogieResult.contains("could not be proved")
-    val timedOut = boogieResult.strip() contains "timed out"
+    val (boogieFailureMsg, verified, timedOut) = checkVerify(boogieResult, resultPath, conf.expectVerify)
 
-    def xor(x: Boolean, y: Boolean): Boolean = (x || y) && !(x && y)
+    val (hasExpected, matchesExpected) = if (conf.checkExpected) {
+      checkExpected(expectedOutPath, BPLPath)
+    } else {
+      (false, false)
+    }
 
-    val failureMsg = if timedOut then "SMT Solver timed out" else
-      (verified, shouldVerify, xor(verified, proveFailed)) match {
-        case (true, true, true) => "Test passed"
-        case (false , false, true) => "Test passed"
-        case (_, _, false) => "Prover error: unknown result: " + boogieResult
-        case (true, false, true) => "Expected verification failure, but got success."
-        case (false, true, true) => "Expected verification success, but got failure."
-      }
+    val passed = boogieFailureMsg.isEmpty
+    if (conf.logResults) {
+      val result = TestResult(s"$name/$variation$testSuffix", passed, verified, conf.expectVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
+      testResults.append(result)
+    }
+    if (!passed) fail(boogieFailureMsg.get)
+  }
 
-    val expectedOutPath = if useBAPFrontend then variationPath + ".expected" else variationPath + "_gtirb.expected"
+  def checkExpected(expectedOutPath: String, BPLPath: String): (Boolean, Boolean) = {
     val hasExpected = File(expectedOutPath).exists
     var matchesExpected = true
     if (hasExpected) {
-      if (!compareFiles(expectedOutPath, outPath)) {
+      if (!BASILTest.compareFiles(expectedOutPath, BPLPath)) {
         matchesExpected = false
         info("Warning: Boogie file differs from expected")
       }
     } else {
       info("Note: this test has not previously succeeded")
     }
-    val passed = !timedOut && (verified == shouldVerify) && xor(verified, proveFailed)
-    val result = TestResult(passed, verified, shouldVerify, hasExpected, timedOut, matchesExpected, translateTime, verifyTime)
-    val testSuffix = if conf.useBAPFrontend then ":BAP" else ":GTIRB"
-    testResults.append((s"$name/$variation$testSuffix", result))
-    if (!passed) fail(failureMsg)
-  }
-
-  def compareFiles(path1: String, path2: String): Boolean = {
-    val source1 = Source.fromFile(path1)
-    val source2 = Source.fromFile(path2)
-    val lines1 = source1.getLines
-    val lines2 = source2.getLines
-    while (lines1.hasNext && lines2.hasNext) {
-      val line1 = lines1.next()
-      val line2 = lines2.next()
-      if (line1 != line2) {
-        source1.close
-        source2.close
-        return false
-      }
-    }
-    if (lines1.hasNext || lines2.hasNext) {
-      source1.close
-      source2.close
-      return false
-    }
-
-    source1.close
-    source2.close
-    true
+    (hasExpected, matchesExpected)
   }
 
 }
 
-class SystemTestsBAP extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=true, expectVerify=true))
-  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=true, expectVerify=false))
+class SystemTestsBAP extends SystemTests {
+  runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(useBAPFrontend = true, expectVerify = false, logResults = true))
   test("summary-BAP") {
     summary("testresult-BAP")
   }
 }
 
-class SystemTestsGTIRB extends SystemTests  {
-  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=false, expectVerify=true))
-  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=false, expectVerify=false))
+class SystemTestsGTIRB extends SystemTests {
+  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, checkExpected = true, logResults = true))
+  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, checkExpected = true, logResults = true))
   test("summary-GTIRB") {
     summary("testresult-GTIRB")
   }
 }
 
+class ExtraSpecTests extends SystemTests {
+  // some of these tests have time out issues so they need more time, but some still time out even with this for unclear reasons
+  val boogieFlags = Seq("/timeLimit:30", "/useArrayAxioms")
+  runTests("extraspec_correct", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
+  runTests("extraspec_correct", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = false, expectVerify = true, checkExpected = true, logResults = true))
+  runTests("extraspec_incorrect", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = true, expectVerify = false, checkExpected = true, logResults = true))
+  runTests("extraspec_incorrect", TestConfig(boogieFlags = boogieFlags, useBAPFrontend = false, expectVerify = false, checkExpected = true, logResults = true))
+  test("summary-extraspec") {
+    summary("testresult-extraspec")
+  }
+}
+
+class AnalysisSystemTestsBAP extends SystemTests {
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = false))
+}
+
+class AnalysisSystemTestsGTIRB extends SystemTests {
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = false, expectVerify = false))
+}
+
 class ProcedureSummaryTests extends SystemTests {
   // TODO currently procedure_summary3 verifies despite incorrect procedure summary analysis
   // this is due to BASIL's currently limited handling of non-returning calls
-  private val procedureSummaryPath = "./src/test/analysis/procedure-summaries"
-  private val procedureSummaryPrograms = getSubdirectories(procedureSummaryPath)
-  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", TestConfig(BASILFlags = Seq("--analyse", "--summarise-procedures"),
-    useBAPFrontend=true, expectVerify=true))
-  runTests(procedureSummaryPrograms, procedureSummaryPath, "analysis/procedure-summaries", TestConfig(BASILFlags = Seq("--analyse", "--summarise-procedures"),
+  runTests("procedure_summaries", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(summariseProcedures = true)),
+    useBAPFrontend = true, expectVerify = true))
+  runTests("procedure_summaries", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(summariseProcedures = true)),
     useBAPFrontend = false, expectVerify = true))
-  test("summary-procedureSummary") {
-    summary("procedureSummary-testResult")
-  }
 }
 
 def mean(xs: Iterable[Double]): Double = xs.sum.toDouble / xs.size
@@ -315,7 +289,7 @@ def loadHisto() = {
   val source = scala.io.Source.fromFile("src/test/full-testresult-GTIRB.csv").getLines().toList
   val headers = source.head.split(",")
 
-  val res = headers.map(h => h -> mutable.ArrayBuffer[String]()).toMap[String, mutable.ArrayBuffer[String]]
+  val res = headers.map(h => h -> ArrayBuffer[String]()).toMap[String, ArrayBuffer[String]]
 
   source.tail.map(line => {
     val cols = line.split(",")
@@ -325,4 +299,9 @@ def loadHisto() = {
   val timeValues = res("verifyTime").map(_.toDouble)
   val histo = histogram(50, Some(800.0, 1000.0))(timeValues.toSeq)
   println(histoToSvg("test histogram", 500, 300, histo, 800.0, 1000.0))
+}
+// tests that require currently unimplemented functionality to pass
+class UnimplementedTests extends SystemTests {
+  runTests("unimplemented", TestConfig(useBAPFrontend = false, expectVerify = true))
+  runTests("unimplemented", TestConfig(useBAPFrontend = true, expectVerify = false))
 }

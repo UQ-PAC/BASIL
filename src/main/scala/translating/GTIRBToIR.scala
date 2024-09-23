@@ -49,7 +49,7 @@ class TempIf(val cond: Expr,
   * @param mainAddress: The address of the main function
   *
   */
-class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[StmtContext]]], cfg: CFG, mainAddress: Int) {
+class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[StmtContext]]], cfg: CFG, mainAddress: BigInt) {
   private val functionNames = MapDecoder.decode_uuid(mods.map(_.auxData("functionNames").data))
   private val functionEntries = MapDecoder.decode_set(mods.map(_.auxData("functionEntries").data))
   private val functionBlocks = MapDecoder.decode_set(mods.map(_.auxData("functionBlocks").data))
@@ -83,15 +83,15 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
   private val externalProcedures = mutable.Map[String, Procedure]()
 
   // maps block UUIDs to their address
-  private def createAddresses(): immutable.Map[ByteString, Int] = {
-    val blockAddresses: immutable.Map[ByteString, Int] = (for {
+  private def createAddresses(): immutable.Map[ByteString, BigInt] = {
+    val blockAddresses: immutable.Map[ByteString, BigInt] = (for {
       mod <- mods
       section <- mod.sections
       byteInterval <- section.byteIntervals
       block <- byteInterval.blocks
       if !block.getCode.uuid.isEmpty
     } yield {
-      block.getCode.uuid -> (byteInterval.address + block.offset).toInt
+      block.getCode.uuid -> BigInt(byteInterval.address + block.offset)
     }).toMap
 
     blockAddresses
@@ -220,9 +220,12 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     Program(procedures, intialProc, initialMemory, readOnlyMemory)
   }
 
-  private def removePCAssign(block: Block): Unit = {
+  private def removePCAssign(block: Block): Option[String] = {
     block.statements.last match {
-      case Assign(lhs: Register, _, _) if lhs.name == "_PC" => block.statements.remove(block.statements.last)
+      case last @ Assign(lhs: Register, _, _) if lhs.name == "_PC" =>
+        val label = last.label
+        block.statements.remove(last)
+        label
       case _ => throw Exception(s"expected block ${block.label} to have a program counter assignment at its end")
     }
   }
@@ -365,7 +368,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       val jumpCopy = currentBlock.jump match {
         case GoTo(targets, label) => GoTo(targets, label)
         case h: Unreachable => Unreachable()
-        case r: Return => Return() 
+        case r: Return => Return()
         case _ => throw Exception("this shouldn't be reachable")
       }
       trueBlock.replaceJump(currentBlock.jump)
@@ -391,8 +394,9 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
               case Assign(lhs: Register, rhs: Register, _) if lhs.name == "_PC" => rhs
               case _ => throw Exception(s"no assignment to program counter found before indirect call in block ${block.label}")
             }
+            val label = block.statements.last.label
             block.statements.remove(block.statements.last) // remove _PC assignment
-            (Some(IndirectCall(target)), Unreachable())
+            (Some(IndirectCall(target, label)), Unreachable())
           } else if (proxySymbols.size > 1) {
             // TODO requires further consideration once encountered
             throw Exception(s"multiple uuidToSymbol ${proxySymbols.map(_.name).mkString(", ")} associated with proxy block ${byteStringToString(edge.targetUuid)}, target of indirect call from block ${block.label}")
@@ -407,15 +411,15 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
               procedures += proc
               proc
             }
-            removePCAssign(block)
-            (Some(DirectCall(target)), Unreachable())
+            val label = removePCAssign(block)
+            (Some(DirectCall(target, label)), Unreachable())
           }
         } else if (uuidToBlock.contains(edge.targetUuid)) {
           // resolved indirect jump
           // TODO consider possibility this can go to another procedure?
           val target = uuidToBlock(edge.targetUuid)
-          removePCAssign(block)
-          (None, GoTo(mutable.Set(target)))
+          val label = removePCAssign(block)
+          (None, GoTo(mutable.Set(target), label))
         } else {
           throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block or proxy block")
         }
@@ -423,26 +427,27 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
         // direct jump, either goto or tail call
         if (entranceUUIDtoProcedure.contains(edge.targetUuid)) {
           val targetProc = entranceUUIDtoProcedure(edge.targetUuid)
+
+          val label = removePCAssign(block)
           // direct jump to start of own subroutine is treated as GoTo, not DirectCall
           // should probably investigate recursive cases to determine if this happens/is correct
           val jump = if (procedure == targetProc) {
-            (None, GoTo(mutable.Set(uuidToBlock(edge.targetUuid))))
+            (None, GoTo(mutable.Set(uuidToBlock(edge.targetUuid)), label))
           } else {
-            (Some(DirectCall(targetProc)), Unreachable())
+            (Some(DirectCall(targetProc, label)), Unreachable())
           }
-          removePCAssign(block)
           jump
         } else if (uuidToBlock.contains(edge.targetUuid)) {
           val target = uuidToBlock(edge.targetUuid)
-          removePCAssign(block)
-          (None, GoTo(mutable.Set(target)))
+          val label = removePCAssign(block)
+          (None, GoTo(mutable.Set(target), label))
         } else {
           throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known block")
         }
       case EdgeLabel(false, _, Type_Return, _) =>
         // return statement, value of 'direct' is just whether DDisasm has resolved the return target
-        removePCAssign(block)
-        (None, Return())
+        val label = removePCAssign(block)
+        (None, Return(label))
       case EdgeLabel(false, true, Type_Fallthrough, _) =>
         // end of block that doesn't end in a control flow instruction and falls through to next
         if (entranceUUIDtoProcedure.contains(edge.targetUuid)) {
@@ -462,8 +467,8 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
         // we are going to trust DDisasm here for now but this may require revisiting
         if (entranceUUIDtoProcedure.contains(edge.targetUuid)) {
           val target = entranceUUIDtoProcedure(edge.targetUuid)
-          removePCAssign(block)
-          (Some(DirectCall(target)), Unreachable())
+          val label = removePCAssign(block)
+          (Some(DirectCall(target, label)), Unreachable())
         } else {
           throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known procedure entrance")
         }
@@ -479,8 +484,9 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     if (edgeLabels.forall { (e: EdgeLabel) => !e.conditional && e.direct && e.`type` == Type_Return }) {
       // multiple resolved returns, translate as single return
-      removePCAssign(block)
-      (None, Return())
+      val label = removePCAssign(block)
+      (None, Return(label))
+
     } else if (edgeLabels.forall { (e: EdgeLabel) => !e.conditional && !e.direct && e.`type` == Type_Branch }) {
       // resolved indirect call with multiple blocks as targets
       val targets = mutable.Set[Block]()
@@ -494,8 +500,8 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
         }
       }
       // TODO add assertion that target register is low
-      removePCAssign(block)
-      (None, GoTo(targets))
+      val label = removePCAssign(block)
+      (None, GoTo(targets, label))
       // TODO possibility not yet encountered: resolved indirect call that goes to multiple procedures?
 
     } else if (outgoingEdges.size == 2) {
@@ -584,14 +590,14 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     if (!entranceUUIDtoProcedure.contains(call.targetUuid)) {
       // unresolved indirect call
       val target = getPCTarget(block)
-      removePCAssign(block)
+      val label = removePCAssign(block)
 
-      (Some(IndirectCall(target)), GoTo(Set(returnTarget)))
+      (Some(IndirectCall(target, label)), GoTo(Set(returnTarget)))
     } else {
       // resolved indirect call
       val target = entranceUUIDtoProcedure(call.targetUuid)
-      removePCAssign(block)
-      (Some(DirectCall(target)), GoTo(Set(returnTarget)))
+      val label = removePCAssign(block)
+      (Some(DirectCall(target, label)), GoTo(Set(returnTarget)))
     }
   }
 

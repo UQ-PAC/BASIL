@@ -17,6 +17,7 @@ val R30: Register = Register("R30", 64)
 val R31: Register = Register("R31", 64)
 
 
+
 def exprEq(l: Expr, r: Expr) : Expr = (l, r) match {
   case (l, r) if l.getType != r.getType => FalseLiteral
   case (l, r) if l.getType == BoolType => BinaryExpr(BoolEQ, l, r) 

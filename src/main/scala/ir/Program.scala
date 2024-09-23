@@ -127,6 +127,14 @@ class Program(var procedures: ArrayBuffer[Procedure],
   def iterator: Iterator[CFGPosition] = {
     ILUnorderedIterator(this)
   }
+
+  def nameToProcedure: Map[String, Procedure] = {
+    procedures.view.map(p => p.name -> p).toMap
+  }
+
+  def labelToBlock: Map[String, Block] = {
+    procedures.view.flatMap(_.blocks.map((b: Block) => b.label -> b)).toMap
+  }
 }
 
 
@@ -139,7 +147,7 @@ class ProgramThread(val entry: Procedure,
 
 class Procedure private (
                   var name: String,
-                  var address: Option[Int],
+                  var address: Option[BigInt],
                   private var _entryBlock: Option[Block],
                   private var _returnBlock: Option[Block],
                   private val _blocks: mutable.LinkedHashSet[Block],
@@ -154,7 +162,7 @@ class Procedure private (
   require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
   require(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
-  def this(name: String, address: Option[Int] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer(), requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
+  def this(name: String, address: Option[BigInt] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer(), requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
     this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out), List.from(requires), List.from(ensures))
   }
 
@@ -322,7 +330,7 @@ class Parameter(var name: String, var size: Int, var value: Register) {
 
 class Block private (
  val label: String,
- val address: Option[Int],
+ val address: Option[BigInt],
  val statements: IntrusiveList[Statement],
  private var _jump: Jump,
  private val _incomingJumps: mutable.HashSet[GoTo],
@@ -333,7 +341,7 @@ class Block private (
   statements.onInsert = x => x.setParent(this)
   statements.onRemove = x => x.deParent()
 
-  def this(label: String, address: Option[Int] = None, statements: IterableOnce[Statement] = Set.empty, jump: Jump = GoTo(Set.empty)) = {
+  def this(label: String, address: Option[BigInt] = None, statements: IterableOnce[Statement] = Set.empty, jump: Jump = GoTo(Set.empty)) = {
     this(label, address, IntrusiveList().addAll(statements), jump, mutable.HashSet.empty)
   }
 
@@ -449,4 +457,4 @@ object Block {
   * @param size number of bytes
   * @param bytes sequence of bytes represented by BitVecLiterals of size 8
   */
-case class MemorySection(name: String, address: Int, size: Int, bytes: Seq[BitVecLiteral])
+case class MemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BitVecLiteral])

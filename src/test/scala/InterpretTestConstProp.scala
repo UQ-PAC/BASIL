@@ -53,20 +53,20 @@ class ConstPropInterpreterValidate extends AnyFunSuite {
 
     assert(breaks.nonEmpty)
 
-   // run the interpreter evaluating the analysis result at each command with a breakpoint
-   val interpretResult = interpretWithBreakPoints(ictx, breaks.toList, NormalInterpreter, InterpreterState())
-   val breakres  : List[(BreakPoint, _, List[(String, Expr, Expr)])] = interpretResult._2
-   assert(interpretResult._1.nextCmd == Stopped())
-   assert(breakres.nonEmpty)
+    // run the interpreter evaluating the analysis result at each command with a breakpoint
+    val interpretResult = interpretWithBreakPoints(ictx, breaks.toList, NormalInterpreter, InterpreterState())
+    val breakres  : List[(BreakPoint, _, List[(String, Expr, Expr)])] = interpretResult._2
+    assert(interpretResult._1.nextCmd == Stopped())
+    assert(breakres.nonEmpty)
 
-   // assert all the collected breakpoint watches have evaluated to true
-   for (b <- breakres) {
-     val (_, _, evaluatedexprs) = b
-     evaluatedexprs.forall(c => {
-       val (n, before, evaled) = c
-       evaled == TrueLiteral
-     })
-   }
+    // assert all the collected breakpoint watches have evaluated to true
+    for (b <- breakres) {
+      val (_, _, evaluatedexprs) = b
+      evaluatedexprs.forall(c => {
+        val (n, before, evaled) = c
+        evaled == TrueLiteral
+      })
+    }
   }
 
   test("indirect_call_example") {

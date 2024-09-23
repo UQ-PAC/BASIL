@@ -154,7 +154,6 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
   }
 
 
-
   test("function") {
     val expected = Map(
       "x" -> 1,

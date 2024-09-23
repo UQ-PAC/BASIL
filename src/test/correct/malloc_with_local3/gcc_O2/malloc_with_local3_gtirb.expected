@@ -145,7 +145,7 @@ implementation FUN_690()
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 4008bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 4008bv64)) || L(mem, bvadd64(R16, 4008bv64)));
     R16, Gamma_R16 := bvadd64(R16, 4008bv64), Gamma_R16;
     call malloc();
-    assume false; //no return target
+    assume false;
 }
 
 procedure FUN_6d0();
@@ -192,7 +192,7 @@ implementation FUN_6d0()
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 4040bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 4040bv64)) || L(mem, bvadd64(R16, 4040bv64)));
     R16, Gamma_R16 := bvadd64(R16, 4040bv64), Gamma_R16;
     call #free();
-    assume false; //no return target
+    assume false;
 }
 
 procedure FUN_6a0();
@@ -239,7 +239,7 @@ implementation FUN_6a0()
     R17, Gamma_R17 := memory_load64_le(mem, bvadd64(R16, 4016bv64)), (gamma_load64(Gamma_mem, bvadd64(R16, 4016bv64)) || L(mem, bvadd64(R16, 4016bv64)));
     R16, Gamma_R16 := bvadd64(R16, 4016bv64), Gamma_R16;
     call __printf_chk();
-    assume false; //no return target
+    assume false;
 }
 
 procedure main();
@@ -404,7 +404,7 @@ implementation printCharValue()
     mem, Gamma_mem := memory_store8_le(mem, R3, R2[8:0]), gamma_store8(Gamma_mem, R3, Gamma_R2);
     assume {:captureState "2236$0"} true;
     call FUN_6a0();
-    assume false; //no return target
+    assume false;
 }
 
 procedure malloc();
