@@ -37,7 +37,8 @@ case class UnknownLocation(override val regionIdentifier: String, proc: Procedur
  * environment transformers for SAA or symbolic access analysis
  * Combination of reaching definitions and constant propagation
  * elements in D are symbolic accesses of the form (variable, symbolic base, concrete offset)
- * lattice L is a binary lattice with top and bottom
+ * lattice L is a binary lattice with top being the definition is valid (alive) and bottom being
+ * the definition is dead or no longer affects the environment
  */
 trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) extends ForwardIDEAnalysis[SymbolicAddress, TwoElement, TwoElementLattice] {
 

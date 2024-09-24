@@ -178,8 +178,8 @@ class DSATest extends AnyFunSuite, TestUtil {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = "examples/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic.adt",
-          relfFile = "examples/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic.relf",
+          inputFile = "src/test/dsa/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic.adt",
+          relfFile = "src/test/dsa/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic.relf",
           specFile = None,
           dumpIL = None,
         ),
@@ -239,8 +239,8 @@ class DSATest extends AnyFunSuite, TestUtil {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
           specFile = None,
           dumpIL = None,
         ),
@@ -274,8 +274,8 @@ class DSATest extends AnyFunSuite, TestUtil {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
           specFile = None,
           dumpIL = None,
         ),
@@ -513,8 +513,8 @@ class DSATest extends AnyFunSuite, TestUtil {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
           specFile = None,
           dumpIL = None,
         ),
@@ -539,8 +539,8 @@ class DSATest extends AnyFunSuite, TestUtil {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
           specFile = None,
           dumpIL = None,
         ),
@@ -578,7 +578,7 @@ class DSATest extends AnyFunSuite, TestUtil {
 
   // top down tests
   ignore("top down jumptable2 main") {
-    // no changes should be made from previous phase 
+    // no changes should be made from previous phase
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
@@ -620,7 +620,7 @@ class DSATest extends AnyFunSuite, TestUtil {
 
     // bu
     assert(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)).getPointee.node.collapsed)
-    
+
   }
 
   ignore("top down jumptable2 callees") {
@@ -662,8 +662,8 @@ class DSATest extends AnyFunSuite, TestUtil {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
           specFile = None,
           dumpIL = None,
         ),
@@ -691,8 +691,8 @@ class DSATest extends AnyFunSuite, TestUtil {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "examples/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
+          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
+          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
           specFile = None,
           dumpIL = None,
         ),
