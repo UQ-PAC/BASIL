@@ -344,6 +344,7 @@ object StaticAnalysis {
     val reachingDefinitionsAnalysisSolver = ReachingDefinitionsAnalysisSolver(IRProgram)
     val reachingDefinitionsAnalysisResults = reachingDefinitionsAnalysisSolver.analyze()
 
+
     config.analysisDotPath.foreach(s => {
       writeToFile(
         toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> reachingDefinitionsAnalysisResults(b).toString).toMap),
@@ -365,14 +366,20 @@ object StaticAnalysis {
       )
     })
 
-    Logger.debug("[!] Running Constant Propagation with SSA")
+    if (config.simplify) {
+      transforms.SSARename.concretiseSSA(ctx.program, reachingDefinitionsAnalysisResults)
+
+      val rds2 = ReachingDefinitionsAnalysisSolver(IRProgram)
+      val rdr2 = rds2.analyze()
+
+      transforms.doCopyPropTransform(ctx.program, rdr2)
+      writeToFile(serialiseIL(IRProgram), s"il-after-copyprop.il")
+    }
+
+    Logger.info("[!] Running Constant Propagation with SSA")
     val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(IRProgram, reachingDefinitionsAnalysisResults)
     val constPropResultWithSSA = constPropSolverWithSSA.analyze()
 
-    if (config.simplify) {
-      transforms.doCopyPropTransform(ctx.program, reachingDefinitionsAnalysisResults)
-      writeToFile(serialiseIL(IRProgram), s"il-after-copyprop.il")
-    }
 
     Logger.debug("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults)

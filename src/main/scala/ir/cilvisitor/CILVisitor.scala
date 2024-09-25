@@ -29,6 +29,7 @@ trait CILVisitor:
 
   def vexpr(e: Expr): VisitAction[Expr] = DoChildren()
   def vvar(e: Variable): VisitAction[Variable] = DoChildren()
+  def vlvar(e: Variable): VisitAction[Variable] = DoChildren()
   def vmem(e: Memory): VisitAction[Memory] = DoChildren()
 
   def enter_scope(params: ArrayBuffer[Parameter]): Unit = ()
@@ -63,6 +64,9 @@ class CILVisitorImpl(val v: CILVisitor) {
     doVisit(v, v.vvar(n), n, (n) => n)
   }
 
+  def visit_lvar(n: Variable): Variable = {
+    doVisit(v, v.vlvar(n), n, (n) => n)
+  }
 
   def visit_mem(n: Memory): Memory = {
     doVisit(v, v.vmem(n), n, (n) => n)
@@ -108,7 +112,7 @@ class CILVisitorImpl(val v: CILVisitor) {
       }
       case m: Assign => {
         m.rhs = visit_expr(m.rhs)
-        m.lhs = visit_var(m.lhs)
+        m.lhs = visit_lvar(m.lhs)
         m
       }
       case s: Assert => {
