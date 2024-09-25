@@ -369,8 +369,10 @@ object StaticAnalysis {
     val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(IRProgram, reachingDefinitionsAnalysisResults)
     val constPropResultWithSSA = constPropSolverWithSSA.analyze()
 
-    transforms.doCopyPropTransform(ctx.program, reachingDefinitionsAnalysisResults)
-    writeToFile(serialiseIL(IRProgram), s"il-after-copyprop.il")
+    if (config.simplify) {
+      transforms.doCopyPropTransform(ctx.program, reachingDefinitionsAnalysisResults)
+      writeToFile(serialiseIL(IRProgram), s"il-after-copyprop.il")
+    }
 
     Logger.debug("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults)

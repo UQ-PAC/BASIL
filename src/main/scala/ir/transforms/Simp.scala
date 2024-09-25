@@ -16,68 +16,6 @@ trait AbstractDomain[L] {
   def bot: L
 }
 
-class Product[L, R, AL <: AbstractDomain[L], AR <: AbstractDomain[R]](val l: AL, val r: AR)
-    extends AbstractDomain[(L, R)] {
-  override def join(a: (L, R), b: (L, R)): (L, R) = (l.join(a._1, b._1), r.join(a._2, b._2))
-  override def widen(a: (L, R), b: (L, R)): (L, R) = (l.widen(a._1, b._1), r.widen(a._2, b._2))
-  override def narrow(a: (L, R), b: (L, R)): (L, R) = (l.narrow(a._1, b._1), r.narrow(a._2, b._2))
-  override def transfer(a: (L, R), b: Statement): (L, R) = (l.transfer(a._1, b), r.transfer(a._2, b))
-
-  override def top = (l.top, r.top)
-  override def bot = (l.bot, r.bot)
-}
-
-enum MapWithDefault[+L] {
-  case Top
-  case Bot
-  // current lattice value, memory of lattice values at each code point
-  case V(value: L, memory: Map[Statement, L])
-}
-
-class MapDomain[L, D <: AbstractDomain[L]](val d: D) extends AbstractDomain[MapWithDefault[L]] {
-
-  def top = MapWithDefault.Top
-  def bot = MapWithDefault.Bot
-
-  def toMap(v: MapWithDefault[L]): Map[Statement, L] = {
-    v match {
-      case MapWithDefault.Top     => Map().withDefaultValue(d.top)
-      case MapWithDefault.Bot     => Map().withDefaultValue(d.bot)
-      case MapWithDefault.V(_, m) => m.withDefaultValue(d.bot)
-    }
-  }
-
-  def join(a: MapWithDefault[L], b: MapWithDefault[L]): MapWithDefault[L] = {
-    (a, b) match {
-      case (MapWithDefault.Top, MapWithDefault.Bot) => MapWithDefault.Top
-      case (MapWithDefault.Bot, MapWithDefault.Top) => MapWithDefault.Top
-      case (MapWithDefault.Top, _)                  => MapWithDefault.Top
-      case (MapWithDefault.Bot, v)                  => v
-      case (v, MapWithDefault.Bot)                  => v
-      case (MapWithDefault.V(vl1, v1), MapWithDefault.V(vl2, v2)) => {
-        MapWithDefault.V(
-          d.join(vl1, vl2),
-          v1.keys.foldLeft(v2)((m, a) => m + (a -> d.join(v1.get(a).getOrElse(d.bot), v2.get(a).getOrElse(d.bot))))
-        )
-      }
-    }
-  }
-
-  def transfer(a: MapWithDefault[L], b: Statement): MapWithDefault[L] = {
-    a match {
-      case MapWithDefault.Top => MapWithDefault.Top
-      case MapWithDefault.Bot => {
-        val c = d.transfer(d.bot, b)
-        MapWithDefault.V(c, Map(b -> c))
-      }
-      case MapWithDefault.V(vl, m) => {
-        val c = d.transfer(vl, b)
-        MapWithDefault.V(c, m.updated(b, c))
-      }
-    }
-  }
-}
-
 def doCopyPropTransform(
     p: Program,
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
@@ -91,16 +29,13 @@ def doCopyPropTransform(
   while (rerun && runs < 5) {
     Logger.info(s"Simp run $runs")
     runs += 1
-    rerun = false
     val solver = workListSolver(d)
     val result = solver.solveProg(p, Set(), Set())
 
     for ((p, xf) <- result) {
       val vis = Simplify(xf, reachingDefs)
       visit_proc(vis, p)
-      if (vis.madeAnyChange) {
-        rerun = true
-      }
+      rerun = vis.madeAnyChange
     }
   }
 }
@@ -179,16 +114,18 @@ class workListSolver[L, A <: AbstractDomain[L]](domain: A) {
   }
 }
 
-case class CopyProp(expr: Expr, deps: Set[RegisterWrapperEqualSets])
+case class CopyProp(expr: Expr, deps: Set[RegisterVariableWrapper])
 
 case class CCP(
-    constants: Map[RegisterWrapperEqualSets, Literal],
+    constants: Map[RegisterVariableWrapper, Literal],
     // variable -> expr * dependencies
-    val exprs: Map[RegisterWrapperEqualSets, CopyProp]
+    val exprs: Map[RegisterVariableWrapper, CopyProp]
 )
 
 class ConstCopyProp(val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])])
     extends AbstractDomain[CCP] {
+
+  private final val callClobbers = (0 to 30).map("R" + _).map(c => Register(c, 64))
 
   def top: CCP = CCP(Map(), Map())
   def bot: CCP = CCP(Map(), Map())
@@ -206,13 +143,13 @@ class ConstCopyProp(val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign
         c.copy(exprs = c.exprs.filterNot((k, v) => v.expr.loads.nonEmpty))
       }
       case Assign(lv, r, lb) => {
-        val l = RegisterWrapperEqualSets(lv, getDefinition(lv, s, reachingDefs))
+        val l = RegisterVariableWrapper(lv, getDefinition(lv, s, reachingDefs))
 
         var p = c
         val evaled = exprSimp(
-          eval.partialEvalExpr(r, v => p.constants.get(RegisterWrapperEqualSets(v, getUse(v, s, reachingDefs))))
+          eval.partialEvalExpr(exprSimp(r), v => p.constants.get(RegisterVariableWrapper(v, getUse(v, s, reachingDefs))))
         )
-        val rhsDeps = evaled.variables.map(v => RegisterWrapperEqualSets(v, getDefinition(v, s, reachingDefs)))
+        val rhsDeps = evaled.variables.map(v => RegisterVariableWrapper(v, getDefinition(v, s, reachingDefs)))
 
         p = evaled match {
           case lit: Literal => p.copy(constants = p.constants.updated(l, lit))
@@ -224,10 +161,16 @@ class ConstCopyProp(val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign
           p = p.copy(exprs = p.exprs.filter((k, v) => v.expr.loads.isEmpty))
         }
         // remove candidates whose value changes due to this update
-        p = p.copy(exprs = p.exprs.filterNot((k, v) => v.deps.contains(l)))
-        p = p.copy(exprs = p.exprs.filterNot((k, v) => v.deps.contains(k)))
+        // without an SSA form in the output, we can't propagate assignments such that R0_1 := f(R0_0)
+        //  or; only replace such that all uses are copyproped, the dead definition is removed
+        p = p.copy(exprs = p.exprs.filterNot((k, v) => v.deps.exists(c => c.variable.name == l.variable.name)))
+        p = p.copy(exprs = p.exprs.filterNot((k, v) => v.deps.exists(d => d.variable.name == k.variable.name)))
 
         p
+      }
+      case x: Call => {
+        val toClob = callClobbers.map(v => RegisterVariableWrapper(v, getDefinition(v, s, reachingDefs)))
+        toClob.foldLeft(c)((c,l) => c.copy(constants = c.constants.removed(l), exprs = c.exprs.filterNot((k, v) => v.deps.contains(l))))
       }
       case _ => c
     }
@@ -239,7 +182,7 @@ def exprSimp(e: Expr): Expr = {
   def simpOne(e: Expr): Expr = {
     e match {
       // normalise
-      case BinaryExpr(op, x: Literal, y: Variable) => BinaryExpr(op, y, x)
+      case BinaryExpr(op, x: Literal, y: Expr) if !y.isInstanceOf[Literal] => BinaryExpr(op, y, x)
 
       // identities
       case Extract(ed, 0, body) if (body.getType == BitVecType(ed))                        => exprSimp(body)
@@ -250,7 +193,6 @@ def exprSimp(e: Expr): Expr = {
       case Repeat(1, body)                                                                 => exprSimp(body)
       case Extract(ed, 0, ZeroExtend(extension, body)) if (body.getType == BitVecType(ed)) => exprSimp(body)
       case Extract(ed, 0, SignExtend(extension, body)) if (body.getType == BitVecType(ed)) => exprSimp(body)
-      // case Extract(ed, 0, BinaryExpr(op, ZeroExtend(ex, hasVar), BitVecLiteral(v, sz)))    =>
       case BinaryExpr(BVXOR, l, r) if l == r =>
         e.getType match {
           case BitVecType(sz) => BitVecLiteral(0, sz)
@@ -260,14 +202,16 @@ def exprSimp(e: Expr): Expr = {
       case UnaryExpr(BVNEG, UnaryExpr(BVNEG, body))     => exprSimp(body)
       case UnaryExpr(BoolNOT, UnaryExpr(BoolNOT, body)) => exprSimp(body)
 
-      // this simplifies the slice register and then extend pattern on operations with bitvectors
-      // to instead extend the bitvector to match the size of the variable
-      case ZeroExtend(ed, BinaryExpr(op, Extract(sz1, 0, hasVar), BitVecLiteral(v, sz2)))
-          if Set(BVADD, BVMUL, BVAND, BVOR).contains(op) =>
-        BinaryExpr(op, hasVar, BitVecLiteral(v, ed + sz1))
+      // compose slices
+      case Extract(ed1, be1, Extract(ed2, be2, body)) => Extract(ed1 - be2, be1 + be2, exprSimp(body))
+
+      // (comp (comp x y) 1) = (comp x y)
+      case BinaryExpr(BVCOMP, body @ BinaryExpr(BVCOMP, _, _), BitVecLiteral(1, 1)) => exprSimp(body)
+      case BinaryExpr(BVCOMP, body @ BinaryExpr(BVCOMP, _, _), BitVecLiteral(0, 1)) => UnaryExpr(BVNOT, exprSimp(body))
+      case BinaryExpr(BVEQ, BinaryExpr(BVCOMP, body @ BinaryExpr(BVCOMP, _, _), BitVecLiteral(0, 1)), BitVecLiteral(1, 1)) => BinaryExpr(BVEQ, exprSimp(body), BitVecLiteral(0, 1))
 
       // constant folding
-      // const + (x + const) -> (const + const) + x
+      // const + (e + const) -> (const + const) + e
       case BinaryExpr(BVADD, BinaryExpr(BVADD, body, l: BitVecLiteral), r: BitVecLiteral) =>
         BinaryExpr(BVADD, BinaryExpr(BVADD, l, r), exprSimp(body))
       case BinaryExpr(BVMUL, BinaryExpr(BVMUL, body, l: BitVecLiteral), r: BitVecLiteral) =>
@@ -281,7 +225,7 @@ def exprSimp(e: Expr): Expr = {
   }
 
   var pe = e
-  var ne = simpOne(pe)
+  var ne =   simpOne(pe)
   while (ne != pe) {
     pe = ne
     ne = simpOne(pe)
@@ -294,30 +238,37 @@ class Simplify(
     val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
 ) extends CILVisitor {
 
-  println(res)
   var madeAnyChange = false
   var statement: Statement = null
 
+  def simp(pe: Expr)(ne: Expr) = {
+    val simped = eval.partialEvalExpr(exprSimp(ne), x => None)
+    if (pe != simped) {
+      madeAnyChange = true
+    }
+
+    simped
+  }
+
   override def vexpr(e: Expr) = {
     e match {
-      case v: Variable if res.constants.contains(RegisterWrapperEqualSets(v, getUse(v, statement, reachingDefs))) => {
+      case v: Variable if res.constants.contains(RegisterVariableWrapper(v, getUse(v, statement, reachingDefs))) => {
         madeAnyChange = true
         ChangeDoChildrenPost(
-          res.constants(RegisterWrapperEqualSets(v, getUse(v, statement, reachingDefs))),
-          exprSimp
+          res.constants(RegisterVariableWrapper(v, getUse(v, statement, reachingDefs))),
+          simp(e) 
         )
       }
-      case v: Variable if res.exprs.contains(RegisterWrapperEqualSets(v, getUse(v, statement, reachingDefs))) => {
-        val repl = res.exprs(RegisterWrapperEqualSets(v, getUse(v, statement, reachingDefs)))
-        val u = RegisterWrapperEqualSets(v, getUse(v, statement, reachingDefs))
-        println(s"COPYPROP $u repl=$repl")
+      case v: Variable if res.exprs.contains(RegisterVariableWrapper(v, getUse(v, statement, reachingDefs))) => {
+        val repl = res.exprs(RegisterVariableWrapper(v, getUse(v, statement, reachingDefs)))
+        val u = RegisterVariableWrapper(v, getUse(v, statement, reachingDefs))
         madeAnyChange = true
         ChangeDoChildrenPost(
           repl.expr,
           exprSimp
         )
       }
-      case e => ChangeDoChildrenPost(e, exprSimp)
+      case e => ChangeDoChildrenPost(e, simp(e))
     }
   }
 
@@ -333,7 +284,7 @@ class Simplify(
         val state = res
         val nr = eval.partialEvalExpr(
           r,
-          v => state.constants.get(RegisterWrapperEqualSets(v, getUse(v, statement, reachingDefs)))
+          v => state.constants.get(RegisterVariableWrapper(v, getUse(v, statement, reachingDefs)))
         )
         if (nr != r) {
           madeAnyChange = true
