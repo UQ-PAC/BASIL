@@ -10,7 +10,7 @@ import translating.*
 import util.Logger
 import util.intrusive_list.IntrusiveList
 import scala.collection.mutable
-import cilvisitor._
+import cilvisitor.*
 
 def resolveIndirectCallsUsingPointsTo(
     pointsTos: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],

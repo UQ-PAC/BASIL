@@ -53,6 +53,14 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node
   }
 
+
+  override def visitAssume(node: Assume): Statement = {
+    program ++= "Assume("
+    visitExpr(node.body)
+    program ++= ")"
+    node
+  }
+
   override def visitAssert(node: Assert): Statement = {
     program ++= "Assert("
     visitExpr(node.body)

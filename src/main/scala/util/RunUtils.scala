@@ -369,6 +369,9 @@ object StaticAnalysis {
     val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(IRProgram, reachingDefinitionsAnalysisResults)
     val constPropResultWithSSA = constPropSolverWithSSA.analyze()
 
+    transforms.doCopyPropTransform(ctx.program, reachingDefinitionsAnalysisResults)
+    writeToFile(serialiseIL(IRProgram), s"il-after-copyprop.il")
+
     Logger.debug("[!] Running MRA")
     val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults)
     val mraResult = mraSolver.analyze()
@@ -421,6 +424,10 @@ object StaticAnalysis {
     } else {
       Logger.warn(s"Disabling IDE solver tests due to external main procedure: ${IRProgram.mainProcedure.name}")
     }
+
+
+    transforms.doCopyPropTransform(ctx.program, reachingDefinitionsAnalysisResults)
+    writeToFile(serialiseIL(IRProgram), s"il-after-copyprop-2.il")
 
     StaticAnalysisContext(
       constPropResult = constPropResult,
@@ -505,7 +512,7 @@ object RunUtils {
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-before-analysis.il"))
     val analysis = q.staticAnalysis.map(conf => staticAnalysis(conf, ctx))
-    q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-after-analysis.il"))
+    q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-after-all-analysis.il"))
 
     if (q.runInterpret) {
       val fs = eval.interpretTrace(ctx)
