@@ -175,17 +175,17 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 
 }
 
-class SystemTestsBAP extends SystemTests {
-  runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, logResults = true))
-  runTests("incorrect", TestConfig(useBAPFrontend = true, expectVerify = false, logResults = true))
+class SystemTestsBAP extends SystemTests  {
+  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=true, expectVerify=true))
+  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=true, expectVerify=false))
   test("summary-BAP") {
     summary("testresult-BAP")
   }
 }
 
-class SystemTestsGTIRB extends SystemTests {
-  runTests("correct", TestConfig(useBAPFrontend = false, expectVerify = true, checkExpected = true, logResults = true))
-  runTests("incorrect", TestConfig(useBAPFrontend = false, expectVerify = false, checkExpected = true, logResults = true))
+class SystemTestsGTIRB extends SystemTests  {
+  runTests(correctPrograms, correctPath, "correct", TestConfig(useBAPFrontend=false, expectVerify=true, BASILFlags = Seq("--analyse")))
+  runTests(incorrectPrograms, incorrectPath, "incorrect", TestConfig(useBAPFrontend=false, expectVerify=false, BASILFlags = Seq("--analyse")))
   test("summary-GTIRB") {
     summary("testresult-GTIRB")
   }

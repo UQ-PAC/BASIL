@@ -21,15 +21,14 @@ def doCopyPropTransform(
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
 ) = {
   val d = ConstCopyProp(reachingDefs)
-  Logger.info("RPO")
-  applyRPO(p)
   var rerun = true
 
+  applyRPO(p)
   var runs = 0
   while (rerun && runs < 5) {
     Logger.info(s"Simp run $runs")
     runs += 1
-    val solver = workListSolver(d)
+    val solver = worklistSolver(d)
     val result = solver.solveProg(p, Set(), Set())
 
     for ((p, xf) <- result) {
@@ -65,14 +64,14 @@ def applyRPO(p: Program) = {
   }
 }
 
-class workListSolver[L, A <: AbstractDomain[L]](domain: A) {
+class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
 
   def solveProg(
       p: Program,
       widenpoints: Set[Block], // set of loop heads
       narrowpoints: Set[Block] // set of conditions
   ): Map[Procedure, L] = {
-    val initDom = p.procedures.map(p => (p, p.blocks.filter(x => x.nextBlocks.size > 1 || x.prevBlocks.size > 1)))
+    val initDom = p.procedures.map(p => (p, p.blocks.filter(x => (x.nextBlocks.size > 1 || x.prevBlocks.size > 1) && x.rpoOrder != -1)))
 
     initDom.map(d => (d._1, solve(d._2, Set(), Set()))).toMap
   }
@@ -83,12 +82,19 @@ class workListSolver[L, A <: AbstractDomain[L]](domain: A) {
       narrowpoints: Set[Block] // set of conditions
   ): L = {
     val saved: mutable.HashMap[Block, L] = mutable.HashMap()
-    val workList = mutable.PriorityQueue[Block]()(Ordering.by(b => b.rpoOrder))
-    workList.addAll(initial)
+    val worklist = mutable.PriorityQueue[Block]()(Ordering.by(b => b.rpoOrder))
+    worklist.addAll(initial)
 
     var x = domain.bot
-    while (workList.nonEmpty) {
-      val b = workList.dequeue
+    while (worklist.nonEmpty) {
+      val b = worklist.dequeue
+
+      while (worklist.nonEmpty && (worklist.head.rpoOrder >= b.rpoOrder)) do {
+        // drop rest of blocks with same priority
+        val m = worklist.dequeue()
+        assert(m == b, s"Different nodes with same priority ${m.rpoOrder} ${b.rpoOrder}, violates PriorityQueueWorklist assumption: $b and $m")
+      }
+
       def bs(b: Block): List[Block] = {
         if (b.nextBlocks.size == 1) {
           val n = b.nextBlocks.head
@@ -106,7 +112,7 @@ class workListSolver[L, A <: AbstractDomain[L]](domain: A) {
       var nx = todo.foldLeft(x)(xf_block)
       saved(lastBlock) = nx
       if (nx != x) then {
-        workList.addAll(lastBlock.nextBlocks)
+        worklist.addAll(lastBlock.nextBlocks)
       }
       x = nx
     }

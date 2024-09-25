@@ -427,10 +427,6 @@ object StaticAnalysis {
       Logger.warn(s"Disabling IDE solver tests due to external main procedure: ${IRProgram.mainProcedure.name}")
     }
 
-
-    transforms.doCopyPropTransform(ctx.program, reachingDefinitionsAnalysisResults)
-    writeToFile(serialiseIL(IRProgram), s"il-after-copyprop-2.il")
-
     StaticAnalysisContext(
       constPropResult = constPropResult,
       IRconstPropResult = newCPResult,

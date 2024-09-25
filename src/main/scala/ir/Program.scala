@@ -350,7 +350,7 @@ class Block private (
 
   def jump: Jump = _jump
 
-  var rpoOrder : Long = 0
+  var rpoOrder : Long = -1
 
   private def jump_=(j: Jump): Unit = {
     require(!j.hasParent)
