@@ -200,8 +200,8 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     val sections = mods.flatMap(_.sections)
 
-    val initialMemory: ArrayBuffer[MemorySection] = ArrayBuffer()
-    sections.map {elem =>
+    val initialMemory: mutable.TreeMap[BigInt, MemorySection] = mutable.TreeMap()
+    sections.map { elem =>
       val bytesToInt = elem.byteIntervals.head.contents.toByteArray.map(byte => BigInt(byte))
       val size = elem.byteIntervals.head.size.toInt
       val bytes = if (elem.name == ".bss" && bytesToInt.isEmpty) {
@@ -215,14 +215,15 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           }
         }.toSeq
       }
-      val section = MemorySection(elem.name, BigInt(elem.byteIntervals.head.address), size, bytes)
-      initialMemory += section
+      val readOnly = elem.name == ".rodata" || elem.name == ".got" // crude heuristic for now
+      val address = BigInt(elem.byteIntervals.head.address)
+      val section = MemorySection(elem.name, address, size, bytes, readOnly, None)
+      initialMemory += (address -> section)
     }
 
-    val readOnlyMemory: ArrayBuffer[MemorySection] = ArrayBuffer()
     val intialProc: Procedure = procedures.find(_.address.get == mainAddress).get
 
-    Program(procedures, intialProc, initialMemory, readOnlyMemory)
+    Program(procedures, intialProc, initialMemory)
   }
 
   private def removePCAssign(block: Block): Option[String] = {

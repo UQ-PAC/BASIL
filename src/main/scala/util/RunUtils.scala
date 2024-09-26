@@ -215,7 +215,9 @@ object IRTransform {
     * add in modifies from the spec.
     */
   def prepareForTranslation(config: BASILConfig, ctx: IRContext): Unit = {
-    ctx.program.determineRelevantMemory(ctx.globalOffsets)
+    if (config.staticAnalysis.isEmpty) {
+      ctx.program.determineRelevantMemory(ctx.globalOffsets)
+    }
 
     Logger.debug("[!] Stripping unreachable")
     val before = ctx.program.procedures.size
@@ -315,8 +317,6 @@ object StaticAnalysis {
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
-    val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
-
     Logger.debug("[!] Running ANR")
     val ANRSolver = ANRAnalysisSolver(IRProgram)
     val ANRResult = ANRSolver.analyze()
@@ -409,7 +409,7 @@ object StaticAnalysis {
     mmm.logRegions(memoryRegionContents)
 
     Logger.debug("[!] Injecting regions")
-    val regionInjector = RegionInjector(domain, IRProgram, constPropResult, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
+    val regionInjector = RegionInjector(IRProgram, constPropResult, mmm, reachingDefinitionsAnalysisResults)
     regionInjector.nodeVisitor()
 
     Logger.debug("[!] Running VSA")
@@ -511,7 +511,9 @@ object RunUtils {
     IRTransform.doCleanup(ctx)
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-before-analysis.il"))
-    val analysis = q.staticAnalysis.map(conf => staticAnalysis(conf, ctx))
+    val analysis = q.staticAnalysis.map {
+      conf => staticAnalysis(conf, ctx)
+    }
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-after-analysis.il"))
 
     if (q.runInterpret) {

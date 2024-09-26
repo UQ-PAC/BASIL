@@ -1,6 +1,7 @@
 package ir.dsl
 import ir.*
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import scala.collection.immutable.*
 
 val R0: Register = Register("R0", 64)
@@ -146,9 +147,8 @@ def stack: SharedMemory = SharedMemory("stack", 64, 8)
 def prog(procedures: EventuallyProcedure*): Program = {
   require(procedures.nonEmpty)
 
-  val initialMemory = mutable.ArrayBuffer.empty[MemorySection]
-  val readOnlyMemory = mutable.ArrayBuffer.empty[MemorySection]
-  val p = Program(mutable.ArrayBuffer.from(procedures.map(_.tempProc)), procedures.map(_.tempProc).head, initialMemory, readOnlyMemory)
+  val initialMemory = mutable.TreeMap[BigInt, MemorySection]()
+  val p = Program(ArrayBuffer.from(procedures.map(_.tempProc)), procedures.map(_.tempProc).head, initialMemory)
 
   procedures.foreach(_.resolve(p))
   p

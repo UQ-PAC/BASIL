@@ -8,6 +8,7 @@ import specification.*
 import scala.collection.mutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.TreeMap
 import util.intrusive_list.*
 
 class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
@@ -62,17 +63,18 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
     }
 
-    val memorySections: ArrayBuffer[MemorySection] = ArrayBuffer()
+    val memorySections: mutable.TreeMap[BigInt, MemorySection] = mutable.TreeMap()
     for (m <- program.memorySections) {
       val bytes = if (m.name == ".bss" && m.bytes.isEmpty) {
         for (_ <- 0 until m.size) yield BitVecLiteral(0, 8)
       } else {
         m.bytes.map(_.toIR)
       }
-      memorySections.append(MemorySection(m.name, m.address, m.size, bytes))
+      val readOnly = m.name == ".rodata" || m.name == ".got" // crude heuristic
+      memorySections.addOne(m.address, MemorySection(m.name, m.address, m.size, bytes, readOnly, None))
     }
 
-    Program(procedures, mainProcedure.get, memorySections, ArrayBuffer())
+    Program(procedures, mainProcedure.get, memorySections)
   }
 
   private def translate(s: BAPStatement) = s match {

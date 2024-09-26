@@ -4,6 +4,7 @@ import boogie.*
 import specification.*
 import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 class IRToBoogie(var program: Program, var spec: Specification, var thread: Option[ProgramThread], val filename: String) {
@@ -52,14 +53,17 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
   def translate(boogieGeneratorConfig: BoogieGeneratorConfig): BProgram = {
     config = boogieGeneratorConfig
-    val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
+    val readOnlySections = program.usedMemory.values.filter(_.readOnly)
+    val readOnlyMemory = memoryToCondition(readOnlySections)
+    val initialSections = program.usedMemory.values.filter(!_.readOnly)
+    val initialMemory = memoryToCondition(initialSections)
 
     val procedures = thread match {
       case None =>
-        program.procedures.map(f => translateProcedure(f, readOnlyMemory))
+        program.procedures.map(f => translateProcedure(f, readOnlyMemory, initialMemory))
       case Some(t) =>
         val translatedProcedures = ArrayBuffer[BProcedure]()
-        t.procedures.foreach(p => translatedProcedures.addOne(translateProcedure(p, readOnlyMemory)))
+        t.procedures.foreach(p => translatedProcedures.addOne(translateProcedure(p, readOnlyMemory, initialMemory)))
         translatedProcedures
     }
     val defaultGlobals = List(BVarDecl(mem, List(externAttr)), BVarDecl(Gamma_mem, List(externAttr)))
@@ -432,7 +436,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   }
 
 
-  def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr]): BProcedure = {
+  def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr], initialMemory: List[BExpr]): BProcedure = {
     val body = (p.entryBlock.view ++ p.blocks.filterNot(x => p.entryBlock.contains(x))).map(translateBlock).toList
 
     val callsRely: Boolean = body.flatMap(_.body).exists(_ match
@@ -455,7 +459,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     val procEnsuresDirect: List[String] = ensuresDirect.getOrElse(p.name, List())
 
     val freeRequires: List[BExpr] = if (p == program.mainProcedure) {
-      memoryToCondition(program.initialMemory) ++ readOnlyMemory
+      initialMemory ++ readOnlyMemory
     } else {
       readOnlyMemory
     }
@@ -477,10 +481,10 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     )
   }
 
-  private def memoryToCondition(memory: ArrayBuffer[MemorySection]): List[BExpr] = {
+  private def memoryToCondition(memorySections: Iterable[MemorySection]): List[BExpr] = {
 
     def coalesced: List[BExpr] = {
-      val sections = memory.flatMap { s =>
+      val sections = memorySections.flatMap { s =>
         // Phrase the memory condition in terms of 64-bit operations, as long as the memory
         // section's size is a multiple of 64-bits and 64-bits (8 bytes) aligned
         // If the memory section is not aligned, the initial unaligned part of it will not be coalesced into a 64-bit
@@ -488,6 +492,10 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
         // If the memory section's size is not a multiple of 64-bits, the last part of it that cannot be coalesced into
         // a 64-bit representation will remain as an 8-bit representation
 
+        val memory = s.region match {
+          case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+          case None => mem
+        }
         val aligned: Int = (s.address % 8).toInt
 
         val alignedSizeMultiple = (s.bytes.size - aligned) % 8
@@ -501,7 +509,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
             (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * BigInt(2).pow(y * 8)))
           BinaryBExpr(
             BVEQ,
-            BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
+            BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
             BitVecBLiteral(combined, 64)
           )
         }
@@ -514,7 +522,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           for (b <- 0 until aligned) yield {
             BinaryBExpr(
               BVEQ,
-              BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+              BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
               s.bytes(b).toBoogie
             )
           }
@@ -532,7 +540,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           for (b <- alignedEnd until s.bytes.size) yield {
             BinaryBExpr(
               BVEQ,
-              BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+              BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
               s.bytes(b).toBoogie
             )
           }
@@ -543,11 +551,15 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     }
 
     def bytes: List[BExpr] = {
-      val sections = memory.flatMap { s =>
+      val sections = memorySections.flatMap { s =>
+        val memory = s.region match {
+          case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+          case None => mem
+        }
         for (b <- s.bytes.indices) yield {
           BinaryBExpr(
             BVEQ,
-            BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+            BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
             s.bytes(b).toBoogie
           )
         }

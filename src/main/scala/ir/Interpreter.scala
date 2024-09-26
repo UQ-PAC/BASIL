@@ -322,9 +322,7 @@ class Interpreter() {
   def interpret(IRProgram: Program): mutable.Map[Variable, BitVecLiteral] = {
     // initialize memory array from IRProgram
     var currentAddress = BigInt(0)
-    IRProgram.initialMemory
-      .sortBy(_.address)
-      .foreach { im =>
+    IRProgram.initialMemory.values.foreach { im =>
         if (im.address + im.size > currentAddress) {
           val start = im.address.max(currentAddress)
           val data = if (im.address < currentAddress) im.bytes.slice((currentAddress - im.address).toInt, im.size) else im.bytes

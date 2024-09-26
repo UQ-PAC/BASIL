@@ -10,18 +10,111 @@ import scala.collection.mutable.ArrayBuffer
 /**
  * Replaces the region access with the calculated memory region.
  */
-class RegionInjector(domain: mutable.Set[CFGPosition],
-                     program: Program,
+
+class MergedRegion(var name: String, val subregions: mutable.Set[MemoryRegion])
+
+class RegionInjector(program: Program,
                      constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
                      mmm: MemoryModelMap,
-                     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-                     globalOffsets: Map[BigInt, BigInt]) {
+                     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+                    ) {
   private val stackPointer = Register("R31", 64)
 
+  val accessToRegion = mutable.Map[Statement, Set[MemoryRegion]]()
+  val loadToMemory = mutable.Map[Statement, Memory]()
+  val mergedRegions = mutable.Map[MemoryRegion, MergedRegion]()
+
   def nodeVisitor(): Unit = {
-    for (elem <- domain) {localTransfer(elem)}
-    program.initialMemory = transformMemorySections(program.initialMemory)
-    program.readOnlyMemory = transformMemorySections(program.readOnlyMemory)
+    // visit reachable procedures
+    val queue = mutable.Queue[Procedure]()
+    val visited = mutable.Set[Procedure]()
+    queue.enqueue(program.mainProcedure)
+
+    while (queue.nonEmpty) {
+      val procedure = queue.dequeue()
+      for {
+        b <- procedure.blocks
+        s <- b.statements
+      } {
+        visitStatement(s)
+      }
+      visited.add(procedure)
+      for (call <- procedure.calls) {
+        if (!queue.contains(call) && !visited.contains(call)) {
+          queue.enqueue(call)
+        }
+      }
+    }
+
+    for (access <- accessToRegion.keys) {
+      val regions = accessToRegion(access)
+      if (regions.isEmpty) {
+        //throw Exception("no regions found for " + access)
+      } else {
+        mergeRegions(regions)
+      }
+    }
+
+    // rename all regions
+    renameMemory()
+
+    transformMemorySections(program)
+  }
+
+  def mergeRegions(regions: Set[MemoryRegion]): Unit = {
+    // TODO need to check that all regions are the same type
+    val oldMergedRegions = regions.flatMap(r => mergedRegions.get(r))
+    if (oldMergedRegions.nonEmpty) {
+      // TODO rename in sensible deterministic way
+      val oldRegion = oldMergedRegions.head
+      for (o <- oldMergedRegions.tail) {
+        oldRegion.subregions.addAll(o.subregions)
+      }
+      oldRegion.subregions.addAll(regions)
+      for (o <- oldRegion.subregions) {
+        mergedRegions(o) = oldRegion
+      }
+    } else {
+      // TODO give sensible deterministic name
+      val mergedRegion = MergedRegion(regions.head.regionIdentifier, mutable.Set())
+      mergedRegion.subregions.addAll(regions)
+      for (m <- mergedRegion.subregions) {
+        mergedRegions(m) = mergedRegion
+      }
+    }
+  }
+
+  def renameMemory(): Unit = {
+    for (access <- accessToRegion.keys) {
+      // all regions associated with an access should have same merged region so no need to check others
+      val regions = accessToRegion(access)
+      if (regions.nonEmpty) {
+        val regionsHead = regions.head
+        val mergedRegion = mergedRegions(regionsHead)
+
+        access match {
+          case store: MemoryAssign =>
+            val newMemory = replaceMemory(store.mem, regionsHead, mergedRegion)
+            store.mem = newMemory
+          case _ =>
+            val newMemory = replaceMemory(loadToMemory(access), regionsHead, mergedRegion)
+            val renamer = RegionRenamer(newMemory)
+            renamer.visitStatement(access)
+        }
+      }
+
+    }
+  }
+
+  def replaceMemory(memory: Memory, region: MemoryRegion, mergedRegion: MergedRegion): Memory = {
+    region match {
+      case _: StackRegion =>
+        StackMemory(mergedRegion.name, memory.addressSize, memory.valueSize)
+      case _: DataRegion =>
+        SharedMemory(mergedRegion.name, memory.addressSize, memory.valueSize)
+      case _: HeapRegion =>
+        SharedMemory(mergedRegion.name, memory.addressSize, memory.valueSize)
+    }
   }
 
   /**
@@ -38,7 +131,7 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
     val tableAddress = globalOffsets.getOrElse(address, address)
     // this condition checks if the address is not layered and returns if it is not
     if (tableAddress != address && !globalOffsets.contains(tableAddress)) {
-      return BitVecLiteral(address, 64)
+      BitVecLiteral(address, 64)
     }
     BitVecLiteral(tableAddress, 64)
   }
@@ -77,16 +170,13 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
           return reducedRegions
         }
         val ctx = getUse(variable, n, reachingDefs)
-        for (i <- ctx) {
-          if (i != n) { // handles loops (ie. R19 = R19 + 1) %00000662 in jumptable2
-            val regions = i.rhs match {
-              case loadL: MemoryLoad =>
-                val foundRegions = exprToRegion(loadL.index, i)
-                val toReturn = mutable.Set[MemoryRegion]().addAll(foundRegions)
-                for {
-                  f <- foundRegions
-                } {
-                  // TODO: Must enable this (probably need to calculate those contents beforehand)
+        for (i <- ctx if i != n) { // handles loops (ie. R19 = R19 + 1)
+          val regions = i.rhs match {
+            case loadL: MemoryLoad =>
+              val foundRegions = exprToRegion(loadL.index, i)
+              val toReturn = mutable.Set[MemoryRegion]().addAll(foundRegions)
+              for (f <- foundRegions) {
+                // TODO: Must enable this (probably need to calculate those contents beforehand)
 //                  if (memoryRegionContents.contains(f)) {
 //                    memoryRegionContents(f).foreach {
 //                      case b: BitVecLiteral =>
@@ -99,36 +189,31 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
 //                        toReturn.remove(f)
 //                    }
 //                  }
-                }
-                toReturn.toSet
-              case _: BitVecLiteral =>
-                Set.empty[MemoryRegion]
-              case _ =>
-                //println(s"Unknown expression: ${i}")
-                //println(ctx)
-                exprToRegion(i.rhs, i)
-            }
-            val result = evaluateExpression(binExpr.arg2, constantProp(n))
-            if (result.isDefined) {
-              val b = result.get
-              for {
-                r <- regions
-              } {
-                r match {
-                  case stackRegion: StackRegion =>
-                    //println(s"StackRegion: ${stackRegion.start}")
-                    //println(s"BitVecLiteral: ${b}")
-                    //if (b.size == stackRegion.start.size) { TODO: Double check why this is needed
-                    val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
-                    reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, BitVecLiteral(nextOffset, 64)), n)
-                  //}
-                  case dataRegion: DataRegion =>
-                    //val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start, globalOffsets), b)
-                    val nextOffset = bitVectorOpToBigIntOp(binExpr.op, dataRegion.start, b.value)
-                    reducedRegions ++= exprToRegion(BitVecLiteral(nextOffset, 64), n)
-                  case _ =>
-                }
               }
+              toReturn.toSet
+            case _: BitVecLiteral =>
+              Set.empty[MemoryRegion]
+            case _ =>
+              //println(s"Unknown expression: ${i}")
+              //println(ctx)
+              exprToRegion(i.rhs, i)
+          }
+          val result = evaluateExpression(binExpr.arg2, constantProp(n))
+          if (result.isDefined) {
+            val b = result.get
+            regions.foreach {
+              case stackRegion: StackRegion =>
+                //println(s"StackRegion: ${stackRegion.start}")
+                //println(s"BitVecLiteral: ${b}")
+                //if (b.size == stackRegion.start.size) { TODO: Double check why this is needed
+                val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
+                reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, BitVecLiteral(nextOffset, 64)), n)
+              //}
+              case dataRegion: DataRegion =>
+                //val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start, globalOffsets), b)
+                val nextOffset = bitVectorOpToBigIntOp(binExpr.op, dataRegion.start, b.value)
+                reducedRegions ++= exprToRegion(BitVecLiteral(nextOffset, 64), n)
+              case _ =>
             }
           }
         }
@@ -181,7 +266,7 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
           for (i <- ctx) {
             i.rhs match {
               case be: BinaryExpr =>
-                res = res ++ exprToRegion(eval(i.rhs, i), n)
+                res = res ++ exprToRegion(i.rhs, n)
               case _ =>
             }
           }
@@ -215,88 +300,68 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
     res
   }
 
-  /** Default implementation of eval.
-   */
-  def eval(expr: Expr, cmd: Command): Expr = {
-    expr match
-      case literal: Literal => literal // ignore literals
-      case Extract(end, start, body) =>
-        Extract(end, start, eval(body, cmd))
-      case UninterpretedFunction(name, params, returnType) =>
-        val newParams = params.map { p => eval(p, cmd) }
-        UninterpretedFunction(name, newParams, returnType)
-      case Repeat(repeats, body) =>
-        Repeat(repeats, eval(body, cmd))
-      case ZeroExtend(extension, body) =>
-        ZeroExtend(extension, eval(body, cmd))
-      case SignExtend(extension, body) =>
-        SignExtend(extension, eval(body, cmd))
-      case UnaryExpr(op, arg) =>
-        UnaryExpr(op, eval(arg, cmd))
-      case BinaryExpr(op, arg1, arg2) =>
-        BinaryExpr(op, eval(arg1, cmd), eval(arg2, cmd))
-      case MemoryLoad(mem, index, endian, size) =>
-        // TODO: index should be replaced region
-        MemoryLoad(renameMemory(mem, index, cmd), eval(index, cmd), endian, size)
-      case variable: Variable => variable // ignore variables
-  }
 
-  def renameMemory(mem: Memory, expr: Expr, cmd : Command): Memory = {
-    val regions = exprToRegion(eval(expr, cmd), cmd)
-    if (regions.size == 1) {
-      Logger.debug(s"Mem CMD is: ${cmd}")
-      Logger.debug(s"Region found for mem: ${regions.head}")
-      regions.head match {
-        case stackRegion: StackRegion =>
-          return StackMemory(stackRegion.regionIdentifier, mem.addressSize, mem.valueSize)
-        case dataRegion: DataRegion =>
-          return SharedMemory(dataRegion.regionIdentifier, mem.addressSize, mem.valueSize)
-        case _ =>
-      }
-    } else if (regions.size > 1) {
-      throw RuntimeException("Multiple regions found for memory")
-//      mmm.mergeRegions(regions) match {
-//        case stackRegion: StackRegion =>
-//          return StackMemory(stackRegion.regionIdentifier, mem.addressSize, mem.valueSize)
-//        case dataRegion: DataRegion =>
-//          return SharedMemory(dataRegion.regionIdentifier, mem.addressSize, mem.valueSize)
-//        case _ =>
-//      }
-    } else {
-      Logger.debug(s"Mem CMD is: ${cmd}")
-      Logger.debug(s"No region found for expr ${expr} regions size is ${regions.size}")
+  def visitExpr(expr: Expr, cmd: Statement): Unit = {
+    expr match {
+      case Extract(_, _, body) =>
+        visitExpr(body, cmd)
+      case UninterpretedFunction(_, params, _) =>
+        params.foreach {
+          p => visitExpr(p, cmd)
+        }
+      case Repeat(_, body) =>
+        visitExpr(body, cmd)
+      case ZeroExtend(_, body) =>
+        visitExpr(body, cmd)
+      case SignExtend(_, body) =>
+        visitExpr(body, cmd)
+      case UnaryExpr(_, arg) =>
+        visitExpr(arg, cmd)
+      case BinaryExpr(_, arg1, arg2) =>
+        visitExpr(arg1, cmd)
+        visitExpr(arg2, cmd)
+      case m: MemoryLoad =>
+        val regions = exprToRegion(m.index, cmd)
+        accessToRegion(cmd) = regions
+        loadToMemory(cmd) = m.mem
+      case _ =>
     }
-    mem
   }
 
-  /** Transfer function for state lattice elements.
-   */
-  def localTransfer(n: CFGPosition): Unit = n match {
+  def visitStatement(n: Statement): Unit = n match {
     case assign: Assign =>
-      assign.rhs = eval(assign.rhs, assign)
-    case mAssign: MemoryAssign =>
-      mAssign.mem = renameMemory(mAssign.mem, mAssign.index, mAssign)
-      mAssign.index = eval(mAssign.index, mAssign)
-      mAssign.value = eval(mAssign.value, mAssign)
+      visitExpr(assign.rhs, assign)
+    case m: MemoryAssign =>
+      val regions = exprToRegion(m.index, m)
+      accessToRegion(m) = regions
     case assert: Assert =>
-      assert.body = eval(assert.body, assert)
+      visitExpr(assert.body, assert)
     case assume: Assume =>
-      assume.body = eval(assume.body, assume)
+      visitExpr(assume.body, assume)
     case _ => // ignore other kinds of nodes
   }
 
-  def transformMemorySections(memorySegment: ArrayBuffer[MemorySection]): ArrayBuffer[MemorySection] = {
-    val newArrayBuffer = ArrayBuffer.empty[MemorySection]
-    for (mem <- memorySegment) {
-      val regions = mmm.findDataObject(mem.address)
-      if (regions.size == 1) {
-        newArrayBuffer += MemorySection(regions.head.regionIdentifier, mem.address, mem.size, mem.bytes)
-        Logger.debug(s"Region ${regions.get.regionIdentifier} found for memory section ${mem.address}")
-      } else {
-        newArrayBuffer += mem
-        Logger.debug(s"No region found for memory section ${mem.address}")
+  // replace memory renamer with something that creates map from access to region
+  // then handle all the merging required
+  // then do the renaming
+  // then get regions per procedure, handle initial memory with those
+
+  def transformMemorySections(program: Program): Unit = {
+    val dataRegions = mergedRegions.keys.collect { case d: DataRegion => d }
+
+    for (region <- dataRegions) {
+      program.initialMemoryLookup(region.start) match {
+        case Some(section) =>
+          val bytes = section.getBytes(region.start, region.size)
+          // should probably check that region is entirely contained within section but shouldn't happen in practice?
+          val newSection = MemorySection(region.regionIdentifier, region.start, region.size, bytes, section.readOnly, Some(mergedRegions(region)))
+          program.usedMemory(region.start) = newSection
+        case None =>
       }
     }
-    newArrayBuffer
   }
+}
+
+class RegionRenamer(memory: Memory) extends Visitor {
+  override def visitMemory(node: Memory): Memory = memory
 }
