@@ -402,7 +402,7 @@ object StaticAnalysis {
     mmm.logRegions()
 
     Logger.debug("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(IRProgram, constPropResult, regionAccessesAnalysisResults, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
+    val steensgaardSolver = InterprocSteensgaardAnalysis(IRProgram, constPropResult, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
     steensgaardSolver.analyze()
     val steensgaardResults = steensgaardSolver.pointsTo()
     val memoryRegionContents = steensgaardSolver.getMemoryRegionContents

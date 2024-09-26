@@ -39,7 +39,6 @@ case class RegisterWrapperEqualSets(variable: Variable, assigns: Set[Assign]) {
 class InterprocSteensgaardAnalysis(
       program: Program,
       constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-      regionAccesses: Map[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]]],
       mmm: MemoryModelMap,
       reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
       globalOffsets: Map[BigInt, BigInt]) extends Analysis[Any] {
@@ -192,17 +191,9 @@ class InterprocSteensgaardAnalysis(
       case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
         val b = evaluateExpression(binOp.arg2, constantProp(n))
         if (b.isDefined) {
-          if binOp.arg2.variables.exists { v => v.sharedVariable } then {
-            Logger.debug("Shared stack object: " + b)
-            Logger.debug("Shared in: " + expr)
-            val regions = mmm.findSharedStackObject(b.get.value)
-            Logger.debug("found: " + regions)
-            res ++= regions
-          } else {
-            val region = mmm.findStackObject(b.get.value)
-            if (region.isDefined) {
-              res = res + region.get
-            }
+          val region = mmm.findStackObject(b.get.value)
+          if (region.isDefined) {
+            res = res + region.get
           }
         }
         res
@@ -415,12 +406,21 @@ case class ExpressionVariable(expr: MemoryRegion | Expr) extends StTerm with Var
 
 /** A fresh term variable.
   */
-case class FreshVariable(var id: Int = 0) extends StTerm with Var[StTerm] {
-
-  id = Fresh.next()
-
+case class FreshVariable(id: Int) extends StTerm with Var[StTerm] {
   override def toString: String = s"x$id"
 }
+
+object FreshVariable {
+  var n = 0
+
+  def next(): Int = {
+    n += 1
+    n
+  }
+
+  def apply(): FreshVariable = FreshVariable(next())
+}
+
 
 /** A constructor term that represents a pointer to another term.
   */
@@ -431,16 +431,4 @@ case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
   def subst(v: Var[StTerm], t: Term[StTerm]): Term[StTerm] = PointerRef(of.subst(v, t))
 
   override def toString: String = s"$of"
-}
-
-/** Counter for producing fresh IDs.
-  */
-object Fresh {
-
-  var n = 0
-
-  def next(): Int = {
-    n += 1
-    n
-  }
 }

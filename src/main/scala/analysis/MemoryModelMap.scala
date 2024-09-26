@@ -326,7 +326,7 @@ class MemoryModelMap {
   }
 
   def getAllHeapRegions: Set[HeapRegion] = {
-      heapMap.values.toSet.map(returnRegion)
+    heapMap.values.toSet.map(returnRegion)
   }
 
   def getAllRegions: Set[MemoryRegion] = {
@@ -456,11 +456,11 @@ case class StackRegion(override val regionIdentifier: String, start: BigInt, par
   override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name}, $subAccesses)"
 }
 
-case class HeapRegion(override val regionIdentifier: String, size: BigInt, parent: Procedure) extends MemoryRegion {
+case class HeapRegion(override val regionIdentifier: String, size: Int, parent: Procedure) extends MemoryRegion {
   override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 
-case class DataRegion(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryRegion {
+case class DataRegion(override val regionIdentifier: String, start: BigInt, size: Int) extends MemoryRegion {
   override def toString: String = s"Data($regionIdentifier, $start)"
 }
 

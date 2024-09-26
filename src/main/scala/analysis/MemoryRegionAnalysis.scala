@@ -42,14 +42,13 @@ trait MemoryRegionAnalysis(val program: Program,
    */
   private def poolMaster(expr: BigInt, stackBase: Procedure, subAccess: BigInt): StackRegion = {
     val stackPool = stackMap.getOrElseUpdate(stackBase, mutable.HashMap())
-    var region: StackRegion = null
-    if (stackPool.contains(expr)) {
-      region = stackPool(expr)
+    val region = if (stackPool.contains(expr)) {
+      stackPool(expr)
     } else {
       val newRegion = StackRegion(nextStackCount(), expr, stackBase)
       addReturnStack(stackBase, newRegion)
       stackPool += (expr -> newRegion)
-      region = newRegion
+      newRegion
     }
     region.subAccesses.add((subAccess.toDouble/8).ceil.toInt)
     region
@@ -230,8 +229,7 @@ trait MemoryRegionAnalysis(val program: Program,
           if (directCall.target.name == "malloc") {
             evaluateExpression(mallocVariable, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
-                val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
-                val newHeapRegion = HeapRegion(nextMallocCount(), negB, IRWalk.procedure(n))
+                val newHeapRegion = HeapRegion(nextMallocCount(), b.value.toInt, IRWalk.procedure(n))
                 addReturnHeap(directCall, newHeapRegion)
                 regionLattice.lub(s, Set(newHeapRegion))
               case None => s

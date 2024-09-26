@@ -152,23 +152,15 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
       case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
         val b = evaluateExpression(binOp.arg2, constantProp(n))
         if (b.isDefined) {
-          if binOp.arg2.variables.exists { v => v.sharedVariable } then {
-            Logger.debug("Shared stack object: " + b)
-            Logger.debug("Shared in: " + expr)
-            val regions = mmm.findSharedStackObject(b.get.value)
-            Logger.debug("found: " + regions)
-            res ++= regions
-          } else {
-            if (isNegative(b.get)) {
-              val region = mmm.findStackObject(0)
-              if (region.isDefined) {
-                res = res + region.get
-              }
-            }
-            val region = mmm.findStackObject(b.get.value)
+          if (isNegative(b.get)) {
+            val region = mmm.findStackObject(0)
             if (region.isDefined) {
               res = res + region.get
             }
+          }
+          val region = mmm.findStackObject(b.get.value)
+          if (region.isDefined) {
+            res = res + region.get
           }
         }
       case binaryExpr: BinaryExpr =>
