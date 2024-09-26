@@ -64,7 +64,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
 
     val memorySections: ArrayBuffer[MemorySection] = ArrayBuffer()
     for (m <- program.memorySections) {
-      val bytes = m.bytes.map(_.toIR)
+      val bytes = if (m.name == ".bss" && m.bytes.isEmpty) {
+        for (_ <- 0 until m.size) yield BitVecLiteral(0, 8)
+      } else {
+        m.bytes.map(_.toIR)
+      }
       memorySections.append(MemorySection(m.name, m.address, m.size, bytes))
     }
 

@@ -202,15 +202,20 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     val initialMemory: ArrayBuffer[MemorySection] = ArrayBuffer()
     sections.map {elem =>
-      val bytestoInt = elem.byteIntervals.head.contents.toByteArray.map(byte => BigInt(byte))
-      val bytes = bytestoInt.map {byte =>
-        if (byte < 0) {
-          BitVecLiteral(byte + (BigInt(1) << 8), 8)
-        } else {
-          BitVecLiteral(byte, 8)
-        }
+      val bytesToInt = elem.byteIntervals.head.contents.toByteArray.map(byte => BigInt(byte))
+      val size = elem.byteIntervals.head.size.toInt
+      val bytes = if (elem.name == ".bss" && bytesToInt.isEmpty) {
+        for (_ <- 0 until size) yield BitVecLiteral(0, 8)
+      } else {
+        bytesToInt.map { byte =>
+          if (byte < 0) {
+            BitVecLiteral(byte + (BigInt(1) << 8), 8)
+          } else {
+            BitVecLiteral(byte, 8)
+          }
+        }.toSeq
       }
-      val section = MemorySection(elem.name, elem.byteIntervals.head.address.toInt, elem.byteIntervals.head.size.toInt, bytes.toSeq)
+      val section = MemorySection(elem.name, BigInt(elem.byteIntervals.head.address), size, bytes)
       initialMemory += section
     }
 
