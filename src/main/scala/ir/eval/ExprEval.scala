@@ -1,6 +1,7 @@
 package ir.eval
 import ir.eval.BitVectorEval
 import util.functional.State
+import util.Logger
 import ir._
 
 /** We generalise the expression evaluator to a partial evaluator to simplify evaluating casts.
@@ -235,8 +236,10 @@ def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S,
   }
   State.protect(
     () => ns,
-    { case e =>
-      Errored(e.toString)
+    { case e => {
+      Logger.error(e.getStackTrace.take(10).mkString("\n"))
+      Errored("eval " + exp + " : "+ e.toString)
+    }
     }: PartialFunction[Exception, InterpreterError]
   )
 
@@ -259,6 +262,8 @@ def partialEvalExpr(
   val l = StatelessLoader[InterpreterError](variableAssignment, memory)
   State.evaluate((), statePartialEvalExpr(l)(exp)) match {
     case Right(e) => e
-    case Left(e)  => throw Exception("Unable to evaluate expr : " + e.toString)
+    case Left(e)  => {
+      throw Exception("Unable to evaluate expr : " + e.toString)
+    }
   }
 }

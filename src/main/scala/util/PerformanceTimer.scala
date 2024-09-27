@@ -12,11 +12,15 @@ case class PerformanceTimer(timerName: String = "") {
       val delta = elapsed()
       lastCheckpoint = System.currentTimeMillis()
       checkpoints.put(name, delta)
-      Logger.debug(s"PerformanceTimer $timerName [$name]: ${delta}ms")
+      Logger.info(s"PerformanceTimer $timerName [$name]: ${delta}ms")
       delta
   }
   def elapsed() :  Long = {
       System.currentTimeMillis() - lastCheckpoint
+  }
+
+  def reset = {
+      lastCheckpoint = System.currentTimeMillis()
   }
 
   def checkPoints(): scala.collection.Map[String, Long] = checkpoints

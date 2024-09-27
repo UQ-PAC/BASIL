@@ -7,6 +7,7 @@ import util.intrusive_list.*
 import translating.serialiseIL
 import eval.BitVectorEval
 
+
 class Program(var procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
               var initialMemory: ArrayBuffer[MemorySection],
@@ -327,7 +328,6 @@ class Parameter(var name: String, var size: Int, var value: Register) {
 }
 
 
-
 class Block private (
  val label: String,
  val address: Option[BigInt],
@@ -349,6 +349,9 @@ class Block private (
   def isEntry: Boolean = parent.entryBlock.contains(this)
 
   def jump: Jump = _jump
+
+  /** sort index in reverse post order **/
+  var rpoOrder : Long = -1
 
   private def jump_=(j: Jump): Unit = {
     require(!j.hasParent)
