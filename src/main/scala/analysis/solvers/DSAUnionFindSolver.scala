@@ -22,12 +22,7 @@ class DSAUnionFindSolver extends UnionFindSolver[UniTerm] {
 
     if (rep1 == rep2) return
 
-      (rep1, rep2) match {
-        case (t1: DSAUniTerm, t2: DSAUniTerm) =>
-          mkUnion(t1, t2, offset)
-        case (x, y) =>
-          throw new UnificationFailure(s"Cannot unify $t1 and $t2 (with representatives $x and $y)")
-      }
+      mkUnion(t1, t2, offset)
   }
 
 
