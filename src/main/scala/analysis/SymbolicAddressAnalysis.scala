@@ -146,6 +146,13 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
               case Some(value) => value.value
               case None => -1
             Map(d -> IdEdge(), Left(SymbolicAddress(mallocVariable, HeapLocation(nextMallocCount, procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
+      case DirectCall(proc, ret, label) if proc.returnBlock.isEmpty => // for when calls are non returning, kills the stack dataflow facts
+        d match
+          case Left(value) =>
+            value.symbolicBase match
+              case StackLocation(regionIdentifier, parent, size) => Map()
+              case _ => Map(d -> IdEdge())
+          case Right(_) => Map(d -> IdEdge())
       case _ => Map(d -> IdEdge())
 }
 
