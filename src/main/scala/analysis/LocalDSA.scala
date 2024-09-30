@@ -47,16 +47,41 @@ class LocalDSA(
         (m, access) =>
           if m.contains(access._1.accessor) then
             // every variable pointing to a stack region ONLY has one symbolic access associated with it.
-            m(access._1.accessor).foreach(
-              sym => assert(!sym.symbolicBase.isInstanceOf[StackLocation])
-            )
-            assert(!access._1.symbolicBase.isInstanceOf[StackLocation])
+//            m(access._1.accessor).foreach(
+//              sym =>
+//                if (sym.symbolicBase.isInstanceOf[StackLocation]) then
+//                  println(m)
+//                  println(access._1.accessor)
+//                  println(access)
+//                  print("")
+//                //assert(!sym.symbolicBase.isInstanceOf[StackLocation])
+//            )
+//            assert(!access._1.symbolicBase.isInstanceOf[StackLocation])
             m + (access._1.accessor -> (m(access._1.accessor) + access._1))
           else
             m + (access._1.accessor -> Set(access._1))
       }
       outerMap + (position -> innerMap)
   }
+
+  private def getStack(offset: BigInt): DSC =
+    var last: BigInt = 0
+    if graph.stackMapping.contains(offset) then
+      graph.stackMapping(offset).cells(0)
+    else
+      breakable {
+        graph.stackMapping.keys.foreach(
+          elementOffset =>
+            if offset < elementOffset then
+              break
+            else
+              last = elementOffset
+        )
+      }
+      val diff = offset - last
+      assert(graph.stackMapping.contains(last))
+      graph.stackMapping(last).getCell(diff)
+
 
 
   /**
@@ -66,22 +91,24 @@ class LocalDSA(
   def isStack(expr: Expr, pos: CFGPosition): Option[DSC] =
     expr match
       case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
-        varToSym(pos)(arg1).size == 1 && varToSym(pos)(arg1).head.symbolicBase.isInstanceOf[StackLocation] =>
+        varToSym(pos)(arg1).exists(s => s.symbolicBase.isInstanceOf[StackLocation]) =>
         evaluateExpression(arg2, constProp(pos)) match
           case Some(v) =>
-            val offset = v.value + varToSym(pos)(arg1).head.offset
-            if graph.stackMapping.contains(offset) then
-              Some(graph.stackMapping(offset).cells(0))
-            else
-              None
+            val stackRegions = varToSym(pos)(arg1).filter(s => s.symbolicBase.isInstanceOf[StackLocation])
+            val res = stackRegions.tail.foldLeft(getStack(v.value + stackRegions.head.offset)) {
+              (res, sym) =>
+                graph.mergeCells(res, getStack(v.value + sym.offset))
+            }
+            Some(res)
           case None => None
       case arg: Variable if varToSym.contains(pos) && varToSym(pos).contains(arg) &&
-        varToSym(pos)(arg).size == 1 && varToSym(pos)(arg).head.symbolicBase.isInstanceOf[StackLocation] =>
-        val offset = varToSym(pos)(arg).head.offset
-        if graph.stackMapping.contains(offset) then
-          Some(graph.stackMapping(offset).cells(0))
-        else
-          None
+        varToSym(pos)(arg).exists(s => s.symbolicBase.isInstanceOf[StackLocation]) =>
+        val stackRegions = varToSym(pos)(arg).filter(s => s.symbolicBase.isInstanceOf[StackLocation])
+        val res = stackRegions.tail.foldLeft(getStack(stackRegions.head.offset)) {
+          (res, sym) =>
+            graph.mergeCells(res, getStack(sym.offset))
+        }
+        Some(res)
       case _ => None
 
 
@@ -183,15 +210,6 @@ class LocalDSA(
    * handles unsupported pointer arithmetic by collapsing all the nodes invloved
    */
   def unsupportedPointerArithmeticOperation(n: CFGPosition, expr: Expr, lhsCell: DSC): DSC = {
-//    var containsPointer = false
-//    breakable {
-//      for (v <- expr.variables) {
-//        if varToSym.contains(n) && varToSym(n).contains(v) then
-//          containsPointer = true
-//          break
-//      }
-//    }
-//    if containsPointer then
     val cell = expr.variables.foldLeft(lhsCell) {
       (c, v) =>
         val cells: Set[Slice] = graph.getCells(n, v)

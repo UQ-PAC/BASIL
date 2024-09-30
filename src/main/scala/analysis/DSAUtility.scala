@@ -4,6 +4,7 @@ import analysis.solvers.{DSAUniTerm, DSAUnionFindSolver, UnionFindSolver, Var}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
 import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, Memory, MemoryAssign, MemoryLoad, Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, begin, computeDomain, toShortString}
 import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
+import util.Logger
 
 import scala.util.control.Breaks.{break, breakable}
 import scala.collection.mutable
@@ -51,70 +52,87 @@ class DSG(val proc: Procedure,
   val mallocRegister = Register("R0", 64)
   val stackPointer = Register("R31", 64)
 
-  // this is the mapping from offsets/positions on the stack to their representative DS nodes
-  val stackMapping: mutable.Map[BigInt, DSN] =
-    computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(Map[BigInt, DSN]()) {
-      (results, pos) => stackBuilder(pos, results)
-    }.to(collection.mutable.Map)
+  // collect all stack access and their maximum accessed size
+  // BigInt is the offset of the stack position and Int is it's size
+  val stackAccesses: Map[BigInt, Int] = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(Map[BigInt, Int]()) {
+    (results, pos) =>
+      pos match
+        case Assign(variable: Variable, expr: Expr, _) =>
+          expr match
+            case MemoryLoad(mem, index, endian, size) =>
+              visitStackAccess(pos, index, size).foldLeft(results) {
+                (res, access) =>
+                  if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
+                    res + (access.offset -> access.size)
+                  else
+                    res
+              }
+            case _ =>
+              visitStackAccess(pos, expr, 0).foldLeft(results) {
+                (res, access) =>
+                  if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
+                    res + (access.offset -> access.size)
+                  else
+                    res
+              }
+        case MemoryAssign(mem, index: Expr, value: Expr, endian, size: Int, label) =>
+          visitStackAccess(pos, index, size).foldLeft(results) {
+            (res, access) =>
+              if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
+                res + (access.offset -> access.size)
+              else
+                res
+          }
+        case _ => results
+  }
 
-
-  /**
-   * this function takes a stackMapping and updates it based on a memory load and memory store
-   * @param pos memory load or store IL position
-   * @param index memory location of load or store
-   * @param size size of the load or store
-   * @param m stack mapping
-   * @return updated stack mapping
-   */
-  private def visitStackAccess(pos: CFGPosition, index: Expr, size: Int, m: Map[BigInt, DSN]) : Map[BigInt, DSN] =
-    assert(size % 8 == 0)
+  case class StackAccess(offset: BigInt, size: Int)
+  private def visitStackAccess(pos: CFGPosition, index: Expr, size: Int): Set[StackAccess] = {
+    assert( size % 8 == 0)
     val byteSize = size / 8
     index match
       case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
         evaluateExpression(arg2, constProp(pos)).isDefined =>
-        var offset = evaluateExpression(arg2, constProp(pos)).get.value
-        varToSym(pos)(arg1).foldLeft(m) { // go through all the symbolic accesses tied to arg1 at pos
+        val offset = evaluateExpression(arg2, constProp(pos)).get.value
+        varToSym(pos)(arg1).foldLeft(Set[StackAccess]()) { // go through all the symbolic accesses tied to arg1 at pos
           (m, sym) =>
             sym match
               case SymbolicAddress(accessor, StackLocation(regionIdentifier, proc, size), symOffset) => // only consider stack accesses
-                offset = offset + symOffset
-                createStackMapping(pos.toShortString, offset, m, byteSize)
+                m + StackAccess(offset + symOffset, byteSize)
               case _ => m
         }
       case arg: Variable if varToSym.contains(pos) && varToSym(pos).contains(arg) =>
-        varToSym(pos)(arg).foldLeft(m) {
+        varToSym(pos)(arg).foldLeft(Set[StackAccess]()) {
           (m, sym) =>
             sym match
               case SymbolicAddress(accessor, StackLocation(regionIdentifier, proc, size), offset) =>
-                createStackMapping(pos.toShortString, offset, m, byteSize)
+//                 createStackMapping(pos.toShortString, offset, m, byteSize)
+                m + StackAccess(offset, byteSize)
               case _ => m
         }
-      case _ => m
-
-  private def stackBuilder(pos: CFGPosition, m: Map[BigInt, DSN]): Map[BigInt, DSN] = {
-    pos match
-      case Assign(variable: Variable, expr: Expr, _) =>
-        expr match
-          case MemoryLoad(mem, index, endian, size) =>
-            visitStackAccess(pos, index, size, m)
-          case _ => m
-      case MemoryAssign(mem, index: Expr, value: Expr, endian, size: Int, label) =>
-        visitStackAccess(pos, index, size, m)
-      case _ => m
-
+      case _ => Set.empty
   }
 
-  private def createStackMapping(label: String, offset: BigInt, m:  Map[BigInt, DSN], byteSize: Int) :  Map[BigInt, DSN]=
-    if m.contains(offset) then
-      assert(!m(offset).cells(0).growSize(byteSize))
-      m
-    else
-      val node = DSN(Some(this), byteSize)
-      node.allocationRegions.add(StackLocation(label, proc, byteSize))
-      node.flags.stack = true
-      node.addCell(0, byteSize)
-      m + (offset -> node)
 
+  // this is the mapping from offsets/positions on the stack to their representative DS nodes
+  val stackMapping: mutable.Map[BigInt, DSN] = mutable.Map()
+  var lastOffset: BigInt = -1
+  var nextValidOffset: BigInt = 0
+  stackAccesses.keys.toSeq.sorted.foreach(
+    offset =>
+      val byteSize = stackAccesses(offset)
+      if offset >= nextValidOffset then
+        val node = DSN(Some(this), byteSize)
+        node.allocationRegions.add(StackLocation(s"Stack_${proc}_${offset}", proc, byteSize))
+        node.flags.stack = true
+        node.addCell(0, byteSize)
+        stackMapping.update(offset, node)
+        lastOffset = offset
+      else
+        val diff = nextValidOffset - offset
+        stackMapping(lastOffset).addCell(diff, byteSize)
+      nextValidOffset = offset + byteSize
+  )
 
   private val swappedOffsets = globalOffsets.map(_.swap)
 
@@ -169,7 +187,6 @@ class DSG(val proc: Procedure,
       node.flags.incomplete = true
       globalMapping.update(AddressRange(external.offset, external.offset), Field(node, 0))
   )
-
 
 
   // determine if an address is a global and return the corresponding global if it is.
@@ -806,8 +823,9 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
       }
       result match
         case Some(value) => value
-        case None =>
-          ???
+        case None => ???
+//          Logger.warn(s"$this didn't have a cell at offset: $offset. An empty cell was added in")
+//          addCell(offset, 0)
     else
       cells(offset)
       
