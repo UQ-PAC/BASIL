@@ -66,7 +66,7 @@ class DSA(program: Program,
     // perform local analysis on all procs
     domain.foreach(
       proc =>
-        val dsg = Local(proc, symResults, constProp, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params).analyze()
+        val dsg = LocalDSA(proc, symResults, constProp, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params).analyze()
 
         locals.update(proc, dsg)
         bu.update(proc, dsg.cloneSelf())

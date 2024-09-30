@@ -21,7 +21,7 @@ import scala.collection.mutable
  * @param writesTo mapping from procedures to registers they change
  * @param params mapping from procedures to their parameters
  */
-class Local(
+class LocalDSA(
              proc: Procedure,
              symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
              constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
@@ -182,28 +182,31 @@ class Local(
   /**
    * handles unsupported pointer arithmetic by collapsing all the nodes invloved
    */
-  def unsupportedPointerArithmeticOperation(n: CFGPosition, expr: Expr, lhsCell: DSC): Unit = {
-    var containsPointer = false
-    breakable {
-      for (v <- expr.variables) {
-        if varToSym.contains(n) && varToSym(n).contains(v) then
-          containsPointer = true
-          break
-      }
-    }
-    if containsPointer then
-      val cell = expr.variables.foldLeft(lhsCell) {
-        (c, v) =>
-          val cells: Set[Slice] = graph.getCells(n, v)
+  def unsupportedPointerArithmeticOperation(n: CFGPosition, expr: Expr, lhsCell: DSC): DSC = {
+//    var containsPointer = false
+//    breakable {
+//      for (v <- expr.variables) {
+//        if varToSym.contains(n) && varToSym(n).contains(v) then
+//          containsPointer = true
+//          break
+//      }
+//    }
+//    if containsPointer then
+    val cell = expr.variables.foldLeft(lhsCell) {
+      (c, v) =>
+        val cells: Set[Slice] = graph.getCells(n, v)
 
-          cells.foldLeft(c) {
-            (c, p) =>
-              graph.mergeCells(c, p._1)
-          }
-      }
-      val node = cell.node.get
-      node.flags.unknown = true
-      val test = graph.collapseNode(node)
+        cells.foldLeft(c) {
+          (c, p) =>
+            graph.mergeCells(c, p._1)
+        }
+    }
+
+    val node = cell.node.get
+    node.flags.unknown = true
+    graph.collapseNode(node)
+
+    node.cells(0)
   }
 
   def visit(n: CFGPosition): Unit = {
@@ -282,7 +285,8 @@ class Local(
                       case None =>
 //                        assert(varToSym(n).contains(arg1))
                         // collapse the result
-                        visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, 0, true)
+//                        visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, 0, true)
+                        unsupportedPointerArithmeticOperation(n, index,DSN(Some(graph)).cells(0))
                   case arg: Variable =>
 //                    assert(varToSym(n).contains(arg))
                     visitPointerArithmeticOperation(n, lhsCell, arg, byteSize, true)
@@ -315,7 +319,8 @@ class Local(
                   case None =>
 //                    assert(varToSym(n).contains(arg1))
                     // collapse the results
-                    visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, 0, true)
+                    // visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, 0, true)
+                    unsupportedPointerArithmeticOperation(n, index,DSN(Some(graph)).cells(0))
               case arg: Variable =>
 //                assert(varToSym(n).contains(arg))
                 visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg, byteSize, true)
