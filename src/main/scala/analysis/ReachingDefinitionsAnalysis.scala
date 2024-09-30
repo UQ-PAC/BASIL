@@ -3,7 +3,7 @@ package analysis
 import ir.*
 import analysis.solvers.SimpleWorklistFixpointSolver
 
-case class ReachingDefinitionsAnalysis(program: Program) {
+case class ReachingDefinitionsAnalysis(program: Program, inter: Boolean = false) {
 
   type Definition = Assign // local assign is a definition because it is a statement and statements are assumed to be unique
   type TupleElement =
@@ -77,7 +77,8 @@ case class ReachingDefinitionsAnalysis(program: Program) {
       transformUses(assume.body.variables, s)
     case indirectCall: IndirectCall =>
       transformUses(indirectCall.target.variables, s)
-    case directCall: DirectCall if directCall.target.name == "malloc" =>
+    // if we do interproc analysis then there is no need to make any special assumptions about malloc
+    case directCall: DirectCall if directCall.target.name == "malloc" && !inter =>
       // assume R0 has been assigned, generate a fake definition
       val mallocVar = Register("R0", 64)
       val mallocDef = generateUniqueDefinition(mallocVar)
@@ -96,6 +97,6 @@ class ReachingDefinitionsAnalysisSolver(program: Program)
     with IRIntraproceduralForwardDependencies
 
 class InterprocReachingDefinitionsAnalysisSolver(program: Program)
-  extends ReachingDefinitionsAnalysis(program)
+  extends ReachingDefinitionsAnalysis(program, true)
     with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[ReachingDefinitionsAnalysis#Definition]], Map[Variable, Set[ReachingDefinitionsAnalysis#Definition]]), ReachingDefinitionsAnalysis#TupleElement]
     with IRInterproceduralForwardDependencies

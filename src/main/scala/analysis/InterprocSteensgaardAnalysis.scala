@@ -34,12 +34,11 @@ case class RegisterWrapperEqualSets(variable: Variable, assigns: Set[Assign]) {
 }
 
 /** Steensgaard-style pointer analysis. The analysis associates an [[StTerm]] with each variable declaration and
-  * expression node in the AST. It is implemented using [[analysis.solvers.UnionFindSolver]].
-  */
+ * expression node in the AST. It is implemented using [[analysis.solvers.UnionFindSolver]].
+ */
 class InterprocSteensgaardAnalysis(
       program: Program,
       constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-      regionAccesses: Map[CFGPosition, Map[RegisterVariableWrapper, FlatElement[Expr]]],
       mmm: MemoryModelMap,
       reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
       globalOffsets: Map[BigInt, BigInt]) extends Analysis[Any] {
@@ -60,11 +59,6 @@ class InterprocSteensgaardAnalysis(
   private val visited: mutable.Set[CFGPosition] = mutable.Set()
 
   def getMemoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]] = memoryRegionContents.map((k, v) => k -> v.toSet).toMap
-
-  private def nextMallocCount() = {
-    mallocCount += 1
-    s"malloc_$mallocCount"
-  }
 
   /**
    * In expressions that have accesses within a region, we need to relocate
@@ -157,12 +151,12 @@ class InterprocSteensgaardAnalysis(
                 r match {
                   case stackRegion: StackRegion =>
                     val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
-                    reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, BitVecLiteral(nextOffset, 64)), n)
+                    reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, BitVecLiteral(nextOffset, 64)), i)
                   case dataRegion: DataRegion =>
                     val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start), b)
                     val b2 = evaluateExpression(nextOffset, constantProp(n))
                     if (b2.isDefined) {
-                      reducedRegions ++= exprToRegion(b2.get, n)
+                      reducedRegions ++= exprToRegion(b2.get, i)
                     }
                   case _ =>
                 }
@@ -249,8 +243,17 @@ class InterprocSteensgaardAnalysis(
     }
   }
 
+  //  def exprToRegion(expr: Expr, cmd: Command): Option[MemoryRegion] = {
+  //    val isGlobal = evaluateExpression(expr, constantProp(cmd))
+  //    if (isGlobal.isDefined) {
+  //      mmm.findDataObject(isGlobal.get.value)
+  //    } else {
+  //      mmm.getStack((cmd, expr))
+  //    }
+  //  }
+
   /** @inheritdoc
-    */
+   */
   def analyze(): Unit =
     // generate the constraints by traversing the AST and solve them on-the-fly
     program.procedures.foreach(p => {
@@ -258,11 +261,11 @@ class InterprocSteensgaardAnalysis(
     })
 
   /** Generates the constraints for the given sub-AST.
-    * @param node
-    *   the node for which it generates the constraints
-    * @param arg
-    *   unused for this visitor
-    */
+   * @param node
+   *   the node for which it generates the constraints
+   * @param arg
+   *   unused for this visitor
+   */
   def visit(node: CFGPosition, arg: Unit): Unit = {
     if (visited.contains(node)) {
       return
@@ -284,6 +287,11 @@ class InterprocSteensgaardAnalysis(
                 exprToRegion(binOp, cmd).foreach(
                   x => unify(IdentifierVariable(RegisterVariableWrapper(assign.lhs, getDefinition(assign.lhs, cmd, reachingDefs))), PointerRef(AllocVariable(x)))
                 )
+              case variable: Variable =>
+                // X1 = X2: [[X1]] = [[X2]]
+                val X1 = assign.lhs
+                val X2 = variable
+                unify(IdentifierVariable(RegisterVariableWrapper(X1, getDefinition(X1, cmd, reachingDefs))), IdentifierVariable(RegisterVariableWrapper(X2, getUse(X2, cmd, reachingDefs))))
               // TODO: should lookout for global base + offset case as well
               case _ =>
                 unwrapExpr(assign.rhs).foreach {
@@ -309,17 +317,25 @@ class InterprocSteensgaardAnalysis(
                     $X2.foreach(
                       x => unify(IdentifierVariable(RegisterVariableWrapper(assign.lhs, getDefinition(assign.lhs, cmd, reachingDefs))), PointerRef(AllocVariable(x)))
                     )
-                  case variable: Variable =>
-                    // X1 = X2: [[X1]] = [[X2]]
-                    val X1 = assign.lhs
-                    val X2 = variable
-                    unify(IdentifierVariable(RegisterVariableWrapper(X1, getDefinition(X1, cmd, reachingDefs))), IdentifierVariable(RegisterVariableWrapper(X2, getUse(X2, cmd, reachingDefs))))
                   case _ => // do nothing
                 }
             }
           case memoryAssign: MemoryAssign =>
             // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
-            val X1_star = exprToRegion(memoryAssign.index, cmd)
+            val X1_star1 = exprToRegion(memoryAssign.index, cmd)
+            val X1_star = X1_star1.foldLeft(Set[MemoryRegion]()) {
+              case (acc, x) =>
+                if (!memoryRegionContents.contains(x)) {
+                  memoryRegionContents.addOne(x -> mutable.Set())
+                }
+                val found = memoryRegionContents(x).filter(r => r.isInstanceOf[MemoryRegion]).map(r => r.asInstanceOf[MemoryRegion])
+                if (found.nonEmpty) {
+                  // get just the memory regions from the region contents
+                  acc ++ found
+                } else {
+                  acc + x
+                }
+            }
             val X2 = evaluateExpression(memoryAssign.value, constantProp(cmd))
             // TODO: This is risky as it tries to coerce every value to a region (needed for functionpointer example)
             val possibleRegions = exprToRegion(memoryAssign.value, cmd)
@@ -357,7 +373,7 @@ class InterprocSteensgaardAnalysis(
   }
 
   /** @inheritdoc
-    */
+   */
   def pointsTo(): Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]] = {
     val solution = solver.solution()
     val unifications = solver.unifications()
@@ -378,7 +394,7 @@ class InterprocSteensgaardAnalysis(
   }
 
   /** @inheritdoc
-    */
+   */
   def mayAlias(): (RegisterVariableWrapper, RegisterVariableWrapper) => Boolean = {
     val solution = solver.solution()
     (id1: RegisterVariableWrapper, id2: RegisterVariableWrapper) =>
@@ -389,32 +405,32 @@ class InterprocSteensgaardAnalysis(
 }
 
 /** Terms used in unification.
-  */
+ */
 sealed trait StTerm
 
 /** A term variable that represents an alloc in the program.
-  */
+ */
 case class AllocVariable(alloc: MemoryRegion) extends StTerm with Var[StTerm] {
 
   override def toString: String = s"alloc{${alloc}}"
 }
 
 /** A term variable that represents an identifier in the program.
-  */
+ */
 case class IdentifierVariable(id: RegisterVariableWrapper) extends StTerm with Var[StTerm] {
 
   override def toString: String = s"$id"
 }
 
 /** A term variable that represents an expression in the program.
-  */
+ */
 case class ExpressionVariable(expr: MemoryRegion | Expr) extends StTerm with Var[StTerm] {
 
   override def toString: String = s"$expr"
 }
 
 /** A fresh term variable.
-  */
+ */
 case class FreshVariable(var id: Int = 0) extends StTerm with Var[StTerm] {
 
   id = Fresh.next()
@@ -423,7 +439,7 @@ case class FreshVariable(var id: Int = 0) extends StTerm with Var[StTerm] {
 }
 
 /** A constructor term that represents a pointer to another term.
-  */
+ */
 case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
 
   val args: List[Term[StTerm]] = List(of)
@@ -434,7 +450,7 @@ case class PointerRef(of: Term[StTerm]) extends StTerm with Cons[StTerm] {
 }
 
 /** Counter for producing fresh IDs.
-  */
+ */
 object Fresh {
 
   var n = 0

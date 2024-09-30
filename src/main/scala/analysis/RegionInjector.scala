@@ -262,7 +262,7 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
         case _ =>
       }
     } else if (regions.size > 1) {
-      throw RuntimeException("Multiple regions found for memory")
+      //throw RuntimeException("Multiple regions found for memory")
 //      mmm.mergeRegions(regions) match {
 //        case stackRegion: StackRegion =>
 //          return StackMemory(stackRegion.regionIdentifier, mem.addressSize, mem.valueSize)
