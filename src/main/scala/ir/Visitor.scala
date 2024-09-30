@@ -60,11 +60,11 @@ abstract class Visitor {
     for (b <- node.blocks) {
       node.replaceBlock(b, visitBlock(b))
     }
-    for (i <- node.in.indices) {
-      node.in(i) = visitParameter(node.in(i))
+    for (i <- node.formalInParam.indices) {
+      node.formalInParam(i) = visitLocalVar(node.formalInParam(i))
     }
-    for (i <- node.out.indices) {
-      node.out(i) = visitParameter(node.out(i))
+    for (i <- node.formalOutParam.indices) {
+      node.formalOutParam(i) = visitLocalVar(node.formalOutParam(i))
     }
     node
   }
@@ -220,11 +220,11 @@ abstract class ReadOnlyVisitor extends Visitor {
     for (i <- node.blocks) {
       visitBlock(i)
     }
-    for (i <- node.in) {
-      visitParameter(i)
+    for (i <- node.formalInParam) {
+      visitLocalVar(i)
     }
-    for (i <- node.out) {
-      visitParameter(i)
+    for (i <- node.formalOutParam) {
+      visitLocalVar(i)
     }
     node
   }
@@ -380,13 +380,6 @@ class Renamer(reserved: Set[String]) extends Visitor {
     } else {
       node
     }
-  }
-
-  override def visitParameter(node: Parameter): Parameter = {
-    if (reserved.contains(node.name)) {
-      node.name = s"#${node.name}"
-    }
-    super.visitParameter(node)
   }
 
   override def visitProcedure(node: Procedure): Procedure = {

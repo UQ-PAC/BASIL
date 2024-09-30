@@ -131,17 +131,17 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
   // TODO this is a hack to imitate BAP so that the existing specifications relying on this will work
   // we cannot and should not rely on this at all
-  private def createArguments(name: String): (ArrayBuffer[Parameter], ArrayBuffer[Parameter]) = {
+  private def createArguments(name: String): (ArrayBuffer[LocalVar], ArrayBuffer[LocalVar]) = {
     val args = ArrayBuffer.newBuilder[Parameter]
     var regNum = 0
 
     val in = if (name == "main") {
-      ArrayBuffer(Parameter("main_argc", 32, Register("R0", 64)), Parameter("main_argv", 64, Register("R1", 64)))
+      ArrayBuffer(LocalVar("main_argc", BitVecType(32)), LocalVar("main_argv", BitVecType(32)))
     } else {
       ArrayBuffer()
     }
 
-    val out = ArrayBuffer(Parameter(name + "_result", 32, Register("R0", 64)))
+    val out = ArrayBuffer(LocalVar(name + "_result", BitVecType(64)))
 
     (in, out)
   }
@@ -258,7 +258,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     val (in, out) = createArguments(name)
 
-    val procedure = Procedure(name, address, in = in, out = out)
+    val procedure = Procedure(name, address, formalInParam = in, formalOutParam = out)
     uuidToProcedure += (functionUUID -> procedure)
     entranceUUIDtoProcedure += (entranceUUID -> procedure)
 
@@ -412,7 +412,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
               proc
             }
             val label = removePCAssign(block)
-            (Some(DirectCall(target, label)), Unreachable())
+            (Some(DirectCall(target, immutable.Map(), label)), Unreachable())
           }
         } else if (uuidToBlock.contains(edge.targetUuid)) {
           // resolved indirect jump
@@ -434,7 +434,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
           val jump = if (procedure == targetProc) {
             (None, GoTo(mutable.Set(uuidToBlock(edge.targetUuid)), label))
           } else {
-            (Some(DirectCall(targetProc, label)), Unreachable())
+            (Some(DirectCall(targetProc, immutable.Map(), label)), Unreachable())
           }
           jump
         } else if (uuidToBlock.contains(edge.targetUuid)) {
@@ -468,7 +468,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
         if (entranceUUIDtoProcedure.contains(edge.targetUuid)) {
           val target = entranceUUIDtoProcedure(edge.targetUuid)
           val label = removePCAssign(block)
-          (Some(DirectCall(target, label)), Unreachable())
+          (Some(DirectCall(target, immutable.Map(), label)), Unreachable())
         } else {
           throw Exception(s"edge from ${block.label} to ${byteStringToString(edge.targetUuid)} does not point to a known procedure entrance")
         }
@@ -597,7 +597,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
       // resolved indirect call
       val target = entranceUUIDtoProcedure(call.targetUuid)
       val label = removePCAssign(block)
-      (Some(DirectCall(target, label)), GoTo(Set(returnTarget)))
+      (Some(DirectCall(target, immutable.Map(), label)), GoTo(Set(returnTarget)))
     }
   }
 

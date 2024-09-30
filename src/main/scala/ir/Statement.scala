@@ -87,7 +87,7 @@ class Unreachable(override val label: Option[String] = None) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
-class Return(override val label: Option[String] = None) extends Jump {
+class Return(override val label: Option[String] = None, val outParams : List[Expr] = List()) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
@@ -145,6 +145,7 @@ sealed trait Call extends Statement {
 }
 
 class DirectCall(val target: Procedure,
+                 val params: Map[LocalVar, Expr] = Map(), // lhs match target.formal_inparams
                  override val label: Option[String] = None
                 ) extends Call {
   /* override def locals: Set[Variable] = condition match {

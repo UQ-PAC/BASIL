@@ -31,8 +31,8 @@ trait CILVisitor:
   def vvar(e: Variable): VisitAction[Variable] = DoChildren()
   def vmem(e: Memory): VisitAction[Memory] = DoChildren()
 
-  def enter_scope(params: ArrayBuffer[Parameter]): Unit = ()
-  def leave_scope(outparam: ArrayBuffer[Parameter]): Unit = ()
+  def enter_scope(params: Map[LocalVar, Expr]): Unit = ()
+  def leave_scope(): Unit = ()
 
 
 def doVisitList[T](v: CILVisitor, a: VisitAction[List[T]], n: T, continue: (T) => T): List[T] = {
@@ -55,10 +55,6 @@ def doVisit[T](v: CILVisitor, a: VisitAction[T], n: T, continue: (T) => T): T = 
 
 class CILVisitorImpl(val v: CILVisitor) {
 
-  def visit_parameters(p: ArrayBuffer[Parameter]): ArrayBuffer[Parameter] = {
-    doVisit(v, v.vparams(p), p, (n) => n)
-  }
-
   def visit_var(n: Variable): Variable = {
     doVisit(v, v.vvar(n), n, (n) => n)
   }
@@ -70,7 +66,14 @@ class CILVisitorImpl(val v: CILVisitor) {
 
 
   def visit_jump(j: Jump): Jump = {
-    doVisit(v, v.vjump(j), j, (j) => j)
+    val ji = j match {
+      case r: Return => {
+        v.leave_scope()
+        r
+      }
+      case x => x
+    }
+    doVisit(v, v.vjump(ji), ji, (x) => x)
   }
 
   def visit_fallthrough(j: Option[GoTo]): Option[GoTo] = {
@@ -95,7 +98,10 @@ class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_stmt(s: Statement): List[Statement] = {
     def continue(n: Statement) = n match {
-      case d: DirectCall => d
+      case d: DirectCall => {
+        v.enter_scope(d.params)
+        d
+      }
       case i: IndirectCall => {
         i.target = visit_var(i.target)
         i
@@ -144,13 +150,12 @@ class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_proc(p: Procedure): List[Procedure] = {
     def continue(p: Procedure) = {
-      p.in = visit_parameters(p.in)
-      v.enter_scope(p.in)
+      // manage scope on call/return
+      // v.enter_scope(ArrayBuffer())
       for (b <- p.blocks) {
         p.replaceBlock(b, visit_block(b))
       }
-      p.out = visit_parameters(p.out)
-      v.leave_scope(p.out)
+      // v.leave_scope(ArrayBuffer())
       p
     }
 

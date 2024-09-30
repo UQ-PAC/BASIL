@@ -141,8 +141,16 @@ class Program(var procedures: ArrayBuffer[Procedure],
 class ProgramThread(val entry: Procedure,
                     val procedures: mutable.LinkedHashSet[Procedure],
                     val creationSite: Option[DirectCall]) {
-
 }
+
+/*
+ * R0 := call procname(R0, R1, R2)
+ *
+ * procname (R0a, R1a, R2a):  
+ *  ...
+ *  return (R0)
+ *
+*/
 
 class Procedure private (
                   var name: String,
@@ -150,8 +158,8 @@ class Procedure private (
                   private var _entryBlock: Option[Block],
                   private var _returnBlock: Option[Block],
                   private val _blocks: mutable.LinkedHashSet[Block],
-                  var in: ArrayBuffer[Parameter],
-                  var out: ArrayBuffer[Parameter],
+                  var formalInParam: ArrayBuffer[LocalVar],
+                  var formalOutParam: ArrayBuffer[LocalVar],
                   var requires: List[BExpr],
                   var ensures: List[BExpr],
                 ) {
@@ -161,12 +169,15 @@ class Procedure private (
   require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
   require(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
-  def this(name: String, address: Option[BigInt] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer(), requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
-    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out), List.from(requires), List.from(ensures))
+  def this(name: String, address: Option[BigInt] = None , entryBlock: Option[Block] = None, 
+      returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), 
+      formalInParam: IterableOnce[LocalVar] = ArrayBuffer(), formalOutParam: IterableOnce[LocalVar] = ArrayBuffer(), 
+      requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
+    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(formalInParam), ArrayBuffer.from(formalOutParam), List.from(requires), List.from(ensures))
   }
 
   override def toString: String = {
-    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
+    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${formalInParam.size} in and ${formalOutParam.size} out parameters"
   }
 
   def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet

@@ -6,6 +6,7 @@ import ir.{UnaryExpr, BinaryExpr, *}
 import specification.*
 
 import scala.collection.mutable
+import scala.collection.immutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 import util.intrusive_list.*
@@ -28,12 +29,12 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         }
         labelToBlock.addOne(b.label, block)
       }
-      for (p <- s.in) {
-        procedure.in.append(p.toIR)
-      }
-      for (p <- s.out) {
-        procedure.out.append(p.toIR)
-      }
+      // for (p <- s.in) {
+      //   procedure.in.append(p.toIR)
+      // }
+      // for (p <- s.out) {
+      //   procedure.out.append(p.toIR)
+      // }
       if (s.address.get == mainAddress) {
         mainProcedure = Some(procedure)
       }
@@ -135,7 +136,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     } else {
       jumps.head match {
         case b: BAPDirectCall =>
-          val call = Some(DirectCall(nameToProcedure(b.target),Some(b.line)))
+          val call = Some(DirectCall(nameToProcedure(b.target),immutable.Map(), Some(b.line)))
           val ft = (b.returnTarget.map(t => labelToBlock(t))).map(x => GoTo(Set(x))).getOrElse(Unreachable())
           (call, ft, ArrayBuffer())
         case b: BAPIndirectCall =>

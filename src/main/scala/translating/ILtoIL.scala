@@ -126,17 +126,17 @@ private class ILSerialiser extends ReadOnlyVisitor {
     indentLevel += 1
 
     program ++= "in("
-    for (i <- node.in.indices) {
-      visitParameter(node.in(i))
-      if (i != node.in.size - 1) {
+    for (i <- node.formalInParam.indices) {
+      visitLocalVar(node.formalInParam(i))
+      if (i != node.formalInParam.size - 1) {
         program ++= ", "
       }
     }
     program ++= "), "
     program ++= "out("
-    for (i <- node.out.indices) {
-      visitParameter(node.out(i))
-      if (i != node.out.size - 1)
+    for (i <- node.formalInParam.indices) {
+      visitLocalVar(node.formalInParam(i))
+      if (i != node.formalInParam.size - 1)
         program ++= ", "
     }
     program ++= "), "
