@@ -28,7 +28,8 @@ trait CILVisitor:
   def vfallthrough(j: Option[GoTo]): VisitAction[Option[GoTo]] = DoChildren()
 
   def vexpr(e: Expr): VisitAction[Expr] = DoChildren()
-  def vvar(e: Variable): VisitAction[Variable] = DoChildren()
+  def vrvar(e: Variable): VisitAction[Variable] = DoChildren()
+  def vlvar(e: Variable): VisitAction[Variable] = DoChildren()
   def vmem(e: Memory): VisitAction[Memory] = DoChildren()
 
   def enter_scope(params: Map[LocalVar, Expr]): Unit = ()
@@ -55,15 +56,19 @@ def doVisit[T](v: CILVisitor, a: VisitAction[T], n: T, continue: (T) => T): T = 
 
 class CILVisitorImpl(val v: CILVisitor) {
 
-  def visit_var(n: Variable): Variable = {
-    doVisit(v, v.vvar(n), n, (n) => n)
+  def visit_rvar(n: Variable): Variable = {
+    // variable in right expression
+    doVisit(v, v.vrvar(n), n, (n) => n)
   }
 
+  def visit_lvar(n: Variable): Variable = {
+    // variable in left expression
+    doVisit(v, v.vlvar(n), n, (n) => n)
+  }
 
   def visit_mem(n: Memory): Memory = {
     doVisit(v, v.vmem(n), n, (n) => n)
   }
-
 
   def visit_jump(j: Jump): Jump = {
     val ji = j match {
@@ -90,7 +95,7 @@ class CILVisitorImpl(val v: CILVisitor) {
       case SignExtend(bits, arg)                => SignExtend(bits, visit_expr(arg))
       case BinaryExpr(op, arg, arg2)            => BinaryExpr(op, visit_expr(arg), visit_expr(arg2))
       case UnaryExpr(op, arg)                   => UnaryExpr(op, visit_expr(arg))
-      case v: Variable                          => visit_var(v)
+      case v: Variable                          => visit_rvar(v)
       case UninterpretedFunction(n, params, rt) => UninterpretedFunction(n, params.map(visit_expr), rt)
     }
     doVisit(v, v.vexpr(n), n, continue)
@@ -103,7 +108,7 @@ class CILVisitorImpl(val v: CILVisitor) {
         d
       }
       case i: IndirectCall => {
-        i.target = visit_var(i.target)
+        i.target = visit_rvar(i.target)
         i
       }
       case m: MemoryAssign => {
@@ -114,7 +119,7 @@ class CILVisitorImpl(val v: CILVisitor) {
       }
       case m: Assign => {
         m.rhs = visit_expr(m.rhs)
-        m.lhs = visit_var(m.lhs)
+        m.lhs = visit_lvar(m.lhs)
         m
       }
       case s: Assert => {
