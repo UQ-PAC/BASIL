@@ -206,7 +206,7 @@ object IRTransform {
     externalRemover.visitProgram(ctx.program)
     renamer.visitProgram(ctx.program)
 
-    ctx
+    ir.transforms.liftProcedureCallAbstraction(ctx)
   }
 
   /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
@@ -272,6 +272,7 @@ object IRTransform {
 /** Methods relating to program static analysis.
   */
 object StaticAnalysis {
+  var first : Boolean = true
   /** Run all static analysis passes on the provided IRProgram.
     */
   def analyse(
@@ -320,9 +321,17 @@ object StaticAnalysis {
     val ANRSolver = ANRAnalysisSolver(IRProgram)
     val ANRResult = ANRSolver.analyze()
 
+
     Logger.debug("[!] Running RNA")
     val RNASolver = RNAAnalysisSolver(IRProgram)
     val RNAResult = RNASolver.analyze()
+
+    config.analysisResultsPath.foreach(s =>
+      writeToFile(printAnalysisResults(IRProgram, ANRResult), s"${s}-anr-result$iteration.txt")
+    )
+    config.analysisResultsPath.foreach(s =>
+      writeToFile(printAnalysisResults(IRProgram, RNAResult), s"${s}-rna-result$iteration.txt")
+    )
 
     Logger.debug("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationSolver(IRProgram)
@@ -427,6 +436,7 @@ object StaticAnalysis {
       Logger.warn(s"Disabling IDE solver tests due to external main procedure: ${IRProgram.mainProcedure.name}")
     }
 
+    first = false
     StaticAnalysisContext(
       constPropResult = constPropResult,
       IRconstPropResult = newCPResult,
@@ -504,9 +514,9 @@ object RunUtils {
 
   def loadAndTranslate(q: BASILConfig): BASILResult = {
     Logger.debug("[!] Loading Program")
-    val ctx = IRLoading.load(q.loading)
+    var ctx = IRLoading.load(q.loading)
 
-    IRTransform.doCleanup(ctx)
+    ctx = IRTransform.doCleanup(ctx)
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-before-analysis.il"))
     val analysis = q.staticAnalysis.map(conf => staticAnalysis(conf, ctx))

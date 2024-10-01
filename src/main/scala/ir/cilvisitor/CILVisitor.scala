@@ -20,7 +20,6 @@ case class ChangeDoChildrenPost[T](e: T, f: T => T) extends VisitAction[T]
 trait CILVisitor:
   def vprog(e: Program): VisitAction[Program] = DoChildren()
   def vproc(e: Procedure): VisitAction[List[Procedure]] = DoChildren()
-  def vparams(e: ArrayBuffer[Parameter]): VisitAction[ArrayBuffer[Parameter]] = DoChildren()
   def vblock(e: Block): VisitAction[Block] = DoChildren()
 
   def vstmt(e: Statement): VisitAction[List[Statement]] = DoChildren()
@@ -104,7 +103,7 @@ class CILVisitorImpl(val v: CILVisitor) {
   def visit_stmt(s: Statement): List[Statement] = {
     def continue(n: Statement) = n match {
       case d: DirectCall => {
-        v.enter_scope(d.params)
+        v.enter_scope(d.actualParams)
         d
       }
       case i: IndirectCall => {

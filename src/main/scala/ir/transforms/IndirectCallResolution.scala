@@ -110,7 +110,7 @@ def resolveIndirectCallsUsingPointsTo(
       if (targets.size == 1) {
         modified = true
 
-        val newCall = DirectCall(targets.head, Map(), indirectCall.label)
+        val newCall = DirectCall(targets.head, indirectCall.label)
         block.statements.replace(indirectCall, newCall)
       } else if (targets.size > 1) {
 

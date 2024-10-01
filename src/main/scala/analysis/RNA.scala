@@ -10,7 +10,7 @@ import scala.collection.immutable
  * This helps to identify the set of variables that are read from memory before they have been initialised.
  * This could be used on callee side to identify what parameters where passed to the function.
  */
-trait RNAAnalysis(program: Program) {
+trait RNAAnalysis(program: Program, ignoreStackPtrs: Boolean = true) {
 
   val powersetLattice: PowersetLattice[Variable] = PowersetLattice()
 
@@ -22,7 +22,7 @@ trait RNAAnalysis(program: Program) {
   private val linkRegister = Register("R30", 64)
   private val framePointer = Register("R29", 64)
 
-  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer, stackPointer)
+  private val ignoreRegions: Set[Expr] = if (ignoreStackPtrs) then Set(linkRegister, framePointer, stackPointer) else Set()
 
   /** Default implementation of eval.
     */
@@ -34,7 +34,7 @@ trait RNAAnalysis(program: Program) {
       case assert: Assert =>
         m.union(assert.body.variables.filter(!ignoreRegions.contains(_)))
       case memoryAssign: MemoryAssign =>
-        m.union(memoryAssign.index.variables.filter(!ignoreRegions.contains(_)))
+        m.union((memoryAssign.index.variables ++ memoryAssign.value.variables).filter(!ignoreRegions.contains(_)))
       case indirectCall: IndirectCall =>
         if (ignoreRegions.contains(indirectCall.target)) return m
         m + indirectCall.target
@@ -61,7 +61,8 @@ trait RNAAnalysis(program: Program) {
 
 class RNAAnalysisSolver(
     program: Program,
-) extends RNAAnalysis(program)
+    ignoreStackPtrs: Boolean = true,
+) extends RNAAnalysis(program, ignoreStackPtrs)
     with IRIntraproceduralBackwardDependencies
     with Analysis[Map[CFGPosition, Set[Variable]]]
     with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]] {

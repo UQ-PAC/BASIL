@@ -64,12 +64,11 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node match {
       case j: GoTo => program ++= s"goTo(${j.targets.map(_.label).mkString(", ")})" 
       case h: Unreachable => program ++= "halt"
-      case h: Return => program ++= "return"
+      case h: Return => program ++= s"return (${h.outParams.map(_._2).mkString(", ")})"
     }
 
     node
   }
-
 
   override def visitGoTo(node: GoTo): GoTo = {
     program ++= "GoTo("
@@ -81,7 +80,9 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   override def visitDirectCall(node: DirectCall): Statement = {
     program ++= "DirectCall("
+    program ++= "(" + node.outParams.map(_._2).mkString(", ") + ") := call "
     program ++= procedureIdentifier(node.target)
+    program ++= "(" + node.actualParams + ")"
     program ++= ")" // DirectCall
     node
   }
@@ -126,19 +127,10 @@ private class ILSerialiser extends ReadOnlyVisitor {
     indentLevel += 1
 
     program ++= "in("
-    for (i <- node.formalInParam.indices) {
-      visitLocalVar(node.formalInParam(i))
-      if (i != node.formalInParam.size - 1) {
-        program ++= ", "
-      }
-    }
+    program ++= node.formalInParam.mkString(", ")
     program ++= "), "
     program ++= "out("
-    for (i <- node.formalInParam.indices) {
-      visitLocalVar(node.formalInParam(i))
-      if (i != node.formalInParam.size - 1)
-        program ++= ", "
-    }
+    program ++= node.formalOutParam.mkString(", ")
     program ++= "), "
     program ++= "blocks(\n"
     for (b <- node.blocks) {
@@ -146,13 +138,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
     }
     program ++= ")),\n"
     indentLevel -= 1
-    node
-  }
-
-  override def visitParameter(node: Parameter): Parameter = {
-    program ++= "Parameter("
-    visitRegister(node.value)
-    program ++= ")"
     node
   }
 

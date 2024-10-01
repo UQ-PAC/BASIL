@@ -7,6 +7,32 @@ import analysis.BitVectorEval
 import util.intrusive_list.*
 import translating.serialiseIL
 
+
+/**
+  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+  * not guaranteed to be in any defined order. 
+  */
+class ILUnorderedIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
+  private val stack = mutable.Stack[CFGPosition]()
+  stack.addAll(begin)
+
+  override def hasNext: Boolean = {
+    stack.nonEmpty
+  }
+
+  override def next(): CFGPosition = {
+    val n: CFGPosition = stack.pop()
+
+    stack.pushAll(n match {
+      case p: Procedure => p.blocks
+      case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
+      case s: Command => Seq()
+    })
+    n
+  }
+
+}
+
 class Program(var procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
               var initialMemory: ArrayBuffer[MemorySection],
@@ -94,37 +120,13 @@ class Program(var procedures: ArrayBuffer[Procedure],
     initialMemory = initialMemoryNew
   }
 
-  /**
-   * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-   * not guaranteed to be in any defined order. 
-   */
-  private class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
-    private val stack = mutable.Stack[CFGPosition]()
-    stack.addAll(begin.procedures)
-
-    override def hasNext: Boolean = {
-      stack.nonEmpty
-    }
-
-    override def next(): CFGPosition = {
-      val n: CFGPosition = stack.pop()
-
-      stack.pushAll(n match {
-        case p: Procedure => p.blocks
-        case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
-        case s: Command => Seq()
-      })
-      n
-    }
-
-  }
 
   /**
    * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
    * not guaranteed to be in any defined order. 
    */
   def iterator: Iterator[CFGPosition] = {
-    ILUnorderedIterator(this)
+    ILUnorderedIterator(this.procedures)
   }
 
   def nameToProcedure: Map[String, Procedure] = {
@@ -158,11 +160,11 @@ class Procedure private (
                   private var _entryBlock: Option[Block],
                   private var _returnBlock: Option[Block],
                   private val _blocks: mutable.LinkedHashSet[Block],
-                  var formalInParam: ArrayBuffer[LocalVar],
-                  var formalOutParam: ArrayBuffer[LocalVar],
+                  var formalInParam: mutable.SortedSet[LocalVar],
+                  var formalOutParam: mutable.SortedSet[LocalVar],
                   var requires: List[BExpr],
                   var ensures: List[BExpr],
-                ) {
+                ) extends Iterable[CFGPosition] {
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant
@@ -173,7 +175,12 @@ class Procedure private (
       returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), 
       formalInParam: IterableOnce[LocalVar] = ArrayBuffer(), formalOutParam: IterableOnce[LocalVar] = ArrayBuffer(), 
       requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
-    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(formalInParam), ArrayBuffer.from(formalOutParam), List.from(requires), List.from(ensures))
+    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), mutable.SortedSet.from(formalInParam), mutable.SortedSet.from(formalOutParam), List.from(requires), List.from(ensures))
+  }
+
+
+  def iterator: Iterator[CFGPosition] = {
+    ILUnorderedIterator(this)
   }
 
   override def toString: String = {
@@ -330,13 +337,6 @@ class Procedure private (
     reachable.toSet
   }
 }
-
-class Parameter(var name: String, var size: Int, var value: Register) {
-  def toBoogie: BVariable = BParam(name, BitVecBType(size))
-  def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
-}
-
-
 
 class Block private (
  val label: String,

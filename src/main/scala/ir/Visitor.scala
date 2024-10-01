@@ -60,17 +60,8 @@ abstract class Visitor {
     for (b <- node.blocks) {
       node.replaceBlock(b, visitBlock(b))
     }
-    for (i <- node.formalInParam.indices) {
-      node.formalInParam(i) = visitLocalVar(node.formalInParam(i))
-    }
-    for (i <- node.formalOutParam.indices) {
-      node.formalOutParam(i) = visitLocalVar(node.formalOutParam(i))
-    }
-    node
-  }
-
-  def visitParameter(node: Parameter): Parameter = {
-    node.value = visitRegister(node.value)
+    node.formalInParam = node.formalInParam.map(visitLocalVar)
+    node.formalOutParam = node.formalOutParam.map(visitLocalVar)
     node
   }
 
@@ -229,10 +220,6 @@ abstract class ReadOnlyVisitor extends Visitor {
     node
   }
 
-  override def visitParameter(node: Parameter): Parameter = {
-    visitRegister(node.value)
-    node
-  }
 
   override def visitProgram(node: Program): Program = {
     for (i <- node.procedures) {
@@ -301,6 +288,7 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
     // reset for each procedure
     stackRefs.clear()
     stackRefs.add(stackPointer)
+    stackRefs.add(LocalVar("R31", BitVecType(64)))
     super.visitProcedure(node)
   }
 
@@ -325,7 +313,7 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
     val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackRefs)
     if (rhsStackRefs.nonEmpty) {
       stackRefs.add(node.lhs)
-    } else if (stackRefs.contains(node.lhs) && node.lhs != stackPointer) {
+    } else if (stackRefs.contains(node.lhs) && node.lhs.name != stackPointer.name) {
       stackRefs.remove(node.lhs)
     }
     node

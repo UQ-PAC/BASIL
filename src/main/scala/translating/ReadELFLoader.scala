@@ -1,6 +1,7 @@
 package translating
 
 import Parsers.ReadELFParser.*
+import boogie.*
 import specification.*
 import util.ILLoadingConfig
 

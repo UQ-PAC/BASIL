@@ -46,14 +46,22 @@ case class BAPBlock(label: String, address: Option[BigInt], statements: List[BAP
 }
 
 case class BAPParameter(name: String, size: Int, value: BAPVar) {
-  def toIR: Parameter = {
+
+  def toAssign : Assign = {
     val register = value.toIR
     register match {
-      case r: Register => Parameter(name, size, r)
-      case _           => throw Exception(s"subroutine parameter $this refers to non-register variable $value")
+      case r: Register => {
+        if (r.size == size) then {
+          Assign(r, toIR)
+        } else {
+          Assign(r, ZeroExtend(r.size - size, toIR))
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable $value")
     }
-
   }
+
+  def toIR: LocalVar = LocalVar(name, BitVecType(size))
 }
 
 case class BAPMemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BAPLiteral])

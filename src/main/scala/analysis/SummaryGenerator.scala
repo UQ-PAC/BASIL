@@ -4,7 +4,7 @@ import analysis.*
 import ir.*
 import boogie.*
 import util.Logger
-import specification.SpecGlobal
+import boogie.SpecGlobal
 
 /**
  * A temporary copy of RNA analysis which works on Taintables.
