@@ -103,7 +103,7 @@ def resolveIndirectCallsUsingPointsTo(
       val targets: mutable.Set[Procedure] =
         targetNames.map(name => IRProgram.procedures.find(_.name == name).getOrElse(addFakeProcedure(name)))
 
-      if (targets.size > 1) {
+      if (targets.nonEmpty) {
         Logger.debug(s"Resolved indirect call $indirectCall")
       }
 

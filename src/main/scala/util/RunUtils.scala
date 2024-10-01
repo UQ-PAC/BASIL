@@ -329,6 +329,10 @@ object StaticAnalysis {
     val constPropSolver = ConstantPropagationSolver(IRProgram)
     val constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]] = constPropSolver.analyze()
 
+    config.analysisResultsPath.foreach(s =>
+      writeToFile(printAnalysisResults(IRProgram, constPropResult), s"${s}OGconstprop$iteration.txt")
+    )
+
     Logger.debug("[!] Variable dependency summaries")
     val scc = stronglyConnectedComponents(CallGraph, List(IRProgram.mainProcedure))
     val specGlobalAddresses = ctx.specification.globals.map(s => s.address -> s.name).toMap
@@ -346,27 +350,13 @@ object StaticAnalysis {
       writeToFile(toDot(dumpdomain, InterProcIRCursor, Map.empty), s"${f}_new_ir_intercfg$iteration.dot")
     })
 
-    val reachingDefinitionsAnalysisSolver = ReachingDefinitionsAnalysisSolver(IRProgram)
+    val reachingDefinitionsAnalysisSolver = InterprocReachingDefinitionsAnalysisSolver(IRProgram)
     val reachingDefinitionsAnalysisResults = reachingDefinitionsAnalysisSolver.analyze()
 
     config.analysisDotPath.foreach(s => {
       writeToFile(
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> reachingDefinitionsAnalysisResults(b).toString).toMap),
+        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> reachingDefinitionsAnalysisResults(b).toString).toMap, true),
         s"${s}_reachingDefinitions$iteration.dot"
-      )
-    })
-
-
-    Logger.debug("[!] Running RegToMemAnalysisSolver")
-    val regionAccessesAnalysisSolver = RegionAccessesAnalysisSolver(IRProgram, constPropResult, reachingDefinitionsAnalysisResults)
-    val regionAccessesAnalysisResults = regionAccessesAnalysisSolver.analyze()
-
-//     config.analysisDotPath.foreach(s => writeToFile(cfg.toDot(Output.labeler(regionAccessesAnalysisResults, true), Output.dotIder), s"${s}_RegTo$iteration.dot"))
-    config.analysisResultsPath.foreach(s => writeToFile(printAnalysisResults(IRProgram, regionAccessesAnalysisResults), s"${s}_RegTo$iteration.txt"))
-    config.analysisDotPath.foreach(s => {
-      writeToFile(
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> regionAccessesAnalysisResults(b).toString).toMap),
-        s"${s}_RegTo$iteration.dot"
       )
     })
 
@@ -374,8 +364,13 @@ object StaticAnalysis {
     val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(IRProgram, reachingDefinitionsAnalysisResults)
     val constPropResultWithSSA = constPropSolverWithSSA.analyze()
 
+    val mmm = MemoryModelMap()
+    mmm.preLoadGlobals(mergedSubroutines, globalOffsets, globalAddresses, globalSizes)
+
     Logger.debug("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, regionAccessesAnalysisResults, reachingDefinitionsAnalysisResults)
+    val assumeR31 = false
+    val constantPropForMRA = ConstantPropagationSolver(IRProgram, assumeR31).analyze()
+    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constantPropForMRA, ANRResult, RNAResult, reachingDefinitionsAnalysisResults, assumeR31, mmm)
     val mraResult = mraSolver.analyze()
 
     config.analysisDotPath.foreach(s => {
@@ -397,8 +392,7 @@ object StaticAnalysis {
     })
 
     Logger.debug("[!] Running MMM")
-    val mmm = MemoryModelMap()
-    mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mraSolver.mergeRegions, mergedSubroutines, globalOffsets, globalAddresses, globalSizes, mraSolver.procedureToSharedRegions)
+    mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mraSolver.mergeRegions, mraSolver.allocationSites, mraSolver.procedureToSharedRegions)
     mmm.logRegions()
 
     Logger.debug("[!] Running Steensgaard")

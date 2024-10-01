@@ -22,7 +22,7 @@ class MemoryModelMap {
   private val MAX_BIGINT: BigInt = BigInt(Long.MaxValue)
   private val contextStack = mutable.Stack.empty[String]
   private val sharedContextStack = mutable.Stack.empty[List[StackRegion]]
-  private val localStacks = mutable.Map[String, List[StackRegion]]()
+  private val localStacks = mutable.Map[String, List[StackRegion]]().withDefaultValue(List.empty)
   private val sharedStacks = mutable.Map[String, List[StackRegion]]()
 
   private val stackMap: mutable.Map[RangeKey, StackRegion] = mutable.TreeMap()
@@ -32,6 +32,8 @@ class MemoryModelMap {
   private val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.TreeMap()
   private val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.TreeMap()
   private val heapCalls: mutable.Map[DirectCall, HeapRegion] = mutable.Map()
+
+  private val stackAllocationSites: mutable.Map[(CFGPosition, Expr), StackRegion] = mutable.Map()
 
   private val uf = new UnionFind()
 
@@ -76,7 +78,7 @@ class MemoryModelMap {
           if (offset <= currentMaxRange.end) {
             currentStackMap.remove(currentMaxRange)
             currentMaxRegion.fields += offset
-            val updatedRange = RangeKey(currentMaxRange.start, offset + maxSize(region) - 1)
+            val updatedRange = RangeKey(currentMaxRange.start, (maxSize(region) - 1).max(currentMaxRange.end))
             currentStackMap.addOne(updatedRange -> currentMaxRegion)
             for (elem <- region.fields) {
               currentMaxRegion.fields += offset + elem
@@ -137,13 +139,22 @@ class MemoryModelMap {
     tableAddress
   }
 
-  def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]], heapRegions: mutable.Map[DirectCall, HeapRegion], mergeRegions: mutable.Set[Set[MemoryRegion]], externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
+  def preLoadGlobals(externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
     val reversedExternalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(name, offset, globalOffsets) -> name)
     val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => reversedExternalFunctionRgns.contains(offset))
 
-    val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, (globalSizes.getOrElse(name, 1).toDouble/8).ceil.toInt))
+    val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, (globalSizes.getOrElse(name, 1).toDouble / 8).ceil.toInt))
 
+    // add externalFunctionRgn to dataRgns and sort by value
+    val allDataRgns = externalFunctionRgns.toList.sortBy(_.start)
+    for (dataRgn <- allDataRgns) {
+      add(dataRgn.start, dataRgn)
+    }
+  }
+
+  def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]], heapRegions: mutable.Map[DirectCall, HeapRegion], mergeRegions: mutable.Set[Set[MemoryRegion]], allocationSites: mutable.Map[(CFGPosition, Expr), StackRegion], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
+    stackAllocationSites ++= allocationSites
     stackRegionsPerProcedure.keys.foreach(exitNode =>
       if (procedureToSharedRegions.contains(exitNode)) {
         val sharedRegions = procedureToSharedRegions(exitNode)
@@ -153,11 +164,6 @@ class MemoryModelMap {
       val stackRgns = stackRegionsPerProcedure(exitNode).toList.sortBy(_.start)
       localStacks(exitNode.name) = stackRgns
     )
-    // add externalFunctionRgn to dataRgns and sort by value
-    val allDataRgns = externalFunctionRgns.toList.sortBy(_.start)
-    for (dataRgn <- allDataRgns) {
-      add(dataRgn.start, dataRgn)
-    }
 
     heapCalls ++= heapRegions
     // add heap regions
@@ -393,7 +399,7 @@ class MemoryModelMap {
           logRegion(range, region, true)
         }
       }
-    Logger.debug("Stack Root:")
+    Logger.debug("Stack Union-Find Roots:")
     for name <- localStacks.keys do
       popContext()
       pushContext(name)
@@ -407,6 +413,11 @@ class MemoryModelMap {
           parentCount += 1
       }
       if parentCount == 0 then Logger.debug("    No root regions") else Logger.debug(s"    Parents: $parentCount/${stackMap.size}")
+    Logger.debug("Shared Stacks:")
+    for (name, sharedStacks) <- sharedStacks do
+      Logger.debug(s"  Function: $name")
+      for region <- sharedStacks do
+        Logger.debug(s"    $region")
     Logger.debug("Heap:")
     for ((range, region) <- heapMap) {
       logRegion(range, region)
@@ -443,6 +454,11 @@ class MemoryModelMap {
   def getHeap(directCall: DirectCall): HeapRegion = {
     require(directCall.target.name == "malloc", "Should be a malloc call")
     heapCalls(directCall)
+  }
+
+  def getStack(allocationSite: (CFGPosition, Expr)): Option[StackRegion] = {
+    val stackRegion = stackAllocationSites.get(allocationSite)
+    if stackRegion.isDefined then Some(returnRegion(stackAllocationSites(allocationSite))) else None
   }
 }
 
