@@ -12,8 +12,8 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   def blockIdentifier(block: Block): String = {
     val i = block.address match {
-      case Some(addr) => f"$addr:${block.label}"
-      case None       => f"?:${block.label}"
+      case Some(addr) => f"${block.label}"
+      case None       => f"${block.label}"
     }
     s"\"$i\""
   }
@@ -59,6 +59,14 @@ private class ILSerialiser extends ReadOnlyVisitor {
     program ++= ")"
     node
   }
+
+  override def visitAssume(node: Assume): Statement = {
+    program ++= "Assume("
+    visitExpr(node.body)
+    program ++= ")"
+    node
+  }
+
 
   override def visitJump(node: Jump): Jump = {
     node match {
