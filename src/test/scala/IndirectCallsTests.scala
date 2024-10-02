@@ -4,6 +4,7 @@ import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
 import util.{BASILConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext, BASILResult}
+import boogie.SpecGlobal
 
 import java.io.IOException
 import java.nio.file.*
