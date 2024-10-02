@@ -47,18 +47,39 @@ case class BAPBlock(label: String, address: Option[BigInt], statements: List[BAP
 
 case class BAPParameter(name: String, size: Int, value: BAPVar) {
 
-  def toAssign : Assign = {
-    val register = value.toIR
-    register match {
+  def paramRegisterLVal: Variable = value.toIR
+  def paramVariable = toIR
+  def paramRegisterRVal: Expr = {
+    paramRegisterLVal match {
       case r: Register => {
         if (r.size == size) then {
-          Assign(r, toIR)
+          r
         } else {
-          Assign(r, ZeroExtend(r.size - size, toIR))
+          Extract(size, 0, r)
         }
       }
       case _ => throw Exception(s"subroutine parameter $this refers to non-register variable $value")
     }
+  }
+  def paramVariableRVal: Expr = {
+    paramRegisterLVal match {
+      case r: Register => {
+        if (r.size == size) then {
+          toIR
+        } else {
+          ZeroExtend(r.size - size, toIR)
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable $value")
+    }
+  }
+
+  def toAssignOut : Assign = {
+    Assign(paramVariable, paramRegisterRVal)
+  }
+
+  def toAssignIn : Assign = {
+    Assign(paramRegisterLVal, paramVariableRVal)
   }
 
   def toIR: LocalVar = LocalVar(name, BitVecType(size))

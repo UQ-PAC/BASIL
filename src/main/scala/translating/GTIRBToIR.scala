@@ -131,19 +131,16 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
   // TODO this is a hack to imitate BAP so that the existing specifications relying on this will work
   // we cannot and should not rely on this at all
-  private def createArguments(name: String): ((ArrayBuffer[LocalVar],ArrayBuffer[Assign]), ArrayBuffer[LocalVar]) = {
+  private def createArguments(name: String): (Map[LocalVar, Expr], ArrayBuffer[LocalVar]) = {
     var regNum = 0
 
-    val in = if (name == "main") {
-      (ArrayBuffer(LocalVar("main_argc", BitVecType(32)), 
-        LocalVar("main_argv", BitVecType(32))),
-      ArrayBuffer(
-        Assign(Register("R0", 64), ZeroExtend(32, LocalVar("main_argc", BitVecType(32)))),
-        Assign(Register("R1", 64), ZeroExtend(32, LocalVar("main_argv", BitVecType(32))))
-        )
+    val in : Map[LocalVar, Expr] = if (name == "main") {
+      Map(
+        (LocalVar("main_argc", BitVecType(32)) -> Extract(32,0, Register("R0", (64)))),
+        (LocalVar("main_argv", BitVecType(32)) -> Extract(32,0, Register("R1", (64)))),
       )
     } else {
-      (ArrayBuffer(),ArrayBuffer())
+      Map()
     }
 
     val out = ArrayBuffer[LocalVar]()
@@ -263,7 +260,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
 
     val (in, out) = createArguments(name)
 
-    val procedure = Procedure(name, address, formalInParam = in._1, formalOutParam = out)
+    val procedure = Procedure(name, address, formalInParam = in.map(_._1), formalOutParam = out, inParamDefaultBinding=in.toMap)
     uuidToProcedure += (functionUUID -> procedure)
     entranceUUIDtoProcedure += (entranceUUID -> procedure)
 
@@ -276,10 +273,6 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     for (blockUUID <- blockUUIDsSorted) {
       createBlock(blockUUID, procedure, entranceUUID, blockCount)
       blockCount += 1
-    }
-
-    for (eb <- procedure.entryBlock) {
-      eb.statements.prependAll(in._2)
     }
 
     procedure

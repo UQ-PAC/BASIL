@@ -32,21 +32,8 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       }
       procedure.formalInParam = mutable.SortedSet.from(s.in.map(_.toIR))
       procedure.formalOutParam = mutable.SortedSet.from(s.out.map(_.toIR))
-      class FixCallParams(s: BAPSubroutine) extends CILVisitor {
-        override def vstmt(st: Statement) = st match {
-          case d: DirectCall => {
-            ChangeTo(List(DirectCall(d.target, d.label, 
-              immutable.SortedMap.from(s.in.map(s => s.toIR -> s.value.toIR)),
-              immutable.SortedMap.from(s.out.map(s => s.toIR -> s.value.toIR)))))
-          }
-          case _ => SkipChildren()
-        }
-      }
-      visit_proc(FixCallParams(s), procedure)
-
-      for (eb <- procedure.entryBlock) {
-        eb.statements.prependAll(s.in.map(_.toAssign))
-      }
+      procedure.inParamDefaultBinding = immutable.SortedMap.from(s.in.map(s => s.toIR -> s.paramRegisterRVal))
+      procedure.outParamDefaultBinding = immutable.SortedMap.from(s.out.map(s => s.toIR -> s.paramRegisterLVal))
 
       if (s.address.get == mainAddress) {
         mainProcedure = Some(procedure)
@@ -82,7 +69,30 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       memorySections.append(MemorySection(m.name, m.address, m.size, bytes))
     }
 
-    Program(procedures, mainProcedure.get, memorySections, ArrayBuffer())
+    class FixCallParams(subroutines: immutable.Map[String, BAPSubroutine]) extends CILVisitor {
+      override def vstmt(st: Statement) = st match {
+        case d: DirectCall => {
+          if (subroutines.contains(d.target.name)) {
+            val s = subroutines(d.target.name)
+            ChangeTo(List(DirectCall(d.target, d.label, 
+              d.target.outParamDefaultBinding,
+              d.target.inParamDefaultBinding)))
+          }  else {
+            SkipChildren()
+          }
+        }
+        case _ => SkipChildren()
+      }
+    }
+
+    val specParams = program.subroutines.map(s => s.name -> {
+      val in = (s.in.map(p => p.name -> p.paramRegisterRVal))
+      val out = (s.out.map(p => p.name -> p.paramRegisterRVal))
+      (in, out)
+    })
+
+    var prog = Program(procedures, mainProcedure.get, memorySections, ArrayBuffer())
+    visit_prog(FixCallParams(program.subroutines.map(s => s.name -> s).toMap), prog)
   }
 
   private def translate(s: BAPStatement) = s match {

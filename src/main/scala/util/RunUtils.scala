@@ -205,8 +205,7 @@ object IRTransform {
     val renamer = Renamer(boogieReserved)
     externalRemover.visitProgram(ctx.program)
     renamer.visitProgram(ctx.program)
-
-    ir.transforms.liftProcedureCallAbstraction(ctx)
+    ctx
   }
 
   /** Cull unneccessary information that does not need to be included in the translation, and infer stack regions, and
@@ -517,6 +516,12 @@ object RunUtils {
     var ctx = IRLoading.load(q.loading)
 
     ctx = IRTransform.doCleanup(ctx)
+
+    if (q.loading.parameterForm) {
+      ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+    } else {
+      ir.transforms.clearParams(ctx.program)
+    }
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-before-analysis.il"))
     val analysis = q.staticAnalysis.map(conf => staticAnalysis(conf, ctx))

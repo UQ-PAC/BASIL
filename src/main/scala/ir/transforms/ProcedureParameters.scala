@@ -2,7 +2,7 @@ package ir.transforms
 import ir.cilvisitor.*
 import ir.*
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable
+import scala.collection.{mutable, immutable}
 import collection.immutable.SortedMap
 import specification.Specification
 
@@ -32,6 +32,30 @@ def liftProcedureCallAbstraction(ctx: util.IRContext) : util.IRContext = {
   visit_prog(actualParams, p)
 
   ctx.copy(specification = specToProcForm(ctx.specification, formalParams.mappingInparam, formalParams.mappingOutparam))
+}
+
+def clearParams(p: Program) = {
+
+  class RemoveCallParams extends CILVisitor {
+    override def vstmt(s: Statement) = s match {
+      case d: DirectCall => ChangeTo(List(DirectCall(d.target, d.label,immutable.SortedMap.empty, immutable.SortedMap.empty)))
+      case _ => SkipChildren()
+    }
+  }
+
+  for (c <- p) {
+    c match {
+      case proc: Procedure => {
+        proc.formalInParam.clear
+        proc.formalOutParam.clear
+        proc.inParamDefaultBinding = immutable.SortedMap.empty
+        proc.outParamDefaultBinding = immutable.SortedMap.empty
+      }
+      case _ => ()
+    }
+  }
+
+  visit_prog(RemoveCallParams(), p)
 }
 
 def collectVariables(p: Procedure): (Set[Variable], Set[Variable]) = {
@@ -82,6 +106,8 @@ class SetFormalParams(val anr: Map[CFGPosition, Set[Variable]], val rna: Map[CFG
     if (externalFunctions.contains(p.name)) {
       p.formalInParam = mutable.SortedSet.from(externalIn.map(_._1))
       p.formalOutParam = mutable.SortedSet.from(externalOut.map(_._1))
+      p.inParamDefaultBinding = immutable.SortedMap.from(externalIn)
+      p.outParamDefaultBinding = immutable.SortedMap.from(externalOut)
       mappingInparam = mappingInparam.updated(p, externalIn)
       mappingOutparam = mappingOutparam.updated(p, externalOut)
       SkipChildren()
@@ -95,12 +121,14 @@ class SetFormalParams(val anr: Map[CFGPosition, Set[Variable]], val rna: Map[CFG
         )
         p.formalInParam.addAll(inparams.map(_._1))
         mappingInparam = mappingInparam.updated(p, inparams.toMap)
+        p.inParamDefaultBinding = immutable.SortedMap.from(inparams)
       }
 
       // outparams is everything touched
       val outparams = lvars.map(v => LocalVar(v.name + "_out", v.getType) -> LocalVar(v.name, v.getType))
       p.formalOutParam = mutable.SortedSet.from(outparams.map(_._1))
       mappingOutparam = mappingOutparam.updated(p, outparams.toMap)
+      p.outParamDefaultBinding = immutable.SortedMap.from(outparams)
 
       SkipChildren()
     }

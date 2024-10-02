@@ -162,6 +162,8 @@ class Procedure private (
                   private val _blocks: mutable.LinkedHashSet[Block],
                   var formalInParam: mutable.SortedSet[LocalVar],
                   var formalOutParam: mutable.SortedSet[LocalVar],
+                  var inParamDefaultBinding: immutable.SortedMap[LocalVar, Expr],
+                  var outParamDefaultBinding: immutable.SortedMap[LocalVar, Variable],
                   var requires: List[BExpr],
                   var ensures: List[BExpr],
                 ) extends Iterable[CFGPosition] {
@@ -174,10 +176,14 @@ class Procedure private (
   def this(name: String, address: Option[BigInt] = None , entryBlock: Option[Block] = None, 
       returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), 
       formalInParam: IterableOnce[LocalVar] = ArrayBuffer(), formalOutParam: IterableOnce[LocalVar] = ArrayBuffer(), 
+      inParamDefaultBinding: Map[LocalVar, Expr] = Map(), outParamDefaultBinding: Map[LocalVar, Variable] = Map(), 
       requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
-    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), mutable.SortedSet.from(formalInParam), mutable.SortedSet.from(formalOutParam), List.from(requires), List.from(ensures))
+    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), mutable.SortedSet.from(formalInParam), mutable.SortedSet.from(formalOutParam), 
+      immutable.SortedMap.from(inParamDefaultBinding), immutable.SortedMap.from(outParamDefaultBinding),
+      List.from(requires), List.from(ensures))
   }
 
+  def makeCall(label: Option[String] = None) = DirectCall(this, label, outParamDefaultBinding, inParamDefaultBinding)
 
   def iterator: Iterator[CFGPosition] = {
     ILUnorderedIterator(this)
