@@ -292,6 +292,7 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
     // reset for each procedure
     stackRefs.clear()
     stackRefs.add(stackPointer)
+    stackRefs.add(LocalVar("R31_in", BitVecType(64)))
     stackRefs.add(LocalVar("R31", BitVecType(64)))
     super.visitProcedure(node)
   }

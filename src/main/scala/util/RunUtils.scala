@@ -276,10 +276,11 @@ object StaticAnalysis {
   /** Run all static analysis passes on the provided IRProgram.
     */
   def analyse(
-      ctx: IRContext,
+      ictx: IRContext,
       config: StaticAnalysisConfig,
       iteration: Int
   ): StaticAnalysisContext = {
+    var ctx = ictx
     val IRProgram: Program = ctx.program
     val externalFunctions: Set[ExternalFunction] = ctx.externalFunctions
     val globals: Set[SpecGlobal] = ctx.globals
@@ -381,8 +382,19 @@ object StaticAnalysis {
       )
     })
 
-    if (config.simplify) {
-      transforms.SSARename.concretiseSSA(ctx.program, reachingDefinitionsAnalysisResults)
+    if (config.simplify && first) {
+      Logger.info("[!] Running simplification")
+      ctx = transforms.liftProcedureCallAbstraction(ctx)
+      writeToFile(serialiseIL(IRProgram), s"il-after-params.il")
+
+      val rd = ReachingDefinitionsAnalysisSolver(IRProgram).analyze()
+
+      config.analysisResultsPath.foreach(s =>
+        writeToFile(printAnalysisResults(IRProgram, rd), s"${s}-reachingdefs-result$iteration.txt")
+      )
+
+      transforms.SSARename.concretiseSSA(ctx.program, rd)
+      writeToFile(serialiseIL(IRProgram), s"il-after-ssa.il")
 
       val rds2 = ReachingDefinitionsAnalysisSolver(IRProgram)
       val rdr2 = rds2.analyze()
@@ -391,7 +403,7 @@ object StaticAnalysis {
       writeToFile(serialiseIL(IRProgram), s"il-after-copyprop.il")
     }
 
-    Logger.info("[!] Running Constant Propagation with SSA")
+    Logger.debug("[!] Running Constant Propagation with SSA")
     val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(IRProgram, reachingDefinitionsAnalysisResults)
     val constPropResultWithSSA = constPropSolverWithSSA.analyze()
 

@@ -203,6 +203,14 @@ class ExtraSpecTests extends SystemTests {
   }
 }
 
+class SimplifySystemTests extends SystemTests {
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = true, expectVerify = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = true, expectVerify = false))
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = false, expectVerify = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = false, expectVerify = false))
+}
+
+
 class AnalysisSystemTestsBAP extends SystemTests {
   runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = true))
   runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig()), useBAPFrontend = true, expectVerify = false))

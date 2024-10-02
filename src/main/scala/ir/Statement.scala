@@ -90,8 +90,8 @@ class Unreachable(override val label: Option[String] = None) extends Jump {
 
 class Return(override val label: Option[String] = None, var outParams : SortedMap[LocalVar, Expr] = SortedMap()) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
+  override def toString = s"Return(${outParams.mkString(",")})"
 }
-
 
 class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String]) extends Jump {
 

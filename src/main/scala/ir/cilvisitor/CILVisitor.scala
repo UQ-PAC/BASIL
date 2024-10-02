@@ -68,14 +68,16 @@ class CILVisitorImpl(val v: CILVisitor) {
   }
 
   def visit_jump(j: Jump): Jump = {
-    val ji = j match {
+    def continue(j: Jump) = j match {
       case r: Return => {
+        val outs = r.outParams.map(o => o._1 -> visit_expr(o._2))
         v.leave_scope()
+        r.outParams = outs
         r
       }
       case x => x
     }
-    doVisit(v, v.vjump(ji), ji, (x) => x)
+    doVisit(v, v.vjump(j), j, continue)
   }
 
   def visit_fallthrough(j: Option[GoTo]): Option[GoTo] = {
@@ -102,8 +104,9 @@ class CILVisitorImpl(val v: CILVisitor) {
     def continue(n: Statement) = n match {
       case d: DirectCall => {
         val actuals = d.actualParams.map(i => i._1 -> visit_expr(i._2))
+        val outs = d.outParams.map(i => i._1 -> visit_lvar(i._2))
         v.enter_scope(actuals)
-        DirectCall(d.target, d.label, d.outParams, actuals)
+        DirectCall(d.target, d.label, outs, actuals)
       }
       case i: IndirectCall => {
         i.target = visit_rvar(i.target)

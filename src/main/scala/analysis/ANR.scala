@@ -36,6 +36,9 @@ trait ANRAnalysis(program: Program, ignoreStackPtrs: Boolean = false) {
         m.diff(memoryAssign.index.variables ++ memoryAssign.value.variables)
       case indirectCall: IndirectCall =>
         m - indirectCall.target
+      case call: DirectCall =>
+        m.diff(call.actualParams.flatMap(_._2.variables).toSet.filterNot(ignoreRegions.contains(_))) 
+        ++ call.outParams.map(_._2).toSet
       case assign: Assign =>
         m = m.diff(assign.rhs.variables)
         if ignoreRegions.contains(assign.lhs) then m else m + assign.lhs

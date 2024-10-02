@@ -14,7 +14,7 @@ case class ILLoadingConfig(inputFile: String,
                            dumpIL: Option[String] = None,
                            mainProcedureName: String = "main",
                            procedureTrimDepth: Int = Int.MaxValue,
-                           parameterForm: Boolean =true 
+                           parameterForm: Boolean = false
                            )
 
 case class StaticAnalysisConfig(dumpILToPath: Option[String] = None,

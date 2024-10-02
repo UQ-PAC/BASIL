@@ -19,7 +19,7 @@ import util.RunUtils.loadAndTranslate
 
 import scala.collection.mutable
 
-class DifferentialAnalysis extends AnyFunSuite {
+class DifferentialTest extends AnyFunSuite {
 
   Logger.setLevel(LogLevel.WARN)
 
@@ -61,7 +61,7 @@ class DifferentialAnalysis extends AnyFunSuite {
     assert(filterEvents(traceInit.t).mkString("\n") == filterEvents(traceRes.t).mkString("\n"))
   }
 
-  def testProgram(testName: String, examplePath: String, suffix: String =".adt") = {
+  def testProgram(testName: String, examplePath: String, suffix: String =".adt", staticAnalysisConfig : StaticAnalysisConfig = StaticAnalysisConfig(None, None, None)) = {
 
     val loading = ILLoadingConfig(inputFile = examplePath + testName + suffix,
       relfFile = examplePath + testName + ".relf",
@@ -73,10 +73,14 @@ class DifferentialAnalysis extends AnyFunSuite {
 
     var comparectx = IRLoading.load(loading)
     comparectx = IRTransform.doCleanup(ictx)
-    val analysisres = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), comparectx)
+    val analysisres = RunUtils.staticAnalysis(staticAnalysisConfig, comparectx)
 
     diffTest(ictx, comparectx)
   }
+}
+
+
+class DifferentialTestAnalysis extends DifferentialTest {
 
   test("indirect_call_example") {
     val testName = "indirect_call"
@@ -137,3 +141,30 @@ class DifferentialAnalysis extends AnyFunSuite {
 
   runSystemTests()
 }
+
+class DifferentialTestSimplification extends DifferentialTest {
+
+  def runSystemTests(): Unit = {
+
+    val path = System.getProperty("user.dir") + s"/src/test/correct/"
+    val programs: Array[String] = getSubdirectories(path)
+
+    // get all variations of each program
+    for (p <- programs) {
+      val programPath = path + "/" + p
+      val variations = getSubdirectories(programPath)
+      variations.foreach(variation => {
+        test("analysis_differential:" + p + "/" + variation + ":BAP") {
+          testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".adt", staticAnalysisConfig=StaticAnalysisConfig(simplify=true))
+        }
+        //test("analysis_differential:" +  p + "/" + variation + ":GTIRB") {
+        //  testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".gts")
+        //}
+      }
+      )
+    }
+  }
+  runSystemTests()
+}
+
+

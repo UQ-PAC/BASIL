@@ -187,7 +187,7 @@ class Procedure private (
   def makeCall(label: Option[String] = None) = DirectCall(this, label, outParamDefaultBinding, inParamDefaultBinding)
 
   def iterator: Iterator[CFGPosition] = {
-    ILUnorderedIterator(this)
+    ILUnorderedIterator(Seq(this))
   }
 
   override def toString: String = {

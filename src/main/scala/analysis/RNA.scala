@@ -38,6 +38,9 @@ trait RNAAnalysis(program: Program, ignoreStackPtrs: Boolean = true) {
       case indirectCall: IndirectCall =>
         if (ignoreRegions.contains(indirectCall.target)) return m
         m + indirectCall.target
+      case call: DirectCall=>
+        (m ++ call.actualParams.flatMap(_._2.variables).toSet.filterNot(ignoreRegions.contains(_)))
+          .diff(call.outParams.map(_._2).toSet)
       case assign: Assign =>
         m = m - assign.lhs
         m.union(assign.rhs.variables.filter(!ignoreRegions.contains(_)))

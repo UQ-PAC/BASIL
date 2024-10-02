@@ -17,6 +17,98 @@ trait AbstractDomain[L] {
 }
 
 
+def getRedundantAssignments(v: Procedure) : Set[Assign] = {
+  /**
+   * Get all assign statements which define a variable never used, assuming ssa form.
+   */
+
+  enum VS:
+    case Bot
+    case Assigned(definition: Set[Assign])
+    case Read
+
+
+  def joinVS(a: VS, b: VS) = {
+    (a, b) match {
+      case (VS.Bot, o) => o
+      case (o, VS.Bot) => o
+      case (VS.Read, _) => VS.Read
+      case (_, VS.Read) => VS.Read
+      case (VS.Assigned(d1), VS.Assigned(d2)) => VS.Assigned(d1 ++ d2)
+    }
+  }
+
+  val assignedNotRead = mutable.Map[Variable, VS]().withDefaultValue(VS.Bot)
+
+  for (c <- v) {
+    c match {
+      case a : Assign => {
+        assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
+        a.rhs.variables.foreach(v => {
+          assignedNotRead(v) = VS.Read
+        })
+      }
+      case m: MemoryAssign => {
+        m.index.variables.foreach(v => {
+          assignedNotRead(v) = VS.Read
+        })
+        m.value.variables.foreach(v => {
+          assignedNotRead(v) = VS.Read
+        })
+      }
+      case m: IndirectCall => {
+        assignedNotRead(m.target) = VS.Read
+      }
+      case m: Assert => {
+        m.body.variables.foreach(v => {
+          assignedNotRead(v) = VS.Read
+        })
+      }
+      case m: Assume => {
+        m.body.variables.foreach(v => {
+          assignedNotRead(v) = VS.Read
+        })
+      }
+      case c: DirectCall => {
+        c.actualParams.flatMap(_._2.variables).foreach (v => {
+          assignedNotRead(v) = VS.Read
+        })
+
+      }
+      case p: Return => {
+        p.outParams.flatMap(_._2.variables).foreach(v => {
+          assignedNotRead(v) = VS.Read
+        })
+      }
+      case p: GoTo => ()
+      case p: NOP => ()
+      case p: Unreachable => ()
+      case p: Procedure => ()
+      case b: Block => ()
+    }
+  }
+
+  assignedNotRead.collect {
+    case (v, VS.Assigned(d)) => d
+  }.toSet.flatten
+}
+
+
+class CleanupAssignments extends CILVisitor {
+  var redundant = Set[Assign]()
+
+  override def vproc(p: Procedure) = {
+    redundant = getRedundantAssignments(p).filter(_.rhs.loads.isEmpty)
+    DoChildren()
+  }
+
+  override def vstmt(s: Statement) = s match {
+    case a: Assign if redundant.contains(a) => ChangeTo(List())
+    case _ => SkipChildren()
+  }
+
+}
+
 def doCopyPropTransform(
     p: Program,
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
@@ -41,6 +133,9 @@ def doCopyPropTransform(
       rerun = vis.madeAnyChange
     }
   }
+
+  visit_prog(CleanupAssignments(), p)
+
 }
 
 def reversePostOrder(startBlock: Block): Unit = {
@@ -96,7 +191,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       val b = worklist.dequeue
 
       if (b.label == "lmain_goto_l00000321") {
-        println(s"$b\n  prevs : ${b.prevBlocks.map(c => saved.get(c))}")
+        // println(s"$b\n  prevs : ${b.prevBlocks.map(c => saved.get(c))}")
       }
 
       while (worklist.nonEmpty && (worklist.head.rpoOrder >= b.rpoOrder)) do {
@@ -201,6 +296,72 @@ class ConstCopyProp(val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign
   }
 }
 
+
+
+case class CCopyProp(expr: Expr, deps: Set[Variable])
+case class SSACCP(
+    constants: Map[Variable, Literal],
+    // variable -> expr * dependencies
+    val exprs: Map[Variable, CCopyProp]
+)
+
+class ConstCopyPropSSA()
+    extends AbstractDomain[SSACCP] {
+  // assuming concrete ssa form with renamed variables
+
+  def top: SSACCP = SSACCP(Map(), Map())
+  def bot: SSACCP = SSACCP(Map(), Map())
+
+  override def join(l: SSACCP, r: SSACCP): SSACCP = {
+    SSACCP(
+      (l.constants ++ r.constants).removedAll(l.constants.keySet.intersect(r.constants.keySet).filterNot(k => l.constants(k) == r.constants(k))),
+      (l.exprs ++ r.exprs).removedAll(l.exprs.keySet.intersect(r.exprs.keySet).filterNot(k => l.exprs(k) == r.exprs(k)))
+    )
+  }
+
+  override def transfer(c: SSACCP, s: Statement): SSACCP = {
+    s match {
+      case m: MemoryAssign => {
+        c.copy(exprs = c.exprs.filterNot((k, v) => v.expr.loads.nonEmpty))
+      }
+      case Assign(l, r, lb) => {
+
+        var p = c
+        val evaled = exprSimp(
+          eval.partialEvalExpr(
+            exprSimp(r),
+            v => p.constants.get(v)
+          )
+        )
+        val rhsDeps = evaled.variables
+
+        p = evaled match {
+          case lit: Literal => p.copy(constants = p.constants.updated(l, lit))
+          case _: Expr =>
+            p.copy(constants = p.constants.removed(l), exprs = p.exprs.updated(l, CCopyProp(evaled, rhsDeps)))
+        }
+
+        if (r.loads.nonEmpty) {
+          // don't re-order loads
+          p = p.copy(exprs = p.exprs.filter((k, v) => v.expr.loads.isEmpty))
+        }
+        // remove candidates whose value changes due to this update
+        // without an SSA form in the output, we can't propagate assignments such that R0_1 := f(R0_0)
+        //  or; only replace such that all uses are copyproped, the dead definition is removed
+        p = p.copy(exprs = p.exprs.filterNot((k, v) => v.deps.exists(c => c.name == l.name)))
+        p
+      }
+      case d: DirectCall => {
+        val toClob = d.outParams.map(_._2)
+        toClob.foldLeft(c)((c, l) =>
+          c.copy(constants = c.constants.removed(l), exprs = c.exprs.filterNot((k, v) => v.deps.contains(l)))
+        )
+      }
+      case _ => c
+    }
+  }
+}
+
 def exprSimp(e: Expr): Expr = {
 
   val assocOps: Set[BinOp] =
@@ -275,19 +436,23 @@ object SSARename:
 
   def concretiseSSA(p: Program, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) = {
     println("SSA conc ")
+   //  println(reachingDefs)
     val c = SSACollect(p, reachingDefs)
     c.initial()
     visit_prog(c, p)
-    println(c.names)
+   // println(c.names)
     val rn = SSARename(p, c.names, reachingDefs)
     visit_prog(rn, p)
   }
 
   class SSARename(p: Program, renames: mutable.HashMap[Assign, Int], reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) extends CILVisitor {
-    var statement : Statement = null
+    var statement : Command = null
 
     override def vrvar(v: Variable) = {
-      val assigns = getUse(v, statement, reachingDefs)
+      val assigns = statement match {
+        case a : Assign => getUse(v, statement, reachingDefs)
+        case _  => getDefinition(v, statement, reachingDefs)
+      }
       assigns.headOption.map(doRename(v, _)) match {
         case Some(nv) => ChangeTo(nv)
         case None => SkipChildren()
@@ -306,6 +471,12 @@ object SSARename:
       }
     }
 
+
+    override def vjump(s: Jump) = {
+      statement = s
+      DoChildren()
+    }
+
     override def vstmt(s: Statement) = {
       statement = s
       s match {
@@ -316,7 +487,6 @@ object SSARename:
         case _ => DoChildren()
       }
     }
-
   }
 
   class SSACollect(p: Program, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) extends CILVisitor {
