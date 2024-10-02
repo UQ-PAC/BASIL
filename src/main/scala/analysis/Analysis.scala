@@ -22,7 +22,7 @@ trait Analysis[+R]:
 
 /** Base class for value analysis with simple (non-lifted) lattice.
   */
-trait ConstantPropagation(val program: Program) {
+trait ConstantPropagation(val program: Program, val assumeR31: Boolean) {
   /** The lattice of abstract states.
     */
 
@@ -76,15 +76,19 @@ trait ConstantPropagation(val program: Program) {
   /** Transfer function for state lattice elements.
     */
   def localTransfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] =
+    var m = s
     n match
       case r: Command =>
+        if (assumeR31 && IRWalk.procedure(n).entryBlock.isDefined && IRWalk.firstInBlock(program.mainProcedure.entryBlock.get) == n) {
+          m = m + (Register("R31", 64) -> eval(BitVecLiteral(Long.MaxValue, 64), m))
+        }
         r match
           // assignments
           case la: Assign =>
-            s + (la.lhs -> eval(la.rhs, s))
+            m + (la.lhs -> eval(la.rhs, m))
           // all others: like no-ops
-          case _ => s
-      case _ => s
+          case _ => m
+      case _ => m
 
   /** The analysis lattice.
     */
@@ -97,10 +101,11 @@ trait ConstantPropagation(val program: Program) {
   def transfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = localTransfer(n, s)
 }
 
-class ConstantPropagationSolver(program: Program) extends ConstantPropagation(program)
+class ConstantPropagationSolver(program: Program, assumeR31: Boolean = false) extends ConstantPropagation(program, assumeR31)
     with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
-    with IRIntraproceduralForwardDependencies
+    with IRInterproceduralForwardDependencies
     with Analysis[Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]]
+
 
 /** Base class for value analysis with simple (non-lifted) lattice.
  */

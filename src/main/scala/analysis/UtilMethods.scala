@@ -12,7 +12,6 @@ import util.Logger
   *   The evaluated expression (e.g. 0x69632)
   */
 def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[BitVecLiteral]]): Option[BitVecLiteral] = {
-  Logger.debug(s"evaluateExpression: $exp")
   exp match {
     case binOp: BinaryExpr =>
       val lhs = evaluateExpression(binOp.arg1, constantPropResult)
@@ -73,8 +72,6 @@ def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[
 }
 
 def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[BitVecLiteral] = {
-  Logger.debug(s"evaluateExpression: $exp")
-
   def apply(op: (BitVecLiteral, BitVecLiteral) => BitVecLiteral, a: Set[BitVecLiteral], b: Set[BitVecLiteral]): Set[BitVecLiteral] = {
     val res = for {
       x <- a
@@ -139,18 +136,21 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
       Logger.debug("getUse: " + getUse(variable, n, reachingDefs))
       constantPropResult(RegisterWrapperEqualSets(variable, getUse(variable, n, reachingDefs)))
     case b: BitVecLiteral => Set(b)
+    case Repeat(repeats, body) => evaluateExpressionWithSSA(body, constantPropResult, n, reachingDefs)
+    case MemoryLoad(mem, index, endian, size) => Set.empty
+    case UninterpretedFunction(name, params, returnType) => Set.empty
     case _ => throw RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
   }
 }
 
-def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
+def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFilter: Boolean = true): Set[Assign] = {
   val (in, _) = reachingDefs(node)
-  in.getOrElse(variable, Set())
+  if noFilter then in.getOrElse(variable, Set()) else in.getOrElse(variable, Set()).filterNot(_.rhs.variables.forall(_.name.contains("Unique")))
 }
 
-def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
+def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFiler: Boolean = true): Set[Assign] = {
   val (_, out) = reachingDefs(node)
-  out.getOrElse(variable, Set())
+  if noFiler then out.getOrElse(variable, Set()) else out.getOrElse(variable, Set()).filterNot(_.rhs.variables.forall(_.name.contains("Unique")))
 }
 
 def unwrapExpr(expr: Expr): Set[Expr] = {
@@ -170,4 +170,12 @@ def unwrapExpr(expr: Expr): Set[Expr] = {
     case _ =>
   }
   buffers
+}
+
+def bitVectorOpToBigIntOp(op: BinOp, lhs: BigInt, rhs: BigInt): BigInt = {
+  op match {
+    case BVADD => lhs + rhs
+    case BVSUB => lhs - rhs
+    case _ => throw RuntimeException("Binary operation support not implemented: " + op)
+  }
 }
