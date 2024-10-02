@@ -49,13 +49,28 @@ case class BAPParameter(name: String, size: Int, value: BAPVar) {
 
   def paramRegisterLVal: Variable = value.toIR
   def paramVariable = toIR
+  def toIROutParam =  {
+    paramRegisterLVal match {
+      case r: Register => {
+        if (r.size == size) then {
+          toIR
+        } else {
+          LocalVar(name, BitVecType(r.size))
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable $value")
+    }
+
+  }
   def paramRegisterRVal: Expr = {
     paramRegisterLVal match {
       case r: Register => {
         if (r.size == size) then {
           r
-        } else {
+        } else if (r.size > size){
           Extract(size, 0, r)
+        } else {
+          ZeroExtend(size - r.size, r)
         }
       }
       case _ => throw Exception(s"subroutine parameter $this refers to non-register variable $value")

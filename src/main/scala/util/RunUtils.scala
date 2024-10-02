@@ -517,11 +517,13 @@ object RunUtils {
 
     ctx = IRTransform.doCleanup(ctx)
 
+    assert(invariant.correctCalls(ctx.program))
     if (q.loading.parameterForm) {
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
     } else {
       ir.transforms.clearParams(ctx.program)
     }
+    assert(invariant.correctCalls(ctx.program))
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-before-analysis.il"))
     val analysis = q.staticAnalysis.map(conf => staticAnalysis(conf, ctx))

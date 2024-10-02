@@ -31,9 +31,9 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         labelToBlock.addOne(b.label, block)
       }
       procedure.formalInParam = mutable.SortedSet.from(s.in.map(_.toIR))
-      procedure.formalOutParam = mutable.SortedSet.from(s.out.map(_.toIR))
+      procedure.formalOutParam = mutable.SortedSet.from(s.out.filterNot(_.name.endsWith("_result")).map(_.toIR))
       procedure.inParamDefaultBinding = immutable.SortedMap.from(s.in.map(s => s.toIR -> s.paramRegisterRVal))
-      procedure.outParamDefaultBinding = immutable.SortedMap.from(s.out.map(s => s.toIR -> s.paramRegisterLVal))
+      procedure.outParamDefaultBinding = immutable.SortedMap.from(s.out.filterNot(_.name.endsWith("_result")).map(s => s.toIR -> s.paramRegisterLVal))
 
       if (s.address.get == mainAddress) {
         mainProcedure = Some(procedure)
@@ -84,12 +84,6 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         case _ => SkipChildren()
       }
     }
-
-    val specParams = program.subroutines.map(s => s.name -> {
-      val in = (s.in.map(p => p.name -> p.paramRegisterRVal))
-      val out = (s.out.map(p => p.name -> p.paramRegisterRVal))
-      (in, out)
-    })
 
     var prog = Program(procedures, mainProcedure.get, memorySections, ArrayBuffer())
     visit_prog(FixCallParams(program.subroutines.map(s => s.name -> s).toMap), prog)
