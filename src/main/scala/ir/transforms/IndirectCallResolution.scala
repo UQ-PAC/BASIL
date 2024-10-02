@@ -110,7 +110,7 @@ def resolveIndirectCallsUsingPointsTo(
       if (targets.size == 1) {
         modified = true
 
-        val newCall = DirectCall(targets.head, indirectCall.label)
+        val newCall = targets.head.makeCall(indirectCall.label)
         block.statements.replace(indirectCall, newCall)
       } else if (targets.size > 1) {
 
@@ -127,7 +127,7 @@ def resolveIndirectCallsUsingPointsTo(
           }
           val assume = Assume(BinaryExpr(BVEQ, indirectCall.target, BitVecLiteral(address, 64)))
           val newLabel: String = block.label + t.name
-          val directCall = DirectCall(t)
+          val directCall = t.makeCall()
 
           /* copy the goto node resulting */
           val fallthrough = oft match {

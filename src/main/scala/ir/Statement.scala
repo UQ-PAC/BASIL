@@ -1,6 +1,7 @@
 package ir
 import util.intrusive_list.IntrusiveListElement
 import boogie.{BMapVar, GammaStore}
+import collection.immutable.SortedMap
 
 import collection.mutable
 
@@ -87,7 +88,7 @@ class Unreachable(override val label: Option[String] = None) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
-class Return(override val label: Option[String] = None) extends Jump {
+class Return(override val label: Option[String] = None, var outParams : SortedMap[LocalVar, Expr] = SortedMap()) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
@@ -145,7 +146,9 @@ sealed trait Call extends Statement {
 }
 
 class DirectCall(val target: Procedure,
-                 override val label: Option[String] = None
+                 override val label: Option[String] = None,
+                 var outParams: SortedMap[LocalVar, Variable] = SortedMap(), // out := formal
+                 var actualParams: SortedMap[LocalVar, Expr] = SortedMap(), // formal := actual
                 ) extends Call {
   /* override def locals: Set[Variable] = condition match {
     case Some(c) => c.locals
@@ -168,7 +171,7 @@ class DirectCall(val target: Procedure,
 }
 
 object DirectCall:
-  def unapply(i: DirectCall): Option[(Procedure, Option[String])] = Some(i.target, i.label)
+  def unapply(i: DirectCall): Option[(Procedure, Map[LocalVar, Variable], Map[LocalVar, Expr], Option[String])] = Some(i.target, i.outParams, i.actualParams, i.label)
 
 class IndirectCall(var target: Variable,
                    override val label: Option[String] = None

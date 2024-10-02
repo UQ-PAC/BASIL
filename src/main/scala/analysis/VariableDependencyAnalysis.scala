@@ -4,7 +4,7 @@ import analysis.solvers.ForwardIDESolver
 import ir.*
 import boogie.*
 import util.Logger
-import specification.SpecGlobal
+import boogie.SpecGlobal
 
 import scala.collection.mutable
 

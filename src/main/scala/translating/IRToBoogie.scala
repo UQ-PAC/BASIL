@@ -462,10 +462,13 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
     val freeEnsures = modifiedPreserveEnsures ++ readOnlyMemory
 
+    val inparams = p.formalInParam.toList.flatMap(para => Seq(para.toBoogie, para.toGamma))
+    val outparams = p.formalOutParam.toList.flatMap(para => Seq(para.toBoogie, para.toGamma))
+
     BProcedure(
       p.name,
-      List(),
-      List(),
+      inparams,
+      outparams,
       procEnsures,
       procRequires,
       procEnsuresDirect,
@@ -648,13 +651,22 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       }
       val jump = GoToCmd(g.targets.map(_.label).toSeq)
       conditionAssert :+ jump
-    case r: Return => List(ReturnCmd)
+    case r: Return => {
+      val out = r.outParams.toList
+      if (out.nonEmpty) then List(
+        AssignCmd(out.map(_._1.toBoogie), out.map(_._2.toBoogie)),
+        AssignCmd(out.map(_._1.toGamma), out.map(_._2.toGamma)),
+        ReturnCmd) else List(ReturnCmd)
+    }
     case r: Unreachable => List(BAssume(FalseBLiteral))
   }
 
   def translate(j: Call): List[BCmd] = j match {
     case d: DirectCall =>
-      val call = BProcedureCall(d.target.name)
+      val call = BProcedureCall(d.target.name, 
+        d.outParams.toList.flatMap(c => Seq(c._2.toBoogie, c._2.toGamma)),
+        d.actualParams.toList.flatMap(c => Seq(c._2.toBoogie, c._2.toGamma))
+      )
 
       (config.procedureRely match {
         case Some(ProcRelyVersion.Function) =>

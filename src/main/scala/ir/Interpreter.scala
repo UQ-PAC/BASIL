@@ -209,14 +209,14 @@ class Interpreter() {
     Logger.debug(s"Procedure(${p.name}, ${p.address.getOrElse("None")})")
 
     // Procedure.in
-    for ((in, index) <- p.in.zipWithIndex) {
-      Logger.debug(s"\tin[$index]:${in.name} ${in.size} ${in.value}")
-    }
+    //for ((in, index) <- p.in.zipWithIndex) {
+    //  Logger.debug(s"\tin[$index]:${in.name} ${in.size} ${in.value}")
+    //}
 
-    // Procedure.out
-    for ((out, index) <- p.out.zipWithIndex) {
-      Logger.debug(s"\tout[$index]:${out.name} ${out.size} ${out.value}")
-    }
+    //// Procedure.out
+    //for ((out, index) <- p.out.zipWithIndex) {
+    //  Logger.debug(s"\tout[$index]:${out.name} ${out.size} ${out.value}")
+    //}
 
     // Procedure.Block
     p.entryBlock match {

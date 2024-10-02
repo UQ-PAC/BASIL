@@ -9,7 +9,7 @@ import scala.collection.immutable
  * Calculates the set of variables that are not read after being written up to that point in the program.
  * Useful for detecting dead stores, constants and if what variables are passed as parameters in a function call.
  */
-trait ANRAnalysis(program: Program) {
+trait ANRAnalysis(program: Program, ignoreStackPtrs: Boolean = false) {
 
   val powersetLattice: PowersetLattice[Variable] = PowersetLattice()
 
@@ -21,7 +21,7 @@ trait ANRAnalysis(program: Program) {
   private val linkRegister = Register("R30", 64)
   private val framePointer = Register("R29", 64)
 
-  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer, stackPointer)
+  private val ignoreRegions: Set[Expr] = if (ignoreStackPtrs) then Set(linkRegister, framePointer, stackPointer) else Set()
 
   /** Default implementation of eval.
     */
@@ -33,7 +33,7 @@ trait ANRAnalysis(program: Program) {
       case assert: Assert =>
         m.diff(assert.body.variables)
       case memoryAssign: MemoryAssign =>
-        m.diff(memoryAssign.index.variables)
+        m.diff(memoryAssign.index.variables ++ memoryAssign.value.variables)
       case indirectCall: IndirectCall =>
         m - indirectCall.target
       case assign: Assign =>
@@ -57,7 +57,7 @@ trait ANRAnalysis(program: Program) {
   def transfer(n: CFGPosition, s: Set[Variable]): Set[Variable] = localTransfer(n, s)
 }
 
-class ANRAnalysisSolver(program: Program) extends ANRAnalysis(program)
+class ANRAnalysisSolver(program: Program, ignoreStack : Boolean = true) extends ANRAnalysis(program, ignoreStack)
     with IRIntraproceduralForwardDependencies
     with Analysis[Map[CFGPosition, Set[Variable]]]
     with SimpleWorklistFixpointSolver[CFGPosition, Set[Variable], PowersetLattice[Variable]] {

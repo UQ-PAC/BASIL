@@ -55,8 +55,8 @@ case class BProcedure(
     val ensuresStrs = ensures.map(e => s"  ensures $e;") ++ ensuresDirect.map(e => s"  ensures $e;")
     val freeRequiresStrs = freeRequires.map(r => s"  free requires $r;")
     val freeEnsuresStrs = freeEnsures.map(e => s"  free ensures $e;")
-    val locals = body.flatMap(l => l.locals).distinct.sorted
-    val localDefs = locals.map(l => "  " + BVarDecl(l).toString)
+    val locals : Set[BVar] = (body.flatMap(l => l.locals).toSet) --  (in.toSet ++ out.toSet)
+    val localDefs = locals.toList.sorted.map(l => "  " + BVarDecl(l).toString)
     val bodyStr = if (body.nonEmpty) {
       List("{") ++ localDefs ++ body.flatMap(x => x.toBoogie).map(s => "  " + s) ++ List("}")
     } else {
