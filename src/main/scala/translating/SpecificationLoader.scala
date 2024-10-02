@@ -152,7 +152,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitExpr(
       ctx: ExprContext,
       nameToGlobals: Map[String, SpecGlobal],
-      params: Map[String, Parameter] = Map()
+      params: Map[String, Expr] = Map()
   ): BExpr = {
     val exprs = ctx.impliesExpr.asScala.map(e => visitImpliesExpr(e, nameToGlobals, params))
     if (exprs.size > 1) {
@@ -165,7 +165,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitImpliesExpr(
       ctx: ImpliesExprContext,
       nameToGlobals: Map[String, SpecGlobal],
-      params: Map[String, Parameter] = Map()
+      params: Map[String, Expr] = Map()
   ): BExpr = Option(ctx.arg2) match {
     case Some(_) =>
       BinaryBExpr(
@@ -179,7 +179,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitLogicalExpr(
       ctx: LogicalExprContext,
       nameToGlobals: Map[String, SpecGlobal],
-      params: Map[String, Parameter] = Map()
+      params: Map[String, Expr] = Map()
   ): BExpr = {
     val rels = ctx.relExpr.asScala.map(r => visitRelExpr(r, nameToGlobals, params))
     if (rels.size > 1) {
@@ -197,7 +197,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitRelExpr(
       ctx: RelExprContext,
       nameToGlobals: Map[String, SpecGlobal],
-      params: Map[String, Parameter] = Map()
+      params: Map[String, Expr] = Map()
   ): BExpr = Option(ctx.arg2) match {
     case Some(_) =>
       BinaryBExpr(
@@ -211,7 +211,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitTerm(
       ctx: TermContext,
       nameToGlobals: Map[String, SpecGlobal],
-      params: Map[String, Parameter] = Map()
+      params: Map[String, Expr] = Map()
   ): BExpr = Option(ctx.arg2) match {
     case Some(_) =>
       BinaryBExpr(
@@ -225,7 +225,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitFactor(
       ctx: FactorContext,
       nameToGlobals: Map[String, SpecGlobal],
-      params: Map[String, Parameter] = Map()
+      params: Map[String, Expr] = Map()
   ): BExpr = Option(ctx.arg2) match {
     case Some(_) =>
       BinaryBExpr(
@@ -239,7 +239,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitUnaryExpr(
       ctx: UnaryExprContext,
       nameToGlobals: Map[String, SpecGlobal],
-      params: Map[String, Parameter] = Map()
+      params: Map[String, Expr] = Map()
   ): BExpr = ctx match {
     case n: NegExprContext       => UnaryBExpr(BVNEG, visitUnaryExpr(n.unaryExpr, nameToGlobals, params))
     case a: AtomUnaryExprContext => visitAtomExpr(a.atomExpr, nameToGlobals, params)
@@ -249,7 +249,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitAtomExpr(
       ctx: AtomExprContext,
       nameToGlobals: Map[String, SpecGlobal],
-      params: Map[String, Parameter] = Map()
+      params: Map[String, Expr] = Map()
   ): BExpr = ctx match {
     case b: BoolLitExprContext     => visitBoolLit(b.boolLit)
     case i: IdExprContext          => visitId(i.id, nameToGlobals, params)
@@ -264,7 +264,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitArrayAccess(
       ctx: ArrayAccessContext,
       nameToGlobals: Map[String, SpecGlobal],
-      params: Map[String, Parameter] = Map()
+      params: Map[String, Expr] = Map()
   ): ArrayAccess = {
     val global = visitId(ctx.id, nameToGlobals, params) match {
       case g: SpecGlobal => g
@@ -294,13 +294,13 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitOldExpr(
       ctx: OldExprContext,
       nameToGlobals: Map[String, SpecGlobal],
-      params: Map[String, Parameter] = Map()
+      params: Map[String, Expr] = Map()
   ): Old = Old(visitExpr(ctx.expr, nameToGlobals, params))
 
   def visitIfThenElseExpr(
       ctx: IfThenElseExprContext,
       nameToGlobals: Map[String, SpecGlobal],
-      params: Map[String, Parameter] = Map()
+      params: Map[String, Expr] = Map()
   ): IfThenElse = {
     IfThenElse(
       visitExpr(ctx.guard, nameToGlobals, params),
@@ -316,7 +316,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     case "false" => FalseBLiteral
   }
 
-  def visitId(ctx: IdContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Parameter] = Map()): BExpr = {
+  def visitId(ctx: IdContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Expr] = Map()): BExpr = {
     val id = ctx.getText
     id match {
       case id if id.startsWith("Gamma_R") => {
@@ -325,7 +325,8 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case id if (id.startsWith("Gamma_")) => {
       val gamma_id = id.stripPrefix("Gamma_")
       params.get(gamma_id) match {
-        case Some(p: Parameter) => p.value.toGamma
+        case Some(p: LocalVar) => p.toGamma
+        case Some(p: Expr) => p.toGamma
         case None =>
           nameToGlobals.get(gamma_id) match {
             case Some(g: SpecGlobal) => SpecGamma(g)
@@ -338,16 +339,8 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       }
       case id =>  {
         params.get(id) match {
-          case Some(p: Parameter) =>
-            val registerSize = p.value.size
-            val paramSize = p.size
-            if (paramSize == registerSize) {
-              p.value.toBoogie
-            } else if (registerSize > paramSize) {
-              BVExtract(registerSize - p.size, 0, p.value.toBoogie)
-            } else {
-              throw Exception(s"parameter $p doesn't fit in register ${p.value} for ID $id")
-            }
+          case Some(p: LocalVar) => p.toBoogie
+          case Some(p: Expr) => p.toBoogie
           case None =>
             nameToGlobals.get(ctx.getText) match {
               case Some(g: SpecGlobal) => g
@@ -383,10 +376,12 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
     val name = ctx.id.getText
     val irProc = program.procedures.collectFirst { case p if p.name == name => p }
 
-    val params: Map[String, Parameter] = irProc match {
+    val params: Map[String, Expr] = irProc match {
       case None => Map()
       case Some(p) =>
-        p.in.map(p => p.name -> p).toMap ++ p.out.map(p => p.name -> p).toMap
+        val r = p.inParamDefaultBinding.map(p => p._1.name -> p._2).toMap ++ p.outParamDefaultBinding.map(p => p._1.name -> p._2).toMap 
+        + (p.name + "_result" -> (Extract(32,0,Register("R0", 64)))) 
+        r
     }
 
     val requires = ctx.requires.asScala.collect { case r: ParsedRequiresContext =>

@@ -286,7 +286,7 @@ object SSARename:
   class SSARename(p: Program, renames: mutable.HashMap[Assign, Int], reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) extends CILVisitor {
     var statement : Statement = null
 
-    override def vvar(v: Variable) = {
+    override def vrvar(v: Variable) = {
       val assigns = getUse(v, statement, reachingDefs)
       assigns.headOption.map(doRename(v, _)) match {
         case Some(nv) => ChangeTo(nv)
@@ -324,7 +324,7 @@ object SSARename:
     var count = mutable.HashMap[Variable, Int]().withDefaultValue(0)
     var statement : Statement = null
 
-    override def vvar(v: Variable) =  {
+    override def vrvar(v: Variable) =  {
       val assigns = getUse(v, statement, reachingDefs)
       if (assigns.size > 1) {
         count(v) = count(v) + 1

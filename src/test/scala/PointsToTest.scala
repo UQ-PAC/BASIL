@@ -3,6 +3,7 @@ import ir.Endian.LittleEndian
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
+import boogie.*
 import util.{RunUtils, StaticAnalysisConfig, StaticAnalysis, StaticAnalysisContext, IRContext}
 
 import java.io.IOException

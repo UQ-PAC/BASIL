@@ -356,6 +356,10 @@ sealed trait Variable extends Expr {
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
+object Variable {
+  implicit def ordering[V <: Variable]: Ordering[V] = Ordering.by(_.name)
+}
+
 // Variable with global scope (in a 'accessible from any procedure' sense), not related to the concurrent shared memory sense
 // These are all hardware registers
 case class Register(override val name: String, size: Int) extends Variable with Global {
@@ -370,9 +374,10 @@ case class Register(override val name: String, size: Int) extends Variable with 
 case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar(${name}_$sharedVariable, $irType)"
+  override def toString: String = s"LocalVar(${name}, ${if sharedVariable then "shared" else "unshared"}, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
+
 
 // A memory section
 sealed trait Memory extends Global {

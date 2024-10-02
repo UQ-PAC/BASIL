@@ -206,7 +206,6 @@ object IRTransform {
     val renamer = Renamer(boogieReserved)
     externalRemover.visitProgram(ctx.program)
     renamer.visitProgram(ctx.program)
-
     ctx
   }
 
@@ -222,6 +221,13 @@ object IRTransform {
     Logger.debug(
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
+    val dupProcNames = (ctx.program.procedures.groupBy(_.name).filter((n,p) => p.size > 1)).toList.flatMap(_._2)
+
+    var dupCounter = 0 
+    for (p <- dupProcNames) {
+      dupCounter += 1
+      p.name = p.name + "$" + p.address.map(_.toString).getOrElse(dupCounter.toString)
+    }
 
     val stackIdentification = StackSubstituter()
     stackIdentification.visitProgram(ctx.program)
@@ -266,6 +272,7 @@ object IRTransform {
 /** Methods relating to program static analysis.
   */
 object StaticAnalysis {
+  var first : Boolean = true
   /** Run all static analysis passes on the provided IRProgram.
     */
   def analyse(
@@ -316,9 +323,17 @@ object StaticAnalysis {
     val ANRSolver = ANRAnalysisSolver(IRProgram)
     val ANRResult = ANRSolver.analyze()
 
+
     Logger.debug("[!] Running RNA")
     val RNASolver = RNAAnalysisSolver(IRProgram)
     val RNAResult = RNASolver.analyze()
+
+    config.analysisResultsPath.foreach(s =>
+      writeToFile(printAnalysisResults(IRProgram, ANRResult), s"${s}-anr-result$iteration.txt")
+    )
+    config.analysisResultsPath.foreach(s =>
+      writeToFile(printAnalysisResults(IRProgram, RNAResult), s"${s}-rna-result$iteration.txt")
+    )
 
     Logger.debug("[!] Running Constant Propagation")
     val constPropSolver = ConstantPropagationSolver(IRProgram)
@@ -434,6 +449,7 @@ object StaticAnalysis {
       Logger.warn(s"Disabling IDE solver tests due to external main procedure: ${IRProgram.mainProcedure.name}")
     }
 
+    first = false
     StaticAnalysisContext(
       constPropResult = constPropResult,
       IRconstPropResult = newCPResult,
@@ -511,9 +527,17 @@ object RunUtils {
 
   def loadAndTranslate(q: BASILConfig): BASILResult = {
     Logger.debug("[!] Loading Program")
-    val ctx = IRLoading.load(q.loading)
+    var ctx = IRLoading.load(q.loading)
 
-    IRTransform.doCleanup(ctx)
+    ctx = IRTransform.doCleanup(ctx)
+
+    assert(invariant.correctCalls(ctx.program))
+    if (q.loading.parameterForm) {
+      ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
+    } else {
+      ir.transforms.clearParams(ctx.program)
+    }
+    assert(invariant.correctCalls(ctx.program))
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-before-analysis.il"))
     val analysis = q.staticAnalysis.map(conf => staticAnalysis(conf, ctx))

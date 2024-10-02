@@ -192,6 +192,16 @@ final class IntrusiveList[T <: IntrusiveListElement[T]] private (
     newElem
   }
 
+  def prependAll(elems: Iterable[T]) = {
+    // first == None ==> empty list
+    insertAllBefore(firstElem, elems)
+  }
+
+  def appendAll(elems: Iterable[T]) = {
+    // last == None ==> empty list
+    insertAllAfter(lastElem, elems)
+  }
+
   /**
    * Add an element to the end of the list.
    * The element must not be a member of any other IntrusiveList.

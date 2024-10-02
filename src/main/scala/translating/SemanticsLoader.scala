@@ -100,14 +100,21 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
         // LittleEndian is an assumption
         if (index.isDefined && value.isDefined) {
-          Some(MemoryAssign(mem, index.get, value.get, Endian.LittleEndian, size, label))
+          Some(MemoryAssign(mem, index.get, value.get, Endian.LittleEndian, size.toInt, label))
         } else {
           None
         }
-
+      case "unsupported_opcode.0" => {
+        val op = args.headOption.flatMap(visitExpr) match {
+          case Some(IntLiteral(s)) => Some("%08x".format(s))
+          case c => c.map(_.toString)
+        }
+        val comment = " unsupported opcode" + op.map(": " + _).getOrElse("")
+        Some(Assert(FalseLiteral, Some(comment)))
+      }
       case _ =>
-        Logger.debug(s"Unidentified function call $function: ${ctx.getText}")
-        None
+        Logger.error(s"Unidentified function call $function: ${ctx.getText}")
+        Some(Assert(FalseLiteral, Some( " unsupported: " + ctx.getText)))
     }
   }
 
@@ -173,11 +180,11 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
   private def visitType(ctx: TypeContext): IRType = {
     ctx match
-      case e: TypeBitsContext => BitVecType(parseInt(e.size))
+      case e: TypeBitsContext => BitVecType(parseInt(e.size).toInt)
       case r: TypeRegisterContext =>
         // this is a special register - not the same as a register in the IR
         // ignoring the register's fields for now
-        BitVecType(visitInteger(r.size))
+        BitVecType(visitInteger(r.size).toInt)
       case c: TypeConstructorContext => visitIdent(c.str).match {
         case "FPRounding" => BitVecType(3)
         case "integer" => BitVecType(64)
@@ -212,6 +219,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case "__BranchTaken" => None
       case "BTypeNext" => None
       case "BTypeCompatible" => None
+      case "TPIDR_EL0" => Some(Register(name, 64))
+      // case ov => Some(LocalVar(ov, BitVecType(1)))
       case _ => throw Exception(s"could not identify variable '$name'")
     }
   }
@@ -243,7 +252,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
         if (index.isDefined) {
           // LittleEndian is assumed
-          Some(MemoryLoad(mem, index.get, Endian.LittleEndian, size))
+          Some(MemoryLoad(mem, index.get, Endian.LittleEndian, size.toInt))
         } else {
           None
         }
@@ -255,6 +264,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
           val e = expr.get
           e match {
             case b: BinaryExpr if b.op == BVEQ => Some(BinaryExpr(BVCOMP, b.arg1, b.arg2))
+            case FalseLiteral   => Some(BitVecLiteral(0, 1))
+            case TrueLiteral => Some(BitVecLiteral(1, 1))
             case _ => throw Exception(s"unhandled conversion from bool to bitvector: ${ctx.getText}")
           }
         } else {
@@ -289,7 +300,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case "replicate_bits.0" =>
         checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
         val oldSize = parseInt(typeArgs(0))
-        val replications = parseInt(typeArgs(1))
+        val replications = parseInt(typeArgs(1)).toInt
         val arg0 = visitExpr(args(0))
         val arg1 = parseInt(args(1))
         val newSize = oldSize * replications
@@ -312,7 +323,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
           Exception(s"inconsistent size parameters in ZeroExtend.0: ${ctx.getText}")
         }
         if (arg0.isDefined) {
-          Some(ZeroExtend(newSize - oldSize, arg0.get))
+          Some(ZeroExtend((newSize - oldSize).toInt, arg0.get))
         } else {
           None
         }
@@ -327,7 +338,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
           Exception(s"inconsistent size parameters in SignExtend.0: ${ctx.getText}")
         }
         if (arg0.isDefined) {
-          Some(SignExtend(newSize - oldSize, arg0.get))
+          Some(SignExtend((newSize - oldSize).toInt, arg0.get))
         } else {
           None
         }
@@ -342,7 +353,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case "FPAdd.0" | "FPMul.0" | "FPDiv.0" | "FPMulX.0" | "FPMax.0" | "FPMin.0" | "FPMaxNum.0" | "FPMinNum.0" | "FPSub.0" =>
         checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
-        val size = parseInt(typeArgs(0))
+        val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
 
@@ -351,7 +362,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
            "FPRoundIntN.0" =>
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
-        val size = parseInt(typeArgs(0))
+        val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
 
@@ -359,7 +370,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
            "FPRSqrtStepFused.0" | "FPRecipStepFused.0" =>
         checkArgs(function, 1, 2, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
-        val size = parseInt(typeArgs(0))
+        val size = parseInt(typeArgs(0)).toInt
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
 
@@ -373,7 +384,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case "FPConvert.0" =>
         checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
-        val outSize = parseInt(typeArgs(0))
+        val outSize = parseInt(typeArgs(0)).toInt
         val inSize = parseInt(typeArgs(1))
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
@@ -381,7 +392,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case "FPToFixed.0" =>
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
-        val outSize = parseInt(typeArgs(0))
+        val outSize = parseInt(typeArgs(0)).toInt
         val inSize = parseInt(typeArgs(1))
         // need to specifically handle the integer parameter
         val argsIR = args.flatMap(visitExpr).toSeq
@@ -391,7 +402,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val inSize = parseInt(typeArgs(0))
-        val outSize = parseInt(typeArgs(1))
+        val outSize = parseInt(typeArgs(1)).toInt
         // need to specifically handle the integer parameter
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
@@ -406,7 +417,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val inSize = parseInt(typeArgs(0))
-        val outSize = parseInt(typeArgs(1))
+        val outSize = parseInt(typeArgs(1)).toInt
         val argsIR = args.flatMap(visitExpr).toSeq
         Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
 
@@ -478,7 +489,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       if (size0 == size1) {
         Some(BinaryExpr(operator, arg0.get, arg1.get))
       } else {
-        Some(BinaryExpr(operator, arg0.get, ZeroExtend(size0 - size1, arg1.get)))
+        Some(BinaryExpr(operator, arg0.get, ZeroExtend((size0 - size1).toInt, arg1.get)))
       }
     } else {
       None
@@ -503,12 +514,12 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
   private def visitSliceContext(ctx: SliceContext): (Int, Int) = {
     ctx match {
       case s: Slice_HiLoContext =>
-        val hi = parseInt(s.hi)
-        val lo = parseInt(s.lo)
+        val hi = parseInt(s.hi).toInt
+        val lo = parseInt(s.lo).toInt
         (hi + 1, lo)
       case s: Slice_LoWdContext =>
-        val lo = parseInt(s.lo)
-        val wd = parseInt(s.wd)
+        val lo = parseInt(s.lo).toInt
+        val wd = parseInt(s.wd).toInt
         (lo + wd, lo)
     }
   }
@@ -528,7 +539,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case e: ExprVarContext => visitIdent(e.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an Expr_Var as first parameter")
     }
-    val index = parseInt(ctx.index)
+    val index = parseInt(ctx.index).toInt
 
     resolveArrayExpr(name, index)
   }
@@ -558,6 +569,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case "__BranchTaken" => None
       case "BTypeNext" => None
       case "BTypeCompatible" => None
+      case "TPIDR_EL0" => Some(Register(name, 64))
+      // case ov => Some(LocalVar(ov, BitVecType(1)))
       case _ => throw Exception(s"could not identify variable '$name' in ${ctx.getText}")
     }
   }
@@ -579,15 +592,15 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     }
     val index = parseInt(ctx.index)
 
-    resolveArrayExpr(name, index)
+    resolveArrayExpr(name, index.toInt)
   }
 
   private def visitIdent(ctx: IdentContext): String = {
     ctx.ID.getText.stripPrefix("\"").stripSuffix("\"")
   }
 
-  private def visitInteger(ctx: IntegerContext): Int = {
-    ctx.DEC.getText.toInt
+  private def visitInteger(ctx: IntegerContext): BigInt = {
+    BigInt(ctx.DEC.getText, 10)
   }
 
   private def visitBits(ctx: BitsContext): BitVecLiteral = {

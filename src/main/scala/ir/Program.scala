@@ -7,6 +7,32 @@ import util.intrusive_list.*
 import translating.serialiseIL
 import eval.BitVectorEval
 
+
+/**
+  * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
+  * not guaranteed to be in any defined order. 
+  */
+class ILUnorderedIterator(private val begin: Iterable[CFGPosition]) extends Iterator[CFGPosition] {
+  private val stack = mutable.Stack[CFGPosition]()
+  stack.addAll(begin)
+
+  override def hasNext: Boolean = {
+    stack.nonEmpty
+  }
+
+  override def next(): CFGPosition = {
+    val n: CFGPosition = stack.pop()
+
+    stack.pushAll(n match {
+      case p: Procedure => p.blocks
+      case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
+      case s: Command => Seq()
+    })
+    n
+  }
+
+}
+
 class Program(var procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
               var initialMemory: ArrayBuffer[MemorySection],
@@ -95,37 +121,13 @@ class Program(var procedures: ArrayBuffer[Procedure],
     initialMemory = initialMemoryNew
   }
 
-  /**
-   * Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
-   * not guaranteed to be in any defined order. 
-   */
-  private class ILUnorderedIterator(private val begin: Program) extends Iterator[CFGPosition] {
-    private val stack = mutable.Stack[CFGPosition]()
-    stack.addAll(begin.procedures)
-
-    override def hasNext: Boolean = {
-      stack.nonEmpty
-    }
-
-    override def next(): CFGPosition = {
-      val n: CFGPosition = stack.pop()
-
-      stack.pushAll(n match {
-        case p: Procedure => p.blocks
-        case b: Block => Seq() ++ b.statements.toSeq ++ Seq(b.jump)
-        case s: Command => Seq()
-      })
-      n
-    }
-
-  }
 
   /**
    * Get an Iterator in approximate syntactic pre-order of procedures, blocks, and commands. Blocks and procedures are 
    * not guaranteed to be in any defined order. 
    */
   def iterator: Iterator[CFGPosition] = {
-    ILUnorderedIterator(this)
+    ILUnorderedIterator(this.procedures)
   }
 
   def nameToProcedure: Map[String, Procedure] = {
@@ -142,8 +144,16 @@ class Program(var procedures: ArrayBuffer[Procedure],
 class ProgramThread(val entry: Procedure,
                     val procedures: mutable.LinkedHashSet[Procedure],
                     val creationSite: Option[DirectCall]) {
-
 }
+
+/*
+ * R0 := call procname(R0, R1, R2)
+ *
+ * procname (R0a, R1a, R2a):  
+ *  ...
+ *  return (R0)
+ *
+*/
 
 class Procedure private (
                   var name: String,
@@ -151,23 +161,37 @@ class Procedure private (
                   private var _entryBlock: Option[Block],
                   private var _returnBlock: Option[Block],
                   private val _blocks: mutable.LinkedHashSet[Block],
-                  var in: ArrayBuffer[Parameter],
-                  var out: ArrayBuffer[Parameter],
+                  var formalInParam: mutable.SortedSet[LocalVar],
+                  var formalOutParam: mutable.SortedSet[LocalVar],
+                  var inParamDefaultBinding: immutable.SortedMap[LocalVar, Expr],
+                  var outParamDefaultBinding: immutable.SortedMap[LocalVar, Variable],
                   var requires: List[BExpr],
                   var ensures: List[BExpr],
-                ) {
+                ) extends Iterable[CFGPosition] {
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant
   require(_returnBlock.forall(b => _blocks.contains(b)) && _entryBlock.forall(b => _blocks.contains(b)))
   require(_blocks.isEmpty == _entryBlock.isEmpty) // blocks.nonEmpty <==> entryBlock.isDefined
 
-  def this(name: String, address: Option[BigInt] = None , entryBlock: Option[Block] = None, returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), in: IterableOnce[Parameter] = ArrayBuffer(), out: IterableOnce[Parameter] = ArrayBuffer(), requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
-    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), ArrayBuffer.from(in), ArrayBuffer.from(out), List.from(requires), List.from(ensures))
+  def this(name: String, address: Option[BigInt] = None , entryBlock: Option[Block] = None, 
+      returnBlock: Option[Block] = None, blocks: Iterable[Block] = ArrayBuffer(), 
+      formalInParam: IterableOnce[LocalVar] = ArrayBuffer(), formalOutParam: IterableOnce[LocalVar] = ArrayBuffer(), 
+      inParamDefaultBinding: Map[LocalVar, Expr] = Map(), outParamDefaultBinding: Map[LocalVar, Variable] = Map(), 
+      requires: IterableOnce[BExpr] = ArrayBuffer(), ensures: IterableOnce[BExpr] = ArrayBuffer()) = {
+    this(name, address, entryBlock, returnBlock, mutable.LinkedHashSet.from(blocks), mutable.SortedSet.from(formalInParam), mutable.SortedSet.from(formalOutParam), 
+      immutable.SortedMap.from(inParamDefaultBinding), immutable.SortedMap.from(outParamDefaultBinding),
+      List.from(requires), List.from(ensures))
+  }
+
+  def makeCall(label: Option[String] = None) = DirectCall(this, label, outParamDefaultBinding, inParamDefaultBinding)
+
+  def iterator: Iterator[CFGPosition] = {
+    ILUnorderedIterator(this)
   }
 
   override def toString: String = {
-    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${in.size} in and ${out.size} out parameters"
+    s"Procedure $name at ${address.getOrElse("None")} with ${blocks.size} blocks and ${formalInParam.size} in and ${formalOutParam.size} out parameters"
   }
 
   def calls: Set[Procedure] = blocks.iterator.flatMap(_.calls).toSet
@@ -320,13 +344,6 @@ class Procedure private (
     reachable.toSet
   }
 }
-
-class Parameter(var name: String, var size: Int, var value: Register) {
-  def toBoogie: BVariable = BParam(name, BitVecBType(size))
-  def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
-}
-
-
 
 class Block private (
  val label: String,
