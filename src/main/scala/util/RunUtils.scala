@@ -221,6 +221,13 @@ object IRTransform {
     Logger.debug(
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
+    val dupProcNames = (ctx.program.procedures.groupBy(_.name).filter((n,p) => p.size > 1)).toList.flatMap(_._2)
+
+    var dupCounter = 0 
+    for (p <- dupProcNames) {
+      dupCounter += 1
+      p.name = p.name + "$" + p.address.map(_.toString).getOrElse(dupCounter.toString)
+    }
 
     val stackIdentification = StackSubstituter()
     stackIdentification.visitProgram(ctx.program)
