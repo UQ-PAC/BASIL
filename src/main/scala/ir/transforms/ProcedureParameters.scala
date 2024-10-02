@@ -256,13 +256,11 @@ def specToProcForm(
   }
 
 
-  println(spec.subroutines)
   val ns = spec.copy(subroutines = spec.subroutines.map(s => {
     s.copy(requires = 
       s.requires.map(convVarToOld(varToInVar(s.name), varToOutVar(s.name), false)), 
       ensures = s.ensures.map(convVarToOld(varToInVar(s.name), varToOutVar(s.name), true)))
   }))
-  println(ns.subroutines)
   ns
 }
 

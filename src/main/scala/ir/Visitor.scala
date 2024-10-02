@@ -40,7 +40,9 @@ abstract class Visitor {
   }
 
   def visitDirectCall(node: DirectCall): Statement = {
-    node
+    val ins = node.actualParams.map(i => i._1 -> visitExpr(i._2))
+    val outs = node.outParams.map(i => i._1 -> visitVariable(i._2))
+    DirectCall(node.target, node.label, outs, ins)
   }
 
   def visitIndirectCall(node: IndirectCall): Statement = {
@@ -191,6 +193,8 @@ abstract class ReadOnlyVisitor extends Visitor {
   }
 
   override def visitDirectCall(node: DirectCall): Statement = {
+    node.actualParams.foreach(i => visitExpr(i._2))
+    node.outParams.foreach(i => visitVariable(i._2))
     node
   }
 

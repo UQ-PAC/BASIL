@@ -103,8 +103,9 @@ class CILVisitorImpl(val v: CILVisitor) {
   def visit_stmt(s: Statement): List[Statement] = {
     def continue(n: Statement) = n match {
       case d: DirectCall => {
-        v.enter_scope(d.actualParams)
-        d
+        val actuals = d.actualParams.map(i => i._1 -> visit_expr(i._2))
+        v.enter_scope(actuals)
+        DirectCall(d.target, d.label, d.outParams, actuals)
       }
       case i: IndirectCall => {
         i.target = visit_rvar(i.target)
