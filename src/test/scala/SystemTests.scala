@@ -203,11 +203,24 @@ class ExtraSpecTests extends SystemTests {
   }
 }
 
+
+class NoSimplifySystemTests extends SystemTests {
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=false)), useBAPFrontend = true, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=false)), useBAPFrontend = true, expectVerify = false, logResults = true))
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=false)), useBAPFrontend = false, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=false)), useBAPFrontend = false, expectVerify = false, logResults = true))
+  test("summary-nosimplify") {
+    summary("summary-nosimplify")
+  }
+}
 class SimplifySystemTests extends SystemTests {
-  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = true, expectVerify = true))
-  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = true, expectVerify = false))
-  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = false, expectVerify = true))
-  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = false, expectVerify = false))
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = true, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = true, expectVerify = false, logResults = true))
+  runTests("correct", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = false, expectVerify = true, logResults = true))
+  runTests("incorrect", TestConfig(staticAnalysisConfig = Some(StaticAnalysisConfig(simplify=true)), useBAPFrontend = false, expectVerify = false, logResults = true))
+  test("summary-simplify") {
+    summary("summary-simplify")
+  }
 }
 
 

@@ -22,14 +22,6 @@ case class ReachingDefinitionsAnalysis(program: Program) {
 
   val domain: Set[CFGPosition] = Set.empty ++ program
 
-  /*
-   * Good enough as stmts are unique
-   */
-  private def generateUniqueDefinition(
-      variable: Variable
-  ): Assign = {
-    Assign(variable, BitVecLiteral(0, 0))
-  }
 
   def transfer(n: CFGPosition, s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) =
     localTransfer(n, s)

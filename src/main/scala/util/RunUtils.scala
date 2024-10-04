@@ -272,7 +272,6 @@ object IRTransform {
 /** Methods relating to program static analysis.
   */
 object StaticAnalysis {
-  var first : Boolean = true
   /** Run all static analysis passes on the provided IRProgram.
     */
   def analyse(
@@ -301,7 +300,40 @@ object StaticAnalysis {
     Logger.debug("Subroutine Addresses:")
     Logger.debug(subroutines)
 
+    if (config.simplify && iteration == 1) {
+      Logger.info("[!] Running simplification")
+      writeToFile(serialiseIL(IRProgram), s"il-after-params.il")
 
+      Logger.info("Reachingdefs")
+      val rd = ReachingDefinitionsAnalysisSolver(IRProgram).analyze()
+
+      config.analysisResultsPath.foreach(s =>
+        writeToFile(printAnalysisResults(IRProgram, rd), s"${s}-reachingdefs-result$iteration.txt")
+      )
+
+      Logger.info("DSA X")
+      // transforms.SSARename.concretiseSSA(ctx.program, rd)
+      transforms.SSARename.concretiseDSASinglePass(ctx.program)
+      writeToFile(serialiseIL(IRProgram), s"il-after-ssa.il")
+
+      Logger.info("reaching defs ")
+      val rds2 = ReachingDefinitionsAnalysisSolver(IRProgram)
+      val rdr2 = rds2.analyze()
+
+      config.analysisDotPath.foreach { s =>
+        writeToFile(dotBlockGraph(IRProgram, IRProgram.mainProcedure.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-dsa-$iteration.dot")
+      }
+      Logger.info("copyprop ")
+      transforms.doCopyPropTransform(ctx.program, rdr2)
+      writeToFile(serialiseIL(IRProgram), s"il-after-copyprop.il")
+      Logger.info("done copyprop")
+      config.analysisDotPath.foreach { s =>
+        writeToFile(dotBlockGraph(IRProgram, IRProgram.mainProcedure.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-simp-$iteration.dot")
+      }
+    }
+
+
+    Logger.info("reducible loops")
     // reducible loops
     val detector = LoopDetector(IRProgram)
     val foundLoops = detector.identify_loops()
@@ -382,26 +414,6 @@ object StaticAnalysis {
       )
     })
 
-    if (config.simplify && first) {
-      Logger.info("[!] Running simplification")
-      ctx = transforms.liftProcedureCallAbstraction(ctx)
-      writeToFile(serialiseIL(IRProgram), s"il-after-params.il")
-
-      val rd = ReachingDefinitionsAnalysisSolver(IRProgram).analyze()
-
-      config.analysisResultsPath.foreach(s =>
-        writeToFile(printAnalysisResults(IRProgram, rd), s"${s}-reachingdefs-result$iteration.txt")
-      )
-
-      transforms.SSARename.concretiseSSA(ctx.program, rd)
-      writeToFile(serialiseIL(IRProgram), s"il-after-ssa.il")
-
-      val rds2 = ReachingDefinitionsAnalysisSolver(IRProgram)
-      val rdr2 = rds2.analyze()
-
-      transforms.doCopyPropTransform(ctx.program, rdr2)
-      writeToFile(serialiseIL(IRProgram), s"il-after-copyprop.il")
-    }
 
     Logger.debug("[!] Running Constant Propagation with SSA")
     val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(IRProgram, reachingDefinitionsAnalysisResults)
@@ -461,7 +473,6 @@ object StaticAnalysis {
       Logger.warn(s"Disabling IDE solver tests due to external main procedure: ${IRProgram.mainProcedure.name}")
     }
 
-    first = false
     StaticAnalysisContext(
       constPropResult = constPropResult,
       IRconstPropResult = newCPResult,
@@ -537,8 +548,13 @@ object RunUtils {
     }
   }
 
-  def loadAndTranslate(q: BASILConfig): BASILResult = {
+  def loadAndTranslate(conf: BASILConfig): BASILResult = {
     Logger.debug("[!] Loading Program")
+    var q = conf
+    if (q.staticAnalysis.map(_.simplify).getOrElse(false)) {
+      q = q.copy(loading=q.loading.copy(parameterForm=true))
+    }
+
     var ctx = IRLoading.load(q.loading)
 
     ctx = IRTransform.doCleanup(ctx)

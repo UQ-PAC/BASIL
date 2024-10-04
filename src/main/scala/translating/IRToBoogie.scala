@@ -567,7 +567,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
   def translateBlock(b: Block): BBlock = {
     val captureState = captureStateStatement(s"${b.label}")
-    val cmds = List(captureState) ++ b.statements.flatMap(s => translate(s)) ++ translate(b.jump)
+    val cmds = List() ++ b.statements.flatMap(s => translate(s)) ++ translate(b.jump)
 
     BBlock(b.label, cmds)
   }
@@ -693,11 +693,11 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       val lhsGamma = m.mem.toGamma
       val rhsGamma = GammaStore(m.mem.toGamma, m.index.toBoogie, m.value.toGamma, m.size, m.size / m.mem.valueSize)
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
-      val stateSplit = s match {
+      val stateSplit = List.empty /*s match {
         case MemoryAssign(_, _, _, _, _, Some(label)) => List(captureStateStatement(s"$label"))
         case Assign(_, _, Some(label)) => List(captureStateStatement(s"$label"))
         case _ => List.empty
-      }
+      } */
       m.mem match {
         case s: StackMemory =>
           List(store) ++ stateSplit

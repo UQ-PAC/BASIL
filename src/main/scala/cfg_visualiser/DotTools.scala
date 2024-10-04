@@ -11,7 +11,8 @@ object IDGenerator {
   }
 }
 
-def wrap(input: String, width: Integer = 20): String =
+def wrap(_input: String, width: Integer = 20): String =
+  var input = _input.replace("\n", "\\l")
   if (input.length() <= width) {
     input
   } else {
@@ -25,7 +26,7 @@ def wrap(input: String, width: Integer = 20): String =
       splitPoint = width
     }
     val line = input.substring(0, splitPoint)
-    line + "\\l" + wrap(input.substring(splitPoint), width)
+    "\\l    " + line + wrap(input.substring(splitPoint), width)
   }
 
 
@@ -51,7 +52,7 @@ class DotNode(val id: String, val label: String) extends DotElement {
   override def toString: String = toDotString
 
   def toDotString: String =
-    s"\"$id\"" + "[label=\"" + wrap(label, 80) + "\"]"
+    s"\"$id\"" + "[label=\"" + wrap(label, 100) + "\", shape=\"box\", fontname=\"Mono\"]"
 
 }
 

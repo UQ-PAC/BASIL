@@ -10,4 +10,4 @@ Subroutine: main
 Requires: Gamma_main_argc == false
 
 Subroutine: zero
-Ensures: R0 == 0bv64  && Gamma_R0
+Ensures: zero_result == 0bv32  && Gamma_R0

@@ -106,7 +106,9 @@ class CILVisitorImpl(val v: CILVisitor) {
         val actuals = d.actualParams.map(i => i._1 -> visit_expr(i._2))
         val outs = d.outParams.map(i => i._1 -> visit_lvar(i._2))
         v.enter_scope(actuals)
-        DirectCall(d.target, d.label, outs, actuals)
+        d.outParams = outs
+        d.actualParams = actuals
+        d
       }
       case i: IndirectCall => {
         i.target = visit_rvar(i.target)
