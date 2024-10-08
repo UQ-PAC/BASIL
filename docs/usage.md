@@ -58,6 +58,19 @@ See also: [tool-installation](development/tool-installation.md)
 and [development: building](development/readme.md#building)
 (primarily if you are interested in building BASIL manually).
 
+#### Mac OS
+
+The Mac OS platform (both x86 and arm64)
+uses a different binary format (Mach-O instead of ELF),
+so you will need to install and use a cross-compiler targeting aarch64-unknown-linux-gnu such as the one here:
+https://github.com/messense/homebrew-macos-cross-toolchains
+This means the commands for gcc and readelf might be different from those shown below.
+The Nix commands should work unchanged.
+Some scripts/makefiles within the repository
+might also need tweaks.
+Mac OS is a less supported platform,
+please report any issues.
+
 ### Preparation
 
 1. Compile a C program into an Aarch64 binary, for example:
