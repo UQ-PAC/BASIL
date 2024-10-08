@@ -61,7 +61,7 @@ class DifferentialTest extends AnyFunSuite {
     assert(filterEvents(traceInit.t).mkString("\n") == filterEvents(traceRes.t).mkString("\n"))
   }
 
-  def testProgram(testName: String, examplePath: String, suffix: String =".adt", staticAnalysisConfig : StaticAnalysisConfig = StaticAnalysisConfig(None, None, None)) = {
+  def testProgram(testName: String, examplePath: String, suffix: String =".adt", staticAnalysisConfig : StaticAnalysisConfig = StaticAnalysisConfig(None, None, None), simplify: Boolean = true) = {
 
     val loading = ILLoadingConfig(inputFile = examplePath + testName + suffix,
       relfFile = examplePath + testName + ".relf",
@@ -74,6 +74,11 @@ class DifferentialTest extends AnyFunSuite {
     var comparectx = IRLoading.load(loading)
     comparectx = IRTransform.doCleanup(ictx)
     val analysisres = RunUtils.staticAnalysis(staticAnalysisConfig, comparectx)
+
+    if (simplify) {
+      RunUtils.doSimplify(ictx, Some(staticAnalysisConfig))
+    }
+
 
     diffTest(ictx, comparectx)
   }
@@ -155,7 +160,7 @@ class DifferentialTestSimplification extends DifferentialTest {
       val variations = getSubdirectories(programPath)
       variations.foreach(variation => {
         test("analysis_differential:" + p + "/" + variation + ":BAP") {
-          testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".adt", staticAnalysisConfig=StaticAnalysisConfig(simplify=true))
+          testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".adt", simplify=true)
         }
         //test("analysis_differential:" +  p + "/" + variation + ":GTIRB") {
         //  testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".gts")

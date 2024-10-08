@@ -13,15 +13,20 @@ object IDGenerator {
 
 def wrap(_input: String, width: Integer = 20): String =
   var input = _input.replace("\n", "\\l")
+
+  def cannotSplit(c:Char) = {
+    c.isLetterOrDigit || ("_$".contains(c))
+  }
+
   if (input.length() <= width) {
     input
   } else {
     var splitPoint = width
-    while (input.charAt(splitPoint).isLetterOrDigit && splitPoint > width / 2) {
+    while (cannotSplit(input.charAt(splitPoint)) && splitPoint > width / 2) {
       // search backwards for a non alphanumeric charcter to split on
       splitPoint -= 1
     }
-    if (input.charAt(splitPoint).isLetterOrDigit) {
+    if (cannotSplit(input.charAt(splitPoint))) {
       // didn't find a character to split on
       splitPoint = width
     }

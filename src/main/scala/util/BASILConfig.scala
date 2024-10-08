@@ -22,13 +22,13 @@ case class StaticAnalysisConfig(dumpILToPath: Option[String] = None,
                                 analysisDotPath: Option[String] = None,
                                 threadSplit: Boolean = false,
                                 summariseProcedures: Boolean = false,
-                                simplify: Boolean = false
                                )
 enum BoogieMemoryAccessMode:
   case SuccessiveStoreSelect, LambdaStoreSelect
 
 case class BASILConfig(loading: ILLoadingConfig,
                        runInterpret: Boolean = false,
+                       simplify: Boolean = false,
                        staticAnalysis: Option[StaticAnalysisConfig] = None,
                        boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
                        outputPrefix: String

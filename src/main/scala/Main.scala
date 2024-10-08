@@ -84,9 +84,10 @@ object Main {
     }
 
     val q = BASILConfig(
-      loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth, conf.parameterForm.value),
+      loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth, conf.parameterForm.value || conf.simplify.value),
       runInterpret = conf.interpret.value,
-      staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot, conf.threadSplit.value, conf.summariseProcedures.value, conf.simplify.value)) else None,
+      simplify = conf.simplify.value,
+      staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot, conf.threadSplit.value, conf.summariseProcedures.value)) else None,
       boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect,
         true, rely, conf.threadSplit.value),
       outputPrefix = conf.outFileName,

@@ -300,38 +300,6 @@ object StaticAnalysis {
     Logger.debug("Subroutine Addresses:")
     Logger.debug(subroutines)
 
-    if (config.simplify && iteration == 1) {
-      Logger.info("[!] Running simplification")
-      writeToFile(serialiseIL(IRProgram), s"il-after-params.il")
-
-      Logger.info("Reachingdefs")
-      val rd = ReachingDefinitionsAnalysisSolver(IRProgram).analyze()
-
-      config.analysisResultsPath.foreach(s =>
-        writeToFile(printAnalysisResults(IRProgram, rd), s"${s}-reachingdefs-result$iteration.txt")
-      )
-
-      Logger.info("DSA X")
-      // transforms.SSARename.concretiseSSA(ctx.program, rd)
-      transforms.SSARename.concretiseDSASinglePass(ctx.program)
-      writeToFile(serialiseIL(IRProgram), s"il-after-ssa.il")
-
-      Logger.info("reaching defs ")
-      val rds2 = ReachingDefinitionsAnalysisSolver(IRProgram)
-      val rdr2 = rds2.analyze()
-
-      config.analysisDotPath.foreach { s =>
-        writeToFile(dotBlockGraph(IRProgram, IRProgram.mainProcedure.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-dsa-$iteration.dot")
-      }
-      Logger.info("copyprop ")
-      transforms.doCopyPropTransform(ctx.program, rdr2)
-      writeToFile(serialiseIL(IRProgram), s"il-after-copyprop.il")
-      Logger.info("done copyprop")
-      config.analysisDotPath.foreach { s =>
-        writeToFile(dotBlockGraph(IRProgram, IRProgram.mainProcedure.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-simp-$iteration.dot")
-      }
-    }
-
 
     Logger.info("reducible loops")
     // reducible loops
@@ -548,12 +516,28 @@ object RunUtils {
     }
   }
 
+  def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = {
+    Logger.info("[!] Running simplification")
+    Logger.info("[!] DynamicSingleAssignment")
+    transforms.DynamicSingleAssignment.applyTransform(ctx.program)
+
+    config.foreach(_.analysisDotPath.foreach { s =>
+      writeToFile(dotBlockGraph(ctx.program, ctx.program.mainProcedure.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-dsa.dot")
+    })
+    writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
+
+    Logger.info("[!] CopyProp")
+    transforms.doCopyPropTransform(ctx.program)
+    writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
+
+    config.foreach(_.analysisDotPath.foreach { s =>
+      writeToFile(dotBlockGraph(ctx.program, ctx.program.mainProcedure.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-simp.dot")
+    })
+  }
+
   def loadAndTranslate(conf: BASILConfig): BASILResult = {
     Logger.debug("[!] Loading Program")
     var q = conf
-    if (q.staticAnalysis.map(_.simplify).getOrElse(false)) {
-      q = q.copy(loading=q.loading.copy(parameterForm=true))
-    }
 
     var ctx = IRLoading.load(q.loading)
 
@@ -565,6 +549,12 @@ object RunUtils {
     } else {
       ir.transforms.clearParams(ctx.program)
     }
+    assert(invariant.correctCalls(ctx.program))
+
+    if (conf.simplify) {
+      doSimplify(ctx, conf.staticAnalysis)
+    }
+
     assert(invariant.correctCalls(ctx.program))
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-before-analysis.il"))

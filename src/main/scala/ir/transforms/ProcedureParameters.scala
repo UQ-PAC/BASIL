@@ -8,22 +8,14 @@ import specification.Specification
 import analysis.{TwoElement, TwoElementTop, TwoElementBottom}
 import ir.CallGraph
 
-/** Use ANR and RNA to identify procedure parameters.
-  */
-
-// procedure ->
-//  rna at beginning = in params
-//  anr at return = out parms
-
-// call : forall vars in scope if name matches formal inparams of target = actual parameters
-// return : forall vars in scope if name matches formal outparams of proc = actual outparams
-
 def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
-  val p = ctx.program
-  val anr = analysis.ANRAnalysisSolver(p, false).analyze()
-  val rna = analysis.RNAAnalysisSolver(p, false).analyze()
 
-  val liveVars = analysis.InterLiveVarsAnalysis(ctx.program).analyze()
+  val liveVars  =
+  if (ctx.program.mainProcedure.blocks.nonEmpty && ctx.program.mainProcedure.returnBlock.isDefined && ctx.program.mainProcedure.entryBlock.isDefined) {
+    analysis.InterLiveVarsAnalysis(ctx.program).analyze()
+  } else {
+    Map.empty
+  }
 
   val params = inOutParams(ctx.program, liveVars)
 
@@ -32,10 +24,10 @@ def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
     case b: Procedure if b.blocks.isEmpty => b.name
   }
 
-  val formalParams = SetFormalParams(anr, rna, params, external)
-  visit_prog(formalParams, p)
+  val formalParams = SetFormalParams(params, external)
+  visit_prog(formalParams, ctx.program)
   val actualParams = SetActualParams(formalParams.mappingInparam, formalParams.mappingOutparam, external)
-  visit_prog(actualParams, p)
+  visit_prog(actualParams, ctx.program)
 
   ctx.copy(specification = specToProcForm(ctx.specification, formalParams.mappingInparam, formalParams.mappingOutparam))
 }
@@ -94,8 +86,6 @@ def collectVariables(p: Procedure): (Set[Variable], Set[Variable]) = {
 }
 
 class SetFormalParams(
-    val anr: Map[CFGPosition, Set[Variable]],
-    val rna: Map[CFGPosition, Set[Variable]],
     val inoutparams: Map[Procedure, (Set[Variable], Set[Variable])],
     val externalFunctions: Set[String]
 ) extends CILVisitor {
@@ -188,7 +178,7 @@ object ReadWriteAnalysis {
             .map(addReads(s.rhs.variables))
         }
         case s: Return => {
-          ir.map(addWrites(s.outParams.flatMap(_._2.variables)))
+          ir.map(addReads(s.outParams.flatMap(_._2.variables)))
         }
         case s: MemoryAssign => {
           ir.map(addReads(s.index.variables ++ s.value.variables))
