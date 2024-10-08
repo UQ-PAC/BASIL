@@ -1,11 +1,10 @@
 import analysis.{AddressRange, DSC, DSG, DSN, DataLocation, HeapLocation}
 import ir.Endian.BigEndian
-import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, CFGPosition, ConvertToSingleProcedureReturn, DirectCall, Memory, MemoryAssign, MemoryLoad, Register, SharedMemory}
+import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Memory, MemoryAssign, MemoryLoad, Program, Register, SharedMemory, cilvisitor, transforms}
 import org.scalatest.funsuite.AnyFunSuite
-import test_util.TestUtil
 import ir.dsl.*
 import specification.Specification
-import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig}
+import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext}
 
 /**
  * This is the test suite for testing DSA functionality
@@ -19,7 +18,17 @@ import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, IRContext, Run
  * BASILRESULT.analysis.get.td is the set of graphs from the end of the top-down phase
  *
  */
-class DSATest extends AnyFunSuite, TestUtil {
+class DSATest extends AnyFunSuite {
+
+  def runAnalysis(program: Program): StaticAnalysisContext = {
+    cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
+    transforms.addReturnBlocks(program)
+    cilvisitor.visit_prog(transforms.ConvertSingleReturn(), program)
+
+    val emptySpec = Specification(Set(), Set(), Map(), List(), List(), List(), Set())
+    val emptyContext = IRContext(List(), Set(), Set(), Set(), Map(), emptySpec, program)
+    RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
+  }
 
   // Local DSA tests
   test("basic pointer") {
@@ -124,9 +133,11 @@ class DSATest extends AnyFunSuite, TestUtil {
     val program = results.ir.program
     // test that all three calles have the same local graph
     val callees = Set("sub_seven", "add_two", "add_six")
+    val procs = program.nameToProcedure
+
     callees.foreach(
       callee =>
-        val dsg = results.analysis.get.locals.get(program.procs(callee))
+        val dsg = results.analysis.get.locals.get(procs(callee))
         assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
         assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
         // x should point to a collapsed object, in all 3 functions
@@ -285,7 +296,7 @@ class DSATest extends AnyFunSuite, TestUtil {
       )
     )
     val program = results.ir.program
-    val dsg = results.analysis.get.locals.get(program.procs("callee"))
+    val dsg = results.analysis.get.locals.get(program.nameToProcedure("callee"))
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
 
@@ -314,12 +325,9 @@ class DSATest extends AnyFunSuite, TestUtil {
       )
     )
 
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
-    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Set.empty, Map.empty, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program))
+    val results = runAnalysis(program)
+
     val dsg: DSG = results.locals.get(program.mainProcedure)
-
-
 
     // R6 and R7 address the same cell (overlapping cells in the same node that are merged)
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign2)(R7)).cell))
@@ -357,10 +365,7 @@ class DSATest extends AnyFunSuite, TestUtil {
       )
     )
 
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
-
-    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Set.empty, Map.empty, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program))
+    val results = runAnalysis(program)
     val dsg: DSG = results.locals.get(program.mainProcedure)
     // check that R5 points to separate cell at offset 13
     assert(dsg.find(dsg.varToCell(locAssign3)(R5)).offset == 13)
@@ -387,10 +392,7 @@ class DSATest extends AnyFunSuite, TestUtil {
       )
     )
 
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
-
-    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Set.empty, Map.empty, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program))
+    val results = runAnalysis(program)
     val dsg: DSG = results.locals.get(program.mainProcedure)
     assert(dsg.find(dsg.formals(R1)).equals(dsg.find(dsg.formals(R2))))
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign2)(R7)).cell))
@@ -423,10 +425,8 @@ class DSATest extends AnyFunSuite, TestUtil {
       )
     )
 
-    val returnUnifier = ConvertToSingleProcedureReturn()
-    program = returnUnifier.visitProgram(program)
+    val results = runAnalysis(program)
 
-    val results = RunUtils.staticAnalysis(StaticAnalysisConfig(None, None, None), IRContext(Set.empty, Set.empty, Set.empty, Map.empty, Specification(Set(), Set(), Map(), List(), List(), List(), Set()), program))
     val dsg: DSG = results.locals.get(program.mainProcedure)
     assert(dsg.find(dsg.varToCell(locAssign2)(R7)).equals(dsg.find(dsg.varToCell(locAssign3)(R5))))
   }
@@ -454,9 +454,10 @@ class DSATest extends AnyFunSuite, TestUtil {
     val program = results.ir.program
     // test that all three calles have the same local graph
     val callees = Set("sub_seven", "add_two", "add_six")
+    val procs = program.nameToProcedure
     callees.foreach(
       callee =>
-        val dsg = results.analysis.get.bus.get(program.procs(callee))
+        val dsg = results.analysis.get.bus.get(procs(callee))
         assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
         assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
         // x should point to a collapsed object, in all 3 functions
@@ -524,7 +525,7 @@ class DSATest extends AnyFunSuite, TestUtil {
       )
     )
     val program = results.ir.program
-    val dsg = results.analysis.get.bus.get(program.procs("callee"))
+    val dsg = results.analysis.get.bus.get(program.nameToProcedure("callee"))
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
 
@@ -642,9 +643,10 @@ class DSATest extends AnyFunSuite, TestUtil {
     val program = results.ir.program
     // test that all three callees have the same local graph
     val callees = Set("sub_seven", "add_two", "add_six")
+    val procs = program.nameToProcedure
     callees.foreach(
       callee =>
-        val dsg = results.analysis.get.tds.get(program.procs(callee))
+        val dsg = results.analysis.get.tds.get(procs(callee))
         assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
         assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
         // x should point to a collapsed object, in all 3 functions
@@ -673,7 +675,7 @@ class DSATest extends AnyFunSuite, TestUtil {
       )
     )
     val program = results.ir.program
-    val dsg = results.analysis.get.tds.get(program.procs("callee"))
+    val dsg = results.analysis.get.tds.get(program.nameToProcedure("callee"))
 
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)

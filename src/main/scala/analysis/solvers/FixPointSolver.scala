@@ -225,10 +225,12 @@ trait PushDownWorklistFixPointFunctions[N, T, L <: Lattice[T]] extends LinkedHas
    */
   def propagate(y: T, m: N): Unit = {
     val xm = x(m)
-    val t = lattice.sublattice.lub(xm, y)
-    if (t != xm) {
-      add(m)
-      x += m -> t
+    if (xm != y) {
+      val t = lattice.sublattice.lub(xm, y)
+      if (t != xm) {
+        add(m)
+        x += m -> t
+      }
     }
   }
 
@@ -247,8 +249,8 @@ trait PushDownWorklistFixpointSolver[N, T, L <: Lattice[T]] extends MapLatticeSo
   def process(n: N): Unit =
     val xn = x(n)
     val y = transfer(n, xn)
-
     for succ <- outdep(n) do propagate(y, succ)
+
 
 /** Worklist-based fixpoint solver.
   *

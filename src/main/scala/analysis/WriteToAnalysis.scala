@@ -23,21 +23,18 @@ class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[Regi
     if writesTo.contains(proc) then
       writesTo(proc)
     else
-      val writtenTo : mutable.Set[Register] = mutable.Set()
+      val writtenTo: mutable.Set[Register] = mutable.Set()
       proc.blocks.foreach(
         block =>
           block.statements.foreach {
-            case Assign(variable: Register, value, label) if paramRegisters.contains(variable) =>
+            case Assign(variable: Register, _, _) if paramRegisters.contains(variable) =>
               writtenTo.add(variable)
+            case DirectCall(target, _) if target.name == "malloc" =>
+              writtenTo.add(mallocRegister)
+            case DirectCall(target, _) if program.procedures.contains(target) =>
+              writtenTo.addAll(getWritesTos(target))
             case _ =>
           }
-
-          block.jump match
-            case DirectCall(proc, returnTarget, label) if proc.name == "malloc" =>
-              writtenTo.add(mallocRegister)
-            case DirectCall(proc, returnTarget, label) if program.procedures.contains(proc) =>
-              writtenTo.++=(getWritesTos(proc))
-            case _ =>
       )
 
       writesTo.update(proc, writtenTo.toSet)

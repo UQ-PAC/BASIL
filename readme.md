@@ -35,13 +35,21 @@ Boogie program verifier finished with 4 verified, 0 errors
 
 The tool takes as inputs either a BAP ADT file (here denoted with `.adt`) or a `.gts` file produced by [gtirb-semantics](https://github.com/UQ-PAC/gtirb-semantics), as well as a file containing the output of readelf (here denoted with `.relf`), both created from the same AArch64/ARM64 binary, and outputs a semantically equivalent .bpl Boogie-language source file. The default output file is `boogie_out.bpl`, but the output location can be specified.
 
-To build and run the tool using sbt, use the following command:
+To build and run the tool use one of the following commands:
 
-`sbt "run --input file.{adt, gts} --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]"` where the output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
-
-or mill:
-
-`mill run --input file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]`.
+sbt:
+```
+sbt "run --input file.{adt, gts} --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]"
+```
+mill (Mac OS X / Linux):
+```
+./mill run --input file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]
+```
+mill (Windows): 
+```
+./mill.bat run --input file.adt --relf file.relf [--spec file.spec] [--output output.bpl] [--analyse] [--interpret]
+```
+The output filename is optional and specification filenames are optional. The specification filename must end in `.spec`.
 
 #### Usage
 
@@ -54,6 +62,8 @@ BASIL
   --analyse                       Run static analysis pass.
   --analysis-results <str>        Log analysis results in files at specified path.
   --analysis-results-dot <str>    Log analysis results in .dot form at specified path.
+  --boogie-procedure-rg <str>     Switch version of procedure rely/guarantee checks to emit.
+                                  (function|ifblock)
   --boogie-use-lambda-stores      Use lambda representation of store operations.
   --dump-il <str>                 Dump the Intermediate Language to text.
   -h --help                       Show this help message.
@@ -65,8 +75,14 @@ BASIL
                                   (defaults to Int.MaxValue)
   -r --relf <str>                 Name of the file containing the output of 'readelf -s -r -W'.
   -s --spec <str>                 BASIL specification file.
+  --summarise-procedures          Generates summaries of procedures which are used in
+                                  pre/post-conditions (requires --analyse flag)
+  -t --threads                    Separates threads into multiple .bpl files with given output
+                                  filename as prefix (requires --analyse flag)
   -v --verbose                    Show extra debugging logs.
 ```
+
+For more information see [docs/usage](docs/usage.md).
 
 ## Introduction
 
@@ -82,8 +98,13 @@ See [docs/development](docs/development)
 2. Install [boogie](/docs/development/tool-installation.md)
 3. To a single system test case :
 
+Mac OS X / Linux: 
 ```
-./mill test.testOnly '*SystemTests*' -- -z secret_write -z secret_write 
+./mill test.testOnly 'SystemTestsBAP' -- -z correct/secret_write/clang:BAP
+```
+Windows:
+```
+./mill.bat test.testOnly 'SystemTestsBAP' -- -z correct/secret_write/clang:BAP
 ```
 
 ## Open Source License

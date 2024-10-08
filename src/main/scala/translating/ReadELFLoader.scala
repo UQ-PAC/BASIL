@@ -6,27 +6,75 @@ import util.ILLoadingConfig
 
 import scala.jdk.CollectionConverters.*
 
+/**
+ * https://refspecs.linuxfoundation.org/elf/elf.pdf
+ */
+
+enum ELFSymType:
+  case NOTYPE /* absolute symbol or similar */
+  case SECTION /* memory section */
+  case FILE
+  case OBJECT
+  case FUNC /* code function */
+  case TLS /* ??? */
+
+
+enum ELFBind:
+  case LOCAL  /* local to the translation unit */
+  case GLOBAL /* global to the program */
+  case WEAK  /* multiple versions of symbol may be exposed to the linker, and the last definition is used. */
+
+enum ELFVis:
+  case HIDDEN
+  case DEFAULT
+  case PROTECTED
+
+enum ELFNDX:
+  case Section(num: Int) /* Section containing the symbol */
+  case UND /* Undefined */
+  case ABS /* Absolute, unaffected by relocation */
+
+case class ELFSymbol(num: Int,  /* symbol number */
+  value: BigInt, /* symbol address */
+  size: Int,  /* symbol size (bytes) */
+  etype: ELFSymType,
+  bind: ELFBind,
+  vis: ELFVis,
+  ndx: ELFNDX, /* The section containing the symbol */
+  name: String)
+
 object ReadELFLoader {
-  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], Int) = {
-    val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableExtFunc(r)).toSet
-    val relocationOffsets = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableOffsets(r)).toMap
-    val symbolTableEntries = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toSet
-    val globalVariables: Set[SpecGlobal] = symbolTableEntries.filter(_.isInstanceOf[SpecGlobal]).map(_.asInstanceOf[SpecGlobal])
-    val functionEntries: Set[FuncEntry] = symbolTableEntries.filter(_.isInstanceOf[FuncEntry]).map(_.asInstanceOf[FuncEntry])
+  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
+    val externalFunctions = ctx.relocationTable.asScala.filter(_.relocationTableHeader != null).flatMap(r => visitRelocationTableExtFunc(r)).toSet
+    val relocationOffsets = ctx.relocationTable.asScala.filter(_.relocationTableHeader != null).flatMap(r => visitRelocationTableOffsets(r)).toMap
     val mainAddress = ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, config.mainProcedureName))
+
+    val symbolTable = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toList
+    val globalVariables = symbolTable.collect {
+      case ELFSymbol(_, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name) if ndx != ELFNDX.UND => SpecGlobal(name, size * 8, None, value)
+    }.toSet
+
+    val functionEntries = symbolTable.collect {
+      case ELFSymbol(_, value, size, ELFSymType.FUNC, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name) if ndx != ELFNDX.UND => FuncEntry(name, size * 8, value)
+    }.toSet
+
     if (mainAddress.isEmpty) {
       throw Exception(s"no ${config.mainProcedureName} function in symbol table")
     }
-    (externalFunctions, globalVariables, functionEntries, relocationOffsets, mainAddress.head)
+    (symbolTable, externalFunctions, globalVariables, functionEntries, relocationOffsets, mainAddress.head)
   }
 
   def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {
-    val sectionName = ctx.relocationTableHeader.tableName.STRING.getText
-    if (sectionName == ".rela.plt" || sectionName == ".rela.dyn") {
-      val rows = ctx.relocationTableRow.asScala
-      rows.filter(r => r.name != null).map(r => visitRelocationTableRowExtFunc(r)).toSet
-    } else {
+    if (ctx.relocationTableHeader == null) {
       Set()
+    } else {
+      val sectionName = ctx.relocationTableHeader.tableName.STRING.getText
+      if (sectionName == ".rela.plt" || sectionName == ".rela.dyn") {
+        val rows = ctx.relocationTableRow.asScala
+        rows.filter(r => r.name != null).map(r => visitRelocationTableRowExtFunc(r)).toSet
+      } else {
+        Set()
+      }
     }
   }
 
@@ -51,25 +99,24 @@ object ReadELFLoader {
     }
   }
 
-  def visitSymbolTable(ctx: SymbolTableContext): Set[SymbolTableEntry] = {
+  def visitSymbolTable(ctx: SymbolTableContext): List[ELFSymbol] = {
     if (ctx.symbolTableHeader.tableName.STRING.getText == ".symtab") {
-      val rows = ctx.symbolTableRow.asScala
-      rows.flatMap(r => visitSymbolTableRow(r)).toSet
+      ctx.symbolTableRow.asScala.map(getSymbolTableRow).toList
     } else {
-      Set()
+      List()
     }
   }
 
-  def getFunctionAddress(ctx: SymsContext, functionName: String): Option[Int] = {
+  def getFunctionAddress(ctx: SymsContext, functionName: String): Option[BigInt] = {
     ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, functionName)).headOption
   }
 
-  private def getFunctionAddress(ctx: SymbolTableContext, functionName: String): Option[Int] = {
+  private def getFunctionAddress(ctx: SymbolTableContext, functionName: String): Option[BigInt] = {
     if (ctx.symbolTableHeader.tableName.STRING.getText == ".symtab") {
       val rows = ctx.symbolTableRow.asScala
       val mainAddress = rows.collectFirst {
         case r if r.entrytype.getText == "FUNC" && r.bind.getText == "GLOBAL" && r.name.getText == functionName =>
-          Integer.parseInt(r.value.getText, 16)
+          hexToBigInt(r.value.getText)
       }
       mainAddress
     } else {
@@ -77,20 +124,25 @@ object ReadELFLoader {
     }
   }
 
-  def visitSymbolTableRow(ctx: SymbolTableRowContext): Option[SymbolTableEntry] = {
-    if ((ctx.entrytype.getText == "OBJECT" || ctx.entrytype.getText == "FUNC") && ctx.bind.getText == "GLOBAL" && ctx.vis.getText == "DEFAULT") {
-      val name = ctx.name.getText
-      if (name.forall(allowedChars.contains)) {
-        ctx.entrytype.getText match
-          case "OBJECT" => Some(SpecGlobal(name, ctx.size.getText.toInt * 8, None, hexToBigInt(ctx.value.getText)))
-          case "FUNC" => Some(FuncEntry(name, ctx.size.getText.toInt * 8, hexToBigInt(ctx.value.getText)))
-          case _ => None
-      } else {
-        None
-      }
-    } else {
-      None
+  def getSymbolTableRow(ctx: SymbolTableRowContext): ELFSymbol = {
+    val bind = ELFBind.valueOf(ctx.bind.getText)
+    val etype = ELFSymType.valueOf(ctx.entrytype.getText)
+    val size = ctx.size.getText.toInt
+    val name = ctx.name match {
+      case null => ""
+      case x => x.getText
     }
+    val value = BigInt(ctx.value.getText, 16)
+    val num = ctx.num.getText.toInt
+    val vis = ELFVis.valueOf(ctx.vis.getText)
+
+    val ndx = ctx.ndx.getText match {
+      case "ABS" => ELFNDX.ABS
+      case "UND" => ELFNDX.UND
+      case o => ELFNDX.Section(o.toInt)
+    }
+
+    ELFSymbol(num, value, size, etype, bind, vis, ndx, name)
   }
 
   def hexToBigInt(hex: String): BigInt = BigInt(hex, 16)

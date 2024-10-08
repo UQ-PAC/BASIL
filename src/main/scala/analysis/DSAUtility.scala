@@ -2,7 +2,7 @@ package analysis
 
 import analysis.solvers.{DSAUniTerm, DSAUnionFindSolver, UnionFindSolver, Var}
 import cfg_visualiser.{DotStruct, DotStructElement, StructArrow, StructDotGraph}
-import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, Memory, MemoryAssign, MemoryLoad, Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, begin, computeDomain, toShortString}
+import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, IntraProcIRCursor, Literal, Memory, MemoryAssign, MemoryLoad, Procedure, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend, IRWalk, computeDomain, toShortString}
 import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
 import util.Logger
 
@@ -626,11 +626,11 @@ class DSG(val proc: Procedure,
   // formal arguments to this function
   val formals: mutable.Map[Variable, Slice] = mutable.Map()
 
-  //  mapping from each SSA variable (position, variable) to a slice
+  // mapping from each SSA variable (position, variable) to a slice
   val varToCell: mutable.Map[CFGPosition, mutable.Map[Variable, Slice]] = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(mutable.Map[CFGPosition, mutable.Map[Variable, Slice]]()) {
     (m, pos) =>
       pos match
-        case Assign(variable, value , label) =>
+        case Assign(variable, value, _) =>
           value.variables.foreach(
             v =>
               if isFormal(pos, v) then
@@ -641,11 +641,11 @@ class DSG(val proc: Procedure,
           )
           val node = DSN(Some(this))
           m +=(pos -> mutable.Map(variable -> Slice(node.cells(0), 0)))
-        case DirectCall(proc, target, label) if proc.name == "malloc" =>
+        case DirectCall(target, _) if target.name == "malloc" =>
           val node = DSN(Some(this))
            m += (pos -> mutable.Map(mallocRegister -> Slice(node.cells(0), 0)))
-        case DirectCall(proc, target, label) if writesTo.contains(proc) =>
-          val result: Map[Variable, Slice] = writesTo(proc).foldLeft(Map[Variable, Slice]()){
+        case DirectCall(target, _) if writesTo.contains(target) =>
+          val result: Map[Variable, Slice] = writesTo(target).foldLeft(Map[Variable, Slice]()){
             (n, variable) =>
               val node = DSN(Some(this))
               n + (variable -> Slice(node.cells(0), 0))
@@ -878,8 +878,8 @@ class DSN(val graph: Option[DSG], var size: BigInt = 0, val id: Int =  NodeCount
         case (variable: Variable, slice: Slice) =>
           if from.find(slice).node.equals(this) then
             to.varToCell.update(
-              begin(from.proc),
-              to.varToCell.getOrElseUpdate(begin(from.proc),
+              from.proc,
+              to.varToCell.getOrElseUpdate(from.proc,
                 mutable.Map[Variable, Slice]()) ++ Map(variable -> from.find(slice))
             )
       }

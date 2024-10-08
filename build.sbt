@@ -44,57 +44,9 @@ lazy val updateExpectedBAP = taskKey[Unit]("updates .expected for BAP test cases
 updateExpectedBAP := {
   val correctPath = baseDirectory.value / "src" / "test" / "correct"
   val incorrectPath = baseDirectory.value / "src" / "test" / "incorrect"
-
-  def expectedUpdate(path: File, shouldVerify: Boolean): Unit = {
-    val log = streams.value.log
-    val examples = (path * "*") filter { _.isDirectory }
-    for (e <- examples.get()) {
-      val variations = (e * "*") filter { _.isDirectory }
-      for (v <- variations.get()) {
-        val name = e.getName
-        val outPath = v / (name + "_bap.bpl")
-        val expectedPath = v / (name + ".expected")
-        val resultPath = v / (name + "_bap_result.txt")
-        if (resultPath.exists()) {
-          val result = IO.read(resultPath)
-          val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
-          if (verified == shouldVerify) {
-            if (outPath.exists() && !(expectedPath.exists() && filesContentEqual(outPath, expectedPath))) {
-              IO.copyFile(outPath, expectedPath)
-            }
-          }
-        }
-      }
-    }
-  }
-
-  def filesContentEqual(path1: File, path2: File): Boolean = {
-    val source1 = Source.fromFile(path1)
-    val source2 = Source.fromFile(path2)
-    val lines1 = source1.getLines
-    val lines2 = source2.getLines
-    while (lines1.hasNext && lines2.hasNext) {
-      val line1 = lines1.next()
-      val line2 = lines2.next()
-      if (line1 != line2) {
-        source1.close
-        source2.close
-        return false
-      }
-    }
-    if (lines1.hasNext || lines2.hasNext) {
-      source1.close
-      source2.close
-      return false
-    }
-
-    source1.close
-    source2.close
-    true
-  }
-
-  expectedUpdate(correctPath, true)
-  expectedUpdate(incorrectPath, false)
+  val log = streams.value.log
+  expectedUpdate(correctPath, true, true)
+  expectedUpdate(incorrectPath, false, true)
 }
 
 lazy val updateExpectedGTIRB = taskKey[Unit]("updates .expected for GTIRB test cases")
@@ -103,54 +55,81 @@ updateExpectedGTIRB := {
   val correctPath = baseDirectory.value / "src" / "test" / "correct"
   val incorrectPath = baseDirectory.value / "src" / "test" / "incorrect"
 
-  def expectedUpdate(path: File, shouldVerify: Boolean): Unit = {
-    val log = streams.value.log
-    val examples = (path * "*") filter { _.isDirectory }
-    for (e <- examples.get()) {
-      val variations = (e * "*") filter { _.isDirectory }
-      for (v <- variations.get()) {
-        val name = e.getName
-        val outPath = v / (name + "_gtirb.bpl")
-        val expectedPath = v / (name + "_gtirb.expected")
-        val resultPath = v / (name + "_gtirb_result.txt")
-        if (resultPath.exists()) {
-          val result = IO.read(resultPath)
-          val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
-          if (verified == shouldVerify) {
-            if (outPath.exists() && !(expectedPath.exists() && filesContentEqual(outPath, expectedPath))) {
-              IO.copyFile(outPath, expectedPath)
-            }
+  val log = streams.value.log
+  expectedUpdate(correctPath, true, false)
+  expectedUpdate(incorrectPath, false, false)
+}
+
+lazy val updateExpectedExtraSpec = taskKey[Unit]("updates .expected for ExtraSpec test cases")
+
+updateExpectedExtraSpec := {
+  val correctPath = baseDirectory.value / "src" / "test" / "extraspec_correct"
+  val incorrectPath = baseDirectory.value / "src" / "test" / "extraspec_incorrect"
+
+  val log = streams.value.log
+  expectedUpdate(correctPath, true, true)
+  expectedUpdate(incorrectPath, false, true)
+  expectedUpdate(correctPath, true, false)
+  expectedUpdate(incorrectPath, false, false)
+}
+
+def expectedUpdate(path: File, shouldVerify: Boolean, BAPVariant: Boolean): Unit = {
+  val examples = (path * "*") filter {
+    _.isDirectory
+  }
+  for (e <- examples.get()) {
+    val variations = (e * "*") filter {
+      _.isDirectory
+    }
+    for (v <- variations.get()) {
+      val name = e.getName
+      val suffix = if (BAPVariant) {
+        "_bap"
+      } else {
+        "_gtirb"
+      }
+      val expectedSuffix = if (BAPVariant) {
+        ""
+      } else {
+        "_gtirb"
+      }
+      val outPath = v / (name + suffix + ".bpl")
+      val expectedPath = v / (name + expectedSuffix + ".expected")
+      val resultPath = v / (name + suffix + "_result.txt")
+      if (resultPath.exists()) {
+        val result = IO.read(resultPath)
+        val verified = result.strip().equals("Boogie program verifier finished with 0 errors")
+        if (verified == shouldVerify) {
+          if (outPath.exists() && !(expectedPath.exists() && filesContentEqual(outPath, expectedPath))) {
+            IO.copyFile(outPath, expectedPath)
           }
         }
       }
     }
   }
+}
 
-  def filesContentEqual(path1: File, path2: File): Boolean = {
-    val source1 = Source.fromFile(path1)
-    val source2 = Source.fromFile(path2)
-    val lines1 = source1.getLines
-    val lines2 = source2.getLines
-    while (lines1.hasNext && lines2.hasNext) {
-      val line1 = lines1.next()
-      val line2 = lines2.next()
-      if (line1 != line2) {
-        source1.close
-        source2.close
-        return false
-      }
-    }
-    if (lines1.hasNext || lines2.hasNext) {
+def filesContentEqual(path1: File, path2: File): Boolean = {
+  val source1 = Source.fromFile(path1)
+  val source2 = Source.fromFile(path2)
+  val lines1 = source1.getLines
+  val lines2 = source2.getLines
+  while (lines1.hasNext && lines2.hasNext) {
+    val line1 = lines1.next()
+    val line2 = lines2.next()
+    if (line1 != line2) {
       source1.close
       source2.close
       return false
     }
-
+  }
+  if (lines1.hasNext || lines2.hasNext) {
     source1.close
     source2.close
-    true
+    return false
   }
 
-  expectedUpdate(correctPath, true)
-  expectedUpdate(incorrectPath, false)
+  source1.close
+  source2.close
+  true
 }

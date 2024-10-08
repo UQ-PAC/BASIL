@@ -233,12 +233,12 @@ class LocalDSA(
     else
       visited.add(n)
     n match
-      case DirectCall(proc, target, label) if proc.name == "malloc" => // R0 = Malloc()
+      case DirectCall(target, _) if target.name == "malloc" => // R0 = Malloc()
         val size: BigInt = evaluateExpression(mallocRegister, constProp(n)) match
           case Some(value) => value.value
           case None => 0
         val node = DSN(Some(graph), size)
-        node.allocationRegions.add(HeapLocation(nextMallocCount, proc, size))
+        node.allocationRegions.add(HeapLocation(nextMallocCount, target, size))
         node.flags.heap = true
         graph.mergeCells(graph.varToCell(n)(mallocRegister)._1, node.cells(0))
       case call: DirectCall if params.contains(call.target) => // Rx, Ry, ... Rn = FunctionCall()

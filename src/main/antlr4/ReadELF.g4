@@ -9,7 +9,7 @@ syms : NEWLINE* relocationTable+ symbolTable+ ;
     Sym value is the addend to be added to the symbol resolution
     Sym name and addend - a pretty printing of the symbol name + addend.
 */
-relocationTable : relocationTableHeader NEWLINE relocationTableRow* NEWLINE*;
+relocationTable : (empty='There are no relocations in this file.') NEWLINE* | (relocationTableHeader NEWLINE relocationTableRow* NEWLINE*);
 relocationTableHeader :
   'Relocation section' tableName 'at offset 0x' HEX 'contains' HEX 'entries:' NEWLINE
   'Offset' 'Info' 'Type' ('Sym. Value' | 'Symbol\'s Value') ('Symbol\'s Name + Addend' | 'Sym. Name + Addend')
@@ -31,7 +31,7 @@ symbolTableHeader :
   'Symbol table' tableName 'contains' HEX 'entries:' NEWLINE
   'Num:' 'Value' 'Size' 'Type' 'Bind' 'Vis' 'Ndx' 'Name'  // Mainly a sanity check for the column order
   ;
-symbolTableRow : HEX ':' value=HEX size=HEX entrytype=STRING bind=STRING vis=STRING (HEX | STRING) name=(HEX | STRING)? STRING? NEWLINE;
+symbolTableRow : (num=HEX) ':' value=HEX size=HEX entrytype=STRING bind=STRING vis=STRING ndx=(HEX | STRING) name=(HEX | STRING)? STRING? NEWLINE;
 // symbolTableRow : HEX ':' HEX HEX symbolType bind vis ndx name? ;
 
 tableName : '\'' STRING '\'' ;

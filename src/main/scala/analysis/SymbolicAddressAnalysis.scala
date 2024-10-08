@@ -3,7 +3,7 @@ package analysis
 import analysis.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.solvers.ForwardIDESolver
 import ir.IRWalk.procedure
-import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Expr, Extract, GoTo, IndirectCall, Literal, Memory, MemoryLoad, Procedure, Program, Register, Repeat, SignExtend, UnaryExpr, Variable, ZeroExtend}
+import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, Command, DirectCall, Expr, Extract, GoTo, IndirectCall, Literal, Memory, MemoryLoad, Procedure, Program, Register, Repeat, Return, SignExtend, UnaryExpr, Variable, ZeroExtend}
 
 import java.math.BigInteger
 
@@ -72,28 +72,28 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
           case _ => Map(d -> IdEdge())
       case Right(_) => Map(d -> IdEdge())
 
-  def edgesExitToAfterCall(exit: IndirectCall, aftercall: GoTo)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
+  def edgesExitToAfterCall(exit: Return, aftercall: Command)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
     d match
       case Left(value) =>
         value.symbolicBase match
-          case StackLocation(regionIdentifier, parent, size) => Map()
+          case _: StackLocation => Map()
           case _ =>
             if value.accessor.name == "R29" then
               Map()
             else Map(d -> IdEdge())
       case Right(_) => Map(d -> IdEdge())
 
-  def edgesCallToAfterCall(call: DirectCall, aftercall: GoTo)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
+  def edgesCallToAfterCall(call: DirectCall, aftercall: Command)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
     d match
       case Left(value) =>
         value.symbolicBase match
-          case StackLocation(regionIdentifier, parent, size) => Map(d -> IdEdge())
+          case _: StackLocation => Map(d -> IdEdge())
           case _ => Map() // maps all variables before the call to bottom
       case Right(_) => Map(d -> IdEdge())
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
     n match
-      case Assign(variable, rhs, maybeString: Option[String]) =>
+      case Assign(variable, rhs, _) =>
         val expr = unwrapPaddingAndSlicing(rhs)
         expr match
           case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
@@ -137,7 +137,7 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
             d match
               case Left(value) if value.accessor == variable => Map()
               case _ => Map(d -> IdEdge())
-      case DirectCall(proc, ret, label) if proc.name == "malloc" =>
+      case DirectCall(target, _) if target.name == "malloc" =>
         d match
           case Left(value) if value.accessor == mallocVariable => Map()
           case Left(value) => Map(d -> IdEdge())
@@ -146,11 +146,11 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
               case Some(value) => value.value
               case None => -1
             Map(d -> IdEdge(), Left(SymbolicAddress(mallocVariable, HeapLocation(nextMallocCount, procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
-      case DirectCall(proc, ret, label) if proc.returnBlock.isEmpty => // for when calls are non returning, kills the stack dataflow facts
+      case DirectCall(target, _) if target.returnBlock.isEmpty => // for when calls are non returning, kills the stack dataflow facts
         d match
           case Left(value) =>
             value.symbolicBase match
-              case StackLocation(regionIdentifier, parent, size) => Map()
+              case _: StackLocation => Map()
               case _ => Map(d -> IdEdge())
           case Right(_) => Map(d -> IdEdge())
       case _ => Map(d -> IdEdge())

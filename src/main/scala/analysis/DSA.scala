@@ -1,6 +1,6 @@
 package analysis
 
-import ir.{BitVecLiteral, BitVecType, CFGPosition, CallGraph, Procedure, Program, Register, Variable, begin, computeDomain, end}
+import ir.{BitVecLiteral, BitVecType, CFGPosition, CallGraph, Procedure, Program, Register, Variable, computeDomain, IRWalk}
 import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
 
 import scala.collection.mutable
@@ -105,7 +105,7 @@ class DSA(program: Program,
                 newNode.cloneNode(calleeGraph, buGraph)
             }
 
-            calleeGraph.formals.foreach{
+            calleeGraph.formals.foreach {
               case (variable: Variable, slice: Slice) if !ignoreRegisters.contains(variable)  =>
                 assert(callSite.paramCells.contains(variable))
                 val node = calleeGraph.find(slice).node
@@ -117,7 +117,7 @@ class DSA(program: Program,
             writesTo(callee).foreach(
               reg =>
                 assert(callSite.returnCells.contains(reg))
-                val returnCells = calleeGraph.getCells(end(callee), reg).map(calleeGraph.find)
+                val returnCells = calleeGraph.getCells(IRWalk.lastInProc(callee).get, reg).map(calleeGraph.find)
                 assert(returnCells.nonEmpty)
                 returnCells.foreach{
                   case slice: Slice =>
@@ -135,7 +135,7 @@ class DSA(program: Program,
                   field.node.getCell(field.offset + offset))
             }
 
-            buGraph.varToCell.getOrElse(begin(callee), Map.empty).foreach{
+            buGraph.varToCell.getOrElse(callee, Map.empty).foreach{
               case (variable: Variable, formal) if !ignoreRegisters.contains(variable)  =>
                 val test = buGraph.mergeCells(buGraph.adjust(formal), buGraph.adjust(callSite.paramCells(variable)))
                 test
@@ -143,7 +143,7 @@ class DSA(program: Program,
             }
             writesTo(callee).foreach(
               reg =>
-                val returnCells = buGraph.getCells(end(callee), reg)
+                val returnCells = buGraph.getCells(IRWalk.lastInProc(callee).get, reg)
                 //              assert(returnCells.nonEmpty)
                 val result: DSC = returnCells.foldLeft(buGraph.adjust(callSite.returnCells(reg))){
                   //
@@ -217,7 +217,7 @@ class DSA(program: Program,
           calleesGraph.varToCell.getOrElse(callSite.call, Map.empty).foreach{
             case (variable: Variable, oldSlice: Slice) =>
               val slice = callersGraph.find(oldSlice)
-              val returnCells = calleesGraph.getCells(end(callee), variable)
+              val returnCells = calleesGraph.getCells(IRWalk.lastInProc(callee).get, variable)
               returnCells.foldLeft(calleesGraph.adjust(slice)){
                 case (c: DSC, retCell: Slice) =>
                   calleesGraph.mergeCells(c, calleesGraph.adjust(retCell))

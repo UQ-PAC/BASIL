@@ -1,7 +1,7 @@
 package analysis
 
 import analysis.solvers.SimpleWorklistFixpointSolver
-import ir.{Assert, Assume, Block, CFGPosition, Call, DirectCall, GoTo, IndirectCall, Jump, Assign, MemoryAssign, NOP, Procedure, Program, Statement, Variable}
+import ir.{Assert, Assume, Block, CFGPosition, Call, DirectCall, GoTo, IndirectCall, Jump, Assign, MemoryAssign, NOP, Procedure, Program, Statement, Variable, Return, Unreachable}
 
 abstract class LivenessAnalysis(program: Program) extends Analysis[Any]:
   val lattice: MapLattice[CFGPosition, Set[Variable], PowersetLattice[Variable]] = MapLattice(PowersetLattice())
@@ -15,9 +15,11 @@ abstract class LivenessAnalysis(program: Program) extends Analysis[Any]:
       case MemoryAssign(_, index, value, _, _, _) => s ++ index.variables ++ value.variables
       case Assume(expr, _, _, _) => s ++ expr.variables
       case Assert(expr, _, _) => s ++ expr.variables
-      case IndirectCall(variable, _, _) => s + variable
+      case IndirectCall(variable, _) => s + variable
       case c: DirectCall => s
       case g: GoTo => s
+      case r: Return => s
+      case r: Unreachable => s
       case _ => ???
     }
   }
