@@ -1,6 +1,7 @@
 package analysis
 import ir.*
 import util.Logger
+import ir.eval.BitVectorEval
 
 /** Evaluate an expression in a hope of finding a global variable.
   *
@@ -12,63 +13,14 @@ import util.Logger
   *   The evaluated expression (e.g. 0x69632)
   */
 def evaluateExpression(exp: Expr, constantPropResult: Map[Variable, FlatElement[BitVecLiteral]]): Option[BitVecLiteral] = {
-  Logger.debug(s"evaluateExpression: $exp")
-  exp match {
-    case binOp: BinaryExpr =>
-      val lhs = evaluateExpression(binOp.arg1, constantPropResult)
-      val rhs = evaluateExpression(binOp.arg2, constantPropResult)
-
-      (lhs, rhs) match {
-        case (Some(l: BitVecLiteral), Some(r: BitVecLiteral)) =>
-          val result = binOp.op match {
-            case BVADD => BitVectorEval.smt_bvadd(l, r)
-            case BVSUB => BitVectorEval.smt_bvsub(l, r)
-            case BVMUL => BitVectorEval.smt_bvmul(l, r)
-            case BVUDIV => BitVectorEval.smt_bvudiv(l, r)
-            case BVSDIV => BitVectorEval.smt_bvsdiv(l, r)
-            case BVSREM => BitVectorEval.smt_bvsrem(l, r)
-            case BVUREM => BitVectorEval.smt_bvurem(l, r)
-            case BVSMOD => BitVectorEval.smt_bvsmod(l, r)
-            case BVAND => BitVectorEval.smt_bvand(l, r)
-            case BVOR => BitVectorEval.smt_bvxor(l, r)
-            case BVXOR => BitVectorEval.smt_bvxor(l, r)
-            case BVNAND => BitVectorEval.smt_bvnand(l, r)
-            case BVNOR => BitVectorEval.smt_bvnor(l, r)
-            case BVXNOR => BitVectorEval.smt_bvxnor(l, r)
-            case BVSHL => BitVectorEval.smt_bvshl(l, r)
-            case BVLSHR => BitVectorEval.smt_bvlshr(l, r)
-            case BVASHR => BitVectorEval.smt_bvashr(l, r)
-            case BVCOMP => BitVectorEval.smt_bvcomp(l, r)
-            case BVCONCAT => BitVectorEval.smt_concat(l, r)
-            case x => throw RuntimeException("Binary operation support not implemented: " + binOp.op)
-          }
-          Some(result)
-        case _ => None
-      }
-    case extend: ZeroExtend =>
-      evaluateExpression(extend.body, constantPropResult) match {
-        case Some(b: BitVecLiteral) => Some(BitVectorEval.smt_zero_extend(extend.extension, b))
-        case None                => None
-      }
-    case extend: SignExtend =>
-      evaluateExpression(extend.body, constantPropResult) match {
-        case Some(b: BitVecLiteral) => Some(BitVectorEval.smt_sign_extend(extend.extension, b))
-        case None => None
-      }
-    case e: Extract =>
-      evaluateExpression(e.body, constantPropResult) match {
-        case Some(b: BitVecLiteral) => Some(BitVectorEval.boogie_extract(e.end, e.start, b))
-        case None               => None
-      }
-    case variable: Variable =>
-      constantPropResult(variable) match {
+  def value(v: Variable) = constantPropResult(v) match {
         case FlatEl(value) => Some(value)
-        case Top           => None
-        case Bottom        => None
-      }
-    case b: BitVecLiteral => Some(b)
-    case _ => //throw new RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
-      None
+        case _             => None
+  }
+
+  ir.eval.evalBVExpr(exp, value) match {
+    case Right(v) => Some(v)
+    case Left(_) => None
   }
 }
 

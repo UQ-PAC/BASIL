@@ -132,11 +132,11 @@ object ReadELFLoader {
     val num = ctx.num.getText.toInt
     val vis = ELFVis.valueOf(ctx.vis.getText)
 
-    val ndx = ctx.ndx.getText match {
+    val ndx = (ctx.ndx.getText match {
       case "ABS" => ELFNDX.ABS
       case "UND" => ELFNDX.UND
       case o => ELFNDX.Section(o.toInt)
-    }
+    })
 
     ELFSymbol(num, value, size, etype, bind, vis, ndx, name)
   }

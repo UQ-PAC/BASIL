@@ -5,6 +5,7 @@ import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
 import spray.json.*
+import ir.eval
 import gtirb.*
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
@@ -316,6 +317,8 @@ object StaticAnalysis {
 
     val mergedSubroutines = subroutines ++ externalAddresses
 
+    val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
+
     Logger.debug("[!] Running ANR")
     val ANRSolver = ANRAnalysisSolver(IRProgram)
     val ANRResult = ANRSolver.analyze()
@@ -411,7 +414,6 @@ object StaticAnalysis {
     Logger.debug("[!] Running VSA")
     val vsaSolver = ValueSetAnalysisSolver(IRProgram, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
-
 
     var paramResults: Map[Procedure, Set[Variable]] = Map.empty
     var interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = Map.empty
@@ -513,8 +515,14 @@ object RunUtils {
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-after-analysis.il"))
 
     if (q.runInterpret) {
-      val interpreter = Interpreter()
-      interpreter.interpret(ctx.program)
+      val fs = eval.interpretTrace(ctx)
+      Logger.info("Interpreter Trace:\n" + fs._2.t.mkString("\n"))
+      val stopState = fs._1.nextCmd
+      if (stopState != eval.Stopped()) {
+        Logger.error(s"Interpreter exited with $stopState")
+      } else {
+        Logger.info("Interpreter stopped normally.")
+      }
     }
 
     IRTransform.prepareForTranslation(q.loading, ctx)

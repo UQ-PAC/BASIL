@@ -12,6 +12,7 @@ To get started on development, see [development](development).
     - [editor-setup](development/editor-setup.md) Guide to basil development in IDEs 
     - [tool-installation](development/tool-installation.md) Guide to lifter, etc. tool installation
     - [cfg](development/cfg.md) Explanation of the old CFG datastructure 
+    - [interpreter](development/interpreter.md) Explanation of IR interpreter
 - [basil-ir](basil-ir.md) explanation of BASIL's intermediate representation
 - [compiler-explorer](compiler-explorer.md) guide to the compiler explorer basil interface
 - [il-cfg](il-cfg.md) explanation of the IL cfg iterator design

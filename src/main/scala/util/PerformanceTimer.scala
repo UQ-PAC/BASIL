@@ -15,7 +15,7 @@ case class PerformanceTimer(timerName: String = "") {
       Logger.debug(s"PerformanceTimer $timerName [$name]: ${delta}ms")
       delta
   }
-  private def elapsed() :  Long = {
+  def elapsed() :  Long = {
       System.currentTimeMillis() - lastCheckpoint
   }
 

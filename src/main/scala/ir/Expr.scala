@@ -1,5 +1,6 @@
 package ir
 
+
 import boogie._
 import scala.collection.mutable
 
@@ -28,18 +29,22 @@ sealed trait Literal extends Expr {
   override def acceptVisit(visitor: Visitor): Literal = visitor.visitLiteral(this)
 }
 
-sealed trait BoolLit extends Literal
+sealed trait BoolLit extends Literal {
+  def value: Boolean
+}
 
 case object TrueLiteral extends BoolLit {
   override def toBoogie: BoolBLiteral = TrueBLiteral
   override def getType: IRType = BoolType
   override def toString: String = "true"
+  override def value = true
 }
 
 case object FalseLiteral extends BoolLit {
   override def toBoogie: BoolBLiteral = FalseBLiteral
   override def getType: IRType = BoolType
   override def toString: String = "false"
+  override def value = false
 }
 
 case class BitVecLiteral(value: BigInt, size: Int) extends Literal {

@@ -1,7 +1,7 @@
 package analysis
 
 import ir._
-import analysis.BitVectorEval
+import ir.eval.BitVectorEval
 import util.Logger
 
 /** Basic lattice

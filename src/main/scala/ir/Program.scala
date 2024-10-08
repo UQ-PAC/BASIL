@@ -3,9 +3,9 @@ package ir
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
-import analysis.BitVectorEval
 import util.intrusive_list.*
 import translating.serialiseIL
+import eval.BitVectorEval
 
 class Program(var procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
@@ -17,6 +17,7 @@ class Program(var procedures: ArrayBuffer[Procedure],
   override def toString(): String = {
     serialiseIL(this)
   }
+
 
   def setModifies(specModifies: Map[String, List[String]]): Unit = {
     val procToCalls: mutable.Map[Procedure, Set[Procedure]] = mutable.Map()
