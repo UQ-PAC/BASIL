@@ -522,7 +522,7 @@ object RunUtils {
     transforms.DynamicSingleAssignment.applyTransform(ctx.program)
 
     config.foreach(_.analysisDotPath.foreach { s =>
-      writeToFile(dotBlockGraph(ctx.program, ctx.program.mainProcedure.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-dsa.dot")
+      writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-dsa.dot")
     })
     writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
 
@@ -531,7 +531,7 @@ object RunUtils {
     writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
 
     config.foreach(_.analysisDotPath.foreach { s =>
-      writeToFile(dotBlockGraph(ctx.program, ctx.program.mainProcedure.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-simp.dot")
+      writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-simp.dot")
     })
   }
 

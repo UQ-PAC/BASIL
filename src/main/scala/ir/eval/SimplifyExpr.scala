@@ -65,6 +65,8 @@ def simplifyExpr(e: Expr): Expr = {
       BinaryExpr(BVADD, BinaryExpr(BVSUB, r, l), simplifyExpr(body))
     case BinaryExpr(BVSUB, BinaryExpr(BVADD, body, l: BitVecLiteral), r: BitVecLiteral) =>
       BinaryExpr(BVADD, BinaryExpr(BVSUB, r, l), simplifyExpr(body))
+    case BinaryExpr(BVSUB, BinaryExpr(BVSUB, body, l: BitVecLiteral), r: BitVecLiteral) =>
+      BinaryExpr(BVSUB, simplifyExpr(body), BinaryExpr(BVADD, l, r))
     case BinaryExpr(BVADD, BinaryExpr(BVADD, body, l: BitVecLiteral), r: BitVecLiteral) =>
       BinaryExpr(BVADD, BinaryExpr(BVADD, l, r), simplifyExpr(body))
     case BinaryExpr(BVMUL, BinaryExpr(BVMUL, body, l: BitVecLiteral), r: BitVecLiteral) =>
