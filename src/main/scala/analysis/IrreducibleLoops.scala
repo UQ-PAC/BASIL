@@ -85,6 +85,124 @@ object LoopDetector {
       .foldLeft(State())((st, eb) => (traverse_loops_dfs(st, eb, 1)._1))
   }
 
+
+  def processEdgeNonRecCase(istate: State, edge: LoopEdge, b0: Block, DFSPpos: Int): State = {
+    var st = istate
+    val from = edge.from
+    val b = edge.to
+    if (st.nodeDFSPpos(b) > 0) {
+      // Case (b)
+      // b is in DFSP(b0)
+      st = st.copy(headers = st.headers + b)
+
+      val newLoop = st.loops.get(b).getOrElse(Loop(b))
+      st.edgeStack.reverse.slice(st.nodeDFSPpos(b) - 1, st.nodeDFSPpos(b0)).foreach { pEdge => newLoop.addEdge(pEdge) }
+      newLoop.backEdges += edge
+
+      // Add loop entry edge
+      b.prevBlocks.foreach { predNode =>
+        val predEdge = LoopEdge(predNode, b)
+        if (st.nodeDFSPpos.contains(predNode)) {
+          if (st.nodeDFSPpos(predNode) > 0 && predEdge != edge) {
+            newLoop.entryEdges += predEdge
+          }
+        }
+      }
+
+      if (!st.loops.contains(b)) {
+        st = st.copy(loops = st.loops.updated(b, newLoop))
+      }
+
+      st = tag_lhead(st, b0, b)
+    } else if (!st.iloopHeaders.contains(b)) {
+      // Case (c) - do nothing
+      // b is not part of this path, and it's not a header, so we can ignore it.
+      // (in effect we add it to our path later, but we do that when we discover a new header
+      //  by looking through the instruction call stack)
+    } else {
+      var h: Block = st.iloopHeaders(b)
+      if (st.nodeDFSPpos(h) > 0) {
+        // Case (d)
+        // h is in DFSP(b0)
+        val loop = st.loops(h)
+
+        // Add current path to the existing loop (a new path in the loop is discovered)
+        // This can happen for example in the case that there is a branch in a loop, or a `continue` stmt, etc
+        st.edgeStack.reverse.slice(st.nodeDFSPpos(h) - 1, st.nodeDFSPpos(b0)).foreach(loop.addEdge)
+        b.nextBlocks.filter(n => n == h).foreach { n =>
+          val outEdge = LoopEdge(b, n)
+          loop.addEdge(outEdge)
+        }
+
+        st = tag_lhead(st, b0, h)
+      } else {
+        // Case (e)
+        // reentry (irreducible!)
+        val loop = st.loops(h)
+        loop.reducible = false
+        loop.reentries += edge
+
+        // Make outer loops irreducible if the originating node of the re-entry edge is not within those loops
+        b.nextBlocks.foreach { nextNode =>
+          val nextEdge = LoopEdge(b, nextNode)
+          var ih = nextNode
+
+          while (st.iloopHeaders.contains(ih)) {
+            ih = st.iloopHeaders(ih)
+            val thisLoop = st.loops(ih)
+            if (st.iloopHeaders.contains(from)) {
+              if (st.iloopHeaders(from) != ih) {
+                thisLoop.reducible = false
+                thisLoop.reentries += edge
+              }
+            } else {
+              // `from` must be outside the loop
+              thisLoop.reducible = false
+              thisLoop.reentries += edge
+            }
+          }
+        }
+
+        var break = false
+        while (st.iloopHeaders.contains(h) && !break) {
+          h = st.iloopHeaders(h)
+          if (st.nodeDFSPpos(h) > 0) {
+            st = tag_lhead(st, b0, h)
+            break = true
+          }
+        }
+      }
+    }
+
+    // Here the most recent edge will be originating from `b0`
+    st = st.copy(edgeStack = st.edgeStack match {
+      case h :: tl => tl
+      case Nil => Nil
+    })
+    st
+}
+
+def processEdge(edge: LoopEdge, istate: State, b0: Block, DFSPpos: Int) : State = {
+  var st = istate.copy(edgeStack = edge::istate.edgeStack)
+  val from = edge.from
+  val b = edge.to
+
+  if (!st.visitedNodes.contains(b)) {
+    // Case (a)
+    val (x,nh) = traverse_loops_dfs(st, b, DFSPpos + 1)
+    st = x
+    st = nh.foldLeft(st)((st, b) => tag_lhead(st, b0, b))
+    // Here the most recent edge will be originating from `b0`
+    st = st.copy(edgeStack = st.edgeStack match {
+      case h :: tl => tl
+      case Nil => Nil
+    }) 
+  } else {
+    st = processEdgeNonRecCase(st,edge, b0, DFSPpos)
+  }
+  st
+}
+
   /*
    * This algorithm performs a DFS on the CFG, starting from the node `h0` (the initial one passed)
    *  and tags nodes as visited as it goes. There are 5 possible pathways on visit for each node `b`:
@@ -99,124 +217,72 @@ object LoopDetector {
    *          node into the target loop, making it irreducible, so we mark it as such.
    *
    */
-  private def traverse_loops_dfs(istate: State, b0: Block, DFSPpos: Int): (State, Option[Block]) = {
-    var st = istate
+  private def traverse_loops_dfs(_istate: State, _b0: Block, _DFSPpos: Int): (State, Option[Block]) = {
 
-    st = st.copy(visitedNodes = st.visitedNodes + b0)
-    st = st.copy(nodeDFSPpos = st.nodeDFSPpos.updated(b0, DFSPpos))
+    enum Action:
+      case Before 
+      case LoopBefore
+      case LoopAfterRec
+      case After
 
-    // Process all outgoing edges from the current node
-    // IntraProcIRCursor.succ(b0).toList.sortBy(n => n.to.ed).foreach{ toNode =>
-    //  The above makes the iteration of loops deterministic. The algorithm (and transform) should be agnostic of how loops are identified
-    //      (in the sense its application should completely resolve any irreducibility), though by the nature of irreducible loops they can be
-    //      characterised in different ways
-    b0.nextBlocks.foreach { toNode =>
-      val edge = LoopEdge(b0, toNode)
-      st = st.copy(edgeStack = edge::st.edgeStack)
-      val from = edge.from
-      val b = edge.to
+    case class LocalState(istate: State, b0: Block, pos: Int, action: Action, processingEdges: List[LoopEdge])
+    val stack = mutable.Stack[LocalState]()
+    stack.push(LocalState(_istate, _b0, _DFSPpos, Action.Before, List()))
 
-      if (!st.visitedNodes.contains(b)) {
-        // Case (a)
-        val (x,y) = traverse_loops_dfs(st, b, DFSPpos + 1)
-        st = x
-        val nh: Option[Block] = y
-        st = nh.foldLeft(st)((st, b) => tag_lhead(st, b0, b))
-      } else {
-        if (st.nodeDFSPpos(b) > 0) {
-          // Case (b)
-          // b is in DFSP(b0)
-          st = st.copy(headers = st.headers + b)
+    var retval : (State, Option[Block]) = (_istate, None)
 
-          val newLoop = st.loops.get(b).getOrElse(Loop(b))
-          // TODO: is this correct with current stack
-          st.edgeStack.reverse.slice(st.nodeDFSPpos(b) - 1, st.nodeDFSPpos(b0)).foreach { pEdge => newLoop.addEdge(pEdge) }
-          newLoop.backEdges += edge
+    while (!stack.isEmpty) {
+      var sf = stack.pop()
+      var st = sf.istate
 
-          // Add loop entry edge
-          b.prevBlocks.foreach { predNode =>
-            val predEdge = LoopEdge(predNode, b)
-            if (st.nodeDFSPpos.contains(predNode)) {
-              if (st.nodeDFSPpos(predNode) > 0 && predEdge != edge) {
-                newLoop.entryEdges += predEdge
+      sf.action match {
+        case Action.Before => {
+          st = st.copy(visitedNodes = st.visitedNodes + sf.b0)
+          st = st.copy(nodeDFSPpos = st.nodeDFSPpos.updated(sf.b0, sf.pos))
+          val edgesToProcess = sf.b0.nextBlocks.map(toNode => LoopEdge(sf.b0, toNode)).toList
+          sf = sf.copy(istate = st, processingEdges = edgesToProcess, action = Action.LoopBefore)
+          stack.push(sf)
+        }
+        case Action.LoopBefore => {
+          sf.processingEdges match {
+            case edge::tl => {
+              // in for loop
+              sf = sf.copy(processingEdges = tl)
+              if (!st.visitedNodes.contains(edge.to)) {
+                // recusive case
+                st = st.copy(edgeStack = edge::st.edgeStack)
+                stack.push(sf.copy(action = Action.LoopAfterRec)) // return
+                stack.push(sf.copy(istate = st, b0 = edge.to, pos = sf.pos + 1, action=Action.Before)) // call
+              } else {
+                // nonrecursive case
+                st = processEdgeNonRecCase(st, edge, sf.b0, sf.pos)
+                sf = sf.copy(istate = st, action = Action.LoopBefore)
+                // use stack to continue iterating
+                stack.push(sf)
               }
             }
-          }
-
-          if (!st.loops.contains(b)) {
-            st = st.copy(loops = st.loops.updated(b, newLoop))
-          }
-
-          st = tag_lhead(st, b0, b)
-        } else if (!st.iloopHeaders.contains(b)) {
-          // Case (c) - do nothing
-          // b is not part of this path, and it's not a header, so we can ignore it.
-          // (in effect we add it to our path later, but we do that when we discover a new header
-          //  by looking through the instruction call stack)
-        } else {
-          var h: Block = st.iloopHeaders(b)
-          if (st.nodeDFSPpos(h) > 0) {
-            // Case (d)
-            // h is in DFSP(b0)
-            val loop = st.loops(h)
-
-            // Add current path to the existing loop (a new path in the loop is discovered)
-            // This can happen for example in the case that there is a branch in a loop, or a `continue` stmt, etc
-            st.edgeStack.reverse.slice(st.nodeDFSPpos(h) - 1, st.nodeDFSPpos(b0)).foreach(loop.addEdge)
-            b.nextBlocks.filter(n => n == h).foreach { n =>
-              val outEdge = LoopEdge(b, n)
-              loop.addEdge(outEdge)
-            }
-
-            st = tag_lhead(st, b0, h)
-          } else {
-            // Case (e)
-            // reentry (irreducible!)
-            val loop = st.loops(h)
-            loop.reducible = false
-            loop.reentries += edge
-
-            // Make outer loops irreducible if the originating node of the re-entry edge is not within those loops
-            b.nextBlocks.foreach { nextNode =>
-              val nextEdge = LoopEdge(b, nextNode)
-              var ih = nextNode
-
-              while (st.iloopHeaders.contains(ih)) {
-                ih = st.iloopHeaders(ih)
-                val thisLoop = st.loops(ih)
-                if (st.iloopHeaders.contains(from)) {
-                  if (st.iloopHeaders(from) != ih) {
-                    thisLoop.reducible = false
-                    thisLoop.reentries += edge
-                  }
-                } else {
-                  // `from` must be outside the loop
-                  thisLoop.reducible = false
-                  thisLoop.reentries += edge
-                }
-              }
-            }
-
-            var break = false
-            while (st.iloopHeaders.contains(h) && !break) {
-              h = st.iloopHeaders(h)
-              if (st.nodeDFSPpos(h) > 0) {
-                st = tag_lhead(st, b0, h)
-                break = true
-              }
+            case Nil => {
+              // loop over
+              sf = sf.copy(action = Action.After)
+              stack.push(sf)
             }
           }
         }
+        case Action.LoopAfterRec => {
+          val (nst, newhead) = retval
+          st = nst
+          st = newhead.foldLeft(st)((st, b) => tag_lhead(st, sf.b0, b))
+          sf = sf.copy(action=Action.LoopBefore, istate = st) // continue iteration
+          stack.push(sf)
+        }
+        case Action.After => {
+          st = st.copy(nodeDFSPpos = st.nodeDFSPpos.updated(sf.b0, 0))
+          retval = (st, st.iloopHeaders.get(sf.b0))
+        }
       }
-      // Here the most recent edge will be originating from `b0`
-      st = st.copy(edgeStack = st.edgeStack match {
-        case h :: tl => tl
-        case Nil => Nil
-      })
-
     }
-    st = st.copy(nodeDFSPpos = st.nodeDFSPpos.updated(b0, 0))
-    (st, st.iloopHeaders.get(b0))
+
+    retval
   }
 
   /** Sets the most inner loop header `h` for a given node `b`
