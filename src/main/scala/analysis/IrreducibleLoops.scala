@@ -2,6 +2,7 @@ package analysis
 
 import scala.annotation.tailrec
 import ir.{Block, Command, IntraProcIRCursor, Program, Procedure, GoTo, IRWalk}
+import ir.{Assign, Assume, IntLiteral, IntType, IntEQ, BoolOR, LocalVar, BinaryExpr}
 import util.intrusive_list.IntrusiveList
 import util.Logger
 
@@ -355,6 +356,28 @@ object LoopTransform {
       predNodes.map(a => LoopEdge(a, e.to))
     } -- P_e // N back edges
     val body: Set[LoopEdge] = loop.edges.toSet -- P_b // Regular control flow in the loop
+
+    // Add bookeeping to preserve control flow precision across the introduced N block
+    // WARNING: We are not careful to avoid repeatedly adding these statements to the IR, so
+    // re-running this transform following a transform producing irreducible control flow over the
+    // same entry blocks will produce invalid/unreachable code
+    val entrys = P_e.map(_.from).toSet
+    val entryids = entrys.zip(0 until entrys.size).toMap
+
+    for ((block, id) <- entryids) {
+      block.statements.prepend(Assign(LocalVar("FromEntryIdx", IntType), IntLiteral(BigInt(id))))
+    }
+
+    P_e.groupBy(_.to).map((destBlock,origins) => {
+      val idexs = origins.map(b => BinaryExpr(IntEQ,LocalVar("FromEntryIdx", IntType), IntLiteral(BigInt(entryids(b.from)))))
+      idexs.toList match {
+        case Nil => ()
+        case h::tl => {
+          val cond = tl.foldLeft(h)((l, r) => BinaryExpr(BoolOR, l, r))
+          destBlock.statements.prepend(Assume(cond))
+        }
+      }
+    })
 
     // 3. Create block `N` and redirect every edge from set `P` to `H` via `N`
     val conns = P_e.map(e => e.to).union(P_b.map(e => e.to)).collect { case blk: Block => blk }
