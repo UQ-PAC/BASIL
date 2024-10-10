@@ -7,7 +7,7 @@ import boogie.Scope
 import ir.dsl._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.BeforeAndAfter
-import specification.SpecGlobal
+import boogie.SpecGlobal
 import translating.BAPToIR
 import util.{LogLevel, Logger}
 import util.IRLoading.{loadBAP, loadReadELF}

@@ -166,7 +166,8 @@ trait MemoryRegionAnalysis(val program: Program,
       // we cannot evaluate this to a concrete value, we need VSA for this
       case _ =>
         Logger.debug(s"type: ${exp.getClass} $exp\n")
-        throw new Exception("Unknown type")
+        Set()
+        // throw new Exception("Unknown type")
     }
   }
 

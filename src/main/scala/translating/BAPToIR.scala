@@ -4,8 +4,10 @@ import bap.*
 import boogie.UnaryBExpr
 import ir.{UnaryExpr, BinaryExpr, *}
 import specification.*
+import ir.cilvisitor.*
 
 import scala.collection.mutable
+import scala.collection.immutable
 import scala.collection.mutable.Map
 import scala.collection.mutable.ArrayBuffer
 import util.intrusive_list.*
@@ -28,12 +30,11 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
         }
         labelToBlock.addOne(b.label, block)
       }
-      for (p <- s.in) {
-        procedure.in.append(p.toIR)
-      }
-      for (p <- s.out) {
-        procedure.out.append(p.toIR)
-      }
+      procedure.formalInParam = mutable.SortedSet.from(s.in.map(_.toIR))
+      procedure.formalOutParam = mutable.SortedSet.from(s.out.filterNot(_.name.endsWith("_result")).map(_.toIR))
+      procedure.inParamDefaultBinding = immutable.SortedMap.from(s.in.map(s => s.toIR -> s.paramRegisterRVal))
+      procedure.outParamDefaultBinding = immutable.SortedMap.from(s.out.filterNot(_.name.endsWith("_result")).map(s => s.toIR -> s.paramRegisterLVal))
+
       if (s.address.get == mainAddress) {
         mainProcedure = Some(procedure)
       }
@@ -68,7 +69,24 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
       memorySections.append(MemorySection(m.name, m.address, m.size, bytes))
     }
 
-    Program(procedures, mainProcedure.get, memorySections, ArrayBuffer())
+    class FixCallParams(subroutines: immutable.Map[String, BAPSubroutine]) extends CILVisitor {
+      override def vstmt(st: Statement) = st match {
+        case d: DirectCall => {
+          if (subroutines.contains(d.target.name)) {
+            val s = subroutines(d.target.name)
+            ChangeTo(List(DirectCall(d.target, d.label, 
+              d.target.outParamDefaultBinding,
+              d.target.inParamDefaultBinding)))
+          }  else {
+            SkipChildren()
+          }
+        }
+        case _ => SkipChildren()
+      }
+    }
+
+    var prog = Program(procedures, mainProcedure.get, memorySections, ArrayBuffer())
+    visit_prog(FixCallParams(program.subroutines.map(s => s.name -> s).toMap), prog)
   }
 
   private def translate(s: BAPStatement) = s match {
@@ -135,7 +153,7 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
     } else {
       jumps.head match {
         case b: BAPDirectCall =>
-          val call = Some(DirectCall(nameToProcedure(b.target),Some(b.line)))
+          val call = Some(DirectCall(nameToProcedure(b.target), Some(b.line)))
           val ft = (b.returnTarget.map(t => labelToBlock(t))).map(x => GoTo(Set(x))).getOrElse(Unreachable())
           (call, ft, ArrayBuffer())
         case b: BAPIndirectCall =>
