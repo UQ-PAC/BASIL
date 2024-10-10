@@ -316,12 +316,10 @@ object StaticAnalysis {
     Logger.debug(subroutines)
 
     // reducible loops
-    val detector = LoopDetector(IRProgram)
-    val foundLoops = detector.identify_loops()
-    foundLoops.foreach(l => Logger.debug(s"Loop found: ${l.name}"))
+    val foundLoops = LoopDetector.identify_loops(IRProgram)
+    foundLoops.identifiedLoops.foreach(l => Logger.debug(s"Loop found: ${l.name}"))
 
-    val transformer = LoopTransform(foundLoops)
-    val newLoops = transformer.llvm_transform()
+    val newLoops = foundLoops.reducibleTransformIR().identifiedLoops
     newLoops.foreach(l => Logger.debug(s"Loop found: ${l.name}"))
 
     config.analysisDotPath.foreach { s =>
