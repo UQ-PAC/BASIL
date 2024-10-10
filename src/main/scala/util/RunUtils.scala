@@ -417,20 +417,8 @@ object StaticAnalysis {
     val vsaSolver = ValueSetAnalysisSolver(IRProgram, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
-
-    var paramResults: Map[Procedure, Set[Variable]] = Map.empty
-    var interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = Map.empty
-
-    if (IRProgram.mainProcedure.blocks.nonEmpty && IRProgram.mainProcedure.returnBlock.isDefined && IRProgram.mainProcedure.entryBlock.isDefined) {
-      Logger.debug("[!] Running Interprocedural Live Variables Analysis")
-      interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
-
-      Logger.debug("[!] Running Parameter Analysis")
-      paramResults = ParamAnalysis(IRProgram).analyze()
-
-    } else {
-      Logger.warn(s"Disabling IDE solver tests due to external main procedure: ${IRProgram.mainProcedure.name}")
-    }
+    val paramResults: Map[Procedure, Set[Variable]] = ParamAnalysis(IRProgram).analyze()
+    val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
 
     StaticAnalysisContext(
       constPropResult = constPropResult,
@@ -598,18 +586,14 @@ object RunUtils {
       }), s"${s}_saa.dot")
     )
 
-    Logger.debug("[!] Running Parameter Analysis")
-    val paramResults = ParamAnalysis(ctx.program).analyze()
-
     Logger.debug("[!] Running DSA Analysis")
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
-    val dsa = DSA(ctx.program, symResults, analysisResult.last.IRconstPropResult, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, paramResults)
+    val dsa = DSA(ctx.program, symResults, analysisResult.last.IRconstPropResult, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults)
     dsa.analyze()
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     Logger.debug(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last.copy(
-      paramResults = paramResults,
       SymbolicAddressess = symResults,
       locals = Some(dsa.locals.toMap),
       bus = Some(dsa.bu.toMap),
