@@ -87,22 +87,21 @@ object LoopDetector {
   }
 
 
-  private def processEdgeNonRecCase(istate: State, edge: LoopEdge, b0: Block, DFSPpos: Int): State = {
+  private def processVisitedNodeOutgoingEdge(istate: State, edge: LoopEdge, DFSPpos: Int): State = {
     var st = istate
     val from = edge.from
-    val b = edge.to
-    if (st.nodeDFSPpos(b) > 0) {
+    if (st.nodeDFSPpos(edge.to) > 0) {
       // Case (b)
-      // b is in DFSP(b0)
-      st = st.copy(headers = st.headers + b)
+      // b is in DFSP(edge.from)
+      st = st.copy(headers = st.headers + edge.to)
 
-      val newLoop = st.loops.get(b).getOrElse(Loop(b))
-      st.edgeStack.reverse.slice(st.nodeDFSPpos(b) - 1, st.nodeDFSPpos(b0)).foreach { pEdge => newLoop.addEdge(pEdge) }
+      val newLoop = st.loops.get(edge.to).getOrElse(Loop(edge.to))
+      st.edgeStack.reverse.slice(st.nodeDFSPpos(edge.to) - 1, st.nodeDFSPpos(edge.from)).foreach { pEdge => newLoop.addEdge(pEdge) }
       newLoop.backEdges += edge
 
       // Add loop entry edge
-      b.prevBlocks.foreach { predNode =>
-        val predEdge = LoopEdge(predNode, b)
+      edge.to.prevBlocks.foreach { predNode =>
+        val predEdge = LoopEdge(predNode, edge.to)
         if (st.nodeDFSPpos.contains(predNode)) {
           if (st.nodeDFSPpos(predNode) > 0 && predEdge != edge) {
             newLoop.entryEdges += predEdge
@@ -110,32 +109,32 @@ object LoopDetector {
         }
       }
 
-      if (!st.loops.contains(b)) {
-        st = st.copy(loops = st.loops.updated(b, newLoop))
+      if (!st.loops.contains(edge.to)) {
+        st = st.copy(loops = st.loops.updated(edge.to, newLoop))
       }
 
-      st = tag_lhead(st, b0, b)
-    } else if (!st.iloopHeaders.contains(b)) {
+      st = tag_lhead(st, edge.from, edge.to)
+    } else if (!st.iloopHeaders.contains(edge.to)) {
       // Case (c) - do nothing
-      // b is not part of this path, and it's not a header, so we can ignore it.
+      // edge.to is not part of this path, and it's not a header, so we can ignore it.
       // (in effect we add it to our path later, but we do that when we discover a new header
       //  by looking through the instruction call stack)
     } else {
-      var h: Block = st.iloopHeaders(b)
+      var h: Block = st.iloopHeaders(edge.to)
       if (st.nodeDFSPpos(h) > 0) {
         // Case (d)
-        // h is in DFSP(b0)
+        // h is in DFSP(edge.from)
         val loop = st.loops(h)
 
         // Add current path to the existing loop (a new path in the loop is discovered)
         // This can happen for example in the case that there is a branch in a loop, or a `continue` stmt, etc
-        st.edgeStack.reverse.slice(st.nodeDFSPpos(h) - 1, st.nodeDFSPpos(b0)).foreach(loop.addEdge)
-        b.nextBlocks.filter(n => n == h).foreach { n =>
-          val outEdge = LoopEdge(b, n)
+        st.edgeStack.reverse.slice(st.nodeDFSPpos(h) - 1, st.nodeDFSPpos(edge.from)).foreach(loop.addEdge)
+        edge.to.nextBlocks.filter(n => n == h).foreach { n =>
+          val outEdge = LoopEdge(edge.to, n)
           loop.addEdge(outEdge)
         }
 
-        st = tag_lhead(st, b0, h)
+        st = tag_lhead(st, edge.from, h)
       } else {
         // Case (e)
         // reentry (irreducible!)
@@ -144,8 +143,8 @@ object LoopDetector {
         loop.reentries += edge
 
         // Make outer loops irreducible if the originating node of the re-entry edge is not within those loops
-        b.nextBlocks.foreach { nextNode =>
-          val nextEdge = LoopEdge(b, nextNode)
+        edge.to.nextBlocks.foreach { nextNode =>
+          val nextEdge = LoopEdge(edge.to, nextNode)
           var ih = nextNode
 
           while (st.iloopHeaders.contains(ih)) {
@@ -168,14 +167,14 @@ object LoopDetector {
         while (st.iloopHeaders.contains(h) && !break) {
           h = st.iloopHeaders(h)
           if (st.nodeDFSPpos(h) > 0) {
-            st = tag_lhead(st, b0, h)
+            st = tag_lhead(st, edge.from, h)
             break = true
           }
         }
       }
     }
 
-    // Here the most recent edge will be originating from `b0`
+    // Here the most recent edge will be originating from `edge.from`
     st = st.copy(edgeStack = st.edgeStack match {
       case h :: tl => tl
       case Nil => Nil
@@ -200,15 +199,38 @@ object LoopDetector {
    */
   private def traverse_loops_dfs(_istate: State, _b0: Block, _DFSPpos: Int): (State, Option[Block]) = {
 
+    /**
+     * The recursion is flattened using a state machine operating over the stack of operations
+     * to perform
+     *
+     *      +--> BeginProcessNode <--+     Start DFS on node: push ContinueDFS with node's successors
+     *      |           |            |
+     *      |           |       succ not visited 
+     *      |           |    (push self & successor)
+     *      |           v            |
+     *      |       ContinueDFS -----+     if not previously visited, traverse to successors (a),
+     *      |           |            |     otherwise process this edge (b-e) then continue procesing edges.
+     *      |      succ visited      |
+     *  siblings        |       no successors           (siblings = processingEdges) 
+     *      |           V            |
+     *      +---- ProcesVisitedNode  |      we have returned after processing successor edges
+     *                  |            |
+     *              no siblings      |
+     *                  |            |
+     *                  v            |
+     *          FinishProcessNode <--+     all outgoing edges have been processed, finish this node
+     *
+     *
+     */
     enum Action:
-      case Before 
-      case LoopBefore
-      case LoopAfterRec
-      case After
+      case BeginProcessNode 
+      case ContinueDFS
+      case ProcessVisitedNode
+      case FinishProcessNode 
 
     case class LocalState(istate: State, b0: Block, pos: Int, action: Action, processingEdges: List[LoopEdge])
     val stack = mutable.Stack[LocalState]()
-    stack.push(LocalState(_istate, _b0, _DFSPpos, Action.Before, List()))
+    stack.push(LocalState(_istate, _b0, _DFSPpos, Action.BeginProcessNode, List()))
 
     var retval : (State, Option[Block]) = (_istate, None)
 
@@ -217,46 +239,45 @@ object LoopDetector {
       var st = sf.istate
 
       sf.action match {
-        case Action.Before => {
+        case Action.BeginProcessNode => {
           st = st.copy(visitedNodes = st.visitedNodes + sf.b0)
           st = st.copy(nodeDFSPpos = st.nodeDFSPpos.updated(sf.b0, sf.pos))
           val edgesToProcess = sf.b0.nextBlocks.map(toNode => LoopEdge(sf.b0, toNode)).toList
-          sf = sf.copy(istate = st, processingEdges = edgesToProcess, action = Action.LoopBefore)
+          sf = sf.copy(istate = st, processingEdges = edgesToProcess, action = Action.ContinueDFS)
           stack.push(sf)
         }
-        case Action.LoopBefore => {
+        case Action.ContinueDFS => {
           sf.processingEdges match {
             case edge::tl => {
-              // in for loop
               sf = sf.copy(processingEdges = tl)
+
               if (!st.visitedNodes.contains(edge.to)) {
-                // recusive case
+                // (a) not visited before: BeginProcessNode on this successor
                 st = st.copy(edgeStack = edge::st.edgeStack)
-                stack.push(sf.copy(action = Action.LoopAfterRec)) // return
-                stack.push(sf.copy(istate = st, b0 = edge.to, pos = sf.pos + 1, action=Action.Before)) // call
+                stack.push(sf.copy(action = Action.ProcessVisitedNode)) // continue after processing this successor
+                stack.push(sf.copy(istate = st, b0 = edge.to, pos = sf.pos + 1, action=Action.BeginProcessNode)) // process this successor 
               } else {
-                // nonrecursive case
-                st = processEdgeNonRecCase(st, edge, sf.b0, sf.pos)
-                sf = sf.copy(istate = st, action = Action.LoopBefore)
-                // use stack to continue iterating
-                stack.push(sf)
+                // (b-e) visited before: finish processing this edge
+                st = processVisitedNodeOutgoingEdge(st, edge, sf.pos)
+                // continue iterating `processingEdges`
+                stack.push(sf.copy(istate = st, action = Action.ContinueDFS))
               }
             }
             case Nil => {
               // loop over
-              sf = sf.copy(action = Action.After)
+              sf = sf.copy(action = Action.FinishProcessNode)
               stack.push(sf)
             }
           }
         }
-        case Action.LoopAfterRec => {
+        case Action.ProcessVisitedNode => {
           val (nst, newhead) = retval
           st = nst
           st = newhead.foldLeft(st)((st, b) => tag_lhead(st, sf.b0, b))
-          sf = sf.copy(action=Action.LoopBefore, istate = st) // continue iteration
+          sf = sf.copy(action=Action.ContinueDFS, istate = st) // continue iteration
           stack.push(sf)
         }
-        case Action.After => {
+        case Action.FinishProcessNode => {
           st = st.copy(nodeDFSPpos = st.nodeDFSPpos.updated(sf.b0, 0))
           retval = (st, st.iloopHeaders.get(sf.b0))
         }
