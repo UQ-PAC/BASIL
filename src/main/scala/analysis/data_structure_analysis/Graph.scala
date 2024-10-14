@@ -239,7 +239,7 @@ class Graph(val proc: Procedure,
     }
 
     formals.keys.foreach { variable =>
-      structs.append(DotStruct(s"Formal_$variable", s"Formal_$variable", None))
+      structs.append(DotStruct(s"Formal_${variable.name}", s"Formal_${variable.name}", None))
     }
 
     pointsto.foreach { (cell, pointee) =>
@@ -254,7 +254,11 @@ class Graph(val proc: Procedure,
     }
 
     varToCell.foreach { (pos, mapping) =>
-      var id = pos.toShortString
+      var id = pos match {
+        case p: Procedure => p.name
+        case b: Block => b.label
+        case c: Command => c.label.getOrElse("")
+      }
       if (id.startsWith("%")) {
         id = id.drop(1)
       }
