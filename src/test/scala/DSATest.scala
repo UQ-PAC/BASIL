@@ -88,7 +88,7 @@ class DSATest extends AnyFunSuite {
     assert(dsg.adjust(stack24.getPointee).equals(stack24)) // 00000466, R31 + 32 and R31 + 24 pointees are merged
 
     // __stack_chk_guard's pointee is also pointed to by stack40
-    assert(dsg.find(dsg.adjust(stack40.getPointee)).equals(dsg.find(dsg.adjust(dsg.find(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69600))._1.cells(0).getPointee)).getPointee))))
+    assert(dsg.find(dsg.adjust(stack40.getPointee)).equals(dsg.find(dsg.adjust(dsg.find(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69600)).node.cells(0).getPointee)).getPointee))))
 
   }
 
@@ -97,21 +97,21 @@ class DSATest extends AnyFunSuite {
     // global mappings
 
     // __libc_csu_init relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124)).node.cells(0))))
     // __lib_csu_fini relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268)).node.cells(0))))
     // jumptable relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0))))
     // add_two relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36)).node.cells(0))))
     // add_six relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36)).node.cells(0))))
     // sub_seven relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36)).node.cells(0))))
     // main relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76)).node.cells(0))))
     // x relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0))))
   }
 
   test("local jumptable2 callees") {
@@ -144,7 +144,7 @@ class DSATest extends AnyFunSuite {
         // all three load value of x
         // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
         // arbitrary pointer is used in arithmetic causing collapse
-        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.get.collapsed)
+        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652)).node.cells(0)).getPointee).node.get.collapsed)
     )
 
   }
@@ -180,7 +180,7 @@ class DSATest extends AnyFunSuite {
     assertJumptable2Globals(dsg)
 
     // x should not be collapsed in the main function's local graph
-    assert(!dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)).getPointee.node.collapsed)
+    assert(!dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
 
 
   }
@@ -313,7 +313,7 @@ class DSATest extends AnyFunSuite {
     val mem = SharedMemory("mem", 64, 8)
     val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
     val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
-    var program = prog(
+    val program = prog(
       proc("main",
         block("operations",
           locAssign1, // R6 = R0 + 4
@@ -352,7 +352,7 @@ class DSATest extends AnyFunSuite {
     val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
     val locAssign3 = Assign(R5, BinaryExpr(BVADD, R7,  BitVecLiteral(8, 64)), Some("00005"))
 
-    var program = prog(
+    val program = prog(
       proc("main",
         block("operations",
           locAssign1, // R6 = R0 + 4
@@ -379,7 +379,7 @@ class DSATest extends AnyFunSuite {
     val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
     val locAssign3 = Assign(R5, BinaryExpr(BVADD, R7, BitVecLiteral(7, 64)), Some("00005"))
 
-    var program = prog(
+    val program = prog(
       proc("main",
         block("operations",
           locAssign1,
@@ -411,7 +411,7 @@ class DSATest extends AnyFunSuite {
     val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
     val locAssign3 = Assign(R5, R7, Some("00005"))
 
-    var program = prog(
+    val program = prog(
       proc("main",
         block("operations",
           //          Assign(R0, MemoryLoad(mem, R0, BigEndian, 0), Some("00000")),
@@ -464,7 +464,7 @@ class DSATest extends AnyFunSuite {
         // all three load value of x
         // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
         // arbitrary pointer is used in arithmetic causing collapse
-        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.get.collapsed)
+        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652)).node.cells(0)).getPointee).node.get.collapsed)
     )
 
   }
@@ -503,7 +503,7 @@ class DSATest extends AnyFunSuite {
     assertJumptable2Globals(dsg)
 
     // bu x now should be collapsed since it was collapsed in callees
-    assert(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)).getPointee.node.collapsed)
+    assert(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
 
   }
 
@@ -609,18 +609,18 @@ class DSATest extends AnyFunSuite {
 
 
     // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24))._1.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36))._1.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8))._1.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0))))
 
     // bu
-    assert(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4))._1.cells(0)).getPointee.node.collapsed)
+    assert(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
 
   }
 
@@ -653,7 +653,7 @@ class DSATest extends AnyFunSuite {
         // all three load value of x
         // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
         // arbitrary pointer is used in arithmetic causing collapse
-        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652))._1.cells(0)).getPointee).node.get.collapsed)
+        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652)).node.cells(0)).getPointee).node.get.collapsed)
     )
 
   }
