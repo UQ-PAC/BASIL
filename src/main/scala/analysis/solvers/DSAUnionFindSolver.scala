@@ -1,7 +1,6 @@
 package analysis.solvers
 
-import analysis.DSN
-
+import analysis.data_structure_analysis.Node
 import scala.collection.mutable
 
 class DSAUnionFindSolver extends UnionFindSolver[UniTerm] {
@@ -55,7 +54,7 @@ sealed trait UniTerm
 
 /** A term variable in the solver
  */
-case class DSAUniTerm(node: DSN) extends Var[UniTerm] {
+case class DSAUniTerm(node: Node) extends Var[UniTerm] {
 
   override def toString: String = s"Term{$node}"
 }

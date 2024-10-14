@@ -1,6 +1,7 @@
-package analysis
+package analysis.data_structure_analysis
 
-import ir.{BitVecLiteral, BitVecType, CFGPosition, CallGraph, Procedure, Program, Register, Variable, computeDomain, IRWalk}
+import analysis.*
+import ir.*
 import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
 
 import scala.collection.mutable
@@ -19,19 +20,20 @@ import scala.collection.mutable
  * @param writesTo mapping from procedures to registers they change
  * @param params mapping from procedures to their parameters
  */
-class DSA(program: Program,
-            symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
-            constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-            globals: Set[SymbolTableEntry], globalOffsets: Map[BigInt, BigInt],
-            externalFunctions: Set[ExternalFunction],
-            reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
-            writesTo: Map[Procedure, Set[Register]],
-            params: Map[Procedure, Set[Variable]]
-         ) extends Analysis[Map[Procedure, DSG]] {
+class DataStructureAnalysis(program: Program,
+                            symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
+                            constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                            globals: Set[SymbolTableEntry],
+                            globalOffsets: Map[BigInt, BigInt],
+                            externalFunctions: Set[ExternalFunction],
+                            reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
+                            writesTo: Map[Procedure, Set[Register]],
+                            params: Map[Procedure, Set[Variable]]
+         ) extends Analysis[Map[Procedure, Graph]] {
 
-  val locals: mutable.Map[Procedure, DSG] = mutable.Map()
-  val bu: mutable.Map[Procedure, DSG] = mutable.Map()
-  val td: mutable.Map[Procedure, DSG] = mutable.Map()
+  val local: mutable.Map[Procedure, Graph] = mutable.Map()
+  val bottomUp: mutable.Map[Procedure, Graph] = mutable.Map()
+  val topDown: mutable.Map[Procedure, Graph] = mutable.Map()
 
   private val stackPointer = Register("R31", 64)
   private val returnPointer = Register("R30", 64)
@@ -51,7 +53,7 @@ class DSA(program: Program,
   private var visited = Set[Procedure]()
   private val queue = mutable.Queue[Procedure]()
 
-  override def analyze(): Map[Procedure, DSG] = {
+  override def analyze(): Map[Procedure, Graph] = {
     var domain: Set[Procedure] = Set(program.mainProcedure)
     val stack: mutable.Stack[Procedure] = mutable.Stack()
     stack.pushAll(program.mainProcedure.calls)
@@ -65,16 +67,16 @@ class DSA(program: Program,
 
     // perform local analysis on all procs
     domain.foreach { proc =>
-      val dsg = LocalDSA(proc, symResults, constProp, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params).analyze()
+      val dsg = LocalPhase(proc, symResults, constProp, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params).analyze()
 
-      locals.update(proc, dsg)
-      bu.update(proc, dsg.cloneSelf())
+      local.update(proc, dsg)
+      bottomUp.update(proc, dsg.cloneSelf())
     }
 
     val leafNodes = findLeaf(program.mainProcedure)
 
     leafNodes.foreach { proc =>
-      assert(locals(proc).callsites.isEmpty)
+      assert(local(proc).callsites.isEmpty)
       visited += proc
       //val preds: Set[Procedure] = CallGraph.pred(proc)
       queue.enqueueAll(CallGraph.pred(proc).diff(visited).intersect(domain))
@@ -83,15 +85,15 @@ class DSA(program: Program,
     // bottom up phase
     while queue.nonEmpty do
       var proc = queue.dequeue()
-      while !locals.contains(proc) && queue.nonEmpty do proc = queue.dequeue()
+      while !local.contains(proc) && queue.nonEmpty do proc = queue.dequeue()
       visited += proc
-      if locals.contains(proc) then
+      if local.contains(proc) then
         queue.enqueueAll(CallGraph.pred(proc).diff(visited))
-        val buGraph = bu(proc)
+        val buGraph = bottomUp(proc)
 
         buGraph.callsites.foreach { callSite =>
           val callee = callSite.proc
-          val calleeGraph = locals(callee) //.cloneSelf()
+          val calleeGraph = local(callee) //.cloneSelf()
           assert(buGraph.globalMapping.keySet.equals(calleeGraph.globalMapping.keySet))
           assert(calleeGraph.formals.keySet.diff(ignoreRegisters).equals(callSite.paramCells.keySet))
           calleeGraph.globalMapping.values.foreach { field =>
@@ -120,7 +122,7 @@ class DSA(program: Program,
 
           //          assert(calleeGraph.formals.isEmpty || buGraph.varToCell(begin(callee)).equals(calleeGraph.formals))
           calleeGraph.globalMapping.foreach {
-            case (range: AddressRange, Field(node: DSN, offset: BigInt)) =>
+            case (range: AddressRange, Field(node: Node, offset: BigInt)) =>
               val field = calleeGraph.find(node)
               buGraph.mergeCells(
                 buGraph.globalMapping(range).node.getCell(buGraph.globalMapping(range).offset),
@@ -149,7 +151,7 @@ class DSA(program: Program,
     // bottom up phase finished
     // clone bu graphs to top-down graphs
     domain.foreach { proc =>
-      td.update(proc, bu(proc).cloneSelf())
+      topDown.update(proc, bottomUp(proc).cloneSelf())
     }
 
     queue.enqueue(program.mainProcedure)
@@ -160,10 +162,10 @@ class DSA(program: Program,
       val proc = queue.dequeue()
       visited += proc
       queue.enqueueAll(CallGraph.succ(proc).diff(visited))
-      val callersGraph = td(proc)
+      val callersGraph = topDown(proc)
       callersGraph.callsites.foreach { callSite =>
         val callee = callSite.proc
-        val calleesGraph = td(callee)
+        val calleesGraph = topDown(callee)
         assert(callersGraph.globalMapping.keySet.equals(calleesGraph.globalMapping.keySet))
 
         callersGraph.globalMapping.values.foreach { field =>
@@ -210,7 +212,7 @@ class DSA(program: Program,
       }
       callersGraph.collectNodes()
     }
-    td.toMap
+    topDown.toMap
 
   }
 }

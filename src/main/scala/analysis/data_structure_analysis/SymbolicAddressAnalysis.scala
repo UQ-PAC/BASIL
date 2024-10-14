@@ -1,9 +1,9 @@
-package analysis
+package analysis.data_structure_analysis
 
 import analysis.BitVectorEval.{bv2SignedInt, isNegative}
 import analysis.solvers.ForwardIDESolver
-import ir.IRWalk.procedure
-import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, Command, DirectCall, Expr, Extract, GoTo, IndirectCall, Literal, Memory, MemoryLoad, Procedure, Program, Register, Repeat, Return, SignExtend, UnaryExpr, Variable, ZeroExtend}
+import analysis.*
+import ir.*
 
 import java.math.BigInteger
 
@@ -59,7 +59,7 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
 
   val valuelattice: TwoElementLattice = TwoElementLattice()
   val edgelattice: EdgeFunctionLattice[TwoElement, TwoElementLattice] = EdgeFunctionLattice(valuelattice)
-  import edgelattice.{IdEdge, ConstEdge}
+  import edgelattice.{ConstEdge, IdEdge}
 
   def edgesCallToEntry(call: DirectCall, entry: Procedure)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
     d match
@@ -101,7 +101,8 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
                     case Left(_) => Map(d -> IdEdge())
                     case Right(_) =>
                       val size = bv2SignedInt(v)
-                      Map(d -> IdEdge(), Left(SymbolicAddress(variable, StackLocation(s"Stack_${procedure(n).name}", procedure(n), -size), 0)) -> ConstEdge(TwoElementTop))
+                      val procedure = IRWalk.procedure(n)
+                      Map(d -> IdEdge(), Left(SymbolicAddress(variable, StackLocation(s"Stack_${procedure.name}", procedure, -size), 0)) -> ConstEdge(TwoElementTop))
                 else
                   d match
                     case Left(value) if value.accessor == arg1 =>
@@ -128,7 +129,7 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
             d match
               case Left(value) if value.accessor == variable => Map()
               case Left(_) => Map(d -> IdEdge())
-              case Right(_) => Map(d -> IdEdge(), Left(SymbolicAddress(variable, UnknownLocation(nextunknownCount, procedure(n)), 0)) -> ConstEdge(TwoElementTop))
+              case Right(_) => Map(d -> IdEdge(), Left(SymbolicAddress(variable, UnknownLocation(nextunknownCount, IRWalk.procedure(n)), 0)) -> ConstEdge(TwoElementTop))
           case _ =>
             d match
               case Left(value) if value.accessor == variable => Map()
@@ -141,7 +142,7 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
             val size: BigInt = evaluateExpression(mallocVariable, constProp(n)) match
               case Some(value) => value.value
               case None => -1
-            Map(d -> IdEdge(), Left(SymbolicAddress(mallocVariable, HeapLocation(nextMallocCount, procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
+            Map(d -> IdEdge(), Left(SymbolicAddress(mallocVariable, HeapLocation(nextMallocCount, IRWalk.procedure(n), size), 0)) -> ConstEdge(TwoElementTop))
       case DirectCall(target, _) if target.returnBlock.isEmpty => // for when calls are non returning, kills the stack dataflow facts
         d match
           case Left(value) =>

@@ -1,13 +1,14 @@
-package analysis
+package analysis.data_structure_analysis
 
 import analysis.BitVectorEval.{bv2SignedInt, isNegative}
-import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, BitVecType, CFGPosition, DirectCall, Endian, Expr, Extract, IntraProcIRCursor, MemoryAssign, MemoryLoad, Procedure, Register, Variable, ZeroExtend, computeDomain, toShortString}
+import analysis.*
+import ir.*
 import specification.{ExternalFunction, SpecGlobal, SymbolTableEntry}
 import util.writeToFile
 
-import scala.util.control.Breaks.{break, breakable}
 import java.math.BigInteger
 import scala.collection.mutable
+import scala.util.control.Breaks.{break, breakable}
 
 /**
  * The local phase of Data Structure Analysis
@@ -21,16 +22,15 @@ import scala.collection.mutable
  * @param writesTo mapping from procedures to registers they change
  * @param params mapping from procedures to their parameters
  */
-class LocalDSA(
-             proc: Procedure,
-             symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
-             constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-             globals: Set[SymbolTableEntry], globalOffsets: Map[BigInt, BigInt],
-             externalFunctions: Set[ExternalFunction],
-             reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
-             writesTo: Map[Procedure, Set[Register]],
-             params: Map[Procedure, Set[Variable]]
-           ) extends Analysis[Any] {
+class LocalPhase(proc: Procedure,
+                 symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
+                 constProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                 globals: Set[SymbolTableEntry], globalOffsets: Map[BigInt, BigInt],
+                 externalFunctions: Set[ExternalFunction],
+                 reachingDefs: Map[CFGPosition, Map[Variable, Set[CFGPosition]]],
+                 writesTo: Map[Procedure, Set[Register]],
+                 params: Map[Procedure, Set[Variable]]
+                ) extends Analysis[Any] {
 
   private val mallocRegister = Register("R0", 64)
   private val stackPointer = Register("R31", 64)
@@ -60,7 +60,7 @@ class LocalDSA(
     position -> newMap
   }
 
-  private def getStack(offset: BigInt): DSC = {
+  private def getStack(offset: BigInt): Cell = {
     var last: BigInt = 0
     if graph.stackMapping.contains(offset) then
       graph.stackMapping(offset).cells(0)
@@ -79,12 +79,11 @@ class LocalDSA(
       graph.stackMapping(last).getCell(diff)
   }
 
-
   /**
    * if an expr is the address of a stack location return its corresponding cell
    * @param pos IL position where the expression is used
    */
-  private def isStack(expr: Expr, pos: CFGPosition): Option[DSC] = {
+  private def isStack(expr: Expr, pos: CFGPosition): Option[Cell] = {
     expr match
       case BinaryExpr(_, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
         varToSym(pos)(arg1).exists(s => s.symbolicBase.isInstanceOf[StackLocation]) =>
@@ -115,13 +114,13 @@ class LocalDSA(
     s"malloc_$mallocCount"
   }
 
-  val graph: DSG = DSG(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
-  
+  val graph: Graph = Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
+
   /**
    * if an expr is the address of a global location return its corresponding cell
    * @param pos IL position where the expression is used
    */
-  def isGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[DSC] = {
+  def isGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
     val value = evaluateExpression(expr, constProp(pos))
     if value.isDefined  then
       val global = graph.isGlobal(value.get.value)
@@ -152,7 +151,7 @@ class LocalDSA(
    * @param offset offset if [+ offset] is present
    * @return the cell resulting from the unification
    */
-  private def visitPointerArithmeticOperation(position: CFGPosition, lhs: DSC, rhs: Variable, size: Int, pointee: Boolean = false,  offset: BigInt = 0, collapse: Boolean = false): DSC =
+  private def visitPointerArithmeticOperation(position: CFGPosition, lhs: Cell, rhs: Variable, size: Int, pointee: Boolean = false, offset: BigInt = 0, collapse: Boolean = false): Cell =
     // visit all the defining pointer operation on rhs variable first
     reachingDefs(position)(rhs).foreach(visit)
     // get the cells of all the SSA variables in the set
@@ -203,7 +202,7 @@ class LocalDSA(
   /**
    * handles unsupported pointer arithmetic by collapsing all the nodes invloved
    */
-  private def unsupportedPointerArithmeticOperation(n: CFGPosition, expr: Expr, lhsCell: DSC): DSC = {
+  private def unsupportedPointerArithmeticOperation(n: CFGPosition, expr: Expr, lhsCell: Cell): Cell = {
     val cell = expr.variables.foldLeft(lhsCell) {
       (c, v) =>
         val cells: Set[Slice] = graph.getCells(n, v)
@@ -231,7 +230,7 @@ class LocalDSA(
         val size: BigInt = evaluateExpression(mallocRegister, constProp(n)) match
           case Some(value) => value.value
           case None => 0
-        val node = DSN(Some(graph), size)
+        val node = Node(Some(graph), size)
         node.allocationRegions.add(HeapLocation(nextMallocCount, target, size))
         node.flags.heap = true
         graph.mergeCells(graph.varToCell(n)(mallocRegister).cell, node.cells(0))
@@ -295,7 +294,7 @@ class LocalDSA(
 //                        assert(varToSym(n).contains(arg1))
                         // collapse the result
 //                        visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, 0, true)
-                        unsupportedPointerArithmeticOperation(n, index,DSN(Some(graph)).cells(0))
+                        unsupportedPointerArithmeticOperation(n, index,Node(Some(graph)).cells(0))
                   case arg: Variable =>
 //                    assert(varToSym(n).contains(arg))
                     visitPointerArithmeticOperation(n, lhsCell, arg, byteSize, true)
@@ -314,7 +313,7 @@ class LocalDSA(
             val byteSize = size / 8
             val global = isGlobal(index, n, byteSize)
             val stack = isStack(index, n)
-            val addressPointee: DSC =
+            val addressPointee: Cell =
               if global.isDefined then
                 graph.adjust(graph.find(global.get).getPointee)
               else if stack.isDefined then
@@ -326,15 +325,15 @@ class LocalDSA(
                       case Some(v) =>
                         //                    assert(varToSym(n).contains(arg1))
                         val offset = v.value
-                        visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, offset)
+                        visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg1, byteSize, true, offset)
                       case None =>
                         //                    assert(varToSym(n).contains(arg1))
                         // collapse the results
                         // visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg1, byteSize, true, 0, true)
-                        unsupportedPointerArithmeticOperation(n, index, DSN(Some(graph)).cells(0))
+                        unsupportedPointerArithmeticOperation(n, index, Node(Some(graph)).cells(0))
                   case arg: Variable =>
                     //                assert(varToSym(n).contains(arg))
-                    visitPointerArithmeticOperation(n, DSN(Some(graph)).cells(0), arg, byteSize, true)
+                    visitPointerArithmeticOperation(n, Node(Some(graph)).cells(0), arg, byteSize, true)
                   case _ =>
                     ???
 
@@ -349,7 +348,7 @@ class LocalDSA(
 
     writeToFile(graph.toDot, "test.dot")
   }
-  def analyze(): DSG = {
+  def analyze(): Graph = {
     val domain = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString)
 
     domain.foreach(visit)

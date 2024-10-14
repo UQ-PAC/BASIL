@@ -1,11 +1,12 @@
 package util
 
-import java.io.{File, PrintWriter, FileInputStream, BufferedWriter, FileWriter, IOException}
+import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
 import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
 import spray.json.*
 import gtirb.*
+
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import java.io.{File, PrintWriter}
@@ -19,11 +20,13 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.SemanticsParser.*
+import analysis.data_structure_analysis.{DataStructureAnalysis, Graph, SymbolicAddress, SymbolicAddressAnalysis}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
 import util.Logger
+
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
@@ -51,21 +54,21 @@ case class IRContext(
 /** Stores the results of the static analyses.
   */
 case class StaticAnalysisContext(
-    constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    memoryRegionResult: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]],
-    vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
-    interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
-    paramResults: Map[Procedure, Set[Variable]],
-    steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
-    mmmResults: MemoryModelMap,
-    memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
-    SymbolicAddressess: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
-    locals: Option[Map[Procedure, DSG]],
-    bus: Option[Map[Procedure, DSG]],
-    tds: Option[Map[Procedure, DSG]],
+                                  constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                                  IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                                  memoryRegionResult: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]],
+                                  vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
+                                  interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
+                                  paramResults: Map[Procedure, Set[Variable]],
+                                  steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
+                                  mmmResults: MemoryModelMap,
+                                  memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
+                                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+                                  varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
+                                  SymbolicAddressess: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
+                                  locals: Option[Map[Procedure, Graph]],
+                                  bus: Option[Map[Procedure, Graph]],
+                                  tds: Option[Map[Procedure, Graph]],
 )
 
 /** Results of the main program execution.
@@ -588,16 +591,16 @@ object RunUtils {
 
     Logger.debug("[!] Running DSA Analysis")
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
-    val dsa = DSA(ctx.program, symResults, analysisResult.last.IRconstPropResult, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults)
+    val dsa = DataStructureAnalysis(ctx.program, symResults, analysisResult.last.IRconstPropResult, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults)
     dsa.analyze()
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     Logger.debug(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last.copy(
       SymbolicAddressess = symResults,
-      locals = Some(dsa.locals.toMap),
-      bus = Some(dsa.bu.toMap),
-      tds = Some(dsa.td.toMap)
+      locals = Some(dsa.local.toMap),
+      bus = Some(dsa.bottomUp.toMap),
+      tds = Some(dsa.topDown.toMap)
     )
   }
 }

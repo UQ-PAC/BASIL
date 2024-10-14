@@ -1,5 +1,5 @@
-import analysis.{AddressRange, DSC, DSG, DSN, DataLocation, HeapLocation}
-import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Endian, Memory, MemoryAssign, MemoryLoad, Program, Register, SharedMemory, cilvisitor, transforms}
+import analysis.data_structure_analysis.*
+import ir.*
 import org.scalatest.funsuite.AnyFunSuite
 import ir.dsl.*
 import specification.Specification
@@ -17,7 +17,7 @@ import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, I
  * BASILRESULT.analysis.get.td is the set of graphs from the end of the top-down phase
  *
  */
-class DSATest extends AnyFunSuite {
+class DataStructureAnalysisTest extends AnyFunSuite {
 
   def runAnalysis(program: Program): StaticAnalysisContext = {
     cilvisitor.visit_prog(transforms.ReplaceReturns(), program)
@@ -106,7 +106,7 @@ class DSATest extends AnyFunSuite {
   */
 
   // this function asserts universal properties about global objects in Jumptable2  example
-  def assertJumptable2Globals(dsg: DSG): Unit = {
+  def assertJumptable2Globals(dsg: Graph): Unit = {
     // global mappings
 
     // jump_table relocation
@@ -262,7 +262,7 @@ class DSATest extends AnyFunSuite {
 
     val results = runAnalysis(program)
 
-    val dsg: DSG = results.locals.get(program.mainProcedure)
+    val dsg: Graph = results.locals.get(program.mainProcedure)
 
     // R6 and R7 address the same cell (overlapping cells in the same node that are merged)
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign2)(R7)).cell))
@@ -300,7 +300,7 @@ class DSATest extends AnyFunSuite {
     )
 
     val results = runAnalysis(program)
-    val dsg: DSG = results.locals.get(program.mainProcedure)
+    val dsg: Graph = results.locals.get(program.mainProcedure)
     // check that R5 points to separate cell at offset 13
     assert(dsg.find(dsg.varToCell(locAssign3)(R5)).offset == 13)
   }
@@ -327,7 +327,7 @@ class DSATest extends AnyFunSuite {
     )
 
     val results = runAnalysis(program)
-    val dsg: DSG = results.locals.get(program.mainProcedure)
+    val dsg: Graph = results.locals.get(program.mainProcedure)
     assert(dsg.find(dsg.formals(R1)).equals(dsg.find(dsg.formals(R2))))
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign2)(R7)).cell))
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign3)(R5)).cell))
@@ -361,7 +361,7 @@ class DSATest extends AnyFunSuite {
 
     val results = runAnalysis(program)
 
-    val dsg: DSG = results.locals.get(program.mainProcedure)
+    val dsg: Graph = results.locals.get(program.mainProcedure)
     assert(dsg.find(dsg.varToCell(locAssign2)(R7)).equals(dsg.find(dsg.varToCell(locAssign3)(R5))))
   }
 
