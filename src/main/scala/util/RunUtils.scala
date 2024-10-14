@@ -54,21 +54,21 @@ case class IRContext(
 /** Stores the results of the static analyses.
   */
 case class StaticAnalysisContext(
-                                  constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-                                  IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-                                  memoryRegionResult: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]],
-                                  vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
-                                  interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
-                                  paramResults: Map[Procedure, Set[Variable]],
-                                  steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
-                                  mmmResults: MemoryModelMap,
-                                  memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-                                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-                                  varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
-                                  SymbolicAddressess: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
-                                  locals: Option[Map[Procedure, Graph]],
-                                  bus: Option[Map[Procedure, Graph]],
-                                  tds: Option[Map[Procedure, Graph]],
+  constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  memoryRegionResult: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]],
+  vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
+  interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
+  paramResults: Map[Procedure, Set[Variable]],
+  steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
+  mmmResults: MemoryModelMap,
+  memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
+  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+  varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
+  SymbolicAddressess: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
+  localDSA: Map[Procedure, Graph],
+  bottomUpDSA: Map[Procedure, Graph],
+  topDownDSA: Map[Procedure, Graph]
 )
 
 /** Results of the main program execution.
@@ -436,9 +436,9 @@ object StaticAnalysis {
       SymbolicAddressess = Map.empty,
       reachingDefs = reachingDefinitionsAnalysisResults,
       varDepsSummaries = varDepsSummaries,
-      locals = None,
-      bus = None,
-      tds = None,
+      localDSA = Map.empty,
+      bottomUpDSA = Map.empty,
+      topDownDSA = Map.empty,
     )
   }
 
@@ -598,9 +598,9 @@ object RunUtils {
     Logger.debug(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last.copy(
       SymbolicAddressess = symResults,
-      locals = Some(dsa.local.toMap),
-      bus = Some(dsa.bottomUp.toMap),
-      tds = Some(dsa.topDown.toMap)
+      localDSA = dsa.local.toMap,
+      bottomUpDSA = dsa.bottomUp.toMap,
+      topDownDSA = dsa.topDown.toMap
     )
   }
 }

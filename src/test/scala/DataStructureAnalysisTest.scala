@@ -65,7 +65,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val program = results.ir.program
 
     // the dsg of the main procedure after the local phase
-    val dsg = results.analysis.get.locals.get(program.mainProcedure)
+    val dsg = results.analysis.get.localDSA(program.mainProcedure)
 
     // dsg.formals(R29) is the slice representing formal R29
     val R29formal = dsg.adjust(dsg.formals(R29))
@@ -132,7 +132,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val procs = program.nameToProcedure
 
     callees.foreach { callee =>
-      val dsg = results.analysis.get.locals.get(procs(callee))
+      val dsg = results.analysis.get.localDSA(procs(callee))
       assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
       assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
       // x should point to a collapsed object, in all 3 functions
@@ -147,7 +147,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
 
     val program = results.ir.program
-    val dsg = results.analysis.get.locals.get(program.mainProcedure)
+    val dsg = results.analysis.get.localDSA(program.mainProcedure)
     val stack0 = dsg.find(dsg.stackMapping(0).cells(0))
     val stack8 = dsg.find(dsg.stackMapping(8).cells(0))
     val stack16 = dsg.find(dsg.stackMapping(16).cells(0))
@@ -168,7 +168,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val results = runTest("src/test/dsa/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic")
 
     val program = results.ir.program
-    val dsg = results.analysis.get.locals.get(program.mainProcedure)
+    val dsg = results.analysis.get.localDSA(program.mainProcedure)
 
     // stackX is the pointee of stack object at position X instead of the stack object itself
     val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
@@ -208,7 +208,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   test("interproc pointer arithmetic main") {
     val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
-    val dsg = results.analysis.get.locals.get(program.mainProcedure)
+    val dsg = results.analysis.get.localDSA(program.mainProcedure)
     val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
@@ -231,7 +231,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   test("interproc pointer arithmetic callee") {
     val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
-    val dsg = results.analysis.get.locals.get(program.nameToProcedure("callee"))
+    val dsg = results.analysis.get.localDSA(program.nameToProcedure("callee"))
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
 
@@ -262,7 +262,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
     val results = runAnalysis(program)
 
-    val dsg: Graph = results.locals.get(program.mainProcedure)
+    val dsg: Graph = results.localDSA(program.mainProcedure)
 
     // R6 and R7 address the same cell (overlapping cells in the same node that are merged)
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign2)(R7)).cell))
@@ -300,7 +300,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     )
 
     val results = runAnalysis(program)
-    val dsg: Graph = results.locals.get(program.mainProcedure)
+    val dsg: Graph = results.localDSA(program.mainProcedure)
     // check that R5 points to separate cell at offset 13
     assert(dsg.find(dsg.varToCell(locAssign3)(R5)).offset == 13)
   }
@@ -327,7 +327,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     )
 
     val results = runAnalysis(program)
-    val dsg: Graph = results.locals.get(program.mainProcedure)
+    val dsg: Graph = results.localDSA(program.mainProcedure)
     assert(dsg.find(dsg.formals(R1)).equals(dsg.find(dsg.formals(R2))))
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign2)(R7)).cell))
     assert(dsg.find(dsg.varToCell(locAssign1)(R6)).cell.equals(dsg.find(dsg.varToCell(locAssign3)(R5)).cell))
@@ -361,7 +361,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
     val results = runAnalysis(program)
 
-    val dsg: Graph = results.locals.get(program.mainProcedure)
+    val dsg: Graph = results.localDSA(program.mainProcedure)
     assert(dsg.find(dsg.varToCell(locAssign2)(R7)).equals(dsg.find(dsg.varToCell(locAssign3)(R5))))
   }
 
@@ -377,7 +377,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val callees = Set("sub_seven", "add_two", "add_six")
     val procs = program.nameToProcedure
     callees.foreach { callee =>
-      val dsg = results.analysis.get.bus.get(procs(callee))
+      val dsg = results.analysis.get.bottomUpDSA(procs(callee))
       assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
       assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
       // x should point to a collapsed object, in all 3 functions
@@ -391,7 +391,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   test("bottom up jumptable2 main") {
     val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
     val program = results.ir.program
-    val dsg = results.analysis.get.bus.get(program.mainProcedure)
+    val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
 
     val framePointer = dsg.find(dsg.stackMapping(0).cells(0))
     val stack8 = dsg.find(dsg.stackMapping(8).cells(0))
@@ -413,7 +413,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     // same as interproc pointer arithmetic callee's local graph (no changes should have been made)
     val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
-    val dsg = results.analysis.get.bus.get(program.nameToProcedure("callee"))
+    val dsg = results.analysis.get.bottomUpDSA(program.nameToProcedure("callee"))
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
 
@@ -425,7 +425,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   test("bottom up interproc pointer arithmetic main") {
     val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
-    val dsg = results.analysis.get.bus.get(program.mainProcedure)
+    val dsg = results.analysis.get.bottomUpDSA(program.mainProcedure)
 
     val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
@@ -453,7 +453,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     // no changes should be made from previous phase
     val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
     val program = results.ir.program
-    val dsg = results.analysis.get.tds.get(program.mainProcedure)
+    val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
 //    assert(dsg.pointTo.size == 13) // 13
 
     val framePointer = dsg.find(dsg.stackMapping(0).cells(0))
@@ -479,7 +479,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     val callees = Set("sub_seven", "add_two", "add_six")
     val procs = program.nameToProcedure
     callees.foreach { callee =>
-      val dsg = results.analysis.get.tds.get(procs(callee))
+      val dsg = results.analysis.get.topDownDSA(procs(callee))
       assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
       assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
       // x should point to a collapsed object, in all 3 functions
@@ -493,7 +493,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   test("top down interproc pointer arithmetic callee") {
     val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
-    val dsg = results.analysis.get.tds.get(program.nameToProcedure("callee"))
+    val dsg = results.analysis.get.topDownDSA(program.nameToProcedure("callee"))
 
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
@@ -508,7 +508,7 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   ignore("top down interproc pointer arithmetic main") {
     val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
-    val dsg = results.analysis.get.tds.get(program.mainProcedure)
+    val dsg = results.analysis.get.topDownDSA(program.mainProcedure)
 
     val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
