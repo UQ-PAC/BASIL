@@ -591,6 +591,12 @@ object RunUtils {
     val dsa = DataStructureAnalysis(ctx.program, symResults, analysisResult.last.IRconstPropResult, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults)
     dsa.analyze()
 
+
+    config.analysisDotPath.foreach { s =>
+      dsa.topDown(ctx.program.mainProcedure).toDot
+      writeToFile(dsa.topDown(ctx.program.mainProcedure).toDot, s"${s}_main_dsg.dot")
+    }
+
     assert(invariant.singleCallBlockEnd(ctx.program))
     Logger.debug(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last.copy(

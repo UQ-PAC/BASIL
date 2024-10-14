@@ -239,7 +239,11 @@ class Graph(val proc: Procedure,
     }
 
     formals.keys.foreach { variable =>
-      structs.append(DotStruct(s"Formal_$variable", s"Formal_$variable", None))
+      var varName = variable.name
+      if (varName.startsWith("#")) {
+        varName = s"LocalVar_${varName.drop(1)}"
+      }
+      structs.append(DotStruct(s"Formal_${varName}", s"Formal_${varName}", None))
     }
 
     pointsto.foreach { (cell, pointee) =>
@@ -254,14 +258,22 @@ class Graph(val proc: Procedure,
     }
 
     varToCell.foreach { (pos, mapping) =>
-      var id = pos.toShortString
+      var id = pos match {
+        case p: Procedure => p.name
+        case b: Block => b.label
+        case c: Command => c.label.getOrElse("")
+      }
       if (id.startsWith("%")) {
         id = id.drop(1)
       }
       mapping.foreach { (variable, slice) =>
-        structs.append(DotStruct(s"SSA_${id}_${variable.name}", s"SSA_${pos}_${variable.name}", None, false))
+        var varName = variable.name
+        if (varName.startsWith("#")) {
+          varName = s"LocalVar_${varName.drop(1)}"
+        }
+        structs.append(DotStruct(s"SSA_${id}_${varName}", s"SSA_${pos}_${varName}", None, false))
         val value = find(slice)
-        arrows.append(StructArrow(DotStructElement(s"SSA_${id}_${variable.name}", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
+        arrows.append(StructArrow(DotStructElement(s"SSA_${id}_${varName}", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
       }
     }
 
