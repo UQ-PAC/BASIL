@@ -1,11 +1,12 @@
 package util
 
-import java.io.{File, PrintWriter, FileInputStream, BufferedWriter, FileWriter, IOException}
+import java.io.{BufferedWriter, File, FileInputStream, FileWriter, IOException, PrintWriter}
 import com.grammatech.gtirb.proto.IR.IR
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Section.Section
 import spray.json.*
 import gtirb.*
+
 import scala.collection.mutable.ListBuffer
 import scala.collection.mutable.ArrayBuffer
 import java.io.{File, PrintWriter}
@@ -19,11 +20,13 @@ import boogie.*
 import specification.*
 import Parsers.*
 import Parsers.SemanticsParser.*
+import analysis.data_structure_analysis.{DataStructureAnalysis, Graph, SymbolicAddress, SymbolicAddressAnalysis}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
 import org.antlr.v4.runtime.{CharStreams, CommonTokenStream, Token}
 import translating.*
 import util.Logger
+
 import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
@@ -42,6 +45,7 @@ case class IRContext(
     symbols: List[ELFSymbol],
     externalFunctions: Set[ExternalFunction],
     globals: Set[SpecGlobal],
+    funcEntries: Set[FuncEntry],
     globalOffsets: Map[BigInt, BigInt],
     specification: Specification,
     program: Program // internally mutable
@@ -50,17 +54,21 @@ case class IRContext(
 /** Stores the results of the static analyses.
   */
 case class StaticAnalysisContext(
-    constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    memoryRegionResult: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]],
-    vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
-    interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
-    paramResults: Map[Procedure, Set[Variable]],
-    steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
-    mmmResults: MemoryModelMap,
-    memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-    varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
+  constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+  memoryRegionResult: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]],
+  vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
+  interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
+  paramResults: Map[Procedure, Set[Variable]],
+  steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
+  mmmResults: MemoryModelMap,
+  memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
+  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+  varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
+  symbolicAddresses: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
+  localDSA: Map[Procedure, Graph],
+  bottomUpDSA: Map[Procedure, Graph],
+  topDownDSA: Map[Procedure, Graph]
 )
 
 /** Results of the main program execution.
@@ -74,14 +82,14 @@ object IRLoading {
   /** Create a context from just an IR program.
     */
   def load(p: Program): IRContext = {
-    IRContext(List.empty, Set.empty, Set.empty, Map.empty, IRLoading.loadSpecification(None, p, Set.empty), p)
+    IRContext(List.empty, Set.empty, Set.empty, Set.empty, Map.empty, IRLoading.loadSpecification(None, p, Set.empty), p)
   }
 
   /** Load a program from files using the provided configuration.
     */
   def load(q: ILLoadingConfig): IRContext = {
     // TODO: this tuple is large, should be a case class
-    val (symbols, externalFunctions, globals, globalOffsets, mainAddress) = IRLoading.loadReadELF(q.relfFile, q)
+    val (symbols, externalFunctions, globals, funcEntries, globalOffsets, mainAddress) = IRLoading.loadReadELF(q.relfFile, q)
 
     val program: Program = if (q.inputFile.endsWith(".adt")) {
       val bapProgram = loadBAP(q.inputFile)
@@ -95,7 +103,7 @@ object IRLoading {
 
     val specification = IRLoading.loadSpecification(q.specFile, program, globals)
 
-    IRContext(symbols, externalFunctions, globals, globalOffsets, specification, program)
+    IRContext(symbols, externalFunctions, globals, funcEntries, globalOffsets, specification, program)
   }
 
   def loadBAP(fileName: String): BAPProgram = {
@@ -153,7 +161,7 @@ object IRLoading {
   def loadReadELF(
       fileName: String,
       config: ILLoadingConfig
-  ): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], BigInt) = {
+  ): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal],  Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
     val lexer = ReadELFLexer(CharStreams.fromFileName(fileName))
     val tokens = CommonTokenStream(lexer)
     val parser = ReadELFParser(tokens)
@@ -170,7 +178,7 @@ object IRLoading {
         specParser.setBuildParseTree(true)
         val specLoader = SpecificationLoader(globals, program)
         specLoader.visitSpecification(specParser.specification())
-      case None => Specification(globals, Map(), List(), List(), List(), Set())
+      case None => Specification(Set(), globals, Map(), List(), List(), List(), Set())
     }
   }
 }
@@ -223,7 +231,7 @@ object IRTransform {
     )
     val dupProcNames = (ctx.program.procedures.groupBy(_.name).filter((n,p) => p.size > 1)).toList.flatMap(_._2)
 
-    var dupCounter = 0 
+    var dupCounter = 0
     for (p <- dupProcNames) {
       dupCounter += 1
       p.name = p.name + "$" + p.address.map(_.toString).getOrElse(dupCounter.toString)
@@ -299,7 +307,6 @@ object StaticAnalysis {
     Logger.debug("Subroutine Addresses:")
     Logger.debug(subroutines)
 
-
     // reducible loops
     val detector = LoopDetector(IRProgram)
     val foundLoops = detector.identify_loops()
@@ -345,6 +352,7 @@ object StaticAnalysis {
       writeToFile(toDot(dumpdomain, InterProcIRCursor, Map.empty), s"${f}_new_ir_intercfg$iteration.dot")
     })
 
+    Logger.debug("[!] Running Reaching Definitions Analysis")
     val reachingDefinitionsAnalysisSolver = ReachingDefinitionsAnalysisSolver(IRProgram)
     val reachingDefinitionsAnalysisResults = reachingDefinitionsAnalysisSolver.analyze()
 
@@ -412,20 +420,8 @@ object StaticAnalysis {
     val vsaSolver = ValueSetAnalysisSolver(IRProgram, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
-
-    var paramResults: Map[Procedure, Set[Variable]] = Map.empty
-    var interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = Map.empty
-
-    if (IRProgram.mainProcedure.blocks.nonEmpty && IRProgram.mainProcedure.returnBlock.isDefined && IRProgram.mainProcedure.entryBlock.isDefined) {
-      Logger.debug("[!] Running Interprocedural Live Variables Analysis")
-      interLiveVarsResults = InterLiveVarsAnalysis(IRProgram).analyze()
-
-      Logger.debug("[!] Running Parameter Analysis")
-      paramResults = ParamAnalysis(IRProgram).analyze()
-
-    } else {
-      Logger.warn(s"Disabling IDE solver tests due to external main procedure: ${IRProgram.mainProcedure.name}")
-    }
+    val paramResults: Map[Procedure, Set[Variable]] = ParamAnalysis(IRProgram).analyze()
+    val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
 
     StaticAnalysisContext(
       constPropResult = constPropResult,
@@ -437,8 +433,12 @@ object StaticAnalysis {
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,
       memoryRegionContents = memoryRegionContents,
+      symbolicAddresses = Map.empty,
       reachingDefs = reachingDefinitionsAnalysisResults,
       varDepsSummaries = varDepsSummaries,
+      localDSA = Map.empty,
+      bottomUpDSA = Map.empty,
+      topDownDSA = Map.empty,
     )
   }
 
@@ -571,9 +571,34 @@ object RunUtils {
       transforms.splitThreads(ctx.program, analysisResult.last.steensgaardResults, analysisResult.last.memoryRegionContents, analysisResult.last.reachingDefs)
     }
 
+    Logger.debug("[!] Running Writes To")
+    val writesTo = WriteToAnalysis(ctx.program).analyze()
+    val reachingDefs = ReachingDefsAnalysis(ctx.program, writesTo).analyze()
+    config.analysisDotPath.foreach { s =>
+      writeToFile(toDot(ctx.program), s"${s}_ct.dot")
+    }
+
+    Logger.debug("[!] Running Symbolic Access Analysis")
+    val symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]] =
+      SymbolicAddressAnalysis(ctx.program, analysisResult.last.IRconstPropResult).analyze()
+    config.analysisDotPath.foreach { s =>
+      val labels = symResults.map { (k, v) => k -> v.toString }
+      writeToFile(toDot(ctx.program, labels), s"${s}_saa.dot")
+    }
+
+    Logger.debug("[!] Running DSA Analysis")
+    val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
+    val dsa = DataStructureAnalysis(ctx.program, symResults, analysisResult.last.IRconstPropResult, symbolTableEntries, ctx.globalOffsets, ctx.externalFunctions, reachingDefs, writesTo, analysisResult.last.paramResults)
+    dsa.analyze()
+
     assert(invariant.singleCallBlockEnd(ctx.program))
     Logger.debug(s"[!] Finished indirect call resolution after $iteration iterations")
-    analysisResult.last
+    analysisResult.last.copy(
+      symbolicAddresses = symResults,
+      localDSA = dsa.local.toMap,
+      bottomUpDSA = dsa.bottomUp.toMap,
+      topDownDSA = dsa.topDown.toMap
+    )
   }
 }
 

@@ -199,10 +199,15 @@ abstract class IDESolver[E <: Procedure | Command, EE <: Procedure | Command, C 
       }
 
   def analyze(): Map[CFGPosition, Map[D, T]] = {
-    val phase1 = Phase1(program)
-    phase1.analyze()
-    val phase2 = Phase2(program, phase1)
-    phase2.restructure(phase2.analyze())
+    if (program.mainProcedure.blocks.nonEmpty && program.mainProcedure.returnBlock.isDefined && program.mainProcedure.entryBlock.isDefined) {
+      val phase1 = Phase1(program)
+      phase1.analyze()
+      val phase2 = Phase2(program, phase1)
+      phase2.restructure(phase2.analyze())
+    } else {
+      Logger.warn(s"Disabling IDE solver tests due to external main procedure: ${program.mainProcedure.name}")
+      Map()
+    }
   }
 }
 
@@ -244,7 +249,7 @@ abstract class ForwardIDESolver[D, T, L <: Lattice[T]](program: Program)
 
 
 abstract class BackwardIDESolver[D, T, L <: Lattice[T]](program: Program)
-  extends IDESolver[Return, Procedure, Command, DirectCall, D, T, L](program, IRWalk.lastInProc(program.mainProcedure).get),
+  extends IDESolver[Return, Procedure, Command, DirectCall, D, T, L](program, IRWalk.lastInProc(program.mainProcedure).getOrElse(program.mainProcedure)),
     BackwardIDEAnalysis[D, T, L], IRInterproceduralBackwardDependencies {
 
   protected def entryToExit(entry: Return): Procedure = IRWalk.procedure(entry)
