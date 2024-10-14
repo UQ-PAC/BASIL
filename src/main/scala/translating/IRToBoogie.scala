@@ -496,56 +496,68 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
           case None => mem
         }
-        val aligned: Int = (s.address % 8).toInt
 
-        val alignedSizeMultiple = (s.bytes.size - aligned) % 8
-        // index of the byte that marks the end of the part that is a multiple of 64-bits
-        val alignedEnd = s.bytes.size - alignedSizeMultiple
-
-        // Aligned section that is safe to convert to 64-bit values
-        val alignedSection = for (b <- aligned until alignedEnd by 8) yield {
-          // Combine the byte constants into a 64-bit value
-          val combined: BigInt =
-            (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * BigInt(2).pow(y * 8)))
-          BinaryBExpr(
+        if (s.bytes.size <= 8) {
+          // if section is less than 8 bytes, just represent it with one access
+          val combined = s.bytes.indices.foldLeft(BigInt(0))((x, y) => x + (s.bytes(y).value * BigInt(2).pow(y * 8)))
+          val bits = s.bytes.size * 8
+          Seq(BinaryBExpr(
             BVEQ,
-            BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
-            BitVecBLiteral(combined, 64)
-          )
-        }
-
-        // If memory section is somehow not aligned (is this possible?) then don't convert the initial non-aligned
-        // section to 64-bit operations, just the rest
-        val unalignedStartSection = if (aligned == 0) {
-          Seq()
+            BMemoryLoad(memory, BitVecBLiteral(s.address, 64), Endian.LittleEndian, bits),
+            BitVecBLiteral(combined, bits)
+          ))
         } else {
-          for (b <- 0 until aligned) yield {
+          val aligned: Int = (s.address % 8).toInt
+
+          val alignedSizeMultiple = (s.bytes.size - aligned) % 8
+          // index of the byte that marks the end of the part that is a multiple of 64-bits
+          val alignedEnd = s.bytes.size - alignedSizeMultiple
+
+          // Aligned section that is safe to convert to 64-bit values
+          val alignedSection = for (b <- aligned until alignedEnd by 8) yield {
+            // Combine the byte constants into a 64-bit value
+            val combined: BigInt =
+              (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * BigInt(2).pow(y * 8)))
             BinaryBExpr(
               BVEQ,
-              BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
-              s.bytes(b).toBoogie
+              BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
+              BitVecBLiteral(combined, 64)
             )
           }
-        }
 
-        // If the memory section is not a multiple of 64-bits then don't convert the last section to 64-bits
-        // This is not ideal but will do for now
-        // Ideal solution is to match the sizes based on the sizes listed in the symbol table, dividing further
-        // for values greater than 64-bit as much as possible
-        // But that requires more work
-        // Combine the byte constants into a 64-bit value
-        val unalignedEndSection = if (alignedSizeMultiple == 0) {
-          Seq()
-        } else {
-          for (b <- alignedEnd until s.bytes.size) yield {
-            BinaryBExpr(
-              BVEQ,
-              BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
-              s.bytes(b).toBoogie
-            )
+          // If memory section is somehow not aligned (is this possible?) then don't convert the initial non-aligned
+          // section to 64-bit operations, just the rest
+          val unalignedStartSection = if (aligned == 0) {
+            Seq()
+          } else {
+            for (b <- 0 until aligned) yield {
+              BinaryBExpr(
+                BVEQ,
+                BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+                s.bytes(b).toBoogie
+              )
+            }
           }
+
+          // If the memory section is not a multiple of 64-bits then don't convert the last section to 64-bits
+          // This is not ideal but will do for now
+          // Ideal solution is to match the sizes based on the sizes listed in the symbol table, dividing further
+          // for values greater than 64-bit as much as possible
+          // But that requires more work
+          // Combine the byte constants into a 64-bit value
+          val unalignedEndSection = if (alignedSizeMultiple == 0) {
+            Seq()
+          } else {
+            for (b <- alignedEnd until s.bytes.size) yield {
+              BinaryBExpr(
+                BVEQ,
+                BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+                s.bytes(b).toBoogie
+              )
+            }
+          }
+          unalignedStartSection ++ alignedSection ++ unalignedEndSection
         }
-        unalignedStartSection ++ alignedSection ++ unalignedEndSection
       }
       sections.toList
     }
