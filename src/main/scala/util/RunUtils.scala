@@ -574,20 +574,17 @@ object RunUtils {
     Logger.debug("[!] Running Writes To")
     val writesTo = WriteToAnalysis(ctx.program).analyze()
     val reachingDefs = ReachingDefsAnalysis(ctx.program, writesTo).analyze()
-    config.analysisDotPath.foreach(
-      s =>
-        writeToFile(toDot(ctx.program), s"${s}_ct.dot")
-    )
+    config.analysisDotPath.foreach { s =>
+      writeToFile(toDot(ctx.program), s"${s}_ct.dot")
+    }
 
     Logger.debug("[!] Running Symbolic Access Analysis")
     val symResults: Map[CFGPosition, Map[SymbolicAddress, TwoElement]] =
       SymbolicAddressAnalysis(ctx.program, analysisResult.last.IRconstPropResult).analyze()
-    config.analysisDotPath.foreach(s =>
-      writeToFile(toDot(ctx.program, symResults.foldLeft(Map(): Map[CFGPosition, String]) {
-        (m, t) =>
-          m + (t._1 -> t._2.toString)
-      }), s"${s}_saa.dot")
-    )
+    config.analysisDotPath.foreach { s =>
+      val labels = symResults.map { (k, v) => k -> v.toString }
+      writeToFile(toDot(ctx.program, labels), s"${s}_saa.dot")
+    }
 
     Logger.debug("[!] Running DSA Analysis")
     val symbolTableEntries: Set[SymbolTableEntry] = ctx.globals ++ ctx.funcEntries
