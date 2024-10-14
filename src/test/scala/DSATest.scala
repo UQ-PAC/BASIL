@@ -1,10 +1,9 @@
 import analysis.{AddressRange, DSC, DSG, DSN, DataLocation, HeapLocation}
-import ir.Endian.BigEndian
-import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Memory, MemoryAssign, MemoryLoad, Program, Register, SharedMemory, cilvisitor, transforms}
+import ir.{Assign, BVADD, BinaryExpr, BitVecLiteral, CFGPosition, DirectCall, Endian, Memory, MemoryAssign, MemoryLoad, Program, Register, SharedMemory, cilvisitor, transforms}
 import org.scalatest.funsuite.AnyFunSuite
 import ir.dsl.*
 import specification.Specification
-import util.{BASILConfig, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext}
+import util.{BASILConfig, BASILResult, BoogieGeneratorConfig, ILLoadingConfig, IRContext, RunUtils, StaticAnalysisConfig, StaticAnalysisContext}
 
 /**
  * This is the test suite for testing DSA functionality
@@ -30,7 +29,25 @@ class DSATest extends AnyFunSuite {
     RunUtils.staticAnalysis(StaticAnalysisConfig(), emptyContext)
   }
 
+  def runTest(path: String): BASILResult = {
+    RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = path + ".adt",
+          relfFile = path + ".relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+  }
+
   // Local DSA tests
+  /*
+  TODO - rewrite this test with a new input that is more suitable than the removed example
   test("basic pointer") {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
@@ -50,11 +67,8 @@ class DSATest extends AnyFunSuite {
     // the dsg of the main procedure after the local phase
     val dsg = results.analysis.get.locals.get(program.mainProcedure)
 
-
-
     // dsg.formals(R29) is the slice representing formal R29
     val R29formal = dsg.adjust(dsg.formals(R29))
-
 
     // cells representing the stack at various offsets
     val stack0 = dsg.find(dsg.stackMapping(0).cells(0)) // R31
@@ -65,7 +79,6 @@ class DSATest extends AnyFunSuite {
 
     assert(dsg.adjust(stack0.getPointee).equals(R29formal)) // R31 points to the frame pointer
     assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
-
 
     /*
     Position 0000044F: tmp1 := R31 + 24 // Ev(tmp1) = new Node(R31 + 24).0
@@ -81,7 +94,6 @@ class DSATest extends AnyFunSuite {
     which merges make the stack + 24 point to itself
      */
 
-
     // R31 + 32 points to R31 + 24, later set to point to heap but it should point to both (
     assert(dsg.adjust(stack32.getPointee).equals(stack24))
     assert(stack24.node.get.collapsed) // 00000497 collapses stack24 concatenation is currently unhandled, any objects referenced in an unhandled operation are collapsed
@@ -91,79 +103,48 @@ class DSATest extends AnyFunSuite {
     assert(dsg.find(dsg.adjust(stack40.getPointee)).equals(dsg.find(dsg.adjust(dsg.find(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69600)).node.cells(0).getPointee)).getPointee))))
 
   }
+  */
 
   // this function asserts universal properties about global objects in Jumptable2  example
-  def assertJumptable2Globals(dsg: DSG) : Unit = {
+  def assertJumptable2Globals(dsg: DSG): Unit = {
     // global mappings
 
-    // __libc_csu_init relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124)).node.cells(0))))
-    // __lib_csu_fini relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268)).node.cells(0))))
-    // jumptable relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0))))
+    // jump_table relocation
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69624 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0))))
     // add_two relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1940, 1940 + 36)).node.cells(0))))
     // add_six relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1976, 1976 + 36)).node.cells(0))))
     // sub_seven relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2012, 2012 + 36)).node.cells(0))))
     // main relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69608 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2048, 2048 + 76)).node.cells(0))))
     // x relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69592, 69592 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0))))
   }
 
   test("local jumptable2 callees") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
-
+    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
 
     val program = results.ir.program
-    // test that all three calles have the same local graph
+    // test that all three callees have the same local graph
     val callees = Set("sub_seven", "add_two", "add_six")
     val procs = program.nameToProcedure
 
-    callees.foreach(
-      callee =>
-        val dsg = results.analysis.get.locals.get(procs(callee))
-        assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
-        assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
-        // x should point to a collapsed object, in all 3 functions
-        // all three load value of x
-        // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
-        // arbitrary pointer is used in arithmetic causing collapse
-        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652)).node.cells(0)).getPointee).node.get.collapsed)
-    )
-
+    callees.foreach { callee =>
+      val dsg = results.analysis.get.locals.get(procs(callee))
+      assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
+      assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
+      // x should point to a collapsed object, in all 3 functions
+      // all three load value of x
+      // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
+      // arbitrary pointer is used in arithmetic causing collapse
+      assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee).node.get.collapsed)
+    }
   }
 
   test("local jumptable2 main") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
-
+    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
 
     val program = results.ir.program
     val dsg = results.analysis.get.locals.get(program.mainProcedure)
@@ -181,25 +162,10 @@ class DSATest extends AnyFunSuite {
 
     // x should not be collapsed in the main function's local graph
     assert(!dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
-
-
   }
 
   test("unsafe pointer arithmetic") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "src/test/dsa/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic.adt",
-          relfFile = "src/test/dsa/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
-
+    val results = runTest("src/test/dsa/unsafe_pointer_arithmetic/unsafe_pointer_arithmetic")
 
     val program = results.ir.program
     val dsg = results.analysis.get.locals.get(program.mainProcedure)
@@ -213,18 +179,14 @@ class DSATest extends AnyFunSuite {
     val stack48 = dsg.adjust(dsg.find(dsg.stackMapping(48).cells(0)).getPointee)
     val stack56 = dsg.adjust(dsg.find(dsg.stackMapping(56).cells(0)).getPointee)
 
-
     assert(stack0.equals(dsg.adjust(dsg.formals(R29))))
     assert(stack8.equals(dsg.adjust(dsg.formals(R30))))
-
-
 
     // stack24 and stack32 should point to the beginning of first Malloc (size 20)
     assert(stack24.equals(stack32))
     assert(stack24.offset == 0)
     assert(stack24.node.get.allocationRegions.size == 1)
     assert(stack24.node.get.allocationRegions.head.asInstanceOf[HeapLocation].size == 20)
-
 
     // stack24 and stack40 should be pointing to the same cell at different internal offsets
     val unadjustedStack24Pointee = dsg.find(dsg.stackMapping(24).cells(0)).getPointee
@@ -238,28 +200,13 @@ class DSATest extends AnyFunSuite {
     assert(stack48.node.get.allocationRegions.size == 1)
     assert(stack48.node.get.allocationRegions.head.asInstanceOf[HeapLocation].size == 8)
 
-
     // stack 48 points to a malloc address which point to the pointee of stack40 and stack56
     assert(dsg.adjust(stack48.getPointee).equals(stack40))
     assert(dsg.adjust(stack48.getPointee).equals(stack56))
-
-
   }
 
   test("interproc pointer arithmetic main") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
+    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.locals.get(program.mainProcedure)
     val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
@@ -282,19 +229,7 @@ class DSATest extends AnyFunSuite {
   }
 
   test("interproc pointer arithmetic callee") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
+    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.locals.get(program.nameToProcedure("callee"))
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
@@ -318,8 +253,8 @@ class DSATest extends AnyFunSuite {
         block("operations",
           locAssign1, // R6 = R0 + 4
           locAssign2, // R7 = R0 + 5
-          MemoryAssign(mem,  R7, R1, BigEndian, 64, Some("00003")), // *R7 = R1, (*R6 + 1) = R1
-          MemoryAssign(mem,  R6, R2, BigEndian, 64, Some("00004")), // *R6 = R2
+          MemoryAssign(mem, R7, R1, Endian.BigEndian, 64, Some("00003")), // *R7 = R1, (*R6 + 1) = R1
+          MemoryAssign(mem, R6, R2, Endian.BigEndian, 64, Some("00004")), // *R6 = R2
           ret
         )
       )
@@ -343,7 +278,6 @@ class DSATest extends AnyFunSuite {
     // R6 (or R7)'s pointee should be the same as R1 and R2
     assert(dsg.adjust(dsg.varToCell(locAssign1)(R6)).pointee.isDefined)
     assert(dsg.adjust(dsg.adjust(dsg.varToCell(locAssign1)(R6)).getPointee).equals(dsg.adjust(dsg.formals(R1))))
-
   }
 
   test("offsetting from middle of cell to a new cell") {
@@ -357,8 +291,8 @@ class DSATest extends AnyFunSuite {
         block("operations",
           locAssign1, // R6 = R0 + 4
           locAssign2, // R7 = R0 + 5
-          MemoryAssign(mem, R7, R1, BigEndian, 64, Some("00003")),
-          MemoryAssign(mem, R6, R2, BigEndian, 64, Some("00004")),
+          MemoryAssign(mem, R7, R1, Endian.BigEndian, 64, Some("00003")),
+          MemoryAssign(mem, R6, R2, Endian.BigEndian, 64, Some("00004")),
           locAssign3, // R5 = R7 + 8
           ret
         )
@@ -384,8 +318,8 @@ class DSATest extends AnyFunSuite {
         block("operations",
           locAssign1,
           locAssign2,
-          MemoryAssign(mem,  R7, R1, BigEndian, 64, Some("00003")),
-          MemoryAssign(mem,  R6, R2, BigEndian, 64, Some("00004")),
+          MemoryAssign(mem, R7, R1, Endian.BigEndian, 64, Some("00003")),
+          MemoryAssign(mem,  R6, R2, Endian.BigEndian, 64, Some("00004")),
           locAssign3,
           ret
         )
@@ -417,8 +351,8 @@ class DSATest extends AnyFunSuite {
           //          Assign(R0, MemoryLoad(mem, R0, BigEndian, 0), Some("00000")),
           locAssign1,
           locAssign2,
-          MemoryAssign(mem,  R7, R1, BigEndian, 64, Some("00003")),
-          MemoryAssign(mem,  R6, R2, BigEndian, 64, Some("00004")),
+          MemoryAssign(mem, R7, R1, Endian.BigEndian, 64, Some("00003")),
+          MemoryAssign(mem, R6, R2, Endian.BigEndian, 64, Some("00004")),
           locAssign3,
           ret
         )
@@ -436,56 +370,26 @@ class DSATest extends AnyFunSuite {
     // this is the same as local graphs
     // nothing should be changed
     // TODO count point-to relations and ensure no more constraints are added in this phase
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
-
+    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
 
     val program = results.ir.program
-    // test that all three calles have the same local graph
+    // test that all three callees have the same local graph
     val callees = Set("sub_seven", "add_two", "add_six")
     val procs = program.nameToProcedure
-    callees.foreach(
-      callee =>
-        val dsg = results.analysis.get.bus.get(procs(callee))
-        assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
-        assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
-        // x should point to a collapsed object, in all 3 functions
-        // all three load value of x
-        // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
-        // arbitrary pointer is used in arithmetic causing collapse
-        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652)).node.cells(0)).getPointee).node.get.collapsed)
-    )
-
+    callees.foreach { callee =>
+      val dsg = results.analysis.get.bus.get(procs(callee))
+      assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
+      assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
+      // x should point to a collapsed object, in all 3 functions
+      // all three load value of x
+      // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
+      // arbitrary pointer is used in arithmetic causing collapse
+      assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee).node.get.collapsed)
+    }
   }
 
-
   test("bottom up jumptable2 main") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
-
-
+    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
     val program = results.ir.program
     val dsg = results.analysis.get.bus.get(program.mainProcedure)
 
@@ -498,32 +402,16 @@ class DSATest extends AnyFunSuite {
     assert(dsg.adjust(stack16.getPointee).equals(dsg.adjust(dsg.formals(R1))))
     assert(dsg.adjust(stack28.getPointee).equals(dsg.adjust(dsg.formals(R0))))
 
-
     // initial global mappings
     assertJumptable2Globals(dsg)
 
-    // bu x now should be collapsed since it was collapsed in callees
+    // bottom-up x now should be collapsed since it was collapsed in callees
     assert(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
-
   }
-
-
 
   ignore("bottom up interproc pointer arithmetic callee") {
     // same as interproc pointer arithmetic callee's local graph (no changes should have been made)
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
+    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.bus.get(program.nameToProcedure("callee"))
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
@@ -532,24 +420,10 @@ class DSATest extends AnyFunSuite {
     assert(stack8.equals(dsg.adjust(dsg.formals(R0))))
     assert(stack8.offset == 0)
     assert(stack24.equals(dsg.adjust(dsg.formals(R0)).node.get.cells(16)))
-
   }
 
-
   test("bottom up interproc pointer arithmetic main") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
+    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.bus.get(program.mainProcedure)
 
@@ -558,7 +432,6 @@ class DSATest extends AnyFunSuite {
     val stack24 = dsg.adjust(dsg.find(dsg.stackMapping(24).cells(0)).getPointee)
     val stack32 = dsg.adjust(dsg.find(dsg.stackMapping(32).cells(0)).getPointee)
     val stack40 = dsg.adjust(dsg.find(dsg.stackMapping(40).cells(0)).getPointee)
-
 
     // same as the local graph with the difference that stack40 points to cell at
     // a different of the same node as pointees of stack32 and stack24
@@ -573,27 +446,12 @@ class DSATest extends AnyFunSuite {
     assert(dsg.find(dsg.stackMapping(40).cells(0)).getPointee.internalOffset == 0)
     assert(dsg.find(dsg.stackMapping(32).cells(0)).getPointee.internalOffset == 0)
     assert(dsg.find(dsg.stackMapping(24).cells(0)).getPointee.internalOffset == 0)
-
   }
-
 
   // top down tests
   ignore("top down jumptable2 main") {
     // no changes should be made from previous phase
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
-
+    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
     val program = results.ir.program
     val dsg = results.analysis.get.tds.get(program.mainProcedure)
 //    assert(dsg.pointTo.size == 13) // 13
@@ -606,74 +464,34 @@ class DSATest extends AnyFunSuite {
     assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30))))
     assert(dsg.adjust(stack16.getPointee).equals(dsg.adjust(dsg.formals(R1))))
     assert(dsg.adjust(stack28.getPointee).equals(dsg.adjust(dsg.formals(R0))))
+    assertJumptable2Globals(dsg)
 
-
-    // initial global mappings
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69600, 69608)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2136, 2136 + 124)).node.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1948, 1948 + 36)).node.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69632)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76)).node.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69616)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2056, 2056 + 76)).node.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1984, 1984 + 36)).node.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69560, 69568)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2264, 2268)).node.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2020, 2020 + 36)).node.cells(0))))
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69584, 69584 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0))))
-
-    // bu
+    // bottom-up
     assert(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0)).getPointee.node.collapsed)
 
   }
 
   ignore("top down jumptable2 callees") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "examples/jumptable2/jumptable2.adt",
-          relfFile = "examples/jumptable2/jumptable2.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
-
+    val results = runTest("src/test/indirect_calls/jumptable2/gcc_pic/jumptable2")
 
     val program = results.ir.program
     // test that all three callees have the same local graph
     val callees = Set("sub_seven", "add_two", "add_six")
     val procs = program.nameToProcedure
-    callees.foreach(
-      callee =>
-        val dsg = results.analysis.get.tds.get(procs(callee))
-        assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
-        assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
-        // x should point to a collapsed object, in all 3 functions
-        // all three load value of x
-        // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
-        // arbitrary pointer is used in arithmetic causing collapse
-        assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652)).node.cells(0)).getPointee).node.get.collapsed)
-    )
-
+    callees.foreach { callee =>
+      val dsg = results.analysis.get.tds.get(procs(callee))
+      assert(dsg.stackMapping.isEmpty) // stack is not used in either callee
+      assertJumptable2Globals(dsg) // globals should be the same everywhere unused in callees
+      // x should point to a collapsed object, in all 3 functions
+      // all three load value of x
+      // the analysis doesn't know if x is a pointer or not therefore assumes it is for soundness
+      // arbitrary pointer is used in arithmetic causing collapse
+      assert(dsg.adjust(dsg.find(dsg.globalMapping(AddressRange(69648, 69652)).node.cells(0)).getPointee).node.get.collapsed)
+    }
   }
 
-
-
   test("top down interproc pointer arithmetic callee") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
+    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.tds.get(program.nameToProcedure("callee"))
 
@@ -684,28 +502,13 @@ class DSATest extends AnyFunSuite {
     assert(stack8.equals(dsg.adjust(dsg.formals(R0))))
     assert(stack8.offset == 16)
     assert(stack24.equals(dsg.adjust(dsg.formals(R0)).node.get.cells(32)))
-
   }
 
-
-  // top down phase should be the same as bu phase
+  // top-down phase should be the same as bottom-up phase
   ignore("top down interproc pointer arithmetic main") {
-    val results = RunUtils.loadAndTranslate(
-      BASILConfig(
-        loading = ILLoadingConfig(
-          inputFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.adt",
-          relfFile = "src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic.relf",
-          specFile = None,
-          dumpIL = None,
-        ),
-        staticAnalysis = Some(StaticAnalysisConfig()),
-        boogieTranslation = BoogieGeneratorConfig(),
-        outputPrefix = "boogie_out",
-      )
-    )
+    val results = runTest("src/test/dsa/interproc_pointer_arithmetic/interproc_pointer_arithmetic")
     val program = results.ir.program
     val dsg = results.analysis.get.tds.get(program.mainProcedure)
-
 
     val stack0 = dsg.adjust(dsg.find(dsg.stackMapping(0).cells(0)).getPointee)
     val stack8 = dsg.adjust(dsg.find(dsg.stackMapping(8).cells(0)).getPointee)
@@ -724,7 +527,6 @@ class DSATest extends AnyFunSuite {
     assert(dsg.find(dsg.stackMapping(40).cells(0)).getPointee.internalOffset == 0)
     assert(dsg.find(dsg.stackMapping(32).cells(0)).getPointee.internalOffset == 0)
     assert(dsg.find(dsg.stackMapping(24).cells(0)).getPointee.internalOffset == 0)
-
   }
 
 }
