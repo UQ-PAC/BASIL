@@ -60,48 +60,66 @@ class LocalPhase(proc: Procedure,
     position -> newMap
   }
 
-  private def getStack(offset: BigInt): Cell = {
+  private def getStack(offset: BigInt, size: Int): Cell = {
     var last: BigInt = 0
-    if graph.stackMapping.contains(offset) then
-      graph.stackMapping(offset).cells(0)
-    else
-      breakable {
-        graph.stackMapping.keys.foreach {
-          elementOffset =>
-            if offset < elementOffset then
-              break
-            else
-              last = elementOffset
+    var headNodeOffset: BigInt = -1
+
+    val head: Cell =
+      if graph.stackMapping.contains(offset) then
+        headNodeOffset = 0
+        graph.stackMapping(offset).cells(0)
+      else
+        breakable {
+          graph.stackMapping.keys.toSeq.sorted.foreach(
+            elementOffset =>
+              if offset < elementOffset then
+                break
+              else
+                last = elementOffset
+          )
         }
-      }
-      val diff = offset - last
-      assert(graph.stackMapping.contains(last))
-      graph.stackMapping(last).getCell(diff)
+        val diff = offset - last
+        headNodeOffset = offset
+        assert(graph.stackMapping.contains(last))
+        graph.stackMapping(last).getCell(diff)
+
+    graph.find(head).growSize(size)
+    val headOffset = head.offset
+    graph.stackMapping.keys.toSeq.filter(off => off > headOffset && off < headOffset + size).sorted.foreach {
+      off =>
+        val stackDiff = off - headOffset
+        val updatedHead = graph.find(head)
+        val newHeadOffset = updatedHead.offset
+        val headNode = updatedHead.node.get
+        graph.mergeCells(headNode.addCell(newHeadOffset + stackDiff, 0), graph.find(graph.stackMapping(off).cells(0)))
+    }
+    head
   }
+
 
   /**
    * if an expr is the address of a stack location return its corresponding cell
    * @param pos IL position where the expression is used
    */
-  private def isStack(expr: Expr, pos: CFGPosition): Option[Cell] = {
+  private def isStack(expr: Expr, pos: CFGPosition, size : Int = 0): Option[Cell] = {
     expr match
-      case BinaryExpr(_, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
+      case BinaryExpr(op, arg1: Variable, arg2) if varToSym.contains(pos) && varToSym(pos).contains(arg1) &&
         varToSym(pos)(arg1).exists(s => s.symbolicBase.isInstanceOf[StackLocation]) =>
         evaluateExpression(arg2, constProp(pos)) match
           case Some(v) =>
             val stackRegions = varToSym(pos)(arg1).filter(s => s.symbolicBase.isInstanceOf[StackLocation])
-            val res = stackRegions.tail.foldLeft(getStack(v.value + stackRegions.head.offset)) {
+            val res = stackRegions.tail.foldLeft(getStack(v.value + stackRegions.head.offset, size)) {
               (res, sym) =>
-                graph.mergeCells(res, getStack(v.value + sym.offset))
+                graph.mergeCells(res, getStack(v.value + sym.offset, size))
             }
             Some(res)
           case None => None
       case arg: Variable if varToSym.contains(pos) && varToSym(pos).contains(arg) &&
         varToSym(pos)(arg).exists(s => s.symbolicBase.isInstanceOf[StackLocation]) =>
         val stackRegions = varToSym(pos)(arg).filter(s => s.symbolicBase.isInstanceOf[StackLocation])
-        val res = stackRegions.tail.foldLeft(getStack(stackRegions.head.offset)) {
+        val res = stackRegions.tail.foldLeft(getStack(stackRegions.head.offset, size)) {
           (res, sym) =>
-            graph.mergeCells(res, getStack(sym.offset))
+            graph.mergeCells(res, getStack(sym.offset, size))
         }
         Some(res)
       case _ => None
@@ -120,20 +138,30 @@ class LocalPhase(proc: Procedure,
    * if an expr is the address of a global location return its corresponding cell
    * @param pos IL position where the expression is used
    */
-  def isGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
+  def getGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
     val value = evaluateExpression(expr, constProp(pos))
-    if value.isDefined  then
-      val global = graph.isGlobal(value.get.value)
-      if global.isDefined then
-        val address = value.get.value
-        val DSAGlobal(range: AddressRange, Field(node, internal)) = global.get
-        val offset = address - range.start
-        node.addCell(internal + offset, size)
-        graph.selfCollapse(node)
-        if node.collapsed then
-          Some(node.cells(0))
-        else
-          Some(node.getCell(internal + offset))
+    if value.isDefined then
+      val globals = graph.getGlobal(value.get.value, size)
+      val address = value.get.value
+      if globals.nonEmpty then
+        val head = globals.head
+        val DSAGlobal(range: AddressRange, Field(node, internal)) = head
+        val headOffset: BigInt = if address > range.start then address - range.start + internal else internal
+        val headNode = node
+        val headCell: Cell = node.addCell(headOffset, size)
+        graph.selfCollapse(headNode)
+        val tail = globals.tail
+        tail.foreach {
+          g =>
+            val DSAGlobal(range: AddressRange, Field(node, internal)) = g
+            val offset: BigInt = if address > range.start then address - range.start + internal else internal
+            node.addCell(offset, 0)
+            graph.selfCollapse(node)
+            assert(range.start >= address)
+            graph.mergeCells(graph.find(headNode.addCell(range.start - address, 0)), graph.find(node.getCell(offset)))
+        }
+
+        Some(graph.find(headCell))
       else
         None
     else
@@ -273,15 +301,15 @@ class LocalPhase(proc: Procedure,
              visitPointerArithmeticOperation(n, lhsCell, arg, 0)
             case _ =>
               unsupportedPointerArithmeticOperation(n, expr, lhsCell)
-        
+
       case MemoryLoad(lhs, _, index, _, size, _) => // Rx = Mem[Ry], merge Rx and pointee of Ry (E(Ry))
         val indexUnwrapped = unwrapPaddingAndSlicing(index)
         val lhsCell = graph.adjust(graph.varToCell(n)(lhs))
         assert(size % 8 == 0)
         val byteSize = size / 8
         lhsCell.node.get.flags.read = true
-        val global = isGlobal(indexUnwrapped, n, byteSize)
-        val stack = isStack(indexUnwrapped, n)
+        val global = getGlobal(indexUnwrapped, n, byteSize)
+        val stack = isStack(indexUnwrapped, n, byteSize)
         if global.isDefined then
           graph.mergeCells(lhsCell, graph.adjust(graph.find(global.get).getPointee))
         else if stack.isDefined then
@@ -312,8 +340,8 @@ class LocalPhase(proc: Procedure,
             reachingDefs(n)(value).foreach(visit)
             assert(size % 8 == 0)
             val byteSize = size / 8
-            val global = isGlobal(index, n, byteSize)
-            val stack = isStack(index, n)
+            val global = getGlobal(index, n, byteSize)
+            val stack = isStack(index, n, byteSize)
             val addressPointee: Cell =
               if global.isDefined then
                 graph.adjust(graph.find(global.get).getPointee)

@@ -45,6 +45,42 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     )
   }
 
+  ignore("overlapping access") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "src/test/correct/jumptable/clang/jumptable.adt",
+          relfFile = "src/test/correct/jumptable/clang/jumptable.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+
+    // the dsg of the main procedure after the local phase
+    val program = results.ir.program
+    val dsg = results.analysis.get.localDSA(program.mainProcedure)
+
+
+    // dsg.formals(R29) is the slice representing formal R29
+    val R29formal = dsg.adjust(dsg.formals(R29))
+
+
+    // cells representing the stack at various offsets
+    val stack0 = dsg.find(dsg.stackMapping(0).cells(0)) // R31
+    val stack8 = dsg.find(dsg.stackMapping(8).cells(0)) //  R31 + 8
+    val stack40 = dsg.find(dsg.stackMapping(40).cells(0)) //  R31 + 40
+    val stack32 = dsg.find(dsg.stackMapping(32).cells(0)) //  R31 + 32
+    val stack24 = dsg.find(dsg.stackMapping(24).cells(0)) //  R31 + 24 and Malloc
+
+    assert(dsg.adjust(stack0.getPointee).equals(R29formal)) // R31 points to the frame pointer
+    assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
+
+  }
+
   // Local DSA tests
   /*
   TODO - rewrite this test with a new input that is more suitable than the removed example
