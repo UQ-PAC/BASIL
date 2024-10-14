@@ -346,7 +346,6 @@ class LocalPhase(proc: Procedure,
         }
       case _ =>
 
-    writeToFile(graph.toDot, "test.dot")
   }
   def analyze(): Graph = {
     val domain = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString)
