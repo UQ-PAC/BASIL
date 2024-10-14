@@ -204,9 +204,7 @@ object IRTransform {
     cilvisitor.visit_prog(transforms.ConvertSingleReturn(), ctx.program)
 
     val externalRemover = ExternalRemover(externalNamesLibRemoved.toSet)
-    val renamer = Renamer(boogieReserved)
     externalRemover.visitProgram(ctx.program)
-    renamer.visitProgram(ctx.program)
 
     ctx
   }
@@ -233,6 +231,10 @@ object IRTransform {
 
     val specModifies = ctx.specification.subroutines.map(s => s.name -> s.modifies).toMap
     ctx.program.setModifies(specModifies)
+
+    val renamer = Renamer(boogieReserved)
+    renamer.visitProgram(ctx.program)
+
     assert(invariant.singleCallBlockEnd(ctx.program))
   }
 
