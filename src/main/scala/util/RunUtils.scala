@@ -65,7 +65,7 @@ case class StaticAnalysisContext(
   memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
   reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
   varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
-  SymbolicAddressess: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
+  symbolicAddresses: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
   localDSA: Map[Procedure, Graph],
   bottomUpDSA: Map[Procedure, Graph],
   topDownDSA: Map[Procedure, Graph]
@@ -433,7 +433,7 @@ object StaticAnalysis {
       steensgaardResults = steensgaardResults,
       mmmResults = mmm,
       memoryRegionContents = memoryRegionContents,
-      SymbolicAddressess = Map.empty,
+      symbolicAddresses = Map.empty,
       reachingDefs = reachingDefinitionsAnalysisResults,
       varDepsSummaries = varDepsSummaries,
       localDSA = Map.empty,
@@ -594,7 +594,7 @@ object RunUtils {
     assert(invariant.singleCallBlockEnd(ctx.program))
     Logger.debug(s"[!] Finished indirect call resolution after $iteration iterations")
     analysisResult.last.copy(
-      SymbolicAddressess = symResults,
+      symbolicAddresses = symResults,
       localDSA = dsa.local.toMap,
       bottomUpDSA = dsa.bottomUp.toMap,
       topDownDSA = dsa.topDown.toMap
