@@ -49,33 +49,6 @@ class LocalPhase(proc: Procedure,
     position -> newMap
   }
 
-  private def mergeOverlapping(cell: Cell, size: Int): Cell = {
-    val inputNode = cell.node.get
-    if (size != 0) then
-      if (inputNode.flags.global) then
-        breakable {
-          graph.globalMapping.foreach {
-            case (range: AddressRange, Field(node, offset)) =>
-              val field = graph.find(node)
-              if field.node == inputNode && node.cells.values.map(graph.find).exists(c => c == cell)  then
-                  val diff = cell.offset - field.offset
-                  getGlobal(range.start + diff, size)
-                  break
-          }
-        }
-      if (inputNode.flags.stack) then
-        breakable {
-          graph.stackMapping.foreach {
-            case (offset: BigInt, node: Node) =>
-              val field = graph.find(node)
-              if field.node == inputNode && node.cells.values.map(graph.find).exists(c => c == cell) then
-                getStack(offset, size)
-
-          }
-        }
-
-    graph.find(cell)
-  }
 
   private def getStack(offset: BigInt, size: Int): Cell = {
     var last: BigInt = 0
@@ -100,7 +73,10 @@ class LocalPhase(proc: Procedure,
         assert(graph.stackMapping.contains(last))
         graph.stackMapping(last).getCell(diff)
 
-    graph.find(head).growSize(size)
+    // DSA grows cell size with size
+    // selfCollapse at the end to merge all the overlapping accessed size
+    // However, the above approach prevents distinct multi loads
+     graph.find(head).growSize(size)
     val headOffset = head.offset
     graph.stackMapping.keys.toSeq.filter(off => off > headOffset && off < headOffset + size).sorted.foreach {
       off =>
@@ -110,6 +86,7 @@ class LocalPhase(proc: Procedure,
         val headNode = updatedHead.node.get
         graph.mergeCells(headNode.addCell(newHeadOffset + stackDiff, 0), graph.find(graph.stackMapping(off).cells(0)))
     }
+    graph.selfCollapse(head.node.get)
     head
   }
 
@@ -151,14 +128,28 @@ class LocalPhase(proc: Procedure,
 
   val graph: Graph = Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
 
-  private def getGlobalHelper(address: BigInt, size: Int): Option[Cell] = {
+  /**
+   * if an expr is the address of a global location return its corresponding cell
+   * @param pos IL position where the expression is used
+   */
+  def getGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
+    val value = evaluateExpression(expr, constProp(pos))
+    if value.isDefined then
+        getGlobal(value.get.value, size)
+    else
+      None
+  }
+
+  def getGlobal(address: BigInt, size: Int): Option[Cell] = {
     val globals = graph.getGlobal(address, size)
     if globals.nonEmpty then
       val head = globals.head
       val DSAGlobal(range: AddressRange, Field(node, internal)) = head
       val headOffset: BigInt = if address > range.start then address - range.start + internal else internal
       val headNode = node
-      val headCell: Cell = node.addCell(headOffset, size)
+      val headCell: Cell = node.addCell(headOffset, size) // DSA has the size of the added cell should as size with
+      // selfCollapse at the end to merge all the overlapping accessed size
+      // However, the above approach prevent distinct multi loads
       graph.selfCollapse(headNode)
       val tail = globals.tail
       tail.foreach {
@@ -170,24 +161,10 @@ class LocalPhase(proc: Procedure,
           assert(range.start >= address)
           graph.mergeCells(graph.find(headNode.addCell(range.start - address, 0)), graph.find(node.getCell(offset)))
       }
+      graph.selfCollapse(graph.find(headCell).node.get)
       Some(graph.find(headCell))
     else
       None
-  }
-  /**
-   * if an expr is the address of a global location return its corresponding cell
-   * @param pos IL position where the expression is used
-   */
-  def getGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
-    val value = evaluateExpression(expr, constProp(pos))
-    if value.isDefined then
-        getGlobalHelper(value.get.value, size)
-    else
-      None
-  }
-
-  def getGlobal(address: BigInt, size: Int): Option[Cell] = {
-      getGlobalHelper(address, size)
   }
 
   /**
@@ -270,6 +247,21 @@ class LocalPhase(proc: Procedure,
     node.cells(0)
   }
 
+//  def multiAcccess(lhs: Cell, pointees: Seq[Cell]): Unit = {
+//    val pointeeNode = pointees.head.node.get
+//    val pointeeStartOffset = pointees.head.offset
+//    assert(!pointees.tail.exists(p => p.node.get != pointeeNode))
+//
+//    val lhsNode = lhs.node.get
+//    val lhsStartOffset = lhs.offset
+//    var last = -1
+//    pointees.foreach(
+//      pointee =>
+//        assert(last == -1 || !pointeeNode.cells.keys.exists(offset => offset > last  && offset < pointee.offset))
+//        graph.mergeCells(lhsNode.addCell(lhsStartOffset + (pointee.offset - pointeeStartOffset), 0), pointee)
+//    )
+//
+//  }
   def visit(n: CFGPosition): Unit = {
     if visited.contains(n) then
       return

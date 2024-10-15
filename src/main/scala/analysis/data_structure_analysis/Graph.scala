@@ -193,15 +193,12 @@ class Graph(val proc: Procedure,
   // determine if an address is a global and return the corresponding global(s) if it is.
   def getGlobal(address: BigInt, size: Int): Seq[DSAGlobal] =
     var global: Seq[DSAGlobal] = Seq.empty
-    breakable {
-      for (elem <- globalMapping) {
-        val range = elem._1
-        val field = elem._2
-        if (address < range.end && range.start < address + size) ||
-          (address + size > range.end && address < range.end) ||
-          (address >= range.start && (address < range.end || (range.start == range.end && range.end == address))) then
-          global = global ++ Seq(DSAGlobal(range, field))
-      }
+    for ((range, field) <- globalMapping) {
+      if (address < range.end && range.start < address + size) ||
+        (address + size > range.end && address < range.end) ||
+        (address >= range.start && (address < range.end || (range.start == range.end && range.end == address))) then
+        global = global ++ Seq(DSAGlobal(range, field))
+
     }
     global.sortBy(f => f.addressRange.start)
 
