@@ -41,17 +41,6 @@ class LocalPhase(proc: Procedure,
   val varToSym: Map[CFGPosition, Map[Variable, Set[SymbolicAddress]]] = symResults.map { (position, innerMap) =>
     val newMap = innerMap.keys.foldLeft(Map[Variable, Set[SymbolicAddress]]()) { (m, access) =>
       if (m.contains(access.accessor)) {
-        // every variable pointing to a stack region ONLY has one symbolic access associated with it.
-        //            m(access.accessor).foreach(
-        //              sym =>
-        //                if (sym.symbolicBase.isInstanceOf[StackLocation]) then
-        //                  println(m)
-        //                  println(access.accessor)
-        //                  println(access)
-        //                  print("")
-        //                //assert(!sym.symbolicBase.isInstanceOf[StackLocation])
-        //            )
-        //            assert(!access.symbolicBase.isInstanceOf[StackLocation])
         m + (access.accessor -> (m(access.accessor) + access))
       } else {
         m + (access.accessor -> Set(access))
