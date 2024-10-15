@@ -49,6 +49,34 @@ class LocalPhase(proc: Procedure,
     position -> newMap
   }
 
+  private def mergeOverlapping(cell: Cell, size: Int): Cell = {
+    val inputNode = cell.node.get
+    if (size != 0) then
+      if (inputNode.flags.global) then
+        breakable {
+          graph.globalMapping.foreach {
+            case (range: AddressRange, Field(node, offset)) =>
+              val field = graph.find(node)
+              if field.node == inputNode && node.cells.values.map(graph.find).exists(c => c == cell)  then
+                  val diff = cell.offset - field.offset
+                  getGlobal(range.start + diff, size)
+                  break
+          }
+        }
+      if (inputNode.flags.stack) then
+        breakable {
+          graph.stackMapping.foreach {
+            case (offset: BigInt, node: Node) =>
+              val field = graph.find(node)
+              if field.node == inputNode && node.cells.values.map(graph.find).exists(c => c == cell) then
+                getStack(offset, size)
+
+          }
+        }
+
+    graph.find(cell)
+  }
+
   private def getStack(offset: BigInt, size: Int): Cell = {
     var last: BigInt = 0
     var headNodeOffset: BigInt = -1
@@ -123,6 +151,29 @@ class LocalPhase(proc: Procedure,
 
   val graph: Graph = Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
 
+  private def getGlobalHelper(address: BigInt, size: Int): Option[Cell] = {
+    val globals = graph.getGlobal(address, size)
+    if globals.nonEmpty then
+      val head = globals.head
+      val DSAGlobal(range: AddressRange, Field(node, internal)) = head
+      val headOffset: BigInt = if address > range.start then address - range.start + internal else internal
+      val headNode = node
+      val headCell: Cell = node.addCell(headOffset, size)
+      graph.selfCollapse(headNode)
+      val tail = globals.tail
+      tail.foreach {
+        g =>
+          val DSAGlobal(range: AddressRange, Field(node, internal)) = g
+          val offset: BigInt = if address > range.start then address - range.start + internal else internal
+          node.addCell(offset, 0)
+          graph.selfCollapse(node)
+          assert(range.start >= address)
+          graph.mergeCells(graph.find(headNode.addCell(range.start - address, 0)), graph.find(node.getCell(offset)))
+      }
+      Some(graph.find(headCell))
+    else
+      None
+  }
   /**
    * if an expr is the address of a global location return its corresponding cell
    * @param pos IL position where the expression is used
@@ -130,31 +181,13 @@ class LocalPhase(proc: Procedure,
   def getGlobal(expr: Expr, pos: CFGPosition, size: Int = 0): Option[Cell] = {
     val value = evaluateExpression(expr, constProp(pos))
     if value.isDefined then
-      val globals = graph.getGlobal(value.get.value, size)
-      val address = value.get.value
-      if globals.nonEmpty then
-        val head = globals.head
-        val DSAGlobal(range: AddressRange, Field(node, internal)) = head
-        val headOffset: BigInt = if address > range.start then address - range.start + internal else internal
-        val headNode = node
-        val headCell: Cell = node.addCell(headOffset, size)
-        graph.selfCollapse(headNode)
-        val tail = globals.tail
-        tail.foreach {
-          g =>
-            val DSAGlobal(range: AddressRange, Field(node, internal)) = g
-            val offset: BigInt = if address > range.start then address - range.start + internal else internal
-            node.addCell(offset, 0)
-            graph.selfCollapse(node)
-            assert(range.start >= address)
-            graph.mergeCells(graph.find(headNode.addCell(range.start - address, 0)), graph.find(node.getCell(offset)))
-        }
-
-        Some(graph.find(headCell))
-      else
-        None
+        getGlobalHelper(value.get.value, size)
     else
       None
+  }
+
+  def getGlobal(address: BigInt, size: Int): Option[Cell] = {
+      getGlobalHelper(address, size)
   }
 
   /**
@@ -265,7 +298,7 @@ class LocalPhase(proc: Procedure,
       case LocalAssign(variable, rhs, _) =>
         val expr: Expr = unwrapPaddingAndSlicing(rhs)
         val lhsCell = graph.adjust(graph.varToCell(n)(variable))
-        val global = isGlobal(rhs, n)
+        val global = getGlobal(rhs, n)
         val stack = isStack(rhs, n)
         if global.isDefined then // Rx = global address
           graph.mergeCells(lhsCell, global.get)
@@ -300,9 +333,15 @@ class LocalPhase(proc: Procedure,
         val global = getGlobal(indexUnwrapped, n, byteSize)
         val stack = isStack(indexUnwrapped, n, byteSize)
         if global.isDefined then
-          graph.mergeCells(lhsCell, graph.adjust(graph.find(global.get).getPointee))
+          val index = graph.find(global.get)
+          index.growSize(byteSize)
+          graph.selfCollapse(index.node.get)
+          graph.mergeCells(lhsCell,graph.adjust(graph.find(index).getPointee))
         else if stack.isDefined then
-          graph.mergeCells(lhsCell, graph.adjust(graph.find(stack.get).getPointee))
+          val index = graph.find(stack.get)
+          index.growSize(byteSize)
+          graph.selfCollapse(index.node.get)
+          graph.mergeCells(lhsCell, graph.adjust(graph.find(index).getPointee))
         else
           indexUnwrapped match
             case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
@@ -329,13 +368,19 @@ class LocalPhase(proc: Procedure,
             reachingDefs(n)(value).foreach(visit)
             assert(size % 8 == 0)
             val byteSize = size / 8
-            val global = getGlobal(index, n, byteSize)
-            val stack = isStack(index, n, byteSize)
+            val global = getGlobal(index, n)
+            val stack = isStack(index, n)
             val addressPointee: Cell =
               if global.isDefined then
-                graph.adjust(graph.find(global.get).getPointee)
+                val index = graph.find(global.get)
+                index.growSize(byteSize)
+                graph.selfCollapse(index.node.get)
+                graph.adjust(graph.find(index).getPointee)
               else if stack.isDefined then
-                graph.adjust(graph.find(stack.get).getPointee)
+                val index = graph.find(stack.get)
+                index.growSize(byteSize)
+                graph.selfCollapse(index.node.get)
+                graph.adjust(graph.find(index).getPointee)
               else
                 index match
                   case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
