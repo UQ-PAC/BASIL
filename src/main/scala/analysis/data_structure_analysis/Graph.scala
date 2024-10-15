@@ -557,7 +557,8 @@ class Graph(val proc: Procedure,
 
       resultCells.keys.foreach { offset =>
         val collapsedCell = resultNode.addCell(offset, resultLargestAccesses(offset))
-        val outgoing: Set[Slice] = cells.flatMap { (_, cell) =>
+        val cells = resultCells(offset)
+        val outgoing: Set[Slice] = cells.flatMap { cell =>
           if (cell.pointee.isDefined) {
             Some(cell.getPointee)
           } else {
