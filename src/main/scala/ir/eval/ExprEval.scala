@@ -259,6 +259,6 @@ def partialEvalExpr(
   val l = StatelessLoader[InterpreterError](variableAssignment, memory)
   State.evaluate((), statePartialEvalExpr(l)(exp)) match {
     case Right(e) => e
-    case Left(e)  => throw Exception("Unable to evaluate expr : " + e.toString)
+    case Left(e)  => throw Exception(s"Unable to evaluate expr  $exp :" + e.toString)
   }
 }

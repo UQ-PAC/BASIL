@@ -188,7 +188,7 @@ def doCopyPropTransform(p: Program) = {
   }
 
   // cleanup
-  visit_prog(CleanupAssignments(), p)
+//  visit_prog(CleanupAssignments(), p)
   val toremove = p.collect {
     case b: Block if b.statements.size == 0 && b.prevBlocks.size == 1 && b.nextBlocks.size == 1 => b
   }
