@@ -16,6 +16,148 @@ trait AbstractDomain[L] {
   def bot: L
 }
 
+def removeSlices(p: Program): Unit = {
+  p.procedures.foreach(removeSlices)
+}
+
+def removeSlices(p: Procedure): Unit = {
+
+  /** if for each variable v there is some i:int such that (i) all its assignments have a ZeroExtend(i, x) and (ii) all
+    * its uses have Extract(size(v) - i, 0, v) Then we replace v by a variable of bitvector size (size(v) - i)
+    *
+    * We check this flow-insensitively and recover precision using DSA form.
+    */
+
+  val assignments: Map[LocalVar, Iterable[Assign]] = p
+    .collect { case a: Assign =>
+      a
+    }
+    .groupBy(_.lhs)
+    .collect { case (k: LocalVar, v) =>
+      (k, v)
+    }
+
+  enum HighZeroBits:
+    case Bits(n: Int) // (i) and (ii) hold; the n highest bits are redundant
+    case False // property is false
+    case Bot // don't know anything
+
+  def size(e: Expr) = {
+    e.getType match {
+      case BitVecType(s) => Some(s)
+      case _             => None
+    }
+  }
+
+  case class LVTerm(v: LocalVar) extends analysis.solvers.Var[LVTerm]
+
+  // unify variable uses across direct assignments
+  val ufsolver = analysis.solvers.UnionFindSolver[LVTerm]()
+  val unioned = assignments.foreach {
+    case (lv, Assign(lhs: LocalVar, rhs: LocalVar, _)) => ufsolver.unify(LVTerm(lhs), LVTerm(rhs))
+    case _                                             => ()
+  }
+
+  val unifiedAssignments = ufsolver
+    .unifications()
+    .map { case (v: LVTerm, rvs) =>
+      v.v -> (rvs.map { case LVTerm(rv) =>
+        rv
+      }).toSet
+    }
+    .map((repr: LocalVar, elems: Set[LocalVar]) =>
+      repr -> elems.flatMap(assignments(_).filter(_ match {
+        // filter out the direct assignments we used to build the unif class
+        case Assign(lhs: LocalVar, rhs: LocalVar, _) if elems.contains(lhs) && elems.contains(rhs) => false
+        case _                                                                                     => true
+      }))
+    )
+
+  // try and find a single extension size for all rhs of assignments to all variables in the assigned equality class
+  val varHighZeroBits: Map[LocalVar, HighZeroBits] = assignments.map((v, assigns) =>
+    // note: this overapproximates on x := y when x and y may both be smaller than their declared size
+    val allRHSExtended = assigns.foldLeft(HighZeroBits.Bot: HighZeroBits)((e, assign) =>
+      (e, assign.rhs) match {
+        case (HighZeroBits.Bot, ZeroExtend(i, lhs))                   => HighZeroBits.Bits(i)
+        case (b @ HighZeroBits.Bits(ei), ZeroExtend(i, _)) if i == ei => b
+        case (b @ HighZeroBits.Bits(ei), ZeroExtend(i, _)) if i != ei => HighZeroBits.False
+        case (HighZeroBits.False, _)                                  => HighZeroBits.False
+        case (_, other)                                               => HighZeroBits.False
+      }
+    )
+    (v, allRHSExtended)
+  )
+
+  val varsWithExtend: Map[LocalVar, HighZeroBits] = assignments
+    .map((lhs, _) => {
+      // map all lhs to the result for their representative
+      val rep = ufsolver.find(LVTerm(lhs)) match {
+        case LVTerm(r) => r
+      }
+      lhs -> varHighZeroBits.get(rep)
+    })
+    .collect { case (l, Some(x)) /* remove anything we have no information on */ =>
+      (l, x)
+    }
+
+  class CheckUsesHaveExtend() extends CILVisitor {
+    val result: mutable.HashMap[LocalVar, HighZeroBits] =
+      mutable.HashMap[LocalVar, HighZeroBits]()
+
+    override def vexpr(v: Expr) = {
+      v match {
+        case Extract(i, 0, v: LocalVar)
+            if size(v).isDefined && result.get(v).contains(HighZeroBits.Bits(size(v).get - i)) =>
+          SkipChildren()
+        case v: LocalVar => {
+          result.remove(v)
+          SkipChildren()
+        }
+        case _ => DoChildren()
+      }
+    }
+
+    def apply(assignHighZeroBits: Map[LocalVar, HighZeroBits])(p: Procedure): Map[LocalVar, HighZeroBits] = {
+      result.clear()
+      result.addAll(assignHighZeroBits)
+      visit_proc(this, p)
+      result.toMap
+    }
+  }
+
+  val toSmallen = CheckUsesHaveExtend()(varsWithExtend)(p).collect { case (v, HighZeroBits.Bits(x)) =>
+    v -> x
+  }.toMap
+
+  class ReplaceAlwaysSlicedVars(varHighZeroBits: Map[LocalVar, Int]) extends CILVisitor {
+
+    override def vexpr(v: Expr) = {
+      v match {
+        case Extract(i, 0, v: LocalVar) if size(v).isDefined && varHighZeroBits.contains(v) => {
+          ChangeTo(LocalVar(v.name, BitVecType(size(v).get - varHighZeroBits(v))))
+        }
+        case _ => DoChildren()
+      }
+    }
+
+    override def vstmt(s: Statement) = {
+      s match {
+        case a @ Assign(lhs: LocalVar, ZeroExtend(sz, rhs), _)
+            if size(lhs).isDefined && varHighZeroBits.contains(lhs) => {
+          assert(varHighZeroBits(lhs) == sz)
+          a.lhs = LocalVar(lhs.name, BitVecType(size(lhs).get - varHighZeroBits(lhs)))
+          a.rhs = rhs
+          DoChildren()
+        }
+        case _ => DoChildren()
+      }
+    }
+  }
+
+  visit_proc(ReplaceAlwaysSlicedVars(toSmallen), p)
+
+}
+
 def saturateVariableDependencies(procedure: Procedure): Map[Variable, Set[Variable]] = {
   // assuming dsa single-assigned variables are those which do not depend on themselves; variables which do not depend on themselves
   //    x1 := y1 + z1
@@ -52,20 +194,20 @@ def saturateVariableDependencies(procedure: Procedure): Map[Variable, Set[Variab
       }
     }
     ndeps != deps
-    }) {;}
+  }) { ; }
 
   ndeps
 }
 
-def cyclicVariables(p: Procedure) : Set[Variable] = {
+def cyclicVariables(p: Procedure): Set[Variable] = {
   val deps = saturateVariableDependencies(p)
   deps.filter(v => v._2.contains(v._1)).map(_._1).toSet
 }
 
 def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
 
-  /** Get all assign statements which define a variable never used, assuming ssa form and proc parameters
-   *  so that interprocedural check is not required.
+  /** Get all assign statements which define a variable never used, assuming ssa form and proc parameters so that
+    * interprocedural check is not required.
     */
 
   enum VS:
@@ -180,7 +322,7 @@ def doCopyPropTransform(p: Program) = {
     while (rerun) {
       rerun = false
       for ((p, xf) <- result) {
-        val vis = Simplify(xf.withDefaultValue(CCP(Map(), Map()))) 
+        val vis = Simplify(xf.withDefaultValue(CCP(Map(), Map())))
         visit_proc(vis, p)
         rerun = rerun || vis.madeAnyChange
       }
@@ -188,7 +330,7 @@ def doCopyPropTransform(p: Program) = {
   }
 
   // cleanup
-//  visit_prog(CleanupAssignments(), p)
+  visit_prog(CleanupAssignments(), p)
   val toremove = p.collect {
     case b: Block if b.statements.size == 0 && b.prevBlocks.size == 1 && b.nextBlocks.size == 1 => b
   }
@@ -233,9 +375,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       widenpoints: Set[Block], // set of loop heads
       narrowpoints: Set[Block] // set of conditions
   ): Map[Procedure, Map[Block, L]] = {
-    val initDom = p.procedures.map(p =>
-      (p, p.blocks)
-    )
+    val initDom = p.procedures.map(p => (p, p.blocks))
 
     initDom.map(d => (d._1, solve(d._2, Set(), Set()))).toMap
   }
@@ -244,7 +384,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       initial: IterableOnce[Block],
       widenpoints: Set[Block], // set of loop heads
       narrowpoints: Set[Block] // set of conditions
-  ):  Map[Block, L] = {
+  ): Map[Block, L] = {
     val saved: mutable.HashMap[Block, L] = mutable.HashMap()
     val worklist = mutable.PriorityQueue[Block]()(Ordering.by(b => b.rpoOrder))
     worklist.addAll(initial)
@@ -330,14 +470,15 @@ class ConstCopyProp(cyclicVariables: Map[Procedure, Set[Variable]]) extends Abst
       case Assign(l, r, lb) => {
         var p = c
         val evaled = eval.partialEvalExpr(
-            eval.simplifyExprFixpoint(r),
-            v => p.constants.get(v)
-          )
+          eval.simplifyExprFixpoint(r),
+          v => p.constants.get(v)
+        )
         val rhsDeps = evaled.variables
 
         p = evaled match {
           case lit: Literal => p.copy(constants = p.constants.updated(l, lit), exprs = p.exprs.removed(l))
-          case e: Expr if e.loads.isEmpty && !e.variables.contains(l) && !(cyclicVariables(s.parent.parent).contains(l)) =>
+          case e: Expr
+              if e.loads.isEmpty && !e.variables.contains(l) && !(cyclicVariables(s.parent.parent).contains(l)) =>
             p.copy(constants = p.constants.removed(l), exprs = p.exprs.updated(l, CopyProp(e, e.variables)))
           case _ => p.copy(constants = p.constants.removed(l), exprs = p.exprs.removed(l))
         }
@@ -364,14 +505,13 @@ class ConstCopyProp(cyclicVariables: Map[Procedure, Set[Variable]]) extends Abst
   }
 }
 
-
 class Simplify(
     val res: Map[Block, CCP],
-    val initialBlock: Block = null,
+    val initialBlock: Block = null
 ) extends CILVisitor {
 
   var madeAnyChange = false
-  var block : Block =  initialBlock
+  var block: Block = initialBlock
 
   def simp(pe: Expr)(ne: Expr) = {
     val simped = eval.partialEvalExpr(ir.eval.simplifyExprFixpoint(ne), x => None)

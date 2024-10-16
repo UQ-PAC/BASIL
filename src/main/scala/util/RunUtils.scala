@@ -530,6 +530,9 @@ object RunUtils {
     transforms.doCopyPropTransform(ctx.program)
     writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
 
+    transforms.removeSlices(ctx.program)
+    writeToFile(serialiseIL(ctx.program), s"il-after-slices.il")
+
     config.foreach(_.analysisDotPath.foreach { s =>
       writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-simp.dot")
     })
