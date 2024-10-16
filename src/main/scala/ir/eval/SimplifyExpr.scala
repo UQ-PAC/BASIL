@@ -126,13 +126,13 @@ def simplifyExpr(e: Expr): Expr = {
     case BinaryExpr(op, x: Literal, y: Expr) if !y.isInstanceOf[Literal] && assocOps.contains(op) =>
       BinaryExpr(op, simplifyExpr(y), simplifyExpr(x))
 
-    case BinaryExpr(
-          BVAND,
-          UninterpretedFunction("bool2bvan1", Seq(l), _),
-          UninterpretedFunction("bool2bvan1", Seq(r), _)
-        ) => {
-      BinaryExpr(BoolAND, l, r)
-    }
+    //case BinaryExpr(
+    //      BVAND,
+    //      UninterpretedFunction("bool2bv1", Seq(l), _),
+    //      UninterpretedFunction("bool2bv1", Seq(r), _)
+    //    ) => {
+    //  bool2bv1(BinaryExpr(BoolAND, l, r))
+    //}
     //case BinaryExpr(BVADD, x: Expr, y: BitVecLiteral) if ir.eval.BitVectorEval.isNegative(y) =>
     //  BinaryExpr(BVSUB, simplifyExpr(x), ir.eval.BitVectorEval.smt_bvneg(y))
 
@@ -153,12 +153,12 @@ def simplifyExpr(e: Expr): Expr = {
     case BinaryExpr(BVCOMP, BinaryExpr(BVSUB, e1, e2), BitVecLiteral(0, sz)) =>
       BinaryExpr(BVCOMP, simplifyExpr(e1), simplifyExpr(e2))
     // NF check on expr
-    case Extract(upper, lower, b)
-        if (b.getType.isInstanceOf[BitVecType]) && (upper == (lower + 1)) && (upper == b.getType
-          .asInstanceOf[BitVecType]
-          .size) => {
-      bool2bv1(BinaryExpr(BVSLT, simplifyExpr(b), BitVecLiteral(0, b.getType.asInstanceOf[BitVecType].size)))
-    }
+    //case Extract(upper, lower, b)
+    //    if (b.getType.isInstanceOf[BitVecType]) && (upper == (lower + 1)) && (upper == b.getType
+    //      .asInstanceOf[BitVecType]
+    //      .size) => {
+    //  bool2bv1(BinaryExpr(BVSLT, simplifyExpr(b), BitVecLiteral(0, b.getType.asInstanceOf[BitVecType].size)))
+    //}
     case BinaryExpr(BVSLT, BinaryExpr(BVSUB, a, b), BitVecLiteral(0, sz)) => BinaryExpr(BVSLT, a, b)
     case BinaryExpr(BVSLT, BinaryExpr(BVADD, a, b: BitVecLiteral), BitVecLiteral(0, sz)) =>
       BinaryExpr(BVSLT, a, UnaryExpr(BVNEG, b))
@@ -212,21 +212,21 @@ def simplifyExpr(e: Expr): Expr = {
     //    )
     //  r
     //}
-    case BinaryExpr(
-          BVAND,
-          UninterpretedFunction("bool2bv1", Seq(l), BitVecType(1)),
-          UninterpretedFunction("bool2bv1", Seq(r), BitVecType(1))
-        ) =>
-      bool2bv1(BinaryExpr(BoolAND, l, r))
-    case BinaryExpr(
-          BVCOMP,
-          UninterpretedFunction("bool2bv1", Seq(l), BitVecType(1)),
-          UninterpretedFunction("bool2bv1", Seq(r), BitVecType(1))
-        ) =>
-      bool2bv1(BinaryExpr(BoolEQ, l, r))
-    case BinaryExpr(BVSLT, BinaryExpr(BVADD, x, const: BitVecLiteral), y) => {
-      BinaryExpr(BVSLT, x, BinaryExpr(BVSUB, y, const))
-    }
+    //case BinaryExpr(
+    //      BVAND,
+    //      UninterpretedFunction("bool2bv1", Seq(l), BitVecType(1)),
+    //      UninterpretedFunction("bool2bv1", Seq(r), BitVecType(1))
+    //    ) =>
+    //  bool2bv1(BinaryExpr(BoolAND, l, r))
+    //case BinaryExpr(
+    //      BVCOMP,
+    //      UninterpretedFunction("bool2bv1", Seq(l), BitVecType(1)),
+    //      UninterpretedFunction("bool2bv1", Seq(r), BitVecType(1))
+    //    ) =>
+    //  bool2bv1(BinaryExpr(BoolEQ, l, r))
+    //case BinaryExpr(BVSLT, BinaryExpr(BVADD, x, const: BitVecLiteral), y) => {
+    //  BinaryExpr(BVSLT, x, BinaryExpr(BVSUB, y, const))
+    //}
 
     // tighten bounds
     case e @ BinaryExpr(BoolAND, BinaryExpr(BVSLT, x, y), (BinaryExpr(BVSLT, z, y2))) if y == y2 => {
@@ -287,9 +287,9 @@ def simplifyExpr(e: Expr): Expr = {
 
     case BinaryExpr(BVSUB, x: Expr, y: BitVecLiteral)         => BinaryExpr(BVADD, x, UnaryExpr(BVNEG, y))
     case BinaryExpr(BVAND, l, r) if l == r && l.loads.isEmpty => simplifyExpr(l)
-    case BinaryExpr(BVCOMP, l, r)                             => bool2bv1(BinaryExpr(BVEQ, l, r))
-    case BinaryExpr(BVEQ, UninterpretedFunction("bool2bv1", Seq(l), BitVecType(1)), BitVecLiteral(1, 1)) => l
-    case UnaryExpr(BVNOT, UninterpretedFunction("bool2bv1", Seq(l), BitVecType(1))) => bool2bv1(UnaryExpr(BoolNOT, l))
+    // case BinaryExpr(BVCOMP, l, r)                             => bool2bv1(BinaryExpr(BVEQ, l, r))
+    //case BinaryExpr(BVEQ, UninterpretedFunction("bool2bv1", Seq(l), BitVecType(1)), BitVecLiteral(1, 1)) => l
+    //case UnaryExpr(BVNOT, UninterpretedFunction("bool2bv1", Seq(l), BitVecType(1))) => bool2bv1(UnaryExpr(BoolNOT, l))
 
     case r => r
   }
