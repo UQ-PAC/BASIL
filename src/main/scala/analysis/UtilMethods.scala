@@ -143,33 +143,49 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
   }
 }
 
-def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFilter: Boolean = true): Set[Assign] = {
+def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
   val (in, _) = reachingDefs(node)
-  if noFilter then in.getOrElse(variable, Set()) else in.getOrElse(variable, Set()).filterNot(_.rhs.variables.forall(_.name.contains("Unique")))
+  in.getOrElse(variable, Set())
 }
 
-def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFiler: Boolean = true): Set[Assign] = {
+def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
   val (_, out) = reachingDefs(node)
-  if noFiler then out.getOrElse(variable, Set()) else out.getOrElse(variable, Set()).filterNot(_.rhs.variables.forall(_.name.contains("Unique")))
+  out.getOrElse(variable, Set())
 }
 
-def unwrapExpr(expr: Expr): Set[Expr] = {
-  var buffers: Set[Expr] = Set()
+def unwrapExpr(expr: Expr): Option[MemoryLoad] = {
   expr match {
-    case e: Extract => buffers ++= unwrapExpr(e.body)
-    case e: SignExtend => buffers ++= unwrapExpr(e.body)
-    case e: ZeroExtend => buffers ++= unwrapExpr(e.body)
-    case repeat: Repeat => buffers ++= unwrapExpr(repeat.body)
-    case unaryExpr: UnaryExpr => buffers ++= unwrapExpr(unaryExpr.arg)
+    case e: Extract => unwrapExpr(e.body)
+    case e: SignExtend => unwrapExpr(e.body)
+    case e: ZeroExtend => unwrapExpr(e.body)
+    case repeat: Repeat => unwrapExpr(repeat.body)
+    case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
     case binaryExpr: BinaryExpr =>
-      buffers ++= unwrapExpr(binaryExpr.arg1)
-      buffers ++= unwrapExpr(binaryExpr.arg2)
+      unwrapExpr(binaryExpr.arg1)
+      unwrapExpr(binaryExpr.arg2)
     case memoryLoad: MemoryLoad =>
-      buffers += memoryLoad
-      buffers ++= unwrapExpr(memoryLoad.index)
+      Some(memoryLoad)
     case _ =>
+      None
   }
-  buffers
+}
+
+def unwrapExprToVar(expr: Expr): Option[Variable] = {
+  expr match {
+    case variable: Variable =>
+      Some(variable)
+    case e: Extract => unwrapExprToVar(e.body)
+    case e: SignExtend => unwrapExprToVar(e.body)
+    case e: ZeroExtend => unwrapExprToVar(e.body)
+    case repeat: Repeat => unwrapExprToVar(repeat.body)
+    case unaryExpr: UnaryExpr => unwrapExprToVar(unaryExpr.arg)
+    case binaryExpr: BinaryExpr =>
+      unwrapExprToVar(binaryExpr.arg1)
+      unwrapExprToVar(binaryExpr.arg2)
+    case memoryLoad: MemoryLoad => unwrapExprToVar(memoryLoad.index)
+    case _ =>
+      None
+  }
 }
 
 def bitVectorOpToBigIntOp(op: BinOp, lhs: BigInt, rhs: BigInt): BigInt = {

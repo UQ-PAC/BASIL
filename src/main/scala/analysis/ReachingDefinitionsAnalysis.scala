@@ -21,21 +21,6 @@ case class ReachingDefinitionsAnalysis(program: Program, inter: Boolean = false)
   )
 
   val domain: Set[CFGPosition] = Set.empty ++ program
-  var uniqueDefCounter: Int = 0
-
-  def nextDef(): Int = {
-    uniqueDefCounter += 1
-    uniqueDefCounter
-  }
-
-  /*
-   * Good enough as stmts are unique
-   */
-  private def generateUniqueDefinition(
-                                        variable: Variable
-                                      ): Assign = {
-    Assign(variable, Register("Unique_" + nextDef(), 0))
-  }
 
   def transfer(n: CFGPosition, s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) =
     localTransfer(n, s)
@@ -77,24 +62,9 @@ case class ReachingDefinitionsAnalysis(program: Program, inter: Boolean = false)
       transformUses(assume.body.variables, s)
     case indirectCall: IndirectCall =>
       transformUses(indirectCall.target.variables, s)
-    // if we do interproc analysis then there is no need to make any special assumptions about malloc
-    case directCall: DirectCall if directCall.target.name == "malloc" && !inter =>
-      // assume R0 has been assigned, generate a fake definition
-      val mallocVar = Register("R0", 64)
-      val mallocDef = generateUniqueDefinition(mallocVar)
-      val mallocUseDefs: Map[Variable, Set[Definition]] = Set(mallocVar).foldLeft(Map.empty[Variable, Set[Definition]]) {
-        case (acc, v) =>
-          acc + (v -> s._1(v))
-      }
-      (s._1 + (Register("R0", 64) -> Set(mallocDef)), mallocUseDefs)
     case _ => s
   }
 }
-
-class ReachingDefinitionsAnalysisSolver(program: Program)
-  extends ReachingDefinitionsAnalysis(program)
-    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[ReachingDefinitionsAnalysis#Definition]], Map[Variable, Set[ReachingDefinitionsAnalysis#Definition]]), ReachingDefinitionsAnalysis#TupleElement]
-    with IRIntraproceduralForwardDependencies
 
 class InterprocReachingDefinitionsAnalysisSolver(program: Program)
   extends ReachingDefinitionsAnalysis(program, true)
