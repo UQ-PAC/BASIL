@@ -83,7 +83,7 @@ trait ValueSetAnalysis(domain: Set[CFGPosition],
                 case Some(v: Variable) =>
                   m = m + (localAssign.lhs -> m(v))
                 case None =>
-                  Logger.debug(s"Too Complex: $localAssign.rhs") // do nothing
+                  Logger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
               }
         }
         m

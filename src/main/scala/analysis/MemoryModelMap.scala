@@ -151,19 +151,19 @@ class MemoryModelMap {
 
   def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]], heapRegions: mutable.Map[DirectCall, HeapRegion], mergeRegions: mutable.Set[Set[MemoryRegion]], allocationSites: Map[CFGPosition, Set[StackRegion]], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]], graRegions: mutable.HashMap[BigInt, DataRegion], graResults: Map[CFGPosition, Set[DataRegion]]): Unit = {
     //val keepData = dataMap.filterNot((range, region) => graRegions.contains(region.start)).map((range, region) => region)
-//    val oldRegions = dataMap.values.toSet
-//    dataMap.clear()
-//    for (dr <- graRegions.map((_, dataRegion) => dataRegion)) {
-//      add(dr.start, dr)
-//    }
-//    for (dr <- oldRegions) {
-//      val obj = findDataObject(dr.start)
-//      if (obj.isEmpty) {
-//        Logger.debug(s"Data region $dr not found in the new data map")
-//      } else {
-//        obj.get.relfContent.add(dr.regionIdentifier)
-//      }
-//    }
+    val oldRegions = dataMap.values.toSet
+    dataMap.clear()
+    for (dr <- graRegions.map((_, dataRegion) => dataRegion)) {
+      add(dr.start, dr)
+    }
+    for (dr <- oldRegions) {
+      val obj = findDataObject(dr.start)
+      if (obj.isEmpty) {
+        Logger.debug(s"Data region $dr not found in the new data map")
+      } else {
+        obj.get.relfContent.add(dr.regionIdentifier)
+      }
+    }
 
     cfgPositionToDataRegion ++= graResults
     stackAllocationSites ++= allocationSites

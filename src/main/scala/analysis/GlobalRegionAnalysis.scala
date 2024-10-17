@@ -129,11 +129,11 @@ trait GlobalRegionAnalysis(val program: Program,
         returnSet = returnSet + i
       } else {
           if (accesses.size == 1) {
-            dataMap(i.start) = DataRegion(accesses.head.regionIdentifier, i.start, i.size.max(accesses.head.size))
+            dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(accesses.head.size))
             returnSet = returnSet + dataMap(i.start)
           } else if (accesses.size > 1) {
             val highestRegion = accesses.maxBy(_.start)
-            dataMap(i.start) = DataRegion(accesses.head.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
+            dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
             returnSet = returnSet + dataMap(i.start)
           }
       }
@@ -153,6 +153,9 @@ trait GlobalRegionAnalysis(val program: Program,
             val unwrapped = unwrapExpr(assign.rhs)
             if (unwrapped.isDefined) {
               return checkIfDefined(evalMemLoadToGlobal(unwrapped.get.index, unwrapped.get.size, cmd), n)
+            } else {
+              // this is a constant but we need to check if it is a data region
+              return checkIfDefined(evalMemLoadToGlobal(assign.rhs, 1, cmd), n)
             }
           case _ =>
         }

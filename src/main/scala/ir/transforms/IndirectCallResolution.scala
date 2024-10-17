@@ -202,7 +202,7 @@ def resolveIndirectCallsUsingVSA(
             case _ =>
           case None =>
       case dataRegion: DataRegion =>
-        names.add(dataRegion.regionIdentifier)
+        names.addAll(dataRegion.relfContent)
         vsaResult.get(n) match
           case Some(value) => value match
             case Lift(el) => el.get(dataRegion) match

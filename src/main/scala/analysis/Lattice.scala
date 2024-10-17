@@ -662,8 +662,8 @@ class ValueSetLattice[T] extends Lattice[ValueSet[T]] {
 
   extension (r: DataRegion | StackRegion)
     def start: BigInt = r match {
-      case d: DataRegion => d.start.value
-      case s: StackRegion => s.start.value
+      case d: DataRegion => d.start
+      case s: StackRegion => s.start
     }
 
     def end(mmm: MemoryModelMap): BigInt = r match {
