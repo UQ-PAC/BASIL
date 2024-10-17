@@ -274,7 +274,8 @@ object StaticAnalysis {
   def analyse(
       ctx: IRContext,
       config: StaticAnalysisConfig,
-      iteration: Int
+      iteration: Int,
+      previousResults: Option[StaticAnalysisContext] = None
   ): StaticAnalysisContext = {
     val IRProgram: Program = ctx.program
     val externalFunctions: Set[ExternalFunction] = ctx.externalFunctions
@@ -364,7 +365,13 @@ object StaticAnalysis {
     val mmm = MemoryModelMap()
     mmm.preLoadGlobals(mergedSubroutines, globalOffsets, globalAddresses, globalSizes)
 
-    val graSolver = GlobalRegionAnalysisSolver(IRProgram, domain.toSet, constPropResult, reachingDefinitionsAnalysisResults, mmm, globalOffsets)
+    var previousVSAResults = Option.empty[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
+    if (previousResults.isDefined) {
+      previousVSAResults = Some(previousResults.get.vsaResult)
+    }
+
+    Logger.debug("[!] Running GRA")
+    val graSolver = GlobalRegionAnalysisSolver(IRProgram, domain.toSet, constPropResult, reachingDefinitionsAnalysisResults, mmm, globalOffsets, previousVSAResults)
     val graResult = graSolver.analyze()
 
     Logger.debug("[!] Running MRA")
@@ -552,7 +559,7 @@ object RunUtils {
     val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
     while (modified) {
       Logger.debug("[!] Running Static Analysis")
-      val result = StaticAnalysis.analyse(ctx, config, iteration)
+      val result = StaticAnalysis.analyse(ctx, config, iteration, analysisResult.lastOption)
       analysisResult.append(result)
       Logger.debug("[!] Replacing Indirect Calls")
 //      modified = transforms.resolveIndirectCallsUsingPointsTo(

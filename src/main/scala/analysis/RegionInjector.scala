@@ -24,205 +24,6 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
     program.readOnlyMemory = transformMemorySections(program.readOnlyMemory)
   }
 
-  /**
-   * In expressions that have accesses within a region, we need to relocate
-   * the base address to the actual address using the relocation table.
-   * MUST RELOCATE because MMM iterate to find the lowest address
-   * TODO: May need to iterate over the relocation table to find the actual address
-   *
-   * @param address
-   * @param globalOffsets
-   * @return BitVecLiteral: the relocated address
-   */
-  def relocatedBase(address: BigInt, globalOffsets: Map[BigInt, BigInt]): BitVecLiteral = {
-    val tableAddress = globalOffsets.getOrElse(address, address)
-    // this condition checks if the address is not layered and returns if it is not
-    if (tableAddress != address && !globalOffsets.contains(tableAddress)) {
-      return BitVecLiteral(address, 64)
-    }
-    BitVecLiteral(tableAddress, 64)
-  }
-
-  /**
-   * Used to reduce an expression that may be a sub-region of a memory region.
-   * Pointer reduction example:
-   * R2 = R31 + 20
-   * Mem[R2 + 8] <- R1
-   *
-   * Steps:
-   * 1) R2 = R31 + 20         <- ie. stack access (assume R31 = stackPointer)
-   * ↓
-   * R2 = StackRegion("stack_1", 20)
-   *
-   * 2) Mem[R2 + 8] <- R1     <- ie. memStore
-   * ↓
-   * (StackRegion("stack_1", 20) + 8) <- R1
-   * ↓
-   * MMM.get(20 + 8) <- R1
-   *
-   * @param binExpr
-   * @param n
-   * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
-   */
-  def reducibleToRegion(binExpr: BinaryExpr, n: Command): Set[MemoryRegion] = {
-    var reducedRegions = Set.empty[MemoryRegion]
-    binExpr.arg1 match {
-      case variable: Variable =>
-        val b = evaluateExpression(binExpr, constantProp(n))
-          if (b.isDefined) {
-          val region = mmm.findDataObject(b.get.value)
-          reducedRegions = reducedRegions ++ region
-        }
-        if (reducedRegions.nonEmpty) {
-          return reducedRegions
-        }
-        val ctx = getUse(variable, n, reachingDefs)
-        for (i <- ctx) {
-          if (i != n) { // handles loops (ie. R19 = R19 + 1) %00000662 in jumptable2
-            val regions = i.rhs match {
-              case loadL: MemoryLoad =>
-                val foundRegions = exprToRegion(loadL.index, i)
-                val toReturn = mutable.Set[MemoryRegion]().addAll(foundRegions)
-                for {
-                  f <- foundRegions
-                } {
-                  // TODO: Must enable this (probably need to calculate those contents beforehand)
-//                  if (memoryRegionContents.contains(f)) {
-//                    memoryRegionContents(f).foreach {
-//                      case b: BitVecLiteral =>
-//                      //                        val region = mmm.findDataObject(b.value)
-//                      //                        if (region.isDefined) {
-//                      //                          toReturn.addOne(region.get)
-//                      //                        }
-//                      case r: MemoryRegion =>
-//                        toReturn.addOne(r)
-//                        toReturn.remove(f)
-//                    }
-//                  }
-                }
-                toReturn.toSet
-              case _: BitVecLiteral =>
-                Set.empty[MemoryRegion]
-              case _ =>
-                //println(s"Unknown expression: ${i}")
-                //println(ctx)
-                exprToRegion(i.rhs, i)
-            }
-            val result = evaluateExpression(binExpr.arg2, constantProp(n))
-            if (result.isDefined) {
-              val b = result.get
-              for {
-                r <- regions
-              } {
-                r match {
-                  case stackRegion: StackRegion =>
-                    //println(s"StackRegion: ${stackRegion.start}")
-                    //println(s"BitVecLiteral: ${b}")
-                    //if (b.size == stackRegion.start.size) { TODO: Double check why this is needed
-                    val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
-                    reducedRegions ++= exprToRegion(BinaryExpr(binExpr.op, stackPointer, BitVecLiteral(nextOffset, 64)), n)
-                  //}
-                  case dataRegion: DataRegion =>
-                    //val nextOffset = BinaryExpr(binExpr.op, relocatedBase(dataRegion.start, globalOffsets), b)
-                    val nextOffset = bitVectorOpToBigIntOp(binExpr.op, dataRegion.start, b.value)
-                    reducedRegions ++= exprToRegion(BitVecLiteral(nextOffset, 64), n)
-                  case _ =>
-                }
-              }
-            }
-          }
-        }
-      case _ =>
-    }
-    reducedRegions
-  }
-
-  /**
-   * Finds a region for a given expression using MMM results
-   *
-   * @param expr
-   * @param n
-   * @return Set[MemoryRegion]: a set of regions that the expression may be pointing to
-   */
-  def exprToRegion(expr: Expr, n: Command): Set[MemoryRegion] = {
-    var res = Set[MemoryRegion]()
-    mmm.popContext()
-    mmm.pushContext(IRWalk.procedure(n).name)
-    expr match { // TODO: Stack detection here should be done in a better way or just merged with data
-      case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
-        val b = evaluateExpression(binOp.arg2, constantProp(n))
-        if (b.isDefined) {
-          if binOp.arg2.variables.exists { v => v.sharedVariable } then {
-            Logger.debug("Shared stack object: " + b)
-            Logger.debug("Shared in: " + expr)
-            val regions = mmm.findSharedStackObject(b.get.value)
-            Logger.debug("found: " + regions)
-            res ++= regions
-          } else {
-            if (isNegative(b.get)) {
-              val region = mmm.findStackObject(0)
-              if (region.isDefined) {
-                res = res + region.get
-              }
-            }
-            val region = mmm.findStackObject(b.get.value)
-            if (region.isDefined) {
-              res = res + region.get
-            }
-          }
-        }
-      case binaryExpr: BinaryExpr =>
-        res ++= reducibleToRegion(binaryExpr, n)
-      case v: Variable if v == stackPointer =>
-        res ++= mmm.findStackObject(0)
-      case v: Variable =>
-        val b = evaluateExpression(expr, constantProp(n))
-        if (b.isDefined) {
-          Logger.debug("BitVecLiteral: " + b)
-          val region = mmm.findDataObject(b.get.value)
-          if (region.isDefined) {
-            res += region.get
-          }
-        }
-        if (res.isEmpty) {
-          val ctx = getDefinition(v, n, reachingDefs)
-          for (i <- ctx) {
-            i.rhs match {
-              case be: BinaryExpr =>
-                res = res ++ exprToRegion(eval(i.rhs, i), n)
-              case _ =>
-            }
-          }
-        }
-
-        if (res.isEmpty) { // may be passed as param
-          val ctx = getUse(v, n, reachingDefs)
-          for (i <- ctx) {
-            i.rhs match {
-              case load: MemoryLoad => // treat as a region
-                res ++= exprToRegion(load.index, i)
-              case binaryExpr: BinaryExpr =>
-                res ++= reducibleToRegion(binaryExpr, i)
-              case _ => // also treat as a region (for now) even if just Base + Offset without memLoad
-                res ++= exprToRegion(i.rhs, i)
-            }
-          }
-        }
-      case load: MemoryLoad => // treat as a region
-        res ++= exprToRegion(load.index, n)
-      case _ =>
-        val b = evaluateExpression(expr, constantProp(n))
-        if (b.isDefined) {
-          Logger.debug("BitVecLiteral: " + b)
-          val region = mmm.findDataObject(b.get.value)
-          if (region.isDefined) {
-            res += region.get
-          }
-        }
-    }
-    res
-  }
-
   /** Default implementation of eval.
    */
   def eval(expr: Expr, cmd: Command): Expr = {
@@ -245,12 +46,23 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
         BinaryExpr(op, eval(arg1, cmd), eval(arg2, cmd))
       case MemoryLoad(mem, index, endian, size) =>
         // TODO: index should be replaced region
-        MemoryLoad(renameMemory(mem, index, cmd), eval(index, cmd), endian, size)
+        MemoryLoad(renameMemory(mem, cmd), eval(index, cmd), endian, size)
       case variable: Variable => variable // ignore variables
   }
 
-  def renameMemory(mem: Memory, expr: Expr, cmd : Command): Memory = {
-    val regions = exprToRegion(eval(expr, cmd), cmd)
+  def nodeToRegion(n: CFGPosition): Set[MemoryRegion] = {
+    var returnRegions = Set.empty[MemoryRegion]
+    n match {
+      case directCall: DirectCall =>
+        returnRegions = returnRegions + mmm.getHeap(directCall).asInstanceOf[MemoryRegion]
+      case _ =>
+        returnRegions = returnRegions ++ mmm.getStack(n).asInstanceOf[Set[MemoryRegion]] ++ mmm.getData(n).asInstanceOf[Set[MemoryRegion]]
+    }
+    returnRegions
+  }
+
+  def renameMemory(mem: Memory, cmd : Command): Memory = {
+    val regions = nodeToRegion(cmd)
     if (regions.size == 1) {
       Logger.debug(s"Mem CMD is: ${cmd}")
       Logger.debug(s"Region found for mem: ${regions.head}")
@@ -271,8 +83,7 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
 //        case _ =>
 //      }
     } else {
-      Logger.debug(s"Mem CMD is: ${cmd}")
-      Logger.debug(s"No region found for expr ${expr} regions size is ${regions.size}")
+      Logger.debug(s"No region found for cmd ${cmd} regions size is ${regions.size}")
     }
     mem
   }
@@ -283,7 +94,7 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
     case assign: Assign =>
       assign.rhs = eval(assign.rhs, assign)
     case mAssign: MemoryAssign =>
-      mAssign.mem = renameMemory(mAssign.mem, mAssign.index, mAssign)
+      mAssign.mem = renameMemory(mAssign.mem, mAssign)
       mAssign.index = eval(mAssign.index, mAssign)
       mAssign.value = eval(mAssign.value, mAssign)
     case assert: Assert =>

@@ -113,12 +113,11 @@ class MemoryModelMap {
    * This is because when regions are found, the relocated address is used and as such match
    * the correct range.
    *
-   * @param name
    * @param address
    * @param globalOffsets
    * @return BitVector: a BitVector representing the actual address
    */
-  private def resolveInverseGlobalOffset(name: String, address: BigInt, globalOffsets: Map[BigInt, BigInt]): BigInt = {
+  private def resolveInverseGlobalOffset(address: BigInt, globalOffsets: Map[BigInt, BigInt]): BigInt = {
     val inverseGlobalOffsets = globalOffsets.map(_.swap)
     var tableAddress = inverseGlobalOffsets.getOrElse(address, address)
     // addresses may be layered as in jumptable2 example for which recursive search is required
@@ -131,13 +130,12 @@ class MemoryModelMap {
         tableAddress = newAddress
       }
     }
-
     tableAddress
   }
 
   def preLoadGlobals(externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
-    val reversedExternalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(name, offset, globalOffsets) -> name)
+    val reversedExternalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(offset, globalOffsets) -> name)
     val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => reversedExternalFunctionRgns.contains(offset))
 
     val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, (globalSizes.getOrElse(name, 1).toDouble / 8).ceil.toInt))
@@ -188,8 +186,19 @@ class MemoryModelMap {
     for (regions <- mergeRegions) {
       uf.bulkUnion(regions)
     }
+
+    /* this is done because the stack regions will change after MMM transforms them
+    and merges some of them based on size, thus we need to alter the results of
+    the analysis to match MMM transformations
+    TODO: Can this be done directly in MRA?
+     */
+    for ((n, stacks) <- stackAllocationSites) {
+      pushContext(IRWalk.procedure(n).name)
+      stackAllocationSites(n) = stacks.map(r => findStackObject(r.start).getOrElse(r))
+      pushContext(IRWalk.procedure(n).name)
+    }
   }
-  // TODO: push and pop could be optimised by caching the results
+
   def pushContext(funName: String): Unit = {
     contextStack.push(funName)
     stackMap.clear()

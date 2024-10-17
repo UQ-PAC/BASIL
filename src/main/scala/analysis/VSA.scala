@@ -50,8 +50,8 @@ trait ValueSetAnalysis(domain: Set[CFGPosition],
     returnRegions
   }
 
-  def canCoerceIntoDataRegion(bitVecLiteral: BitVecLiteral): Option[DataRegion] = {
-    mmm.isDataBase(bitVecLiteral.value)
+  def canCoerceIntoDataRegion(bitVecLiteral: BitVecLiteral, size: Int): Option[DataRegion] = {
+    mmm.findDataObject(bitVecLiteral.value)
   }
 
   /** Default implementation of eval.
@@ -71,7 +71,7 @@ trait ValueSetAnalysis(domain: Set[CFGPosition],
         } else {
           evaluateExpression(localAssign.rhs, constantProp(n)) match
             case Some(bitVecLiteral: BitVecLiteral) =>
-              val possibleData = canCoerceIntoDataRegion(bitVecLiteral)
+              val possibleData = canCoerceIntoDataRegion(bitVecLiteral, 1)
               if (possibleData.isDefined) {
                 m = m + (localAssign.lhs -> Set(AddressValue(possibleData.get)))
               } else {
@@ -92,7 +92,7 @@ trait ValueSetAnalysis(domain: Set[CFGPosition],
         evaluateExpression(memAssign.value, constantProp(n)) match
           case Some(bitVecLiteral: BitVecLiteral) =>
             regions.foreach { r =>
-              val possibleData = canCoerceIntoDataRegion(bitVecLiteral)
+              val possibleData = canCoerceIntoDataRegion(bitVecLiteral, memAssign.size)
               if (possibleData.isDefined) {
                 m = m + (r -> Set(AddressValue(possibleData.get)))
               } else {

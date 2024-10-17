@@ -37,20 +37,20 @@ trait MemoryRegionAnalysis(val program: Program,
    * Controls the pool of stack regions. Each pool is unique to a function.
    * If the offset has already been defined in the context of the function, then the same region is returned.
    *
-   * @param expr   : the offset
+   * @param base   : the offset
    * @param parent : the function entry node
    * @return the stack region corresponding to the offset
    */
-  private def poolMaster(expr: BigInt, stackBase: Procedure, subAccess: BigInt): StackRegion = {
+  private def poolMaster(base: BigInt, stackBase: Procedure, subAccess: BigInt): StackRegion = {
     assert(subAccess >= 0)
     val stackPool = stackMap.getOrElseUpdate(stackBase, mutable.HashMap())
     var region: StackRegion = null
-    if (stackPool.contains(expr)) {
-      region = stackPool(expr)
+    if (stackPool.contains(base)) {
+      region = stackPool(base)
     } else {
-      val newRegion = StackRegion(nextStackCount(), expr, stackBase)
+      val newRegion = StackRegion(nextStackCount(), base, stackBase)
       addReturnStack(stackBase, newRegion)
-      stackPool += (expr -> newRegion)
+      stackPool += (base -> newRegion)
       region = newRegion
     }
     region.subAccesses.add((subAccess.toDouble/8).ceil.toInt)
