@@ -25,6 +25,14 @@ sealed trait Expr {
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
+
+def size(e: Expr) = {
+  e.getType match {
+    case BitVecType(s) => Some(s)
+    case _             => None
+  }
+}
+
 sealed trait Literal extends Expr {
   override def acceptVisit(visitor: Visitor): Literal = visitor.visitLiteral(this)
 }

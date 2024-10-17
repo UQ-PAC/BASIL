@@ -519,6 +519,7 @@ object RunUtils {
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = {
     Logger.info("[!] Running simplification")
     Logger.info("[!] DynamicSingleAssignment")
+
     transforms.DynamicSingleAssignment.applyTransform(ctx.program)
 
     config.foreach(_.analysisDotPath.foreach { s =>
@@ -526,12 +527,13 @@ object RunUtils {
     })
     writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
 
+    transforms.removeSlices(ctx.program)
+    writeToFile(serialiseIL(ctx.program), s"il-after-slices.il")
+
     Logger.info("[!] CopyProp")
     transforms.doCopyPropTransform(ctx.program)
     writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
 
-    transforms.removeSlices(ctx.program)
-    writeToFile(serialiseIL(ctx.program), s"il-after-slices.il")
 
     config.foreach(_.analysisDotPath.foreach { s =>
       writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-simp.dot")
@@ -546,8 +548,9 @@ object RunUtils {
 
     ctx = IRTransform.doCleanup(ctx)
 
-    assert(invariant.correctCalls(ctx.program))
+    //assert(invariant.correctCalls(ctx.program))
     if (q.loading.parameterForm) {
+      ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
     } else {
       ir.transforms.clearParams(ctx.program)

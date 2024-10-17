@@ -42,13 +42,6 @@ def removeSlices(p: Procedure): Unit = {
     case False // property is false
     case Bot // don't know anything
 
-  def size(e: Expr) = {
-    e.getType match {
-      case BitVecType(s) => Some(s)
-      case _             => None
-    }
-  }
-
   case class LVTerm(v: LocalVar) extends analysis.solvers.Var[LVTerm]
 
   // unify variable uses across direct assignments
