@@ -342,6 +342,7 @@ case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IR
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
   override def gammas: Set[Expr] = params.flatMap(_.gammas).toSet
   override def variables: Set[Variable] = params.flatMap(_.variables).toSet
+  override def toString = s"$name(${params.mkString(", ")})"
 }
 
 // Means something has a global scope from the perspective of the IR and Boogie

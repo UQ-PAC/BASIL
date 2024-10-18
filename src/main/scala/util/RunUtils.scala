@@ -559,7 +559,10 @@ object RunUtils {
 
     if (conf.simplify) {
       doSimplify(ctx, conf.staticAnalysis)
+      writeToFile(ir.eval.makeValidation(), s"simps.smt2")
     }
+
+
 
     assert(invariant.correctCalls(ctx.program))
 

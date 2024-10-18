@@ -12,7 +12,9 @@ trait BasilIRExp[Repr[_]] {
       case n: Literal                               => vliteral(n)
       case m @ MemoryLoad(mem, index, endian, size) => vload(m)
       case Extract(ed, start, arg)                  => vextract(ed, start, vexpr(arg))
-      case Repeat(repeats, arg)  => vexpr((0 until repeats).foldLeft(arg)((acc, n) => BinaryExpr(BVCONCAT, acc, arg)))
+      case Repeat(repeats, arg) => {
+        vexpr((0 until (repeats - 1)).foldLeft(arg)((acc, n) => BinaryExpr(BVCONCAT, acc, arg)))
+      }
       case ZeroExtend(bits, arg) => vexpr(BinaryExpr(BVCONCAT, BitVecLiteral(0, bits), arg))
       case SignExtend(bits, arg) =>
         vexpr(BinaryExpr(BVCONCAT, Repeat(bits, Extract(size(arg).get, size(arg).get - 1, arg)), arg))
@@ -58,6 +60,26 @@ def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l.toList)
 
 object BasilIRToSMT2 extends BasilIRExp[Sexp] {
 
+  def exprUnsat(e: Expr, name : Option[String] = None): String = {
+
+    val assert = if (name.isDefined ) {
+        list(sym("assert"), list(sym("!"), BasilIRToSMT2.vexpr(e), sym(":named"), sym(name.get)))
+    } else {
+        list(sym("assert"), BasilIRToSMT2.vexpr(e))
+    }
+
+    val terms = list(sym("push"))::BasilIRToSMT2.extractDecls(e)
+      ++ List(
+        assert,
+        list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")),
+        list(sym("check-sat")),
+        list(sym("get-model")),
+        list(sym("pop"))
+      )
+
+    (terms.map(Sexp.print)).mkString("\n")
+  }
+
   def unaryOpnameToFun(b: UnOp) = {
     b match {
       case BoolNOT => "not"
@@ -82,26 +104,41 @@ object BasilIRToSMT2 extends BasilIRExp[Sexp] {
     }
   }
 
+  def fixVname(n: String): String = {
+    n.map(c =>
+      c match {
+        case '#' => 'x'
+        case c   => c
+      }
+    ).mkString("")
+  }
+
   def int2smt(i: Int) = sym(i.toString)
-  def bv2smt(i: BitVecLiteral) = sym(i.toString)
+  def bv2smt(i: BitVecLiteral) = list(sym("_"), sym(s"bv${i.value}"), sym(i.size.toString))
 
   override def vextract(ed: Int, start: Int, a: Sexp[Expr]): Sexp[Expr] =
     list(list(sym("_"), sym("extract"), int2smt(ed - 1), int2smt(start)), a)
   override def vbinary_expr(e: BinOp, l: Sexp[Expr], r: Sexp[Expr]): Sexp[Expr] = list(sym(opnameToFun(e)), l, r)
   override def vunary_expr(e: UnOp, arg: Sexp[Expr]): Sexp[Expr] = list(sym(unaryOpnameToFun(e)), arg)
   override def vliteral(arg: Literal): Sexp[Expr] = arg match {
-    case BitVecLiteral(value, size) => list(sym("_"), sym(s"bv${value}"), sym(size.toString))
-    case IntLiteral(i)              => sym(i.toString)
-    case TrueLiteral                => sym("true")
-    case FalseLiteral               => sym("false")
+    case bv @ BitVecLiteral(value, size) => bv2smt(bv)
+    case IntLiteral(i)                   => sym(i.toString)
+    case TrueLiteral                     => sym("true")
+    case FalseLiteral                    => sym("false")
   }
 
   def endianToBool(endian: Endian): Sexp[Expr] = {
     if endian == Endian.LittleEndian then vexpr(FalseLiteral) else vexpr(TrueLiteral)
   }
-  override def vuninterp_function(name: String, args: Seq[Sexp[Expr]]): Sexp[Expr] =
-    list(sym(name), Sexp.Slist(args.toList))
-  override def vrvar(e: Variable): Sexp[Expr] = sym(e.name)
+  override def vuninterp_function(name: String, args: Seq[Sexp[Expr]]): Sexp[Expr] = {
+    if (args.size == 1) {
+      list(sym(name), args.head)
+    } else {
+      list(sym(name), Sexp.Slist(args.toList))
+    }
+  }
+
+  override def vrvar(e: Variable): Sexp[Expr] = sym(fixVname(e.name))
   override def vload(l: MemoryLoad): Sexp[Expr] =
     list(sym("memoryload"), sym(l.mem.name), vexpr(l.index), endianToBool(l.endian), int2smt(l.size))
 
@@ -114,23 +151,41 @@ object BasilIRToSMT2 extends BasilIRExp[Sexp] {
     }
   }
 
+  def interpretFun(x: UninterpretedFunction): Sexp[Expr] = {
+    x.name match {
+      case "bool2bv1" => {
+        list(
+          sym("define-fun"),
+          sym(x.name),
+          list(list(sym("arg"), basilTypeToSMTType(BoolType))),
+          basilTypeToSMTType(x.returnType),
+          list(sym("ite"), sym("arg"), bv2smt(BitVecLiteral(1, 1)), bv2smt(BitVecLiteral(0, 1)))
+        )
+      }
+      case _ => {
+        list(
+          sym("declare-fun"),
+          sym(x.name),
+          Sexp.Slist(x.params.toList.map(a => basilTypeToSMTType(a.getType))),
+          basilTypeToSMTType(x.returnType)
+        )
+      }
+    }
+  }
+
   def extractDecls(e: Expr): List[Sexp[Expr]] = {
 
     class ToDecl extends CILVisitor {
       var decled = Set[Sexp[Expr]]()
 
       override def vexpr(e: Expr) = e match {
-        case UninterpretedFunction(name, args, rt) => {
-          val decl = list(
-            sym("declare-fun"),
-            Sexp.Slist(args.toList.map(a => basilTypeToSMTType(a.getType))),
-            basilTypeToSMTType(rt)
-          )
+        case f: UninterpretedFunction => {
+          val decl = interpretFun(f)
           decled = decled + decl
           DoChildren() // get variables out of args
         }
         case v: Variable => {
-          val decl = list(sym("declare-const"), sym(v.name), basilTypeToSMTType(v.getType))
+          val decl = list(sym("declare-const"), sym(fixVname(v.name)), basilTypeToSMTType(v.getType))
           decled = decled + decl
           SkipChildren()
         }
@@ -163,14 +218,5 @@ object BasilIRToSMT2 extends BasilIRExp[Sexp] {
 
     ToDecl().getDecls(e).toList
   }
-
-}
-
-def expToSmt2(e: Expr): String = {
-
-  val decls = BasilIRToSMT2.extractDecls(e).map(Sexp.print)
-  val s = Sexp.print(BasilIRToSMT2.vexpr(e))
-
-  (decls ++ List(s)).mkString("\n")
 
 }
