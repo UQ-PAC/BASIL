@@ -6,6 +6,21 @@ import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 import ir.cilvisitor.*
 
 trait BasilIRExp[Repr[_]] {
+  def vexpr(e: Expr): Repr[Expr] 
+  def vextract(ed: Int, start: Int, a: Repr[Expr]): Repr[Expr]
+  def vbinary_expr(e: BinOp, l: Repr[Expr], r: Repr[Expr]): Repr[Expr]
+  def vunary_expr(e: UnOp, arg: Repr[Expr]): Repr[Expr]
+  def vliteral(arg: Literal): Repr[Expr]
+  def vuninterp_function(name: String, args: Seq[Repr[Expr]]): Repr[Expr]
+
+  def vrvar(e: Variable): Repr[Expr]
+  def vload(arg: MemoryLoad): Repr[Expr]
+}
+
+trait BasilIRExpWithVis[Repr[_]] extends BasilIRExp[Repr] {
+  /**
+   * Performs some simple reductions to fit basil IR into SMT2.
+   */
 
   def vexpr(e: Expr): Repr[Expr] = {
     e match {
@@ -31,14 +46,6 @@ trait BasilIRExp[Repr[_]] {
     }
   }
 
-  def vextract(ed: Int, start: Int, a: Repr[Expr]): Repr[Expr]
-  def vbinary_expr(e: BinOp, l: Repr[Expr], r: Repr[Expr]): Repr[Expr]
-  def vunary_expr(e: UnOp, arg: Repr[Expr]): Repr[Expr]
-  def vliteral(arg: Literal): Repr[Expr]
-  def vuninterp_function(name: String, args: Seq[Repr[Expr]]): Repr[Expr]
-
-  def vrvar(e: Variable): Repr[Expr]
-  def vload(arg: MemoryLoad): Repr[Expr]
 }
 
 enum Sexp[+T] {
@@ -58,7 +65,8 @@ object Sexp {
 def sym[T](l: String): Sexp[T] = Sexp.Symb[T](l)
 def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l.toList)
 
-object BasilIRToSMT2 extends BasilIRExp[Sexp] {
+
+object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
   def exprUnsat(e: Expr, name : Option[String] = None): String = {
 

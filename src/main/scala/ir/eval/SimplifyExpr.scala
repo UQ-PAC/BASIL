@@ -138,17 +138,14 @@ def simplifyExpr(e: Expr): Expr = {
     case BinaryExpr(op, x: Literal, y: Expr) if !y.isInstanceOf[Literal] && assocOps.contains(op) =>
       BinaryExpr(op, simplifyExpr(y), simplifyExpr(x))
 
-    // def of bvneg
-    //case UnaryExpr(BVNOT, x) if (!size(x).contains(1)) => BinaryExpr(BVSUB, UnaryExpr(BVNEG, x), BitVecLiteral(1, size(x).get))
     case BinaryExpr(BVADD, UnaryExpr(BVNOT, x), BitVecLiteral(1, _)) => UnaryExpr(BVNEG, x)
+
     case BinaryExpr(BVADD, BinaryExpr(BVADD, y, UnaryExpr(BVNOT, x)), BitVecLiteral(1, _))
         if !(y.isInstanceOf[BitVecLiteral]) =>
       BinaryExpr(BVADD, y, UnaryExpr(BVNEG, x))
     case BinaryExpr(BVADD, BinaryExpr(BVADD, y, ed @ SignExtend(sz, UnaryExpr(BVNOT, x))), BitVecLiteral(1, sz2))
         if size(ed).contains(sz2) && !(y.isInstanceOf[BitVecLiteral]) =>
       BinaryExpr(BVADD, y, UnaryExpr(BVNEG, SignExtend(sz, x)))
-
-    //case BinaryExpr(BVADD, BinaryExpr(BVADD, y, UnaryExpr(BVNOT, x)), BitVecLiteral(1, _)) if !(y.isInstanceOf[BitVecLiteral]) => BinaryExpr(BVADD, UnaryExpr(BVNEG, x), y)
 
     /*
      * Simplify BVop to Bool ops in a boolean context.
