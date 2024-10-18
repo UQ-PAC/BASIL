@@ -23,7 +23,6 @@ trait CILVisitor:
 
   def vstmt(e: Statement): VisitAction[List[Statement]] = DoChildren()
   def vjump(j: Jump): VisitAction[Jump] = DoChildren()
-  def vfallthrough(j: Option[GoTo]): VisitAction[Option[GoTo]] = DoChildren()
 
   def vexpr(e: Expr): VisitAction[Expr] = DoChildren()
   def vrvar(e: Variable): VisitAction[Variable] = DoChildren()
@@ -80,9 +79,6 @@ class CILVisitorImpl(val v: CILVisitor) {
     doVisit(v, v.vjump(j), j, continue)
   }
 
-  def visit_fallthrough(j: Option[GoTo]): Option[GoTo] = {
-    doVisit(v, v.vfallthrough(j), j, (j) => j)
-  }
 
   def visit_expr(n: Expr): Expr = {
     def continue(n: Expr): Expr = n match {

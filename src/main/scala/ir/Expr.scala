@@ -1,6 +1,4 @@
 package ir
-
-
 import boogie._
 import scala.collection.mutable
 
@@ -236,10 +234,13 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
 
 }
 
-trait BinOp
+trait BinOp {
+  def opName : String  
+}
 
 sealed trait BoolBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
 }
 
 case object BoolEQ extends BoolBinOp("==")
@@ -251,6 +252,7 @@ case object BoolEQUIV extends BoolBinOp("<==>")
 
 sealed trait BVBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
 }
 
 case object BVAND extends BVBinOp("and")
@@ -285,6 +287,7 @@ case object BVCONCAT extends BVBinOp("++")
 
 sealed trait IntBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
   def toBV: BVBinOp = this match {
     case IntADD => BVADD
     case IntMUL => BVMUL
