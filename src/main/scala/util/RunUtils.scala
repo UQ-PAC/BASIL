@@ -527,13 +527,15 @@ object RunUtils {
     })
     writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
 
-    transforms.removeSlices(ctx.program)
-    writeToFile(serialiseIL(ctx.program), s"il-after-slices.il")
 
     Logger.info("[!] CopyProp")
     transforms.doCopyPropTransform(ctx.program)
     writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
 
+    // run this after cond recovery because sign bit calculations often need high bits
+    // which go away in high level conss
+    transforms.removeSlices(ctx.program)
+    writeToFile(serialiseIL(ctx.program), s"il-after-slices.il")
 
     config.foreach(_.analysisDotPath.foreach { s =>
       writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-simp.dot")
@@ -561,7 +563,6 @@ object RunUtils {
       doSimplify(ctx, conf.staticAnalysis)
       writeToFile(ir.eval.makeValidation(), s"simps.smt2")
     }
-
 
 
     assert(invariant.correctCalls(ctx.program))
