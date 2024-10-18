@@ -13,18 +13,22 @@ case class ILLoadingConfig(inputFile: String,
                            specFile: Option[String] = None,
                            dumpIL: Option[String] = None,
                            mainProcedureName: String = "main",
-                           procedureTrimDepth: Int = Int.MaxValue)
+                           procedureTrimDepth: Int = Int.MaxValue,
+                           parameterForm: Boolean = false
+                           )
 
 case class StaticAnalysisConfig(dumpILToPath: Option[String] = None,
                                 analysisResultsPath: Option[String] = None,
                                 analysisDotPath: Option[String] = None,
                                 threadSplit: Boolean = false,
-                                summariseProcedures: Boolean = false)
+                                summariseProcedures: Boolean = false,
+                               )
 enum BoogieMemoryAccessMode:
   case SuccessiveStoreSelect, LambdaStoreSelect
 
 case class BASILConfig(loading: ILLoadingConfig,
                        runInterpret: Boolean = false,
+                       simplify: Boolean = false,
                        staticAnalysis: Option[StaticAnalysisConfig] = None,
                        boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
                        outputPrefix: String

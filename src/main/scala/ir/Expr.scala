@@ -1,6 +1,4 @@
 package ir
-
-
 import boogie._
 import scala.collection.mutable
 
@@ -23,6 +21,14 @@ sealed trait Expr {
   def gammas: Set[Expr] = Set()
   def variables: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
+}
+
+
+def size(e: Expr) = {
+  e.getType match {
+    case BitVecType(s) => Some(s)
+    case _             => None
+  }
 }
 
 sealed trait Literal extends Expr {
@@ -228,10 +234,13 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
 
 }
 
-trait BinOp
+trait BinOp {
+  def opName : String  
+}
 
 sealed trait BoolBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
 }
 
 case object BoolEQ extends BoolBinOp("==")
@@ -243,6 +252,7 @@ case object BoolEQUIV extends BoolBinOp("<==>")
 
 sealed trait BVBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
 }
 
 case object BVAND extends BVBinOp("and")
@@ -277,6 +287,7 @@ case object BVCONCAT extends BVBinOp("++")
 
 sealed trait IntBinOp(op: String) extends BinOp {
   override def toString: String = op
+  def opName = op
   def toBV: BVBinOp = this match {
     case IntADD => BVADD
     case IntMUL => BVMUL
@@ -331,6 +342,7 @@ case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IR
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
   override def gammas: Set[Expr] = params.flatMap(_.gammas).toSet
   override def variables: Set[Variable] = params.flatMap(_.variables).toSet
+  override def toString = s"$name(${params.mkString(", ")})"
 }
 
 // Means something has a global scope from the perspective of the IR and Boogie
@@ -356,6 +368,10 @@ sealed trait Variable extends Expr {
     throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
 
+object Variable {
+  implicit def ordering[V <: Variable]: Ordering[V] = Ordering.by(_.name)
+}
+
 // Variable with global scope (in a 'accessible from any procedure' sense), not related to the concurrent shared memory sense
 // These are all hardware registers
 case class Register(override val name: String, size: Int) extends Variable with Global {
@@ -370,9 +386,10 @@ case class Register(override val name: String, size: Int) extends Variable with 
 case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar(${name}_$sharedVariable, $irType)"
+  override def toString: String = s"LocalVar(${name}, ${if sharedVariable then "shared" else "unshared"}, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
+
 
 // A memory section
 sealed trait Memory extends Global {

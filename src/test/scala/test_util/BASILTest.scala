@@ -13,11 +13,12 @@ case class TestConfig(boogieFlags: Seq[String] = Seq("/timeLimit:10", "/useArray
                       useBAPFrontend: Boolean,
                       expectVerify: Boolean,
                       checkExpected: Boolean = false,
-                      logResults: Boolean = false
+                      logResults: Boolean = false,
+                      simplify: Boolean = false,
                      )
 
 trait BASILTest {
-  def runBASIL(inputPath: String, RELFPath: String, specPath: Option[String], BPLPath: String, staticAnalysisConf: Option[StaticAnalysisConfig]): BASILResult = {
+  def runBASIL(inputPath: String, RELFPath: String, specPath: Option[String], BPLPath: String, staticAnalysisConf: Option[StaticAnalysisConfig], simplify: Boolean=false): BASILResult = {
     val specFile = if (specPath.isDefined && File(specPath.get).exists) {
       specPath
     } else {
@@ -27,8 +28,10 @@ trait BASILTest {
       loading = ILLoadingConfig(
         inputFile = inputPath,
         relfFile = RELFPath,
-        specFile = specFile
+        specFile = specFile,
+        parameterForm = simplify,
       ),
+      simplify = simplify,
       staticAnalysis = staticAnalysisConf,
       outputPrefix = BPLPath
     )
