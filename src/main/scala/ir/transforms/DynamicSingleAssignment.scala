@@ -7,8 +7,9 @@ import scala.collection.mutable
 import analysis._
 
 object DynamicSingleAssignment {
+  /* TODO: improve using liveness */
 
-  def applyTransform(program: Program) = {
+  def applyTransform(program: Program, liveVars: Map[CFGPosition, Set[Variable]]) = {
 
     case class DSARes(renames: Map[Variable, Int] = Map().withDefaultValue(-1)) // -1 means no rename
 
@@ -73,6 +74,8 @@ object DynamicSingleAssignment {
        * with the larger assignment.
        *
        * some consideration is required when adding copies to keep the call-end-of-block invariant
+       *
+       *  TODO: we can avoid adding copies for variables not live at the join
        */
       var lhs = lhss
       var rhs = rhss
@@ -81,12 +84,13 @@ object DynamicSingleAssignment {
         val all = incoming.flatMap(st(_).renames.keySet)
         val outgoing = rhss(IRWalk.firstInBlock(b))
 
-        // fix when all incoming block renames rhs don't match the expected rename rhs
+        // fix renames for all variables when when all incoming block renames rhs don't match 
+        // the expected rename at this block rhs AND the variable is still live at this block 
         // by adding the appropriate copy
         for (v <- all) {
           val outgoingRename = outgoing(v)
           for (b <- incoming) {
-            if (st(b).renames(v) != outgoingRename && outgoingRename != -1) {
+            if (st(b).renames(v) != outgoingRename && outgoingRename != -1 && (liveVars(b).contains(v))) {
               b.statements.lastOption match {
                 case Some(d: DirectCall) if d.outParams.toSet.map(_._2).contains(v) => {
                   // if there is a call on this block assigning the variable, update its outparam's ssa index

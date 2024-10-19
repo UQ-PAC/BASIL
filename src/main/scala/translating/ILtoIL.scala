@@ -243,6 +243,13 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
 }
 
+
+def serialiseIL(p: Procedure): String = {
+  val s = ILSerialiser()
+  s.visitProcedure(p)
+  s.program.toString()
+}
+
 def serialiseIL(p: Program): String = {
   val s = ILSerialiser()
   s.visitProgram(p)

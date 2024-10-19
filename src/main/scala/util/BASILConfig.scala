@@ -29,6 +29,7 @@ enum BoogieMemoryAccessMode:
 case class BASILConfig(loading: ILLoadingConfig,
                        runInterpret: Boolean = false,
                        simplify: Boolean = false,
+                       validateSimp: Boolean = false,
                        staticAnalysis: Option[StaticAnalysisConfig] = None,
                        boogieTranslation: BoogieGeneratorConfig = BoogieGeneratorConfig(),
                        outputPrefix: String

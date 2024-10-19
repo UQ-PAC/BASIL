@@ -235,7 +235,7 @@ def inOutParams(
     p -> p.returnBlock.getOrElse(p)
   }.toMap
 
-  val lives = p.procedures
+  val lives : Map[Procedure, (Set[Variable], Set[Variable])] = p.procedures
     .map(p => {
       val in = (interLiveVarsResults.get(p))
       val out = (interLiveVarsResults.get(procEnd(p)))
