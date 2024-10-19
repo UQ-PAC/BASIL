@@ -206,6 +206,11 @@ object IRTransform {
     val renamer = Renamer(boogieReserved)
     externalRemover.visitProgram(ctx.program)
     renamer.visitProgram(ctx.program)
+
+    // before DSA ; make locals block-local 
+    // TODO: should be in loading phase
+    // transforms.MakeLocalsBlockUnique(ctx.program)
+
     ctx
   }
 
@@ -215,7 +220,7 @@ object IRTransform {
   def prepareForTranslation(config: ILLoadingConfig, ctx: IRContext): Unit = {
     ctx.program.determineRelevantMemory(ctx.globalOffsets)
 
-    Logger.debug("[!] Stripping unreachable")
+    Logger.info("[!] Stripping unreachable")
     val before = ctx.program.procedures.size
     transforms.stripUnreachableFunctions(ctx.program, config.procedureTrimDepth)
     Logger.debug(
@@ -504,6 +509,7 @@ object RunUtils {
 
   def run(q: BASILConfig): Unit = {
     val result = loadAndTranslate(q)
+    Logger.info("Writing output")
     writeOutput(result)
   }
 
@@ -518,9 +524,19 @@ object RunUtils {
 
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = {
     Logger.info("[!] Running simplification")
+
+    //val before = ctx.program.procedures.size
+    //transforms.stripUnreachableFunctions(ctx.program, 1)
+    //Logger.info(
+    //  s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
+    //)
+
     Logger.info("[!] DynamicSingleAssignment")
 
-    transforms.DynamicSingleAssignment.applyTransform(ctx.program)
+    val liveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
+
+    writeToFile(serialiseIL(ctx.program), s"il-before-dsa.il")
+    transforms.DynamicSingleAssignment.applyTransform(ctx.program, liveVars)
 
     config.foreach(_.analysisDotPath.foreach { s =>
       writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-dsa.dot")
@@ -534,12 +550,17 @@ object RunUtils {
 
     // run this after cond recovery because sign bit calculations often need high bits
     // which go away in high level conss
+    Logger.info("[!] RemoveSlices")
     transforms.removeSlices(ctx.program)
     writeToFile(serialiseIL(ctx.program), s"il-after-slices.il")
 
     config.foreach(_.analysisDotPath.foreach { s =>
       writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-simp.dot")
     })
+
+    Logger.info("Done simp")
+    //Logger.info("done simp...writing validation")
+    //writeToFile(ir.eval.makeValidation(), s"simps.smt2")
   }
 
   def loadAndTranslate(conf: BASILConfig): BASILResult = {
@@ -552,6 +573,7 @@ object RunUtils {
 
     //assert(invariant.correctCalls(ctx.program))
     if (q.loading.parameterForm) {
+
       ir.transforms.clearParams(ctx.program)
       ctx = ir.transforms.liftProcedureCallAbstraction(ctx)
     } else {
@@ -561,9 +583,9 @@ object RunUtils {
 
     if (conf.simplify) {
       doSimplify(ctx, conf.staticAnalysis)
-      writeToFile(ir.eval.makeValidation(), s"simps.smt2")
     }
 
+    Logger.info("Done simplify")
 
     assert(invariant.correctCalls(ctx.program))
 
@@ -584,7 +606,7 @@ object RunUtils {
 
     IRTransform.prepareForTranslation(q.loading, ctx)
 
-    Logger.debug("[!] Translating to Boogie")
+    Logger.info("[!] Translating to Boogie")
 
     val boogiePrograms = if (q.boogieTranslation.threadSplit && ctx.program.threads.nonEmpty) {
       val outPrograms = ArrayBuffer[BProgram]()

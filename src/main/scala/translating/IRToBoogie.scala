@@ -2,7 +2,7 @@ package translating
 import ir.{BoolOR, *}
 import boogie.*
 import specification.*
-import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
+import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion, Logger}
 
 import scala.collection.mutable.ArrayBuffer
 
