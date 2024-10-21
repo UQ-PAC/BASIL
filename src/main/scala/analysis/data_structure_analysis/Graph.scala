@@ -5,7 +5,7 @@ import analysis.solvers.DSAUnionFindSolver
 import analysis.evaluateExpression
 import cfg_visualiser.*
 import ir.*
-import specification.{ExternalFunction, SymbolTableEntry}
+import specification.{ExternalFunction, FuncEntry, SpecGlobal, SymbolTableEntry}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -128,12 +128,30 @@ class Graph(val proc: Procedure,
 
   // creates the globals from the symbol tables
   val globalMapping = mutable.Map[AddressRange, Field]()
-  globals.foreach { global =>
-    val node = Node(Some(this), global.size)
-    node.allocationRegions.add(DataLocation(global.name, global.address, global.size / 8))
-    node.flags.global = true
-    node.flags.incomplete = true
-    globalMapping.update(AddressRange(global.address, global.address + global.size / 8), Field(node, 0))
+  globals.foreach {
+    global =>
+      global match
+        case FuncEntry(name, size, address) =>
+          val func = Node(Some(this), size)
+          func.allocationRegions.add(DataLocation(name, -address, size / 8))
+          func.flags.global = true
+          func.flags.incomplete = true
+          globalMapping.update(AddressRange(-address, (-address - size) / 8), Field(func, 0))
+
+          val pointer = Node(Some(this), 8)
+          pointer.allocationRegions.add(DataLocation(s"$name's pointer@$address", address, 8))
+          pointer.flags.global = true
+          pointer.flags.incomplete = true
+          pointer.cells(0).pointee = Some(Slice(func.cells(0), 0))
+          globalMapping.update(AddressRange(address, address + 8), Field(pointer, 0))
+        case SpecGlobal(name, size, arraySize, address) =>
+          val node = Node(Some(this), size)
+          node.allocationRegions.add(DataLocation(name, address, size / 8))
+          node.flags.global = true
+          node.flags.incomplete = true
+          globalMapping.update(AddressRange(address, address + size / 8), Field(node, 0))
+        case _ => ???
+
   }
 
   // creates a global for each relocation entry in the symbol table
@@ -188,6 +206,18 @@ class Graph(val proc: Procedure,
     }
     global
   }
+
+  // determine if an address is a global and return the corresponding global(s) if it is.
+  def getGlobal(address: BigInt, size: Int): Seq[DSAGlobal] =
+    var global: Seq[DSAGlobal] = Seq.empty
+    for ((range, field) <- globalMapping) {
+      if (address < range.end && range.start < address + size) ||
+        (address + size > range.end && address < range.end) ||
+        (address >= range.start && (address < range.end || (range.start == range.end && range.end == address))) then
+        global = global ++ Seq(DSAGlobal(range, field))
+
+    }
+    global.sortBy(f => f.addressRange.start)
 
   def getCells(pos: CFGPosition, arg: Variable): Set[Slice] = {
     if (reachingDefs(pos).contains(arg)) {
@@ -283,7 +313,7 @@ class Graph(val proc: Procedure,
       val offset = field.offset + find(field.node).offset
       val cellOffset = node.getCell(offset).offset
       val internalOffset = offset - cellOffset
-      arrows.append(StructArrow(DotStructElement(s"Global_${range.start}_${range.end}", None), DotStructElement(node.id.toString, Some(cellOffset.toString)), internalOffset.toString))
+      // arrows.append(StructArrow(DotStructElement(s"Global_${range.start}_${range.end}", None), DotStructElement(node.id.toString, Some(cellOffset.toString)), internalOffset.toString))
     }
 
     stackMapping.foreach { (offset, dsn) =>
@@ -541,7 +571,8 @@ class Graph(val proc: Procedure,
 
       resultCells.keys.foreach { offset =>
         val collapsedCell = resultNode.addCell(offset, resultLargestAccesses(offset))
-        val outgoing: Set[Slice] = cells.flatMap { (_, cell) =>
+        val cells = resultCells(offset)
+        val outgoing: Set[Slice] = cells.flatMap { cell =>
           if (cell.pointee.isDefined) {
             Some(cell.getPointee)
           } else {
@@ -688,7 +719,7 @@ class Graph(val proc: Procedure,
       if !idToNode.contains(field.node.id) then
         val newNode = node.cloneSelf(newGraph)
         idToNode.update(field.node.id, newNode)
-      newGraph.globalMapping.update(range, Field(idToNode(field.node.id), field.offset + offset))
+      newGraph.globalMapping.update(range, Field(idToNode(field.node.id), field.offset))
     }
 
     val queue = mutable.Queue[Node]()

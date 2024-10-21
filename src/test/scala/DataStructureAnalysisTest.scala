@@ -45,6 +45,42 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     )
   }
 
+  ignore("overlapping access") {
+    val results = RunUtils.loadAndTranslate(
+      BASILConfig(
+        loading = ILLoadingConfig(
+          inputFile = "src/test/correct/jumptable/clang/jumptable.adt",
+          relfFile = "src/test/correct/jumptable/clang/jumptable.relf",
+          specFile = None,
+          dumpIL = None,
+        ),
+        staticAnalysis = Some(StaticAnalysisConfig()),
+        boogieTranslation = BoogieGeneratorConfig(),
+        outputPrefix = "boogie_out",
+      )
+    )
+
+    // the dsg of the main procedure after the local phase
+    val program = results.ir.program
+    val dsg = results.analysis.get.localDSA(program.mainProcedure)
+
+
+    // dsg.formals(R29) is the slice representing formal R29
+    val R29formal = dsg.adjust(dsg.formals(R29))
+
+
+    // cells representing the stack at various offsets
+    val stack0 = dsg.find(dsg.stackMapping(0).cells(0)) // R31
+    val stack8 = dsg.find(dsg.stackMapping(8).cells(0)) //  R31 + 8
+    val stack40 = dsg.find(dsg.stackMapping(40).cells(0)) //  R31 + 40
+    val stack32 = dsg.find(dsg.stackMapping(32).cells(0)) //  R31 + 32
+    val stack24 = dsg.find(dsg.stackMapping(24).cells(0)) //  R31 + 24 and Malloc
+
+    assert(dsg.adjust(stack0.getPointee).equals(R29formal)) // R31 points to the frame pointer
+    assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
+
+  }
+
   // Local DSA tests
   /*
   TODO - rewrite this test with a new input that is more suitable than the removed example
@@ -112,13 +148,13 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     // jump_table relocation
     assert(dsg.adjust(dsg.globalMapping(AddressRange(69624, 69624 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0))))
     // add_two relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1940, 1940 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1940, 1940 + 8)).node.cells(0))))
     // add_six relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1976, 1976 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(8).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1976, 1976 + 8)).node.cells(0))))
     // sub_seven relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2012, 2012 + 36)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69656, 69656 + 24)).node.cells(16).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2012, 2012 + 8)).node.cells(0))))
     // main relocation
-    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69608 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2048, 2048 + 76)).node.cells(0))))
+    assert(dsg.adjust(dsg.globalMapping(AddressRange(69608, 69608 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(2048, 2048 + 8)).node.cells(0))))
     // x relocation
     assert(dsg.adjust(dsg.globalMapping(AddressRange(69592, 69592 + 8)).node.cells(0).getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(69648, 69648 + 4)).node.cells(0))))
   }
