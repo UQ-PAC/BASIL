@@ -345,10 +345,7 @@ class CleanupAssignments() extends CILVisitor {
 
 def copypropTransform(p: Procedure) = {
   val t = util.PerformanceTimer(s"simplify ${p.name} (${p.blocks.size} blocks)")
-  val cyclic = circularDeps(p)
-  val circ = t.checkPoint("Circular Deps")
-
-  val dom = ConstCopyProp(Map((p -> cyclic)))
+  val dom = ConstCopyProp()
   val solver = worklistSolver(dom)
 
   // Logger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
@@ -382,7 +379,8 @@ def doCopyPropTransform(p: Program) = {
     .map(p =>
       p -> //Future
         {
-          Logger.debug(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
+          Logger
+            .debug(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
           copypropTransform(p)
         }
     )
@@ -414,7 +412,6 @@ def doCopyPropTransform(p: Program) = {
     b.parent.removeBlocks(b)
   }
 
-  Logger.info("[!] Simplify :: finished")
 
 }
 
@@ -540,9 +537,10 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       saved(lastBlock) = nx
       saveCount(lastBlock) = saveCount.get(lastBlock).getOrElse(0) + 1
       if (!prev.contains(nx)) then {
-        if (saveCount(lastBlock) == 20) {
-          println(lastBlock.label + "    ==> " + x)
-          println(lastBlock.label + "    <== " + nx)
+        if (saveCount(lastBlock) == 50) {
+          Logger.warn(s"Large join count on block ${lastBlock.label}, no fix point? (-v for mor info)")
+          Logger.debug(lastBlock.label + "    ==> " + x)
+          Logger.debug(lastBlock.label + "    <== " + nx)
         }
         worklist.addAll(lastBlock.nextBlocks)
       }
@@ -562,10 +560,6 @@ enum CopyProp {
 
 case class CCP(
     val state: Map[Variable, CopyProp] = Map()
-    //constants: Map[Variable, Literal],
-    //// variable -> expr * dependencies
-    //exprs: Map[Variable, CopyProp],
-    //top: Set[Variable]
 )
 
 object CCP {
@@ -576,8 +570,7 @@ object CCP {
   }
 }
 
-class ConstCopyProp(cyclicVariables: Map[Procedure, Set[Variable]] = Map().withDefaultValue(Set()))
-    extends AbstractDomain[CCP] {
+class ConstCopyProp() extends AbstractDomain[CCP] {
   private final val callClobbers = (0 to 30).map("R" + _).map(c => Register(c, 64))
 
   def top: CCP = CCP(Map().withDefaultValue(CopyProp.Bot))
@@ -635,9 +628,9 @@ class ConstCopyProp(cyclicVariables: Map[Procedure, Set[Variable]] = Map().withD
           val existing = c.state.get(l).getOrElse(CopyProp.Bot)
 
           val ns = existing match {
-            case CopyProp.Bot => CopyProp.Prop(evaled, rhsDeps) // not seen yet
-            // case CopyProp.Prop(e, _) if e == evaled || e == r => CopyProp.Prop(evaled, rhsDeps) // refine value
-            case _ => CopyProp.Clobbered // our expr value has changed
+            case CopyProp.Bot                                 => CopyProp.Prop(evaled, rhsDeps) // not seen yet
+            case CopyProp.Prop(e, _) if e == evaled || e == r => CopyProp.Prop(evaled, rhsDeps) // refine value
+            case _                                            => CopyProp.Clobbered // our expr value has changed
           }
           val p = c.copy(state = c.state + (l -> ns))
           clobber(p, l)
@@ -657,6 +650,7 @@ class ConstCopyProp(cyclicVariables: Map[Procedure, Set[Variable]] = Map().withD
 }
 
 class ExprComplexity extends CILVisitor {
+  // count the nodes in the expression AST
   var count = 0
   override def vexpr(e: Expr) = {
     count += 1
@@ -726,6 +720,7 @@ class Simplify(
 
   var madeAnyChange = false
   var block: Block = initialBlock
+  var skipped = Set[String]()
 
   override def vexpr(e: Expr) = {
     val threshold = 500
@@ -733,9 +728,11 @@ class Simplify(
     val subst = Substitute(CCP.toSubstitutions(res(block)), true, threshold)
     val result = subst(e).getOrElse(e)
     if (subst.complexity > threshold) {
-      Logger.warn(
-        s"Some skipped substitution at ${block.parent.name}::${block.label}"
-      )
+      val bl = s"${block.parent.name}::${block.label}"
+      if (!skipped.contains(bl)) {
+        skipped = skipped + bl
+        Logger.warn(s"Some skipped substitution at $bl due to resulting expr size > ${threshold} threshold")
+      }
     }
     ChangeTo(result)
   }

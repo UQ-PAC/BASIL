@@ -562,6 +562,8 @@ object RunUtils {
       ir.eval.SimplifyValidation.makeValidation(w)
       w.close()
     }
+
+    Logger.info("[!] Simplify :: finished")
   }
 
   def loadAndTranslate(conf: BASILConfig): BASILResult = {
