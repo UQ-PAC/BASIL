@@ -74,14 +74,15 @@ class RegionInjector(domain: mutable.Set[CFGPosition],
         case _ =>
       }
     } else if (regions.size > 1) {
-      //throw RuntimeException("Multiple regions found for memory")
-//      mmm.mergeRegions(regions) match {
-//        case stackRegion: StackRegion =>
-//          return StackMemory(stackRegion.regionIdentifier, mem.addressSize, mem.valueSize)
-//        case dataRegion: DataRegion =>
-//          return SharedMemory(dataRegion.regionIdentifier, mem.addressSize, mem.valueSize)
-//        case _ =>
-//      }
+      val hasToBeDefined = mmm.getMergedName(regions)
+      Logger.debug(s"Multiple regions found for cmd ${cmd} regions size is ${regions.size}")
+      regions.head match {
+        case stackRegion: StackRegion =>
+          return StackMemory(hasToBeDefined, mem.addressSize, mem.valueSize)
+        case dataRegion: DataRegion =>
+          return SharedMemory(hasToBeDefined, mem.addressSize, mem.valueSize)
+        case _ =>
+      }
     } else {
       Logger.debug(s"No region found for cmd ${cmd} regions size is ${regions.size}")
     }

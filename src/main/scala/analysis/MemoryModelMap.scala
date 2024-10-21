@@ -4,7 +4,11 @@ import analysis.*
 import ir.*
 import util.Logger
 
+import scala.collection.immutable.TreeMap
 import scala.collection.mutable
+
+enum MemoryType:
+  case Data, Heap, Stack
 
 // Define a case class to represent a range
 case class RangeKey(start: BigInt, end: BigInt) extends Ordered[RangeKey]:
@@ -33,10 +37,56 @@ class MemoryModelMap {
   private val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.TreeMap()
   private val cfgPositionToDataRegion: mutable.Map[CFGPosition, Set[DataRegion]] = mutable.Map()
   private val heapCalls: mutable.Map[DirectCall, HeapRegion] = mutable.Map()
+  private val mergedRegions: mutable.Map[Set[MemoryRegion], String] = mutable.Map()
 
   private val stackAllocationSites: mutable.Map[CFGPosition, Set[StackRegion]] = mutable.Map()
 
   private val uf = new UnionFind()
+  private var DataMemory, HeapMemory, StackMemory = TreeMap[BigInt, Array[Byte]]()
+
+
+
+  // Store operation: store BigInt value at a BigInt address
+  def store(address: BigInt, value: BigInt, memoryType: MemoryType): Unit = {
+    val byteArray = value.toByteArray
+    memoryType match
+      case MemoryType.Data => DataMemory += (address -> byteArray)
+      case MemoryType.Heap => HeapMemory += (address -> byteArray)
+      case MemoryType.Stack => StackMemory += (address -> byteArray)
+  }
+
+  // Load operation: load from a BigInt address with a specific size
+  def load(address: BigInt, size: Int, memoryType: MemoryType): BigInt = {
+    val memory = memoryType match
+      case MemoryType.Data => DataMemory
+      case MemoryType.Heap => HeapMemory
+      case MemoryType.Stack => StackMemory
+    // Find the memory block that contains the starting address
+    val floorEntry = memory.rangeTo(address).lastOption
+
+    floorEntry match {
+      case Some((startAddress, byteArray)) =>
+        val offset = (address - startAddress).toInt // Offset within the byte array
+        // If the load exceeds the stored data, we need to handle padding with zeros
+        if (offset >= byteArray.length) {
+          BigInt(0)
+        } else {
+          // Calculate how much data we can retrieve
+          val availableSize = byteArray.length - offset
+          // Slice the available data, and if requested size exceeds, append zeros
+          val result = byteArray.slice(offset, offset + size)
+          val paddedResult = if (size > availableSize) {
+            result ++ Array.fill(size - availableSize)(0.toByte) // Padding with zeros
+          } else {
+            result
+          }
+          BigInt(1, paddedResult) // Convert the byte array back to BigInt
+        }
+      case None =>
+        // If no memory is stored at the requested address, return zero
+        BigInt(0) // TODO: may need to be sm else
+    }
+  }
 
   /** Add a range and object to the mapping
    *
@@ -49,7 +99,7 @@ class MemoryModelMap {
     def maxSize(r: MemoryRegion): BigInt = {
       r match
         case DataRegion(regionIdentifier, start, size) => start + size
-        case HeapRegion(regionIdentifier, size, parent) => ???
+        case HeapRegion(regionIdentifier, start, size, parent) => ???
         case StackRegion(regionIdentifier, start, parent) =>
           if (r.subAccesses.nonEmpty) {
             val max = start + r.subAccesses.max
@@ -159,6 +209,8 @@ class MemoryModelMap {
       if (obj.isEmpty) {
         Logger.debug(s"Data region $dr not found in the new data map")
       } else {
+        val address = dr.start
+        val size = dr.size
         obj.get.relfContent.add(dr.regionIdentifier)
       }
     }
@@ -506,10 +558,19 @@ class MemoryModelMap {
   def getData(cfgPosition: CFGPosition): Set[DataRegion] = {
     cfgPositionToDataRegion.getOrElse(cfgPosition, Set.empty).map(returnRegion)
   }
+
+  def addMergeRegions(regions: Set[MemoryRegion], name: String): Unit = {
+    mergedRegions(regions) = name
+  }
+
+  def getMergedName(regions: Set[MemoryRegion]): String = {
+    mergedRegions(regions)
+  }
 }
 
 trait MemoryRegion {
   val regionIdentifier: String
+  val start: BigInt
   val subAccesses: mutable.Set[BigInt] = mutable.Set()
 }
 
@@ -517,7 +578,7 @@ case class StackRegion(override val regionIdentifier: String, start: BigInt, par
   override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name}, $subAccesses)"
 }
 
-case class HeapRegion(override val regionIdentifier: String, size: BigInt, parent: Procedure) extends MemoryRegion {
+case class HeapRegion(override val regionIdentifier: String, start: BigInt, size: BigInt, parent: Procedure) extends MemoryRegion {
   override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 

@@ -19,13 +19,14 @@ trait MemoryRegionAnalysis(val program: Program,
                            val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
                            val graResult: Map[CFGPosition, Set[DataRegion]]) {
 
-  var mallocCount: Int = 0
+  var mallocCount: BigInt = 0
   private var stackCount: Int = 0
   val stackMap: mutable.Map[Procedure, mutable.Map[BigInt, StackRegion]] = mutable.Map()
 
-  private def nextMallocCount() = {
-    mallocCount += 1
-    s"malloc_$mallocCount"
+  private def nextMallocCount(size: BigInt) = {
+    val start = mallocCount
+    mallocCount += (size.toDouble/8).ceil.toInt + 1
+    (s"malloc_$mallocCount", start)
   }
 
   private def nextStackCount() = {
@@ -216,7 +217,8 @@ trait MemoryRegionAnalysis(val program: Program,
             evaluateExpression(mallocVariable, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
                 val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
-                val newHeapRegion = HeapRegion(nextMallocCount(), negB, IRWalk.procedure(n))
+                val (name, start) = nextMallocCount(negB)
+                val newHeapRegion = HeapRegion(name, start, negB, IRWalk.procedure(n))
                 addReturnHeap(directCall, newHeapRegion)
                 s
               case None => s

@@ -159,6 +159,18 @@ trait GlobalRegionAnalysis(val program: Program,
     tryCoerceIntoData(index, n, size)
   }
 
+//  def mergeRegions(regions: Set[DataRegion]): DataRegion = {
+//    if (regions.size == 1) {
+//      return regions.head
+//    }
+//    val start = regions.minBy(_.start).start
+//    val end = regions.maxBy(_.end).end
+//    val size = end - start
+//    val newRegion = DataRegion(nextDataCount(), start, size)
+//    regions.foreach(i => dataMap(i.start) = newRegion)
+//    newRegion
+//  }
+
   /**
    * Check if the data region is defined.
    * Finds full and partial matches
@@ -187,6 +199,9 @@ trait GlobalRegionAnalysis(val program: Program,
             returnSet = returnSet + dataMap(i.start)
           }
       }
+    }
+    if (returnSet.size > 1) {
+      mmm.addMergeRegions(returnSet.asInstanceOf[Set[MemoryRegion]], nextDataCount())
     }
     returnSet
   }
