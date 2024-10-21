@@ -76,8 +76,8 @@ class LocalPhase(proc: Procedure,
     // DSA grows cell size with size
     // selfCollapse at the end to merge all the overlapping accessed size
     // However, the above approach prevents distinct multi loads
-     graph.find(head).growSize(size)
-    val headOffset = head.offset
+    // graph.find(head).growSize(size)
+    val headOffset = last + head.offset
     graph.stackMapping.keys.toSeq.filter(off => off > headOffset && off < headOffset + size).sorted.foreach {
       off =>
         val stackDiff = off - headOffset
@@ -86,7 +86,7 @@ class LocalPhase(proc: Procedure,
         val headNode = updatedHead.node.get
         graph.mergeCells(headNode.addCell(newHeadOffset + stackDiff, 0), graph.find(graph.stackMapping(off).cells(0)))
     }
-    graph.selfCollapse(head.node.get)
+    // graph.selfCollapse(head.node.get)
     head
   }
 
@@ -147,10 +147,10 @@ class LocalPhase(proc: Procedure,
       val DSAGlobal(range: AddressRange, Field(node, internal)) = head
       val headOffset: BigInt = if address > range.start then address - range.start + internal else internal
       val headNode = node
-      val headCell: Cell = node.addCell(headOffset, size) // DSA has the size of the added cell should as size with
+      val headCell: Cell = node.addCell(headOffset, 0) // DSA has the size of the added cell should as size with
       // selfCollapse at the end to merge all the overlapping accessed size
       // However, the above approach prevent distinct multi loads
-      graph.selfCollapse(headNode)
+      // graph.selfCollapse(headNode)
       val tail = globals.tail
       tail.foreach {
         g =>
@@ -247,21 +247,25 @@ class LocalPhase(proc: Procedure,
     node.cells(0)
   }
 
-//  def multiAcccess(lhs: Cell, pointees: Seq[Cell]): Unit = {
-//    val pointeeNode = pointees.head.node.get
-//    val pointeeStartOffset = pointees.head.offset
-//    assert(!pointees.tail.exists(p => p.node.get != pointeeNode))
-//
-//    val lhsNode = lhs.node.get
-//    val lhsStartOffset = lhs.offset
-//    var last = -1
-//    pointees.foreach(
-//      pointee =>
-//        assert(last == -1 || !pointeeNode.cells.keys.exists(offset => offset > last  && offset < pointee.offset))
-//        graph.mergeCells(lhsNode.addCell(lhsStartOffset + (pointee.offset - pointeeStartOffset), 0), pointee)
-//    )
-//
-//  }
+
+
+  def multiAccess(lhsOrValue: Cell, pointer: Cell, size: Int): Unit = {
+    // TODO there should be another check here to see we cover the bytesize
+    // otherwise can fall back on expanding
+
+    val diff = pointer.offset - lhsOrValue.offset
+    val startPointerOffset = pointer.offset
+    val lhsNode = lhsOrValue.node.get
+
+
+    val pointers = pointer.node.get.cells.filter((offset, _) => offset >= startPointerOffset && offset < startPointerOffset + size).toSeq.sortBy((offset, cell) => offset)
+    for ((offset, cell) <- pointers) {
+      val lhs = lhsNode.addCell(offset - diff, 0) // todo check if 0 is the right size
+      graph.mergeCells(lhs, graph.adjust(graph.find(cell).getPointee))
+    }
+  }
+
+
   def visit(n: CFGPosition): Unit = {
     if visited.contains(n) then
       return
@@ -325,15 +329,9 @@ class LocalPhase(proc: Procedure,
         val global = getGlobal(indexUnwrapped, n, byteSize)
         val stack = isStack(indexUnwrapped, n, byteSize)
         if global.isDefined then
-          val index = graph.find(global.get)
-          index.growSize(byteSize)
-          graph.selfCollapse(index.node.get)
-          graph.mergeCells(lhsCell,graph.adjust(graph.find(index).getPointee))
+          multiAccess(lhsCell, graph.find(global.get), byteSize)
         else if stack.isDefined then
-          val index = graph.find(stack.get)
-          index.growSize(byteSize)
-          graph.selfCollapse(index.node.get)
-          graph.mergeCells(lhsCell, graph.adjust(graph.find(index).getPointee))
+          multiAccess(lhsCell, graph.find(stack.get), byteSize)
         else
           indexUnwrapped match
             case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
@@ -362,18 +360,18 @@ class LocalPhase(proc: Procedure,
             val byteSize = size / 8
             val global = getGlobal(index, n)
             val stack = isStack(index, n)
-            val addressPointee: Cell =
-              if global.isDefined then
-                val index = graph.find(global.get)
-                index.growSize(byteSize)
-                graph.selfCollapse(index.node.get)
-                graph.adjust(graph.find(index).getPointee)
-              else if stack.isDefined then
-                val index = graph.find(stack.get)
-                index.growSize(byteSize)
-                graph.selfCollapse(index.node.get)
-                graph.adjust(graph.find(index).getPointee)
-              else
+
+            val valueCells = graph.getCells(n, value)
+            val valueCell = valueCells.tail.foldLeft(graph.adjust(valueCells.head)) { (c, slice) =>
+              graph.mergeCells(graph.adjust(slice), c)
+            }
+
+            if global.isDefined then
+              multiAccess(valueCell, graph.find(global.get), byteSize)
+            else if stack.isDefined then
+              multiAccess(valueCell, graph.find(stack.get), byteSize)
+            else
+              val addressPointee: Cell =
                 index match
                   case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
                     evaluateExpression(arg2, constProp(n)) match
@@ -392,11 +390,7 @@ class LocalPhase(proc: Procedure,
                   case _ =>
                     ???
 
-            addressPointee.node.get.flags.modified = true
-            val valueCells = graph.getCells(n, value)
-            val result = valueCells.foldLeft(addressPointee) { (c, slice) =>
-              graph.mergeCells(graph.adjust(slice), c)
-            }
+              graph.mergeCells(valueCell, addressPointee)
           case _ => // if value is a literal ignore it
         }
       case _ =>
