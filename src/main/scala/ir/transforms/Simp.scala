@@ -351,41 +351,38 @@ def copypropTransform(p: Procedure) = {
   val dom = ConstCopyProp(Map((p -> cyclic)))
   val solver = worklistSolver(dom)
 
-  Logger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
+  // Logger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
   val result = solver.solveProc(p)
   val solve = t.checkPoint("Solve CopyProp")
 
-  val vis = Simplify(result.withDefaultValue(CCP(Map(), Map(), Set())))
+  val vis = Simplify(result.withDefaultValue(dom.bot))
   visit_proc(vis, p)
   val xf = t.checkPoint("transform")
-  Logger.info(s"    ${p.name} after transform expr complexity ${ExprComplexity()(p)}")
+  // Logger.info(s"    ${p.name} after transform expr complexity ${ExprComplexity()(p)}")
 
   visit_proc(CleanupAssignments(), p)
   t.checkPoint("redundant assignments")
-  Logger.info(s"    ${p.name} after dead var cleanup expr complexity ${ExprComplexity()(p)}")
+  // Logger.info(s"    ${p.name} after dead var cleanup expr complexity ${ExprComplexity()(p)}")
 
   visit_proc(AlgebraicSimplifications, p)
-  Logger.info(s"    ${p.name}  after simp 1 expr complexity ${ExprComplexity()(p)}")
   visit_proc(AlgebraicSimplifications, p)
   visit_proc(AlgebraicSimplifications, p)
   visit_proc(AlgebraicSimplifications, p)
-  visit_proc(AlgebraicSimplifications, p)
-  Logger.info(s"    ${p.name}  after simp 2 expr complexity ${ExprComplexity()(p)}")
+  // Logger.info(s"    ${p.name}  after simp expr complexity ${ExprComplexity()(p)}")
   val sipm = t.checkPoint("algebraic simp")
 }
 
 def doCopyPropTransform(p: Program) = {
 
-  Logger.info("RPO")
   applyRPO(p)
 
-  Logger.info("Copyprop Transform")
+  Logger.info("[!] Simplify :: Expr/Copy-prop Transform")
   val work = p.procedures
     .filter(_.blocks.size > 0)
     .map(p =>
       p -> //Future
         {
-          Logger.info(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
+          Logger.debug(s"CopyProp Transform ${p.name} (${p.blocks.size} blocks, expr complexity ${ExprComplexity()(p)})")
           copypropTransform(p)
         }
     )
@@ -396,12 +393,12 @@ def doCopyPropTransform(p: Program) = {
       job
     } catch {
       case e => {
-        Logger.error("CopyProp " + p.name + ": " + e.toString)
+        Logger.error("Simplify :: CopyProp " + p.name + ": " + e.toString)
       }
     }
   })
 
-  Logger.info("Dead variable elimination")
+  Logger.info("[!] Simplify :: Dead variable elimination")
 
   // cleanup
   visit_prog(CleanupAssignments(), p)
@@ -409,7 +406,7 @@ def doCopyPropTransform(p: Program) = {
     case b: Block if b.statements.size == 0 && b.prevBlocks.size == 1 && b.nextBlocks.size == 1 => b
   }
 
-  Logger.info("Merge empty blocks")
+  Logger.info("[!] Simplify :: Merge empty blocks")
   for (b <- toremove) {
     val p = b.prevBlocks.head
     val n = b.nextBlocks.head
@@ -417,7 +414,7 @@ def doCopyPropTransform(p: Program) = {
     b.parent.removeBlocks(b)
   }
 
-  Logger.info("Done simplify")
+  Logger.info("[!] Simplify :: finished")
 
 }
 
@@ -525,6 +522,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
         blocks.toList
       }
 
+      val prev = saved.get(b)
       x = b.prevBlocks.flatMap(ib => saved.get(ib).toList).foldLeft(x)(domain.join)
       saved(b) = x
       // val todo = bs(b)
@@ -541,8 +539,8 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       })
       saved(lastBlock) = nx
       saveCount(lastBlock) = saveCount.get(lastBlock).getOrElse(0) + 1
-      if (nx != x) then {
-        if (saveCount(lastBlock) > 20) {
+      if (!prev.contains(nx)) then {
+        if (saveCount(lastBlock) == 20) {
           println(lastBlock.label + "    ==> " + x)
           println(lastBlock.label + "    <== " + nx)
         }
@@ -554,18 +552,27 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
   }
 }
 
-case class CopyProp(from: Expr, expr: Expr, deps: Set[Variable])
+// case class CopyProp(from: Expr, expr: Expr, deps: Set[Variable])
+
+enum CopyProp {
+  case Bot
+  case Prop(expr: Expr, deps: Set[Variable])
+  case Clobbered
+}
 
 case class CCP(
-    constants: Map[Variable, Literal],
-    // variable -> expr * dependencies
-    exprs: Map[Variable, CopyProp],
-    top: Set[Variable]
+    val state: Map[Variable, CopyProp] = Map()
+    //constants: Map[Variable, Literal],
+    //// variable -> expr * dependencies
+    //exprs: Map[Variable, CopyProp],
+    //top: Set[Variable]
 )
 
 object CCP {
   def toSubstitutions(c: CCP): Map[Variable, Expr] = {
-    c.exprs.map((v, cp) => v -> cp.expr) ++ c.constants
+    c.state.collect { case (v, CopyProp.Prop(e, _)) =>
+      v -> e
+    }
   }
 }
 
@@ -573,23 +580,40 @@ class ConstCopyProp(cyclicVariables: Map[Procedure, Set[Variable]] = Map().withD
     extends AbstractDomain[CCP] {
   private final val callClobbers = (0 to 30).map("R" + _).map(c => Register(c, 64))
 
-  def top: CCP = CCP(Map(), Map(), Set())
-  def bot: CCP = CCP(Map(), Map(), Set())
+  def top: CCP = CCP(Map().withDefaultValue(CopyProp.Bot))
+  def bot: CCP = CCP(Map().withDefaultValue(CopyProp.Clobbered))
 
   override def join(l: CCP, r: CCP): CCP = {
-    val const = l.constants.keySet.intersect(r.constants.keySet)
-    val exprs = l.exprs.keySet.intersect(r.exprs.keySet)
-    val eqConstIntersection = const.collect {
-      case k if (l.constants(k) == r.constants(k)) => k -> l.constants(k)
-    }.toMap
-    val eqExprIntersection = exprs.collect {
-      case k if (l.exprs(k) == r.exprs(k)) => k -> l.exprs(k)
-    }.toMap
+    val ks = l.state.keySet.intersect(r.state.keySet)
+    val merged = ks.map(v =>
+      (v ->
+        ((l.state(v), r.state(v)) match {
+          case (l, CopyProp.Bot)                                                            => l
+          case (CopyProp.Bot, r)                                                            => r
+          case (c @ CopyProp.Clobbered, _)                                                  => c
+          case (_, c @ CopyProp.Clobbered)                                                  => c
+          case (p1 @ CopyProp.Prop(e1, deps1), p2 @ CopyProp.Prop(e2, deps2)) if (p1 == p2) => p1
+          case (_, _)                                                                       => CopyProp.Clobbered
+        }))
+    )
+    CCP(merged.toMap)
+  }
 
+  def clobberFull(c: CCP, l: Variable) = {
+    val p = clobber(c, l)
+    p.copy(state = p.state + (l -> CopyProp.Clobbered))
+  }
+
+  def clobber(c: CCP, l: Variable) = {
     CCP(
-      eqConstIntersection,
-      eqExprIntersection,
-      (l.top ++ r.top) ++ (l.exprs.keySet ++ r.exprs.keySet -- eqExprIntersection.keySet) ++ (l.constants.keySet ++ r.constants.keySet -- eqConstIntersection.keySet)
+      c.state
+        .map((k, v) =>
+          k -> (v match {
+            case CopyProp.Prop(_, deps) if deps.contains(l) => CopyProp.Clobbered
+            case o                                          => o
+          })
+        )
+        .withDefaultValue(CopyProp.Bot)
     )
   }
 
@@ -599,47 +623,33 @@ class ConstCopyProp(cyclicVariables: Map[Procedure, Set[Variable]] = Map().withD
         // c.copy(exprs = c.exprs.filterNot((k, v) => v.expr.loads.nonEmpty))
         c
       }
-      case Assign(l, r, lb) if !(c.top.contains(l)) => {
-        var p = c
-        val evaled = (Substitute(c.constants, false)(r).getOrElse(r))
-        //eval.partialEvalExpr(
-        //  eval.simplifyExprFixpoint(r),
-        //  v => p.constants.get(v)
-        //)
-        val rhsDeps = evaled.variables.toSet
+      case Assign(l, r, lb) => {
+        if (r.loads.size > 0) {
+          clobberFull(c, l)
+        } else {
+          val consts = c.state.collect {
+            case (k, CopyProp.Prop(c, deps)) if deps.isEmpty => k -> c
+          }
+          val evaled = ir.eval.partialEvalExpr(Substitute(consts, false)(r).getOrElse(r), e => None)
+          val rhsDeps = evaled.variables.toSet
+          val existing = c.state.get(l).getOrElse(CopyProp.Bot)
 
-        p = evaled match {
-          // remove reassignments
-          case e if p.exprs.contains(l) && p.exprs(l).from != l =>
-            p.copy(constants = p.constants.removed(l), exprs = p.exprs.removed(l), top = p.top + l)
-          case lit: Literal => p.copy(constants = p.constants.updated(l, lit), exprs = p.exprs.removed(l))
-          case e: Expr
-              if e.loads.isEmpty && !e.variables.contains(
-                l
-              ) /* && !(cyclicVariables(s.parent.parent).contains(l)) && rhsDeps.intersect(cyclicVariables(s.parent.parent)).isEmpty */ =>
-            p.copy(constants = p.constants.removed(l), exprs = p.exprs.updated(l, CopyProp(r, e, e.variables)))
-          case _ => p.copy(constants = p.constants.removed(l), exprs = p.exprs.removed(l), top = p.top + l)
+          val ns = existing match {
+            case CopyProp.Bot => CopyProp.Prop(evaled, rhsDeps) // not seen yet
+            // case CopyProp.Prop(e, _) if e == evaled || e == r => CopyProp.Prop(evaled, rhsDeps) // refine value
+            case _ => CopyProp.Clobbered // our expr value has changed
+          }
+          val p = c.copy(state = c.state + (l -> ns))
+          clobber(p, l)
         }
-
-        // remove candidates whose value changes due to this update
-        val clobbered = p.exprs.filter((k, v) => v.deps.exists(c => c.name == l.name)).keySet
-        p = p.copy(exprs = p.exprs.filterNot((k, v) => clobbered.contains(k)), top = p.top ++ clobbered)
-
-        p
       }
       case x: DirectCall => {
         val lhs = x.outParams.map(_._2)
-        val p = lhs.foldLeft(c)((c, l) =>
-          c.copy(constants = c.constants.removed(l), exprs = c.exprs.filterNot((k, v) => v.deps.contains(l)))
-        )
-        p.copy(top = p.top ++ lhs)
+        lhs.foldLeft(c)(clobberFull)
       }
       case x: IndirectCall => {
         val toClob = callClobbers
-        val p = toClob.foldLeft(c)((c, l) =>
-          c.copy(constants = c.constants.removed(l), exprs = c.exprs.filterNot((k, v) => v.deps.contains(l)))
-        )
-        p.copy(top = p.top ++ toClob)
+        toClob.foldLeft(c)(clobberFull)
       }
       case _ => c
     }
@@ -718,7 +728,7 @@ class Simplify(
   var block: Block = initialBlock
 
   override def vexpr(e: Expr) = {
-    val threshold = 1000
+    val threshold = 500
     val variables = e.variables.toSet
     val subst = Substitute(CCP.toSubstitutions(res(block)), true, threshold)
     val result = subst(e).getOrElse(e)
@@ -726,7 +736,7 @@ class Simplify(
       Logger.warn(
         s"Some skipped substitution at ${block.parent.name}::${block.label}"
       )
-    } 
+    }
     ChangeTo(result)
   }
 

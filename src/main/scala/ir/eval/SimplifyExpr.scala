@@ -1,12 +1,13 @@
 package ir.eval
 import ir.*
 import util.Logger
+import scala.collection.mutable
+
+import java.io.{BufferedWriter}
 import ir.cilvisitor.*
 
 val assocOps: Set[BinOp] =
   Set(BVADD, BVMUL, BVOR, BVAND, BVEQ, BoolAND, BoolEQ, BoolOR, BoolEQUIV, BoolEQ, IntADD, IntMUL, IntEQ)
-
-var traceLog = List[(Expr, Expr)]()
 
 
 object AlgebraicSimplifications extends CILVisitor  {
@@ -16,6 +17,43 @@ object AlgebraicSimplifications extends CILVisitor  {
     visit_expr(this, e)
   }
 }
+
+
+object SimplifyValidation {
+  var traceLog = mutable.LinkedHashSet[(Expr, Expr)]()
+  var validate : Boolean = false
+
+  def makeValidation(writer: BufferedWriter) = {
+
+    def makeEQ(a: Expr, b: Expr) = {
+      require(a.getType == b.getType)
+      a.getType match {
+        case BitVecType(sz) => BinaryExpr(BVEQ, a, b)
+        case IntType        => BinaryExpr(IntEQ, a, b)
+        case BoolType       => BinaryExpr(BoolEQ, a, b)
+        case m: MapType        => ???
+      }
+    }
+
+    var ind = 0
+
+    for ((o, n) <- traceLog) {
+      ind += 1
+      if (ir.transforms.ExprComplexity()(n) > 5000) {
+        Logger.warn(s"Skipping simplification proof $ind because too large (> 5000)!")
+      } else {
+        if (ind % 100 == 0) Logger.info(s"Wrote simplification proof $ind / ${traceLog.size}")
+        val equal = UnaryExpr(BoolNOT, makeEQ(o, n))
+        val expr = translating.BasilIRToSMT2.exprUnsat(equal, Some(s"simp$ind"))
+        writer.write(expr)
+        writer.write("\n\n")
+      }
+    }
+  }
+
+
+}
+
 
 def simplifyExprFixpoint(e: Expr): Expr = {
   val begin = e
@@ -30,33 +68,53 @@ def simplifyExprFixpoint(e: Expr): Expr = {
   if (ne != pe) {
     Logger.error(s"stopping simp before fixed point: there is likely a simplificatinon loop: $pe !=== $ne")
   }
-  if (begin != ne) {
-    traceLog = (begin, ne) :: traceLog
+  if (SimplifyValidation.validate) {
+    // normalise to deduplicate log entries
+    val normer = VarNameNormalise()
+    val a = visit_expr(normer, begin) 
+    val b = visit_expr(normer, ne) 
+
+    SimplifyValidation.traceLog.add((a, b))
   }
   ne
 }
 
-def makeValidation() = {
-  def makeEQ(a: Expr, b: Expr) = {
-    require(a.getType == b.getType)
-    a.getType match {
-      case BitVecType(sz) => BinaryExpr(BVEQ, a, b)
-      case IntType        => BinaryExpr(IntEQ, a, b)
-      case BoolType       => BinaryExpr(BoolEQ, a, b)
-      case m: MapType        => ???
+class VarNameNormalise() extends CILVisitor {
+  var count = 1
+  val assigned = mutable.Map[Variable, Variable]()
+
+
+  def rename(v: Variable, newName: String) = {
+    v match {
+      case LocalVar(n, t) => LocalVar(newName, t)
+      case Register(n, sz) => Register(newName, sz)
     }
   }
 
-  var ind = 0
-  traceLog
-    .map((o, n) => {
-      ind += 1
-      val equal = UnaryExpr(BoolNOT, makeEQ(o, n))
-      val expr = translating.BasilIRToSMT2.exprUnsat(equal, Some(s"simp$ind"))
-      expr
-    })
-    .mkString("\n\n")
+  override def vlvar(v: Variable) = {
+    if (assigned.contains(v)) {
+      ChangeTo(assigned(v))
+    } else {
+      count += 1
+      val newName = "Var" + count
+      val nv = rename(v, newName)
+      assigned(v) = nv
+      ChangeTo(nv)
+    }
+  }
+
+
+  def apply(e: Expr) = {
+    count = 1
+    assigned.clear()
+    val ne = visit_expr(this, e)
+    count = 1
+    assigned.clear()
+    ne
+  }
 }
+
+
 
 def simplifyExpr(e: Expr): Expr = {
   // println((0 until indent).map(" ").mkString("") + e)

@@ -523,7 +523,7 @@ object RunUtils {
   }
 
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = {
-    Logger.info("[!] Running simplification")
+    Logger.info("[!] Running Simplify")
 
     //val before = ctx.program.procedures.size
     //transforms.stripUnreachableFunctions(ctx.program, 1)
@@ -531,8 +531,7 @@ object RunUtils {
     //  s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     //)
 
-    Logger.info("[!] DynamicSingleAssignment")
-
+    Logger.info("[!] Simplify :: DynamicSingleAssignment")
     val liveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
 
     writeToFile(serialiseIL(ctx.program), s"il-before-dsa.il")
@@ -544,13 +543,12 @@ object RunUtils {
     writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
 
 
-    Logger.info("[!] CopyProp")
     transforms.doCopyPropTransform(ctx.program)
     writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
 
     // run this after cond recovery because sign bit calculations often need high bits
     // which go away in high level conss
-    Logger.info("[!] RemoveSlices")
+    Logger.info("[!] Simplify :: RemoveSlices")
     transforms.removeSlices(ctx.program)
     writeToFile(serialiseIL(ctx.program), s"il-after-slices.il")
 
@@ -558,9 +556,12 @@ object RunUtils {
       writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-simp.dot")
     })
 
-    Logger.info("Done simp")
-    //Logger.info("done simp...writing validation")
-    //writeToFile(ir.eval.makeValidation(), s"simps.smt2")
+    if (ir.eval.SimplifyValidation.validate) {
+      Logger.info("[!] Simplify :: Writing simplification validation")
+      val w = BufferedWriter(FileWriter("rewrites.smt2"))
+      ir.eval.SimplifyValidation.makeValidation(w)
+      w.close()
+    }
   }
 
   def loadAndTranslate(conf: BASILConfig): BASILResult = {
@@ -581,6 +582,7 @@ object RunUtils {
     }
     assert(invariant.correctCalls(ctx.program))
 
+    ir.eval.SimplifyValidation.validate = conf.validateSimp
     if (conf.simplify) {
       doSimplify(ctx, conf.staticAnalysis)
     }

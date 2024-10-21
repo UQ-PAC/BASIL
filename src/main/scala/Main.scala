@@ -53,7 +53,9 @@ object Main {
       @arg(name = "summarise-procedures", doc = "Generates summaries of procedures which are used in pre/post-conditions (requires --analyse flag)")
       summariseProcedures: Flag,
       @arg(name = "simplify", doc = "Partial evaluate / simplify BASIL IR before output (requires --analyse flag)")
-      simplify: Flag
+      simplify: Flag,
+      @arg(name = "validate-simplify", doc = "Emit SMT2 check for algebraic simplification translation validation to 'rewrites.smt2'")
+      validateSimplify: Flag
   )
 
   def main(args: Array[String]): Unit = {
@@ -87,6 +89,7 @@ object Main {
       loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth, conf.parameterForm.value || conf.simplify.value),
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
+      validateSimp = conf.validateSimplify.value,
       staticAnalysis = if conf.analyse.value then Some(StaticAnalysisConfig(conf.dumpIL, conf.analysisResults, conf.analysisResultsDot, conf.threadSplit.value, conf.summariseProcedures.value)) else None,
       boogieTranslation = BoogieGeneratorConfig(if conf.lambdaStores.value then BoogieMemoryAccessMode.LambdaStoreSelect else BoogieMemoryAccessMode.SuccessiveStoreSelect,
         true, rely, conf.threadSplit.value),
