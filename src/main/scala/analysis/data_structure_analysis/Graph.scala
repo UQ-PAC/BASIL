@@ -5,7 +5,7 @@ import analysis.solvers.DSAUnionFindSolver
 import analysis.evaluateExpression
 import cfg_visualiser.*
 import ir.*
-import specification.{ExternalFunction, SymbolTableEntry}
+import specification.{ExternalFunction, FuncEntry, SpecGlobal, SymbolTableEntry}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -129,12 +129,30 @@ class Graph(val proc: Procedure,
 
   // creates the globals from the symbol tables
   val globalMapping = mutable.Map[AddressRange, Field]()
-  globals.foreach { global =>
-    val node = Node(Some(this), global.size)
-    node.allocationRegions.add(DataLocation(global.name, global.address, global.size / 8))
-    node.flags.global = true
-    node.flags.incomplete = true
-    globalMapping.update(AddressRange(global.address, global.address + global.size / 8), Field(node, 0))
+  globals.foreach {
+    global =>
+      global match
+        case FuncEntry(name, size, address) =>
+          val func = Node(Some(this), size)
+          func.allocationRegions.add(DataLocation(name, -address, size / 8))
+          func.flags.global = true
+          func.flags.incomplete = true
+          globalMapping.update(AddressRange(-address, (-address - size) / 8), Field(func, 0))
+
+          val pointer = Node(Some(this), 8)
+          pointer.allocationRegions.add(DataLocation(s"$name's pointer@$address", address, 8))
+          pointer.flags.global = true
+          pointer.flags.incomplete = true
+          pointer.cells(0).pointee = Some(Slice(func.cells(0), 0))
+          globalMapping.update(AddressRange(address, address + 8), Field(pointer, 0))
+        case SpecGlobal(name, size, arraySize, address) =>
+          val node = Node(Some(this), size)
+          node.allocationRegions.add(DataLocation(name, address, size / 8))
+          node.flags.global = true
+          node.flags.incomplete = true
+          globalMapping.update(AddressRange(address, address + size / 8), Field(node, 0))
+        case _ => ???
+
   }
 
   // creates a global for each relocation entry in the symbol table
