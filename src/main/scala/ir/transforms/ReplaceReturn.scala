@@ -1,8 +1,8 @@
 package ir.transforms
 
 import util.Logger
-import ir.cilvisitor._
-import ir._
+import ir.cilvisitor.*
+import ir.*
 
 
 class ReplaceReturns extends CILVisitor {

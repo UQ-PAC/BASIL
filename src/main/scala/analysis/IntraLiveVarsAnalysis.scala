@@ -16,9 +16,9 @@ abstract class LivenessAnalysis(program: Program) extends Analysis[Any]:
       case Assume(expr, _, _, _) => s ++ expr.variables
       case Assert(expr, _, _) => s ++ expr.variables
       case IndirectCall(variable, _) => s + variable
-      case c: DirectCall => s
+      case c: DirectCall => s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables)
       case g: GoTo => s
-      case r: Return => s
+      case r: Return => s ++ r.outParams.flatMap(_._2.variables)
       case r: Unreachable => s
       case _ => ???
     }

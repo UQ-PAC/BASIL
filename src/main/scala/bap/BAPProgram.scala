@@ -46,14 +46,58 @@ case class BAPBlock(label: String, address: Option[BigInt], statements: List[BAP
 }
 
 case class BAPParameter(name: String, size: Int, value: BAPVar) {
-  def toIR: Parameter = {
-    val register = value.toIR
-    register match {
-      case r: Register => Parameter(name, size, r)
-      case _           => throw Exception(s"subroutine parameter $this refers to non-register variable $value")
+
+  def paramRegisterLVal: Variable = value.toIR
+  def paramVariable = toIR
+  def toIROutParam =  {
+    paramRegisterLVal match {
+      case r: Register => {
+        if (r.size == size) then {
+          toIR
+        } else {
+          LocalVar(name, BitVecType(r.size))
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable $value")
     }
 
   }
+  def paramRegisterRVal: Expr = {
+    paramRegisterLVal match {
+      case r: Register => {
+        if (r.size == size) then {
+          r
+        } else if (r.size > size){
+          Extract(size, 0, r)
+        } else {
+          ZeroExtend(size - r.size, r)
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable $value")
+    }
+  }
+  def paramVariableRVal: Expr = {
+    paramRegisterLVal match {
+      case r: Register => {
+        if (r.size == size) then {
+          toIR
+        } else {
+          ZeroExtend(r.size - size, toIR)
+        }
+      }
+      case _ => throw Exception(s"subroutine parameter $this refers to non-register variable $value")
+    }
+  }
+
+  def toAssignOut : Assign = {
+    Assign(paramVariable, paramRegisterRVal)
+  }
+
+  def toAssignIn : Assign = {
+    Assign(paramRegisterLVal, paramVariableRVal)
+  }
+
+  def toIR: LocalVar = LocalVar(name, BitVecType(size))
 }
 
 case class BAPMemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BAPLiteral])
