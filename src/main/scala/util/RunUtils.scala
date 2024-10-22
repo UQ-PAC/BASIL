@@ -207,10 +207,9 @@ object IRTransform {
     externalRemover.visitProgram(ctx.program)
     renamer.visitProgram(ctx.program)
 
-    // before DSA ; make locals block-local 
-    // TODO: should be in loading phase
-    // transforms.MakeLocalsBlockUnique(ctx.program)
-
+    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.cfgCorrect(ctx.program))
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     ctx
   }
 
@@ -223,7 +222,7 @@ object IRTransform {
     Logger.info("[!] Stripping unreachable")
     val before = ctx.program.procedures.size
     transforms.stripUnreachableFunctions(ctx.program, config.procedureTrimDepth)
-    Logger.debug(
+    Logger.info(
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
     val dupProcNames = (ctx.program.procedures.groupBy(_.name).filter((n,p) => p.size > 1)).toList.flatMap(_._2)
@@ -290,6 +289,12 @@ object StaticAnalysis {
     val globals: Set[SpecGlobal] = ctx.globals
     val globalOffsets: Map[BigInt, BigInt] = ctx.globalOffsets
 
+    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.cfgCorrect(ctx.program))
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+    assert(invariant.correctCalls(ctx.program))
+
+
     val subroutines = IRProgram.procedures
       .filter(p => p.address.isDefined)
       .map(p => p.address.get -> p.name)
@@ -305,6 +310,7 @@ object StaticAnalysis {
     Logger.debug("Subroutine Addresses:")
     Logger.debug(subroutines)
 
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
     Logger.info("reducible loops")
     // reducible loops
@@ -525,12 +531,6 @@ object RunUtils {
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = {
     Logger.info("[!] Running Simplify")
 
-    //val before = ctx.program.procedures.size
-    //transforms.stripUnreachableFunctions(ctx.program, 1)
-    //Logger.info(
-    //  s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
-    //)
-
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
     val liveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
 
@@ -574,7 +574,17 @@ object RunUtils {
 
     ctx = IRTransform.doCleanup(ctx)
 
-    //assert(invariant.correctCalls(ctx.program))
+    if (q.loading.trimEarly) {
+      val before = ctx.program.procedures.size
+      transforms.stripUnreachableFunctions(ctx.program, q.loading.procedureTrimDepth)
+      Logger.info(
+        s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
+      )
+
+      val dumpdomain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, ctx.program.procedures)
+      writeToFile(toDot(dumpdomain, InterProcIRCursor, Map.empty), s"ldakjldajnew_ir_intercfg.dot")
+    }
+
     if (q.loading.parameterForm) {
 
       ir.transforms.clearParams(ctx.program)
@@ -589,8 +599,9 @@ object RunUtils {
       doSimplify(ctx, conf.staticAnalysis)
     }
 
-    Logger.info("Done simplify")
-
+    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.cfgCorrect(ctx.program))
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
     assert(invariant.correctCalls(ctx.program))
 
     q.loading.dumpIL.foreach(s => writeToFile(serialiseIL(ctx.program), s"$s-before-analysis.il"))

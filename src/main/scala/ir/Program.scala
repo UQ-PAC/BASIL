@@ -33,12 +33,32 @@ class ILUnorderedIterator(private val begin: Iterable[CFGPosition]) extends Iter
 
 }
 
-class Program(var procedures: ArrayBuffer[Procedure],
+class Program(val procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
               var initialMemory: ArrayBuffer[MemorySection],
               var readOnlyMemory: ArrayBuffer[MemorySection]) extends Iterable[CFGPosition] {
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
+
+
+  def removeProcedure(i: Int) : Unit = {
+    val p = procedures(i)
+    for (b <- p.blocks) {
+      b.deParent()
+    }
+    procedures.remove(i)
+  }
+
+  def removeProcedure(p: Procedure) : Unit = {
+    removeProcedure(procedures.indexOf(p))
+  }
+
+  def addProcedure(p: Procedure) = {
+    for (b <- p.blocks) {
+      b.setParent(p)
+    }
+    procedures += p
+  }
 
   override def toString(): String = {
     serialiseIL(this)
@@ -276,11 +296,10 @@ class Procedure private (
    * @return the removed block
    */
   def removeBlocks(block: Block): Block = {
+    require(_blocks.contains(block)) 
     require(block.incomingJumps.isEmpty) // don't leave jumps dangling
-    if (_blocks.contains(block)) {
-      block.deParent()
-      _blocks.remove(block)
-    }
+    block.deParent()
+    _blocks.remove(block)
     if (_entryBlock.contains(block)) {
       _entryBlock = None
     }
@@ -455,11 +474,17 @@ class Block private (
 
   override def linkParent(p: Procedure): Unit = {
     // to connect call() links that reference jump.parent.parent
+    for (s <- statements) {
+      s.setParent(this)
+    }
     jump.setParent(this)
   }
 
   override def unlinkParent(): Unit = {
     // to disconnect call() links that reference jump.parent.parent
+    for (s <- statements) {
+      s.deParent()
+    }
     jump.deParent()
   }
 }

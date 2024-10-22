@@ -365,6 +365,12 @@ def copypropTransform(p: Procedure) = {
   visit_proc(AlgebraicSimplifications, p)
   visit_proc(AlgebraicSimplifications, p)
   visit_proc(AlgebraicSimplifications, p)
+  visit_proc(AlgebraicSimplifications, p)
+  visit_proc(AlgebraicSimplifications, p)
+  visit_proc(AlgebraicSimplifications, p)
+  visit_proc(AlgebraicSimplifications, p)
+  visit_proc(AlgebraicSimplifications, p)
+  visit_proc(AlgebraicSimplifications, p)
   // Logger.info(s"    ${p.name}  after simp expr complexity ${ExprComplexity()(p)}")
   val sipm = t.checkPoint("algebraic simp")
 }
@@ -629,7 +635,7 @@ class ConstCopyProp() extends AbstractDomain[CCP] {
 
           val ns = existing match {
             case CopyProp.Bot                                 => CopyProp.Prop(evaled, rhsDeps) // not seen yet
-            case CopyProp.Prop(e, _) if e == evaled || e == r => CopyProp.Prop(evaled, rhsDeps) // refine value
+            case CopyProp.Prop(e, _)                          => CopyProp.Prop(evaled, rhsDeps)
             case _                                            => CopyProp.Clobbered // our expr value has changed
           }
           val p = c.copy(state = c.state + (l -> ns))

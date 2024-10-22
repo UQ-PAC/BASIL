@@ -168,7 +168,23 @@ class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_prog(p: Program): Program = {
     def continue(p: Program) = {
-      p.procedures = p.procedures.flatMap(visit_proc)
+      for (i <- (0 until p.procedures.size)) {
+        visit_proc(p.procedures(i)) match {
+          case h::Nil if p.procedures(i) eq h => {}
+          case h::Nil if !(p.procedures(i) eq h) => {
+            // TODO: need some better approximation of knowing whether this procedure requires relinking?
+            p.removeProcedure(i)
+            p.addProcedure(h)
+          }
+          case Nil => p.removeProcedure(i)
+          case h::tl => {
+            p.removeProcedure(i)
+            for (x <- h::tl) {
+              p.addProcedure(x)
+            }
+          }
+        }
+      }
       p
     }
     doVisit(v, v.vprog(p), p, continue)

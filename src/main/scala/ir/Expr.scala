@@ -383,11 +383,18 @@ case class Register(override val name: String, size: Int) extends Variable with 
 }
 
 // Variable with scope local to the procedure, typically a temporary variable created in the lifting process
-case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
+case class LocalVar(varName: String, override val irType: IRType, val index : Int = 0) extends Variable {
+  override val name = varName + (if (index > 0) then s"_$index" else "")
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
   override def toString: String = s"LocalVar(${name}, ${if sharedVariable then "shared" else "unshared"}, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
+}
+
+object LocalVar {
+
+  def unapply(l: LocalVar) : Option[(String, IRType)] = Some((s"${l.name}_${l.index}", l.irType)) 
+
 }
 
 

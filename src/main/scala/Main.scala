@@ -40,6 +40,8 @@ object Main {
       mainProcedureName: String = "main",
       @arg(name = "procedure-call-depth", doc = "Cull procedures beyond this call depth from the main function (defaults to Int.MaxValue)")
       procedureDepth: Int = Int.MaxValue,
+      @arg(name = "trim-early", doc = "Cull procedures BEFORE running analysis")
+      trimEarly: Flag,
       @arg(name = "help", short = 'h', doc = "Show this help message.")
       help: Flag,
       @arg(name = "analysis-results", doc = "Log analysis results in files at specified path.")
@@ -86,7 +88,7 @@ object Main {
     }
 
     val q = BASILConfig(
-      loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth, conf.parameterForm.value || conf.simplify.value),
+      loading = ILLoadingConfig(conf.inputFileName, conf.relfFileName, conf.specFileName, conf.dumpIL, conf.mainProcedureName, conf.procedureDepth, conf.parameterForm.value || conf.simplify.value, conf.trimEarly.value),
       runInterpret = conf.interpret.value,
       simplify = conf.simplify.value,
       validateSimp = conf.validateSimplify.value,

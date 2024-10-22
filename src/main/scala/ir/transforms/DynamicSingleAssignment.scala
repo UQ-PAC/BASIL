@@ -16,8 +16,11 @@ object DynamicSingleAssignment {
     def addIndex(v: Variable, idx: Int) = {
       if (idx != -1) {
         v match {
-          case Register(n, sz) => Register(n + "_" + idx, sz)
-          case LocalVar(n, t)  => LocalVar(n + "_" + idx, t)
+          case Register(n, sz) => {
+            throw Exception("Should not SSA registers")
+            Register(n + "_" + idx, sz)
+          }
+          case v @ LocalVar(n, t)  => LocalVar(v.varName, t, idx)
         }
       } else {
         v
@@ -231,3 +234,41 @@ object DynamicSingleAssignment {
     program.procedures.foreach(visitProc)
   }
 }
+
+
+
+def undoDSA(p: Procedure) : Unit = {
+  /**
+   * This just naively removes the indices from variables, some analyses may require dsa form to maintain correctness
+   * (e.g. bitvector width removal)
+   *
+   * You can only do this if the ssa index order matches the flow order, and all have the same type. 
+   */
+  visit_proc(RevIndices, p)
+  visit_proc(RemoveCopy, p)
+
+  object RevIndices extends CILVisitor {
+    override def vlvar(v: Variable) = v match {
+      case l: LocalVar => ChangeTo(LocalVar(l.varName, l.irType))
+      case o => SkipChildren()
+    }
+    override def vrvar(v: Variable) = v match {
+      case l: LocalVar => ChangeTo(LocalVar(l.varName, l.irType))
+      case o => SkipChildren()
+    }
+  }
+
+  object RemoveCopy extends CILVisitor {
+    override def vstmt(s: Statement) = s match {
+      case Assign(LocalVar(n1, t1), LocalVar(n2, t2), _) if n1 == n2 => ChangeTo(List())
+      case o => SkipChildren()
+    }
+  }
+}
+
+def undoDSA(p: Program) : Unit = {
+  for (proc <- p.procedures) {
+    undoDSA(proc)
+  }
+}
+

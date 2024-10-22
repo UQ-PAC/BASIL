@@ -352,8 +352,8 @@ class Substituter(variables: Map[Variable, Variable] = Map(), memories: Map[Memo
   */
 class Renamer(reserved: Set[String]) extends Visitor {
   override def visitLocalVar(node: LocalVar): LocalVar = {
-    if (reserved.contains(node.name)) {
-      node.copy(name = s"#${node.name}")
+    if (reserved.contains(node.varName)) {
+      node.copy(varName = s"#${node.varName}")
     } else {
       node
     }
