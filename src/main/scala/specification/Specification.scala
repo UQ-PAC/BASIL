@@ -1,7 +1,7 @@
 package specification
 
-import boogie._
-import ir._
+import boogie.*
+import ir.*
 import util.Logger
 
 trait SpecVar extends BExpr {
@@ -24,83 +24,11 @@ case class SpecGlobal(name: String, override val size: Int, arraySize: Option[In
   override val toOldVar: BVar = BVariable(s"${name}_old", BitVecBType(size), Scope.Local)
   override val toOldGamma: BVar = BVariable(s"Gamma_${name}_old", BoolBType, Scope.Local)
   val toAxiom: BAxiom = BAxiom(BinaryBExpr(BoolEQ, toAddrVar, BitVecBLiteral(address, 64)), List.empty)
-  override def resolveSpec: BMemoryLoad = BMemoryLoad(
-    BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global),
-    toAddrVar,
-    Endian.LittleEndian,
-    size
-  )
-  override def resolveSpecParam: BMemoryLoad = BMemoryLoad(
-    BMapVar("mem$out", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
-    toAddrVar,
-    Endian.LittleEndian,
-    size
-  )
-  override def resolveSpecParamOld: BMemoryLoad = BMemoryLoad(
-    BMapVar("mem$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
-    toAddrVar,
-    Endian.LittleEndian,
-    size
-  )
-  override def resolveSpecInv: BMemoryLoad = BMemoryLoad(
-    BMapVar("mem$inv2", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local),
-    toAddrVar,
-    Endian.LittleEndian,
-    size
-  )
-  override def resolveSpecInvOld: BMemoryLoad = BMemoryLoad(
-    BMapVar("mem$inv1", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local),
-    toAddrVar,
-    Endian.LittleEndian,
-    size
-  )
-  override def resolveOld: BMemoryLoad = resolveSpec
-  override def resolveInsideOld: BExpr = toOldVar
-  override def removeOld: BMemoryLoad = resolveSpec
-  override def resolveSpecL: BMemoryLoad = BMemoryLoad(
-    BMapVar("memory", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
-    toAddrVar,
-    Endian.LittleEndian,
-    size
-  )
+  override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitSpecGlobal(this)
 }
 
 case class SpecGamma(global: SpecGlobal) extends SpecVar {
-  // TODO don't hardcode this
-  override def resolveSpec: GammaLoad = GammaLoad(
-    BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global),
-    global.toAddrVar,
-    global.size,
-    global.size / 8
-  )
-  override def resolveSpecParam: GammaLoad = GammaLoad(
-    BMapVar("Gamma_mem$out", MapBType(BitVecBType(64), BoolBType), Scope.Parameter),
-    global.toAddrVar,
-    global.size,
-    global.size / 8
-  )
-  override def resolveSpecParamOld: GammaLoad = GammaLoad(
-    BMapVar("Gamma_mem$in", MapBType(BitVecBType(64), BoolBType), Scope.Parameter),
-    global.toAddrVar,
-    global.size,
-    global.size / 8
-  )
-  override def resolveSpecInv: GammaLoad = GammaLoad(
-    BMapVar("Gamma_mem$inv2", MapBType(BitVecBType(64), BoolBType), Scope.Local),
-    global.toAddrVar,
-    global.size,
-    global.size / 8
-  )
-  override def resolveSpecInvOld: GammaLoad = GammaLoad(
-    BMapVar("Gamma_mem$inv1", MapBType(BitVecBType(64), BoolBType), Scope.Local),
-    global.toAddrVar,
-    global.size,
-    global.size / 8
-  )
-  override def resolveOld: GammaLoad = resolveSpec
-  override def resolveInsideOld: BExpr = global.toOldGamma
-  override def removeOld: GammaLoad = resolveSpec
-  override def resolveSpecL: GammaLoad = resolveSpec
+  override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitSpecGamma(this)
 }
 
 case class ArrayAccess(global: SpecGlobal, index: Int) extends SpecGlobalOrAccess {
@@ -110,46 +38,7 @@ case class ArrayAccess(global: SpecGlobal, index: Int) extends SpecGlobalOrAcces
   override val toAddrVar: BExpr = BinaryBExpr(BVADD, global.toAddrVar, accessIndex)
   override val toOldGamma: BVar = BVariable(s"Gamma_${global.name}$$${index}_old", BoolBType, Scope.Local)
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
-  override def resolveSpec: BMemoryLoad = BMemoryLoad(
-    BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global),
-    toAddrVar,
-    Endian.LittleEndian,
-    global.size
-  )
-  override def resolveSpecParam: BMemoryLoad = BMemoryLoad(
-    BMapVar("mem$out", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
-    toAddrVar,
-    Endian.LittleEndian,
-    global.size
-  )
-  override def resolveSpecParamOld: BMemoryLoad = BMemoryLoad(
-    BMapVar("mem$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
-    toAddrVar,
-    Endian.LittleEndian,
-    global.size
-  )
-
-  override def resolveSpecInv: BMemoryLoad = BMemoryLoad(
-    BMapVar("mem$inv2", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local),
-    toAddrVar,
-    Endian.LittleEndian,
-    global.size
-  )
-  override def resolveSpecInvOld: BMemoryLoad = BMemoryLoad(
-    BMapVar("mem$inv1", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local),
-    toAddrVar,
-    Endian.LittleEndian,
-    global.size
-  )
-  override def resolveOld: BMemoryLoad = resolveSpec
-  override def resolveInsideOld: BExpr = toOldVar
-  override def removeOld: BMemoryLoad = resolveSpec
-  override def resolveSpecL: BMemoryLoad = BMemoryLoad(
-    BMapVar("memory", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
-    toAddrVar,
-    Endian.LittleEndian,
-    global.size
-  )
+  override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitArrayAccess(this)
 }
 
 case class Specification(
@@ -164,7 +53,7 @@ case class Specification(
 
   val controls: Map[SpecGlobalOrAccess, Set[SpecGlobal]] = {
     val controlledBy = LPreds.map((k, v) => k -> v.specGlobals).collect { case (k, v) if v.nonEmpty => (k, v) }
-    controlledBy.toSet.flatMap((k, v) => v.map(_ -> k)).groupMap(_._1)(_._2)
+    controlledBy.toSet.flatMap((k, v) => v.map(_ -> k)).groupMap(_(0))(_(1))
   }
   val controlled: Set[SpecGlobal] = controls.values.flatten.toSet
 }

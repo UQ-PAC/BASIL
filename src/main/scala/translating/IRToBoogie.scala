@@ -13,17 +13,17 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   private val globals = spec.globals
   private val controls = spec.controls
   private val controlled = spec.controlled
-  private val relies = spec.relies.map(r => r.resolveSpec)
-  private val reliesParam = spec.relies.map(r => r.resolveSpecParam)
-  private val reliesReflexive = spec.relies.map(r => r.removeOld)
-  private val guarantees = spec.guarantees.map(g => g.resolveOld)
-  private val guaranteesParam = spec.guarantees.map(g => g.resolveSpecParam)
-  private val guaranteesReflexive = spec.guarantees.map(g => g.removeOld)
+  private val relies = spec.relies.map(ResolveSpec.visitBExpr)
+  private val reliesParam = spec.relies.map(ResolveSpecParam.visitBExpr)
+  private val reliesReflexive = spec.relies.map(RemoveOld.visitBExpr)
+  private val guarantees = spec.guarantees.map(ResolveOld.visitBExpr)
+  private val guaranteesParam = spec.guarantees.map(ResolveSpecParam.visitBExpr)
+  private val guaranteesReflexive = spec.guarantees.map(RemoveOld.visitBExpr)
   private val guaranteeOldVars = spec.guaranteeOldVars
-  private val LPreds = spec.LPreds.map((k, v) => k -> v.resolveSpecL)
-  private val requires = spec.subroutines.map(s => s.name -> s.requires.map(e => e.resolveSpec)).toMap
+  private val LPreds = spec.LPreds.map((k, v) => k -> ResolveSpecL.visitBExpr(v))
+  private val requires = spec.subroutines.map(s => s.name -> s.requires.map(ResolveSpec.visitBExpr)).toMap
   private val requiresDirect = spec.subroutines.map(s => s.name -> s.requiresDirect).toMap
-  private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(e => e.resolveSpec)).toMap
+  private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(ResolveSpec.visitBExpr)).toMap
   private val ensuresDirect = spec.subroutines.map(s => s.name -> s.ensuresDirect).toMap
   private val libRelies = spec.subroutines.map(s => s.name -> s.rely).toMap
   private val libGuarantees = spec.subroutines.map(s => s.name -> s.guarantee).toMap
@@ -172,7 +172,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       relyEnsures.head
     }
 
-    val guaranteeEnsures = libGuarantees(name).map(g => g.resolveSpecParam)
+    val guaranteeEnsures = libGuarantees(name).map(ResolveSpecParam.visitBExpr)
     val guaranteeOneLine = if (guaranteeEnsures.size > 1) {
       guaranteeEnsures.tail.foldLeft(guaranteeEnsures.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
     } else {
@@ -194,7 +194,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
   def genLibGuarantee(name: String): BProcedure = {
     // G_f
-    val guaranteeLib = libGuarantees(name).map(g => g.resolveSpecParam)
+    val guaranteeLib = libGuarantees(name).map(ResolveSpecParam.visitBExpr)
     val guaranteeOneLine = if (guaranteeLib.size > 1) {
       guaranteeLib.tail.foldLeft(guaranteeLib.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
     } else {
@@ -613,11 +613,11 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
      *
      */
     (libRelies.keySet ++ libGuarantees.keySet).filter(x => libRelies(x).nonEmpty && libGuarantees(x).nonEmpty).map(targetName => {
-      val Rc: BExpr = spec.relies.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
-      val Gc: BExpr = spec.guarantees.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
+      val Rc: BExpr = ResolveSpec.visitBExpr(spec.relies.reduce((a, b) => BinaryBExpr(BoolAND, a, b)))
+      val Gc: BExpr = ResolveSpec.visitBExpr(spec.guarantees.reduce((a, b) => BinaryBExpr(BoolAND, a, b)))
 
-      val Rf: BExpr = libRelies(targetName).reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
-      val Gf: BExpr = libGuarantees(targetName).reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
+      val Rf: BExpr = ResolveSpec.visitBExpr(libRelies(targetName).reduce((a, b) => BinaryBExpr(BoolAND, a, b)))
+      val Gf: BExpr = ResolveSpec.visitBExpr(libGuarantees(targetName).reduce((a, b) => BinaryBExpr(BoolAND, a, b)))
 
       val inv = BinaryBExpr(BoolOR, Rc, Gf)
       val conseq = BinaryBExpr(BoolIMPLIES, Rc, Rf)
@@ -685,7 +685,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           if (libRelies.contains(d.target.name) && libGuarantees.contains(d.target.name) && libRelies(d.target.name).nonEmpty && libGuarantees(d.target.name).nonEmpty) {
             val invCall1 = BProcedureCall(d.target.name + "$inv", List(mem_inv1, Gamma_mem_inv1), List(mem, Gamma_mem))
             val invCall2 = BProcedureCall("rely$inv", List(mem_inv2, Gamma_mem_inv2), List(mem_inv1, Gamma_mem_inv1))
-            val libRGAssert = libRelies(d.target.name).map(r => BAssert(r.resolveSpecInv))
+            val libRGAssert = libRelies(d.target.name).map(r => BAssert(ResolveSpecInv.visitBExpr(r)))
             List(invCall1, invCall2) ++ libRGAssert
           } else {
             List()
