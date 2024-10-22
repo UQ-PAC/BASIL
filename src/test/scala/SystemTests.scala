@@ -176,8 +176,8 @@ trait SystemTests extends AnyFunSuite, BASILTest {
 }
 
 class SystemTestsBAP extends SystemTests {
-  runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, logResults = true))
-  runTests("incorrect", TestConfig(useBAPFrontend = true, expectVerify = false, logResults = true))
+  runTests("correct", TestConfig(useBAPFrontend = true, expectVerify = true, checkExpected = true, logResults = true))
+  runTests("incorrect", TestConfig(useBAPFrontend = true, expectVerify = false, checkExpected = true, logResults = true))
   test("summary-BAP") {
     summary("testresult-BAP")
   }
