@@ -63,6 +63,7 @@ case class StaticAnalysisContext(
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
     varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
+    regionInjector: RegionInjector
 )
 
 /** Results of the main program execution.
@@ -438,6 +439,7 @@ object StaticAnalysis {
       memoryRegionContents = memoryRegionContents,
       reachingDefs = reachingDefinitionsAnalysisResults,
       varDepsSummaries = varDepsSummaries,
+      regionInjector = regionInjector
     )
   }
 
@@ -521,16 +523,18 @@ object RunUtils {
 
     Logger.debug("[!] Translating to Boogie")
 
+    val regionInjector = analysis.map(a => a.regionInjector)
+
     val boogiePrograms = if (q.boogieTranslation.threadSplit && ctx.program.threads.nonEmpty) {
       val outPrograms = ArrayBuffer[BProgram]()
       for (thread <- ctx.program.threads) {
         val fileName = q.outputPrefix.stripSuffix(".bpl") + "_" + thread.entry.name + ".bpl"
-        val boogieTranslator = IRToBoogie(ctx.program, ctx.specification, Some(thread), fileName)
+        val boogieTranslator = IRToBoogie(ctx.program, ctx.specification, Some(thread), fileName, regionInjector)
         outPrograms.addOne(boogieTranslator.translate(q.boogieTranslation))
       }
       outPrograms
     } else {
-      val boogieTranslator = IRToBoogie(ctx.program, ctx.specification, None, q.outputPrefix)
+      val boogieTranslator = IRToBoogie(ctx.program, ctx.specification, None, q.outputPrefix, regionInjector)
       ArrayBuffer(boogieTranslator.translate(q.boogieTranslation))
     }
     assert(invariant.singleCallBlockEnd(ctx.program))

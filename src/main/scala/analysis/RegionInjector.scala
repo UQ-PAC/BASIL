@@ -360,6 +360,15 @@ class RegionInjector(program: Program,
       }
     }
   }
+
+  def getMergedRegion(address: BigInt): Option[MergedRegion] = {
+    val region = mmm.findDataObject(address)
+    if (region.isDefined && mergedRegions.contains(region.get)) {
+      Some(mergedRegions(region.get))
+    } else {
+      None
+    }
+  }
 }
 
 class RegionRenamer(memory: Memory) extends Visitor {

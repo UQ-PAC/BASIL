@@ -33,9 +33,9 @@ case class SpecGamma(global: SpecGlobal) extends SpecVar {
 
 case class ArrayAccess(global: SpecGlobal, index: Int) extends SpecGlobalOrAccess {
   override val size: Int = global.size
-  private val accessIndex = BitVecBLiteral(index * (global.size / 8), 64)
+  val offset = index * (global.size / 8)
   override val toOldVar: BVar = BVariable(s"${global.name}$$${index}_old", BitVecBType(global.size), Scope.Local)
-  override val toAddrVar: BExpr = BinaryBExpr(BVADD, global.toAddrVar, accessIndex)
+  override val toAddrVar: BExpr = BinaryBExpr(BVADD, global.toAddrVar, BitVecBLiteral(offset, 64))
   override val toOldGamma: BVar = BVariable(s"Gamma_${global.name}$$${index}_old", BoolBType, Scope.Local)
   override def specGlobals: Set[SpecGlobalOrAccess] = Set(this)
   override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitArrayAccess(this)

@@ -1,12 +1,11 @@
 package boogie
 
+import analysis.RegionInjector
 import ir.{Endian, IntBinOp, IntUnOp}
 import specification.{ArrayAccess, SpecGamma, SpecGlobal}
 
 trait BVisitor {
   def visitBExpr(node: BExpr): BExpr = node.acceptVisit(this)
-
-  def visitIntBLiteral(node: IntBLiteral): BExpr = node
 
   def visitBVExtract(node: BVExtract): BExpr = node.copy(body = visitBExpr(node.body))
 
@@ -53,51 +52,63 @@ trait SpecResolutionVisitor extends BVisitor {
   }
 }
 
-object ResolveSpec extends SpecResolutionVisitor {
+class ResolveSpec(regionInjector: Option[RegionInjector]) extends SpecResolutionVisitor {
+  private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+  private val gammaMem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+
   override def visitSpecGlobal(node: SpecGlobal): BMemoryLoad = {
-    BMemoryLoad(
-      BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global),
-      node.toAddrVar,
-      Endian.LittleEndian,
-      node.size
-    )
+    val memory = if (regionInjector.isDefined) {
+      regionInjector.get.getMergedRegion(node.address) match {
+        case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+        case None => mem
+      }
+    } else {
+      mem
+    }
+    BMemoryLoad(memory, node.toAddrVar, Endian.LittleEndian, node.size)
   }
 
   override def visitSpecGamma(node: SpecGamma): GammaLoad = {
-    GammaLoad(
-      BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global),
-      node.global.toAddrVar,
-      node.global.size,
-      node.global.size / 8
-    )
+    val gammaMemory = if (regionInjector.isDefined) {
+      regionInjector.get.getMergedRegion(node.global.address) match {
+        case Some(region) => BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+        case None => gammaMem
+      }
+    } else {
+      gammaMem
+    }
+    GammaLoad(gammaMemory, node.global.toAddrVar, node.global.size, node.global.size / 8)
   }
 
   override def visitArrayAccess(node: ArrayAccess): BMemoryLoad = {
-    BMemoryLoad(
-      BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global),
-      node.toAddrVar,
-      Endian.LittleEndian,
-      node.global.size
-    )
+    val memory = if (regionInjector.isDefined) {
+      regionInjector.get.getMergedRegion(node.global.address + node.offset) match {
+        case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+        case None => mem
+      }
+    } else {
+      mem
+    }
+    BMemoryLoad(memory, node.toAddrVar, Endian.LittleEndian, node.size)
   }
 
 }
 
-object ResolveOld extends SpecResolutionVisitor {
+class ResolveOld(resolveSpec: ResolveSpec) extends SpecResolutionVisitor {
   override def visitOld(node: Old): BExpr = ResolveInsideOld.visitBExpr(node.body)
-  override def visitSpecGlobal(node: SpecGlobal): BMemoryLoad = ResolveSpec.visitSpecGlobal(node)
-  override def visitSpecGamma(node: SpecGamma): GammaLoad = ResolveSpec.visitSpecGamma(node)
-  override def visitArrayAccess(node: ArrayAccess): BMemoryLoad = ResolveSpec.visitArrayAccess(node)
+  override def visitSpecGlobal(node: SpecGlobal): BMemoryLoad = resolveSpec.visitSpecGlobal(node)
+  override def visitSpecGamma(node: SpecGamma): GammaLoad = resolveSpec.visitSpecGamma(node)
+  override def visitArrayAccess(node: ArrayAccess): BMemoryLoad = resolveSpec.visitArrayAccess(node)
 }
 
-object RemoveOld extends SpecResolutionVisitor {
-  override def visitOld(node: Old): BExpr = ResolveSpec.visitBExpr(node.body)
-  override def visitSpecGlobal(node: SpecGlobal): BMemoryLoad = ResolveSpec.visitSpecGlobal(node)
-  override def visitSpecGamma(node: SpecGamma): GammaLoad = ResolveSpec.visitSpecGamma(node)
-  override def visitArrayAccess(node: ArrayAccess): BMemoryLoad = ResolveSpec.visitArrayAccess(node)
+class RemoveOld(resolveSpec: ResolveSpec) extends SpecResolutionVisitor {
+  override def visitOld(node: Old): BExpr = resolveSpec.visitBExpr(node.body)
+  override def visitSpecGlobal(node: SpecGlobal): BMemoryLoad = resolveSpec.visitSpecGlobal(node)
+  override def visitSpecGamma(node: SpecGamma): GammaLoad = resolveSpec.visitSpecGamma(node)
+  override def visitArrayAccess(node: ArrayAccess): BMemoryLoad = resolveSpec.visitArrayAccess(node)
 }
 
-object ResolveSpecL extends SpecResolutionVisitor {
+class ResolveSpecL(resolveSpec: ResolveSpec) extends SpecResolutionVisitor {
   override def visitSpecGlobal(node: SpecGlobal): BMemoryLoad = {
     BMemoryLoad(
       BMapVar("memory", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
@@ -107,7 +118,7 @@ object ResolveSpecL extends SpecResolutionVisitor {
     )
   }
 
-  override def visitSpecGamma(node: SpecGamma): GammaLoad = ResolveSpec.visitSpecGamma(node)
+  override def visitSpecGamma(node: SpecGamma): GammaLoad = resolveSpec.visitSpecGamma(node)
 
   override def visitArrayAccess(node: ArrayAccess): BMemoryLoad = {
     BMemoryLoad(

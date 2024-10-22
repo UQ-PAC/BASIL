@@ -44,13 +44,6 @@ case class BitVecBLiteral(value: BigInt, size: Int) extends BLiteral {
 case class IntBLiteral(value: BigInt) extends BLiteral {
   override val getType: BType = IntBType
   override def toString: String = value.toString
-  /*
-  override def resolveSpecL: BitVecBLiteral = BitVecBLiteral(value, 32) // TODO
-  override def resolveSpec: BitVecBLiteral = BitVecBLiteral(value, 32) // TODO
-  override def resolveOld: BitVecBLiteral = BitVecBLiteral(value, 32) // TODO
-  override def removeOld: BitVecBLiteral = BitVecBLiteral(value, 32) // TODO
-  */
-  override def acceptVisit(visitor: BVisitor): BExpr = visitor.visitIntBLiteral(this)
 }
 
 case class BVExtract(end: Int, start: Int, body: BExpr) extends BExpr {
