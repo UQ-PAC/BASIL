@@ -70,7 +70,7 @@ class ResolveSpec(regionInjector: Option[RegionInjector]) extends SpecResolution
 
   override def visitSpecGamma(node: SpecGamma): GammaLoad = {
     val gammaMemory = if (regionInjector.isDefined) {
-      regionInjector.get.getMergedRegion(node.global.address) match {
+      regionInjector.get.getMergedRegion(node.address) match {
         case Some(region) => BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
         case None => gammaMem
       }
@@ -82,7 +82,7 @@ class ResolveSpec(regionInjector: Option[RegionInjector]) extends SpecResolution
 
   override def visitArrayAccess(node: ArrayAccess): BMemoryLoad = {
     val memory = if (regionInjector.isDefined) {
-      regionInjector.get.getMergedRegion(node.global.address + node.offset) match {
+      regionInjector.get.getMergedRegion(node.address) match {
         case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
         case None => mem
       }
