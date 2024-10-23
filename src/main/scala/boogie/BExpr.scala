@@ -628,7 +628,7 @@ case class L(memory: BMapVar, index: BExpr) extends BExpr {
   override def toString: String = s"L($memory, $index)"
   override val getType: BType = BoolBType
   override def functionOps: Set[FunctionOp] = index.functionOps + LOp(memory.getType, index.getType)
-  override def locals: Set[BVar] = index.locals
-  override def globals: Set[BVar] = index.globals
+  override def locals: Set[BVar] = index.locals ++ memory.locals
+  override def globals: Set[BVar] = index.globals ++ memory.globals
   override def loads: Set[BExpr] = index.loads
 }

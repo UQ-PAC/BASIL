@@ -72,21 +72,14 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     val initialSections = program.usedMemory.values.filter(!_.readOnly)
     val initialMemory = memoryToCondition(initialSections)
 
-    val procedures = thread match {
+    val procedures: ArrayBuffer[BProcedure] = thread match {
       case None =>
         program.procedures.map(f => translateProcedure(f, readOnlyMemory, initialMemory))
       case Some(t) =>
-        val translatedProcedures = ArrayBuffer[BProcedure]()
+        val translatedProcedures: ArrayBuffer[BProcedure] = ArrayBuffer[BProcedure]()
         t.procedures.foreach(p => translatedProcedures.addOne(translateProcedure(p, readOnlyMemory, initialMemory)))
         translatedProcedures
     }
-    //val defaultGlobals = (gammas ++ memories).toList.sorted.map(m => BVarDecl(m, List(externAttr)))
-    val defaultGlobals = List()
-    val globalVars = procedures.flatMap(p => p.globals ++ p.freeRequires.flatMap(_.globals) ++ p.freeEnsures.flatMap(_.globals) ++ p.ensures.flatMap(_.globals) ++ p.requires.flatMap(_.globals))
-    val globalDecls = (globalVars.map(b => BVarDecl(b, List(externAttr))) ++ defaultGlobals).distinct.sorted.toList
-
-    val globalConsts: List[BConstAxiomPair] =
-      globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar, List(externAttr)), g.toAxiom)).toList.sorted
 
     val guaranteeReflexive = BProcedure(
       name = "guarantee_reflexive",
@@ -118,6 +111,13 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     val functionsUsed3 = functionsUsed2.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed4 = functionsUsed3.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4).toList.sorted
+
+    val globalVars = procedures.flatMap(_.globals) ++ rgProcs.flatMap(_.globals)
+    val globalDecls = globalVars.map(b => BVarDecl(b, List(externAttr))).distinct.sorted.toList
+
+    val globalConsts: List[BConstAxiomPair] = globals.map { g =>
+      BConstAxiomPair(BVarDecl(g.toAddrVar, List(externAttr)), g.toAxiom)
+    }.toList.sorted
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgLib ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
     BProgram(declarations, filename)
@@ -153,7 +153,6 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     val relyReflexive = BProcedure("rely_reflexive", body = reliesReflexive.map(r => BAssert(r)), attributes = List(externAttr))
     List(relyProc, relyTransitive, relyReflexive)
   }
-
 
   def genRelyInv: BProcedure = {
     val reliesUsed = if (reliesParam.nonEmpty) {
@@ -439,21 +438,19 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     while (changed) {
       changed = false
       val nameToProcedure = proceduresUpdated.map(p => p.name -> p).toMap
-      proceduresUpdated = proceduresUpdated.map(
-        procedure => {
-          val cmds: List[BCmd] = procedure.body.flatten {
-            case b: BBlock => b.body
-            case c: BCmd => Seq(c)
-          }
-          val callModifies = cmds.collect { case c: BProcedureCall => nameToProcedure(c.name) }.flatMap(_.modifies)
-          val modifiesUpdate = procedure.modifies ++ callModifies
-          if (modifiesUpdate != procedure.modifies) {
-            changed = true
-          }
-
-          procedure.copy(modifies = modifiesUpdate)
+      proceduresUpdated = proceduresUpdated.map { procedure =>
+        val cmds: List[BCmd] = procedure.body.flatten {
+          case b: BBlock => b.body
+          case c: BCmd => Seq(c)
         }
-      )
+        val callModifies = cmds.collect { case c: BProcedureCall => nameToProcedure(c.name) }.flatMap(_.modifies)
+        val modifiesUpdate = procedure.modifies ++ callModifies
+        if (modifiesUpdate != procedure.modifies) {
+          changed = true
+        }
+
+        procedure.copy(modifies = modifiesUpdate)
+      }
     }
     proceduresUpdated
   }
@@ -744,10 +741,10 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
             val memory = if (regionInjector.isDefined) {
               regionInjector.get.getMergedRegion(g.address) match {
                 case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-                case None => lhs
+                case None => mem
               }
             } else {
-              lhs
+              mem
             }
             AssignCmd(g.toOldVar, BMemoryLoad(memory, g.toAddrVar, Endian.LittleEndian, g.size))
           }
@@ -758,10 +755,10 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
                   (BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global),
                     BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global))
                 case None =>
-                  (lhs, lhsGamma)
+                  (mem, Gamma_mem)
               }
             } else {
-              (lhs, lhsGamma)
+              (mem, Gamma_mem)
             }
             AssignCmd(
               g.toOldGamma,
@@ -774,10 +771,10 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
               val memory = if (regionInjector.isDefined) {
                 regionInjector.get.getMergedRegion(v.address) match {
                   case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-                  case None => lhs
+                  case None => mem
                 }
               } else {
-                lhs
+                mem
               }
               BinaryBExpr(BoolIMPLIES, L(memory, v.toAddrVar), v.toOldGamma)
             }
