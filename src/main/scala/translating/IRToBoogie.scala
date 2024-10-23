@@ -8,7 +8,7 @@ import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-class IRToBoogie(var program: Program, var spec: Specification, var thread: Option[ProgramThread], val filename: String, val regionInjector: Option[RegionInjector]) {
+class IRToBoogie(var program: Program, var spec: Specification, var thread: Option[ProgramThread], val filename: String, val regionInjector: Option[RegionInjector], val config: BoogieGeneratorConfig) {
   private val externAttr = BAttribute("extern")
   private val inlineAttr = BAttribute("inline")
   private val globals = spec.globals
@@ -37,6 +37,18 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
 
+  private val memoriesGammas = if (regionInjector.isDefined) {
+    regionInjector.get.mergedRegions.values.map { region =>
+      val memory = BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+      val gamma = BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+      memory -> gamma
+    }.toMap
+  } else {
+    Map(mem -> Gamma_mem)
+  }
+
+  private val memories: Set[BVar] = memoriesGammas.flatMap((k, v) => Set(k, v)).toSet
+
   private val mem_in = BMapVar("mem$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
   private val Gamma_mem_in = BMapVar("Gamma_mem$in", MapBType(BitVecBType(64), BoolBType), Scope.Parameter)
   private val mem_out = BMapVar("mem$out", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
@@ -47,8 +59,6 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   private val mem_inv2 = BMapVar("mem$inv2", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local)
   private val Gamma_mem_inv2 = BMapVar("Gamma_mem$inv2", MapBType(BitVecBType(64), BoolBType), Scope.Local)
 
-
-  private var config: BoogieGeneratorConfig = BoogieGeneratorConfig()
   private val modifiedCheck: Set[BVar] = (for (i <- 19 to 29) yield {
     Set(BVariable("R" + i, BitVecBType(64), Scope.Global), BVariable("Gamma_R" + i, BoolBType, Scope.Global))
   }).flatten.toSet ++ Set(
@@ -56,8 +66,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     BVariable("Gamma_R31", BoolBType, Scope.Global)
   )
 
-  def translate(boogieGeneratorConfig: BoogieGeneratorConfig): BProgram = {
-    config = boogieGeneratorConfig
+  def translate: BProgram = {
     val readOnlySections = program.usedMemory.values.filter(_.readOnly)
     val readOnlyMemory = memoryToCondition(readOnlySections)
     val initialSections = program.usedMemory.values.filter(!_.readOnly)
@@ -71,7 +80,8 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
         t.procedures.foreach(p => translatedProcedures.addOne(translateProcedure(p, readOnlyMemory, initialMemory)))
         translatedProcedures
     }
-    val defaultGlobals = List(BVarDecl(mem, List(externAttr)), BVarDecl(Gamma_mem, List(externAttr)))
+    //val defaultGlobals = (gammas ++ memories).toList.sorted.map(m => BVarDecl(m, List(externAttr)))
+    val defaultGlobals = List()
     val globalVars = procedures.flatMap(p => p.globals ++ p.freeRequires.flatMap(_.globals) ++ p.freeEnsures.flatMap(_.globals) ++ p.ensures.flatMap(_.globals) ++ p.requires.flatMap(_.globals))
     val globalDecls = (globalVars.map(b => BVarDecl(b, List(externAttr))) ++ defaultGlobals).distinct.sorted.toList
 
@@ -80,7 +90,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
     val guaranteeReflexive = BProcedure(
       name = "guarantee_reflexive",
-      modifies = Set(mem, Gamma_mem),
+      modifies = memories,
       body = guaranteesReflexive.map(g => BAssert(g)),
       attributes = List(externAttr)
     )
@@ -118,17 +128,27 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       relies
     } else {
       // default case where no rely is given - rely on no external changes
-      List(BinaryBExpr(BVEQ, mem, Old(mem)), BinaryBExpr(BVEQ, Gamma_mem, Old(Gamma_mem)))
+      memories.toList.sorted.map(m => BinaryBExpr(BVEQ, m, Old(m)))
     }
     val relyEnsures = if (relies.nonEmpty) {
       val i = BVariable("i", BitVecBType(64), Scope.Local)
-      val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem, i), Old(MapAccess(mem, i))), BinaryBExpr(BVEQ, MapAccess(Gamma_mem, i), Old(MapAccess(Gamma_mem, i)))))
-      List(rely2) ++ reliesUsed
+
+      val memImpliesGamma = memoriesGammas.keys.toList.sorted.map { memory =>
+        val gamma = memoriesGammas(memory)
+        ForAll(
+          List(i),
+          BinaryBExpr(BoolIMPLIES,
+            BinaryBExpr(BVEQ, MapAccess(memory, i), Old(MapAccess(memory, i))),
+            BinaryBExpr(BVEQ, MapAccess(gamma, i), Old(MapAccess(gamma, i)))
+          )
+        )
+      }
+      memImpliesGamma ++ reliesUsed
     } else {
       reliesUsed
     }
-    val relyProc = BProcedure("rely", ensures = relyEnsures, freeEnsures = readOnlyMemory, modifies = Set(mem, Gamma_mem), attributes = List(externAttr))
-    val relyTransitive = BProcedure("rely_transitive", ensures = reliesUsed, modifies = Set(mem, Gamma_mem), body = List(BProcedureCall("rely"), BProcedureCall("rely")),
+    val relyProc = BProcedure("rely", ensures = relyEnsures, freeEnsures = readOnlyMemory, modifies = memories, attributes = List(externAttr))
+    val relyTransitive = BProcedure("rely_transitive", ensures = reliesUsed, modifies = memories, body = List(BProcedureCall("rely"), BProcedureCall("rely")),
       attributes = List(externAttr))
     val relyReflexive = BProcedure("rely_reflexive", body = reliesReflexive.map(r => BAssert(r)), attributes = List(externAttr))
     List(relyProc, relyTransitive, relyReflexive)
