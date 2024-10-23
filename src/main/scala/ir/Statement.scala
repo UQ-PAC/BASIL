@@ -156,7 +156,7 @@ class DirectCall(val target: Procedure,
     case None => Set()
   } */
   def calls: Set[Procedure] = Set(target)
-  override def toString: String = s"${labelStr}${outParams.mkString(",")} := DirectCall(${target.name})(${actualParams.mkString(",")})"
+  override def toString: String = s"${labelStr}${outParams.map(_._2.name).mkString(",")} := DirectCall(${target.name})(${actualParams.map(_._2).mkString(",")})"
   override def acceptVisit(visitor: Visitor): Statement = visitor.visitDirectCall(this)
 
   override def linkParent(p: Block): Unit = {

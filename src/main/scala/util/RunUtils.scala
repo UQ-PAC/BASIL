@@ -310,8 +310,6 @@ object StaticAnalysis {
     Logger.debug("Subroutine Addresses:")
     Logger.debug(subroutines)
 
-    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
-
     Logger.info("reducible loops")
     // reducible loops
     val detector = LoopDetector(IRProgram)
@@ -530,31 +528,39 @@ object RunUtils {
 
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = {
     Logger.info("[!] Running Simplify")
+    val timer = PerformanceTimer("Simplify")
 
+    transforms.applyRPO(ctx.program)
+    Logger.info(s"RPO ${timer.checkPoint("RPO")} ms ")
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
-    val liveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
+    // val liveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
 
-    writeToFile(serialiseIL(ctx.program), s"il-before-dsa.il")
-    transforms.DynamicSingleAssignment.applyTransform(ctx.program, liveVars)
+    // writeToFile(serialiseIL(ctx.program), s"il-before-dsa.il")
 
-    config.foreach(_.analysisDotPath.foreach { s =>
-      writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-dsa.dot")
-    })
-    writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
+    // transforms.DynamicSingleAssignment.applyTransform(ctx.program, liveVars)
+    transforms.OnePassDSA().applyTransform(ctx.program)
+    Logger.info(s"DSA ${timer.checkPoint("DSA ")} ms ")
+    // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-after-dsa.dot")
+    Logger.info("DSA Check")
+    val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
+    assert(x)
+    Logger.info("DSA Check passed")
+    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.cfgCorrect(ctx.program))
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+
+    // writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
 
 
     transforms.doCopyPropTransform(ctx.program)
-    writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
+    Logger.info(s"CopyProp ${timer.checkPoint("CopyProp")} ms ")
+    // writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
 
     // run this after cond recovery because sign bit calculations often need high bits
     // which go away in high level conss
-    Logger.info("[!] Simplify :: RemoveSlices")
-    transforms.removeSlices(ctx.program)
-    writeToFile(serialiseIL(ctx.program), s"il-after-slices.il")
+    // writeToFile(serialiseIL(ctx.program), s"il-after-slices.il")
 
-    config.foreach(_.analysisDotPath.foreach { s =>
-      writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"${s}_blockgraph-after-simp.dot")
-    })
+    // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-after-simp.dot")
 
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("[!] Simplify :: Writing simplification validation")
@@ -572,6 +578,10 @@ object RunUtils {
 
     var ctx = IRLoading.load(q.loading)
 
+    assert(invariant.singleCallBlockEnd(ctx.program))
+    assert(invariant.cfgCorrect(ctx.program))
+    assert(invariant.blocksUniqueToEachProcedure(ctx.program))
+
     ctx = IRTransform.doCleanup(ctx)
 
     if (q.loading.trimEarly) {
@@ -580,9 +590,6 @@ object RunUtils {
       Logger.info(
         s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
       )
-
-      val dumpdomain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, ctx.program.procedures)
-      writeToFile(toDot(dumpdomain, InterProcIRCursor, Map.empty), s"ldakjldajnew_ir_intercfg.dot")
     }
 
     if (q.loading.parameterForm) {
@@ -680,6 +687,7 @@ object RunUtils {
 }
 
 def writeToFile(content: String, fileName: String): Unit = {
+  Logger.debug(s"Writing $fileName (${content.size} bytes)")
   val outFile = File(fileName)
   val pw = PrintWriter(outFile, "UTF-8")
   pw.write(content)

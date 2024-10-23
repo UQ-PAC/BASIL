@@ -80,18 +80,46 @@ class CILVisitorImpl(val v: CILVisitor) {
   }
 
 
-  def visit_expr(n: Expr): Expr = {
+
+   def visit_expr(n: Expr): Expr = {
     def continue(n: Expr): Expr = n match {
-      case n: Literal                           => n
-      case MemoryLoad(mem, index, endian, size) => MemoryLoad(visit_mem(mem), visit_expr(index), endian, size)
-      case Extract(end, start, arg)             => Extract(end, start, visit_expr(arg))
-      case Repeat(repeats, arg)                 => Repeat(repeats, visit_expr(arg))
-      case ZeroExtend(bits, arg)                => ZeroExtend(bits, visit_expr(arg))
-      case SignExtend(bits, arg)                => SignExtend(bits, visit_expr(arg))
-      case BinaryExpr(op, arg, arg2)            => BinaryExpr(op, visit_expr(arg), visit_expr(arg2))
-      case UnaryExpr(op, arg)                   => UnaryExpr(op, visit_expr(arg))
-      case v: Variable                          => visit_rvar(v)
-      case UninterpretedFunction(n, params, rt) => UninterpretedFunction(n, params.map(visit_expr), rt)
+      case n: Literal => n
+      case MemoryLoad(mem, index, endian, size) => {
+        val nmem = visit_mem(mem)
+        val nind = visit_expr(index)
+        if ((nmem ne mem) || (nind ne index)) MemoryLoad(visit_mem(mem), visit_expr(index), endian, size) else n
+      }
+      case Extract(end, start, arg) => {
+        val narg = visit_expr(arg)
+        if (narg ne arg) Extract(end, start, narg) else n
+      }
+      case Repeat(repeats, arg) => {
+        val narg = visit_expr(arg)
+        if (narg ne arg) Repeat(repeats, arg) else n
+      }
+      case ZeroExtend(bits, arg) => {
+        val narg = visit_expr(arg)
+        if (narg ne arg) ZeroExtend(bits, narg) else n
+      }
+      case SignExtend(bits, arg) => {
+        val narg = visit_expr(arg)
+        if (narg ne arg) SignExtend(bits, narg) else n
+      }
+      case BinaryExpr(op, arg, arg2) => {
+        val narg1 = visit_expr(arg)
+        val narg2 = visit_expr(arg2)
+        if ((narg1 ne arg) || (narg2 ne arg2)) BinaryExpr(op, narg1, narg2) else n
+      }
+      case UnaryExpr(op, arg) => {
+        val narg = visit_expr(arg)
+        if (narg ne arg) UnaryExpr(op, narg) else n
+      }
+      case v: Variable => visit_rvar(v)
+      case UninterpretedFunction(name, params, rt) => {
+        val nparams = params.map(visit_expr)
+        val updated = (params.zip(nparams).map((a, b) => a ne b)).contains(true)
+        if (updated) UninterpretedFunction(name, nparams, rt) else n
+      } 
     }
     doVisit(v, v.vexpr(n), n, continue)
   }

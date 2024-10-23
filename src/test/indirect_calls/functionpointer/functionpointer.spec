@@ -1,2 +1,2 @@
 Subroutine: main
-Requires: Gamma_main_argc == true
+Requires: Gamma_R0 == true

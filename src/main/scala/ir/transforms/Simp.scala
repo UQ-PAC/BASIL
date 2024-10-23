@@ -13,13 +13,134 @@ import scala.util.{Failure, Success}
 import ExecutionContext.Implicits.global
 
 trait AbstractDomain[L] {
-  def join(a: L, b: L): L
-  def widen(a: L, b: L): L = join(a, b)
+  def join(a: L, b: L, pos: Block): L
+  def widen(a: L, b: L, pos: Block): L = join(a, b, pos)
   def narrow(a: L, b: L): L = a
-  def transfer(a: L, b: Statement): L
+  def transfer(a: L, b: Command): L
+  def transferBlockFwd(a: L, b: Block): L = {
+    transfer(b.statements.foldLeft(a)(transfer), b.jump)
+  }
+  def transferBlockBwd(a: L, b: Block): L = {
+    b.statements.toList.reverse.foldLeft(transfer(a, b.jump))(transfer)
+  }
 
   def top: L
   def bot: L
+}
+
+
+def getLiveVars(p: Procedure) = {
+  val liveVarsDom = IntraLiveVarsDomain()
+  val liveVarsSolver = worklistSolver(liveVarsDom)
+  liveVarsSolver.solveProc(p, backwards=true)
+}
+
+
+def basicReachingDefs(p: Procedure): Map[Command, Map[Variable, Set[Assign | DirectCall]]] = {
+  val (beforeLive, afterLive) = getLiveVars(p)
+  val dom = DefUseDomain(beforeLive)
+  val solver = worklistSolver(dom)
+  // type rtype = Map[Block, Map[Variable, Set[Assign | DirectCall]]]
+  val (beforeRes, afterRes) = solver.solveProc(p)
+
+
+  val merged: Map[Command, Map[Variable, Set[Assign | DirectCall]]] = 
+    beforeRes.flatMap((block, sts) => {
+      val b = Seq(IRWalk.firstInBlock(block) -> sts)
+      val stmts =
+        if (block.statements.nonEmpty) then
+          (block.statements.toList: List[Command]).zip(block.statements.toList.tail ++ List(block.jump))
+        else List()
+      val transferred = stmts
+        .foldLeft((sts, List[(Command, Map[Variable, Set[Assign | DirectCall]])]()))((st, s) => {
+          // map successor to transferred predecessor
+          val x = dom.transfer(st._1, s._1)
+          (x, (s._2 -> x) :: st._2)
+        })
+        ._2.toMap
+      b ++ transferred 
+    })
+    .toMap
+  merged
+}
+
+case class DefUse(defined: Map[Variable, Assign | DirectCall])
+
+// map v -> definitions reached here
+class DefUseDomain(liveBefore: Map[Block, Set[Variable]]) extends AbstractDomain[Map[Variable, Set[Assign | DirectCall]]] {
+  // TODO: cull values using liveness
+
+  override def transfer(s: Map[Variable, Set[Assign | DirectCall]], b: Command) = {
+    b match {
+      case a: Assign     => s.updated(a.lhs, Set(a))
+      case d: DirectCall => d.outParams.map(_._2).foldLeft(s)((s, r) => s.updated(r, Set(d)))
+      case _             => s
+    }
+  }
+  override def top = ???
+  def bot = Map[Variable, Set[Assign | DirectCall]]()
+  def join(l: Map[Variable, Set[Assign | DirectCall]], r: Map[Variable, Set[Assign | DirectCall]], pos: Block) = {
+    l.keySet
+      .union(r.keySet).filter(k => liveBefore(pos).contains(k))
+      .map(k => {
+        k -> (l.get(k).getOrElse(Set()) ++ r.get(k).getOrElse(Set()))
+      })
+      .toMap
+  }
+
+}
+
+class CollectingDomain[T, D <: AbstractDomain[T]](d: D) extends AbstractDomain[(T, Map[Command, T])] {
+  def bot = (d.bot, Map())
+  def top = ???
+
+  def join(l: (T, Map[Command, T]), r: (T, Map[Command, T]), pos: Block): (T, Map[Command, T]) = {
+    val nr = d.join(l._1, r._1, pos)
+    (
+      nr,
+      (l._2.keySet ++ r._2.keySet)
+        .map((s: Command) => {
+          ((l._2.get(s), r._2.get(s)) match {
+            case (Some(l), Some(r)) if l == r => Seq(s -> l)
+            case (Some(l), Some(r)) if l != r => Seq()
+            case (Some(l), None)              => Seq(s -> l)
+            case (None, Some(l))              => Seq(s -> l)
+            case _                            => ???
+          })
+        })
+        .flatten
+        .toMap
+    )
+  }
+
+  override def transfer(s: (T, Map[Command, T]), c: Command) = {
+    val u = d.transfer(s._1, c)
+    (u, s._2.updated(c, u))
+  }
+}
+
+trait PowerSetDomain[T] extends AbstractDomain[Set[T]] {
+  def bot = Set()
+  def top = ???
+  def join(a: Set[T], b: Set[T], pos: Block) = a.union(b)
+}
+
+class IntraLiveVarsDomain extends PowerSetDomain[Variable] {
+  // expected backwards
+
+  def transfer(s: Set[Variable], a: Command): Set[Variable] = {
+    a match {
+      case a: Assign       => (s - a.lhs) ++ a.rhs.variables
+      case m: MemoryAssign => s ++ m.index.variables ++ m.value.variables
+      case a: Assume       => s ++ a.body.variables
+      case a: Assert       => s ++ a.body.variables
+      case i: IndirectCall => s + i.target
+      case c: DirectCall   => (s -- c.outParams.map(_._2)) ++ c.actualParams.flatMap(_._2.variables)
+      case g: GoTo         => s
+      case r: Return       => s ++ r.outParams.flatMap(_._2.variables)
+      case r: Unreachable  => s
+    }
+  }
 }
 
 object MakeLocalsBlockUnique extends CILVisitor {
@@ -129,7 +250,7 @@ def removeSlices(p: Procedure): Unit = {
     }
 
   enum HighZeroBits:
-    case Bits(n: Int) // (i) and (ii) hold; the n highest bits are redundant
+    case Bits(n: Int) // most significant bit that is accessed (and all below)
     case False // property is false
     case Bot // don't know anything
 
@@ -142,10 +263,12 @@ def removeSlices(p: Procedure): Unit = {
 
   val unifiedAssignments = ufsolver
     .unifications()
-    .map { case (v: LVTerm, rvs) =>
-      v.v -> (rvs.map { case LVTerm(rv) =>
-        rv
-      }).toSet
+    .map {
+      case (v: LVTerm, rvs) =>
+        v.v -> (rvs.map { case LVTerm(rv) =>
+          rv
+        }).toSet
+      case _ => ???
     }
     .map((repr: LocalVar, elems: Set[LocalVar]) =>
       repr -> elems.flatMap(assignments(_).filter(_ match {
@@ -156,79 +279,115 @@ def removeSlices(p: Procedure): Unit = {
     )
 
   // try and find a single extension size for all rhs of assignments to all variables in the assigned equality class
-  val varHighZeroBits: Map[LocalVar, HighZeroBits] = assignments.map((v, assigns) =>
-    // note: this overapproximates on x := y when x and y may both be smaller than their declared size
-    val allRHSExtended = assigns.foldLeft(HighZeroBits.Bot: HighZeroBits)((e, assign) =>
-      (e, assign.rhs) match {
-        case (HighZeroBits.Bot, ZeroExtend(i, lhs))                   => HighZeroBits.Bits(i)
-        case (b @ HighZeroBits.Bits(ei), ZeroExtend(i, _)) if i == ei => b
-        case (b @ HighZeroBits.Bits(ei), ZeroExtend(i, _)) if i != ei => HighZeroBits.False
-        case (HighZeroBits.False, _)                                  => HighZeroBits.False
-        case (_, other)                                               => HighZeroBits.False
-      }
-    )
-    (v, allRHSExtended)
-  )
+  // val varHighZeroBits: Map[LocalVar, HighZeroBits] = assignments.map((v, assigns) =>
+  //   // note: this overapproximates on x := y when x and y may both be smaller than their declared size
+  //   val allRHSExtended = assigns.foldLeft(HighZeroBits.Bot: HighZeroBits)((e, assign) =>
+  //     (e, assign.rhs) match {
+  //       case (HighZeroBits.Bot, ZeroExtend(i, lhs))                   => HighZeroBits.Bits(i)
+  //       case (b @ HighZeroBits.Bits(ei), ZeroExtend(i, _)) if i == ei => b
+  //       case (b @ HighZeroBits.Bits(ei), ZeroExtend(i, _)) if i != ei => HighZeroBits.False
+  //       case (HighZeroBits.False, _)                                  => HighZeroBits.False
+  //       case (_, other)                                               => HighZeroBits.False
+  //     }
+  //   )
+  //   (v, allRHSExtended)
+  // )
 
-  val varsWithExtend: Map[LocalVar, HighZeroBits] = assignments
-    .map((lhs, _) => {
-      // map all lhs to the result for their representative
-      val rep = ufsolver.find(LVTerm(lhs)) match {
-        case LVTerm(r) => r
-      }
-      lhs -> varHighZeroBits.get(rep)
-    })
-    .collect { case (l, Some(x)) /* remove anything we have no information on */ =>
-      (l, x)
-    }
+  //val varsWithExtend: Map[LocalVar, HighZeroBits] = assignments
+  //  .map((lhs, _) => {
+  //    // map all lhs to the result for their representative
+  //    val rep = ufsolver.find(LVTerm(lhs)) match {
+  //      case LVTerm(r) => r
+  //      case _         => ???
+  //    }
+  //    lhs -> varHighZeroBits.get(rep)
+  //  })
+  //  .collect { case (l, Some(x)) /* remove anything we have no information on */ =>
+  //    (l, x)
+  //  }
 
   class CheckUsesHaveExtend() extends CILVisitor {
     val result: mutable.HashMap[LocalVar, HighZeroBits] =
       mutable.HashMap[LocalVar, HighZeroBits]()
 
+    override def vrvar(v: Variable) = {
+      v match {
+        case v: LocalVar => {
+          result(v) = HighZeroBits.False
+        }
+        case _ => ()
+      }
+      SkipChildren()
+    }
+
     override def vexpr(v: Expr) = {
       v match {
         case Extract(i, 0, v: LocalVar)
-            if size(v).isDefined && result.get(v).contains(HighZeroBits.Bits(size(v).get - i)) =>
-          SkipChildren()
-        case v: LocalVar => {
-          result.remove(v)
+            if size(v).isDefined && ((!result.contains(v)) || result.get(v).contains(HighZeroBits.Bot)) => {
+          result(v) = HighZeroBits.Bits(i)
           SkipChildren()
         }
+        case Extract(i, 0, v: LocalVar) if size(v).isDefined && result.get(v).contains(HighZeroBits.Bits(i)) =>
+          SkipChildren()
         case _ => DoChildren()
       }
     }
 
-    def apply(assignHighZeroBits: Map[LocalVar, HighZeroBits])(p: Procedure): Map[LocalVar, HighZeroBits] = {
+    def apply(p: Procedure): Map[LocalVar, HighZeroBits] = {
       result.clear()
-      result.addAll(assignHighZeroBits)
       visit_proc(this, p)
       result.toMap
     }
   }
 
-  val toSmallen = CheckUsesHaveExtend()(varsWithExtend)(p).collect { case (v, HighZeroBits.Bits(x)) =>
+  val toSmallen = CheckUsesHaveExtend()(p).collect { case (v, HighZeroBits.Bits(x)) =>
     v -> x
   }.toMap
 
   class ReplaceAlwaysSlicedVars(varHighZeroBits: Map[LocalVar, Int]) extends CILVisitor {
+    var formals = Set[LocalVar]()
 
     override def vexpr(v: Expr) = {
       v match {
-        case Extract(i, 0, v: LocalVar) if size(v).isDefined && varHighZeroBits.contains(v) => {
-          ChangeTo(LocalVar(v.name, BitVecType(size(v).get - varHighZeroBits(v))))
+        case Extract(i, 0, v: LocalVar)
+            if size(v).isDefined && !(formals.contains(v)) && varHighZeroBits.contains(v) => {
+          assert(varHighZeroBits(v) == i)
+          ChangeTo(LocalVar(v.name, BitVecType(varHighZeroBits(v))))
         }
         case _ => DoChildren()
       }
     }
 
+    override def vproc(p: Procedure) = {
+      formals = p.formalInParam.toSet ++ p.formalOutParam.toSet
+      DoChildren()
+    }
+
     override def vstmt(s: Statement) = {
       s match {
-        case a @ Assign(lhs: LocalVar, ZeroExtend(sz, rhs), _)
-            if size(lhs).isDefined && varHighZeroBits.contains(lhs) => {
-          assert(varHighZeroBits(lhs) == sz)
-          a.lhs = LocalVar(lhs.name, BitVecType(size(lhs).get - varHighZeroBits(lhs)))
+        case a @ Assign(lhs: LocalVar, SignExtend(sz, rhs), _)
+            if size(lhs).isDefined && varHighZeroBits.get(lhs).contains(size(rhs).get) && !(formals.contains(lhs)) => {
+          // assert(varHighZeroBits(lhs) == sz)
+          val varsize = varHighZeroBits(lhs)
+          a.lhs = LocalVar(lhs.name, BitVecType(varsize))
           a.rhs = rhs
+          assert(size(a.lhs).get == size(a.rhs).get)
+          DoChildren()
+        }
+        case a @ Assign(lhs: LocalVar, ZeroExtend(sz, rhs), _)
+            if size(lhs).isDefined && varHighZeroBits.get(lhs).contains(size(rhs).get) && !(formals.contains(lhs)) => {
+          val varsize = varHighZeroBits(lhs)
+          a.lhs = LocalVar(lhs.name, BitVecType(varsize))
+          a.rhs = rhs
+          assert(size(a.lhs).get == size(a.rhs).get)
+          DoChildren()
+        }
+        case a @ Assign(lhs: LocalVar, rhs, _)
+            if size(lhs).isDefined && varHighZeroBits.contains(lhs) && !(formals.contains(lhs)) => {
+          // promote extract to the definition
+          a.lhs = LocalVar(lhs.name, BitVecType(varHighZeroBits(lhs)))
+          a.rhs = Extract(varHighZeroBits(lhs), 0, rhs)
+          assert(size(a.lhs).get == size(a.rhs).get, s"${size(a.lhs).get} != ${size(a.rhs).get}")
           DoChildren()
         }
         case _ => DoChildren()
@@ -249,14 +408,15 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
   enum VS:
     case Bot
     case Assigned(definition: Set[Assign])
-    case Read
+    case Read(definition: Set[Assign], uses: Set[CFGPosition])
 
   def joinVS(a: VS, b: VS) = {
     (a, b) match {
       case (VS.Bot, o)                        => o
       case (o, VS.Bot)                        => o
-      case (VS.Read, _)                       => VS.Read
-      case (_, VS.Read)                       => VS.Read
+      case (VS.Read(d, u), VS.Read(d1, u1))   => VS.Read(d ++ d1, u ++ u1)
+      case (VS.Assigned(d), VS.Read(d1, u1))  => VS.Read(d ++ d1, u1)
+      case (VS.Read(d1, u1), VS.Assigned(d))  => VS.Read(d ++ d1, u1)
       case (VS.Assigned(d1), VS.Assigned(d2)) => VS.Assigned(d1 ++ d2)
     }
   }
@@ -268,43 +428,42 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
       case a: Assign => {
         assignedNotRead(a.lhs) = joinVS(assignedNotRead(a.lhs), VS.Assigned(Set(a)))
         a.rhs.variables.foreach(v => {
-          assignedNotRead(v) = VS.Read
+          assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(a)))
         })
       }
       case m: MemoryAssign => {
         m.index.variables.foreach(v => {
-          assignedNotRead(v) = VS.Read
+          assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
         })
         m.value.variables.foreach(v => {
-          assignedNotRead(v) = VS.Read
+          assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
         })
       }
       case m: IndirectCall => {
-        assignedNotRead(m.target) = VS.Read
+        assignedNotRead(m.target) = joinVS(assignedNotRead(m.target), VS.Read(Set(), Set(m)))
       }
       case m: Assert => {
         m.body.variables.foreach(v => {
-          assignedNotRead(v) = VS.Read
+          assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
         })
       }
       case m: Assume => {
         for (v <- m.body.variables) {
-          assignedNotRead(v) = VS.Read
+          assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(m)))
         }
       }
       case c: DirectCall => {
         c.actualParams
           .flatMap(_._2.variables)
           .foreach(v => {
-            assignedNotRead(v) = VS.Read
+            assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(c)))
           })
-
       }
       case p: Return => {
         p.outParams
           .flatMap(_._2.variables)
           .foreach(v => {
-            assignedNotRead(v) = VS.Read
+            assignedNotRead(v) = joinVS(assignedNotRead(v), VS.Read(Set(), Set(p)))
           })
       }
       case p: GoTo        => ()
@@ -315,7 +474,41 @@ def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
     }
   }
 
-  val r = assignedNotRead
+  var toRemove = assignedNotRead
+  var removeOld = toRemove
+
+  // def remove(a: Assign): Boolean = {
+  //   var removed : Boolean = false
+  //   toRemove = toRemove.map((v, s) =>
+  //     v -> {
+  //       s match {
+  //         case VS.Read(defs, uses) if uses.size == 1 && uses.contains(a) => {
+  //           removed = true
+  //           VS.Assigned(defs)
+  //         }
+  //         case VS.Read(defs, uses) if uses.contains(a)                   => {
+  //           removed = true
+  //           VS.Read(defs, uses - a)
+  //         }
+  //         case o                                                         => o
+  //       }
+  //     }
+  //   )
+  //   removed
+  // }
+
+  // while ({
+  //   removeOld = toRemove
+  //   val removed = removeOld.map((v, s) => {
+  //     s match {
+  //       case VS.Assigned(definition) => definition.map(remove).foldLeft(false)((x,y) => x || y)
+  //       case _                       => false
+  //     }
+  //   })
+  //   removed.exists(x => x)
+  // }) {}
+
+  val r = toRemove
     .collect { case (v, VS.Assigned(d)) =>
       d
     }
@@ -345,14 +538,15 @@ class CleanupAssignments() extends CILVisitor {
 
 def copypropTransform(p: Procedure) = {
   val t = util.PerformanceTimer(s"simplify ${p.name} (${p.blocks.size} blocks)")
-  val dom = ConstCopyProp()
-  val solver = worklistSolver(dom)
+  // val dom = ConstCopyProp()
+  // val solver = worklistSolver(dom)
 
   // Logger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
-  val result = solver.solveProc(p)
+  // val result = solver.solveProc(p, true).withDefaultValue(dom.bot)
+  val result = DSACopyProp(p)
   val solve = t.checkPoint("Solve CopyProp")
 
-  val vis = Simplify(result.withDefaultValue(dom.bot))
+  val vis = Simplify(result)
   visit_proc(vis, p)
   val xf = t.checkPoint("transform")
   // Logger.info(s"    ${p.name} after transform expr complexity ${ExprComplexity()(p)}")
@@ -364,15 +558,21 @@ def copypropTransform(p: Procedure) = {
   visit_proc(AlgebraicSimplifications, p)
   visit_proc(AlgebraicSimplifications, p)
   visit_proc(AlgebraicSimplifications, p)
-  visit_proc(AlgebraicSimplifications, p)
-  visit_proc(AlgebraicSimplifications, p)
-  visit_proc(AlgebraicSimplifications, p)
-  visit_proc(AlgebraicSimplifications, p)
-  visit_proc(AlgebraicSimplifications, p)
-  visit_proc(AlgebraicSimplifications, p)
-  visit_proc(AlgebraicSimplifications, p)
+  // visit_proc(AlgebraicSimplifications, p)
+  // visit_proc(AlgebraicSimplifications, p)
+  // visit_proc(AlgebraicSimplifications, p)
+  // visit_proc(AlgebraicSimplifications, p)
+  // visit_proc(AlgebraicSimplifications, p)
+  // visit_proc(AlgebraicSimplifications, p)
+  // visit_proc(AlgebraicSimplifications, p)
+  // visit_proc(AlgebraicSimplifications, p)
   // Logger.info(s"    ${p.name}  after simp expr complexity ${ExprComplexity()(p)}")
   val sipm = t.checkPoint("algebraic simp")
+
+  // Logger.info("[!] Simplify :: RemoveSlices")
+  removeSlices(p)
+  visit_proc(AlgebraicSimplifications, p)
+
 }
 
 def doCopyPropTransform(p: Program) = {
@@ -406,18 +606,29 @@ def doCopyPropTransform(p: Program) = {
 
   // cleanup
   visit_prog(CleanupAssignments(), p)
-  val toremove = p.collect {
-    case b: Block if b.statements.size == 0 && b.prevBlocks.size == 1 && b.nextBlocks.size == 1 => b
+  for (proc <- p.procedures) {
+    val blocks = proc.blocks.toList
+    for (b <- blocks) {
+      b match {
+        case b: Block if b.statements.size == 0 && b.prevBlocks.size == 1 && b.nextBlocks.size == 1 => {
+          val p = b.prevBlocks.head
+          val n = b.nextBlocks.head
+          p.jump match {
+            case g: GoTo => {
+              g.addTarget(n)
+              g.removeTarget(b)
+            }
+            case _ => ???
+          }
+          b.replaceJump(Unreachable())
+          b.parent.removeBlocks(b)
+        }
+        case _ => ()
+      }
+    }
   }
 
   Logger.info("[!] Simplify :: Merge empty blocks")
-  for (b <- toremove) {
-    val p = b.prevBlocks.head
-    val n = b.nextBlocks.head
-    p.replaceJump((GoTo(n)))
-    b.parent.removeBlocks(b)
-  }
-
 
 }
 
@@ -448,8 +659,8 @@ def applyRPO(p: Program) = {
 
 class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
 
-  def solveProc(p: Procedure) = {
-    solve(p.blocks, Set(), Set())
+  def solveProc(p: Procedure, backwards: Boolean = false) = {
+    solve(p.blocks, Set(), Set(), backwards)
   }
 
   def solveProg(
@@ -474,7 +685,7 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
     work
       .map((prog, x) =>
         try {
-          (prog, Await.result(x, 10000.millis))
+          (prog, Await.result(x, 10000.millis)._2)
         } catch {
           case t: Exception => {
             Logger.error(s"${prog.name} : $t")
@@ -489,18 +700,30 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
   def solve(
       initial: IterableOnce[Block],
       widenpoints: Set[Block], // set of loop heads
-      narrowpoints: Set[Block] // set of conditions
-  ): Map[Block, L] = {
-    val saved: mutable.HashMap[Block, L] = mutable.HashMap()
+      narrowpoints: Set[Block], // set of conditions
+      backwards: Boolean = false
+  ): (Map[Block, L], Map[Block, L]) = {
+    val savedAfter: mutable.HashMap[Block, L] = mutable.HashMap()
+    val savedBefore: mutable.HashMap[Block, L] = mutable.HashMap()
     val saveCount: mutable.HashMap[Block, Int] = mutable.HashMap()
-    val worklist = mutable.PriorityQueue[Block]()(Ordering.by(b => b.rpoOrder))
+    val worklist = {
+      if (backwards) {
+        mutable.PriorityQueue[Block]()(Ordering.by(b => -b.rpoOrder))
+      } else {
+        mutable.PriorityQueue[Block]()(Ordering.by(b => b.rpoOrder))
+      }
+    }
     worklist.addAll(initial)
 
-    var x = domain.bot
+    def successors(b: Block) = if backwards then b.prevBlocks else b.nextBlocks
+    def predecessors(b: Block) = if backwards then b.nextBlocks else b.prevBlocks
+
     while (worklist.nonEmpty) {
       val b = worklist.dequeue
 
-      while (worklist.nonEmpty && (worklist.head.rpoOrder >= b.rpoOrder)) do {
+      while (worklist.nonEmpty && (if backwards then (worklist.head.rpoOrder <= b.rpoOrder)
+                                   else (worklist.head.rpoOrder >= b.rpoOrder)))
+      do {
         // drop rest of blocks with same priority
         val m = worklist.dequeue()
         assert(
@@ -509,50 +732,42 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
         )
       }
 
-      def bs(b: Block): List[Block] = {
-        var blocks = mutable.LinkedHashSet[Block]()
-        var thisBlock = b
-        while ({
-          blocks.add(thisBlock)
 
-          if (thisBlock.nextBlocks.size == 1) {
-            thisBlock = thisBlock.nextBlocks.head
-            blocks.contains(thisBlock)
-          } else {
-            false
-          }
-        }) {}
-        blocks.toList
+      val prev = savedAfter.get(b)
+      val x = {
+        predecessors(b).toList.flatMap(b => savedAfter.get(b).toList) match {
+          case Nil      => domain.bot
+          case h :: Nil => h
+          case h :: tl  => tl.foldLeft(h)((acc, nb) => domain.join(acc, nb, b))
+        }
       }
-
-      val prev = saved.get(b)
-      x = b.prevBlocks.flatMap(ib => saved.get(ib).toList).foldLeft(x)(domain.join)
-      saved(b) = x
-      // val todo = bs(b)
+      savedBefore(b) = x
       val todo = List(b)
-      val lastBlock = todo.last
 
-      def xf_block(x: L, b: Block) = {
-        saved(b) = b.statements.foldLeft(x)(domain.transfer)
-        saved(b)
-      }
+      val lastBlock = b // todo.last
       var nx = todo.foldLeft(x)((x, b) => {
-        saved(b) = xf_block(x, b)
-        saved(b)
+        savedBefore(b) = x
+        if (backwards) {
+          val ojmp = domain.transfer(x, b.jump)
+          savedAfter(b) = b.statements.toList.reverse.foldLeft(ojmp)(domain.transfer)
+        } else {
+          val stmts = b.statements.foldLeft(x)(domain.transfer)
+          savedAfter(b) = domain.transfer(stmts, b.jump)
+        }
+        savedAfter(b)
       })
-      saved(lastBlock) = nx
+      savedAfter(lastBlock) = nx
       saveCount(lastBlock) = saveCount.get(lastBlock).getOrElse(0) + 1
       if (!prev.contains(nx)) then {
-        if (saveCount(lastBlock) == 50) {
+        if (saveCount(lastBlock) >= 50) {
           Logger.warn(s"Large join count on block ${lastBlock.label}, no fix point? (-v for mor info)")
           Logger.debug(lastBlock.label + "    ==> " + x)
           Logger.debug(lastBlock.label + "    <== " + nx)
         }
-        worklist.addAll(lastBlock.nextBlocks)
+        worklist.addAll(successors(lastBlock))
       }
-      x = nx
     }
-    saved.toMap
+    if backwards then (savedAfter.toMap, savedBefore.toMap) else (savedBefore.toMap, savedAfter.toMap)
   }
 }
 
@@ -569,33 +784,11 @@ case class CCP(
 )
 
 object CCP {
+
   def toSubstitutions(c: CCP): Map[Variable, Expr] = {
     c.state.collect { case (v, CopyProp.Prop(e, _)) =>
       v -> e
     }
-  }
-}
-
-class ConstCopyProp() extends AbstractDomain[CCP] {
-  private final val callClobbers = (0 to 30).map("R" + _).map(c => Register(c, 64))
-
-  def top: CCP = CCP(Map().withDefaultValue(CopyProp.Bot))
-  def bot: CCP = CCP(Map().withDefaultValue(CopyProp.Clobbered))
-
-  override def join(l: CCP, r: CCP): CCP = {
-    val ks = l.state.keySet.intersect(r.state.keySet)
-    val merged = ks.map(v =>
-      (v ->
-        ((l.state(v), r.state(v)) match {
-          case (l, CopyProp.Bot)                                                            => l
-          case (CopyProp.Bot, r)                                                            => r
-          case (c @ CopyProp.Clobbered, _)                                                  => c
-          case (_, c @ CopyProp.Clobbered)                                                  => c
-          case (p1 @ CopyProp.Prop(e1, deps1), p2 @ CopyProp.Prop(e2, deps2)) if (p1 == p2) => p1
-          case (_, _)                                                                       => CopyProp.Clobbered
-        }))
-    )
-    CCP(merged.toMap)
   }
 
   def clobberFull(c: CCP, l: Variable) = {
@@ -615,16 +808,126 @@ class ConstCopyProp() extends AbstractDomain[CCP] {
         .withDefaultValue(CopyProp.Bot)
     )
   }
+}
 
-  override def transfer(c: CCP, s: Statement): CCP = {
+def DSACopyProp(p: Procedure): Map[Variable, Expr] = {
+
+  case class PropState(val e: Expr, val deps: Set[Variable], var clobbered: Boolean, var useCount: Int)
+  val state = mutable.HashMap[Variable, PropState]()
+  var poisoned = false
+
+  def clobberFull(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
+    if (c.contains(l)) {
+      c(l).clobbered = true
+    } else {
+      c(l) = PropState(FalseLiteral, Set(), true, 0)
+    }
+  }
+
+  def clobberDeps(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
+    val toclobber = c.filter(_.isInstanceOf[CopyProp.Prop]).filter(_.asInstanceOf[CopyProp.Prop].deps.contains(l))
+    for ((v, e) <- toclobber) {
+      c(v).clobbered = true
+    }
+  }
+
+  def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
+    // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
     s match {
-      case m: MemoryAssign => {
-        // c.copy(exprs = c.exprs.filterNot((k, v) => v.expr.loads.nonEmpty))
-        c
-      }
       case Assign(l, r, lb) => {
         if (r.loads.size > 0) {
+          // c.copy(state = c.state + (l -> CopyProp.Clobbered))
           clobberFull(c, l)
+        } else {
+          val evaled = r
+          val rhsDeps = evaled.variables.toSet
+          val existing = c.get(l)
+
+          existing match {
+            case None => {
+              c(l) = PropState(evaled, rhsDeps, false, 0)
+            }
+            case Some(ps) if ps.clobbered => {
+              ()
+            }
+            case Some(ps) if ps.e != evaled => {
+              clobberFull(c, l)
+            }
+            case _ => {
+              // ps.e == evaled and have prop
+            }
+          }
+
+          for (v <- rhsDeps) {
+            if (state.contains(v)) {
+              state(v).useCount += 1
+            }
+          }
+
+        }
+      }
+      case x: DirectCall => {
+        val lhs = x.outParams.map(_._2)
+        for (l <- lhs) {
+          clobberFull(c, l)
+        }
+      }
+      case x: IndirectCall => {
+        for ((i, v) <- c) {
+          v.clobbered = true
+        }
+      }
+      case _ => ()
+    }
+  }
+
+  // sort by precedence
+  val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+  worklist.addAll(p.blocks)
+
+  while (worklist.nonEmpty) {
+    val b: Block = worklist.dequeue
+
+    for (l <- b.statements) {
+      transfer(state, l)
+    }
+  }
+
+  val res = state.collect {
+    case (v, c) if !c.clobbered => v -> c.e
+  }.toMap
+  res
+}
+
+class ConstCopyProp() extends AbstractDomain[CCP] {
+  private final val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
+
+  def top: CCP = CCP(Map().withDefaultValue(CopyProp.Clobbered))
+  def bot: CCP = CCP(Map().withDefaultValue(CopyProp.Bot))
+
+  override def join(l: CCP, r: CCP, pos: Block): CCP = {
+    // val ks = l.state.keySet.intersect(r.state.keySet)
+    val ks = l.state.keySet ++ (r.state.keySet)
+
+    val merged = ks.map(v =>
+      (v ->
+        ((l.state.get(v).getOrElse(CopyProp.Clobbered), r.state.get(v).getOrElse(CopyProp.Clobbered)) match {
+          case (l, CopyProp.Bot)                                                            => l
+          case (CopyProp.Bot, r)                                                            => r
+          case (c @ CopyProp.Clobbered, _)                                                  => c
+          case (_, c @ CopyProp.Clobbered)                                                  => c
+          case (p1 @ CopyProp.Prop(e1, deps1), p2 @ CopyProp.Prop(e2, deps2)) if (p1 == p2) => p1
+          case (_, _)                                                                       => CopyProp.Clobbered
+        }))
+    )
+    CCP(merged.toMap)
+  }
+
+  override def transfer(c: CCP, s: Command): CCP = {
+    s match {
+      case Assign(l, r, lb) => {
+        if (r.loads.size > 0) {
+          CCP.clobberFull(c, l)
         } else {
           val consts = c.state.collect {
             case (k, CopyProp.Prop(c, deps)) if deps.isEmpty => k -> c
@@ -633,22 +936,27 @@ class ConstCopyProp() extends AbstractDomain[CCP] {
           val rhsDeps = evaled.variables.toSet
           val existing = c.state.get(l).getOrElse(CopyProp.Bot)
 
-          val ns = existing match {
-            case CopyProp.Bot                                 => CopyProp.Prop(evaled, rhsDeps) // not seen yet
-            case CopyProp.Prop(e, _)                          => CopyProp.Prop(evaled, rhsDeps)
-            case _                                            => CopyProp.Clobbered // our expr value has changed
+          existing match {
+            case CopyProp.Bot => {
+              c.copy(state = c.state + (l -> CopyProp.Prop(evaled, rhsDeps))) // not seen yet
+            }
+            case CopyProp.Prop(e, _) => {
+              val p = CCP.clobber(c, l)
+              p.copy(state = p.state + (l -> CopyProp.Prop(evaled, rhsDeps))) // not seen yet
+            }
+            case _ => {
+              CCP.clobberFull(c, l)
+            }
           }
-          val p = c.copy(state = c.state + (l -> ns))
-          clobber(p, l)
         }
       }
       case x: DirectCall => {
         val lhs = x.outParams.map(_._2)
-        lhs.foldLeft(c)(clobberFull)
+        lhs.foldLeft(c)(CCP.clobberFull)
       }
       case x: IndirectCall => {
         val toClob = callClobbers
-        toClob.foldLeft(c)(clobberFull)
+        toClob.foldLeft(c)(CCP.clobberFull)
       }
       case _ => c
     }
@@ -720,8 +1028,9 @@ class Substitute(
 }
 
 class Simplify(
-    val res: Map[Block, CCP],
-    val initialBlock: Block = null
+    val res: Map[Variable, Expr],
+    val initialBlock: Block = null,
+    val absdom: Option[ConstCopyProp] = None /* flow sensitive */
 ) extends CILVisitor {
 
   var madeAnyChange = false
@@ -731,7 +1040,7 @@ class Simplify(
   override def vexpr(e: Expr) = {
     val threshold = 500
     val variables = e.variables.toSet
-    val subst = Substitute(CCP.toSubstitutions(res(block)), true, threshold)
+    val subst = Substitute(res, true, threshold)
     val result = subst(e).getOrElse(e)
     if (subst.complexity > threshold) {
       val bl = s"${block.parent.name}::${block.label}"
@@ -744,7 +1053,8 @@ class Simplify(
   }
 
   override def vblock(b: Block) = {
-    block = b
+    block = b  
     DoChildren()
   }
+
 }

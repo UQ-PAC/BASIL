@@ -159,24 +159,25 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
   }
 
-  def interpretFun(x: UninterpretedFunction): Sexp[Expr] = {
+  def interpretFun(x: UninterpretedFunction): Option[Sexp[Expr]] = {
     x.name match {
       case "bool2bv1" => {
-        list(
+        Some(list(
           sym("define-fun"),
           sym(x.name),
           list(list(sym("arg"), basilTypeToSMTType(BoolType))),
           basilTypeToSMTType(x.returnType),
           list(sym("ite"), sym("arg"), bv2smt(BitVecLiteral(1, 1)), bv2smt(BitVecLiteral(0, 1)))
-        )
+        ))
       }
+      case "bvsaddo" => None
       case _ => {
-        list(
+        Some(list(
           sym("declare-fun"),
           sym(x.name),
           Sexp.Slist(x.params.toList.map(a => basilTypeToSMTType(a.getType))),
           basilTypeToSMTType(x.returnType)
-        )
+        ))
       }
     }
   }
@@ -189,7 +190,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       override def vexpr(e: Expr) = e match {
         case f: UninterpretedFunction => {
           val decl = interpretFun(f)
-          decled = decled + decl
+          decled = decled ++ decl.toSet
           DoChildren() // get variables out of args
         }
         case v: Variable => {

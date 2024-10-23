@@ -8,6 +8,24 @@ import specification.Specification
 import analysis.{TwoElement, TwoElementTop, TwoElementBottom}
 import ir.CallGraph
 
+case class FunSig(inArgs: List[Register], outArgs: List[Register]) 
+
+def R(n: Int) = {
+  Register(s"R$n", 64)
+}
+
+val builtinSigs : Map[String, FunSig] = Map(
+  "#free" -> FunSig(List(R(0)), List(R(0))),
+  "malloc" -> FunSig(List(R(0)), List(R(0))),
+  "strlen" -> FunSig(List(R(0)), List(R(0))),
+  "strchr" -> FunSig(List(R(0), R(1)), List(R(0))),
+  "strlcpy" -> FunSig(List(R(0), R(1), R(2)), List(R(0))),
+  "strlcat" -> FunSig(List(R(0), R(1), R(2)), List(R(0)))
+  )
+
+def fnsigToBinding(f: FunSig) = (f.inArgs.map(a => LocalVar(a.name + "_in", a.getType) -> LocalVar(a.name, a.getType)), 
+  f.outArgs.map(a => LocalVar(a.name + "_out", a.getType) -> LocalVar(a.name, a.getType)))
+
 def liftProcedureCallAbstraction(ctx: util.IRContext): util.IRContext = {
 
   val liveVars  =
@@ -103,6 +121,9 @@ class SetFormalParams(
 
   override def vproc(p: Procedure) = {
     if (externalFunctions.contains(p.name)) {
+
+
+
       p.formalInParam = mutable.SortedSet.from(externalIn.map(_._1))
       p.formalOutParam = mutable.SortedSet.from(externalOut.map(_._1))
       p.inParamDefaultBinding = immutable.SortedMap.from(externalIn)
@@ -293,22 +314,22 @@ class SetActualParams(
   override def vstmt(s: Statement) = {
     currStmt = Some(s)
     s match {
-      case d: DirectCall if !externalFunctions.contains(d.target.name) => {
-        // we have changed the parameter-passed variable to locals so we have LocalVar(n) -> LocalVar(n)
-        for (binding <- inBinding.get(d.target)) {
-          if (externalFunctions.contains(d.target.name)) {
-            d.actualParams = SortedMap.from(binding)
-          } else {
-            d.actualParams = d.actualParams ++ SortedMap.from(binding)
-          }
-        }
-        for (binding <- outBinding.get(d.target)) {
-          d.outParams = SortedMap.from(binding)
-        }
-      }
-      case d: DirectCall /* if external */ => {
-        d.actualParams = SortedMap.from(externalIn)
-        d.outParams = SortedMap.from(externalOut)
+      // case d: DirectCall if !externalFunctions.contains(d.target.name) => {
+      //   // we have changed the parameter-passed variable to locals so we have LocalVar(n) -> LocalVar(n)
+      //   for (binding <- inBinding.get(d.target)) {
+      //     if (externalFunctions.contains(d.target.name)) {
+      //       d.actualParams = SortedMap.from(binding)
+      //     } else {
+      //       d.actualParams = d.actualParams ++ SortedMap.from(binding)
+      //     }
+      //   }
+      //   for (binding <- outBinding.get(d.target)) {
+      //     d.outParams = SortedMap.from(binding)
+      //   }
+      // }
+      case d: DirectCall => {
+        d.actualParams = SortedMap.from(d.target.inParamDefaultBinding)
+        d.outParams = SortedMap.from(d.target.outParamDefaultBinding)
       }
       case _ => ()
     }
@@ -318,9 +339,7 @@ class SetActualParams(
   override def vjump(j: Jump) = {
     j match {
       case r: Return => {
-        for (binding <- outBinding.get(r.parent.parent)) {
-          r.outParams = SortedMap.from(binding)
-        }
+        r.outParams = SortedMap.from(r.parent.parent.outParamDefaultBinding)
         DoChildren()
       }
       case _ => DoChildren()

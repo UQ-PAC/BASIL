@@ -57,7 +57,7 @@ class DotNode(val id: String, val label: String) extends DotElement {
   override def toString: String = toDotString
 
   def toDotString: String =
-    s"\"$id\"" + "[label=\"" + wrap(label, 100) + "\", shape=\"box\", fontname=\"Mono\"]"
+    s"\"$id\"" + "[label=\"" + wrap(label, 100) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
 
 }
 
@@ -140,5 +140,6 @@ class DotGraph(val title: String, val nodes: Iterable[DotNode], val edges: Itera
 
   override def toString: String = toDotString
 
-  def toDotString: String = "digraph " + title + " {\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
+  val graph = "graph [ fontsize=18 ];" 
+  def toDotString: String = "digraph " + title + " {\n" + graph + "\n" + (nodes ++ edges).foldLeft("")((str, elm) => str + elm.toDotString + "\n") + "}"
 }

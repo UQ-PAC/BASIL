@@ -21,6 +21,8 @@ sealed trait Expr {
   def gammas: Set[Expr] = Set()
   def variables: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
+
+  lazy val variablesCached = variables
 }
 
 
@@ -195,7 +197,7 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
           } else {
             throw new Exception("bitvector size mismatch")
           }
-        case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE =>
+        case BVULT | BVULE | BVUGT | BVUGE | BVSLT | BVSLE | BVSGT | BVSGE | BVSADDO =>
           if (bv1.size == bv2.size) {
             BoolType
           } else {
@@ -210,7 +212,7 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
         case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => BoolType
       }
     case _ =>
-      throw new Exception("type mismatch, operator " + op + " type doesn't match args: (" + arg1 + ", " + arg2 + ")")
+      throw new Exception("type mismatch, operator " + op.getClass.getSimpleName + s" type doesn't match args: (" + arg1 + ", " + arg2 + ")")
   }
 
   private def inSize = arg1.getType match {
@@ -255,6 +257,7 @@ sealed trait BVBinOp(op: String) extends BinOp {
   def opName = op
 }
 
+case object BVSADDO extends BVBinOp("saddo")
 case object BVAND extends BVBinOp("and")
 case object BVOR extends BVBinOp("or")
 case object BVADD extends BVBinOp("add")

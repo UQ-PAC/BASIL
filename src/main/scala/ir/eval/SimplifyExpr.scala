@@ -9,19 +9,17 @@ import ir.cilvisitor.*
 val assocOps: Set[BinOp] =
   Set(BVADD, BVMUL, BVOR, BVAND, BVEQ, BoolAND, BoolEQ, BoolOR, BoolEQUIV, BoolEQ, IntADD, IntMUL, IntEQ)
 
-
-object AlgebraicSimplifications extends CILVisitor  {
-  override def vexpr(e: Expr) = ChangeDoChildrenPost(eval.simplifyExprFixpoint(e), eval.simplifyExprFixpoint)
+object AlgebraicSimplifications extends CILVisitor {
+  override def vexpr(e: Expr) = ChangeDoChildrenPost(e, eval.simplifyExprFixpoint)
 
   def apply(e: Expr) = {
     visit_expr(this, e)
   }
 }
 
-
 object SimplifyValidation {
   var traceLog = mutable.LinkedHashSet[(Expr, Expr)]()
-  var validate : Boolean = false
+  var validate: Boolean = false
 
   def makeValidation(writer: BufferedWriter) = {
 
@@ -31,7 +29,7 @@ object SimplifyValidation {
         case BitVecType(sz) => BinaryExpr(BVEQ, a, b)
         case IntType        => BinaryExpr(IntEQ, a, b)
         case BoolType       => BinaryExpr(BoolEQ, a, b)
-        case m: MapType        => ???
+        case m: MapType     => ???
       }
     }
 
@@ -51,28 +49,30 @@ object SimplifyValidation {
     }
   }
 
-
 }
-
 
 def simplifyExprFixpoint(e: Expr): Expr = {
   val begin = e
   var pe = e
   var count = 0
-  var ne = simplifyExpr(pe)
-  while (ne != pe && count < 5) {
+  var ne = e
+  var changedAny = false
+  var changed = true
+  while (changed) {
+    val (x, didAnything) = simplifyExpr(ne)
+    changed = didAnything
+    changedAny = changedAny || changed
     count += 1
-    pe = ne
-    ne = simplifyExpr(pe)
+    ne = ir.eval.fastPartialEvalExpr(x)
   }
-  if (ne != pe) {
+  if (changed) {
     Logger.error(s"stopping simp before fixed point: there is likely a simplificatinon loop: $pe !=== $ne")
   }
   if (SimplifyValidation.validate) {
     // normalise to deduplicate log entries
     val normer = VarNameNormalise()
-    val a = visit_expr(normer, begin) 
-    val b = visit_expr(normer, ne) 
+    val a = visit_expr(normer, begin)
+    val b = visit_expr(normer, ne)
 
     SimplifyValidation.traceLog.add((a, b))
   }
@@ -83,10 +83,9 @@ class VarNameNormalise() extends CILVisitor {
   var count = 1
   val assigned = mutable.Map[Variable, Variable]()
 
-
   def rename(v: Variable, newName: String) = {
     v match {
-      case LocalVar(n, t) => LocalVar(newName, t)
+      case LocalVar(n, t)  => LocalVar(newName, t)
       case Register(n, sz) => Register(newName, sz)
     }
   }
@@ -103,7 +102,6 @@ class VarNameNormalise() extends CILVisitor {
     }
   }
 
-
   def apply(e: Expr) = {
     count = 1
     assigned.clear()
@@ -114,9 +112,7 @@ class VarNameNormalise() extends CILVisitor {
   }
 }
 
-
-
-def simplifyExpr(e: Expr): Expr = {
+def simplifyExpr(e: Expr): (Expr, Boolean) = {
   // println((0 until indent).map(" ").mkString("") + e)
 
   def bool2bv1(e: Expr) = {
@@ -133,19 +129,7 @@ def simplifyExpr(e: Expr): Expr = {
     BVUGE -> BVUGT,
     BVSLE -> BVSLT,
     BVULE -> BVULT
-    )
-
-
-  def isNegBV(e: Expr) = {
-    simplifyExpr(e).getType match {
-      case BitVecType(sz) => {
-        BinaryExpr(BVSLT, e, BitVecLiteral(0, sz))
-      }
-      case _ => ???
-    }
-  }
-
-  val e2 = ir.eval.partialEvalExpr(e, (v) => None)
+  )
 
   def pushExtend(e: Expr, extend: Expr => Expr): Expr = {
     e match {
@@ -170,7 +154,8 @@ def simplifyExpr(e: Expr): Expr = {
   /** Apply the rewrite rules once. Note some rules expect a canonical form produced by other rules, and hence this is
     * more effective when applied iteratively until a fixed point.
     */
-  val simped = e2 match {
+  var didAnything = true
+  val simped = e match {
     // constant folding
     // const + (expr + const) -> expr + (const + const)
 
@@ -203,7 +188,6 @@ def simplifyExpr(e: Expr): Expr = {
     case BinaryExpr(BVEQ, BinaryExpr(BVCOMP, e1: Expr, e2: Expr), BitVecLiteral(0, 1)) =>
       UnaryExpr(BoolNOT, BinaryExpr(BVEQ, (e1), (e2)))
     case BinaryExpr(BVNEQ, e1, e2) => UnaryExpr(BoolNOT, BinaryExpr(BVEQ, (e1), (e2)))
-
 
     case BinaryExpr(op, BinaryExpr(op1, a, b: Literal), BinaryExpr(op2, c, d: Literal))
         if !a.isInstanceOf[Literal] && !c.isInstanceOf[Literal]
@@ -268,6 +252,10 @@ def simplifyExpr(e: Expr): Expr = {
     case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, y: BitVecLiteral), BitVecLiteral(0, s))
         if ir.eval.BitVectorEval.isNegative(y) =>
       BinaryExpr(BVEQ, x, UnaryExpr(BVNEG, y))
+
+    case BinaryExpr(BVCONCAT, BitVecLiteral(0, sz), expr) => ZeroExtend(sz, expr)
+    case BinaryExpr(BVCONCAT, expr, BitVecLiteral(0, sz)) if (BigInt(2).pow(sz + size(expr).get) > sz) =>
+      BinaryExpr(BVSHL, ZeroExtend(sz, expr), BitVecLiteral(sz, sz + size(expr).get))
 
     /*  COMPARISON FLAG HANDLING
      *
@@ -362,7 +350,7 @@ def simplifyExpr(e: Expr): Expr = {
           && AlgebraicSimplifications(x2) == AlgebraicSimplifications(ZeroExtend(exts, x1))
           && AlgebraicSimplifications(y2) == AlgebraicSimplifications(ZeroExtend(exts, y1)) => {
       // C not Set
-      AlgebraicSimplifications(UnaryExpr(BoolNOT, BinaryExpr(BVUGE, x1, UnaryExpr(BVNEG, y1))))
+      UnaryExpr(BoolNOT, BinaryExpr(BVUGE, x1, UnaryExpr(BVNEG, y1)))
     }
 
     case BinaryExpr(
@@ -392,7 +380,7 @@ def simplifyExpr(e: Expr): Expr = {
 
     /* generic comparison simplification */
 
-    // weak to strict inequality 
+    // weak to strict inequality
     // x >= 0 && x != 0 ===> x > 0
     case BinaryExpr(BoolAND, BinaryExpr(op, lhs, BitVecLiteral(0, sz)), UnaryExpr(BoolNOT, rhs))
         if size(lhs).isDefined && (AlgebraicSimplifications(BinaryExpr(BVEQ, lhs, BitVecLiteral(0, size(lhs).get))) == rhs) && ineqToStrict.contains(op) => {
@@ -407,7 +395,7 @@ def simplifyExpr(e: Expr): Expr = {
       BinaryExpr(ineqToStrict(op), lhs, rhs)
     }
     case BinaryExpr(BoolAND, BinaryExpr(op, lhs, rhs), UnaryExpr(BoolNOT, BinaryExpr(BVEQ, BinaryExpr(BVADD, lhs2, rhs2), BitVecLiteral(0, _))))
-      if rhs == rhs2 && AlgebraicSimplifications(lhs) == AlgebraicSimplifications(UnaryExpr(BVNEG, lhs2)) && ineqToStrict.contains(op) => {
+      if rhs == rhs2 && (AlgebraicSimplifications(lhs) == AlgebraicSimplifications(UnaryExpr(BVNEG, lhs2))) && ineqToStrict.contains(op) => {
       BinaryExpr(ineqToStrict(op), lhs, rhs)
     }
 
@@ -459,6 +447,18 @@ def simplifyExpr(e: Expr): Expr = {
         case _              => throw Exception("Type error (should be unreachable)")
       }
     case BinaryExpr(BoolEQ, x, FalseLiteral) => UnaryExpr(BoolNOT, x)
+
+    // redundant extends
+    // extract extended zero part
+    case Extract(ed, bg, ZeroExtend(x, expr)) if (bg > size(expr).get) => BitVecLiteral(0, ed - bg)
+    // extract below extend
+    case Extract(ed, bg, ZeroExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) => Extract(ed, bg, expr)
+    case Extract(ed, bg, SignExtend(x, expr)) if (bg < size(expr).get) && (ed < size(expr).get) => Extract(ed, bg, expr)
+
+    case BinaryExpr(BVEQ, ZeroExtend(sz, expr), BitVecLiteral(0, sz2)) => BinaryExpr(BVEQ, expr, BitVecLiteral(0, size(expr).get))
+
+
+
     // double negation
     case UnaryExpr(BVNOT, UnaryExpr(BVNOT, body))     => (body)
     case UnaryExpr(BVNEG, UnaryExpr(BVNEG, body))     => (body)
@@ -483,15 +483,12 @@ def simplifyExpr(e: Expr): Expr = {
         ) =>
       BinaryExpr(BVEQ, (body), BitVecLiteral(0, 1))
 
-    case BinaryExpr(BVSUB, x: Expr, y: BitVecLiteral)         => BinaryExpr(BVADD, x, UnaryExpr(BVNEG, y))
-    case BinaryExpr(BVAND, l, r) if l == r && l.loads.isEmpty => (l)
-    case BinaryExpr(op, x, y)                                 => BinaryExpr(op, (x), (y))
-    case r                                                    => r
+    case BinaryExpr(BVSUB, x: Expr, y: BitVecLiteral) => BinaryExpr(BVADD, x, UnaryExpr(BVNEG, y))
+    case r => {
+      didAnything = false
+      r
+    }
   }
 
-  if (simped != e) {
-    // println(s"old $e -> ")
-    // println(s"    $simped")
-  }
-  simped
+  (simped, didAnything)
 }

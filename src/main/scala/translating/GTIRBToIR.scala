@@ -261,6 +261,7 @@ class GTIRBToIR(mods: Seq[Module], parserMap: immutable.Map[String, Array[Array[
     val (in, out) = createArguments(name)
 
     val procedure = Procedure(name, address, formalInParam = in.map(_._1), formalOutParam = out, inParamDefaultBinding=in.toMap)
+    procedure.inParamDefaultBinding = immutable.SortedMap.from(in.map((l,r) => l -> LocalVar(l.name, BitVecType(64))))
     uuidToProcedure += (functionUUID -> procedure)
     entranceUUIDtoProcedure += (entranceUUID -> procedure)
 

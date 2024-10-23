@@ -289,7 +289,7 @@ def toDot[T <: CFGPosition](
 
   def nodeText(node: CFGPosition): String = {
     var text = node match {
-      case s: Block => f"[Block] ${s.label}"
+      case s: Block => f"[Block] (prec ${s.rpoOrder}) ${s.label}"
       case s        => s.toString
     }
     if (labels.contains(node)) {

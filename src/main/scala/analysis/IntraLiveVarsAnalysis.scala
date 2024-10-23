@@ -11,16 +11,15 @@ abstract class LivenessAnalysis(program: Program) extends Analysis[Any]:
     n match {
       case p: Procedure => s
       case b: Block => s
-      case Assign(variable, expr, _) => (s - variable) ++ expr.variables
-      case MemoryAssign(_, index, value, _, _, _) => s ++ index.variables ++ value.variables
-      case Assume(expr, _, _, _) => s ++ expr.variables
-      case Assert(expr, _, _) => s ++ expr.variables
-      case IndirectCall(variable, _) => s + variable
-      case c: DirectCall => s -- c.outParams.map(_._2) ++ c.actualParams.flatMap(_._2.variables)
+      case a : Assign => (s - a.lhs) ++ a.rhs.variables
+      case m: MemoryAssign => s ++ m.index.variables ++ m.value.variables
+      case a : Assume => s ++ a.body.variables
+      case a : Assert => s ++ a.body.variables
+      case i : IndirectCall => s + i.target
+      case c: DirectCall => (s -- c.outParams.map(_._2)) ++ c.actualParams.flatMap(_._2.variables)
       case g: GoTo => s
       case r: Return => s ++ r.outParams.flatMap(_._2.variables)
       case r: Unreachable => s
-      case _ => ???
     }
   }
 
