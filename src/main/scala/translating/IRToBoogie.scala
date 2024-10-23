@@ -1,5 +1,5 @@
 package translating
-import analysis.RegionInjector
+import analysis.{RegionInjector, DataRegion, HeapRegion, MergedRegion}
 import ir.{BoolOR, *}
 import boogie.*
 import specification.*
@@ -40,10 +40,11 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   private val LArgs = lArgs
 
   private val memoriesToGamma = if (regionInjector.isDefined) {
-    regionInjector.get.mergedRegions.values.map { region =>
-      val memory = BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
-      val gamma = BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
-      memory -> gamma
+    regionInjector.get.mergedRegions.collect {
+      case (_: DataRegion | _: HeapRegion, region: MergedRegion) =>
+        val memory = BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+        val gamma = BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+        memory -> gamma
     }.toMap
   } else {
     Map(mem -> Gamma_mem)
