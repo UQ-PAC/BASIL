@@ -13,7 +13,7 @@ class Program(var procedures: ArrayBuffer[Procedure],
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
 
-  val usedMemory = mutable.TreeMap[BigInt, MemorySection]()
+  val usedMemory: mutable.Map[BigInt, MemorySection] = mutable.TreeMap()
 
   override def toString(): String = {
     serialiseIL(this)
@@ -201,7 +201,7 @@ class Procedure private (
 
   def returnBlock_=(value: Block): Unit = {
     if (!returnBlock.contains(value)) {
-      _returnBlock.foreach(removeBlocks(_))
+      _returnBlock.foreach(removeBlocks)
       _returnBlock = Some(addBlocks(value))
     }
   }
@@ -210,7 +210,7 @@ class Procedure private (
 
   def entryBlock_=(value: Block): Unit = {
     if (!entryBlock.contains(value)) {
-      _entryBlock.foreach(removeBlocks(_))
+      _entryBlock.foreach(removeBlocks)
       _entryBlock = Some(addBlocks(value))
     }
   }
@@ -336,8 +336,6 @@ class Parameter(var name: String, var size: Int, var value: Register) {
   def toBoogie: BVariable = BParam(name, BitVecBType(size))
   def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
 }
-
-
 
 class Block private (
  val label: String,

@@ -108,25 +108,30 @@ class RemoveOld(resolveSpec: ResolveSpec) extends SpecResolutionVisitor {
   override def visitArrayAccess(node: ArrayAccess): BMemoryLoad = resolveSpec.visitArrayAccess(node)
 }
 
-class ResolveSpecL(resolveSpec: ResolveSpec) extends SpecResolutionVisitor {
+class ResolveSpecL(regionInjector: Option[RegionInjector]) extends SpecResolutionVisitor {
+  private val mem_in = BMapVar("mem$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
   override def visitSpecGlobal(node: SpecGlobal): BMemoryLoad = {
-    BMemoryLoad(
-      BMapVar("memory", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
-      node.toAddrVar,
-      Endian.LittleEndian,
-      node.size
-    )
+    val memory = if (regionInjector.isDefined) {
+      regionInjector.get.getMergedRegion(node.address) match {
+        case Some(region) => BMapVar(s"${region.name}$$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
+        case None => mem_in
+      }
+    } else {
+      mem_in
+    }
+    BMemoryLoad(memory, node.toAddrVar, Endian.LittleEndian, node.size)
   }
 
-  override def visitSpecGamma(node: SpecGamma): GammaLoad = resolveSpec.visitSpecGamma(node)
-
   override def visitArrayAccess(node: ArrayAccess): BMemoryLoad = {
-    BMemoryLoad(
-      BMapVar("memory", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter),
-      node.toAddrVar,
-      Endian.LittleEndian,
-      node.global.size
-    )
+    val memory = if (regionInjector.isDefined) {
+      regionInjector.get.getMergedRegion(node.address) match {
+        case Some(region) => BMapVar(s"${region.name}$$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
+        case None => mem_in
+      }
+    } else {
+      mem_in
+    }
+    BMemoryLoad(memory, node.toAddrVar, Endian.LittleEndian, node.size)
   }
 }
 

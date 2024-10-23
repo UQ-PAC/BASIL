@@ -239,6 +239,7 @@ object IRTransform {
     assert(invariant.singleCallBlockEnd(ctx.program))
   }
 
+  /*
   def generateProcedureSummaries(
     ctx: IRContext,
     IRProgram: Program,
@@ -268,6 +269,7 @@ object IRTransform {
 
     modified
   }
+  */
 
 }
 
@@ -559,10 +561,12 @@ object RunUtils {
         result.reachingDefs,
         ctx.program
       )
+      /*
       Logger.debug("[!] Generating Procedure Summaries")
       if (config.summariseProcedures) {
         IRTransform.generateProcedureSummaries(ctx, ctx.program, result.constPropResult, result.varDepsSummaries)
       }
+      */
       if (modified) {
         iteration += 1
         Logger.debug(s"[!] Analysing again (iter $iteration)")
