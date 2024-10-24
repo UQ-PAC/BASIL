@@ -1,7 +1,8 @@
 package analysis
-import ir._
+import ir.*
 import analysis.BitVectorEval.*
 
+import scala.annotation.tailrec
 import scala.math.pow
 
 object BitVectorEval {
@@ -328,4 +329,29 @@ object BitVectorEval {
     }
   }
 
+  def bitVec_min(s: BitVecLiteral, t: BitVecLiteral): BitVecLiteral = {
+    if (smt_bvslt(s, t) == TrueLiteral) s else t
+  }
+
+  def bitVec_min(s: List[BitVecLiteral]): BitVecLiteral = {
+    s.reduce(bitVec_min)
+  }
+
+  def bitVec_max(s: BitVecLiteral, t: BitVecLiteral): BitVecLiteral = {
+    if (smt_bvslt(s, t) == TrueLiteral) t else s
+  }
+
+  def bitVec_max(s: List[BitVecLiteral]): BitVecLiteral = {
+      s.reduce(bitVec_max)
+  }
+
+  @tailrec
+  def bitVec_gcd(a: BitVecLiteral, b: BitVecLiteral): BitVecLiteral = {
+    if (b.value == 0) a else bitVec_gcd(b, smt_bvsmod(a, b))
+  }
+
+  def bitVec_interval(lb: BitVecLiteral, ub: BitVecLiteral, step: BitVecLiteral): Set[BitVecLiteral] = {
+    require(smt_bvule(lb, ub) == TrueLiteral, "Lower bound must be less than or equal to upper bound")
+    (lb.value to ub.value by step.value).map(BitVecLiteral(_, lb.size)).toSet
+  }
 }

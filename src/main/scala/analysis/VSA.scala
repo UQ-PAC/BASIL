@@ -11,31 +11,21 @@ import util.Logger
 
 /** ValueSets are PowerSet of possible values */
 trait Value {
-  val expr: BitVecLiteral
-}
-trait AddressValue extends Value {
-  val name: String
 }
 
-case class GlobalAddress(override val expr: BitVecLiteral, override val name: String) extends AddressValue {
-  override def toString: String = "GlobalAddress(" + expr + ", " + name + ")"
-}
-
-case class LocalAddress(override val expr: BitVecLiteral, override val name: String) extends AddressValue {
-  override def toString: String = "LocalAddress(" + expr + ", " + name + ")"
+case class AddressValue(region: MemoryRegion) extends Value {
+  override def toString: String = "Address(" + region + ")"
 }
 
 case class LiteralValue(expr: BitVecLiteral) extends Value {
   override def toString: String = "Literal(" + expr + ")"
 }
 
-trait ValueSetAnalysis(program: Program,
-                        globals: Map[BigInt, String],
-                        externalFunctions: Map[BigInt, String],
-                        globalOffsets: Map[BigInt, BigInt],
-                        subroutines: Map[BigInt, String],
+trait ValueSetAnalysis(domain: Set[CFGPosition],
+                        program: Program,
                         mmm: MemoryModelMap,
-                        constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]) {
+                        constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                        reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) {
 
   val powersetLattice: PowersetLattice[Value] = PowersetLattice()
 
@@ -45,57 +35,23 @@ trait ValueSetAnalysis(program: Program,
 
   val lattice: MapLattice[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]], LiftLattice[Map[Variable | MemoryRegion, Set[Value]], mapLattice.type]] = MapLattice(liftedLattice)
 
-  val domain: Set[CFGPosition] = Set.empty ++ program
-
-  val first: Set[CFGPosition] = Set.empty ++ program
-
-  private val stackPointer = Register("R31", 64)
-  private val linkRegister = Register("R30", 64)
-  private val framePointer = Register("R29", 64)
-
-  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
+  val first: Set[CFGPosition] = Set.empty + program.mainProcedure
 
   private val mallocVariable = Register("R0", 64)
 
-  private def resolveGlobalOffset(address: BigInt): String = {
-    val tableAddress = globalOffsets(address)
-    if (globals.contains(tableAddress)) {
-      globals(tableAddress)
-    } else if (subroutines.contains(tableAddress)) {
-      subroutines(tableAddress)
-    } else {
-      //throw Exception("Error: cannot resolve global offset " + address + " -> " + tableAddress)
-      "@ERROR"
-    }
-  }
-
-  def exprToRegion(expr: Expr, n: CFGPosition): Option[MemoryRegion] = {
-    expr match {
-      case binOp: BinaryExpr if binOp.arg1 == stackPointer =>
-        evaluateExpression(binOp.arg2, constantProp(n)) match {
-          case Some(b: BitVecLiteral) => mmm.findStackObject(b.value)
-          case None => None
-        }
+  def nodeToRegion(n: CFGPosition): Set[MemoryRegion] = {
+    var returnRegions = Set.empty[MemoryRegion]
+    n match {
+      case directCall: DirectCall =>
+        returnRegions = returnRegions + mmm.getHeap(directCall).asInstanceOf[MemoryRegion]
       case _ =>
-        evaluateExpression(expr, constantProp(n)) match {
-          case Some(b: BitVecLiteral) => mmm.findDataObject(b.value)
-          case None => None
-        }
+        returnRegions = returnRegions ++ mmm.getStack(n).asInstanceOf[Set[MemoryRegion]] ++ mmm.getData(n).asInstanceOf[Set[MemoryRegion]]
     }
+    returnRegions
   }
 
-  private def getValueType(bitVecLiteral: BitVecLiteral): Value = {
-    if (externalFunctions.contains(bitVecLiteral.value)) {
-      LocalAddress(bitVecLiteral, externalFunctions(bitVecLiteral.value))
-    } else if (globals.contains(bitVecLiteral.value)) {
-      GlobalAddress(bitVecLiteral, globals(bitVecLiteral.value))
-    } else if (globalOffsets.contains(bitVecLiteral.value)) {
-      GlobalAddress(bitVecLiteral, resolveGlobalOffset(bitVecLiteral.value))
-    } else if (subroutines.contains(bitVecLiteral.value)) {
-      GlobalAddress(bitVecLiteral, subroutines(bitVecLiteral.value))
-    } else {
-      LiteralValue(bitVecLiteral)
-    }
+  def canCoerceIntoDataRegion(bitVecLiteral: BitVecLiteral, size: Int): Option[DataRegion] = {
+    mmm.findDataObject(bitVecLiteral.value)
   }
 
   /** Default implementation of eval.
@@ -103,62 +59,57 @@ trait ValueSetAnalysis(program: Program,
   def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]], n: CFGPosition): Map[Variable | MemoryRegion, Set[Value]] = {
     var m = s
     cmd match
+      case directCall: DirectCall if directCall.target.name == "malloc" =>
+        val regions = nodeToRegion(n)
+        // malloc variable
+        m = m + (mallocVariable -> regions.map(r => AddressValue(r)))
+        m
       case localAssign: Assign =>
-        localAssign.rhs match
-          case memoryLoad: MemoryLoad =>
-            exprToRegion(memoryLoad.index, n) match
-              case Some(r: MemoryRegion) =>
-                // this is an exception to the rule and only applies to data regions
-                evaluateExpression(memoryLoad.index, constantProp(n)) match
-                  case Some(bitVecLiteral: BitVecLiteral) =>
-                    m = m + (r -> Set(getValueType(bitVecLiteral)))
-                    m = m + (localAssign.lhs -> m(r))
-                    m
-                  case None =>
-                    m = m + (localAssign.lhs -> m(r))
-                    m
-              case None =>
-                Logger.debug("could not find region for " + localAssign)
-                m
-          case e: Expr =>
-            evaluateExpression(e, constantProp(n)) match {
-              case Some(bv: BitVecLiteral) =>
-                m = m + (localAssign.lhs -> Set(getValueType(bv)))
-                m
-              case None =>
-                Logger.debug("could not evaluate expression" + e)
-                m
-            }
+        val regions = nodeToRegion(n)
+        if (regions.nonEmpty) {
+          m = m + (localAssign.lhs -> regions.map(r => AddressValue(r)))
+        } else {
+          evaluateExpression(localAssign.rhs, constantProp(n)) match
+            case Some(bitVecLiteral: BitVecLiteral) =>
+              val possibleData = canCoerceIntoDataRegion(bitVecLiteral, 1)
+              if (possibleData.isDefined) {
+                m = m + (localAssign.lhs -> Set(AddressValue(possibleData.get)))
+              } else {
+                m = m + (localAssign.lhs -> Set(LiteralValue(bitVecLiteral)))
+              }
+            case None =>
+              val unwrapValue = unwrapExprToVar(localAssign.rhs)
+              unwrapValue match {
+                case Some(v: Variable) =>
+                  m = m + (localAssign.lhs -> m(v))
+                case None =>
+                  Logger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
+              }
+        }
+        m
       case memAssign: MemoryAssign =>
-        memAssign.index match
-          case binOp: BinaryExpr =>
-            val region: Option[MemoryRegion] = exprToRegion(binOp, n)
-            region match
-              case Some(r: MemoryRegion) =>
-                val storeValue = memAssign.value
-                evaluateExpression(storeValue, constantProp(n)) match
-                  case Some(bitVecLiteral: BitVecLiteral) =>
-                    m = m + (r -> Set(getValueType(bitVecLiteral)))
-                    m
-                    /*
-                  // TODO constant prop returned BOT OR TOP. Merge regions because RHS could be a memory loaded address
-                  case variable: Variable =>
-                    s + (r -> s(variable))
-                    */
-                  case None =>
-                    storeValue.match {
-                      case v: Variable =>
-                        m = m + (r -> m(v))
-                        m
-                      case _ =>
-                        Logger.debug(s"Too Complex: $storeValue") // do nothing
-                        m
-                    }
+        val regions = nodeToRegion(n)
+        evaluateExpression(memAssign.value, constantProp(n)) match
+          case Some(bitVecLiteral: BitVecLiteral) =>
+            regions.foreach { r =>
+              val possibleData = canCoerceIntoDataRegion(bitVecLiteral, memAssign.size)
+              if (possibleData.isDefined) {
+                m = m + (r -> Set(AddressValue(possibleData.get)))
+              } else {
+                m = m + (r -> Set(LiteralValue(bitVecLiteral)))
+              }
+            }
+          case None =>
+            val unwrapValue = unwrapExprToVar(memAssign.value)
+            unwrapValue match {
+              case Some(v: Variable) =>
+                regions.foreach { r =>
+                  m = m + (r -> m(v))
+                }
               case None =>
-                Logger.debug("could not find region for " + memAssign)
-                m
-          case _ =>
-            m
+                Logger.debug(s"Too Complex: $memAssign.value") // do nothing
+            }
+        m
       case _ =>
         m
   }
@@ -184,15 +135,13 @@ trait ValueSetAnalysis(program: Program,
 }
 
 class ValueSetAnalysisSolver(
+    domain: Set[CFGPosition],
     program: Program,
-    globals: Map[BigInt, String],
-    externalFunctions: Map[BigInt, String],
-    globalOffsets: Map[BigInt, BigInt],
-    subroutines: Map[BigInt, String],
     mmm: MemoryModelMap,
     constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-) extends ValueSetAnalysis(program, globals, externalFunctions, globalOffsets, subroutines, mmm, constantProp)
-    with IRInterproceduralForwardDependencies
+    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
+) extends ValueSetAnalysis(domain, program, mmm, constantProp, reachingDefs)
+    with IRIntraproceduralForwardDependencies
     with Analysis[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
     with WorklistFixpointSolverWithReachability[CFGPosition, Map[Variable | MemoryRegion, Set[Value]], MapLattice[Variable | MemoryRegion, Set[Value], PowersetLattice[Value]]] {
 

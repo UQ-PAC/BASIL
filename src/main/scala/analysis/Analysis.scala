@@ -195,5 +195,5 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
 
 class ConstantPropagationSolverWithSSA(program: Program, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) extends ConstantPropagationWithSSA(program, reachingDefs)
   with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], MapLattice[RegisterWrapperEqualSets, Set[BitVecLiteral], ConstantPropagationLatticeWithSSA]]
-  with IRIntraproceduralForwardDependencies
+  with IRInterproceduralForwardDependencies
   with Analysis[Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]]]
