@@ -473,7 +473,7 @@ case class MemorySection(name: String, address: BigInt, size: Int, bytes: Seq[Bi
     for (i <- 0 until num) yield {
       val index = startIndex + i
       if (index >= bytes.size || index < 0) {
-        throw Exception("www")
+        throw Exception("www" + num)
       }
       bytes(startIndex + i)
     }

@@ -54,11 +54,11 @@ case class IRContext(
 case class StaticAnalysisContext(
     constPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
     IRconstPropResult: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    memoryRegionResult: Map[CFGPosition, LiftedElement[Set[MemoryRegion]]],
+    memoryRegionResult: Map[CFGPosition, Set[StackRegion]],
     vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
     interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
     paramResults: Map[Procedure, Set[Variable]],
-    steensgaardResults: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
+    steensgaardResults: Map[RegisterWrapperEqualSets | MemoryRegion, Set[RegisterWrapperEqualSets | MemoryRegion]],
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
@@ -281,7 +281,8 @@ object StaticAnalysis {
   def analyse(
       ctx: IRContext,
       config: StaticAnalysisConfig,
-      iteration: Int
+      iteration: Int,
+      previousResults: Option[StaticAnalysisContext] = None
   ): StaticAnalysisContext = {
     val IRProgram: Program = ctx.program
     val externalFunctions: Set[ExternalFunction] = ctx.externalFunctions
@@ -321,6 +322,9 @@ object StaticAnalysis {
     }
 
     val mergedSubroutines = subroutines ++ externalAddresses
+
+    val domain = computeDomain(IntraProcIRCursor, IRProgram.procedures)
+    val interDomain = computeDomain(InterProcIRCursor, IRProgram.procedures)
 
     Logger.debug("[!] Running ANR")
     val ANRSolver = ANRAnalysisSolver(IRProgram)
@@ -365,17 +369,20 @@ object StaticAnalysis {
       )
     })
 
-    Logger.debug("[!] Running Constant Propagation with SSA")
-    val constPropSolverWithSSA = ConstantPropagationSolverWithSSA(IRProgram, reachingDefinitionsAnalysisResults)
-    val constPropResultWithSSA = constPropSolverWithSSA.analyze()
-
     val mmm = MemoryModelMap()
     mmm.preLoadGlobals(mergedSubroutines, globalOffsets, globalAddresses, globalSizes)
 
+    var previousVSAResults = Option.empty[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
+    if (previousResults.isDefined) {
+      previousVSAResults = Some(previousResults.get.vsaResult)
+    }
+
+    Logger.debug("[!] Running GRA")
+    val graSolver = GlobalRegionAnalysisSolver(IRProgram, domain.toSet, constPropResult, reachingDefinitionsAnalysisResults, mmm, globalOffsets, previousVSAResults)
+    val graResult = graSolver.analyze()
+
     Logger.debug("[!] Running MRA")
-    val assumeR31 = false
-    val constantPropForMRA = ConstantPropagationSolver(IRProgram, assumeR31).analyze()
-    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, globalAddresses, globalOffsets, mergedSubroutines, constantPropForMRA, ANRResult, RNAResult, reachingDefinitionsAnalysisResults, assumeR31, mmm)
+    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, domain.toSet, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, reachingDefinitionsAnalysisResults, graResult)
     val mraResult = mraSolver.analyze()
 
     config.analysisDotPath.foreach(s => {
@@ -394,26 +401,38 @@ object StaticAnalysis {
         toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> mraResult(b).toString).toMap),
         s"${s}_MRA$iteration.dot"
       )
+
+      writeToFile(
+        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> graResult(b).toString).toMap),
+        s"${s}_GRA$iteration.dot"
+      )
     })
 
     Logger.debug("[!] Running MMM")
-    mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mraSolver.mergeRegions, mraSolver.allocationSites, mraSolver.procedureToSharedRegions)
+    mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mraSolver.mergeRegions, mraResult, mraSolver.procedureToSharedRegions, graSolver.getDataMap, graResult)
     mmm.logRegions()
 
+    Logger.debug("[!] Running VSA")
+    val vsaSolver = ValueSetAnalysisSolver(domain.toSet, IRProgram, mmm, constPropResult, reachingDefinitionsAnalysisResults)
+    val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
+
+    config.analysisDotPath.foreach(s => {
+      writeToFile(
+        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> vsaResult(b).toString).toMap),
+        s"${s}_VSA$iteration.dot"
+      )
+    })
+
     Logger.debug("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(IRProgram, constPropResult, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
+    val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, constPropResult, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
     steensgaardSolver.analyze()
     val steensgaardResults = steensgaardSolver.pointsTo()
     val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
     mmm.logRegions(memoryRegionContents)
 
     Logger.debug("[!] Injecting regions")
-    val regionInjector = RegionInjector(IRProgram, constPropResult, mmm, reachingDefinitionsAnalysisResults)
+    val regionInjector = RegionInjector(IRProgram, mmm)
     regionInjector.nodeVisitor()
-
-    Logger.debug("[!] Running VSA")
-    val vsaSolver = ValueSetAnalysisSolver(IRProgram, globalAddresses, externalAddresses, globalOffsets, subroutines, mmm, constPropResult)
-    val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
 
     var paramResults: Map[Procedure, Set[Variable]] = Map.empty
     var interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = Map.empty
@@ -552,13 +571,16 @@ object RunUtils {
     val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
     while (modified) {
       Logger.debug("[!] Running Static Analysis")
-      val result = StaticAnalysis.analyse(ctx, config, iteration)
+      val result = StaticAnalysis.analyse(ctx, config, iteration, analysisResult.lastOption)
       analysisResult.append(result)
       Logger.debug("[!] Replacing Indirect Calls")
-      modified = transforms.resolveIndirectCallsUsingPointsTo(
-        result.steensgaardResults,
-        result.memoryRegionContents,
-        result.reachingDefs,
+//      modified = transforms.resolveIndirectCallsUsingPointsTo(
+//        result.steensgaardResults,
+//        result.reachingDefs,
+//        ctx.program
+//      )
+      modified = transforms.resolveIndirectCallsUsingVSA(
+        result.vsaResult,
         ctx.program
       )
       /*

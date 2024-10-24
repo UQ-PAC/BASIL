@@ -4,7 +4,11 @@ import analysis.*
 import ir.*
 import util.Logger
 
+import scala.collection.immutable.TreeMap
 import scala.collection.mutable
+
+enum MemoryType:
+  case Data, Heap, Stack
 
 // Define a case class to represent a range
 case class RangeKey(start: BigInt, end: BigInt) extends Ordered[RangeKey]:
@@ -31,11 +35,57 @@ class MemoryModelMap {
   private val bufferedSharedStackMap: mutable.Map[String, mutable.Map[Procedure, mutable.TreeMap[RangeKey, StackRegion]]] = mutable.Map()
   private val heapMap: mutable.Map[RangeKey, HeapRegion] = mutable.TreeMap()
   private val dataMap: mutable.Map[RangeKey, DataRegion] = mutable.TreeMap()
+  private val cfgPositionToDataRegion: mutable.Map[CFGPosition, Set[DataRegion]] = mutable.Map()
   private val heapCalls: mutable.Map[DirectCall, HeapRegion] = mutable.Map()
 
-  private val stackAllocationSites: mutable.Map[(CFGPosition, Expr), StackRegion] = mutable.Map()
+  private val stackAllocationSites: mutable.Map[CFGPosition, Set[StackRegion]] = mutable.Map()
 
   private val uf = new UnionFind()
+  private var DataMemory, HeapMemory, StackMemory = TreeMap[BigInt, Array[Byte]]()
+
+
+
+  // Store operation: store BigInt value at a BigInt address
+  def store(address: BigInt, value: BigInt, memoryType: MemoryType): Unit = {
+    val byteArray = value.toByteArray
+    memoryType match
+      case MemoryType.Data => DataMemory += (address -> byteArray)
+      case MemoryType.Heap => HeapMemory += (address -> byteArray)
+      case MemoryType.Stack => StackMemory += (address -> byteArray)
+  }
+
+  // Load operation: load from a BigInt address with a specific size
+  def load(address: BigInt, size: Int, memoryType: MemoryType): BigInt = {
+    val memory = memoryType match
+      case MemoryType.Data => DataMemory
+      case MemoryType.Heap => HeapMemory
+      case MemoryType.Stack => StackMemory
+    // Find the memory block that contains the starting address
+    val floorEntry = memory.rangeTo(address).lastOption
+
+    floorEntry match {
+      case Some((startAddress, byteArray)) =>
+        val offset = (address - startAddress).toInt // Offset within the byte array
+        // If the load exceeds the stored data, we need to handle padding with zeros
+        if (offset >= byteArray.length) {
+          BigInt(0)
+        } else {
+          // Calculate how much data we can retrieve
+          val availableSize = byteArray.length - offset
+          // Slice the available data, and if requested size exceeds, append zeros
+          val result = byteArray.slice(offset, offset + size)
+          val paddedResult = if (size > availableSize) {
+            result ++ Array.fill(size - availableSize)(0.toByte) // Padding with zeros
+          } else {
+            result
+          }
+          BigInt(1, paddedResult) // Convert the byte array back to BigInt
+        }
+      case None =>
+        // If no memory is stored at the requested address, return zero
+        BigInt(0) // TODO: may need to be sm else
+    }
+  }
 
   /** Add a range and object to the mapping
    *
@@ -48,11 +98,10 @@ class MemoryModelMap {
     def maxSize(r: MemoryRegion): BigInt = {
       r match
         case DataRegion(regionIdentifier, start, size) => start + size
-        case HeapRegion(regionIdentifier, size, parent) => ???
+        case HeapRegion(regionIdentifier, start, size, parent) => ???
         case StackRegion(regionIdentifier, start, parent) =>
           if (r.subAccesses.nonEmpty) {
             val max = start + r.subAccesses.max
-            r.fields ++= r.subAccesses.diff(Set(max)).map(_ + start)
             max
           } else {
             ???
@@ -77,12 +126,8 @@ class MemoryModelMap {
           val currentMaxRegion = currentStackMap(currentMaxRange)
           if (offset <= currentMaxRange.end) {
             currentStackMap.remove(currentMaxRange)
-            currentMaxRegion.fields += offset
             val updatedRange = RangeKey(currentMaxRange.start, (maxSize(region) - 1).max(currentMaxRange.end))
             currentStackMap.addOne(updatedRange -> currentMaxRegion)
-            for (elem <- region.fields) {
-              currentMaxRegion.fields += offset + elem
-            }
           } else {
             currentStackMap(RangeKey(offset, maxSize(region) - 1)) = s
           }
@@ -117,12 +162,11 @@ class MemoryModelMap {
    * This is because when regions are found, the relocated address is used and as such match
    * the correct range.
    *
-   * @param name
    * @param address
    * @param globalOffsets
    * @return BitVector: a BitVector representing the actual address
    */
-  private def resolveInverseGlobalOffset(name: String, address: BigInt, globalOffsets: Map[BigInt, BigInt]): BigInt = {
+  private def resolveInverseGlobalOffset(address: BigInt, globalOffsets: Map[BigInt, BigInt]): BigInt = {
     val inverseGlobalOffsets = globalOffsets.map(_.swap)
     var tableAddress = inverseGlobalOffsets.getOrElse(address, address)
     // addresses may be layered as in jumptable2 example for which recursive search is required
@@ -135,13 +179,12 @@ class MemoryModelMap {
         tableAddress = newAddress
       }
     }
-
     tableAddress
   }
 
   def preLoadGlobals(externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int]): Unit = {
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
-    val reversedExternalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(name, offset, globalOffsets) -> name)
+    val reversedExternalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(offset, globalOffsets) -> name)
     val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => reversedExternalFunctionRgns.contains(offset))
 
     val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, (globalSizes.getOrElse(name, 1).toDouble / 8).ceil.toInt))
@@ -153,7 +196,25 @@ class MemoryModelMap {
     }
   }
 
-  def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]], heapRegions: mutable.Map[DirectCall, HeapRegion], mergeRegions: mutable.Set[Set[MemoryRegion]], allocationSites: mutable.Map[(CFGPosition, Expr), StackRegion], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]]): Unit = {
+  def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]], heapRegions: mutable.Map[DirectCall, HeapRegion], mergeRegions: mutable.Set[Set[MemoryRegion]], allocationSites: Map[CFGPosition, Set[StackRegion]], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]], graRegions: mutable.HashMap[BigInt, DataRegion], graResults: Map[CFGPosition, Set[DataRegion]]): Unit = {
+    //val keepData = dataMap.filterNot((range, region) => graRegions.contains(region.start)).map((range, region) => region)
+    val oldRegions = dataMap.values.toSet
+    dataMap.clear()
+    for (dr <- graRegions.map((_, dataRegion) => dataRegion)) {
+      add(dr.start, dr)
+    }
+    for (dr <- oldRegions) {
+      val obj = findDataObject(dr.start)
+      if (obj.isEmpty) {
+        Logger.debug(s"Data region $dr not found in the new data map")
+      } else {
+        val address = dr.start
+        val size = dr.size
+        obj.get.relfContent.add(dr.regionIdentifier)
+      }
+    }
+
+    cfgPositionToDataRegion ++= graResults
     stackAllocationSites ++= allocationSites
     stackRegionsPerProcedure.keys.foreach(exitNode =>
       if (procedureToSharedRegions.contains(exitNode)) {
@@ -176,8 +237,19 @@ class MemoryModelMap {
     for (regions <- mergeRegions) {
       uf.bulkUnion(regions)
     }
+
+    /* this is done because the stack regions will change after MMM transforms them
+    and merges some of them based on size, thus we need to alter the results of
+    the analysis to match MMM transformations
+    TODO: Can this be done directly in MRA?
+     */
+    for ((n, stacks) <- stackAllocationSites) {
+      pushContext(IRWalk.procedure(n).name)
+      stackAllocationSites(n) = stacks.map(r => findStackObject(r.start).getOrElse(r))
+      pushContext(IRWalk.procedure(n).name)
+    }
   }
-  // TODO: push and pop could be optimised by caching the results
+
   def pushContext(funName: String): Unit = {
     contextStack.push(funName)
     stackMap.clear()
@@ -359,11 +431,33 @@ class MemoryModelMap {
   def findStackObject(value: BigInt): Option[StackRegion] = 
     stackMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => returnRegion(obj))
 
+  def isStackBase(value: BigInt): Option[StackRegion] = {
+    val found = stackMap.find((range, _) => range.start == value)
+    if (found.isDefined) then Some(returnRegion(found.get._2)) else None
+  }
+
+  def isDataBase(value: BigInt): Option[DataRegion] = {
+    val found = dataMap.find((range, _) => range.start == value)
+    if (found.isDefined) then Some(returnRegion(found.get._2)) else None
+  }
+
   def findSharedStackObject(value: BigInt): Set[StackRegion] =
     sharedStackMap.values.flatMap(_.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => returnRegion(obj))).toSet
 
-  def findDataObject(value: BigInt): Option[DataRegion] = 
+  def findDataObject(value: BigInt): Option[DataRegion] =
     dataMap.find((range, _) => range.start <= value && value <= range.end).map((range, obj) => returnRegion(obj))
+
+  def findDataObjectWithSize(value: BigInt, size: BigInt): (Set[DataRegion], Set[DataRegion]) =
+    // get regions that are between value and value + size and put partial regions (if part of the regions is between value and value + size) in a separate set
+    dataMap.foldLeft((Set.empty[DataRegion], Set.empty[DataRegion])) { case ((fullRegions, partialRegions), (range, region)) =>
+      if (range.start >= value && range.end <= value + size - 1) {
+        (fullRegions + returnRegion(region), partialRegions)
+      } else if ((range.start < value && range.end >= value) || (range.start <= value + size - 1 && range.end > value + size - 1)) {
+        (fullRegions, partialRegions + returnRegion(region))
+      } else {
+        (fullRegions, partialRegions)
+      }
+    }
 
   override def toString: String =
     s"Stack: $stackMap\n Heap: $heapMap\n Data: $dataMap\n"
@@ -440,15 +534,15 @@ class MemoryModelMap {
   }
 
   private def returnRegion(region: StackRegion): StackRegion = {
-    uf.find(region.asInstanceOf[MemoryRegion]).asInstanceOf[StackRegion]
+    uf.find(region).asInstanceOf[StackRegion]
   }
 
   private def returnRegion(region: DataRegion): DataRegion = {
-    uf.find(region.asInstanceOf[MemoryRegion]).asInstanceOf[DataRegion]
+    uf.find(region).asInstanceOf[DataRegion]
   }
 
   private def returnRegion(region: HeapRegion): HeapRegion = {
-    uf.find(region.asInstanceOf[MemoryRegion]).asInstanceOf[HeapRegion]
+    uf.find(region).asInstanceOf[HeapRegion]
   }
 
   def getHeap(directCall: DirectCall): HeapRegion = {
@@ -456,28 +550,33 @@ class MemoryModelMap {
     heapCalls(directCall)
   }
 
-  def getStack(allocationSite: (CFGPosition, Expr)): Option[StackRegion] = {
-    val stackRegion = stackAllocationSites.get(allocationSite)
-    if stackRegion.isDefined then Some(returnRegion(stackAllocationSites(allocationSite))) else None
+  def getStack(allocationSite: CFGPosition): Set[StackRegion] = {
+    stackAllocationSites.getOrElse(allocationSite, Set.empty).map(returnRegion)
+  }
+
+  def getData(cfgPosition: CFGPosition): Set[DataRegion] = {
+    cfgPositionToDataRegion.getOrElse(cfgPosition, Set.empty).map(returnRegion)
   }
 }
 
 trait MemoryRegion {
   val regionIdentifier: String
+  val start: BigInt
   val subAccesses: mutable.Set[BigInt] = mutable.Set()
-  val fields: mutable.Set[BigInt] = mutable.Set()
 }
 
 case class StackRegion(override val regionIdentifier: String, start: BigInt, parent: Procedure) extends MemoryRegion {
   override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name}, $subAccesses)"
 }
 
-case class HeapRegion(override val regionIdentifier: String, size: Int, parent: Procedure) extends MemoryRegion {
+case class HeapRegion(override val regionIdentifier: String, start: BigInt, size: BigInt, parent: Procedure) extends MemoryRegion {
   override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 
-case class DataRegion(override val regionIdentifier: String, start: BigInt, size: Int) extends MemoryRegion {
-  override def toString: String = s"Data($regionIdentifier, $start)"
+case class DataRegion(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryRegion {
+  override def toString: String = s"Data($regionIdentifier, $start, $size, ($relfContent))"
+  def end: BigInt = start + size - 1
+  val relfContent: mutable.Set[String] = mutable.Set[String]()
 }
 
 class UnionFind {

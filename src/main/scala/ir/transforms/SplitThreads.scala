@@ -20,7 +20,7 @@ import cilvisitor._
 // do reachability analysis
 // also need a bit in the IR where it creates separate files
 def splitThreads(program: Program,
-                 pointsTo: Map[RegisterVariableWrapper, Set[RegisterVariableWrapper | MemoryRegion]],
+                 pointsTo: Map[RegisterWrapperEqualSets | MemoryRegion, Set[RegisterWrapperEqualSets | MemoryRegion]],
                  regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
                 ): Unit = {
@@ -34,7 +34,7 @@ def splitThreads(program: Program,
         // look up R2 value using points to results
         val R2 = Register("R2", 64)
         val b = reachingDefs(d)
-        val R2Wrapper = RegisterVariableWrapper(R2, getDefinition(R2, d, reachingDefs))
+        val R2Wrapper = RegisterWrapperEqualSets(R2, getDefinition(R2, d, reachingDefs))
         val threadTargets = pointsTo(R2Wrapper)
 
         if (threadTargets.size > 1) {

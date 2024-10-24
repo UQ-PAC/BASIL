@@ -143,33 +143,68 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
   }
 }
 
-def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFilter: Boolean = true): Set[Assign] = {
+def getDefinition(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
   val (in, _) = reachingDefs(node)
-  if noFilter then in.getOrElse(variable, Set()) else in.getOrElse(variable, Set()).filterNot(_.rhs.variables.forall(_.name.contains("Unique")))
+  in.getOrElse(variable, Set())
 }
 
-def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])], noFiler: Boolean = true): Set[Assign] = {
+def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]): Set[Assign] = {
   val (_, out) = reachingDefs(node)
-  if noFiler then out.getOrElse(variable, Set()) else out.getOrElse(variable, Set()).filterNot(_.rhs.variables.forall(_.name.contains("Unique")))
+  out.getOrElse(variable, Set())
 }
 
-def unwrapExpr(expr: Expr): Set[Expr] = {
-  var buffers: Set[Expr] = Set()
-  expr match {
-    case e: Extract => buffers ++= unwrapExpr(e.body)
-    case e: SignExtend => buffers ++= unwrapExpr(e.body)
-    case e: ZeroExtend => buffers ++= unwrapExpr(e.body)
-    case repeat: Repeat => buffers ++= unwrapExpr(repeat.body)
-    case unaryExpr: UnaryExpr => buffers ++= unwrapExpr(unaryExpr.arg)
-    case binaryExpr: BinaryExpr =>
-      buffers ++= unwrapExpr(binaryExpr.arg1)
-      buffers ++= unwrapExpr(binaryExpr.arg2)
-    case memoryLoad: MemoryLoad =>
-      buffers += memoryLoad
-      buffers ++= unwrapExpr(memoryLoad.index)
-    case _ =>
+/**
+ * In expressions that have accesses within a region, we need to relocate
+ * the base address to the actual address using the relocation table.
+ * MUST RELOCATE because MMM iterate to find the lowest address
+ * TODO: May need to iterate over the relocation table to find the actual address
+ *
+ * @param address
+ * @param globalOffsets
+ * @return BitVecLiteral: the relocated address
+ */
+def relocatedBase(address: BitVecLiteral, globalOffsets: Map[BigInt, BigInt]): BitVecLiteral = {
+  val tableAddress = globalOffsets.getOrElse(address.value, address.value)
+  // this condition checks if the address is not layered and returns if it is not
+  if (tableAddress != address.value && !globalOffsets.contains(tableAddress)) {
+    return address
   }
-  buffers
+  BitVecLiteral(tableAddress, address.size)
+}
+
+def unwrapExpr(expr: Expr): Option[MemoryLoad] = {
+  expr match {
+    case e: Extract => unwrapExpr(e.body)
+    case e: SignExtend => unwrapExpr(e.body)
+    case e: ZeroExtend => unwrapExpr(e.body)
+    case repeat: Repeat => unwrapExpr(repeat.body)
+    case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
+    case binaryExpr: BinaryExpr =>
+      unwrapExpr(binaryExpr.arg1)
+      unwrapExpr(binaryExpr.arg2)
+    case memoryLoad: MemoryLoad =>
+      Some(memoryLoad)
+    case _ =>
+      None
+  }
+}
+
+def unwrapExprToVar(expr: Expr): Option[Variable] = {
+  expr match {
+    case variable: Variable =>
+      Some(variable)
+    case e: Extract => unwrapExprToVar(e.body)
+    case e: SignExtend => unwrapExprToVar(e.body)
+    case e: ZeroExtend => unwrapExprToVar(e.body)
+    case repeat: Repeat => unwrapExprToVar(repeat.body)
+    case unaryExpr: UnaryExpr => unwrapExprToVar(unaryExpr.arg)
+    case binaryExpr: BinaryExpr =>
+      unwrapExprToVar(binaryExpr.arg1)
+      unwrapExprToVar(binaryExpr.arg2)
+    case memoryLoad: MemoryLoad => unwrapExprToVar(memoryLoad.index)
+    case _ =>
+      None
+  }
 }
 
 def bitVectorOpToBigIntOp(op: BinOp, lhs: BigInt, rhs: BigInt): BigInt = {
