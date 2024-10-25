@@ -7,7 +7,6 @@ import $ivy.`com.lihaoyi::mill-contrib-scalapblib:$MILL_VERSION`
 import contrib.scalapblib._
 
 
-
 object basil extends RootModule with ScalaModule with antlr.AntlrModule with ScalaPBModule{
   def scalaVersion = "3.3.1"
 
@@ -26,9 +25,18 @@ object basil extends RootModule with ScalaModule with antlr.AntlrModule with Sca
 
   def mainClass = Some("Main")
 
+
+  object Apron extends JavaModule {
+    def unmanagedClasspath = T {
+      Agg.from(os.list(currPath / "lib" / "apron" / "lib").map(PathRef(_)))
+    }
+  }
+
   override def scalaPBSources = T.sources {Seq(PathRef(this.millSourcePath / "main" / "protobuf"))}
+  def currPath = super.millSourcePath
   def millSourcePath = super.millSourcePath / "src"
   def ivyDeps = Agg(scalactic, antlrRuntime, sourceCode, mainArgs, sprayJson, scalapb)
+  def moduleDeps = Seq(Apron)
   def sources = T.sources {Seq(PathRef(this.millSourcePath / "main" / "scala" ))}
 
 

@@ -14,6 +14,8 @@ import mainargs.{main, arg, ParserForClass, Flag}
 
 object Main {
 
+  absint.analyses.testApron
+
   @main(name = "BASIL")
   case class Config(
       @arg(name = "input", short = 'i', doc = "BAP .adt file or GTIRB/ASLi .gts file")
