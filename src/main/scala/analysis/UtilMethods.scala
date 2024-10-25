@@ -179,7 +179,7 @@ def unwrapExpr(expr: Expr): Option[MemoryLoad] = {
     case e: ZeroExtend => unwrapExpr(e.body)
     case repeat: Repeat => unwrapExpr(repeat.body)
     case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
-    case binaryExpr: BinaryExpr =>
+    case binaryExpr: BinaryExpr => // TODO: incorrect
       unwrapExpr(binaryExpr.arg1)
       unwrapExpr(binaryExpr.arg2)
     case memoryLoad: MemoryLoad =>
@@ -198,7 +198,7 @@ def unwrapExprToVar(expr: Expr): Option[Variable] = {
     case e: ZeroExtend => unwrapExprToVar(e.body)
     case repeat: Repeat => unwrapExprToVar(repeat.body)
     case unaryExpr: UnaryExpr => unwrapExprToVar(unaryExpr.arg)
-    case binaryExpr: BinaryExpr =>
+    case binaryExpr: BinaryExpr => // TODO: incorrect
       unwrapExprToVar(binaryExpr.arg1)
       unwrapExprToVar(binaryExpr.arg2)
     case memoryLoad: MemoryLoad => unwrapExprToVar(memoryLoad.index)

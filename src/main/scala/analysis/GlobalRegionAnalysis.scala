@@ -85,13 +85,6 @@ trait GlobalRegionAnalysis(val program: Program,
           val firstArg = tryCoerceIntoData(arg1, n, subAccess)
           var regions = Set.empty[DataRegion]
           for (i <- firstArg) {
-//            if (globalOffsets.contains(i.start) && globalOffsets.contains(globalOffsets(i.start))) { // get the first base address
-//              val newExpr = BinaryExpr(op, BitVecLiteral(globalOffsets(i.start), evalArg2.get.size), evalArg2.get)
-//              regions = regions ++ tryCoerceIntoData(newExpr, n, subAccess)
-//            } else {
-//              val newExpr = BinaryExpr(op, BitVecLiteral(i.start, evalArg2.get.size), evalArg2.get)
-//              regions = regions ++ tryCoerceIntoData(newExpr, n, subAccess)
-//            }
             val newExpr = BinaryExpr(op, BitVecLiteral(resolveGlobalOffsetSecondLast(i.start), evalArg2.get.size), evalArg2.get)
             regions = regions ++ tryCoerceIntoData(newExpr, n, subAccess)
           }

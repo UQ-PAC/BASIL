@@ -58,7 +58,7 @@ case class StaticAnalysisContext(
     vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
     interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]],
     paramResults: Map[Procedure, Set[Variable]],
-    steensgaardResults: Map[RegisterWrapperEqualSets | MemoryRegion, Set[RegisterWrapperEqualSets | MemoryRegion]],
+    steensgaardResults: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
     mmmResults: MemoryModelMap,
     memoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
@@ -405,6 +405,13 @@ object StaticAnalysis {
     mmm.convertMemoryRegions(mraSolver.procedureToStackRegions, mraSolver.procedureToHeapRegions, mraSolver.mergeRegions, mraResult, mraSolver.procedureToSharedRegions, graSolver.getDataMap, graResult)
     mmm.logRegions()
 
+    Logger.debug("[!] Running Steensgaard")
+    val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, constPropResult, mmm, reachingDefinitionsAnalysisResults, globalOffsets, previousVSAResults)
+    steensgaardSolver.analyze()
+    val steensgaardResults = steensgaardSolver.pointsTo()
+    val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
+    mmm.logRegions(memoryRegionContents)
+
     Logger.debug("[!] Running VSA")
     val vsaSolver = ValueSetAnalysisSolver(domain.toSet, IRProgram, mmm, constPropResult, reachingDefinitionsAnalysisResults)
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()
@@ -415,13 +422,6 @@ object StaticAnalysis {
         s"${s}_VSA$iteration.dot"
       )
     })
-
-    Logger.debug("[!] Running Steensgaard")
-    val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, constPropResult, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
-    steensgaardSolver.analyze()
-    val steensgaardResults = steensgaardSolver.pointsTo()
-    val memoryRegionContents = steensgaardSolver.getMemoryRegionContents
-    mmm.logRegions(memoryRegionContents)
 
     Logger.debug("[!] Injecting regions")
     val regionInjector = RegionInjector(domain, IRProgram, constPropResult, mmm, reachingDefinitionsAnalysisResults, globalOffsets)
@@ -557,7 +557,7 @@ object RunUtils {
     var iteration = 1
     var modified: Boolean = true
     val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
-    while (modified) {
+    while (modified || analysisResult.size < 2) {
       Logger.debug("[!] Running Static Analysis")
       val result = StaticAnalysis.analyse(ctx, config, iteration, analysisResult.lastOption)
       analysisResult.append(result)

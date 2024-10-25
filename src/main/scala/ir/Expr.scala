@@ -336,7 +336,6 @@ sealed trait Global
 sealed trait Variable extends Expr {
   val name: String
   val irType: IRType
-  var sharedVariable: Boolean = false
 
   override def getType: IRType = irType
   override def variables: Set[Variable] = Set(this)
@@ -365,7 +364,7 @@ case class Register(override val name: String, size: Int) extends Variable with 
 case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar(${name}_$sharedVariable, $irType)"
+  override def toString: String = s"LocalVar($name, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 
