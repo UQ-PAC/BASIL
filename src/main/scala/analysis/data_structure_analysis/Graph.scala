@@ -680,6 +680,22 @@ class Graph(val proc: Procedure,
     }
     varToCell
   }
+  
+  def SSAVar(posLabel:String, varName: String): Slice = {
+    assert(posLabel.matches("%[0-9]{8}"))
+
+    val res = varToCell.keys.filter(pos => pos.toShortString.startsWith(posLabel))
+    assert(res.size == 1)
+    val key = res.head
+    
+    val map = varToCell(key).toMap
+    
+    val temp =  map.keys.filter(variable => variable.name == varName)
+    assert(temp.size == 1)
+    val variable = temp.head
+    map(variable)
+  }
+  
 
   def cloneSelf(): Graph = {
     val newGraph = Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)

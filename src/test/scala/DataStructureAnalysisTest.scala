@@ -45,12 +45,12 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     )
   }
 
-  ignore("overlapping access") {
+  test("overlapping access") {
     val results = RunUtils.loadAndTranslate(
       BASILConfig(
         loading = ILLoadingConfig(
-          inputFile = "src/test/correct/jumptable/clang/jumptable.adt",
-          relfFile = "src/test/correct/jumptable/clang/jumptable.relf",
+          inputFile = "src/test/indirect_calls/jumptable/clang/jumptable.adt",
+          relfFile = "src/test/indirect_calls/jumptable/clang/jumptable.relf",
           specFile = None,
           dumpIL = None,
         ),
@@ -70,14 +70,32 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
 
     // cells representing the stack at various offsets
-    val stack0 = dsg.find(dsg.stackMapping(0).cells(0)) // R31
-    val stack8 = dsg.find(dsg.stackMapping(8).cells(0)) //  R31 + 8
-    val stack40 = dsg.find(dsg.stackMapping(40).cells(0)) //  R31 + 40
+    val stack64 = dsg.find(dsg.stackMapping(64).cells(0)) // R31 + 0x40
+    val stack72 = dsg.find(dsg.stackMapping(72).cells(0)) //  R31 + 0x40 + 8
+    val stack16 = dsg.find(dsg.stackMapping(16).cells(0)) //  R31 + 40
     val stack32 = dsg.find(dsg.stackMapping(32).cells(0)) //  R31 + 32
-    val stack24 = dsg.find(dsg.stackMapping(24).cells(0)) //  R31 + 24 and Malloc
+    val stack24 = dsg.find(dsg.stackMapping(16).cells(8)) //  R31 + 24 and Malloc
 
-    assert(dsg.adjust(stack0.getPointee).equals(R29formal)) // R31 points to the frame pointer
-    assert(dsg.adjust(stack8.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
+    assert(dsg.adjust(stack64.getPointee).equals(R29formal)) // R31 points to the frame pointer
+    assert(dsg.adjust(stack72.getPointee).equals(dsg.adjust(dsg.formals(R30)))) // R31 + 8 points to the link register
+
+    // overlapping access
+    assert(dsg.adjust(stack16.getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 8)).node.cells(0))))
+    assert(dsg.adjust(stack24.getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 8)).node.cells(0))))
+
+    assert(!dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 8)).node.cells(0)).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 8)).node.cells(0))))
+    assert(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 8)).node.cells(0)).node.get.equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 8)).node.cells(0)).node.get))
+
+    assert(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 8)).node.cells(0)).offset.equals(0))
+    assert(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 8)).node.cells(0)).offset.equals(8))
+
+    assert(dsg.adjust(dsg.SSAVar("%00000429", "R8")).equals(dsg.find(dsg.globalMapping(AddressRange(1876, 1876 + 8)).node.cells(0))))
+    assert(dsg.adjust(dsg.SSAVar("%00000438", "R8")).equals(dsg.find(dsg.globalMapping(AddressRange(1896, 1896 + 8)).node.cells(0))))
+
+
+
+    assert(dsg.adjust(stack32.getPointee).equals(dsg.find(dsg.globalMapping(AddressRange(1916, 1916 + 8)).node.cells(0))))
+
 
   }
 
