@@ -43,7 +43,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
       case Some(_) => visitDirectFunctions(ctx.directFunctions)
       case None    => Set()
     }
-    Specification(globals, lPreds, relies, guarantees, subroutines, directFunctions)
+    Specification(Set(), globals, lPreds, relies, guarantees, subroutines, directFunctions)
   }
 
   def visitDirectFunctions(ctx: DirectFunctionsContext): Set[FunctionOp] = {

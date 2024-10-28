@@ -25,6 +25,16 @@ object BitVectorEval {
     */
   def bv2nat(b: BitVecLiteral): BigInt = b.value
 
+  /**
+   * Converts a bitvector value to its corresponding signed integer
+   */
+  def bv2SignedInt(b: BitVecLiteral): BigInt =
+    if isNegative(b) then
+      b.value - BigInt(2).pow(b.size)
+    else
+      b.value
+
+
   /** (bvadd (_ BitVec m) (_ BitVec m) (_ BitVec m))
     *   - addition modulo 2^m
     *
