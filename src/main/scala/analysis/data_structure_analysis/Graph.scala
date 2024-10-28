@@ -134,17 +134,17 @@ class Graph(val proc: Procedure,
       global match
         case FuncEntry(name, size, address) =>
           val func = Node(Some(this), size)
-          func.allocationRegions.add(DataLocation(name, -address, size / 8))
+          func.allocationRegions.add(DataLocation(name, address, size / 8))
           func.flags.global = true
           func.flags.incomplete = true
-          globalMapping.update(AddressRange(-address, (-address - size) / 8), Field(func, 0))
+          globalMapping.update(AddressRange(address, (address + size) / 8), Field(func, 0))
 
-          val pointer = Node(Some(this), 8)
-          pointer.allocationRegions.add(DataLocation(s"$name's pointer@$address", address, 8))
+          val pointer = Node(Some(this), 0)
+          pointer.allocationRegions.add(DataLocation(s"$name's pointer@$address", address, 0)) // todo check that size 0 is correct
           pointer.flags.global = true
           pointer.flags.incomplete = true
           pointer.cells(0).pointee = Some(Slice(func.cells(0), 0))
-          globalMapping.update(AddressRange(address, address + 8), Field(pointer, 0))
+          globalMapping.update(AddressRange(address, address), Field(pointer, 0))
         case SpecGlobal(name, size, arraySize, address) =>
           val node = Node(Some(this), size)
           node.allocationRegions.add(DataLocation(name, address, size / 8))
@@ -680,22 +680,22 @@ class Graph(val proc: Procedure,
     }
     varToCell
   }
-  
+
   def SSAVar(posLabel:String, varName: String): Slice = {
     assert(posLabel.matches("%[0-9]{8}"))
 
     val res = varToCell.keys.filter(pos => pos.toShortString.startsWith(posLabel))
     assert(res.size == 1)
     val key = res.head
-    
+
     val map = varToCell(key).toMap
-    
+
     val temp =  map.keys.filter(variable => variable.name == varName)
     assert(temp.size == 1)
     val variable = temp.head
     map(variable)
   }
-  
+
 
   def cloneSelf(): Graph = {
     val newGraph = Graph(proc, constProp, varToSym, globals, globalOffsets, externalFunctions, reachingDefs, writesTo, params)
