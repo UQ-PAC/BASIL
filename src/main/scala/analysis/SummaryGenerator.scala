@@ -1,4 +1,3 @@
-/*
 package analysis
 
 import analysis.*
@@ -96,7 +95,7 @@ class SummaryGenerator(
 
   private def toGamma(variable: Taintable): Option[BExpr] = {
     variable match {
-      case variable: Register => Some(variable.toGamma())
+      case variable: Register => Some(variable.toGamma)
       case variable: LocalVar => None
       case variable: GlobalVariable => Some(variable.toGamma)
       //case variable: LocalStackVariable => None
@@ -186,4 +185,3 @@ class SummaryGenerator(
     }
   }
 }
-*/
