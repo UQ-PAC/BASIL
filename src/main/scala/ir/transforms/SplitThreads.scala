@@ -20,7 +20,7 @@ import cilvisitor._
 // do reachability analysis
 // also need a bit in the IR where it creates separate files
 def splitThreads(program: Program,
-                 pointsTo: Map[RegisterWrapperEqualSets | MemoryRegion, Set[RegisterWrapperEqualSets | MemoryRegion]],
+                 pointsTo: Map[RegisterWrapperEqualSets, Set[RegisterWrapperEqualSets | MemoryRegion]],
                  regionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]],
                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]
                 ): Unit = {

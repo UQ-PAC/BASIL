@@ -24,7 +24,7 @@ private def label(p: CFGPosition) = {
  *
  */
 case class LoopEdge(from: CFGPosition, to: CFGPosition) {
-  override def toString: String = s"(${from}, ${to})"
+  override def toString: String = s"(${label(from)}, ${label(to)})"
 }
 
 /* A loop is a subgraph <G_l, E_l> of a CFG <G, E>

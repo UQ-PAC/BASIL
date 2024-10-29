@@ -220,7 +220,13 @@ trait MemoryRegionAnalysis(val program: Program,
                 val newHeapRegion = HeapRegion(name, start, negB, IRWalk.procedure(n))
                 addReturnHeap(directCall, newHeapRegion)
                 s
-              case None => s
+              case None =>
+                // Assume heap region size is at least 1 TODO: must approximate size of heap
+                val negB = 1
+                val (name, start) = nextMallocCount(negB)
+                val newHeapRegion = HeapRegion(name, start, negB, IRWalk.procedure(n))
+                addReturnHeap(directCall, newHeapRegion)
+                s
             }
           } else {
             s

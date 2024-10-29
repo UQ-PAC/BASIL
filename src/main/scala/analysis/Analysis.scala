@@ -79,9 +79,6 @@ trait ConstantPropagation(val program: Program, val assumeR31: Boolean) {
     var m = s
     n match
       case r: Command =>
-        if (assumeR31 && IRWalk.procedure(n).entryBlock.isDefined && IRWalk.firstInBlock(program.mainProcedure.entryBlock.get) == n) {
-          m = m + (Register("R31", 64) -> eval(BitVecLiteral(Long.MaxValue, 64), m))
-        }
         r match
           // assignments
           case la: Assign =>
