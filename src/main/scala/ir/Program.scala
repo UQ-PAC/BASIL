@@ -473,9 +473,9 @@ case class MemorySection(name: String, address: BigInt, size: Int, bytes: Seq[Bi
     for (i <- 0 until num) yield {
       val index = startIndex + i
       if (index >= bytes.size || index < 0) {
-        throw Exception("www" + num)
+        throw Exception(s"can't get $num bytes from section $name with size $size starting at index $startIndex (access address $addr)")
       }
-      bytes(startIndex + i)
+      bytes(index)
     }
   }
 

@@ -14,11 +14,9 @@ import scala.collection.mutable.ArrayBuffer
 class MergedRegion(var name: String, val subregions: mutable.Set[MemoryRegion])
 
 class RegionInjector(program: Program, mmm: MemoryModelMap) {
-  private val stackPointer = Register("R31", 64)
-
-  val accessToRegion = mutable.Map[Statement, Set[MemoryRegion]]()
-  val loadToMemory = mutable.Map[Statement, Memory]()
-  val mergedRegions = mutable.Map[MemoryRegion, MergedRegion]()
+  private val accessToRegion = mutable.Map[Statement, Set[MemoryRegion]]()
+  private val loadToMemory = mutable.Map[Statement, Memory]()
+  val mergedRegions: mutable.Map[MemoryRegion, MergedRegion] = mutable.Map()
 
   def nodeVisitor(): Unit = {
     // visit reachable procedures
@@ -113,7 +111,7 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
     }
   }
 
-  def statementToRegions(n: Statement): Set[MemoryRegion] = {
+  private def statementToRegions(n: Statement): Set[MemoryRegion] = {
     mmm.getStack(n) ++ mmm.getData(n)
   }
 

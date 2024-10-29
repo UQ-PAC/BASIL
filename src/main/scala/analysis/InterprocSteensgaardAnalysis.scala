@@ -22,116 +22,50 @@ case class RegisterVariableWrapper(variable: Variable, assigns: Set[Assign]) {
 /** Wrapper for variables so we can have ConstantPropegation-specific equals method indirectly
  * Relies on SSA sets being exactly the same
  * */
-case class RegisterWrapperEqualSets(variable: Variable, assigns: Set[Assign]) {
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case RegisterWrapperEqualSets(other, otherAssigns) =>
-        variable == other && assigns == otherAssigns
-      case _ =>
-        false
-    }
-  }
-}
+case class RegisterWrapperEqualSets(variable: Variable, assigns: Set[Assign])
 
 /** Steensgaard-style pointer analysis. The analysis associates an [[StTerm]] with each variable declaration and
  * expression node in the AST. It is implemented using [[analysis.solvers.UnionFindSolver]].
  */
 class InterprocSteensgaardAnalysis(
       domain: Set[CFGPosition],
-      constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
       mmm: MemoryModelMap,
       reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-      globalOffsets: Map[BigInt, BigInt],
-      vsaResult: Option[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]) extends Analysis[Any] {
+      vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
 
-  private val stackPointer = Register("R31", 64)
-  private val linkRegister = Register("R30", 64)
-  private val framePointer = Register("R29", 64)
-  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
   private val mallocVariable = Register("R0", 64)
-
-  var mallocCount: Int = 0
-  var stackCount: Int = 0
-  val stackMap: mutable.Map[Expr, StackRegion] = mutable.Map()
-
-  private val memoryRegionContents: mutable.Map[MemoryRegion, mutable.Set[BitVecLiteral | MemoryRegion]] = mutable.Map()
-
-  def getMemoryRegionContents: Map[MemoryRegion, Set[BitVecLiteral | MemoryRegion]] = memoryRegionContents.map((k, v) => k -> v.toSet).toMap
-
-  /**
-   * In expressions that have accesses within a region, we need to relocate
-   * the base address to the actual address using the relocation table.
-   * MUST RELOCATE because MMM iterate to find the lowest address
-   * TODO: May need to iterate over the relocation table to find the actual address
-   *
-   * @param address
-   * @return BitVecLiteral: the relocated address
-   */
-  def relocatedBase(address: BigInt): BitVecLiteral = {
-    val tableAddress = globalOffsets.getOrElse(address, address)
-    // this condition checks if the address is not layered and returns if it is not
-    if (tableAddress != address && !globalOffsets.contains(tableAddress)) {
-      BitVecLiteral(address, 64)
-    } else {
-      BitVecLiteral(tableAddress, 64)
-    }
-  }
-
-  def nodeToRegion(n: CFGPosition): Set[MemoryRegion] = {
-    var returnRegions = Set.empty[MemoryRegion]
-    n match {
-      case directCall: DirectCall =>
-        returnRegions = returnRegions + mmm.getHeap(directCall).asInstanceOf[MemoryRegion]
-      case _ =>
-        returnRegions = returnRegions ++ mmm.getStack(n).asInstanceOf[Set[MemoryRegion]] ++ mmm.getData(n).asInstanceOf[Set[MemoryRegion]]
-    }
-    returnRegions
-  }
-
-  def canCoerceIntoDataRegion(bitVecLiteral: BitVecLiteral, size: Int): Option[DataRegion] = {
-    mmm.findDataObject(bitVecLiteral.value)
-  }
 
   def vsaApproximation(variable: Variable, n: CFGPosition): Set[MemoryRegion] = {
     val ctx = getUse(variable, n, reachingDefs)
-    var collage = Set.empty[MemoryRegion]
-    for (i <- ctx) {
+    ctx.flatMap { i =>
       if (i != n) {
-        var tryVisit = Set.empty[MemoryRegion]
-        if (vsaResult.isDefined) {
-          vsaResult.get.get(i) match
-            case Some(value) => value match
-              case Lift(el) => el.get(i.lhs) match
-                case Some(value) => value.foreach {
-                  case addressValue: AddressValue =>
-                    tryVisit = tryVisit + addressValue.region
-                  case literalValue: LiteralValue =>
-                }
-                case None =>
-              case LiftedBottom =>
-              case _ =>
-            case None =>
+        vsaResult.get(i) match {
+          case Some(Lift(el)) => el.get(i.lhs) match {
+            case Some(values) => values.flatMap {
+              case addressValue: AddressValue =>
+                Some(addressValue.region)
+              case _: LiteralValue => None
+            }
+            case None => Set()
+          }
+          case _ => Set()
         }
-//        if (tryVisit.isEmpty) {
-//          tryVisit = localTransfer(i, Set.empty)
-//        }
-        if (tryVisit.nonEmpty) {
-          collage = collage ++ tryVisit
-        }
+      } else {
+        Set()
       }
     }
-    collage
   }
 
   /** @inheritdoc
    */
-  def analyze(): Unit =
+  def analyze(): Unit = {
     // generate the constraints by traversing the AST and solve them on-the-fly
-    domain.foreach(p => {
+    domain.foreach { p =>
       visit(p, ())
-    })
+    }
+  }
 
   /** Generates the constraints for the given sub-AST.
    * @param node
@@ -141,53 +75,47 @@ class InterprocSteensgaardAnalysis(
    */
   def visit(node: CFGPosition, arg: Unit): Unit = {
     node match {
-      case cmd: Command =>
-        cmd match {
-          case directCall: DirectCall if directCall.target.name == "malloc" =>
-            // X = alloc P:  [[X]] = ↑[[alloc-i]]
-            val alloc = nodeToRegion(cmd).head
-            val defs = getDefinition(mallocVariable, cmd, reachingDefs)
-            unify(IdentifierVariable(RegisterWrapperEqualSets(mallocVariable, defs)), PointerRef(AllocVariable(alloc)))
-          case assign: Assign =>
-            val unwrapped = unwrapExprToVar(assign.rhs)
-            if (unwrapped.isDefined) {
-              // X1 = X2: [[X1]] = [[X2]]
-              val X1 = assign.lhs
-              val X2 = unwrapped.get
-              unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, cmd, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getUse(X2, cmd, reachingDefs))))
-            } else {
-              // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable
-              val X1 = assign.lhs
-              val X2_star = nodeToRegion(node)
-              val alpha = FreshVariable()
-              X2_star.foreach(
-                x =>
-                  unify(PointerRef(alpha), ExpressionVariable(x))
-              )
-              unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, cmd, reachingDefs))), alpha)
-              }
-          case memoryAssign: MemoryAssign =>
-            // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
-            val X1_star = nodeToRegion(node)
-            // TODO: This is risky as it tries to coerce every value to a region (needed for functionpointer example)
-            val unwrapped = unwrapExprToVar(memoryAssign.value)
-            if (unwrapped.isDefined) {
-              val X2 = unwrapped.get
-              val X2_regions: Set[MemoryRegion] = vsaApproximation(X2, node)
-
-              val alpha = FreshVariable()
-              val pointerRef = PointerRef(alpha)
-              X1_star.foreach(x =>
-                unify(ExpressionVariable(x), pointerRef)
-              )
-              X2_regions.foreach(
-                x =>
-                  unify(ExpressionVariable(x), alpha)
-              )
-            }
-          case _ => // do nothing TODO: Maybe LocalVar too?
+      case directCall: DirectCall if directCall.target.name == "malloc" =>
+        // X = alloc P:  [[X]] = ↑[[alloc-i]]
+        val alloc = mmm.nodeToRegion(directCall).head
+        val defs = getDefinition(mallocVariable, directCall, reachingDefs)
+        unify(IdentifierVariable(RegisterWrapperEqualSets(mallocVariable, defs)), PointerRef(AllocVariable(alloc)))
+      case assign: Assign =>
+        val unwrapped = unwrapExprToVar(assign.rhs)
+        if (unwrapped.isDefined) {
+          // X1 = X2: [[X1]] = [[X2]]
+          val X1 = assign.lhs
+          val X2 = unwrapped.get
+          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, assign, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getUse(X2, assign, reachingDefs))))
+        } else {
+          // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable
+          val X1 = assign.lhs
+          val X2_star = mmm.nodeToRegion(node)
+          val alpha = FreshVariable()
+          X2_star.foreach { x =>
+            unify(PointerRef(alpha), ExpressionVariable(x))
+          }
+          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, assign, reachingDefs))), alpha)
         }
-    case _ =>
+      case memoryAssign: MemoryAssign =>
+        // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
+        val X1_star = mmm.nodeToRegion(node)
+        // TODO: This is risky as it tries to coerce every value to a region (needed for functionpointer example)
+        val unwrapped = unwrapExprToVar(memoryAssign.value)
+        if (unwrapped.isDefined) {
+          val X2 = unwrapped.get
+          val X2_regions: Set[MemoryRegion] = vsaApproximation(X2, node)
+
+          val alpha = FreshVariable()
+          val pointerRef = PointerRef(alpha)
+          X1_star.foreach { x =>
+            unify(ExpressionVariable(x), pointerRef)
+          }
+          X2_regions.foreach { x =>
+            unify(ExpressionVariable(x), alpha)
+          }
+        }
+      case _ => // do nothing TODO: Maybe LocalVar too?
     }
   }
 
@@ -214,18 +142,8 @@ class InterprocSteensgaardAnalysis(
       }.toSet
       a + (v.id -> pt)
     }
-    Logger.debug(s"\nPoints-to:\n${pointsto.map(p => s"${p._1} -> { ${p._2.mkString(",")} }").mkString("\n")}\n")
+    Logger.debug(s"\nPoints-to:\n${pointsto.map((k, v) => s"$k -> { ${v.mkString(",")} }").mkString("\n")}\n")
     pointsto
-  }
-
-  /** @inheritdoc
-   */
-  def mayAlias(): (RegisterWrapperEqualSets, RegisterWrapperEqualSets) => Boolean = {
-    val solution = solver.solution()
-    (id1: RegisterWrapperEqualSets, id2: RegisterWrapperEqualSets) =>
-      val sol1 = solution(IdentifierVariable(id1))
-      val sol2 = solution(IdentifierVariable(id2))
-      sol1 == sol2 && sol1.isInstanceOf[PointerRef] // same equivalence class, and it contains a reference
   }
 }
 
@@ -261,7 +179,7 @@ case class FreshVariable(id: Int) extends StTerm with Var[StTerm] {
 }
 
 object FreshVariable {
-  var n = 0
+  private var n = 0
 
   def next(): Int = {
     n += 1
