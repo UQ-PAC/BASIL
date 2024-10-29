@@ -10,7 +10,6 @@ trait GlobalRegionAnalysis(val program: Program,
                            val constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
                            val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
                            val mmm: MemoryModelMap,
-                           val globalOffsets: Map[BigInt, BigInt],
                            val vsaResult: Option[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]) {
 
   var dataCount: Int = 0
@@ -49,12 +48,20 @@ trait GlobalRegionAnalysis(val program: Program,
 
   def getDataMap: mutable.HashMap[BigInt, DataRegion] = dataMap
 
-  def resolveGlobalOffsetSecondLast(address: BigInt): BigInt = {
+  /**
+   * For DataRegions, the actual address used needs to be converted to the relocated address.
+   * This is because when regions are found, the relocated address is used and as such match
+   * the correct range.
+   *
+   * @param address: The starting DataRegion
+   * @return DataRegion: The relocated data region if any
+   */
+  def resolveGlobalOffsetSecondLast(address: DataRegion): DataRegion = {
     var tableAddress = address
     // addresses may be layered as in jumptable2 example for which recursive search is required
     var exitLoop = false
-    while (globalOffsets.contains(tableAddress) && globalOffsets.contains(globalOffsets(tableAddress)) && !exitLoop) {
-      val newAddress = globalOffsets.getOrElse(tableAddress, tableAddress)
+    while (mmm.relocatedDataRegion(tableAddress.start).isDefined && mmm.relocatedDataRegion(mmm.relocatedDataRegion(tableAddress.start).get.start).isDefined && !exitLoop) {
+      val newAddress = mmm.relocatedDataRegion(tableAddress.start).getOrElse(tableAddress)
       if (newAddress == tableAddress) {
         exitLoop = true
       } else {
@@ -64,7 +71,7 @@ trait GlobalRegionAnalysis(val program: Program,
     tableAddress
   }
 
-  def tryCoerceIntoData(exp: Expr, n: Command, subAccess: BigInt): Set[DataRegion] = {
+  def tryCoerceIntoData(exp: Expr, n: Command, subAccess: BigInt, loadOp: Boolean = false): Set[DataRegion] = {
     val eval = evaluateExpression(exp, constantProp(n))
     if (eval.isDefined) {
       val region = dataPoolMaster(eval.get.value, subAccess)
@@ -82,10 +89,10 @@ trait GlobalRegionAnalysis(val program: Program,
       case BinaryExpr(op, arg1, arg2) =>
         val evalArg2 = evaluateExpression(arg2, constantProp(n))
         if (evalArg2.isDefined) {
-          val firstArg = tryCoerceIntoData(arg1, n, subAccess)
+          val firstArg = tryCoerceIntoData(arg1, n, subAccess, true)
           var regions = Set.empty[DataRegion]
           for (i <- firstArg) {
-            val newExpr = BinaryExpr(op, BitVecLiteral(resolveGlobalOffsetSecondLast(i.start), evalArg2.get.size), evalArg2.get)
+            val newExpr = BinaryExpr(op, BitVecLiteral(i.start, evalArg2.get.size), evalArg2.get)
             regions = regions ++ tryCoerceIntoData(newExpr, n, subAccess)
           }
           return regions
@@ -136,11 +143,13 @@ trait GlobalRegionAnalysis(val program: Program,
             }
           }
         }
-        collage
+        collage.map(i =>
+          val resolved = resolveGlobalOffsetSecondLast(i)
+          if !loadOp then mmm.relocatedDataRegion(i.start).getOrElse(i) else resolved)
       case _ => Set.empty
   }
 
-  def evalMemLoadToGlobal(index: Expr, size: BigInt, n: Command): Set[DataRegion] = {
+  def evalMemLoadToGlobal(index: Expr, size: BigInt, n: Command, loadOp: Boolean = false): Set[DataRegion] = {
     val indexValue = evaluateExpression(index, constantProp(n))
     if (indexValue.isDefined) {
       val indexValueBigInt = indexValue.get.value
@@ -210,7 +219,7 @@ trait GlobalRegionAnalysis(val program: Program,
           case assign: Assign =>
             val unwrapped = unwrapExpr(assign.rhs)
             if (unwrapped.isDefined) {
-              return checkIfDefined(evalMemLoadToGlobal(unwrapped.get.index, unwrapped.get.size, cmd), n)
+              return checkIfDefined(evalMemLoadToGlobal(unwrapped.get.index, unwrapped.get.size, cmd, loadOp = true), n)
             } else {
               // this is a constant but we need to check if it is a data region
               return checkIfDefined(evalMemLoadToGlobal(assign.rhs, 1, cmd), n)
@@ -231,9 +240,8 @@ class GlobalRegionAnalysisSolver(
     constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
     mmm: MemoryModelMap,
-    globalOffsets: Map[BigInt, BigInt],
     vsaResult: Option[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
-  ) extends GlobalRegionAnalysis(program, domain, constantProp, reachingDefs, mmm, globalOffsets, vsaResult)
+  ) extends GlobalRegionAnalysis(program, domain, constantProp, reachingDefs, mmm, vsaResult)
   with IRIntraproceduralForwardDependencies
   with Analysis[Map[CFGPosition, Set[DataRegion]]]
   with SimpleWorklistFixpointSolver[CFGPosition, Set[DataRegion], PowersetLattice[DataRegion]]

@@ -22,7 +22,7 @@ case class RangeKey(start: BigInt, end: BigInt) extends Ordered[RangeKey]:
 
 
 // Custom data structure for storing range-to-object mappings
-class MemoryModelMap {
+class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
   private val MAX_BIGINT: BigInt = BigInt(Long.MaxValue)
   private val contextStack = mutable.Stack.empty[String]
   private val sharedContextStack = mutable.Stack.empty[List[StackRegion]]
@@ -38,6 +38,7 @@ class MemoryModelMap {
   private val cfgPositionToDataRegion: mutable.Map[CFGPosition, Set[DataRegion]] = mutable.Map()
   private val heapCalls: mutable.Map[DirectCall, HeapRegion] = mutable.Map()
   private val mergedRegions: mutable.Map[Set[MemoryRegion], String] = mutable.Map()
+  private var relocatedAddressesMap: Map[BigInt, DataRegion] = Map()
 
   private val stackAllocationSites: mutable.Map[CFGPosition, Set[StackRegion]] = mutable.Map()
 
@@ -158,43 +159,38 @@ class MemoryModelMap {
     }
   }
 
-  /**
-   * For DataRegions, the actual address used needs to be converted to the relocated address.
-   * This is because when regions are found, the relocated address is used and as such match
-   * the correct range.
-   *
-   * @param address
-   * @param globalOffsets
-   * @return BitVector: a BitVector representing the actual address
-   */
-  private def resolveInverseGlobalOffset(address: BigInt, globalOffsets: Map[BigInt, BigInt]): BigInt = {
-    val inverseGlobalOffsets = globalOffsets.map(_.swap)
-    var tableAddress = inverseGlobalOffsets.getOrElse(address, address)
-    // addresses may be layered as in jumptable2 example for which recursive search is required
-    var exitLoop = false
-    while (inverseGlobalOffsets.contains(tableAddress) && !exitLoop) {
-      val newAddress = inverseGlobalOffsets.getOrElse(tableAddress, tableAddress)
-      if (newAddress == tableAddress) {
-        exitLoop = true
-      } else {
-        tableAddress = newAddress
-      }
-    }
-    tableAddress
+  private var relocCount: Int = 0
+  private def nextRelocCount() = {
+    relocCount += 1
+    s"reloc_$relocCount"
   }
 
-  def preLoadGlobals(externalFunctions: Map[BigInt, String], globalOffsets: Map[BigInt, BigInt], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int]): Unit = {
-    // map externalFunctions name, value to DataRegion(name, value) and then sort by value
-    val reversedExternalFunctionRgns = externalFunctions.map((offset, name) => resolveInverseGlobalOffset(offset, globalOffsets) -> name)
-    val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => reversedExternalFunctionRgns.contains(offset))
+  // size of pointer is 8 bytes
+  val SIZE_OF_POINTER = 8
 
-    val externalFunctionRgns = (reversedExternalFunctionRgns ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, (globalSizes.getOrElse(name, 1).toDouble / 8).ceil.toInt))
+  def preLoadGlobals(externalFunctions: Map[BigInt, String], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int]): Unit = {
+    val relocRegions = globalOffsets.map((offset, _) => DataRegion(nextRelocCount(), offset, SIZE_OF_POINTER))
+
+    // map externalFunctions name, value to DataRegion(name, value) and then sort by value
+    val filteredGlobalOffsets = globalAddresses.filterNot((offset, name) => externalFunctions.contains(offset))
+
+    val externalFunctionRgns = (externalFunctions ++ filteredGlobalOffsets).map((offset, name) => DataRegion(name, offset, (globalSizes.getOrElse(name, 1).toDouble / 8).ceil.toInt))
 
     // add externalFunctionRgn to dataRgns and sort by value
-    val allDataRgns = externalFunctionRgns.toList.sortBy(_.start)
+    val allDataRgns = (externalFunctionRgns ++ relocRegions).toList.sortBy(_.start)
     for (dataRgn <- allDataRgns) {
       add(dataRgn.start, dataRgn)
     }
+
+    // cannot fail to find any regions here
+    relocatedAddressesMap = globalOffsets.map((offset, offset2) => {
+      val newRegion = findDataObject(offset2).get
+      (offset, newRegion)
+    })
+  }
+
+  def relocatedDataRegion(value: BigInt): Option[DataRegion] = {
+    relocatedAddressesMap.get(value)
   }
 
   def convertMemoryRegions(stackRegionsPerProcedure: mutable.Map[Procedure, mutable.Set[StackRegion]], heapRegions: mutable.Map[DirectCall, HeapRegion], mergeRegions: mutable.Set[Set[MemoryRegion]], allocationSites: Map[CFGPosition, Set[StackRegion]], procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]], graRegions: mutable.HashMap[BigInt, DataRegion], graResults: Map[CFGPosition, Set[DataRegion]]): Unit = {
@@ -209,9 +205,12 @@ class MemoryModelMap {
       if (obj.isEmpty) {
         Logger.debug(s"Data region $dr not found in the new data map")
       } else {
-        val address = dr.start
-        val size = dr.size
-        obj.get.relfContent.add(dr.regionIdentifier)
+        val isRelocated = relocatedDataRegion(dr.start)
+        if (isRelocated.isDefined) {
+          obj.get.relfContent.add(isRelocated.get.regionIdentifier)
+        } else {
+          obj.get.relfContent.add(dr.regionIdentifier)
+        }
       }
     }
 
@@ -574,18 +573,19 @@ trait MemoryRegion {
   val subAccesses: mutable.Set[BigInt] = mutable.Set()
 }
 
-case class StackRegion(override val regionIdentifier: String, start: BigInt, parent: Procedure) extends MemoryRegion {
+case class StackRegion(override val regionIdentifier: String, override val start: BigInt, parent: Procedure) extends MemoryRegion {
   override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name}, $subAccesses)"
 }
 
-case class HeapRegion(override val regionIdentifier: String, start: BigInt, size: BigInt, parent: Procedure) extends MemoryRegion {
+case class HeapRegion(override val regionIdentifier: String, override val start: BigInt, size: BigInt, parent: Procedure) extends MemoryRegion {
   override def toString: String = s"Heap($regionIdentifier, $size)"
 }
 
-case class DataRegion(override val regionIdentifier: String, start: BigInt, size: BigInt) extends MemoryRegion {
+case class DataRegion(override val regionIdentifier: String, override val start: BigInt, size: BigInt) extends MemoryRegion {
   override def toString: String = s"Data($regionIdentifier, $start, $size, ($relfContent))"
   def end: BigInt = start + size - 1
   val relfContent: mutable.Set[String] = mutable.Set[String]()
+  val isPointerTo: Option[DataRegion] = None
 }
 
 class UnionFind {

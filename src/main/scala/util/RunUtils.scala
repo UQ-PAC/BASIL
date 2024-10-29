@@ -30,6 +30,7 @@ import java.util.Base64
 import spray.json.DefaultJsonProtocol.*
 import util.intrusive_list.IntrusiveList
 import cilvisitor.*
+import util.StaticAnalysis.printAnalysisResults
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -362,8 +363,8 @@ object StaticAnalysis {
       )
     })
 
-    val mmm = MemoryModelMap()
-    mmm.preLoadGlobals(mergedSubroutines, globalOffsets, globalAddresses, globalSizes)
+    val mmm = MemoryModelMap(globalOffsets)
+    mmm.preLoadGlobals(mergedSubroutines, globalAddresses, globalSizes)
 
     var previousVSAResults = Option.empty[Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]]
     if (previousResults.isDefined) {
@@ -371,7 +372,7 @@ object StaticAnalysis {
     }
 
     Logger.debug("[!] Running GRA")
-    val graSolver = GlobalRegionAnalysisSolver(IRProgram, domain.toSet, constPropResult, reachingDefinitionsAnalysisResults, mmm, globalOffsets, previousVSAResults)
+    val graSolver = GlobalRegionAnalysisSolver(IRProgram, domain.toSet, constPropResult, reachingDefinitionsAnalysisResults, mmm, previousVSAResults)
     val graResult = graSolver.analyze()
 
     Logger.debug("[!] Running MRA")
@@ -586,6 +587,8 @@ object RunUtils {
     if (config.threadSplit) {
       transforms.splitThreads(ctx.program, analysisResult.last.steensgaardResults, analysisResult.last.memoryRegionContents, analysisResult.last.reachingDefs)
     }
+
+    writeToFile(ctx.program.toString(), s"AfterAnalysis.txt")
 
     assert(invariant.singleCallBlockEnd(ctx.program))
     Logger.debug(s"[!] Finished indirect call resolution after $iteration iterations")
