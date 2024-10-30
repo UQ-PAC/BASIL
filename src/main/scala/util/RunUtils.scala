@@ -217,7 +217,7 @@ object IRTransform {
     * add in modifies from the spec.
     */
   def prepareForTranslation(config: BASILConfig, ctx: IRContext): Unit = {
-    if (config.staticAnalysis.isEmpty) {
+    if (!config.staticAnalysis.isDefined || !config.staticAnalysis.get.memoryRegions) {
       ctx.program.determineRelevantMemory(ctx.globalOffsets)
     }
 
@@ -227,7 +227,7 @@ object IRTransform {
     Logger.debug(
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
-    val dupProcNames = (ctx.program.procedures.groupBy(_.name).filter((n,p) => p.size > 1)).toList.flatMap(_._2)
+    val dupProcNames = ctx.program.procedures.groupBy(_.name).filter((_, p) => p.size > 1).toList.flatMap(_(1))
 
     var dupCounter = 0
     for (p <- dupProcNames) {
@@ -235,7 +235,7 @@ object IRTransform {
       p.name = p.name + "$" + p.address.map(_.toString).getOrElse(dupCounter.toString)
     }
 
-    if (config.staticAnalysis.isEmpty) {
+    if (!config.staticAnalysis.isDefined || !config.staticAnalysis.get.memoryRegions) {
       val stackIdentification = StackSubstituter()
       stackIdentification.visitProgram(ctx.program)
     }
