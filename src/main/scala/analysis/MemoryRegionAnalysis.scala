@@ -17,7 +17,8 @@ trait MemoryRegionAnalysis(val program: Program,
                            val ANRResult: Map[CFGPosition, Set[Variable]],
                            val RNAResult: Map[CFGPosition, Set[Variable]],
                            val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-                           val graResult: Map[CFGPosition, Set[DataRegion]]) {
+                           val graResult: Map[CFGPosition, Set[DataRegion]],
+                           val mmm: MemoryModelMap) {
 
   private var mallocCount: BigInt = 0
   private var stackCount: Int = 0
@@ -53,7 +54,7 @@ trait MemoryRegionAnalysis(val program: Program,
       stackPool += (base -> newRegion)
       newRegion
     }
-    region.subAccesses.add((subAccess.toDouble/8).ceil.toInt)
+    mmm.stackSubAccesses(region) = mmm.stackSubAccesses.getOrElse(region, mutable.Set()) += (subAccess.toDouble/8).ceil.toInt
     region
   }
 
@@ -252,8 +253,9 @@ class MemoryRegionAnalysisSolver(
     ANRResult: Map[CFGPosition, Set[Variable]],
     RNAResult: Map[CFGPosition, Set[Variable]],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-    graResult: Map[CFGPosition, Set[DataRegion]]
-  ) extends MemoryRegionAnalysis(program, domain, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, reachingDefs, graResult)
+    graResult: Map[CFGPosition, Set[DataRegion]],
+    mmm: MemoryModelMap
+  ) extends MemoryRegionAnalysis(program, domain, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, reachingDefs, graResult, mmm)
   with IRIntraproceduralForwardDependencies
   with Analysis[Map[CFGPosition, Set[StackRegion]]]
   with SimpleWorklistFixpointSolver[CFGPosition, Set[StackRegion], PowersetLattice[StackRegion]]

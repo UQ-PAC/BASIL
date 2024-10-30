@@ -391,7 +391,7 @@ object StaticAnalysis {
     val graResult = graSolver.analyze()
 
     Logger.debug("[!] Running MRA")
-    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, domain.toSet, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, reachingDefinitionsAnalysisResults, graResult)
+    val mraSolver = MemoryRegionAnalysisSolver(IRProgram, domain.toSet, globalAddresses, globalOffsets, mergedSubroutines, constPropResult, ANRResult, RNAResult, reachingDefinitionsAnalysisResults, graResult, mmm)
     val mraResult = mraSolver.analyze()
 
     config.analysisDotPath.foreach(s => {

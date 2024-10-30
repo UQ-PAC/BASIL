@@ -38,6 +38,7 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
 
   private val uf = UnionFind()
   val relfContent: mutable.Map[DataRegion, mutable.Set[String]] = mutable.Map()
+  val stackSubAccesses: mutable.Map[StackRegion, mutable.Set[BigInt]] = mutable.Map()
 
   /** Add a range and object to the mapping
    *
@@ -51,10 +52,9 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
       r match {
         case DataRegion(_, start, size) => start + size
         case _: HeapRegion => ???
-        case StackRegion(_, start, _) =>
-          if (r.subAccesses.nonEmpty) {
-            val max = start + r.subAccesses.max
-            max
+        case s: StackRegion =>
+          if (stackSubAccesses.contains(s) && stackSubAccesses(s).nonEmpty) {
+            s.start + stackSubAccesses(s).max
           } else {
             ???
           }
@@ -385,11 +385,10 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
 trait MemoryRegion {
   val regionIdentifier: String
   val start: BigInt
-  val subAccesses: mutable.Set[BigInt] = mutable.Set()
 }
 
 case class StackRegion(override val regionIdentifier: String, override val start: BigInt, parent: Procedure) extends MemoryRegion {
-  override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name}, $subAccesses)"
+  override def toString: String = s"Stack($regionIdentifier, $start, ${parent.name}"
 }
 
 case class HeapRegion(override val regionIdentifier: String, override val start: BigInt, size: BigInt, parent: Procedure) extends MemoryRegion {
