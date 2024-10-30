@@ -573,7 +573,7 @@ object RunUtils {
     var iteration = 1
     var modified: Boolean = true
     val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
-    while (modified || analysisResult.size < 2) {
+    while (modified || (analysisResult.size < 2 && config.memoryRegions)) {
       Logger.debug("[!] Running Static Analysis")
       val result = StaticAnalysis.analyse(ctx, config, iteration, analysisResult.lastOption)
       analysisResult.append(result)
