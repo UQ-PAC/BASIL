@@ -584,7 +584,8 @@ object RunUtils {
 
       modified = transforms.VSAIndirectCallResolution(
         ctx.program,
-        result.vsaResult
+        result.vsaResult,
+        result.mmmResults
       ).resolveIndirectCalls()
 
       Logger.debug("[!] Generating Procedure Summaries")

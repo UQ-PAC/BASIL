@@ -37,6 +37,7 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
   private val stackAllocationSites: mutable.Map[CFGPosition, Set[StackRegion]] = mutable.Map()
 
   private val uf = UnionFind()
+  val relfContent: mutable.Map[DataRegion, mutable.Set[String]] = mutable.Map()
 
   /** Add a range and object to the mapping
    *
@@ -160,9 +161,9 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
       } else {
         val isRelocated = relocatedDataRegion(dr.start)
         if (isRelocated.isDefined) {
-          obj.get.relfContent.add(isRelocated.get.regionIdentifier)
+          relfContent(obj.get) = relfContent.getOrElse(obj.get, mutable.Set()) += isRelocated.get.regionIdentifier
         } else {
-          obj.get.relfContent.add(dr.regionIdentifier)
+          relfContent(obj.get) = relfContent.getOrElse(obj.get, mutable.Set()) += dr.regionIdentifier
         }
       }
     }
@@ -375,7 +376,7 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
     n match {
       case directCall: DirectCall =>
         Set(getHeap(directCall))
-      case _ => 
+      case _ =>
         getStack(n) ++ getData(n)
     }
   }
@@ -396,9 +397,8 @@ case class HeapRegion(override val regionIdentifier: String, override val start:
 }
 
 case class DataRegion(override val regionIdentifier: String, override val start: BigInt, size: BigInt) extends MemoryRegion {
-  override def toString: String = s"Data($regionIdentifier, $start, $size, ($relfContent))"
-  def end: BigInt = start + size - 1
-  val relfContent: mutable.Set[String] = mutable.Set[String]()
+  override def toString: String = s"Data($regionIdentifier, $start, $size)"
+  val end: BigInt = start + size - 1
 }
 
 class UnionFind {

@@ -1,6 +1,6 @@
 package ir.transforms
 
-import analysis.{AddressValue, DataRegion, Lift, LiftedElement, LiteralValue, MemoryRegion, RegisterWrapperEqualSets, StackRegion, Value, getUse}
+import analysis.{AddressValue, DataRegion, Lift, LiftedElement, LiteralValue, MemoryModelMap, MemoryRegion, RegisterWrapperEqualSets, StackRegion, Value, getUse}
 import ir.*
 import util.Logger
 
@@ -70,7 +70,8 @@ class SteensgaardIndirectCallResolution(
 
 class VSAIndirectCallResolution(
   override val program: Program,
-  val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
+  val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]],
+  val mmm: MemoryModelMap
 ) extends IndirectCallResolution {
 
   private def searchRegion(memoryRegion: MemoryRegion, n: CFGPosition): Set[String] = {
@@ -89,7 +90,7 @@ class VSAIndirectCallResolution(
       case _: StackRegion =>
         names
       case dataRegion: DataRegion =>
-        names ++ dataRegion.relfContent
+        names ++ mmm.relfContent.getOrElse(dataRegion, Set())
       case _ =>
         Set()
     }
