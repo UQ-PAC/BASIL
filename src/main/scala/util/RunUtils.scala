@@ -62,7 +62,7 @@ case class StaticAnalysisContext(
     mmmResults: MemoryModelMap,
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
     varDepsSummaries: Map[Procedure, Map[Taintable, Set[Taintable]]],
-    regionInjector: RegionInjector,
+    regionInjector: Option[RegionInjector],
     symbolicAddresses: Map[CFGPosition, Map[SymbolicAddress, TwoElement]],
     localDSA: Map[Procedure, Graph],
     bottomUpDSA: Map[Procedure, Graph],
@@ -438,8 +438,13 @@ object StaticAnalysis {
     })
 
     Logger.debug("[!] Injecting regions")
-    val regionInjector = RegionInjector(IRProgram, mmm)
-    regionInjector.nodeVisitor()
+    val regionInjector = if (config.memoryRegions) {
+      val injector = RegionInjector(IRProgram, mmm)
+      injector.nodeVisitor()
+      Some(injector)
+    } else {
+      None
+    }
 
     val paramResults: Map[Procedure, Set[Variable]] = ParamAnalysis(IRProgram).analyze()
     val interLiveVarsResults: Map[CFGPosition, Map[Variable, TwoElement]] = InterLiveVarsAnalysis(IRProgram).analyze()
@@ -543,7 +548,7 @@ object RunUtils {
 
     Logger.debug("[!] Translating to Boogie")
 
-    val regionInjector = analysis.map(a => a.regionInjector)
+    val regionInjector = analysis.flatMap(a => a.regionInjector)
 
     val boogiePrograms = if (q.boogieTranslation.threadSplit && ctx.program.threads.nonEmpty) {
       val outPrograms = ArrayBuffer[BProgram]()
