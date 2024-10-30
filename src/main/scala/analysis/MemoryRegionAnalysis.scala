@@ -17,9 +17,10 @@ trait MemoryRegionAnalysis(val program: Program,
                            val ANRResult: Map[CFGPosition, Set[Variable]],
                            val RNAResult: Map[CFGPosition, Set[Variable]],
                            val reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-                           val graResult: Map[CFGPosition, Set[DataRegion]]) {
+                           val graResult: Map[CFGPosition, Set[DataRegion]],
+                           val mmm: MemoryModelMap) {
 
-  var mallocCount: BigInt = 0
+  private var mallocCount: BigInt = 0
   private var stackCount: Int = 0
   val stackMap: mutable.Map[Procedure, mutable.Map[BigInt, StackRegion]] = mutable.Map()
 
@@ -45,16 +46,15 @@ trait MemoryRegionAnalysis(val program: Program,
   private def poolMaster(base: BigInt, stackBase: Procedure, subAccess: BigInt): StackRegion = {
     assert(subAccess >= 0)
     val stackPool = stackMap.getOrElseUpdate(stackBase, mutable.HashMap())
-    var region: StackRegion = null
-    if (stackPool.contains(base)) {
-      region = stackPool(base)
+    val region = if (stackPool.contains(base)) {
+      stackPool(base)
     } else {
       val newRegion = StackRegion(nextStackCount(), base, stackBase)
       addReturnStack(stackBase, newRegion)
       stackPool += (base -> newRegion)
-      region = newRegion
+      newRegion
     }
-    region.subAccesses.add((subAccess.toDouble/8).ceil.toInt)
+    mmm.stackSubAccesses(region) = mmm.stackSubAccesses.getOrElse(region, mutable.Set()) += (subAccess.toDouble/8).ceil.toInt
     region
   }
 
@@ -66,10 +66,10 @@ trait MemoryRegionAnalysis(val program: Program,
         if (spList.contains(assign.rhs)) {
           // add lhs to spList
           spList.addOne(assign.lhs)
-        } else {
+        // TODO: This is a hack: it should check for stack ptr using the wrapper
+        } else if (spList.contains(assign.lhs) && assign.lhs != stackPointer) {
           // remove lhs from spList
-          if spList.contains(assign.lhs) && assign.lhs != stackPointer then // TODO: This is a hack: it should check for stack ptr using the wrapper
-            spList.remove(spList.indexOf(assign.lhs))
+          spList.remove(spList.indexOf(assign.lhs))
         }
       // TODO: should handle the store case (last case)
       case _ =>
@@ -83,22 +83,12 @@ trait MemoryRegionAnalysis(val program: Program,
   val first: Set[CFGPosition] = Set.empty + program.mainProcedure
 
   private val stackPointer = Register("R31", 64)
-  private val linkRegister = Register("R30", 64)
-  private val framePointer = Register("R29", 64)
   private val mallocVariable = Register("R0", 64)
   private val spList = ListBuffer[Expr](stackPointer)
-  private val ignoreRegions: Set[Expr] = Set(linkRegister, framePointer)
-  // TODO: this could be used instead of regionAccesses in other analyses to reduce the Expr to region conversion
-  private val registerToRegions: mutable.Map[RegisterVariableWrapper, mutable.Set[MemoryRegion]] = mutable.Map()
   val procedureToSharedRegions: mutable.Map[Procedure, mutable.Set[MemoryRegion]] = mutable.Map()
   var procedureToStackRegions: mutable.Map[Procedure, mutable.Set[StackRegion]] = mutable.Map()
   var procedureToHeapRegions: mutable.Map[DirectCall, HeapRegion] = mutable.Map()
-  var memLoadToRegion: mutable.Map[MemoryLoad, MemoryRegion] = mutable.Map()
   var mergeRegions: mutable.Set[Set[MemoryRegion]] = mutable.Set()
-
-  def addMergableRegions(regions: Set[MemoryRegion]): Unit = {
-    mergeRegions.add(regions)
-  }
 
   def addReturnStack(procedure: Procedure, returnRegion: StackRegion): Unit = {
     procedureToStackRegions.getOrElseUpdate(procedure, mutable.Set.empty).add(returnRegion)
@@ -108,38 +98,37 @@ trait MemoryRegionAnalysis(val program: Program,
     procedureToHeapRegions.put(directCall, returnRegion)
   }
 
-  def addMemLoadRegion(memoryLoad: MemoryLoad, memoryRegion: StackRegion): Unit = {
-    memLoadToRegion.put(memoryLoad, memoryRegion)
-  }
-
   def reducibleToRegion(binExpr: BinaryExpr, n: Command, subAccess: BigInt): Set[StackRegion] = {
-    var reducedRegions = Set.empty[StackRegion]
-    binExpr.arg1 match {
+    val reducedRegions = binExpr.arg1 match {
       case variable: Variable if !spList.contains(variable) =>
-        val ctx = getUse(variable, n, reachingDefs)
-        for (i <- ctx) {
-          val regions = eval(i.rhs, Set.empty, i, subAccess)
-          evaluateExpression(binExpr.arg2, constantProp(n)) match {
-            case Some(b: BitVecLiteral) =>
-              regions.foreach { stackRegion =>
-                  val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
-                  reducedRegions = reducedRegions + poolMaster(nextOffset, IRWalk.procedure(n), subAccess)
-              }
-            case None =>
-          }
+        evaluateExpression(binExpr.arg2, constantProp(n)) match {
+          case Some(b: BitVecLiteral) =>
+            val ctx = getUse(variable, n, reachingDefs)
+            for {
+              i <- ctx
+              stackRegion <- eval(i.rhs, Set.empty, i, subAccess)
+            } yield {
+              val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
+              poolMaster(nextOffset, IRWalk.procedure(n), subAccess)
+            }
+          case None =>
+            Set()
         }
       case _ =>
-        reducedRegions = reducedRegions ++ eval(binExpr, Set.empty, n, subAccess)
+        eval(binExpr, Set.empty, n, subAccess)
     }
     reducedRegions
   }
 
   def reducibleVariable(variable: Variable, n: Command, subAccess: BigInt): Set[StackRegion] = {
-    var regions = Set.empty[StackRegion]
     val ctx = getDefinition(variable, n, reachingDefs)
-    for (i <- ctx) {
-      if (i != n) { // TODO: nicer way to deal with loops (a variable is being incremented in a loop)
-        regions = regions ++ eval(i.rhs, Set.empty, i, subAccess)
+
+    // TODO: nicer way to deal with loops (a variable is being incremented in a loop)
+    val regions = ctx.flatMap { i =>
+      if (i != n) {
+        eval(i.rhs, Set.empty, i, subAccess)
+      } else {
+        Set()
       }
     }
     regions
@@ -147,59 +136,56 @@ trait MemoryRegionAnalysis(val program: Program,
 
   def eval(exp: Expr, env: Set[StackRegion], n: Command, subAccess: BigInt): Set[StackRegion] = {
     if (graResult(n).nonEmpty) {
-      return Set.empty // skip global memory regions
-    }
-    exp match {
-      case binOp: BinaryExpr =>
-        if (spList.contains(binOp.arg1)) {
-          evaluateExpression(binOp.arg2, constantProp(n)) match {
-            case Some(b: BitVecLiteral) =>
-              val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
-              Set(poolMaster(negB, IRWalk.procedure(n), subAccess))
-            case None => Set.empty
-          }
-        } else if (reducibleToRegion(binOp, n, subAccess).nonEmpty) {
-          reducibleToRegion(binOp, n, subAccess)
-        } else {
-          Set.empty
-        }
-      case variable: Variable =>
-        variable match {
-          case reg: Register if spList.contains(reg) => // TODO: this is a hack because spList is not comprehensive it needs to be a standalone analysis
-            if getDefinition(variable, n, reachingDefs).isEmpty then
-              Set(poolMaster(Long.MaxValue, IRWalk.procedure(n), subAccess))
-            else
-              reducibleVariable(variable, n, subAccess)
-          case _ =>
-            evaluateExpression(variable, constantProp(n)) match {
+      Set.empty // skip global memory regions
+    } else {
+      exp match {
+        case binOp: BinaryExpr =>
+          if (spList.contains(binOp.arg1)) {
+            evaluateExpression(binOp.arg2, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
-                eval(b, env, n, subAccess)
-              case _ =>
-                reducibleVariable(variable, n, subAccess)
+                val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
+                Set(poolMaster(negB, IRWalk.procedure(n), subAccess))
+              case None => Set.empty
             }
-        }
-      case memoryLoad: MemoryLoad =>
-        eval(memoryLoad.index, env, n, memoryLoad.size)
-      // ignore case where it could be a global region (loaded later in MMM from relf)
-      case b: BitVecLiteral =>
-        Set.empty
-      // we cannot evaluate this to a concrete value, we need VSA for this
-      case _ =>
-        Logger.debug(s"type: ${exp.getClass} $exp\n")
-        throw new Exception("Unknown type")
+          } else if (reducibleToRegion(binOp, n, subAccess).nonEmpty) {
+            reducibleToRegion(binOp, n, subAccess)
+          } else {
+            Set.empty
+          }
+        case reg: Register if spList.contains(reg) => // TODO: this is a hack because spList is not comprehensive it needs to be a standalone analysis
+          if (getDefinition(reg, n, reachingDefs).isEmpty) {
+            Set(poolMaster(Long.MaxValue, IRWalk.procedure(n), subAccess))
+          } else {
+            reducibleVariable(reg, n, subAccess)
+          }
+        case variable: Variable =>
+          evaluateExpression(variable, constantProp(n)) match {
+            case Some(b: BitVecLiteral) =>
+              eval(b, env, n, subAccess)
+            case _ =>
+              reducibleVariable(variable, n, subAccess)
+          }
+        case memoryLoad: MemoryLoad =>
+          eval(memoryLoad.index, env, n, memoryLoad.size)
+        // ignore case where it could be a global region (loaded later in MMM from relf)
+        case _: BitVecLiteral =>
+          Set.empty
+        // we cannot evaluate this to a concrete value, we need VSA for this
+        case _ =>
+          Logger.debug(s"type: ${exp.getClass} $exp\n")
+          throw new Exception("Unknown type")
+      }
     }
   }
 
   /** Transfer function for state lattice elements.
    */
   def localTransfer(n: CFGPosition, s: Set[StackRegion]): Set[StackRegion] = n match {
-    case cmd: Command =>
-      cmd match {
-        case directCall: DirectCall =>
-          val ANR = ANRResult(cmd)
-          val RNA = RNAResult(program.procedures.filter(fn => fn == directCall.target).head)
-          val parameters = RNA.intersect(ANR)
-          // TODO: Re-enable when ReachingDef has interprocedural option
+    case directCall: DirectCall =>
+      // TODO: Re-enable when ReachingDef has interprocedural option
+      // val ANR = ANRResult(directCall)
+      // val RNA = RNAResult(program.procedures.filter(fn => fn == directCall.target).head)
+      //      val parameters = RNA.intersect(ANR)
 //          val ctx = regionAccesses(cmd)
 //          for (elem <- parameters) {
 //            if (ctx.contains(RegisterVariableWrapper(elem, getUse(elem, cmd.data, reachingDefs)))) {
@@ -213,95 +199,46 @@ trait MemoryRegionAnalysis(val program: Program,
 //              }
 //            }
 //          }
-          if (directCall.target.name == "malloc") {
-            evaluateExpression(mallocVariable, constantProp(n)) match {
-              case Some(b: BitVecLiteral) =>
-                val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
-                val (name, start) = nextMallocCount(negB)
-                val newHeapRegion = HeapRegion(name, start, negB, IRWalk.procedure(n))
-                addReturnHeap(directCall, newHeapRegion)
-                s
-              case None =>
-                // Assume heap region size is at least 1 TODO: must approximate size of heap
-                val negB = 1
-                val (name, start) = nextMallocCount(negB)
-                val newHeapRegion = HeapRegion(name, start, negB, IRWalk.procedure(n))
-                addReturnHeap(directCall, newHeapRegion)
-                s
-            }
-          } else {
+      if (directCall.target.name == "malloc") {
+        evaluateExpression(mallocVariable, constantProp(n)) match {
+          case Some(b: BitVecLiteral) =>
+            val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
+            val (name, start) = nextMallocCount(negB)
+            val newHeapRegion = HeapRegion(name, start, negB, IRWalk.procedure(n))
+            addReturnHeap(directCall, newHeapRegion)
             s
-          }
-        case memAssign: MemoryAssign =>
-          val result = eval(memAssign.index, s, cmd, memAssign.size)
+          case None =>
+            // Assume heap region size is at least 1 TODO: must approximate size of heap
+            val negB = 1
+            val (name, start) = nextMallocCount(negB)
+            val newHeapRegion = HeapRegion(name, start, negB, IRWalk.procedure(n))
+            addReturnHeap(directCall, newHeapRegion)
+            s
+        }
+      } else {
+        s
+      }
+    case memAssign: MemoryAssign =>
+      val result = eval(memAssign.index, s, memAssign, memAssign.size)
 //          if (result.size > 1) {
 //            //throw new Exception(s"Memory load resulted in multiple regions ${result} for mem load $memoryLoad")
 //            addMergableRegions(result)
 //          }
-          result
-        case assign: Assign =>
-          stackDetection(assign)
-          var m = Set[StackRegion]()
-
-          val unwrapped = unwrapExpr(assign.rhs)
-          if (unwrapped.isDefined)
-            val result = eval(unwrapped.get.index, s, cmd, unwrapped.get.size)
-//            if (result.size > 1) {
-//              //throw new Exception(s"Memory load resulted in multiple regions ${result} for mem load $memoryLoad")
-//              addMergableRegions(result)
-//            }
-            m = m ++ result
-          m
-        case _ => s
+      result
+    case assign: Assign =>
+      stackDetection(assign)
+      val unwrapped = unwrapExpr(assign.rhs)
+      if (unwrapped.isDefined) {
+        eval(unwrapped.get.index, s, assign, unwrapped.get.size)
+        //            if (result.size > 1) {
+        //              //throw new Exception(s"Memory load resulted in multiple regions ${result} for mem load $memoryLoad")
+        //              addMergableRegions(result)
+        //            }
+      } else {
+        Set()
       }
-    case _ => s // ignore other kinds of nodes
+    case _ => s
   }
-
-//  def localTransfer2(n: CFGPosition, s: Set[StackRegion]): Set[StackRegion] = n match {
-//    case cmd: Command =>
-//      cmd match {
-//        case directCall: DirectCall =>
-//          if (directCall.target.name == "malloc") {
-//            evaluateExpression(mallocVariable, constantProp(n)) match {
-//              case Some(b: BitVecLiteral) =>
-//                val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
-//                val newHeapRegion = HeapRegion(nextMallocCount(), negB, IRWalk.procedure(n))
-//                addReturnHeap(directCall, newHeapRegion)
-//                s
-//              case None => s
-//            }
-//          } else {
-//            s
-//          }
-//        case memAssign: MemoryAssign =>
-//          val evaluation = evaluateExpression(memAssign.index, constantProp(n))
-//          if (evaluation.isDefined) {
-//            val isGlobal = mmm.findDataObject(evaluation.get.value)
-//            if (isGlobal.isEmpty) {
-//              val result = poolMaster(Long.MaxValue - evaluation.get.value, IRWalk.procedure(n), memAssign.size)
-//              return Set(result)
-//            }
-//          }
-//          s
-//        case assign: Assign =>
-//          var m = Set[StackRegion]()
-//          unwrapExpr(assign.rhs).foreach {
-//            case memoryLoad: MemoryLoad =>
-//              val evaluation = evaluateExpression(memoryLoad.index, constantProp(n))
-//              if (evaluation.isDefined) {
-//                val isGlobal = mmm.findDataObject(evaluation.get.value)
-//                if (isGlobal.isEmpty) {
-//                  val result = poolMaster(Long.MaxValue - evaluation.get.value, IRWalk.procedure(n), memoryLoad.size)
-//                  m = m + result
-//                }
-//              }
-//            case _ => m
-//          }
-//          m
-//        case _ => s
-//      }
-//    case _ => s // ignore other kinds of nodes
-//  }
 
   def transfer(n: CFGPosition, s: Set[StackRegion]): Set[StackRegion] = localTransfer(n, s)
 }
@@ -316,8 +253,9 @@ class MemoryRegionAnalysisSolver(
     ANRResult: Map[CFGPosition, Set[Variable]],
     RNAResult: Map[CFGPosition, Set[Variable]],
     reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-    graResult: Map[CFGPosition, Set[DataRegion]]
-  ) extends MemoryRegionAnalysis(program, domain, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, reachingDefs, graResult)
+    graResult: Map[CFGPosition, Set[DataRegion]],
+    mmm: MemoryModelMap
+  ) extends MemoryRegionAnalysis(program, domain, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, reachingDefs, graResult, mmm)
   with IRIntraproceduralForwardDependencies
   with Analysis[Map[CFGPosition, Set[StackRegion]]]
   with SimpleWorklistFixpointSolver[CFGPosition, Set[StackRegion], PowersetLattice[StackRegion]]

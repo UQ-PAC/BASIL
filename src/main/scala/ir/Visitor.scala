@@ -358,6 +358,18 @@ class Substituter(variables: Map[Variable, Variable] = Map(), memories: Map[Memo
   * Useful for avoiding Boogie's reserved keywords.
   */
 class Renamer(reserved: Set[String]) extends Visitor {
+  override def visitProgram(node: Program): Program = {
+    for (section <- node.usedMemory.values) {
+      section.region match {
+        case Some(region) if reserved.contains(region.name) =>
+          region.name = s"#${region.name}"
+        case _ =>
+      }
+    }
+
+    super.visitProgram(node)
+  }
+
   override def visitLocalVar(node: LocalVar): LocalVar = {
     if (reserved.contains(node.name)) {
       node.copy(name = s"#${node.name}")

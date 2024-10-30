@@ -3,57 +3,56 @@ package analysis
 import ir.*
 import analysis.solvers.SimpleWorklistFixpointSolver
 
-case class ReachingDefinitionsAnalysis(program: Program, inter: Boolean = false) {
+type TupleElement =
+  TupleLattice[MapLattice[Variable, Set[Assign], PowersetLattice[Assign]], MapLattice[Variable, Set[Assign], PowersetLattice[Assign]], Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]]
 
-  type Definition = Assign // local assign is a definition because it is a statement and statements are assumed to be unique
-  type TupleElement =
-    TupleLattice[MapLattice[Variable, Set[Definition], PowersetLattice[Definition]], MapLattice[Variable, Set[Definition], PowersetLattice[Definition]], Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]]
+trait ReachingDefinitionsAnalysis(program: Program) {
 
-  val tupleLattice: TupleLattice[MapLattice[Variable, Set[Definition], PowersetLattice[Definition]], MapLattice[Variable, Set[Assign], PowersetLattice[
-    Assign]], Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]] =
-    new TupleLattice(
-      new MapLattice[Variable, Set[Definition], PowersetLattice[Definition]](new PowersetLattice[Definition]()),
-      new MapLattice[Variable, Set[Definition], PowersetLattice[Definition]](new PowersetLattice[Definition]())
+  private val tupleLattice: TupleLattice[MapLattice[Variable, Set[Assign], PowersetLattice[Assign]], MapLattice[Variable, Set[Assign], PowersetLattice[
+    Assign]], Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]] =
+    TupleLattice(
+      MapLattice[Variable, Set[Assign], PowersetLattice[Assign]](PowersetLattice[Assign]()),
+      MapLattice[Variable, Set[Assign], PowersetLattice[Assign]](PowersetLattice[Assign]())
     )
 
-  val lattice: MapLattice[CFGPosition, (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]), TupleElement] = MapLattice(
+  val lattice: MapLattice[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), TupleElement] = MapLattice(
     tupleLattice
   )
 
   val domain: Set[CFGPosition] = Set.empty ++ program
 
-  def transfer(n: CFGPosition, s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) =
+  def transfer(n: CFGPosition, s: (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])): (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]) =
     localTransfer(n, s)
 
   def localTransfer(
-                     n: CFGPosition,
-                     s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])
-                   ): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) = n match {
+      n: CFGPosition,
+      s: (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])
+  ): (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]) = n match {
     case cmd: Command =>
       eval(cmd, s)
     case _ => s
   }
 
-  def transformUses(vars: Set[Variable], s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) = {
-    vars.foldLeft((s._1, Map.empty[Variable, Set[Definition]])) {
+  private def transformUses(vars: Set[Variable], s: (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])): (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]) = {
+    vars.foldLeft((s(0), Map.empty[Variable, Set[Assign]])) {
       case ((state, acc), v) =>
         (state, acc + (v -> state(v)))
     }
   }
 
-  def eval(cmd: Command, s: (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]])
-          ): (Map[Variable, Set[Definition]], Map[Variable, Set[Definition]]) = cmd match {
+  def eval(cmd: Command, s: (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])):
+    (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]) = cmd match {
     case assign: Assign =>
       // do the rhs first (should reset the values for this node to the empty set)
       // for each variable in the rhs, find the definitions from the lattice lhs and add them to the lattice rhs
       // for lhs, addOrReplace the definition
       val rhs = assign.rhs.variables
       val lhs = assign.lhs
-      val rhsUseDefs: Map[Variable, Set[Definition]] = rhs.foldLeft(Map.empty[Variable, Set[Definition]]) {
+      val rhsUseDefs: Map[Variable, Set[Assign]] = rhs.foldLeft(Map.empty[Variable, Set[Assign]]) {
         case (acc, v) =>
-          acc + (v -> s._1(v))
+          acc + (v -> s(0)(v))
       }
-      (s._1 + (lhs -> Set(assign)), rhsUseDefs)
+      (s(0) + (lhs -> Set(assign)), rhsUseDefs)
     case assert: Assert =>
       transformUses(assert.body.variables, s)
     case memoryAssign: MemoryAssign =>
@@ -67,6 +66,6 @@ case class ReachingDefinitionsAnalysis(program: Program, inter: Boolean = false)
 }
 
 class InterprocReachingDefinitionsAnalysisSolver(program: Program)
-  extends ReachingDefinitionsAnalysis(program, true)
-    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[ReachingDefinitionsAnalysis#Definition]], Map[Variable, Set[ReachingDefinitionsAnalysis#Definition]]), ReachingDefinitionsAnalysis#TupleElement]
+  extends ReachingDefinitionsAnalysis(program)
+    with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), TupleElement]
     with IRInterproceduralForwardDependencies

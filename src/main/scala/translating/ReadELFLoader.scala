@@ -16,6 +16,7 @@ enum ELFSymType:
   case FILE
   case OBJECT
   case FUNC /* code function */
+  case TLS /* ??? */
 
 
 enum ELFBind:
@@ -26,6 +27,7 @@ enum ELFBind:
 enum ELFVis:
   case HIDDEN
   case DEFAULT
+  case PROTECTED
 
 enum ELFNDX:
   case Section(num: Int) /* Section containing the symbol */
@@ -42,29 +44,37 @@ case class ELFSymbol(num: Int,  /* symbol number */
   name: String)
 
 object ReadELFLoader {
-  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Map[BigInt, BigInt], BigInt) = {
-    val externalFunctions = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableExtFunc(r)).toSet
-    val relocationOffsets = ctx.relocationTable.asScala.flatMap(r => visitRelocationTableOffsets(r)).toMap
+  def visitSyms(ctx: SymsContext, config: ILLoadingConfig): (List[ELFSymbol], Set[ExternalFunction], Set[SpecGlobal], Set[FuncEntry], Map[BigInt, BigInt], BigInt) = {
+    val externalFunctions = ctx.relocationTable.asScala.filter(_.relocationTableHeader != null).flatMap(r => visitRelocationTableExtFunc(r)).toSet
+    val relocationOffsets = ctx.relocationTable.asScala.filter(_.relocationTableHeader != null).flatMap(r => visitRelocationTableOffsets(r)).toMap
     val mainAddress = ctx.symbolTable.asScala.flatMap(s => getFunctionAddress(s, config.mainProcedureName))
 
     val symbolTable = ctx.symbolTable.asScala.flatMap(s => visitSymbolTable(s)).toList
-    val globalVariables = (symbolTable.collect {
-      case ELFSymbol(num, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name) if ndx != ELFNDX.UND =>  SpecGlobal(name, size * 8, None, value)
-    }).toSet
+    val globalVariables = symbolTable.collect {
+      case ELFSymbol(_, value, size, ELFSymType.OBJECT, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name) if ndx != ELFNDX.UND => SpecGlobal(name, size * 8, None, value)
+    }.toSet
+
+    val functionEntries = symbolTable.collect {
+      case ELFSymbol(_, value, size, ELFSymType.FUNC, ELFBind.GLOBAL, ELFVis.DEFAULT, ndx, name) if ndx != ELFNDX.UND => FuncEntry(name, size * 8, value)
+    }.toSet
 
     if (mainAddress.isEmpty) {
       throw Exception(s"no ${config.mainProcedureName} function in symbol table")
     }
-    (symbolTable, externalFunctions, globalVariables, relocationOffsets, mainAddress.head)
+    (symbolTable, externalFunctions, globalVariables, functionEntries, relocationOffsets, mainAddress.head)
   }
 
   def visitRelocationTableExtFunc(ctx: RelocationTableContext): Set[ExternalFunction] = {
-    val sectionName = ctx.relocationTableHeader.tableName.STRING.getText
-    if (sectionName == ".rela.plt" || sectionName == ".rela.dyn") {
-      val rows = ctx.relocationTableRow.asScala
-      rows.filter(r => r.name != null).map(r => visitRelocationTableRowExtFunc(r)).toSet
-    } else {
+    if (ctx.relocationTableHeader == null) {
       Set()
+    } else {
+      val sectionName = ctx.relocationTableHeader.tableName.STRING.getText
+      if (sectionName == ".rela.plt" || sectionName == ".rela.dyn") {
+        val rows = ctx.relocationTableRow.asScala
+        rows.filter(r => r.name != null).map(r => visitRelocationTableRowExtFunc(r)).toSet
+      } else {
+        Set()
+      }
     }
   }
 

@@ -3,16 +3,17 @@ package ir
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{IterableOnceExtensionMethods, View, immutable, mutable}
 import boogie.*
-import analysis.BitVectorEval
+import analysis.{BitVectorEval, MergedRegion}
 import util.intrusive_list.*
 import translating.serialiseIL
 
 class Program(var procedures: ArrayBuffer[Procedure],
               var mainProcedure: Procedure,
-              var initialMemory: ArrayBuffer[MemorySection],
-              var readOnlyMemory: ArrayBuffer[MemorySection]) extends Iterable[CFGPosition] {
+              val initialMemory: mutable.TreeMap[BigInt, MemorySection]) extends Iterable[CFGPosition] {
 
   val threads: ArrayBuffer[ProgramThread] = ArrayBuffer()
+
+  val usedMemory: mutable.Map[BigInt, MemorySection] = mutable.TreeMap()
 
   override def toString(): String = {
     serialiseIL(this)
@@ -71,14 +72,12 @@ class Program(var procedures: ArrayBuffer[Procedure],
     * section in readOnlyMemory. It also takes the .rela.dyn entries taken from the readelf output and adds them to the
     * .rodata section, as they are the global offset table entries that we can assume are constant.
     */
+
   def determineRelevantMemory(rela_dyn: Map[BigInt, BigInt]): Unit = {
-    val initialMemoryNew = ArrayBuffer[MemorySection]()
-
-    val rodata = initialMemory.collect { case s if s.name == ".rodata" => s }
-    readOnlyMemory.addAll(rodata)
-
-    val data = initialMemory.collect { case s if s.name == ".data" => s }
-    initialMemoryNew.addAll(data)
+    val rodata = initialMemory.values.collect { case s if s.name == ".rodata" => s }
+    rodata.foreach { r => usedMemory.addOne(r.address, r) }
+    val data = initialMemory.values.collect { case s if s.name == ".data" => s }
+    data.foreach { d => usedMemory.addOne(d.address, d) }
 
     // assuming little endian, adding the rela_dyn offset/address pairs like this is crude but is simplest for now
     for ((offset, address) <- rela_dyn) {
@@ -88,10 +87,9 @@ class Program(var procedures: ArrayBuffer[Procedure],
         val high = low + 8
         BitVectorEval.boogie_extract(high, low, addressBV)
       }
-      readOnlyMemory.append(MemorySection(s".got_$offset", offset.intValue, 8, bytes))
+      usedMemory.addOne(offset, MemorySection(s".got_$offset", offset, 8, bytes, true, None))
     }
 
-    initialMemory = initialMemoryNew
   }
 
   /**
@@ -126,6 +124,20 @@ class Program(var procedures: ArrayBuffer[Procedure],
   def iterator: Iterator[CFGPosition] = {
     ILUnorderedIterator(this)
   }
+
+  private def memoryLookup(memory: mutable.TreeMap[BigInt, MemorySection], address: BigInt) = {
+    memory.maxBefore(address + 1) match {
+      case Some(_, section) =>
+        if (section.address + section.size > address) {
+          Some(section)
+        } else {
+          None
+        }
+      case _ => None
+    }
+  }
+
+  def initialMemoryLookup(address: BigInt): Option[MemorySection] = memoryLookup(initialMemory, address)
 
   def nameToProcedure: Map[String, Procedure] = {
     procedures.view.map(p => p.name -> p).toMap
@@ -189,7 +201,7 @@ class Procedure private (
 
   def returnBlock_=(value: Block): Unit = {
     if (!returnBlock.contains(value)) {
-      _returnBlock.foreach(removeBlocks(_))
+      _returnBlock.foreach(removeBlocks)
       _returnBlock = Some(addBlocks(value))
     }
   }
@@ -198,7 +210,7 @@ class Procedure private (
 
   def entryBlock_=(value: Block): Unit = {
     if (!entryBlock.contains(value)) {
-      _entryBlock.foreach(removeBlocks(_))
+      _entryBlock.foreach(removeBlocks)
       _entryBlock = Some(addBlocks(value))
     }
   }
@@ -324,8 +336,6 @@ class Parameter(var name: String, var size: Int, var value: Register) {
   def toBoogie: BVariable = BParam(name, BitVecBType(size))
   def toGamma: BVariable = BParam(s"Gamma_$name", BoolBType)
 }
-
-
 
 class Block private (
  val label: String,
@@ -456,4 +466,17 @@ object Block {
   * @param size number of bytes
   * @param bytes sequence of bytes represented by BitVecLiterals of size 8
   */
-case class MemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BitVecLiteral])
+case class MemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BitVecLiteral], readOnly: Boolean, region: Option[MergedRegion] = None) {
+
+  def getBytes(addr: BigInt, num: Int): Seq[BitVecLiteral] = {
+    val startIndex = (addr - address).toInt
+    for (i <- 0 until num) yield {
+      val index = startIndex + i
+      if (index >= bytes.size || index < 0) {
+        throw Exception(s"can't get $num bytes from section $name with size $size starting at index $startIndex (access address $addr)")
+      }
+      bytes(index)
+    }
+  }
+
+}
