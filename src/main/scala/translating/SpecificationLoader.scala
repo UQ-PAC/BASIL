@@ -276,8 +276,8 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   def visitBoogieTypeName(ctx: BoogieTypeNameContext): BType = {
     ctx match {
       case b: BvBTypeContext => BitVecBType(Integer.parseInt(b.BVSIZE.getText.stripPrefix("bv")))
-      case c: IntBTypeContext => IntBType
-      case c: BoolBTypeContext => BoolBType
+      case _: IntBTypeContext => IntBType
+      case _: BoolBTypeContext => BoolBType
       case m: MapBTypeContext => MapBType(visitBoogieTypeName(m.keyT), visitBoogieTypeName(m.valT))
     }
   }
@@ -317,26 +317,22 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
   }
 
   def visitId(ctx: IdContext, nameToGlobals: Map[String, SpecGlobal], params: Map[String, Parameter] = Map()): BExpr = {
-    val id = ctx.getText
-    id match {
-      case id if id.startsWith("Gamma_R") => {
+    ctx.getText match {
+      case id if id.startsWith("Gamma_R") =>
         BVariable(id, BoolBType, Scope.Global)
-      }
-      case id if (id.startsWith("Gamma_")) => {
-      val gamma_id = id.stripPrefix("Gamma_")
-      params.get(gamma_id) match {
-        case Some(p: Parameter) => p.value.toGamma
-        case None =>
-          nameToGlobals.get(gamma_id) match {
-            case Some(g: SpecGlobal) => SpecGamma(g)
-            case None                => throw new Exception(s"unresolvable reference to '$id' in specification")
+      case id if id.startsWith("Gamma_") =>
+        val gamma_id = id.stripPrefix("Gamma_")
+        params.get(gamma_id) match {
+          case Some(p: Parameter) => p.value.toGamma
+          case None =>
+            nameToGlobals.get(gamma_id) match {
+              case Some(g: SpecGlobal) => SpecGamma(g)
+              case None                => throw new Exception(s"unresolvable reference to '$id' in specification")
+            }
           }
-        }
-      }
-      case id if id.startsWith("R") => {
+      case id if id.startsWith("R") =>
         BVariable(id, BitVecBType(64), Scope.Global)
-      }
-      case id =>  {
+      case id =>
         params.get(id) match {
           case Some(p: Parameter) =>
             val registerSize = p.value.size
@@ -354,8 +350,7 @@ case class SpecificationLoader(symbols: Set[SpecGlobal], program: Program) {
               case None                => throw new Exception(s"unresolvable reference to '$id' in specification")
             }
         }
-      }
-      }
+    }
   }
 
   def visitMulDivModOp(ctx: MulDivModOpContext): BVBinOp = ctx.getText match {

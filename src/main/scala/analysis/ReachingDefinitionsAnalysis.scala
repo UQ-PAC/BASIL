@@ -21,13 +21,6 @@ trait ReachingDefinitionsAnalysis(program: Program) {
 
   val domain: Set[CFGPosition] = Set.empty ++ program
 
-  /*
-   * Good enough as stmts are unique
-   */
-  private def generateUniqueDefinition(variable: Variable): Assign = {
-    Assign(variable, BitVecLiteral(0, 0))
-  }
-
   def transfer(n: CFGPosition, s: (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])): (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]) =
     localTransfer(n, s)
 
@@ -72,7 +65,7 @@ trait ReachingDefinitionsAnalysis(program: Program) {
   }
 }
 
-class ReachingDefinitionsAnalysisSolver(program: Program)
+class InterprocReachingDefinitionsAnalysisSolver(program: Program)
   extends ReachingDefinitionsAnalysis(program)
     with SimpleWorklistFixpointSolver[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]]), TupleElement]
-    with IRIntraproceduralForwardDependencies
+    with IRInterproceduralForwardDependencies

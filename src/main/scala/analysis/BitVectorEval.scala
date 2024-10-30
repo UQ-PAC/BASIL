@@ -1,7 +1,8 @@
 package analysis
-import ir._
+import ir.*
 import analysis.BitVectorEval.*
 
+import scala.annotation.tailrec
 import scala.math.pow
 
 object BitVectorEval {
@@ -337,5 +338,4 @@ object BitVectorEval {
       smt_zero_extend(i, s)
     }
   }
-
 }

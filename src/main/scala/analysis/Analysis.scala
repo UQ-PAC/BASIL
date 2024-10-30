@@ -32,9 +32,9 @@ trait ConstantPropagation(val program: Program) {
 
   /** Default implementation of eval.
     */
-  def eval(exp: Expr, env: Map[Variable, FlatElement[BitVecLiteral]]): FlatElement[BitVecLiteral] =
+  def eval(exp: Expr, env: Map[Variable, FlatElement[BitVecLiteral]]): FlatElement[BitVecLiteral] = {
     import valuelattice._
-    exp match
+    exp match {
       case id: Variable => env(id)
       case n: BitVecLiteral => bv(n)
       case ze: ZeroExtend => zero_extend(ze.extension, eval(ze.body, env))
@@ -43,7 +43,7 @@ trait ConstantPropagation(val program: Program) {
       case bin: BinaryExpr =>
         val left = eval(bin.arg1, env)
         val right = eval(bin.arg2, env)
-        bin.op match
+        bin.op match {
           case BVADD => bvadd(left, right)
           case BVSUB => bvsub(left, right)
           case BVMUL => bvmul(left, right)
@@ -63,28 +63,29 @@ trait ConstantPropagation(val program: Program) {
           case BVASHR => bvashr(left, right)
           case BVCOMP => bvcomp(left, right)
           case BVCONCAT => concat(left, right)
-
+        }
       case un: UnaryExpr =>
         val arg = eval(un.arg, env)
-
-        un.op match
+        un.op match {
           case BVNOT => bvnot(arg)
           case BVNEG => bvneg(arg)
-
+        }
       case _ => valuelattice.top
+    }
+  }
+
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] =
-    n match
-      case r: Command =>
-        r match
-          // assignments
-          case la: Assign =>
-            s + (la.lhs -> eval(la.rhs, s))
-          // all others: like no-ops
-          case _ => s
+  def localTransfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = {
+    n match {
+      // assignments
+      case la: Assign =>
+        s + (la.lhs -> eval(la.rhs, s))
+      // all others: like no-ops
       case _ => s
+    }
+  }
 
   /** The analysis lattice.
     */
@@ -99,8 +100,9 @@ trait ConstantPropagation(val program: Program) {
 
 class ConstantPropagationSolver(program: Program) extends ConstantPropagation(program)
     with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]]
-    with IRIntraproceduralForwardDependencies
+    with IRInterproceduralForwardDependencies
     with Analysis[Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]]]
+
 
 /** Base class for value analysis with simple (non-lifted) lattice.
  */
@@ -114,9 +116,9 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
 
   /** Default implementation of eval.
    */
-  def eval(exp: Expr, env: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition): Set[BitVecLiteral] =
+  def eval(exp: Expr, env: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], n: CFGPosition): Set[BitVecLiteral] = {
     import valuelattice._
-    exp match
+    exp match {
       case id: Variable => env(RegisterWrapperEqualSets(id, getUse(id, n, reachingDefs)))
       case n: BitVecLiteral => bv(n)
       case ze: ZeroExtend => zero_extend(ze.extension, eval(ze.body, env, n))
@@ -125,7 +127,7 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
       case bin: BinaryExpr =>
         val left = eval(bin.arg1, env, n)
         val right = eval(bin.arg2, env, n)
-        bin.op match
+        bin.op match {
           case BVADD => bvadd(left, right)
           case BVSUB => bvsub(left, right)
           case BVMUL => bvmul(left, right)
@@ -145,34 +147,31 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
           case BVASHR => bvashr(left, right)
           case BVCOMP => bvcomp(left, right)
           case BVCONCAT => concat(left, right)
+        }
 
       case un: UnaryExpr =>
         val arg = eval(un.arg, env, n)
-
-        un.op match
+        un.op match {
           case BVNOT => bvnot(arg)
           case BVNEG => bvneg(arg)
+        }
 
       case _ => Set.empty
+    }
+  }
 
   /** Transfer function for state lattice elements.
    */
   def localTransfer(n: CFGPosition, s: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]): Map[RegisterWrapperEqualSets, Set[BitVecLiteral]] =
     n match {
-      case r: Command =>
-        r match {
-          // assignments
-          case a: Assign =>
-            val lhsWrappers = s.collect {
-              case (k, v) if RegisterVariableWrapper(k.variable, k.assigns) == RegisterVariableWrapper(a.lhs, getDefinition(a.lhs, r, reachingDefs)) => (k, v)
-            }
-            if (lhsWrappers.nonEmpty) {
-              s ++ lhsWrappers.map((k, v) => (k, v.union(eval(a.rhs, s, r))))
-            } else {
-              s + (RegisterWrapperEqualSets(a.lhs, getDefinition(a.lhs, r, reachingDefs)) -> eval(a.rhs, s, n))
-            }
-          // all others: like no-ops
-          case _ => s
+      case a: Assign =>
+        val lhsWrappers = s.collect {
+          case (k, v) if RegisterVariableWrapper(k.variable, k.assigns) == RegisterVariableWrapper(a.lhs, getDefinition(a.lhs, a, reachingDefs)) => (k, v)
+        }
+        if (lhsWrappers.nonEmpty) {
+          s ++ lhsWrappers.map((k, v) => (k, v.union(eval(a.rhs, s, a))))
+        } else {
+          s + (RegisterWrapperEqualSets(a.lhs, getDefinition(a.lhs, a, reachingDefs)) -> eval(a.rhs, s, n))
         }
       case _ => s
     }
@@ -190,5 +189,5 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
 
 class ConstantPropagationSolverWithSSA(program: Program, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) extends ConstantPropagationWithSSA(program, reachingDefs)
   with SimplePushDownWorklistFixpointSolver[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], MapLattice[RegisterWrapperEqualSets, Set[BitVecLiteral], ConstantPropagationLatticeWithSSA]]
-  with IRIntraproceduralForwardDependencies
+  with IRInterproceduralForwardDependencies
   with Analysis[Map[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]]]

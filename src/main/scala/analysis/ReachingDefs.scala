@@ -7,24 +7,26 @@ abstract class ReachingDefs(program: Program, writesTo: Map[Procedure, Set[Regis
 
   val mallocRegister = Register("R0", 64)
   val domain: Set[CFGPosition] = computeDomain(IntraProcIRCursor, program.procedures).toSet
-  val lattice: MapLattice[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]] = new MapLattice(new MapLattice(new PowersetLattice[CFGPosition]()))
+  val lattice: MapLattice[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]] = MapLattice(MapLattice(PowersetLattice[CFGPosition]()))
 
-  def transfer(n: CFGPosition, s: Map[Variable, Set[CFGPosition]]): Map[Variable, Set[CFGPosition]] =
-    n match
-      case loc:Assign =>
+  def transfer(n: CFGPosition, s: Map[Variable, Set[CFGPosition]]): Map[Variable, Set[CFGPosition]] = {
+    n match {
+      case loc: Assign =>
         s + (loc.lhs -> Set(n))
       case DirectCall(target, _) if target.name == "malloc" =>
         s + (mallocRegister -> Set(n))
       case DirectCall(target, _) if writesTo.contains(target) =>
-        val result: Map[Variable, Set[CFGPosition]] = writesTo(target).foldLeft(Map[Variable, Set[CFGPosition]]()){
+        val result: Map[Variable, Set[CFGPosition]] = writesTo(target).foldLeft(Map[Variable, Set[CFGPosition]]()) {
           (m, register) =>
             m + (register -> Set(n))
         }
         s ++ result
       case _ => s
+    }
+  }
 
 }
 
-class ReachingDefsAnalysis(program: Program, writesTo:  Map[Procedure, Set[Register]]) extends ReachingDefs(program, writesTo),  IRIntraproceduralForwardDependencies,
+class ReachingDefsAnalysis(program: Program, writesTo:  Map[Procedure, Set[Register]]) extends ReachingDefs(program, writesTo), IRIntraproceduralForwardDependencies,
   SimplePushDownWorklistFixpointSolver[CFGPosition, Map[Variable, Set[CFGPosition]], MapLattice[Variable, Set[CFGPosition], PowersetLattice[CFGPosition]]]
 

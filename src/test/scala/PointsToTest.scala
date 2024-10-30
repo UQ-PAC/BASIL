@@ -49,7 +49,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     val results = runAnalyses(program)
     results.mmmResults.pushContext("main")
     assert(results.mmmResults.findStackObject(BigInt(4)).isDefined)
-    assert(results.mmmResults.findStackObject(BigInt(4)).get.start == bv64(4))
+    assert(results.mmmResults.findStackObject(BigInt(4)).get.start == BigInt(4))
     assert(results.mmmResults.findStackObject(BigInt(4)).get.regionIdentifier == "stack_1")
   }
 
@@ -82,10 +82,10 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     assert(results.mmmResults.findStackObject(BigInt(6)).isDefined)
     assert(results.mmmResults.findStackObject(BigInt(10)).isDefined)
 
-    assert(results.mmmResults.findStackObject(BigInt(4)).get.start == bv64(4))
-    assert(results.mmmResults.findStackObject(BigInt(5)).get.start == bv64(4))
-    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
-    assert(results.mmmResults.findStackObject(BigInt(10)).get.start == bv64(6))
+    assert(results.mmmResults.findStackObject(BigInt(4)).get.start == BigInt(4))
+    assert(results.mmmResults.findStackObject(BigInt(5)).get.start == BigInt(4))
+    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == BigInt(6))
+    assert(results.mmmResults.findStackObject(BigInt(10)).get.start == BigInt(6))
   }
 
 //  /**
@@ -165,7 +165,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     results.mmmResults.pushContext("main")
     assert(results.mmmResults.findStackObject(BigInt(6)).isDefined)
 
-    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
+    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == BigInt(6))
 
     /* ------------------------------------------------------------------------- */
 
@@ -173,8 +173,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     assert(results.mmmResults.findSharedStackObject(BigInt(6)).nonEmpty)
     assert(results.mmmResults.findSharedStackObject(BigInt(10)).nonEmpty)
 
-    assert(results.mmmResults.findSharedStackObject(BigInt(6)).head.start == bv64(6))
-    assert(results.mmmResults.findSharedStackObject(BigInt(10)).head.start == bv64(10))
+    assert(results.mmmResults.findSharedStackObject(BigInt(6)).head.start == BigInt(6))
+    assert(results.mmmResults.findSharedStackObject(BigInt(10)).head.start == BigInt(10))
   }
 
   /**
@@ -224,7 +224,7 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     results.mmmResults.pushContext("main")
     assert(results.mmmResults.findStackObject(BigInt(6)).isDefined)
 
-    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == bv64(6))
+    assert(results.mmmResults.findStackObject(BigInt(6)).get.start == BigInt(6))
 
     /* ------------------------------------------------------------------------- */
 

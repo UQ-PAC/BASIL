@@ -29,7 +29,7 @@ function FPMul$64(bv64, bv64, bv32) returns (bv64);
 function FPSub$32(bv32, bv32, bv32) returns (bv32);
 function FPSub$64(bv64, bv64, bv32) returns (bv64);
 function FPToFixed$32$64(bv64, int, bool, bv32, int) returns (bv32);
-function {:extern} L(memory: [bv64]bv8, index: bv64) returns (bool) {
+function {:extern} L(mem$in: [bv64]bv8, index: bv64) returns (bool) {
   false
 }
 
@@ -72,8 +72,8 @@ function {:extern} {:bvbuiltin "zero_extend 64"} zero_extend64_64(bv64) returns 
 function {:extern} {:bvbuiltin "zero_extend 96"} zero_extend96_32(bv32) returns (bv128);
 procedure {:extern} rely();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
   free ensures (memory_load64_le(mem, 2088bv64) == 131073bv64);
   free ensures (memory_load64_le(mem, 2096bv64) == 4767034467667331754bv64);
   free ensures (memory_load64_le(mem, 69064bv64) == 1808bv64);
@@ -83,8 +83,8 @@ procedure {:extern} rely();
 
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
 
 implementation {:extern} rely_transitive()
 {
@@ -171,25 +171,25 @@ implementation main()
     assume {:captureState "1856$0"} true;
     V0, Gamma_V0 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 44bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 44bv64));
     V1, Gamma_V1 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 40bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 40bv64));
-    Exp9__5$0$14, Gamma_Exp9__5$0$14 := FPMul$32(V0[32:0], V1[32:0], FPCR), (Gamma_FPCR && (Gamma_V1 && Gamma_V0));
+    Exp9__5$0$14, Gamma_Exp9__5$0$14 := FPMul$32(V0[32:0], V1[32:0], FPCR), true;
     V0, Gamma_V0 := zero_extend96_32(Exp9__5$0$14), Gamma_Exp9__5$0$14;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 36bv64), V0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 36bv64), Gamma_V0);
     assume {:captureState "1872$0"} true;
     V0, Gamma_V0 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 44bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 44bv64));
     V1, Gamma_V1 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 40bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 40bv64));
-    Exp9__5$0$18, Gamma_Exp9__5$0$18 := FPDiv$32(V0[32:0], V1[32:0], FPCR), (Gamma_FPCR && (Gamma_V1 && Gamma_V0));
+    Exp9__5$0$18, Gamma_Exp9__5$0$18 := FPDiv$32(V0[32:0], V1[32:0], FPCR), true;
     V0, Gamma_V0 := zero_extend96_32(Exp9__5$0$18), Gamma_Exp9__5$0$18;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 36bv64), V0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 36bv64), Gamma_V0);
     assume {:captureState "1888$0"} true;
     V0, Gamma_V0 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 44bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 44bv64));
     V1, Gamma_V1 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 40bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 40bv64));
-    Exp9__5$0$22, Gamma_Exp9__5$0$22 := FPSub$32(V0[32:0], V1[32:0], FPCR), (Gamma_FPCR && (Gamma_V1 && Gamma_V0));
+    Exp9__5$0$22, Gamma_Exp9__5$0$22 := FPSub$32(V0[32:0], V1[32:0], FPCR), true;
     V0, Gamma_V0 := zero_extend96_32(Exp9__5$0$22), Gamma_Exp9__5$0$22;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 36bv64), V0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 36bv64), Gamma_V0);
     assume {:captureState "1904$0"} true;
     V0, Gamma_V0 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 44bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 44bv64));
     V1, Gamma_V1 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 40bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 40bv64));
-    Exp9__5$0$26, Gamma_Exp9__5$0$26 := FPAdd$32(V0[32:0], V1[32:0], FPCR), (Gamma_FPCR && (Gamma_V1 && Gamma_V0));
+    Exp9__5$0$26, Gamma_Exp9__5$0$26 := FPAdd$32(V0[32:0], V1[32:0], FPCR), true;
     V0, Gamma_V0 := zero_extend96_32(Exp9__5$0$26), Gamma_Exp9__5$0$26;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 36bv64), V0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 36bv64), Gamma_V0);
     assume {:captureState "1920$0"} true;
@@ -201,53 +201,53 @@ implementation main()
     V0, Gamma_V0 := zero_extend64_64(memory_load64_le(stack, bvadd64(R31, 24bv64))), gamma_load64(Gamma_stack, bvadd64(R31, 24bv64));
     V1, Gamma_V1 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 40bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 40bv64));
     FPDecodeRounding8__7, Gamma_FPDecodeRounding8__7 := zero_extend1_2(FPCR[24:22]), Gamma_FPCR;
-    Exp10__6$0$33, Gamma_Exp10__6$0$33 := FPConvert$64$32(V1[32:0], FPCR), (Gamma_FPCR && Gamma_V1);
+    Exp10__6$0$33, Gamma_Exp10__6$0$33 := FPConvert$64$32(V1[32:0], FPCR), true;
     V1, Gamma_V1 := zero_extend64_64(Exp10__6$0$33), Gamma_Exp10__6$0$33;
-    Exp9__5$0$34, Gamma_Exp9__5$0$34 := FPMul$64(V0[64:0], V1[64:0], FPCR), (Gamma_FPCR && (Gamma_V1 && Gamma_V0));
+    Exp9__5$0$34, Gamma_Exp9__5$0$34 := FPMul$64(V0[64:0], V1[64:0], FPCR), true;
     V0, Gamma_V0 := zero_extend64_64(Exp9__5$0$34), Gamma_Exp9__5$0$34;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 16bv64), V0[64:0]), gamma_store64(Gamma_stack, bvadd64(R31, 16bv64), Gamma_V0);
     assume {:captureState "1952$0"} true;
     V0, Gamma_V0 := zero_extend64_64(memory_load64_le(stack, bvadd64(R31, 24bv64))), gamma_load64(Gamma_stack, bvadd64(R31, 24bv64));
     V1, Gamma_V1 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 40bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 40bv64));
     FPDecodeRounding8__7, Gamma_FPDecodeRounding8__7 := zero_extend1_2(FPCR[24:22]), Gamma_FPCR;
-    Exp10__6$0$38, Gamma_Exp10__6$0$38 := FPConvert$64$32(V1[32:0], FPCR), (Gamma_FPCR && Gamma_V1);
+    Exp10__6$0$38, Gamma_Exp10__6$0$38 := FPConvert$64$32(V1[32:0], FPCR), true;
     V1, Gamma_V1 := zero_extend64_64(Exp10__6$0$38), Gamma_Exp10__6$0$38;
-    Exp9__5$0$39, Gamma_Exp9__5$0$39 := FPSub$64(V0[64:0], V1[64:0], FPCR), (Gamma_FPCR && (Gamma_V1 && Gamma_V0));
+    Exp9__5$0$39, Gamma_Exp9__5$0$39 := FPSub$64(V0[64:0], V1[64:0], FPCR), true;
     V0, Gamma_V0 := zero_extend64_64(Exp9__5$0$39), Gamma_Exp9__5$0$39;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 16bv64), V0[64:0]), gamma_store64(Gamma_stack, bvadd64(R31, 16bv64), Gamma_V0);
     assume {:captureState "1972$0"} true;
     V0, Gamma_V0 := zero_extend64_64(memory_load64_le(stack, bvadd64(R31, 24bv64))), gamma_load64(Gamma_stack, bvadd64(R31, 24bv64));
     V1, Gamma_V1 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 40bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 40bv64));
     FPDecodeRounding8__7, Gamma_FPDecodeRounding8__7 := zero_extend1_2(FPCR[24:22]), Gamma_FPCR;
-    Exp10__6$0$43, Gamma_Exp10__6$0$43 := FPConvert$64$32(V1[32:0], FPCR), (Gamma_FPCR && Gamma_V1);
+    Exp10__6$0$43, Gamma_Exp10__6$0$43 := FPConvert$64$32(V1[32:0], FPCR), true;
     V1, Gamma_V1 := zero_extend64_64(Exp10__6$0$43), Gamma_Exp10__6$0$43;
-    Exp9__5$0$44, Gamma_Exp9__5$0$44 := FPAdd$64(V0[64:0], V1[64:0], FPCR), (Gamma_FPCR && (Gamma_V1 && Gamma_V0));
+    Exp9__5$0$44, Gamma_Exp9__5$0$44 := FPAdd$64(V0[64:0], V1[64:0], FPCR), true;
     V0, Gamma_V0 := zero_extend64_64(Exp9__5$0$44), Gamma_Exp9__5$0$44;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 16bv64), V0[64:0]), gamma_store64(Gamma_stack, bvadd64(R31, 16bv64), Gamma_V0);
     assume {:captureState "1992$0"} true;
     V0, Gamma_V0 := zero_extend64_64(memory_load64_le(stack, bvadd64(R31, 24bv64))), gamma_load64(Gamma_stack, bvadd64(R31, 24bv64));
     V1, Gamma_V1 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 40bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 40bv64));
     FPDecodeRounding8__7, Gamma_FPDecodeRounding8__7 := zero_extend1_2(FPCR[24:22]), Gamma_FPCR;
-    Exp10__6$0$48, Gamma_Exp10__6$0$48 := FPConvert$64$32(V1[32:0], FPCR), (Gamma_FPCR && Gamma_V1);
+    Exp10__6$0$48, Gamma_Exp10__6$0$48 := FPConvert$64$32(V1[32:0], FPCR), true;
     V1, Gamma_V1 := zero_extend64_64(Exp10__6$0$48), Gamma_Exp10__6$0$48;
-    Exp9__5$0$49, Gamma_Exp9__5$0$49 := FPDiv$64(V0[64:0], V1[64:0], FPCR), (Gamma_FPCR && (Gamma_V1 && Gamma_V0));
+    Exp9__5$0$49, Gamma_Exp9__5$0$49 := FPDiv$64(V0[64:0], V1[64:0], FPCR), true;
     V0, Gamma_V0 := zero_extend64_64(Exp9__5$0$49), Gamma_Exp9__5$0$49;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 16bv64), V0[64:0]), gamma_store64(Gamma_stack, bvadd64(R31, 16bv64), Gamma_V0);
     assume {:captureState "2012$0"} true;
     V0, Gamma_V0 := zero_extend64_64(memory_load64_le(stack, bvadd64(R31, 16bv64))), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
     FPDecodeRounding8__7, Gamma_FPDecodeRounding8__7 := zero_extend1_2(FPCR[24:22]), Gamma_FPCR;
-    Exp10__6$0$52, Gamma_Exp10__6$0$52 := FPConvert$32$64(V0[64:0], FPCR), (Gamma_FPCR && Gamma_V0);
+    Exp10__6$0$52, Gamma_Exp10__6$0$52 := FPConvert$32$64(V0[64:0], FPCR), true;
     V0, Gamma_V0 := zero_extend96_32(Exp10__6$0$52), Gamma_Exp10__6$0$52;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 44bv64), V0[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 44bv64), Gamma_V0);
     assume {:captureState "2024$0"} true;
     V0, Gamma_V0 := zero_extend96_32(memory_load32_le(stack, bvadd64(R31, 40bv64))), gamma_load32(Gamma_stack, bvadd64(R31, 40bv64));
     FPDecodeRounding8__7, Gamma_FPDecodeRounding8__7 := zero_extend1_2(FPCR[24:22]), Gamma_FPCR;
-    Exp10__6$0$55, Gamma_Exp10__6$0$55 := FPConvert$64$32(V0[32:0], FPCR), (Gamma_FPCR && Gamma_V0);
+    Exp10__6$0$55, Gamma_Exp10__6$0$55 := FPConvert$64$32(V0[32:0], FPCR), true;
     V0, Gamma_V0 := zero_extend64_64(Exp10__6$0$55), Gamma_Exp10__6$0$55;
     stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 24bv64), V0[64:0]), gamma_store64(Gamma_stack, bvadd64(R31, 24bv64), Gamma_V0);
     assume {:captureState "2036$0"} true;
     V0, Gamma_V0 := zero_extend64_64(memory_load64_le(stack, bvadd64(R31, 16bv64))), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
-    Exp7__5$0$58, Gamma_Exp7__5$0$58 := FPToFixed$32$64(V0[64:0], 0, false, FPCR, 3), (Gamma_FPCR && Gamma_V0);
+    Exp7__5$0$58, Gamma_Exp7__5$0$58 := FPToFixed$32$64(V0[64:0], 0, false, FPCR, 3), true;
     R8, Gamma_R8 := zero_extend32_32(Exp7__5$0$58), Gamma_Exp7__5$0$58;
     stack, Gamma_stack := memory_store32_le(stack, bvadd64(R31, 12bv64), R8[32:0]), gamma_store32(Gamma_stack, bvadd64(R31, 12bv64), Gamma_R8);
     assume {:captureState "2048$0"} true;

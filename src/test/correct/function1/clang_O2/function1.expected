@@ -30,7 +30,7 @@ const {:extern} $x_addr: bv64;
 axiom ($x_addr == 69692bv64);
 const {:extern} $y_addr: bv64;
 axiom ($y_addr == 69696bv64);
-function {:extern} L(memory: [bv64]bv8, index: bv64) returns (bool) {
+function {:extern} L(mem$in: [bv64]bv8, index: bv64) returns (bool) {
   false
 }
 
@@ -62,8 +62,8 @@ function {:extern} memory_store64_le(memory: [bv64]bv8, index: bv64, value: bv64
 function {:extern} {:bvbuiltin "zero_extend 32"} zero_extend32_32(bv32) returns (bv64);
 procedure {:extern} rely();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
   free ensures (memory_load64_le(mem, 1976bv64) == 2924859843805185bv64);
   free ensures (memory_load64_le(mem, 69064bv64) == 1872bv64);
   free ensures (memory_load64_le(mem, 69072bv64) == 1792bv64);
@@ -72,8 +72,8 @@ procedure {:extern} rely();
 
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
 
 implementation {:extern} rely_transitive()
 {
