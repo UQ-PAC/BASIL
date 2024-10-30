@@ -43,8 +43,8 @@ function {:extern} memory_store64_le(memory: [bv64]bv8, index: bv64, value: bv64
 
 procedure {:extern} rely();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
   free ensures (memory_load64_le(mem, 2088bv64) == 131073bv64);
   free ensures (memory_load64_le(mem, 2096bv64) == 8241983568019286100bv64);
   free ensures (memory_load64_le(mem, 2104bv64) == 748482783423457568bv64);
@@ -64,8 +64,8 @@ procedure {:extern} rely();
 
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
 
 implementation {:extern} rely_transitive()
 {

@@ -405,7 +405,11 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
         } */
           IfThenElse(guard, LPred, ite)
         }
-        val params = (body.params - indexVar).toList.sorted
+        val params = if (regionInjector.isDefined) {
+          (body.params - indexVar).toList.sorted
+        } else {
+          List(BParam("mem$in", mem.bType))
+        }
         BFunction("L", params :+ indexVar, BParam(BoolBType), Some(body), List(externAttr))
       case b: ByteExtract =>
         val valueVar = BParam("value", BitVecBType(b.valueSize))

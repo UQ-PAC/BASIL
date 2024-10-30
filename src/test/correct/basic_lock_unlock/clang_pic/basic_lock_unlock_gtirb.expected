@@ -10,7 +10,7 @@ const {:extern} $x_addr: bv64;
 axiom ($x_addr == 69684bv64);
 const {:extern} $z_addr: bv64;
 axiom ($z_addr == 69688bv64);
-function {:extern} L(memory: [bv64]bv8, index: bv64) returns (bool) {
+function {:extern} L(mem$in: [bv64]bv8, index: bv64) returns (bool) {
   (if (index == $x_addr) then true else (if (index == $z_addr) then true else false))
 }
 
@@ -31,10 +31,6 @@ function {:extern} memory_load64_le(memory: [bv64]bv8, index: bv64) returns (bv6
   (memory[bvadd64(index, 7bv64)] ++ (memory[bvadd64(index, 6bv64)] ++ (memory[bvadd64(index, 5bv64)] ++ (memory[bvadd64(index, 4bv64)] ++ (memory[bvadd64(index, 3bv64)] ++ (memory[bvadd64(index, 2bv64)] ++ (memory[bvadd64(index, 1bv64)] ++ memory[index])))))))
 }
 
-function {:extern} memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8) {
-  memory[index]
-}
-
 function {:extern} memory_store32_le(memory: [bv64]bv8, index: bv64, value: bv32) returns ([bv64]bv8) {
   memory[index := value[8:0]][bvadd64(index, 1bv64) := value[16:8]][bvadd64(index, 2bv64) := value[24:16]][bvadd64(index, 3bv64) := value[32:24]]
 }
@@ -43,16 +39,13 @@ procedure {:extern} rely();
   modifies Gamma_mem, mem;
   ensures (forall i: bv64 :: (((mem[i] == old(mem[i])) ==> (Gamma_mem[i] == old(Gamma_mem[i])))));
   ensures (memory_load32_le(mem, $z_addr) == old(memory_load32_le(mem, $z_addr)));
-  free ensures (memory_load8_le(mem, 1932bv64) == 1bv8);
-  free ensures (memory_load8_le(mem, 1933bv64) == 0bv8);
-  free ensures (memory_load8_le(mem, 1934bv64) == 2bv8);
-  free ensures (memory_load8_le(mem, 1935bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 69576bv64) == 69684bv64);
-  free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
+  free ensures (memory_load32_le(mem, 1932bv64) == 131073bv32);
   free ensures (memory_load64_le(mem, 69048bv64) == 1872bv64);
-  free ensures (memory_load64_le(mem, 69568bv64) == 69688bv64);
-  free ensures (memory_load64_le(mem, 69592bv64) == 1876bv64);
   free ensures (memory_load64_le(mem, 69056bv64) == 1792bv64);
+  free ensures (memory_load64_le(mem, 69568bv64) == 69688bv64);
+  free ensures (memory_load64_le(mem, 69576bv64) == 69684bv64);
+  free ensures (memory_load64_le(mem, 69592bv64) == 1876bv64);
+  free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
 
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
@@ -84,26 +77,20 @@ procedure main();
   requires (memory_load32_le(mem, $z_addr) == 1bv32);
   free requires (memory_load64_le(mem, 69664bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69672bv64) == 69672bv64);
-  free requires (memory_load8_le(mem, 1932bv64) == 1bv8);
-  free requires (memory_load8_le(mem, 1933bv64) == 0bv8);
-  free requires (memory_load8_le(mem, 1934bv64) == 2bv8);
-  free requires (memory_load8_le(mem, 1935bv64) == 0bv8);
-  free requires (memory_load64_le(mem, 69576bv64) == 69684bv64);
-  free requires (memory_load64_le(mem, 69672bv64) == 69672bv64);
+  free requires (memory_load32_le(mem, 1932bv64) == 131073bv32);
   free requires (memory_load64_le(mem, 69048bv64) == 1872bv64);
-  free requires (memory_load64_le(mem, 69568bv64) == 69688bv64);
-  free requires (memory_load64_le(mem, 69592bv64) == 1876bv64);
   free requires (memory_load64_le(mem, 69056bv64) == 1792bv64);
-  free ensures (memory_load8_le(mem, 1932bv64) == 1bv8);
-  free ensures (memory_load8_le(mem, 1933bv64) == 0bv8);
-  free ensures (memory_load8_le(mem, 1934bv64) == 2bv8);
-  free ensures (memory_load8_le(mem, 1935bv64) == 0bv8);
-  free ensures (memory_load64_le(mem, 69576bv64) == 69684bv64);
-  free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
+  free requires (memory_load64_le(mem, 69568bv64) == 69688bv64);
+  free requires (memory_load64_le(mem, 69576bv64) == 69684bv64);
+  free requires (memory_load64_le(mem, 69592bv64) == 1876bv64);
+  free requires (memory_load64_le(mem, 69672bv64) == 69672bv64);
+  free ensures (memory_load32_le(mem, 1932bv64) == 131073bv32);
   free ensures (memory_load64_le(mem, 69048bv64) == 1872bv64);
-  free ensures (memory_load64_le(mem, 69568bv64) == 69688bv64);
-  free ensures (memory_load64_le(mem, 69592bv64) == 1876bv64);
   free ensures (memory_load64_le(mem, 69056bv64) == 1792bv64);
+  free ensures (memory_load64_le(mem, 69568bv64) == 69688bv64);
+  free ensures (memory_load64_le(mem, 69576bv64) == 69684bv64);
+  free ensures (memory_load64_le(mem, 69592bv64) == 1876bv64);
+  free ensures (memory_load64_le(mem, 69672bv64) == 69672bv64);
 
 implementation main()
 {
@@ -117,8 +104,8 @@ implementation main()
     R8, Gamma_R8 := 1bv64, true;
     call rely();
     assert (L(mem, R9) ==> Gamma_R8);
-    z_old := memory_load32_le(mem, $z_addr);
     x_old := memory_load32_le(mem, $x_addr);
+    z_old := memory_load32_le(mem, $z_addr);
     mem, Gamma_mem := memory_store32_le(mem, R9, R8[32:0]), gamma_store32(Gamma_mem, R9, Gamma_R8);
     assert ((z_old == 0bv32) ==> ((memory_load32_le(mem, $x_addr) == x_old) && (memory_load32_le(mem, $z_addr) == z_old)));
     assume {:captureState "1888$0"} true;
@@ -128,8 +115,8 @@ implementation main()
     R0, Gamma_R0 := 0bv64, true;
     call rely();
     assert (L(mem, R8) ==> true);
-    z_old := memory_load32_le(mem, $z_addr);
     x_old := memory_load32_le(mem, $x_addr);
+    z_old := memory_load32_le(mem, $z_addr);
     mem, Gamma_mem := memory_store32_le(mem, R8, 0bv32), gamma_store32(Gamma_mem, R8, true);
     assert ((z_old == 0bv32) ==> ((memory_load32_le(mem, $x_addr) == x_old) && (memory_load32_le(mem, $z_addr) == z_old)));
     assume {:captureState "1904$0"} true;
