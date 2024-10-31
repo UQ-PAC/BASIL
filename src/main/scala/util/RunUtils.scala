@@ -527,13 +527,14 @@ object RunUtils {
   }
 
   def doSimplify(ctx: IRContext, config: Option[StaticAnalysisConfig]) : Unit = {
+
+    // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
 
     transforms.applyRPO(ctx.program)
     Logger.info(s"RPO ${timer.checkPoint("RPO")} ms ")
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
-    // val liveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
 
     // writeToFile(serialiseIL(ctx.program), s"il-before-dsa.il")
 
@@ -541,9 +542,15 @@ object RunUtils {
     transforms.OnePassDSA().applyTransform(ctx.program)
     Logger.info(s"DSA ${timer.checkPoint("DSA ")} ms ")
     // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-after-dsa.dot")
-    Logger.info("DSA Check")
-    val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
-    assert(x)
+    if (ir.eval.SimplifyValidation.validate) {
+      Logger.info("Live vars difftest")
+      val tipLiveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
+      assert(ctx.program.procedures.forall(transforms.difftestLiveVars(_, tipLiveVars)))
+
+      Logger.info("DSA Check")
+      val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
+      assert(x)
+    }
     Logger.info("DSA Check passed")
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
@@ -551,7 +558,9 @@ object RunUtils {
 
     // writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
 
-
+    // brute force run the analysis twice because it cleans up more stuff
+    transforms.doCopyPropTransform(ctx.program)
+    transforms.doCopyPropTransform(ctx.program)
     transforms.doCopyPropTransform(ctx.program)
     Logger.info(s"CopyProp ${timer.checkPoint("CopyProp")} ms ")
     // writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")

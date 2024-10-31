@@ -468,9 +468,9 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BVEQ, a, b) if a.loads.isEmpty && b.loads.isEmpty && a == b => TrueLiteral
 
     // compose slices
-    case Extract(ed1, be1, Extract(ed2, be2, body)) => {
-      Extract(ed1 + be2, be1 + be2, (body))
-    }
+    case Extract(ed1, be1, Extract(ed2, be2, body)) => Extract(ed1 + be2, be1 + be2, (body))
+    case SignExtend(sz1, SignExtend(sz2, exp)) => SignExtend(sz1 + sz2, exp)
+    case ZeroExtend(sz1, ZeroExtend(sz2, exp)) => ZeroExtend(sz1 + sz2, exp)
 
     // (comp (comp x y) 1) = (comp x y)
     case BinaryExpr(BVCOMP, body @ BinaryExpr(BVCOMP, _, _), BitVecLiteral(1, 1)) => (body)

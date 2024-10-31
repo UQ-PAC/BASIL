@@ -57,7 +57,7 @@ class DotNode(val id: String, val label: String) extends DotElement {
   override def toString: String = toDotString
 
   def toDotString: String =
-    s"\"$id\"" + "[label=\"" + wrap(label, 100) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
+    s"\"$id\"" + "[label=\"" + wrap(label, 200) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
 
 }
 

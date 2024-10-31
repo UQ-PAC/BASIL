@@ -9,14 +9,14 @@ import analysis._
 
 val phiAssignLabel = Some("phi")
 
-/** This transforms the program by no-op copies and renaming local variable indices to establish the property that
+/** This transforms the program by adding no-op copies and renaming local variable indices to establish the property that
   *
   * \forall variables v, forall uses of v : u, No subset of definitions of v defines the use u.
   */
 
 class OnePassDSA(
-    liveVarsCheck: Option[Map[CFGPosition, Set[Variable]]] = None
-    /** Check our (faster) live var result against the TIP sovler solution */
+    /** Check our (faster) live var result against the TIP sovler solution 
+     */
 ) {
 
   val liveVarsDom = transforms.IntraLiveVarsDomain()
@@ -141,7 +141,7 @@ class OnePassDSA(
             // if there is no renaming such that all the incoming renames agree
             // then we create a new copy
             case h :: tl =>
-              tl.foldLeft(Some(h): Option[Int])((acc, rn) =>
+              tl.foldLeft(Some(h): Option[Int])((acc : Option[Int], rn: Int) =>
                 acc match {
                   case Some(v) if v == rn => Some(v)
                   case _                  => None
@@ -238,19 +238,19 @@ class OnePassDSA(
       block: Block
   ) = {
 
-    /** VisitBlock:
-      *
-      *   1. for all complete incoming
-      *      - if there is an incoming rename that is not equal across the predecessors
-      *      - add back phi block to each incoming edge
-      *      - create a fresh copy of each non-uniform renamed variable
-      *      - add copies to each phi block unify the incoming rename with the nominated new rename 2. add local value
-      *        numbering to this block 3. if all predecessors are filled, mark this complete, otherwise mark this
-      *        filled. 4. for all successors
-      *   - if marked filled, add phi block to unify our outgoing with its incoming
-      *   - if > 1 total predecessors for each unmarked , add phi block to nominate a new copy 5. for all successors, if
-      *     all predecessors are now filled, mark complete
-      */
+  /** VisitBlock:
+    *
+    *   1. for all complete incoming
+    *      - if there is an incoming rename that is not equal across the predecessors
+    *      - add back phi block to each incoming edge
+    *      - create a fresh copy of each non-uniform renamed variable
+    *      - add copies to each phi block unify the incoming rename with the nominated new rename 2. add local value
+    *        numbering to this block 3. if all predecessors are filled, mark this complete, otherwise mark this
+    *        filled. 4. for all successors
+    *   - if marked filled, add phi block to unify our outgoing with its incoming
+    *   - if > 1 total predecessors for each unmarked , add phi block to nominate a new copy 5. for all successors, if
+    *     all predecessors are now filled, mark complete
+    */
 
     def state(b: Block) = withDefault(_st)(b)
 
@@ -286,16 +286,6 @@ class OnePassDSA(
     val (liveBeforeIn, liveAfterIn) = liveVarsSolver.solveProc(p, backwards = true)
     val liveBefore = mutable.Map.from(liveBeforeIn)
     val liveAfter = mutable.Map.from(liveAfterIn)
-
-    for (lvResult <- liveVarsCheck) {
-      // check live vars has equal result to TIP solver
-      for ((b, s) <- liveBefore) {
-        assert(
-          lvResult(b) == s,
-          s"LiveVars unequal ${b.label}: ${lvResult(b)} == $s (differing ${lvResult(b).diff(s)})"
-        )
-      }
-    }
 
     val worklist = mutable.PriorityQueue[Block]()(Ordering.by(b => b.rpoOrder))
     worklist.addAll(p.blocks)
