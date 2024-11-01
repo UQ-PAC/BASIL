@@ -63,7 +63,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
         translatedProcedures
     }
     val defaultGlobals = List(BVarDecl(mem, List(externAttr)), BVarDecl(Gamma_mem, List(externAttr)))
-    val globalVars = procedures.flatMap(p => p.globals ++ p.freeRequires.flatMap(_.globals) ++ p.freeEnsures.flatMap(_.globals) ++ p.ensures.flatMap(_.globals) ++ p.requires.flatMap(_.globals))
+    val globalVars = procedures.flatMap(p => p.globals)
     val globalDecls = (globalVars.map(b => BVarDecl(b, List(externAttr))) ++ defaultGlobals).distinct.sorted.toList
 
     val globalConsts: List[BConstAxiomPair] =
@@ -217,6 +217,12 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
   def functionOpToDefinition(f: FunctionOp): BFunction = {
     f match {
+      case b @ BoolToBV1Op(arg) =>  {
+        val invar = BParam("arg", BoolBType)
+        val outvar = BParam(BitVecBType(1))
+        val body = IfThenElse(invar, BitVecBLiteral(1,1), BitVecBLiteral(0, 1))
+        BFunction(b.fnName, List(invar), outvar, Some(body), List(externAttr))
+      }
       case b: BVFunctionOp => BFunction(b.name, b.in, b.out, None, List(externAttr, b.attribute))
       case m: MemoryLoadOp =>
         val memVar = BMapVar("memory", MapBType(BitVecBType(m.addressSize), BitVecBType(m.valueSize)), Scope.Parameter)

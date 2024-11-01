@@ -89,6 +89,8 @@ def evalUnOp(op: UnOp, body: Literal): Expr = {
     case (i: IntLiteral, IntNEG)   => IntLiteral(-i.value)
     case (FalseLiteral, BoolNOT)   => TrueLiteral
     case (TrueLiteral, BoolNOT)    => FalseLiteral
+    case (TrueLiteral, BoolToBV1)  => BitVecLiteral(1, 0)
+    case (FalseLiteral, BoolToBV1) => BitVecLiteral(0, 1)
     case (_, _)                    => throw Exception(s"Unreachable ${(body, op)}")
   }
 }
@@ -154,15 +156,15 @@ def fastPartialEvalExpr(exp: Expr): Expr = {
   exp match {
     case f: UninterpretedFunction => f
     case unOp: UnaryExpr => {
-        unOp.arg match {
-          case l: Literal => evalUnOp(unOp.op, l)
-          case o          => UnaryExpr(unOp.op, o) 
-        }
+      unOp.arg match {
+        case l: Literal => evalUnOp(unOp.op, l)
+        case o          => UnaryExpr(unOp.op, o)
       }
+    }
     case binOp: BinaryExpr =>
-        val lhs = binOp.arg1
-        val rhs = binOp.arg2
-        binOp.getType match {
+      val lhs = binOp.arg1
+      val rhs = binOp.arg2
+      binOp.getType match {
         case m: MapType => binOp
         case b: BitVecType => {
           (binOp.op, lhs, rhs) match {
@@ -217,13 +219,12 @@ def fastPartialEvalExpr(exp: Expr): Expr = {
         case o => r.copy(body = o)
       }
     case variable: Variable => variable
-    case ml: MemoryLoad => 
+    case ml: MemoryLoad =>
       val addr = ml.index
-      ml.copy(index= addr)
-    case b: Literal =>  b
+      ml.copy(index = addr)
+    case b: Literal => b
   }
 }
-
 
 def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S, Expr, InterpreterError] = {
   val eval = statePartialEvalExpr(l)

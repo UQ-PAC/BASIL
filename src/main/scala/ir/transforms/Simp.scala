@@ -269,7 +269,7 @@ def removeSlices(p: Procedure): Unit = {
     }
 
   enum HighZeroBits:
-    case Bits(n: Int) // most significant bit that is accessed (and all below)
+    case Bits(n: Int, var unifromAccesses: Boolean = true) // most significant bit that is accessed (and all below)
     case False // property is false
     case Bot // don't know anything
 
@@ -306,18 +306,18 @@ def removeSlices(p: Procedure): Unit = {
         return ();
       }
       if (((!result.contains(v)) || result.get(v).contains(HighZeroBits.Bot))) {
-        result(v) = HighZeroBits.Bits(highestBit)
+        result(v) = HighZeroBits.Bits(highestBit, true)
       } else {
         result(v) match {
-          case HighZeroBits.Bits(n) if highestBit == size(v).get => {
+          case HighZeroBits.Bits(n, _) if highestBit == size(v).get => {
             // access full expr
             result(v) = HighZeroBits.False
           }
-          case HighZeroBits.Bits(n) if highestBit > n => {
+          case HighZeroBits.Bits(n, _) if highestBit > n => {
             // relax constraint to bits accessed
-            result(v) = HighZeroBits.Bits(highestBit)
+            result(v) = HighZeroBits.Bits(highestBit, false)
           }
-          case HighZeroBits.Bits(n) if n >= highestBit => {
+          case HighZeroBits.Bits(n, _) if n >= highestBit => {
             // access satisfied by upper constraint
           }
           case _ => ()
@@ -327,7 +327,12 @@ def removeSlices(p: Procedure): Unit = {
 
     override def vstmt(s: Statement) = {
       s match {
+        case Assign(l: LocalVar, r: LocalVar, _) => {
+          /** direct copy ; use union-find result to process access **/
+          SkipChildren()
+        }
         case d: DirectCall => {
+          /** we always need to pass whole variable across calls since we analyse intraprocedurally */
           d.outParams.map(_._2).collect {
             case l: LocalVar => {
               result(l) = HighZeroBits.False
@@ -366,9 +371,17 @@ def removeSlices(p: Procedure): Unit = {
     }
   }
 
-  val toSmallen = CheckUsesHaveExtend()(p).collect { case (v, HighZeroBits.Bits(x)) =>
+  val onlyKeepWhereAllAccessesSliceSameBits = true
+  val toSmallen = CheckUsesHaveExtend()(p).collect { case (v, HighZeroBits.Bits(x, onlyKeepWhereAllAccessesSliceSameBits)) =>
     v -> x
   }.toMap
+
+  /**
+   * This transform moves bvextracts from the uses to the definition, if all uses have an extract of some size. 
+   * Ideally this removes the extract in some cases. To bemore strict the 
+   *    val onlyKeepWhereAllAccessesSliceSameBits = true
+   * flag only applies this transform when all accesses have extactly the same slice, effectively removing the slice at access.
+   */
 
   class ReplaceAlwaysSlicedVars(varHighZeroBits: Map[LocalVar, Int]) extends CILVisitor {
     var formals = Set[LocalVar]()
@@ -914,15 +927,15 @@ object CCP {
 
 def DSACopyProp(p: Procedure): Map[Variable, Expr] = {
 
-  case class PropState(val e: Expr, val deps: Set[Variable], var clobbered: Boolean, var useCount: Int)
+  case class PropState(val e: Expr, val deps: mutable.Set[Variable], var clobbered: Boolean, var useCount: Int, var isFlagDep: Boolean)
   val state = mutable.HashMap[Variable, PropState]()
-  var poisoned = false
+  var poisoned = false // we have an indirect call
 
   def clobberFull(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
     if (c.contains(l)) {
       c(l).clobbered = true
     } else {
-      c(l) = PropState(FalseLiteral, Set(), true, 0)
+      c(l) = PropState(FalseLiteral, mutable.Set(), true, 0, false)
     }
   }
 
@@ -932,6 +945,8 @@ def DSACopyProp(p: Procedure): Map[Variable, Expr] = {
       c(v).clobbered = true
     }
   }
+
+  val flagNames = Set("ZF", "VF", "CF", "NF", "R31")
 
   def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
     // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
@@ -945,17 +960,29 @@ def DSACopyProp(p: Procedure): Map[Variable, Expr] = {
           val rhsDeps = evaled.variables.toSet
           val existing = c.get(l)
 
+          val isFlag = l match {
+            case l: LocalVar =>  flagNames.contains(l.varName)
+            case l           =>  flagNames.contains(l.name)
+          }
+
+          c.get(l).foreach(v => v.isFlagDep = v.isFlagDep || isFlag)
+          for (l <- rhsDeps) {
+            c.get(l).foreach(v => v.isFlagDep = v.isFlagDep || isFlag)
+          }
+
           existing match {
             case None => {
-              c(l) = PropState(evaled, rhsDeps, false, 0)
+              c(l) = PropState(evaled, mutable.Set.from(rhsDeps), false, 0, isFlag)
             }
             case Some(ps) if ps.clobbered => {
               ()
             }
             case Some(ps) if ps.e != evaled => {
+              ps.deps.addAll(rhsDeps)
               clobberFull(c, l)
             }
             case _ => {
+              // clobberFull(c, l)
               // ps.e == evaled and have prop
             }
           }
@@ -975,6 +1002,8 @@ def DSACopyProp(p: Procedure): Map[Variable, Expr] = {
         }
       }
       case x: IndirectCall => {
+        // not really correct 
+        poisoned = true
         for ((i, v) <- c) {
           v.clobbered = true
         }
@@ -987,7 +1016,7 @@ def DSACopyProp(p: Procedure): Map[Variable, Expr] = {
   val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
   worklist.addAll(p.blocks)
 
-  while (worklist.nonEmpty) {
+  while (worklist.nonEmpty && !poisoned) {
     val b: Block = worklist.dequeue
 
     for (l <- b.statements) {
@@ -995,8 +1024,8 @@ def DSACopyProp(p: Procedure): Map[Variable, Expr] = {
     }
   }
 
-  val res = state.collect {
-    case (v, c) if !c.clobbered => v -> c.e
+  val res = if poisoned then Map() else state.collect {
+    case (v, c) if !c.clobbered && (c.useCount == 1 || c.isFlagDep || c.e.isInstanceOf[Variable] || c.e.isInstanceOf[Literal]) => v -> c.e
   }.toMap
   res
 }
@@ -1151,7 +1180,8 @@ class Simplify(
         Logger.warn(s"Some skipped substitution at $bl due to resulting expr size > ${threshold} threshold")
       }
     }
-    ChangeTo(result)
+    // ChangeDoChildrenPost(result, x => x)
+    ChangeDoChildrenPost(result, x => x)
   }
 
   override def vblock(b: Block) = {

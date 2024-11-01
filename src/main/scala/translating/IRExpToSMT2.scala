@@ -94,6 +94,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       case BVNOT   => "bvnot"
       case BVNEG   => "bvneg"
       case IntNEG  => "-"
+      case BoolToBV1 => "bool2bv1"
     }
   }
 
@@ -159,16 +160,21 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
     }
   }
 
+
+  def booltoBVDef : Sexp[Expr] = {
+    list(
+      sym("define-fun"),
+      sym("bool2bv1"),
+      list(list(sym("arg"), basilTypeToSMTType(BoolType))),
+      basilTypeToSMTType(BitVecType(1)),
+      list(sym("ite"), sym("arg"), bv2smt(BitVecLiteral(1, 1)), bv2smt(BitVecLiteral(0, 1)))
+    )
+  }
+
   def interpretFun(x: UninterpretedFunction): Option[Sexp[Expr]] = {
     x.name match {
       case "bool2bv1" => {
-        Some(list(
-          sym("define-fun"),
-          sym(x.name),
-          list(list(sym("arg"), basilTypeToSMTType(BoolType))),
-          basilTypeToSMTType(x.returnType),
-          list(sym("ite"), sym("arg"), bv2smt(BitVecLiteral(1, 1)), bv2smt(BitVecLiteral(0, 1)))
-        ))
+        Some(booltoBVDef)
       }
       case "bvsaddo" => None
       case _ => {
@@ -192,6 +198,10 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
           val decl = interpretFun(f)
           decled = decled ++ decl.toSet
           DoChildren() // get variables out of args
+        }
+        case UnaryExpr(BoolToBV1, _) => {
+          decled = decled + booltoBVDef
+          DoChildren()
         }
         case v: Variable => {
           val decl = list(sym("declare-const"), sym(fixVname(v.name)), basilTypeToSMTType(v.getType))

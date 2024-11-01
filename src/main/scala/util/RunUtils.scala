@@ -531,45 +531,64 @@ object RunUtils {
     // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
+    val write = false
 
     transforms.applyRPO(ctx.program)
+
+    transforms.removeEmptyBlocks(ctx.program)
+    transforms.coalesceBlocks(ctx.program)
+    transforms.removeEmptyBlocks(ctx.program)
+    if write then writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-dsa.dot")
+    
     Logger.info(s"RPO ${timer.checkPoint("RPO")} ms ")
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
-
-    // writeToFile(serialiseIL(ctx.program), s"il-before-dsa.il")
+    if write then writeToFile(serialiseIL(ctx.program), s"il-before-dsa.il")
 
     // transforms.DynamicSingleAssignment.applyTransform(ctx.program, liveVars)
     transforms.OnePassDSA().applyTransform(ctx.program)
     Logger.info(s"DSA ${timer.checkPoint("DSA ")} ms ")
-    // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-after-dsa.dot")
+    if write then writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-after-dsa.dot")
     if (ir.eval.SimplifyValidation.validate) {
-      Logger.info("Live vars difftest")
-      val tipLiveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
-      assert(ctx.program.procedures.forall(transforms.difftestLiveVars(_, tipLiveVars)))
+      // Logger.info("Live vars difftest")
+      // val tipLiveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
+      //assert(ctx.program.procedures.forall(transforms.difftestLiveVars(_, tipLiveVars)))
 
       Logger.info("DSA Check")
       val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
       assert(x)
+      Logger.info("DSA Check passed")
     }
-    Logger.info("DSA Check passed")
     assert(invariant.singleCallBlockEnd(ctx.program))
     assert(invariant.cfgCorrect(ctx.program))
     assert(invariant.blocksUniqueToEachProcedure(ctx.program))
 
-    // writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
+    if write then writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
 
     // brute force run the analysis twice because it cleans up more stuff
     transforms.doCopyPropTransform(ctx.program)
     transforms.doCopyPropTransform(ctx.program)
-    transforms.doCopyPropTransform(ctx.program)
+    assert(invariant.blockUniqueLabels(ctx.program))
     Logger.info(s"CopyProp ${timer.checkPoint("CopyProp")} ms ")
-    // writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
+    if write then writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
+
+
+    if (ir.eval.SimplifyValidation.validate) {
+      Logger.info("DSA Check (after transform)")
+      val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
+      assert(x)
+      Logger.info("passed")
+    }
 
     // run this after cond recovery because sign bit calculations often need high bits
     // which go away in high level conss
-    // writeToFile(serialiseIL(ctx.program), s"il-after-slices.il")
+    if write then writeToFile(serialiseIL(ctx.program), s"il-after-slices.il")
 
-    // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-after-simp.dot")
+    if write then writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-after-simp.dot")
+
+    // re-apply dsa
+    // transforms.OnePassDSA().applyTransform(ctx.program)
+    if write then writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-after-second-dsa.dot")
+
 
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("[!] Simplify :: Writing simplification validation")

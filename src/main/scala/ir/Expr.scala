@@ -25,7 +25,6 @@ sealed trait Expr {
   lazy val variablesCached = variables
 }
 
-
 def size(e: Expr) = {
   e.getType match {
     case BitVecType(s) => Some(s)
@@ -67,9 +66,10 @@ case class IntLiteral(value: BigInt) extends Literal {
   override def toString: String = value.toString
 }
 
-/**
-  * @param end : high bit exclusive
-  * @param start : low bit inclusive
+/** @param end
+  *   : high bit exclusive
+  * @param start
+  *   : low bit inclusive
   * @param body
   */
 case class Extract(end: Int, start: Int, body: Expr) extends Expr {
@@ -130,6 +130,7 @@ case class UnaryExpr(op: UnOp, arg: Expr) extends Expr {
   override def variables: Set[Variable] = arg.variables
   override def loads: Set[MemoryLoad] = arg.loads
   override def getType: IRType = (op, arg.getType) match {
+    case (BoolToBV1, BoolType)       => BitVecType(1)
     case (_: BoolUnOp, BoolType)     => BoolType
     case (_: BVUnOp, bv: BitVecType) => bv
     case (_: IntUnOp, IntType)       => IntType
@@ -157,6 +158,7 @@ sealed trait BoolUnOp(op: String) extends UnOp {
 }
 
 case object BoolNOT extends BoolUnOp("!")
+case object BoolToBV1 extends BoolUnOp("bool2bv1")
 
 sealed trait IntUnOp(op: String) extends UnOp {
   override def toString: String = op
@@ -164,7 +166,6 @@ sealed trait IntUnOp(op: String) extends UnOp {
 }
 
 case object IntNEG extends IntUnOp("-")
-
 
 sealed trait BVUnOp(op: String) extends UnOp {
   override def toString: String = op
@@ -212,7 +213,9 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
         case IntEQ | IntNEQ | IntLT | IntLE | IntGT | IntGE => BoolType
       }
     case _ =>
-      throw new Exception("type mismatch, operator " + op.getClass.getSimpleName + s" type doesn't match args: (" + arg1 + ", " + arg2 + ")")
+      throw new Exception(
+        "type mismatch, operator " + op.getClass.getSimpleName + s" type doesn't match args: (" + arg1 + ", " + arg2 + ")"
+      )
   }
 
   private def inSize = arg1.getType match {
@@ -237,7 +240,7 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
 }
 
 trait BinOp {
-  def opName : String  
+  def opName: String
 }
 
 sealed trait BoolBinOp(op: String) extends BinOp {
@@ -386,7 +389,7 @@ case class Register(override val name: String, size: Int) extends Variable with 
 }
 
 // Variable with scope local to the procedure, typically a temporary variable created in the lifting process
-case class LocalVar(varName: String, override val irType: IRType, val index : Int = 0) extends Variable {
+case class LocalVar(varName: String, override val irType: IRType, val index: Int = 0) extends Variable {
   override val name = varName + (if (index > 0) then s"_$index" else "")
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
@@ -396,10 +399,9 @@ case class LocalVar(varName: String, override val irType: IRType, val index : In
 
 object LocalVar {
 
-  def unapply(l: LocalVar) : Option[(String, IRType)] = Some((s"${l.name}_${l.index}", l.irType)) 
+  def unapply(l: LocalVar): Option[(String, IRType)] = Some((s"${l.name}_${l.index}", l.irType))
 
 }
-
 
 // A memory section
 sealed trait Memory extends Global {
@@ -416,11 +418,13 @@ sealed trait Memory extends Global {
 }
 
 // A stack section of memory, which is local to a thread
-case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
+case class StackMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
+    extends Memory {
   override def acceptVisit(visitor: Visitor): Memory = visitor.visitStackMemory(this)
 }
 
 // A non-stack region of memory, which is shared between threads
-case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int) extends Memory {
+case class SharedMemory(override val name: String, override val addressSize: Int, override val valueSize: Int)
+    extends Memory {
   override def acceptVisit(visitor: Visitor): Memory = visitor.visitSharedMemory(this)
 }

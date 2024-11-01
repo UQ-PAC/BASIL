@@ -37,6 +37,26 @@ private class BVis extends CILVisitor {
   }
 }
 
+
+def blockUniqueLabels(p: Program) : Boolean = {
+  p.procedures.forall(blockUniqueLabels)
+}
+
+def blockUniqueLabels(p: Procedure) : Boolean = {
+  val blockNames = mutable.Set[String]()
+  var passed = true
+
+  for (block <- p.blocks) {
+    if (blockNames.contains(block.label)) {
+      passed = false
+      Logger.error("Duplicate block name: " + block.label)
+    }
+    blockNames.add(block.label)
+  }
+  passed
+}
+
+
 def blocksUniqueToEachProcedure(p: Program) : Boolean = {
   val v = BVis()
   visit_prog(v, p)
