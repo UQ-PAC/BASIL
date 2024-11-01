@@ -531,7 +531,7 @@ object RunUtils {
     // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
-    val write = false
+    val write = true
 
     transforms.applyRPO(ctx.program)
 
@@ -572,6 +572,8 @@ object RunUtils {
     if write then writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
 
 
+    val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
+    assert(x)
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("DSA Check (after transform)")
       val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
