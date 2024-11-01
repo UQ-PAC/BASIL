@@ -426,6 +426,17 @@ object StaticAnalysis {
     steensgaardSolver.analyze()
     val steensgaardResults = steensgaardSolver.pointsTo()
 
+    Logger.debug("[!] Running SASI_VSA")
+    val sasiVsaSolver = SASI_VSA(IRProgram, constPropResult, mmm)
+    val sasiVsaResult = sasiVsaSolver.IntraProceduralVSA()
+
+    config.analysisDotPath.foreach(s => {
+      writeToFile(
+        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> sasiVsaResult.getOrElse(b, "").toString).toMap),
+        s"${s}_SASI_VSA$iteration.dot"
+      )
+    })
+
     Logger.debug("[!] Running VSA")
     val vsaSolver = ValueSetAnalysisSolver(IRProgram, mmm, constPropResult)
     val vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]] = vsaSolver.analyze()

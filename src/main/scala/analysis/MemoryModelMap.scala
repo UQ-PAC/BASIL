@@ -364,12 +364,22 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
     heapCalls(directCall)
   }
 
+  def getHeapRegions: Set[HeapRegion] = {
+    heapMap.values.toSet
+  }
+
   def getStack(allocationSite: CFGPosition): Set[StackRegion] = {
     stackAllocationSites.getOrElse(allocationSite, Set.empty).map(returnRegion)
   }
 
+  def getLocalStacks: mutable.Map[String, List[StackRegion]] = localStacks
+
   def getData(cfgPosition: CFGPosition): Set[DataRegion] = {
     cfgPositionToDataRegion.getOrElse(cfgPosition, Set.empty).map(returnRegion)
+  }
+
+  def getDataRegions: Set[DataRegion] = {
+    dataMap.values.toSet
   }
 
   def nodeToRegion(n: CFGPosition): Set[MemoryRegion] = {
@@ -378,6 +388,14 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
         Set(getHeap(directCall))
       case _ =>
         getStack(n) ++ getData(n)
+    }
+  }
+
+  def getOffset(region: MemoryRegion): BigInt = {
+    region match {
+      case s: StackRegion => s.start
+      case d: DataRegion => d.start
+      case h: HeapRegion => h.start
     }
   }
 }
