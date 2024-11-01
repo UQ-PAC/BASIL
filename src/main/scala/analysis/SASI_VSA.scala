@@ -61,30 +61,28 @@ class SASI_VSA(program: Program,
    * Heap
    *   Heap -> {alloc8, alloc9}
    */
-  case class AbsEnv():
-    var regEnv: mutable.Map[Variable, ValueSet[MemRgn]] = mutable.Map[Variable, ValueSet[MemRgn]]().withDefault(_ => valueSetLattice.bottom)
-    var flagEnv: Flag = FlagMap(Map[Flags, Bool3]())
-    var alocEnv: mutable.Map[aaloc, ValueSet[MemRgn]] = mutable.Map[aaloc, ValueSet[MemRgn]]().withDefault(_ => valueSetLattice.bottom)
-
+  case class AbsEnv(
+    regEnv: Map[Variable, ValueSet[MemRgn]] = Map[Variable, ValueSet[MemRgn]]().withDefault(_ => valueSetLattice.bottom),
+    flagEnv: Flag = FlagMap(Map[Flags, Bool3]()),
+    alocEnv: Map[aaloc, ValueSet[MemRgn]] = Map[aaloc, ValueSet[MemRgn]]().withDefault(_ => valueSetLattice.bottom)
+    ):
     def join(absEnv: AbsEnv): AbsEnv = {
-      val out = AbsEnv()
+      var curRegEnv = this.regEnv
+      var curFlagEnv = this.flagEnv
+      var curAlocEnv = this.alocEnv
       // unify regs
       absEnv.regEnv.foreach((k, v) =>
-        if (regEnv.contains(k)) {
-          out.regEnv(k) = valueSetLattice.lub(regEnv(k), v)
-        } else {
-          out.regEnv(k) = v
+        if (curRegEnv.contains(k)) {
+          curRegEnv = curRegEnv ++ Map(k -> valueSetLattice.lub(absEnv.regEnv(k), v))
         })
        // unify alocs
         absEnv.alocEnv.foreach((k, v) =>
-          if (alocEnv.contains(k)) {
-            out.alocEnv(k) = valueSetLattice.lub(alocEnv(k), v)
-          } else {
-            out.alocEnv(k) = v
+          if (curAlocEnv.contains(k)) {
+            curAlocEnv = curAlocEnv ++ Map(k -> valueSetLattice.lub(absEnv.alocEnv(k), v))
           })
         // unify flags
-        out.flagEnv = flagLattice.lub(flagEnv, absEnv.flagEnv)
-      out
+      curFlagEnv = flagLattice.lub(flagEnv, absEnv.flagEnv)
+      AbsEnv(curRegEnv, curFlagEnv, curAlocEnv)
     }
 
     override def toString: String = {
@@ -150,32 +148,27 @@ class SASI_VSA(program: Program,
       case directCall: DirectCall if directCall.target.name == "malloc" =>
         val regions = mmm.nodeToRegion(n)
         // R1 = malloc(c)
-        out.regEnv(mallocVariable) = allocEnv(regions, mallocVariable.size)
-        out
+        AbsEnv(out.regEnv ++ Map(mallocVariable -> allocEnv(regions, mallocVariable.size)), out.flagEnv, out.alocEnv)
       case localAssign: Assign =>
         val regions = mmm.nodeToRegion(n)
         if (regions.nonEmpty) {
-          out.regEnv(localAssign.lhs) = allocEnv(regions, STANDARD_WIDTH)
-          out
+          AbsEnv(out.regEnv ++ Map(localAssign.lhs -> allocEnv(regions, STANDARD_WIDTH)), out.flagEnv, out.alocEnv)
         } else {
           evaluateExpression(localAssign.rhs, constantProp(n)) match {
             case Some(bitVecLiteral: BitVecLiteral) =>
               val possibleData = canCoerceIntoDataRegion(bitVecLiteral, 1)
               if (possibleData.isDefined) {
-                out.regEnv(localAssign.lhs) = allocEnv(Set(possibleData.get), STANDARD_WIDTH)
-                out
+                AbsEnv(out.regEnv ++ Map(localAssign.lhs -> allocEnv(Set(possibleData.get), STANDARD_WIDTH)), out.flagEnv, out.alocEnv)
               } else {
                 val si = valueSetLattice.lattice.singletonSI(bitVecLiteral.value, bitVecLiteral.size)
                 val vs = VS(Map(VSADataRegion -> si).withDefault(_ => valueSetLattice.lattice.bottom))
-                out.regEnv(localAssign.lhs) = vs.asInstanceOf[ValueSet[MemRgn]]
-                out
+                AbsEnv(out.regEnv ++ Map(localAssign.lhs -> vs.asInstanceOf[ValueSet[MemRgn]]), out.flagEnv, out.alocEnv)
               }
             case None =>
               val unwrapValue = unwrapExprToVar(localAssign.rhs)
               unwrapValue match {
                 case Some(v: Variable) =>
-                  out.regEnv(localAssign.lhs) = out.regEnv(v)
-                  out
+                  AbsEnv(out.regEnv ++ Map(localAssign.lhs -> out.regEnv(v)), out.flagEnv, out.alocEnv)
                 case None =>
                   Logger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
                   out
@@ -188,20 +181,20 @@ class SASI_VSA(program: Program,
           case Some(bitVecLiteral: BitVecLiteral) =>
             val possibleData = canCoerceIntoDataRegion(bitVecLiteral, memAssign.size)
             if (possibleData.isDefined) {
-              regions.foreach(r => out.alocEnv(r) = allocEnv(Set(possibleData.get), memAssign.size))
-              out
+              val mappings = regions.map(r => r -> allocEnv(Set(possibleData.get), memAssign.size)).toMap
+              AbsEnv(out.regEnv, out.flagEnv, out.alocEnv ++ mappings)
             } else {
               val si = valueSetLattice.lattice.singletonSI(bitVecLiteral.value, bitVecLiteral.size)
               val vs = VS(Map(VSADataRegion -> si).withDefault(_ => valueSetLattice.lattice.bottom))
-              regions.foreach(r => out.alocEnv(r) = vs.asInstanceOf[ValueSet[MemRgn]])
-              out
+              val mappings = regions.map(r => r -> vs.asInstanceOf[ValueSet[MemRgn]]).toMap
+              AbsEnv(out.regEnv, out.flagEnv, out.alocEnv ++ mappings)
             }
           case None =>
             val unwrapValue = unwrapExprToVar(memAssign.value)
             unwrapValue match {
               case Some(v: Variable) =>
-                regions.foreach(r => out.alocEnv(r) = out.regEnv(v))
-                out
+                val mappings = regions.map(r => r -> out.regEnv(v)).toMap
+                AbsEnv(out.regEnv, out.flagEnv, out.alocEnv ++ mappings)
               case None =>
                 Logger.debug(s"Too Complex: $memAssign.value") // do nothing
                 out
