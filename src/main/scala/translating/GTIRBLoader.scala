@@ -1,5 +1,5 @@
 package translating
-import Parsers.SemanticsParser.*
+import Parsers.ASLpParser.*
 import com.google.protobuf.ByteString
 import Parsers.*
 

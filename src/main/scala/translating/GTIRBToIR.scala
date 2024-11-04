@@ -7,7 +7,7 @@ import com.grammatech.gtirb.proto.CFG.Edge
 import com.grammatech.gtirb.proto.CFG.EdgeLabel
 import com.grammatech.gtirb.proto.Module.Module
 import com.grammatech.gtirb.proto.Symbol.Symbol
-import Parsers.SemanticsParser.*
+import Parsers.ASLpParser.*
 import gtirb.*
 import ir.*
 

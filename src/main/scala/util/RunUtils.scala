@@ -17,7 +17,7 @@ import ir.*
 import boogie.*
 import specification.*
 import Parsers.*
-import Parsers.SemanticsParser.*
+import Parsers.ASLpParser.*
 import analysis.data_structure_analysis.{DataStructureAnalysis, Graph, SymbolicAddress, SymbolicAddressAnalysis}
 import org.antlr.v4.runtime.tree.ParseTreeWalker
 import org.antlr.v4.runtime.BailErrorStrategy
@@ -123,9 +123,9 @@ object IRLoading {
     val semantics = mods.map(_.auxData("ast").data.toStringUtf8.parseJson.convertTo[Map[String, Array[Array[String]]]])
 
     def parse_insn(line: String): StmtContext = {
-      val semanticsLexer = SemanticsLexer(CharStreams.fromString(line))
-      val tokens = CommonTokenStream(semanticsLexer)
-      val parser = SemanticsParser(tokens)
+      val lexer = ASLpLexer(CharStreams.fromString(line))
+      val tokens = CommonTokenStream(lexer)
+      val parser = ASLpParser(tokens)
       parser.setErrorHandler(BailErrorStrategy())
       parser.setBuildParseTree(true)
 
