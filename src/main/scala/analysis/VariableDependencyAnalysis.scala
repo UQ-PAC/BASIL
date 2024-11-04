@@ -101,7 +101,7 @@ class ProcVariableDependencyAnalysis(
 {
   override def phase2Init: Set[Taintable] = Set(Register("R0", 64))
 
-  override val startNode: CFGPosition = procedure
+  override def start: CFGPosition = procedure
 }
 
 class VariableDependencyAnalysis(
