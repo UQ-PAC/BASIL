@@ -7,12 +7,12 @@ import test_util.BASILTest
 
 class TaintAnalysisTests extends AnyFunSuite, BASILTest {
   def getTaintAnalysisResults(program: Program, taint: Map[CFGPosition, Set[Taintable]]): Map[CFGPosition, Set[Taintable]] = {
-    val constPropResults = ConstantPropagationSolver(program).analyze()
+    val constPropResults = InterProcConstantPropagation(program).analyze()
     TaintAnalysis(program, Map(), constPropResults, taint).analyze().map { (c, m) => (c, m.map { (v, _) => v }.toSet)}
   }
 
   def getVarDepResults(program: Program, procedure: Procedure): Map[CFGPosition, Map[Taintable, Set[Taintable]]] = {
-    val constPropResults = ConstantPropagationSolver(program).analyze()
+    val constPropResults = InterProcConstantPropagation(program).analyze()
     val variables = registers
     ProcVariableDependencyAnalysis(program, variables, Map(), constPropResults, Map(), procedure).analyze()
   }
