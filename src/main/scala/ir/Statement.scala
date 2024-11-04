@@ -23,33 +23,47 @@ sealed trait Statement extends Command, IntrusiveListElement[Statement] {
   def acceptVisit(visitor: Visitor): Statement = throw new Exception(
     "visitor " + visitor + " unimplemented for: " + this
   )
-
   def successor: Command = parent.statements.nextOption(this).getOrElse(parent.jump)
-
 }
 
-// invariant: rhs contains at most one MemoryLoad
-class Assign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends Statement {
+sealed trait Assign extends Statement {
+  var lhs: Variable
+}
+
+class LocalAssign(var lhs: Variable, var rhs: Expr, override val label: Option[String] = None) extends Assign {
   override def modifies: Set[Global] = lhs match {
     case r: Register => Set(r)
     case _           => Set()
   }
   override def toString: String = s"$labelStr$lhs := $rhs"
-  override def acceptVisit(visitor: Visitor): Statement = visitor.visitAssign(this)
+  override def acceptVisit(visitor: Visitor): Statement = visitor.visitLocalAssign(this)
 }
 
-object Assign:
-  def unapply(l: Assign): Option[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
+object LocalAssign:
+  def unapply(l: LocalAssign): Option[(Variable, Expr, Option[String])] = Some(l.lhs, l.rhs, l.label)
 
-// invariant: index and value do not contain MemoryLoads
-class MemoryAssign(var mem: Memory, var index: Expr, var value: Expr, var endian: Endian, var size: Int, override val label: Option[String] = None) extends Statement {
+class MemoryStore(var mem: Memory, var index: Expr, var value: Expr, var endian: Endian, var size: Int, override val label: Option[String] = None) extends Statement {
   override def modifies: Set[Global] = Set(mem)
   override def toString: String = s"$labelStr$mem[$index] := MemoryStore($value, $endian, $size)"
-  override def acceptVisit(visitor: Visitor): Statement = visitor.visitMemoryAssign(this)
+  override def acceptVisit(visitor: Visitor): Statement = visitor.visitMemoryStore(this)
 }
 
-object MemoryAssign:
-  def unapply(m: MemoryAssign): Option[(Memory, Expr, Expr, Endian, Int, Option[String])] = Some(m.mem, m.index, m.value, m.endian, m.size, m.label)
+object MemoryStore {
+  def unapply(m: MemoryStore): Option[(Memory, Expr, Expr, Endian, Int, Option[String])] = Some(m.mem, m.index, m.value, m.endian, m.size, m.label)
+}
+
+class MemoryLoad(var lhs: Variable, var mem: Memory, var index: Expr, var endian: Endian, var size: Int, override val label: Option[String] = None) extends Assign {
+  override def modifies: Set[Global] = lhs match {
+    case r: Register => Set(r)
+    case _ => Set()
+  }
+  override def toString: String = s"$labelStr$lhs := MemoryLoad($mem, $index, $endian, $size)"
+  override def acceptVisit(visitor: Visitor): Statement = visitor.visitMemoryLoad(this)
+}
+
+object MemoryLoad {
+  def unapply(m: MemoryLoad): Option[(Variable, Memory, Expr, Endian, Int, Option[String])] = Some(m.lhs, m.mem, m.index, m.endian, m.size, m.label)
+}
 
 class NOP(override val label: Option[String] = None) extends Statement {
   override def toString: String = s"NOP $labelStr"
@@ -87,10 +101,17 @@ class Unreachable(override val label: Option[String] = None) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
+object Unreachable {
+  def unapply(u: Unreachable): Option[Option[String]] = Some(u.label)
+}
+
 class Return(override val label: Option[String] = None) extends Jump {
   override def acceptVisit(visitor: Visitor): Jump = this
 }
 
+object Return {
+  def unapply(r: Return): Option[Option[String]] = Some(r.label)
+}
 
 class GoTo private (private val _targets: mutable.LinkedHashSet[Block], override val label: Option[String]) extends Jump {
 

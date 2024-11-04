@@ -88,7 +88,6 @@ trait GlobalRegionAnalysis(val program: Program,
           } else {
             Set()
           }
-        case _: MemoryLoad => ???
         case _: UninterpretedFunction => Set.empty
         case variable: Variable =>
           val ctx = getUse(variable, n, reachingDefs)
@@ -169,16 +168,13 @@ trait GlobalRegionAnalysis(val program: Program,
    */
   def localTransfer(n: CFGPosition, s: Set[DataRegion]): Set[DataRegion] = {
     n match {
-      case memAssign: MemoryAssign =>
-        checkIfDefined(evalMemLoadToGlobal(memAssign.index, memAssign.size, memAssign), n)
-      case assign: Assign =>
-        val unwrapped = unwrapExpr(assign.rhs)
-        if (unwrapped.isDefined) {
-          checkIfDefined(evalMemLoadToGlobal(unwrapped.get.index, unwrapped.get.size, assign, loadOp = true), n)
-        } else {
-          // this is a constant but we need to check if it is a data region
-          checkIfDefined(evalMemLoadToGlobal(assign.rhs, 1, assign), n)
-        }
+      case store: MemoryStore =>
+        checkIfDefined(evalMemLoadToGlobal(store.index, store.size, store), n)
+      case load: MemoryLoad =>
+        checkIfDefined(evalMemLoadToGlobal(load.index, load.size, load, loadOp = true), n)
+      case assign: LocalAssign =>
+        // this is a constant but we need to check if it is a data region
+        checkIfDefined(evalMemLoadToGlobal(assign.rhs, 1, assign), n)
       case _ =>
         Set()
     }
@@ -188,12 +184,12 @@ trait GlobalRegionAnalysis(val program: Program,
 }
 
 class GlobalRegionAnalysisSolver(
-    program: Program,
-    domain: Set[CFGPosition],
-    constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-    mmm: MemoryModelMap,
-    vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
+                                  program: Program,
+                                  domain: Set[CFGPosition],
+                                  constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+                                  mmm: MemoryModelMap,
+                                  vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]
   ) extends GlobalRegionAnalysis(program, domain, constantProp, reachingDefs, mmm, vsaResult)
   with IRIntraproceduralForwardDependencies
   with Analysis[Map[CFGPosition, Set[DataRegion]]]

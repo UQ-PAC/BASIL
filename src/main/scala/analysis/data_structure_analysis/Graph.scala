@@ -48,36 +48,37 @@ class Graph(val proc: Procedure,
 
   // collect all stack access and their maximum accessed size
   // BigInt is the offset of the stack position and Int is it's size
-  private val stackAccesses: Map[BigInt, Int] = computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(Map[BigInt, Int]()) {
-    (results, pos) =>
-      pos match
-        case Assign(_, expr, _) =>
-          expr match
-            case MemoryLoad(_, index, _, size) =>
-              visitStackAccess(pos, index, size).foldLeft(results) {
-                (res, access) =>
-                  if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
-                    res + (access.offset -> access.size)
-                  else
-                    res
-              }
-            case _ =>
-              visitStackAccess(pos, expr, 0).foldLeft(results) {
-                (res, access) =>
-                  if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
-                    res + (access.offset -> access.size)
-                  else
-                    res
-              }
-        case MemoryAssign(_, index, _, _, size, _) =>
-          visitStackAccess(pos, index, size).foldLeft(results) {
-            (res, access) =>
-              if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
-                res + (access.offset -> access.size)
-              else
-                res
-          }
-        case _ => results
+  private val stackAccesses: Map[BigInt, Int] = {
+    computeDomain(IntraProcIRCursor, Set(proc)).toSeq.sortBy(_.toShortString).foldLeft(Map[BigInt, Int]()) {
+      (results, pos) =>
+        pos match {
+          case LocalAssign(_, expr, _) =>
+            visitStackAccess(pos, expr, 0).foldLeft(results) {
+              (res, access) =>
+                if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
+                  res + (access.offset -> access.size)
+                else
+                  res
+            }
+          case MemoryStore(_, index, _, _, size, _) =>
+            visitStackAccess(pos, index, size).foldLeft(results) {
+              (res, access) =>
+                if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
+                  res + (access.offset -> access.size)
+                else
+                  res
+            }
+          case MemoryLoad(_, _, index, _, size, _) =>
+            visitStackAccess(pos, index, size).foldLeft(results) {
+              (res, access) =>
+                if !res.contains(access.offset) || (res.getOrElse(access.offset, -1) < access.size) then
+                  res + (access.offset -> access.size)
+                else
+                  res
+            }
+          case _ => results
+        }
+    }
   }
 
   private case class StackAccess(offset: BigInt, size: Int)
@@ -271,9 +272,9 @@ class Graph(val proc: Procedure,
         if (varName.startsWith("#")) {
           varName = s"LocalVar_${varName.drop(1)}"
         }
-        structs.append(DotStruct(s"SSA_${id}_${varName}", s"SSA_${pos}_${varName}", None, false))
+        structs.append(DotStruct(s"SSA_${id}_$varName", s"SSA_${pos}_$varName", None, false))
         val value = find(slice)
-        arrows.append(StructArrow(DotStructElement(s"SSA_${id}_${varName}", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
+        arrows.append(StructArrow(DotStructElement(s"SSA_${id}_$varName", None), DotStructElement(value.node.id.toString, Some(value.cell.offset.toString)), value.internalOffset.toString))
       }
     }
 
@@ -601,7 +602,7 @@ class Graph(val proc: Procedure,
     val varToCell = mutable.Map[CFGPosition, mutable.Map[Variable, Slice]]()
     val domain = computeDomain(IntraProcIRCursor, Set(proc))
     domain.foreach {
-      case pos @ Assign(variable, value, _) =>
+      case pos @ LocalAssign(variable, value, _) =>
         value.variables.foreach { v =>
           if (isFormal(pos, v)) {
             val node = Node(Some(this))
@@ -612,6 +613,17 @@ class Graph(val proc: Procedure,
         }
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(variable -> Slice(node.cells(0), 0))
+      case pos @ MemoryLoad(lhs, _, index, _, _, _) =>
+        index.variables.foreach { v =>
+          if (isFormal(pos, v)) {
+            val node = Node(Some(this))
+            node.flags.incomplete = true
+            nodes.add(node)
+            formals.update(v, Slice(node.cells(0), 0))
+          }
+        }
+        val node = Node(Some(this))
+        varToCell(pos) = mutable.Map(lhs -> Slice(node.cells(0), 0))
       case pos @ DirectCall(target, _) if target.name == "malloc" =>
         val node = Node(Some(this))
         varToCell(pos) = mutable.Map(mallocRegister -> Slice(node.cells(0), 0))
@@ -622,7 +634,7 @@ class Graph(val proc: Procedure,
           result(variable) = Slice(node.cells(0), 0)
         }
         varToCell(pos) = result
-      case pos @ MemoryAssign(_, _, expr, _, _, _) =>
+      case pos @ MemoryStore(_, _, expr, _, _, _) =>
         unwrapPaddingAndSlicing(expr) match {
           case value: Variable =>
             if (isFormal(pos, value)) {

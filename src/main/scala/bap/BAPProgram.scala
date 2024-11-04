@@ -45,15 +45,6 @@ case class BAPBlock(label: String, address: Option[BigInt], statements: List[BAP
 
 }
 
-case class BAPParameter(name: String, size: Int, value: BAPVar) {
-  def toIR: Parameter = {
-    val register = value.toIR
-    register match {
-      case r: Register => Parameter(name, size, r)
-      case _           => throw Exception(s"subroutine parameter $this refers to non-register variable $value")
-    }
-
-  }
-}
+case class BAPParameter(name: String, size: Int, value: BAPVar)
 
 case class BAPMemorySection(name: String, address: BigInt, size: Int, bytes: Seq[BAPLiteral])

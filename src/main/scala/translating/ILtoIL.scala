@@ -1,5 +1,5 @@
 package translating
-import ir._
+import ir.*
 
 private class ILSerialiser extends ReadOnlyVisitor {
   var program: StringBuilder = StringBuilder()
@@ -32,7 +32,7 @@ private class ILSerialiser extends ReadOnlyVisitor {
 
   override def visitStatement(node: Statement): Statement = node.acceptVisit(this)
 
-  override def visitAssign(node: Assign): Statement = {
+  override def visitLocalAssign(node: LocalAssign): Statement = {
     program ++= "LocalAssign("
     visitVariable(node.lhs)
     program ++= " := "
@@ -41,8 +41,8 @@ private class ILSerialiser extends ReadOnlyVisitor {
     node
   }
 
-  override def visitMemoryAssign(node: MemoryAssign): Statement = {
-    program ++= "MemoryAssign("
+  override def visitMemoryStore(node: MemoryStore): Statement = {
+    program ++= "MemoryStore("
     visitMemory(node.mem)
     program ++= "["
     visitExpr(node.index)
@@ -50,6 +50,17 @@ private class ILSerialiser extends ReadOnlyVisitor {
     program ++= " := "
     visitExpr(node.value)
     program ++= ")"
+    node
+  }
+
+  override def visitMemoryLoad(node: MemoryLoad): Statement = {
+    program ++= "MemoryLoad("
+    visitVariable(node.lhs)
+    program ++= " := "
+    visitMemory(node.mem)
+    program ++= ", ["
+    visitExpr(node.index)
+    program ++= "])"
     node
   }
 
@@ -63,13 +74,12 @@ private class ILSerialiser extends ReadOnlyVisitor {
   override def visitJump(node: Jump): Jump = {
     node match {
       case j: GoTo => program ++= s"goTo(${j.targets.map(_.label).mkString(", ")})" 
-      case h: Unreachable => program ++= "halt"
-      case h: Return => program ++= "return"
+      case _: Unreachable => program ++= "halt"
+      case _: Return => program ++= "return"
     }
 
     node
   }
-
 
   override def visitGoTo(node: GoTo): GoTo = {
     program ++= "GoTo("
@@ -77,7 +87,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
     program ++= ")" // GoTo
     node
   }
-
 
   override def visitDirectCall(node: DirectCall): Statement = {
     program ++= "DirectCall("
@@ -210,15 +219,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
     program ++= ", "
     visitExpr(node.arg2)
     program ++= ")"
-    node
-  }
-
-  override def visitMemoryLoad(node: MemoryLoad): Expr = {
-    program ++= "MemoryLoad("
-    visitMemory(node.mem)
-    program ++= ", ["
-    visitExpr(node.index)
-    program ++= "])"
     node
   }
 

@@ -35,7 +35,7 @@ trait CILVisitor:
   def leave_scope(outparam: ArrayBuffer[Parameter]): Unit = ()
 
 
-def doVisitList[T](v: CILVisitor, a: VisitAction[List[T]], n: T, continue: (T) => T): List[T] = {
+def doVisitList[T](v: CILVisitor, a: VisitAction[List[T]], n: T, continue: T => T): List[T] = {
   a match {
     case SkipChildren()             => List(n)
     case ChangeTo(z)                => z
@@ -44,7 +44,7 @@ def doVisitList[T](v: CILVisitor, a: VisitAction[List[T]], n: T, continue: (T) =
   }
 }
 
-def doVisit[T](v: CILVisitor, a: VisitAction[T], n: T, continue: (T) => T): T = {
+def doVisit[T](v: CILVisitor, a: VisitAction[T], n: T, continue: T => T): T = {
   a match {
     case SkipChildren()             => n
     case DoChildren()               => continue(n)
@@ -56,31 +56,30 @@ def doVisit[T](v: CILVisitor, a: VisitAction[T], n: T, continue: (T) => T): T = 
 class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_parameters(p: ArrayBuffer[Parameter]): ArrayBuffer[Parameter] = {
-    doVisit(v, v.vparams(p), p, (n) => n)
+    doVisit(v, v.vparams(p), p, n => n)
   }
 
   def visit_var(n: Variable): Variable = {
-    doVisit(v, v.vvar(n), n, (n) => n)
+    doVisit(v, v.vvar(n), n, n => n)
   }
 
 
   def visit_mem(n: Memory): Memory = {
-    doVisit(v, v.vmem(n), n, (n) => n)
+    doVisit(v, v.vmem(n), n, n => n)
   }
 
 
   def visit_jump(j: Jump): Jump = {
-    doVisit(v, v.vjump(j), j, (j) => j)
+    doVisit(v, v.vjump(j), j, j => j)
   }
 
   def visit_fallthrough(j: Option[GoTo]): Option[GoTo] = {
-    doVisit(v, v.vfallthrough(j), j, (j) => j)
+    doVisit(v, v.vfallthrough(j), j, j => j)
   }
 
   def visit_expr(n: Expr): Expr = {
     def continue(n: Expr): Expr = n match {
       case n: Literal                           => n
-      case MemoryLoad(mem, index, endian, size) => MemoryLoad(visit_mem(mem), visit_expr(index), endian, size)
       case Extract(end, start, arg)             => Extract(end, start, visit_expr(arg))
       case Repeat(repeats, arg)                 => Repeat(repeats, visit_expr(arg))
       case ZeroExtend(bits, arg)                => ZeroExtend(bits, visit_expr(arg))
@@ -96,29 +95,29 @@ class CILVisitorImpl(val v: CILVisitor) {
   def visit_stmt(s: Statement): List[Statement] = {
     def continue(n: Statement) = n match {
       case d: DirectCall => d
-      case i: IndirectCall => {
+      case i: IndirectCall =>
         i.target = visit_var(i.target)
         i
-      }
-      case m: MemoryAssign => {
+      case m: MemoryStore =>
         m.mem = visit_mem(m.mem)
         m.index = visit_expr(m.index)
         m.value = visit_expr(m.value)
         m
-      }
-      case m: Assign => {
+      case m: MemoryLoad =>
+        m.lhs = visit_var(m.lhs)
+        m.mem = visit_mem(m.mem)
+        m.index = visit_expr(m.index)
+        m
+      case m: LocalAssign =>
         m.rhs = visit_expr(m.rhs)
         m.lhs = visit_var(m.lhs)
         m
-      }
-      case s: Assert => {
+      case s: Assert =>
         s.body = visit_expr(s.body)
         s
-      }
-      case s: Assume => {
+      case s: Assume =>
         s.body = visit_expr(s.body)
         s
-      }
       case n: NOP => n
     }
     doVisitList(v, v.vstmt(s), s, continue)
@@ -126,7 +125,7 @@ class CILVisitorImpl(val v: CILVisitor) {
 
   def visit_block(b: Block): Block = {
     def continue(b: Block) = {
-      b.statements.foreach(s => {
+      b.statements.foreach { s =>
         val r = visit_stmt(s)
         r match {
           case Nil => b.statements.remove(s)
@@ -134,7 +133,7 @@ class CILVisitorImpl(val v: CILVisitor) {
             b.statements.replace(s, n)
             b.statements.insertAllAfter(Some(n), tl)
         }
-      })
+      }
       b.replaceJump(visit_jump(b.jump))
       b
     }

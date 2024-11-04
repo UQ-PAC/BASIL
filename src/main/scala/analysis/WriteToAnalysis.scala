@@ -1,6 +1,6 @@
 package analysis
 
-import ir.{Assert, Assume, BitVecType, Call, DirectCall, GoTo, Assign, MemoryAssign, NOP, Procedure, Program, Register}
+import ir.{DirectCall, LocalAssign, MemoryLoad, MemoryStore, Procedure, Program, Register}
 
 import scala.collection.mutable
 
@@ -24,18 +24,19 @@ class WriteToAnalysis(program: Program) extends Analysis[Map[Procedure, Set[Regi
       writesTo(proc)
     else
       val writtenTo: mutable.Set[Register] = mutable.Set()
-      proc.blocks.foreach(
-        block =>
-          block.statements.foreach {
-            case Assign(variable: Register, _, _) if paramRegisters.contains(variable) =>
-              writtenTo.add(variable)
-            case DirectCall(target, _) if target.name == "malloc" =>
-              writtenTo.add(mallocRegister)
-            case DirectCall(target, _) if program.procedures.contains(target) =>
-              writtenTo.addAll(getWritesTos(target))
-            case _ =>
-          }
-      )
+      proc.blocks.foreach { block =>
+        block.statements.foreach {
+          case LocalAssign(variable: Register, _, _) if paramRegisters.contains(variable) =>
+            writtenTo.add(variable)
+          case MemoryLoad(lhs: Register, _, _, _, _, _) if paramRegisters.contains(lhs) =>
+            writtenTo.add(lhs)
+          case DirectCall(target, _) if target.name == "malloc" =>
+            writtenTo.add(mallocRegister)
+          case DirectCall(target, _) if program.procedures.contains(target) =>
+            writtenTo.addAll(getWritesTos(target))
+          case _ =>
+        }
+    }
 
       writesTo.update(proc, writtenTo.toSet)
       writesTo(proc)

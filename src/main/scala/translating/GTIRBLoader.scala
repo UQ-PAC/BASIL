@@ -13,14 +13,15 @@ import scala.collection.mutable.ArrayBuffer
 import com.grammatech.gtirb.proto.Module.ByteOrder.LittleEndian
 import util.Logger
 
-class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
+class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
 
   private val constMap = mutable.Map[String, IRType]()
   private val varMap = mutable.Map[String, IRType]()
   private var instructionCount = 0
   private var blockCount = 0
+  private var loadCounter = 0
 
-  val opcodeSize = 4
+  private val opcodeSize = 4
 
   def visitBlock(blockUUID: ByteString, blockCountIn: Int, blockAddress: Option[BigInt]): ArrayBuffer[Statement] = {
     blockCount = blockCountIn
@@ -39,34 +40,31 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
           val instructionAddress = a + (opcodeSize * instructionCount)
           instructionAddress.toString + "$" + i
         }
-        
-        val statement = visitStmt(s, label)
-        if (statement.isDefined) {
-          statements.append(statement.get)
-        }
+
+        statements.appendAll(visitStmt(s, label))
       }
       instructionCount += 1
     }
     statements
   }
 
-  private def visitStmt(ctx: StmtContext, label: Option[String] = None): Option[Statement] = {
+  private def visitStmt(ctx: StmtContext, label: Option[String] = None): Seq[Statement] = {
     ctx match {
       case a: AssignContext => visitAssign(a, label)
       case c: ConstDeclContext => visitConstDecl(c, label)
       case v: VarDeclContext => visitVarDecl(v, label)
       case v: VarDeclsNoInitContext =>
         visitVarDeclsNoInit(v)
-        None
-      case a: AssertContext => visitAssert(a, label)
-      case t: TCallContext => visitTCall(t, label)
-      case i: IfContext => visitIf(i, label)
-      case t: ThrowContext => Some(visitThrow(t, label))
+        Seq()
+      case a: AssertContext => visitAssert(a, label).toSeq
+      case t: TCallContext => visitTCall(t, label).toSeq
+      case i: IfContext => visitIf(i, label).toSeq
+      case t: ThrowContext => Seq(visitThrow(t, label))
     }
   }
 
-  private def visitAssert(ctx: AssertContext, label: Option[String] = None): Option[Assert] = {
-    val expr = visitExpr(ctx.expr)
+  private def visitAssert(ctx: AssertContext, label: Option[String] = None): Option[Statement] = {
+    val expr = visitExprOnly(ctx.expr)
     if (expr.isDefined) {
       Some(Assert(expr.get, None, label))
     } else {
@@ -90,8 +88,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
         val mem = SharedMemory("mem", 64, 8) // yanked from BAP
         val size = parseInt(typeArgs.head) * 8
-        val index = visitExpr(args.head)
-        val value = visitExpr(args(3))
+        val index = visitExprOnly(args.head)
+        val value = visitExprOnly(args(3))
         val otherSize = parseInt(args(1)) * 8
         val accessType = parseInt(args(2)) // AccType enum in ASLi, not very relevant to us
         if (size != otherSize) {
@@ -100,12 +98,12 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
 
         // LittleEndian is an assumption
         if (index.isDefined && value.isDefined) {
-          Some(MemoryAssign(mem, index.get, value.get, Endian.LittleEndian, size.toInt, label))
+          Some(MemoryStore(mem, index.get, value.get, Endian.LittleEndian, size.toInt, label))
         } else {
           None
         }
       case "unsupported_opcode.0" => {
-        val op = args.headOption.flatMap(visitExpr) match {
+        val op = args.headOption.flatMap(visitExprOnly) match {
           case Some(IntLiteral(s)) => Some("%08x".format(s))
           case c => c.map(_.toString)
         }
@@ -130,7 +128,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
   }
 
   private def visitIf(ctx: IfContext, label: Option[String] = None): Option[TempIf] = {
-    val condition = visitExpr(ctx.cond)
+    val condition = visitExprOnly(ctx.cond)
     val thenStmts = ctx.thenStmts.stmt.asScala.flatMap(visitStmt(_, label))
 
     val elseStmts = Option(ctx.elseStmts) match {
@@ -151,35 +149,58 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     varMap ++= newVars
   }
 
-  private def visitVarDecl(ctx: VarDeclContext, label: Option[String] = None): Option[Assign] = {
+  private def visitVarDecl(ctx: VarDeclContext, label: Option[String] = None): Seq[Statement] = {
     val ty = visitType(ctx.`type`())
     val name = visitIdent(ctx.lvar)
     varMap += (name -> ty)
 
-    val expr = visitExpr(ctx.expr())
-    expr.map(Assign(LocalVar(name, ty), _, label))
+    val (expr, load) = visitExpr(ctx.expr)
+    if (expr.isDefined) {
+      val assign = LocalAssign(LocalVar(name, ty), expr.get, label)
+      if (load.isDefined) {
+        Seq(load.get, assign)
+      } else {
+        Seq(assign)
+      }
+    } else {
+      Seq()
+    }
   }
 
-  private def visitAssign(ctx: AssignContext, label: Option[String] = None): Option[Assign] = {
+  private def visitAssign(ctx: AssignContext, label: Option[String] = None): Seq[Statement] = {
     val lhs = visitLexpr(ctx.lexpr)
-    val rhs = visitExpr(ctx.expr)
-    lhs.zip(rhs).map((lhs, rhs) => Assign(lhs, rhs, label))
+    val (rhs, load) = visitExpr(ctx.expr)
+    if (lhs.isDefined && rhs.isDefined) {
+      val assign = LocalAssign(lhs.get, rhs.get, label)
+      if (load.isDefined) {
+        Seq(load.get, assign)
+      } else {
+        Seq(assign)
+      }
+    } else {
+      Seq()
+    }
   }
 
-  private def visitConstDecl(ctx: ConstDeclContext, label: Option[String] = None): Option[Assign] = {
+  private def visitConstDecl(ctx: ConstDeclContext, label: Option[String] = None): Seq[Statement] = {
     val ty = visitType(ctx.`type`())
     val name = visitIdent(ctx.lvar)
     constMap += (name -> ty)
-    val expr = visitExpr(ctx.expr)
+    val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {
-      Some(Assign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label))
+      val assign = LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label)
+      if (load.isDefined) {
+        Seq(load.get, assign)
+      } else {
+        Seq(assign)
+      }
     } else {
-      None
+      Seq()
     }
   }
 
   private def visitType(ctx: TypeContext): IRType = {
-    ctx match
+    ctx match {
       case e: TypeBitsContext => BitVecType(parseInt(e.size).toInt)
       case r: TypeRegisterContext =>
         // this is a special register - not the same as a register in the IR
@@ -191,21 +212,31 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         case _ => throw Exception(s"unknown type ${ctx.getText}")
       }
       case _ => throw Exception(s"unknown type ${ctx.getText}")
-  }
-
-  private def visitExpr(ctx: ExprContext): Option[Expr] = {
-    ctx match {
-      case e: ExprVarContext => visitExprVar(e)
-      case e: ExprTApplyContext => visitExprTApply(e)
-      case e: ExprSlicesContext => visitExprSlices(e)
-      case e: ExprFieldContext => Some(visitExprField(e))
-      case e: ExprArrayContext => Some(visitExprArray(e))
-      case e: ExprLitIntContext => Some(IntLiteral(parseInt(e)))
-      case e: ExprLitBitsContext => Some(visitExprLitBits(e))
     }
   }
 
-  private  def visitExprVar(ctx: ExprVarContext): Option[Expr] = {
+  private def visitExpr(ctx: ExprContext): (Option[Expr], Option[MemoryLoad]) = {
+    ctx match {
+      case e: ExprVarContext => (visitExprVar(e), None)
+      case e: ExprTApplyContext => visitExprTApply(e)
+      case e: ExprSlicesContext => visitExprSlices(e)
+      case e: ExprFieldContext => (Some(visitExprField(e)), None)
+      case e: ExprArrayContext => (Some(visitExprArray(e)), None)
+      case e: ExprLitIntContext => (Some(IntLiteral(parseInt(e))), None)
+      case e: ExprLitBitsContext => (Some(visitExprLitBits(e)), None)
+    }
+  }
+
+  private def visitExprOnly(ctx: ExprContext): Option[Expr] = {
+    val (expr, load) = visitExpr(ctx)
+    if (load.isDefined) {
+      throw Exception("")
+    } else {
+      expr
+    }
+  }
+
+  private def visitExprVar(ctx: ExprVarContext): Option[Expr] = {
     val name = visitIdent(ctx.ident)
     name match {
       case n if constMap.contains(n) => Some(LocalVar(n + "$" + blockCount + "$" + instructionCount, constMap(n)))
@@ -225,7 +256,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     }
   }
 
-  private def visitExprTApply(ctx: ExprTApplyContext): Option[Expr] = {
+  private def visitExprTApply(ctx: ExprTApplyContext): (Option[Expr], Option[MemoryLoad]) = {
     val function = visitIdent(ctx.ident)
 
     val typeArgs: mutable.Buffer[ExprContext] = Option(ctx.tes) match {
@@ -241,7 +272,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
       case "Mem.read.0" =>
         checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
         val mem = SharedMemory("mem", 64, 8)
-        val index = visitExpr(args.head)
+        val index = visitExprOnly(args.head) // can't have load inside load
         val size = parseInt(typeArgs.head) * 8
 
         val otherSize = parseInt(args(1)) * 8
@@ -250,112 +281,112 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
           throw Exception(s"inconsistent size parameters in Mem.read.0: ${ctx.getText}")
         }
 
+        val temp = LocalVar("$load" + loadCounter, BitVecType(size.toInt))
+        loadCounter += 1
+
         if (index.isDefined) {
           // LittleEndian is assumed
-          Some(MemoryLoad(mem, index.get, Endian.LittleEndian, size.toInt))
+          (Some(temp), Some(MemoryLoad(temp, mem, index.get, Endian.LittleEndian, size.toInt, None)))
         } else {
-          None
+          (None, None)
         }
 
       case "cvt_bool_bv.0" =>
         checkArgs(function, 0, 1, typeArgs.size, args.size, ctx.getText)
-        val expr = visitExpr(args.head)
-        if (expr.isDefined) {
-          val e = expr.get
-          e match {
-            case b: BinaryExpr if b.op == BVEQ => Some(BinaryExpr(BVCOMP, b.arg1, b.arg2))
-            case FalseLiteral   => Some(BitVecLiteral(0, 1))
-            case TrueLiteral => Some(BitVecLiteral(1, 1))
-            case _ => throw Exception(s"unhandled conversion from bool to bitvector: ${ctx.getText}")
-          }
-        } else {
-          None
+        val expr = visitExprOnly(args.head)
+        val result = expr.map {
+          case b: BinaryExpr if b.op == BVEQ => BinaryExpr(BVCOMP, b.arg1, b.arg2)
+          case FalseLiteral => BitVecLiteral(0, 1)
+          case TrueLiteral => BitVecLiteral(1, 1)
+          case _ => throw Exception(s"unhandled conversion from bool to bitvector: ${ctx.getText}")
         }
+        (result, None)
 
-      case "not_bool.0" => resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText)
-      case "eq_enum.0" => resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText)
-      case "or_bool.0" => resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText)
-      case "and_bool.0" => resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText)
+      case "not_bool.0" => (resolveUnaryOp(BoolNOT, function, 0, typeArgs, args, ctx.getText), None)
+      case "eq_enum.0" => (resolveBinaryOp(BoolEQ, function, 0, typeArgs, args, ctx.getText), None)
+      case "or_bool.0" => (resolveBinaryOp(BoolOR, function, 0, typeArgs, args, ctx.getText), None)
+      case "and_bool.0" => (resolveBinaryOp(BoolAND, function, 0, typeArgs, args, ctx.getText), None)
 
-      case "not_bits.0" => resolveUnaryOp(BVNOT, function, 1, typeArgs, args, ctx.getText)
-      case "or_bits.0" => resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText)
-      case "and_bits.0" => resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText)
-      case "eor_bits.0" => resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText)
-      case "eq_bits.0" => resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText)
-      case "add_bits.0" => resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText)
-      case "sub_bits.0" => resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText)
-      case "mul_bits.0" => resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText)
-      case "sdiv_bits.0" => resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText)
+      case "not_bits.0" => (resolveUnaryOp(BVNOT, function, 1, typeArgs, args, ctx.getText), None)
+      case "or_bits.0" => (resolveBinaryOp(BVOR, function, 1, typeArgs, args, ctx.getText), None)
+      case "and_bits.0" => (resolveBinaryOp(BVAND, function, 1, typeArgs, args, ctx.getText), None)
+      case "eor_bits.0" => (resolveBinaryOp(BVXOR, function, 1, typeArgs, args, ctx.getText), None)
+      case "eq_bits.0" => (resolveBinaryOp(BVEQ, function, 1, typeArgs, args, ctx.getText), None)
+      case "add_bits.0" => (resolveBinaryOp(BVADD, function, 1, typeArgs, args, ctx.getText), None)
+      case "sub_bits.0" => (resolveBinaryOp(BVSUB, function, 1, typeArgs, args, ctx.getText), None)
+      case "mul_bits.0" => (resolveBinaryOp(BVMUL, function, 1, typeArgs, args, ctx.getText), None)
+      case "sdiv_bits.0" => (resolveBinaryOp(BVSDIV, function, 1, typeArgs, args, ctx.getText), None)
 
-      case "slt_bits.0" => resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText)
-      case "sle_bits.0" => resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText)
+      case "slt_bits.0" => (resolveBinaryOp(BVSLT, function, 1, typeArgs, args, ctx.getText), None)
+      case "sle_bits.0" => (resolveBinaryOp(BVSLE, function, 1, typeArgs, args, ctx.getText), None)
 
-      case "lsl_bits.0" => resolveBitShiftOp(BVSHL, function, typeArgs, args, ctx.getText)
-      case "lsr_bits.0" => resolveBitShiftOp(BVLSHR, function, typeArgs, args, ctx.getText)
-      case "asr_bits.0" => resolveBitShiftOp(BVASHR, function, typeArgs, args, ctx.getText)
+      case "lsl_bits.0" => (resolveBitShiftOp(BVSHL, function, typeArgs, args, ctx.getText), None)
+      case "lsr_bits.0" => (resolveBitShiftOp(BVLSHR, function, typeArgs, args, ctx.getText), None)
+      case "asr_bits.0" => (resolveBitShiftOp(BVASHR, function, typeArgs, args, ctx.getText), None)
 
       case "append_bits.0" =>
-        resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText)
+        (resolveBinaryOp(BVCONCAT, function, 2, typeArgs, args, ctx.getText), None)
 
       case "replicate_bits.0" =>
         checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
         val oldSize = parseInt(typeArgs(0))
         val replications = parseInt(typeArgs(1)).toInt
-        val arg0 = visitExpr(args(0))
+        // memory loads shouldn't appear here?
+        val arg0 = visitExprOnly(args(0))
         val arg1 = parseInt(args(1))
         val newSize = oldSize * replications
         if (arg1 != replications) {
           Exception(s"inconsistent size parameters in replicate_bits.0: ${ctx.getText}")
         }
         if (arg0.isDefined) {
-          Some(Repeat(replications, arg0.get))
+          (Some(Repeat(replications, arg0.get)), None)
         } else {
-          None
+          (None, None)
         }
 
       case "ZeroExtend.0" =>
         checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
         val oldSize = parseInt(typeArgs(0))
         val newSize = parseInt(typeArgs(1))
-        val arg0 = visitExpr(args(0))
+        val (arg0, load) = visitExpr(args(0))
         val arg1 = parseInt(args(1))
         if (arg1 != newSize) {
           Exception(s"inconsistent size parameters in ZeroExtend.0: ${ctx.getText}")
         }
         if (arg0.isDefined) {
-          Some(ZeroExtend((newSize - oldSize).toInt, arg0.get))
+          (Some(ZeroExtend((newSize - oldSize).toInt, arg0.get)), load)
         } else {
-          None
+          (None, None)
         }
 
       case "SignExtend.0" =>
         checkArgs(function, 2, 2, typeArgs.size, args.size, ctx.getText)
         val oldSize = parseInt(typeArgs(0))
         val newSize = parseInt(typeArgs(1))
-        val arg0 = visitExpr(args(0))
+        val (arg0, load) = visitExpr(args(0))
         val arg1 = parseInt(args(1))
         if (arg1 != newSize) {
           Exception(s"inconsistent size parameters in SignExtend.0: ${ctx.getText}")
         }
         if (arg0.isDefined) {
-          Some(SignExtend((newSize - oldSize).toInt, arg0.get))
+          (Some(SignExtend((newSize - oldSize).toInt, arg0.get)), load)
         } else {
-          None
+          (None, None)
         }
 
       case "FPCompareGT.0" | "FPCompareGE.0" | "FPCompareEQ.0" =>
         checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
-        val argsIR = args.flatMap(visitExpr).toSeq
-        Some(UninterpretedFunction(name + "$" + size, argsIR, BoolType))
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(name + "$" + size, argsIR, BoolType)), None)
 
       case "FPAdd.0" | "FPMul.0" | "FPDiv.0" | "FPMulX.0" | "FPMax.0" | "FPMin.0" | "FPMaxNum.0" | "FPMinNum.0" | "FPSub.0" =>
         checkArgs(function, 1, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
-        val argsIR = args.flatMap(visitExpr).toSeq
-        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
 
       case "FPMulAddH.0" | "FPMulAdd.0" |
            "FPRoundInt.0" |
@@ -363,31 +394,31 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
-        val argsIR = args.flatMap(visitExpr).toSeq
-        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
 
       case "FPRecpX.0" | "FPSqrt.0" | "FPRecipEstimate.0" |
            "FPRSqrtStepFused.0" | "FPRecipStepFused.0" =>
         checkArgs(function, 1, 2, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0)).toInt
-        val argsIR = args.flatMap(visitExpr).toSeq
-        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size)))
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(size))), None)
 
       case "FPCompare.0" =>
         checkArgs(function, 1, 4, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val size = parseInt(typeArgs(0))
-        val argsIR = args.flatMap(visitExpr).toSeq
-        Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(4)))
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(name + "$" + size, argsIR, BitVecType(4))), None)
 
       case "FPConvert.0" =>
         checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val outSize = parseInt(typeArgs(0)).toInt
         val inSize = parseInt(typeArgs(1))
-        val argsIR = args.flatMap(visitExpr).toSeq
-        Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FPToFixed.0" =>
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
@@ -395,8 +426,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         val outSize = parseInt(typeArgs(0)).toInt
         val inSize = parseInt(typeArgs(1))
         // need to specifically handle the integer parameter
-        val argsIR = args.flatMap(visitExpr).toSeq
-        Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FixedToFP.0" =>
         checkArgs(function, 2, 5, typeArgs.size, args.size, ctx.getText)
@@ -404,28 +435,28 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         val inSize = parseInt(typeArgs(0))
         val outSize = parseInt(typeArgs(1)).toInt
         // need to specifically handle the integer parameter
-        val argsIR = args.flatMap(visitExpr).toSeq
-        Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "FPConvertBF.0" =>
         checkArgs(function, 0, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
-        val argsIR = args.flatMap(visitExpr).toSeq
-        Some(UninterpretedFunction(name, argsIR, BitVecType(32)))
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(name, argsIR, BitVecType(32))), None)
 
       case "FPToFixedJS_impl.0" =>
         checkArgs(function, 2, 3, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
         val inSize = parseInt(typeArgs(0))
         val outSize = parseInt(typeArgs(1)).toInt
-        val argsIR = args.flatMap(visitExpr).toSeq
-        Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize)))
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(name + "$" + outSize + "$" + inSize, argsIR, BitVecType(outSize))), None)
 
       case "BFAdd.0" | "BFMul.0" =>
         checkArgs(function, 0, 2, typeArgs.size, args.size, ctx.getText)
         val name = function.stripSuffix(".0")
-        val argsIR = args.flatMap(visitExpr).toSeq
-        Some(UninterpretedFunction(name, argsIR, BitVecType(32)))
+        val argsIR = args.flatMap(visitExprOnly).toSeq
+        (Some(UninterpretedFunction(name, argsIR, BitVecType(32))), None)
 
       case _ =>
         // known ASLp methods not yet handled:
@@ -434,7 +465,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
         // and will require some research into their semantics
         // AtomicStart, AtomicEnd - can't model as uninterpreted functions, requires modelling atomic section
         Logger.debug(s"unidentified call to $function: ${ctx.getText}")
-        None
+        (None, None)
     }
 
   }
@@ -448,8 +479,9 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
                              ): Option[BinaryExpr] = {
     checkArgs(function, typeArgsExpected, 2, typeArgs.size, args.size, token)
     // we don't currently check the size for BV ops which is the type arg
-    val arg0 = visitExpr(args(0))
-    val arg1 = visitExpr(args(1))
+    // memory loads shouldn't appear inside binary operations?
+    val arg0 = visitExprOnly(args(0))
+    val arg1 = visitExprOnly(args(1))
     if (arg0.isDefined && arg1.isDefined) {
       Some(BinaryExpr(operator, arg0.get, arg1.get))
     } else {
@@ -466,7 +498,8 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
                             ): Option[UnaryExpr] = {
     checkArgs(function, typeArgsExpected, 1, typeArgs.size, args.size, token)
     // we don't currently check the size for BV ops which is the type arg
-    val arg = visitExpr(args.head)
+    // memory loads shouldn't appear inside unary operations?
+    val arg = visitExprOnly(args.head)
     if (arg.isDefined) {
       Some(UnaryExpr(operator, arg.get))
     } else {
@@ -483,8 +516,9 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     checkArgs(function, 2, 2, typeArgs.size, args.size, token)
     val size0 = parseInt(typeArgs(0))
     val size1 = parseInt(typeArgs(1))
-    val arg0 = visitExpr(args(0))
-    val arg1 = visitExpr(args(1))
+    val arg0 = visitExprOnly(args(0))
+    val arg1 = visitExprOnly(args(1))
+    // memory loads shouldn't appear inside bitshifts?
     if (arg0.isDefined && arg1.isDefined) {
       if (size0 == size1) {
         Some(BinaryExpr(operator, arg0.get, arg1.get))
@@ -496,18 +530,18 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     }
   }
 
-  private def visitExprSlices(ctx: ExprSlicesContext): Option[Extract] = {
+  private def visitExprSlices(ctx: ExprSlicesContext): (Option[Extract], Option[MemoryLoad]) = {
     val slices = ctx.slices.slice().asScala
     if (slices.size != 1) {
       // need to determine the semantics for this case
       throw Exception(s"currently unable to handle Expr_Slices that contains more than one slice: ${ctx.getText}")
     }
     val (hi, lo) = visitSliceContext(slices.head)
-    val expr = visitExpr(ctx.expr)
+    val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {
-      Some(Extract(hi, lo, expr.get))
+      (Some(Extract(hi, lo, expr.get)), load)
     } else {
-      None
+      (None, None)
     }
   }
 
@@ -524,7 +558,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     }
   }
 
-  private  def visitExprField(ctx: ExprFieldContext): Register = {
+  private def visitExprField(ctx: ExprFieldContext): Register = {
     val name = ctx.expr match {
       case e: ExprVarContext => visitIdent(e.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an Expr_Var as first parameter")
@@ -534,7 +568,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
     resolveFieldExpr(name, field)
   }
 
-  private  def visitExprArray(ctx: ExprArrayContext): Register = {
+  private def visitExprArray(ctx: ExprArrayContext): Register = {
     val name = ctx.array match {
       case e: ExprVarContext => visitIdent(e.ident)
       case _ => throw Exception(s"expected ${ctx.getText} to have an Expr_Var as first parameter")

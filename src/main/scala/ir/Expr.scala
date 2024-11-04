@@ -5,7 +5,6 @@ import scala.collection.mutable
 
 sealed trait Expr {
   def toBoogie: BExpr
-  def loads: Set[MemoryLoad] = Set()
   def getType: IRType
   def gammas: Set[Variable] = Set() // variables not including those inside a load's index
   def variables: Set[Variable] = Set()
@@ -54,7 +53,6 @@ case class Extract(end: Int, start: Int, body: Expr) extends Expr {
   override def getType: BitVecType = BitVecType(end - start)
   override def toString: String = s"$body[$end:$start]"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitExtract(this)
-  override def loads: Set[MemoryLoad] = body.loads
 }
 
 case class Repeat(repeats: Int, body: Expr) extends Expr {
@@ -68,7 +66,6 @@ case class Repeat(repeats: Int, body: Expr) extends Expr {
   }
   override def toString: String = s"Repeat($repeats, $body)"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitRepeat(this)
-  override def loads: Set[MemoryLoad] = body.loads
 }
 
 case class ZeroExtend(extension: Int, body: Expr) extends Expr {
@@ -82,7 +79,6 @@ case class ZeroExtend(extension: Int, body: Expr) extends Expr {
   }
   override def toString: String = s"ZeroExtend($extension, $body)"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitZeroExtend(this)
-  override def loads: Set[MemoryLoad] = body.loads
 }
 
 case class SignExtend(extension: Int, body: Expr) extends Expr {
@@ -96,14 +92,12 @@ case class SignExtend(extension: Int, body: Expr) extends Expr {
   }
   override def toString: String = s"SignExtend($extension, $body)"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitSignExtend(this)
-  override def loads: Set[MemoryLoad] = body.loads
 }
 
 case class UnaryExpr(op: UnOp, arg: Expr) extends Expr {
   override def toBoogie: BExpr = UnaryBExpr(op, arg.toBoogie)
   override def gammas: Set[Variable] = arg.gammas
   override def variables: Set[Variable] = arg.variables
-  override def loads: Set[MemoryLoad] = arg.loads
   override def getType: IRType = (op, arg.getType) match {
     case (_: BoolUnOp, BoolType)     => BoolType
     case (_: BVUnOp, bv: BitVecType) => bv
@@ -152,7 +146,6 @@ case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
   override def toBoogie: BExpr = BinaryBExpr(op, arg1.toBoogie, arg2.toBoogie)
   override def gammas: Set[Variable] = arg1.gammas ++ arg2.gammas
   override def variables: Set[Variable] = arg1.variables ++ arg2.variables
-  override def loads: Set[MemoryLoad] = arg1.loads ++ arg2.loads
   override def getType: IRType = (op, arg1.getType, arg2.getType) match {
     case (_: BoolBinOp, BoolType, BoolType) => BoolType
     case (binOp: BVBinOp, bv1: BitVecType, bv2: BitVecType) =>
@@ -292,6 +285,7 @@ enum Endian {
   case BigEndian
 }
 
+/*
 case class MemoryLoad(mem: Memory, index: Expr, endian: Endian, size: Int) extends Expr {
   override def toBoogie: BMemoryLoad = BMemoryLoad(mem.toBoogie, index.toBoogie, endian, size)
   def toGamma(LArgs: List[BMapVar]): BExpr = mem match {
@@ -302,11 +296,11 @@ case class MemoryLoad(mem: Memory, index: Expr, endian: Endian, size: Int) exten
   }
   override def variables: Set[Variable] = index.variables
   override def gammas: Set[Variable] = Set()
-  override def loads: Set[MemoryLoad] = Set(this)
   override def getType: IRType = BitVecType(size)
   override def toString: String = s"MemoryLoad($mem, $index, $endian, $size)"
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemoryLoad(this)
 }
+*/
 
 case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType) extends Expr {
   override def getType: IRType = returnType

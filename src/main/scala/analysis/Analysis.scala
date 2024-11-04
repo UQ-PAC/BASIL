@@ -77,11 +77,13 @@ trait ConstantPropagation(val program: Program) {
 
   /** Transfer function for state lattice elements.
     */
-  def localTransfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = {
+  def transfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = {
     n match {
       // assignments
-      case la: Assign =>
+      case la: LocalAssign =>
         s + (la.lhs -> eval(la.rhs, s))
+      case load: MemoryLoad =>
+        s + (load.lhs -> valuelattice.top)
       // all others: like no-ops
       case _ => s
     }
@@ -92,10 +94,6 @@ trait ConstantPropagation(val program: Program) {
   val lattice: MapLattice[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]], MapLattice[Variable, FlatElement[BitVecLiteral], ConstantPropagationLattice]] = MapLattice(statelattice)
 
   val domain: Set[CFGPosition] = Set.empty ++ program
-
-  /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
-    */
-  def transfer(n: CFGPosition, s: Map[Variable, FlatElement[BitVecLiteral]]): Map[Variable, FlatElement[BitVecLiteral]] = localTransfer(n, s)
 }
 
 class ConstantPropagationSolver(program: Program) extends ConstantPropagation(program)
@@ -162,9 +160,9 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
 
   /** Transfer function for state lattice elements.
    */
-  def localTransfer(n: CFGPosition, s: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]): Map[RegisterWrapperEqualSets, Set[BitVecLiteral]] =
+  def transfer(n: CFGPosition, s: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]): Map[RegisterWrapperEqualSets, Set[BitVecLiteral]] =
     n match {
-      case a: Assign =>
+      case a: LocalAssign =>
         val lhsWrappers = s.collect {
           case (k, v) if RegisterVariableWrapper(k.variable, k.assigns) == RegisterVariableWrapper(a.lhs, getDefinition(a.lhs, a, reachingDefs)) => (k, v)
         }
@@ -173,6 +171,16 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
         } else {
           s + (RegisterWrapperEqualSets(a.lhs, getDefinition(a.lhs, a, reachingDefs)) -> eval(a.rhs, s, n))
         }
+      case l: MemoryLoad =>
+        val lhsWrappers = s.collect {
+          case (k, v) if RegisterVariableWrapper(k.variable, k.assigns) == RegisterVariableWrapper(l.lhs, getDefinition(l.lhs, l, reachingDefs)) => (k, v)
+        }
+        if (lhsWrappers.nonEmpty) {
+          s ++ lhsWrappers
+        } else {
+          s + (RegisterWrapperEqualSets(l.lhs, getDefinition(l.lhs, l, reachingDefs)) -> Set())
+        }
+
       case _ => s
     }
 
@@ -181,10 +189,6 @@ trait ConstantPropagationWithSSA(val program: Program, val reachingDefs: Map[CFG
   val lattice: MapLattice[CFGPosition, Map[RegisterWrapperEqualSets, Set[BitVecLiteral]], MapLattice[RegisterWrapperEqualSets, Set[BitVecLiteral], ConstantPropagationLatticeWithSSA]] = MapLattice(statelattice)
 
   val domain: Set[CFGPosition] = Set.empty ++ program
-
-  /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
-   */
-  def transfer(n: CFGPosition, s: Map[RegisterWrapperEqualSets, Set[BitVecLiteral]]): Map[RegisterWrapperEqualSets, Set[BitVecLiteral]] = localTransfer(n, s)
 }
 
 class ConstantPropagationSolverWithSSA(program: Program, reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])]) extends ConstantPropagationWithSSA(program, reachingDefs)

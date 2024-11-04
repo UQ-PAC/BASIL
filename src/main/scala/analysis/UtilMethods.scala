@@ -81,9 +81,7 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
   }
 
   def applySingle(op: BitVecLiteral => BitVecLiteral, a: Set[BitVecLiteral]): Set[BitVecLiteral] = {
-    val res = for {
-      x <- a
-    } yield op(x)
+    val res = for (x <- a) yield op(x)
     res
   }
 
@@ -136,9 +134,8 @@ def evaluateExpressionWithSSA(exp: Expr, constantPropResult: Map[RegisterWrapper
       Logger.debug("getUse: " + getUse(variable, n, reachingDefs))
       constantPropResult(RegisterWrapperEqualSets(variable, getUse(variable, n, reachingDefs)))
     case b: BitVecLiteral => Set(b)
-    case Repeat(repeats, body) => evaluateExpressionWithSSA(body, constantPropResult, n, reachingDefs)
-    case MemoryLoad(mem, index, endian, size) => Set.empty
-    case UninterpretedFunction(name, params, returnType) => Set.empty
+    case Repeat(_, body) => evaluateExpressionWithSSA(body, constantPropResult, n, reachingDefs)
+    case _: UninterpretedFunction => Set.empty
     case _ => throw RuntimeException("ERROR: CASE NOT HANDLED: " + exp + "\n")
   }
 }
@@ -153,23 +150,6 @@ def getUse(variable: Variable, node: CFGPosition, reachingDefs: Map[CFGPosition,
   out.getOrElse(variable, Set())
 }
 
-def unwrapExpr(expr: Expr): Option[MemoryLoad] = {
-  expr match {
-    case e: Extract => unwrapExpr(e.body)
-    case e: SignExtend => unwrapExpr(e.body)
-    case e: ZeroExtend => unwrapExpr(e.body)
-    case repeat: Repeat => unwrapExpr(repeat.body)
-    case unaryExpr: UnaryExpr => unwrapExpr(unaryExpr.arg)
-    case binaryExpr: BinaryExpr => // TODO: incorrect
-      unwrapExpr(binaryExpr.arg1)
-      unwrapExpr(binaryExpr.arg2)
-    case memoryLoad: MemoryLoad =>
-      Some(memoryLoad)
-    case _ =>
-      None
-  }
-}
-
 def unwrapExprToVar(expr: Expr): Option[Variable] = {
   expr match {
     case variable: Variable =>
@@ -182,7 +162,6 @@ def unwrapExprToVar(expr: Expr): Option[Variable] = {
     case binaryExpr: BinaryExpr => // TODO: incorrect
       unwrapExprToVar(binaryExpr.arg1)
       unwrapExprToVar(binaryExpr.arg2)
-    case memoryLoad: MemoryLoad => unwrapExprToVar(memoryLoad.index)
     case _ =>
       None
   }

@@ -10,8 +10,7 @@ import scala.collection.immutable
 import util.Logger
 
 /** ValueSets are PowerSet of possible values */
-trait Value {
-}
+trait Value
 
 case class AddressValue(region: MemoryRegion) extends Value {
   override def toString: String = "Address(" + region + ")"
@@ -43,26 +42,27 @@ trait ValueSetAnalysis(program: Program,
 
   /** Default implementation of eval.
     */
-  def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]], n: CFGPosition): Map[Variable | MemoryRegion, Set[Value]] = {
-    cmd match
+  def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = {
+    cmd match {
       case directCall: DirectCall if directCall.target.name == "malloc" =>
-        val regions = mmm.nodeToRegion(n)
+        val regions = mmm.nodeToRegion(cmd)
         // malloc variable
         s + (mallocVariable -> regions.map(r => AddressValue(r)))
-      case localAssign: Assign =>
-        val regions = mmm.nodeToRegion(n)
+      case localAssign: LocalAssign =>
+        val regions = mmm.nodeToRegion(cmd)
         if (regions.nonEmpty) {
           s + (localAssign.lhs -> regions.map(r => AddressValue(r)))
         } else {
-          evaluateExpression(localAssign.rhs, constantProp(n)) match {
+          evaluateExpression(localAssign.rhs, constantProp(cmd)) match {
             case Some(bitVecLiteral: BitVecLiteral) =>
               val possibleData = canCoerceIntoDataRegion(bitVecLiteral, 1)
-                if (possibleData.isDefined) {
-                  s + (localAssign.lhs -> Set(AddressValue(possibleData.get)))
-                } else {
-                  s + (localAssign.lhs -> Set(LiteralValue(bitVecLiteral)))
-                }
+              if (possibleData.isDefined) {
+                s + (localAssign.lhs -> Set(AddressValue(possibleData.get)))
+              } else {
+                s + (localAssign.lhs -> Set(LiteralValue(bitVecLiteral)))
+              }
             case None =>
+              // TODO this is not at all sound
               val unwrapValue = unwrapExprToVar(localAssign.rhs)
               unwrapValue match {
                 case Some(v: Variable) =>
@@ -73,33 +73,50 @@ trait ValueSetAnalysis(program: Program,
               }
           }
         }
-      case memAssign: MemoryAssign =>
-        val regions = mmm.nodeToRegion(n)
-        evaluateExpression(memAssign.value, constantProp(n)) match {
+      case load: MemoryLoad =>
+        val regions = mmm.nodeToRegion(cmd)
+        if (regions.nonEmpty) {
+          s + (load.lhs -> regions.map(r => AddressValue(r)))
+        } else {
+          // TODO this is blatantly incorrect but maintaining current functionality to start
+          val unwrapValue = unwrapExprToVar(load.index)
+          unwrapValue match {
+            case Some(v: Variable) =>
+              s + (load.lhs -> s(v))
+            case None =>
+              Logger.debug(s"Too Complex: ${load.index}") // do nothing
+              s
+          }
+        }
+      case store: MemoryStore =>
+        val regions = mmm.nodeToRegion(cmd)
+        evaluateExpression(store.value, constantProp(cmd)) match {
           case Some(bitVecLiteral: BitVecLiteral) =>
-            val possibleData = canCoerceIntoDataRegion(bitVecLiteral, memAssign.size)
+            val possibleData = canCoerceIntoDataRegion(bitVecLiteral, store.size)
             if (possibleData.isDefined) {
               s ++ regions.map(r => r -> Set(AddressValue(possibleData.get)))
             } else {
               s ++ regions.map(r => r -> Set(LiteralValue(bitVecLiteral)))
             }
           case None =>
-            val unwrapValue = unwrapExprToVar(memAssign.value)
+            // TODO: unsound
+            val unwrapValue = unwrapExprToVar(store.value)
             unwrapValue match {
               case Some(v: Variable) =>
                 s ++ regions.map(r => r -> s(v))
               case None =>
-                Logger.debug(s"Too Complex: $memAssign.value") // do nothing
+                Logger.debug(s"Too Complex: $store.value") // do nothing
                 s
             }
         }
       case _ =>
         s
+    }
   }
 
-  /** Transfer function for state lattice elements.
+  /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
     */
-  def localTransfer(n: CFGPosition, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = {
+  def transferUnlifted(n: CFGPosition, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = {
     n match {
       case p: Procedure =>
         mmm.pushContext(p.name)
@@ -108,15 +125,11 @@ trait ValueSetAnalysis(program: Program,
         mmm.popContext()
         s
       case command: Command =>
-        eval(command, s, n)
+        eval(command, s)
       case _ =>
         s
     }
   }
-
-  /** Transfer function for state lattice elements. (Same as `localTransfer` for simple value analysis.)
-    */
-  def transferUnlifted(n: CFGPosition, s: Map[Variable | MemoryRegion, Set[Value]]): Map[Variable | MemoryRegion, Set[Value]] = localTransfer(n, s)
 }
 
 class ValueSetAnalysisSolver(

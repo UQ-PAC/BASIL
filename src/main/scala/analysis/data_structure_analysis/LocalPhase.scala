@@ -144,7 +144,7 @@ class LocalPhase(proc: Procedure,
    * Handles unification for instructions of the form R_x = R_y [+ offset] where R_y is a pointer and [+ offset] is optional
    * @param position the cfg position being visited (note this might be a local assign of the form R_x = R_y [+ offset]
    *                 or it might be memory load/store where the index is of the form R_y [+ offset]
-   * @param lhs Ev(R_x) if position is local assign or a cell from an empty node if R_y [+ offset] is the index of a memoryAssign
+   * @param lhs Ev(R_x) if position is local assign or a cell from an empty node if R_y [+ offset] is the index of a memoryStore
    * @param rhs R_y, reachingDefs(position)(R_y) can be used to find the set of SSA variables that may define R_x
    * @param pointee if false, the position is local pointer arithmetic therefore Ev(R_y [+ offset]) is merged with lhs
    *                else, the position is a memory read/write therefore E(Ev(R_y [+ offset])) is merged with lhs
@@ -245,11 +245,11 @@ class LocalPhase(proc: Procedure,
           val returnArgument = graph.varToCell(n)(variable)
           graph.mergeCells(graph.adjust(returnArgument), graph.adjust(slice))
         }
-      case Assign(variable, rhs, _) =>
+      case LocalAssign(variable, rhs, _) =>
         val expr: Expr = unwrapPaddingAndSlicing(rhs)
         val lhsCell = graph.adjust(graph.varToCell(n)(variable))
-        var global = isGlobal(rhs, n)
-        var stack = isStack(rhs, n)
+        val global = isGlobal(rhs, n)
+        val stack = isStack(rhs, n)
         if global.isDefined then // Rx = global address
           graph.mergeCells(lhsCell, global.get)
         else if stack.isDefined then // Rx = stack address
@@ -271,38 +271,38 @@ class LocalPhase(proc: Procedure,
             // Rx = Ry merge corresponding cells to Rx and Ry
             case arg: Variable /*if varToSym.contains(n) && varToSym(n).contains(arg)*/ =>
              visitPointerArithmeticOperation(n, lhsCell, arg, 0)
-
-            case MemoryLoad(_, index, _, size) => // Rx = Mem[Ry], merge Rx and pointee of Ry (E(Ry))
-              assert(size % 8 == 0)
-              val byteSize = size/8
-              lhsCell.node.get.flags.read  = true
-              global = isGlobal(index, n, byteSize)
-              stack = isStack(index, n)
-              if global.isDefined then
-                graph.mergeCells(lhsCell,graph.adjust(graph.find(global.get).getPointee))
-              else if stack.isDefined then
-                graph.mergeCells(lhsCell, graph.adjust(graph.find(stack.get).getPointee))
-              else
-                index match
-                  case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
-                    evaluateExpression(arg2, constProp(n)) match
-                      case Some(v) =>
-//                        assert(varToSym(n).contains(arg1))
-                        val offset = v.value
-                        visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, offset)
-                      case None =>
-//                        assert(varToSym(n).contains(arg1))
-                        // collapse the result
-//                        visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, 0, true)
-                        unsupportedPointerArithmeticOperation(n, index,Node(Some(graph)).cells(0))
-                  case arg: Variable =>
-//                    assert(varToSym(n).contains(arg))
-                    visitPointerArithmeticOperation(n, lhsCell, arg, byteSize, true)
-                  case _ => ???
             case _ =>
               unsupportedPointerArithmeticOperation(n, expr, lhsCell)
-
-      case MemoryAssign(_, ind, expr, _, size, _) =>
+        
+      case MemoryLoad(lhs, _, index, _, size, _) => // Rx = Mem[Ry], merge Rx and pointee of Ry (E(Ry))
+        val lhsCell = graph.adjust(graph.varToCell(n)(lhs))
+        assert(size % 8 == 0)
+        val byteSize = size / 8
+        lhsCell.node.get.flags.read = true
+        val global = isGlobal(index, n, byteSize)
+        val stack = isStack(index, n)
+        if global.isDefined then
+          graph.mergeCells(lhsCell, graph.adjust(graph.find(global.get).getPointee))
+        else if stack.isDefined then
+          graph.mergeCells(lhsCell, graph.adjust(graph.find(stack.get).getPointee))
+        else
+          index match
+            case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
+              evaluateExpression(arg2, constProp(n)) match
+                case Some(v) =>
+                  //                        assert(varToSym(n).contains(arg1))
+                  val offset = v.value
+                  visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, offset)
+                case None =>
+                  //                        assert(varToSym(n).contains(arg1))
+                  // collapse the result
+                  //                        visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, 0, true)
+                  unsupportedPointerArithmeticOperation(n, index, Node(Some(graph)).cells(0))
+            case arg: Variable =>
+              //                    assert(varToSym(n).contains(arg))
+              visitPointerArithmeticOperation(n, lhsCell, arg, byteSize, true)
+            case _ => ???
+      case MemoryStore(_, ind, expr, _, size, _) =>
         val unwrapped = unwrapPaddingAndSlicing(expr)
         unwrapped match {
           // Mem[Ry] = Rx
