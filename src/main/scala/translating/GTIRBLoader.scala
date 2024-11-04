@@ -156,10 +156,12 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
 
     val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {
-      val assign = LocalAssign(LocalVar(name, ty), expr.get, label)
       if (load.isDefined) {
-        Seq(load.get, assign)
+        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
+        val assign = LocalAssign(LocalVar(name, ty), expr.get, label.map(_ + "$1"))
+        Seq(loadWithLabel, assign)
       } else {
+        val assign = LocalAssign(LocalVar(name, ty), expr.get, label)
         Seq(assign)
       }
     } else {
@@ -171,10 +173,12 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
     val lhs = visitLexpr(ctx.lexpr)
     val (rhs, load) = visitExpr(ctx.expr)
     if (lhs.isDefined && rhs.isDefined) {
-      val assign = LocalAssign(lhs.get, rhs.get, label)
       if (load.isDefined) {
-        Seq(load.get, assign)
+        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
+        val assign = LocalAssign(lhs.get, rhs.get, label.map(_ + "$1"))
+        Seq(loadWithLabel, assign)
       } else {
+        val assign = LocalAssign(lhs.get, rhs.get, label)
         Seq(assign)
       }
     } else {
@@ -188,10 +192,12 @@ class GTIRBLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]]) {
     constMap += (name -> ty)
     val (expr, load) = visitExpr(ctx.expr)
     if (expr.isDefined) {
-      val assign = LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label)
       if (load.isDefined) {
-        Seq(load.get, assign)
+        val loadWithLabel = MemoryLoad(load.get.lhs, load.get.mem, load.get.index, load.get.endian, load.get.size, label.map(_ + "$0"))
+        val assign = LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label.map(_ + "$1"))
+        Seq(loadWithLabel, assign)
       } else {
+        val assign = LocalAssign(LocalVar(name + "$" + blockCount + "$" + instructionCount, ty), expr.get, label)
         Seq(assign)
       }
     } else {
