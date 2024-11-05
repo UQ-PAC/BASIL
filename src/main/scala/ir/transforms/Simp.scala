@@ -50,8 +50,6 @@ def difftestLiveVars(p: Procedure, compareResult: Map[CFGPosition, Set[Variable]
   passed
 }
 
-
-
 def basicReachingDefs(p: Procedure): Map[Command, Map[Variable, Set[Assign | DirectCall]]] = {
   val (beforeLive, afterLive) = getLiveVars(p)
   val dom = DefUseDomain(beforeLive)
@@ -243,7 +241,11 @@ def removeSlices(p: Procedure): Unit = {
     }
 
   enum HighZeroBits:
-    case Bits(n: Int, var unifromAccesses: Boolean = true, highAlwaysZero: Option[Int] = None) // most significant bit that is accessed (and all below)
+    case Bits(
+        n: Int,
+        var unifromAccesses: Boolean = true,
+        highAlwaysZero: Option[Int] = None
+    ) // most significant bit that is accessed (and all below)
     case False // property is false
     case Bot // don't know anything
 
@@ -254,7 +256,7 @@ def removeSlices(p: Procedure): Unit = {
     case _                                             => ()
   }
 
-  def getRep(v: LocalVar)  : LocalVar = ufsolver.find(LVTerm(v)).asInstanceOf[LVTerm].v
+  def getRep(v: LocalVar): LocalVar = ufsolver.find(LVTerm(v)).asInstanceOf[LVTerm].v
 
   val unifiedAssignments = ufsolver
     .unifications()
@@ -272,7 +274,6 @@ def removeSlices(p: Procedure): Unit = {
         case _                                                                                     => true
       }))
     )
-
 
   class CheckUsesHaveExtend() extends CILVisitor {
     val result: mutable.HashMap[LocalVar, HighZeroBits] =
@@ -310,7 +311,8 @@ def removeSlices(p: Procedure): Unit = {
     override def vstmt(s: Statement) = {
       s match {
         case Assign(l: LocalVar, r: LocalVar, _) => {
-          /** direct copy ; use union-find result to process access **/
+
+          /** direct copy ; use union-find result to process access * */
           ufsolver.unify(LVTerm(l), LVTerm(r))
           SkipChildren()
         }
@@ -349,6 +351,7 @@ def removeSlices(p: Procedure): Unit = {
           DoChildren()
         }
         case d: DirectCall => {
+
           /** we always need to pass whole variable across calls since we analyse intraprocedurally */
           d.outParams.map(_._2).collect {
             case l: LocalVar => {
@@ -367,10 +370,10 @@ def removeSlices(p: Procedure): Unit = {
     }
 
     override def vjump(j: Jump) = j match {
-      case r: Return => { 
+      case r: Return => {
         for ((formal, actual) <- r.outParams) {
           actual match {
-            case v: LocalVar if (size(v).isDefined)=> {
+            case v: LocalVar if (size(v).isDefined) => {
               extractAccess(v, size(formal).get)
             }
             case _ => ()
@@ -413,12 +416,11 @@ def removeSlices(p: Procedure): Unit = {
     v -> x
   }.toMap
 
-  /**
-   * This transform moves bvextracts from the uses to the definition, if all uses have an extract of some size. 
-   * Ideally this removes the extract in some cases. To bemore strict the 
-   *    val onlyKeepWhereAllAccessesSliceSameBits = true
-   * flag only applies this transform when all accesses have extactly the same slice, effectively removing the slice at access.
-   */
+  /** This transform moves bvextracts from the uses to the definition, if all uses have an extract of some size. Ideally
+    * this removes the extract in some cases. To bemore strict the val onlyKeepWhereAllAccessesSliceSameBits = true flag
+    * only applies this transform when all accesses have extactly the same slice, effectively removing the slice at
+    * access.
+    */
 
   class ReplaceAlwaysSlicedVars(varHighZeroBits: Map[LocalVar, Int]) extends CILVisitor {
     var formals = Set[LocalVar]()
@@ -466,10 +468,11 @@ def removeSlices(p: Procedure): Unit = {
 
     override def vstmt(s: Statement) = {
       s match {
-        case a @ Assign(lhs: LocalVar, rhs : LocalVar, _) if  varHighZeroBits.contains(getRep(lhs)) && varHighZeroBits.contains(getRep(rhs)) => {
+        case a @ Assign(lhs: LocalVar, rhs: LocalVar, _)
+            if varHighZeroBits.contains(getRep(lhs)) && varHighZeroBits.contains(getRep(rhs)) => {
           assert(varHighZeroBits(getRep(lhs)) == varHighZeroBits(getRep(rhs)))
-          a.lhs = lhs.copy(irType=BitVecType(varHighZeroBits(getRep(lhs))))
-          a.rhs = rhs.copy(irType=BitVecType(varHighZeroBits(getRep(rhs))))
+          a.lhs = lhs.copy(irType = BitVecType(varHighZeroBits(getRep(lhs))))
+          a.rhs = rhs.copy(irType = BitVecType(varHighZeroBits(getRep(rhs))))
           // if (varHighZeroBits(getRep(lhs)) == varHighZeroBits(getRep(rhs))) {
           // } else if (varHighZeroBits(lhs) < varHighZeroBits(rhs)) {
           //   a.lhs = lhs.copy(irType=BitVecType(varHighZeroBits(lhs)))
@@ -482,7 +485,8 @@ def removeSlices(p: Procedure): Unit = {
           SkipChildren()
         }
         case a @ Assign(lhs: LocalVar, SignExtend(sz, rhs), _)
-            if size(lhs).isDefined && varHighZeroBits.get(getRep(lhs)).contains(size(rhs).get) && !(formals.contains(lhs)) => {
+            if size(lhs).isDefined && varHighZeroBits.get(getRep(lhs)).contains(size(rhs).get) && !(formals
+              .contains(lhs)) => {
           // assert(varHighZeroBits(lhs) == sz)
           val varsize = varHighZeroBits(getRep(lhs))
           a.lhs = LocalVar(lhs.varName, BitVecType(varsize), lhs.index)
@@ -491,7 +495,8 @@ def removeSlices(p: Procedure): Unit = {
           DoChildren()
         }
         case a @ Assign(lhs: LocalVar, ZeroExtend(sz, rhs), _)
-            if size(lhs).isDefined && varHighZeroBits.get(getRep(lhs)).contains(size(rhs).get) && !(formals.contains(lhs)) => {
+            if size(lhs).isDefined && varHighZeroBits.get(getRep(lhs)).contains(size(rhs).get) && !(formals
+              .contains(lhs)) => {
           val varsize = varHighZeroBits(getRep(lhs))
           a.lhs = LocalVar(lhs.varName, BitVecType(varsize), lhs.index)
           a.rhs = rhs
@@ -660,11 +665,19 @@ def copypropTransform(p: Procedure) = {
 
   // Logger.info(s"${p.name} ExprComplexity ${ExprComplexity()(p)}")
   // val result = solver.solveProc(p, true).withDefaultValue(dom.bot)
-  val result = DSACopyProp(p)
+  val result = CopyProp.DSACopyProp(p)
   val solve = t.checkPoint("Solve CopyProp")
 
-  val vis = Simplify(result)
-  visit_proc(vis, p)
+  if (result.nonEmpty) {
+    val vis = Simplify(CopyProp.toResult(result, true))
+    visit_proc(vis, p)
+
+    val condResult = CopyProp.PropFlagCalculations(p, result.toMap)
+    val condVis = Simplify(CopyProp.toResult(condResult, false))
+    visit_proc(condVis, p)
+
+  }
+
   val xf = t.checkPoint("transform")
   // Logger.info(s"    ${p.name} after transform expr complexity ${ExprComplexity()(p)}")
 
@@ -687,64 +700,70 @@ def copypropTransform(p: Procedure) = {
   val sipm = t.checkPoint("algebraic simp")
 
   // Logger.info("[!] Simplify :: RemoveSlices")
-  removeSlices(p)
+  // removeSlices(p)
   visit_proc(AlgebraicSimplifications, p)
 
 }
 
-  def removeEmptyBlocks(p: Program) = {
-    for (proc <- p.procedures) {
-      val blocks = proc.blocks.toList
-      for (b <- blocks) {
-        b match {
-          case b: Block if b.statements.size == 0 && b.prevBlocks.size == 1 && b.jump.isInstanceOf[GoTo] => {
-            val prev = b.prevBlocks
-            val next = b.nextBlocks
-            for (p <- prev) {
-              p.jump match {
-                case g: GoTo => {
-                  for (n <- next) {
-                    g.addTarget(n)
-                  }
-                  g.removeTarget(b)
+def removeEmptyBlocks(p: Program) = {
+  for (proc <- p.procedures) {
+    val blocks = proc.blocks.toList
+    for (b <- blocks) {
+      b match {
+        case b: Block if b.statements.size == 0 && b.prevBlocks.size == 1 && b.jump.isInstanceOf[GoTo] => {
+          val prev = b.prevBlocks
+          val next = b.nextBlocks
+          for (p <- prev) {
+            p.jump match {
+              case g: GoTo => {
+                for (n <- next) {
+                  g.addTarget(n)
                 }
-                case _ => throw Exception("Must have goto")
+                g.removeTarget(b)
               }
+              case _ => throw Exception("Must have goto")
             }
-            b.replaceJump(Unreachable())
-            b.parent.removeBlocks(b)
           }
-          case _ => ()
+          b.replaceJump(Unreachable())
+          b.parent.removeBlocks(b)
         }
+        case _ => ()
       }
     }
   }
+}
 
 def coalesceBlocks(p: Program) = {
   var didAny = false
   for (proc <- p.procedures) {
     val blocks = proc.blocks.toList
     for (b <- blocks.sortBy(_.rpoOrder)) {
-      if (b.prevBlocks.size == 1 && b.prevBlocks.head.statements.nonEmpty && b.statements.nonEmpty
+      if (
+        b.prevBlocks.size == 1 && b.prevBlocks.head.statements.nonEmpty && b.statements.nonEmpty
         && b.prevBlocks.head.nextBlocks.size == 1
-        && b.prevBlocks.head.statements.lastOption.map(s => !(s.isInstanceOf[Call])).getOrElse(true)) {
-          didAny = true
-          // append topredecessor  
-          // we know prevBlock is only jumping to b and has no call at the end
-          val prevBlock = b.prevBlocks.head
-          val stmts = b.statements.map(b.statements.remove).toList
-          prevBlock.statements.appendAll(stmts)
-          // leave empty block b and cleanup with removeEmptyBlocks 
-        } else if (b.nextBlocks.size == 1 && b.nextBlocks.head.statements.nonEmpty && b.statements.nonEmpty
-          && b.nextBlocks.head.prevBlocks.size == 1
-          && b.statements.lastOption.map(s => !(s.isInstanceOf[Call])).getOrElse(true)) {
-          didAny = true
-          // append to successor
-          // we know b is only jumping to nextBlock and does not end in a call
-          val nextBlock = b.nextBlocks.head
-          val stmts = b.statements.map(b.statements.remove).toList
-          nextBlock.statements.prependAll(stmts)
-          // leave empty block b and cleanup with removeEmptyBlocks 
+        && b.prevBlocks.head.statements.lastOption.map(s => !(s.isInstanceOf[Call])).getOrElse(true)
+        && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
+      ) {
+        didAny = true
+        // append topredecessor
+        // we know prevBlock is only jumping to b and has no call at the end
+        val prevBlock = b.prevBlocks.head
+        val stmts = b.statements.map(b.statements.remove).toList
+        prevBlock.statements.appendAll(stmts)
+        // leave empty block b and cleanup with removeEmptyBlocks
+      } else if (
+        b.nextBlocks.size == 1 && b.nextBlocks.head.statements.nonEmpty && b.statements.nonEmpty
+        && b.nextBlocks.head.prevBlocks.size == 1
+        && b.statements.lastOption.map(s => !(s.isInstanceOf[Call])).getOrElse(true)
+        && !(b.parent.entryBlock.contains(b) || b.parent.returnBlock.contains(b))
+      ) {
+        didAny = true
+        // append to successor
+        // we know b is only jumping to nextBlock and does not end in a call
+        val nextBlock = b.nextBlocks.head
+        val stmts = b.statements.map(b.statements.remove).toList
+        nextBlock.statements.prependAll(stmts)
+        // leave empty block b and cleanup with removeEmptyBlocks
       }
     }
   }
@@ -788,15 +807,12 @@ def doCopyPropTransform(p: Program) = {
   visit_prog(CleanupAssignments(), p)
   Logger.info("[!] Simplify :: Merge empty blocks")
 
-  
-
   removeEmptyBlocks(p)
   coalesceBlocks(p)
   coalesceBlocks(p)
   coalesceBlocks(p)
   coalesceBlocks(p)
   removeEmptyBlocks(p)
-
 
 }
 
@@ -890,10 +906,9 @@ class worklistSolver[L, A <: AbstractDomain[L]](domain: A) {
       val b = worklist.dequeue
 
       while (
-          worklist.nonEmpty && (if backwards then (worklist.head.rpoOrder <= b.rpoOrder)
-                                else (worklist.head.rpoOrder >= b.rpoOrder))
-        )
-      do {
+        worklist.nonEmpty && (if backwards then (worklist.head.rpoOrder <= b.rpoOrder)
+                              else (worklist.head.rpoOrder >= b.rpoOrder))
+      ) do {
         // drop rest of blocks with same priority
         val m = worklist.dequeue()
         assert(
@@ -979,11 +994,75 @@ object CCP {
   }
 }
 
-def DSACopyProp(p: Procedure): Map[Variable, Expr] = {
+object CopyProp {
 
-  case class PropState(val e: Expr, val deps: mutable.Set[Variable], var clobbered: Boolean, var useCount: Int, var isFlagDep: Boolean)
-  val state = mutable.HashMap[Variable, PropState]()
-  var poisoned = false // we have an indirect call
+  def isFlagVar(l: Variable) = {
+    val flagNames = Set("ZF", "VF", "CF", "NF")
+    l match {
+      case l: LocalVar => flagNames.contains(l.varName)
+      case l           => flagNames.contains(l.name)
+    }
+  }
+
+  case class PropState(
+      var e: Expr,
+      val deps: mutable.Set[Variable],
+      var clobbered: Boolean,
+      var useCount: Int,
+      var isFlagDep: Boolean,
+  )
+
+
+  def PropFlagCalculations(p: Procedure, initialState: Map[Variable, PropState]) = {
+    val state = mutable.HashMap[Variable, PropState]()
+
+    val flagDeps = initialState.collect {
+      case (v, e) if e.isFlagDep => v -> e
+    }
+
+    val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+    worklist.addAll(p.blocks)
+    var poisoned = false
+
+    def transfer(s: Statement) = {
+      s match {
+        case a: Assign if a.rhs.loads.size > 0 => clobberFull(state, a.lhs)
+        case a: Assign if !state.contains(a.lhs) && flagDeps.contains(a.lhs) => {
+          val r = canPropTo(state, a.rhs, true).get
+          state(a.lhs) = PropState(r, mutable.Set.from(r.variables), false, 0, true)
+        }
+        case a: Assign if state.contains(a.lhs) && state(a.lhs).clobbered => {
+          ()
+        }
+        case a: Assign
+            if state.contains(a.lhs) && (a.rhs != state(a.lhs).e) && (canPropTo(state, a.rhs, true) != canPropTo(state, state(a.lhs).e, true))
+             => {
+          clobberFull(state, a.lhs)
+        }
+        case a: Assign if state.contains(a.lhs) => {
+          state(a.lhs) = state(a.lhs).copy(e = canPropTo(state, a.rhs, true).get)
+        }
+        case i: IndirectCall => {
+          poisoned = true
+        }
+        case d: DirectCall => {
+          for (l <- d.outParams.map(_._2)) {
+            clobberFull(state, l)
+          }
+        }
+        case _ => ()
+      }
+    }
+
+    while (worklist.nonEmpty && !poisoned) {
+      val b: Block = worklist.dequeue
+
+      for (l <- b.statements) {
+        transfer(l)
+      }
+    }
+    if (poisoned) then mutable.HashMap() else state
+  }
 
   def clobberFull(c: mutable.HashMap[Variable, PropState], l: Variable): Unit = {
     if (c.contains(l)) {
@@ -1000,88 +1079,141 @@ def DSACopyProp(p: Procedure): Map[Variable, Expr] = {
     }
   }
 
-  val flagNames = Set("ZF", "VF", "CF", "NF", "R31")
+  def isTrivial(e: Expr) = e match {
+    case l: Literal                              => true
+    case l: Variable                             => true
+    case BinaryExpr(op, e: Variable, b: Literal) => true
+    case _                                       => false
+  }
 
-  def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
-    // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
-    s match {
-      case Assign(l, r, lb) => {
-        if (r.loads.size > 0) {
-          // c.copy(state = c.state + (l -> CopyProp.Clobbered))
-          clobberFull(c, l)
-        } else {
-          val evaled = r
-          val rhsDeps = evaled.variables.toSet
-          val existing = c.get(l)
+  def canPropTo(s: mutable.HashMap[Variable, PropState], e: Expr, isFlag: Boolean = false): Option[Expr] = {
 
-          val isFlag = l match {
-            case l: LocalVar =>  flagNames.contains(l.varName)
-            case l           =>  flagNames.contains(l.name)
-          }
+    def proped(e: Expr) = {
+      val ne =
+        if e.variables.size > 1 && !isFlag then Some(e)
+        else
+          Substitute(
+            v => {
+              s.get(v) match {
+                case Some(vs) if !vs.clobbered => Some(vs.e)
+                case _                         => None
+              }
+            },
+            true
+          )(e)
 
-          c.get(l).foreach(v => v.isFlagDep = v.isFlagDep || isFlag)
-          for (l <- rhsDeps) {
-            c.get(l).foreach(v => v.isFlagDep = v.isFlagDep || isFlag)
-          }
+      // partial eval after prop
+      visit_expr(AlgebraicSimplifications, ne.getOrElse(e))
+    }
 
-          existing match {
-            case None => {
-              c(l) = PropState(evaled, mutable.Set.from(rhsDeps), false, 0, isFlag)
-            }
-            case Some(ps) if ps.clobbered => {
-              ()
-            }
-            case Some(ps) if ps.e != evaled => {
-              ps.deps.addAll(rhsDeps)
-              clobberFull(c, l)
-            }
-            case _ => {
-              // clobberFull(c, l)
-              // ps.e == evaled and have prop
-            }
-          }
+    def propfp(e: Expr) = {
+      var o = e
+      var p = proped(e)
 
-          for (v <- rhsDeps) {
-            if (state.contains(v)) {
-              state(v).useCount += 1
-            }
-          }
-
-        }
+      while (o != p) {
+        o = p
+        p = proped(o)
       }
-      case x: DirectCall => {
-        val lhs = x.outParams.map(_._2)
-        for (l <- lhs) {
-          clobberFull(c, l)
-        }
-      }
-      case x: IndirectCall => {
-        // not really correct 
-        poisoned = true
-        for ((i, v) <- c) {
-          v.clobbered = true
-        }
-      }
-      case _ => ()
+      p
+    }
+
+    proped(e) match {
+      case l: Literal                                 => Some(l)
+      case l: Variable                                => Some(l)
+      case e @ BinaryExpr(o, v: Variable, c: Literal) => Some(e)
+      case e: Expr if isFlag || e.variables.size <= 1 => Some(e)
+      case e                                          => None
     }
   }
 
-  // sort by precedence
-  val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
-  worklist.addAll(p.blocks)
+  def DSACopyProp(p: Procedure) = {
 
-  while (worklist.nonEmpty && !poisoned) {
-    val b: Block = worklist.dequeue
+    val state = mutable.HashMap[Variable, PropState]()
+    var poisoned = false // we have an indirect call
 
-    for (l <- b.statements) {
-      transfer(state, l)
+    def transfer(c: mutable.HashMap[Variable, PropState], s: Statement): Unit = {
+      // val callClobbers = ((0 to 7) ++ (19 to 30)).map("R" + _).map(c => Register(c, 64))
+      s match {
+        case Assign(l, r, lb) => {
+          if (r.loads.size > 0) {
+            // c.copy(state = c.state + (l -> CopyProp.Clobbered))
+            clobberFull(c, l)
+          } else {
+
+            val isFlag = isFlagVar(l) || r.variables.exists(isFlagVar)
+            val isFlagDep = isFlag || c.get(l).map(v => v.isFlagDep).getOrElse(false)
+
+            c.get(l).foreach(v => v.isFlagDep = v.isFlagDep || isFlagDep)
+            for (l <- r.variables) {
+              c.get(l).foreach(v => v.isFlagDep = v.isFlagDep || isFlagDep)
+            }
+
+            var prop = canPropTo(c, r, isFlagDep)
+            val existing = c.get(l)
+
+            (prop, existing) match {
+              case (Some(evaled), None) => {
+                c(l) = PropState(evaled, mutable.Set.from(evaled.variables), false, 0, isFlagDep)
+              }
+              case (_, Some(ps)) if ps.clobbered => {
+                ()
+              }
+              case (Some(evaled), Some(ps))
+                  if ps.e == r || ps.e == evaled || (canPropTo(c, ps.e, isFlagDep).contains(evaled)) => {
+                c(l) = c(l).copy(e = evaled)
+              }
+              case (Some(evaled), Some(ps)) => {
+                clobberFull(c, l)
+              }
+              case _ => {
+                // ps.e != evaled and have prop
+                clobberFull(c, l)
+              }
+            }
+
+          }
+        }
+        case x: DirectCall => {
+          val lhs = x.outParams.map(_._2)
+          for (l <- lhs) {
+            clobberFull(c, l)
+          }
+        }
+        case x: IndirectCall => {
+          // not really correct
+          poisoned = true
+          for ((i, v) <- c) {
+            v.clobbered = true
+          }
+        }
+        case _ => ()
+      }
+    }
+
+    // sort by precedence
+    val worklist = mutable.PriorityQueue[Block]()(Ordering.by(_.rpoOrder))
+    worklist.addAll(p.blocks)
+
+    while (worklist.nonEmpty && !poisoned) {
+      val b: Block = worklist.dequeue
+
+      for (l <- b.statements) {
+        transfer(state, l)
+      }
+    }
+
+    val trivialOnly = false
+
+    if poisoned then mutable.HashMap() else state
+  }
+
+  def toResult(s: mutable.Map[Variable, PropState], trivialOnly: Boolean = true)(v: Variable): Option[Expr] = {
+    s.get(v) match {
+      case Some(c) if !c.clobbered && (!trivialOnly || isTrivial(c.e)) => Some(c.e)
+      case _                                                           => None
     }
   }
 
-  val res = if poisoned then Map() else state.collect {
-    case (v, c) if !c.clobbered && (c.useCount == 1 || c.isFlagDep || c.e.isInstanceOf[Variable] || c.e.isInstanceOf[Literal]) => v -> c.e
-  }.toMap
-  res
 }
 
 class ConstCopyProp() extends AbstractDomain[CCP] {
@@ -1114,10 +1246,18 @@ class ConstCopyProp() extends AbstractDomain[CCP] {
         if (r.loads.size > 0) {
           CCP.clobberFull(c, l)
         } else {
-          val consts = c.state.collect {
-            case (k, CopyProp.Prop(c, deps)) if deps.isEmpty => k -> c
-          }
-          val evaled = ir.eval.partialEvalExpr(Substitute(consts, false)(r).getOrElse(r), e => None)
+          val evaled = ir.eval.partialEvalExpr(
+            Substitute(
+              v => {
+                c.state.get(v) match {
+                  case Some(CopyProp.Prop(c, deps)) if deps.isEmpty => Some(c)
+                  case _                                            => None
+                }
+              },
+              false
+            )(r).getOrElse(r),
+            e => None
+          )
           val rhsDeps = evaled.variables.toSet
           val existing = c.state.get(l).getOrElse(CopyProp.Bot)
 
@@ -1170,7 +1310,7 @@ class ExprComplexity extends CILVisitor {
 }
 
 class Substitute(
-    val res: Map[Variable, Expr],
+    val res: Variable => Option[Expr],
     val recurse: Boolean = true,
     val complexityThreshold: Int = 0
 ) extends CILVisitor {
@@ -1179,10 +1319,10 @@ class Substitute(
 
   override def vexpr(e: Expr) = {
     e match {
-      case v: Variable if res.contains(v) => {
-        val changeTo = res(v)
+      case v: Variable if res(v).isDefined => {
+        val changeTo = res(v).get
         if (complexityThreshold > 0) {
-          complexity += ExprComplexity()(changeTo)
+          complexity += ExprComplexity()(changeTo) - ExprComplexity()(e)
         }
         if (complexityThreshold > 0 && complexity > complexityThreshold) {
           SkipChildren()
@@ -1213,7 +1353,7 @@ class Substitute(
 }
 
 class Simplify(
-    val res: Map[Variable, Expr],
+    val res: Variable => Option[Expr],
     val initialBlock: Block = null,
     val absdom: Option[ConstCopyProp] = None /* flow sensitive */
 ) extends CILVisitor {
@@ -1226,7 +1366,13 @@ class Simplify(
     val threshold = 500
     val variables = e.variables.toSet
     val subst = Substitute(res, true, threshold)
-    val result = subst(e).getOrElse(e)
+    var old: Expr = e
+    var result = subst(e).getOrElse(e)
+    while (old != result) {
+      old = result
+      result = subst(e).getOrElse(e)
+    }
+
     if (subst.complexity > threshold) {
       val bl = s"${block.parent.name}::${block.label}"
       if (!skipped.contains(bl)) {
@@ -1234,7 +1380,6 @@ class Simplify(
         Logger.warn(s"Some skipped substitution at $bl due to resulting expr size > ${threshold} threshold")
       }
     }
-    // ChangeDoChildrenPost(result, x => x)
     ChangeDoChildrenPost(result, x => x)
   }
 

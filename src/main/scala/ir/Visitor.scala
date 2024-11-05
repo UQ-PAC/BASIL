@@ -297,10 +297,17 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
     super.visitProcedure(node)
   }
 
+  def isStackPtr(v: Variable) = {
+      (v match {
+            case l: LocalVar if l.varName == "R31" => true
+            case r: Variable if r.name == "R31" => true
+            case _ => false
+      }) || stackRefs.contains(v)
+  }
+
   override def visitMemoryLoad(node: MemoryLoad): MemoryLoad = {
     // replace mem with stack in load if index contains stack references
-    val loadStackRefs = node.index.variables.intersect(stackRefs)
-    if (loadStackRefs.nonEmpty) {
+    if (node.index.variables.exists(isStackPtr)) {
       node.copy(mem = stackMemory)
     } else {
       node
@@ -315,8 +322,7 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
     val variableVisitor = VariablesWithoutStoresLoads()
     variableVisitor.visitExpr(node.rhs)
 
-    val rhsStackRefs = variableVisitor.variables.toSet.intersect(stackRefs)
-    if (rhsStackRefs.nonEmpty) {
+    if (variableVisitor.variables.exists(isStackPtr)) {
       stackRefs.add(node.lhs)
     } else if (stackRefs.contains(node.lhs) && node.lhs.name != stackPointer.name) {
       stackRefs.remove(node.lhs)
@@ -325,8 +331,7 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
   }
 
   override def visitMemoryAssign(node: MemoryAssign): Statement = {
-    val indexStackRefs = node.index.variables.intersect(stackRefs)
-    if (indexStackRefs.nonEmpty) {
+    if (node.index.variables.exists(isStackPtr)) {
       node.mem = stackMemory
     }
     node

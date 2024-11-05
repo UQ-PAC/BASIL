@@ -218,6 +218,7 @@ object IRTransform {
     */
   def prepareForTranslation(config: ILLoadingConfig, ctx: IRContext): Unit = {
     ctx.program.determineRelevantMemory(ctx.globalOffsets)
+    transforms.applyRPO(ctx.program)
 
     Logger.info("[!] Stripping unreachable")
     val before = ctx.program.procedures.size
@@ -531,7 +532,7 @@ object RunUtils {
     // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
-    val write = true
+    val write = false
 
     transforms.applyRPO(ctx.program)
 
@@ -551,7 +552,7 @@ object RunUtils {
     if (ir.eval.SimplifyValidation.validate) {
       // Logger.info("Live vars difftest")
       // val tipLiveVars : Map[CFGPosition, Set[Variable]] = analysis.IntraLiveVarsAnalysis(ctx.program).analyze()
-      //assert(ctx.program.procedures.forall(transforms.difftestLiveVars(_, tipLiveVars)))
+      // assert(ctx.program.procedures.forall(transforms.difftestLiveVars(_, tipLiveVars)))
 
       Logger.info("DSA Check")
       val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
@@ -565,8 +566,11 @@ object RunUtils {
     if write then writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
 
     // brute force run the analysis twice because it cleans up more stuff
+    assert(ctx.program.procedures.forall(transforms.rdDSAProperty))
     transforms.doCopyPropTransform(ctx.program)
-    transforms.doCopyPropTransform(ctx.program)
+    if write then writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-after-simp.dot")
+    assert(ctx.program.procedures.forall(transforms.rdDSAProperty))
+
     assert(invariant.blockUniqueLabels(ctx.program))
     Logger.info(s"CopyProp ${timer.checkPoint("CopyProp")} ms ")
     if write then writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")

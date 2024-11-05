@@ -673,7 +673,7 @@ case class BInBounds(base: BExpr, len: BExpr, endian: Endian, i: BExpr) extends 
     case _              => throw new Exception(s"InBounds does not have Bitvector type: $this")
   }
 
-  val fnName: String = s"in_bounds${baseSize}"
+  val fnName: String = s"in_bounds${baseSize}_${if endian == Endian.LittleEndian then "le" else "be"}"
 
   override val getType: BType = BoolBType
   override def functionOps: Set[FunctionOp] =

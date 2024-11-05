@@ -1,6 +1,5 @@
 package util
 
-
 enum ProcRelyVersion:
   case Function, IfCommandContradiction
 case class BoogieGeneratorConfig(memoryFunctionType: BoogieMemoryAccessMode = BoogieMemoryAccessMode.SuccessiveStoreSelect,

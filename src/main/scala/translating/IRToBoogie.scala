@@ -100,7 +100,8 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     val functionsUsed2 = functionsUsed1.map(p => functionOpToDefinition(p))
     val functionsUsed3 = functionsUsed2.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed4 = functionsUsed3.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
-    val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4).toList.sorted
+    val functionsUsed5 = functionsUsed4.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
+    val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4 ++ functionsUsed5).toList.sorted
 
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgLib ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
@@ -439,7 +440,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
 
   def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr]): BProcedure = {
-    val body = (p.entryBlock.view ++ p.blocks.filterNot(x => p.entryBlock.contains(x))).map(translateBlock).toList
+    val body = (p.entryBlock.view ++ ArrayBuffer.from(p.blocks).sortBy( x => -x.rpoOrder).filterNot(x => p.entryBlock.contains(x))).map(translateBlock).toList
 
     val callsRely: Boolean = body.flatMap(_.body).exists(_ match
       case BProcedureCall("rely", lhs, params, comment) => true

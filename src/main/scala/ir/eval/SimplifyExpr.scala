@@ -263,7 +263,7 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
      */
 
     // NF check on expr
-    case Extract(upper, lower, b) if size(b).contains(upper) && (upper == (lower + 1)) => {
+    case Extract(upper, lower, b) if size(b).contains(upper) && (upper == (lower + 1)) && size(b).get >= 8 => {
       bool2bv1(BinaryExpr(BVSLT, (b), BitVecLiteral(0, size(b).get)))
     }
 
@@ -308,7 +308,7 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
             ) // high precision op
           )
         )
-        if (o1 == o2) && o1 == BVADD && (lhs) == (orig)
+      if (o1 == o2) && o1 == BVADD && (lhs) == (orig) && sz >= 8
           && exts == ext1 && exts == ext2
           && x2 == x1
           && y2 == y1 => {
@@ -332,7 +332,7 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
             )
           )
         )
-        if sz > 1 && (o1 == o2) && o2 == o4 && o1 == BVADD && (lhs) == (orig)
+        if sz >= 8 && (o1 == o2) && o2 == o4 && o1 == BVADD && (lhs) == (orig)
           && AlgebraicSimplifications(x2) == AlgebraicSimplifications(SignExtend(exts, x1))
           && AlgebraicSimplifications(y2) == AlgebraicSimplifications(SignExtend(exts, y1))
           && AlgebraicSimplifications(z2) == AlgebraicSimplifications(SignExtend(exts, z1)) => {
@@ -357,7 +357,7 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
           ZeroExtend(exts, orig @ BinaryExpr(o1, BinaryExpr(o3, x1, y1), z1)),
           BinaryExpr(o2, compar @ BinaryExpr(o4, x2, y2), z2) // high precision op
         )
-        if size(x1).get > 1 && (o1 == o2) && o2 == o4 && o1 == BVADD
+        if size(x1).get >= 8 && (o1 == o2) && o2 == o4 && o1 == BVADD
           && (x2) == (ZeroExtend(exts, x1))
           && (y2) == (ZeroExtend(exts, y1))
           && (z2) == (ZeroExtend(exts, z1)) => {
@@ -370,7 +370,7 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
           ZeroExtend(exts, orig @ BinaryExpr(o1, x1, UnaryExpr(BVNEG, y1))),
           BinaryExpr(o2, compar @ BinaryExpr(o4, ZeroExtend(ext1, x2), ZeroExtend(ext2, UnaryExpr(BVNOT, y2))), BitVecLiteral(1, _)) // high precision op
         )
-        if size(x1).get > 1 && (o1 == o2) && o2 == o4 && o1 == BVADD
+        if size(x1).get >= 8 && (o1 == o2) && o2 == o4 && o1 == BVADD
           && exts == ext1 && exts == ext2
           && x1 == x2 && y1 == y2 => {
       // C not Set

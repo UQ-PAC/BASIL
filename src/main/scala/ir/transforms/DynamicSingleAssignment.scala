@@ -197,11 +197,11 @@ class OnePassDSA(
 
     val next = block.nextBlocks.toList
     val anyNextFilled = next.exists(state(_).filled)
-    val anyNextJoin = next.exists(_.prevBlocks.size > 1)
+    val anyNextPrevNotFilled = next.exists(_.prevBlocks.exists(b => !state(b).filled))
     for (b <- next) {
       val definedVars = state(block).renamesAfter.keySet.intersect(liveAfter(block))
 
-      if (definedVars.size > 0 && (anyNextFilled || anyNextJoin)) {
+      if (definedVars.size > 0 && (anyNextPrevNotFilled)) {
         val nb = createBlockBetween(block, b, "_phi_")
 
         state(nb).renamesBefore.addAll(state(block).renamesAfter)
