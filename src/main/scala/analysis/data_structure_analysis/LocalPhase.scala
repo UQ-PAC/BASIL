@@ -275,18 +275,19 @@ class LocalPhase(proc: Procedure,
               unsupportedPointerArithmeticOperation(n, expr, lhsCell)
         
       case MemoryLoad(lhs, _, index, _, size, _) => // Rx = Mem[Ry], merge Rx and pointee of Ry (E(Ry))
+        val indexUnwrapped = unwrapPaddingAndSlicing(index)
         val lhsCell = graph.adjust(graph.varToCell(n)(lhs))
         assert(size % 8 == 0)
         val byteSize = size / 8
         lhsCell.node.get.flags.read = true
-        val global = isGlobal(index, n, byteSize)
-        val stack = isStack(index, n)
+        val global = isGlobal(indexUnwrapped, n, byteSize)
+        val stack = isStack(indexUnwrapped, n)
         if global.isDefined then
           graph.mergeCells(lhsCell, graph.adjust(graph.find(global.get).getPointee))
         else if stack.isDefined then
           graph.mergeCells(lhsCell, graph.adjust(graph.find(stack.get).getPointee))
         else
-          index match
+          indexUnwrapped match
             case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
               evaluateExpression(arg2, constProp(n)) match
                 case Some(v) =>
@@ -297,7 +298,7 @@ class LocalPhase(proc: Procedure,
                   //                        assert(varToSym(n).contains(arg1))
                   // collapse the result
                   //                        visitPointerArithmeticOperation(n, lhsCell, arg1, byteSize, true, 0, true)
-                  unsupportedPointerArithmeticOperation(n, index, Node(Some(graph)).cells(0))
+                  unsupportedPointerArithmeticOperation(n, indexUnwrapped, Node(Some(graph)).cells(0))
             case arg: Variable =>
               //                    assert(varToSym(n).contains(arg))
               visitPointerArithmeticOperation(n, lhsCell, arg, byteSize, true)
