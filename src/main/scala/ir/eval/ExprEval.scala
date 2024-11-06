@@ -89,7 +89,7 @@ def evalUnOp(op: UnOp, body: Literal): Expr = {
     case (i: IntLiteral, IntNEG)   => IntLiteral(-i.value)
     case (FalseLiteral, BoolNOT)   => TrueLiteral
     case (TrueLiteral, BoolNOT)    => FalseLiteral
-    case (TrueLiteral, BoolToBV1)  => BitVecLiteral(1, 0)
+    case (TrueLiteral, BoolToBV1)  => BitVecLiteral(1, 1)
     case (FalseLiteral, BoolToBV1) => BitVecLiteral(0, 1)
     case (_, _)                    => throw Exception(s"Unreachable ${(body, op)}")
   }
@@ -149,81 +149,40 @@ trait Loader[S, E] {
   }
 }
 
-def fastPartialEvalExpr(exp: Expr): Expr = {
+def fastPartialEvalExpr(exp: Expr): (Expr, Boolean) = {
   /*
    * Ignore substitutions and parital eval
    */
-  exp match {
-    case f: UninterpretedFunction => f
-    case unOp: UnaryExpr => {
-      unOp.arg match {
-        case l: Literal => evalUnOp(unOp.op, l)
-        case o          => UnaryExpr(unOp.op, o)
+  var didAnything = true
+  val r = exp match {
+    case f: UninterpretedFunction  => f
+    case UnaryExpr(op, l: Literal) => evalUnOp(op, l)
+    case BinaryExpr(op: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) if exp.getType.isInstanceOf[BitVecType] =>
+      evalBVBinExpr(op, l, r)
+    case BinaryExpr(op: IntBinOp, l: IntLiteral, r: IntLiteral) if exp.getType == IntType =>
+      IntLiteral(evalIntBinExpr(op, l.value, r.value))
+    case BinaryExpr(op: IntBinOp, l: IntLiteral, r: IntLiteral) if exp.getType == BoolType =>
+      if evalIntLogBinExpr(op, l.value, r.value) then TrueLiteral else FalseLiteral
+    case BinaryExpr(op: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) if exp.getType == BoolType =>
+      if evalBVLogBinExpr(op, l, r) then TrueLiteral else FalseLiteral
+    case BinaryExpr(op: BoolBinOp, l: BoolLit, r: BoolLit) =>
+      if (evalBoolLogBinExpr(op, l.value, r.value)) then TrueLiteral else FalseLiteral
+    case ZeroExtend(e, l: BitVecLiteral) => BitVectorEval.smt_zero_extend(e, l)
+    case SignExtend(e, l: BitVecLiteral) => BitVectorEval.smt_sign_extend(e, l)
+    case Extract(e, b, l: BitVecLiteral) => BitVectorEval.boogie_extract(e, b, l)
+    case Repeat(reps, b: BitVecLiteral) => {
+      assert(reps > 0)
+      if (reps == 1) b
+      else {
+        (2 to reps).foldLeft(b)((acc, r) => BitVectorEval.smt_concat(acc, b))
       }
     }
-    case binOp: BinaryExpr =>
-      val lhs = binOp.arg1
-      val rhs = binOp.arg2
-      binOp.getType match {
-        case m: MapType => binOp
-        case b: BitVecType => {
-          (binOp.op, lhs, rhs) match {
-            case (o: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) => evalBVBinExpr(o, l, r)
-            case _                                                => BinaryExpr(binOp.op, lhs, rhs)
-          }
-        }
-        case BoolType => {
-          def bool2lit(b: Boolean) = if b then TrueLiteral else FalseLiteral
-          (binOp.op, lhs, rhs) match {
-            case (o: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) => bool2lit(evalBVLogBinExpr(o, l, r))
-            case (o: IntBinOp, l: IntLiteral, r: IntLiteral)      => bool2lit(evalIntLogBinExpr(o, l.value, r.value))
-            case (o: BoolBinOp, l: BoolLit, r: BoolLit)           => bool2lit(evalBoolLogBinExpr(o, l.value, r.value))
-            case _                                                => BinaryExpr(binOp.op, lhs, rhs)
-          }
-        }
-        case IntType => {
-          (binOp.op, lhs, rhs) match {
-            case (o: IntBinOp, l: IntLiteral, r: IntLiteral) => IntLiteral(evalIntBinExpr(o, l.value, r.value))
-            case _                                           => BinaryExpr(binOp.op, lhs, rhs)
-          }
-        }
-      }
-    case extend: ZeroExtend =>
-      val body = extend.body
-      (body match {
-        case b: BitVecLiteral => BitVectorEval.smt_zero_extend(extend.extension, b)
-        case o                => extend.copy(body = o)
-      })
-    case extend: SignExtend =>
-      val body = extend.body
-      body match {
-        case b: BitVecLiteral => BitVectorEval.smt_sign_extend(extend.extension, b)
-        case o                => extend.copy(body = o)
-      }
-    case e: Extract =>
-      val body = e.body
-      body match {
-        case b: BitVecLiteral => BitVectorEval.boogie_extract(e.end, e.start, b)
-        case o                => e.copy(body = o)
-      }
-    case r: Repeat =>
-      val body = r.body
-      body match {
-        case b: BitVecLiteral => {
-          assert(r.repeats > 0)
-          if (r.repeats == 1) b
-          else {
-            (2 to r.repeats).foldLeft(b)((acc, r) => BitVectorEval.smt_concat(acc, b))
-          }
-        }
-        case o => r.copy(body = o)
-      }
-    case variable: Variable => variable
-    case ml: MemoryLoad =>
-      val addr = ml.index
-      ml.copy(index = addr)
-    case b: Literal => b
+    case o => {
+      didAnything = false
+      o
+    }
   }
+  (r, didAnything)
 }
 
 def statePartialEvalExpr[S](l: Loader[S, InterpreterError])(exp: Expr): State[S, Expr, InterpreterError] = {

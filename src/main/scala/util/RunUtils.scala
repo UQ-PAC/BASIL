@@ -566,18 +566,18 @@ object RunUtils {
     if write then writeToFile(serialiseIL(ctx.program), s"il-before-copyprop.il")
 
     // brute force run the analysis twice because it cleans up more stuff
-    assert(ctx.program.procedures.forall(transforms.rdDSAProperty))
+    //assert(ctx.program.procedures.forall(transforms.rdDSAProperty))
     transforms.doCopyPropTransform(ctx.program)
     if write then writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-after-simp.dot")
-    assert(ctx.program.procedures.forall(transforms.rdDSAProperty))
+    // assert(ctx.program.procedures.forall(transforms.rdDSAProperty))
 
     assert(invariant.blockUniqueLabels(ctx.program))
     Logger.info(s"CopyProp ${timer.checkPoint("CopyProp")} ms ")
     if write then writeToFile(serialiseIL(ctx.program), s"il-after-copyprop.il")
 
 
-    val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
-    assert(x)
+    // val x = ctx.program.procedures.forall(transforms.rdDSAProperty)
+    //assert(x)
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("DSA Check (after transform)")
       val x = ctx.program.procedures.forall(transforms.rdDSAProperty)

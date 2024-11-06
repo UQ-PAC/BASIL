@@ -106,6 +106,7 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       case BVNEQ        => ???
       case IntNEQ       => ???
       case BoolNEQ      => ???
+      case BoolOR       => "or"
       case BVCONCAT     => "concat"
       case b: BVBinOp   => "bv" + b.opName
       case b: BoolBinOp => b.opName

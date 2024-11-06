@@ -28,7 +28,7 @@ trait AbstractDomain[L] {
   def bot: L
 }
 
-def getLiveVars(p: Procedure) = {
+def getLiveVars(p: Procedure) : (Map[Block, Set[Variable]], Map[Block, Set[Variable]]) = {
   val liveVarsDom = IntraLiveVarsDomain()
   val liveVarsSolver = worklistSolver(liveVarsDom)
   liveVarsSolver.solveProc(p, backwards = true)
@@ -643,7 +643,7 @@ class CleanupAssignments() extends CILVisitor {
   var redundantAssignments = Set[Assign]()
 
   def isRedundant(a: Assign) = {
-    redundantAssignments.contains(a)
+    a.lhs == a.rhs || redundantAssignments.contains(a)
   }
 
   override def vproc(p: Procedure) = {
@@ -685,6 +685,11 @@ def copypropTransform(p: Procedure) = {
   t.checkPoint("redundant assignments")
   // Logger.info(s"    ${p.name} after dead var cleanup expr complexity ${ExprComplexity()(p)}")
 
+  visit_proc(AlgebraicSimplifications, p)
+  visit_proc(AlgebraicSimplifications, p)
+  visit_proc(AlgebraicSimplifications, p)
+  visit_proc(AlgebraicSimplifications, p)
+  visit_proc(AlgebraicSimplifications, p)
   visit_proc(AlgebraicSimplifications, p)
   visit_proc(AlgebraicSimplifications, p)
   visit_proc(AlgebraicSimplifications, p)
@@ -774,9 +779,6 @@ def doCopyPropTransform(p: Program) = {
 
   applyRPO(p)
 
-  removeEmptyBlocks(p)
-  coalesceBlocks(p)
-  removeEmptyBlocks(p)
 
   Logger.info("[!] Simplify :: Expr/Copy-prop Transform")
   val work = p.procedures
@@ -809,8 +811,11 @@ def doCopyPropTransform(p: Program) = {
 
   removeEmptyBlocks(p)
   coalesceBlocks(p)
+  removeEmptyBlocks(p)
   coalesceBlocks(p)
+  removeEmptyBlocks(p)
   coalesceBlocks(p)
+  removeEmptyBlocks(p)
   coalesceBlocks(p)
   removeEmptyBlocks(p)
 
@@ -996,6 +1001,16 @@ object CCP {
 
 object CopyProp {
 
+
+  def forwardFlagCalc(p: Procedure) = {
+    val (beforeLive, afterLive) = getLiveVars(p)
+    val dom = DefUseDomain(beforeLive)
+    val solver = worklistSolver(dom)
+    // type rtype = Map[Block, Map[Variable, Set[Assign | DirectCall]]]
+    val (beforeRes, afterRes) = solver.solveProc(p)
+
+  }
+
   def isFlagVar(l: Variable) = {
     val flagNames = Set("ZF", "VF", "CF", "NF")
     l match {
@@ -1103,7 +1118,7 @@ object CopyProp {
           )(e)
 
       // partial eval after prop
-      visit_expr(AlgebraicSimplifications, ne.getOrElse(e))
+      eval.simplifyExprFixpoint(false)(ne.getOrElse(e))
     }
 
     def propfp(e: Expr) = {
