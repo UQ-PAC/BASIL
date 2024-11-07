@@ -164,73 +164,13 @@ def removeSlices(p: Program): Unit = {
   p.procedures.foreach(removeSlices)
 }
 
-def circularDeps(p: Procedure): Set[Variable] = {
-
-  /** this is flow insensitive, used to remove copy prop candidates which produce a substitution cycle
-    */
-
-  case class VTerm(v: Variable) extends analysis.solvers.Var[VTerm]
-
-  // map variable to the representative of the set of dependencies
-  val results = mutable.Map[Variable, VTerm]()
-  val ufsolver = analysis.solvers.UnionFindSolver[VTerm]()
-
-  def addDependency(lhs: Variable, dependency: Variable) = {
-    val rep = results.get(lhs) match {
-      case Some(d) => {
-        ufsolver.unify(d, VTerm(dependency))
-        val nrep = ufsolver.find(d).asInstanceOf[VTerm]
-        results(lhs) = nrep
-      }
-      case None => VTerm(dependency)
-    }
-  }
-
-  p.foreach {
-    case (Assign(lhs: LocalVar, rhs, _)) => {
-      for (rvar <- rhs.variables) {
-        addDependency(lhs, rvar)
-      }
-    }
-    case d: DirectCall => {
-      // unify formal and actual
-      for (rvar <- d.actualParams) {
-        for (r <- rvar._2.variables) {
-          addDependency(rvar._1, r)
-        }
-      }
-      for (lvar <- d.outParams) {
-        addDependency(lvar._1, lvar._2)
-        for (rvar <- d.actualParams.flatMap(_._2.variables)) {
-          // unify in and out
-          addDependency(lvar._2, rvar)
-        }
-      }
-    }
-    case _ => ()
-  }
-
-  val unif = ufsolver.unifications().map((k, v) => (k, v.toSet)).toMap
-  val circular = results
-    .filter((v, rep) => {
-      unif(rep).contains(VTerm(v))
-    })
-    .map((v, rep) => v)
-    .toSet
-
-  circular
-
-}
 
 def removeSlices(p: Procedure): Unit = {
-  case class LVTerm(v: LocalVar) extends analysis.solvers.Var[LVTerm]
-
   /** if for each variable v there is some i:int such that (i) all its assignments have a ZeroExtend(i, x) and (ii) all
     * its uses have Extract(size(v) - i, 0, v) Then we replace v by a variable of bitvector size (size(v) - i)
     *
     * We check this flow-insensitively and recover precision using DSA form.
     */
-
   val assignments: Map[LocalVar, Iterable[Assign]] = p
     .collect { case a: Assign =>
       a
@@ -239,33 +179,29 @@ def removeSlices(p: Procedure): Unit = {
     .collect { case (k: LocalVar, v) =>
       (k, v)
     }
-
   enum HighZeroBits:
-    case Bits(
-        n: Int,
-        var unifromAccesses: Boolean = true,
-        highAlwaysZero: Option[Int] = None
-    ) // most significant bit that is accessed (and all below)
+    case Bits(n: Int) // (i) and (ii) hold; the n highest bits are redundant
     case False // property is false
     case Bot // don't know anything
-
+  def size(e: Expr) = {
+    e.getType match {
+      case BitVecType(s) => Some(s)
+      case _             => None
+    }
+  }
+  case class LVTerm(v: LocalVar) extends analysis.solvers.Var[LVTerm]
   // unify variable uses across direct assignments
   val ufsolver = analysis.solvers.UnionFindSolver[LVTerm]()
-  assignments.foreach {
+  val unioned = assignments.foreach {
     case (lv, Assign(lhs: LocalVar, rhs: LocalVar, _)) => ufsolver.unify(LVTerm(lhs), LVTerm(rhs))
     case _                                             => ()
   }
-
-  def getRep(v: LocalVar): LocalVar = ufsolver.find(LVTerm(v)).asInstanceOf[LVTerm].v
-
   val unifiedAssignments = ufsolver
     .unifications()
-    .map {
-      case (v: LVTerm, rvs) =>
-        v.v -> (rvs.map { case LVTerm(rv) =>
-          rv
-        }).toSet
-      case _ => ???
+    .map { case (v: LVTerm, rvs) =>
+      v.v -> (rvs.map { case LVTerm(rv) =>
+        rv
+      }).toSet
     }
     .map((repr: LocalVar, elems: Set[LocalVar]) =>
       repr -> elems.flatMap(assignments(_).filter(_ match {
@@ -274,252 +210,81 @@ def removeSlices(p: Procedure): Unit = {
         case _                                                                                     => true
       }))
     )
-
+  // try and find a single extension size for all rhs of assignments to all variables in the assigned equality class
+  val varHighZeroBits: Map[LocalVar, HighZeroBits] = assignments.map((v, assigns) =>
+    // note: this overapproximates on x := y when x and y may both be smaller than their declared size
+    val allRHSExtended = assigns.foldLeft(HighZeroBits.Bot: HighZeroBits)((e, assign) =>
+      (e, assign.rhs) match {
+        case (HighZeroBits.Bot, ZeroExtend(i, lhs))                   => HighZeroBits.Bits(i)
+        case (b @ HighZeroBits.Bits(ei), ZeroExtend(i, _)) if i == ei => b
+        case (b @ HighZeroBits.Bits(ei), ZeroExtend(i, _)) if i != ei => HighZeroBits.False
+        case (HighZeroBits.False, _)                                  => HighZeroBits.False
+        case (_, other)                                               => HighZeroBits.False
+      }
+    )
+    (v, allRHSExtended)
+  )
+  val varsWithExtend: Map[LocalVar, HighZeroBits] = assignments
+    .map((lhs, _) => {
+      // map all lhs to the result for their representative
+      val rep = ufsolver.find(LVTerm(lhs)) match {
+        case LVTerm(r) => r
+      }
+      lhs -> varHighZeroBits.get(rep)
+    })
+    .collect { case (l, Some(x)) /* remove anything we have no information on */ =>
+      (l, x)
+    }
   class CheckUsesHaveExtend() extends CILVisitor {
     val result: mutable.HashMap[LocalVar, HighZeroBits] =
       mutable.HashMap[LocalVar, HighZeroBits]()
-
-    def extractAccess(actualVar: LocalVar, highestBit: Int): Unit = {
-      val v = getRep(actualVar)
-      // val v = actualVar
-      if (!size(v).isDefined) {
-        return ();
-      }
-
-      if (highestBit == size(v).get) {
-        result(v) = HighZeroBits.False
-      } else if (((!result.contains(v)) || result.get(v).contains(HighZeroBits.Bot))) {
-        result(v) = HighZeroBits.Bits(highestBit, true)
-      } else {
-        result(v) match {
-          case HighZeroBits.Bits(n, _, z) if highestBit > n && n != 0 => {
-            // relax constraint to bits accessed
-            result(v) = HighZeroBits.Bits(highestBit, false, z)
-          }
-          case HighZeroBits.Bits(n, _, _) if n >= highestBit => {
-            // access satisfied by upper constraint
-          }
-          case _ => ()
-        }
-      }
-    }
-
-    // TODO: make correct wrt casting if you know that you can extend to zero
-    //  - otherwise dont smallen variable
-    //  - allow casting at more points (e.g. copies)
-
-    override def vstmt(s: Statement) = {
-      s match {
-        case Assign(l: LocalVar, r: LocalVar, _) => {
-
-          /** direct copy ; use union-find result to process access * */
-          ufsolver.unify(LVTerm(l), LVTerm(r))
-          SkipChildren()
-        }
-        case Assign(v: LocalVar, ZeroExtend(sz, exp), _) => {
-          val l = getRep(v)
-          result.get(l) match {
-            case None => {
-              result(l) = HighZeroBits.Bits(0, true, Some(sz))
-            }
-            case Some(HighZeroBits.Bits(bits, o, None)) => {
-              result(l) = HighZeroBits.Bits(bits, o, Some(sz))
-            }
-            case Some(HighZeroBits.Bits(bits, o, Some(existing))) if existing <= sz => {
-              result(l) = HighZeroBits.Bits(bits, o, Some(existing))
-            }
-            case Some(HighZeroBits.Bits(bits, o, Some(existing))) if existing > sz => {
-              result(l) = HighZeroBits.Bits(bits, o, Some(sz))
-            }
-          }
-          DoChildren()
-        }
-        case Assign(v: LocalVar, exp, _) => {
-          val l = getRep(v)
-          result.get(l) match {
-            case None => {
-              result(l) = HighZeroBits.Bits(0, true, Some(0))
-            }
-            case Some(HighZeroBits.Bot) => {
-              result(l) = HighZeroBits.Bits(0, true, Some(0))
-            }
-            case Some(HighZeroBits.Bits(bits, o, Some(existing))) => {
-              result(l) = HighZeroBits.Bits(bits, o, Some(0))
-            }
-            case _ => {}
-          }
-          DoChildren()
-        }
-        case d: DirectCall => {
-
-          /** we always need to pass whole variable across calls since we analyse intraprocedurally */
-          d.outParams.map(_._2).collect {
-            case l: LocalVar => {
-              extractAccess(l, size(l).get)
-            }
-          }
-          d.actualParams.flatMap(_._2.variables).collect {
-            case l: LocalVar => {
-              extractAccess(l, size(l).get)
-            }
-          }
-          SkipChildren()
-        }
-        case _ => DoChildren()
-      }
-    }
-
-    override def vjump(j: Jump) = j match {
-      case r: Return => {
-        for ((formal, actual) <- r.outParams) {
-          actual match {
-            case v: LocalVar if (size(v).isDefined) => {
-              extractAccess(v, size(formal).get)
-            }
-            case _ => ()
-          }
-        }
-        SkipChildren()
-      }
-      case _ => DoChildren()
-    }
-
-    override def vrvar(v: Variable) = {
-      v match {
-        case v: LocalVar if size(v).isDefined => {
-          result(getRep(v)) = HighZeroBits.False
-        }
-        case _ => ()
-      }
-      SkipChildren()
-    }
-
     override def vexpr(v: Expr) = {
       v match {
-        case Extract(i, 0, v: LocalVar) if size(v).isDefined => {
-          result(getRep(v)) = HighZeroBits.False
+        case Extract(i, 0, v: LocalVar)
+            if size(v).isDefined && result.get(v).contains(HighZeroBits.Bits(size(v).get - i)) =>
+          SkipChildren()
+        case v: LocalVar => {
+          result.remove(v)
           SkipChildren()
         }
         case _ => DoChildren()
       }
     }
-
-    def apply(p: Procedure): Map[LocalVar, HighZeroBits] = {
+    def apply(assignHighZeroBits: Map[LocalVar, HighZeroBits])(p: Procedure): Map[LocalVar, HighZeroBits] = {
       result.clear()
+      result.addAll(assignHighZeroBits)
       visit_proc(this, p)
       result.toMap
     }
   }
-
-  val onlyKeepWhereAllAccessesSliceSameBits = true
-  val toSmallen = CheckUsesHaveExtend()(p).collect { case (v, HighZeroBits.Bits(x, _, _)) =>
+  val toSmallen = CheckUsesHaveExtend()(varsWithExtend)(p).collect { case (v, HighZeroBits.Bits(x)) =>
     v -> x
   }.toMap
-
-  /** This transform moves bvextracts from the uses to the definition, if all uses have an extract of some size. Ideally
-    * this removes the extract in some cases. To bemore strict the val onlyKeepWhereAllAccessesSliceSameBits = true flag
-    * only applies this transform when all accesses have extactly the same slice, effectively removing the slice at
-    * access.
-    */
-
   class ReplaceAlwaysSlicedVars(varHighZeroBits: Map[LocalVar, Int]) extends CILVisitor {
-    var formals = Set[LocalVar]()
-
     override def vexpr(v: Expr) = {
       v match {
-        case Extract(i, 0, v: LocalVar)
-            if size(v).isDefined && !(formals.contains(v)) && varHighZeroBits.contains(getRep(v)) => {
-          val size = varHighZeroBits(getRep(v))
-          assert(size >= i)
-          if (size == i) {
-            ChangeTo(v.copy(irType = BitVecType(size)))
-          } else {
-            ChangeTo(Extract(i, 0, v.copy(irType = BitVecType(size))))
-          }
+        case Extract(i, 0, v: LocalVar) if size(v).isDefined && varHighZeroBits.contains(v) => {
+          ChangeTo(LocalVar(v.name, BitVecType(size(v).get - varHighZeroBits(v))))
         }
         case _ => DoChildren()
       }
     }
-
-    override def vlvar(v: Variable) = {
-      v match {
-        case lhs: LocalVar if (varHighZeroBits.contains(getRep(lhs)) && !formals.contains(getRep(lhs))) => {
-          val n = lhs.copy(irType = BitVecType(varHighZeroBits(getRep(lhs))))
-          ChangeTo(n)
-        }
-        case _ => SkipChildren()
-      }
-    }
-
-    override def vrvar(v: Variable) = {
-      v match {
-        case lhs: LocalVar if (varHighZeroBits.contains(getRep(lhs)) && !formals.contains(getRep(lhs))) => {
-          val n = lhs.copy(irType = BitVecType(varHighZeroBits(getRep(lhs))))
-          ChangeTo(n)
-        }
-        case _ => SkipChildren()
-      }
-    }
-
-    override def vproc(p: Procedure) = {
-      formals = p.formalInParam.toSet ++ p.formalOutParam.toSet
-      DoChildren()
-    }
-
     override def vstmt(s: Statement) = {
       s match {
-        case a @ Assign(lhs: LocalVar, rhs: LocalVar, _)
-            if varHighZeroBits.contains(getRep(lhs)) && varHighZeroBits.contains(getRep(rhs)) => {
-          assert(varHighZeroBits(getRep(lhs)) == varHighZeroBits(getRep(rhs)))
-          a.lhs = lhs.copy(irType = BitVecType(varHighZeroBits(getRep(lhs))))
-          a.rhs = rhs.copy(irType = BitVecType(varHighZeroBits(getRep(rhs))))
-          // if (varHighZeroBits(getRep(lhs)) == varHighZeroBits(getRep(rhs))) {
-          // } else if (varHighZeroBits(lhs) < varHighZeroBits(rhs)) {
-          //   a.lhs = lhs.copy(irType=BitVecType(varHighZeroBits(lhs)))
-          //   a.rhs = Extract(varHighZeroBits(lhs), 0, rhs.copy(irType=BitVecType(varHighZeroBits(rhs))))
-          // } else {
-          //   // lhs > rhs
-          //   a.lhs = lhs.copy(irType=BitVecType(varHighZeroBits(lhs)))
-          //   a.rhs = ZeroExtend(varHighZeroBits(lhs) - varHighZeroBits(rhs),rhs.copy(irType=BitVecType(varHighZeroBits(rhs))))
-          // }
-          SkipChildren()
-        }
-        case a @ Assign(lhs: LocalVar, SignExtend(sz, rhs), _)
-            if size(lhs).isDefined && varHighZeroBits.get(getRep(lhs)).contains(size(rhs).get) && !(formals
-              .contains(lhs)) => {
-          // assert(varHighZeroBits(lhs) == sz)
-          val varsize = varHighZeroBits(getRep(lhs))
-          a.lhs = LocalVar(lhs.varName, BitVecType(varsize), lhs.index)
-          a.rhs = rhs
-          assert(size(a.lhs).get == size(a.rhs).get)
-          DoChildren()
-        }
         case a @ Assign(lhs: LocalVar, ZeroExtend(sz, rhs), _)
-            if size(lhs).isDefined && varHighZeroBits.get(getRep(lhs)).contains(size(rhs).get) && !(formals
-              .contains(lhs)) => {
-          val varsize = varHighZeroBits(getRep(lhs))
-          a.lhs = LocalVar(lhs.varName, BitVecType(varsize), lhs.index)
+            if size(lhs).isDefined && varHighZeroBits.contains(lhs) => {
+          assert(varHighZeroBits(lhs) == sz)
+          a.lhs = LocalVar(lhs.name, BitVecType(size(lhs).get - varHighZeroBits(lhs)))
           a.rhs = rhs
-          assert(size(a.lhs).get == size(a.rhs).get)
-          DoChildren()
-        }
-        case a @ Assign(lhs: LocalVar, rhs, _)
-            if size(lhs).isDefined && varHighZeroBits.contains(getRep(lhs)) && !(formals.contains(lhs)) => {
-          // promote extract to the definition
-          val varsize = varHighZeroBits(getRep(lhs))
-          a.lhs = LocalVar(lhs.varName, BitVecType(varsize), lhs.index)
-          a.rhs = Extract(varsize, 0, rhs)
-          assert(size(a.lhs).get == size(a.rhs).get, s"${size(a.lhs).get} != ${size(a.rhs).get}")
           DoChildren()
         }
         case _ => DoChildren()
       }
     }
   }
-
   visit_proc(ReplaceAlwaysSlicedVars(toSmallen), p)
-
 }
+
 
 def getRedundantAssignments(procedure: Procedure): Set[Assign] = {
 
@@ -690,19 +455,12 @@ def copypropTransform(p: Procedure) = {
   visit_proc(AlgebraicSimplifications, p)
   visit_proc(AlgebraicSimplifications, p)
   ir.eval.cleanupSimplify(p)
-  // visit_proc(AlgebraicSimplifications, p)
-  // visit_proc(AlgebraicSimplifications, p)
-  // visit_proc(AlgebraicSimplifications, p)
-  // visit_proc(AlgebraicSimplifications, p)
-  // visit_proc(AlgebraicSimplifications, p)
-  // visit_proc(AlgebraicSimplifications, p)
-  // visit_proc(AlgebraicSimplifications, p)
-  // visit_proc(AlgebraicSimplifications, p)
+  ir.eval.cleanupSimplify(p)
   // Logger.info(s"    ${p.name}  after simp expr complexity ${ExprComplexity()(p)}")
   val sipm = t.checkPoint("algebraic simp")
 
   // Logger.info("[!] Simplify :: RemoveSlices")
-  // removeSlices(p)
+  removeSlices(p)
   visit_proc(AlgebraicSimplifications, p)
 
 }
