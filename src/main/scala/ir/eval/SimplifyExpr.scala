@@ -196,6 +196,11 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
     /** https://developer.arm.com/documentation/dui0801/l/Condition-Codes/Condition-code-suffixes-and-related-flags
       *
       * match NF == VF
+      *
+      * (declare-const Var2 (_ BitVec 64))
+      * (declare-const Var3 (_ BitVec 64))
+      * (assert (! (not (= (= (bvslt (bvadd Var2 Var3) (_ bv0 64)) (not (= (concat ((_ extract 63 63) (bvadd Var2 Var3)) (bvadd Var2 Var3)) (bvadd (concat ((_ extract 63 63) Var2) Var2) (concat ((_ extract 63 63) Var3) Var3))))) (bvsgt Var2 (bvnot Var3)))) :named simp105))
+      *
       */
     case BinaryExpr(
           // add case
@@ -207,15 +212,39 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
             BoolNOT,
             BinaryExpr(
               BVEQ,
-              SignExtend(exts, orig @ BinaryExpr(o1, x1, y1)),
-              compar @ BinaryExpr(o2, x2, y2)
+              SignExtend(exts, orig @ BinaryExpr(BVADD, x1, y1)),
+              compar @ BinaryExpr(BVADD, x2, y2)
             ) // high precision op
           )
         )
-        if sz > 1 && (o1 == o2) && o1 == BVADD && (lhs) == (orig)
+        if sz > 1 && lhs == orig
           && AlgebraicSimplifications(SignExtend(exts, x1)) == x2
           && AlgebraicSimplifications(SignExtend(exts, y1)) == y2 => {
-      BinaryExpr(BVSGE, x1, UnaryExpr(BVNEG, y1))
+      val n = BinaryExpr(BVSGE, x1, UnaryExpr(BVNEG, y1))
+      logSimp(e, n)
+      n
+    }
+
+    // special case for collapsed cmp 0 x
+    case BinaryExpr(
+          // add case
+          BoolEQ,
+          // N set
+          (BinaryExpr(BVSLT, lhs @ UnaryExpr(BVNOT, _), BitVecLiteral(0, sz))),
+          // V set
+          UnaryExpr(
+            BoolNOT,
+            BinaryExpr(
+              BVEQ,
+              SignExtend(exts, orig @ UnaryExpr(BVNOT, x2)),
+              compar @ BinaryExpr(BVADD, SignExtend(_, UnaryExpr(BVNOT, x3)), BitVecLiteral(2, _))
+            ) // high precision op
+          )
+        )
+        if sz >= 8 && lhs == orig && x2 == x3
+          => {
+      val n = BinaryExpr(BVSLE, BitVecLiteral(0, sz), x2)
+      n
     }
 
 
@@ -275,7 +304,18 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
           && AlgebraicSimplifications(x2) == AlgebraicSimplifications(ZeroExtend(exts, x1))
           && AlgebraicSimplifications(y2) == AlgebraicSimplifications(ZeroExtend(exts, y1)) => {
       // C not Set
-      UnaryExpr(BoolNOT, BinaryExpr(BVUGT, x1, UnaryExpr(BVNOT, y1)))
+      val n = UnaryExpr(BoolNOT, BinaryExpr(BVUGT, x1, UnaryExpr(BVNOT, y1)))
+      // logSimp(e, n)
+      n
+    }
+
+    case BinaryExpr(BVEQ, ZeroExtend(sz, v), 
+        BinaryExpr(BVADD, ZeroExtend(sz2, v2), BitVecLiteral(mv, _))) 
+      if sz == sz2 && v == v2 && mv == BigInt(2).pow(size(v).get)  => {
+      // special case for comparison collapsed cmp 0 - v
+      val ne = UnaryExpr(BoolNOT, BinaryExpr(BVUGT, v, UnaryExpr(BVNEG, BitVecLiteral(1, size(v).get))))
+      // logSimp(e, ne)
+      ne
     }
 
     case BinaryExpr(
@@ -435,6 +475,11 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
           && lhs == lhs2 => {
       l
     }
+
+    case BinaryExpr(BoolAND, lhs @ BinaryExpr(op, l, r), UnaryExpr(BoolNOT, BinaryExpr(BVEQ, l2, r2))) if strictIneq.contains(op) && l == l2 && r == r2=> {
+      lhs
+    }
+
     case BinaryExpr(
           BoolOR,
           BinaryExpr(BoolAND, l @ BinaryExpr(op1, lhs1, lb: Literal), r @ BinaryExpr(op2, lhs3, rb: Literal)),
@@ -525,7 +570,22 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
         case _            => e
       }
     }
-    // constant case combine overlaping
+
+    // subsume constant bound
+    case BinaryExpr(BoolOR, l @ BinaryExpr(BVUGE, x, y: BitVecLiteral), BinaryExpr(BVEQ, x2, y2: BitVecLiteral)) if x == x2 && y2.value >= y.value => {
+      l
+    }
+    case BinaryExpr(BoolOR, l @ BinaryExpr(BVULE, x, y: BitVecLiteral), BinaryExpr(BVEQ, x2, y2: BitVecLiteral)) if x == x2 && y2.value <= y.value => {
+      l
+    }
+    case BinaryExpr(BoolOR, l @ BinaryExpr(BVUGT, x, y: BitVecLiteral), BinaryExpr(BVEQ, x2, y2: BitVecLiteral)) if x == x2 && y2.value > y.value => {
+      l
+    }
+    case BinaryExpr(BoolOR, l @ BinaryExpr(BVULT, x, y: BitVecLiteral), BinaryExpr(BVEQ, x2, y2: BitVecLiteral)) if x == x2 && y2.value < y.value => {
+      l
+    }
+
+    // relax bound by 1
     case e @ BinaryExpr(BoolOR, BinaryExpr(BVULT, x, y: BitVecLiteral), (BinaryExpr(BVEQ, x2, z: BitVecLiteral))) 
       if x == x2 && y.value == z.value => {
       BinaryExpr(BVULE, x, z)
@@ -542,6 +602,25 @@ def simplifyCmpInequalities(e: Expr): (Expr, Boolean) = {
       if x == x2 && y.value - 1 == z.value=> {
       BinaryExpr(BVULE, x, z)
     }
+
+    // tighten bound by 1
+    case e @ BinaryExpr(BoolAND, BinaryExpr(BVUGT, x, y: BitVecLiteral), UnaryExpr(BoolNOT, (BinaryExpr(BVEQ, x2, z: BitVecLiteral)))) 
+      if x == x2 && z.value == y.value + 1 => {
+      BinaryExpr(BVUGT, x, z)
+    }
+    case e @ BinaryExpr(BoolAND, BinaryExpr(BVULT, x, y: BitVecLiteral), UnaryExpr(BoolNOT, (BinaryExpr(BVEQ, x2, z: BitVecLiteral)))) 
+      if x == x2 && z.value == y.value - 1 => {
+      BinaryExpr(BVULT, x, z)
+    }
+    case e @ BinaryExpr(BoolAND, BinaryExpr(BVUGE, x, y: BitVecLiteral), UnaryExpr(BoolNOT, (BinaryExpr(BVEQ, x2, z: BitVecLiteral)))) 
+      if x == x2 && z.value == y.value + 1 => {
+      BinaryExpr(BVUGT, x, z)
+    }
+    case e @ BinaryExpr(BoolAND, BinaryExpr(BVULE, x, y: BitVecLiteral), UnaryExpr(BoolNOT, (BinaryExpr(BVEQ, x2, z: BitVecLiteral)))) 
+      if x == x2 && z.value == y.value - 1 => {
+      BinaryExpr(BVULT, x, z)
+    }
+
     // TODO; we can generalise
     // below is wrong obviously; would be good to have a better 'in-interval' notion
     //case BinaryExpr(BoolOR, l @ BinaryExpr(op, lhs, rhs: BitVecLiteral), BinaryExpr(BVEQ, lhs2, rhs2: BitVecLiteral))
@@ -749,6 +828,9 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
         if size(ed).contains(sz2) && !(y.isInstanceOf[BitVecLiteral]) =>
       BinaryExpr(BVADD, y, UnaryExpr(BVNEG, SignExtend(sz, x)))
 
+    case BinaryExpr(BVADD, UnaryExpr(BVNEG, x), BitVecLiteral(1, _)) => UnaryExpr(BVNOT, x)
+    case BinaryExpr(BVADD, BitVecLiteral(1, _), UnaryExpr(BVNEG, x)) => UnaryExpr(BVNOT, x)
+
     /*
      * Simplify BVop to Bool ops in a boolean context.
      */
@@ -791,8 +873,7 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BoolOR, x, FalseLiteral)  => x
     case BinaryExpr(BoolOR, x, TrueLiteral)   => TrueLiteral
 
-    case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, y: BitVecLiteral), BitVecLiteral(0, s))
-        if ir.eval.BitVectorEval.isNegative(y) =>
+    case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, y: BitVecLiteral), BitVecLiteral(0, s)) =>
       BinaryExpr(BVEQ, x, UnaryExpr(BVNEG, y))
 
     case BinaryExpr(BVCONCAT, BitVecLiteral(0, sz), expr) => ZeroExtend(sz, expr)
@@ -831,6 +912,8 @@ def simplifyExpr(e: Expr): (Expr, Boolean) = {
     case BinaryExpr(BVSUB, x: Expr, y: BitVecLiteral) => BinaryExpr(BVADD, x, UnaryExpr(BVNEG, y))
 
     case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, UnaryExpr(BVNEG, y)), BitVecLiteral(0, _)) => BinaryExpr(BVEQ, x, y)
+    case BinaryExpr(BVEQ, BinaryExpr(BVADD, x, y: BitVecLiteral), BitVecLiteral(0, _)) 
+      if (eval.BitVectorEval.isNegative(y)) => BinaryExpr(BVEQ, x, eval.BitVectorEval.smt_bvneg(y))
 
     case r => {
       didAnything = false

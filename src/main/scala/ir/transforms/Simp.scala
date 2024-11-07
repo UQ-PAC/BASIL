@@ -690,8 +690,6 @@ def copypropTransform(p: Procedure) = {
   visit_proc(AlgebraicSimplifications, p)
   visit_proc(AlgebraicSimplifications, p)
   ir.eval.cleanupSimplify(p)
-  ir.eval.cleanupSimplify(p)
-  ir.eval.cleanupSimplify(p)
   // visit_proc(AlgebraicSimplifications, p)
   // visit_proc(AlgebraicSimplifications, p)
   // visit_proc(AlgebraicSimplifications, p)
