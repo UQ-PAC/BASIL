@@ -1157,5 +1157,4 @@ class Simplify(
     block = b
     DoChildren()
   }
-
 }
