@@ -24,8 +24,7 @@ class ConstPropInterpreterValidate extends AnyFunSuite {
   Logger.setLevel(LogLevel.ERROR)
 
   def testInterpretConstProp(name: String, variation: String, path: String): Unit = {
-    val directoryPath = path + name + "/"
-    val variationPath = directoryPath + variation + "/" + name
+    val variationPath = path + name + "/" + variation + "/" + name
     val loading = ILLoadingConfig(
       inputFile = variationPath + ".adt",
       relfFile = variationPath + ".relf",

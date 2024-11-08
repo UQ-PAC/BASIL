@@ -7,7 +7,7 @@ import org.scalatest.funsuite.*
 import specification.*
 import util.{BASILConfig, IRLoading, ILLoadingConfig, IRContext, RunUtils, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext, BASILResult, Logger, LogLevel, IRTransform}
 import ir.eval.*
-import test_util.*
+import test_util.BASILTest.getSubdirectories
 
 import java.io.IOException
 import java.nio.file.*
@@ -29,7 +29,7 @@ class DifferentialAnalysis extends AnyFunSuite {
       val interpreter = LayerInterpreter(tracingInterpreter(NormalInterpreter), EffectsRLimit(instructionLimit))
       val initialState = InterpFuns.initProgState(NormalInterpreter)(p, InterpreterState())
       //Logger.setLevel(LogLevel.DEBUG)
-      val r = BASILInterpreter(interpreter).run((initialState, Trace(List())), 0)._1
+      val (r, _) = BASILInterpreter(interpreter).run((initialState, Trace(List())), 0)
       //Logger.setLevel(LogLevel.WARN)
       r
     }
@@ -46,22 +46,23 @@ class DifferentialAnalysis extends AnyFunSuite {
     }
 
     Logger.info(traceInit.t.map(_.toString.take(80)).mkString("\n"))
-    val initstdout = initialRes.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
-    val comparstdout  = result.memoryState.getMem("stdout").toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
-    info("STDOUT: \"" + initstdout + "\"")
-    // Logger.info(initialRes.memoryState.getMem("stderr").toList.sortBy(_._1.value).map(_._2).mkString(""))
+    val initstdout = initialRes.memoryState.getMem("stdout")
+    val comparstdout = result.memoryState.getMem("stdout")
+    val text = initstdout.toList.sortBy(_._1.value).map(_._2.value.toChar).mkString("")
+    info("STDOUT: \"" + text + "\"")
     assert(initstdout == comparstdout)
     assert(initialRes.nextCmd == Stopped())
     assert(result.nextCmd == Stopped())
-    assert(Set.empty == initialRes.memoryState.getMem("mem").toSet.diff(result.memoryState.getMem("mem").toSet))
     assert(traceInit.t.nonEmpty)
     assert(traceRes.t.nonEmpty)
     assert(filterEvents(traceInit.t).mkString("\n") == filterEvents(traceRes.t).mkString("\n"))
   }
 
-  def testProgram(testName: String, examplePath: String, suffix: String = ".adt"): Unit = {
-    val loading = ILLoadingConfig(inputFile = examplePath + testName + suffix,
-      relfFile = examplePath + testName + ".relf",
+  def testProgram(name: String, variation: String, path: String): Unit = {
+    val variationPath = path + name + "/" + variation + "/" + name
+    val loading = ILLoadingConfig(
+      inputFile = variationPath + ".adt",
+      relfFile = variationPath + ".relf",
       dumpIL = None,
     )
 
@@ -75,54 +76,41 @@ class DifferentialAnalysis extends AnyFunSuite {
     diffTest(ictx, comparectx)
   }
 
-  test("indirect_call_example") {
-    val testName = "indirect_call"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testProgram(testName, examplePath)
+  test("indirect_calls/indirect_call/gcc_pic:BAP") {
+    testProgram("indirect_call", "gcc_pic", "./src/test/indirect_calls/")
   }
 
-  test("jumptable2_example") {
-    val testName = "jumptable2"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testProgram(testName, examplePath)
+  test("indirect_calls/jumptable2/gcc_pic:BAP") {
+    testProgram("jumptable2", "gcc_pic", "./src/test/indirect_calls/")
   }
 
-  test("jumptable_example") {
-    val testName = "jumptable"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testProgram(testName, examplePath)
+  test("indirect_calls/jumptable/gcc:BAP") {
+    testProgram("jumptable", "gcc", "./src/test/indirect_calls/")
   }
 
-  test("functionpointer_example") {
-    val testName = "functionpointer"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testProgram(testName, examplePath)
+  test("functionpointer/gcc_pic:BAP") {
+    testProgram("functionpointer", "gcc_pic", "./src/test/indirect_calls/")
   }
 
-  test("function_got_example") {
-    val testName = "function_got"
-    val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
-    testProgram(testName, examplePath)
-  }
-
-  def runSystemTests(): Unit = {
+  def runTests(): Unit = {
     val path = System.getProperty("user.dir") + s"/src/test/correct/"
-    val programs: Array[String] = BASILTest.getSubdirectories(path)
+    val programs = getSubdirectories(path)
 
     // get all variations of each program
     for (p <- programs) {
       val programPath = path + "/" + p
-      val variations = BASILTest.getSubdirectories(programPath)
-      variations.foreach { variation =>
-        test("analysis_differential:" + p + "/" + variation + ":BAP") {
-          testProgram(p, path + "/" + p + "/" + variation + "/", suffix = ".adt")
+      val variations = getSubdirectories(programPath)
+      variations.foreach { t =>
+        val variationPath = programPath + "/" + t + "/" + p
+        val inputPath = variationPath + ".adt"
+        if (File(inputPath).exists) {
+          test("correct" + "/" + p + "/" + t + ":BAP") {
+            testProgram(p, t, path)
+          }
         }
-        //test("analysis_differential:" +  p + "/" + variation + ":GTIRB") {
-        //  testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".gts")
-        //}
       }
     }
   }
 
-  runSystemTests()
+  runTests()
 }

@@ -37,11 +37,11 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
 
   Logger.setLevel(LogLevel.WARN)
 
-  def getProgram(name: String): IRContext = {
+  def getProgram(name: String, folder: String): IRContext = {
     val compiler = "gcc"
     val loading = ILLoadingConfig(
-      inputFile = s"src/test/correct/$name/$compiler/$name.adt",
-      relfFile = s"src/test/correct/$name/$compiler/$name.relf",
+      inputFile = s"src/test/$folder/$name/$compiler/$name.adt",
+      relfFile = s"src/test/$folder/$name/$compiler/$name.relf",
       specFile = None,
       dumpIL = None
     )
@@ -61,8 +61,8 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     ctx
   }
 
-  def testInterpret(name: String, expected: Map[String, Int]): Unit = {
-    val ctx = getProgram(name)
+  def testInterpret(name: String, folder: String, expected: Map[String, Int]): Unit = {
+    val ctx = getProgram(name, folder)
     val fstate = interpret(ctx)
     val regs = fstate.memoryState.getGlobalVals
     val globals = ctx.globals
@@ -136,21 +136,21 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
     val expected = Map(
       "arr" -> 0
     )
-    testInterpret("basic_arrays_read", expected)
+    testInterpret("basic_arrays_read", "correct", expected)
   }
 
   test("basic_assign_assign") {
     val expected = Map(
       "x" -> 5
     )
-    testInterpret("basic_assign_assign", expected)
+    testInterpret("basic_assign_assign", "correct", expected)
   }
 
   test("basic_assign_increment") {
     val expected = Map(
       "x" -> 1
     )
-    testInterpret("basic_assign_increment", expected)
+    testInterpret("basic_assign_increment", "correct", expected)
   }
 
 
@@ -159,7 +159,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       "x" -> 1,
       "y" -> 2
     )
-    testInterpret("function", expected)
+    testInterpret("function", "correct", expected)
   }
 
   test("function1") {
@@ -167,7 +167,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       "x" -> 1,
       "y" -> 1410065515 // 10000000107 % 2147483648 = 1410065515
     )
-    testInterpret("function1", expected)
+    testInterpret("function1", "correct", expected)
   }
 
   test("secret_write") {
@@ -176,19 +176,19 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       "x" -> 0,
       "secret" -> 0
     )
-    testInterpret("secret_write", expected)
+    testInterpret("secret_write", "correct", expected)
   }
 
   test("indirect_call") {
     val expected = Map[String, Int]()
-    testInterpret("indirect_call", expected)
+    testInterpret("indirect_call", "indirect_calls", expected)
   }
 
   test("ifglobal") {
     val expected = Map(
       "x" -> 1
     )
-    testInterpret("ifglobal", expected)
+    testInterpret("ifglobal", "correct", expected)
   }
 
   test("cjump") {
@@ -196,7 +196,7 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       "x" -> 1,
       "y" -> 3
     )
-    testInterpret("cjump", expected)
+    testInterpret("cjump", "correct", expected)
   }
 
   test("initialisation") {
@@ -207,21 +207,21 @@ class InterpreterTests extends AnyFunSuite with BeforeAndAfter {
       "y" -> ('b'.toInt)
     )
 
-    testInterpret("initialisation", expected)
+    testInterpret("initialisation", "correct", expected)
   }
 
   test("no_interference_update_x") {
     val expected = Map(
       "x" -> 1
     )
-    testInterpret("no_interference_update_x", expected)
+    testInterpret("no_interference_update_x", "correct", expected)
   }
 
   test("no_interference_update_y") {
     val expected = Map(
       "y" -> 1
     )
-    testInterpret("no_interference_update_y", expected)
+    testInterpret("no_interference_update_y", "correct", expected)
   }
 
   def fib(n: Int): Int = {
