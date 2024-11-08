@@ -1,15 +1,13 @@
 
 import ir.*
-import ir.eval._
 import java.io.{BufferedWriter, File, FileWriter}
 import ir.Endian.LittleEndian
 import org.scalatest.*
 import org.scalatest.funsuite.*
 import specification.*
 import util.{BASILConfig, IRLoading, ILLoadingConfig, IRContext, RunUtils, StaticAnalysis, StaticAnalysisConfig, StaticAnalysisContext, BASILResult, Logger, LogLevel, IRTransform}
-import ir.eval.{interpretTrace, interpret, ExecEffect, Stopped}
+import ir.eval.*
 import test_util.*
-
 
 import java.io.IOException
 import java.nio.file.*
@@ -23,7 +21,7 @@ class DifferentialAnalysis extends AnyFunSuite {
 
   Logger.setLevel(LogLevel.WARN)
 
-  def diffTest(initial: IRContext, transformed: IRContext) = {
+  def diffTest(initial: IRContext, transformed: IRContext): Unit = {
 
     val instructionLimit = 1000000 
 
@@ -61,8 +59,7 @@ class DifferentialAnalysis extends AnyFunSuite {
     assert(filterEvents(traceInit.t).mkString("\n") == filterEvents(traceRes.t).mkString("\n"))
   }
 
-  def testProgram(testName: String, examplePath: String, suffix: String =".adt") = {
-
+  def testProgram(testName: String, examplePath: String, suffix: String = ".adt"): Unit = {
     val loading = ILLoadingConfig(inputFile = examplePath + testName + suffix,
       relfFile = examplePath + testName + ".relf",
       dumpIL = None,
@@ -84,13 +81,11 @@ class DifferentialAnalysis extends AnyFunSuite {
     testProgram(testName, examplePath)
   }
 
-
   test("jumptable2_example") {
     val testName = "jumptable2"
     val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
     testProgram(testName, examplePath)
   }
-
 
   test("jumptable_example") {
     val testName = "jumptable"
@@ -104,36 +99,30 @@ class DifferentialAnalysis extends AnyFunSuite {
     testProgram(testName, examplePath)
   }
 
-
-
   test("function_got_example") {
     val testName = "function_got"
     val examplePath = System.getProperty("user.dir") + s"/examples/$testName/"
     testProgram(testName, examplePath)
   }
 
-
   def runSystemTests(): Unit = {
-
     val path = System.getProperty("user.dir") + s"/src/test/correct/"
-    val programs: Array[String] = getSubdirectories(path)
+    val programs: Array[String] = BASILTest.getSubdirectories(path)
 
     // get all variations of each program
     for (p <- programs) {
       val programPath = path + "/" + p
-      val variations = getSubdirectories(programPath)
-      variations.foreach(variation => {
+      val variations = BASILTest.getSubdirectories(programPath)
+      variations.foreach { variation =>
         test("analysis_differential:" + p + "/" + variation + ":BAP") {
-          testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".adt")
+          testProgram(p, path + "/" + p + "/" + variation + "/", suffix = ".adt")
         }
         //test("analysis_differential:" +  p + "/" + variation + ":GTIRB") {
         //  testProgram(p, path + "/" + p + "/" + variation + "/", suffix=".gts")
         //}
       }
-      )
     }
   }
-
 
   runSystemTests()
 }

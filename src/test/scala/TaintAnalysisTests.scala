@@ -126,7 +126,7 @@ class TaintAnalysisTests extends AnyFunSuite, BASILTest {
 
     val varDepResults = getVarDepResults(program, f)
 
-    assert(varDepResults.get(IRWalk.lastInProc(f).get) == Some(baseRegisterMap + (R0 -> Set(R1, R2))))
+    assert(varDepResults.get(IRWalk.lastInProc(f).get).contains(baseRegisterMap + (R0 -> Set(R1, R2))))
   }
 
   test("interproc") {

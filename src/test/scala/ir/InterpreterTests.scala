@@ -1,10 +1,10 @@
 package ir
 
 import util.PerformanceTimer
-import util.functional._
-import ir.eval._
+import util.functional.*
+import ir.eval.*
 import boogie.Scope
-import ir.dsl._
+import ir.dsl.*
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.BeforeAndAfter
 import specification.SpecGlobal

@@ -1,26 +1,13 @@
 package ir
 
-
 import boogie._
 import scala.collection.mutable
 
 sealed trait Expr {
   def toBoogie: BExpr
-  def toGamma: BExpr = {
-    val gammaVars: Set[BExpr] = gammas.map(_.toGamma)
-    if (gammaVars.isEmpty) {
-      TrueBLiteral
-    } else if (gammaVars.size == 1) {
-      gammaVars.head
-    } else {
-      gammaVars.tail.foldLeft(gammaVars.head) { (join: BExpr, next: BExpr) =>
-        BinaryBExpr(BoolAND, next, join)
-      }
-    }
-  }
   def loads: Set[MemoryLoad] = Set()
   def getType: IRType
-  def gammas: Set[Expr] = Set()
+  def gammas: Set[Variable] = Set() // variables not including those inside a load's index
   def variables: Set[Variable] = Set()
   def acceptVisit(visitor: Visitor): Expr = throw new Exception("visitor " + visitor + " unimplemented for: " + this)
 }
@@ -66,7 +53,7 @@ case class IntLiteral(value: BigInt) extends Literal {
   */
 case class Extract(end: Int, start: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVExtract(end, start, body.toBoogie)
-  override def gammas: Set[Expr] = body.gammas
+  override def gammas: Set[Variable] = body.gammas
   override def variables: Set[Variable] = body.variables
   override def getType: BitVecType = BitVecType(end - start)
   override def toString: String = s"$body[$end:$start]"
@@ -76,7 +63,7 @@ case class Extract(end: Int, start: Int, body: Expr) extends Expr {
 
 case class Repeat(repeats: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVRepeat(repeats, body.toBoogie)
-  override def gammas: Set[Expr] = body.gammas
+  override def gammas: Set[Variable] = body.gammas
   override def variables: Set[Variable] = body.variables
   override def getType: BitVecType = BitVecType(bodySize * repeats)
   private def bodySize: Int = body.getType match {
@@ -90,7 +77,7 @@ case class Repeat(repeats: Int, body: Expr) extends Expr {
 
 case class ZeroExtend(extension: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVZeroExtend(extension, body.toBoogie)
-  override def gammas: Set[Expr] = body.gammas
+  override def gammas: Set[Variable] = body.gammas
   override def variables: Set[Variable] = body.variables
   override def getType: BitVecType = BitVecType(bodySize + extension)
   private def bodySize: Int = body.getType match {
@@ -104,7 +91,7 @@ case class ZeroExtend(extension: Int, body: Expr) extends Expr {
 
 case class SignExtend(extension: Int, body: Expr) extends Expr {
   override def toBoogie: BExpr = BVSignExtend(extension, body.toBoogie)
-  override def gammas: Set[Expr] = body.gammas
+  override def gammas: Set[Variable] = body.gammas
   override def variables: Set[Variable] = body.variables
   override def getType: BitVecType = BitVecType(bodySize + extension)
   private def bodySize: Int = body.getType match {
@@ -118,7 +105,7 @@ case class SignExtend(extension: Int, body: Expr) extends Expr {
 
 case class UnaryExpr(op: UnOp, arg: Expr) extends Expr {
   override def toBoogie: BExpr = UnaryBExpr(op, arg.toBoogie)
-  override def gammas: Set[Expr] = arg.gammas
+  override def gammas: Set[Variable] = arg.gammas
   override def variables: Set[Variable] = arg.variables
   override def loads: Set[MemoryLoad] = arg.loads
   override def getType: IRType = (op, arg.getType) match {
@@ -167,7 +154,7 @@ case object BVNEG extends BVUnOp("neg")
 
 case class BinaryExpr(op: BinOp, arg1: Expr, arg2: Expr) extends Expr {
   override def toBoogie: BExpr = BinaryBExpr(op, arg1.toBoogie, arg2.toBoogie)
-  override def gammas: Set[Expr] = arg1.gammas ++ arg2.gammas
+  override def gammas: Set[Variable] = arg1.gammas ++ arg2.gammas
   override def variables: Set[Variable] = arg1.variables ++ arg2.variables
   override def loads: Set[MemoryLoad] = arg1.loads ++ arg2.loads
   override def getType: IRType = (op, arg1.getType, arg2.getType) match {
@@ -311,14 +298,14 @@ enum Endian {
 
 case class MemoryLoad(mem: Memory, index: Expr, endian: Endian, size: Int) extends Expr {
   override def toBoogie: BMemoryLoad = BMemoryLoad(mem.toBoogie, index.toBoogie, endian, size)
-  override def toGamma: BExpr = mem match {
+  def toGamma(LArgs: List[BMapVar]): BExpr = mem match {
     case m: StackMemory =>
       GammaLoad(m.toGamma, index.toBoogie, size, size / m.valueSize)
     case m: SharedMemory =>
-      BinaryBExpr(BoolOR, GammaLoad(m.toGamma, index.toBoogie, size, size / m.valueSize), L(m.toBoogie, index.toBoogie))
+      BinaryBExpr(BoolOR, GammaLoad(m.toGamma, index.toBoogie, size, size / m.valueSize), L(LArgs, index.toBoogie))
   }
   override def variables: Set[Variable] = index.variables
-  override def gammas: Set[Expr] = Set(this)
+  override def gammas: Set[Variable] = Set()
   override def loads: Set[MemoryLoad] = Set(this)
   override def getType: IRType = BitVecType(size)
   override def toString: String = s"MemoryLoad($mem, $index, $endian, $size)"
@@ -329,7 +316,6 @@ case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IR
   override def getType: IRType = returnType
   override def toBoogie: BFunctionCall = BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, true)
   override def acceptVisit(visitor: Visitor): Expr = visitor.visitUninterpretedFunction(this)
-  override def gammas: Set[Expr] = params.flatMap(_.gammas).toSet
   override def variables: Set[Variable] = params.flatMap(_.variables).toSet
 }
 
@@ -341,14 +327,12 @@ sealed trait Global
 sealed trait Variable extends Expr {
   val name: String
   val irType: IRType
-  var sharedVariable: Boolean = false
 
   override def getType: IRType = irType
   override def variables: Set[Variable] = Set(this)
-  override def gammas: Set[Expr] = Set(this)
+  override def gammas: Set[Variable] = Set(this)
   override def toBoogie: BVar
-  // placeholder definition not actually used
-  override def toGamma: BVar = BVariable(s"$name", irType.toBoogie, Scope.Global)
+  def toGamma: BVar
 
   override def toString: String = s"Variable($name, $irType)"
 
@@ -370,7 +354,7 @@ case class Register(override val name: String, size: Int) extends Variable with 
 case class LocalVar(override val name: String, override val irType: IRType) extends Variable {
   override def toGamma: BVar = BVariable(s"Gamma_$name", BoolBType, Scope.Local)
   override def toBoogie: BVar = BVariable(s"$name", irType.toBoogie, Scope.Local)
-  override def toString: String = s"LocalVar(${name}_$sharedVariable, $irType)"
+  override def toString: String = s"LocalVar($name, $irType)"
   override def acceptVisit(visitor: Visitor): Variable = visitor.visitLocalVar(this)
 }
 

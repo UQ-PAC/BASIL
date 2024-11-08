@@ -101,7 +101,7 @@ class IRTest extends AnyFunSuite {
         ),
         block("l_main_1",
           Assign(R0, bv64(22)),
-          directCall("p2"), 
+          directCall("p2"),
           goto("returntarget")
         ),
         block("returntarget",
@@ -194,7 +194,7 @@ class IRTest extends AnyFunSuite {
       Assign(R0, bv64(22)),
       Assign(R0, bv64(22)),
       directCall("main"),
-      unreachable 
+      unreachable
     ).resolve(p)
     val b2 = block("newblock1",
       Assign(R0, bv64(22)),
@@ -314,10 +314,10 @@ class IRTest extends AnyFunSuite {
     val prev = InterProcIRCursor.pred(blocks("returntarget"))
 
     assert(prev.size == 1 && prev.collect {
-      case c : GoTo => (c.parent == p.labelToBlock("l_main"))
+      case c: GoTo => (c.parent == blocks("l_main"))
     }.contains(true))
 
-    // assert(next == Set(p.procs("p1"), p.labelToBlock("l_main").fallthrough.get))
+    // assert(next == Set(procs("p1"), blocks("l_main").fallthrough.get))
 
     val prevB: Command = (blocks("l_main").statements.lastOption match
       case Some(c: IndirectCall) => c.returnTarget

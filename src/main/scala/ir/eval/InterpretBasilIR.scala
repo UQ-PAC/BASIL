@@ -460,7 +460,7 @@ object InterpFuns {
   }
 
   def initialiseProgram[S, T <: Effects[S, InterpreterError]](f: T)(p: Program): State[S, Unit, InterpreterError] = {
-    def initMemory(mem: String, mems: ArrayBuffer[MemorySection]) = {
+    def initMemory(mem: String, mems: Iterable[MemorySection]) = {
       for {
         m <- State.sequence(
           State.pure(()),
@@ -493,10 +493,8 @@ object InterpFuns {
           )
       )
       _ <- State.pure(Logger.debug("INITIALISE MEMORY SECTIONS"))
-      mem <- initMemory("mem", p.initialMemory)
-      mem <- initMemory("stack", p.initialMemory)
-      mem <- initMemory("mem", p.readOnlyMemory)
-      mem <- initMemory("stack", p.readOnlyMemory)
+      mem <- initMemory("mem", p.initialMemory.values)
+      mem <- initMemory("stack", p.initialMemory.values)
       mainfun = {
         p.mainProcedure
       }

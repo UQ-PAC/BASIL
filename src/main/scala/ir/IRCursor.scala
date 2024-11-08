@@ -148,27 +148,21 @@ object IntraProcBlockIRCursor extends IntraProcBlockIRCursor
 trait InterProcIRCursor extends IRWalk[CFGPosition, CFGPosition] {
 
   final def succ(pos: CFGPosition): Set[CFGPosition] = {
-    IntraProcIRCursor.succ(pos) ++
-      (pos match
+      pos match
         case c: DirectCall if c.target.blocks.nonEmpty => Set(c.target)
         case c: Return => c.parent.parent.incomingCalls().map(_.successor).toSet
-        case _         => Set.empty
-      )
+        case _         => IntraProcIRCursor.succ(pos)
   }
 
   final def pred(pos: CFGPosition): Set[CFGPosition] = {
-    IntraProcIRCursor.pred(pos) ++
-      (pos match
-        case c: Command => {
+      pos match
+        case c: Command =>
           IRWalk.prevCommandInBlock(c) match {
             case Some(d: DirectCall) if d.target.blocks.nonEmpty => d.target.returnBlock.toSet
-            case o            => o.toSet
+            case o            => o.toSet ++ IntraProcIRCursor.pred(pos)
           }
-
-        }
-        case c: Procedure                              => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
-        case _                                         => Set.empty
-      )
+        case c: Procedure => c.incomingCalls().toSet.asInstanceOf[Set[CFGPosition]]
+        case _            => IntraProcIRCursor.pred(pos)
   }
 }
 
@@ -177,7 +171,7 @@ object InterProcIRCursor extends InterProcIRCursor
 trait CallGraph extends IRWalk[Procedure, Procedure] {
   final def succ(b: Procedure): Set[Procedure] = b.calls
 
-  final def pred(b: Procedure): Set[Procedure] = b.incomingCalls().map(_.target).toSet
+  final def pred(b: Procedure): Set[Procedure] = b.incomingCalls().map(_.parent.parent).toSet
 }
 
 object CallGraph extends CallGraph
@@ -251,9 +245,14 @@ def stronglyConnectedComponents[T <: CFGPosition, O <: T](walker: IRWalk[T, O], 
   out
 }
 
-def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty): String = {
-  val domain = computeDomain[CFGPosition, CFGPosition](IntraProcIRCursor, program.procedures)
-  toDot[CFGPosition](domain, IntraProcIRCursor, labels)
+def toDot(program: Program, labels: Map[CFGPosition, String] = Map.empty, inter: Boolean = false): String = {
+  if (inter) {
+    val domain = computeDomain[CFGPosition, CFGPosition](InterProcIRCursor, program.procedures)
+    toDot[CFGPosition](domain, InterProcIRCursor, labels)
+  } else {
+    val domain = computeDomain[CFGPosition, CFGPosition](IntraProcIRCursor, program.procedures)
+    toDot[CFGPosition](domain, IntraProcIRCursor, labels)
+  }
 }
 
 def dotCallGraph(program: Program, labels: Map[CFGPosition, String] = Map.empty): String = {
@@ -293,7 +292,7 @@ def toDot[T <: CFGPosition](
       case s        => s.toString
     }
     if (labels.contains(node)) {
-      text += "\n" ++ labels(node)
+      text = labels(node) ++ "\n" ++ text
     }
     text
   }

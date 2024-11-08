@@ -1,28 +1,33 @@
 package translating
+import analysis.{RegionInjector, DataRegion, HeapRegion, MergedRegion}
 import ir.{BoolOR, *}
 import boogie.*
 import specification.*
 import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-class IRToBoogie(var program: Program, var spec: Specification, var thread: Option[ProgramThread], val filename: String) {
+class IRToBoogie(var program: Program, var spec: Specification, var thread: Option[ProgramThread], val filename: String, val regionInjector: Option[RegionInjector], val config: BoogieGeneratorConfig) {
   private val externAttr = BAttribute("extern")
   private val inlineAttr = BAttribute("inline")
   private val globals = spec.globals
   private val controls = spec.controls
   private val controlled = spec.controlled
-  private val relies = spec.relies.map(r => r.resolveSpec)
-  private val reliesParam = spec.relies.map(r => r.resolveSpecParam)
-  private val reliesReflexive = spec.relies.map(r => r.removeOld)
-  private val guarantees = spec.guarantees.map(g => g.resolveOld)
-  private val guaranteesParam = spec.guarantees.map(g => g.resolveSpecParam)
-  private val guaranteesReflexive = spec.guarantees.map(g => g.removeOld)
-  private val guaranteeOldVars = spec.guaranteeOldVars
-  private val LPreds = spec.LPreds.map((k, v) => k -> v.resolveSpecL)
-  private val requires = spec.subroutines.map(s => s.name -> s.requires.map(e => e.resolveSpec)).toMap
+  private val resolveSpec = ResolveSpec(regionInjector)
+  private val resolveSpecL = ResolveSpecL(regionInjector)
+  private val resolveOld = ResolveOld(resolveSpec)
+  private val removeOld = RemoveOld(resolveSpec)
+  private val relies = spec.relies.map(resolveSpec.visitBExpr)
+  private val reliesParam = spec.relies.map(ResolveSpecParam.visitBExpr)
+  private val reliesReflexive = spec.relies.map(removeOld.visitBExpr)
+  private val guarantees = spec.guarantees.map(g => resolveOld.visitBExpr(g) -> g.oldSpecGlobals).toMap
+  private val guaranteeRegions = guarantees.keys.map(g => g -> g.globals).toMap
+  private val guaranteesParam = spec.guarantees.map(ResolveSpecParam.visitBExpr)
+  private val guaranteesReflexive = spec.guarantees.map(removeOld.visitBExpr)
+  private val requires = spec.subroutines.map(s => s.name -> s.requires.map(resolveSpec.visitBExpr)).toMap
   private val requiresDirect = spec.subroutines.map(s => s.name -> s.requiresDirect).toMap
-  private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(e => e.resolveSpec)).toMap
+  private val ensures = spec.subroutines.map(s => s.name -> s.ensures.map(resolveSpec.visitBExpr)).toMap
   private val ensuresDirect = spec.subroutines.map(s => s.name -> s.ensuresDirect).toMap
   private val libRelies = spec.subroutines.map(s => s.name -> s.rely).toMap
   private val libGuarantees = spec.subroutines.map(s => s.name -> s.guarantee).toMap
@@ -30,6 +35,22 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
   private val mem = BMapVar("mem", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
   private val Gamma_mem = BMapVar("Gamma_mem", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+
+  private val LPreds = spec.LPreds.map((k, v) => k -> resolveSpecL.visitBExpr(v))
+  private val LArgs = lArgs
+
+  private val memoriesToGamma = if (regionInjector.isDefined) {
+    regionInjector.get.mergedRegions.collect {
+      case (_: DataRegion | _: HeapRegion, region: MergedRegion) =>
+        val memory = BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+        val gamma = BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+        memory -> gamma
+    }.toMap
+  } else {
+    Map(mem -> Gamma_mem)
+  }
+
+  private val memoriesAndGammas: Set[BVar] = memoriesToGamma.flatMap((k, v) => Set(k, v)).toSet
 
   private val mem_in = BMapVar("mem$in", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Parameter)
   private val Gamma_mem_in = BMapVar("Gamma_mem$in", MapBType(BitVecBType(64), BoolBType), Scope.Parameter)
@@ -41,8 +62,6 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   private val mem_inv2 = BMapVar("mem$inv2", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Local)
   private val Gamma_mem_inv2 = BMapVar("Gamma_mem$inv2", MapBType(BitVecBType(64), BoolBType), Scope.Local)
 
-
-  private var config: BoogieGeneratorConfig = BoogieGeneratorConfig()
   private val modifiedCheck: Set[BVar] = (for (i <- 19 to 29) yield {
     Set(BVariable("R" + i, BitVecBType(64), Scope.Global), BVariable("Gamma_R" + i, BoolBType, Scope.Global))
   }).flatten.toSet ++ Set(
@@ -50,34 +69,42 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     BVariable("Gamma_R31", BoolBType, Scope.Global)
   )
 
-  def translate(boogieGeneratorConfig: BoogieGeneratorConfig): BProgram = {
-    config = boogieGeneratorConfig
-    val readOnlyMemory = memoryToCondition(program.readOnlyMemory)
+  def lArgs: List[BMapVar] = {
+    if (regionInjector.isDefined) {
+      spec.LPreds.values.flatMap(_.specGlobals).toSet.map { g =>
+        regionInjector.get.getMergedRegion(g.address) match {
+          case Some(region) => BMapVar(s"${region.name}", MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+          case None => mem
+        }
+      }.toList.sorted
+    } else {
+      List(mem)
+    }
+  }
 
-    val procedures = thread match {
+  def translate: BProgram = {
+    val readOnlySections = program.usedMemory.values.filter(_.readOnly)
+    val readOnlyMemory = memoryToCondition(readOnlySections)
+    val initialSections = program.usedMemory.values.filter(!_.readOnly)
+    val initialMemory = memoryToCondition(initialSections)
+
+    val procedures: ArrayBuffer[BProcedure] = thread match {
       case None =>
-        program.procedures.map(f => translateProcedure(f, readOnlyMemory))
+        program.procedures.map(f => translateProcedure(f, readOnlyMemory, initialMemory))
       case Some(t) =>
-        val translatedProcedures = ArrayBuffer[BProcedure]()
-        t.procedures.foreach(p => translatedProcedures.addOne(translateProcedure(p, readOnlyMemory)))
+        val translatedProcedures: ArrayBuffer[BProcedure] = ArrayBuffer[BProcedure]()
+        t.procedures.foreach(p => translatedProcedures.addOne(translateProcedure(p, readOnlyMemory, initialMemory)))
         translatedProcedures
     }
-    val defaultGlobals = List(BVarDecl(mem, List(externAttr)), BVarDecl(Gamma_mem, List(externAttr)))
-    val globalVars = procedures.flatMap(p => p.globals ++ p.freeRequires.flatMap(_.globals) ++ p.freeEnsures.flatMap(_.globals) ++ p.ensures.flatMap(_.globals) ++ p.requires.flatMap(_.globals))
-    val globalDecls = (globalVars.map(b => BVarDecl(b, List(externAttr))) ++ defaultGlobals).distinct.sorted.toList
-
-    val globalConsts: List[BConstAxiomPair] =
-      globals.map(g => BConstAxiomPair(BVarDecl(g.toAddrVar, List(externAttr)), g.toAxiom)).toList.sorted
 
     val guaranteeReflexive = BProcedure(
       name = "guarantee_reflexive",
-      modifies = Set(mem, Gamma_mem),
+      modifies = memoriesAndGammas,
       body = guaranteesReflexive.map(g => BAssert(g)),
       attributes = List(externAttr)
     )
 
     val rgProcs = genRely(relies, readOnlyMemory) :+ guaranteeReflexive
-
 
     val rgLib = config.procedureRely match {
       case Some(ProcRelyVersion.Function) =>
@@ -91,7 +118,6 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       case None => Nil
     }
 
-
     val functionsUsed1 = procedures.flatMap(p => p.functionOps).toSet ++
       rgProcs.flatMap(p => p.functionOps).toSet ++
       rgLib.flatMap(p => p.functionOps).toSet ++
@@ -102,6 +128,12 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     val functionsUsed4 = functionsUsed3.flatMap(p => p.functionOps).map(p => functionOpToDefinition(p))
     val functionsUsed = (functionsUsed2 ++ functionsUsed3 ++ functionsUsed4).toList.sorted
 
+    val globalVars = procedures.flatMap(_.globals) ++ rgProcs.flatMap(_.globals)
+    val globalDecls = globalVars.map(b => BVarDecl(b, List(externAttr))).distinct.sorted.toList
+
+    val globalConsts: List[BConstAxiomPair] = globals.map { g =>
+      BConstAxiomPair(BVarDecl(g.toAddrVar, List(externAttr)), g.toAxiom)
+    }.toList.sorted
 
     val declarations = globalDecls ++ globalConsts ++ functionsUsed ++ rgLib ++ pushUpModifiesFixedPoint(rgProcs ++ procedures)
     BProgram(declarations, filename)
@@ -112,22 +144,31 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       relies
     } else {
       // default case where no rely is given - rely on no external changes
-      List(BinaryBExpr(BVEQ, mem, Old(mem)), BinaryBExpr(BVEQ, Gamma_mem, Old(Gamma_mem)))
+      memoriesAndGammas.toList.sorted.map(m => BinaryBExpr(BVEQ, m, Old(m)))
     }
     val relyEnsures = if (relies.nonEmpty) {
       val i = BVariable("i", BitVecBType(64), Scope.Local)
-      val rely2 = ForAll(List(i), BinaryBExpr(BoolIMPLIES, BinaryBExpr(BVEQ, MapAccess(mem, i), Old(MapAccess(mem, i))), BinaryBExpr(BVEQ, MapAccess(Gamma_mem, i), Old(MapAccess(Gamma_mem, i)))))
-      List(rely2) ++ reliesUsed
+
+      val memImpliesGamma = memoriesToGamma.keys.toList.sorted.map { memory =>
+        val gamma = memoriesToGamma(memory)
+        ForAll(
+          List(i),
+          BinaryBExpr(BoolIMPLIES,
+            BinaryBExpr(BVEQ, MapAccess(memory, i), Old(MapAccess(memory, i))),
+            BinaryBExpr(BVEQ, MapAccess(gamma, i), Old(MapAccess(gamma, i)))
+          )
+        )
+      }
+      memImpliesGamma ++ reliesUsed
     } else {
       reliesUsed
     }
-    val relyProc = BProcedure("rely", ensures = relyEnsures, freeEnsures = readOnlyMemory, modifies = Set(mem, Gamma_mem), attributes = List(externAttr))
-    val relyTransitive = BProcedure("rely_transitive", ensures = reliesUsed, modifies = Set(mem, Gamma_mem), body = List(BProcedureCall("rely"), BProcedureCall("rely")),
+    val relyProc = BProcedure("rely", ensures = relyEnsures, freeEnsures = readOnlyMemory, modifies = memoriesAndGammas, attributes = List(externAttr))
+    val relyTransitive = BProcedure("rely_transitive", ensures = reliesUsed, modifies = memoriesAndGammas, body = List(BProcedureCall("rely"), BProcedureCall("rely")),
       attributes = List(externAttr))
     val relyReflexive = BProcedure("rely_reflexive", body = reliesReflexive.map(r => BAssert(r)), attributes = List(externAttr))
     List(relyProc, relyTransitive, relyReflexive)
   }
-
 
   def genRelyInv: BProcedure = {
     val reliesUsed = if (reliesParam.nonEmpty) {
@@ -168,7 +209,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       relyEnsures.head
     }
 
-    val guaranteeEnsures = libGuarantees(name).map(g => g.resolveSpecParam)
+    val guaranteeEnsures = libGuarantees(name).map(ResolveSpecParam.visitBExpr)
     val guaranteeOneLine = if (guaranteeEnsures.size > 1) {
       guaranteeEnsures.tail.foldLeft(guaranteeEnsures.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
     } else {
@@ -190,7 +231,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
   def genLibGuarantee(name: String): BProcedure = {
     // G_f
-    val guaranteeLib = libGuarantees(name).map(g => g.resolveSpecParam)
+    val guaranteeLib = libGuarantees(name).map(ResolveSpecParam.visitBExpr)
     val guaranteeOneLine = if (guaranteeLib.size > 1) {
       guaranteeLib.tail.foldLeft(guaranteeLib.head)((ands: BExpr, next: BExpr) => BinaryBExpr(BoolAND, ands, next))
     } else {
@@ -266,7 +307,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
         val in = List(memVar, indexVar, valueVar)
         val out = BParam(memType)
         val body: BExpr = config.memoryFunctionType match {
-          case BoogieMemoryAccessMode.SuccessiveStoreSelect => {
+          case BoogieMemoryAccessMode.SuccessiveStoreSelect =>
             val indices: Seq[BExpr] = for (i <- 0 until m.accesses) yield {
               if (i == 0) {
                 indexVar
@@ -286,18 +327,19 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
             }
 
             indiceValues.tail.foldLeft(MapUpdate(memVar, indices.head, valuesEndian.head)) {
-              (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+              (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next(0), next(1))
             }
-          }
+
           case BoogieMemoryAccessMode.LambdaStoreSelect =>
-            if m.accesses == 1 then
+            if (m.accesses == 1) {
               MapUpdate(memVar, indexVar, valueVar)
-            else {
+            } else {
               val i = BVariable("i", BitVecBType(m.addressSize), Scope.Local)
               Lambda(List(i), IfThenElse(
                 BInBounds(indexVar, BitVecBLiteral(m.accesses, m.addressSize), m.endian, i),
                 BByteExtract(valueVar, BinaryBExpr(BVSUB, i, indexVar)),
-                MapAccess(memVar, i)))
+                MapAccess(memVar, i))
+              )
             }
         }
 
@@ -319,7 +361,8 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
               Lambda(List(i), IfThenElse(
                 BInBounds(indexVar, BitVecBLiteral(g.accesses, g.addressSize), Endian.LittleEndian, i),
                 valueVar,
-                MapAccess(gammaMapVar, i)))
+                MapAccess(gammaMapVar, i))
+              )
             }
           case BoogieMemoryAccessMode.SuccessiveStoreSelect =>
             val indices: Seq[BExpr] = for (i <- 0 until g.accesses) yield {
@@ -336,47 +379,51 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
               (indices(i), values(i))
             }
             indiceValues.tail.foldLeft(MapUpdate(gammaMapVar, indices.head, values.head)) {
-              (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next._1, next._2)
+              (update: MapUpdate, next: (BExpr, BExpr)) => MapUpdate(update, next(0), next(1))
             }
         }
 
         BFunction(g.fnName, in, out, Some(body), List(externAttr))
       case l: LOp =>
-        val memoryVar = BParam("memory", l.memoryType)
-        val indexVar = BParam("index", l.indexType)
+        val indexVar: BVar = BParam("index", l.indexType)
         val body: BExpr = LPreds.keys.foldLeft(FalseBLiteral) { (ite: BExpr, next: SpecGlobal) =>
-          {
-            val guard = next.arraySize match {
-              case Some(size: Int) =>
-                val initial: BExpr = BinaryBExpr(BoolEQ, indexVar, ArrayAccess(next, 0).toAddrVar)
-                val indices = 1 until size
-                indices.foldLeft(initial) { (or: BExpr, i: Int) =>
-                  {
-                    BinaryBExpr(BoolOR, BinaryBExpr(BoolEQ, indexVar, ArrayAccess(next, i).toAddrVar), or)
-                  }
-                }
-              case None => BinaryBExpr(BoolEQ, indexVar, next.toAddrVar)
-            }
-            val LPred = LPreds(next)
-            /*if (controlled.contains(next)) {
-            FunctionCall(s"L_${next.name}", List(l.memory), BoolType)
-          } else {
-            LPreds(next)
-          } */
-            IfThenElse(guard, LPred, ite)
+          val guard = next.arraySize match {
+            case Some(size: Int) =>
+              val initial: BExpr = BinaryBExpr(BoolEQ, indexVar, ArrayAccess(next, 0).toAddrVar)
+              val indices = 1 until size
+              indices.foldLeft(initial) { (or: BExpr, i: Int) =>
+                BinaryBExpr(BoolOR, BinaryBExpr(BoolEQ, indexVar, ArrayAccess(next, i).toAddrVar), or)
+              }
+            case None =>
+              BinaryBExpr(BoolEQ, indexVar, next.toAddrVar)
           }
+          val LPred = LPreds(next)
+          /*if (controlled.contains(next)) {
+          FunctionCall(s"L_${next.name}", List(l.memory), BoolType)
+        } else {
+          LPreds(next)
+        } */
+          IfThenElse(guard, LPred, ite)
         }
-        BFunction("L", List(memoryVar, indexVar), BParam(BoolBType), Some(body), List(externAttr))
+        val params = if (regionInjector.isDefined) {
+          (body.params - indexVar).toList.sorted
+        } else {
+          List(BParam("mem$in", mem.bType))
+        }
+        BFunction("L", params :+ indexVar, BParam(BoolBType), Some(body), List(externAttr))
       case b: ByteExtract =>
         val valueVar = BParam("value", BitVecBType(b.valueSize))
         val offsetVar = BParam("offset", BitVecBType(b.offsetSize))
         val in = List(valueVar, offsetVar)
         val out = BParam(BitVecBType(8))
         val shift = BinaryBExpr(BVMUL, offsetVar, BitVecBLiteral(8, b.offsetSize))
-        val eshift =
-          if (b.valueSize < b.offsetSize) BVExtract(b.valueSize, 0, shift)
-          else if (b.valueSize == b.offsetSize) shift
-          else BVZeroExtend(b.valueSize - b.offsetSize, shift)
+        val eshift = if (b.valueSize < b.offsetSize) {
+          BVExtract(b.valueSize, 0, shift)
+        } else if (b.valueSize == b.offsetSize) {
+          shift
+        } else {
+          BVZeroExtend(b.valueSize - b.offsetSize, shift)
+        }
         val body = BVExtract(8, 0, BinaryBExpr(BVLSHR, valueVar, eshift))
         BFunction(b.fnName, in, out, Some(body), List(inlineAttr))
       case b: InBounds =>
@@ -406,41 +453,33 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
   }
 
   def pushUpModifiesFixedPoint(procedures: List[BProcedure]): List[BProcedure] = {
-
     var changed = true
     var proceduresUpdated = procedures
     while (changed) {
       changed = false
       val nameToProcedure = proceduresUpdated.map(p => p.name -> p).toMap
-      proceduresUpdated = proceduresUpdated.map(
-        procedure => {
-          val cmds: List[BCmd] = procedure.body.flatten {
-            case b: BBlock => b.body
-            case c: BCmd => Seq(c)
-          }
-          val callModifies = cmds.collect { case c: BProcedureCall => nameToProcedure(c.name) }.flatMap(_.modifies)
-          val modifiesUpdate = procedure.modifies ++ callModifies
-          if (modifiesUpdate != procedure.modifies) {
-            changed = true
-          }
-
-          procedure.copy(modifies = modifiesUpdate)
+      proceduresUpdated = proceduresUpdated.map { procedure =>
+        val cmds: List[BCmd] = procedure.body.flatten {
+          case b: BBlock => b.body
+          case c: BCmd => Seq(c)
         }
-      )
+        val callModifies = cmds.collect { case c: BProcedureCall => nameToProcedure(c.name) }.flatMap(_.modifies)
+        val modifiesUpdate = procedure.modifies ++ callModifies
+        if (modifiesUpdate != procedure.modifies) {
+          changed = true
+        }
+
+        procedure.copy(modifies = modifiesUpdate)
+      }
     }
     proceduresUpdated
   }
 
 
-  def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr]): BProcedure = {
+  def translateProcedure(p: Procedure, readOnlyMemory: List[BExpr], initialMemory: List[BExpr]): BProcedure = {
     val body = (p.entryBlock.view ++ p.blocks.filterNot(x => p.entryBlock.contains(x))).map(translateBlock).toList
 
-    val callsRely: Boolean = body.flatMap(_.body).exists(_ match
-      case BProcedureCall("rely", lhs, params, comment) => true
-      case _ => false)
-
-    val modifies: Seq[BVar] = p.modifies.toSeq
-      .flatMap {
+    val modifies: Seq[BVar] = p.modifies.toSeq.flatMap {
         case m: Memory   => Seq(m.toBoogie, m.toGamma)
         case r: Register => Seq(r.toBoogie, r.toGamma)
       }.distinct.sorted
@@ -455,7 +494,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     val procEnsuresDirect: List[String] = ensuresDirect.getOrElse(p.name, List())
 
     val freeRequires: List[BExpr] = if (p == program.mainProcedure) {
-      memoryToCondition(program.initialMemory) ++ readOnlyMemory
+      initialMemory ++ readOnlyMemory
     } else {
       readOnlyMemory
     }
@@ -477,10 +516,10 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     )
   }
 
-  private def memoryToCondition(memory: ArrayBuffer[MemorySection]): List[BExpr] = {
+  private def memoryToCondition(memorySections: Iterable[MemorySection]): List[BExpr] = {
 
     def coalesced: List[BExpr] = {
-      val sections = memory.flatMap { s =>
+      val sections = memorySections.flatMap { s =>
         // Phrase the memory condition in terms of 64-bit operations, as long as the memory
         // section's size is a multiple of 64-bits and 64-bits (8 bytes) aligned
         // If the memory section is not aligned, the initial unaligned part of it will not be coalesced into a 64-bit
@@ -488,66 +527,86 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
         // If the memory section's size is not a multiple of 64-bits, the last part of it that cannot be coalesced into
         // a 64-bit representation will remain as an 8-bit representation
 
-        val aligned: Int = (s.address % 8).toInt
+        val memory = s.region match {
+          case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+          case None => mem
+        }
 
-        val alignedSizeMultiple = (s.bytes.size - aligned) % 8
-        // index of the byte that marks the end of the part that is a multiple of 64-bits
-        val alignedEnd = s.bytes.size - alignedSizeMultiple
-
-        // Aligned section that is safe to convert to 64-bit values
-        val alignedSection = for (b <- aligned until alignedEnd by 8) yield {
-          // Combine the byte constants into a 64-bit value
-          val combined: BigInt =
-            (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * BigInt(2).pow(y * 8)))
-          BinaryBExpr(
+        if (s.bytes.size <= 8) {
+          // if section is less than 8 bytes, just represent it with one access
+          val combined = s.bytes.indices.foldLeft(BigInt(0))((x, y) => x + (s.bytes(y).value * BigInt(2).pow(y * 8)))
+          val bits = s.bytes.size * 8
+          Seq(BinaryBExpr(
             BVEQ,
-            BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
-            BitVecBLiteral(combined, 64)
-          )
-        }
-
-        // If memory section is somehow not aligned (is this possible?) then don't convert the initial non-aligned
-        // section to 64-bit operations, just the rest
-        val unalignedStartSection = if (aligned == 0) {
-          Seq()
+            BMemoryLoad(memory, BitVecBLiteral(s.address, 64), Endian.LittleEndian, bits),
+            BitVecBLiteral(combined, bits)
+          ))
         } else {
-          for (b <- 0 until aligned) yield {
+          val aligned: Int = (s.address % 8).toInt
+
+          val alignedSizeMultiple = (s.bytes.size - aligned) % 8
+          // index of the byte that marks the end of the part that is a multiple of 64-bits
+          val alignedEnd = s.bytes.size - alignedSizeMultiple
+
+          // Aligned section that is safe to convert to 64-bit values
+          val alignedSection = for (b <- aligned until alignedEnd by 8) yield {
+            // Combine the byte constants into a 64-bit value
+            val combined: BigInt =
+              (0 until 8).foldLeft(BigInt(0))((x, y) => x + (s.bytes(b + y).value * BigInt(2).pow(y * 8)))
             BinaryBExpr(
               BVEQ,
-              BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
-              s.bytes(b).toBoogie
+              BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 64),
+              BitVecBLiteral(combined, 64)
             )
           }
-        }
 
-        // If the memory section is not a multiple of 64-bits then don't convert the last section to 64-bits
-        // This is not ideal but will do for now
-        // Ideal solution is to match the sizes based on the sizes listed in the symbol table, dividing further
-        // for values greater than 64-bit as much as possible
-        // But that requires more work
-        // Combine the byte constants into a 64-bit value
-        val unalignedEndSection = if (alignedSizeMultiple == 0) {
-          Seq()
-        } else {
-          for (b <- alignedEnd until s.bytes.size) yield {
-            BinaryBExpr(
-              BVEQ,
-              BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
-              s.bytes(b).toBoogie
-            )
+          // If memory section is somehow not aligned (is this possible?) then don't convert the initial non-aligned
+          // section to 64-bit operations, just the rest
+          val unalignedStartSection = if (aligned == 0) {
+            Seq()
+          } else {
+            for (b <- 0 until aligned) yield {
+              BinaryBExpr(
+                BVEQ,
+                BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+                s.bytes(b).toBoogie
+              )
+            }
           }
+
+          // If the memory section is not a multiple of 64-bits then don't convert the last section to 64-bits
+          // This is not ideal but will do for now
+          // Ideal solution is to match the sizes based on the sizes listed in the symbol table, dividing further
+          // for values greater than 64-bit as much as possible
+          // But that requires more work
+          // Combine the byte constants into a 64-bit value
+          val unalignedEndSection = if (alignedSizeMultiple == 0) {
+            Seq()
+          } else {
+            for (b <- alignedEnd until s.bytes.size) yield {
+              BinaryBExpr(
+                BVEQ,
+                BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+                s.bytes(b).toBoogie
+              )
+            }
+          }
+          unalignedStartSection ++ alignedSection ++ unalignedEndSection
         }
-        unalignedStartSection ++ alignedSection ++ unalignedEndSection
       }
       sections.toList
     }
 
     def bytes: List[BExpr] = {
-      val sections = memory.flatMap { s =>
+      val sections = memorySections.flatMap { s =>
+        val memory = s.region match {
+          case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+          case None => mem
+        }
         for (b <- s.bytes.indices) yield {
           BinaryBExpr(
             BVEQ,
-            BMemoryLoad(mem, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
+            BMemoryLoad(memory, BitVecBLiteral(s.address + b, 64), Endian.LittleEndian, 8),
             s.bytes(b).toBoogie
           )
         }
@@ -588,12 +647,12 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
      *   Procedures with no precond and the predicate as their postcond are generated to encode two-state assumptions.
      *
      */
-    (libRelies.keySet ++ libGuarantees.keySet).filter(x => libRelies(x).nonEmpty && libGuarantees(x).nonEmpty).map(targetName => {
-      val Rc: BExpr = spec.relies.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
-      val Gc: BExpr = spec.guarantees.reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
+    (libRelies.keySet ++ libGuarantees.keySet).filter(x => libRelies(x).nonEmpty && libGuarantees(x).nonEmpty).map { targetName =>
+      val Rc: BExpr = resolveSpec.visitBExpr(spec.relies.reduce((a, b) => BinaryBExpr(BoolAND, a, b)))
+      val Gc: BExpr = resolveSpec.visitBExpr(spec.guarantees.reduce((a, b) => BinaryBExpr(BoolAND, a, b)))
 
-      val Rf: BExpr = libRelies(targetName).reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
-      val Gf: BExpr = libGuarantees(targetName).reduce((a, b) => BinaryBExpr(BoolAND, a, b)).resolveSpec
+      val Rf: BExpr = resolveSpec.visitBExpr(libRelies(targetName).reduce((a, b) => BinaryBExpr(BoolAND, a, b)))
+      val Gf: BExpr = resolveSpec.visitBExpr(libGuarantees(targetName).reduce((a, b) => BinaryBExpr(BoolAND, a, b)))
 
       val inv = BinaryBExpr(BoolOR, Rc, Gf)
       val conseq = BinaryBExpr(BoolIMPLIES, Rc, Rf)
@@ -617,20 +676,19 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
         ))
 
       targetName -> Seq(procInv, proc2, procGf, proc4, proc5)
-    }).toMap
+    }.toMap
   }
 
-  def relyfun(targetName: String) : Option[IfCmd] = {
-    libRGFunsContradictionProof.get(targetName).map(proc =>
-      {
-        IfCmd(StarBLiteral, List(
-          BProcedureCall(proc(0).name, Seq(), Seq()),
-          BProcedureCall(proc(1).name, Seq(), Seq()),
-          BAssert(FalseBLiteral)
-        ))
-      }
-    )
+  def relyfun(targetName: String): Option[IfCmd] = {
+    libRGFunsContradictionProof.get(targetName).map { proc =>
+      IfCmd(StarBLiteral, List(
+        BProcedureCall(proc(0).name, Seq(), Seq()),
+        BProcedureCall(proc(1).name, Seq(), Seq()),
+        BAssert(FalseBLiteral)
+      ))
+    }
   }
+
   def translate(j: Jump): List[BCmd] = j match {
     case g: GoTo =>
       // collects all targets of the goto with a branch condition that we need to check the security level for
@@ -648,8 +706,8 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
       }
       val jump = GoToCmd(g.targets.map(_.label).toSeq)
       conditionAssert :+ jump
-    case r: Return => List(ReturnCmd)
-    case r: Unreachable => List(BAssume(FalseBLiteral))
+    case _: Return => List(ReturnCmd)
+    case _: Unreachable => List(BAssume(FalseBLiteral))
   }
 
   def translate(j: Call): List[BCmd] = j match {
@@ -661,7 +719,7 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
           if (libRelies.contains(d.target.name) && libGuarantees.contains(d.target.name) && libRelies(d.target.name).nonEmpty && libGuarantees(d.target.name).nonEmpty) {
             val invCall1 = BProcedureCall(d.target.name + "$inv", List(mem_inv1, Gamma_mem_inv1), List(mem, Gamma_mem))
             val invCall2 = BProcedureCall("rely$inv", List(mem_inv2, Gamma_mem_inv2), List(mem_inv1, Gamma_mem_inv1))
-            val libRGAssert = libRelies(d.target.name).map(r => BAssert(r.resolveSpecInv))
+            val libRGAssert = libRelies(d.target.name).map(r => BAssert(ResolveSpecInv.visitBExpr(r)))
             List(invCall1, invCall2) ++ libRGAssert
           } else {
             List()
@@ -674,12 +732,12 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
 
   def translate(s: Statement): List[BCmd] = s match {
     case d: Call => translate(d)
-    case m: NOP => List.empty
+    case _: NOP => List.empty
     case m: MemoryAssign =>
       val lhs = m.mem.toBoogie
       val rhs = BMemoryStore(m.mem.toBoogie, m.index.toBoogie, m.value.toBoogie, m.endian, m.size)
       val lhsGamma = m.mem.toGamma
-      val rhsGamma = GammaStore(m.mem.toGamma, m.index.toBoogie, m.value.toGamma, m.size, m.size / m.mem.valueSize)
+      val rhsGamma = GammaStore(m.mem.toGamma, m.index.toBoogie, exprToGamma(m.value), m.size, m.size / m.mem.valueSize)
       val store = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val stateSplit = s match {
         case MemoryAssign(_, _, _, _, _, Some(label)) => List(captureStateStatement(s"$label"))
@@ -687,22 +745,50 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
         case _ => List.empty
       }
       m.mem match {
-        case s: StackMemory =>
+        case _: StackMemory =>
           List(store) ++ stateSplit
-        case s: SharedMemory =>
+        case _: SharedMemory =>
           val rely = BProcedureCall("rely")
-          val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(lhs, rhs.index), m.value.toGamma))
-          val oldAssigns =
-            guaranteeOldVars.map(g => AssignCmd(g.toOldVar, BMemoryLoad(lhs, g.toAddrVar, Endian.LittleEndian, g.size)))
-          val oldGammaAssigns = controlled.map(g =>
+          val gammaValueCheck = BAssert(BinaryBExpr(BoolIMPLIES, L(LArgs, rhs.index), exprToGamma(m.value)))
+          val oldVars = guarantees.keys.view.toSet.flatMap { g =>
+            if (guaranteeRegions(g).contains(lhs)) {
+              guarantees(g)
+            } else {
+              Set()
+            }
+          }
+          val oldAssigns = oldVars.toList.sorted.map { g =>
+            val memory = if (regionInjector.isDefined) {
+              regionInjector.get.getMergedRegion(g.address) match {
+                case Some(region) => BMapVar(region.name, MapBType(BitVecBType(64), BitVecBType(8)), Scope.Global)
+                case None => mem
+              }
+            } else {
+              mem
+            }
+            AssignCmd(g.toOldVar, BMemoryLoad(memory, g.toAddrVar, Endian.LittleEndian, g.size))
+          }
+          val oldGammaAssigns = controlled.map { g =>
+            val gamma = if (regionInjector.isDefined) {
+              regionInjector.get.getMergedRegion(g.address) match {
+                case Some(region) =>
+                  BMapVar(s"Gamma_${region.name}", MapBType(BitVecBType(64), BoolBType), Scope.Global)
+                case None =>
+                  Gamma_mem
+              }
+            } else {
+              Gamma_mem
+            }
             AssignCmd(
               g.toOldGamma,
-              BinaryBExpr(BoolOR, GammaLoad(lhsGamma, g.toAddrVar, g.size, g.size / m.mem.valueSize), L(lhs, g.toAddrVar))
+              BinaryBExpr(BoolOR, GammaLoad(gamma, g.toAddrVar, g.size, g.size / m.mem.valueSize), L(LArgs, g.toAddrVar))
             )
-          )
-          val secureUpdate = for (c <- controls.keys) yield {
+          }
+          val secureUpdate = for (c <- controls.keys.view.toSeq.sorted) yield {
             val addrCheck = BinaryBExpr(BVEQ, rhs.index, c.toAddrVar)
-            val checks = controls(c).map(v => BinaryBExpr(BoolIMPLIES, L(lhs, v.toAddrVar), v.toOldGamma)).toList
+            val checks = controls(c).toList.sorted.map { v =>
+              BinaryBExpr(BoolIMPLIES, L(LArgs, v.toAddrVar), v.toOldGamma)
+            }
             val checksAnd = if (checks.size > 1) {
               checks.tail.foldLeft(checks.head)((next: BExpr, ands: BExpr) => BinaryBExpr(BoolAND, next, ands))
             } else {
@@ -710,14 +796,16 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
             }
             BAssert(BinaryBExpr(BoolIMPLIES, addrCheck, checksAnd))
           }
-          val guaranteeChecks = guarantees.map(v => BAssert(v))
+          val guaranteeChecks = guarantees.keys.collect {
+            case g if guaranteeRegions(g).contains(lhs) => BAssert(g)
+          }
           (List(rely, gammaValueCheck) ++ oldAssigns ++ oldGammaAssigns :+ store) ++ secureUpdate ++ guaranteeChecks ++ stateSplit
       }
     case l: Assign =>
       val lhs = l.lhs.toBoogie
       val rhs = l.rhs.toBoogie
       val lhsGamma = l.lhs.toGamma
-      val rhsGamma = l.rhs.toGamma
+      val rhsGamma = exprToGamma(l.rhs)
       val assign = AssignCmd(List(lhs, lhsGamma), List(rhs, rhsGamma))
       val loads = l.rhs.loads
       if (loads.size > 1) {
@@ -737,5 +825,18 @@ class IRToBoogie(var program: Program, var spec: Specification, var thread: Opti
     case a: Assume =>
       val body = a.body.toBoogie
       List(BAssume(body, a.comment))
+  }
+
+  def exprToGamma(e: Expr): BExpr = {
+    val gammaVars: Set[BExpr] = e.gammas.map(_.toGamma) ++ e.loads.map(_.toGamma(LArgs))
+    if (gammaVars.isEmpty) {
+      TrueBLiteral
+    } else if (gammaVars.size == 1) {
+      gammaVars.head
+    } else {
+      gammaVars.tail.foldLeft(gammaVars.head) { (join: BExpr, next: BExpr) =>
+        BinaryBExpr(BoolAND, next, join)
+      }
+    }
   }
 }

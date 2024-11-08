@@ -16,7 +16,7 @@ var {:extern} mem: [bv64]bv8;
 var {:extern} stack: [bv64]bv8;
 const {:extern} $_IO_stdin_used_addr: bv64;
 axiom ($_IO_stdin_used_addr == 1984bv64);
-function {:extern} L(memory: [bv64]bv8, index: bv64) returns (bool) {
+function {:extern} L(mem$in: [bv64]bv8, index: bv64) returns (bool) {
   false
 }
 
@@ -43,8 +43,8 @@ function {:extern} memory_store64_le(memory: [bv64]bv8, index: bv64, value: bv64
 
 procedure {:extern} rely();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
   free ensures (memory_load64_le(mem, 1984bv64) == 131073bv64);
   free ensures (memory_load64_le(mem, 1992bv64) == 8583909746840200520bv64);
   free ensures (memory_load64_le(mem, 2000bv64) == 143418749551bv64);
@@ -62,8 +62,8 @@ procedure {:extern} rely();
 
 procedure {:extern} rely_transitive();
   modifies Gamma_mem, mem;
-  ensures (mem == old(mem));
   ensures (Gamma_mem == old(Gamma_mem));
+  ensures (mem == old(mem));
 
 implementation {:extern} rely_transitive()
 {

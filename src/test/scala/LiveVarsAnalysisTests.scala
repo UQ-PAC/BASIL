@@ -6,10 +6,9 @@ import org.scalatest.funsuite.AnyFunSuite
 import test_util.BASILTest
 import util.{BASILResult, StaticAnalysisConfig}
 
-
 class LiveVarsAnalysisTests extends AnyFunSuite, BASILTest {
-  Logger.setLevel(LogLevel.ERROR)
   private val correctPath = "./src/test/correct/"
+
   def runExample(name: String): BASILResult = {
     val inputFile = correctPath + s"/$name/gcc/$name.adt"
     val relfFile = correctPath + s"/$name/gcc/$name.relf"
