@@ -1,19 +1,9 @@
-var {:extern} Gamma_R0: bool;
-var {:extern} Gamma_R1: bool;
 var {:extern} Gamma_R16: bool;
 var {:extern} Gamma_R17: bool;
-var {:extern} Gamma_R29: bool;
-var {:extern} Gamma_R30: bool;
-var {:extern} Gamma_R31: bool;
 var {:extern} Gamma_mem: [bv64]bool;
 var {:extern} Gamma_stack: [bv64]bool;
-var {:extern} R0: bv64;
-var {:extern} R1: bv64;
 var {:extern} R16: bv64;
 var {:extern} R17: bv64;
-var {:extern} R29: bv64;
-var {:extern} R30: bv64;
-var {:extern} R31: bv64;
 var {:extern} mem: [bv64]bv8;
 var {:extern} stack: [bv64]bv8;
 const {:extern} $_IO_stdin_used_addr: bv64;
@@ -23,6 +13,20 @@ function {:extern} L(memory: [bv64]bv8, index: bv64) returns (bool) {
 }
 
 function {:extern} {:bvbuiltin "bvadd"} bvadd64(bv64, bv64) returns (bv64);
+function {:extern} {:bvbuiltin "bvlshr"} bvlshr32(bv32, bv32) returns (bv32);
+function {:extern} {:bvbuiltin "bvlshr"} bvlshr64(bv64, bv64) returns (bv64);
+function {:extern} {:bvbuiltin "bvmul"} bvmul64(bv64, bv64) returns (bv64);
+function {:extern} {:bvbuiltin "bvsub"} bvsub64(bv64, bv64) returns (bv64);
+function {:extern} {:bvbuiltin "bvule"} bvule64(bv64, bv64) returns (bool);
+function {:extern} {:bvbuiltin "bvult"} bvult64(bv64, bv64) returns (bool);
+function {:inline} byte_extract32_64(value: bv32, offset: bv64) returns (bv8) {
+  bvlshr32(value,bvmul64(offset,8bv64)[32:0])[8:0]
+}
+
+function {:inline} byte_extract64_64(value: bv64, offset: bv64) returns (bv8) {
+  bvlshr64(value,bvmul64(offset,8bv64))[8:0]
+}
+
 function {:extern} gamma_load32(gammaMap: [bv64]bool, index: bv64) returns (bool) {
   (gammaMap[bvadd64(index, 3bv64)] && (gammaMap[bvadd64(index, 2bv64)] && (gammaMap[bvadd64(index, 1bv64)] && gammaMap[index])))
 }
@@ -36,15 +40,19 @@ function {:extern} gamma_load8(gammaMap: [bv64]bool, index: bv64) returns (bool)
 }
 
 function {:extern} gamma_store32(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
-  gammaMap[index := value][bvadd64(index, 1bv64) := value][bvadd64(index, 2bv64) := value][bvadd64(index, 3bv64) := value]
+  (lambda i: bv64 :: ((if in_bounds64_le(index, 4bv64, i) then value else gammaMap[i])))
 }
 
 function {:extern} gamma_store64(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
-  gammaMap[index := value][bvadd64(index, 1bv64) := value][bvadd64(index, 2bv64) := value][bvadd64(index, 3bv64) := value][bvadd64(index, 4bv64) := value][bvadd64(index, 5bv64) := value][bvadd64(index, 6bv64) := value][bvadd64(index, 7bv64) := value]
+  (lambda i: bv64 :: ((if in_bounds64_le(index, 8bv64, i) then value else gammaMap[i])))
 }
 
 function {:extern} gamma_store8(gammaMap: [bv64]bool, index: bv64, value: bool) returns ([bv64]bool) {
   gammaMap[index := value]
+}
+
+function {:inline} in_bounds64_le(base: bv64, len: bv64, i: bv64) returns (bool) {
+  (if bvule64(base, bvadd64(base, len)) then (bvule64(base, i) && bvult64(i, bvadd64(base, len))) else (bvule64(base, i) || bvult64(i, bvadd64(base, len))))
 }
 
 function {:extern} memory_load32_le(memory: [bv64]bv8, index: bv64) returns (bv32) {
@@ -60,15 +68,15 @@ function {:extern} memory_load8_le(memory: [bv64]bv8, index: bv64) returns (bv8)
 }
 
 function {:extern} memory_store32_le(memory: [bv64]bv8, index: bv64, value: bv32) returns ([bv64]bv8) {
-  memory[index := value[8:0]][bvadd64(index, 1bv64) := value[16:8]][bvadd64(index, 2bv64) := value[24:16]][bvadd64(index, 3bv64) := value[32:24]]
+  (lambda i: bv64 :: ((if in_bounds64_le(index, 4bv64, i) then byte_extract32_64(value, bvsub64(i, index)) else memory[i])))
 }
 
 function {:extern} memory_store64_le(memory: [bv64]bv8, index: bv64, value: bv64) returns ([bv64]bv8) {
-  memory[index := value[8:0]][bvadd64(index, 1bv64) := value[16:8]][bvadd64(index, 2bv64) := value[24:16]][bvadd64(index, 3bv64) := value[32:24]][bvadd64(index, 4bv64) := value[40:32]][bvadd64(index, 5bv64) := value[48:40]][bvadd64(index, 6bv64) := value[56:48]][bvadd64(index, 7bv64) := value[64:56]]
+  (lambda i: bv64 :: ((if in_bounds64_le(index, 8bv64, i) then byte_extract64_64(value, bvsub64(i, index)) else memory[i])))
 }
 
 function {:extern} memory_store8_le(memory: [bv64]bv8, index: bv64, value: bv8) returns ([bv64]bv8) {
-  memory[index := value[8:0]]
+  memory[index := value]
 }
 
 function {:extern} {:bvbuiltin "zero_extend 32"} zero_extend32_32(bv32) returns (bv64);
@@ -104,7 +112,7 @@ procedure {:extern} rely_reflexive();
 procedure {:extern} guarantee_reflexive();
   modifies Gamma_mem, mem;
 
-procedure #free();
+procedure #free(R0_in: bv64, Gamma_R0_in: bool, R10_in: bv64, Gamma_R10_in: bool, R11_in: bv64, Gamma_R11_in: bool, R12_in: bv64, Gamma_R12_in: bool, R13_in: bv64, Gamma_R13_in: bool, R14_in: bv64, Gamma_R14_in: bool, R15_in: bv64, Gamma_R15_in: bool, R16_in: bv64, Gamma_R16_in: bool, R17_in: bv64, Gamma_R17_in: bool, R18_in: bv64, Gamma_R18_in: bool, R19_in: bv64, Gamma_R19_in: bool, R1_in: bv64, Gamma_R1_in: bool, R20_in: bv64, Gamma_R20_in: bool, R21_in: bv64, Gamma_R21_in: bool, R22_in: bv64, Gamma_R22_in: bool, R23_in: bv64, Gamma_R23_in: bool, R24_in: bv64, Gamma_R24_in: bool, R25_in: bv64, Gamma_R25_in: bool, R26_in: bv64, Gamma_R26_in: bool, R27_in: bv64, Gamma_R27_in: bool, R28_in: bv64, Gamma_R28_in: bool, R29_in: bv64, Gamma_R29_in: bool, R2_in: bv64, Gamma_R2_in: bool, R30_in: bv64, Gamma_R30_in: bool, R31_in: bv64, Gamma_R31_in: bool, R3_in: bv64, Gamma_R3_in: bool, R4_in: bv64, Gamma_R4_in: bool, R5_in: bv64, Gamma_R5_in: bool, R6_in: bv64, Gamma_R6_in: bool, R7_in: bv64, Gamma_R7_in: bool, R8_in: bv64, Gamma_R8_in: bool, R9_in: bv64, Gamma_R9_in: bool) returns (R0_out: bv64, Gamma_R0_out: bool, R10_out: bv64, Gamma_R10_out: bool, R11_out: bv64, Gamma_R11_out: bool, R12_out: bv64, Gamma_R12_out: bool, R13_out: bv64, Gamma_R13_out: bool, R14_out: bv64, Gamma_R14_out: bool, R15_out: bv64, Gamma_R15_out: bool, R16_out: bv64, Gamma_R16_out: bool, R17_out: bv64, Gamma_R17_out: bool, R18_out: bv64, Gamma_R18_out: bool, R19_out: bv64, Gamma_R19_out: bool, R1_out: bv64, Gamma_R1_out: bool, R20_out: bv64, Gamma_R20_out: bool, R21_out: bv64, Gamma_R21_out: bool, R22_out: bv64, Gamma_R22_out: bool, R23_out: bv64, Gamma_R23_out: bool, R24_out: bv64, Gamma_R24_out: bool, R25_out: bv64, Gamma_R25_out: bool, R26_out: bv64, Gamma_R26_out: bool, R27_out: bv64, Gamma_R27_out: bool, R28_out: bv64, Gamma_R28_out: bool, R29_out: bv64, Gamma_R29_out: bool, R2_out: bv64, Gamma_R2_out: bool, R30_out: bv64, Gamma_R30_out: bool, R31_out: bv64, Gamma_R31_out: bool, R3_out: bv64, Gamma_R3_out: bool, R4_out: bv64, Gamma_R4_out: bool, R5_out: bv64, Gamma_R5_out: bool, R6_out: bv64, Gamma_R6_out: bool, R7_out: bv64, Gamma_R7_out: bool, R8_out: bv64, Gamma_R8_out: bool, R9_out: bv64, Gamma_R9_out: bool);
   modifies Gamma_R16, Gamma_R17, R16, R17;
   free requires (memory_load64_le(mem, 2224bv64) == 131073bv64);
   free requires (memory_load64_le(mem, 2232bv64) == 8241983568019286100bv64);
@@ -127,8 +135,8 @@ procedure #free();
   free ensures (memory_load64_le(mem, 69616bv64) == 2068bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-procedure main();
-  modifies Gamma_R0, Gamma_R1, Gamma_R16, Gamma_R17, Gamma_R29, Gamma_R30, Gamma_R31, Gamma_mem, Gamma_stack, R0, R1, R16, R17, R29, R30, R31, mem, stack;
+procedure main(R29_in: bv64, Gamma_R29_in: bool, R30_in: bv64, Gamma_R30_in: bool, R31_in: bv64, Gamma_R31_in: bool) returns (R0_out: bv64, Gamma_R0_out: bool, R1_out: bv64, Gamma_R1_out: bool, R29_out: bv64, Gamma_R29_out: bool, R30_out: bv64, Gamma_R30_out: bool, R31_out: bv64, Gamma_R31_out: bool);
+  modifies Gamma_R16, Gamma_R17, Gamma_mem, Gamma_stack, R16, R17, mem, stack;
   free requires (memory_load64_le(mem, 69632bv64) == 0bv64);
   free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
   free requires (memory_load64_le(mem, 2224bv64) == 131073bv64);
@@ -141,10 +149,6 @@ procedure main();
   free requires (memory_load64_le(mem, 69000bv64) == 1984bv64);
   free requires (memory_load64_le(mem, 69616bv64) == 2068bv64);
   free requires (memory_load64_le(mem, 69640bv64) == 69640bv64);
-  free ensures (Gamma_R29 == old(Gamma_R29));
-  free ensures (Gamma_R31 == old(Gamma_R31));
-  free ensures (R29 == old(R29));
-  free ensures (R31 == old(R31));
   free ensures (memory_load64_le(mem, 2224bv64) == 131073bv64);
   free ensures (memory_load64_le(mem, 2232bv64) == 8241983568019286100bv64);
   free ensures (memory_load64_le(mem, 2240bv64) == 748482783423457568bv64);
@@ -156,92 +160,523 @@ procedure main();
   free ensures (memory_load64_le(mem, 69616bv64) == 2068bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-implementation main()
+implementation main(R29_in: bv64, Gamma_R29_in: bool, R30_in: bv64, Gamma_R30_in: bool, R31_in: bv64, Gamma_R31_in: bool) returns (R0_out: bv64, Gamma_R0_out: bool, R1_out: bv64, Gamma_R1_out: bool, R29_out: bv64, Gamma_R29_out: bool, R30_out: bv64, Gamma_R30_out: bool, R31_out: bv64, Gamma_R31_out: bool)
 {
-  var #4: bv64;
-  var Gamma_#4: bool;
+  var Gamma_R0_11: bool;
+  var Gamma_R0_12: bool;
+  var Gamma_R0_13: bool;
+  var Gamma_R0_16: bool;
+  var Gamma_R0_17: bool;
+  var Gamma_R0_18: bool;
+  var Gamma_R0_19: bool;
+  var Gamma_R0_2: bool;
+  var Gamma_R0_20: bool;
+  var Gamma_R0_4: bool;
+  var Gamma_R0_5: bool;
+  var Gamma_R0_6: bool;
+  var Gamma_R0_7: bool;
+  var Gamma_R0_8: bool;
+  var Gamma_R1: bool;
+  var Gamma_R10: bool;
+  var Gamma_R10_1: bool;
+  var Gamma_R10_2: bool;
+  var Gamma_R10_3: bool;
+  var Gamma_R10_4: bool;
+  var Gamma_R10_5: bool;
+  var Gamma_R10_6: bool;
+  var Gamma_R11: bool;
+  var Gamma_R11_1: bool;
+  var Gamma_R11_2: bool;
+  var Gamma_R11_3: bool;
+  var Gamma_R11_4: bool;
+  var Gamma_R11_5: bool;
+  var Gamma_R11_6: bool;
+  var Gamma_R12: bool;
+  var Gamma_R12_1: bool;
+  var Gamma_R12_2: bool;
+  var Gamma_R12_3: bool;
+  var Gamma_R12_4: bool;
+  var Gamma_R12_5: bool;
+  var Gamma_R12_6: bool;
+  var Gamma_R13: bool;
+  var Gamma_R13_1: bool;
+  var Gamma_R13_2: bool;
+  var Gamma_R13_3: bool;
+  var Gamma_R13_4: bool;
+  var Gamma_R13_5: bool;
+  var Gamma_R13_6: bool;
+  var Gamma_R14: bool;
+  var Gamma_R14_1: bool;
+  var Gamma_R14_2: bool;
+  var Gamma_R14_3: bool;
+  var Gamma_R14_4: bool;
+  var Gamma_R14_5: bool;
+  var Gamma_R14_6: bool;
+  var Gamma_R15: bool;
+  var Gamma_R15_1: bool;
+  var Gamma_R15_2: bool;
+  var Gamma_R15_3: bool;
+  var Gamma_R15_4: bool;
+  var Gamma_R15_5: bool;
+  var Gamma_R15_6: bool;
+  var Gamma_R16: bool;
+  var Gamma_R16_1: bool;
+  var Gamma_R16_2: bool;
+  var Gamma_R16_3: bool;
+  var Gamma_R16_4: bool;
+  var Gamma_R16_5: bool;
+  var Gamma_R16_6: bool;
+  var Gamma_R17: bool;
+  var Gamma_R17_1: bool;
+  var Gamma_R17_2: bool;
+  var Gamma_R17_3: bool;
+  var Gamma_R17_4: bool;
+  var Gamma_R17_5: bool;
+  var Gamma_R17_6: bool;
+  var Gamma_R18: bool;
+  var Gamma_R18_1: bool;
+  var Gamma_R18_2: bool;
+  var Gamma_R18_3: bool;
+  var Gamma_R18_4: bool;
+  var Gamma_R18_5: bool;
+  var Gamma_R18_6: bool;
+  var Gamma_R19: bool;
+  var Gamma_R19_1: bool;
+  var Gamma_R19_2: bool;
+  var Gamma_R19_3: bool;
+  var Gamma_R19_4: bool;
+  var Gamma_R19_5: bool;
+  var Gamma_R19_6: bool;
+  var Gamma_R1_1: bool;
+  var Gamma_R1_10: bool;
+  var Gamma_R1_2: bool;
+  var Gamma_R1_5: bool;
+  var Gamma_R1_6: bool;
+  var Gamma_R1_7: bool;
+  var Gamma_R1_8: bool;
+  var Gamma_R1_9: bool;
+  var Gamma_R2: bool;
+  var Gamma_R20: bool;
+  var Gamma_R20_1: bool;
+  var Gamma_R20_2: bool;
+  var Gamma_R20_3: bool;
+  var Gamma_R20_4: bool;
+  var Gamma_R20_5: bool;
+  var Gamma_R20_6: bool;
+  var Gamma_R21: bool;
+  var Gamma_R21_1: bool;
+  var Gamma_R21_2: bool;
+  var Gamma_R21_3: bool;
+  var Gamma_R21_4: bool;
+  var Gamma_R21_5: bool;
+  var Gamma_R21_6: bool;
+  var Gamma_R22: bool;
+  var Gamma_R22_1: bool;
+  var Gamma_R22_2: bool;
+  var Gamma_R22_3: bool;
+  var Gamma_R22_4: bool;
+  var Gamma_R22_5: bool;
+  var Gamma_R22_6: bool;
+  var Gamma_R23: bool;
+  var Gamma_R23_1: bool;
+  var Gamma_R23_2: bool;
+  var Gamma_R23_3: bool;
+  var Gamma_R23_4: bool;
+  var Gamma_R23_5: bool;
+  var Gamma_R23_6: bool;
+  var Gamma_R24: bool;
+  var Gamma_R24_1: bool;
+  var Gamma_R24_2: bool;
+  var Gamma_R24_3: bool;
+  var Gamma_R24_4: bool;
+  var Gamma_R24_5: bool;
+  var Gamma_R24_6: bool;
+  var Gamma_R25: bool;
+  var Gamma_R25_1: bool;
+  var Gamma_R25_2: bool;
+  var Gamma_R25_3: bool;
+  var Gamma_R25_4: bool;
+  var Gamma_R25_5: bool;
+  var Gamma_R25_6: bool;
+  var Gamma_R26: bool;
+  var Gamma_R26_1: bool;
+  var Gamma_R26_2: bool;
+  var Gamma_R26_3: bool;
+  var Gamma_R26_4: bool;
+  var Gamma_R26_5: bool;
+  var Gamma_R26_6: bool;
+  var Gamma_R27: bool;
+  var Gamma_R27_1: bool;
+  var Gamma_R27_2: bool;
+  var Gamma_R27_3: bool;
+  var Gamma_R27_4: bool;
+  var Gamma_R27_5: bool;
+  var Gamma_R27_6: bool;
+  var Gamma_R28: bool;
+  var Gamma_R28_1: bool;
+  var Gamma_R28_2: bool;
+  var Gamma_R28_3: bool;
+  var Gamma_R28_4: bool;
+  var Gamma_R28_5: bool;
+  var Gamma_R28_6: bool;
+  var Gamma_R29_3: bool;
+  var Gamma_R29_4: bool;
+  var Gamma_R29_5: bool;
+  var Gamma_R29_6: bool;
+  var Gamma_R29_7: bool;
+  var Gamma_R29_8: bool;
+  var Gamma_R29_9: bool;
+  var Gamma_R2_1: bool;
+  var Gamma_R2_2: bool;
+  var Gamma_R2_3: bool;
+  var Gamma_R2_4: bool;
+  var Gamma_R2_5: bool;
+  var Gamma_R2_6: bool;
+  var Gamma_R3: bool;
+  var Gamma_R30_11: bool;
+  var Gamma_R30_13: bool;
+  var Gamma_R30_14: bool;
+  var Gamma_R30_3: bool;
+  var Gamma_R30_5: bool;
+  var Gamma_R30_7: bool;
+  var Gamma_R30_9: bool;
+  var Gamma_R31_3: bool;
+  var Gamma_R31_4: bool;
+  var Gamma_R31_5: bool;
+  var Gamma_R31_6: bool;
+  var Gamma_R31_7: bool;
+  var Gamma_R31_8: bool;
+  var Gamma_R3_1: bool;
+  var Gamma_R3_2: bool;
+  var Gamma_R3_3: bool;
+  var Gamma_R3_4: bool;
+  var Gamma_R3_5: bool;
+  var Gamma_R3_6: bool;
+  var Gamma_R4: bool;
+  var Gamma_R4_1: bool;
+  var Gamma_R4_2: bool;
+  var Gamma_R4_3: bool;
+  var Gamma_R4_4: bool;
+  var Gamma_R4_5: bool;
+  var Gamma_R4_6: bool;
+  var Gamma_R5: bool;
+  var Gamma_R5_1: bool;
+  var Gamma_R5_2: bool;
+  var Gamma_R5_3: bool;
+  var Gamma_R5_4: bool;
+  var Gamma_R5_5: bool;
+  var Gamma_R5_6: bool;
+  var Gamma_R6: bool;
+  var Gamma_R6_1: bool;
+  var Gamma_R6_2: bool;
+  var Gamma_R6_3: bool;
+  var Gamma_R6_4: bool;
+  var Gamma_R6_5: bool;
+  var Gamma_R6_6: bool;
+  var Gamma_R7: bool;
+  var Gamma_R7_1: bool;
+  var Gamma_R7_2: bool;
+  var Gamma_R7_3: bool;
+  var Gamma_R7_4: bool;
+  var Gamma_R7_5: bool;
+  var Gamma_R7_6: bool;
+  var Gamma_R8: bool;
+  var Gamma_R8_1: bool;
+  var Gamma_R8_2: bool;
+  var Gamma_R8_3: bool;
+  var Gamma_R8_4: bool;
+  var Gamma_R8_5: bool;
+  var Gamma_R8_6: bool;
+  var Gamma_R9: bool;
+  var Gamma_R9_1: bool;
+  var Gamma_R9_2: bool;
+  var Gamma_R9_3: bool;
+  var Gamma_R9_4: bool;
+  var Gamma_R9_5: bool;
+  var Gamma_R9_6: bool;
+  var R0_11: bv64;
+  var R0_12: bv64;
+  var R0_13: bv32;
+  var R0_16: bv64;
+  var R0_17: bv64;
+  var R0_18: bv64;
+  var R0_19: bv64;
+  var R0_2: bv64;
+  var R0_20: bv64;
+  var R0_4: bv64;
+  var R0_5: bv64;
+  var R0_6: bv64;
+  var R0_7: bv64;
+  var R0_8: bv64;
+  var R1: bv64;
+  var R10: bv64;
+  var R10_1: bv64;
+  var R10_2: bv64;
+  var R10_3: bv64;
+  var R10_4: bv64;
+  var R10_5: bv64;
+  var R10_6: bv64;
+  var R11: bv64;
+  var R11_1: bv64;
+  var R11_2: bv64;
+  var R11_3: bv64;
+  var R11_4: bv64;
+  var R11_5: bv64;
+  var R11_6: bv64;
+  var R12: bv64;
+  var R12_1: bv64;
+  var R12_2: bv64;
+  var R12_3: bv64;
+  var R12_4: bv64;
+  var R12_5: bv64;
+  var R12_6: bv64;
+  var R13: bv64;
+  var R13_1: bv64;
+  var R13_2: bv64;
+  var R13_3: bv64;
+  var R13_4: bv64;
+  var R13_5: bv64;
+  var R13_6: bv64;
+  var R14: bv64;
+  var R14_1: bv64;
+  var R14_2: bv64;
+  var R14_3: bv64;
+  var R14_4: bv64;
+  var R14_5: bv64;
+  var R14_6: bv64;
+  var R15: bv64;
+  var R15_1: bv64;
+  var R15_2: bv64;
+  var R15_3: bv64;
+  var R15_4: bv64;
+  var R15_5: bv64;
+  var R15_6: bv64;
+  var R16: bv64;
+  var R16_1: bv64;
+  var R16_2: bv64;
+  var R16_3: bv64;
+  var R16_4: bv64;
+  var R16_5: bv64;
+  var R16_6: bv64;
+  var R17: bv64;
+  var R17_1: bv64;
+  var R17_2: bv64;
+  var R17_3: bv64;
+  var R17_4: bv64;
+  var R17_5: bv64;
+  var R17_6: bv64;
+  var R18: bv64;
+  var R18_1: bv64;
+  var R18_2: bv64;
+  var R18_3: bv64;
+  var R18_4: bv64;
+  var R18_5: bv64;
+  var R18_6: bv64;
+  var R19: bv64;
+  var R19_1: bv64;
+  var R19_2: bv64;
+  var R19_3: bv64;
+  var R19_4: bv64;
+  var R19_5: bv64;
+  var R19_6: bv64;
+  var R1_1: bv64;
+  var R1_10: bv64;
+  var R1_2: bv64;
+  var R1_5: bv64;
+  var R1_6: bv64;
+  var R1_7: bv64;
+  var R1_8: bv64;
+  var R1_9: bv64;
+  var R2: bv64;
+  var R20: bv64;
+  var R20_1: bv64;
+  var R20_2: bv64;
+  var R20_3: bv64;
+  var R20_4: bv64;
+  var R20_5: bv64;
+  var R20_6: bv64;
+  var R21: bv64;
+  var R21_1: bv64;
+  var R21_2: bv64;
+  var R21_3: bv64;
+  var R21_4: bv64;
+  var R21_5: bv64;
+  var R21_6: bv64;
+  var R22: bv64;
+  var R22_1: bv64;
+  var R22_2: bv64;
+  var R22_3: bv64;
+  var R22_4: bv64;
+  var R22_5: bv64;
+  var R22_6: bv64;
+  var R23: bv64;
+  var R23_1: bv64;
+  var R23_2: bv64;
+  var R23_3: bv64;
+  var R23_4: bv64;
+  var R23_5: bv64;
+  var R23_6: bv64;
+  var R24: bv64;
+  var R24_1: bv64;
+  var R24_2: bv64;
+  var R24_3: bv64;
+  var R24_4: bv64;
+  var R24_5: bv64;
+  var R24_6: bv64;
+  var R25: bv64;
+  var R25_1: bv64;
+  var R25_2: bv64;
+  var R25_3: bv64;
+  var R25_4: bv64;
+  var R25_5: bv64;
+  var R25_6: bv64;
+  var R26: bv64;
+  var R26_1: bv64;
+  var R26_2: bv64;
+  var R26_3: bv64;
+  var R26_4: bv64;
+  var R26_5: bv64;
+  var R26_6: bv64;
+  var R27: bv64;
+  var R27_1: bv64;
+  var R27_2: bv64;
+  var R27_3: bv64;
+  var R27_4: bv64;
+  var R27_5: bv64;
+  var R27_6: bv64;
+  var R28: bv64;
+  var R28_1: bv64;
+  var R28_2: bv64;
+  var R28_3: bv64;
+  var R28_4: bv64;
+  var R28_5: bv64;
+  var R28_6: bv64;
+  var R29_3: bv64;
+  var R29_4: bv64;
+  var R29_5: bv64;
+  var R29_6: bv64;
+  var R29_7: bv64;
+  var R29_8: bv64;
+  var R29_9: bv64;
+  var R2_1: bv64;
+  var R2_2: bv64;
+  var R2_3: bv64;
+  var R2_4: bv64;
+  var R2_5: bv64;
+  var R2_6: bv64;
+  var R3: bv64;
+  var R30_11: bv64;
+  var R30_13: bv64;
+  var R30_14: bv64;
+  var R30_3: bv64;
+  var R30_5: bv64;
+  var R30_7: bv64;
+  var R30_9: bv64;
+  var R31_3: bv64;
+  var R31_4: bv64;
+  var R31_5: bv64;
+  var R31_6: bv64;
+  var R31_7: bv64;
+  var R31_8: bv64;
+  var R3_1: bv64;
+  var R3_2: bv64;
+  var R3_3: bv64;
+  var R3_4: bv64;
+  var R3_5: bv64;
+  var R3_6: bv64;
+  var R4: bv64;
+  var R4_1: bv64;
+  var R4_2: bv64;
+  var R4_3: bv64;
+  var R4_4: bv64;
+  var R4_5: bv64;
+  var R4_6: bv64;
+  var R5: bv64;
+  var R5_1: bv64;
+  var R5_2: bv64;
+  var R5_3: bv64;
+  var R5_4: bv64;
+  var R5_5: bv64;
+  var R5_6: bv64;
+  var R6: bv64;
+  var R6_1: bv64;
+  var R6_2: bv64;
+  var R6_3: bv64;
+  var R6_4: bv64;
+  var R6_5: bv64;
+  var R6_6: bv64;
+  var R7: bv64;
+  var R7_1: bv64;
+  var R7_2: bv64;
+  var R7_3: bv64;
+  var R7_4: bv64;
+  var R7_5: bv64;
+  var R7_6: bv64;
+  var R8: bv64;
+  var R8_1: bv64;
+  var R8_2: bv64;
+  var R8_3: bv64;
+  var R8_4: bv64;
+  var R8_5: bv64;
+  var R8_6: bv64;
+  var R9: bv64;
+  var R9_1: bv64;
+  var R9_2: bv64;
+  var R9_3: bv64;
+  var R9_4: bv64;
+  var R9_5: bv64;
+  var R9_6: bv64;
   lmain:
-    assume {:captureState "lmain"} true;
-    #4, Gamma_#4 := bvadd64(R31, 18446744073709551584bv64), Gamma_R31;
-    stack, Gamma_stack := memory_store64_le(stack, #4, R29), gamma_store64(Gamma_stack, #4, Gamma_R29);
-    assume {:captureState "%00000338"} true;
-    stack, Gamma_stack := memory_store64_le(stack, bvadd64(#4, 8bv64), R30), gamma_store64(Gamma_stack, bvadd64(#4, 8bv64), Gamma_R30);
-    assume {:captureState "%0000033e"} true;
-    R31, Gamma_R31 := #4, Gamma_#4;
-    R29, Gamma_R29 := R31, Gamma_R31;
-    R0, Gamma_R0 := 1bv64, true;
-    R30, Gamma_R30 := 2084bv64, true;
-    call malloc();
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31_in, 18446744073709551584bv64), R29_in), gamma_store64(Gamma_stack, bvadd64(R31_in, 18446744073709551584bv64), Gamma_R29_in);
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31_in, 18446744073709551592bv64), R30_in), gamma_store64(Gamma_stack, bvadd64(R31_in, 18446744073709551592bv64), Gamma_R30_in);
+    call R0_2, Gamma_R0_2, R10_1, Gamma_R10_1, R11_1, Gamma_R11_1, R12_1, Gamma_R12_1, R13_1, Gamma_R13_1, R14_1, Gamma_R14_1, R15_1, Gamma_R15_1, R16_1, Gamma_R16_1, R17_1, Gamma_R17_1, R18_1, Gamma_R18_1, R19_1, Gamma_R19_1, R1_1, Gamma_R1_1, R20_1, Gamma_R20_1, R21_1, Gamma_R21_1, R22_1, Gamma_R22_1, R23_1, Gamma_R23_1, R24_1, Gamma_R24_1, R25_1, Gamma_R25_1, R26_1, Gamma_R26_1, R27_1, Gamma_R27_1, R28_1, Gamma_R28_1, R29_3, Gamma_R29_3, R2_1, Gamma_R2_1, R30_3, Gamma_R30_3, R31_3, Gamma_R31_3, R3_1, Gamma_R3_1, R4_1, Gamma_R4_1, R5_1, Gamma_R5_1, R6_1, Gamma_R6_1, R7_1, Gamma_R7_1, R8_1, Gamma_R8_1, R9_1, Gamma_R9_1 := malloc(1bv64, true, R10, Gamma_R10, R11, Gamma_R11, R12, Gamma_R12, R13, Gamma_R13, R14, Gamma_R14, R15, Gamma_R15, R16, Gamma_R16, R17, Gamma_R17, R18, Gamma_R18, R19, Gamma_R19, R1, Gamma_R1, R20, Gamma_R20, R21, Gamma_R21, R22, Gamma_R22, R23, Gamma_R23, R24, Gamma_R24, R25, Gamma_R25, R26, Gamma_R26, R27, Gamma_R27, R28, Gamma_R28, bvadd64(R31_in, 18446744073709551584bv64), Gamma_R31_in, R2, Gamma_R2, 2084bv64, true, bvadd64(R31_in, 18446744073709551584bv64), Gamma_R31_in, R3, Gamma_R3, R4, Gamma_R4, R5, Gamma_R5, R6, Gamma_R6, R7, Gamma_R7, R8, Gamma_R8, R9, Gamma_R9);
     goto l00000357;
   l00000357:
-    assume {:captureState "l00000357"} true;
-    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 16bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 16bv64), Gamma_R0);
-    assume {:captureState "%0000035d"} true;
-    R0, Gamma_R0 := 4bv64, true;
-    R30, Gamma_R30 := 2096bv64, true;
-    call malloc();
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31_3, 16bv64), R0_2), gamma_store64(Gamma_stack, bvadd64(R31_3, 16bv64), Gamma_R0_2);
+    call R0_4, Gamma_R0_4, R10_2, Gamma_R10_2, R11_2, Gamma_R11_2, R12_2, Gamma_R12_2, R13_2, Gamma_R13_2, R14_2, Gamma_R14_2, R15_2, Gamma_R15_2, R16_2, Gamma_R16_2, R17_2, Gamma_R17_2, R18_2, Gamma_R18_2, R19_2, Gamma_R19_2, R1_2, Gamma_R1_2, R20_2, Gamma_R20_2, R21_2, Gamma_R21_2, R22_2, Gamma_R22_2, R23_2, Gamma_R23_2, R24_2, Gamma_R24_2, R25_2, Gamma_R25_2, R26_2, Gamma_R26_2, R27_2, Gamma_R27_2, R28_2, Gamma_R28_2, R29_4, Gamma_R29_4, R2_2, Gamma_R2_2, R30_5, Gamma_R30_5, R31_4, Gamma_R31_4, R3_2, Gamma_R3_2, R4_2, Gamma_R4_2, R5_2, Gamma_R5_2, R6_2, Gamma_R6_2, R7_2, Gamma_R7_2, R8_2, Gamma_R8_2, R9_2, Gamma_R9_2 := malloc(4bv64, true, R10_1, Gamma_R10_1, R11_1, Gamma_R11_1, R12_1, Gamma_R12_1, R13_1, Gamma_R13_1, R14_1, Gamma_R14_1, R15_1, Gamma_R15_1, R16_1, Gamma_R16_1, R17_1, Gamma_R17_1, R18_1, Gamma_R18_1, R19_1, Gamma_R19_1, R1_1, Gamma_R1_1, R20_1, Gamma_R20_1, R21_1, Gamma_R21_1, R22_1, Gamma_R22_1, R23_1, Gamma_R23_1, R24_1, Gamma_R24_1, R25_1, Gamma_R25_1, R26_1, Gamma_R26_1, R27_1, Gamma_R27_1, R28_1, Gamma_R28_1, R29_3, Gamma_R29_3, R2_1, Gamma_R2_1, 2096bv64, true, R31_3, Gamma_R31_3, R3_1, Gamma_R3_1, R4_1, Gamma_R4_1, R5_1, Gamma_R5_1, R6_1, Gamma_R6_1, R7_1, Gamma_R7_1, R8_1, Gamma_R8_1, R9_1, Gamma_R9_1);
     goto l0000036b;
   l0000036b:
-    assume {:captureState "l0000036b"} true;
-    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31, 24bv64), R0), gamma_store64(Gamma_stack, bvadd64(R31, 24bv64), Gamma_R0);
-    assume {:captureState "%00000371"} true;
-    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
-    R1, Gamma_R1 := 65bv64, true;
+    stack, Gamma_stack := memory_store64_le(stack, bvadd64(R31_4, 24bv64), R0_4), gamma_store64(Gamma_stack, bvadd64(R31_4, 24bv64), Gamma_R0_4);
+    R0_5, Gamma_R0_5 := memory_load64_le(stack, bvadd64(R31_4, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31_4, 16bv64));
     call rely();
-    assert (L(mem, R0) ==> Gamma_R1);
-    mem, Gamma_mem := memory_store8_le(mem, R0, R1[8:0]), gamma_store8(Gamma_mem, R0, Gamma_R1);
-    assume {:captureState "%00000385"} true;
-    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 24bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 24bv64));
-    R1, Gamma_R1 := 42bv64, true;
+    assert (L(mem, R0_5) ==> true);
+    mem, Gamma_mem := memory_store8_le(mem, R0_5, 65bv8), gamma_store8(Gamma_mem, R0_5, true);
+    R0_6, Gamma_R0_6 := memory_load64_le(stack, bvadd64(R31_4, 24bv64)), gamma_load64(Gamma_stack, bvadd64(R31_4, 24bv64));
     call rely();
-    assert (L(mem, R0) ==> Gamma_R1);
-    mem, Gamma_mem := memory_store32_le(mem, R0, R1[32:0]), gamma_store32(Gamma_mem, R0, Gamma_R1);
-    assume {:captureState "%00000399"} true;
-    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
+    assert (L(mem, R0_6) ==> true);
+    mem, Gamma_mem := memory_store32_le(mem, R0_6, 42bv32), gamma_store32(Gamma_mem, R0_6, true);
+    R0_7, Gamma_R0_7 := memory_load64_le(stack, bvadd64(R31_4, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31_4, 16bv64));
     call rely();
-    R0, Gamma_R0 := zero_extend56_8(memory_load8_le(mem, R0)), (gamma_load8(Gamma_mem, R0) || L(mem, R0));
-    R1, Gamma_R1 := zero_extend32_32(R0[32:0]), Gamma_R0;
-    R0, Gamma_R0 := 0bv64, true;
-    R0, Gamma_R0 := bvadd64(R0, 2232bv64), Gamma_R0;
-    R30, Gamma_R30 := 2148bv64, true;
-    call printf();
+    R0_8, Gamma_R0_8 := zero_extend56_8(memory_load8_le(mem, R0_7)), (gamma_load8(Gamma_mem, R0_7) || L(mem, R0_7));
+    R1_5, Gamma_R1_5 := zero_extend32_32(R0_8[32:0]), Gamma_R0_8;
+    call R0_11, Gamma_R0_11, R10_3, Gamma_R10_3, R11_3, Gamma_R11_3, R12_3, Gamma_R12_3, R13_3, Gamma_R13_3, R14_3, Gamma_R14_3, R15_3, Gamma_R15_3, R16_3, Gamma_R16_3, R17_3, Gamma_R17_3, R18_3, Gamma_R18_3, R19_3, Gamma_R19_3, R1_6, Gamma_R1_6, R20_3, Gamma_R20_3, R21_3, Gamma_R21_3, R22_3, Gamma_R22_3, R23_3, Gamma_R23_3, R24_3, Gamma_R24_3, R25_3, Gamma_R25_3, R26_3, Gamma_R26_3, R27_3, Gamma_R27_3, R28_3, Gamma_R28_3, R29_5, Gamma_R29_5, R2_3, Gamma_R2_3, R30_7, Gamma_R30_7, R31_5, Gamma_R31_5, R3_3, Gamma_R3_3, R4_3, Gamma_R4_3, R5_3, Gamma_R5_3, R6_3, Gamma_R6_3, R7_3, Gamma_R7_3, R8_3, Gamma_R8_3, R9_3, Gamma_R9_3 := printf(2232bv64, true, R10_2, Gamma_R10_2, R11_2, Gamma_R11_2, R12_2, Gamma_R12_2, R13_2, Gamma_R13_2, R14_2, Gamma_R14_2, R15_2, Gamma_R15_2, R16_2, Gamma_R16_2, R17_2, Gamma_R17_2, R18_2, Gamma_R18_2, R19_2, Gamma_R19_2, R1_5, Gamma_R1_5, R20_2, Gamma_R20_2, R21_2, Gamma_R21_2, R22_2, Gamma_R22_2, R23_2, Gamma_R23_2, R24_2, Gamma_R24_2, R25_2, Gamma_R25_2, R26_2, Gamma_R26_2, R27_2, Gamma_R27_2, R28_2, Gamma_R28_2, R29_4, Gamma_R29_4, R2_2, Gamma_R2_2, 2148bv64, true, R31_4, Gamma_R31_4, R3_2, Gamma_R3_2, R4_2, Gamma_R4_2, R5_2, Gamma_R5_2, R6_2, Gamma_R6_2, R7_2, Gamma_R7_2, R8_2, Gamma_R8_2, R9_2, Gamma_R9_2);
     goto l000003c2;
   l000003c2:
-    assume {:captureState "l000003c2"} true;
-    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 24bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 24bv64));
+    R0_12, Gamma_R0_12 := memory_load64_le(stack, bvadd64(R31_5, 24bv64)), gamma_load64(Gamma_stack, bvadd64(R31_5, 24bv64));
     call rely();
-    R0, Gamma_R0 := zero_extend32_32(memory_load32_le(mem, R0)), (gamma_load32(Gamma_mem, R0) || L(mem, R0));
-    R1, Gamma_R1 := zero_extend32_32(R0[32:0]), Gamma_R0;
-    R0, Gamma_R0 := 0bv64, true;
-    R0, Gamma_R0 := bvadd64(R0, 2256bv64), Gamma_R0;
-    R30, Gamma_R30 := 2172bv64, true;
-    call printf();
+    R0_13, Gamma_R0_13 := memory_load32_le(mem, R0_12), (gamma_load32(Gamma_mem, R0_12) || L(mem, R0_12));
+    R1_7, Gamma_R1_7 := zero_extend32_32(R0_13), Gamma_R0_13;
+    call R0_16, Gamma_R0_16, R10_4, Gamma_R10_4, R11_4, Gamma_R11_4, R12_4, Gamma_R12_4, R13_4, Gamma_R13_4, R14_4, Gamma_R14_4, R15_4, Gamma_R15_4, R16_4, Gamma_R16_4, R17_4, Gamma_R17_4, R18_4, Gamma_R18_4, R19_4, Gamma_R19_4, R1_8, Gamma_R1_8, R20_4, Gamma_R20_4, R21_4, Gamma_R21_4, R22_4, Gamma_R22_4, R23_4, Gamma_R23_4, R24_4, Gamma_R24_4, R25_4, Gamma_R25_4, R26_4, Gamma_R26_4, R27_4, Gamma_R27_4, R28_4, Gamma_R28_4, R29_6, Gamma_R29_6, R2_4, Gamma_R2_4, R30_9, Gamma_R30_9, R31_6, Gamma_R31_6, R3_4, Gamma_R3_4, R4_4, Gamma_R4_4, R5_4, Gamma_R5_4, R6_4, Gamma_R6_4, R7_4, Gamma_R7_4, R8_4, Gamma_R8_4, R9_4, Gamma_R9_4 := printf(2256bv64, true, R10_3, Gamma_R10_3, R11_3, Gamma_R11_3, R12_3, Gamma_R12_3, R13_3, Gamma_R13_3, R14_3, Gamma_R14_3, R15_3, Gamma_R15_3, R16_3, Gamma_R16_3, R17_3, Gamma_R17_3, R18_3, Gamma_R18_3, R19_3, Gamma_R19_3, R1_7, Gamma_R1_7, R20_3, Gamma_R20_3, R21_3, Gamma_R21_3, R22_3, Gamma_R22_3, R23_3, Gamma_R23_3, R24_3, Gamma_R24_3, R25_3, Gamma_R25_3, R26_3, Gamma_R26_3, R27_3, Gamma_R27_3, R28_3, Gamma_R28_3, R29_5, Gamma_R29_5, R2_3, Gamma_R2_3, 2172bv64, true, R31_5, Gamma_R31_5, R3_3, Gamma_R3_3, R4_3, Gamma_R4_3, R5_3, Gamma_R5_3, R6_3, Gamma_R6_3, R7_3, Gamma_R7_3, R8_3, Gamma_R8_3, R9_3, Gamma_R9_3);
     goto l000003e8;
   l000003e8:
-    assume {:captureState "l000003e8"} true;
-    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 16bv64));
-    R30, Gamma_R30 := 2180bv64, true;
-    call #free();
+    R0_17, Gamma_R0_17 := memory_load64_le(stack, bvadd64(R31_6, 16bv64)), gamma_load64(Gamma_stack, bvadd64(R31_6, 16bv64));
+    call R0_18, Gamma_R0_18, R10_5, Gamma_R10_5, R11_5, Gamma_R11_5, R12_5, Gamma_R12_5, R13_5, Gamma_R13_5, R14_5, Gamma_R14_5, R15_5, Gamma_R15_5, R16_5, Gamma_R16_5, R17_5, Gamma_R17_5, R18_5, Gamma_R18_5, R19_5, Gamma_R19_5, R1_9, Gamma_R1_9, R20_5, Gamma_R20_5, R21_5, Gamma_R21_5, R22_5, Gamma_R22_5, R23_5, Gamma_R23_5, R24_5, Gamma_R24_5, R25_5, Gamma_R25_5, R26_5, Gamma_R26_5, R27_5, Gamma_R27_5, R28_5, Gamma_R28_5, R29_7, Gamma_R29_7, R2_5, Gamma_R2_5, R30_11, Gamma_R30_11, R31_7, Gamma_R31_7, R3_5, Gamma_R3_5, R4_5, Gamma_R4_5, R5_5, Gamma_R5_5, R6_5, Gamma_R6_5, R7_5, Gamma_R7_5, R8_5, Gamma_R8_5, R9_5, Gamma_R9_5 := #free(R0_17, Gamma_R0_17, R10_4, Gamma_R10_4, R11_4, Gamma_R11_4, R12_4, Gamma_R12_4, R13_4, Gamma_R13_4, R14_4, Gamma_R14_4, R15_4, Gamma_R15_4, R16_4, Gamma_R16_4, R17_4, Gamma_R17_4, R18_4, Gamma_R18_4, R19_4, Gamma_R19_4, R1_8, Gamma_R1_8, R20_4, Gamma_R20_4, R21_4, Gamma_R21_4, R22_4, Gamma_R22_4, R23_4, Gamma_R23_4, R24_4, Gamma_R24_4, R25_4, Gamma_R25_4, R26_4, Gamma_R26_4, R27_4, Gamma_R27_4, R28_4, Gamma_R28_4, R29_6, Gamma_R29_6, R2_4, Gamma_R2_4, 2180bv64, true, R31_6, Gamma_R31_6, R3_4, Gamma_R3_4, R4_4, Gamma_R4_4, R5_4, Gamma_R5_4, R6_4, Gamma_R6_4, R7_4, Gamma_R7_4, R8_4, Gamma_R8_4, R9_4, Gamma_R9_4);
     goto l000003f7;
   l000003f7:
-    assume {:captureState "l000003f7"} true;
-    R0, Gamma_R0 := memory_load64_le(stack, bvadd64(R31, 24bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 24bv64));
-    R30, Gamma_R30 := 2188bv64, true;
-    call #free();
+    R0_19, Gamma_R0_19 := memory_load64_le(stack, bvadd64(R31_7, 24bv64)), gamma_load64(Gamma_stack, bvadd64(R31_7, 24bv64));
+    call R0_20, Gamma_R0_20, R10_6, Gamma_R10_6, R11_6, Gamma_R11_6, R12_6, Gamma_R12_6, R13_6, Gamma_R13_6, R14_6, Gamma_R14_6, R15_6, Gamma_R15_6, R16_6, Gamma_R16_6, R17_6, Gamma_R17_6, R18_6, Gamma_R18_6, R19_6, Gamma_R19_6, R1_10, Gamma_R1_10, R20_6, Gamma_R20_6, R21_6, Gamma_R21_6, R22_6, Gamma_R22_6, R23_6, Gamma_R23_6, R24_6, Gamma_R24_6, R25_6, Gamma_R25_6, R26_6, Gamma_R26_6, R27_6, Gamma_R27_6, R28_6, Gamma_R28_6, R29_8, Gamma_R29_8, R2_6, Gamma_R2_6, R30_13, Gamma_R30_13, R31_8, Gamma_R31_8, R3_6, Gamma_R3_6, R4_6, Gamma_R4_6, R5_6, Gamma_R5_6, R6_6, Gamma_R6_6, R7_6, Gamma_R7_6, R8_6, Gamma_R8_6, R9_6, Gamma_R9_6 := #free(R0_19, Gamma_R0_19, R10_5, Gamma_R10_5, R11_5, Gamma_R11_5, R12_5, Gamma_R12_5, R13_5, Gamma_R13_5, R14_5, Gamma_R14_5, R15_5, Gamma_R15_5, R16_5, Gamma_R16_5, R17_5, Gamma_R17_5, R18_5, Gamma_R18_5, R19_5, Gamma_R19_5, R1_9, Gamma_R1_9, R20_5, Gamma_R20_5, R21_5, Gamma_R21_5, R22_5, Gamma_R22_5, R23_5, Gamma_R23_5, R24_5, Gamma_R24_5, R25_5, Gamma_R25_5, R26_5, Gamma_R26_5, R27_5, Gamma_R27_5, R28_5, Gamma_R28_5, R29_7, Gamma_R29_7, R2_5, Gamma_R2_5, 2188bv64, true, R31_7, Gamma_R31_7, R3_5, Gamma_R3_5, R4_5, Gamma_R4_5, R5_5, Gamma_R5_5, R6_5, Gamma_R6_5, R7_5, Gamma_R7_5, R8_5, Gamma_R8_5, R9_5, Gamma_R9_5);
     goto l00000405;
   l00000405:
-    assume {:captureState "l00000405"} true;
-    R0, Gamma_R0 := 0bv64, true;
-    R29, Gamma_R29 := memory_load64_le(stack, R31), gamma_load64(Gamma_stack, R31);
-    R30, Gamma_R30 := memory_load64_le(stack, bvadd64(R31, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31, 8bv64));
-    R31, Gamma_R31 := bvadd64(R31, 32bv64), Gamma_R31;
+    R29_9, Gamma_R29_9 := memory_load64_le(stack, R31_8), gamma_load64(Gamma_stack, R31_8);
+    R30_14, Gamma_R30_14 := memory_load64_le(stack, bvadd64(R31_8, 8bv64)), gamma_load64(Gamma_stack, bvadd64(R31_8, 8bv64));
     goto main_basil_return;
   main_basil_return:
-    assume {:captureState "main_basil_return"} true;
+    R0_out, R1_out, R29_out, R30_out, R31_out := 0bv64, R1_10, R29_9, R30_14, bvadd64(R31_8, 32bv64);
+    Gamma_R0_out, Gamma_R1_out, Gamma_R29_out, Gamma_R30_out, Gamma_R31_out := true, Gamma_R1_10, Gamma_R29_9, Gamma_R30_14, Gamma_R31_8;
     return;
 }
 
-procedure malloc();
+procedure malloc(R0_in: bv64, Gamma_R0_in: bool, R10_in: bv64, Gamma_R10_in: bool, R11_in: bv64, Gamma_R11_in: bool, R12_in: bv64, Gamma_R12_in: bool, R13_in: bv64, Gamma_R13_in: bool, R14_in: bv64, Gamma_R14_in: bool, R15_in: bv64, Gamma_R15_in: bool, R16_in: bv64, Gamma_R16_in: bool, R17_in: bv64, Gamma_R17_in: bool, R18_in: bv64, Gamma_R18_in: bool, R19_in: bv64, Gamma_R19_in: bool, R1_in: bv64, Gamma_R1_in: bool, R20_in: bv64, Gamma_R20_in: bool, R21_in: bv64, Gamma_R21_in: bool, R22_in: bv64, Gamma_R22_in: bool, R23_in: bv64, Gamma_R23_in: bool, R24_in: bv64, Gamma_R24_in: bool, R25_in: bv64, Gamma_R25_in: bool, R26_in: bv64, Gamma_R26_in: bool, R27_in: bv64, Gamma_R27_in: bool, R28_in: bv64, Gamma_R28_in: bool, R29_in: bv64, Gamma_R29_in: bool, R2_in: bv64, Gamma_R2_in: bool, R30_in: bv64, Gamma_R30_in: bool, R31_in: bv64, Gamma_R31_in: bool, R3_in: bv64, Gamma_R3_in: bool, R4_in: bv64, Gamma_R4_in: bool, R5_in: bv64, Gamma_R5_in: bool, R6_in: bv64, Gamma_R6_in: bool, R7_in: bv64, Gamma_R7_in: bool, R8_in: bv64, Gamma_R8_in: bool, R9_in: bv64, Gamma_R9_in: bool) returns (R0_out: bv64, Gamma_R0_out: bool, R10_out: bv64, Gamma_R10_out: bool, R11_out: bv64, Gamma_R11_out: bool, R12_out: bv64, Gamma_R12_out: bool, R13_out: bv64, Gamma_R13_out: bool, R14_out: bv64, Gamma_R14_out: bool, R15_out: bv64, Gamma_R15_out: bool, R16_out: bv64, Gamma_R16_out: bool, R17_out: bv64, Gamma_R17_out: bool, R18_out: bv64, Gamma_R18_out: bool, R19_out: bv64, Gamma_R19_out: bool, R1_out: bv64, Gamma_R1_out: bool, R20_out: bv64, Gamma_R20_out: bool, R21_out: bv64, Gamma_R21_out: bool, R22_out: bv64, Gamma_R22_out: bool, R23_out: bv64, Gamma_R23_out: bool, R24_out: bv64, Gamma_R24_out: bool, R25_out: bv64, Gamma_R25_out: bool, R26_out: bv64, Gamma_R26_out: bool, R27_out: bv64, Gamma_R27_out: bool, R28_out: bv64, Gamma_R28_out: bool, R29_out: bv64, Gamma_R29_out: bool, R2_out: bv64, Gamma_R2_out: bool, R30_out: bv64, Gamma_R30_out: bool, R31_out: bv64, Gamma_R31_out: bool, R3_out: bv64, Gamma_R3_out: bool, R4_out: bv64, Gamma_R4_out: bool, R5_out: bv64, Gamma_R5_out: bool, R6_out: bv64, Gamma_R6_out: bool, R7_out: bv64, Gamma_R7_out: bool, R8_out: bv64, Gamma_R8_out: bool, R9_out: bv64, Gamma_R9_out: bool);
   modifies Gamma_R16, Gamma_R17, R16, R17;
   free requires (memory_load64_le(mem, 2224bv64) == 131073bv64);
   free requires (memory_load64_le(mem, 2232bv64) == 8241983568019286100bv64);
@@ -264,7 +699,7 @@ procedure malloc();
   free ensures (memory_load64_le(mem, 69616bv64) == 2068bv64);
   free ensures (memory_load64_le(mem, 69640bv64) == 69640bv64);
 
-procedure printf();
+procedure printf(R0_in: bv64, Gamma_R0_in: bool, R10_in: bv64, Gamma_R10_in: bool, R11_in: bv64, Gamma_R11_in: bool, R12_in: bv64, Gamma_R12_in: bool, R13_in: bv64, Gamma_R13_in: bool, R14_in: bv64, Gamma_R14_in: bool, R15_in: bv64, Gamma_R15_in: bool, R16_in: bv64, Gamma_R16_in: bool, R17_in: bv64, Gamma_R17_in: bool, R18_in: bv64, Gamma_R18_in: bool, R19_in: bv64, Gamma_R19_in: bool, R1_in: bv64, Gamma_R1_in: bool, R20_in: bv64, Gamma_R20_in: bool, R21_in: bv64, Gamma_R21_in: bool, R22_in: bv64, Gamma_R22_in: bool, R23_in: bv64, Gamma_R23_in: bool, R24_in: bv64, Gamma_R24_in: bool, R25_in: bv64, Gamma_R25_in: bool, R26_in: bv64, Gamma_R26_in: bool, R27_in: bv64, Gamma_R27_in: bool, R28_in: bv64, Gamma_R28_in: bool, R29_in: bv64, Gamma_R29_in: bool, R2_in: bv64, Gamma_R2_in: bool, R30_in: bv64, Gamma_R30_in: bool, R31_in: bv64, Gamma_R31_in: bool, R3_in: bv64, Gamma_R3_in: bool, R4_in: bv64, Gamma_R4_in: bool, R5_in: bv64, Gamma_R5_in: bool, R6_in: bv64, Gamma_R6_in: bool, R7_in: bv64, Gamma_R7_in: bool, R8_in: bv64, Gamma_R8_in: bool, R9_in: bv64, Gamma_R9_in: bool) returns (R0_out: bv64, Gamma_R0_out: bool, R10_out: bv64, Gamma_R10_out: bool, R11_out: bv64, Gamma_R11_out: bool, R12_out: bv64, Gamma_R12_out: bool, R13_out: bv64, Gamma_R13_out: bool, R14_out: bv64, Gamma_R14_out: bool, R15_out: bv64, Gamma_R15_out: bool, R16_out: bv64, Gamma_R16_out: bool, R17_out: bv64, Gamma_R17_out: bool, R18_out: bv64, Gamma_R18_out: bool, R19_out: bv64, Gamma_R19_out: bool, R1_out: bv64, Gamma_R1_out: bool, R20_out: bv64, Gamma_R20_out: bool, R21_out: bv64, Gamma_R21_out: bool, R22_out: bv64, Gamma_R22_out: bool, R23_out: bv64, Gamma_R23_out: bool, R24_out: bv64, Gamma_R24_out: bool, R25_out: bv64, Gamma_R25_out: bool, R26_out: bv64, Gamma_R26_out: bool, R27_out: bv64, Gamma_R27_out: bool, R28_out: bv64, Gamma_R28_out: bool, R29_out: bv64, Gamma_R29_out: bool, R2_out: bv64, Gamma_R2_out: bool, R30_out: bv64, Gamma_R30_out: bool, R31_out: bv64, Gamma_R31_out: bool, R3_out: bv64, Gamma_R3_out: bool, R4_out: bv64, Gamma_R4_out: bool, R5_out: bv64, Gamma_R5_out: bool, R6_out: bv64, Gamma_R6_out: bool, R7_out: bv64, Gamma_R7_out: bool, R8_out: bv64, Gamma_R8_out: bool, R9_out: bv64, Gamma_R9_out: bool);
   modifies Gamma_R16, Gamma_R17, R16, R17;
   free requires (memory_load64_le(mem, 2224bv64) == 131073bv64);
   free requires (memory_load64_le(mem, 2232bv64) == 8241983568019286100bv64);

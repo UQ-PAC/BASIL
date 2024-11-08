@@ -153,28 +153,27 @@ def fastPartialEvalExpr(exp: Expr): (Expr, Boolean) = {
   /*
    * Ignore substitutions and parital eval
    */
+
   var didAnything = true
   val r = exp match {
-    case f: UninterpretedFunction  => f
-    case UnaryExpr(op, l: Literal) => evalUnOp(op, l)
-    case BinaryExpr(op: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) if exp.getType.isInstanceOf[BitVecType] =>
-      evalBVBinExpr(op, l, r)
+    case UnaryExpr(op, l: Literal) => logSimp(exp, evalUnOp(op, l))
+    case BinaryExpr(op: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) if exp.getType.isInstanceOf[BitVecType] => logSimp(exp, evalBVBinExpr(op, l, r))
     case BinaryExpr(op: IntBinOp, l: IntLiteral, r: IntLiteral) if exp.getType == IntType =>
-      IntLiteral(evalIntBinExpr(op, l.value, r.value))
+      logSimp(exp, IntLiteral(evalIntBinExpr(op, l.value, r.value)))
     case BinaryExpr(op: IntBinOp, l: IntLiteral, r: IntLiteral) if exp.getType == BoolType =>
-      if evalIntLogBinExpr(op, l.value, r.value) then TrueLiteral else FalseLiteral
+      logSimp(exp, if evalIntLogBinExpr(op, l.value, r.value) then TrueLiteral else FalseLiteral)
     case BinaryExpr(op: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) if exp.getType == BoolType =>
-      if evalBVLogBinExpr(op, l, r) then TrueLiteral else FalseLiteral
+      logSimp(exp, if evalBVLogBinExpr(op, l, r) then TrueLiteral else FalseLiteral)
     case BinaryExpr(op: BoolBinOp, l: BoolLit, r: BoolLit) =>
-      if (evalBoolLogBinExpr(op, l.value, r.value)) then TrueLiteral else FalseLiteral
-    case ZeroExtend(e, l: BitVecLiteral) => BitVectorEval.smt_zero_extend(e, l)
-    case SignExtend(e, l: BitVecLiteral) => BitVectorEval.smt_sign_extend(e, l)
-    case Extract(e, b, l: BitVecLiteral) => BitVectorEval.boogie_extract(e, b, l)
+      logSimp(exp, if (evalBoolLogBinExpr(op, l.value, r.value)) then TrueLiteral else FalseLiteral)
+    case ZeroExtend(e, l: BitVecLiteral) => logSimp(exp, BitVectorEval.smt_zero_extend(e, l))
+    case SignExtend(e, l: BitVecLiteral) => logSimp(exp, BitVectorEval.smt_sign_extend(e, l))
+    case Extract(e, b, l: BitVecLiteral) => logSimp(exp, BitVectorEval.boogie_extract(e, b, l))
     case Repeat(reps, b: BitVecLiteral) => {
       assert(reps > 0)
-      if (reps == 1) b
+      if (reps == 1) logSimp(exp, b)
       else {
-        (2 to reps).foldLeft(b)((acc, r) => BitVectorEval.smt_concat(acc, b))
+        logSimp(exp, (2 to reps).foldLeft(b)((acc, r) => BitVectorEval.smt_concat(acc, b)))
       }
     }
     case o => {

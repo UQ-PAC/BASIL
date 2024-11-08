@@ -3,6 +3,8 @@ import translating.serialiseIL
 
 import util.Logger
 import ir.eval.AlgebraicSimplifications
+import ir.eval.AssumeConditionSimplifications
+import ir.eval.simplifyExprFixpoint
 import ir.cilvisitor.*
 import ir.*
 import scala.collection.mutable
@@ -450,18 +452,17 @@ def copypropTransform(p: Procedure) = {
   t.checkPoint("redundant assignments")
   // Logger.info(s"    ${p.name} after dead var cleanup expr complexity ${ExprComplexity()(p)}")
 
-  visit_proc(AlgebraicSimplifications, p)
-  visit_proc(AlgebraicSimplifications, p)
-  visit_proc(AlgebraicSimplifications, p)
-  visit_proc(AlgebraicSimplifications, p)
-  ir.eval.cleanupSimplify(p)
-  ir.eval.cleanupSimplify(p)
+  AlgebraicSimplifications(p)
+  AssumeConditionSimplifications(p)
+
+  AlgebraicSimplifications(p)
   // Logger.info(s"    ${p.name}  after simp expr complexity ${ExprComplexity()(p)}")
   val sipm = t.checkPoint("algebraic simp")
 
   // Logger.info("[!] Simplify :: RemoveSlices")
   removeSlices(p)
-  visit_proc(AlgebraicSimplifications, p)
+  ir.eval.cleanupSimplify(p)
+  AlgebraicSimplifications(p)
 
 }
 
@@ -873,7 +874,7 @@ object CopyProp {
           )(e)
 
       // partial eval after prop
-      eval.simplifyExprFixpoint(false)(ne.getOrElse(e))
+      simplifyExprFixpoint(ne.getOrElse(e))._1
     }
 
     def propfp(e: Expr) = {
