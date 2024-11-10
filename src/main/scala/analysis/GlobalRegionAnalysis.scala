@@ -66,10 +66,11 @@ trait GlobalRegionAnalysis(val program: Program,
     tableAddress
   }
 
-  def tryCoerceIntoData(exp: Expr, n: Command, subAccess: BigInt, loadOp: Boolean = false): Set[DataRegion] = {
+  def tryCoerceIntoData(exp: Expr, n: Command, subAccess: BigInt): Set[DataRegion] = {
     val eval = evaluateExpression(exp, constantProp(n))
     if (eval.isDefined) {
-      Set(dataPoolMaster(eval.get.value, subAccess))
+      val index = eval.get.value
+      Set(dataPoolMaster(index, subAccess))
     } else {
       exp match {
         case literal: BitVecLiteral => tryCoerceIntoData(literal, n, subAccess)
@@ -81,7 +82,7 @@ trait GlobalRegionAnalysis(val program: Program,
         case BinaryExpr(op, arg1, arg2) =>
           val evalArg2 = evaluateExpression(arg2, constantProp(n))
           if (evalArg2.isDefined) {
-            tryCoerceIntoData(arg1, n, subAccess, true) flatMap { i =>
+            tryCoerceIntoData(arg1, n, subAccess) flatMap { i =>
               val newExpr = BinaryExpr(op, BitVecLiteral(i.start, evalArg2.get.size), evalArg2.get)
               tryCoerceIntoData(newExpr, n, subAccess)
             }
@@ -91,49 +92,21 @@ trait GlobalRegionAnalysis(val program: Program,
         case _: MemoryLoad => ???
         case _: UninterpretedFunction => Set.empty
         case variable: Variable =>
-          val ctx = getUse(variable, n, reachingDefs)
-          val collage = ctx.flatMap { i =>
-            if (i != n) {
-              val regions: Set[DataRegion] = vsaResult.get(i) match {
-                case Some(Lift(el)) =>
-                  el.getOrElse(i.lhs, Set()).flatMap {
-                    case AddressValue(region) =>
-                      el.getOrElse(region, Set()).flatMap {
-                        case AddressValue(dataRegion: DataRegion) => Some(dataRegion)
-                        case _ => None
-                      }
+          val collage: Set[DataRegion] = vsaResult.get(n) match {
+            case Some(Lift(el)) =>
+              el.getOrElse(variable, Set()).flatMap {
+                case addressValue: AddressValue =>
+                  el.getOrElse(addressValue.region, Set(addressValue)).flatMap {
+                    case AddressValue(dataRegion2: DataRegion) => Some(dataRegion2)
                     case _ => Set()
                   }
                 case _ => Set()
               }
-              if (regions.isEmpty) {
-                localTransfer(i, Set())
-              } else {
-                regions
-              }
-            } else {
-              Set()
-            }
+            case _ => Set()
           }
-          collage.map { i =>
-            if (!loadOp) {
-              mmm.relocatedDataRegion(i.start).getOrElse(i)
-            } else {
-              resolveGlobalOffsetSecondLast(i)
-            }
-          }
+          return collage
         case _ => Set()
       }
-    }
-  }
-
-  def evalMemLoadToGlobal(index: Expr, size: BigInt, n: Command, loadOp: Boolean = false): Set[DataRegion] = {
-    val indexValue = evaluateExpression(index, constantProp(n))
-    if (indexValue.isDefined) {
-      val indexValueBigInt = indexValue.get.value
-      Set(dataPoolMaster(indexValueBigInt, size))
-    } else {
-      tryCoerceIntoData(index, n, size)
     }
   }
 
@@ -149,7 +122,7 @@ trait GlobalRegionAnalysis(val program: Program,
    * @return Set[DataRegion]
    */
   def checkIfDefined(dataRegions: Set[DataRegion], n: CFGPosition): Set[DataRegion] = {
-    dataRegions.map { i =>
+    val converted = dataRegions.map { i =>
       val (f, p) = mmm.findDataObjectWithSize(i.start, i.size)
       val accesses = f.union(p)
       if (accesses.isEmpty) {
@@ -163,6 +136,17 @@ trait GlobalRegionAnalysis(val program: Program,
         dataMap(i.start)
       }
     }
+    converted
+  }
+
+  // TODO: might need similar for stack regions
+  def findLoadedWithPreDefined(n: CFGPosition, region: DataRegion): Set[DataRegion] = {
+    // check if relocated
+    val relocated = mmm.relocatedDataRegion(region.start)
+    if (relocated.isDefined) {
+      return Set(relocated.get)
+    }
+    Set(region)
   }
 
   /** Transfer function for state lattice elements.
@@ -170,14 +154,19 @@ trait GlobalRegionAnalysis(val program: Program,
   def localTransfer(n: CFGPosition, s: Set[DataRegion]): Set[DataRegion] = {
     n match {
       case memAssign: MemoryAssign =>
-        checkIfDefined(evalMemLoadToGlobal(memAssign.index, memAssign.size, memAssign), n)
+        return checkIfDefined(tryCoerceIntoData(memAssign.index, memAssign, memAssign.size), n)
       case assign: Assign =>
         val unwrapped = unwrapExpr(assign.rhs)
         if (unwrapped.isDefined) {
-          checkIfDefined(evalMemLoadToGlobal(unwrapped.get.index, unwrapped.get.size, assign, loadOp = true), n)
+          var regions: Set[DataRegion] = tryCoerceIntoData(unwrapped.get.index, assign, unwrapped.get.size).flatMap(findLoadedWithPreDefined(n, _))
+          // if regions is empty, it means that the load index must be a direct stack address
+          if (regions.isEmpty) {
+            regions = tryCoerceIntoData(assign.lhs, assign, unwrapped.get.size).flatMap(findLoadedWithPreDefined(n, _))
+          }
+          return checkIfDefined(regions, n)
         } else {
           // this is a constant but we need to check if it is a data region
-          checkIfDefined(evalMemLoadToGlobal(assign.rhs, 1, assign), n)
+          return checkIfDefined(tryCoerceIntoData(assign.rhs, assign, 1), n)
         }
       case _ =>
         Set()

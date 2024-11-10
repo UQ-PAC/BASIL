@@ -285,10 +285,10 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
           case _: DataRegion => "  "
       }
       Logger.debug(s"$spacing$range -> $region")
-      if content.contains(region) then
-        if content.contains(region) then
-          for value <- content(region) do
-            Logger.debug(s"$spacing    $value")
+      region match
+        case region1: DataRegion if relfContent.contains(region1) => for value <- relfContent(region1) do
+          Logger.debug(s"$spacing    $value")
+        case _ =>
     }
     Logger.debug("Stack:")
     for name <- localStacks.keys do

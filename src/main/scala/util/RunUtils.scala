@@ -584,7 +584,7 @@ object RunUtils {
     var iteration = 1
     var modified: Boolean = true
     val analysisResult = mutable.ArrayBuffer[StaticAnalysisContext]()
-    while (modified || (analysisResult.size < 2 && config.memoryRegions)) {
+    while (modified || (analysisResult.size < 2)) {
       Logger.debug("[!] Running Static Analysis")
       val result = StaticAnalysis.analyse(ctx, config, iteration, analysisResult.lastOption)
       analysisResult.append(result)
@@ -598,11 +598,14 @@ object RunUtils {
       ).resolveIndirectCalls()
       */
 
-      modified = transforms.VSAIndirectCallResolution(
-        ctx.program,
-        result.vsaResult,
-        result.mmmResults
-      ).resolveIndirectCalls()
+      if analysisResult.size < 2 then
+        modified = true
+      else
+        modified = transforms.VSAIndirectCallResolution(
+          ctx.program,
+          result.vsaResult,
+          result.mmmResults
+        ).resolveIndirectCalls()
 
       Logger.debug("[!] Generating Procedure Summaries")
       if (config.summariseProcedures) {

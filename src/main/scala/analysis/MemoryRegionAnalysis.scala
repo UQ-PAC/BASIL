@@ -103,7 +103,7 @@ trait MemoryRegionAnalysis(val program: Program,
       case variable: Variable if !spList.contains(variable) =>
         evaluateExpression(binExpr.arg2, constantProp(n)) match {
           case Some(b: BitVecLiteral) =>
-            val ctx = getUse(variable, n, reachingDefs)
+            val ctx = getUse(variable, n, reachingDefs).filter(assign => unwrapExpr(assign.rhs).isEmpty)
             for {
               i <- ctx
               stackRegion <- eval(i.rhs, Set.empty, i, subAccess)
