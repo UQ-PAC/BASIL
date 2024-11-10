@@ -41,6 +41,23 @@ trait ValueSetAnalysis(program: Program,
     mmm.findDataObject(bitVecLiteral.value)
   }
 
+  def findLoadedWithPreDefined(s: Map[Variable | MemoryRegion, Set[Value]], region: MemoryRegion, n: CFGPosition): Set[MemoryRegion] = {
+    // check if relocated
+    if (region.isInstanceOf[DataRegion]) {
+      val relocated = mmm.relocatedDataRegion(region.start)
+      if (relocated.isDefined) {
+        return Set(relocated.get)
+      }
+    }
+    // get only the address values
+    val vsaDetermined = s(region).collect { case a: AddressValue => a.region }
+    if (vsaDetermined.nonEmpty) {
+      vsaDetermined
+    } else {
+      Set(region) // TODO: works for syscall:clang_O2 but it is a memLoad so it should be getting what is loaded?
+    }
+  }
+
   /** Default implementation of eval.
     */
   def eval(cmd: Command, s: Map[Variable | MemoryRegion, Set[Value]], n: CFGPosition): Map[Variable | MemoryRegion, Set[Value]] = {
@@ -50,7 +67,7 @@ trait ValueSetAnalysis(program: Program,
         // malloc variable
         s + (mallocVariable -> regions.map(r => AddressValue(r)))
       case localAssign: Assign =>
-        val regions = mmm.nodeToRegion(n)
+        val regions = mmm.nodeToRegion(n).flatMap(r => findLoadedWithPreDefined(s, r, n))
         if (regions.nonEmpty) {
           s + (localAssign.lhs -> regions.map(r => AddressValue(r)))
         } else {

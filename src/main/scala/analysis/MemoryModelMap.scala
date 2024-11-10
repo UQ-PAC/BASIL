@@ -136,6 +136,10 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
     relocatedAddressesMap = globalOffsets.map { (offset, offset2) =>
       (offset, findDataObject(offset2).get)
     }
+
+    relocatedAddressesMap.foreach((offset, region) => {
+      relfContent(region) = relfContent.getOrElse(region, mutable.Set()) += region.regionIdentifier
+    })
   }
 
   def relocatedDataRegion(value: BigInt): Option[DataRegion] = {

@@ -74,34 +74,15 @@ class VSAIndirectCallResolution(
   val mmm: MemoryModelMap
 ) extends IndirectCallResolution {
 
-  private def searchRegion(memoryRegion: MemoryRegion, n: CFGPosition): Set[String] = {
-    val names = vsaResult.get(n) match {
-      case Some(Lift(el)) => el.get(memoryRegion) match {
-        case Some(values) =>
-          values.flatMap {
-            case addressValue: AddressValue => searchRegion(addressValue.region, n)
-            case _ => Set()
-          }
-        case _ => Set()
-      }
-      case _ => Set()
-    }
-    memoryRegion match {
-      case _: StackRegion =>
-        names
-      case dataRegion: DataRegion =>
-        names ++ mmm.relfContent.getOrElse(dataRegion, Set())
-      case _ =>
-        Set()
-    }
-  }
-
   override def resolveAddresses(variable: Variable, i: IndirectCall): Set[String] = {
     vsaResult.get(i) match {
       case Some(Lift(el)) => el.get(variable) match {
         case Some(values) =>
           values.flatMap {
-            case addressValue: AddressValue => searchRegion(addressValue.region, i)
+            case addressValue: AddressValue =>
+              addressValue.region match {
+                case dataRegion: DataRegion => mmm.relfContent.getOrElse(dataRegion, Set())
+              }
             case _: LiteralValue => Set()
           }
         case _ => Set()

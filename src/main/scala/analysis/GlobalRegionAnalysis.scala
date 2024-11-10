@@ -95,11 +95,7 @@ trait GlobalRegionAnalysis(val program: Program,
           val collage: Set[DataRegion] = vsaResult.get(n) match {
             case Some(Lift(el)) =>
               el.getOrElse(variable, Set()).flatMap {
-                case addressValue: AddressValue =>
-                  el.getOrElse(addressValue.region, Set(addressValue)).flatMap {
-                    case AddressValue(dataRegion2: DataRegion) => Some(dataRegion2)
-                    case _ => Set()
-                  }
+                case AddressValue(dataRegion2: DataRegion) => Some(dataRegion2)
                 case _ => Set()
               }
             case _ => Set()
@@ -122,31 +118,25 @@ trait GlobalRegionAnalysis(val program: Program,
    * @return Set[DataRegion]
    */
   def checkIfDefined(dataRegions: Set[DataRegion], n: CFGPosition): Set[DataRegion] = {
-    val converted = dataRegions.map { i =>
-      val (f, p) = mmm.findDataObjectWithSize(i.start, i.size)
-      val accesses = f.union(p)
-      if (accesses.isEmpty) {
-        i
-      } else if (accesses.size == 1) {
-        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(accesses.head.size))
-        dataMap(i.start)
-      } else {
-        val highestRegion = accesses.maxBy(_.start)
-        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
-        dataMap(i.start)
-      }
+    var converted: Set[DataRegion] = Set.empty
+    dataRegions.foreach { i =>
+    val (f, p) = mmm.findDataObjectWithSize(i.start, i.size)
+    val accesses = f.union(p)
+    if (accesses.isEmpty) {
+      i
+    } else if (accesses.size == 1) {
+      dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(accesses.head.size))
+      converted = converted ++ Set(dataMap(i.start))
+    } else {
+//        val highestRegion = accesses.maxBy(_.start)
+//        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
+//        dataMap(i.start)
+      dataMap.remove(i.start)
+      accesses.foreach(a => dataMap(a.start) = dataPoolMaster(a.start, a.size))
+      converted = converted ++ accesses.collect({ case a => dataMap(a.start) })
     }
-    converted
   }
-
-  // TODO: might need similar for stack regions
-  def findLoadedWithPreDefined(n: CFGPosition, region: DataRegion): Set[DataRegion] = {
-    // check if relocated
-    val relocated = mmm.relocatedDataRegion(region.start)
-    if (relocated.isDefined) {
-      return Set(relocated.get)
-    }
-    Set(region)
+  converted
   }
 
   /** Transfer function for state lattice elements.
@@ -158,11 +148,7 @@ trait GlobalRegionAnalysis(val program: Program,
       case assign: Assign =>
         val unwrapped = unwrapExpr(assign.rhs)
         if (unwrapped.isDefined) {
-          var regions: Set[DataRegion] = tryCoerceIntoData(unwrapped.get.index, assign, unwrapped.get.size).flatMap(findLoadedWithPreDefined(n, _))
-          // if regions is empty, it means that the load index must be a direct stack address
-          if (regions.isEmpty) {
-            regions = tryCoerceIntoData(assign.lhs, assign, unwrapped.get.size).flatMap(findLoadedWithPreDefined(n, _))
-          }
+          val regions: Set[DataRegion] = tryCoerceIntoData(unwrapped.get.index, assign, unwrapped.get.size)
           return checkIfDefined(regions, n)
         } else {
           // this is a constant but we need to check if it is a data region
