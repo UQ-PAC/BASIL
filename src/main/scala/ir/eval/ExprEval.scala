@@ -1,7 +1,7 @@
 package ir.eval
 import ir.eval.BitVectorEval
 import util.functional.State
-import ir._
+import ir.*
 
 /** We generalise the expression evaluator to a partial evaluator to simplify evaluating casts.
   *

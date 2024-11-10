@@ -1,18 +1,9 @@
 package ir.eval
-import ir._
-import ir.eval.BitVectorEval.*
 import ir.*
 import util.IRContext
 import util.Logger
 import util.functional.*
-import util.functional.State.*
 import boogie.Scope
-import scala.collection.WithFilter
-
-import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.collection.immutable
-import scala.util.control.Breaks.{break, breakable}
 
 enum ExecEffect:
   case Call(target: String, begin: ExecutionContinuation, returnTo: ExecutionContinuation)
@@ -23,7 +14,7 @@ enum ExecEffect:
   case LoadMem(vname: String, addrs: List[BasilValue])
   case FindProc(addr: Int)
 
-case class Trace(val t: List[ExecEffect])
+case class Trace(t: List[ExecEffect])
 
 case object Trace {
   def add[E](e: ExecEffect): State[Trace, Unit, E] = {
@@ -34,25 +25,25 @@ case object Trace {
 case class TraceGen[E]() extends NopEffects[Trace, E] {
 
   /** Values are discarded by ProductInterpreter so do not matter */
-  override def loadMem(v: String, addrs: List[BasilValue]) = for {
+  override def loadMem(v: String, addrs: List[BasilValue]): State[Trace, List[BasilValue], E] = for {
     s <- Trace.add(ExecEffect.LoadMem(v, addrs))
-  } yield (List())
+  } yield List()
 
-  override def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation) = for {
+  override def call(target: String, beginFrom: ExecutionContinuation, returnTo: ExecutionContinuation): State[Trace, Unit, E] = for {
     s <- Trace.add(ExecEffect.Call(target, beginFrom, returnTo))
-  } yield (())
+  } yield ()
 
-  override def doReturn() = for {
+  override def doReturn(): State[Trace, Unit, E] = for {
     s <- Trace.add(ExecEffect.Return)
-  } yield (())
+  } yield ()
 
-  override def storeVar(v: String, scope: Scope, value: BasilValue) = for {
-    s <- if (!v.startsWith("ghost")) Trace.add(ExecEffect.StoreVar(v, scope, value)) else State.pure(())
-  } yield (())
+  override def storeVar(v: String, scope: Scope, value: BasilValue): State[Trace, Unit, E] = for {
+    s <- if !v.startsWith("ghost") then Trace.add(ExecEffect.StoreVar(v, scope, value)) else State.pure(())
+  } yield ()
 
-  override def storeMem(vname: String, update: Map[BasilValue, BasilValue]) = for {
-    s <- if (!vname.startsWith("ghost")) Trace.add(ExecEffect.StoreMem(vname, update)) else State.pure(())
-  } yield (())
+  override def storeMem(vname: String, update: Map[BasilValue, BasilValue]): State[Trace, Unit, E] = for {
+    s <- if !vname.startsWith("ghost") then Trace.add(ExecEffect.StoreMem(vname, update)) else State.pure(())
+  } yield ()
 
 }
 
@@ -64,9 +55,9 @@ def interpretWithTrace[I](p: Program, innerInterpreter: Effects[I, InterpreterEr
 
 def interpretWithTrace[I](p: IRContext, innerInterpreter: Effects[I, InterpreterError], innerInitialState: I): (I, Trace) = {
   val tracingInterpreter = ProductInterpreter(innerInterpreter, TraceGen())
-  val begin = InterpFuns.initProgState(tracingInterpreter)(p, (innerInitialState, Trace(List())))
+  val (begin, _) = InterpFuns.initProgState(tracingInterpreter)(p, (innerInitialState, Trace(List())))
   // throw away initialisation trace
-  BASILInterpreter(tracingInterpreter).run((begin._1, Trace(List())))
+  BASILInterpreter(tracingInterpreter).run((begin, Trace(List())))
 }
 
 def interpretTrace(p: Program) = {

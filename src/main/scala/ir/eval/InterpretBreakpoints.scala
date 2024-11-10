@@ -1,28 +1,18 @@
 package ir.eval
-import ir._
-import ir.eval.BitVectorEval.*
 import ir.*
 import util.Logger
 import util.IRContext
 import util.functional.*
-import util.functional.State.*
-import boogie.Scope
-import scala.collection.WithFilter
-
-import scala.annotation.tailrec
-import scala.collection.mutable
-import scala.collection.immutable
-import scala.util.control.Breaks.{break, breakable}
 
 enum BreakPointLoc:
   case CMD(c: Command)
   case CMDCond(c: Command, condition: Expr)
 
 case class BreakPointAction(
-    saveState: Boolean = true,
-    stop: Boolean = false,
-    evalExprs: List[(String, Expr)] = List(),
-    log: Boolean = false
+  saveState: Boolean = true,
+  stop: Boolean = false,
+  evalExprs: List[(String, Expr)] = List(),
+  log: Boolean = false
 )
 
 case class BreakPoint(name: String = "", location: BreakPointLoc, action: BreakPointAction)
@@ -34,7 +24,7 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, break
     State.filterM(
       b =>
         b.location match {
-          case BreakPointLoc.CMD(bc) if (bc == c)      => State.pure(true)
+          case BreakPointLoc.CMD(bc) if bc == c        => State.pure(true)
           case BreakPointLoc.CMDCond(bc, e) if bc == c => doLeft(Eval.evalBool(f)(e))
           case _                                       => State.pure(false)
         },
@@ -56,49 +46,46 @@ case class RememberBreakpoints[T, I <: Effects[T, InterpreterError]](f: I, break
             res <- State
               .sequence[(T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])]), Unit, InterpreterError](
                 State.pure(()),
-                breaks.map((breakpoint: BreakPoint) =>
-                  (breakpoint match {
-                    case breakpoint @ BreakPoint(name, stopcond, action) => (
-                      for {
-                        saved <- doLeft(
-                          if action.saveState then State.getS[T, InterpreterError].map(s => Some(s))
-                          else State.pure(None)
-                        )
-                        evals <- (State.mapM(
-                          (e: (String, Expr)) =>
-                            for {
-                              ev <- doLeft(Eval.evalExpr(f)(e._2))
-                            } yield (e._1, e._2, ev),
-                          action.evalExprs
-                        ))
-                        _ <- State.pure({
-                          if (action.log) {
-                            val bpn = breakpoint.name
-                            val bpcond = breakpoint.location match {
-                              case BreakPointLoc.CMD(c)        => s"${c.parent.label}:$c"
-                              case BreakPointLoc.CMDCond(c, e) => s"${c.parent.label}:$c when $e"
-                            }
-                            val saving = if action.saveState then " stashing state, " else ""
-                            val stopping = if action.stop then " stopping. " else ""
-                            val evalstr = evals.map(e => s"\n  ${e._1} : eval(${e._2}) = ${e._3}").mkString("")
-                            Logger.warn(s"Breakpoint $bpn@$bpcond.$saving$stopping$evalstr")
+                breaks.map {
+                  case breakpoint @ BreakPoint(name, stopcond, action) =>
+                    for {
+                      saved <- doLeft(
+                        if action.saveState then State.getS[T, InterpreterError].map(s => Some(s))
+                        else State.pure(None)
+                      )
+                      evals <- State.mapM(
+                        (e: (String, Expr)) =>
+                          for {
+                            ev <- doLeft(Eval.evalExpr(f)(e(1)))
+                          } yield (e(0), e(1), ev),
+                        action.evalExprs
+                      )
+                      _ <- State.pure({
+                        if (action.log) {
+                          val bpn = breakpoint.name
+                          val bpcond = breakpoint.location match {
+                            case BreakPointLoc.CMD(c)        => s"${c.parent.label}:$c"
+                            case BreakPointLoc.CMDCond(c, e) => s"${c.parent.label}:$c when $e"
                           }
-                        })
-                        _ <-
-                          if action.stop then doLeft(f.setNext(ErrorStop(Errored(s"Stopped at breakpoint ${name}"))))
-                          else doLeft(State.pure(()))
-                        _ <- State.modify((istate: (T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])])) =>
-                          (istate._1, ((breakpoint, saved, evals) :: istate._2))
-                        )
-                      } yield ()
-                    )
-                  })
-                )
+                          val saving = if action.saveState then " stashing state, " else ""
+                          val stopping = if action.stop then " stopping. " else ""
+                          val evalstr = evals.map(e => s"\n  ${e(0)} : eval(${e(1)}) = ${e(2)}").mkString("")
+                          Logger.warn(s"Breakpoint $bpn@$bpcond.$saving$stopping$evalstr")
+                        }
+                      })
+                      _ <-
+                        if action.stop then doLeft(f.setNext(ErrorStop(Errored(s"Stopped at breakpoint ${name}"))))
+                        else doLeft(State.pure(()))
+                      _ <- State.modify((istate: (T, List[(BreakPoint, Option[T], List[(String, Expr, Expr)])])) =>
+                        (istate(0), ((breakpoint, saved, evals) :: istate(1)))
+                      )
+                    } yield ()
+                }
               )
           } yield ()
         case _ => State.pure(())
       }
-    } yield (v)
+    } yield v
   }
 }
 
