@@ -120,23 +120,30 @@ trait GlobalRegionAnalysis(val program: Program,
   def checkIfDefined(dataRegions: Set[DataRegion], n: CFGPosition): Set[DataRegion] = {
     var converted: Set[DataRegion] = Set.empty
     dataRegions.foreach { i =>
-    val (f, p) = mmm.findDataObjectWithSize(i.start, i.size)
-    val accesses = f.union(p)
-    if (accesses.isEmpty) {
-      i
-    } else if (accesses.size == 1) {
-      dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(accesses.head.size))
-      converted = converted ++ Set(dataMap(i.start))
-    } else {
-//        val highestRegion = accesses.maxBy(_.start)
-//        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
-//        dataMap(i.start)
-      dataMap.remove(i.start)
-      accesses.foreach(a => dataMap(a.start) = dataPoolMaster(a.start, a.size))
-      converted = converted ++ accesses.collect({ case a => dataMap(a.start) })
+      val (f, p) = mmm.findDataObjectWithSize(i.start, i.size)
+      val accesses = f.union(p)
+      if (accesses.isEmpty) {
+        i
+      } else if (accesses.size == 1) {
+        if (f.contains(accesses.head)) {
+          // full access
+          dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(accesses.head.size))
+          converted = converted ++ Set(dataMap(i.start))
+        } else {
+          // partial access (we cannot determine the size)
+          dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size)
+          converted = converted ++ Set(dataMap(i.start))
+        }
+      } else {
+  //        val highestRegion = accesses.maxBy(_.start)
+  //        dataMap(i.start) = DataRegion(i.regionIdentifier, i.start, i.size.max(highestRegion.end - i.start))
+  //        dataMap(i.start)
+        dataMap.remove(i.start)
+        accesses.foreach(a => dataMap(a.start) = dataPoolMaster(a.start, a.size))
+        converted = converted ++ accesses.collect({ case a => dataMap(a.start) })
+      }
     }
-  }
-  converted
+    converted
   }
 
   /** Transfer function for state lattice elements.
