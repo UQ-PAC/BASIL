@@ -170,7 +170,7 @@ class SASI_VSA(program: Program,
                 case Some(v: Variable) =>
                   AbsEnv(out.regEnv ++ Map(localAssign.lhs -> out.regEnv(v)), out.flagEnv, out.alocEnv)
                 case None =>
-                  Logger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
+                  //Logger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
                   out
               }
           }
@@ -196,7 +196,7 @@ class SASI_VSA(program: Program,
                 val mappings = regions.map(r => r -> out.regEnv(v)).toMap
                 AbsEnv(out.regEnv, out.flagEnv, out.alocEnv ++ mappings)
               case None =>
-                Logger.debug(s"Too Complex: $memAssign.value") // do nothing
+                //Logger.debug(s"Too Complex: $memAssign.value") // do nothing
                 out
             }
         }

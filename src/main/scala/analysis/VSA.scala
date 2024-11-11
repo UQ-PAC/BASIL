@@ -67,49 +67,68 @@ trait ValueSetAnalysis(program: Program,
         // malloc variable
         s + (mallocVariable -> regions.map(r => AddressValue(r)))
       case localAssign: Assign =>
-        val regions = mmm.nodeToRegion(n).flatMap(r => findLoadedWithPreDefined(s, r, n))
+        var regions = mmm.nodeToRegion(n)
         if (regions.nonEmpty) {
+          if (unwrapExpr(localAssign.rhs).isDefined) {
+            regions = regions.flatMap(r => findLoadedWithPreDefined(s, r, n))
+          }
           s + (localAssign.lhs -> regions.map(r => AddressValue(r)))
         } else {
-          evaluateExpression(localAssign.rhs, constantProp(n)) match {
-            case Some(bitVecLiteral: BitVecLiteral) =>
-              val possibleData = canCoerceIntoDataRegion(bitVecLiteral, 1)
-                if (possibleData.isDefined) {
-                  s + (localAssign.lhs -> Set(AddressValue(possibleData.get)))
-                } else {
-                  s + (localAssign.lhs -> Set(LiteralValue(bitVecLiteral)))
-                }
+          val unwrapValue = unwrapExprToVar(localAssign.rhs)
+          unwrapValue match {
+            case Some(v: Variable) =>
+              s + (localAssign.lhs -> s(v))
             case None =>
-              val unwrapValue = unwrapExprToVar(localAssign.rhs)
-              unwrapValue match {
-                case Some(v: Variable) =>
-                  s + (localAssign.lhs -> s(v))
-                case None =>
-                  Logger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
-                  s
-              }
+              Logger.debug(s"Too Complex: ${localAssign}") // do nothing
+              s
           }
+//          evaluateExpression(localAssign.rhs, constantProp(n)) match {
+//            case Some(bitVecLiteral: BitVecLiteral) =>
+//              val possibleData = canCoerceIntoDataRegion(bitVecLiteral, 1)
+//                if (possibleData.isDefined) {
+//                  s + (localAssign.lhs -> Set(AddressValue(possibleData.get)))
+//                } else {
+//                  s + (localAssign.lhs -> Set(LiteralValue(bitVecLiteral)))
+//                }
+//            case None =>
+//              val unwrapValue = unwrapExprToVar(localAssign.rhs)
+//              unwrapValue match {
+//                case Some(v: Variable) =>
+//                  s + (localAssign.lhs -> s(v))
+//                case None =>
+//                  Logger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
+//                  s
+//              }
+//          }
         }
       case memAssign: MemoryAssign =>
         val regions = mmm.nodeToRegion(n)
-        evaluateExpression(memAssign.value, constantProp(n)) match {
-          case Some(bitVecLiteral: BitVecLiteral) =>
-            val possibleData = canCoerceIntoDataRegion(bitVecLiteral, memAssign.size)
-            if (possibleData.isDefined) {
-              s ++ regions.map(r => r -> Set(AddressValue(possibleData.get)))
-            } else {
-              s ++ regions.map(r => r -> Set(LiteralValue(bitVecLiteral)))
-            }
+        val unwrapValue = unwrapExprToVar(memAssign.value)
+        unwrapValue match {
+          case Some(v: Variable) =>
+            s ++ regions.map(r => r -> s(v))
           case None =>
-            val unwrapValue = unwrapExprToVar(memAssign.value)
-            unwrapValue match {
-              case Some(v: Variable) =>
-                s ++ regions.map(r => r -> s(v))
-              case None =>
-                Logger.debug(s"Too Complex: $memAssign.value") // do nothing
-                s
-            }
+            Logger.debug(s"Too Complex: $memAssign") // do nothing
+            s
         }
+//        evaluateExpression(memAssign.value, constantProp(n)) match {
+//          case Some(bitVecLiteral: BitVecLiteral) =>
+//            val possibleData = canCoerceIntoDataRegion(bitVecLiteral, memAssign.size)
+//            if (possibleData.isDefined) {
+//              s ++ regions.map(r => r -> Set(AddressValue(possibleData.get)))
+//            } else {
+//              s ++ regions.map(r => r -> Set(LiteralValue(bitVecLiteral)))
+//            }
+//          case None =>
+//            val unwrapValue = unwrapExprToVar(memAssign.value)
+//            unwrapValue match {
+//              case Some(v: Variable) =>
+//                s ++ regions.map(r => r -> s(v))
+//              case None =>
+//                Logger.debug(s"Too Complex: $memAssign.value") // do nothing
+//                s
+//            }
+//        }
       case _ =>
         s
   }
