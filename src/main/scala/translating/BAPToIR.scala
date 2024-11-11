@@ -103,7 +103,15 @@ class BAPToIR(var program: BAPProgram, mainAddress: BigInt) {
   }
 
   private def translateExpr(e: BAPExpr): (Expr, Option[MemoryLoad]) = e match {
-    case BAPConcat(left, right) => (BinaryExpr(BVCONCAT, translateExprOnly(left), translateExprOnly(right)), None)
+    case b @ BAPConcat(left, right) =>
+      val (arg0, load0) = translateExpr(left)
+      val (arg1, load1) = translateExpr(right)
+      (load0, load1) match {
+        case (Some(load), None) => (BinaryExpr(BVCONCAT, arg0, arg1), Some(load))
+        case (None, Some(load)) => (BinaryExpr(BVCONCAT, arg0, arg1), Some(load))
+        case (None, None) => (BinaryExpr(BVCONCAT, arg0, arg1), None)
+        case (Some(_), Some(_)) => throw Exception(s"$b contains multiple loads")
+      }
     case BAPSignedExtend(width, body) =>
       if (width > body.size) {
         val (irBody, load) = translateExpr(body)

@@ -285,23 +285,6 @@ enum Endian {
   case BigEndian
 }
 
-/*
-case class MemoryLoad(mem: Memory, index: Expr, endian: Endian, size: Int) extends Expr {
-  override def toBoogie: BMemoryLoad = BMemoryLoad(mem.toBoogie, index.toBoogie, endian, size)
-  def toGamma(LArgs: List[BMapVar]): BExpr = mem match {
-    case m: StackMemory =>
-      GammaLoad(m.toGamma, index.toBoogie, size, size / m.valueSize)
-    case m: SharedMemory =>
-      BinaryBExpr(BoolOR, GammaLoad(m.toGamma, index.toBoogie, size, size / m.valueSize), L(LArgs, index.toBoogie))
-  }
-  override def variables: Set[Variable] = index.variables
-  override def gammas: Set[Variable] = Set()
-  override def getType: IRType = BitVecType(size)
-  override def toString: String = s"MemoryLoad($mem, $index, $endian, $size)"
-  override def acceptVisit(visitor: Visitor): Expr = visitor.visitMemoryLoad(this)
-}
-*/
-
 case class UninterpretedFunction(name: String, params: Seq[Expr], returnType: IRType) extends Expr {
   override def getType: IRType = returnType
   override def toBoogie: BFunctionCall = BFunctionCall(name, params.map(_.toBoogie).toList, returnType.toBoogie, true)

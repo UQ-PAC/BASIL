@@ -104,9 +104,9 @@ class CILVisitorImpl(val v: CILVisitor) {
         m.value = visit_expr(m.value)
         m
       case m: MemoryLoad =>
-        m.lhs = visit_var(m.lhs)
         m.mem = visit_mem(m.mem)
         m.index = visit_expr(m.index)
+        m.lhs = visit_var(m.lhs)
         m
       case m: LocalAssign =>
         m.rhs = visit_expr(m.rhs)
