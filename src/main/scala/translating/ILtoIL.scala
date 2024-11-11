@@ -1,5 +1,6 @@
 package translating
 import ir._
+import ir.cilvisitor.*
 
 private class ILSerialiser extends ReadOnlyVisitor {
   var program: StringBuilder = StringBuilder()
@@ -242,7 +243,6 @@ private class ILSerialiser extends ReadOnlyVisitor {
   }
 
 }
-
 
 def serialiseIL(p: Procedure): String = {
   val s = ILSerialiser()

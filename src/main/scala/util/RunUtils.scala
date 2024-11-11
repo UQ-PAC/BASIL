@@ -532,14 +532,17 @@ object RunUtils {
     // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
-    val write = false
+    val write = true
+
 
     transforms.applyRPO(ctx.program)
 
     transforms.removeEmptyBlocks(ctx.program)
     transforms.coalesceBlocks(ctx.program)
     transforms.removeEmptyBlocks(ctx.program)
-    if write then writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-dsa.dot")
+    if write then writeToFile(dotBlockGraph(ctx.program, (ctx.program.collect {
+      case b : Block => b -> translating.BasilIRPrettyPrinter()(b)
+    }).toMap), s"blockgraph-before-dsa.dot")
     
     Logger.info(s"RPO ${timer.checkPoint("RPO")} ms ")
     Logger.info("[!] Simplify :: DynamicSingleAssignment")
@@ -595,6 +598,10 @@ object RunUtils {
     // transforms.OnePassDSA().applyTransform(ctx.program)
     if write then writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-after-second-dsa.dot")
 
+
+    if (write) {
+      writeToFile(translating.BasilIRPrettyPrinter()(ctx.program), "prettyprinted.il")
+    }
 
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("[!] Simplify :: Writing simplification validation")
