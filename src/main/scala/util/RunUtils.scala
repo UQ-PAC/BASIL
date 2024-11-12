@@ -377,8 +377,8 @@ object StaticAnalysis {
       )
     })
 
-    val mmm = MemoryModelMap(globalOffsets)
-    mmm.preLoadGlobals(mergedSubroutines, globalAddresses, globalSizes)
+    val mmm = MemoryModelMap(globalOffsets, mergedSubroutines, globalAddresses, globalSizes)
+    mmm.preLoadGlobals()
 
     val previousVSAResults = if (previousResults.isDefined) {
       previousResults.get.vsaResult
@@ -425,17 +425,6 @@ object StaticAnalysis {
     val steensgaardSolver = InterprocSteensgaardAnalysis(interDomain.toSet, mmm, reachingDefinitionsAnalysisResults, previousVSAResults)
     steensgaardSolver.analyze()
     val steensgaardResults = steensgaardSolver.pointsTo()
-
-    Logger.debug("[!] Running SASI_VSA")
-    val sasiVsaSolver = SASI_VSA(IRProgram, constPropResult, mmm)
-    val sasiVsaResult = sasiVsaSolver.IntraProceduralVSA()
-
-    config.analysisDotPath.foreach(s => {
-      writeToFile(
-        toDot(IRProgram, IRProgram.filter(_.isInstanceOf[Command]).map(b => b -> sasiVsaResult.getOrElse(b, "").toString).toMap),
-        s"${s}_SASI_VSA$iteration.dot"
-      )
-    })
 
     Logger.debug("[!] Running VSA")
     val vsaSolver = ValueSetAnalysisSolver(IRProgram, mmm, constPropResult)

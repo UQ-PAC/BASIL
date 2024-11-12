@@ -43,18 +43,23 @@ trait ValueSetAnalysis(program: Program,
 
   def findLoadedWithPreDefined(s: Map[Variable | MemoryRegion, Set[Value]], region: MemoryRegion, n: CFGPosition): Set[MemoryRegion] = {
     // check if relocated
-    if (region.isInstanceOf[DataRegion]) {
-      val relocated = mmm.relocatedDataRegion(region.start)
-      if (relocated.isDefined) {
-        return Set(relocated.get)
-      }
+    region match {
+      case dataRegion: DataRegion =>
+        val relocated = mmm.relocatedDataRegion(dataRegion.start)
+        if (relocated.isDefined) {
+          return Set(relocated.get)
+        }
+        if (mmm.externalFunctions.contains(dataRegion.start)) {
+          return Set(dataRegion) // TODO: works for syscall:clang_O2 load of external function but it is a memLoad so it should be getting what is loaded?
+        }
+      case _ => // do nothing
     }
     // get only the address values
     val vsaDetermined = s(region).collect { case a: AddressValue => a.region }
     if (vsaDetermined.nonEmpty) {
-      vsaDetermined
+      return vsaDetermined
     } else {
-      Set(region) // TODO: works for syscall:clang_O2 but it is a memLoad so it should be getting what is loaded?
+      return Set()
     }
   }
 
@@ -69,7 +74,7 @@ trait ValueSetAnalysis(program: Program,
       case localAssign: Assign =>
         var regions = mmm.nodeToRegion(n)
         if (regions.nonEmpty) {
-          if (unwrapExpr(localAssign.rhs).isDefined) {
+          if (unwrapExpr(localAssign.rhs).isDefined) { // checks if it is a memory load
             regions = regions.flatMap(r => findLoadedWithPreDefined(s, r, n))
           }
           s + (localAssign.lhs -> regions.map(r => AddressValue(r)))
@@ -82,24 +87,6 @@ trait ValueSetAnalysis(program: Program,
               Logger.debug(s"Too Complex: ${localAssign}") // do nothing
               s
           }
-//          evaluateExpression(localAssign.rhs, constantProp(n)) match {
-//            case Some(bitVecLiteral: BitVecLiteral) =>
-//              val possibleData = canCoerceIntoDataRegion(bitVecLiteral, 1)
-//                if (possibleData.isDefined) {
-//                  s + (localAssign.lhs -> Set(AddressValue(possibleData.get)))
-//                } else {
-//                  s + (localAssign.lhs -> Set(LiteralValue(bitVecLiteral)))
-//                }
-//            case None =>
-//              val unwrapValue = unwrapExprToVar(localAssign.rhs)
-//              unwrapValue match {
-//                case Some(v: Variable) =>
-//                  s + (localAssign.lhs -> s(v))
-//                case None =>
-//                  Logger.debug(s"Too Complex: ${localAssign.rhs}") // do nothing
-//                  s
-//              }
-//          }
         }
       case memAssign: MemoryAssign =>
         val regions = mmm.nodeToRegion(n)
@@ -111,24 +98,6 @@ trait ValueSetAnalysis(program: Program,
             Logger.debug(s"Too Complex: $memAssign") // do nothing
             s
         }
-//        evaluateExpression(memAssign.value, constantProp(n)) match {
-//          case Some(bitVecLiteral: BitVecLiteral) =>
-//            val possibleData = canCoerceIntoDataRegion(bitVecLiteral, memAssign.size)
-//            if (possibleData.isDefined) {
-//              s ++ regions.map(r => r -> Set(AddressValue(possibleData.get)))
-//            } else {
-//              s ++ regions.map(r => r -> Set(LiteralValue(bitVecLiteral)))
-//            }
-//          case None =>
-//            val unwrapValue = unwrapExprToVar(memAssign.value)
-//            unwrapValue match {
-//              case Some(v: Variable) =>
-//                s ++ regions.map(r => r -> s(v))
-//              case None =>
-//                Logger.debug(s"Too Complex: $memAssign.value") // do nothing
-//                s
-//            }
-//        }
       case _ =>
         s
   }

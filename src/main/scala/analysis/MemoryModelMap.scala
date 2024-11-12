@@ -18,7 +18,7 @@ case class RangeKey(start: BigInt, end: BigInt) extends Ordered[RangeKey]:
   override def toString: String = s"Range[$start, $end] (size: $size)"
 
 // Custom data structure for storing range-to-object mappings
-class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
+class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt], val externalFunctions: Map[BigInt, String], val globalAddresses: Map[BigInt, String], val globalSizes: Map[String, Int]) {
   private val contextStack = mutable.Stack.empty[String]
   private val sharedContextStack = mutable.Stack.empty[List[StackRegion]]
   private val localStacks = mutable.Map[String, List[StackRegion]]().withDefaultValue(List.empty)
@@ -118,7 +118,7 @@ class MemoryModelMap(val globalOffsets: Map[BigInt, BigInt]) {
   // size of pointer is 8 bytes
   private val SIZE_OF_POINTER = 8
 
-  def preLoadGlobals(externalFunctions: Map[BigInt, String], globalAddresses: Map[BigInt, String], globalSizes: Map[String, Int]): Unit = {
+  def preLoadGlobals(): Unit = {
     val relocRegions = globalOffsets.keys.map(offset => DataRegion(nextRelocCount(), offset, SIZE_OF_POINTER))
 
     // map externalFunctions name, value to DataRegion(name, value) and then sort by value
