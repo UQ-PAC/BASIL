@@ -79,13 +79,13 @@ class BasilIRPrettyPrinter() extends BasilIR[BST] {
       procname: String,
       inparams: List[(BST[Variable], BST[Expr])]
   ): BST[DirectCall] = {
-    BST(s"(${outParams.map((l,r) => l).mkString(", ")} := call $procname ${inparams.map((l,r) => r).mkString(", ")})")
+    BST(s"(${outParams.map((l,r) => l).mkString(", ")}) := call $procname (${inparams.map((l,r) => r).mkString(", ")});")
   }
 
 
   override def vindirect(target: BST[Variable]): BST[IndirectCall] = BST(s"indirect_call(${target})")
-  override def vassert(body: BST[Expr]): BST[Assert] = BST(s"assert $body")
-  override def vassume(body: BST[Expr]): BST[Assume] = BST(s"assume $body")
+  override def vassert(body: BST[Expr]): BST[Assert] = BST(s"assert($body)")
+  override def vassume(body: BST[Expr]): BST[Assume] = BST(s"assume($body)")
   override def vnop(): BST[NOP] = BST("nop")
 
   override def vgoto(t: List[String]): BST[GoTo] = BST(s"goto(${t.mkString(", ")})")
@@ -114,7 +114,7 @@ class BasilIRPrettyPrinter() extends BasilIR[BST] {
   override def vrepeat(reps: Int, b: BST[Expr]) = BST(s"repeat($reps, $b)")
   override def vbinary_expr(e: BinOp, l: BST[Expr], r: BST[Expr]): BST[Expr] = {
     val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
-    BST(s"$opn($l $r)")
+    BST(s"$opn($l, $r)")
   }
   override def vunary_expr(e: UnOp, arg: BST[Expr]): BST[Expr] = {
     val opn = e.getClass.getSimpleName.toLowerCase.stripSuffix("$")
@@ -123,8 +123,8 @@ class BasilIRPrettyPrinter() extends BasilIR[BST] {
 
 
   override def vboollit(b: Boolean) = BST(b.toString)
-  override def vintlit(i: BigInt) = BST("%x".format(i))
-  override def vbvlit(i: BitVecLiteral) = BST("%x".format(i.value) + s"bv${i.size}")
+  override def vintlit(i: BigInt) = BST("0x%x".format(i))
+  override def vbvlit(i: BitVecLiteral) = BST("0x%x".format(i.value) + s"bv${i.size}")
   override def vuninterp_function(name: String, args: Seq[BST[Expr]]): BST[Expr] = BST(s"$name(${args.mkString(", ")})")
 
   override def vload(arg: MemoryLoad): BST[Expr] = {

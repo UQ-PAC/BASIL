@@ -4,6 +4,7 @@ import boogie.*
 import specification.*
 import util.{BoogieGeneratorConfig, BoogieMemoryAccessMode, ProcRelyVersion}
 import ir.cilvisitor.*
+import scala.sys.process.*
 
 trait BasilIR[Repr[+_]] extends BasilIRExp[Repr] {
   // def vstmt(s: Statement) : Repr[Statement]
@@ -125,23 +126,10 @@ trait BasilIRExpWithVis[Repr[+_]] extends BasilIRExp[Repr] {
   /** Performs some simple reductions to fit basil IR into SMT2.
     */
 
-  def vprog(mainProc: String, procedures: List[Repr[Procedure]]) : Repr[Program] = ???
-  def vrepeat(reps: Int, value: Repr[Expr]): Repr[Expr] = ???
-  def vzeroextend(bits: Int, b: Repr[Expr]): Repr[Expr] = ???
-  def vsignextend(bits: Int, b: Repr[Expr]): Repr[Expr] = ???
-  def vboollit(b: Boolean): Repr[BoolLit] = ???
-  def vbvlit(b: BitVecLiteral): Repr[BitVecLiteral] = ???
-  def vintlit(b: BigInt): Repr[IntLiteral] = ???
 
   def vexpr(e: Expr): Repr[Expr] = {
     e match {
-      case n: Literal =>
-        n match {
-          case TrueLiteral      => vboollit(true)
-          case FalseLiteral     => vboollit(false)
-          case v: IntLiteral    => vintlit(v.value)
-          case b: BitVecLiteral => vbvlit(b)
-        }
+      case n: Literal => vliteral(n)
       case m @ MemoryLoad(mem, index, endian, size) => vload(m)
       case Extract(ed, start, arg)                  => vextract(ed, start, vexpr(arg))
       case Repeat(repeats, arg) => {
@@ -184,8 +172,30 @@ def list[T](l: Sexp[T]*): Sexp[T] = Sexp.Slist(l.toList)
 
 object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
 
-  def exprUnsat(e: Expr, name: Option[String] = None): String = {
+  def vprog(mainProc: String, procedures: List[Sexp[Procedure]]) : Sexp[Program] = ???
+  def vrepeat(reps: Int, value: Sexp[Expr]): Sexp[Expr] = ???
+  def vzeroextend(bits: Int, b: Sexp[Expr]): Sexp[Expr] = ???
+  def vsignextend(bits: Int, b: Sexp[Expr]): Sexp[Expr] = ???
+  def vboollit(b: Boolean): Sexp[BoolLit] = ???
+  def vbvlit(b: BitVecLiteral): Sexp[BitVecLiteral] = ???
+  def vintlit(b: BigInt): Sexp[IntLiteral] = ???
 
+  /**
+   * Immediately invoke z3 and block until it returns a result.
+   *
+   * Return Some(true) when proven, Some(false) when counterexample found, and None when unknown.
+   */
+  def proveExpr(e: Expr, softTimeoutMillis: Option[Int] = None) : Option[Boolean] = {
+    val query = exprUnsat(e, None, false)
+    val res = util.z3.checkSATSMT2(query, softTimeoutMillis)
+    res match {
+      case util.z3.SatResult.UNSAT => Some(true)
+      case util.z3.SatResult.SAT => Some(false)
+      case util.z3.SatResult.Unknown(_) => None
+    }
+  }
+
+  def exprUnsat(e: Expr, name: Option[String] = None, getModel : Boolean = true): String = {
     val assert = if (name.isDefined) {
       list(sym("assert"), list(sym("!"), BasilIRToSMT2.vexpr(e), sym(":named"), sym(name.get)))
     } else {
@@ -196,11 +206,10 @@ object BasilIRToSMT2 extends BasilIRExpWithVis[Sexp] {
       ++ List(
         assert,
         list(sym("set-option"), sym(":smt.timeout"), sym("1")),
-        list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")),
-        list(sym("check-sat")),
-        list(sym("get-model")),
-        list(sym("pop"))
-      )
+        list(sym("check-sat"))
+      ) 
+      ++ (if (getModel) then List(list(sym("echo"), sym("\"" + name.getOrElse("") + "  ::  " + e + "\"")), list(sym("get-model"))) else List())
+      ++ List(list(sym("pop")))
 
     (terms.map(Sexp.print)).mkString("\n")
   }

@@ -1,5 +1,6 @@
 package ir.eval
 import ir.eval.BitVectorEval
+import ir.cilvisitor.*
 import util.functional.State
 import ir._
 
@@ -149,6 +150,14 @@ trait Loader[S, E] {
   }
 }
 
+def evaluateExpr(exp: Expr): Option[Literal] = {
+  val (e, _) = SimpExpr(fastPartialEvalExpr)(exp)
+  e match {
+    case l: Literal => Some(l)
+    case _          => None
+  }
+}
+
 def fastPartialEvalExpr(exp: Expr): (Expr, Boolean) = {
   /*
    * Ignore substitutions and parital eval
@@ -157,7 +166,8 @@ def fastPartialEvalExpr(exp: Expr): (Expr, Boolean) = {
   var didAnything = true
   val r = exp match {
     case UnaryExpr(op, l: Literal) => logSimp(exp, evalUnOp(op, l))
-    case BinaryExpr(op: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) if exp.getType.isInstanceOf[BitVecType] => logSimp(exp, evalBVBinExpr(op, l, r))
+    case BinaryExpr(op: BVBinOp, l: BitVecLiteral, r: BitVecLiteral) if exp.getType.isInstanceOf[BitVecType] =>
+      logSimp(exp, evalBVBinExpr(op, l, r))
     case BinaryExpr(op: IntBinOp, l: IntLiteral, r: IntLiteral) if exp.getType == IntType =>
       logSimp(exp, IntLiteral(evalIntBinExpr(op, l.value, r.value)))
     case BinaryExpr(op: IntBinOp, l: IntLiteral, r: IntLiteral) if exp.getType == BoolType =>

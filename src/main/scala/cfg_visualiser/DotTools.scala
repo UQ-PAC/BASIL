@@ -11,18 +11,25 @@ object IDGenerator {
   }
 }
 
-def wrap(_input: String, width: Integer = 20): String =
-  var input = _input.replace("\n", "\\l")
+def wrap(_input: String, width: Integer = 20, first : Boolean = true): String =
+  var input = _input
 
   def cannotSplit(c:Char) = {
     c.isLetterOrDigit || ("_$".contains(c))
   }
 
   if (input.length() <= width) {
-    input
+    input.replace("\n", "\\l") + "\\l"
+  } else if ({
+    val index = input.indexOf('\n')
+    index != -1 && index <= width
+    }) {
+    var splitPoint = input.indexOf('\n')
+    val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint + 1))
+    (if (!first) then "    " else "") + line  + "\\l" + wrap(rest, width=width, true)
   } else {
     var splitPoint = width
-    while (cannotSplit(input.charAt(splitPoint)) && splitPoint > width / 2) {
+    while (cannotSplit(input.charAt(splitPoint)) && splitPoint > width / 3) {
       // search backwards for a non alphanumeric charcter to split on
       splitPoint -= 1
     }
@@ -30,8 +37,8 @@ def wrap(_input: String, width: Integer = 20): String =
       // didn't find a character to split on
       splitPoint = width
     }
-    val line = input.substring(0, splitPoint)
-    "\\l    " + line + wrap(input.substring(splitPoint), width)
+    val (line, rest) = (input.substring(0, splitPoint).replace("\n", "\\l"), input.substring(splitPoint))
+    (if (!first) then "    " else "") + line  + "\\l" + wrap(rest, width=width, false)
   }
 
 
@@ -57,7 +64,7 @@ class DotNode(val id: String, val label: String) extends DotElement {
   override def toString: String = toDotString
 
   def toDotString: String =
-    s"\"$id\"" + "[label=\"" + wrap(label, 200) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
+    s"\"$id\"" + "[label=\"" + wrap(label, 100) + "\", shape=\"box\", fontname=\"Mono\", fontsize=\"5\"]"
 
 }
 
