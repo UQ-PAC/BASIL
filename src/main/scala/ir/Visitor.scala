@@ -10,18 +10,26 @@ abstract class Visitor {
 
   def visitStatement(node: Statement): Statement = node.acceptVisit(this)
 
-  def visitAssign(node: Assign): Statement = {
+  def visitLocalAssign(node: LocalAssign): Statement = {
     node.lhs = visitVariable(node.lhs)
     node.rhs = visitExpr(node.rhs)
     node
   }
 
-  def visitMemoryAssign(node: MemoryAssign): Statement = {
+  def visitMemoryStore(node: MemoryStore): Statement = {
     node.mem = visitMemory(node.mem)
     node.index = visitExpr(node.index)
     node.value = visitExpr(node.value)
     node
   }
+
+  def visitMemoryLoad(node: MemoryLoad): Statement = {
+    node.lhs = visitVariable(node.lhs)
+    node.mem = visitMemory(node.mem)
+    node.index = visitExpr(node.index)
+    node
+  }
+
 
   def visitAssume(node: Assume): Statement = {
     node.body = visitExpr(node.body)
@@ -110,10 +118,6 @@ abstract class Visitor {
     node.copy(arg1 = visitExpr(node.arg1), arg2 = visitExpr(node.arg2))
   }
 
-  def visitMemoryLoad(node: MemoryLoad): Expr = {
-    node.copy(mem = visitMemory(node.mem), index = visitExpr(node.index))
-  }
-
   def visitMemory(node: Memory): Memory = node.acceptVisit(this)
 
   def visitStackMemory(node: StackMemory): Memory = node
@@ -166,22 +170,23 @@ abstract class ReadOnlyVisitor extends Visitor {
     node
   }
 
-  override def visitMemoryLoad(node: MemoryLoad): Expr = {
-    visitMemory(node.mem)
-    visitExpr(node.index)
-    node
-  }
-
-  override def visitAssign(node: Assign): Statement = {
+  override def visitLocalAssign(node: LocalAssign): Statement = {
     visitVariable(node.lhs)
     visitExpr(node.rhs)
     node
   }
 
-  override def visitMemoryAssign(node: MemoryAssign): Statement = {
+  override def visitMemoryStore(node: MemoryStore): Statement = {
     visitMemory(node.mem)
     visitExpr(node.index)
     visitExpr(node.value)
+    node
+  }
+
+  override def visitMemoryLoad(node: MemoryLoad): Statement = {
+    visitVariable(node.lhs)
+    visitMemory(node.mem)
+    visitExpr(node.index)
     node
   }
 
@@ -307,17 +312,18 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
   override def visitMemoryLoad(node: MemoryLoad): MemoryLoad = {
     // replace mem with stack in load if index contains stack references
     val loadStackRefs = node.index.variables.intersect(stackRefs)
+
     if (loadStackRefs.nonEmpty) {
-      node.copy(mem = stackMemory)
-    } else {
-      node
+      node.mem = stackMemory
     }
+    if (stackRefs.contains(node.lhs) && node.lhs != stackPointer) {
+      stackRefs.remove(node.lhs)
+    }
+
+    node
   }
 
-  override def visitAssign(node: Assign): Statement = {
-    node.lhs = visitVariable(node.lhs)
-    node.rhs = visitExpr(node.rhs)
-
+  override def visitLocalAssign(node: LocalAssign): Statement = {
     // update stack references
     val variableVisitor = VariablesWithoutStoresLoads()
     variableVisitor.visitExpr(node.rhs)
@@ -331,7 +337,7 @@ class StackSubstituter extends IntraproceduralControlFlowVisitor {
     node
   }
 
-  override def visitMemoryAssign(node: MemoryAssign): Statement = {
+  override def visitMemoryStore(node: MemoryStore): Statement = {
     val indexStackRefs = node.index.variables.intersect(stackRefs)
     if (indexStackRefs.nonEmpty) {
       node.mem = stackMemory
@@ -421,7 +427,7 @@ class ExternalRemover(external: Set[String]) extends Visitor {
   }
 }
 
-/** Gives variables that are not contained within a MemoryStore or MemoryLoad
+/** Gives variables that are not contained within a MemoryStore or the rhs of a MemoryLoad
   * */
 class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
   val variables: mutable.Set[Variable] = mutable.Set()
@@ -437,6 +443,7 @@ class VariablesWithoutStoresLoads extends ReadOnlyVisitor {
   }
 
   override def visitMemoryLoad(node: MemoryLoad): MemoryLoad = {
+    visitVariable(node.lhs)
     node
   }
 

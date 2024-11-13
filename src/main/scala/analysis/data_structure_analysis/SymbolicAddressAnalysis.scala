@@ -89,7 +89,7 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
 
   def edgesOther(n: CFGPosition)(d: DL): Map[DL, EdgeFunction[TwoElement]] =
     n match
-      case Assign(variable, rhs, _) =>
+      case LocalAssign(variable, rhs, _) =>
         val expr = unwrapPaddingAndSlicing(rhs)
         expr match
           case BinaryExpr(op, arg1: Variable, arg2) if op.equals(BVADD) =>
@@ -115,7 +115,7 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
                     case Left(value) if value.accessor == variable => Map()
                     case _ => Map(d -> IdEdge())
               case None => Map(d -> IdEdge())
-          case arg:Variable =>
+          case arg: Variable =>
             d match
               case Left(value) if value.accessor == arg =>
                 val result: Map[DL, EdgeFunction[TwoElement]] = Map(Left(SymbolicAddress(variable, value.symbolicBase, value.offset)) -> ConstEdge(TwoElementTop))
@@ -125,15 +125,15 @@ trait SymbolicAddressFunctions(constProp: Map[CFGPosition, Map[Variable, FlatEle
                   result
               case Left(value) if value.accessor == variable => Map()
               case _ => Map(d -> IdEdge())
-          case _: MemoryLoad =>
-            d match
-              case Left(value) if value.accessor == variable => Map()
-              case Left(_) => Map(d -> IdEdge())
-              case Right(_) => Map(d -> IdEdge(), Left(SymbolicAddress(variable, UnknownLocation(nextunknownCount, IRWalk.procedure(n)), 0)) -> ConstEdge(TwoElementTop))
           case _ =>
             d match
               case Left(value) if value.accessor == variable => Map()
               case _ => Map(d -> IdEdge())
+      case MemoryLoad(lhs, _, _, _, _, _) =>
+        d match
+          case Left(value) if value.accessor == lhs => Map()
+          case Left(_) => Map(d -> IdEdge())
+          case Right(_) => Map(d -> IdEdge(), Left(SymbolicAddress(lhs, UnknownLocation(nextunknownCount, IRWalk.procedure(n)), 0)) -> ConstEdge(TwoElementTop))
       case DirectCall(target, _) if target.name == "malloc" =>
         d match
           case Left(value) if value.accessor == mallocVariable => Map()

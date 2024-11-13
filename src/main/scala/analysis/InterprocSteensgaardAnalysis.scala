@@ -28,10 +28,10 @@ case class RegisterWrapperEqualSets(variable: Variable, assigns: Set[Assign])
  * expression node in the AST. It is implemented using [[analysis.solvers.UnionFindSolver]].
  */
 class InterprocSteensgaardAnalysis(
-      domain: Set[CFGPosition],
-      mmm: MemoryModelMap,
-      reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-      vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]) extends Analysis[Any] {
+                                    domain: Set[CFGPosition],
+                                    mmm: MemoryModelMap,
+                                    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+                                    vsaResult: Map[CFGPosition, LiftedElement[Map[Variable | MemoryRegion, Set[Value]]]]) extends Analysis[Any] {
 
   val solver: UnionFindSolver[StTerm] = UnionFindSolver()
 
@@ -80,7 +80,8 @@ class InterprocSteensgaardAnalysis(
         val alloc = mmm.nodeToRegion(directCall).head
         val defs = getDefinition(mallocVariable, directCall, reachingDefs)
         unify(IdentifierVariable(RegisterWrapperEqualSets(mallocVariable, defs)), PointerRef(AllocVariable(alloc)))
-      case assign: Assign =>
+      case assign: LocalAssign =>
+        // TODO: unsound
         val unwrapped = unwrapExprToVar(assign.rhs)
         if (unwrapped.isDefined) {
           // X1 = X2: [[X1]] = [[X2]]
@@ -97,11 +98,11 @@ class InterprocSteensgaardAnalysis(
           }
           unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, assign, reachingDefs))), alpha)
         }
-      case memoryAssign: MemoryAssign =>
+      case memoryStore: MemoryStore =>
         // *X1 = X2: [[X1]] = ↑a ^ [[X2]] = a where a is a fresh term variable
         val X1_star = mmm.nodeToRegion(node)
-        // TODO: This is risky as it tries to coerce every value to a region (needed for functionpointer example)
-        val unwrapped = unwrapExprToVar(memoryAssign.value)
+        // TODO: This is not sound
+        val unwrapped = unwrapExprToVar(memoryStore.value)
         if (unwrapped.isDefined) {
           val X2 = unwrapped.get
           val X2_regions: Set[MemoryRegion] = vsaApproximation(X2, node)
@@ -115,6 +116,25 @@ class InterprocSteensgaardAnalysis(
             unify(ExpressionVariable(x), alpha)
           }
         }
+      case memoryLoad: MemoryLoad =>
+        // TODO: unsound
+        val unwrapped = unwrapExprToVar(memoryLoad.index)
+        if (unwrapped.isDefined) {
+          // X1 = X2: [[X1]] = [[X2]]
+          val X1 = memoryLoad.lhs
+          val X2 = unwrapped.get
+          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, memoryLoad, reachingDefs))), IdentifierVariable(RegisterWrapperEqualSets(X2, getUse(X2, memoryLoad, reachingDefs))))
+        } else {
+          // X1 = *X2: [[X2]] = ↑a ^ [[X1]] = a where a is a fresh term variable
+          val X1 = memoryLoad.lhs
+          val X2_star = mmm.nodeToRegion(node)
+          val alpha = FreshVariable()
+          X2_star.foreach { x =>
+            unify(PointerRef(alpha), ExpressionVariable(x))
+          }
+          unify(IdentifierVariable(RegisterWrapperEqualSets(X1, getDefinition(X1, memoryLoad, reachingDefs))), alpha)
+        }
+
       case _ => // do nothing TODO: Maybe LocalVar too?
     }
   }

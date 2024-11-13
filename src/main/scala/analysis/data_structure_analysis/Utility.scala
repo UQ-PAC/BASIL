@@ -246,7 +246,6 @@ def unwrapPaddingAndSlicing(expr: Expr): Expr =
     case SignExtend(extension, body) => SignExtend(extension, unwrapPaddingAndSlicing(body))
     case UnaryExpr(op, arg) => UnaryExpr(op, arg)
     case BinaryExpr(op, arg1, arg2) => BinaryExpr(op, unwrapPaddingAndSlicing(arg1), unwrapPaddingAndSlicing(arg2))
-    case MemoryLoad(mem, index, endian, size) => MemoryLoad(mem, unwrapPaddingAndSlicing(index), endian, size)
     case variable: Variable => variable
     case Extract(_, _, body) /*if start == 0 && end == 32*/ => unwrapPaddingAndSlicing(body) // this may make it unsound
     case ZeroExtend(_, body) => unwrapPaddingAndSlicing(body)

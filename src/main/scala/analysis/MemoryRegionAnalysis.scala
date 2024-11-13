@@ -1,6 +1,6 @@
 package analysis
 
-import analysis.BitVectorEval.isNegative
+import analysis.BitVectorEval.bv2SignedInt
 import analysis.solvers.SimpleWorklistFixpointSolver
 import ir.*
 import util.Logger
@@ -62,7 +62,7 @@ trait MemoryRegionAnalysis(val program: Program,
     Logger.debug("Stack detection")
     Logger.debug(spList)
     stmt match {
-      case assign: Assign =>
+      case assign: LocalAssign =>
         if (spList.contains(assign.rhs)) {
           // add lhs to spList
           spList.addOne(assign.lhs)
@@ -104,10 +104,11 @@ trait MemoryRegionAnalysis(val program: Program,
         evaluateExpression(binExpr.arg2, constantProp(n)) match {
           case Some(b: BitVecLiteral) =>
             val ctx = getUse(variable, n, reachingDefs)
-            for {
-              i <- ctx
-              stackRegion <- eval(i.rhs, Set.empty, i, subAccess)
-            } yield {
+            val stackRegions = ctx.flatMap {
+              case l: LocalAssign => eval(l.rhs, l, subAccess)
+              case m: MemoryLoad => eval(m.index, m, m.size)
+            }
+            for (stackRegion <- stackRegions) yield {
               val nextOffset = bitVectorOpToBigIntOp(binExpr.op, stackRegion.start, b.value)
               poolMaster(nextOffset, IRWalk.procedure(n), subAccess)
             }
@@ -115,7 +116,7 @@ trait MemoryRegionAnalysis(val program: Program,
             Set()
         }
       case _ =>
-        eval(binExpr, Set.empty, n, subAccess)
+        eval(binExpr, n, subAccess)
     }
     reducedRegions
   }
@@ -126,7 +127,10 @@ trait MemoryRegionAnalysis(val program: Program,
     // TODO: nicer way to deal with loops (a variable is being incremented in a loop)
     val regions = ctx.flatMap { i =>
       if (i != n) {
-        eval(i.rhs, Set.empty, i, subAccess)
+        i match {
+          case l: LocalAssign => eval(l.rhs, l, subAccess)
+          case m: MemoryLoad => eval(m.index, m, m.size)
+        }
       } else {
         Set()
       }
@@ -134,7 +138,7 @@ trait MemoryRegionAnalysis(val program: Program,
     regions
   }
 
-  def eval(exp: Expr, env: Set[StackRegion], n: Command, subAccess: BigInt): Set[StackRegion] = {
+  def eval(exp: Expr, n: Command, subAccess: BigInt): Set[StackRegion] = {
     if (graResult(n).nonEmpty) {
       Set.empty // skip global memory regions
     } else {
@@ -143,7 +147,7 @@ trait MemoryRegionAnalysis(val program: Program,
           if (spList.contains(binOp.arg1)) {
             evaluateExpression(binOp.arg2, constantProp(n)) match {
               case Some(b: BitVecLiteral) =>
-                val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
+                val negB = bv2SignedInt(b)
                 Set(poolMaster(negB, IRWalk.procedure(n), subAccess))
               case None => Set.empty
             }
@@ -161,12 +165,10 @@ trait MemoryRegionAnalysis(val program: Program,
         case variable: Variable =>
           evaluateExpression(variable, constantProp(n)) match {
             case Some(b: BitVecLiteral) =>
-              eval(b, env, n, subAccess)
+              eval(b, n, subAccess)
             case _ =>
               reducibleVariable(variable, n, subAccess)
           }
-        case memoryLoad: MemoryLoad =>
-          eval(memoryLoad.index, env, n, memoryLoad.size)
         // ignore case where it could be a global region (loaded later in MMM from relf)
         case _: BitVecLiteral =>
           Set.empty
@@ -202,7 +204,7 @@ trait MemoryRegionAnalysis(val program: Program,
       if (directCall.target.name == "malloc") {
         evaluateExpression(mallocVariable, constantProp(n)) match {
           case Some(b: BitVecLiteral) =>
-            val negB = if isNegative(b) then b.value - BigInt(2).pow(b.size) else b.value
+            val negB = bv2SignedInt(b)
             val (name, start) = nextMallocCount(negB)
             val newHeapRegion = HeapRegion(name, start, negB, IRWalk.procedure(n))
             addReturnHeap(directCall, newHeapRegion)
@@ -218,25 +220,18 @@ trait MemoryRegionAnalysis(val program: Program,
       } else {
         s
       }
-    case memAssign: MemoryAssign =>
-      val result = eval(memAssign.index, s, memAssign, memAssign.size)
+    case memAssign: MemoryStore =>
+      val result = eval(memAssign.index, memAssign, memAssign.size)
 //          if (result.size > 1) {
 //            //throw new Exception(s"Memory load resulted in multiple regions ${result} for mem load $memoryLoad")
 //            addMergableRegions(result)
 //          }
       result
-    case assign: Assign =>
+    case assign: LocalAssign =>
       stackDetection(assign)
-      val unwrapped = unwrapExpr(assign.rhs)
-      if (unwrapped.isDefined) {
-        eval(unwrapped.get.index, s, assign, unwrapped.get.size)
-        //            if (result.size > 1) {
-        //              //throw new Exception(s"Memory load resulted in multiple regions ${result} for mem load $memoryLoad")
-        //              addMergableRegions(result)
-        //            }
-      } else {
-        Set()
-      }
+      Set()
+    case load: MemoryLoad =>
+      eval(load.index, load, load.size)
     case _ => s
   }
 
@@ -244,17 +239,17 @@ trait MemoryRegionAnalysis(val program: Program,
 }
 
 class MemoryRegionAnalysisSolver(
-    program: Program,
-    domain: Set[CFGPosition],
-    globals: Map[BigInt, String],
-    globalOffsets: Map[BigInt, BigInt],
-    subroutines: Map[BigInt, String],
-    constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
-    ANRResult: Map[CFGPosition, Set[Variable]],
-    RNAResult: Map[CFGPosition, Set[Variable]],
-    reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
-    graResult: Map[CFGPosition, Set[DataRegion]],
-    mmm: MemoryModelMap
+                                  program: Program,
+                                  domain: Set[CFGPosition],
+                                  globals: Map[BigInt, String],
+                                  globalOffsets: Map[BigInt, BigInt],
+                                  subroutines: Map[BigInt, String],
+                                  constantProp: Map[CFGPosition, Map[Variable, FlatElement[BitVecLiteral]]],
+                                  ANRResult: Map[CFGPosition, Set[Variable]],
+                                  RNAResult: Map[CFGPosition, Set[Variable]],
+                                  reachingDefs: Map[CFGPosition, (Map[Variable, Set[Assign]], Map[Variable, Set[Assign]])],
+                                  graResult: Map[CFGPosition, Set[DataRegion]],
+                                  mmm: MemoryModelMap
   ) extends MemoryRegionAnalysis(program, domain, globals, globalOffsets, subroutines, constantProp, ANRResult, RNAResult, reachingDefs, graResult, mmm)
   with IRIntraproceduralForwardDependencies
   with Analysis[Map[CFGPosition, Set[StackRegion]]]

@@ -246,15 +246,15 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   test("internal merge") {
     // this is an internal merge (two cells of the same node overlap and are merged together)
     val mem = SharedMemory("mem", 64, 8)
-    val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
-    val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
+    val locAssign1 = LocalAssign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
+    val locAssign2 = LocalAssign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
     val program = prog(
       proc("main",
         block("operations",
           locAssign1, // R6 = R0 + 4
           locAssign2, // R7 = R0 + 5
-          MemoryAssign(mem, R7, R1, Endian.BigEndian, 64, Some("00003")), // *R7 = R1, (*R6 + 1) = R1
-          MemoryAssign(mem, R6, R2, Endian.BigEndian, 64, Some("00004")), // *R6 = R2
+          MemoryStore(mem, R7, R1, Endian.BigEndian, 64, Some("00003")), // *R7 = R1, (*R6 + 1) = R1
+          MemoryStore(mem, R6, R2, Endian.BigEndian, 64, Some("00004")), // *R6 = R2
           ret
         )
       )
@@ -282,17 +282,17 @@ class DataStructureAnalysisTest extends AnyFunSuite {
 
   test("offsetting from middle of cell to a new cell") {
     val mem = SharedMemory("mem", 64, 8)
-    val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
-    val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
-    val locAssign3 = Assign(R5, BinaryExpr(BVADD, R7,  BitVecLiteral(8, 64)), Some("00005"))
+    val locAssign1 = LocalAssign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
+    val locAssign2 = LocalAssign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
+    val locAssign3 = LocalAssign(R5, BinaryExpr(BVADD, R7,  BitVecLiteral(8, 64)), Some("00005"))
 
     val program = prog(
       proc("main",
         block("operations",
           locAssign1, // R6 = R0 + 4
           locAssign2, // R7 = R0 + 5
-          MemoryAssign(mem, R7, R1, Endian.BigEndian, 64, Some("00003")),
-          MemoryAssign(mem, R6, R2, Endian.BigEndian, 64, Some("00004")),
+          MemoryStore(mem, R7, R1, Endian.BigEndian, 64, Some("00003")),
+          MemoryStore(mem, R6, R2, Endian.BigEndian, 64, Some("00004")),
           locAssign3, // R5 = R7 + 8
           ret
         )
@@ -309,17 +309,17 @@ class DataStructureAnalysisTest extends AnyFunSuite {
     // similar to above except instead of creating new cell the last assign
     // points R5's cell at an internal offset of 8
     val mem = SharedMemory("mem", 64, 8)
-    val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
-    val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
-    val locAssign3 = Assign(R5, BinaryExpr(BVADD, R7, BitVecLiteral(7, 64)), Some("00005"))
+    val locAssign1 = LocalAssign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
+    val locAssign2 = LocalAssign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
+    val locAssign3 = LocalAssign(R5, BinaryExpr(BVADD, R7, BitVecLiteral(7, 64)), Some("00005"))
 
     val program = prog(
       proc("main",
         block("operations",
           locAssign1,
           locAssign2,
-          MemoryAssign(mem, R7, R1, Endian.BigEndian, 64, Some("00003")),
-          MemoryAssign(mem,  R6, R2, Endian.BigEndian, 64, Some("00004")),
+          MemoryStore(mem, R7, R1, Endian.BigEndian, 64, Some("00003")),
+          MemoryStore(mem,  R6, R2, Endian.BigEndian, 64, Some("00004")),
           locAssign3,
           ret
         )
@@ -341,9 +341,9 @@ class DataStructureAnalysisTest extends AnyFunSuite {
   test("internal offset transfer") {
     // this is a test to check assignments transfer internal offset of slices.
     val mem = SharedMemory("mem", 64, 8)
-    val locAssign1 = Assign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
-    val locAssign2 = Assign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
-    val locAssign3 = Assign(R5, R7, Some("00005"))
+    val locAssign1 = LocalAssign(R6, BinaryExpr(BVADD, R0, BitVecLiteral(4, 64)), Some("00001"))
+    val locAssign2 = LocalAssign(R7, BinaryExpr(BVADD, R0, BitVecLiteral(5, 64)), Some("00002"))
+    val locAssign3 = LocalAssign(R5, R7, Some("00005"))
 
     val program = prog(
       proc("main",
@@ -351,8 +351,8 @@ class DataStructureAnalysisTest extends AnyFunSuite {
           //          Assign(R0, MemoryLoad(mem, R0, BigEndian, 0), Some("00000")),
           locAssign1,
           locAssign2,
-          MemoryAssign(mem, R7, R1, Endian.BigEndian, 64, Some("00003")),
-          MemoryAssign(mem, R6, R2, Endian.BigEndian, 64, Some("00004")),
+          MemoryStore(mem, R7, R1, Endian.BigEndian, 64, Some("00003")),
+          MemoryStore(mem, R6, R2, Endian.BigEndian, 64, Some("00004")),
           locAssign3,
           ret
         )

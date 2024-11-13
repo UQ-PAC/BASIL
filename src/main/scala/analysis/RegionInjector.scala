@@ -15,7 +15,6 @@ class MergedRegion(var name: String, val subregions: mutable.Set[MemoryRegion])
 
 class RegionInjector(program: Program, mmm: MemoryModelMap) {
   private val accessToRegion = mutable.Map[Statement, Set[MemoryRegion]]()
-  private val loadToMemory = mutable.Map[Statement, Memory]()
   val mergedRegions: mutable.Map[MemoryRegion, MergedRegion] = mutable.Map()
 
   def nodeVisitor(): Unit = {
@@ -87,13 +86,13 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
         val mergedRegion = mergedRegions(regionsHead)
 
         access match {
-          case store: MemoryAssign =>
+          case store: MemoryStore =>
             val newMemory = replaceMemory(store.mem, regionsHead, mergedRegion)
             store.mem = newMemory
+          case load: MemoryLoad =>
+            val newMemory = replaceMemory(load.mem, regionsHead, mergedRegion)
+            load.mem = newMemory
           case _ =>
-            val newMemory = replaceMemory(loadToMemory(access), regionsHead, mergedRegion)
-            val renamer = RegionRenamer(newMemory)
-            renamer.visitStatement(access)
         }
       }
 
@@ -115,43 +114,13 @@ class RegionInjector(program: Program, mmm: MemoryModelMap) {
     mmm.getStack(n) ++ mmm.getData(n)
   }
 
-  def visitExpr(expr: Expr, cmd: Statement): Unit = {
-    expr match {
-      case Extract(_, _, body) =>
-        visitExpr(body, cmd)
-      case UninterpretedFunction(_, params, _) =>
-        params.foreach {
-          p => visitExpr(p, cmd)
-        }
-      case Repeat(_, body) =>
-        visitExpr(body, cmd)
-      case ZeroExtend(_, body) =>
-        visitExpr(body, cmd)
-      case SignExtend(_, body) =>
-        visitExpr(body, cmd)
-      case UnaryExpr(_, arg) =>
-        visitExpr(arg, cmd)
-      case BinaryExpr(_, arg1, arg2) =>
-        visitExpr(arg1, cmd)
-        visitExpr(arg2, cmd)
-      case m: MemoryLoad =>
-        val regions = statementToRegions(cmd)
-        accessToRegion(cmd) = regions
-        loadToMemory(cmd) = m.mem
-      case _ =>
-    }
-  }
-
   def visitStatement(n: Statement): Unit = n match {
-    case assign: Assign =>
-      visitExpr(assign.rhs, assign)
-    case m: MemoryAssign =>
+    case m: MemoryStore =>
       val regions = statementToRegions(m)
       accessToRegion(m) = regions
-    case assert: Assert =>
-      visitExpr(assert.body, assert)
-    case assume: Assume =>
-      visitExpr(assume.body, assume)
+    case m: MemoryLoad =>
+      val regions = statementToRegions(n)
+      accessToRegion(n) = regions
     case _ => // ignore other kinds of nodes
   }
 

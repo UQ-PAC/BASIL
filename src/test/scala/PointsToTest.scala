@@ -30,11 +30,11 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     var program: Program = prog(
       proc("main",
         block("0x0",
-          Assign(R6, R31),
+          LocalAssign(R6, R31),
           goto("0x1")
         ),
         block("0x1",
-          MemoryAssign(mem, BinaryExpr(BVADD, R6, bv64(4)), bv64(10), LittleEndian, 64),
+          MemoryStore(mem, BinaryExpr(BVADD, R6, bv64(4)), bv64(10), LittleEndian, 64),
           goto("returntarget")
         ),
         block("returntarget",
@@ -60,8 +60,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     var program: Program = prog(
       proc("main",
         block("0x0",
-          Assign(R1, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64)),
-          Assign(R3, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(4)), LittleEndian, 64)),
+          MemoryLoad(R1, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
+          MemoryLoad(R3, mem, BinaryExpr(BVADD, R31, bv64(4)), LittleEndian, 64),
           goto("0x1")
         ),
         block("0x1",
@@ -135,8 +135,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     val program: Program = prog(
       proc("main",
         block("0x0",
-          Assign(R0, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64)),
-          Assign(R1, BinaryExpr(BVADD, R31, bv64(10))),
+          MemoryLoad(R0, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
+          LocalAssign(R1, BinaryExpr(BVADD, R31, bv64(10))),
           goto("0x1")
         ),
         block("0x1",
@@ -148,8 +148,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
       ),
       proc("p2",
         block("l_p2",
-          Assign(R3, R0),
-          Assign(R2, MemoryLoad(mem, R1, LittleEndian, 64)),
+          LocalAssign(R3, R0),
+          MemoryLoad(R2, mem, R1, LittleEndian, 64),
           goto("l_p2_1"),
         ),
         block("l_p2_1",
@@ -184,8 +184,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
     val program: Program = prog(
       proc("main",
         block("0x0",
-          Assign(R0, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64)),
-          Assign(R1, BinaryExpr(BVADD, R31, bv64(10))),
+          MemoryLoad(R0, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
+          LocalAssign(R1, BinaryExpr(BVADD, R31, bv64(10))),
           goto("0x1")
         ),
         block("0x1",
@@ -197,8 +197,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
       ),
       proc("foo",
         block("l_foo",
-          Assign(R0, MemoryLoad(mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64)),
-          Assign(R1, BinaryExpr(BVADD, R31, bv64(10))),
+          MemoryLoad(R0, mem, BinaryExpr(BVADD, R31, bv64(6)), LittleEndian, 64),
+          LocalAssign(R1, BinaryExpr(BVADD, R31, bv64(10))),
           directCall("p2"), goto("l_foo_1")
         ),
         block("l_foo_1",
@@ -207,8 +207,8 @@ class PointsToTest extends AnyFunSuite with OneInstancePerTest {
       ),
       proc("p2",
         block("l_p2",
-          Assign(R3, R0),
-          Assign(R2, MemoryLoad(mem, R1, LittleEndian, 64)),
+          LocalAssign(R3, R0),
+          MemoryLoad(R2, mem, R1, LittleEndian, 64),
           goto("l_p2_1"),
         ),
         block("l_p2_1",
