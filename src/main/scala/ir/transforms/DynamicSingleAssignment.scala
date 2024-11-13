@@ -281,11 +281,19 @@ class OnePassDSA(
   def applyTransform(p: Procedure): Unit = {
     val _st = mutable.Map[Block, BlockState]()
     // ensure order is defined
-    p.entryBlock.map(reversePostOrder)
+    reversePostOrder(p)
 
     val (liveBeforeIn, liveAfterIn) = liveVarsSolver.solveProc(p, backwards = true)
     val liveBefore = mutable.Map.from(liveBeforeIn)
     val liveAfter = mutable.Map.from(liveAfterIn)
+
+    for (b <- p.blocks.filterNot(liveBeforeIn.contains)) {
+      liveBefore(b) = liveVarsDom.bot
+    }
+    for (b <- p.blocks.filterNot(liveAfterIn.contains)) {
+      liveAfter(b) = liveVarsDom.bot
+    }
+
 
     val worklist = mutable.PriorityQueue[Block]()(Ordering.by(b => b.rpoOrder))
     worklist.addAll(p.blocks)
@@ -302,7 +310,7 @@ class OnePassDSA(
     }
 
     // fix up rpo index of added phi blocks
-    p.entryBlock.map(reversePostOrder)
+    reversePostOrder(p)
   }
 
 }
@@ -360,7 +368,7 @@ def rdDSAProperty(p: Procedure): Boolean = {
 
     override def vrvar(v: Variable) = {
       val allDefs = defs.get(v).toSet.flatten
-      val reachDefs = reachingDefs(stmt).get(v).toSet.flatten
+      val reachDefs = reachingDefs.get(stmt).flatMap(_.get(v)).toSet.flatten
 
       val check = allDefs == reachDefs
       if (!check) {

@@ -382,7 +382,7 @@ class Renamer(reserved: Set[String]) extends Visitor {
 
   override def visitProcedure(node: Procedure): Procedure = {
     if (reserved.contains(node.name)) {
-      node.name = s"#${node.name}"
+      node.procName = s"#${node.name}"
     }
     super.visitProcedure(node)
   }

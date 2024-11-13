@@ -493,8 +493,20 @@ def doCopyPropTransform(p: Program) = {
 
 }
 
-def reversePostOrder(startBlock: Block): Unit = {
-  var count = 0
+
+def reversePostOrder(p: Procedure) : Unit = {
+  /* Procedures may contain disconnected sets of blocks so we arbitrarily order these with respect to eachother. */
+  for (b <- p.blocks) {
+    b.rpoOrder = -1
+  }
+  var left = p.entryBlock.map(reversePostOrder(_)).getOrElse(0) + 1
+  for (b <- p.blocks.filter(_.rpoOrder == -1)) {
+     left = reversePostOrder(b, true, left) + 1
+  }
+}
+
+def reversePostOrder(startBlock: Block, fixup: Boolean = false, begin : Int = 0): Int = {
+  var count = begin
   val seen = mutable.HashSet[Block]()
   val vcs = mutable.HashMap[Block, Int]()
 
@@ -505,16 +517,19 @@ def reversePostOrder(startBlock: Block): Unit = {
         walk(s)
       }
     }
-    b.rpoOrder = count
+    if (!fixup || b.rpoOrder < count) {
+      b.rpoOrder = count
+    }
     count += 1
   }
 
   walk(startBlock)
+  count
 }
 
 def applyRPO(p: Program) = {
   for (proc <- p.procedures) {
-    proc.entryBlock.map(eb => reversePostOrder(eb))
+    reversePostOrder(proc)
   }
 }
 

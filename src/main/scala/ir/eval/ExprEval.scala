@@ -41,7 +41,7 @@ def evalBVBinExpr(b: BVBinOp, l: BitVecLiteral, r: BitVecLiteral): BitVecLiteral
 
 def evalBVLogBinExpr(b: BVBinOp, l: BitVecLiteral, r: BitVecLiteral): Boolean = b match {
   case BVULE => BitVectorEval.smt_bvule(l, r)
-  case BVUGT => BitVectorEval.smt_bvult(l, r)
+  case BVUGT => BitVectorEval.smt_bvugt(l, r)
   case BVUGE => BitVectorEval.smt_bvuge(l, r)
   case BVULT => BitVectorEval.smt_bvult(l, r)
   case BVSLT => BitVectorEval.smt_bvslt(l, r)

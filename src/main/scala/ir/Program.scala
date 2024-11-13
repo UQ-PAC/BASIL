@@ -176,7 +176,7 @@ class ProgramThread(val entry: Procedure,
 */
 
 class Procedure private (
-                  var name: String,
+                  var procName: String,
                   var address: Option[BigInt],
                   private var _entryBlock: Option[Block],
                   private var _returnBlock: Option[Block],
@@ -188,6 +188,9 @@ class Procedure private (
                   var requires: List[BExpr],
                   var ensures: List[BExpr],
                 ) extends Iterable[CFGPosition] {
+
+  def name = procName + address.map("_" + _).getOrElse("") 
+
   private val _callers = mutable.HashSet[DirectCall]()
   _blocks.foreach(_.parent = this)
   // class invariant

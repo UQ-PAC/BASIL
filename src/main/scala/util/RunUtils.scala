@@ -227,12 +227,7 @@ object IRTransform {
       s"[!] Removed ${before - ctx.program.procedures.size} functions (${ctx.program.procedures.size} remaining)"
     )
     val dupProcNames = (ctx.program.procedures.groupBy(_.name).filter((n,p) => p.size > 1)).toList.flatMap(_._2)
-
-    var dupCounter = 0 
-    for (p <- dupProcNames) {
-      dupCounter += 1
-      p.name = p.name + "$" + p.address.map(_.toString).getOrElse(dupCounter.toString)
-    }
+    assert(dupProcNames.isEmpty)
 
     val stackIdentification = StackSubstituter()
     stackIdentification.visitProgram(ctx.program)
@@ -532,7 +527,7 @@ object RunUtils {
     // writeToFile(dotBlockGraph(ctx.program, ctx.program.filter(_.isInstanceOf[Block]).map(b => b -> b.toString).toMap), s"blockgraph-before-simp.dot")
     Logger.info("[!] Running Simplify")
     val timer = PerformanceTimer("Simplify")
-    val write = true
+    val write = false
 
     transforms.applyRPO(ctx.program)
 
@@ -573,7 +568,7 @@ object RunUtils {
     // brute force run the analysis twice because it cleans up more stuff
     //assert(ctx.program.procedures.forall(transforms.rdDSAProperty))
     transforms.doCopyPropTransform(ctx.program)
-    if write then writeToFile(dotBlockGraph(ctx.program), s"blockgraph-after-simp.dot")
+    if write then writeToFile(dotBlockGraph(ctx.program.mainProcedure), s"blockgraph-after-simp.dot")
 
     // assert(ctx.program.procedures.forall(transforms.rdDSAProperty))
 
@@ -598,9 +593,9 @@ object RunUtils {
     // re-apply dsa
     // transforms.OnePassDSA().applyTransform(ctx.program)
 
-    if (write) {
-      writeToFile(translating.BasilIRPrettyPrinter()(ctx.program), "prettyprinted.il")
-    }
+    Logger.info("writing")
+
+    if write then writeToFile(translating.BasilIRPrettyPrinter()(ctx.program), "prettyprinted.il")
 
     if (ir.eval.SimplifyValidation.validate) {
       Logger.info("[!] Simplify :: Writing simplification validation")

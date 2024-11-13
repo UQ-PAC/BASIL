@@ -266,7 +266,7 @@ class SemanticsLoader(parserMap: immutable.Map[String, Array[Array[StmtContext]]
             case b: BinaryExpr if b.op == BVEQ => Some(BinaryExpr(BVCOMP, b.arg1, b.arg2))
             case FalseLiteral   => Some(BitVecLiteral(0, 1))
             case TrueLiteral => Some(BitVecLiteral(1, 1))
-            case _ => throw Exception(s"unhandled conversion from bool to bitvector: ${ctx.getText}")
+            case o => Some(UnaryExpr(BoolToBV1, o))
           }
         } else {
           None

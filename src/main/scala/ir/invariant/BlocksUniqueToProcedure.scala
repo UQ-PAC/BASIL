@@ -61,7 +61,7 @@ def blocksUniqueToEachProcedure(p: Program) : Boolean = {
   val v = BVis()
   visit_prog(v, p)
   for (g <- v.gotoViolations) {
-    Logger.error(s"$g has target outside parent block")
+    Logger.error(s"$g has target outside parent procedure ${g.parent.parent.name}")
   }
 
   for (b <- v.blockMultiProcViolations) {
